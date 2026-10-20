@@ -7,11 +7,22 @@ Reads and writes raw 32-bit float stereo at 44.1 kHz (the site's ffmpeg makes
 and reads them), so it needs nothing but onnxruntime and numpy, which the
 installer unpacks into --lib. Says "progress DONE TOTAL" after each chunk.
 
-    separate.py --lib DIR --model FILE [--threads N] IN.f32 REST.f32 VOICES.f32
-    separate.py --lib DIR --model FILE --check
+With --isolator (a speech-isolation program, DeepFilterNet's deep-filter) and
+a fourth path, it also splits the voices once more: the main, close speaker,
+whom the dub replaces, and the voices further back (children reciting, a
+crowd, chanting), which the dub keeps. The program gives the main speaker;
+the voices further back are the voices where the main speaker does not
+dominate, frequency by frequency (a soft mask), so hardly anything of the
+main speaker is left in them.
+
+    separate.py --lib DIR --model FILE [--threads N] [--isolator FILE --ffmpeg FILE] IN.f32 REST.f32 VOICES.f32 [BACKGROUND_VOICES.f32]
+    separate.py --lib DIR --model FILE [--isolator FILE --ffmpeg FILE] --check
 """
 import argparse
+import os
+import subprocess
 import sys
+import tempfile
 import time
 
 
@@ -21,6 +32,11 @@ def main():
     parser.add_argument('--model', required=True)
     parser.add_argument('--threads', type=int, default=2)
     parser.add_argument('--check', action='store_true')
+    parser.add_argument('--isolator', default='')
+    parser.add_argument('--ffmpeg', default='ffmpeg')
+    # How strongly the main speaker's moments are kept out of the voices further back: measured on a narrator
+    # over background voices, 16 leaves him 27-31 dB down and keeps 52-61% of them (4: 26-29 dB, 57-68%; 64: 28-32 dB, 47-54%).
+    parser.add_argument('--mask-strength', type=float, default=16.0)
     parser.add_argument('paths', nargs='*')
     args = parser.parse_args()
     sys.path.insert(0, args.lib)
@@ -73,11 +89,13 @@ def main():
     session = ort.InferenceSession(args.model, options, providers=['CPUExecutionProvider'])
     name = session.get_inputs()[0].name
 
+    extra_steps = 2 if args.isolator and len(args.paths) > 3 else 0
+
     def background(mix, report=False):
         n = mix.shape[1]
         pad = gen - n % gen
         padded = np.concatenate([np.zeros((2, trim), np.float32), mix, np.zeros((2, pad + trim), np.float32)], 1)
-        total = (n + pad + gen - 1) // gen
+        total = (n + pad + gen - 1) // gen + extra_steps
         out = []
         i = 0
         while i < n + pad:
@@ -93,19 +111,79 @@ def main():
                 print('progress %d %d' % (len(out), total), flush=True)
         return np.concatenate(out, 1)[:, :n] * compensate
 
+    def ffmpeg(cmd, data=None):
+        return subprocess.run([args.ffmpeg, '-v', 'error', '-y'] + cmd, input=data, capture_output=True, check=True).stdout
+
+    def main_speaker(voices, work):
+        """The close, main speaker in the voices, from the isolation program (it works at 48 kHz)."""
+        wav = os.path.join(work, 'voices.wav')
+        ffmpeg(['-f', 'f32le', '-ar', str(sr), '-ac', '2', '-i', '-', '-ar', '48000', '-c:a', 'pcm_s16le', wav], voices.T.astype(np.float32).tobytes())
+        done = subprocess.run([args.isolator, '-D', '-o', os.path.join(work, 'out'), wav], capture_output=True)
+        if done.returncode != 0:
+            raise RuntimeError(done.stderr.decode(errors='replace')[-300:])
+        raw = ffmpeg(['-i', os.path.join(work, 'out', 'voices.wav'), '-f', 'f32le', '-ar', str(sr), '-ac', '2', '-'])
+        speaker = np.frombuffer(raw, dtype=np.float32).reshape(-1, 2).T
+        out = np.zeros_like(voices)
+        n = min(out.shape[1], speaker.shape[1])
+        out[:, :n] = speaker[:, :n]
+        return out
+
+    def voices_further_back(voices, speaker, strength):
+        """The voices where the main speaker does not dominate: a soft mask, frame by frame, in batches."""
+        size, step = 2048, 512
+        win = np.hanning(size + 1)[:-1].astype(np.float32)
+        n = voices.shape[1]
+        pad = size // 2
+        v = np.pad(voices, ((0, 0), (pad, pad + size)))
+        f = np.pad(speaker, ((0, 0), (pad, pad + size)))
+        frames = 1 + (n + pad) // step
+        out = np.zeros((2, v.shape[1]), dtype=np.float32)
+        norm = np.zeros(v.shape[1], dtype=np.float32)
+        for first in range(0, frames, 256):
+            idx = np.arange(size)[None, :] + step * np.arange(first, min(frames, first + 256))[:, None]
+            V = np.fft.rfft(v[:, idx] * win, axis=-1)
+            F = np.fft.rfft(f[:, idx] * win, axis=-1)
+            rest = np.abs(V - F) ** 2
+            mask = rest / (rest + strength * np.abs(F) ** 2 + 1e-12)
+            y = np.fft.irfft(V * mask, n=size, axis=-1).astype(np.float32) * win
+            for k, start in enumerate(idx[:, 0]):
+                out[:, start:start + size] += y[:, k]
+                norm[start:start + size] += win ** 2
+        out /= np.maximum(norm, 1e-8)
+        return out[:, pad:pad + n]
+
     if args.check:
         background(np.zeros((2, sr), dtype=np.float32))
+        if args.isolator:
+            with tempfile.TemporaryDirectory() as work:
+                tone = (0.1 * np.sin(2 * np.pi * 220 * np.arange(sr) / sr)).astype(np.float32)
+                main_speaker(np.stack([tone, tone]), work)
         print('ok')
         return
 
-    source, rest_path, voices_path = args.paths
+    source, rest_path, voices_path = args.paths[:3]
     started = time.time()
     mix = np.fromfile(source, dtype=np.float32).reshape(-1, 2).T.copy()
     rest = background(mix, report=True)
+    del session
     np.clip(rest, -1, 1).T.astype(np.float32).tofile(rest_path)
     # The voices: everything the model did not keep, so the two together are the sound as it was.
-    np.clip(mix - rest, -1, 1).T.astype(np.float32).tofile(voices_path)
-    print('%.1f seconds of sound in %.1f seconds' % (mix.shape[1] / sr, time.time() - started), flush=True)
+    voices = mix - rest
+    del mix, rest
+    np.clip(voices, -1, 1).T.astype(np.float32).tofile(voices_path)
+    if extra_steps:
+        chunks = (voices.shape[1] + gen - 1) // gen
+        try:
+            with tempfile.TemporaryDirectory() as work:
+                speaker = main_speaker(voices, work)
+                print('progress %d %d' % (chunks + 1, chunks + 2), flush=True)
+                further = voices_further_back(voices, speaker, args.mask_strength)
+            np.clip(further, -1, 1).T.astype(np.float32).tofile(args.paths[3])
+            print('progress %d %d' % (chunks + 2, chunks + 2), flush=True)
+        except Exception as error:
+            # The dub goes on without them: the main speaker's lines only lose the voices further back.
+            print('isolation failed: %s' % error, file=sys.stderr, flush=True)
+    print('%.1f seconds of sound in %.1f seconds' % (voices.shape[1] / sr, time.time() - started), flush=True)
 
 
 if __name__ == '__main__':

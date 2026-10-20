@@ -229,6 +229,18 @@ class VideoDubberTest extends TestCase
         $this->assertEqualsWithDelta($this->level($video, 4.0, 1.5), $this->level($out['file'], 4.0, 1.5), 1.5, 'between lines, the original');
         $this->assertLessThan(-60, $this->level($out['file'], 1.4, 1.2), 'under the new line no old voice is heard');
 
+        // With the speech isolation: what it heard as voices further back plays on under the new line.
+        $this->fakeSeparator('head -c "$(stat -c %s "$in")" /dev/zero > "$rest"; cp "$in" "$voices"; cp "$in" "$further"', isolator: true);
+        $out = $this->dubSilently($video, 'music', 'further');
+        $this->assertTrue($out['report']['separation']['voices_further_back']);
+        $this->assertEqualsWithDelta($this->level($video, 1.4, 1.2), $this->level($out['file'], 1.4, 1.2), 1.5, 'the voices further back, under the new line');
+        $this->assertEqualsWithDelta($this->level($video, 4.0, 1.5), $this->level($out['file'], 4.0, 1.5), 1.5, 'and the original between lines');
+        // Isolation that failed (no file): the dub goes on as without it.
+        $this->fakeSeparator('head -c "$(stat -c %s "$in")" /dev/zero > "$rest"; cp "$in" "$voices"', isolator: true);
+        $out = $this->dubSilently($video, 'music', 'no-further');
+        $this->assertFalse($out['report']['separation']['voices_further_back']);
+        $this->assertLessThan(-60, $this->level($out['file'], 1.4, 1.2));
+
         // Too little memory free on the server just now: not started, the filters instead.
         $this->fakeSeparator('cp "$in" "$rest"; cp "$in" "$voices"');
         config(['listen.dubbing.separator.min_free_mb' => 100_000_000]);
@@ -250,15 +262,39 @@ class VideoDubberTest extends TestCase
         $this->assertFalse(\App\Services\Dubbing\VoiceSeparator::fitsPlatform('numpy-2.0.2-cp39-cp39-musllinux_1_1_x86_64.whl', 'x86_64', [2, 28]));
     }
 
-    /** A separator set up with a stand-in for Python that runs $body with $in, $rest and $voices set (the last three arguments). */
-    private function fakeSeparator(string $body): void
+    /**
+     * A separator set up with a stand-in for Python that runs $body with $in,
+     * $rest, $voices and (with $isolator, the speech isolation set up too)
+     * $further set from its arguments.
+     */
+    private function fakeSeparator(string $body, bool $isolator = false): void
     {
         $dir = $this->dir.'/separator';
         @mkdir($dir.'/lib', 0755, true);
         file_put_contents($dir.'/model.onnx', 'model');
         file_put_contents($dir.'/ready.json', '{}');
+        @unlink($dir.'/deep-filter');
+        if ($isolator) {
+            file_put_contents($dir.'/deep-filter', "#!/bin/sh\n");
+            chmod($dir.'/deep-filter', 0755);
+        }
         $python = $this->dir.'/python';
-        file_put_contents($python, "#!/bin/sh\nn=\$#\nvoices=\$(eval echo \"\\\${\$n}\")\nrest=\$(eval echo \"\\\${\$((n - 1))}\")\nin=\$(eval echo \"\\\${\$((n - 2))}\")\n{$body}\n");
+        file_put_contents($python, <<<'SH'
+            #!/bin/sh
+            paths=""
+            skip=0
+            for a in "$@"; do
+              if [ $skip = 1 ]; then skip=0; continue; fi
+              case "$a" in
+                -s) ;;
+                --lib|--model|--threads|--isolator|--ffmpeg|--mask-strength) skip=1 ;;
+                *) paths="$paths $a" ;;
+              esac
+            done
+            set -- $paths
+            in=$2; rest=$3; voices=$4; further=$5
+
+            SH.$body."\n");
         chmod($python, 0755);
         config(['listen.dubbing.separator.python' => $python, 'listen.dubbing.separator.dir' => $dir]);
     }

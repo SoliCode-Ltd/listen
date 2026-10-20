@@ -35,8 +35,10 @@ use Symfony\Component\Process\Process;
  *      (VoiceSeparator, run on this server while steps 2 and 3 wait on the
  *      network) splits the original into its voices and the rest; the rest
  *      plays all through, and the original voices only between the new
- *      lines (where they are crowds, singing, recitation in the background),
- *      never under one. Where the model is not set up or busy, filters take
+ *      lines, never under one. Under a new line, the voices further back
+ *      than the main speaker (children reciting, a crowd, chanting) play on
+ *      where the speech isolation told them apart (VoiceSeparator).
+ *      Where the model is not set up or busy, filters take
  *      the old voice out under each new line (only the sides of a stereo mix
  *      stay there; a mono track goes quiet). A preview copy carries the
  *      Listen mark, which means encoding the picture again.
@@ -132,7 +134,7 @@ final class VideoDubber
             $wantsBackground = ($o['background'] ?? 'keep') !== 'replace' && VoiceSeparator::active() && $this->probe($video)['sound'];
             if ($wantsBackground) {
                 $this->run([$ffmpeg, '-v', 'error', '-y', '-i', $video, '-vn', '-af', self::stereo($this->probe($video)['channels']).',aresample='.self::SEPARATION_RATE, '-f', 'f32le', $tmp.'/sound.f32']);
-                $separating = $separator->start($tmp.'/sound.f32', $tmp.'/rest.f32', $tmp.'/voices.f32');
+                $separating = $separator->start($tmp.'/sound.f32', $tmp.'/rest.f32', $tmp.'/voices.f32', $tmp.'/further.f32');
             }
 
             // 2. What is said, by whom and how, timed, and the dubbed lines.
@@ -181,9 +183,10 @@ final class VideoDubber
                 // Busy with another dub when this one began: it waits its turn here, a few minutes at most.
                 $background = $separating !== null
                     ? $separator->finish($separating, $progress)
-                    : $separator->run($tmp.'/sound.f32', $tmp.'/rest.f32', $tmp.'/voices.f32', 240, $progress);
+                    : $separator->run($tmp.'/sound.f32', $tmp.'/rest.f32', $tmp.'/voices.f32', 240, $progress, $tmp.'/further.f32');
                 $separating = null;
-                $report['separation'] = ['method' => $background !== null ? 'model' : 'filters', 'waited_seconds' => round(microtime(true) - $t, 2)];
+                $report['separation'] = ['method' => $background !== null ? 'model' : 'filters', 'waited_seconds' => round(microtime(true) - $t, 2),
+                    'voices_further_back' => ($background['further'] ?? null) !== null];
             } elseif ($keep) {
                 $report['separation'] = ['method' => 'filters'];
             }
@@ -619,7 +622,7 @@ final class VideoDubber
      *
      * @param  array<int, array{audio: ?string, delay_ms: int, tempo: float, from: float, until: float}>  $plan
      * @param  array{path: string, margin: int}|null  $mark
-     * @param  array{rest: string, voices: string}|null  $background
+     * @param  array{rest: string, voices: string, further?: ?string}|null  $background
      * @return array<int, string>
      */
     private function muxCommand(string $ffmpeg, string $video, array $plan, float $seconds, bool $keepBackground, string $out, ?array $mark, ?array $background = null): array
@@ -641,17 +644,24 @@ final class VideoDubber
         $filters[] = $labels.'amix=inputs='.count($plan).':normalize=0:dropout_transition=0[dub]';
         $audioOut = '[dub]';
         if ($keepBackground && $background !== null) {
-            // The rest of the sound (music, effects) all through; the original voices only between the new lines.
-            foreach ([$background['rest'], $background['voices']] as $track) {
+            // The rest of the sound (music, effects) all through; the original voices only between the new lines,
+            // and under them the voices further back than the main speaker (children reciting, a crowd), when they were told apart.
+            $further = $background['further'] ?? null;
+            foreach (array_filter([$background['rest'], $background['voices'], $further]) as $track) {
                 array_push($cmd, '-f', 'f32le', '-ar', (string) self::SEPARATION_RATE, '-ac', '2', '-i', $track);
             }
             $under = self::underLines($plan);
             // The music and effects as they were, all through.
             $filters[] = '['.$next.':a]aresample=48000[bg]';
             $filters[] = '['.($next + 1).":a]aresample=48000,volume='1-({$under})':eval=frame[ov]";
-            $filters[] = '[bg][ov][dub]amix=inputs=3:normalize=0:dropout_transition=0,'.self::LIMITER.'[mix]';
+            if ($further !== null) {
+                $filters[] = '['.($next + 2).":a]aresample=48000,volume='{$under}':eval=frame[fv]";
+                $filters[] = '[bg][ov][fv][dub]amix=inputs=4:normalize=0:dropout_transition=0,'.self::LIMITER.'[mix]';
+            } else {
+                $filters[] = '[bg][ov][dub]amix=inputs=3:normalize=0:dropout_transition=0,'.self::LIMITER.'[mix]';
+            }
             $audioOut = '[mix]';
-            $next += 2;
+            $next += $further !== null ? 3 : 2;
         } elseif ($keepBackground) {
             $under = self::underLines($plan);
             $filters[] = '[0:a]'.self::stereo($this->probe($video)['channels']).',aresample=48000,asplit=2[oa][ob]';

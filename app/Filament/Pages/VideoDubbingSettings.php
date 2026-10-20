@@ -121,7 +121,7 @@ class VideoDubbingSettings extends Page implements HasForms
                             ->helperText('Then the member no longer sees it. A plan\'s videos stay as long as the plan keeps voices (Plans → "Recent Voices Retention").'),
                     ]),
                 Forms\Components\Section::make('Taking the old voices out')
-                    ->description('Before the new voices go in, a separation model on this server takes the original voices out of the video\'s sound and keeps its music and effects, so no old voice is heard under a new one. Without it, simple filters are used, which leave some of the old voice.')
+                    ->description('Before the new voices go in, a separation model on this server takes the original voices out of the video\'s sound and keeps its music and effects, and a speech isolation keeps the voices further back than the main speaker (children reciting, a crowd), so only the main speaker is replaced. Without it, simple filters are used, which leave some of the old voice.')
                     ->schema([
                         Forms\Components\Placeholder::make('separator_status')
                             ->label('Status')
@@ -232,7 +232,9 @@ class VideoDubbingSettings extends Page implements HasForms
         if (VoiceSeparator::installed()) {
             $d = VoiceSeparator::details() ?? [];
 
-            return new HtmlString(sprintf('<strong>Installed</strong>%s. One dub uses it at a time (about 1.4 GB of memory while it runs), and only when %d MB are free; a dub that cannot wait for it, or finds too little memory free, uses the filters. Should the server run short anyway, the system stops the separation first, never the site.%s%s',
+            $isolation = ($d['isolation'] ?? false) ? ' With the speech isolation (the voices further back are kept).' : ' <span style="color:#b45309">Without the speech isolation: press Install again to add it (the voices further back are then kept too).</span>';
+
+            return new HtmlString(sprintf('<strong>Installed</strong>%s.'.$isolation.' One dub uses it at a time (about 1.4 GB of memory while it runs), and only when %d MB are free; a dub that cannot wait for it, or finds too little memory free, uses the filters. Should the server run short anyway, the system stops the separation first, never the site.%s%s',
                 isset($d['installed_at']) ? ' on '.e(\Illuminate\Support\Carbon::parse($d['installed_at'])->toDayDateTimeString()).' (Python '.e(substr((string) ($d['python_version'] ?? ''), 0, 1).'.'.substr((string) ($d['python_version'] ?? ''), 1)).')' : '',
                 (int) config('listen.dubbing.separator.min_free_mb', 2048), self::memoryLine(), $last));
         }
