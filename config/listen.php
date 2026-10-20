@@ -158,4 +158,17 @@ return [
         'stuck_processing_minutes' => (int) env('LISTEN_API_STUCK_PROCESSING_MINUTES', 30),
         'stuck_queued_minutes' => (int) env('LISTEN_API_STUCK_QUEUED_MINUTES', 60),
     ],
+
+    'dubbing' => [
+        // "Dub my video" (App\Http\Controllers\VideoDubController).
+        'min_seconds' => (int) env('LISTEN_DUB_MIN_SECONDS', 3),
+        'max_seconds' => (int) env('LISTEN_DUB_MAX_SECONDS', 60),
+        'max_upload_mb' => (int) env('LISTEN_DUB_MAX_UPLOAD_MB', 100),
+        // Hours the videos are kept before their files are deleted (dubs:prune).
+        'keep_hours' => (int) env('LISTEN_DUB_KEEP_HOURS', 48),
+        // Free marked previews for the whole site a day, so a rush of sign-ups cannot run up the bill.
+        'free_per_day' => (int) env('LISTEN_DUB_FREE_PER_DAY', 50),
+        // Minutes after which a dub still working is failed and its credits given back.
+        'stuck_minutes' => (int) env('LISTEN_DUB_STUCK_MINUTES', 20),
+    ],
 ];

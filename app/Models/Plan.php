@@ -83,6 +83,7 @@ class Plan extends Model
         'recent_voices_days',
         // Voice cloning
         'voice_cloning_enabled',
+        'video_dubbing_enabled',
         'voice_cloning_max_voices',
         'download_formats',
         'kind',
@@ -114,6 +115,7 @@ class Plan extends Model
         'discount_ends_at' => 'datetime',
         'discount_duration_months' => 'integer',
         'voice_cloning_enabled' => 'boolean',
+        'video_dubbing_enabled' => 'boolean',
         'voice_cloning_max_voices' => 'integer',
         'download_formats' => 'array',
         'pricing_lines' => 'array',

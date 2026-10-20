@@ -451,6 +451,13 @@ class PlanResource extends Resource
                             ->suffix('voices')
                             ->helperText('Leave this at 0 to use the site-wide default. Set 1–100 for an exact cap on this plan.'),
                     ]),
+                Forms\Components\Section::make('Dub my video')
+                    ->description('Members on this plan dub videos into an Arabic dialect, paid from their credits: a second of voice for each second of video. They download the copy without the Listen mark. Everyone else gets one free dub with the mark. Who sees the page at all: Video Dubbing settings.')
+                    ->schema([
+                        Forms\Components\Toggle::make('video_dubbing_enabled')
+                            ->label('Include video dubbing')
+                            ->default(false),
+                    ]),
                 Forms\Components\Section::make('Pricing page')
                     ->description('The lines under the price on this plan\'s card. They are written for you in English and Arabic from this plan\'s settings above, so changing a setting updates the card by itself. Tick the ones to show.')
                     ->schema([

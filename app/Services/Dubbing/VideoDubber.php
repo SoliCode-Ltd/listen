@@ -102,7 +102,7 @@ final class VideoDubber
             $report['output'] = $clean;
             if ($o['preview'] ?? true) {
                 $preview = $o['out_dir'].'/'.$o['name'].'-preview.mp4';
-                $report['preview_encode'] = $this->run($this->muxCommand($ffmpeg, $video, $plan, $report['video_seconds'], (float) ($o['keep_original'] ?? 0), $preview, $this->markFile($ffmpeg, $tmp)));
+                $report['preview_encode'] = $this->run($this->muxCommand($ffmpeg, $video, $plan, $report['video_seconds'], (float) ($o['keep_original'] ?? 0), $preview, $this->markFile($ffmpeg, $tmp, $video)));
                 $report['preview_bytes'] = filesize($preview);
                 $report['preview'] = $preview;
             }
@@ -244,7 +244,7 @@ final class VideoDubber
      * @param  array<int, array{audio: ?string, delay_ms: int, tempo: float}>  $plan
      * @return array<int, string>
      */
-    private function muxCommand(string $ffmpeg, string $video, array $plan, float $seconds, float $keepOriginal, string $out, ?string $mark): array
+    private function muxCommand(string $ffmpeg, string $video, array $plan, float $seconds, float $keepOriginal, string $out, ?array $mark): array
     {
         $cmd = [$ffmpeg, '-v', 'error', '-y', '-i', $video];
         foreach ($plan as $p) {
@@ -267,9 +267,9 @@ final class VideoDubber
         $videoMap = ['-map', '0:v:0', '-c:v', 'copy'];
         if ($mark !== null) {
             $markInput = count($plan) + 1;
-            array_push($cmd, '-i', $mark);
-            $filters[] = '['.$markInput.':v]format=rgba,colorchannelmixer=aa=0.75[mk]';
-            $filters[] = '[0:v][mk]overlay=W-w-28:H-h-24[v]';
+            array_push($cmd, '-i', $mark['path']);
+            $filters[] = '['.$markInput.':v]format=rgba,colorchannelmixer=aa=0.92[mk]';
+            $filters[] = '[0:v][mk]overlay=W-w-'.$mark['margin'].':H-h-'.$mark['margin'].'[v]';
             $videoMap = ['-map', '[v]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p'];
         }
 
@@ -277,14 +277,39 @@ final class VideoDubber
             ['-map', $audioOut, '-c:a', 'aac', '-b:a', '160k', '-t', (string) $seconds, '-movflags', '+faststart', $out]);
     }
 
-    /** The Listen mark for the preview: the site's own logo, made a PNG the width of a corner badge. */
-    private function markFile(string $ffmpeg, string $tmp): string
+    /**
+     * The Listen mark for the preview: the site's logo with a soft shadow, sized to the picture
+     * (about a quarter of its short side) so it looks the same on a phone clip and a wide one.
+     *
+     * @return array{path: string, margin: int}
+     */
+    private function markFile(string $ffmpeg, string $tmp, string $video): array
     {
+        $process = new Process([$ffmpeg, '-hide_banner', '-i', $video]);
+        $process->setTimeout(30)->run();
+        $short = preg_match('/Video:.*?, (\d{2,5})x(\d{2,5})/', $process->getErrorOutput(), $m) ? min((int) $m[1], (int) $m[2]) : 720;
         $png = $tmp.'/mark.png';
-        $source = public_path('images/email-logo-en.png');
-        $this->run([$ffmpeg, '-v', 'error', '-y', '-i', $source, '-vf', 'scale=220:-1', $png]);
+        $width = max(120, (int) round($short * 0.26 / 2) * 2);
+        $this->run([$ffmpeg, '-v', 'error', '-y', '-i', public_path('images/dub-mark.png'), '-vf', 'scale='.$width.':-1:flags=lanczos', $png]);
 
-        return $png;
+        return ['path' => $png, 'margin' => max(10, (int) round($short * 0.03))];
+    }
+
+    /**
+     * How long a video runs and whether it has a picture and a sound track;
+     * throws when it cannot be read at all.
+     *
+     * @return array{seconds: float, picture: bool, sound: bool}
+     */
+    public function probe(string $video): array
+    {
+        $ffmpeg = AudioFormats::ffmpegPath() ?? throw new \RuntimeException('ffmpeg is not available on this server.');
+        $process = new Process([$ffmpeg, '-hide_banner', '-i', $video]);
+        $process->setTimeout(30)->run();
+        $info = $process->getErrorOutput();
+
+        return ['seconds' => $this->duration($ffmpeg, $video), 'picture' => preg_match('/Stream #.*Video:/', $info) === 1,
+            'sound' => preg_match('/Stream #.*Audio:/', $info) === 1];
     }
 
     private function duration(string $ffmpeg, string $video): float

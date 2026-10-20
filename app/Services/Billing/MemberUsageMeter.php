@@ -48,6 +48,28 @@ class MemberUsageMeter
      */
     public function reserve(int $userId, ?Plan $quotaPlan, array $estimate, callable $record): array
     {
+        return $this->reserveCredits($userId, $quotaPlan, $estimate, function (array $reservation) use ($record): array {
+            $recorded = $record($reservation);
+            $job = $recorded['job'];
+            $job->forceFill(['settings_snapshot' => array_merge((array) ($job->settings_snapshot ?? []), ['reservation' => $reservation])])->save();
+
+            return $recorded;
+        });
+    }
+
+    /**
+     * reserve() for what is not a voice generation (a dubbed video): the same
+     * limits, locks and reservation, with $record saving whatever it makes and
+     * keeping the reservation itself, to give it back with giveBack().
+     *
+     * @template T
+     *
+     * @param  array{chars:int,words:int,seconds:int,minutes:int,credits:int}  $estimate
+     * @param  callable(array{period:string, billed_to_pack:bool, credits:int, seconds:int}): T  $record
+     * @return T
+     */
+    public function reserveCredits(int $userId, ?Plan $quotaPlan, array $estimate, callable $record): mixed
+    {
         // Made when missing before the transaction, which then reads only under its locks.
         $period = CreditPeriod::counter($userId)->period_ym;
         $reservation = [
@@ -57,7 +79,7 @@ class MemberUsageMeter
             'seconds' => (int) $estimate['seconds'],
         ];
 
-        return DB::transaction(function () use ($userId, $quotaPlan, $estimate, $reservation, $record): array {
+        return DB::transaction(function () use ($userId, $quotaPlan, $estimate, $reservation, $record): mixed {
             // The member's generations first, then the usage row: the job and the
             // refunds lock a generation before the usage row, the same order.
             AudioGeneration::query()->where('user_id', $userId)->lockForUpdate()->max('user_sequence_number');
@@ -80,12 +102,19 @@ class MemberUsageMeter
                 $this->trialUsageRecorder->add($userId, $estimate);
             }
 
-            $recorded = $record($reservation);
-            $job = $recorded['job'];
-            $job->forceFill(['settings_snapshot' => array_merge((array) ($job->settings_snapshot ?? []), ['reservation' => $reservation])])->save();
-
-            return $recorded;
+            return $record($reservation);
         }, 3);
+    }
+
+    /**
+     * Gives back a reservation made with reserveCredits(). The caller makes
+     * sure it happens once (it locks what it saved the reservation on).
+     *
+     * @param  array{period:string, billed_to_pack:bool, credits:int, seconds:int}  $reservation
+     */
+    public function giveBack(int $userId, array $reservation): void
+    {
+        DB::transaction(fn () => $this->release($userId, $reservation), 3);
     }
 
     /**

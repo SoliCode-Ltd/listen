@@ -231,6 +231,15 @@ Route::group([
         });
     });
 
+    // Dub my video: the page for everyone it is open to; the rest needs an account.
+    Route::get('/dub-my-video', [\App\Http\Controllers\VideoDubController::class, 'show'])->name('dub.page');
+    Route::middleware(['auth', 'subscription.sync'])->prefix('dub-my-video')->group(function (): void {
+        Route::post('/', [\App\Http\Controllers\VideoDubController::class, 'store'])->middleware('throttle:10,1')->name('dub.store');
+        Route::get('/{id}/status', [\App\Http\Controllers\VideoDubController::class, 'status'])->whereNumber('id')->name('dub.status');
+        Route::get('/{id}/watch', [\App\Http\Controllers\VideoDubController::class, 'watch'])->whereNumber('id')->name('dub.watch');
+        Route::get('/{id}/download', [\App\Http\Controllers\VideoDubController::class, 'download'])->whereNumber('id')->name('dub.download');
+    });
+
     Route::middleware(['auth'])->group(function () {
         Route::get('/referral/stats', [\App\Http\Controllers\ReferralController::class, 'stats'])->name('referral.stats');
         Route::post('/referral/share', [\App\Http\Controllers\ReferralController::class, 'share'])->name('referral.share');
