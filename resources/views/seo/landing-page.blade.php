@@ -464,5 +464,6 @@
 
   @include('components.footer')
   @include('components.scripts')
+  @include('components.motion')
 </body>
 </html>

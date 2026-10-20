@@ -481,6 +481,7 @@
 
   @include('components.footer')
   @include('components.scripts')
+  @include('components.motion')
   @include('components.voice-player-script')
   @include('components.orb-script')
   <script>

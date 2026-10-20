@@ -29,8 +29,6 @@
   $minutes = \App\Support\Credits::minutesFor((int) ($plan['monthly_chars'] ?? 0));
   // A price in another currency is a guide: the card also shows the US-dollar price
   // a card is really charged, for each cycle.
-  $showUsd = ($plan['display_currency'] ?? 'USD') !== 'USD' && !$isFree && !$isPack;
-  $usdLine = static fn (string $price): string => __('ui.pricing.usd_price', ['price' => "\u{2066}".$wholePrice($price)."\u{2069}"]);
 @endphp
 <div class="plan-card {{ $isPopular ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} {{ $isCurrent ? 'is-current' : '' }} reveal" data-orb-host
      data-plan-slug="{{ $plan['slug'] }}"
@@ -77,10 +75,6 @@
       </span>
       <span class="price-period">{{ $isPack ? __('ui.pack.one_time') : __('ui.pricing.per_month_short') }}</span>
     </div>
-    @if($showUsd)
-      <span class="price-usd" data-monthly="{{ $usdLine((string) ($plan['usd_price_monthly_formatted'] ?? '')) }}"
-            data-yearly="{{ $usdLine((string) ($plan['usd_price_yearly_monthly_formatted'] ?? '')) }}">{{ $usdLine((string) ($plan['usd_price_monthly_formatted'] ?? '')) }}</span>
-    @endif
     <div class="price-note price-note-text"></div>
     @if($hasDiscount && !$isFree && !$isPack && !empty($plan['discount_terms']))
       @php
