@@ -56,11 +56,12 @@ class GeminiKeys extends Page implements HasForms
             return;
         }
 
-        // Basic validation for Google API key format
-        if (!str_starts_with($key, 'AIza')) {
+        // Any key Google AI Studio gives (not only "AIza..."), checked with Google before it is saved.
+        $check = app(GeminiKeyManager::class)->checkNewKey($key);
+        if (! $check['ok']) {
             Notification::make()
-                ->title('Invalid API key format')
-                ->body('Google API keys should start with "AIza"')
+                ->title('API key not added')
+                ->body($check['message'])
                 ->danger()
                 ->send();
             return;
@@ -73,8 +74,8 @@ class GeminiKeys extends Page implements HasForms
 
         Notification::make()
             ->title('API Key Added')
-            ->body("Key saved as {$keyName}")
-            ->success()
+            ->body("Key saved as {$keyName}. ".$check['message'])
+            ->{$check['checked'] ? 'success' : 'warning'}()
             ->send();
     }
 

@@ -51,7 +51,7 @@
                 <input 
                     type="password" 
                     wire:model="newApiKey"
-                    placeholder="AIzaSy..."
+                    placeholder="Paste the key from Google AI Studio"
                     class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
                 />
             </div>
