@@ -5,6 +5,7 @@ namespace App\Services\Tts;
 use App\Support\EnvFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -366,6 +367,44 @@ class GeminiKeyManager
      * @param string $apiKey The new API key value
      * @return string The name assigned to the key (e.g., GEMINI_TTS_API_KEY_3)
      */
+    /**
+     * Whether a key pasted in the admin can be saved. Google's keys no longer all
+     * start with "AIza", so any plain run of letters, digits, ".", "_" and "-" is
+     * taken; Google is then asked to list its models with the key (no speech, no
+     * quota used). A key Google refuses is not saved; when Google cannot be
+     * reached the key is saved, with a warning.
+     *
+     * @return array{ok: bool, checked: bool, message: string}
+     */
+    public function checkNewKey(string $apiKey): array
+    {
+        $apiKey = trim($apiKey);
+        if (! preg_match('/^[A-Za-z0-9._\-]{20,256}$/', $apiKey)) {
+            return ['ok' => false, 'checked' => false, 'message' => 'That does not look like an API key: paste the whole key from Google AI Studio, with no spaces.'];
+        }
+        if (in_array($apiKey, array_column($this->getAllKeys(), 'key'), true)) {
+            return ['ok' => false, 'checked' => false, 'message' => 'This key is already saved.'];
+        }
+
+        $base = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
+        try {
+            $response = Http::timeout(15)->withHeaders(['x-goog-api-key' => $apiKey])->get($base.'/models', ['pageSize' => 1]);
+        } catch (\Throwable) {
+            return ['ok' => true, 'checked' => false, 'message' => 'Saved, but Google could not be reached to check it.'];
+        }
+        if ($response->successful()) {
+            return ['ok' => true, 'checked' => true, 'message' => 'Google accepted the key.'];
+        }
+        if (in_array($response->status(), [400, 401, 403], true)) {
+            $why = trim((string) $response->json('error.message'));
+            $why = str_replace($apiKey, '[key]', $why);
+
+            return ['ok' => false, 'checked' => true, 'message' => 'Google did not accept this key'.($why !== '' ? ': '.mb_substr($why, 0, 200) : '.')];
+        }
+
+        return ['ok' => true, 'checked' => false, 'message' => 'Saved, but Google did not answer the check (HTTP '.$response->status().').'];
+    }
+
     public function addKey(string $apiKey): string
     {
         $envPath = base_path('.env');
