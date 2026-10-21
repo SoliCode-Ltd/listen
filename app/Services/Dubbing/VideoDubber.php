@@ -23,28 +23,27 @@ use Symfony\Component\Process\Process;
  *   1. the sound is taken out of the video, and where someone speaks is
  *      found on it, phrase by phrase, by a speech-detection model
  *      (speechMap(): from one pause, where the mouth closes, to the next);
- *   2. one request to the text model writes out what is said in each
- *      phrase, with who says it (and whether a man or a woman), how they
+ *   2. one request to the text model writes out what is said, in timed
+ *      sentences, with who says it (and whether a man or a woman), how they
  *      say it (an emotion from the studio's list and a short direction, as
- *      a voice actor would be given), and a dubbed part in the chosen
- *      dialect that fits the phrase's time, with the laughs, sighs and
- *      pauses of the original as the studio's sound tags; it also says
- *      whether there is music or other sound behind the speech. A phrase it
- *      leaves without a line is heard again on its own, and failing that is
- *      read as said or dubbed from its words (fillPhrases()): the old voice
- *      never stands in. Where no phrases were found, the model times the
- *      lines itself and what they leave out is heard again (unheard(),
- *      hearAgain());
- *   3. the phrases of a sentence are voiced in one take by the studio's own
- *      speech engine (lines()), so they sound as one reading: each speaker
+ *      a voice actor would be given), and a dubbed line in the chosen
+ *      dialect that fits the same time, with the laughs, sighs and pauses
+ *      of the original as the studio's sound tags; it also says whether
+ *      there is music or other sound behind the speech. What the lines
+ *      leave out is heard again on its own (unheard(), hearAgain()), and
+ *      each line is set on the starts and ends of the phrases it covers
+ *      (onPhrases()). Where switched on (listen.dubbing.phrase_lines), the
+ *      model writes a line for each phrase instead (fillPhrases(), lines(),
+ *      cuts()): off, for it hears two short phrases as one and puts the
+ *      words a phrase or two early;
+ *   3. each line is voiced by the studio's own speech engine: each speaker
  *      in their own voice (the member's choice for the main one, a voice
  *      of the same kind for the others) and, unless the member chose a
  *      style or an emotion for the whole video, in the original's mood. A
- *      take far shorter than its words need is taken once more. The take is
- *      cut at its pauses, a part for each phrase (cuts());
- *   4. each part is placed where its phrase starts on the original speaker's
+ *      take far shorter than its words need is taken once more;
+ *   4. each line is placed where the original speaker starts it on their
  *      own voice (refineTimes()), without the speech engine's silences, and
- *      fitted to end where the phrase ends (plan()), at the
+ *      fitted to end where the original ends (plan()), at the
  *      loudness the original speaker had. The video's other sound stays (unless the
  *      member turned it off), as dubbing studios keep it: a separation model
  *      (VoiceSeparator, run on this server while steps 2 and 3 wait on the
@@ -184,35 +183,38 @@ final class VideoDubber
                 $this->run([$ffmpeg, '-v', 'error', '-y', '-i', $video, '-vn', '-af', self::stereo($this->probe($video)['channels']).',aresample='.self::SEPARATION_RATE, '-f', 'f32le', $tmp.'/sound.f32']);
                 $separating = $separator->start($tmp.'/sound.f32', $tmp.'/rest.f32', $tmp.'/voices.f32', $tmp.'/further.f32');
             }
-            // Where someone speaks, phrase by phrase: the moments the lines are written for and placed on.
+            // Where someone speaks, phrase by phrase: the lines are set on their starts and ends, and the old voice is out in all of them.
             $phrases = $this->speechMap($ffmpeg, $video, $speech, $tmp, $report);
+            // Lines written phrase by phrase only where switched on (listen.dubbing.phrase_lines): the model
+            // hears two short phrases as one and puts the words a phrase or two early.
+            $anchors = config('listen.dubbing.phrase_lines', false) ? $phrases : [];
 
-            // 2. What is said, by whom and how, and the dubbed lines: one for each phrase (or timed by the model, where no phrases were found).
+            // 2. What is said, by whom and how, timed, and the dubbed lines.
             $t = microtime(true);
             try {
-                $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect'], $phrases);
+                $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect'], $anchors);
             } catch (SpeechNotWrittenOut $e) {
-                if ($phrases === []) {
+                if ($anchors === []) {
                     throw $e;
                 }
                 // No answer for the phrases however asked: the model times the lines itself instead.
                 $report['speech_map']['used'] = false;
-                $phrases = [];
+                $anchors = [];
                 $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect']);
                 $heard['finish'] = array_merge($e->finish, $heard['finish']);
             }
             $report['transcribe'] = ['model' => $heard['model'], 'finish' => $heard['finish']] + $heard['usage'];
             $report['background'] = $heard['background'];
             $segments = [];
-            if ($phrases !== [] && ($heard['segments'] !== [] || count($heard['unsaid']) < count($phrases))) {
+            if ($anchors !== [] && ($heard['segments'] !== [] || count($heard['unsaid']) < count($anchors))) {
                 // Speech the lines leave out, heard again on its own: a dub must not go quiet, nor bring back the old voice, where someone still talks.
-                $segments = $this->fillPhrases($ffmpeg, $speech, $heard['segments'], $heard['unsaid'], $phrases, $o, $tmp, $report);
+                $segments = $this->fillPhrases($ffmpeg, $speech, $heard['segments'], $heard['unsaid'], $anchors, $o, $tmp, $report);
             }
             if ($segments === []) {
-                if ($phrases !== []) {
+                if ($anchors !== []) {
                     // Not one line from the phrases (the model would not keep to them): it times the lines itself instead.
                     $report['speech_map']['used'] = false;
-                    $phrases = [];
+                    $anchors = [];
                     $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect']);
                     foreach ($heard['usage'] as $key => $tokens) {
                         $report['transcribe'][$key] = ($report['transcribe'][$key] ?? 0) + $tokens;
@@ -221,6 +223,8 @@ final class VideoDubber
                     $report['background'] = $heard['background'];
                 }
                 $segments = $this->hearAgain($ffmpeg, $speech, $heard['segments'], $o, $tmp, $report);
+                // Each line's start and end on those of the phrases it covers: the model's times are a moment off, the sound's are not.
+                $segments = self::onPhrases($segments, $phrases);
             }
             $report['transcribe']['seconds'] = round(microtime(true) - $t, 2);
             if ($segments === []) {
@@ -327,7 +331,7 @@ final class VideoDubber
             // Exactly where the original speaker starts and stops (the model's times are a moment off),
             // heard on the voices alone where the model split them out.
             $envelope = $this->speechEnvelope($ffmpeg, $background !== null ? $background['voices'] : $video, $background !== null);
-            // The phrases were found on the sound itself: only a small correction then.
+            // Lines set on the phrases found on the sound: only a small correction then.
             $segments = self::refineTimes($segments, $envelope, $report['video_seconds'], 100, $phrases !== [] ? self::PHRASE_REACH : 0.7);
             // Each part on its phrase as it is now (a line that could not be cut: from its first phrase to its last).
             $placed = array_map(fn (array $p): array => ['start' => (float) $segments[$p['segments'][0]]['start'], 'end' => (float) $segments[end($p['segments'])]['end'],
@@ -506,6 +510,39 @@ final class VideoDubber
         }
 
         return $out;
+    }
+
+    /**
+     * The model's lines set on the phrases found on the sound: each start
+     * moved to the nearest start of a phrase, each end to the nearest end of
+     * one, within $reach seconds and never across the line before or after
+     * (the model's times are a moment off; a phrase starts and ends where
+     * the speaker's mouth opens and closes). A line with no phrase near
+     * keeps its times.
+     *
+     * @param  array<int, array<string, mixed>>  $segments  in order of time
+     * @param  array<int, array{0: float, 1: float}>  $phrases
+     * @return array<int, array<string, mixed>>
+     */
+    public static function onPhrases(array $segments, array $phrases, float $reach = 0.8): array
+    {
+        $segments = array_values($segments);
+        $count = count($segments);
+        $previousEnd = 0.0;
+        foreach ($segments as $i => $s) {
+            $start = (float) $s['start'];
+            $end = (float) $s['end'];
+            $nextStart = $i + 1 < $count ? (float) $segments[$i + 1]['start'] : INF;
+            $near = fn (array $times, float $at, float $from, float $to): ?float => array_reduce($times,
+                fn (?float $best, float $t): ?float => $t >= $from && $t <= $to && abs($t - $at) <= $reach && ($best === null || abs($t - $at) < abs($best - $at)) ? $t : $best);
+            $newStart = $near(array_column($phrases, 0), $start, $previousEnd - 0.01, $end) ?? max($start, $previousEnd);
+            $newEnd = $near(array_column($phrases, 1), $end, $newStart + 0.3, $nextStart + 0.1) ?? max($end, $newStart + 0.3);
+            $segments[$i]['start'] = round($newStart, 2);
+            $segments[$i]['end'] = round($newEnd, 2);
+            $previousEnd = $newEnd;
+        }
+
+        return $segments;
     }
 
     /** Seconds a line's words need, read as the speech engine reads them ($config: its voice settings). */

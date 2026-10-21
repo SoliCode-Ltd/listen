@@ -296,6 +296,8 @@ class VideoDubberTest extends TestCase
 
     public function test_every_phrase_gets_the_chosen_voice_and_each_part_goes_on_its_own_phrase(): void
     {
+        // Lines written phrase by phrase (listen.dubbing.phrase_lines, off by default).
+        config(['listen.dubbing.phrase_lines' => true]);
         $ffmpeg = AudioFormats::ffmpegPath();
         $video = $this->phraseVideo();
         $quote = 'إن الله وملائكته وأهل السماوات والأرض ليصلون على معلم الناس الخير';
@@ -361,6 +363,8 @@ class VideoDubberTest extends TestCase
 
     public function test_an_answer_the_model_will_not_give_is_asked_for_again_without_copying_quotations(): void
     {
+        // Lines written phrase by phrase (listen.dubbing.phrase_lines, off by default).
+        config(['listen.dubbing.phrase_lines' => true]);
         $video = $this->phraseVideo();
         $sent = [];
         // The model will not copy a well-known saying word for word: no answer at all (RECITATION). Asked again without, it answers.
@@ -388,6 +392,8 @@ class VideoDubberTest extends TestCase
 
     public function test_an_empty_answer_is_never_taken_for_a_video_nobody_speaks_in(): void
     {
+        // Lines written phrase by phrase (listen.dubbing.phrase_lines, off by default).
+        config(['listen.dubbing.phrase_lines' => true]);
         $video = $this->phraseVideo();
         $sent = 0;
         Http::fake(function () use (&$sent) {
@@ -415,6 +421,8 @@ class VideoDubberTest extends TestCase
 
     public function test_when_the_phrases_get_no_answer_the_model_times_the_lines_itself(): void
     {
+        // Lines written phrase by phrase (listen.dubbing.phrase_lines, off by default).
+        config(['listen.dubbing.phrase_lines' => true]);
         $video = $this->phraseVideo();
         $sent = [];
         Http::fake(function ($request) use (&$sent) {
@@ -439,6 +447,8 @@ class VideoDubberTest extends TestCase
 
     public function test_a_line_the_speech_engine_fails_on_stays_quiet_rather_than_failing_the_dub(): void
     {
+        // Lines written phrase by phrase (listen.dubbing.phrase_lines, off by default).
+        config(['listen.dubbing.phrase_lines' => true]);
         $video = $this->phraseVideo();
         Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'none', 'phrases' => [
             ['n' => 1, 'speaker' => 'A', 'original' => 'Hi there.', 'dubbed' => 'هلا والله.'],
@@ -462,6 +472,8 @@ class VideoDubberTest extends TestCase
 
     public function test_keys_run_out_and_the_dub_fails_whole_rather_than_half_quiet(): void
     {
+        // Lines written phrase by phrase (listen.dubbing.phrase_lines, off by default).
+        config(['listen.dubbing.phrase_lines' => true]);
         $video = $this->phraseVideo();
         Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'none', 'phrases' => [
             ['n' => 1, 'speaker' => 'A', 'original' => 'Hi there.', 'dubbed' => 'هلا والله.'],
@@ -491,6 +503,8 @@ class VideoDubberTest extends TestCase
 
     public function test_when_the_phrases_give_no_line_the_model_times_the_lines_itself(): void
     {
+        // Lines written phrase by phrase (listen.dubbing.phrase_lines, off by default).
+        config(['listen.dubbing.phrase_lines' => true]);
         $video = $this->phraseVideo();
         $sent = [];
         // It heard no words in any phrase (it would not keep to them); timing the lines itself, it does.
@@ -510,6 +524,32 @@ class VideoDubberTest extends TestCase
         $this->assertStringContainsString('Split what is said into segments', $sent[1]['contents'][0]['parts'][1]['text']);
         $this->assertFalse($r['speech_map']['used']);
         $this->assertSame(2, $r['segments']);
+    }
+
+    public function test_the_model_times_its_sentences_and_they_are_set_on_the_phrases(): void
+    {
+        $video = $this->phraseVideo();
+        $sent = 0;
+        // Its times a moment off: the first sentence 0.2 s early and 0.2 s long, the second 0.3 s early.
+        Http::fake(function () use (&$sent) {
+            $sent++;
+
+            return Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'none', 'segments' => [
+                ['start' => 0.3, 'end' => 4.2, 'speaker' => 'A', 'original' => 'Hi there, welcome.', 'dubbed' => 'هلا والله، حياك الله.'],
+                ['start' => 4.7, 'end' => 7.3, 'speaker' => 'A', 'original' => 'How are you today?', 'dubbed' => 'كيف حالك اليوم؟'],
+            ]])]]]]], 'usageMetadata' => []]);
+        });
+
+        $r = $this->dubWith($video, 2);
+
+        $this->assertSame(1, $sent, 'one request: the model times its own sentences');
+        $this->assertSame(3, $r['speech_map']['phrases']);
+        $this->assertSame(['هلا والله، حياك الله.', 'كيف حالك اليوم؟'], array_column($r['lines'], 'dubbed'), 'each read whole, without a pause asked for inside');
+        // On where the speaker's mouth opens and closes.
+        $this->assertEqualsWithDelta(0.5, $r['lines'][0]['start'], 0.06);
+        $this->assertEqualsWithDelta(4.0, $r['lines'][0]['end'], 0.06);
+        $this->assertEqualsWithDelta(5.0, $r['lines'][1]['start'], 0.06);
+        $this->assertEqualsWithDelta(7.5, $r['lines'][1]['end'], 0.06);
     }
 
     /** Someone speaks from 0.5 to 2.5 s, pauses, speaks to 4 s, then from 5 to 7.5 s: three phrases. */

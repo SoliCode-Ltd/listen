@@ -179,6 +179,10 @@ return [
             'min_free_mb' => (int) env('LISTEN_DUB_SEPARATOR_MIN_FREE_MB', 2048),
             'dir' => env('LISTEN_DUB_SEPARATOR_DIR', ''),
         ],
+        // Lines written phrase by phrase on the phrases found on the sound (VideoDubber). Off: on a real video the
+        // text model put the words one or two phrases early (it hears two short phrases as one), up to 5 s off the lips;
+        // the model times its own sentences, which are then set on the phrases' starts and ends.
+        'phrase_lines' => (bool) env('LISTEN_DUB_PHRASE_LINES', false),
         // Free marked previews for the whole site a day, so a rush of sign-ups cannot run up the bill.
         'free_per_day' => (int) env('LISTEN_DUB_FREE_PER_DAY', 50),
         // Minutes after which a dub still working is failed and its credits given back.
