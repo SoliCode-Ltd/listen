@@ -124,7 +124,7 @@ final class VideoDubber
     private const SPLIT_REACH = 0.8;
 
     /** A take of a sentence shorter than this share of the speaker's time for it is taken once more, slower. */
-    private const SLOW_TAKE = 0.88;
+    private const SLOW_TAKE = 0.95;
 
     /** How far a phrase found on the sound may still move to the speaker's own start and end (refineTimes()). */
     private const PHRASE_REACH = 0.25;
@@ -303,11 +303,11 @@ final class VideoDubber
                     }
                     // A take far quicker than the speaker says the sentence ends early on every phrase: taken once more, slower, the closer one kept.
                     $span = count($line['segments']) === 1 ? self::speakerSpan($segments[$line['segments'][0]], $phrases) : null;
-                    if ($span !== null && $span >= 2.5 && $take['seconds'] < self::SLOW_TAKE * $span && $slowed < max(2, (int) ceil(count($lines) / 2))) {
+                    if ($span !== null && $span >= 2.5 && $take['seconds'] < self::SLOW_TAKE * $span && $slowed < count($lines)) {
                         $slowed++;
                         try {
                             $requests++;
-                            $again = $this->voiceLine($ffmpeg, $line['text'], $o['language'], $config + ['speed' => $take['seconds'] < 0.8 * $span ? 0.8 : 0.9],
+                            $again = $this->voiceLine($ffmpeg, $line['text'], $o['language'], $config + ['speed' => $take['seconds'] < 0.85 * $span ? 0.8 : 0.9],
                                 $tmp.'/line-'.$k.'-slower', $made);
                             $chars += mb_strlen($line['text']);
                             if (abs(log(max(0.01, $again['seconds']) / $span)) < abs(log(max(0.01, $take['seconds']) / $span))) {
@@ -1643,8 +1643,9 @@ final class VideoDubber
                 .'2. '.$people
                 .'3. For each segment '.$manner
                 ."4. For each segment write a dubbed line in {$target} that says all of the same thing naturally, as a native speaker would say it in that moment, "
-                .'and can be spoken in about the same time as the original: not longer than the original, nor much shorter (keep every name in full), '
-                .'with a comma where the speaker pauses. '.$faithful
+                .'and can be spoken in about the same time as the original: not longer than the original, nor much shorter (keep every name in full). '
+                .'Every part of the original sentence has its own counterpart in the dubbed line, in the same order (none dropped or moved), '
+                .'with a comma where the speaker pauses, so each part is heard where its own words are. '.$faithful
                 .'5. '.$sound
                 .'Return only JSON: {"background": "music", "speakers": [{"id": "A", "gender": "male", "voice": "..."}], "segments": [{"start": 0.0, "end": 3.2, "speaker": "A", '
                 .'"emotion": "excited", "delivery": "...", "original": "...", "dubbed": "..."}]}. If nothing is spoken, return {"background": "music", "speakers": [], "segments": []}.';
