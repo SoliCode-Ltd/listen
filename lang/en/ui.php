@@ -2092,7 +2092,8 @@ return [
         'files_gone' => 'No longer available',
         'download' => 'Download',
         'upgrade_title' => 'Dubbing is not on your plan yet',
-        'upgrade_text' => 'Your one free dub is below. Plans with dubbing let you dub more videos and download them without the mark.',
+        'upgrade_text' => 'Try one free dub below. Plans with dubbing let you dub more videos and download them without the mark.',
+        'upgrade_text_used' => 'You have used your free dub. Plans with dubbing let you dub more videos and download them without the mark.',
         'js' => [
             'step_upload' => 'Upload',
             'step_listening' => 'Listen',

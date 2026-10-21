@@ -248,6 +248,20 @@ class VideoDubPageTest extends TestCase
             ->assertSee(__('ui.dub.rule_title'))->assertSee(__('ui.dub.rule_example_value', ['credits' => '450']));
     }
 
+    public function test_a_plan_without_dubbing_offers_the_free_dub_until_it_is_made(): void
+    {
+        $this->openToEveryone();
+        $member = $this->member(dubbing: false);
+
+        // No dub made yet: one to try, never "your free dub is below".
+        $this->actingAs($member)->get(route('dashboard'))->assertOk()
+            ->assertSee(__('ui.dub.upgrade_title'))->assertSee(__('ui.dub.upgrade_text'))->assertDontSee(__('ui.dub.upgrade_text_used'));
+
+        VideoDub::query()->create(['user_id' => $member->id, 'status' => VideoDub::READY, 'is_free' => true, 'dialect' => 'ar-EG', 'voice' => 'Kore', 'video_seconds' => 20]);
+        $this->actingAs($member)->get(route('dashboard'))->assertOk()
+            ->assertSee(__('ui.dub.upgrade_text_used'))->assertDontSee(__('ui.dub.upgrade_text'));
+    }
+
     public function test_a_plan_sets_its_videos_a_month(): void
     {
         $this->openToEveryone();

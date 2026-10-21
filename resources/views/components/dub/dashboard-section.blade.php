@@ -80,7 +80,8 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
           {{ __('ui.dub.upgrade_title') }}
         </strong>
-        <p>{{ __('ui.dub.upgrade_text') }}</p>
+        {{-- The free dub still to try, or already made: never "your free dub is below" before there is one. --}}
+        <p>{{ $dub['state'] === 'used' ? __('ui.dub.upgrade_text_used') : __('ui.dub.upgrade_text') }}</p>
       </div>
     @endif
 
