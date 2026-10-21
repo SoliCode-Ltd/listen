@@ -294,6 +294,61 @@ class VideoDubberTest extends TestCase
         $this->assertSame([], VideoDubber::cuts($levels, [2.0]));
     }
 
+    public function test_a_long_sentence_is_read_in_pieces_on_the_speakers_own_pauses(): void
+    {
+        // The speaker says one sentence in three phrases, 5.3 s of speech, pausing after 2.0 s and 3.7 s of it.
+        $phrases = [[10.0, 12.0], [12.3, 14.0], [14.4, 16.0]];
+
+        // A 5 s take pausing at the same shares of its own speech: a piece on each phrase.
+        $this->assertSame([
+            ['take' => [0.0, 1.8], 'at' => [10.0, 12.0]],
+            ['take' => [2.1, 3.4], 'at' => [12.3, 14.0]],
+            ['take' => [3.6, 5.0], 'at' => [14.4, 16.0]],
+        ], VideoDubber::splitTake([[1.8, 2.1], [3.4, 3.6]], 5.0, $phrases));
+
+        // A take that pauses only once, near the second pause: the first two phrases are one piece.
+        $this->assertSame([
+            ['take' => [0.0, 3.4], 'at' => [10.0, 14.0]],
+            ['take' => [3.6, 5.0], 'at' => [14.4, 16.0]],
+        ], VideoDubber::splitTake([[3.4, 3.6]], 5.0, $phrases));
+
+        // Its pauses nowhere near the speaker's: the take stays whole, never a word moved a phrase early.
+        $this->assertNull(VideoDubber::splitTake([[0.5, 0.7]], 5.0, $phrases));
+        $this->assertNull(VideoDubber::splitTake([], 5.0, $phrases));
+        $this->assertNull(VideoDubber::splitTake([[1.8, 2.1]], 5.0, [[10.0, 16.0]]), 'one phrase: nothing to set it on');
+
+        // The phrases inside a line, cut to its start and end; one mostly outside it is not.
+        $this->assertSame([[10.1, 12.0], [12.3, 14.0]], VideoDubber::phrasesIn([[8.0, 9.9], [9.8, 12.0], [12.3, 14.0], [13.8, 16.0]], 10.1, 14.2));
+    }
+
+    public function test_a_sentence_ending_in_the_speakers_silence_ends_where_the_speaker_stopped(): void
+    {
+        $phrases = [[43.23, 44.64], [49.67, 51.39], [53.22, 54.11], [54.95, 56.38], [56.55, 58.81]];
+        $line = fn (float $start, float $end): array => ['start' => $start, 'end' => $end, 'dubbed' => 'كلام'];
+        // The model ends the first sentence at 54.95, 0.84 s past where the speaker stopped, as the next sentence begins.
+        $set = VideoDubber::onPhrases([$line(43.3, 54.95), $line(55.0, 58.8)], $phrases);
+        $this->assertSame([[43.23, 54.11], [54.95, 58.81]], array_map(fn (array $s): array => [$s['start'], $s['end']], $set));
+
+        // Ends inside a phrase, out of reach of any end: kept.
+        $this->assertSame([[49.67, 50.5]], array_map(fn (array $s): array => [$s['start'], $s['end']], VideoDubber::onPhrases([$line(49.7, 50.5)], [[49.67, 52.39]])));
+
+        // How long the speaker takes over the sentence, pauses inside it included; none for a line written for a phrase.
+        $this->assertSame(10.88, VideoDubber::speakerSpan($set[0], $phrases));
+        $this->assertNull(VideoDubber::speakerSpan($set[0] + ['phrase' => 3], $phrases));
+    }
+
+    public function test_a_time_written_as_minutes_and_seconds_is_read_in_seconds(): void
+    {
+        $line = fn (float $start, float $end): array => ['start' => $start, 'end' => $end, 'dubbed' => 'كلام'];
+        // An 81.6 s video: the model wrote 1:06.8 as 106.8 and 1:19.7 as 119.7.
+        $fixed = VideoDubber::inSeconds([$line(43.35, 54.08), $line(54.98, 106.80), $line(106.80, 119.70)], 81.58);
+        $this->assertSame([[43.35, 54.08], [54.98, 66.8], [66.8, 79.7]], array_map(fn (array $s): array => [$s['start'], $s['end']], $fixed));
+
+        // Times all inside the video stay as they are; a line after the end that reads as no such time is dropped.
+        $this->assertSame([[1.0, 2.0], [70.0, 81.58]], array_map(fn (array $s): array => [$s['start'], $s['end']],
+            VideoDubber::inSeconds([$line(1.0, 2.0), $line(70.0, 85.0), $line(90.0, 95.0)], 81.58)));
+    }
+
     public function test_every_phrase_gets_the_chosen_voice_and_each_part_goes_on_its_own_phrase(): void
     {
         // Lines written phrase by phrase (listen.dubbing.phrase_lines, off by default).
@@ -436,7 +491,7 @@ class VideoDubberTest extends TestCase
                 ]])]]]]]]);
         });
 
-        $r = $this->dubWith($video, 2);
+        $r = $this->dubWith($video, 4);
 
         $this->assertCount(3, $sent);
         $this->assertStringContainsString('Split what is said into segments', $sent[2]['contents'][0]['parts'][1]['text']);
@@ -518,7 +573,7 @@ class VideoDubberTest extends TestCase
             return Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode($data)]]]]], 'usageMetadata' => []]);
         });
 
-        $r = $this->dubWith($video, 2);
+        $r = $this->dubWith($video, 4);
 
         $this->assertCount(2, $sent);
         $this->assertStringContainsString('Split what is said into segments', $sent[1]['contents'][0]['parts'][1]['text']);
@@ -540,7 +595,7 @@ class VideoDubberTest extends TestCase
             ]])]]]]], 'usageMetadata' => []]);
         });
 
-        $r = $this->dubWith($video, 2);
+        $r = $this->dubWith($video, 4);
 
         $this->assertSame(1, $sent, 'one request: the model times its own sentences');
         $this->assertSame(3, $r['speech_map']['phrases']);
@@ -550,6 +605,9 @@ class VideoDubberTest extends TestCase
         $this->assertEqualsWithDelta(4.0, $r['lines'][0]['end'], 0.06);
         $this->assertEqualsWithDelta(5.0, $r['lines'][1]['start'], 0.06);
         $this->assertEqualsWithDelta(7.5, $r['lines'][1]['end'], 0.06);
+        // Each take far quicker than the speaker (2.2 s for 3.5 s, 1.65 s for 2.5 s): taken once more, slower, and that one kept.
+        $this->assertSame(2, $r['voicing']['slowed']);
+        $this->assertGreaterThan(2.5, $r['lines'][0]['voiced_seconds']);
     }
 
     /** Someone speaks from 0.5 to 2.5 s, pauses, speaks to 4 s, then from 5 to 7.5 s: three phrases. */
@@ -583,7 +641,7 @@ class VideoDubberTest extends TestCase
             }
             $path = 'audio/take-'.bin2hex(random_bytes(3)).'.wav';
             @mkdir(dirname(Storage::disk('public')->path($path)), 0755, true);
-            // As long as its words need: never taken again.
+            // As long as its words need (never taken again as too short), slower where asked to be.
             $seconds = round(0.9 * VideoDubber::needs($text, $config), 2);
             (new Process([$ffmpeg, '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=800:sample_rate=24000:duration='.$seconds, Storage::disk('public')->path($path)]))->mustRun();
 

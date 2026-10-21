@@ -120,6 +120,12 @@ final class VideoDubber
 
     private const PART_PAUSE = ' <short pause> ';
 
+    /** How far (seconds of speech) a pause of a take may be from a pause of the speaker it is set on (splitTake()). */
+    private const SPLIT_REACH = 0.8;
+
+    /** A take of a sentence shorter than this share of the speaker's time for it is taken once more, slower. */
+    private const SLOW_TAKE = 0.88;
+
     /** How far a phrase found on the sound may still move to the speaker's own start and end (refineTimes()). */
     private const PHRASE_REACH = 0.25;
 
@@ -222,7 +228,7 @@ final class VideoDubber
                     $report['transcribe'] = ['model' => $heard['model'], 'finish' => array_merge($report['transcribe']['finish'], $heard['finish'])] + $report['transcribe'];
                     $report['background'] = $heard['background'];
                 }
-                $segments = $this->hearAgain($ffmpeg, $speech, $heard['segments'], $o, $tmp, $report);
+                $segments = $this->hearAgain($ffmpeg, $speech, self::inSeconds($heard['segments'], $report['video_seconds']), $o, $tmp, $report);
                 // Each line's start and end on those of the phrases it covers: the model's times are a moment off, the sound's are not.
                 $segments = self::onPhrases($segments, $phrases);
             }
@@ -245,6 +251,7 @@ final class VideoDubber
             config(['services.gemini_tts.dialect_rewrite' => false]);
             $chars = 0;
             $retaken = 0;
+            $slowed = 0;
             $placements = [];
             $takes = [];
             $quiet = [];
@@ -294,8 +301,26 @@ final class VideoDubber
                             report($e);
                         }
                     }
+                    // A take far quicker than the speaker says the sentence ends early on every phrase: taken once more, slower, the closer one kept.
+                    $span = count($line['segments']) === 1 ? self::speakerSpan($segments[$line['segments'][0]], $phrases) : null;
+                    if ($span !== null && $span >= 2.5 && $take['seconds'] < self::SLOW_TAKE * $span && $slowed < max(2, (int) ceil(count($lines) / 2))) {
+                        $slowed++;
+                        try {
+                            $requests++;
+                            $again = $this->voiceLine($ffmpeg, $line['text'], $o['language'], $config + ['speed' => $take['seconds'] < 0.8 * $span ? 0.8 : 0.9],
+                                $tmp.'/line-'.$k.'-slower', $made);
+                            $chars += mb_strlen($line['text']);
+                            if (abs(log(max(0.01, $again['seconds']) / $span)) < abs(log(max(0.01, $take['seconds']) / $span))) {
+                                $take = $again;
+                            }
+                        } catch (GeminiKeysOutException|TtsCostLimitException $e) {
+                            throw $e;
+                        } catch (\Throwable $e) {
+                            report($e);
+                        }
+                    }
                     $takes[$k] = $take['audio'];
-                    foreach ($this->piecesOf($ffmpeg, $take, $line, $segments, $tmp.'/part-'.$k) as $piece) {
+                    foreach ($this->piecesOf($ffmpeg, $take, $line, $segments, $tmp.'/part-'.$k, $phrases) as $piece) {
                         $placements[] = $piece + ['line' => $k];
                     }
                 }
@@ -303,7 +328,7 @@ final class VideoDubber
                 config(['services.gemini_tts.dialect_rewrite' => $rewrite]);
             }
             $report['voicing'] = ['seconds' => round(microtime(true) - $t, 2), 'characters' => $chars, 'requests' => $requests,
-                'retaken' => $retaken, 'takes' => count($lines), 'placed_parts' => count($placements),
+                'retaken' => $retaken, 'slowed' => $slowed, 'takes' => count($lines), 'placed_parts' => count($placements),
                 'voiced_seconds' => round(array_sum(array_column($placements, 'seconds')), 2)]
                 + ($quiet !== [] ? ['quiet_lines' => count($quiet), 'quiet_because' => reset($quiet)] : []);
             if ($placements === []) {
@@ -333,8 +358,9 @@ final class VideoDubber
             $envelope = $this->speechEnvelope($ffmpeg, $background !== null ? $background['voices'] : $video, $background !== null);
             // Lines set on the phrases found on the sound: only a small correction then.
             $segments = self::refineTimes($segments, $envelope, $report['video_seconds'], 100, $phrases !== [] ? self::PHRASE_REACH : 0.7);
-            // Each part on its phrase as it is now (a line that could not be cut: from its first phrase to its last).
-            $placed = array_map(fn (array $p): array => ['start' => (float) $segments[$p['segments'][0]]['start'], 'end' => (float) $segments[end($p['segments'])]['end'],
+            // Each part on its phrase as it is now (a line that could not be cut: from its first phrase to its last);
+            // a piece of a sentence on the speaker's phrases inside it.
+            $placed = array_map(fn (array $p): array => ['start' => (float) ($p['from'] ?? $segments[$p['segments'][0]]['start']), 'end' => (float) ($p['until'] ?? $segments[end($p['segments'])]['end']),
                 'voiced_seconds' => $p['seconds'], 'audio' => $p['audio'], 'line' => $p['line']], $placements);
             $plan = self::plan($placed, $report['video_seconds']);
             $report['fit'] = ['sped_up' => count(array_filter($plan, fn ($p) => $p['tempo'] > 1.0)), 'slowed' => count(array_filter($plan, fn ($p) => $p['tempo'] < 1.0)),
@@ -345,9 +371,11 @@ final class VideoDubber
             $report['loudness'] = ['target_db' => $plan[0]['target_db'] ?? null, 'gains_db' => array_column($plan, 'gain_db')];
             // The old voice is out wherever the original speaker makes a sound, a phrase without a new line included.
             $placementOf = [];
+            $piecesOf = [];
             foreach ($placements as $pi => $p) {
                 foreach ($p['segments'] as $si) {
-                    $placementOf[$si] = $pi;
+                    $placementOf[$si] ??= $pi;
+                    $piecesOf[$si][] = $pi;
                 }
             }
             // A line the speech engine could not voice stays quiet: its old voice is out too.
@@ -367,7 +395,10 @@ final class VideoDubber
             }
             $report['lines'] = array_map(fn (array $s, int $si): array => ['start' => $s['start'], 'end' => $s['end'], 'heard_start' => $s['heard_start'] ?? $s['start'],
                 'speaker' => $s['speaker'], 'emotion' => $s['emotion'], 'delivery' => $s['delivery'], 'original' => $s['original'], 'dubbed' => $s['dubbed'],
-                'voiced_seconds' => isset($placementOf[$si]) ? round((float) $placements[$placementOf[$si]]['seconds'], 2) : 0.0,
+                'voiced_seconds' => round(array_sum(array_map(fn (int $pi): float => (float) $placements[$pi]['seconds'], $piecesOf[$si] ?? [])), 2),
+                // A sentence read in pieces on the speaker's own pauses: where each went, and how fast.
+                'pieces' => count($piecesOf[$si] ?? []) > 1 ? array_map(fn (int $pi): array => ['from' => $plan[$pi]['from'], 'until' => $plan[$pi]['until'],
+                    'voiced_seconds' => round((float) $placements[$pi]['seconds'], 2), 'tempo' => $plan[$pi]['tempo']], $piecesOf[$si]) : [],
                 'tempo' => isset($placementOf[$si]) ? $plan[$placementOf[$si]]['tempo'] : null,
                 'gain_db' => isset($placementOf[$si]) ? ($plan[$placementOf[$si]]['gain_db'] ?? 0.0) : null, 'voice' => $voices[$s['speaker']] ?? $o['voice'],
                 'take' => isset($placementOf[$si]) ? $placements[$placementOf[$si]]['line'] : null,
@@ -535,14 +566,60 @@ final class VideoDubber
             $nextStart = $i + 1 < $count ? (float) $segments[$i + 1]['start'] : INF;
             $near = fn (array $times, float $at, float $from, float $to): ?float => array_reduce($times,
                 fn (?float $best, float $t): ?float => $t >= $from && $t <= $to && abs($t - $at) <= $reach && ($best === null || abs($t - $at) < abs($best - $at)) ? $t : $best);
+            // Where a start or an end falls in the speaker's silence (or a start in the last moment of a phrase, an end in
+            // the first moment of one), the speaker starts at the next phrase and stopped at the one before.
+            $silent = fn (float $t, bool $isStart): bool => $phrases !== [] && array_filter($phrases, fn (array $p): bool => $isStart
+                ? $t >= $p[0] - 0.05 && $t <= max($p[0] + 0.05, $p[1] - 0.3)
+                : $t >= min($p[1] - 0.05, $p[0] + 0.3) && $t <= $p[1] + 0.05) === [];
             $newStart = $near(array_column($phrases, 0), $start, $previousEnd - 0.01, $end) ?? max($start, $previousEnd);
+            if ($silent($newStart, true)) {
+                $later = array_filter(array_column($phrases, 0), fn (float $t): bool => $t > $newStart && $t < $end - 0.3);
+                $newStart = $later !== [] ? min($later) : $newStart;
+            }
             $newEnd = $near(array_column($phrases, 1), $end, $newStart + 0.3, $nextStart + 0.1) ?? max($end, $newStart + 0.3);
+            if ($silent($newEnd, false)) {
+                $earlier = array_filter(array_column($phrases, 1), fn (float $t): bool => $t < $newEnd && $t > $newStart + 0.3);
+                $newEnd = $earlier !== [] ? max($earlier) : $newEnd;
+            }
             $segments[$i]['start'] = round($newStart, 2);
             $segments[$i]['end'] = round($newEnd, 2);
             $previousEnd = $newEnd;
         }
 
         return $segments;
+    }
+
+    /**
+     * The model's times in seconds: past the first minute it now and then
+     * writes a time as minutes and seconds run together (106.8 for 1:06.8),
+     * which puts the last lines after the video's end, so they are never
+     * heard. Where a time lies past the end and reads as such a time, every
+     * time of that form is read so; a line that still starts after the end
+     * is dropped, and an end past it is the video's end.
+     *
+     * @param  array<int, array<string, mixed>>  $segments
+     * @return array<int, array<string, mixed>>
+     */
+    public static function inSeconds(array $segments, float $seconds): array
+    {
+        $clock = fn (float $t): ?float => $t >= 100 && fmod($t, 100) < 60 ? floor($t / 100) * 60 + fmod($t, 100) : null;
+        $past = array_filter(array_merge(array_column($segments, 'start'), array_column($segments, 'end')), fn ($t): bool => (float) $t > $seconds + 0.5);
+        if ($past !== [] && array_filter($past, fn ($t): bool => ($clock((float) $t) ?? INF) > $seconds + 0.5) === []) {
+            foreach ($segments as $i => $s) {
+                foreach (['start', 'end'] as $key) {
+                    $segments[$i][$key] = round($clock((float) $s[$key]) ?? (float) $s[$key], 2);
+                }
+            }
+        }
+        $kept = [];
+        foreach ($segments as $s) {
+            if ((float) $s['start'] < $seconds - 0.2) {
+                $kept[] = ['end' => min((float) $s['end'], $seconds)] + $s;
+            }
+        }
+        usort($kept, fn ($a, $b) => $a['start'] <=> $b['start']);
+
+        return $kept;
     }
 
     /** Seconds a line's words need, read as the speech engine reads them ($config: its voice settings). */
@@ -1081,21 +1158,7 @@ final class VideoDubber
         if ($frames < 20) {
             return null;
         }
-        $sorted = $levels;
-        sort($sorted);
-        $gate = $sorted[(int) floor(0.95 * ($frames - 1))] - 30;
-        $pauses = [];
-        $run = null;
-        for ($f = 0; $f <= $frames; $f++) {
-            if ($f < $frames && $levels[$f] < $gate) {
-                $run ??= $f;
-            } elseif ($run !== null) {
-                if ($run > 0 && $f < $frames && $f - $run >= 0.12 * $fps) {
-                    $pauses[] = [round($run / $fps, 2), round($f / $fps, 2)];
-                }
-                $run = null;
-            }
-        }
+        $pauses = self::takePauses($levels, $fps);
         $m = count($pauses);
         if ($m < $parts - 1) {
             return null;
@@ -1147,20 +1210,208 @@ final class VideoDubber
     }
 
     /**
+     * The pauses inside a take (0.12 s or more, 30 dB under its loud end),
+     * not counting the silence at its very start or end: [from, to] in
+     * seconds into the take.
+     *
+     * @param  array<int, float>  $levels  the take's loudness, dB every 10 ms
+     * @return array<int, array{0: float, 1: float}>
+     */
+    public static function takePauses(array $levels, int $fps = 100): array
+    {
+        $frames = count($levels);
+        if ($frames < 20) {
+            return [];
+        }
+        $sorted = $levels;
+        sort($sorted);
+        $gate = $sorted[(int) floor(0.95 * ($frames - 1))] - 30;
+        $pauses = [];
+        $run = null;
+        for ($f = 0; $f <= $frames; $f++) {
+            if ($f < $frames && $levels[$f] < $gate) {
+                $run ??= $f;
+            } elseif ($run !== null) {
+                if ($run > 0 && $f < $frames && $f - $run >= 0.12 * $fps) {
+                    $pauses[] = [round($run / $fps, 2), round($f / $fps, 2)];
+                }
+                $run = null;
+            }
+        }
+
+        return $pauses;
+    }
+
+    /**
+     * Where a sentence the text model timed itself is read in pieces: its
+     * take cut at its own pauses and each piece set on the speaker's phrases
+     * inside the same sentence, so where the speaker stops for breath the new
+     * voice stops too instead of running on and ending early. A pause of the
+     * take goes with a pause of the speaker when it comes at the same share
+     * of the speech (the pauses left out of both), within SPLIT_REACH
+     * seconds of the speaker's; the most such pairs are taken, in order, the
+     * nearest first. A pause of the speaker with no pause of the take near
+     * it stays inside its piece. Null when none pairs: the take stays whole.
+     * Words never move from one sentence to another: the pieces are of this
+     * sentence's take, on this sentence's phrases.
+     *
+     * @param  array<int, array{0: float, 1: float}>  $pauses  the take's (takePauses())
+     * @param  array<int, array{0: float, 1: float}>  $phrases  the speaker's phrases inside the sentence, in order
+     * @return array<int, array{take: array{0: float, 1: float}, at: array{0: float, 1: float}}>|null  each piece: from-to in the take, and the speaker's from-to
+     */
+    public static function splitTake(array $pauses, float $takeSeconds, array $phrases): ?array
+    {
+        $phrases = array_values($phrases);
+        $n = count($phrases) - 1;
+        $m = count($pauses);
+        if ($n < 1 || $m < 1) {
+            return null;
+        }
+        // The speaker's joints and the take's pauses, each as seconds of speech before it.
+        $joints = [];
+        $said = 0.0;
+        for ($i = 0; $i < $n; $i++) {
+            $said += $phrases[$i][1] - $phrases[$i][0];
+            $joints[] = $said;
+        }
+        $speech = $said + $phrases[$n][1] - $phrases[$n][0];
+        $quiet = array_sum(array_map(fn (array $p): float => $p[1] - $p[0], $pauses));
+        $voiced = $takeSeconds - $quiet;
+        if ($speech <= 0 || $voiced <= 0) {
+            return null;
+        }
+        $at = [];
+        $before = 0.0;
+        foreach ($pauses as [$a, $b]) {
+            // On the speaker's scale: the take reads at its own pace.
+            $at[] = ($a - $before) * $speech / $voiced;
+            $before += $b - $a;
+        }
+        // The most pairs, in order; of those, the nearest in all.
+        $best = array_fill(0, $n + 1, array_fill(0, $m + 1, [0, 0.0]));
+        $better = fn (array $x, array $y): bool => $x[0] > $y[0] || ($x[0] === $y[0] && $x[1] < $y[1]);
+        for ($i = 1; $i <= $n; $i++) {
+            for ($j = 1; $j <= $m; $j++) {
+                $best[$i][$j] = $better($best[$i - 1][$j], $best[$i][$j - 1]) ? $best[$i - 1][$j] : $best[$i][$j - 1];
+                $off = abs($joints[$i - 1] - $at[$j - 1]);
+                $pair = [$best[$i - 1][$j - 1][0] + 1, $best[$i - 1][$j - 1][1] + $off];
+                if ($off <= self::SPLIT_REACH && $better($pair, $best[$i][$j])) {
+                    $best[$i][$j] = $pair;
+                }
+            }
+        }
+        if ($best[$n][$m][0] === 0) {
+            return null;
+        }
+        $pairs = [];
+        for ($i = $n, $j = $m; $i > 0 && $j > 0;) {
+            $off = abs($joints[$i - 1] - $at[$j - 1]);
+            $pair = [$best[$i - 1][$j - 1][0] + 1, $best[$i - 1][$j - 1][1] + $off];
+            if ($off <= self::SPLIT_REACH && $pair[0] === $best[$i][$j][0] && abs($pair[1] - $best[$i][$j][1]) < 1e-9) {
+                $pairs[] = [$i - 1, $j - 1];
+                $i--;
+                $j--;
+            } elseif ($best[$i - 1][$j] === $best[$i][$j]) {
+                $i--;
+            } else {
+                $j--;
+            }
+        }
+        $pairs = array_reverse($pairs);
+        $pieces = [];
+        $takeFrom = 0.0;
+        $first = 0;
+        foreach ([...$pairs, [$n, null]] as [$joint, $pause]) {
+            $pieces[] = ['take' => [round($takeFrom, 2), round($pause === null ? $takeSeconds : $pauses[$pause][0], 2)],
+                'at' => [$phrases[$first][0], $phrases[$joint][1]]];
+            if ($pause !== null) {
+                $takeFrom = $pauses[$pause][1];
+                $first = $joint + 1;
+            }
+        }
+        foreach ($pieces as $piece) {
+            if ($piece['take'][1] - $piece['take'][0] < 0.3 || $piece['at'][1] - $piece['at'][0] < 0.3) {
+                return null;
+            }
+        }
+
+        return $pieces;
+    }
+
+    /**
+     * How long the speaker takes over a sentence the text model timed itself:
+     * from the start of the first of their phrases in it to the end of the
+     * last (their pauses inside it included). Null for a line written for
+     * a phrase, or where no phrase is found in it.
+     *
+     * @param  array<string, mixed>  $segment
+     * @param  array<int, array{0: float, 1: float}>  $phrases
+     */
+    public static function speakerSpan(array $segment, array $phrases): ?float
+    {
+        $inside = isset($segment['phrase']) ? [] : self::phrasesIn($phrases, (float) $segment['start'], (float) $segment['end']);
+
+        return $inside === [] ? null : round(end($inside)[1] - $inside[0][0], 2);
+    }
+
+    /**
+     * The speaker's phrases inside a line (those of which half or more lies
+     * in it), cut to the line's own start and end.
+     *
+     * @param  array<int, array{0: float, 1: float}>  $phrases
+     * @return array<int, array{0: float, 1: float}>
+     */
+    public static function phrasesIn(array $phrases, float $start, float $end): array
+    {
+        $inside = array_values(array_filter($phrases, fn (array $p): bool => $p[1] > $p[0]
+            && min($p[1], $end) - max($p[0], $start) >= 0.5 * ($p[1] - $p[0])));
+        if ($inside !== []) {
+            $inside[0][0] = max($inside[0][0], $start);
+            $inside[count($inside) - 1][1] = min($inside[count($inside) - 1][1], $end);
+        }
+
+        return $inside;
+    }
+
+    /**
      * A line's take as the parts it is placed in: cut at its pauses (cuts())
      * into one piece for each phrase, or whole (from its first phrase to its
-     * last) when it cannot be.
+     * last) when it cannot be. A sentence the model timed itself is cut on
+     * the speaker's own pauses inside it where its take pauses there too
+     * (splitTake()): each piece then says where it goes ('from', 'until';
+     * the first starts where the line starts, the last ends where it ends).
      *
      * @param  array{audio: string, seconds: float}  $take
      * @param  array{segments: array<int, int>, text: string}  $line
      * @param  array<int, array<string, mixed>>  $segments
-     * @return array<int, array{segments: array<int, int>, audio: string, seconds: float}>
+     * @param  array<int, array{0: float, 1: float}>  $phrases  where the speaker speaks
+     * @return array<int, array{segments: array<int, int>, audio: string, seconds: float, from?: float, until?: float}>
      */
-    private function piecesOf(string $ffmpeg, array $take, array $line, array $segments, string $out): array
+    private function piecesOf(string $ffmpeg, array $take, array $line, array $segments, string $out, array $phrases = []): array
     {
         $whole = [['segments' => $line['segments'], 'audio' => $take['audio'], 'seconds' => (float) $take['seconds']]];
         if (count($line['segments']) < 2) {
-            return $whole;
+            $s = $segments[$line['segments'][0]];
+            $inside = isset($s['phrase']) ? [] : self::phrasesIn($phrases, (float) $s['start'], (float) $s['end']);
+            $split = count($inside) < 2 ? null
+                : self::splitTake(self::takePauses($this->speechEnvelope($ffmpeg, $take['audio'], false)), (float) $take['seconds'], $inside);
+            if ($split === null) {
+                return $whole;
+            }
+            $pieces = [];
+            $last = count($split) - 1;
+            foreach ($split as $k => $piece) {
+                $file = $out.'-'.$k.'.wav';
+                try {
+                    $this->run([$ffmpeg, '-v', 'error', '-y', '-i', $take['audio'], '-af', 'atrim=start='.$piece['take'][0].':end='.$piece['take'][1].',asetpts=PTS-STARTPTS', '-ac', '1', $file]);
+                } catch (\Throwable) {
+                    return $whole;
+                }
+                $pieces[] = ['segments' => $line['segments'], 'audio' => $file, 'seconds' => round($piece['take'][1] - $piece['take'][0], 3)]
+                    + ($k > 0 ? ['from' => $piece['at'][0]] : []) + ($k < $last ? ['until' => $piece['at'][1]] : []);
+            }
+
+            return $pieces;
         }
         $cuts = self::cuts($this->speechEnvelope($ffmpeg, $take['audio'], false),
             array_map(fn (int $i): float => max(0.3, self::needs((string) $segments[$i]['dubbed'])), $line['segments']));
@@ -1387,12 +1638,13 @@ final class VideoDubber
                 .'"phrases": [{"n": 1, "speaker": "A", "emotion": "excited", "delivery": "...", "original": "...", "dubbed": "..."}]}.';
         } else {
             $prompt .= "1. Split what is said into segments at natural sentence or phrase boundaries, each 2 to 10 seconds long and spoken by one person, "
-                ."with its start and end in seconds from the start of the audio. Cover everything that is said, from the first word to the very last one "
+                ."with its start and end in seconds from the start of the audio, as plain seconds also past the first minute (75.4, never 1:15.4 or 115.4). Cover everything that is said, from the first word to the very last one "
                 ."at the end of the audio: never leave out, merge away or sum up any part, and give each segment every word spoken in it.\n"
                 .'2. '.$people
                 .'3. For each segment '.$manner
                 ."4. For each segment write a dubbed line in {$target} that says all of the same thing naturally, as a native speaker would say it in that moment, "
-                .'and can be spoken in about the same time as the original: not longer than the original. '.$faithful
+                .'and can be spoken in about the same time as the original: not longer than the original, nor much shorter (keep every name in full), '
+                .'with a comma where the speaker pauses. '.$faithful
                 .'5. '.$sound
                 .'Return only JSON: {"background": "music", "speakers": [{"id": "A", "gender": "male", "voice": "..."}], "segments": [{"start": 0.0, "end": 3.2, "speaker": "A", '
                 .'"emotion": "excited", "delivery": "...", "original": "...", "dubbed": "..."}]}. If nothing is spoken, return {"background": "music", "speakers": [], "segments": []}.';

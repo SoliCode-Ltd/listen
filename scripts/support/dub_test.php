@@ -118,5 +118,8 @@ foreach ((array) ($report['lines'] ?? []) as $line) {
         $line['tempo'] ?? '—', isset($line['gain_db']) ? sprintf('%+.1f dB', $line['gain_db']) : '',
         implode('', array_map(fn (string $k): string => ! empty($line[$k]) ? ' ['.$k.']' : '', ['heard_again', 'as_said', 'written', 'placed_whole', 'quiet'])),
         $line['original'], $line['dubbed']);
+    foreach ((array) ($line['pieces'] ?? []) as $piece) {
+        printf("      piece %6.2f-%6.2f %4.1f s ×%s\n", $piece['from'], $piece['until'], $piece['voiced_seconds'], $piece['tempo']);
+    }
 }
 printf("Done in %.1f s: %s (%.1f MB)\n", microtime(true) - $started, $dir.'/dub.mp4', filesize($dir.'/dub.mp4') / 1048576);
