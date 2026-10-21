@@ -297,11 +297,7 @@ class VideoDubberTest extends TestCase
     public function test_every_phrase_gets_the_chosen_voice_and_each_part_goes_on_its_own_phrase(): void
     {
         $ffmpeg = AudioFormats::ffmpegPath();
-        // Someone speaks from 0.5 to 2.5 s, pauses, speaks to 4 s, then quotes a saying from 5 to 7.5 s.
-        $video = $this->dir.'/phrases.mp4';
-        (new Process([$ffmpeg, '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=320x240:rate=15',
-            '-f', 'lavfi', '-i', "aevalsrc='0.5*sin(2*PI*500*t)*(between(t,0.5,2.5)+between(t,2.8,4)+between(t,5,7.5))':s=16000:d=8",
-            '-t', '8', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', $video]))->mustRun();
+        $video = $this->phraseVideo();
         $quote = 'إن الله وملائكته وأهل السماوات والأرض ليصلون على معلم الناس الخير';
         $answer = fn (array $phrases) => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'none',
             'speakers' => [['id' => 'A', 'gender' => 'male', 'voice' => 'calm']], 'phrases' => $phrases])]]]]], 'usageMetadata' => []]);
@@ -361,6 +357,113 @@ class VideoDubberTest extends TestCase
             $this->assertLessThan(-45, $this->level($r['output'], $from, $length, 'bandpass=f=500:w=60,'), 'no old voice at '.$from.' s');
         }
         $this->assertSame([], Storage::disk('public')->allFiles('audio'), 'every take is deleted');
+    }
+
+    public function test_an_answer_the_model_will_not_give_is_asked_for_again_without_copying_quotations(): void
+    {
+        $video = $this->phraseVideo();
+        $sent = [];
+        // The model will not copy a well-known saying word for word: no answer at all (RECITATION). Asked again without, it answers.
+        Http::fake(function ($request) use (&$sent) {
+            $sent[] = $request->data();
+
+            return count($sent) === 1
+                ? Http::response(['candidates' => [['finishReason' => 'RECITATION', 'index' => 0]], 'usageMetadata' => ['promptTokenCount' => 300]])
+                : Http::response(['candidates' => [['finishReason' => 'STOP', 'content' => ['parts' => [['text' => json_encode(['background' => 'none', 'phrases' => [
+                    ['n' => 1, 'speaker' => 'A', 'original' => 'Hi there,', 'dubbed' => 'هلا والله،'], ['n' => 2, 'speaker' => 'A', 'original' => 'welcome.', 'dubbed' => 'حياك الله.'],
+                    ['n' => 3, 'speaker' => 'A', 'original' => '…', 'dubbed' => 'ربنا والملايكة وأهل السما والأرض بيصلّوا على اللي بيعلّم الناس الخير'],
+                ]])]]]]], 'usageMetadata' => ['promptTokenCount' => 300]]);
+        });
+
+        $r = $this->dubWith($video, 2);
+
+        $this->assertCount(2, $sent);
+        // Quotations are never asked for word for word; asked again, not even their first words.
+        $this->assertStringContainsString('never copy them out: for a quotation write only its first three words', $sent[0]['contents'][0]['parts'][1]['text']);
+        $this->assertStringContainsString('for a quotation write only "…" as its original', $sent[1]['contents'][0]['parts'][1]['text']);
+        $this->assertSame(['RECITATION', 'STOP'], $r['transcribe']['finish']);
+        $this->assertSame(600, $r['transcribe']['input_tokens'], 'both requests counted');
+        $this->assertSame(3, $r['segments']);
+    }
+
+    public function test_an_empty_answer_is_never_taken_for_a_video_nobody_speaks_in(): void
+    {
+        $video = $this->phraseVideo();
+        Http::fake(['*' => Http::response(['candidates' => [['finishReason' => 'RECITATION', 'index' => 0]]])]);
+        $dubber = null;
+
+        try {
+            $this->dubWith($video, 0, $dubber);
+            $this->fail('The dub should have failed.');
+        } catch (\RuntimeException $e) {
+            // The member is told something went wrong on our side, not that nobody speaks.
+            $this->assertStringContainsString('could not be written out', $e->getMessage());
+            $this->assertStringContainsString('RECITATION', $e->getMessage());
+            $this->assertStringNotContainsString('No speech', $e->getMessage());
+        }
+        // What it had done up to there, for the admin.
+        $this->assertSame(3, $dubber->lastReport['speech_map']['phrases']);
+        $this->assertStringContainsString('RECITATION', $dubber->lastReport['error']);
+    }
+
+    public function test_when_the_phrases_give_no_line_the_model_times_the_lines_itself(): void
+    {
+        $video = $this->phraseVideo();
+        $sent = [];
+        // It heard no words in any phrase (it would not keep to them); timing the lines itself, it does.
+        Http::fake(function ($request) use (&$sent) {
+            $sent[] = $request->data();
+            $data = count($sent) === 1
+                ? ['background' => 'none', 'phrases' => [['n' => 1, 'original' => '', 'dubbed' => ''], ['n' => 2, 'original' => '', 'dubbed' => ''], ['n' => 3, 'original' => '', 'dubbed' => '']]]
+                : ['background' => 'none', 'segments' => [['start' => 0.5, 'end' => 4.0, 'speaker' => 'A', 'original' => 'Hi there, welcome.', 'dubbed' => 'هلا والله، حياك الله.'],
+                    ['start' => 5.0, 'end' => 7.5, 'speaker' => 'A', 'original' => 'How are you today?', 'dubbed' => 'كيف حالك اليوم؟']]];
+
+            return Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode($data)]]]]], 'usageMetadata' => []]);
+        });
+
+        $r = $this->dubWith($video, 2);
+
+        $this->assertCount(2, $sent);
+        $this->assertStringContainsString('Split what is said into segments', $sent[1]['contents'][0]['parts'][1]['text']);
+        $this->assertFalse($r['speech_map']['used']);
+        $this->assertSame(2, $r['segments']);
+    }
+
+    /** Someone speaks from 0.5 to 2.5 s, pauses, speaks to 4 s, then from 5 to 7.5 s: three phrases. */
+    private function phraseVideo(): string
+    {
+        $video = $this->dir.'/phrases.mp4';
+        (new Process([AudioFormats::ffmpegPath(), '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=320x240:rate=15',
+            '-f', 'lavfi', '-i', "aevalsrc='0.5*sin(2*PI*500*t)*(between(t,0.5,2.5)+between(t,2.8,4)+between(t,5,7.5))':s=16000:d=8",
+            '-t', '8', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', $video]))->mustRun();
+
+        return $video;
+    }
+
+    /**
+     * Dubs $video with the text model as faked by the caller and a speech engine that reads each take as a tone ($takes takes expected).
+     *
+     * @return array<string, mixed>
+     */
+    private function dubWith(string $video, int $takes, ?VideoDubber &$dubber = null): array
+    {
+        $ffmpeg = AudioFormats::ffmpegPath();
+        $keys = \Mockery::mock(GeminiKeyManager::class);
+        $keys->shouldReceive('keysInOrder')->andReturn([['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1]]);
+        $keys->shouldReceive('recordUsage');
+        $tts = \Mockery::mock(GeminiTtsProvider::class);
+        $tts->shouldReceive('synthesize')->times($takes)->andReturnUsing(function (string $text, string $language, array $config) use ($ffmpeg) {
+            $path = 'audio/take-'.bin2hex(random_bytes(3)).'.wav';
+            @mkdir(dirname(Storage::disk('public')->path($path)), 0755, true);
+            // As long as its words need: never taken again.
+            $seconds = round(0.9 * VideoDubber::needs($text, $config), 2);
+            (new Process([$ffmpeg, '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=800:sample_rate=24000:duration='.$seconds, Storage::disk('public')->path($path)]))->mustRun();
+
+            return ['audio_path' => $path, 'duration_seconds' => 2];
+        });
+        $dubber = new VideoDubber($keys, $tts);
+
+        return $dubber->dub($video, ['language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Kore', 'preview' => false, 'out_dir' => $this->dir, 'name' => 'dubbed']);
     }
 
     public function test_tokens_and_characters_turn_into_money(): void

@@ -153,6 +153,9 @@ class VideoDubPageTest extends TestCase
 
         $this->assertSame(VideoDub::FAILED, $dub->status);
         $this->assertSame('ui.dub.error_no_speech', $dub->error_message, 'kept as a key');
+        // For the admin: what went wrong, and what it had done up to there.
+        $this->assertStringContainsString('No speech', (string) ($dub->report['error'] ?? ''));
+        $this->assertArrayHasKey('transcribe', (array) $dub->report);
         $this->assertSame(__('ui.dub.error_no_speech'), $dub->errorText());
         app()->setLocale('ar');
         $this->assertSame(__('ui.dub.error_no_speech', [], 'ar'), $dub->errorText(), 'said in the reader\'s language');

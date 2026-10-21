@@ -82,6 +82,20 @@ class VideoDubResource extends Resource
         return $name ? $name.' ('.$dub->voice.')' : (string) $dub->voice;
     }
 
+    /** How far a failed dub got: the phrases found, what the text model answered, the lines written. */
+    public static function failedSteps(VideoDub $dub): ?string
+    {
+        $r = (array) $dub->report;
+        $steps = array_filter([
+            isset($r['speech_map']) ? 'Speech found: '.(int) ($r['speech_map']['phrases'] ?? 0).' phrases ('.($r['speech_map']['method'] ?? '?').')' : null,
+            isset($r['transcribe']['finish']) ? 'Text model answered: '.implode(', ', array_map(fn ($f): string => (string) $f ?: 'nothing', (array) $r['transcribe']['finish'])) : null,
+            isset($r['segments']) ? 'Lines written: '.(int) $r['segments'] : null,
+            isset($r['voicing']) ? 'Voiced: '.(int) ($r['voicing']['takes'] ?? 0).' takes' : null,
+        ]);
+
+        return $steps === [] ? null : implode(' · ', $steps);
+    }
+
     public static function usd(?float $value, int $decimals = 4): string
     {
         return $value === null ? '—' : '$'.number_format($value, $decimals);
@@ -132,6 +146,9 @@ class VideoDubResource extends Resource
                 ->schema([
                     Infolists\Components\TextEntry::make('error_message')->label('What the member saw')
                         ->state(fn (VideoDub $r): string => $r->errorText())->placeholder('—'),
+                    Infolists\Components\TextEntry::make('report.error')->label('What went wrong')->placeholder('—'),
+                    Infolists\Components\TextEntry::make('steps')->label('How far it got')
+                        ->state(fn (VideoDub $r): ?string => self::failedSteps($r))->placeholder('—'),
                 ]),
             Infolists\Components\Section::make('Videos')
                 ->description(fn (VideoDub $r): string => self::keptText($r))

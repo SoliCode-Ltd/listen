@@ -49,6 +49,7 @@ class VideoDubRunner
         $source = collect($disk->files($dub->folder))->first(fn (string $f): bool => str_starts_with(basename($f), 'source.'));
 
         try {
+            $this->dubber->lastReport = [];
             if ($source === null) {
                 throw new \RuntimeException('The uploaded video is missing.');
             }
@@ -80,7 +81,10 @@ class VideoDubRunner
             ]);
         } catch (\Throwable $e) {
             Log::warning('A video dub failed.', ['video_dub_id' => $dub->id, 'error' => $e->getMessage()]);
-            $this->fail($dub->id, self::messageFor($e));
+            if ($this->fail($dub->id, self::messageFor($e))) {
+                // What it had done up to there, and why it stopped, for the admin's page.
+                $dub->forceFill(['report' => $this->dubber->lastReport ?: ['error' => mb_substr($e->getMessage(), 0, 300)]])->save();
+            }
 
             return;
         } finally {

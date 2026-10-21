@@ -11,6 +11,7 @@ use App\Support\UsageEstimator;
 use App\Support\VoiceFlag;
 use App\Support\VoiceTier;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 
@@ -140,6 +141,9 @@ final class VideoDubber
     /** The separation model's sample rate (resources/dubbing/separate.py). */
     private const SEPARATION_RATE = 44100;
 
+    /** What the last dub() that failed had done, step by step, up to where it failed (for the admin). */
+    public array $lastReport = [];
+
     public function __construct(private GeminiKeyManager $keys, private GeminiTtsProvider $tts, private ?VoiceSeparator $separator = null) {}
 
     /**
@@ -184,23 +188,28 @@ final class VideoDubber
             // 2. What is said, by whom and how, and the dubbed lines: one for each phrase (or timed by the model, where no phrases were found).
             $t = microtime(true);
             $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect'], $phrases);
-            if ($phrases !== [] && $heard['segments'] === [] && count($heard['unsaid']) === count($phrases)) {
-                // No answer for any phrase (the model would not keep to them): it times the lines itself instead.
-                $report['speech_map']['used'] = false;
-                $phrases = [];
-                $asked = $heard['usage'];
-                $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect']);
-                foreach ($asked as $key => $tokens) {
-                    $heard['usage'][$key] = ($heard['usage'][$key] ?? 0) + $tokens;
-                }
-            }
-            $segments = $heard['segments'];
-            $report['transcribe'] = ['seconds' => round(microtime(true) - $t, 2), 'model' => $heard['model']] + $heard['usage'];
+            $report['transcribe'] = ['model' => $heard['model'], 'finish' => $heard['finish']] + $heard['usage'];
             $report['background'] = $heard['background'];
-            // Speech the lines leave out, heard again on its own: a dub must not go quiet, nor bring back the old voice, where someone still talks.
-            $segments = $phrases !== []
-                ? $this->fillPhrases($ffmpeg, $speech, $segments, $heard['unsaid'], $phrases, $o, $tmp, $report)
-                : $this->hearAgain($ffmpeg, $speech, $segments, $o, $tmp, $report);
+            $segments = [];
+            if ($phrases !== [] && ($heard['segments'] !== [] || count($heard['unsaid']) < count($phrases))) {
+                // Speech the lines leave out, heard again on its own: a dub must not go quiet, nor bring back the old voice, where someone still talks.
+                $segments = $this->fillPhrases($ffmpeg, $speech, $heard['segments'], $heard['unsaid'], $phrases, $o, $tmp, $report);
+            }
+            if ($segments === []) {
+                if ($phrases !== []) {
+                    // Not one line from the phrases (the model would not keep to them): it times the lines itself instead.
+                    $report['speech_map']['used'] = false;
+                    $phrases = [];
+                    $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect']);
+                    foreach ($heard['usage'] as $key => $tokens) {
+                        $report['transcribe'][$key] = ($report['transcribe'][$key] ?? 0) + $tokens;
+                    }
+                    $report['transcribe'] = ['model' => $heard['model'], 'finish' => array_merge($report['transcribe']['finish'], $heard['finish'])] + $report['transcribe'];
+                    $report['background'] = $heard['background'];
+                }
+                $segments = $this->hearAgain($ffmpeg, $speech, $heard['segments'], $o, $tmp, $report);
+            }
+            $report['transcribe']['seconds'] = round(microtime(true) - $t, 2);
             if ($segments === []) {
                 throw new \RuntimeException('No speech was found in the video.');
             }
@@ -317,6 +326,10 @@ final class VideoDubber
             $report['total_seconds'] = round(microtime(true) - $started, 2);
 
             return $report;
+        } catch (\Throwable $e) {
+            $this->lastReport = $report + ['error' => mb_substr($e->getMessage(), 0, 300), 'total_seconds' => round(microtime(true) - $started, 2)];
+
+            throw $e;
         } finally {
             if ($separating !== null) {
                 $separator->cancel($separating);
@@ -861,7 +874,8 @@ final class VideoDubber
             $report['heard_again'][] = ['from' => $phrases[$run[0]][0], 'to' => $phrases[end($run)][1], 'phrases' => count($run), 'filled' => $filled];
         }
 
-        $words = array_filter($missing, fn (array $m): bool => $m['original'] !== '');
+        // Words heard and written out whole (a quotation's first words and "…" are not).
+        $words = array_filter($missing, fn (array $m): bool => preg_match('/\p{L}/u', $m['original']) === 1 && ! str_ends_with(trim($m['original']), '…'));
         $texts = [];
         foreach ($words as $k => $m) {
             if ($o['language'] === 'ar' && preg_match('/\p{Arabic}/u', $m['original']) === 1) {
@@ -927,7 +941,7 @@ final class VideoDubber
             $report['transcribe'][$key] = ($report['transcribe'][$key] ?? 0) + $tokens;
         }
 
-        return array_map(fn ($line): string => is_string($line) ? trim($line) : '', array_values((array) ($answer['data']['lines'] ?? [])));
+        return array_map(fn ($line): string => is_string($line) ? trim($line) : '', array_values(is_array($answer['data']) ? (array) ($answer['data']['lines'] ?? []) : []));
     }
 
     /**
@@ -1211,10 +1225,45 @@ final class VideoDubber
      * the audio is a part cut out of the video (heard again): its times are
      * from the part's own start.
      *
+     * The model will not copy a well-known text word for word (a verse, a
+     * saying of the Prophet, a song): asked to, it gives no answer at all
+     * (finish RECITATION). Quotations are dubbed by their meaning, and when
+     * an answer still comes back empty it is asked once more without their
+     * words being written out. An empty answer is never taken for a video
+     * nobody speaks in: that fails as not written out.
+     *
      * @param  array<int, array{0: float, 1: float}>  $phrases
-     * @return array{segments: array<int, array<string, mixed>>, speakers: array<int, array{id: string, gender: string}>, background: string, unsaid: array<int, array<string, mixed>>, usage: array<string, int>, model: string}
+     * @return array{segments: array<int, array<string, mixed>>, speakers: array<int, array{id: string, gender: string}>, background: string, unsaid: array<int, array<string, mixed>>, usage: array<string, int>, model: string, finish: array<int, string>}
      */
     private function transcribeAndRewrite(string $audio, string $language, string $dialect, array $phrases = [], bool $part = false): array
+    {
+        $finish = [];
+        $usage = [];
+        foreach ([false, true] as $careful) {
+            $answer = $this->askModel([['inline_data' => ['mime_type' => 'audio/mpeg', 'data' => base64_encode($audio)]],
+                ['text' => $this->hearingPrompt($language, $dialect, $phrases, $part, $careful)]]);
+            $finish[] = $answer['finish'];
+            foreach ($answer['usage'] as $key => $tokens) {
+                $usage[$key] = ($usage[$key] ?? 0) + $tokens;
+            }
+            if ($answer['data'] !== null) {
+                $heard = $phrases !== [] ? self::readAnchored($answer['data'], $phrases) : self::readHeard($answer['data']) + ['unsaid' => []];
+
+                return $heard + ['usage' => $usage, 'model' => $answer['model'], 'finish' => $finish];
+            }
+            Log::warning('Dub: the text model gave no answer to read.', ['finish' => $answer['finish'], 'model' => $answer['model'], 'careful' => $careful]);
+        }
+
+        throw new \RuntimeException('The speech could not be written out (the model gave no answer: '.implode(', ', array_filter($finish) ?: ['empty']).').');
+    }
+
+    /**
+     * What the text model is asked (transcribeAndRewrite()); $careful: the
+     * words of a quotation are not written out, only its meaning dubbed.
+     *
+     * @param  array<int, array{0: float, 1: float}>  $phrases
+     */
+    private function hearingPrompt(string $language, string $dialect, array $phrases, bool $part, bool $careful): string
     {
         $target = self::target($language, $dialect);
         $emotions = implode(', ', TtsStudioConfig::emotionValues());
@@ -1225,8 +1274,11 @@ final class VideoDubber
         $manner = "say how it is spoken, as a director would brief a voice actor: \"emotion\" is the one word from this list "
             ."that fits best: {$emotions}; \"delivery\" is a short direction in English (energy, pace, loudness, attitude), at most 15 words, "
             ."for example \"bright and fast, smiling, building to a big finish\".\n";
-        $faithful = 'Leave nothing out and never sum anything up. Quotations are dubbed too: verses of the Quran, sayings of the Prophet, prayers, poems and songs '
-            .'(in an Arabic dub keep the Quran and the sayings of the Prophet word for word as they were said; in another language translate them faithfully). '
+        $faithful = 'Leave nothing out and never sum anything up. Quotations are dubbed too (verses of the Quran, sayings of the Prophet, prayers, poems and songs), '
+            .'but never copy them out: '
+            .($careful
+                ? 'for a quotation write only "…" as its original, and in the dubbed line give its whole meaning in plain words of your own. '
+                : 'for a quotation write only its first three words and "…" as its original, and in the dubbed line give its whole meaning in the dub\'s own words. ')
             ."Keep names, brands and numbers right. Where the speaker laughs, sighs, gasps, whispers, shouts or pauses, put the matching tag at that place in the dubbed line, only from these: {$tags}.\n";
         $sound = "Say what plays besides the speech: \"music\" if there is music, \"ambient\" for other sound (crowd, street, room, effects), \"none\" if only the voice.\n";
         $prompt = "You are preparing a professional dub of a video. Listen to its audio closely.\n"
@@ -1256,10 +1308,8 @@ final class VideoDubber
                 .'Return only JSON: {"background": "music", "speakers": [{"id": "A", "gender": "male", "voice": "..."}], "segments": [{"start": 0.0, "end": 3.2, "speaker": "A", '
                 .'"emotion": "excited", "delivery": "...", "original": "...", "dubbed": "..."}]}. If nothing is spoken, return {"background": "music", "speakers": [], "segments": []}.';
         }
-        $answer = $this->askModel([['inline_data' => ['mime_type' => 'audio/mpeg', 'data' => base64_encode($audio)]], ['text' => $prompt]]);
-        $heard = $phrases !== [] ? self::readAnchored($answer['data'], $phrases) : self::readHeard($answer['data']) + ['unsaid' => []];
 
-        return $heard + ['usage' => $answer['usage'], 'model' => $answer['model']];
+        return $prompt;
     }
 
     /** What the dubbed lines are written in: the dialect (or accent), as people there really speak it. */
@@ -1276,10 +1326,12 @@ final class VideoDubber
 
     /**
      * One request to the text model, the models tried in turn and each one's
-     * keys: its answer as JSON, what it used and which model gave it.
+     * keys: its answer as JSON (its text parts together, or the JSON found in
+     * them; null when there is none, as when it would not answer), what it
+     * used, which model gave it and why it stopped (STOP, RECITATION, ...).
      *
      * @param  array<int, array<string, mixed>>  $parts
-     * @return array{data: array<string, mixed>, usage: array<string, int>, model: string}
+     * @return array{data: ?array<string, mixed>, usage: array<string, int>, model: string, finish: string}
      */
     private function askModel(array $parts): array
     {
@@ -1307,10 +1359,18 @@ final class VideoDubber
 
                     continue;
                 }
-                $raw = (string) $response->json('candidates.0.content.parts.0.text');
-                $data = json_decode(trim((string) preg_replace('/^```(?:json)?|```$/m', '', $raw)), true);
+                $raw = '';
+                foreach ((array) $response->json('candidates.0.content.parts', []) as $piece) {
+                    $raw .= is_array($piece) && empty($piece['thought']) ? (string) ($piece['text'] ?? '') : '';
+                }
+                $raw = trim((string) preg_replace('/^```(?:json)?|```$/m', '', $raw));
+                $data = json_decode($raw, true);
+                if (! is_array($data) && preg_match('/\{.*\}/s', $raw, $m) === 1) {
+                    $data = json_decode($m[0], true);
+                }
 
-                return ['data' => is_array($data) ? $data : [], 'usage' => self::usage((array) $response->json('usageMetadata')), 'model' => $model];
+                return ['data' => is_array($data) ? $data : null, 'usage' => self::usage((array) $response->json('usageMetadata')), 'model' => $model,
+                    'finish' => (string) ($response->json('candidates.0.finishReason') ?? $response->json('promptFeedback.blockReason') ?? '')];
             }
         }
 
