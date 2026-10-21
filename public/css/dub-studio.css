@@ -152,6 +152,8 @@
   border-radius: 16px;
   background: color-mix(in oklab, var(--a) 5%, var(--surface));
 }
+/* Brought into view and given the focus when the dub starts: no ring on a card that is only read. */
+.dub-working:focus { outline: none; }
 .dub-working-head { display: flex; align-items: center; gap: .8rem; }
 .dub-working-head > div { display: grid; gap: .15rem; min-width: 0; flex: 1; }
 .dub-working-head strong { font-size: 1.02rem; }

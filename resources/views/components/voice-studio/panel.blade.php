@@ -70,13 +70,14 @@
     <p class="vs-lib-empty" data-vs-lib-empty hidden></p>
   </div>
 
-  <div class="vs-pane">
-    @if(trim((string) $slot) !== '')
-      {{-- Speed, pitch, sound and the rest: how the chosen voice delivers the text. --}}
+  {{-- Speed, pitch, sound and the rest: how the chosen voice delivers the text. None in the dubbing studio:
+       an empty pane drew a bordered empty strip under the voices. --}}
+  @if(trim((string) $slot) !== '')
+    <div class="vs-pane">
       <h3 class="vs-pane-title">{{ __('ui.dashboard.delivery_title') }}</h3>
-    @endif
-    {{ $slot }}
-  </div>
+      {{ $slot }}
+    </div>
+  @endif
 
   @if($showTags && ! $tagsLock)
     <details class="vs-guide">

@@ -95,7 +95,7 @@
           </div>
 
           {{-- Sending it, then dubbing it --}}
-          <div class="dub-working" data-dub-view="working" hidden aria-live="polite">
+          <div class="dub-working" data-dub-view="working" hidden aria-live="polite" tabindex="-1">
             <div class="dub-working-head">
               <span class="dub-spinner" aria-hidden="true"></span>
               <div>

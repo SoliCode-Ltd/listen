@@ -366,6 +366,15 @@
         li.className = i < at ? 'is-done' : (i === at ? 'is-on' : '');
       });
     }
+    // The progress card in the middle of the screen, with the focus: the tall preview it takes the place of
+    // left the page scrolled down past it, the button just pressed in sight and the progress out of it.
+    function reveal(view) {
+      requestAnimationFrame(function () {
+        var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        view.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'center' });
+        view.focus({ preventScroll: true });
+      });
+    }
     function stageOf(dub) {
       switch (dub.stage) {
         case 'voicing': return ['voicing', t.working_voicing, t.working_voicing_note];
@@ -513,6 +522,7 @@
       data.delete('video');
       data.set('background', keep.checked ? 'keep' : 'replace');
       working('upload', 0, t.working_upload, t.working_upload_note);
+      reveal(views.working);
       deviceSignal().then(function (d) {
         var device = d.id ? { 'X-Client-Device': d.id, 'X-Client-Device-Touch': d.touch ? '1' : '0' } : {};
         var start = new FormData();
