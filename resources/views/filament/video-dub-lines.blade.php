@@ -30,6 +30,9 @@
                         @if(! empty($line['placed_whole']))
                             <br><span class="text-gray-500">take placed whole (not cut at its pauses)</span>
                         @endif
+                        @if(! empty($line['quiet']))
+                            <br><span class="text-danger-600">not voiced: the speech engine failed on it twice</span>
+                        @endif
                     </td>
                     <td class="py-2 pe-3 whitespace-nowrap text-xs">{{ $line['speaker'] ?? '—' }}{{ isset($line['voice']) ? ' · '.$line['voice'] : '' }}@if(! empty($line['emotion']))<br><span class="text-gray-500">{{ $line['emotion'] }}</span>@endif</td>
                     <td class="py-2 pe-3" dir="auto">{{ $line['original'] ?? '' }}</td>

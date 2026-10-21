@@ -250,8 +250,8 @@ class VideoDubberTest extends TestCase
             ['n' => 1, 'speaker' => 'A', 'original' => 'twice', 'dubbed' => 'مرتين'],
             // Words heard, nothing dubbed (a quotation the model would not touch).
             ['n' => 2, 'speaker' => 'A', 'original' => 'إن الله وملائكته', 'dubbed' => ''],
-            // A laugh: no words, no line.
-            ['n' => 3, 'speaker' => 'A', 'original' => '', 'dubbed' => ''],
+            // A laugh: no words, no line (a sound tag alone is not a line: the speech engine takes none).
+            ['n' => 3, 'speaker' => 'A', 'original' => '', 'dubbed' => '<laugh>'],
             ['n' => 9, 'speaker' => 'A', 'original' => 'not a phrase', 'dubbed' => 'لا'],
         ]], $phrases);
 
@@ -389,7 +389,12 @@ class VideoDubberTest extends TestCase
     public function test_an_empty_answer_is_never_taken_for_a_video_nobody_speaks_in(): void
     {
         $video = $this->phraseVideo();
-        Http::fake(['*' => Http::response(['candidates' => [['finishReason' => 'RECITATION', 'index' => 0]]])]);
+        $sent = 0;
+        Http::fake(function () use (&$sent) {
+            $sent++;
+
+            return Http::response(['candidates' => [['finishReason' => 'RECITATION', 'index' => 0]]]);
+        });
         $dubber = null;
 
         try {
@@ -401,9 +406,58 @@ class VideoDubberTest extends TestCase
             $this->assertStringContainsString('RECITATION', $e->getMessage());
             $this->assertStringNotContainsString('No speech', $e->getMessage());
         }
+        // Asked for the phrases twice, then to time the lines itself twice.
+        $this->assertSame(4, $sent);
         // What it had done up to there, for the admin.
         $this->assertSame(3, $dubber->lastReport['speech_map']['phrases']);
         $this->assertStringContainsString('RECITATION', $dubber->lastReport['error']);
+    }
+
+    public function test_when_the_phrases_get_no_answer_the_model_times_the_lines_itself(): void
+    {
+        $video = $this->phraseVideo();
+        $sent = [];
+        Http::fake(function ($request) use (&$sent) {
+            $sent[] = $request->data();
+
+            return count($sent) <= 2
+                ? Http::response(['candidates' => [['finishReason' => 'RECITATION', 'index' => 0]]])
+                : Http::response(['candidates' => [['finishReason' => 'STOP', 'content' => ['parts' => [['text' => json_encode(['background' => 'none', 'segments' => [
+                    ['start' => 0.5, 'end' => 4.0, 'speaker' => 'A', 'original' => 'Hi there, welcome.', 'dubbed' => 'هلا والله، حياك الله.'],
+                    ['start' => 5.0, 'end' => 7.5, 'speaker' => 'A', 'original' => 'How are you today?', 'dubbed' => 'كيف حالك اليوم؟'],
+                ]])]]]]]]);
+        });
+
+        $r = $this->dubWith($video, 2);
+
+        $this->assertCount(3, $sent);
+        $this->assertStringContainsString('Split what is said into segments', $sent[2]['contents'][0]['parts'][1]['text']);
+        $this->assertSame(['RECITATION', 'RECITATION', 'STOP'], $r['transcribe']['finish']);
+        $this->assertFalse($r['speech_map']['used']);
+        $this->assertSame(2, $r['segments']);
+    }
+
+    public function test_a_line_the_speech_engine_fails_on_stays_quiet_rather_than_failing_the_dub(): void
+    {
+        $video = $this->phraseVideo();
+        Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'none', 'phrases' => [
+            ['n' => 1, 'speaker' => 'A', 'original' => 'Hi there.', 'dubbed' => 'هلا والله.'],
+            ['n' => 2, 'speaker' => 'A', 'original' => 'Welcome.', 'dubbed' => 'حياك الله.'],
+            ['n' => 3, 'speaker' => 'A', 'original' => 'How are you?', 'dubbed' => 'كيف حالك؟'],
+        ]])]]]]]])]);
+
+        // The second line fails twice; the others are voiced.
+        $r = $this->dubWith($video, 4, $dubber, fail: fn (string $text): bool => $text === 'حياك الله.');
+
+        $this->assertSame(['quiet_lines' => 1, 'quiet_because' => 'The speech engine failed.'], array_intersect_key($r['voicing'], array_flip(['quiet_lines', 'quiet_because'])));
+        $this->assertSame([false, true, false], array_column($r['lines'], 'quiet'));
+        $this->assertNull($r['lines'][1]['tempo']);
+        // No old voice under the quiet line either.
+        $this->assertLessThan(-45, $this->level($r['output'], 2.9, 1.0, 'bandpass=f=500:w=60,'));
+
+        // Every line failing: one is let go quiet, the next fails the dub with the speech engine's own reason.
+        $this->expectExceptionMessage('The speech engine failed.');
+        $this->dubWith($video, 4, $dubber, fail: fn (string $text): bool => true);
     }
 
     public function test_when_the_phrases_give_no_line_the_model_times_the_lines_itself(): void
@@ -441,18 +495,23 @@ class VideoDubberTest extends TestCase
     }
 
     /**
-     * Dubs $video with the text model as faked by the caller and a speech engine that reads each take as a tone ($takes takes expected).
+     * Dubs $video with the text model as faked by the caller and a speech engine that reads each take as a tone ($takes requests
+     * expected; those $fail says fail).
      *
+     * @param  (callable(string): bool)|null  $fail
      * @return array<string, mixed>
      */
-    private function dubWith(string $video, int $takes, ?VideoDubber &$dubber = null): array
+    private function dubWith(string $video, int $takes, ?VideoDubber &$dubber = null, ?callable $fail = null): array
     {
         $ffmpeg = AudioFormats::ffmpegPath();
         $keys = \Mockery::mock(GeminiKeyManager::class);
         $keys->shouldReceive('keysInOrder')->andReturn([['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1]]);
         $keys->shouldReceive('recordUsage');
         $tts = \Mockery::mock(GeminiTtsProvider::class);
-        $tts->shouldReceive('synthesize')->times($takes)->andReturnUsing(function (string $text, string $language, array $config) use ($ffmpeg) {
+        $tts->shouldReceive('synthesize')->times($takes)->andReturnUsing(function (string $text, string $language, array $config) use ($ffmpeg, $fail) {
+            if ($fail !== null && $fail($text)) {
+                throw new \RuntimeException('The speech engine failed.');
+            }
             $path = 'audio/take-'.bin2hex(random_bytes(3)).'.wav';
             @mkdir(dirname(Storage::disk('public')->path($path)), 0755, true);
             // As long as its words need: never taken again.
@@ -619,6 +678,10 @@ class VideoDubberTest extends TestCase
         ]]);
 
         $this->assertSame('ambient', $heard['background'], 'unsure: keep the sound');
+        // Nothing to say in it (a pause, "…", a sound alone): not a line.
+        $this->assertSame([], VideoDubber::readHeard(['segments' => [['start' => 1, 'dubbed' => '…'], ['start' => 2, 'dubbed' => '<short pause>'], ['start' => 3, 'dubbed' => ['a list']]]])['segments']);
+        $this->assertTrue(VideoDubber::spoken('هلا <laugh>'));
+        $this->assertFalse(VideoDubber::spoken('<laugh> [sighs] …'));
         $this->assertSame([['id' => 'A', 'gender' => 'female', 'voice' => ''], ['id' => 'C', 'gender' => 'male', 'voice' => '']], $heard['speakers']);
         $this->assertSame(['أ', 'ب'], array_column($heard['segments'], 'dubbed'));
         $this->assertNull($heard['segments'][0]['emotion']);

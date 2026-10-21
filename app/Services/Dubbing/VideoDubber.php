@@ -187,7 +187,18 @@ final class VideoDubber
 
             // 2. What is said, by whom and how, and the dubbed lines: one for each phrase (or timed by the model, where no phrases were found).
             $t = microtime(true);
-            $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect'], $phrases);
+            try {
+                $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect'], $phrases);
+            } catch (SpeechNotWrittenOut $e) {
+                if ($phrases === []) {
+                    throw $e;
+                }
+                // No answer for the phrases however asked: the model times the lines itself instead.
+                $report['speech_map']['used'] = false;
+                $phrases = [];
+                $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect']);
+                $heard['finish'] = array_merge($e->finish, $heard['finish']);
+            }
             $report['transcribe'] = ['model' => $heard['model'], 'finish' => $heard['finish']] + $heard['usage'];
             $report['background'] = $heard['background'];
             $segments = [];
@@ -230,18 +241,38 @@ final class VideoDubber
             $retaken = 0;
             $placements = [];
             $takes = [];
+            $quiet = [];
+            $requests = 0;
             try {
                 foreach ($lines as $k => $line) {
                     $progress('voicing', $k, count($lines));
                     $first = $segments[$line['segments'][0]];
                     $config = self::voiceConfig($first, $voices[$first['speaker']] ?? $o['voice'], $o, $characters[$first['speaker']] ?? '');
-                    $take = $this->voiceLine($ffmpeg, $line['text'], $o['language'], $config, $tmp.'/line-'.$k, $made);
+                    try {
+                        $requests++;
+                        $take = $this->voiceLine($ffmpeg, $line['text'], $o['language'], $config, $tmp.'/line-'.$k, $made);
+                    } catch (\Throwable $e) {
+                        // Once more; then this line stays quiet rather than the whole dub failing, unless more than a few do.
+                        try {
+                            $requests++;
+                            $take = $this->voiceLine($ffmpeg, $line['text'], $o['language'], $config, $tmp.'/line-'.$k.'-second', $made);
+                        } catch (\Throwable $e) {
+                            report($e);
+                            $quiet[$k] = mb_substr($e->getMessage(), 0, 200);
+                            if (count($quiet) > max(1, intdiv(count($lines), 4))) {
+                                throw $e;
+                            }
+
+                            continue;
+                        }
+                    }
                     $chars += mb_strlen($line['text']);
                     // A take far shorter than its words need stopped early or skipped some: taken once more, the closer one kept.
                     $needs = self::needs($line['text'], $config);
                     if ($needs >= 2.5 && $take['seconds'] < self::SHORT_TAKE * $needs && $retaken < max(2, (int) ceil(count($lines) / 4))) {
                         $retaken++;
                         try {
+                            $requests++;
                             $again = $this->voiceLine($ffmpeg, $line['text'], $o['language'], $config, $tmp.'/line-'.$k.'-again', $made);
                             $chars += mb_strlen($line['text']);
                             if (abs(log(max(0.01, $again['seconds']) / $needs)) < abs(log(max(0.01, $take['seconds']) / $needs))) {
@@ -260,9 +291,13 @@ final class VideoDubber
             } finally {
                 config(['services.gemini_tts.dialect_rewrite' => $rewrite]);
             }
-            $report['voicing'] = ['seconds' => round(microtime(true) - $t, 2), 'characters' => $chars, 'requests' => count($lines) + $retaken,
+            $report['voicing'] = ['seconds' => round(microtime(true) - $t, 2), 'characters' => $chars, 'requests' => $requests,
                 'retaken' => $retaken, 'takes' => count($lines), 'placed_parts' => count($placements),
-                'voiced_seconds' => round(array_sum(array_column($placements, 'seconds')), 2)];
+                'voiced_seconds' => round(array_sum(array_column($placements, 'seconds')), 2)]
+                + ($quiet !== [] ? ['quiet_lines' => count($quiet), 'quiet_because' => reset($quiet)] : []);
+            if ($placements === []) {
+                throw new \RuntimeException('No line could be voiced: '.reset($quiet));
+            }
 
             // 4. Placed and put back onto the picture, over what else the video plays.
             // The member's choice alone decides: the model's guess that there is no music is not reason enough to drop the sound.
@@ -298,7 +333,15 @@ final class VideoDubber
             $plan = $this->evenLoudness($ffmpeg, $plan, $background !== null ? $background['voices'] : $speech, $background !== null, $takes);
             $report['loudness'] = ['target_db' => $plan[0]['target_db'] ?? null, 'gains_db' => array_column($plan, 'gain_db')];
             // The old voice is out wherever the original speaker makes a sound, a phrase without a new line included.
-            $spans = array_map(fn (array $p): array => ['from' => $p[0], 'until' => $p[1]], $phrases);
+            $placementOf = [];
+            foreach ($placements as $pi => $p) {
+                foreach ($p['segments'] as $si) {
+                    $placementOf[$si] = $pi;
+                }
+            }
+            // A line the speech engine could not voice stays quiet: its old voice is out too.
+            $spans = array_merge(array_map(fn (array $p): array => ['from' => $p[0], 'until' => $p[1]], $phrases),
+                array_values(array_map(fn (array $s): array => ['from' => (float) $s['start'], 'until' => (float) $s['end']], array_diff_key($segments, $placementOf))));
             @mkdir($o['out_dir'], 0755, true);
             $clean = $o['out_dir'].'/'.$o['name'].'.mp4';
             $report['mux'] = $this->run($this->muxCommand($ffmpeg, $video, $plan, $report['video_seconds'], $keep, $clean, null, $background, $spans));
@@ -311,17 +354,13 @@ final class VideoDubber
                 $report['preview_bytes'] = filesize($preview);
                 $report['preview'] = $preview;
             }
-            $placementOf = [];
-            foreach ($placements as $pi => $p) {
-                foreach ($p['segments'] as $si) {
-                    $placementOf[$si] = $pi;
-                }
-            }
             $report['lines'] = array_map(fn (array $s, int $si): array => ['start' => $s['start'], 'end' => $s['end'], 'heard_start' => $s['heard_start'] ?? $s['start'],
                 'speaker' => $s['speaker'], 'emotion' => $s['emotion'], 'delivery' => $s['delivery'], 'original' => $s['original'], 'dubbed' => $s['dubbed'],
-                'voiced_seconds' => round((float) $placements[$placementOf[$si]]['seconds'], 2), 'tempo' => $plan[$placementOf[$si]]['tempo'],
-                'gain_db' => $plan[$placementOf[$si]]['gain_db'] ?? 0.0, 'voice' => $voices[$s['speaker']] ?? $o['voice'],
-                'take' => $placements[$placementOf[$si]]['line'], 'placed_whole' => count($placements[$placementOf[$si]]['segments']) > 1,
+                'voiced_seconds' => isset($placementOf[$si]) ? round((float) $placements[$placementOf[$si]]['seconds'], 2) : 0.0,
+                'tempo' => isset($placementOf[$si]) ? $plan[$placementOf[$si]]['tempo'] : null,
+                'gain_db' => isset($placementOf[$si]) ? ($plan[$placementOf[$si]]['gain_db'] ?? 0.0) : null, 'voice' => $voices[$s['speaker']] ?? $o['voice'],
+                'take' => isset($placementOf[$si]) ? $placements[$placementOf[$si]]['line'] : null,
+                'placed_whole' => isset($placementOf[$si]) && count($placements[$placementOf[$si]]['segments']) > 1, 'quiet' => ! isset($placementOf[$si]),
                 'heard_again' => ! empty($s['again']), 'as_said' => ! empty($s['as_said']), 'written' => ! empty($s['written'])], $segments, array_keys($segments));
             $report['total_seconds'] = round(microtime(true) - $started, 2);
 
@@ -1254,7 +1293,13 @@ final class VideoDubber
             Log::warning('Dub: the text model gave no answer to read.', ['finish' => $answer['finish'], 'model' => $answer['model'], 'careful' => $careful]);
         }
 
-        throw new \RuntimeException('The speech could not be written out (the model gave no answer: '.implode(', ', array_filter($finish) ?: ['empty']).').');
+        throw new SpeechNotWrittenOut($finish);
+    }
+
+    /** Whether a dubbed line has words to say: not only a sound tag, a pause or "…" (the speech engine takes none of those alone). */
+    public static function spoken(string $text): bool
+    {
+        return preg_match('/[\p{L}\p{N}]/u', (string) preg_replace('/<[^<>]*>|\[[^\[\]]*\]/u', ' ', $text)) === 1;
     }
 
     /**
@@ -1402,15 +1447,21 @@ final class VideoDubber
         $unsaid = [];
         foreach (array_values($phrases) as $k => [$start, $end]) {
             $p = $answers[$k] ?? null;
-            $original = trim((string) ($p['original'] ?? ''));
-            if ($p !== null && trim((string) ($p['dubbed'] ?? '')) !== '') {
+            $original = self::text($p['original'] ?? '');
+            if ($p !== null && self::spoken(self::text($p['dubbed'] ?? ''))) {
                 $timed[] = ['start' => $start, 'end' => $end, 'phrase' => $k] + $p;
             } elseif ($p === null || $original !== '') {
-                $unsaid[] = ['phrase' => $k, 'original' => $original, 'speaker' => mb_substr(trim((string) ($p['speaker'] ?? '')), 0, 8)];
+                $unsaid[] = ['phrase' => $k, 'original' => $original, 'speaker' => mb_substr(self::text($p['speaker'] ?? ''), 0, 8)];
             }
         }
 
         return self::readHeard(['background' => $data['background'] ?? null, 'speakers' => $data['speakers'] ?? [], 'segments' => $timed]) + ['unsaid' => $unsaid];
+    }
+
+    /** A value of the model's answer as text: a word or a number as it is, anything else (a list, nothing) as empty. */
+    private static function text(mixed $value): string
+    {
+        return is_scalar($value) ? trim((string) $value) : '';
     }
 
     /**
@@ -1427,33 +1478,33 @@ final class VideoDubber
         $genders = [];
         $characters = [];
         foreach ((array) ($data['speakers'] ?? []) as $speaker) {
-            $id = mb_substr(trim((string) ($speaker['id'] ?? '')), 0, 8);
+            $id = mb_substr(self::text($speaker['id'] ?? ''), 0, 8);
             if ($id !== '') {
-                $genders[$id] = strtolower((string) ($speaker['gender'] ?? '')) === 'female' ? 'female' : 'male';
-                $characters[$id] = mb_substr(trim(preg_replace('/\s+/', ' ', (string) ($speaker['voice'] ?? ''))), 0, 120);
+                $genders[$id] = strtolower(self::text($speaker['gender'] ?? '')) === 'female' ? 'female' : 'male';
+                $characters[$id] = mb_substr(trim((string) preg_replace('/\s+/', ' ', self::text($speaker['voice'] ?? ''))), 0, 120);
             }
         }
         $segments = [];
         foreach ((array) ($data['segments'] ?? []) as $s) {
-            $dubbed = trim((string) ($s['dubbed'] ?? ''));
-            if ($dubbed === '' || ! is_numeric($s['start'] ?? null)) {
+            $dubbed = self::text($s['dubbed'] ?? '');
+            if (! self::spoken($dubbed) || ! is_numeric($s['start'] ?? null)) {
                 continue;
             }
-            $speaker = mb_substr(trim((string) ($s['speaker'] ?? '')), 0, 8) ?: 'A';
+            $speaker = mb_substr(self::text($s['speaker'] ?? ''), 0, 8) ?: 'A';
             $genders[$speaker] ??= 'male';
-            $emotion = strtolower(trim((string) ($s['emotion'] ?? '')));
+            $emotion = strtolower(self::text($s['emotion'] ?? ''));
             $segments[] = [
                 'start' => (float) $s['start'],
-                'end' => max((float) $s['start'], (float) ($s['end'] ?? $s['start'])),
+                'end' => max((float) $s['start'], is_numeric($s['end'] ?? null) ? (float) $s['end'] : (float) $s['start']),
                 'speaker' => $speaker,
                 'emotion' => isset($emotions[$emotion]) ? $emotion : null,
-                'delivery' => mb_substr(trim((string) ($s['delivery'] ?? '')), 0, 160),
-                'original' => trim((string) ($s['original'] ?? '')),
+                'delivery' => mb_substr(self::text($s['delivery'] ?? ''), 0, 160),
+                'original' => self::text($s['original'] ?? ''),
                 'dubbed' => $dubbed,
             ] + (isset($s['phrase']) ? ['phrase' => (int) $s['phrase']] : []);
         }
         usort($segments, fn ($a, $b) => $a['start'] <=> $b['start']);
-        $background = strtolower(trim((string) ($data['background'] ?? '')));
+        $background = strtolower(self::text($data['background'] ?? ''));
 
         return [
             'segments' => $segments,
