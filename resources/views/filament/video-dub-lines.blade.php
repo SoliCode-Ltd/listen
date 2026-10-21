@@ -21,8 +21,14 @@
                         @if(! empty($line['heard_again']))
                             <br><span class="text-gray-500">heard again: left out the first time</span>
                         @endif
-                        @if((float) ($line['original_left'] ?? 0) > 0)
-                            <br><span class="text-gray-500">original voice back for the last {{ number_format((float) $line['original_left'], 1) }} s</span>
+                        @if(! empty($line['as_said']))
+                            <br><span class="text-gray-500">read as it was said (a quotation)</span>
+                        @endif
+                        @if(! empty($line['written']))
+                            <br><span class="text-gray-500">dubbed from what was heard</span>
+                        @endif
+                        @if(! empty($line['placed_whole']))
+                            <br><span class="text-gray-500">take placed whole (not cut at its pauses)</span>
                         @endif
                     </td>
                     <td class="py-2 pe-3 whitespace-nowrap text-xs">{{ $line['speaker'] ?? '—' }}{{ isset($line['voice']) ? ' · '.$line['voice'] : '' }}@if(! empty($line['emotion']))<br><span class="text-gray-500">{{ $line['emotion'] }}</span>@endif</td>

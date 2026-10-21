@@ -31,7 +31,8 @@ use Symfony\Component\Process\Process;
  * the server has the memory free (enoughMemory()); should the server still
  * run short, the system stops it first (it says so itself), never the site.
  * A dub that cannot wait for it, or a server without it, uses VideoDubber's
- * filters.
+ * filters. The same install sets up a small speech-detection model
+ * (phrases()): where someone speaks, phrase by phrase, for the dub's timing.
  */
 class VoiceSeparator
 {
@@ -47,6 +48,20 @@ class VoiceSeparator
     public const ISOLATOR_URL = 'https://github.com/Rikorose/DeepFilterNet/releases/download/v0.5.6/deep-filter-0.5.6-x86_64-unknown-linux-musl';
 
     public const ISOLATOR_SHA256 = '70775e251eee44c0f2451a1e833326cf8bcbbe304d3e7cd12851e6fce72ef7da';
+
+    /**
+     * The speech-detection model (Silero VAD, MIT licence), taken from its
+     * wheel: it finds where someone speaks, phrase by phrase, so a dub's
+     * lines are written for those moments and placed on them
+     * (resources/dubbing/phrases.py, VideoDubber's speech map).
+     */
+    public const VAD_WHEEL_URL = 'https://files.pythonhosted.org/packages/84/ef/9099037ed6f180ea33220178df4107112c0ce2bf5fb4d6f6ab19db2844ed/silero_vad-6.2.3-py3-none-any.whl';
+
+    public const VAD_WHEEL_SHA256 = '7b7f5436cfcb02fae583a05b512ea96467fd449fe54cb49a5e4f06c51a1e43b8';
+
+    public const VAD_MEMBER = 'silero_vad/data/silero_vad.onnx';
+
+    public const VAD_SHA256 = '1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3';
 
     /** The packages it needs, unpacked from their wheels. */
     public const PACKAGES = ['numpy', 'onnxruntime'];
@@ -87,6 +102,50 @@ class VoiceSeparator
     public static function isolatorReady(): bool
     {
         return @is_file(self::isolator()) && @is_executable(self::isolator()) && AudioFormats::ffmpegPath() !== null;
+    }
+
+    public static function vad(): string
+    {
+        return self::dir().'/vad.onnx';
+    }
+
+    /** Whether the speech detection is set up (with the rest: it runs on the same Python and packages). */
+    public static function vadReady(): bool
+    {
+        return self::installed() && @is_file(self::vad());
+    }
+
+    /**
+     * Where someone speaks in $audio (raw float mono, 16 kHz), phrase by
+     * phrase, in seconds (resources/dubbing/phrases.py): a second or two of
+     * work for a minute of sound, on one thread, so it needs no turn. Null
+     * when it is not set up or did not answer.
+     *
+     * @return array<int, array{0: float, 1: float}>|null
+     */
+    public static function phrases(string $audio): ?array
+    {
+        if (! self::vadReady()) {
+            return null;
+        }
+        $process = new Process([(string) self::python(), '-s', resource_path('dubbing/phrases.py'), '--lib', self::lib(), '--vad', self::vad(), $audio],
+            null, ['OMP_NUM_THREADS' => '1', 'PYTHONDONTWRITEBYTECODE' => '1']);
+        $process->setTimeout(180)->run();
+        $lines = preg_split('/\r?\n/', trim($process->getOutput())) ?: [];
+        $data = $process->isSuccessful() ? json_decode((string) end($lines), true) : null;
+        if (! is_array($data) || ! is_array($data['phrases'] ?? null)) {
+            Log::warning('The speech detection did not answer.', ['error' => mb_substr(trim($process->getErrorOutput()), -300)]);
+
+            return null;
+        }
+        $phrases = [];
+        foreach ($data['phrases'] as $p) {
+            if (is_array($p) && is_numeric($p[0] ?? null) && is_numeric($p[1] ?? null) && (float) $p[1] > (float) $p[0]) {
+                $phrases[] = [(float) $p[0], (float) $p[1]];
+            }
+        }
+
+        return $phrases;
     }
 
     /** This server's Python 3: the configured one, else the usual places. */
@@ -363,17 +422,39 @@ class VoiceSeparator
             @chmod(self::isolator(), 0755);
         }
 
+        // The speech detection: the one model file inside its wheel, checked against its own checksum too.
+        if (! is_file(self::vad()) || hash_file('sha256', self::vad()) !== self::VAD_SHA256) {
+            $say('Downloading the speech detection (11 MB)…');
+            $wheel = $dir.'/vad.whl';
+            $this->download(self::VAD_WHEEL_URL, $wheel, self::VAD_WHEEL_SHA256);
+            try {
+                $this->runPython($python, ['-c', 'import sys,zipfile;open(sys.argv[3],"wb").write(zipfile.ZipFile(sys.argv[1]).read(sys.argv[2]))', $wheel, self::VAD_MEMBER, self::vad().'.part']);
+            } finally {
+                @unlink($wheel);
+            }
+            if (hash_file('sha256', self::vad().'.part') !== self::VAD_SHA256) {
+                @unlink(self::vad().'.part');
+                throw new \RuntimeException('The speech detection did not match its checksum.');
+            }
+            rename(self::vad().'.part', self::vad());
+        }
+
         $say('Testing it…');
         $check = $this->runPython($python, array_merge(['-s', self::script(), '--lib', $fresh, '--model', self::model(), '--threads', '1'],
             $isolate ? ['--isolator', self::isolator(), '--ffmpeg', (string) AudioFormats::ffmpegPath()] : [], ['--check']), 300);
         if (trim($check) !== 'ok') {
             throw new \RuntimeException('The test run did not pass: '.mb_substr($check, -300));
         }
+        $check = $this->runPython($python, ['-s', resource_path('dubbing/phrases.py'), '--lib', $fresh, '--vad', self::vad(), '--check'], 120);
+        if (trim($check) !== 'ok') {
+            throw new \RuntimeException('The speech detection test did not pass: '.mb_substr($check, -300));
+        }
 
         $this->removeTree(self::lib());
         rename($fresh, self::lib());
         file_put_contents($dir.'/ready.json', json_encode(['python' => $python, 'python_version' => $info['version'], 'machine' => $info['machine'],
-            'packages' => $versions, 'model' => basename(self::MODEL_URL), 'isolation' => $isolate, 'installed_at' => now()->toIso8601String()], JSON_PRETTY_PRINT));
+            'packages' => $versions, 'model' => basename(self::MODEL_URL), 'isolation' => $isolate, 'speech_detection' => true,
+            'installed_at' => now()->toIso8601String()], JSON_PRETTY_PRINT));
         $say($isolate
             ? 'Ready: dubs now take the main speaker out and keep the music, effects and the voices further back.'
             : 'Ready: dubs now take the old voices out before the new ones go in (the voices further back are not kept on this server).');

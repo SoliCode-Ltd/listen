@@ -233,6 +233,8 @@ class VideoDubbingSettings extends Page implements HasForms
             $d = VoiceSeparator::details() ?? [];
 
             $isolation = ($d['isolation'] ?? false) ? ' With the speech isolation (the voices further back are kept).' : ' <span style="color:#b45309">Without the speech isolation: press Install again to add it (the voices further back are then kept too).</span>';
+            $isolation .= VoiceSeparator::vadReady() ? ' With the speech detection (each line is placed on the phrase it is spoken in).'
+                : ' <span style="color:#b45309">Without the speech detection: press Install again to add it (each line is then placed on the phrase it is spoken in, so the new voice keeps closer to the lips).</span>';
 
             return new HtmlString(sprintf('<strong>Installed</strong>%s.'.$isolation.' One dub uses it at a time (about 1.4 GB of memory while it runs), and only when %d MB are free; a dub that cannot wait for it, or finds too little memory free, uses the filters. Should the server run short anyway, the system stops the separation first, never the site.%s%s',
                 isset($d['installed_at']) ? ' on '.e(\Illuminate\Support\Carbon::parse($d['installed_at'])->toDayDateTimeString()).' (Python '.e(substr((string) ($d['python_version'] ?? ''), 0, 1).'.'.substr((string) ($d['python_version'] ?? ''), 1)).')' : '',

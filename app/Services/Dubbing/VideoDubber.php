@@ -17,24 +17,31 @@ use Symfony\Component\Process\Process;
 /**
  * Dubs a short video into an Arabic dialect (or English accent):
  *
- *   1. the sound is taken out of the video;
- *   2. one request to the text model writes out what is said, in timed
- *      segments, with who says it (and whether a man or a woman), how they
+ *   1. the sound is taken out of the video, and where someone speaks is
+ *      found on it, phrase by phrase, by a speech-detection model
+ *      (speechMap(): from one pause, where the mouth closes, to the next);
+ *   2. one request to the text model writes out what is said in each
+ *      phrase, with who says it (and whether a man or a woman), how they
  *      say it (an emotion from the studio's list and a short direction, as
- *      a voice actor would be given), and a dubbed line in the chosen
- *      dialect that fits the same time, with the laughs, sighs and pauses
- *      of the original as the studio's sound tags; it also says whether
- *      there is music or other sound behind the speech. Speech the lines
- *      leave out (a part not written out, or summed up in a few words) is
- *      cut out and heard again on its own (unheard(), hearAgain());
- *   3. each line is voiced by the studio's own speech engine: each speaker
+ *      a voice actor would be given), and a dubbed part in the chosen
+ *      dialect that fits the phrase's time, with the laughs, sighs and
+ *      pauses of the original as the studio's sound tags; it also says
+ *      whether there is music or other sound behind the speech. A phrase it
+ *      leaves without a line is heard again on its own, and failing that is
+ *      read as said or dubbed from its words (fillPhrases()): the old voice
+ *      never stands in. Where no phrases were found, the model times the
+ *      lines itself and what they leave out is heard again (unheard(),
+ *      hearAgain());
+ *   3. the phrases of a sentence are voiced in one take by the studio's own
+ *      speech engine (lines()), so they sound as one reading: each speaker
  *      in their own voice (the member's choice for the main one, a voice
  *      of the same kind for the others) and, unless the member chose a
  *      style or an emotion for the whole video, in the original's mood. A
- *      take far shorter than its words need is taken once more;
- *   4. each line is placed where the original speaker really starts (found
- *      on the voices themselves, refineTimes()), without the speech engine's
- *      silences, and fitted to end where the original ends (plan()), at the
+ *      take far shorter than its words need is taken once more. The take is
+ *      cut at its pauses, a part for each phrase (cuts());
+ *   4. each part is placed where its phrase starts on the original speaker's
+ *      own voice (refineTimes()), without the speech engine's silences, and
+ *      fitted to end where the phrase ends (plan()), at the
  *      loudness the original speaker had. The video's other sound stays (unless the
  *      member turned it off), as dubbing studios keep it: a separation model
  *      (VoiceSeparator, run on this server while steps 2 and 3 wait on the
@@ -83,14 +90,6 @@ final class VideoDubber
 
     private const BRIDGE = 1.0;
 
-    /**
-     * Seconds the original speaker may go on past the end of the new line
-     * with nothing heard in their place; past that (a verse left as it was,
-     * words the model did not write out), their own voice comes back after
-     * the new line rather than a long silence while their lips move (plan()).
-     */
-    private const LONGEST_QUIET = 2.5;
-
     /** A line whose words need under this share of the speech it stands for is heard again (unheard()). */
     private const SHORT_LINE = 0.4;
 
@@ -104,6 +103,23 @@ final class VideoDubber
 
     /** A take this much shorter than its words need (of a line that needs at least 2.5 s) stopped early or skipped some. */
     private const SHORT_TAKE = 0.5;
+
+    /**
+     * The phrases of one sentence read in one take (lines()): one speaker,
+     * pauses shorter than JOIN_GAP between them, at most MAX_PARTS phrases
+     * and LONGEST_TAKE seconds; the take is cut at its pauses (cuts()), where
+     * PART_PAUSE asks the speech engine for one between the phrases.
+     */
+    private const JOIN_GAP = 0.9;
+
+    private const MAX_PARTS = 4;
+
+    private const LONGEST_TAKE = 10.0;
+
+    private const PART_PAUSE = ' <short pause> ';
+
+    /** How far a phrase found on the sound may still move to the speaker's own start and end (refineTimes()). */
+    private const PHRASE_REACH = 0.25;
 
     /** The most a line is turned up or down to the original speaker's loudness (more raised its breaths and noises). */
     private const MAX_GAIN_DB = 6.0;
@@ -162,18 +178,32 @@ final class VideoDubber
                 $this->run([$ffmpeg, '-v', 'error', '-y', '-i', $video, '-vn', '-af', self::stereo($this->probe($video)['channels']).',aresample='.self::SEPARATION_RATE, '-f', 'f32le', $tmp.'/sound.f32']);
                 $separating = $separator->start($tmp.'/sound.f32', $tmp.'/rest.f32', $tmp.'/voices.f32', $tmp.'/further.f32');
             }
+            // Where someone speaks, phrase by phrase: the moments the lines are written for and placed on.
+            $phrases = $this->speechMap($ffmpeg, $video, $speech, $tmp, $report);
 
-            // 2. What is said, by whom and how, timed, and the dubbed lines.
+            // 2. What is said, by whom and how, and the dubbed lines: one for each phrase (or timed by the model, where no phrases were found).
             $t = microtime(true);
-            $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect']);
+            $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect'], $phrases);
+            if ($phrases !== [] && $heard['segments'] === [] && count($heard['unsaid']) === count($phrases)) {
+                // No answer for any phrase (the model would not keep to them): it times the lines itself instead.
+                $report['speech_map']['used'] = false;
+                $phrases = [];
+                $asked = $heard['usage'];
+                $heard = $this->transcribeAndRewrite((string) file_get_contents($speech), $o['language'], $o['dialect']);
+                foreach ($asked as $key => $tokens) {
+                    $heard['usage'][$key] = ($heard['usage'][$key] ?? 0) + $tokens;
+                }
+            }
             $segments = $heard['segments'];
             $report['transcribe'] = ['seconds' => round(microtime(true) - $t, 2), 'model' => $heard['model']] + $heard['usage'];
             $report['background'] = $heard['background'];
+            // Speech the lines leave out, heard again on its own: a dub must not go quiet, nor bring back the old voice, where someone still talks.
+            $segments = $phrases !== []
+                ? $this->fillPhrases($ffmpeg, $speech, $segments, $heard['unsaid'], $phrases, $o, $tmp, $report)
+                : $this->hearAgain($ffmpeg, $speech, $segments, $o, $tmp, $report);
             if ($segments === []) {
                 throw new \RuntimeException('No speech was found in the video.');
             }
-            // Speech the lines leave out, heard again on its own: a dub must not go quiet where someone still talks.
-            $segments = $this->hearAgain($ffmpeg, $speech, $segments, $o, $tmp, $report);
             $report['segments'] = count($segments);
 
             // 3. Each line voiced, with the site's own rewrite off: the lines are already in the dialect.
@@ -182,24 +212,29 @@ final class VideoDubber
             // With one voice for all, none: a description of one person read in the voice chosen for another changed it.
             $characters = ($o['each_speaker'] ?? false) ? array_column($heard['speakers'], 'voice', 'id') : [];
             $report['speakers'] = array_values(array_map(fn (array $s): array => $s + ['voice' => $voices[$s['id']] ?? $o['voice']], $heard['speakers']));
+            // The phrases of a sentence in one take, so it sounds as one reading; cut at its pauses afterwards, a part for each phrase.
+            $lines = self::lines($segments);
             $t = microtime(true);
             $rewrite = config('services.gemini_tts.dialect_rewrite');
             config(['services.gemini_tts.dialect_rewrite' => false]);
             $chars = 0;
             $retaken = 0;
+            $placements = [];
+            $takes = [];
             try {
-                foreach ($segments as $i => $segment) {
-                    $progress('voicing', $i, count($segments));
-                    $config = self::voiceConfig($segment, $voices[$segment['speaker']] ?? $o['voice'], $o, $characters[$segment['speaker']] ?? '');
-                    $take = $this->voiceLine($ffmpeg, $segment['dubbed'], $o['language'], $config, $tmp.'/line-'.$i, $made);
-                    $chars += mb_strlen($segment['dubbed']);
+                foreach ($lines as $k => $line) {
+                    $progress('voicing', $k, count($lines));
+                    $first = $segments[$line['segments'][0]];
+                    $config = self::voiceConfig($first, $voices[$first['speaker']] ?? $o['voice'], $o, $characters[$first['speaker']] ?? '');
+                    $take = $this->voiceLine($ffmpeg, $line['text'], $o['language'], $config, $tmp.'/line-'.$k, $made);
+                    $chars += mb_strlen($line['text']);
                     // A take far shorter than its words need stopped early or skipped some: taken once more, the closer one kept.
-                    $needs = self::needs($segment['dubbed'], $config);
-                    if ($needs >= 2.5 && $take['seconds'] < self::SHORT_TAKE * $needs && $retaken < max(2, (int) ceil(count($segments) / 4))) {
+                    $needs = self::needs($line['text'], $config);
+                    if ($needs >= 2.5 && $take['seconds'] < self::SHORT_TAKE * $needs && $retaken < max(2, (int) ceil(count($lines) / 4))) {
                         $retaken++;
                         try {
-                            $again = $this->voiceLine($ffmpeg, $segment['dubbed'], $o['language'], $config, $tmp.'/line-'.$i.'-again', $made);
-                            $chars += mb_strlen($segment['dubbed']);
+                            $again = $this->voiceLine($ffmpeg, $line['text'], $o['language'], $config, $tmp.'/line-'.$k.'-again', $made);
+                            $chars += mb_strlen($line['text']);
                             if (abs(log(max(0.01, $again['seconds']) / $needs)) < abs(log(max(0.01, $take['seconds']) / $needs))) {
                                 $take = $again;
                             }
@@ -208,14 +243,17 @@ final class VideoDubber
                             report($e);
                         }
                     }
-                    $segments[$i]['audio'] = $take['audio'];
-                    $segments[$i]['voiced_seconds'] = $take['seconds'];
+                    $takes[$k] = $take['audio'];
+                    foreach ($this->piecesOf($ffmpeg, $take, $line, $segments, $tmp.'/part-'.$k) as $piece) {
+                        $placements[] = $piece + ['line' => $k];
+                    }
                 }
             } finally {
                 config(['services.gemini_tts.dialect_rewrite' => $rewrite]);
             }
-            $report['voicing'] = ['seconds' => round(microtime(true) - $t, 2), 'characters' => $chars, 'requests' => count($segments) + $retaken,
-                'retaken' => $retaken, 'voiced_seconds' => round(array_sum(array_column($segments, 'voiced_seconds')), 2)];
+            $report['voicing'] = ['seconds' => round(microtime(true) - $t, 2), 'characters' => $chars, 'requests' => count($lines) + $retaken,
+                'retaken' => $retaken, 'takes' => count($lines), 'placed_parts' => count($placements),
+                'voiced_seconds' => round(array_sum(array_column($placements, 'seconds')), 2)];
 
             // 4. Placed and put back onto the picture, over what else the video plays.
             // The member's choice alone decides: the model's guess that there is no music is not reason enough to drop the sound.
@@ -238,31 +276,44 @@ final class VideoDubber
             // Exactly where the original speaker starts and stops (the model's times are a moment off),
             // heard on the voices alone where the model split them out.
             $envelope = $this->speechEnvelope($ffmpeg, $background !== null ? $background['voices'] : $video, $background !== null);
-            $segments = self::refineTimes($segments, $envelope, $report['video_seconds']);
-            $plan = self::plan($segments, $report['video_seconds']);
+            // The phrases were found on the sound itself: only a small correction then.
+            $segments = self::refineTimes($segments, $envelope, $report['video_seconds'], 100, $phrases !== [] ? self::PHRASE_REACH : 0.7);
+            // Each part on its phrase as it is now (a line that could not be cut: from its first phrase to its last).
+            $placed = array_map(fn (array $p): array => ['start' => (float) $segments[$p['segments'][0]]['start'], 'end' => (float) $segments[end($p['segments'])]['end'],
+                'voiced_seconds' => $p['seconds'], 'audio' => $p['audio'], 'line' => $p['line']], $placements);
+            $plan = self::plan($placed, $report['video_seconds']);
             $report['fit'] = ['sped_up' => count(array_filter($plan, fn ($p) => $p['tempo'] > 1.0)), 'slowed' => count(array_filter($plan, fn ($p) => $p['tempo'] < 1.0)),
                 'max_tempo' => max(array_column($plan, 'tempo')), 'overrun_seconds' => round(array_sum(array_column($plan, 'overrun')), 2),
-                'moved_seconds' => round(array_sum(array_map(fn ($s) => abs($s['start'] - ($s['heard_start'] ?? $s['start'])), $segments)), 2),
-                'original_left_seconds' => round(array_sum(array_column($plan, 'original_left')), 2)];
-            // Every line at the loudness the original speaker had, so none jumps out or falls away.
-            $plan = $this->evenLoudness($ffmpeg, $plan, $background !== null ? $background['voices'] : $speech, $background !== null);
+                'moved_seconds' => round(array_sum(array_map(fn ($s) => abs($s['start'] - ($s['heard_start'] ?? $s['start'])), $segments)), 2)];
+            // Every line at the loudness the original speaker had, so none jumps out or falls away (the parts of a take alike).
+            $plan = $this->evenLoudness($ffmpeg, $plan, $background !== null ? $background['voices'] : $speech, $background !== null, $takes);
             $report['loudness'] = ['target_db' => $plan[0]['target_db'] ?? null, 'gains_db' => array_column($plan, 'gain_db')];
+            // The old voice is out wherever the original speaker makes a sound, a phrase without a new line included.
+            $spans = array_map(fn (array $p): array => ['from' => $p[0], 'until' => $p[1]], $phrases);
             @mkdir($o['out_dir'], 0755, true);
             $clean = $o['out_dir'].'/'.$o['name'].'.mp4';
-            $report['mux'] = $this->run($this->muxCommand($ffmpeg, $video, $plan, $report['video_seconds'], $keep, $clean, null, $background));
+            $report['mux'] = $this->run($this->muxCommand($ffmpeg, $video, $plan, $report['video_seconds'], $keep, $clean, null, $background, $spans));
             $report['output_bytes'] = filesize($clean);
             $report['output'] = $clean;
             if ($o['preview'] ?? true) {
                 $progress('marking', 0, 1);
                 $preview = $o['out_dir'].'/'.$o['name'].'-preview.mp4';
-                $report['preview_encode'] = $this->run($this->muxCommand($ffmpeg, $video, $plan, $report['video_seconds'], $keep, $preview, $this->markFile($ffmpeg, $tmp, $video), $background));
+                $report['preview_encode'] = $this->run($this->muxCommand($ffmpeg, $video, $plan, $report['video_seconds'], $keep, $preview, $this->markFile($ffmpeg, $tmp, $video), $background, $spans));
                 $report['preview_bytes'] = filesize($preview);
                 $report['preview'] = $preview;
             }
-            $report['lines'] = array_map(fn ($s, $p) => ['start' => $s['start'], 'end' => $s['end'], 'heard_start' => $s['heard_start'] ?? $s['start'], 'speaker' => $s['speaker'], 'emotion' => $s['emotion'],
-                'delivery' => $s['delivery'], 'original' => $s['original'], 'dubbed' => $s['dubbed'],
-                'voiced_seconds' => round($s['voiced_seconds'], 2), 'tempo' => $p['tempo'], 'gain_db' => $p['gain_db'] ?? 0.0,
-                'voice' => $voices[$s['speaker']] ?? $o['voice'], 'heard_again' => ! empty($s['again']), 'original_left' => $p['original_left']], $segments, $plan);
+            $placementOf = [];
+            foreach ($placements as $pi => $p) {
+                foreach ($p['segments'] as $si) {
+                    $placementOf[$si] = $pi;
+                }
+            }
+            $report['lines'] = array_map(fn (array $s, int $si): array => ['start' => $s['start'], 'end' => $s['end'], 'heard_start' => $s['heard_start'] ?? $s['start'],
+                'speaker' => $s['speaker'], 'emotion' => $s['emotion'], 'delivery' => $s['delivery'], 'original' => $s['original'], 'dubbed' => $s['dubbed'],
+                'voiced_seconds' => round((float) $placements[$placementOf[$si]]['seconds'], 2), 'tempo' => $plan[$placementOf[$si]]['tempo'],
+                'gain_db' => $plan[$placementOf[$si]]['gain_db'] ?? 0.0, 'voice' => $voices[$s['speaker']] ?? $o['voice'],
+                'take' => $placements[$placementOf[$si]]['line'], 'placed_whole' => count($placements[$placementOf[$si]]['segments']) > 1,
+                'heard_again' => ! empty($s['again']), 'as_said' => ! empty($s['as_said']), 'written' => ! empty($s['written'])], $segments, array_keys($segments));
             $report['total_seconds'] = round(microtime(true) - $started, 2);
 
             return $report;
@@ -363,10 +414,12 @@ final class VideoDubber
      * starts and is fitted to end where it ends, slowed down a little (to
      * MIN_TEMPO) or sped up (to MAX_TEMPO); faster still only as far as it
      * must not run into the next line or past the video's end. Each also
-     * says until when the original voice is taken out for it.
+     * says until when the original voice is taken out for it: to where the
+     * original or the new line ends, whichever is later, so the old voice
+     * never comes back under or after its own line.
      *
-     * @param  array<int, array{start: float, end: float, voiced_seconds: float, audio?: string}>  $segments
-     * @return array<int, array{audio: ?string, delay_ms: int, tempo: float, overrun: float, from: float, until: float, original_left: float}>
+     * @param  array<int, array{start: float, end: float, voiced_seconds: float, audio?: string, line?: int}>  $segments
+     * @return array<int, array{audio: ?string, delay_ms: int, tempo: float, overrun: float, from: float, until: float, line: ?int}>
      */
     public static function plan(array $segments, float $videoSeconds): array
     {
@@ -381,10 +434,6 @@ final class VideoDubber
             $target = max(0.3, min($room, $end - $start));
             $length = max(0.01, (float) $s['voiced_seconds']);
             $tempo = max(self::MIN_TEMPO, min(self::MAX_TEMPO, $length / $target));
-            $voiceEnd = $start + $length / $tempo;
-            // The original's voice is taken out from where the line starts to where the original or the new line
-            // ends, whichever is later; unless the original goes on long after the new line (LONGEST_QUIET).
-            $left = $end - $voiceEnd > self::LONGEST_QUIET ? $end - $voiceEnd : 0.0;
             $out[] = [
                 'audio' => $s['audio'] ?? null,
                 'delay_ms' => (int) round($start * 1000),
@@ -392,8 +441,8 @@ final class VideoDubber
                 // What still runs past its room after speeding up.
                 'overrun' => max(0.0, round($length / $tempo - $room, 2)),
                 'from' => round($start, 3),
-                'until' => round($left > 0 ? $voiceEnd : max($end, $voiceEnd), 3),
-                'original_left' => round($left, 2),
+                'until' => round(max($end, $start + $length / $tempo), 3),
+                'line' => isset($s['line']) ? (int) $s['line'] : null,
             ];
         }
 
@@ -589,9 +638,10 @@ final class VideoDubber
             $from = max(0.0, $span['from'] - 0.5);
             $clip = $tmp.'/again-'.$k.'.mp3';
             $count = count($segments);
+            $length = $span['to'] + 0.5 - $from;
             try {
-                $this->run([$ffmpeg, '-v', 'error', '-y', '-ss', (string) $from, '-t', (string) ($span['to'] + 0.5 - $from), '-i', $speech, '-c:a', 'libmp3lame', '-b:a', '32k', $clip]);
-                $heard = $this->transcribeAndRewrite((string) file_get_contents($clip), $o['language'], $o['dialect'], [$from, $span['to'] + 0.5]);
+                $this->run([$ffmpeg, '-v', 'error', '-y', '-ss', (string) $from, '-t', (string) $length, '-i', $speech, '-c:a', 'libmp3lame', '-b:a', '32k', $clip]);
+                $heard = $this->transcribeAndRewrite((string) file_get_contents($clip), $o['language'], $o['dialect'], [], true);
             } catch (\Throwable $e) {
                 report($e);
 
@@ -601,8 +651,11 @@ final class VideoDubber
             foreach ($heard['usage'] as $key => $tokens) {
                 $report['transcribe'][$key] = ($report['transcribe'][$key] ?? 0) + $tokens;
             }
+            // Times from the part's start, as asked; or, now and then, from the video's.
+            $starts = array_column($heard['segments'], 'start');
+            $offset = $starts !== [] && min($starts) >= $from - 1 && max($starts) > $length + 1 ? 0.0 : $from;
             $before = $segments;
-            $segments = self::withHeardAgain($segments, $span, $heard['segments'], $from);
+            $segments = self::withHeardAgain($segments, $span, $heard['segments'], $offset);
             $report['heard_again'][] = ['from' => $span['from'], 'to' => $span['to'], 'line_replaced' => $span['replace'] !== null,
                 'lines_heard' => count($heard['segments']), 'used' => $segments !== $before, 'lines_added' => count($segments) - $count];
         }
@@ -628,20 +681,430 @@ final class VideoDubber
     }
 
     /**
+     * Where someone speaks, phrase by phrase: from the speech-detection model
+     * where the separator is set up with it (VoiceSeparator::phrases()), else
+     * from the speech band's loudness (phrasesFromLevels()). Empty where
+     * neither finds speech with pauses in it: the text model then times the
+     * lines itself.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<int, array{0: float, 1: float}>
+     */
+    private function speechMap(string $ffmpeg, string $video, string $speech, string $tmp, array &$report): array
+    {
+        $t = microtime(true);
+        $phrases = null;
+        $method = 'model';
+        if (VoiceSeparator::vadReady()) {
+            try {
+                $this->run([$ffmpeg, '-v', 'error', '-y', '-i', $video, '-vn', '-ac', '1', '-ar', '16000', '-f', 'f32le', $tmp.'/speech16.f32']);
+                $phrases = VoiceSeparator::phrases($tmp.'/speech16.f32');
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+        if ($phrases === null) {
+            $method = 'loudness';
+            $phrases = self::phrasesFromLevels($this->speechEnvelope($ffmpeg, $speech, false));
+        }
+        $report['speech_map'] = ['method' => $phrases === [] ? 'none' : $method, 'phrases' => count($phrases), 'seconds' => round(microtime(true) - $t, 2)];
+
+        return $phrases;
+    }
+
+    /**
+     * Phrases from the speech band's loudness alone ($envelope: dB every
+     * 10 ms), on a server without the speech-detection model: speech stands
+     * 10 dB over the quiet of the track and within 30 dB of its loudest; a
+     * pause is where it falls under that, or 25 dB under the speech around
+     * it, for 0.15 s or more. A phrase over 8 s is cut where it is quietest.
+     * None where the track has no such quiet (music all through), or is
+     * nearly all one long sound: pauses cannot be told then.
+     *
+     * @param  array<int, float>  $envelope
+     * @return array<int, array{0: float, 1: float}>
+     */
+    public static function phrasesFromLevels(array $envelope, int $fps = 100): array
+    {
+        $n = count($envelope);
+        if ($n < 50) {
+            return [];
+        }
+        $sorted = $envelope;
+        sort($sorted);
+        $floor = $sorted[(int) floor(0.2 * ($n - 1))];
+        $loud = $sorted[(int) floor(0.95 * ($n - 1))];
+        if ($loud < $floor + 15) {
+            return [];
+        }
+        $speech = max($floor + 10, $loud - 30);
+        // The loud end of the speech around each moment, a quarter of a second at a time, a second either way.
+        $block = max(1, (int) round(0.25 * $fps));
+        $around = [];
+        for ($b = 0; $b * $block < $n; $b++) {
+            $heard = [];
+            for ($f = max(0, $b * $block - $fps), $last = min($n, ($b + 1) * $block + $fps); $f < $last; $f++) {
+                if ($envelope[$f] >= $speech) {
+                    $heard[] = $envelope[$f];
+                }
+            }
+            sort($heard);
+            $around[$b] = $heard === [] ? INF : $heard[(int) floor(0.8 * (count($heard) - 1))];
+        }
+        $least = (int) ceil(0.15 * $fps);
+        $runs = [];
+        $start = null;
+        $quiet = 0;
+        $lastSpeech = 0;
+        for ($f = 0; $f <= $n; $f++) {
+            if ($f < $n && $envelope[$f] >= $speech && $envelope[$f] >= $around[intdiv($f, $block)] - 25) {
+                $start ??= $f;
+                $quiet = 0;
+                $lastSpeech = $f;
+            } elseif ($start !== null && ($f === $n || ++$quiet >= $least)) {
+                $runs[] = [$start, $lastSpeech + 1];
+                $start = null;
+                $quiet = 0;
+            }
+        }
+        $phrases = [];
+        while ($runs !== []) {
+            [$a, $b] = array_shift($runs);
+            if ($b - $a > 8 * $fps) {
+                $cut = $a + (int) (0.2 * ($b - $a));
+                for ($f = $cut, $last = $b - (int) (0.2 * ($b - $a)); $f < $last; $f++) {
+                    $cut = $envelope[$f] < $envelope[$cut] ? $f : $cut;
+                }
+                array_unshift($runs, [$a, $cut], [$cut, $b]);
+
+                continue;
+            }
+            if ($b - $a >= 0.2 * $fps) {
+                $phrases[] = [$a, $b];
+            }
+        }
+        $spoken = array_sum(array_map(fn (array $p): int => $p[1] - $p[0], $phrases));
+        if ($phrases === [] || ($spoken > 0.9 * $n && $spoken / count($phrases) > 6 * $fps)) {
+            return [];
+        }
+
+        // A little before and after each, as far as the phrases around it allow.
+        return array_map(fn (array $p, int $k): array => [
+            round(max($p[0] / $fps - 0.03, $k > 0 ? $phrases[$k - 1][1] / $fps : 0.0), 2),
+            round(min($p[1] / $fps + 0.03, $k + 1 < count($phrases) ? $phrases[$k + 1][0] / $fps : $n / $fps), 2),
+        ], $phrases, array_keys($phrases));
+    }
+
+    /**
+     * The phrases the model left without a dubbed line though someone speaks
+     * in them ($unsaid), filled: heard again on their own, a few at a time,
+     * as the phrases of the part cut out (in its own time). What is still
+     * missing then is read as it was said where the dub is in Arabic and so
+     * was the original (a verse, a saying of the Prophet), or else dubbed
+     * from what was heard, by the text model alone. A phrase nothing could
+     * be made of stays quiet: the old voice never comes back for it.
+     *
+     * @param  array<int, array<string, mixed>>  $segments
+     * @param  array<int, array{phrase: int, original: string, speaker: string}>  $unsaid
+     * @param  array<int, array{0: float, 1: float}>  $phrases
+     * @param  array<string, mixed>  $o
+     * @param  array<string, mixed>  $report
+     * @return array<int, array<string, mixed>>
+     */
+    private function fillPhrases(string $ffmpeg, string $speech, array $segments, array $unsaid, array $phrases, array $o, string $tmp, array &$report): array
+    {
+        $report['heard_again'] = [];
+        $missing = array_column($unsaid, null, 'phrase');
+        ksort($missing);
+        // Runs of missing phrases close together (2 s apart at most), 30 s at most each.
+        $runs = [];
+        foreach (array_keys($missing) as $k) {
+            $last = count($runs) - 1;
+            if ($last >= 0 && $phrases[$k][0] - $phrases[end($runs[$last])][1] <= 2.0 && $phrases[$k][1] - $phrases[$runs[$last][0]][0] <= 30.0) {
+                $runs[$last][] = $k;
+            } else {
+                $runs[] = [$k];
+            }
+        }
+        foreach (array_slice($runs, 0, self::MAX_HEARD_AGAIN) as $n => $run) {
+            $from = max(0.0, $phrases[$run[0]][0] - 0.5);
+            $to = $phrases[end($run)][1] + 0.5;
+            $clip = $tmp.'/again-'.$n.'.mp3';
+            try {
+                $this->run([$ffmpeg, '-v', 'error', '-y', '-ss', (string) $from, '-t', (string) ($to - $from), '-i', $speech, '-c:a', 'libmp3lame', '-b:a', '32k', $clip]);
+                $local = array_map(fn (int $k): array => [round($phrases[$k][0] - $from, 2), round($phrases[$k][1] - $from, 2)], $run);
+                $heard = $this->transcribeAndRewrite((string) file_get_contents($clip), $o['language'], $o['dialect'], $local, true);
+            } catch (\Throwable $e) {
+                report($e);
+
+                continue;
+            }
+            // What it cost, counted with the first request.
+            foreach ($heard['usage'] as $key => $tokens) {
+                $report['transcribe'][$key] = ($report['transcribe'][$key] ?? 0) + $tokens;
+            }
+            $filled = 0;
+            foreach ($heard['segments'] as $s) {
+                $k = $run[$s['phrase']];
+                $segments[] = ['start' => $phrases[$k][0], 'end' => $phrases[$k][1], 'phrase' => $k, 'again' => true,
+                    'speaker' => $missing[$k]['speaker'] !== '' ? $missing[$k]['speaker'] : self::nearestSpeaker($segments, $phrases[$k][0], $s['speaker'])] + $s;
+                unset($missing[$k]);
+                $filled++;
+            }
+            // Words it heard there but did not dub, for what follows.
+            foreach ($heard['unsaid'] as $u) {
+                $k = $run[$u['phrase']];
+                if (isset($missing[$k]) && $missing[$k]['original'] === '') {
+                    $missing[$k]['original'] = $u['original'];
+                }
+            }
+            $report['heard_again'][] = ['from' => $phrases[$run[0]][0], 'to' => $phrases[end($run)][1], 'phrases' => count($run), 'filled' => $filled];
+        }
+
+        $words = array_filter($missing, fn (array $m): bool => $m['original'] !== '');
+        $texts = [];
+        foreach ($words as $k => $m) {
+            if ($o['language'] === 'ar' && preg_match('/\p{Arabic}/u', $m['original']) === 1) {
+                $texts[$k] = ['dubbed' => $m['original'], 'as_said' => true];
+            }
+        }
+        $others = array_diff_key($words, $texts);
+        if ($others !== []) {
+            try {
+                $written = $this->dubTexts(array_values(array_column($others, 'original')), $o['language'], $o['dialect'], $report);
+                foreach (array_keys($others) as $i => $k) {
+                    if (($written[$i] ?? '') !== '') {
+                        $texts[$k] = ['dubbed' => $written[$i], 'written' => true];
+                    }
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+        foreach ($texts as $k => $text) {
+            $segments[] = $text + ['start' => $phrases[$k][0], 'end' => $phrases[$k][1], 'phrase' => $k,
+                'speaker' => $words[$k]['speaker'] !== '' ? $words[$k]['speaker'] : self::nearestSpeaker($segments, $phrases[$k][0], 'A'),
+                'emotion' => null, 'delivery' => '', 'original' => $words[$k]['original']];
+        }
+        $report['phrases_left_quiet'] = count($missing) - count($texts);
+        usort($segments, fn (array $a, array $b): int => $a['start'] <=> $b['start']);
+
+        return array_values($segments);
+    }
+
+    /** @param  array<int, array<string, mixed>>  $segments */
+    private static function nearestSpeaker(array $segments, float $at, string $otherwise): string
+    {
+        $speaker = $otherwise;
+        $distance = INF;
+        foreach ($segments as $s) {
+            $gap = max((float) $s['start'] - $at, $at - (float) $s['end'], 0.0);
+            if ($gap < $distance && empty($s['again'])) {
+                [$distance, $speaker] = [$gap, (string) $s['speaker']];
+            }
+        }
+
+        return $speaker;
+    }
+
+    /**
+     * Dubbed lines written from what was said, from the text alone (for
+     * phrases heard but not dubbed from the sound): one for each, in order;
+     * an empty one where the model gave none.
+     *
+     * @param  array<int, string>  $originals
+     * @param  array<string, mixed>  $report
+     * @return array<int, string>
+     */
+    private function dubTexts(array $originals, string $language, string $dialect, array &$report): array
+    {
+        $list = implode("\n", array_map(fn (string $text, int $i): string => ($i + 1).'. '.$text, $originals, array_keys($originals)));
+        $answer = $this->askModel([['text' => 'You are writing the lines of a professional dub of a video. Write each of these lines, said in the video, '
+            .'as a dubbed line in '.self::target($language, $dialect).': the same meaning, naturally, as a native speaker would say it, and about as long. '
+            .'Leave nothing out and never sum anything up; quotations (verses of the Quran, sayings of the Prophet, prayers, poems) are dubbed too, translated faithfully.'
+            ."\n{$list}\n".'Return only JSON: {"lines": ["...", "..."]}, one line for each, in the same order.']]);
+        foreach ($answer['usage'] as $key => $tokens) {
+            $report['transcribe'][$key] = ($report['transcribe'][$key] ?? 0) + $tokens;
+        }
+
+        return array_map(fn ($line): string => is_string($line) ? trim($line) : '', array_values((array) ($answer['data']['lines'] ?? [])));
+    }
+
+    /**
+     * The lines read in one take each: the phrases of a sentence together
+     * (one speaker; pauses shorter than JOIN_GAP between them; at most
+     * MAX_PARTS phrases and LONGEST_TAKE seconds; a new take after a sentence
+     * ends), joined with a pause (PART_PAUSE) where the take is to be cut, so
+     * the reading carries on as one while each part still goes on its own
+     * phrase. Lines the model timed itself are read one by one.
+     *
+     * @param  array<int, array<string, mixed>>  $segments  in order of time
+     * @return array<int, array{segments: array<int, int>, text: string}>
+     */
+    public static function lines(array $segments): array
+    {
+        $segments = array_values($segments);
+        $lines = [];
+        foreach ($segments as $i => $s) {
+            $k = count($lines) - 1;
+            $previous = $k >= 0 ? $segments[end($lines[$k]['segments'])] : null;
+            if ($previous !== null && isset($s['phrase'], $previous['phrase']) && $s['speaker'] === $previous['speaker']
+                && (float) $s['start'] - (float) $previous['end'] < self::JOIN_GAP && count($lines[$k]['segments']) < self::MAX_PARTS
+                && (float) $s['end'] - (float) $segments[$lines[$k]['segments'][0]]['start'] <= self::LONGEST_TAKE
+                && preg_match('/[.!?؟…]["»”\')\]]*$/u', trim((string) $previous['dubbed'])) !== 1) {
+                $lines[$k]['segments'][] = $i;
+            } else {
+                $lines[] = ['segments' => [$i]];
+            }
+        }
+
+        return array_map(fn (array $line): array => $line + ['text' => implode(self::PART_PAUSE,
+            array_map(fn (int $i): string => trim((string) $segments[$i]['dubbed']), $line['segments']))], $lines);
+    }
+
+    /**
+     * Where a take of several phrases is cut into its parts: at a pause in
+     * it (0.12 s or more, 30 dB under its loud end) for each joint, as near
+     * as may be to where the joint should come by how long each part's words
+     * take ($weights), a longer pause counting for more; none farther than a
+     * quarter of the take (0.8 s at least) from where it should come. Null
+     * when the take has too few such pauses: it is placed whole then.
+     *
+     * @param  array<int, float>  $levels  the take's loudness, dB every 10 ms
+     * @param  array<int, float>  $weights  seconds each part's words need, in order
+     * @return array<int, array{0: float, 1: float}>|null  the pauses it is cut at (from, to: seconds into the take)
+     */
+    public static function cuts(array $levels, array $weights, int $fps = 100): ?array
+    {
+        $parts = count($weights);
+        $frames = count($levels);
+        if ($parts < 2) {
+            return [];
+        }
+        if ($frames < 20) {
+            return null;
+        }
+        $sorted = $levels;
+        sort($sorted);
+        $gate = $sorted[(int) floor(0.95 * ($frames - 1))] - 30;
+        $pauses = [];
+        $run = null;
+        for ($f = 0; $f <= $frames; $f++) {
+            if ($f < $frames && $levels[$f] < $gate) {
+                $run ??= $f;
+            } elseif ($run !== null) {
+                if ($run > 0 && $f < $frames && $f - $run >= 0.12 * $fps) {
+                    $pauses[] = [round($run / $fps, 2), round($f / $fps, 2)];
+                }
+                $run = null;
+            }
+        }
+        $m = count($pauses);
+        if ($m < $parts - 1) {
+            return null;
+        }
+        $length = $frames / $fps;
+        $total = max(0.01, array_sum($weights));
+        $reach = max(0.8, 0.25 * $length);
+        $cost = [];
+        $sum = 0.0;
+        for ($k = 0; $k < $parts - 1; $k++) {
+            $sum += $weights[$k];
+            $expected = $length * $sum / $total;
+            foreach ($pauses as $j => [$a, $b]) {
+                $off = abs(($a + $b) / 2 - $expected);
+                $cost[$k][$j] = $off <= $reach ? $off - 0.8 * min(0.6, $b - $a) : INF;
+            }
+        }
+        // The best pause for each joint, each after the one before.
+        $best = [];
+        $from = [];
+        for ($k = 0; $k < $parts - 1; $k++) {
+            for ($j = 0; $j < $m; $j++) {
+                $best[$k][$j] = $k === 0 ? $cost[$k][$j] : INF;
+                for ($i = 0; $k > 0 && $i < $j; $i++) {
+                    if ($best[$k - 1][$i] + $cost[$k][$j] < $best[$k][$j]) {
+                        $best[$k][$j] = $best[$k - 1][$i] + $cost[$k][$j];
+                        $from[$k][$j] = $i;
+                    }
+                }
+            }
+        }
+        $j = null;
+        foreach ($best[$parts - 2] as $i => $value) {
+            if ($value < INF && ($j === null || $value < $best[$parts - 2][$j])) {
+                $j = $i;
+            }
+        }
+        if ($j === null) {
+            return null;
+        }
+        $chosen = [];
+        for ($k = $parts - 2; $k >= 0; $k--) {
+            $chosen[$k] = $pauses[$j];
+            $j = $from[$k][$j] ?? 0;
+        }
+        ksort($chosen);
+
+        return array_values($chosen);
+    }
+
+    /**
+     * A line's take as the parts it is placed in: cut at its pauses (cuts())
+     * into one piece for each phrase, or whole (from its first phrase to its
+     * last) when it cannot be.
+     *
+     * @param  array{audio: string, seconds: float}  $take
+     * @param  array{segments: array<int, int>, text: string}  $line
+     * @param  array<int, array<string, mixed>>  $segments
+     * @return array<int, array{segments: array<int, int>, audio: string, seconds: float}>
+     */
+    private function piecesOf(string $ffmpeg, array $take, array $line, array $segments, string $out): array
+    {
+        $whole = [['segments' => $line['segments'], 'audio' => $take['audio'], 'seconds' => (float) $take['seconds']]];
+        if (count($line['segments']) < 2) {
+            return $whole;
+        }
+        $cuts = self::cuts($this->speechEnvelope($ffmpeg, $take['audio'], false),
+            array_map(fn (int $i): float => max(0.3, self::needs((string) $segments[$i]['dubbed'])), $line['segments']));
+        if ($cuts === null) {
+            return $whole;
+        }
+        $bounds = [0.0];
+        foreach ($cuts as [$a, $b]) {
+            array_push($bounds, $a, $b);
+        }
+        $bounds[] = (float) $take['seconds'];
+        $pieces = [];
+        foreach ($line['segments'] as $k => $i) {
+            $file = $out.'-'.$k.'.wav';
+            try {
+                $this->run([$ffmpeg, '-v', 'error', '-y', '-i', $take['audio'], '-af', 'atrim=start='.$bounds[2 * $k].':end='.$bounds[2 * $k + 1].',asetpts=PTS-STARTPTS', '-ac', '1', $file]);
+            } catch (\Throwable) {
+                return $whole;
+            }
+            $pieces[] = ['segments' => [$i], 'audio' => $file, 'seconds' => round($bounds[2 * $k + 1] - $bounds[2 * $k], 3)];
+        }
+
+        return $pieces;
+    }
+
+    /**
      * Where each original line really starts and ends, from how loud the
      * speech is moment by moment ($envelope: dB every 10 ms): the model that
      * hears the video places lines a moment early or late, and a dub that
      * starts before or after the lips move is the first thing anyone sees.
-     * Each start is moved to where the speech begins within 0.7 s of it, each
-     * end to where it stops, never across the line before or after. A line
-     * where no clear speech is found keeps its times. The times the model
-     * gave stay as heard_start and heard_end.
+     * Each start is moved to where the speech begins within $reach seconds
+     * of it (0.7 s for the model's times, less for phrases found on the
+     * sound), each end to where it stops, never across the line before or
+     * after. A line where no clear speech is found keeps its times. The
+     * times it had stay as heard_start and heard_end.
      *
      * @param  array<int, array<string, mixed>>  $segments
      * @param  array<int, float>  $envelope
      * @return array<int, array<string, mixed>>
      */
-    public static function refineTimes(array $segments, array $envelope, float $seconds, int $fps = 100): array
+    public static function refineTimes(array $segments, array $envelope, float $seconds, int $fps = 100, float $reach = 0.7): array
     {
         $frames = count($envelope);
         if ($frames < 20) {
@@ -672,14 +1135,14 @@ final class VideoDubber
             // Speech: within 28 dB of the line's loudest, and clearly above the quiet of the whole track.
             $level = max($floor + 10, $peak - 28);
             $onset = null;
-            for ($f = $at(max($previousEnd + 0.05, $start - 0.7)), $last = $at(min($end - 0.2, $start + 0.7)); $f <= $last; $f++) {
+            for ($f = $at(max($previousEnd + 0.05, $start - $reach)), $last = $at(min($end - 0.2, $start + $reach)); $f <= $last; $f++) {
                 if ($above($f, $level)) {
                     $onset = $f / $fps;
                     break;
                 }
             }
             $offset = null;
-            for ($f = $at(min($nextStart - 0.05, $end + 0.7, $seconds)), $first = $at(max(($onset ?? $start) + 0.3, $end - 0.7)); $f >= $first; $f--) {
+            for ($f = $at(min($nextStart - 0.05, $end + $reach, $seconds)), $first = $at(max(($onset ?? $start) + 0.3, $end - $reach)); $f >= $first; $f--) {
                 if ($envelope[$f] >= $level && $envelope[max(0, $f - 1)] >= $level && $envelope[max(0, $f - 2)] >= $level) {
                     $offset = ($f + 1) / $fps;
                     break;
@@ -740,50 +1203,91 @@ final class VideoDubber
     }
 
     /**
-     * One request: the speech, timed in segments, by speaker and mood, with a
-     * dubbed line for each, and what plays behind it. $part says that the
-     * audio is a part cut out of the video (from, to: its seconds there).
+     * One request: what is said, by whom and how, with a dubbed line for it,
+     * and what plays behind it. With $phrases (found on the sound itself,
+     * speechMap()) the model writes out each phrase and a dubbed part for it,
+     * so every moment someone speaks gets its line, timed by the phrase;
+     * without, it splits the speech into timed segments itself. $part says
+     * the audio is a part cut out of the video (heard again): its times are
+     * from the part's own start.
      *
-     * @param  array{0: float, 1: float}|null  $part
-     * @return array{segments: array<int, array{start: float, end: float, speaker: string, emotion: ?string, delivery: string, original: string, dubbed: string}>, speakers: array<int, array{id: string, gender: string}>, background: string, usage: array<string, int>, model: string}
+     * @param  array<int, array{0: float, 1: float}>  $phrases
+     * @return array{segments: array<int, array<string, mixed>>, speakers: array<int, array{id: string, gender: string}>, background: string, unsaid: array<int, array<string, mixed>>, usage: array<string, int>, model: string}
      */
-    private function transcribeAndRewrite(string $audio, string $language, string $dialect, ?array $part = null): array
+    private function transcribeAndRewrite(string $audio, string $language, string $dialect, array $phrases = [], bool $part = false): array
     {
-        $target = $language === 'ar'
-            ? 'Arabic in the '.VoiceFlag::label($dialect, false).' dialect, written the way people there really speak (not Modern Standard Arabic unless that is the dialect asked for)'
-            : 'English with a '.VoiceFlag::label($dialect, false).' accent and wording';
-        if ($dialect === 'ar-XA') {
-            $target = 'Modern Standard Arabic (Fusha), clear and natural';
-        }
+        $target = self::target($language, $dialect);
         $emotions = implode(', ', TtsStudioConfig::emotionValues());
         $tags = implode(', ', array_map(fn (string $tag): string => '<'.$tag.'>', self::SOUND_TAGS));
-        $prompt = "You are preparing a professional dub of a video. Listen to its audio closely.\n"
-            .($part !== null ? sprintf("This audio is only a part of the video, cut out from %.1f to %.1f seconds of it; it may start or end in the middle of a word.\n", $part[0], $part[1]) : '')
-            ."1. Split what is said into segments at natural sentence or phrase boundaries, each 2 to 10 seconds long and spoken by one person, "
-            ."with its start and end in seconds from the beginning of the audio. Cover everything that is said, from the first word to the very last one "
-            ."at the end of the audio: never leave out, merge away or sum up any part, and give each segment every word spoken in it.\n"
-            ."2. Tell the people apart: give each a letter (A, B, ...), say whether they sound male or female, and describe how they speak for a voice actor "
+        $people = "Tell the people apart: give each a letter (A, B, ...), say whether they sound male or female, and describe how they speak for a voice actor "
             ."in at most 10 words of English: pace, energy and manner only, not age or gender (for example \"slow and calm, documentary narrator\"). "
-            ."One person is one letter all through, also across music, pauses or a change of mood; give a new letter only when a clearly different person speaks.\n"
-            ."3. For each segment say how it is spoken, as a director would brief a voice actor: \"emotion\" is the one word from this list "
+            ."One person is one letter all through, also across music, pauses or a change of mood; give a new letter only when a clearly different person speaks.\n";
+        $manner = "say how it is spoken, as a director would brief a voice actor: \"emotion\" is the one word from this list "
             ."that fits best: {$emotions}; \"delivery\" is a short direction in English (energy, pace, loudness, attitude), at most 15 words, "
-            ."for example \"bright and fast, smiling, building to a big finish\".\n"
-            ."4. For each segment write a dubbed line in {$target} that says all of the same thing naturally, as a native speaker would say it in that moment, "
-            ."and can be spoken in about the same time as the original: not longer than the original, but never leaving anything out. Keep names, brands and "
-            ."numbers right. Where the speaker laughs, sighs, gasps, whispers, shouts or pauses, put the matching tag at that place in the dubbed line, "
-            ."only from these: {$tags}.\n"
-            ."5. Say what plays besides the speech: \"music\" if there is music, \"ambient\" for other sound (crowd, street, room, effects), \"none\" if only the voice.\n"
-            .'Return only JSON: {"background": "music", "speakers": [{"id": "A", "gender": "male", "voice": "..."}], "segments": [{"start": 0.0, "end": 3.2, "speaker": "A", '
-            .'"emotion": "excited", "delivery": "...", "original": "...", "dubbed": "..."}]}. If nothing is spoken, return {"background": "music", "speakers": [], "segments": []}.';
+            ."for example \"bright and fast, smiling, building to a big finish\".\n";
+        $faithful = 'Leave nothing out and never sum anything up. Quotations are dubbed too: verses of the Quran, sayings of the Prophet, prayers, poems and songs '
+            .'(in an Arabic dub keep the Quran and the sayings of the Prophet word for word as they were said; in another language translate them faithfully). '
+            ."Keep names, brands and numbers right. Where the speaker laughs, sighs, gasps, whispers, shouts or pauses, put the matching tag at that place in the dubbed line, only from these: {$tags}.\n";
+        $sound = "Say what plays besides the speech: \"music\" if there is music, \"ambient\" for other sound (crowd, street, room, effects), \"none\" if only the voice.\n";
+        $prompt = "You are preparing a professional dub of a video. Listen to its audio closely.\n"
+            .($part ? "This audio is a short part cut out of a longer video; it may start or end in the middle of a word. All times are from the start of this audio.\n" : '');
+        if ($phrases !== []) {
+            $list = implode("\n", array_map(fn (array $p, int $k): string => sprintf('%d. %.2f-%.2f (%.1f s)', $k + 1, $p[0], $p[1], $p[1] - $p[0]), $phrases, array_keys($phrases)));
+            $prompt .= 'Where someone speaks in it was found from the sound itself, as these '.count($phrases)." numbered phrases (start-end, in seconds from the start of the audio):\n{$list}\n"
+                .'1. For each phrase write out exactly what is said in it ("original"), every word, in the language spoken. A phrase is often only a part of a sentence: '
+                .'give only the words spoken inside its own time. A phrase with no words in it (a laugh, a breath, a cough, music, a noise) has an empty original and dubbed.'."\n"
+                .'2. '.$people
+                .'3. For each phrase '.$manner
+                ."4. For each phrase write its dubbed part in {$target}: what is said in it, naturally, as a native speaker would say it there, so that it can be spoken "
+                .'in the phrase\'s own time (not longer). Where a sentence runs over several phrases, split the dubbed sentence over them in the same order, so each part '
+                .'is heard where its own words are. '.$faithful
+                .'5. '.$sound
+                .'Return only JSON, with every phrase from 1 to '.count($phrases).' in order: {"background": "music", "speakers": [{"id": "A", "gender": "male", "voice": "..."}], '
+                .'"phrases": [{"n": 1, "speaker": "A", "emotion": "excited", "delivery": "...", "original": "...", "dubbed": "..."}]}.';
+        } else {
+            $prompt .= "1. Split what is said into segments at natural sentence or phrase boundaries, each 2 to 10 seconds long and spoken by one person, "
+                ."with its start and end in seconds from the start of the audio. Cover everything that is said, from the first word to the very last one "
+                ."at the end of the audio: never leave out, merge away or sum up any part, and give each segment every word spoken in it.\n"
+                .'2. '.$people
+                .'3. For each segment '.$manner
+                ."4. For each segment write a dubbed line in {$target} that says all of the same thing naturally, as a native speaker would say it in that moment, "
+                .'and can be spoken in about the same time as the original: not longer than the original. '.$faithful
+                .'5. '.$sound
+                .'Return only JSON: {"background": "music", "speakers": [{"id": "A", "gender": "male", "voice": "..."}], "segments": [{"start": 0.0, "end": 3.2, "speaker": "A", '
+                .'"emotion": "excited", "delivery": "...", "original": "...", "dubbed": "..."}]}. If nothing is spoken, return {"background": "music", "speakers": [], "segments": []}.';
+        }
+        $answer = $this->askModel([['inline_data' => ['mime_type' => 'audio/mpeg', 'data' => base64_encode($audio)]], ['text' => $prompt]]);
+        $heard = $phrases !== [] ? self::readAnchored($answer['data'], $phrases) : self::readHeard($answer['data']) + ['unsaid' => []];
+
+        return $heard + ['usage' => $answer['usage'], 'model' => $answer['model']];
+    }
+
+    /** What the dubbed lines are written in: the dialect (or accent), as people there really speak it. */
+    private static function target(string $language, string $dialect): string
+    {
+        if ($dialect === 'ar-XA') {
+            return 'Modern Standard Arabic (Fusha), clear and natural';
+        }
+
+        return $language === 'ar'
+            ? 'Arabic in the '.VoiceFlag::label($dialect, false).' dialect, written the way people there really speak (not Modern Standard Arabic unless that is the dialect asked for)'
+            : 'English with a '.VoiceFlag::label($dialect, false).' accent and wording';
+    }
+
+    /**
+     * One request to the text model, the models tried in turn and each one's
+     * keys: its answer as JSON, what it used and which model gave it.
+     *
+     * @param  array<int, array<string, mixed>>  $parts
+     * @return array{data: array<string, mixed>, usage: array<string, int>, model: string}
+     */
+    private function askModel(array $parts): array
+    {
         $base = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
         $body = [
-            'contents' => [['role' => 'user', 'parts' => [
-                ['inline_data' => ['mime_type' => 'audio/mpeg', 'data' => base64_encode($audio)]],
-                ['text' => $prompt],
-            ]]],
+            'contents' => [['role' => 'user', 'parts' => $parts]],
             'generationConfig' => ['responseMimeType' => 'application/json', 'temperature' => 0.3, 'thinkingConfig' => ['thinkingLevel' => 'low']],
         ];
-
         $last = 'no key';
         foreach (self::MODELS as $model) {
             foreach ($this->keys->keysInOrder($model) as $key) {
@@ -806,11 +1310,47 @@ final class VideoDubber
                 $raw = (string) $response->json('candidates.0.content.parts.0.text');
                 $data = json_decode(trim((string) preg_replace('/^```(?:json)?|```$/m', '', $raw)), true);
 
-                return self::readHeard(is_array($data) ? $data : []) + ['usage' => self::usage((array) $response->json('usageMetadata')), 'model' => $model];
+                return ['data' => is_array($data) ? $data : [], 'usage' => self::usage((array) $response->json('usageMetadata')), 'model' => $model];
             }
         }
 
         throw new \RuntimeException('The speech could not be written out ('.$last.').');
+    }
+
+    /**
+     * The model's answer for the phrases made safe (as readHeard()): a line
+     * for each phrase it dubbed, timed by the phrase itself ('phrase': its
+     * number, from 0); and the phrases it left without a dubbed line though
+     * it heard words in them, or gave no answer for at all ('unsaid', with
+     * what it heard). A phrase it heard no words in (a laugh, music) is
+     * neither.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<int, array{0: float, 1: float}>  $phrases
+     * @return array{segments: array<int, array<string, mixed>>, speakers: array<int, array{id: string, gender: string}>, background: string, unsaid: array<int, array{phrase: int, original: string, speaker: string}>}
+     */
+    public static function readAnchored(array $data, array $phrases): array
+    {
+        $answers = [];
+        foreach ((array) ($data['phrases'] ?? []) as $p) {
+            $n = is_array($p) && is_numeric($p['n'] ?? null) ? (int) $p['n'] : 0;
+            if ($n >= 1 && $n <= count($phrases) && ! isset($answers[$n - 1])) {
+                $answers[$n - 1] = $p;
+            }
+        }
+        $timed = [];
+        $unsaid = [];
+        foreach (array_values($phrases) as $k => [$start, $end]) {
+            $p = $answers[$k] ?? null;
+            $original = trim((string) ($p['original'] ?? ''));
+            if ($p !== null && trim((string) ($p['dubbed'] ?? '')) !== '') {
+                $timed[] = ['start' => $start, 'end' => $end, 'phrase' => $k] + $p;
+            } elseif ($p === null || $original !== '') {
+                $unsaid[] = ['phrase' => $k, 'original' => $original, 'speaker' => mb_substr(trim((string) ($p['speaker'] ?? '')), 0, 8)];
+            }
+        }
+
+        return self::readHeard(['background' => $data['background'] ?? null, 'speakers' => $data['speakers'] ?? [], 'segments' => $timed]) + ['unsaid' => $unsaid];
     }
 
     /**
@@ -850,7 +1390,7 @@ final class VideoDubber
                 'delivery' => mb_substr(trim((string) ($s['delivery'] ?? '')), 0, 160),
                 'original' => trim((string) ($s['original'] ?? '')),
                 'dubbed' => $dubbed,
-            ];
+            ] + (isset($s['phrase']) ? ['phrase' => (int) $s['phrase']] : []);
         }
         usort($segments, fn ($a, $b) => $a['start'] <=> $b['start']);
         $background = strtolower(trim((string) ($data['background'] ?? '')));
@@ -893,14 +1433,17 @@ final class VideoDubber
      * stereo) its rest plays all through and its voices only between the new
      * lines; without it, the original plays between lines and under each
      * line only its sides (the old voice, in the middle, goes, and with it a
-     * mono track's music), so no old voice is heard under a new one.
+     * mono track's music), so no old voice is heard under a new one. $spans
+     * (from, until) are taken out as the lines are: the phrases of the
+     * original speaker that have no line of their own.
      *
      * @param  array<int, array{audio: ?string, delay_ms: int, tempo: float, from: float, until: float}>  $plan
      * @param  array{path: string, margin: int}|null  $mark
      * @param  array{rest: string, voices: string, further?: ?string}|null  $background
+     * @param  array<int, array{from: float, until: float}>  $spans
      * @return array<int, string>
      */
-    private function muxCommand(string $ffmpeg, string $video, array $plan, float $seconds, bool $keepBackground, string $out, ?array $mark, ?array $background = null): array
+    private function muxCommand(string $ffmpeg, string $video, array $plan, float $seconds, bool $keepBackground, string $out, ?array $mark, ?array $background = null, array $spans = []): array
     {
         $cmd = [$ffmpeg, '-v', 'error', '-y', '-i', $video];
         foreach ($plan as $p) {
@@ -925,7 +1468,7 @@ final class VideoDubber
             foreach (array_filter([$background['rest'], $background['voices'], $further]) as $track) {
                 array_push($cmd, '-f', 'f32le', '-ar', (string) self::SEPARATION_RATE, '-ac', '2', '-i', $track);
             }
-            $under = self::underLines($plan);
+            $under = self::underLines(array_merge($plan, $spans));
             // The music and effects as they were, all through.
             $filters[] = '['.$next.':a]aresample=48000[bg]';
             $filters[] = '['.($next + 1).":a]aresample=48000,volume='1-({$under})':eval=frame[ov]";
@@ -938,7 +1481,7 @@ final class VideoDubber
             $audioOut = '[mix]';
             $next += $further !== null ? 3 : 2;
         } elseif ($keepBackground) {
-            $under = self::underLines($plan);
+            $under = self::underLines(array_merge($plan, $spans));
             $filters[] = '[0:a]'.self::stereo($this->probe($video)['channels']).',aresample=48000,asplit=2[oa][ob]';
             // Between lines: the original as it is.
             $filters[] = "[oa]volume='1-({$under})':eval=frame[clear]";
@@ -1011,20 +1554,29 @@ final class VideoDubber
      * raw float stereo, or the whole sound), both measured on the speech
      * alone (silences left out). A line is turned up or down by at most
      * MAX_GAIN_DB; nothing changes where the original cannot be measured.
+     * The parts of one take ($takes: its file, by the plan's 'line') are
+     * measured as the take and turned up or down alike, so a reading keeps
+     * its own rise and fall.
      *
      * @param  array<int, array<string, mixed>>  $plan
+     * @param  array<int, string>  $takes
      * @return array<int, array<string, mixed>>
      */
-    private function evenLoudness(string $ffmpeg, array $plan, string $reference, bool $raw): array
+    private function evenLoudness(string $ffmpeg, array $plan, string $reference, bool $raw, array $takes = []): array
     {
         $speechOnly = 'silenceremove=start_periods=1:start_threshold=-45dB:stop_periods=-1:stop_threshold=-45dB:stop_duration=0.25';
         $ranges = implode('+', array_map(fn (array $p): string => 'between(t,'.$p['from'].','.$p['until'].')', $plan));
         $input = $raw ? ['-f', 'f32le', '-ar', (string) self::SEPARATION_RATE, '-ac', '2', '-i', $reference] : ['-i', $reference];
         $target = $ranges === '' ? null : $this->meanVolume(array_merge([$ffmpeg, '-hide_banner'], $input, ['-af', "aselect='{$ranges}',{$speechOnly},volumedetect", '-f', 'null', '-']));
         $target = $target === null ? null : max(-32.0, min(-12.0, $target));
+        $levels = [];
         foreach ($plan as $i => $p) {
-            $level = $target === null || ! is_string($p['audio'] ?? null) ? null
-                : $this->meanVolume([$ffmpeg, '-hide_banner', '-i', $p['audio'], '-af', $speechOnly.',volumedetect', '-f', 'null', '-']);
+            $source = isset($p['line'], $takes[$p['line']]) ? $takes[$p['line']] : ($p['audio'] ?? null);
+            if (! array_key_exists((string) $source, $levels)) {
+                $levels[(string) $source] = $target === null || ! is_string($source) ? null
+                    : $this->meanVolume([$ffmpeg, '-hide_banner', '-i', $source, '-af', $speechOnly.',volumedetect', '-f', 'null', '-']);
+            }
+            $level = $levels[(string) $source];
             $plan[$i]['target_db'] = $target;
             $plan[$i]['gain_db'] = $level === null ? 0.0 : round(max(-self::MAX_GAIN_DB, min(self::MAX_GAIN_DB, $target - $level)), 1);
         }

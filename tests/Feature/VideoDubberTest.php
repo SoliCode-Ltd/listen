@@ -213,65 +213,153 @@ class VideoDubberTest extends TestCase
             [['start' => 0.6, 'end' => 4.0, 'speaker' => 'A', 'original' => 'Then what happened? Tell me everything!', 'dubbed' => 'وش صار؟ قول لي كل شي!']], 19.5));
     }
 
-    public function test_the_original_comes_back_rather_than_a_long_silence(): void
+    public function test_the_old_voice_never_comes_back_however_short_the_new_line(): void
     {
         $plan = VideoDubber::plan([
-            ['start' => 0.5, 'end' => 3.0, 'voiced_seconds' => 2.0],   // a little short: the old voice stays out until the original ends
-            ['start' => 4.0, 'end' => 16.0, 'voiced_seconds' => 1.0],  // 11 s short (a verse left as it was): the original comes back after the line
+            ['start' => 0.5, 'end' => 3.0, 'voiced_seconds' => 2.0, 'line' => 0],
+            // Far shorter than the original (a verse left as it was): still no old voice after it, to where the original ends.
+            ['start' => 4.0, 'end' => 16.0, 'voiced_seconds' => 1.0, 'line' => 1],
         ], 20.0);
 
-        $this->assertSame([3.0, 5.087], array_column($plan, 'until'));
-        $this->assertSame([0.0, 10.91], array_column($plan, 'original_left'));
+        $this->assertSame([3.0, 16.0], array_column($plan, 'until'));
+        $this->assertSame([0, 1], array_column($plan, 'line'));
     }
 
-    public function test_left_out_speech_is_heard_again_and_a_take_cut_short_is_taken_again(): void
+    public function test_phrases_are_found_on_the_sound_from_pause_to_pause(): void
+    {
+        // 20 s, quiet at -60 dB. Speech at -20 dB from 1 to 2.5 s; a pause of 0.3 s; speech to 4 s (with a 0.1 s gap between
+        // two words, no pause); 2 s of quiet; then 9.5 s without a pause, a little softer for a moment at 10 s.
+        $envelope = [];
+        for ($f = 0; $f < 2000; $f++) {
+            $t = $f / 100;
+            $speech = ($t >= 1 && $t < 2.5) || ($t >= 2.8 && $t < 4 && ! ($t >= 3.4 && $t < 3.5)) || ($t >= 6 && $t < 15.5);
+            $envelope[] = $speech ? ($f >= 1000 && $f < 1005 ? -30.0 : -20.0) : -60.0;
+        }
+
+        // The long one is cut where it is softest, so no phrase runs over 8 s.
+        $this->assertSame([[0.97, 2.53], [2.77, 4.03], [5.97, 10.0], [10.0, 15.53]], VideoDubber::phrasesFromLevels($envelope));
+        // No quiet to tell pauses by (music all through): none, and the text model times the lines itself.
+        $this->assertSame([], VideoDubber::phrasesFromLevels(array_map(fn (int $f): float => -20.0 - ($f % 7), range(0, 1999))));
+    }
+
+    public function test_the_model_answer_for_phrases_is_timed_by_the_phrases(): void
+    {
+        $phrases = [[0.5, 2.0], [2.3, 4.0], [4.4, 5.0], [6.0, 8.0]];
+        $heard = VideoDubber::readAnchored(['background' => 'none', 'speakers' => [['id' => 'A', 'gender' => 'female']], 'phrases' => [
+            ['n' => 1, 'speaker' => 'A', 'start' => 9.9, 'original' => 'Hello there,', 'dubbed' => 'هلا والله،'],
+            ['n' => 1, 'speaker' => 'A', 'original' => 'twice', 'dubbed' => 'مرتين'],
+            // Words heard, nothing dubbed (a quotation the model would not touch).
+            ['n' => 2, 'speaker' => 'A', 'original' => 'إن الله وملائكته', 'dubbed' => ''],
+            // A laugh: no words, no line.
+            ['n' => 3, 'speaker' => 'A', 'original' => '', 'dubbed' => ''],
+            ['n' => 9, 'speaker' => 'A', 'original' => 'not a phrase', 'dubbed' => 'لا'],
+        ]], $phrases);
+
+        $this->assertEquals([['start' => 0.5, 'end' => 2.0, 'phrase' => 0, 'dubbed' => 'هلا والله،']],
+            array_map(fn (array $s): array => array_intersect_key($s, array_flip(['start', 'end', 'phrase', 'dubbed'])), $heard['segments']));
+        // The quotation and the phrase it gave no answer for are to be heard again.
+        $this->assertSame([['phrase' => 1, 'original' => 'إن الله وملائكته', 'speaker' => 'A'], ['phrase' => 3, 'original' => '', 'speaker' => '']], $heard['unsaid']);
+        $this->assertSame('female', $heard['speakers'][0]['gender']);
+    }
+
+    public function test_the_phrases_of_a_sentence_are_read_in_one_take(): void
+    {
+        $line = fn (string $speaker, float $start, float $end, string $dubbed, ?int $phrase) => ['speaker' => $speaker, 'start' => $start, 'end' => $end, 'dubbed' => $dubbed]
+            + ($phrase !== null ? ['phrase' => $phrase] : []);
+        $lines = VideoDubber::lines([
+            $line('A', 0.5, 2.0, 'هلا والله،', 0),
+            $line('A', 2.3, 4.0, 'حياك الله.', 1),   // the sentence ends: the next is a new take
+            $line('A', 4.2, 5.0, 'كيف الحال؟', 2),
+            $line('B', 5.1, 6.0, 'بخير،', 3),        // another speaker
+            $line('B', 7.5, 8.0, 'والحمد لله.', 4),  // after a pause of 1.5 s
+            $line('B', 9.0, 10.0, 'وأنت؟', null),     // timed by the model itself: on its own
+        ]);
+
+        $this->assertSame([[0, 1], [2], [3], [4], [5]], array_column($lines, 'segments'));
+        $this->assertSame('هلا والله، <short pause> حياك الله.', $lines[0]['text'], 'a pause where the take is cut');
+    }
+
+    public function test_a_take_is_cut_at_the_pauses_nearest_to_its_phrases(): void
+    {
+        // A 4 s take: speech at -20 dB, a pause of 0.4 s at 1.2 s, a gap of 0.1 s between two words at 2 s, a pause of 0.2 s at 2.8 s.
+        $levels = [];
+        for ($f = 0; $f < 400; $f++) {
+            $levels[] = ($f >= 120 && $f < 160) || ($f >= 200 && $f < 210) || ($f >= 280 && $f < 300) ? -70.0 : -20.0;
+        }
+
+        $this->assertSame([[1.2, 1.6]], VideoDubber::cuts($levels, [1.2, 2.0]));
+        $this->assertSame([[1.2, 1.6], [2.8, 3.0]], VideoDubber::cuts($levels, [1.2, 1.3, 0.8]));
+        $this->assertNull(VideoDubber::cuts($levels, [1.0, 1.0, 1.0, 1.0]), 'too few pauses: placed whole');
+        $this->assertNull(VideoDubber::cuts($levels, [0.2, 3.8]), 'no pause near where the joint should be');
+        $this->assertSame([], VideoDubber::cuts($levels, [2.0]));
+    }
+
+    public function test_every_phrase_gets_the_chosen_voice_and_each_part_goes_on_its_own_phrase(): void
     {
         $ffmpeg = AudioFormats::ffmpegPath();
-        // Someone speaks from 0.5 to 3 s and from 4 to 7.5 s; the model writes out only the first part.
-        $video = $this->dir.'/two-parts.mp4';
+        // Someone speaks from 0.5 to 2.5 s, pauses, speaks to 4 s, then quotes a saying from 5 to 7.5 s.
+        $video = $this->dir.'/phrases.mp4';
         (new Process([$ffmpeg, '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=320x240:rate=15',
-            '-f', 'lavfi', '-i', "aevalsrc='0.5*sin(2*PI*500*t)*(between(t,0.5,3)+between(t,4,7.5))':s=16000:d=8",
+            '-f', 'lavfi', '-i', "aevalsrc='0.5*sin(2*PI*500*t)*(between(t,0.5,2.5)+between(t,2.8,4)+between(t,5,7.5))':s=16000:d=8",
             '-t', '8', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', $video]))->mustRun();
-        $answer = fn (array $segments) => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'none',
-            'speakers' => [['id' => 'A', 'gender' => 'male', 'voice' => 'calm']], 'segments' => $segments])]]]]], 'usageMetadata' => []]);
+        $quote = 'إن الله وملائكته وأهل السماوات والأرض ليصلون على معلم الناس الخير';
+        $answer = fn (array $phrases) => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'none',
+            'speakers' => [['id' => 'A', 'gender' => 'male', 'voice' => 'calm']], 'phrases' => $phrases])]]]]], 'usageMetadata' => []]);
         $sent = [];
-        Http::fake(function ($request) use (&$sent, $answer) {
+        Http::fake(function ($request) use (&$sent, $answer, $quote) {
             $sent[] = $request->data();
 
+            // The saying is left without a line, the first time and when heard again on its own.
             return count($sent) === 1
-                ? $answer([['start' => 0.5, 'end' => 3.0, 'speaker' => 'A', 'original' => 'Hi there.', 'dubbed' => 'هلا والله.']])
-                // The part from 4 s heard again, cut out from 3.5 s: its times are from there.
-                : $answer([['start' => 0.5, 'end' => 4.0, 'speaker' => 'B', 'original' => 'How are you today, my dear friend?', 'dubbed' => 'كيف حالك اليوم يا صديقي العزيز؟']]);
+                ? $answer([['n' => 1, 'speaker' => 'A', 'original' => 'Hi there,', 'dubbed' => 'هلا والله،'], ['n' => 2, 'speaker' => 'A', 'original' => 'welcome.', 'dubbed' => 'حياك الله.'],
+                    ['n' => 3, 'speaker' => 'A', 'original' => $quote, 'dubbed' => '']])
+                : $answer([['n' => 1, 'speaker' => 'A', 'original' => $quote, 'dubbed' => '']]);
         });
         $keys = \Mockery::mock(GeminiKeyManager::class);
         $keys->shouldReceive('keysInOrder')->andReturn([['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1]]);
         $keys->shouldReceive('recordUsage');
-        // The first take of the second line stops after half a second: it is taken again.
-        $takes = [2.3, 0.5, 3.2];
+        // The first two phrases in one take, with the asked-for pause between them; the saying's first take stops short.
+        $takes = ["0.4*sin(2*PI*800*t)*(lt(t,1)+between(t,1.4,2.3)):d=2.3", '0.4*sin(2*PI*800*t):d=0.3', '0.4*sin(2*PI*800*t):d=2.4'];
+        $texts = [];
         $tts = \Mockery::mock(GeminiTtsProvider::class);
-        $tts->shouldReceive('synthesize')->times(3)->andReturnUsing(function () use ($ffmpeg, &$takes) {
-            $path = 'audio/take-'.count($takes).'.mp3';
+        $tts->shouldReceive('synthesize')->times(3)->andReturnUsing(function (string $text, string $language, array $config) use ($ffmpeg, &$takes, &$texts) {
+            $texts[] = [$text, $config['voice_name']];
+            $path = 'audio/take-'.count($takes).'.wav';
             @mkdir(dirname(Storage::disk('public')->path($path)), 0755, true);
-            (new Process([$ffmpeg, '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=400:duration='.array_shift($takes), '-c:a', 'libmp3lame', Storage::disk('public')->path($path)]))->mustRun();
+            [$expression, $duration] = explode(':d=', array_shift($takes));
+            (new Process([$ffmpeg, '-v', 'error', '-y', '-f', 'lavfi', '-i', "aevalsrc='{$expression}':s=24000:d={$duration}", Storage::disk('public')->path($path)]))->mustRun();
 
             return ['audio_path' => $path, 'duration_seconds' => 2];
         });
 
-        $r = (new VideoDubber($keys, $tts))->dub($video, ['language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Puck', 'preview' => false, 'out_dir' => $this->dir, 'name' => 'again']);
+        $r = (new VideoDubber($keys, $tts))->dub($video, ['language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Kore', 'preview' => false, 'out_dir' => $this->dir, 'name' => 'dubbed']);
 
+        $this->assertSame(['method' => 'loudness', 'phrases' => 3], array_intersect_key($r['speech_map'], array_flip(['method', 'phrases'])));
+        $this->assertStringContainsString('3 numbered phrases', $sent[0]['contents'][0]['parts'][1]['text']);
+        $this->assertStringContainsString('sayings of the Prophet', $sent[0]['contents'][0]['parts'][1]['text']);
+        // Heard again on its own, in its own time.
         $this->assertCount(2, $sent);
-        $this->assertStringContainsString('cut out from 3.5 to 8.0 seconds', $sent[1]['contents'][0]['parts'][1]['text']);
-        $this->assertSame(2, $r['segments']);
-        $this->assertCount(1, $r['heard_again']);
-        $this->assertEqualsWithDelta(4.0, $r['heard_again'][0]['from'], 0.1);
-        $this->assertEqualsWithDelta(7.5, $r['heard_again'][0]['to'], 0.1);
-        $this->assertSame(['line_replaced' => false, 'lines_heard' => 1, 'used' => true, 'lines_added' => 1],
-            array_intersect_key($r['heard_again'][0], array_flip(['line_replaced', 'lines_heard', 'used', 'lines_added'])));
-        $this->assertSame([false, true], array_column($r['lines'], 'heard_again'));
-        $this->assertEqualsWithDelta(4.0, $r['lines'][1]['start'], 0.15);
-        $this->assertSame('A', $r['lines'][1]['speaker'], 'read as the line before it');
-        $this->assertSame(1, $r['voicing']['retaken']);
-        $this->assertEqualsWithDelta(3.2, $r['lines'][1]['voiced_seconds'], 0.15, 'the closer take is kept');
+        $this->assertStringContainsString('short part cut out', $sent[1]['contents'][0]['parts'][1]['text']);
+        $this->assertStringContainsString('1. 0.5', $sent[1]['contents'][0]['parts'][1]['text']);
+        $this->assertSame(0, $r['heard_again'][0]['filled']);
+        // Still without a line: read as it was said, in the chosen voice. Never the old voice.
+        $this->assertSame(0, $r['phrases_left_quiet']);
+        $this->assertSame(['هلا والله، <short pause> حياك الله.', $quote, $quote], array_column($texts, 0));
+        $this->assertSame(['Kore'], array_values(array_unique(array_column($texts, 1))));
+        $this->assertSame([false, false, true], array_column($r['lines'], 'as_said'));
+        // The take of the first two is cut at its pause, each part on its own phrase.
+        $this->assertSame([0, 0, 1], array_column($r['lines'], 'take'));
+        $this->assertSame([false, false, false], array_column($r['lines'], 'placed_whole'));
+        $this->assertEqualsWithDelta(2.8, $r['lines'][1]['start'], 0.1);
+        $this->assertEqualsWithDelta(0.9, $r['lines'][1]['voiced_seconds'], 0.1);
+        $this->assertSame(['requests' => 3, 'retaken' => 1, 'takes' => 2, 'placed_parts' => 3],
+            array_intersect_key($r['voicing'], array_flip(['requests', 'retaken', 'takes', 'placed_parts'])));
+        // The second part plays on the second phrase, the pause between them stays quiet, and the old voice is out under every phrase.
+        $this->assertGreaterThan(-25, $this->level($r['output'], 2.9, 0.7, 'bandpass=f=800:w=100,'));
+        $this->assertLessThan(-45, $this->level($r['output'], 2.55, 0.15, 'bandpass=f=800:w=100,'));
+        foreach ([[0.6, 1.8], [2.9, 1.0], [5.1, 2.3]] as [$from, $length]) {
+            $this->assertLessThan(-45, $this->level($r['output'], $from, $length, 'bandpass=f=500:w=60,'), 'no old voice at '.$from.' s');
+        }
         $this->assertSame([], Storage::disk('public')->allFiles('audio'), 'every take is deleted');
     }
 
