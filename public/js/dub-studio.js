@@ -269,6 +269,12 @@
           var b = el('button', 'btn btn-primary', t.lock_verify_resend); b.type = 'submit';
           f.appendChild(token); f.appendChild(b); actions.appendChild(f);
           break;
+        case 'closed':
+          // A paid plan without dubbing: no free dub there, the way to a plan with it.
+          title = t.lock_closed_title;
+          text = plan ? t.lock_closed_text_plan.replace(':plan', plan) : t.lock_closed_text;
+          link(t.see_plans, c.upgrade.url, true);
+          break;
         case 'used':
           title = t.lock_used_title;
           text = plan ? t.lock_used_text_plan.replace(':plan', plan) : t.lock_used_text;
@@ -297,7 +303,7 @@
 
     // The demo's free-video box, where the text studio shows its characters.
     function syncAllowance() {
-      var left = c.state === 'used' ? 0 : 1;
+      var left = c.state === 'used' || c.state === 'closed' ? 0 : 1;
       document.querySelectorAll('[data-dub-allowance]').forEach(function (box) {
         var value = box.querySelector('[data-dub-allowance-value]');
         var fill = box.querySelector('[data-dub-allowance-fill]');

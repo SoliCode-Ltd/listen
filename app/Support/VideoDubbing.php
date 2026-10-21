@@ -52,6 +52,15 @@ final class VideoDubbing
         return (bool) ($plan?->video_dubbing_enabled ?? false);
     }
 
+    /**
+     * A paid plan (or a pack) without dubbing: no free dub there, only the
+     * way to a plan with dubbing. The free dub is for free accounts.
+     */
+    public static function closedOn(?Plan $plan): bool
+    {
+        return $plan !== null && ! self::planIncludes($plan) && ($plan->isPack() || (int) $plan->price_cents > 0);
+    }
+
     /** The cheapest plan on sale with dubbing, for the upgrade button. */
     public static function cheapestPlan(): ?Plan
     {
@@ -341,7 +350,8 @@ final class VideoDubbing
 
     /**
      * What the dubbing studio shows this visitor. state says what they can do:
-     * guest (sign up first), verify (confirm the email), free (their free
+     * guest (sign up first), closed (a paid plan without dubbing: no free
+     * dub, an upgrade), verify (confirm the email), free (their free
      * dub), used (it is used and no plan includes dubbing), day_full (today's
      * free dubs are gone), paid (dub from the plan), limit (this month's
      * videos are used), no_credits (too few credits for the shortest video).
@@ -371,6 +381,7 @@ final class VideoDubbing
             };
         } elseif ($user) {
             $state = match (true) {
+                self::closedOn($plan) => 'closed',
                 EmailVerification::requiredForFreeUse($user) => 'verify',
                 self::freeUsed($user, $request) => 'used',
                 self::freeDayFull() => 'day_full',

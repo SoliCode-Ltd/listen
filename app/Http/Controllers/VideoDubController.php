@@ -31,7 +31,7 @@ use Symfony\Component\HttpFoundation\Response;
  * same studio sits on its own page, in the demo and on the dashboard
  * (components/dub/studio.blade.php); all of them send here.
  *
- * Without a plan that includes dubbing a member gets one free dub, watched
+ * A free account gets one free dub (a paid plan without dubbing none), watched
  * with the Listen mark and never downloaded without it; with one, the dub is
  * paid in credits (up to the plan's videos a month and its longest video)
  * and the clean copy can be downloaded. A member who subscribes after their
@@ -317,6 +317,10 @@ class VideoDubController extends Controller
     {
         if (VideoDub::query()->where('user_id', $user->id)->whereIn('status', [VideoDub::QUEUED, VideoDub::PROCESSING])->exists()) {
             throw ValidationException::withMessages(['video' => __('ui.dub.one_at_a_time')]);
+        }
+        if (VideoDubbing::closedOn($plan)) {
+            // A paid plan without dubbing: no free dub there, only a plan with dubbing.
+            throw ValidationException::withMessages(['video' => __('ui.dub.not_on_plan')]);
         }
         if ($free) {
             $this->assertMayDubFree($user, $request);

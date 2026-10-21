@@ -87,7 +87,7 @@
 
       @if($dubStudio ?? null)
         {{-- The free video, where the text studio shows its trial characters (the dubbing studio's own box stays hidden here). --}}
-        @php $dubLeft = $dubStudio['state'] === 'used' ? 0 : 1; @endphp
+        @php $dubLeft = in_array($dubStudio['state'], ['used', 'closed'], true) ? 0 : 1; @endphp
         <div class="s-card" data-studio-pane="dub" data-dub-allowance style="padding:1rem 1.25rem; margin-bottom:1.1rem">
           <div class="quota-panel">
             <div class="q-head">
