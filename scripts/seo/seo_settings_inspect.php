@@ -26,7 +26,7 @@ require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
-$prefixes = ['seo_', 'meta_', 'og_', 'twitter_', 'sitemap_', 'site_name', 'site_description', 'canonical_url', 'robots_txt', 'llms_txt', 'enable_llms_txt', 'enable_structured_data', 'logo_url', 'google_site_verification', 'bing_site_verification', 'landing_'];
+$prefixes = ['google_', 'facebook_', 'seo_', 'meta_', 'og_', 'twitter_', 'sitemap_', 'site_name', 'site_description', 'canonical_url', 'robots_txt', 'llms_txt', 'enable_llms_txt', 'enable_structured_data', 'logo_url', 'google_site_verification', 'bing_site_verification', 'landing_'];
 $secretWords = ['secret', 'token', 'password', 'api_key', 'apikey', 'private'];
 
 $rows = SiteSetting::query()->orderBy('key')->get(['key', 'value', 'group']);
