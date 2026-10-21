@@ -6,6 +6,7 @@ use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
 use App\Models\GenerationError;
 use App\Models\TextItem;
+use App\Services\Tts\GeminiKeyManager;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -166,6 +167,12 @@ class GenerationErrorRecorder
     private function clean(string $text, int $max): string
     {
         $text = preg_replace('/AIza[0-9A-Za-z_\-]{20,}/', '[key hidden]', $text) ?? $text;
+        // Keys in Google's newer formats too: each saved key, wherever it shows.
+        foreach (rescue(fn () => app(GeminiKeyManager::class)->getAllKeys(), [], false) as $saved) {
+            if (strlen((string) ($saved['key'] ?? '')) >= 20) {
+                $text = str_replace($saved['key'], '[key hidden]', $text);
+            }
+        }
         $text = preg_replace('/([?&](?:key|api_key|access_token)=)[^&\s"\']+/i', '$1[hidden]', $text) ?? $text;
         $text = preg_replace('/(Bearer\s+)[A-Za-z0-9._\-]+/i', '$1[hidden]', $text) ?? $text;
 
