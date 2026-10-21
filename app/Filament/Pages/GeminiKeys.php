@@ -56,11 +56,12 @@ class GeminiKeys extends Page implements HasForms
             return;
         }
 
-        // Basic validation for Google API key format
-        if (!str_starts_with($key, 'AIza')) {
+        // Only a sanity check: Google AI Studio keys no longer all start with "AIza"
+        // (newer ones use other prefixes), so any one-word key of a sensible length is accepted.
+        if (preg_match('/\s/', $key) || strlen($key) < 20) {
             Notification::make()
                 ->title('Invalid API key format')
-                ->body('Google API keys should start with "AIza"')
+                ->body('Paste the whole key from Google AI Studio, with no spaces.')
                 ->danger()
                 ->send();
             return;
