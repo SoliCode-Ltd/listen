@@ -45,6 +45,8 @@ class VideoDubPageTest extends TestCase
         }
         Storage::fake('public');
         Storage::fake('local');
+        // Never the separator this machine may have set up: these dubs run without one, as on a server without it.
+        config(['listen.dubbing.separator.dir' => sys_get_temp_dir().'/no-separator-'.bin2hex(random_bytes(4))]);
         // Routes have no locale prefix in tests (TestCase::localizedRoute).
         $this->withoutMiddleware([
             \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,

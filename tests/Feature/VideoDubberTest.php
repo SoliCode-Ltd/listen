@@ -35,6 +35,8 @@ class VideoDubberTest extends TestCase
         Storage::fake('public');
         $this->dir = sys_get_temp_dir().'/dub-test-'.bin2hex(random_bytes(4));
         @mkdir($this->dir, 0700, true);
+        // Never the separator this machine may have set up: a test that wants one makes its own (fakeSeparator()).
+        config(['listen.dubbing.separator.dir' => $this->dir.'/no-separator']);
     }
 
     protected function tearDown(): void
