@@ -75,7 +75,7 @@ class VideoDubbingSettings extends Page implements HasForms
                             ])
                             ->descriptions([
                                 VideoDubbing::AUDIENCE_PREVIEW => 'Only '.VoiceCloningAccess::PREVIEW_EMAIL.' can open it, to try it before launch. Everyone else gets "page not found".',
-                                VideoDubbing::AUDIENCE_EVERYONE => 'Anyone signed in gets one free dub with the Listen mark. Plans with "Include video dubbing" switched on pay from their credits and download without the mark.',
+                                VideoDubbing::AUDIENCE_EVERYONE => 'Free accounts get one free dub with the Listen mark; paid plans without dubbing (Starter and the like) see an upgrade instead. Plans with "Include video dubbing" switched on pay from their credits and download without the mark.',
                             ])
                             ->required(),
                     ]),
