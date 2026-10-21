@@ -80,8 +80,12 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
           {{ __('ui.dub.upgrade_title') }}
         </strong>
-        {{-- The free dub still to try, or already made: never "your free dub is below" before there is one. --}}
-        <p>{{ $dub['state'] === 'used' ? __('ui.dub.upgrade_text_used') : __('ui.dub.upgrade_text') }}</p>
+        {{-- A paid plan without dubbing has no free dub; a free account its one free dub, still to try or made. --}}
+        <p>{{ match ($dub['state']) {
+            'closed' => __('ui.dub.upgrade_text_closed'),
+            'used' => __('ui.dub.upgrade_text_used'),
+            default => __('ui.dub.upgrade_text'),
+        } }}</p>
       </div>
     @endif
 

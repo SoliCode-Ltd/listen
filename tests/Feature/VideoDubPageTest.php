@@ -262,6 +262,32 @@ class VideoDubPageTest extends TestCase
             ->assertSee(__('ui.dub.upgrade_text_used'))->assertDontSee(__('ui.dub.upgrade_text'));
     }
 
+    public function test_a_paid_plan_without_dubbing_has_no_free_dub_only_the_way_to_a_plan_with_it(): void
+    {
+        $this->openToEveryone();
+        $this->fakeEngine();
+        // Starter: paid, without dubbing.
+        $member = $this->member(dubbing: false);
+        Plan::query()->update(['price_cents' => 900]);
+        Plan::factory()->create(['name' => 'Creator', 'price_cents' => 2200, 'is_active' => true, 'video_dubbing_enabled' => true]);
+
+        $this->actingAs($member)->get(route('dashboard'))->assertOk()
+            ->assertSee('"state":"closed"', false)->assertSee('"plan":"Creator"', false)
+            ->assertSee(__('ui.dub.upgrade_title'))->assertSee(__('ui.dub.upgrade_text_closed'))
+            ->assertDontSee(__('ui.dub.upgrade_text'))->assertDontSee(__('ui.dub.upgrade_text_used'));
+
+        // Refused before a byte is sent, and at the end: nothing is dubbed.
+        $this->actingAs($member)->postJson(route('dub.upload.start'), ['name' => 'clip.mp4', 'size' => 1000])
+            ->assertStatus(422)->assertJsonPath('errors.video.0', __('ui.dub.not_on_plan'));
+        $this->actingAs($member)->post(route('dub.store'), $this->form(), ['Accept' => 'application/json'])
+            ->assertStatus(422)->assertJsonPath('errors.video.0', __('ui.dub.not_on_plan'));
+        $this->assertSame(0, VideoDub::query()->count());
+
+        // On a plan with dubbing, it opens.
+        Plan::query()->update(['video_dubbing_enabled' => true]);
+        $this->actingAs($member)->get(route('dashboard'))->assertOk()->assertSee('"state":"paid"', false);
+    }
+
     public function test_a_plan_sets_its_videos_a_month(): void
     {
         $this->openToEveryone();
