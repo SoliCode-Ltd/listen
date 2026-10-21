@@ -3,7 +3,9 @@
 namespace App\Services\Dubbing;
 
 use App\Services\Tts\GeminiKeyManager;
+use App\Services\Tts\GeminiKeysOutException;
 use App\Services\Tts\GeminiTtsProvider;
+use App\Services\Tts\TtsCostLimitException;
 use App\Support\AudioDuration;
 use App\Support\AudioFormats;
 use App\Support\TtsStudioConfig;
@@ -251,11 +253,16 @@ final class VideoDubber
                     try {
                         $requests++;
                         $take = $this->voiceLine($ffmpeg, $line['text'], $o['language'], $config, $tmp.'/line-'.$k, $made);
+                    } catch (GeminiKeysOutException|TtsCostLimitException $e) {
+                        // The speech engine is out for every line (keys used up, the day's ceiling): the dub fails whole, its credits given back.
+                        throw $e;
                     } catch (\Throwable $e) {
                         // Once more; then this line stays quiet rather than the whole dub failing, unless more than a few do.
                         try {
                             $requests++;
                             $take = $this->voiceLine($ffmpeg, $line['text'], $o['language'], $config, $tmp.'/line-'.$k.'-second', $made);
+                        } catch (GeminiKeysOutException|TtsCostLimitException $e) {
+                            throw $e;
                         } catch (\Throwable $e) {
                             report($e);
                             $quiet[$k] = mb_substr($e->getMessage(), 0, 200);

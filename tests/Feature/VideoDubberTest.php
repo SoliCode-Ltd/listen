@@ -460,6 +460,35 @@ class VideoDubberTest extends TestCase
         $this->dubWith($video, 4, $dubber, fail: fn (string $text): bool => true);
     }
 
+    public function test_keys_run_out_and_the_dub_fails_whole_rather_than_half_quiet(): void
+    {
+        $video = $this->phraseVideo();
+        Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'none', 'phrases' => [
+            ['n' => 1, 'speaker' => 'A', 'original' => 'Hi there.', 'dubbed' => 'هلا والله.'],
+            ['n' => 2, 'speaker' => 'A', 'original' => 'Welcome.', 'dubbed' => 'حياك الله.'],
+            ['n' => 3, 'speaker' => 'A', 'original' => 'How are you?', 'dubbed' => 'كيف حالك؟'],
+        ]])]]]]]])]);
+        $ffmpeg = AudioFormats::ffmpegPath();
+        $keys = \Mockery::mock(GeminiKeyManager::class);
+        $keys->shouldReceive('keysInOrder')->andReturn([['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1]]);
+        $keys->shouldReceive('recordUsage');
+        $tts = \Mockery::mock(GeminiTtsProvider::class);
+        // The first line is voiced; then every key is out. Not asked again, and no line left quiet.
+        $tts->shouldReceive('synthesize')->twice()->andReturnUsing(function (string $text) use ($ffmpeg) {
+            if ($text !== 'هلا والله.') {
+                throw new \App\Services\Tts\GeminiKeysOutException('All Gemini API keys exhausted.');
+            }
+            $path = 'audio/take-'.bin2hex(random_bytes(3)).'.wav';
+            @mkdir(dirname(Storage::disk('public')->path($path)), 0755, true);
+            (new Process([$ffmpeg, '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=800:sample_rate=24000:duration=1.5', Storage::disk('public')->path($path)]))->mustRun();
+
+            return ['audio_path' => $path, 'duration_seconds' => 2];
+        });
+
+        $this->expectException(\App\Services\Tts\GeminiKeysOutException::class);
+        (new VideoDubber($keys, $tts))->dub($video, ['language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Kore', 'preview' => false, 'out_dir' => $this->dir, 'name' => 'dubbed']);
+    }
+
     public function test_when_the_phrases_give_no_line_the_model_times_the_lines_itself(): void
     {
         $video = $this->phraseVideo();
