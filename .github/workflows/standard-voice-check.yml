@@ -63,13 +63,7 @@ jobs:
           grep -q "GLOBALS\['standard_engine'\]" under_test.php
           test "$(grep -c '^namespace ListenUnderTest;' under_test.php)" = "$((3 + $(echo $helpers | wc -w)))"
           ! grep -nE '^use App\\Support\\(AudioFormats|WavPcm|SpeechJoin|SpeechLoudness|ShareableAudio);' under_test.php
-          python3 - <<'PY'
-          import base64
-          code = base64.b64encode(open('under_test.php', 'rb').read()).decode()
-          script = open('scripts/tts/standard_voice_check.php').read()
-          assert '__UNDER_TEST__' in script
-          open('check.php', 'w').write(script.replace('__UNDER_TEST__', code))
-          PY
+          cp scripts/tts/standard_voice_check.php check.php
           php -l check.php
 
       - name: Run against staging over SSH
@@ -92,9 +86,12 @@ jobs:
           ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
           remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; php"
-          ssh -i ~/.ssh/id_check -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" \
-            < check.php > result.json
-          rm -f ~/.ssh/id_check
+          ssh_run() { ssh -i ~/.ssh/id_check -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$@"; }
+          # The code under test goes up as a file of its own, deleted again whatever happens.
+          under_test=""
+          trap '[ -n "$under_test" ] && ssh_run "rm -f \"$under_test\""; rm -f ~/.ssh/id_check' EXIT
+          under_test="$(ssh_run 'f=$(mktemp /tmp/listen-under-test-XXXXXX) && cat > "$f" && echo "$f"' < under_test.php)"
+          ssh_run "export LISTEN_UNDER_TEST='$under_test'; $remote" < check.php > result.json
 
       - name: Install ffprobe
         run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg

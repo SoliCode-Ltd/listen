@@ -9,7 +9,7 @@
  * reason and audio length; the audio comes back as base64 so it can be
  * listened to.
  *
- * The workflow replaces __UNDER_TEST__ with this branch's GeminiVocalTags,
+ * The workflow sends, as a file of its own (LISTEN_UNDER_TEST), this branch's GeminiVocalTags,
  * moved to the ListenUnderTest namespace, so the check runs the new code
  * even on a server that has not deployed it.
  */
@@ -31,15 +31,13 @@ require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
-$underTest = base64_decode('__UNDER_TEST__', true);
-if (! is_string($underTest) || ! str_contains($underTest, 'namespace ListenUnderTest;')) {
-    fwrite(STDERR, "The workflow did not inject the code under test.\n");
+// The code under test, sent by the workflow as a file of its own (LISTEN_UNDER_TEST), loaded once the app is up.
+$underTest = (string) getenv('LISTEN_UNDER_TEST');
+if ($underTest === '' || ! is_file($underTest) || ! str_contains((string) file_get_contents($underTest), 'namespace ListenUnderTest;')) {
+    fwrite(STDERR, "Run this through the Vocal tags check workflow: it sends the code under test.\n");
     exit(1);
 }
-$file = tempnam(sys_get_temp_dir(), 'tagcheck').'.php';
-file_put_contents($file, $underTest);
-require $file;
-unlink($file);
+require $underTest;
 
 $tags = 'ListenUnderTest\GeminiVocalTags';
 $model = 'gemini-3.8-flash-tts';
