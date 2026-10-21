@@ -451,6 +451,50 @@ class PlanResource extends Resource
                             ->suffix('voices')
                             ->helperText('Leave this at 0 to use the site-wide default. Set 1–100 for an exact cap on this plan.'),
                     ]),
+                Forms\Components\Section::make('Dub my video')
+                    ->description('Members on this plan dub videos into an Arabic dialect and download them without the Listen mark. Each dub is paid from the plan\'s credits: one second of voice for each second of video (a 30-second video uses 30 seconds, 450 credits). Everyone else gets one free dub with the mark. Who sees the page at all: Video Dubbing → Settings.')
+                    ->columns(3)
+                    ->schema([
+                        Forms\Components\Toggle::make('video_dubbing_enabled')
+                            ->label('Include video dubbing')
+                            ->default(false)
+                            ->live()
+                            ->columnSpan(3),
+                        Forms\Components\TextInput::make('video_dubs_per_month')
+                            ->label('Videos a month')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->maxValue(10000)
+                            ->default(0)
+                            ->required()
+                            ->suffix('videos')
+                            ->helperText('0: no count, only the credits limit them. Members see how many they have left.')
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('video_dubbing_enabled')),
+                        Forms\Components\TextInput::make('video_dub_max_seconds')
+                            ->label('Longest video')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(5)
+                            ->maxValue(180)
+                            ->default(60)
+                            ->required()
+                            ->suffix('seconds')
+                            ->helperText('Up to 180 seconds. A longer video waits longer and uses more credits.')
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('video_dubbing_enabled')),
+                        Forms\Components\Placeholder::make('video_dub_example')
+                            ->label('What a member gets')
+                            ->content(function (Forms\Get $get): string {
+                                $credits = (int) $get('monthly_chars');
+                                $seconds = max(5, (int) ($get('video_dub_max_seconds') ?: 60));
+                                $byCredits = intdiv(max(0, $credits), \App\Support\Credits::forSeconds($seconds));
+                                $count = (int) $get('video_dubs_per_month');
+
+                                return sprintf('Their credits cover about %s videos of %d seconds a month%s.', number_format($byCredits), $seconds,
+                                    $count > 0 ? ', and the count stops them at '.number_format($count) : '');
+                            })
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('video_dubbing_enabled')),
+                    ]),
                 Forms\Components\Section::make('Pricing page')
                     ->description('The lines under the price on this plan\'s card. They are written for you in English and Arabic from this plan\'s settings above, so changing a setting updates the card by itself. Tick the ones to show.')
                     ->schema([

@@ -39,6 +39,7 @@ use App\Support\SeoHelper;
 use App\Support\SpeakerAvatar;
 use App\Support\SpeechLanguages;
 use App\Support\TtsStudioConfig;
+use App\Support\VideoDubbing;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceFlag;
@@ -524,6 +525,8 @@ class HomeController extends Controller
             'demoQuota' => $this->demoQuotaForPageLoad($request),
             'trialAllowanceChars' => $this->demoCharAllowance($request),
             'upgradePlanSlug' => $upgradePlanSlug,
+            // Dub a video, beside the text studio: the free dub (App\Support\VideoDubbing).
+            'dubStudio' => VideoDubbing::openTo($member) ? VideoDubbing::studio($member, $request) : null,
         ]);
 
         return $this->attachDemoDeviceCookie($request, $response);

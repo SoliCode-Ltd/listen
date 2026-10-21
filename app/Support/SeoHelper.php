@@ -209,6 +209,18 @@ class SeoHelper
                 'localized' => true,
                 'indexable' => false,
             ],
+            // Kept out of search results while it is being tried; open it to search when it launches.
+            'dub' => [
+                'label' => 'Dub my video',
+                'title' => 'Dub My Video into Arabic or English',
+                'title_key' => 'ui.dub.seo_title',
+                'description' => 'Upload a short video and hear it dubbed into the Arabic dialect or English accent you choose.',
+                'description_key' => 'ui.dub.seo_description',
+                'robots' => 'noindex,nofollow,noarchive,nosnippet',
+                'path' => '/dub-my-video',
+                'localized' => true,
+                'indexable' => false,
+            ],
             'login' => [
                 'label' => 'Login',
                 'title' => 'Sign In',
@@ -1949,6 +1961,7 @@ HTML;
         return match ($page) {
             'home' => ['resources/views/landing.blade.php', 'resources/views/components/header.blade.php', 'resources/views/components/footer.blade.php', 'resources/views/components/seo.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'pricing' => ['resources/views/pricing.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
+            'dub' => ['resources/views/dub.blade.php', 'app/Http/Controllers/VideoDubController.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'samples' => ['resources/views/samples.blade.php', 'app/Http/Controllers/HomeController.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'contact' => ['resources/views/contact.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'extension' => ['resources/views/extension.blade.php', 'app/Http/Controllers/ExtensionController.php', 'lang/en/ui.php', 'lang/ar/ui.php'],

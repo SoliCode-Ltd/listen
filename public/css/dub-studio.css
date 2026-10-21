@@ -1,0 +1,430 @@
+/*
+ * The dubbing studio (components/dub/studio.blade.php), the switch between
+ * it and the text studio (components/dub/mode-switch.blade.php) and the
+ * dashboard's dubbing section. Uses the pages' colour tokens (--surface,
+ * --surface2, --line, --text, --muted, --a, --b), so it follows light and
+ * dark themes, and the voice studio's card and pickers (voice-studio.css).
+ */
+
+/* ---------- Text to speech | Dub a video ---------- */
+.studio-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .4rem;
+  padding: .35rem;
+  margin: 0 0 1.1rem;
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--surface2, var(--surface)) 80%, transparent);
+}
+.studio-mode {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .7rem .9rem;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+/* Animated once the page has opened on its side. */
+.studio-modes.is-ready .studio-mode { transition: background .18s ease, color .18s ease, box-shadow .18s ease; }
+.studio-mode:hover { color: var(--text); }
+.studio-mode[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(15, 12, 40, .06), 0 6px 18px -8px color-mix(in oklab, var(--a) 45%, transparent);
+}
+.studio-mode:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
+.studio-mode-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--a) 12%, transparent);
+  color: var(--a);
+}
+.studio-mode[aria-selected="true"] .studio-mode-icon { background: linear-gradient(135deg, var(--a), color-mix(in oklab, var(--b) 70%, #c084fc)); color: #fff; }
+.studio-mode-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+/* Wraps rather than cuts: Arabic letters that reach below the line (ى، ي، ج) need the room. */
+.studio-mode-text { display: grid; gap: .2rem; min-width: 0; line-height: 1.5; }
+.studio-mode-text strong { font-size: 1.02rem; line-height: 1.45; }
+.studio-mode-text small { font-size: .9rem; line-height: 1.55; color: color-mix(in oklab, var(--text) 62%, var(--muted)); overflow-wrap: anywhere; }
+
+/* Only the chosen side shows. */
+[data-studio-host]:not([data-studio="dub"]) [data-studio-pane="dub"],
+[data-studio-host][data-studio="dub"] [data-studio-pane="tts"] { display: none !important; }
+
+/* ---------- The card ---------- */
+.dub-studio { display: grid; gap: 1.5rem; }
+.dub-studio [hidden] { display: none !important; }
+.dub-target-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  min-height: 56px;
+  padding: 0 1rem;
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 14px;
+  font-weight: 700;
+}
+.dub-target-pill svg { width: 20px; height: 20px; fill: none; stroke: var(--a); stroke-width: 1.8; }
+.dub-stage { padding: 1.1rem 1.2rem 0; }
+
+.dub-drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
+  min-height: 300px;
+  padding: 1.5rem;
+  border: 1.5px dashed color-mix(in oklab, var(--a) 35%, var(--line));
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in oklab, var(--a) 7%, transparent), transparent 70%),
+    color-mix(in oklab, var(--surface2, var(--surface)) 60%, transparent);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s ease, background .2s ease, transform .2s ease;
+}
+.dub-drop:hover, .dub-drop.is-over { border-color: var(--a); background-color: color-mix(in oklab, var(--a) 6%, var(--surface)); }
+.dub-drop.is-over { transform: scale(1.005); }
+.dub-drop:focus-visible { outline: 2px solid var(--a); outline-offset: 3px; }
+/* The file field stays out of sight: the whole zone opens it (js/dub-studio.js). */
+.dub-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.dub-drop-art {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  margin-bottom: .5rem;
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--a), color-mix(in oklab, var(--b) 70%, #c084fc));
+  box-shadow: 0 12px 28px -12px color-mix(in oklab, var(--a) 70%, transparent);
+}
+.dub-drop-art svg { width: 38px; height: 38px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.dub-drop-wave { stroke-width: 2.6; }
+.dub-studio .dub-drop-art { flex: 0 0 auto; width: 68px; height: 68px; margin: 0 0 .7rem; }
+.dub-studio .dub-drop-art svg { width: 38px; height: 38px; }
+.dub-drop-title { display: block; font-size: 1.2rem; font-weight: 800; line-height: 1.4; color: var(--text); }
+.dub-drop-or { display: block; font-size: 1rem; line-height: 1.5; color: color-mix(in oklab, var(--text) 72%, var(--muted)); }
+.dub-drop-or u { color: var(--a); font-weight: 700; text-decoration: none; }
+.dub-drop-limits { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem; margin-top: .8rem; }
+.dub-drop-limits span {
+  padding: .3rem .7rem;
+  border-radius: 99px;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  background: var(--surface);
+  color: color-mix(in oklab, var(--text) 75%, var(--muted));
+  font-size: .85rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.dub-chosen, .dub-done { display: grid; gap: .7rem; }
+.dub-chosen video, .dub-done video, .dub-item video {
+  width: 100%;
+  max-height: 380px;
+  border-radius: 14px;
+  background: #0b0a12;
+  display: block;
+}
+.dub-file-row, .dub-done-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem; }
+.dub-file-name { font-weight: 700; overflow-wrap: anywhere; }
+.dub-file-length { color: var(--muted); font-variant-numeric: tabular-nums; }
+.dub-file-row .dub-link { margin-inline-start: auto; }
+.dub-link { background: none; border: 0; padding: 0; color: var(--a); font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
+.dub-link:hover { text-decoration: underline; }
+
+/* Sending it, then dubbing it */
+.dub-working {
+  display: grid;
+  gap: .9rem;
+  padding: 1.3rem 1.2rem;
+  border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line));
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--a) 5%, var(--surface));
+}
+/* Brought into view and given the focus when the dub starts: no ring on a card that is only read. */
+.dub-working:focus { outline: none; }
+.dub-working-head { display: flex; align-items: center; gap: .8rem; }
+.dub-working-head > div { display: grid; gap: .15rem; min-width: 0; flex: 1; }
+.dub-working-head strong { font-size: 1.02rem; }
+.dub-working-head small { color: var(--muted); }
+.dub-percent { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--a); }
+.dub-spinner {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in oklab, var(--a) 18%, transparent);
+  border-top-color: var(--a);
+  animation: dub-spin .8s linear infinite;
+}
+@keyframes dub-spin { to { transform: rotate(360deg); } }
+.dub-bar { height: 8px; border-radius: 99px; background: color-mix(in oklab, var(--a) 12%, transparent); overflow: hidden; }
+.dub-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--a), color-mix(in oklab, var(--b) 60%, #c084fc));
+  transition: width .5s ease;
+}
+.dub-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; margin: 0; padding: 0; list-style: none; counter-reset: dubstep; }
+.dub-steps li {
+  counter-increment: dubstep;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  font-size: .8rem;
+  color: var(--muted);
+}
+.dub-steps li::before {
+  content: counter(dubstep);
+  display: grid;
+  place-items: center;
+  flex: 0 0 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  font-size: .72rem;
+  font-weight: 700;
+}
+.dub-steps li.is-on { color: var(--text); font-weight: 700; }
+.dub-steps li.is-on::before { border-color: var(--a); color: var(--a); }
+.dub-steps li.is-done::before { content: '✓'; border-color: var(--a); background: var(--a); color: #fff; }
+
+/* Finished */
+.dub-done-text { display: grid; gap: .15rem; flex: 1; min-width: 180px; }
+.dub-done-text small { color: var(--muted); }
+.dub-done-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+/* Off the dashboard: ready, and the way to watch it there. */
+.dub-done.is-elsewhere {
+  justify-items: center;
+  align-content: center;
+  min-height: 300px;
+  padding: 1.6rem;
+  border: 1px solid color-mix(in oklab, var(--a) 30%, var(--line));
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--a) 6%, transparent);
+  text-align: center;
+}
+.dub-done.is-elsewhere .dub-done-row { flex-direction: column; justify-content: center; }
+.dub-done.is-elsewhere .dub-done-text { min-width: 0; justify-items: center; }
+.dub-done.is-elsewhere .dub-done-text strong { font-size: 1.2rem; }
+.dub-done.is-elsewhere .dub-done-text small { font-size: 1rem; line-height: 1.6; max-width: 34rem; color: color-mix(in oklab, var(--text) 70%, var(--muted)); }
+.dub-done.is-elsewhere .dub-done-actions { justify-content: center; }
+.dub-done-mark { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--a), color-mix(in oklab, var(--b) 70%, #c084fc)); }
+.dub-done-mark svg { width: 28px; height: 28px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* What may not be done yet */
+.dub-lock {
+  display: grid;
+  justify-items: center;
+  gap: .55rem;
+  min-height: 300px;
+  align-content: center;
+  padding: 1.6rem;
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--surface2, var(--surface)) 70%, transparent);
+  text-align: center;
+}
+.dub-lock-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: color-mix(in oklab, var(--a) 12%, transparent); }
+.dub-lock-icon svg { width: 26px; height: 26px; fill: none; stroke: var(--a); stroke-width: 1.8; stroke-linecap: round; }
+.dub-lock strong { font-size: 1.1rem; }
+.dub-lock p { margin: 0; max-width: 46ch; color: var(--muted); line-height: 1.55; }
+.dub-lock-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; margin-top: .35rem; }
+.dub-lock-actions form { margin: 0; }
+
+/* Keep the music */
+.dub-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  margin: 1rem 1.2rem 0;
+  padding: .75rem .9rem;
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 14px;
+  cursor: pointer;
+}
+.dub-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.dub-switch {
+  position: relative;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 24px;
+  border-radius: 99px;
+  background: color-mix(in oklab, var(--muted) 35%, transparent);
+  transition: background .2s ease;
+}
+.dub-switch::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 3px;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  transition: transform .2s ease;
+}
+.dub-toggle input:checked + .dub-switch { background: var(--a); }
+.dub-toggle input:checked + .dub-switch::after { transform: translateX(18px); }
+html[dir="rtl"] .dub-toggle input:checked + .dub-switch::after { transform: translateX(-18px); }
+.dub-toggle input:focus-visible + .dub-switch { outline: 2px solid var(--a); outline-offset: 2px; }
+.dub-toggle-text { display: grid; gap: .2rem; line-height: 1.55; }
+.dub-toggle-text strong { font-size: 1rem; }
+.dub-toggle-text small { font-size: .92rem; color: color-mix(in oklab, var(--text) 65%, var(--muted)); }
+
+/* What it costs, and what is left */
+.dub-meter { display: grid; gap: .3rem; margin: .8rem 1.2rem 0; padding: .9rem 1rem; border-radius: 14px; background: color-mix(in oklab, var(--a) 7%, transparent); line-height: 1.6; }
+.dub-meter p { margin: 0; }
+.dub-meter:empty, .dub-studio.is-working .dub-meter { display: none; }
+.dub-meter-main { font-weight: 700; font-size: 1rem; color: var(--text); }
+.dub-meter-aside { color: color-mix(in oklab, var(--text) 65%, var(--muted)); font-size: .92rem; }
+.dub-error { margin: .8rem 1.2rem 0; color: var(--danger, #dc2626); font-weight: 600; font-size: .9rem; }
+
+/* The foot: the chosen voice and the button */
+.dub-foot { margin-top: 1rem; }
+.dub-voice-chip { display: flex; align-items: center; gap: .6rem; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; min-width: 0; }
+.dub-voice-face {
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--a) 15%, transparent);
+  color: var(--a);
+  font-weight: 800;
+}
+.dub-voice-face img { width: 100%; height: 100%; object-fit: cover; }
+.dub-voice-text { display: grid; min-width: 0; }
+.dub-voice-text small { font-size: .74rem; color: var(--muted); }
+.dub-voice-text strong { font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dub-go-row { display: flex; flex: 1 1 auto; justify-content: flex-end; min-width: 0; }
+.dub-go {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .55rem;
+  padding: .8rem 1.6rem;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--a), color-mix(in oklab, var(--b) 70%, #a78bfa));
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 20px -6px color-mix(in oklab, var(--a) 60%, transparent);
+  transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease;
+}
+.dub-go span { display: inline-flex; align-items: center; gap: .5rem; }
+.dub-go svg { width: 16px; height: 16px; fill: currentColor; }
+.dub-go:hover:not([disabled]) { transform: translateY(-1px); box-shadow: 0 10px 28px -8px color-mix(in oklab, var(--a) 70%, transparent); }
+.dub-go:focus-visible { outline: 2px solid var(--a); outline-offset: 3px; }
+.dub-go[disabled] { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.dub-studio.is-working .dub-toggle { opacity: .55; pointer-events: none; }
+
+/* ---------- Earlier dubs ---------- */
+.dub-history { margin-top: 1.2rem; padding-top: 2rem; border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+.dub-history header { margin-bottom: 1.1rem; }
+.dub-studio .dub-history h2 { margin: 0 0 .35rem; font-size: 1.4rem; font-weight: 800; line-height: 1.3; }
+.dub-history header p { margin: 0; color: color-mix(in oklab, var(--text) 70%, var(--muted)); font-size: .98rem; line-height: 1.6; }
+.dub-history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 1rem; }
+.dub-item {
+  display: grid;
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 16px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.dub-item video { max-height: 200px; border-radius: 0; }
+.dub-item-media { background: #0b0a12; min-height: 120px; display: grid; place-items: center; }
+.dub-item-empty { color: #a7a3c2; font-size: .85rem; padding: 1rem; text-align: center; }
+.dub-item-body { display: grid; gap: .25rem; padding: .8rem .9rem .9rem; }
+.dub-item-name { overflow-wrap: anywhere; }
+.dub-item-meta { color: var(--muted); font-size: .8rem; }
+.dub-item-error { color: var(--danger, #dc2626); font-size: .8rem; }
+.dub-item .dub-link { justify-self: start; margin-top: .2rem; font-size: .88rem; }
+
+/* ---------- Dashboard: dubbing's own section ---------- */
+.dub-account { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .9rem; margin: 0 0 1.2rem; }
+.dub-stat {
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+  padding: 1.1rem 1.15rem;
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(15, 12, 40, .04);
+}
+.dub-stat-head { display: flex; align-items: center; gap: .55rem; }
+.dub-stat-icon { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; border-radius: 10px; background: color-mix(in oklab, var(--a) 12%, transparent); color: var(--a); }
+.dub-stat-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.dub-stat-label { font-size: .9rem; font-weight: 700; line-height: 1.35; color: color-mix(in oklab, var(--text) 80%, var(--muted)); }
+.dub-stat-value { font-size: 1.6rem; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--text); }
+.dub-stat-value small { margin-inline-start: .3rem; font-size: 1rem; font-weight: 700; color: var(--muted); }
+.dub-stat-note { font-size: .84rem; line-height: 1.45; color: var(--muted); }
+.dub-stat-bar { height: 6px; border-radius: 99px; background: color-mix(in oklab, var(--a) 12%, transparent); overflow: hidden; margin-top: .2rem; }
+.dub-stat-bar i { display: block; height: 100%; border-radius: inherit; background: var(--a); }
+.dub-rule {
+  margin: 0 0 1.5rem;
+  padding: 1rem 1.2rem;
+  border: 1px solid color-mix(in oklab, var(--a) 18%, var(--line));
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--a) 5%, var(--surface));
+}
+.dub-rule-title { display: flex; align-items: center; gap: .5rem; margin-bottom: .7rem; font-size: 1rem; }
+.dub-rule-title svg { flex: 0 0 20px; width: 20px; height: 20px; fill: none; stroke: var(--a); stroke-width: 2; }
+.dub-rule p { margin: 0; font-size: .95rem; line-height: 1.6; color: color-mix(in oklab, var(--text) 80%, var(--muted)); }
+.dub-rule ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin: 0; padding: 0; list-style: none; }
+.dub-rule li { display: grid; gap: .15rem; padding: .7rem .85rem; border-radius: 12px; background: var(--surface); border: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+.dub-rule li b { font-size: .95rem; }
+.dub-rule li span { font-size: .9rem; color: color-mix(in oklab, var(--text) 72%, var(--muted)); }
+.dub-ledger { margin-top: 2.2rem; padding-top: 2rem; border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+.page-card .dub-ledger h2, .dub-ledger h2 { margin: 0 0 .35rem; font-size: 1.4rem; font-weight: 800; line-height: 1.3; }
+.dub-ledger > p { margin: 0 0 1.1rem; color: color-mix(in oklab, var(--text) 70%, var(--muted)); font-size: .98rem; line-height: 1.6; }
+.dub-ledger-wrap { overflow-x: auto; border: 1px solid color-mix(in oklab, var(--line) 85%, transparent); border-radius: 16px; background: var(--surface); }
+.dub-ledger table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.dub-ledger th { text-align: start; padding: .7rem .9rem; color: var(--muted); font-weight: 700; font-size: .82rem; border-bottom: 1px solid color-mix(in oklab, var(--line) 85%, transparent); white-space: nowrap; }
+.dub-ledger td { padding: .75rem .9rem; border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent); vertical-align: middle; }
+.dub-ledger tr:last-child td { border-bottom: 0; }
+.dub-ledger td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dub-ledger tfoot td { font-weight: 700; background: color-mix(in oklab, var(--surface2, var(--surface)) 60%, transparent); }
+.dub-badge { display: inline-flex; align-items: center; padding: .15rem .55rem; border-radius: 99px; font-size: .75rem; font-weight: 700; white-space: nowrap; }
+.dub-badge.is-ready { background: color-mix(in oklab, #16a34a 14%, transparent); color: #15803d; }
+.dub-badge.is-working { background: color-mix(in oklab, #d97706 14%, transparent); color: #b45309; }
+.dub-badge.is-failed { background: color-mix(in oklab, #dc2626 12%, transparent); color: #b91c1c; }
+.dub-badge.is-free { background: color-mix(in oklab, var(--a) 12%, transparent); color: var(--a); }
+.dub-ledger-empty { padding: 1.4rem; text-align: center; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .dub-account { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dub-rule ul { grid-template-columns: 1fr; }
+  .dub-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .studio-mode { padding: .6rem .65rem; gap: .55rem; }
+  .studio-mode-text small { display: none; }
+  .dub-stage { padding: .9rem .9rem 0; }
+  .dub-toggle, .dub-meter, .dub-error { margin-inline: .9rem; }
+  .dub-drop, .dub-lock { min-height: 240px; }
+  .dub-percent { font-size: 1.25rem; }
+}
+.dub-section-lead { margin: -.4rem 0 1.4rem; font-size: 1rem; color: color-mix(in oklab, var(--text) 70%, var(--muted)); line-height: 1.6; }
+.dub-ledger .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

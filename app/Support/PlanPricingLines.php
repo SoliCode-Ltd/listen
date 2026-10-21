@@ -35,6 +35,8 @@ final class PlanPricingLines
         'custom_prompt' => ['sliders', true],
         'sound_environments' => ['sliders', true],
         'voice_cloning' => ['star', true],
+        // Shown on every plan that includes dubbing, once Video Dubbing is open to everyone.
+        'video_dubbing' => ['mic', true],
         'download_formats' => ['download', true],
         // Shown on every plan that includes the developer API (Plans → Developer API).
         'developer_api' => ['globe', true],
@@ -266,6 +268,11 @@ final class PlanPricingLines
                 AudioFormats::availableFor($plan),
             )),
             'developer_api' => ApiPlanAccess::enabled($plan) ? self::t('included', $locale) : null,
+            'video_dubbing' => VideoDubbing::planIncludes($plan) && VideoDubbing::audience() === VideoDubbing::AUDIENCE_EVERYONE
+                ? (VideoDubbing::monthlyLimit($plan) > 0
+                    ? trans_choice('ui.pricing.lines.dubbing_videos', VideoDubbing::monthlyLimit($plan), ['seconds' => VideoDubbing::maxSeconds($plan, false)], $locale)
+                    : self::t('dubbing_open', $locale, ['seconds' => VideoDubbing::maxSeconds($plan, false)]))
+                : null,
             'topup' => ! $plan->isPack() && self::topupCents($plan) > 0
                 ? self::t('topup_price', $locale, ['price' => '$'.number_format(self::topupCents($plan) / 100, 0)])
                 : null,
@@ -297,6 +304,9 @@ final class PlanPricingLines
                 ? 'Hidden: this plan does not include voice cloning (or cloning is switched off site-wide).'
                 : 'Hidden: voice cloning is still a private preview, so members on this plan cannot use it yet.',
             'topup' => 'Hidden: no top-up price is set.',
+            'video_dubbing' => VideoDubbing::planIncludes($plan)
+                ? 'Hidden: Video Dubbing is still for the admin only (Video Dubbing → Settings).'
+                : 'Hidden: this plan does not include video dubbing.',
             'monthly_requests' => 'Hidden: a pack has no monthly count.',
             'daily_requests' => 'Hidden: no daily limit is set (Usage Limits → Generations per day).',
             default => 'Hidden for this plan.',

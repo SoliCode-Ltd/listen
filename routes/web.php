@@ -47,6 +47,18 @@ Route::middleware('auth')->get('/admin-audio/cloned-voices/{voice}/{kind}', Admi
     ->whereIn('kind', ['sample', 'consent'])
     ->name('admin.cloned-voices.audio');
 
+Route::middleware('auth')->get('/admin-video/dubs/{dub}/{kind}', \App\Http\Controllers\AdminVideoDubFileController::class)
+    ->whereNumber('dub')
+    ->whereIn('kind', ['clean', 'preview'])
+    ->name('admin.video-dubs.file');
+
+// Video Dubbing → Settings: connect the site's Google Drive, where the dubbed videos are kept.
+// The callback's address is the one added to the Google client's redirect addresses.
+Route::middleware('auth')->get('/admin-drive/google/connect', [\App\Http\Controllers\AdminDriveController::class, 'connect'])
+    ->name('admin.drive.connect');
+Route::middleware('auth')->get('/admin-drive/google/callback', [\App\Http\Controllers\AdminDriveController::class, 'callback'])
+    ->name('admin.drive.callback');
+
 // SEO: Sitemap
 Route::get('/sitemap.xml', function () {
     $dom = new \DOMDocument('1.0', 'UTF-8');
@@ -230,6 +242,21 @@ Route::group([
             Route::post('/preview', [HomeController::class, 'preview'])->middleware('demo.verified')->name('demo.preview');
         });
     });
+
+    // Dub my video: the page for everyone it is open to; the rest needs an account.
+    Route::get('/dub-my-video', [\App\Http\Controllers\VideoDubController::class, 'show'])->name('dub.page');
+    Route::middleware(['auth', 'subscription.sync'])->prefix('dub-my-video')->group(function (): void {
+        Route::post('/', [\App\Http\Controllers\VideoDubController::class, 'store'])->middleware('throttle:10,1,dub-store')->name('dub.store');
+        // The video itself, sent in pieces before the dub is asked for.
+        Route::post('/upload', [\App\Http\Controllers\VideoDubController::class, 'startUpload'])->middleware('throttle:10,1,dub-upload')->name('dub.upload.start');
+        Route::get('/{code}/status', [\App\Http\Controllers\VideoDubController::class, 'status'])->where('code', '[A-Za-z0-9]{32}')->name('dub.status');
+        Route::get('/{code}/watch', [\App\Http\Controllers\VideoDubController::class, 'watch'])->where('code', '[A-Za-z0-9]{32}')->name('dub.watch');
+        Route::get('/{code}/download', [\App\Http\Controllers\VideoDubController::class, 'download'])->where('code', '[A-Za-z0-9]{32}')->name('dub.download');
+    });
+    // Each piece of a video: kept light (no plan check), many a minute for a large one.
+    // Each limit counts on its own (the third part names it): the pieces never use up the dub's.
+    Route::middleware(['auth', 'throttle:600,1,dub-piece'])->post('/dub-my-video/upload/{id}', [\App\Http\Controllers\VideoDubController::class, 'uploadChunk'])
+        ->where('id', '[A-Za-z0-9]{40}')->name('dub.upload.chunk');
 
     Route::middleware(['auth'])->group(function () {
         Route::get('/referral/stats', [\App\Http\Controllers\ReferralController::class, 'stats'])->name('referral.stats');

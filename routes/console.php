@@ -35,3 +35,7 @@ Schedule::call(function (): void {
 // Studio and extension: give back the credits of members' generations that got stuck.
 // The overlap lock lapses after 10 minutes, so a run that died never stops the next ones for long.
 Schedule::command('listen:expire-stuck-generations')->everyFiveMinutes()->withoutOverlapping(10);
+
+// Dub my video: give back the credits of stuck dubs, move finished videos to Google Drive
+// and delete old server copies (App\Console\Commands\PruneVideoDubsCommand).
+Schedule::command('dubs:prune')->everyTenMinutes()->withoutOverlapping(30);

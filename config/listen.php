@@ -158,4 +158,43 @@ return [
         'stuck_processing_minutes' => (int) env('LISTEN_API_STUCK_PROCESSING_MINUTES', 30),
         'stuck_queued_minutes' => (int) env('LISTEN_API_STUCK_QUEUED_MINUTES', 60),
     ],
+
+    'dubbing' => [
+        // "Dub my video" (App\Http\Controllers\VideoDubController).
+        'min_seconds' => (int) env('LISTEN_DUB_MIN_SECONDS', 3),
+        // The longest free video, and a plan's when it sets none (the admin can change it in Video Dubbing → Settings).
+        'max_seconds' => (int) env('LISTEN_DUB_MAX_SECONDS', 60),
+        // The admin can change it (Video Dubbing → Settings); the server's own PHP limits still apply.
+        'max_upload_mb' => (int) env('LISTEN_DUB_MAX_UPLOAD_MB', 300),
+        // Hours a free dub stays on the member's dashboard before its files are deleted (Video Dubbing → Settings).
+        // A plan's dubs stay as long as the plan keeps voices, in Google Drive once it is connected (dubs:prune).
+        'free_keep_hours' => (int) env('LISTEN_DUB_FREE_KEEP_HOURS', 24),
+        // Taking the old voices out (App\Services\Dubbing\VoiceSeparator): this server's Python 3 when it is
+        // not in the usual places, the processor threads one separation uses, and where it is set up.
+        'separator' => [
+            'python' => env('LISTEN_DUB_SEPARATOR_PYTHON', ''),
+            // 0: all but one of the server's cores, four at most.
+            'threads' => (int) env('LISTEN_DUB_SEPARATOR_THREADS', 0),
+            // It takes about 1.4 GB while it runs: it starts only with this much free, else the dub uses the filters.
+            'min_free_mb' => (int) env('LISTEN_DUB_SEPARATOR_MIN_FREE_MB', 2048),
+            'dir' => env('LISTEN_DUB_SEPARATOR_DIR', ''),
+        ],
+        // Lines written phrase by phrase on the phrases found on the sound (VideoDubber). Off: on a real video the
+        // text model put the words one or two phrases early (it hears two short phrases as one), up to 5 s off the lips;
+        // the model times its own sentences, which are then set on the phrases' starts and ends.
+        'phrase_lines' => (bool) env('LISTEN_DUB_PHRASE_LINES', false),
+        // Free marked previews for the whole site a day, so a rush of sign-ups cannot run up the bill.
+        'free_per_day' => (int) env('LISTEN_DUB_FREE_PER_DAY', 50),
+        // Minutes after which a dub still working is failed and its credits given back.
+        'stuck_minutes' => (int) env('LISTEN_DUB_STUCK_MINUTES', 20),
+        // What a dub costs us, for the admin's figures only (US dollars a million tokens).
+        // The speech engine bills its voice by the second, about 25 tokens each.
+        'prices' => [
+            'text_in' => (float) env('LISTEN_DUB_PRICE_TEXT_IN', 0.5),
+            'audio_in' => (float) env('LISTEN_DUB_PRICE_AUDIO_IN', 1.0),
+            'text_out' => (float) env('LISTEN_DUB_PRICE_TEXT_OUT', 3.0),
+            'voice_out' => (float) env('LISTEN_DUB_PRICE_VOICE_OUT', 9.0),
+            'voice_tokens_per_second' => (int) env('LISTEN_DUB_VOICE_TOKENS_PER_SECOND', 25),
+        ],
+    ],
 ];

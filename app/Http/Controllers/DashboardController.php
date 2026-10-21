@@ -29,6 +29,7 @@ use App\Support\CreditPeriod;
 use App\Support\PlanUsageGuard;
 use App\Support\SpeechLanguages;
 use App\Support\TtsStudioConfig;
+use App\Support\VideoDubbing;
 use App\Support\UsageSnapshot;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceCloningAccess;
@@ -170,7 +171,12 @@ class DashboardController extends Controller
             // Before the developer API migration has run on a server.
         }
 
+        // Dub a video, in its own section (App\Support\VideoDubbing).
+        $dubStudio = VideoDubbing::openTo($request->user()) ? VideoDubbing::studio($request->user(), $request) : null;
+
         $page = view('dashboard', [
+            'dubStudio' => $dubStudio,
+            'dubAccount' => $dubStudio ? VideoDubbing::account($request->user(), $dubStudio) : null,
             'verifyEmail' => $verifyEmail,
             'developerApi' => $developerApi,
             'usage' => $usage,

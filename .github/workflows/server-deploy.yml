@@ -106,6 +106,15 @@ name: Server deploy
 #            fails on an error, a wrong status or text shown as its key
 #            (scripts/support/staging_page_check.php). Billing pages are left
 #            out: staging runs the live Stripe keys.
+#   dub-test: staging only. Dubs the test video with the branch's code the way
+#            a member's dub is made, with the settings of the newest dub of a
+#            video that long (input "dub" changes them: "voice=Kore
+#            dialect=ar-EG"), for no member, and keeps the dubbed video and its
+#            report with the run (scripts/support/dub_test.php). The test video
+#            is sent from tests/dub-test/source.mp4 when the branch has it, and
+#            stays on staging for the next runs; dub "clean" removes it. It uses
+#            the speech quota staging shares with live (about 25 requests a
+#            run): only when the owner has said yes.
 # New migrations and composer.lock changes are reported, not run.
 
 on:
@@ -117,7 +126,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -125,6 +134,10 @@ on:
         default: ""
       member:
         description: "email-check, demo-links, join-check and speed-check: a member's email or member id"
+        type: string
+        default: ""
+      dub:
+        description: "dub-test only: settings to change (voice=Kore dialect=ar-EG style= emotion= background=keep), or clean"
         type: string
         default: ""
 
@@ -139,7 +152,8 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # A test dub takes the server several minutes (separation, hearing, a voice for each line).
+    timeout-minutes: ${{ inputs.mode == 'dub-test' && 45 || 15 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -161,6 +175,7 @@ jobs:
           MODE: ${{ inputs.mode }}
           CUSTOMER: ${{ inputs.customer }}
           MEMBER: ${{ inputs.member }}
+          DUB: ${{ inputs.dub }}
           LIVE_HOST: ${{ secrets.LIVE_SSH_HOST }}
           LIVE_USER: ${{ secrets.LIVE_SSH_USER }}
           LIVE_KEY: ${{ secrets.LIVE_SSH_KEY }}
@@ -456,6 +471,29 @@ jobs:
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
+          if [ "$MODE" = dub-test ]; then
+            [ "$TARGET" = staging ] || { echo "dub-test runs on staging only"; exit 1; }
+            printf '%s' "$DUB" | grep -qE '^[A-Za-z0-9_= .-]*$' || { echo "dub: only name=value pairs, or clean"; exit 1; }
+            T=storage/app/listen-deploy/dub-test
+            if [ "$DUB" = clean ]; then
+              $S "$FIND; rm -rf $T" && echo "The test video and its dub are gone from staging."
+              rm -f ~/.ssh/id_deploy
+              exit 0
+            fi
+            $S "$FIND; mkdir -p $T && chmod 700 $T"
+            if [ -f tests/dub-test/source.mp4 ]; then
+              $S "$FIND; cat > $T/source.mp4" < tests/dub-test/source.mp4
+              echo "Test video sent: $(stat -c %s tests/dub-test/source.mp4) bytes."
+            fi
+            failed=0
+            tool dub_test.php | $S "$FIND; DUB='$DUB' nice php" || failed=1
+            mkdir -p dub-test
+            $S "$FIND; cat $T/report.json" > dub-test/report.json 2>/dev/null || rm -f dub-test/report.json
+            $S "$FIND; test -f $T/dub.mp4 && cat $T/dub.mp4" > dub-test/dub.mp4 2>/dev/null || rm -f dub-test/dub.mp4
+            ls -l dub-test
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
           if [ "$MODE" != deploy ]; then exit 0; fi
           $S "$FIND; cat > storage/app/listen-deploy/bundle.tgz" < bundle.tgz
           # In bash with pipefail, so anything that fails stops the deploy and fails the run.
@@ -488,6 +526,14 @@ jobs:
           md5sum -c --quiet storage/app/listen-deploy/manifest.md5 >/dev/null 2>&1 && echo 'DEPLOYED: every file matches ${{ inputs.target == 'live' && 'main' || github.ref_name }}' || echo 'WARNING: some files still differ'
           REMOTE
           rm -f ~/.ssh/id_deploy
+      - name: Keep the test dub with the run
+        if: always() && inputs.mode == 'dub-test'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dub-test
+          path: dub-test/
+          if-no-files-found: ignore
+          retention-days: 3
       - name: Check the public footer
         env:
           BASE: ${{ inputs.target == 'live' && 'https://listenai.studio' || 'https://phplaravel-1516130-6707450.cloudwaysapps.com' }}
