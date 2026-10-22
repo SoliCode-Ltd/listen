@@ -95,10 +95,6 @@
       const L = lay[fi];
       const who = el('div', 'who' + rtl);
       const name = el('div', 'name', who, f.name);
-      // Where they are from: it stays the same whatever they speak.
-      const row = el('div', 'row', who);
-      const flag = el('img', '', row); flag.src = `assets/${f.flag}.svg`;
-      el('span', '', row, f.origin);
       css(who, { left: L.x + 'px', top: (L.top + L.size * 0.93) + 'px', transform: 'translateX(-50%)' });
       return { ...f, L, P: portrait(f.avatar), who, name };
     });
@@ -115,15 +111,7 @@
         if (tok.t === 'w') group = null;
         return { ...tok, span };
       });
-      // How the line is spoken, when the speaker changes it within the scene.
-      let spoken = null;
-      if (l.spoken) {
-        spoken = el('div', 'spoken' + (l.lang === 'ar' ? ' rtl' : ''));
-        if (l.flag) { const img = el('img', '', spoken); img.src = `assets/${l.flag}.svg`; } else el('span', 'fusha', spoken, 'ع');
-        el('span', '', spoken, l.spoken);
-        css(spoken, { top: '1206px' });
-      }
-      return { ...l, box, toks, spoken };
+      return { ...l, box, toks };
     });
     // Where we are: a small label above the faces (a call also shows its time).
     const where = el('div', 'where' + rtl);
@@ -307,11 +295,6 @@
   function promptFrame(line, t) {
     const visible = t >= line.show - 0.01 && t <= line.out + 0.3;
     css(line.box, { display: visible ? 'block' : 'none' });
-    if (line.spoken) {
-      css(line.spoken, { display: visible ? 'flex' : 'none' });
-      if (visible) wordState(line.spoken, t, line.show - 0.1, line.out, 0);
-      if (visible) line.spoken.style.transform = `translateX(-50%) ${line.spoken.style.transform}`;
-    }
     if (!visible) return;
     line.toks.forEach((tok, i) => {
       wordState(tok.span, t, line.show, line.out, i);
@@ -402,7 +385,7 @@
     const startT = sc.title ? sc.title.start : sc.enter;
     if (t < startT - 0.05 || t > (next && next.title ? next.title.start + 0.01 : end) && t > end) {
       sc.faces.forEach(f => css(f.who, { display: 'none' }));
-      sc.lines.forEach(l => { css(l.box, { display: 'none' }); if (l.spoken) css(l.spoken, { display: 'none' }); });
+      sc.lines.forEach(l => css(l.box, { display: 'none' }));
       if (sc.title) css(sc.title.box, { display: 'none' });
       css(sc.where, { display: 'none' });
       return;
