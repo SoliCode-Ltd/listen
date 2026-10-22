@@ -42,11 +42,19 @@ CAST = {
     "Fatima": ("فاطمة", "ar-fatima"), "Alaa": ("علاء", "ar-alaa"), "Sawsan": ("سوسن", "ar-sawsan"), "Raed": ("رائد", "ar-raed"),
     "Alice": ("أليس", "en-alice"), "Caleb": ("كاليب", "en-caleb"), "Miles": ("مايلز", "en-miles"), "Sumaya": ("سمية", "ar-sumaya"),
 }
-# Each line's dialect, named in the language it is spoken in, and its flag (Fusha has the ع mark).
-DIALECTS = {
-    "ar-SA": ("سعودي", "Saudi", "sa"), "ar-EG": ("مصري", "Egyptian", "eg"), "ar-LB": ("لبناني", "Lebanese", "lb"),
-    "ar-XA": ("فصحى", "Modern Standard Arabic", None), "en-US": ("أمريكي", "American", "us"),
-    "en-GB": ("بريطاني", "British", "gb"), "en-AU": ("أسترالي", "Australian", "au"),
+# Where each speaker is from (their name and dress fit it), shown under the face in
+# the film's language: the flag, then the Arabic and the English.
+ORIGINS = {
+    "Fatima": ("sa", "سعودية", "Saudi"), "Alaa": ("eg", "مصري", "Egyptian"), "Sawsan": ("lb", "لبنانية", "Lebanese"),
+    "Raed": ("lb", "لبناني", "Lebanese"), "Alice": ("gb", "بريطانية", "British"), "Caleb": ("us", "أمريكي", "American"),
+    "Miles": ("au", "أسترالي", "Australian"), "Sumaya": ("eg", "مصرية", "Egyptian"),
+}
+# How a line is spoken, when a speaker changes dialect or language within a scene,
+# in the language of the line itself, with its flag (Fusha has the ع mark).
+SPOKEN = {
+    "ar-SA": ("باللهجة السعودية", "sa"), "ar-EG": ("باللهجة المصرية", "eg"), "ar-LB": ("باللهجة اللبنانية", "lb"),
+    "ar-XA": ("بالعربية الفصحى", None), "en-US": ("In American English", "us"),
+    "en-GB": ("In British English", "gb"), "en-AU": ("In Australian English", "au"),
 }
 # A tag is shown in the language its line is spoken in, as the editor names it.
 TAGS_AR = {
@@ -193,8 +201,9 @@ def build(film, out_dir):
             speaker = line["speaker"]
             if speaker not in [f["key"] for f in scene["faces"]]:
                 name_ar, avatar = CAST[speaker]
+                flag, origin_ar, origin_en = ORIGINS[speaker]
                 scene["faces"].append(dict(key=speaker, name=name_ar if film == "ar" else speaker, avatar=avatar,
-                                           mouth=MOUTHS[avatar]))
+                                           mouth=MOUTHS[avatar], flag=flag, origin=origin_ar if film == "ar" else origin_en))
             face = [f["key"] for f in scene["faces"]].index(speaker)
             audio, cut = trim(emotions.load(FILM / f"voices/{slug}.wav"))
             if prev is not None:
@@ -202,14 +211,20 @@ def build(film, out_dir):
                 switch = prev["dialect"] != line["dialect"]
                 t = prev["end"] + (0.8 if switch else 0.62 if same else 0.42)
             sound.add(vo, audio, t)
-            dialect = DIALECTS[line["dialect"]]
+            spoken, spoken_flag = SPOKEN[line["dialect"]]
             lang = line["language"]
-            entry = dict(slug=slug, face=face, lang=lang, dialect=dialect[0] if lang == "ar" else dialect[1], flag=dialect[2],
+            entry = dict(slug=slug, face=face, lang=lang, spoken=spoken, flag=spoken_flag,
                          at=round(t, 3), end=round(t + len(audio) / SR, 3),
                          tokens=shift(tokens_of(line, heard[slug]["words"], cut), t))
             scene["lines"].append(entry)
             prev = dict(entry, dialect=line["dialect"])
         scene["exit"] = round(prev["end"] + 0.65, 3)
+        # The way of speaking is shown only where a speaker changes it.
+        for f, face in enumerate(scene["faces"]):
+            mine = [ln for ln in scene["lines"] if ln["face"] == f]
+            if len({ln["spoken"] for ln in mine}) < 2:
+                for ln in mine:
+                    ln["spoken"] = None
         scenes.append(scene)
 
     # When each prompt shows: in just before its voice, out just after (the last
@@ -233,13 +248,13 @@ def build(film, out_dir):
         sections.append((scene["enter"] + 0.3, scene["exit"], "scene"))
     o = outro["start"]
     sections += [(o, o + OUTRO["tag"], "title"), (o + OUTRO["tag"], o + OUTRO["bars"], "groove"), (o + OUTRO["bars"], duration, "end")]
-    music = score.music(duration + 0.5, sections)[:n]
+    music = score.music(film, duration + 0.5, sections)[:n]
     music = np.pad(music, ((0, max(0, n - len(music))), (0, 0)))
 
     sfx = np.zeros((n, 2))
     add = sound.add
     add(sfx, score.swell(1.0), INTRO["orb_in"] - 0.55, 0.7)
-    add(sfx, sound.stereo(score.bell(81, 2.5)), INTRO["bars_at"] + 0.05, 0.5)
+    add(sfx, score.signature(film), INTRO["bars_at"] + 0.05, 0.6)
     add(sfx, sound.shimmer(), INTRO["pulse_at"], 0.35)
     for scene in scenes:
         add(sfx, sound.whoosh(0.5, pan_from=-0.3, pan_to=0.3), scene["enter"] - 0.12, 0.13)
@@ -253,7 +268,7 @@ def build(film, out_dir):
             add(sfx, sound.tick(1.2), s0 + TITLE["hold"], 0.6)
     for cue, at in cues:
         if cue == "radio":
-            add(sfx, score.radio_sting(), at + 0.25, 0.55)
+            add(sfx, score.radio_sting(film), at + 0.25, 0.55)
         if cue == "phone":
             add(sfx, score.phone_ring(), at + 0.35, 1.0)
     add(sfx, score.swell(1.1), o + OUTRO["expand"] - 0.3, 0.7)
@@ -332,10 +347,9 @@ def build(film, out_dir):
                 subprocess.run([sys.executable, str(HERE / "dots.py"), str(cut_png), str(data), "520", "4.3"], check=True)
             dots[av] = json.loads(data.read_text())
     (out / "dots.js").write_text("window.DOTS = " + json.dumps(dots, separators=(",", ":")) + ";\n")
-    for scene in scenes:
-        for ln in scene["lines"]:
-            if ln["flag"]:
-                shutil.copy(ROOT / f"public/images/flags/{ln['flag']}.svg", assets / f"{ln['flag']}.svg")
+    flags = {ln["flag"] for sc in scenes for ln in sc["lines"] if ln["flag"]} | {f["flag"] for sc in scenes for f in sc["faces"]}
+    for flag in flags:
+        shutil.copy(ROOT / f"public/images/flags/{flag}.svg", assets / f"{flag}.svg")
     for logo in ("logo-ar-light.svg", "logo-light.svg"):
         svg = (ROOT / f"public/images/{logo}").read_text(encoding="utf-8")
         shutil.copy(ROOT / f"public/images/{logo}", assets / logo)
@@ -351,8 +365,9 @@ def build(film, out_dir):
         if scene["title"]:
             print(f"  {scene['title']['start']:6.2f} title {scene['title']['text']}")
         for ln in scene["lines"]:
-            shown = " ".join(f"[{x['text']}]" if x["t"] == "tag" else x["text"] for x in ln["tokens"])
-            print(f"  {ln['at']:6.2f}-{ln['end']:6.2f} {scene['faces'][ln['face']]['name']} · {ln['dialect']}  {shown}")
+            shown = " ".join(f"<{x['text']}>" if x["t"] == "tag" else x["text"] for x in ln["tokens"])
+            face = scene["faces"][ln["face"]]
+            print(f"  {ln['at']:6.2f}-{ln['end']:6.2f} {face['name']} · {face['origin']}{' · ' + ln['spoken'] if ln['spoken'] else ''}  {shown}")
     print(f"  {outro['start']:6.2f} outro")
 
 

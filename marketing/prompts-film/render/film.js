@@ -95,29 +95,35 @@
       const L = lay[fi];
       const who = el('div', 'who' + rtl);
       const name = el('div', 'name', who, f.name);
-      const dia = el('div', 'dia', who);
-      // One label row per distinct dialect this face speaks in.
-      const rows = [];
-      sc.lines.filter(l => l.face === fi).forEach(l => {
-        if (rows.some(r => r.key === l.dialect)) return;
-        const row = el('div', 'row' + (l.lang === 'ar' ? ' rtl' : ''), dia);
-        if (l.flag) { const img = el('img', '', row); img.src = `assets/${l.flag}.svg`; } else el('span', 'fusha', row, 'ع');
-        el('span', '', row, l.dialect);
-        rows.push({ key: l.dialect, row });
-      });
+      // Where they are from: it stays the same whatever they speak.
+      const row = el('div', 'row', who);
+      const flag = el('img', '', row); flag.src = `assets/${f.flag}.svg`;
+      el('span', '', row, f.origin);
       css(who, { left: L.x + 'px', top: (L.top + L.size * 0.93) + 'px', transform: 'translateX(-50%)' });
-      return { ...f, L, P: portrait(f.avatar), who, name, rows };
+      return { ...f, L, P: portrait(f.avatar), who, name };
     });
     const lines = sc.lines.map(l => {
       const box = el('div', 'prompt' + (l.lang === 'ar' ? ' ar rtl' : ''));
-      css(box, { top: (sc.kind === 'duo' ? 1240 : 1280) + 'px' });
+      css(box, { top: (sc.kind === 'duo' ? 1240 : 1290) + 'px' });
+      // Tags are written as in the editor, <like this>, in the run of the words.
+      // A tag never ends a line: it is kept with the word it comes before.
+      let group = null;
       const toks = l.tokens.map(tok => {
-        const span = el('span', tok.t === 'w' ? 'w' : 'tag', box, tok.text + (tok.t === 'w' ? ' ' : ''));
-        // A tag is set apart from the words around it by a full space on each side.
-        if (tok.t === 'tag') box.appendChild(document.createTextNode(' '));
+        if (tok.t === 'tag' && !group) group = el('span', 'grp', box);
+        const span = el('span', tok.t === 'w' ? 'w' : 'tag', group || box);
+        span.textContent = (tok.t === 'w' ? tok.text : `<${tok.text}>`) + ' ';
+        if (tok.t === 'w') group = null;
         return { ...tok, span };
       });
-      return { ...l, box, toks };
+      // How the line is spoken, when the speaker changes it within the scene.
+      let spoken = null;
+      if (l.spoken) {
+        spoken = el('div', 'spoken' + (l.lang === 'ar' ? ' rtl' : ''));
+        if (l.flag) { const img = el('img', '', spoken); img.src = `assets/${l.flag}.svg`; } else el('span', 'fusha', spoken, 'ع');
+        el('span', '', spoken, l.spoken);
+        css(spoken, { top: '1206px' });
+      }
+      return { ...l, box, toks, spoken };
     });
     // Where we are: a small label above the faces (a call also shows its time).
     const where = el('div', 'where' + rtl);
@@ -301,6 +307,11 @@
   function promptFrame(line, t) {
     const visible = t >= line.show - 0.01 && t <= line.out + 0.3;
     css(line.box, { display: visible ? 'block' : 'none' });
+    if (line.spoken) {
+      css(line.spoken, { display: visible ? 'flex' : 'none' });
+      if (visible) wordState(line.spoken, t, line.show - 0.1, line.out, 0);
+      if (visible) line.spoken.style.transform = `translateX(-50%) ${line.spoken.style.transform}`;
+    }
     if (!visible) return;
     line.toks.forEach((tok, i) => {
       wordState(tok.span, t, line.show, line.out, i);
@@ -311,18 +322,10 @@
         const c = mixC(mixC(FUTURE, INK, said), VIOLET, now);
         tok.span.style.color = rgbStr(c);
       } else {
-        // Tags: outlined before, filled violet while they happen, soft lilac after.
+        // Tags: pale violet before, full violet while they happen, a soft violet after.
         const on = sm(tok.on - 0.08, tok.on + 0.06, t) * (1 - sm(tok.off, tok.off + 0.2, t));
         const done = sm(tok.off, tok.off + 0.2, t);
-        const bg = mixC(mixC([245, 244, 249], [0xEE, 0xEA, 0xFE], done), VIOLET, on);
-        // The label turns white only once the pill is dark enough to carry it.
-        const fg = mixC(mixC([0xA5, 0x97, 0xFB], [0x5B, 0x3D, 0xF5], Math.max(done, sm(0, 0.4, on))), [255, 255, 255], sm(0.45, 0.8, on));
-        const ring = mixC([0xD9, 0xD1, 0xFF], VIOLET, on);
-        css(tok.span, {
-          background: rgbStr(bg), color: rgbStr(fg),
-          boxShadow: `inset 0 0 0 2px rgba(${ring.map(v => v | 0).join(',')},${1 - done * (1 - on)})`,
-          transform: tok.span.style.transform + ` scale(${1 + 0.05 * on})`,
-        });
+        tok.span.style.color = rgbStr(mixC(mixC([0xCF, 0xC6, 0xFB], [0x9D, 0x8B, 0xF8], done), [0x5B, 0x3D, 0xF5], on));
       }
     });
   }
@@ -399,7 +402,7 @@
     const startT = sc.title ? sc.title.start : sc.enter;
     if (t < startT - 0.05 || t > (next && next.title ? next.title.start + 0.01 : end) && t > end) {
       sc.faces.forEach(f => css(f.who, { display: 'none' }));
-      sc.lines.forEach(l => css(l.box, { display: 'none' }));
+      sc.lines.forEach(l => { css(l.box, { display: 'none' }); if (l.spoken) css(l.spoken, { display: 'none' }); });
       if (sc.title) css(sc.title.box, { display: 'none' });
       css(sc.where, { display: 'none' });
       return;
@@ -446,17 +449,6 @@
       const vis = lin * (1 - lout);
       css(f.who, { display: vis > 0 ? 'flex' : 'none', opacity: vis * lerp(0.42, 1, act),
         transform: `translateX(-50%) translateY(${(1 - lin) * 14}px)` });
-      // Dialect rows: the one for the line being said (or the face's first).
-      const mine = sc.lines.filter(l => l.face === fi);
-      let curIdx = 0, switchAt = -1;
-      mine.forEach(l => { const ri = f.rows.findIndex(r => r.key === l.dialect); if (t >= l.show - 0.2) { if (ri !== curIdx) switchAt = l.show - 0.2; curIdx = ri; } });
-      f.rows.forEach((r, ri) => {
-        const sw = switchAt >= 0 ? E.inOut3(prog(t, switchAt, 0.45)) : 1;
-        let o = 0, y = 0;
-        if (ri === curIdx) { o = sw; y = (1 - sw) * 26; }
-        else if (switchAt >= 0 && f.rows.findIndex(x => x === r) === prevRow(f, mine, t)) { o = 1 - sw; y = -sw * 26; }
-        css(r.row, { opacity: o, transform: `translateY(${y}px)`, filter: `blur(${(1 - Math.max(o, 0)) * 4}px)` });
-      });
     });
 
     // Gathered into the orb (drawn here unless the next scene's title or the outro draws it).
@@ -473,12 +465,6 @@
       const secs = Math.max(0, Math.floor(t - sc.lines[0].at + 1));
       sc.clock.textContent = `00:${String(secs).padStart(2, '0')}`;
     }
-  }
-
-  function prevRow(f, mine, t) {
-    let idx = -1, prev = -1;
-    mine.forEach(l => { const ri = f.rows.findIndex(r => r.key === l.dialect); if (t >= l.show - 0.2) { if (ri !== idx) { prev = idx; idx = ri; } } });
-    return prev;
   }
 
   // Title card: the orb gathers at the centre, drops to where the word starts and

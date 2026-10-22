@@ -41,22 +41,23 @@ body { font-family: 'Alexandria', system-ui, sans-serif; color: var(--ink); }
 /* Who is speaking */
 .who { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; white-space: nowrap; }
 .who .name { font-size: 40px; font-weight: 500; letter-spacing: -.3px; line-height: 1.1; }
-.who .dia { position: relative; height: 40px; width: 520px; }
-.who .row { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: center; align-items: center; gap: 12px;
-  font-size: 30px; font-weight: 400; color: var(--ink-2); line-height: 40px; }
-.who .row img, .who .row .fusha { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1px rgba(21,19,31,.08); }
-.who .row .fusha { display: inline-flex; align-items: center; justify-content: center; background: var(--violet); color: #fff;
-  font-size: 19px; font-weight: 600; line-height: 1; padding-bottom: 3px; }
+.who .row { display: flex; justify-content: center; align-items: center; gap: 12px; font-size: 30px; font-weight: 400; color: var(--ink-2); line-height: 40px; }
+.who .row img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1px rgba(21,19,31,.08); }
+
+/* How a line is spoken, when it changes */
+.spoken { position: absolute; left: 50%; display: none; align-items: center; gap: 12px; white-space: nowrap;
+  font-size: 30px; font-weight: 500; color: var(--violet-deep); line-height: 40px; }
+.spoken img, .spoken .fusha { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1px rgba(21,19,31,.08); }
+.spoken .fusha { display: inline-flex; align-items: center; justify-content: center; background: var(--violet); color: #fff;
+  font-size: 18px; font-weight: 600; line-height: 1; padding-bottom: 3px; }
 
 /* The prompt, word by word */
 .prompt { position: absolute; left: 70px; right: 70px; top: 1240px; text-align: center; font-size: 57px; font-weight: 500;
   line-height: 1.55; letter-spacing: -.5px; text-wrap: balance; }
 .prompt.ar { font-size: 56px; line-height: 1.85; letter-spacing: 0; }
 .prompt .w { display: inline-block; white-space: pre; color: var(--future); }
-.prompt .tag { display: inline-block; position: relative; white-space: nowrap; font-size: .6em; font-weight: 500; letter-spacing: 0;
-  line-height: 1; padding: .44em .9em .5em; margin: 0 .3em; border-radius: 999px; vertical-align: .22em;
-  color: #A597FB; background: transparent; box-shadow: inset 0 0 0 2px var(--lilac-line); }
-.prompt.ar .tag { padding: .34em .9em .58em; vertical-align: .3em; }
+.prompt .tag { display: inline-block; white-space: pre; font-weight: 400; letter-spacing: 0; color: #CFC6FB; }
+.prompt .grp { white-space: nowrap; }
 
 /* Section titles: the orb is the full stop */
 .title { position: absolute; left: 0; right: 0; top: 860px; text-align: center; font-size: 150px; font-weight: 500; letter-spacing: -4px; line-height: 1; white-space: nowrap; }
