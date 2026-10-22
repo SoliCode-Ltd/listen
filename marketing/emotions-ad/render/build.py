@@ -186,9 +186,13 @@ def build(cut, length, out_dir, ratio):
     # The end, as in the prompts films: the portrait becomes the Listen orb, the orb
     # fills the frame behind the end line, then shrinks back and splits into the
     # logo's bars as the brand is said; the wordmark and the address follow.
+    # The last phrase ("Every accent…", «كل اللهجات…») stays fully on screen for a
+    # moment before the orb starts back, even when the brand follows it closely.
     cta["orb_at"] = round(cta["start"] - 0.2, 3)
-    cta["contract_at"] = round(cta["logo_at"] - 0.95, 3)
-    duration = round(max(end["end"] + 2.6, cta["logo_at"] + 3.4), 3)
+    last = cta["words"][max(0, k - 1)]
+    cta["contract_at"] = round(max(cta["logo_at"] - 0.95, last["s"] + 1.4), 3)
+    cta["bars_at"] = round(cta["contract_at"] + 0.85, 3)
+    duration = round(max(end["end"] + 2.6, cta["bars_at"] + 3.3), 3)
     n = int((duration + 1.0) * SR)
     vo = np.pad(vo, ((0, max(0, n - len(vo))), (0, 0)))[:n]
 
@@ -215,8 +219,8 @@ def build(cut, length, out_dir, ratio):
     sound.add(sfx, sound.whoosh(0.6, pan_from=0.4, pan_to=-0.4), cta["start"] - 0.35, 0.12)
     sound.add(sfx, sound.whoosh(0.7, rising=False, pan_from=-0.3, pan_to=0.3), cta["contract_at"] - 0.1, 0.12)
     typing = [round(w["s"], 3) for w in cta["words"]]
-    sound.add(sfx, sound.butter(sound.impact(0.5), "lowpass", 150), cta["logo_at"], 0.32)
-    sound.add(sfx, sound.shimmer(), cta["logo_at"] + 0.1, 0.25)
+    sound.add(sfx, sound.butter(sound.impact(0.5), "lowpass", 150), cta["bars_at"], 0.32)
+    sound.add(sfx, sound.shimmer(), cta["bars_at"] + 0.1, 0.25)
 
     # ── Mix: music ducks under the voice ──
     def lufs_gain(x, target):

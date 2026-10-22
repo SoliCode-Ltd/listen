@@ -290,7 +290,7 @@
     const appear = E.inOut3(prog(t, C.orb_at, .3));
     const grow = E.inOut5(prog(t, C.orb_at + .2, .8));
     const back = E.inOut5(prog(t, C.contract_at, .85));
-    const morph = prog(t, C.logo_at - .1, .7);
+    const morph = prog(t, C.bars_at, .7);
     const bigD = 2 * Math.hypot(L.W, L.H) * .62, endD = 2 * 64 * LK;
     if (t >= C.orb_at) {
       if (morph <= 0) {
@@ -315,9 +315,9 @@
       css(f, { opacity: clamp(a * 1.4) * (1 - toLogo), transform: `translateY(${(1 - a) * 24 - toLogo * 20}px) scale(${.7 + .3 * a})` });
     });
     // The wordmark slides out of the bars, then the address.
-    const wm = E.out5(prog(t, C.logo_at + .5, .8));
+    const wm = E.out5(prog(t, C.bars_at + .6, .8));
     css(wordmark, { display: wm > .001 ? 'block' : 'none', opacity: wm, clipPath: `inset(0 ${((1 - wm) * 100).toFixed(2)}% 0 0)` });
-    const u = E.out5(prog(t, C.logo_at + .85, .8)); css(url, { opacity: u, transform: `translateY(${(1 - u) * 18}px)` });
+    const u = E.out5(prog(t, C.bars_at + .95, .8)); css(url, { opacity: u, transform: `translateY(${(1 - u) * 18}px)` });
   }
 
   window.seek = seek;
