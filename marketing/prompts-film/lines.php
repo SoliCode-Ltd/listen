@@ -25,7 +25,7 @@ $raed = ['language' => 'ar', 'voice' => 'Umbriel', 'speaker' => 'Raed'];
 $alice = ['language' => 'en', 'voice' => 'Achernar', 'speaker' => 'Alice'];
 $caleb = ['language' => 'en', 'voice' => 'Sadaltager', 'speaker' => 'Caleb'];
 $miles = ['language' => 'en', 'voice' => 'Iapetus', 'speaker' => 'Miles'];
-$sumaya = ['language' => 'en', 'voice' => 'Callirrhoe', 'speaker' => 'Sumaya'];
+$ruby = ['language' => 'en', 'voice' => 'Aoede', 'speaker' => 'Ruby'];
 
 return [
     'samples' => [
@@ -98,15 +98,15 @@ return [
             'style' => 'The same host revealing the answer: a gasp, then he bursts out laughing while he says it. General Australian.',
             'text' => '<gasp> Well, last night we caught him… <laugh> it\'s a seagull! He rings for chips!'],
 
-        // Scene 3: a call. One agent, three English accents, each for its caller.
-        $sumaya + ['slug' => 'pf-en-9', 'dialect' => 'en-US',
-            'style' => 'A polished customer-service agent answering a call: calm, warm, professional. Clear American English.',
-            'text' => '<professional> Thanks for calling, this is Sumaya. How can I help you today?'],
-        $sumaya + ['slug' => 'pf-en-12', 'dialect' => 'en-GB',
-            'style' => 'The same agent hearing the caller is in London and, playfully, switching to a warm, natural Southern British accent, smiling as she talks.',
-            'text' => '<warm> Oh, you\'re calling from London? Then let\'s do this properly. Your parcel will be with you first thing tomorrow, love.'],
-        $sumaya + ['slug' => 'pf-en-13', 'dialect' => 'en-AU',
-            'style' => 'The same agent switching again, now to a relaxed, friendly General Australian accent, grinning, wrapping up the call.',
-            'text' => '<cheerful> And the one for your brother in Sydney? No worries, it lands Friday, mate. Have a good one!'],
+        // Scene 3: a call. One agent, one voice, three English accents.
+        $ruby + ['slug' => 'pf-en-14', 'dialect' => 'en-US',
+            'style' => 'A polished customer-service agent answering a call: calm, warm, professional. Clear General American English.',
+            'text' => '<professional> Thanks for calling, this is Ruby. How can I help you today?'],
+        $ruby + ['slug' => 'pf-en-15', 'dialect' => 'en-GB',
+            'style' => 'The same agent, now in a warm, natural Southern British accent, smiling as she talks.',
+            'text' => '<warm> Of course. Your parcel will be with you first thing tomorrow morning.'],
+        $ruby + ['slug' => 'pf-en-16', 'dialect' => 'en-AU',
+            'style' => 'The same agent, now in a relaxed, friendly General Australian accent, grinning as she wraps up the call.',
+            'text' => '<cheerful> All sorted! Anything else I can help with? Have a lovely day!'],
     ],
 ];

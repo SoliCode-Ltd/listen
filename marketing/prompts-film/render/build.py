@@ -40,7 +40,7 @@ W, H = 1080, 1920
 # Who speaks: the name in each film's language and the site avatar they are drawn from.
 CAST = {
     "Fatima": ("فاطمة", "ar-fatima"), "Alaa": ("علاء", "ar-alaa"), "Sawsan": ("سوسن", "ar-sawsan"), "Raed": ("رائد", "ar-raed"),
-    "Alice": ("أليس", "en-alice"), "Caleb": ("كاليب", "en-caleb"), "Miles": ("مايلز", "en-miles"), "Sumaya": ("سمية", "ar-sumaya"),
+    "Alice": ("أليس", "en-alice"), "Caleb": ("كاليب", "en-caleb"), "Miles": ("مايلز", "en-miles"), "Ruby": ("روبي", "en-ruby"),
 }
 # A tag is shown in the language its line is spoken in, as the editor names it.
 TAGS_AR = {
@@ -53,7 +53,7 @@ SOUND_TAGS = {"clap", "sob", "gasp", "laugh", "chuckle", "sigh", "snicker"}
 # Where each avatar's mouth is in its 520 px portrait: the voice ripples out from there.
 MOUTHS = {
     "ar-fatima": (262, 252), "ar-alaa": (262, 232), "ar-sawsan": (266, 250), "ar-raed": (262, 268),
-    "en-alice": (262, 254), "en-caleb": (262, 281), "en-miles": (262, 272), "ar-sumaya": (262, 240),
+    "en-alice": (262, 254), "en-caleb": (262, 281), "en-miles": (262, 272), "en-ruby": (262, 246),
 }
 
 FILMS = {
@@ -71,7 +71,7 @@ FILMS = {
         scenes=[
             dict(kind="duo", context="Podcast", lines=["pf-en-1", "pf-en-2", "pf-en-3", "pf-en-4", "pf-en-5"]),
             dict(kind="solo", context="On air", title="Emotion", lines=["pf-en-6", "pf-en-7", "pf-en-8"], cue="radio"),
-            dict(kind="solo", context="On a call", title="Accent", lines=["pf-en-9", "pf-en-12", "pf-en-13"], cue="phone"),
+            dict(kind="solo", context="On a call", title="Accent", lines=["pf-en-14", "pf-en-15", "pf-en-16"], cue="phone"),
         ],
         tagline=["Any text.", "Any emotion.", "Any accent."],
     ),
