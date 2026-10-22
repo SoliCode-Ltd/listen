@@ -143,33 +143,105 @@
  },
  "pf-ar-11": {
   "script": "And for your son in London, I'll send the confirmation in English. Have a great day!",
-  "heard": "Have a great day!",
+  "heard": "And for your son in London, I'll send the confirmation in English. Have a great day!",
   "duration": 4.288,
   "md5": "3e0073b7dbf83d459d43f71932aa9aaa",
   "words": [
    {
+    "w": "And",
+    "start": 0.0,
+    "end": 0.4,
+    "p": 0.643
+   },
+   {
+    "w": "for",
+    "start": 0.4,
+    "end": 0.62,
+    "p": 0.888
+   },
+   {
+    "w": "your",
+    "start": 0.62,
+    "end": 0.72,
+    "p": 0.995
+   },
+   {
+    "w": "son",
+    "start": 0.72,
+    "end": 0.92,
+    "p": 0.995
+   },
+   {
+    "w": "in",
+    "start": 0.92,
+    "end": 1.06,
+    "p": 0.974
+   },
+   {
+    "w": "London,",
+    "start": 1.06,
+    "end": 1.28,
+    "p": 0.994
+   },
+   {
+    "w": "I'll",
+    "start": 1.48,
+    "end": 1.62,
+    "p": 0.981
+   },
+   {
+    "w": "send",
+    "start": 1.62,
+    "end": 1.78,
+    "p": 0.999
+   },
+   {
+    "w": "the",
+    "start": 1.78,
+    "end": 1.88,
+    "p": 0.956
+   },
+   {
+    "w": "confirmation",
+    "start": 1.88,
+    "end": 2.28,
+    "p": 0.99
+   },
+   {
+    "w": "in",
+    "start": 2.28,
+    "end": 2.56,
+    "p": 0.994
+   },
+   {
+    "w": "English.",
+    "start": 2.56,
+    "end": 2.76,
+    "p": 0.998
+   },
+   {
     "w": "Have",
-    "start": 2.6,
-    "end": 3.0,
-    "p": 0.003
+    "start": 3.22,
+    "end": 3.38,
+    "p": 0.995
    },
    {
     "w": "a",
-    "start": 3.0,
-    "end": 3.4,
+    "start": 3.38,
+    "end": 3.48,
     "p": 0.999
    },
    {
     "w": "great",
-    "start": 3.4,
-    "end": 3.54,
-    "p": 0.997
+    "start": 3.48,
+    "end": 3.6,
+    "p": 0.995
    },
    {
     "w": "day!",
-    "start": 3.54,
-    "end": 3.74,
-    "p": 0.999
+    "start": 3.6,
+    "end": 3.78,
+    "p": 0.998
    }
   ]
  },
