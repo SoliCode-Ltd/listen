@@ -11,18 +11,26 @@ name: Launch ad voices
 
 on:
   workflow_dispatch:
+    inputs:
+      ad:
+        description: 'Which ad: launch-ad ("Which voice is real?"), emotions-ad ("One line. Every emotion.") or prompts-film (the prompts film)'
+        type: choice
+        options: [launch-ad, emotions-ad, prompts-film]
+        default: launch-ad
 
 permissions:
   contents: write
 
 concurrency:
-  group: launch-ad-voices
+  group: ad-voices-${{ inputs.ad }}
   cancel-in-progress: false
 
 jobs:
   generate:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      AD: ${{ inputs.ad || 'launch-ad' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,8 +59,8 @@ jobs:
           APP_PATH: ${{ secrets.STAGING_APP_PATH }}
         run: |
           set -euo pipefail
-          mkdir -p public/audio/launch-ad marketing/launch-ad/voices
-          cp marketing/launch-ad/voices/*.wav public/audio/launch-ad/ 2>/dev/null || true
+          mkdir -p "public/audio/$AD" "marketing/$AD/voices"
+          cp marketing/$AD/voices/*.wav "public/audio/$AD/" 2>/dev/null || true
           SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
           SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
           install -m 700 -d ~/.ssh
@@ -64,11 +72,12 @@ jobs:
           rm -f ~/.ssh/id_gen
           if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
           echo "::add-mask::$KEY"
-          php artisan tts:showcase --set=ad --generate --pause=12 --key="$KEY" 2>&1 | grep -v '^\*' | cut -c1-200 || echo "Some clips failed (see above); the ones made are still committed."
-          cp public/audio/launch-ad/*.wav marketing/launch-ad/voices/
+          php artisan tts:showcase --set=ad --ad="$AD" --generate --pause=12 --key="$KEY" 2>&1 | grep -v '^\*' | cut -c1-200 || echo "Some clips failed (see above); the ones made are still committed."
+          cp public/audio/$AD/*.wav "marketing/$AD/voices/"
           # The homepage sound environments are used too: their clean takes are transcribed with the ad's lines.
-          for f in public/audio/environments/clean/env-*.mp3; do ffmpeg -v error -y -i "$f" -ar 48000 -ac 1 "marketing/launch-ad/voices/$(basename "$f" .mp3).wav"; done
-          php -r '$o=[]; foreach (array_merge((require "marketing/launch-ad/lines.php")["samples"], (require "database/seeders/data/environment_samples.php")["samples"]) as $s) { $o[$s["slug"]] = ["language" => $s["language"], "text" => trim(preg_replace("/\s*<[^<>]+>\s*/u", " ", $s["text"]))]; } file_put_contents("/tmp/lines.json", json_encode($o, JSON_UNESCAPED_UNICODE));'
+          if [ "$AD" = launch-ad ]; then for f in public/audio/environments/clean/env-*.mp3; do ffmpeg -v error -y -i "$f" -ar 48000 -ac 1 "marketing/launch-ad/voices/$(basename "$f" .mp3).wav"; done; fi
+          extra='[]'; [ "$AD" = launch-ad ] && extra='(require "database/seeders/data/environment_samples.php")["samples"]'
+          php -r '$o=[]; foreach (array_merge((require "marketing/'"$AD"'/lines.php")["samples"], '"$extra"') as $s) { $o[$s["slug"]] = ["language" => $s["language"], "text" => trim(preg_replace("/\s*<[^<>]+>\s*/u", " ", $s["text"]))]; } file_put_contents("/tmp/lines.json", json_encode($o, JSON_UNESCAPED_UNICODE));'
 
       - uses: actions/setup-python@v5
         with:
@@ -77,7 +86,7 @@ jobs:
       - name: Transcribe with word timings
         run: |
           pip install -q requests soundfile scipy faster-whisper==1.1.1
-          python marketing/launch-ad/transcribe.py marketing/launch-ad/voices /tmp/lines.json marketing/launch-ad/voices/words.json
+          python marketing/launch-ad/transcribe.py "marketing/$AD/voices" /tmp/lines.json "marketing/$AD/voices/words.json"
 
       - name: Commit the voices
         if: always()
@@ -85,9 +94,9 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add marketing/launch-ad/voices
+          git add "marketing/$AD/voices"
           if git diff --cached --quiet; then echo "Nothing new"; exit 0; fi
           git diff --cached --stat
-          git commit -m "Launch ad: voices made with staging key 1, with word timings"
+          git commit -m "$AD: voices made with staging key 1, with word timings"
           git pull --rebase origin "${GITHUB_REF#refs/heads/}"
           git push origin HEAD:${GITHUB_REF#refs/heads/}

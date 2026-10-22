@@ -31,6 +31,7 @@ class GenerateShowcaseSamplesCommand extends Command
         {--key= : Gemini API key for --generate (default: GEMINI_TTS_API_KEY)}
         {--only=* : Only these sample slugs}
         {--set=showcase : Which samples: showcase (dialects, accents, dialogues), environments (the sound environments section) or ad (the launch ad, marketing/launch-ad/lines.php)}
+        {--ad=launch-ad : ad set only: which ad folder under marketing/ (launch-ad, emotions-ad)}
         {--render : environments set only: place each clean clip in its sound environment}
         {--force : Regenerate MP3s that already exist}
         {--keep-old : On import, leave the older homepage samples active}
@@ -131,8 +132,8 @@ class GenerateShowcaseSamplesCommand extends Command
     }
 
     /**
-     * The launch ad's voices (marketing/launch-ad/lines.php): one Gemini request
-     * each, no sign-off, saved as WAV in public/audio/launch-ad.
+     * An ad's voices (marketing/<ad>/lines.php, --ad=launch-ad by default): one
+     * Gemini request each, no sign-off, saved as WAV in public/audio/<ad>.
      */
     private function ad(): int
     {
@@ -141,13 +142,19 @@ class GenerateShowcaseSamplesCommand extends Command
 
             return self::INVALID;
         }
-        $samples = (require base_path('marketing/launch-ad/lines.php'))['samples'];
+        $ad = (string) $this->option('ad');
+        if (preg_match('/^[a-z0-9-]+$/', $ad) !== 1 || ! is_file(base_path("marketing/{$ad}/lines.php"))) {
+            $this->error("No marketing/{$ad}/lines.php.");
+
+            return self::INVALID;
+        }
+        $samples = (require base_path("marketing/{$ad}/lines.php"))['samples'];
         $only = array_filter((array) $this->option('only'));
         if ($only !== []) {
             $samples = array_values(array_filter($samples, fn (array $s): bool => in_array($s['slug'], $only, true)));
         }
         $samples = array_map(fn (array $s): array => $s + ['kind' => 'single', 'sign_off' => false], $samples);
-        $this->dir = self::AD_DIR;
+        $this->dir = $ad === 'launch-ad' ? self::AD_DIR : "audio/{$ad}";
         $this->ext = 'wav';
 
         return $this->generate($samples, ['en' => '', 'ar' => '']) ? self::SUCCESS : self::FAILURE;
