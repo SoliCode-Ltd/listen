@@ -1,0 +1,780 @@
+{
+ "emo-ar-ae": {
+  "script": "ما بتصدّق شو صار…",
+  "heard": "ما بتصدّق شو صار…",
+  "duration": 3.462,
+  "md5": "eb4bdb753e18ab887a533cdbbaaaa799",
+  "words": [
+   {
+    "w": "ما",
+    "start": 0.0,
+    "end": 1.28,
+    "p": 0.46
+   },
+   {
+    "w": "بتصدّق",
+    "start": 1.28,
+    "end": 2.28,
+    "p": 0.621
+   },
+   {
+    "w": "شو",
+    "start": 2.28,
+    "end": 2.52,
+    "p": 0.978
+   },
+   {
+    "w": "صار…",
+    "start": 2.52,
+    "end": 2.98,
+    "p": 0.661
+   }
+  ]
+ },
+ "emo-ar-cta": {
+  "script": "سطر واحد. كل المشاعر. كل اللهجات… منصة إسمع.",
+  "heard": "سطر واحد. كل المشاعر. كل اللهجات… منصة إسمع.",
+  "duration": 7.275,
+  "md5": "b3bc4399987333905defa6f19c188fb4",
+  "words": [
+   {
+    "w": "سطر",
+    "start": 0.0,
+    "end": 0.52,
+    "p": 0.999
+   },
+   {
+    "w": "واحد.",
+    "start": 0.52,
+    "end": 1.08,
+    "p": 0.976
+   },
+   {
+    "w": "كل",
+    "start": 1.08,
+    "end": 1.98,
+    "p": 0.986
+   },
+   {
+    "w": "المشاعر.",
+    "start": 1.98,
+    "end": 2.94,
+    "p": 0.996
+   },
+   {
+    "w": "كل",
+    "start": 2.96,
+    "end": 3.68,
+    "p": 0.999
+   },
+   {
+    "w": "اللهجات…",
+    "start": 3.68,
+    "end": 4.6,
+    "p": 0.745
+   },
+   {
+    "w": "منصة",
+    "start": 4.6,
+    "end": 5.84,
+    "p": 0.951
+   },
+   {
+    "w": "إسمع.",
+    "start": 5.84,
+    "end": 6.76,
+    "p": 0.658
+   }
+  ]
+ },
+ "emo-ar-eg": {
+  "script": "مش هتصدّق اللي حصل!",
+  "heard": "حش هتصدّق اللي حصل!",
+  "duration": 5.045,
+  "md5": "08a3680e77108537f8fca6c7992d7382",
+  "words": [
+   {
+    "w": "حش",
+    "start": 2.98,
+    "end": 3.62,
+    "p": 0.027
+   },
+   {
+    "w": "هتصدّق",
+    "start": 3.62,
+    "end": 4.08,
+    "p": 0.316
+   },
+   {
+    "w": "اللي",
+    "start": 4.08,
+    "end": 4.2,
+    "p": 0.663
+   },
+   {
+    "w": "حصل!",
+    "start": 4.2,
+    "end": 4.52,
+    "p": 0.973
+   }
+  ]
+ },
+ "emo-ar-en": {
+  "script": "You won't believe what happened!",
+  "heard": "You won't believe what happened!",
+  "duration": 2.268,
+  "md5": "8ba0a09369f9896f1f2f66eba68fe157",
+  "words": [
+   {
+    "w": "You",
+    "start": 0.0,
+    "end": 0.24,
+    "p": 0.749
+   },
+   {
+    "w": "won't",
+    "start": 0.24,
+    "end": 0.46,
+    "p": 0.568
+   },
+   {
+    "w": "believe",
+    "start": 0.46,
+    "end": 0.8,
+    "p": 0.989
+   },
+   {
+    "w": "what",
+    "start": 0.8,
+    "end": 1.16,
+    "p": 0.998
+   },
+   {
+    "w": "happened!",
+    "start": 1.16,
+    "end": 1.54,
+    "p": 0.99
+   }
+  ]
+ },
+ "emo-ar-iq": {
+  "script": "ما تصدّگ شصار…",
+  "heard": "ما تصدّگ شصار؟",
+  "duration": 2.82,
+  "md5": "1046b5dc91cbd62dc983a149a43718e9",
+  "words": [
+   {
+    "w": "ما",
+    "start": 0.0,
+    "end": 1.42,
+    "p": 0.484
+   },
+   {
+    "w": "تصدّگ",
+    "start": 1.42,
+    "end": 1.92,
+    "p": 0.588
+   },
+   {
+    "w": "شصار؟",
+    "start": 1.92,
+    "end": 2.38,
+    "p": 0.353
+   }
+  ]
+ },
+ "emo-ar-kw": {
+  "script": "ما راح تصدّق شصار!",
+  "heard": "ما راح تصدّق شصار!",
+  "duration": 2.273,
+  "md5": "50a459bce415f1e0ae3002b32e88c8ce",
+  "words": [
+   {
+    "w": "ما",
+    "start": 0.0,
+    "end": 0.22,
+    "p": 0.852
+   },
+   {
+    "w": "راح",
+    "start": 0.22,
+    "end": 0.56,
+    "p": 0.948
+   },
+   {
+    "w": "تصدّق",
+    "start": 0.56,
+    "end": 1.24,
+    "p": 0.706
+   },
+   {
+    "w": "شصار!",
+    "start": 1.24,
+    "end": 1.74,
+    "p": 0.343
+   }
+  ]
+ },
+ "emo-ar-lb": {
+  "script": "ما رح تصدّق شو صار!",
+  "heard": "رح تصدّق شو صار!",
+  "duration": 1.707,
+  "md5": "10713e59ab9f2db5fe38961e4657e8d8",
+  "words": [
+   {
+    "w": "رح",
+    "start": 0.0,
+    "end": 0.26,
+    "p": 0.206
+   },
+   {
+    "w": "تصدّق",
+    "start": 0.26,
+    "end": 0.74,
+    "p": 0.686
+   },
+   {
+    "w": "شو",
+    "start": 0.74,
+    "end": 0.96,
+    "p": 0.977
+   },
+   {
+    "w": "صار!",
+    "start": 0.96,
+    "end": 1.24,
+    "p": 0.992
+   }
+  ]
+ },
+ "emo-ar-ma": {
+  "script": "ما غاديش تصدّق شنو وقع!",
+  "heard": "ما غاديش تصدّق شنو وقع!",
+  "duration": 1.945,
+  "md5": "86fb7bf441d3635aa05bdef72584fdfd",
+  "words": [
+   {
+    "w": "ما",
+    "start": 0.0,
+    "end": 0.16,
+    "p": 0.386
+   },
+   {
+    "w": "غاديش",
+    "start": 0.16,
+    "end": 0.46,
+    "p": 0.875
+   },
+   {
+    "w": "تصدّق",
+    "start": 0.46,
+    "end": 0.96,
+    "p": 0.787
+   },
+   {
+    "w": "شنو",
+    "start": 0.96,
+    "end": 1.2,
+    "p": 0.314
+   },
+   {
+    "w": "وقع!",
+    "start": 1.2,
+    "end": 1.42,
+    "p": 0.652
+   }
+  ]
+ },
+ "emo-ar-sa": {
+  "script": "ما تتخيّل وش صار!",
+  "heard": "ما تتخيّل وش صار!",
+  "duration": 1.881,
+  "md5": "a7b0f0d9953d6b2bf21d09c1fab27210",
+  "words": [
+   {
+    "w": "ما",
+    "start": 0.0,
+    "end": 0.24,
+    "p": 0.869
+   },
+   {
+    "w": "تتخيّل",
+    "start": 0.24,
+    "end": 0.92,
+    "p": 0.82
+   },
+   {
+    "w": "وش",
+    "start": 0.92,
+    "end": 1.02,
+    "p": 0.844
+   },
+   {
+    "w": "صار!",
+    "start": 1.02,
+    "end": 1.32,
+    "p": 0.989
+   }
+  ]
+ },
+ "emo-ar-tn": {
+  "script": "ما تصدّقش… شنوّة صار.",
+  "heard": "متصدّقش… شنوّة صار.",
+  "duration": 3.66,
+  "md5": "cfc4f6a12bbdf65d263a189c37b690d6",
+  "words": [
+   {
+    "w": "متصدّقش…",
+    "start": 0.0,
+    "end": 1.16,
+    "p": 0.613
+   },
+   {
+    "w": "شنوّة",
+    "start": 1.16,
+    "end": 2.3,
+    "p": 0.696
+   },
+   {
+    "w": "صار.",
+    "start": 2.3,
+    "end": 2.86,
+    "p": 0.985
+   }
+  ]
+ },
+ "emo-en-au": {
+  "script": "You have no idea what happened!",
+  "heard": "You have no idea what happened!",
+  "duration": 5.394,
+  "md5": "e978881969a5bea69b8a5b16ccb4fc37",
+  "words": [
+   {
+    "w": "You",
+    "start": 0.0,
+    "end": 1.44,
+    "p": 0.902
+   },
+   {
+    "w": "have",
+    "start": 1.44,
+    "end": 1.94,
+    "p": 1.0
+   },
+   {
+    "w": "no",
+    "start": 1.94,
+    "end": 2.64,
+    "p": 0.999
+   },
+   {
+    "w": "idea",
+    "start": 2.64,
+    "end": 3.44,
+    "p": 1.0
+   },
+   {
+    "w": "what",
+    "start": 3.44,
+    "end": 3.88,
+    "p": 1.0
+   },
+   {
+    "w": "happened!",
+    "start": 3.88,
+    "end": 4.32,
+    "p": 1.0
+   }
+  ]
+ },
+ "emo-en-ca": {
+  "script": "You have no idea… what happened.",
+  "heard": "You have no idea… what happened.",
+  "duration": 4.864,
+  "md5": "295e794e8d897252bd17130d0b50bef2",
+  "words": [
+   {
+    "w": "You",
+    "start": 0.0,
+    "end": 0.28,
+    "p": 0.758
+   },
+   {
+    "w": "have",
+    "start": 0.28,
+    "end": 0.54,
+    "p": 0.987
+   },
+   {
+    "w": "no",
+    "start": 0.54,
+    "end": 0.98,
+    "p": 0.982
+   },
+   {
+    "w": "idea…",
+    "start": 0.98,
+    "end": 2.3,
+    "p": 0.499
+   },
+   {
+    "w": "what",
+    "start": 2.3,
+    "end": 3.34,
+    "p": 0.752
+   },
+   {
+    "w": "happened.",
+    "start": 3.34,
+    "end": 3.98,
+    "p": 0.996
+   }
+  ]
+ },
+ "emo-en-cta": {
+  "script": "One line. Every emotion. Every accent… Listen.",
+  "heard": "One line. Every emotion. Every accent… Listen.",
+  "duration": 5.99,
+  "md5": "5e770bf951515a77b05d4af18b5d3d02",
+  "words": [
+   {
+    "w": "One",
+    "start": 0.0,
+    "end": 0.3,
+    "p": 0.793
+   },
+   {
+    "w": "line.",
+    "start": 0.3,
+    "end": 0.84,
+    "p": 0.989
+   },
+   {
+    "w": "Every",
+    "start": 0.84,
+    "end": 1.84,
+    "p": 0.998
+   },
+   {
+    "w": "emotion.",
+    "start": 1.84,
+    "end": 2.18,
+    "p": 0.995
+   },
+   {
+    "w": "Every",
+    "start": 2.52,
+    "end": 3.46,
+    "p": 0.998
+   },
+   {
+    "w": "accent…",
+    "start": 3.46,
+    "end": 4.32,
+    "p": 0.499
+   },
+   {
+    "w": "Listen.",
+    "start": 4.32,
+    "end": 5.3,
+    "p": 0.772
+   }
+  ]
+ },
+ "emo-en-eg": {
+  "script": "مش هتصدّق اللي حصل!",
+  "heard": "مش هتصدّق اللي حصل!",
+  "duration": 1.793,
+  "md5": "88890dcfab093cc44c7531628b9d2382",
+  "words": [
+   {
+    "w": "مش",
+    "start": 0.0,
+    "end": 0.24,
+    "p": 0.815
+   },
+   {
+    "w": "هتصدّق",
+    "start": 0.24,
+    "end": 0.8,
+    "p": 0.798
+   },
+   {
+    "w": "اللي",
+    "start": 0.8,
+    "end": 0.96,
+    "p": 0.837
+   },
+   {
+    "w": "حصل!",
+    "start": 0.96,
+    "end": 1.24,
+    "p": 0.784
+   }
+  ]
+ },
+ "emo-en-gb": {
+  "script": "You have no idea what happened!",
+  "heard": "You have no idea what happened!",
+  "duration": 3.098,
+  "md5": "9bbc91719c86cdf2224b5c116b73ed28",
+  "words": [
+   {
+    "w": "You",
+    "start": 0.0,
+    "end": 0.16,
+    "p": 0.301
+   },
+   {
+    "w": "have",
+    "start": 0.16,
+    "end": 0.4,
+    "p": 0.996
+   },
+   {
+    "w": "no",
+    "start": 0.4,
+    "end": 0.8,
+    "p": 0.948
+   },
+   {
+    "w": "idea",
+    "start": 0.8,
+    "end": 1.36,
+    "p": 0.997
+   },
+   {
+    "w": "what",
+    "start": 1.36,
+    "end": 1.96,
+    "p": 0.996
+   },
+   {
+    "w": "happened!",
+    "start": 1.96,
+    "end": 2.38,
+    "p": 0.995
+   }
+  ]
+ },
+ "emo-en-ie": {
+  "script": "You have no idea what happened…",
+  "heard": "You have no idea what happened.",
+  "duration": 3.363,
+  "md5": "dfc4035e3b7d065c31b5b73626d08752",
+  "words": [
+   {
+    "w": "You",
+    "start": 0.0,
+    "end": 1.04,
+    "p": 0.888
+   },
+   {
+    "w": "have",
+    "start": 1.04,
+    "end": 1.36,
+    "p": 1.0
+   },
+   {
+    "w": "no",
+    "start": 1.36,
+    "end": 1.6,
+    "p": 1.0
+   },
+   {
+    "w": "idea",
+    "start": 1.6,
+    "end": 1.94,
+    "p": 1.0
+   },
+   {
+    "w": "what",
+    "start": 1.94,
+    "end": 2.28,
+    "p": 1.0
+   },
+   {
+    "w": "happened.",
+    "start": 2.28,
+    "end": 2.68,
+    "p": 0.999
+   }
+  ]
+ },
+ "emo-en-in": {
+  "script": "You have no idea what happened!",
+  "heard": "You have no idea what happened!",
+  "duration": 2.089,
+  "md5": "fe054e3a2e6d115a2b55675e5e2619fc",
+  "words": [
+   {
+    "w": "You",
+    "start": 0.0,
+    "end": 0.22,
+    "p": 0.758
+   },
+   {
+    "w": "have",
+    "start": 0.22,
+    "end": 0.36,
+    "p": 0.985
+   },
+   {
+    "w": "no",
+    "start": 0.36,
+    "end": 0.6,
+    "p": 0.991
+   },
+   {
+    "w": "idea",
+    "start": 0.6,
+    "end": 0.92,
+    "p": 0.998
+   },
+   {
+    "w": "what",
+    "start": 0.92,
+    "end": 1.16,
+    "p": 0.988
+   },
+   {
+    "w": "happened!",
+    "start": 1.16,
+    "end": 1.44,
+    "p": 0.993
+   }
+  ]
+ },
+ "emo-en-ny": {
+  "script": "You have no idea what happened!",
+  "heard": "You have no idea what happened!",
+  "duration": 2.786,
+  "md5": "d6636152e2024eb801df4e1a3a74b914",
+  "words": [
+   {
+    "w": "You",
+    "start": 0.0,
+    "end": 0.18,
+    "p": 0.797
+   },
+   {
+    "w": "have",
+    "start": 0.18,
+    "end": 0.42,
+    "p": 0.995
+   },
+   {
+    "w": "no",
+    "start": 0.42,
+    "end": 0.74,
+    "p": 0.949
+   },
+   {
+    "w": "idea",
+    "start": 0.74,
+    "end": 1.24,
+    "p": 0.996
+   },
+   {
+    "w": "what",
+    "start": 1.24,
+    "end": 1.56,
+    "p": 0.996
+   },
+   {
+    "w": "happened!",
+    "start": 1.56,
+    "end": 2.02,
+    "p": 0.991
+   }
+  ]
+ },
+ "emo-en-us": {
+  "script": "You have no idea what happened!",
+  "heard": "You have no idea what happened!",
+  "duration": 3.222,
+  "md5": "6e3cd26a23d9b668ebaf253ba299f2f0",
+  "words": [
+   {
+    "w": "You",
+    "start": 0.0,
+    "end": 0.24,
+    "p": 0.706
+   },
+   {
+    "w": "have",
+    "start": 0.24,
+    "end": 0.46,
+    "p": 0.998
+   },
+   {
+    "w": "no",
+    "start": 0.46,
+    "end": 0.86,
+    "p": 0.995
+   },
+   {
+    "w": "idea",
+    "start": 0.86,
+    "end": 1.38,
+    "p": 0.999
+   },
+   {
+    "w": "what",
+    "start": 1.38,
+    "end": 2.02,
+    "p": 0.998
+   },
+   {
+    "w": "happened!",
+    "start": 2.02,
+    "end": 2.48,
+    "p": 0.999
+   }
+  ]
+ },
+ "emo-en-za": {
+  "script": "You have no idea what happened…",
+  "heard": "You have no idea what happened.",
+  "duration": 3.877,
+  "md5": "ed8170ef8a50495c3519d43dd1f44d2d",
+  "words": [
+   {
+    "w": "You",
+    "start": 0.0,
+    "end": 0.92,
+    "p": 0.914
+   },
+   {
+    "w": "have",
+    "start": 0.92,
+    "end": 1.26,
+    "p": 1.0
+   },
+   {
+    "w": "no",
+    "start": 1.26,
+    "end": 1.6,
+    "p": 0.997
+   },
+   {
+    "w": "idea",
+    "start": 1.6,
+    "end": 2.36,
+    "p": 1.0
+   },
+   {
+    "w": "what",
+    "start": 2.36,
+    "end": 2.84,
+    "p": 0.999
+   },
+   {
+    "w": "happened.",
+    "start": 2.84,
+    "end": 3.2,
+    "p": 1.0
+   }
+  ]
+ }
+}
