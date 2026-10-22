@@ -205,8 +205,8 @@
     // A new face for every take: the old one dips into the frame's own backdrop, then the
     // new one rises out of it (never two faces at once).
     faces.forEach((f, k) => {
-      const inn = k === 0 ? 1 : E.out3(prog(t, S[k].start + .1, .32));
-      const out = k + 1 < S.length ? E.inOut3(prog(t, S[k + 1].start - .1, .2)) : 0;
+      const inn = k === 0 ? 1 : E.out3(prog(t, S[k].start + .02, .3));
+      const out = k + 1 < S.length ? E.inOut3(prog(t, S[k + 1].start - .12, .16)) : 0;
       const o = inn * (1 - out);
       css(f, { position: 'absolute', inset: 0, display: o > .001 ? 'block' : 'none', opacity: o.toFixed(3),
         transform: `scale(${(lerp(1.05, 1, inn) * lerp(1, .97, out)).toFixed(4)})` });
@@ -214,8 +214,8 @@
     [...nameRows, ...diaRows].forEach((r, kk) => {
       const k = kk % S.length;
       // The new dialect rises in as the old one lifts away.
-      const inn = k === 0 ? 1 : E.out5(prog(t, S[k].start + .12, .45));
-      const gone = k + 1 < S.length ? E.inOut3(prog(t, S[k + 1].start - .1, .22)) : 0;
+      const inn = k === 0 ? 1 : E.out5(prog(t, S[k].start + .06, .42));
+      const gone = k + 1 < S.length ? E.inOut3(prog(t, S[k + 1].start - .14, .18)) : 0;
       css(r, { opacity: clamp(inn * 1.4) * (1 - gone), transform: `translateY(${(1 - inn) * 26 - gone * 22}px)`, filter: `blur(${((1 - inn) * 6 + gone * 6).toFixed(2)}px)` });
     });
 
