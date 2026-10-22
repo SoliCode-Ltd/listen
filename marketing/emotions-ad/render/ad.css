@@ -23,11 +23,6 @@ body { font-family: 'Alexandria', system-ui, sans-serif; color: var(--ink); }
 
 /* Corners */
 .logo { position: absolute; }
-.counter { position: absolute; font-size: 24px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: .5px; direction: ltr; white-space: nowrap; }
-.counter b { color: var(--ink); font-weight: 500; }
-.foot { position: absolute; white-space: nowrap; display: flex; flex-direction: column; gap: 6px; }
-.foot .a { font-size: 24px; font-weight: 500; color: var(--ink); }
-.foot .b { font-size: 21px; font-weight: 400; color: var(--muted); }
 
 /* The speaker */
 .portrait { position: absolute; border-radius: 50%; overflow: hidden; background: linear-gradient(240deg, #2FA1FC 0%, #4390FB 45%, #6E5CFD 100%);

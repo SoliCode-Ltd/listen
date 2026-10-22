@@ -10,11 +10,11 @@
     ? { W: 1920, H: 1080, pr: { x: 560, y: 470, d: 380 }, ringR: 300, who: { x: 560, y: 760, align: 'center' },
         list: { x: 960, y: 500, pitch: 66, size: 34, cur: 44, span: 4, align: 'start' },
         line: { x: 1330, y: 500, w: 500, size: 52, align: 'start' }, logo: { x: 80, y: 64, h: 40 },
-        counter: { x: 1840, y: 72 }, foot: { x: 80, y: 960 }, flagsY: 620, endY: 380, endSize: 84, logoY: 380, logoH: 120, urlY: 560, btnY: 640 }
+        flagsY: 620, endY: 380, endSize: 84, logoY: 380, logoH: 120, urlY: 560, btnY: 640 }
     : { W: 1080, H: 1920, pr: { x: 540, y: 560, d: 420 }, ringR: 320, who: { x: 540, y: 880, align: 'center' },
         list: { x: 540, y: 1230, pitch: 66, size: 36, cur: 50, span: 2.4, align: 'center' },
         line: { x: 540, y: 1600, w: 920, size: 62, align: 'center' }, logo: { x: 540, y: 110, h: 46, centre: true },
-        counter: { x: 1000, y: 122 }, foot: { x: 540, y: 1790, centre: true }, flagsY: 1080, endY: 700, endSize: 96, logoY: 750, logoH: 140, urlY: 960, btnY: 1050 };
+        flagsY: 1080, endY: 700, endSize: 96, logoY: 750, logoH: 140, urlY: 960, btnY: 1050 };
   document.documentElement.style.setProperty('--W', L.W + 'px');
   document.documentElement.style.setProperty('--H', L.H + 'px');
   if (AR) document.documentElement.setAttribute('dir', 'rtl');
@@ -49,12 +49,6 @@
   // ── Corners ────────────────────────────────────────────────
   const logo = el('img', 'logo', stage); logo.src = AR ? 'assets/logo-ar-light.svg' : 'assets/logo-light.svg';
   css(logo, { height: L.logo.h + 'px', top: L.logo.y + 'px' });
-  const counter = el('div', 'counter', stage);
-  css(counter, { top: L.counter.y + 'px' });
-  const foot = el('div', 'foot', stage, AR
-    ? '<span class="a">سطر واحد. كل المشاعر.</span><span class="b">كل اللهجات، في استوديو إسمع</span>'
-    : '<span class="a">One line. Every emotion.</span><span class="b">Every accent, in Listen Studio</span>');
-  css(foot, { top: L.foot.y + 'px', alignItems: L.foot.centre ? 'center' : (AR ? 'flex-end' : 'flex-start') });
 
   // ── The speaker ────────────────────────────────────────────
   const D = L.pr.d; const R = L.ringR;
@@ -183,9 +177,6 @@
     // Corners.
     const lgx = L.logo.centre ? L.W / 2 : X(L.logo.x);
     css(logo, { left: lgx + 'px', transform: `translateX(${L.logo.centre || AR ? '-' : ''}${L.logo.centre ? 50 : (AR ? 100 : 0)}%)`, opacity: intro * (1 - outro) });
-    counter.innerHTML = `<b>${String(i + 1).padStart(2, '0')}</b> / ${String(S.length).padStart(2, '0')}`;
-    css(counter, { left: (AR ? L.W - L.counter.x : L.counter.x) + 'px', transform: `translateX(${AR ? 0 : -100}%)`, opacity: intro * (1 - outro) });
-    css(foot, { left: (L.foot.centre ? L.W / 2 : X(L.foot.x)) + 'px', transform: `translateX(${L.foot.centre ? -50 : (AR ? -100 : 0)}%)`, opacity: E.out5(prog(t, -.4, 1)) * (1 - outro) });
 
     // The speaker breathes and leans into the voice.
     const level = levelIn(s, t);
