@@ -1,0 +1,335 @@
+{
+ "duration": 35.12,
+ "takes": [
+  {
+   "slug": "emo-ar-sa",
+   "dialect": "ar-SA",
+   "label_ar": "سعودي · عادي",
+   "label_en": "Saudi · Neutral",
+   "text": "ما تتخيّل وش صار!",
+   "start": 0.4,
+   "end": 1.97,
+   "words": [
+    {
+     "w": "ما",
+     "start": 0.34,
+     "end": 0.58
+    },
+    {
+     "w": "تتخيّل",
+     "start": 0.58,
+     "end": 1.26
+    },
+    {
+     "w": "وش",
+     "start": 1.26,
+     "end": 1.36
+    },
+    {
+     "w": "صار!",
+     "start": 1.36,
+     "end": 1.66
+    }
+   ]
+  },
+  {
+   "slug": "emo-ar-lb",
+   "dialect": "ar-LB",
+   "label_ar": "لبناني · همس",
+   "label_en": "Lebanese · Whisper",
+   "text": "ما رح تصدّق شو صار!",
+   "start": 2.47,
+   "end": 3.86,
+   "words": [
+    {
+     "w": "رح",
+     "start": 2.41,
+     "end": 2.67
+    },
+    {
+     "w": "تصدّق",
+     "start": 2.67,
+     "end": 3.15
+    },
+    {
+     "w": "شو",
+     "start": 3.15,
+     "end": 3.37
+    },
+    {
+     "w": "صار!",
+     "start": 3.37,
+     "end": 3.65
+    }
+   ]
+  },
+  {
+   "slug": "emo-ar-eg",
+   "dialect": "ar-EG",
+   "label_ar": "مصري · ضحك",
+   "label_en": "Egyptian · Laugh",
+   "text": "مش هتصدّق اللي حصل!",
+   "start": 4.36,
+   "end": 9.1,
+   "words": [
+    {
+     "w": "حش",
+     "start": 7.28,
+     "end": 7.92
+    },
+    {
+     "w": "هتصدّق",
+     "start": 7.92,
+     "end": 8.38
+    },
+    {
+     "w": "اللي",
+     "start": 8.38,
+     "end": 8.5
+    },
+    {
+     "w": "حصل!",
+     "start": 8.5,
+     "end": 8.82
+    }
+   ]
+  },
+  {
+   "slug": "emo-ar-iq",
+   "dialect": "ar-IQ",
+   "label_ar": "عراقي · بكاء",
+   "label_en": "Iraqi · Sob",
+   "text": "ما تصدّگ شصار…",
+   "start": 9.6,
+   "end": 12.11,
+   "words": [
+    {
+     "w": "ما",
+     "start": 9.54,
+     "end": 10.96
+    },
+    {
+     "w": "تصدّگ",
+     "start": 10.96,
+     "end": 11.46
+    },
+    {
+     "w": "شصار؟",
+     "start": 11.46,
+     "end": 11.92
+    }
+   ]
+  },
+  {
+   "slug": "emo-ar-ma",
+   "dialect": "ar-MA",
+   "label_ar": "مغربي · صراخ",
+   "label_en": "Moroccan · Shout",
+   "text": "ما غاديش تصدّق شنو وقع!",
+   "start": 12.61,
+   "end": 14.23,
+   "words": [
+    {
+     "w": "ما",
+     "start": 12.55,
+     "end": 12.71
+    },
+    {
+     "w": "غاديش",
+     "start": 12.71,
+     "end": 13.01
+    },
+    {
+     "w": "تصدّق",
+     "start": 13.01,
+     "end": 13.51
+    },
+    {
+     "w": "شنو",
+     "start": 13.51,
+     "end": 13.75
+    },
+    {
+     "w": "وقع!",
+     "start": 13.75,
+     "end": 13.97
+    }
+   ]
+  },
+  {
+   "slug": "emo-ar-ae",
+   "dialect": "ar-AE",
+   "label_ar": "إماراتي · سخرية",
+   "label_en": "Emirati · Sarcastic",
+   "text": "ما بتصدّق شو صار…",
+   "start": 14.73,
+   "end": 17.88,
+   "words": [
+    {
+     "w": "ما",
+     "start": 14.67,
+     "end": 15.95
+    },
+    {
+     "w": "بتصدّق",
+     "start": 15.95,
+     "end": 16.95
+    },
+    {
+     "w": "شو",
+     "start": 16.95,
+     "end": 17.19
+    },
+    {
+     "w": "صار…",
+     "start": 17.19,
+     "end": 17.65
+    }
+   ]
+  },
+  {
+   "slug": "emo-ar-tn",
+   "dialect": "ar-TN",
+   "label_ar": "تونسي · إعلان فيلم",
+   "label_en": "Tunisian · Movie trailer",
+   "text": "ما تصدّقش… شنوّة صار.",
+   "start": 18.38,
+   "end": 21.71,
+   "words": [
+    {
+     "w": "متصدّقش…",
+     "start": 18.32,
+     "end": 19.48
+    },
+    {
+     "w": "شنوّة",
+     "start": 19.48,
+     "end": 20.62
+    },
+    {
+     "w": "صار.",
+     "start": 20.62,
+     "end": 21.18
+    }
+   ]
+  },
+  {
+   "slug": "emo-ar-kw",
+   "dialect": "ar-KW",
+   "label_ar": "كويتي · حماس",
+   "label_en": "Kuwaiti · Excited",
+   "text": "ما راح تصدّق شصار!",
+   "start": 22.21,
+   "end": 24.15,
+   "words": [
+    {
+     "w": "ما",
+     "start": 22.15,
+     "end": 22.37
+    },
+    {
+     "w": "راح",
+     "start": 22.37,
+     "end": 22.71
+    },
+    {
+     "w": "تصدّق",
+     "start": 22.71,
+     "end": 23.39
+    },
+    {
+     "w": "شصار!",
+     "start": 23.39,
+     "end": 23.89
+    }
+   ]
+  },
+  {
+   "slug": "emo-ar-en",
+   "dialect": "en-US",
+   "label_ar": "إنجليزي · حماس",
+   "label_en": "English · Excited",
+   "text": "You won't believe what happened!",
+   "start": 24.65,
+   "end": 26.56,
+   "words": [
+    {
+     "w": "You",
+     "start": 24.59,
+     "end": 24.83
+    },
+    {
+     "w": "won't",
+     "start": 24.83,
+     "end": 25.05
+    },
+    {
+     "w": "believe",
+     "start": 25.05,
+     "end": 25.39
+    },
+    {
+     "w": "what",
+     "start": 25.39,
+     "end": 25.75
+    },
+    {
+     "w": "happened!",
+     "start": 25.75,
+     "end": 26.13
+    }
+   ]
+  },
+  {
+   "slug": "emo-ar-cta",
+   "dialect": "ar-SA",
+   "label_ar": "",
+   "label_en": "",
+   "text": "سطر واحد. كل المشاعر. كل اللهجات… منصة إسمع.",
+   "start": 27.46,
+   "end": 34.42,
+   "words": [
+    {
+     "w": "سطر",
+     "start": 27.4,
+     "end": 27.92
+    },
+    {
+     "w": "واحد.",
+     "start": 27.92,
+     "end": 28.48
+    },
+    {
+     "w": "كل",
+     "start": 28.48,
+     "end": 29.38
+    },
+    {
+     "w": "المشاعر.",
+     "start": 29.38,
+     "end": 30.34
+    },
+    {
+     "w": "كل",
+     "start": 30.36,
+     "end": 31.08
+    },
+    {
+     "w": "اللهجات…",
+     "start": 31.08,
+     "end": 32.0
+    },
+    {
+     "w": "منصة",
+     "start": 32.0,
+     "end": 33.24
+    },
+    {
+     "w": "إسمع.",
+     "start": 33.24,
+     "end": 34.16
+    }
+   ]
+  }
+ ]
+}
