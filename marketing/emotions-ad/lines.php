@@ -9,8 +9,11 @@
  * through dialects or accents, and each take follows the highlighted option.
  * The same voice speaks every dialect: any voice can speak any dialect.
  *
- * Arabic cut: Fahad (Iapetus). English cut: Daisy (Kore). Both are Listen HD
- * voices with the same name, voice and avatar as in the product.
+ * Arabic cut: a young Arab man, voice Iapetus (the product's "Fahad"); the
+ * emotion takes are in Fusha, then the line switches dialect. English cut: a
+ * young woman in a hijab, voice Kore (the product's "Daisy"). On screen each
+ * is a realistic AI person (no real person), lip-synced to these takes, with
+ * the Listen logo.
  *
  * Made by the "Launch ad voices" workflow with ad = emotions-ad:
  *   php artisan tts:showcase --set=ad --ad=emotions-ad --generate
@@ -23,35 +26,35 @@ $daisy = ['language' => 'en', 'voice' => 'Kore', 'speaker' => 'Daisy'];
 return [
     'samples' => [
 
-        // ── Arabic cut: one Saudi line, every emotion ───────────────────
+        // ── Arabic cut: one line in Fusha, every emotion ────────────────
 
-        $fahad + ['slug' => 'emo-ar-neutral', 'dialect' => 'ar-SA',
-            'style' => 'A young man from Riyadh saying the line plainly and evenly, like reading it off a screen. No emotion at all. Natural Najdi delivery.',
-            'text' => 'ما تتخيّل وش صار!'],
+        $fahad + ['slug' => 'emo-ar-neutral', 'dialect' => 'ar-XA',
+            'style' => 'A young Arab man saying the line plainly and evenly in clear Modern Standard Arabic, like reading it off a screen. No emotion at all.',
+            'text' => 'لن تصدّق ما حدث!'],
 
-        $fahad + ['slug' => 'emo-ar-whisper', 'dialect' => 'ar-SA',
-            'style' => 'The same young man from Riyadh sharing a big secret: a soft, breathy, intimate whisper the whole way, close to the microphone.',
-            'text' => '<whispers> ما تتخيّل وش صار!'],
+        $fahad + ['slug' => 'emo-ar-whisper', 'dialect' => 'ar-XA',
+            'style' => 'The same young Arab man sharing a big secret: a soft, breathy, intimate whisper the whole way, close to the microphone.',
+            'text' => '<whispers> لن تصدّق ما حدث!'],
 
-        $fahad + ['slug' => 'emo-ar-laugh', 'dialect' => 'ar-SA',
-            'style' => 'The same young man from Riyadh who cannot stop laughing: a real burst of laughter first, then he says the line while still laughing.',
-            'text' => '<laugh> ما تتخيّل وش صار!'],
+        $fahad + ['slug' => 'emo-ar-laugh', 'dialect' => 'ar-XA',
+            'style' => 'The same young Arab man who cannot stop laughing: a real burst of laughter first, then he says the line while still laughing.',
+            'text' => '<laugh> لن تصدّق ما حدث!'],
 
-        $fahad + ['slug' => 'emo-ar-sad', 'dialect' => 'ar-SA',
-            'style' => 'The same young man from Riyadh, heartbroken: a real, shaky sob first, then a trembling, tearful voice, slow and broken.',
-            'text' => '<sob> ما تتخيّل وش صار…'],
+        $fahad + ['slug' => 'emo-ar-sad', 'dialect' => 'ar-XA',
+            'style' => 'The same young Arab man, heartbroken: a real, shaky sob first, then a trembling, tearful voice, slow and broken.',
+            'text' => '<sob> لن تصدّق ما حدث…'],
 
-        $fahad + ['slug' => 'emo-ar-angry', 'dialect' => 'ar-SA',
-            'style' => 'The same young man from Riyadh, furious: he shouts the line with real anger, loud and sharp, but still clear.',
-            'text' => '<shout> ما تتخيّل وش صار!'],
+        $fahad + ['slug' => 'emo-ar-angry', 'dialect' => 'ar-XA',
+            'style' => 'The same young Arab man, furious: he shouts the line with real anger, loud and sharp, but still clear.',
+            'text' => '<shout> لن تصدّق ما حدث!'],
 
-        $fahad + ['slug' => 'emo-ar-sarcastic', 'dialect' => 'ar-SA',
-            'style' => 'The same young man from Riyadh, dripping with sarcasm: a short mocking snicker first, then slow, dry and unimpressed, rolling his eyes.',
-            'text' => '<snicker> ما تتخيّل وش صار…'],
+        $fahad + ['slug' => 'emo-ar-sarcastic', 'dialect' => 'ar-XA',
+            'style' => 'The same young Arab man, dripping with sarcasm: a short mocking snicker first, then slow, dry and unimpressed, rolling his eyes.',
+            'text' => '<snicker> لن تصدّق ما حدث…'],
 
-        $fahad + ['slug' => 'emo-ar-trailer', 'dialect' => 'ar-SA',
+        $fahad + ['slug' => 'emo-ar-trailer', 'dialect' => 'ar-XA',
             'style' => 'The voice of a big cinema trailer: very deep, slow and dramatic, a long suspenseful pause in the middle, every word heavy with meaning.',
-            'text' => 'ما تتخيّل… وش صار.'],
+            'text' => 'لن تصدّق… ما حدث.'],
 
         // ── Arabic cut: the same line, excited, in every dialect ───────
 
@@ -79,7 +82,7 @@ return [
             'style' => 'Bursting with excitement, fast and loud, like telling a friend the best news of the year. General American English.',
             'text' => 'You won\'t believe what happened!'],
 
-        $fahad + ['slug' => 'emo-ar-cta', 'dialect' => 'ar-SA',
+        $fahad + ['slug' => 'emo-ar-cta', 'dialect' => 'ar-XA',
             'style' => 'Calm, warm and proud, like the last line of a premium commercial: a short beat after each sentence, a pause before the brand name.',
             'text' => 'سطر واحد. كل المشاعر. كل اللهجات… منصة إسمع.'],
 
