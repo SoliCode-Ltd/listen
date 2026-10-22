@@ -153,8 +153,14 @@ def build(cut, length, out_dir, ratio):
         dialect_ar, emo_ar = t["label_ar"].split(" · ")
         dialect_en, emo_en = t["label_en"].split(" · ")
         name_ar, name_en, avatar = CAST[t["slug"]]
-        scenes.append(dict(slug=t["slug"], name=name_ar if cut == "ar" else name_en, avatar=avatar, lang=t["dialect"][:2], flag=FLAGS[t["dialect"]], hue=HUES.get(emo_en, 255),
-                           dialect=dialect_ar if cut == "ar" else dialect_en, emotion=emo_ar if cut == "ar" else emo_en,
+        if t["dialect"] == "en-US" and dialect_en == "English":
+            dialect_en = "American"
+        # A take is labelled in the language it is spoken in: an Arabic take in the
+        # English cut reads «سمية · مصري · حماس», an English take in the Arabic cut
+        # "Caleb · American · Excited".
+        lang = t["dialect"][:2]
+        scenes.append(dict(slug=t["slug"], name=name_ar if lang == "ar" else name_en, avatar=avatar, lang=lang, flag=FLAGS[t["dialect"]], hue=HUES.get(emo_en, 255),
+                           dialect=dialect_ar if lang == "ar" else dialect_en, emotion=emo_ar if lang == "ar" else emo_en,
                            emo_key=emo_en, vo_start=t["start"], vo_end=t["end"],
                            words=[dict(w=w["w"], s=w["start"], e=w["end"]) for w in t["words"]]))
     # A take's picture starts a little before its voice and lasts until the next one starts.
@@ -166,6 +172,10 @@ def build(cut, length, out_dir, ratio):
                words=[dict(w=w["w"], s=w["start"], e=w["end"]) for w in end["words"]])
     brand = next((w for w in cta["words"] if w["w"].startswith(("إسمع", "Listen"))), cta["words"][-1])
     cta["logo_at"] = round(brand["s"] - 0.05, 3)
+    # The end line is shown up to the brand ("…منصة إسمع" / "…Listen"); the logo says the rest.
+    k = next((j for j, w in enumerate(cta["words"]) if w["w"].startswith(("منصة", "Listen", "إسمع"))), len(cta["words"]))
+    cta["text_words"] = k
+    cta["text_out"] = round(cta["words"][k]["s"] if k < len(cta["words"]) else cta["logo_at"], 3)
 
     # ── Music: a calm bed under the takes, the groove for the end line ──
     sections = [(0, cta["start"] - 0.5, "intro"), (cta["start"] - 0.5, cta["start"] + 0.1, "hold"),
