@@ -1216,5 +1216,209 @@
     "p": 0.986
    }
   ]
+ },
+ "pf-en-14": {
+  "script": "Thanks for calling, this is Ruby. How can I help you today?",
+  "heard": "Thanks for calling. This is Ruby. How can I help you today?",
+  "duration": 3.461,
+  "md5": "0be19911e1b444c556e2fbf2c4e26233",
+  "words": [
+   {
+    "w": "Thanks",
+    "start": 0.0,
+    "end": 0.24,
+    "p": 0.9
+   },
+   {
+    "w": "for",
+    "start": 0.24,
+    "end": 0.36,
+    "p": 0.999
+   },
+   {
+    "w": "calling.",
+    "start": 0.36,
+    "end": 0.6,
+    "p": 0.998
+   },
+   {
+    "w": "This",
+    "start": 0.82,
+    "end": 1.18,
+    "p": 0.999
+   },
+   {
+    "w": "is",
+    "start": 1.18,
+    "end": 1.34,
+    "p": 0.999
+   },
+   {
+    "w": "Ruby.",
+    "start": 1.34,
+    "end": 1.58,
+    "p": 0.993
+   },
+   {
+    "w": "How",
+    "start": 1.82,
+    "end": 2.22,
+    "p": 0.999
+   },
+   {
+    "w": "can",
+    "start": 2.22,
+    "end": 2.36,
+    "p": 0.999
+   },
+   {
+    "w": "I",
+    "start": 2.36,
+    "end": 2.46,
+    "p": 0.998
+   },
+   {
+    "w": "help",
+    "start": 2.46,
+    "end": 2.62,
+    "p": 1.0
+   },
+   {
+    "w": "you",
+    "start": 2.62,
+    "end": 2.7,
+    "p": 1.0
+   },
+   {
+    "w": "today?",
+    "start": 2.7,
+    "end": 2.9,
+    "p": 1.0
+   }
+  ]
+ },
+ "pf-en-15": {
+  "script": "Of course. Your parcel will be with you first thing tomorrow morning.",
+  "heard": "Of course. Your parcel will be with you first thing tomorrow morning.",
+  "duration": 4.041,
+  "md5": "e24fd1231830ed26a634a51576fa57d2",
+  "words": [
+   {
+    "w": "Of",
+    "start": 0.0,
+    "end": 0.28,
+    "p": 0.9
+   },
+   {
+    "w": "course.",
+    "start": 0.28,
+    "end": 0.56,
+    "p": 0.999
+   },
+   {
+    "w": "Your",
+    "start": 0.76,
+    "end": 1.26,
+    "p": 0.998
+   },
+   {
+    "w": "parcel",
+    "start": 1.26,
+    "end": 1.6,
+    "p": 1.0
+   },
+   {
+    "w": "will",
+    "start": 1.6,
+    "end": 1.82,
+    "p": 1.0
+   },
+   {
+    "w": "be",
+    "start": 1.82,
+    "end": 1.94,
+    "p": 1.0
+   },
+   {
+    "w": "with",
+    "start": 1.94,
+    "end": 2.12,
+    "p": 1.0
+   },
+   {
+    "w": "you",
+    "start": 2.12,
+    "end": 2.2,
+    "p": 1.0
+   },
+   {
+    "w": "first",
+    "start": 2.2,
+    "end": 2.52,
+    "p": 0.998
+   },
+   {
+    "w": "thing",
+    "start": 2.52,
+    "end": 2.72,
+    "p": 1.0
+   },
+   {
+    "w": "tomorrow",
+    "start": 2.72,
+    "end": 3.0,
+    "p": 0.999
+   },
+   {
+    "w": "morning.",
+    "start": 3.0,
+    "end": 3.42,
+    "p": 0.999
+   }
+  ]
+ },
+ "pf-en-16": {
+  "script": "All sorted! Anything else I can help with? Have a lovely day!",
+  "heard": "Subtitles by the Amara .org community",
+  "duration": 4.15,
+  "md5": "2c98f5e57030edab75a4635023578c2e",
+  "words": [
+   {
+    "w": "Subtitles",
+    "start": 0.92,
+    "end": 1.32,
+    "p": 0.654
+   },
+   {
+    "w": "by",
+    "start": 1.32,
+    "end": 1.58,
+    "p": 0.945
+   },
+   {
+    "w": "the",
+    "start": 1.58,
+    "end": 1.72,
+    "p": 0.881
+   },
+   {
+    "w": "Amara",
+    "start": 1.72,
+    "end": 1.92,
+    "p": 1.0
+   },
+   {
+    "w": ".org",
+    "start": 1.92,
+    "end": 2.0,
+    "p": 1.0
+   },
+   {
+    "w": "community",
+    "start": 2.0,
+    "end": 2.0,
+    "p": 1.0
+   }
+  ]
  }
 }
