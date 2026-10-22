@@ -6,7 +6,7 @@
 set -e
 cd "$(dirname "$0")"
 B=${1:-/tmp/emotions-ad-build}
-for cut in ar en; do for length in full short; do for ratio in 9x16 16x9; do
+for cut in ${CUTS:-ar en}; do for length in full short; do for ratio in 9x16 16x9; do
   out="../out/listen-emotions-$cut-$length-$ratio.mp4"
   if [ -f "$out" ] && [ "$out" -nt ad.js ] && ffprobe -v error "$out" >/dev/null 2>&1; then echo "skip $out"; continue; fi
   rm -rf ../out/.segments-*
