@@ -11,7 +11,7 @@
  *
  *   1. A scene between two people (tags: nervous, whisper, clap, sob, gasp, laugh…).
  *   2. One voice, many emotions (a radio host telling a story).
- *   3. One voice, many dialects and languages (a customer-service call).
+ *   3. One voice, many dialects or accents (a customer-service call).
  *
  * Made by the "Launch ad voices" workflow with ad = prompts-film:
  *   php artisan tts:showcase --set=ad --ad=prompts-film --generate
@@ -67,9 +67,6 @@ return [
         $raed + ['slug' => 'pf-ar-10', 'dialect' => 'ar-EG',
             'style' => 'The same agent realising the caller is Egyptian and switching to warm, friendly Cairene Egyptian Arabic, smiling as he talks.',
             'text' => '<warm> آه، حضرتك من مصر؟ خلاص نتكلم مصري… طلبك هيوصل بكرة الصبح إن شاء الله.'],
-        ['slug' => 'pf-ar-11', 'language' => 'en', 'dialect' => 'en-US',
-            'style' => 'The same agent switching to friendly, natural American English to finish the call, smiling.',
-            'text' => '<friendly> And for your son in London, I\'ll send the confirmation in English. Have a great day!'] + $raed,
 
         // ── English film ────────────────────────────────────────────────
 
@@ -101,15 +98,15 @@ return [
             'style' => 'The same host revealing the answer: a gasp, then he bursts out laughing while he says it. General Australian.',
             'text' => '<gasp> Well, last night we caught him… <laugh> it\'s a seagull! He rings for chips!'],
 
-        // Scene 3: a call. One agent, English then Egyptian Arabic then English.
+        // Scene 3: a call. One agent, three English accents, each for its caller.
         $sumaya + ['slug' => 'pf-en-9', 'dialect' => 'en-US',
             'style' => 'A polished customer-service agent answering a call: calm, warm, professional. Clear American English.',
             'text' => '<professional> Thanks for calling, this is Sumaya. How can I help you today?'],
-        ['slug' => 'pf-en-10', 'language' => 'ar', 'dialect' => 'ar-EG',
-            'style' => 'The same agent realising the caller\'s grandmother is on the line, switching to warm, affectionate Cairene Egyptian Arabic, smiling.',
-            'text' => '<warm> أهلاً يا حاجّة! متقلقيش خالص، الطلب هيوصلك بكرة الصبح.'] + $sumaya,
-        $sumaya + ['slug' => 'pf-en-11', 'dialect' => 'en-US',
-            'style' => 'The same agent back in friendly American English, smiling, wrapping up the call.',
-            'text' => '<friendly> Your grandmother says hi! It arrives tomorrow morning. Have a lovely day!'],
+        $sumaya + ['slug' => 'pf-en-12', 'dialect' => 'en-GB',
+            'style' => 'The same agent hearing the caller is in London and, playfully, switching to a warm, natural Southern British accent, smiling as she talks.',
+            'text' => '<warm> Oh, you\'re calling from London? Then let\'s do this properly. Your parcel will be with you first thing tomorrow, love.'],
+        $sumaya + ['slug' => 'pf-en-13', 'dialect' => 'en-AU',
+            'style' => 'The same agent switching again, now to a relaxed, friendly General Australian accent, grinning, wrapping up the call.',
+            'text' => '<cheerful> And the one for your brother in Sydney? No worries, it lands Friday, mate. Have a good one!'],
     ],
 ];
