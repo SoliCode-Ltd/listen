@@ -10,11 +10,11 @@
     ? { W: 1920, H: 1080, pr: { x: 560, y: 470, d: 380 }, ringR: 300, who: { x: 560, y: 760, align: 'center' },
         list: { x: 960, y: 500, pitch: 66, size: 34, cur: 44, span: 4, align: 'start' },
         line: { x: 1330, y: 500, w: 500, size: 52, align: 'start' }, logo: { x: 80, y: 64, h: 40 },
-        flagsY: 620, endY: 380, endSize: 84, logoY: 380, logoH: 120, urlY: 560, btnY: 640 }
+        flagsY: 620, endY: 380, endSize: 84, logoY: 400, logoH: 170, urlY: 640 }
     : { W: 1080, H: 1920, pr: { x: 540, y: 560, d: 420 }, ringR: 320, who: { x: 540, y: 880, align: 'center' },
         list: { x: 540, y: 1230, pitch: 66, size: 36, cur: 50, span: 2.4, align: 'center' },
         line: { x: 540, y: 1600, w: 920, size: 62, align: 'center' }, logo: { x: 540, y: 110, h: 46, centre: true },
-        flagsY: 1080, endY: 700, endSize: 96, logoY: 750, logoH: 140, urlY: 960, btnY: 1050 };
+        flagsY: 1080, endY: 700, endSize: 96, logoY: 760, logoH: 205, urlY: 1060 };
   document.documentElement.style.setProperty('--W', L.W + 'px');
   document.documentElement.style.setProperty('--H', L.H + 'px');
   if (AR) document.documentElement.setAttribute('dir', 'rtl');
@@ -119,6 +119,34 @@
     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`)) : [];
 
   // ── End card ───────────────────────────────────────────────
+  // As in the prompts films: the portrait becomes the Listen orb, which fills the
+  // frame behind the end line, then shrinks back and splits into the logo's bars.
+  const fx = el('canvas', 'layer', stage); fx.width = L.W; fx.height = L.H;
+  const fxc = fx.getContext('2d');
+  const hex = h => { const v = parseInt(h.slice(1), 16); return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255]; };
+  const ORB_C = ['#24138A', '#6747F7', '#B3A2FF', '#FFE3D3'].map(hex);
+  const DEEP_C = ['#12094A', '#3A22C2', '#7659FA', '#E3B9FF'].map(hex);
+  const orbColors = k => ORB_C.map((c, i) => c.map((v, j) => lerp(v, DEEP_C[i][j], k)));
+  const BAR_H = [10, 44, 72, 100, 72, 44, 10];
+  // The logo's seven bars, out of a circle of radius r (m = 0) into bars of k px per logo unit (m = 1).
+  function drawBars(cx, cy, r, k, m, time) {
+    const e = E.inOut3(clamp(m));
+    const sw = (2 * r) / 7;
+    fxc.save();
+    fxc.beginPath();
+    for (let i = 0; i < 7; i++) {
+      const x0 = -r + (i + .5) * sw;
+      const h0 = 2 * Math.sqrt(Math.max(0, r * r - x0 * x0)) * .98;
+      const w = lerp(sw * .94, 10 * k, e);
+      const h = Math.max(w, lerp(h0, BAR_H[i] * k, e));
+      fxc.roundRect(cx + lerp(x0, (18 * i - 54) * k, e) - w / 2, cy - h / 2, w, h, w / 2);
+    }
+    fxc.clip();
+    const solid = clamp((m - .5) / .5);
+    if (solid < 1) ORB.draw(fxc, cx, cy, 2 * Math.max(r, 64 * k) * 1.05, { time: time * .9, colors: ORB_C });
+    if (solid > 0) { fxc.globalAlpha = solid; fxc.fillStyle = '#7659FA'; fxc.fillRect(cx - 80 * k, cy - 64 * k, 160 * k, 128 * k); fxc.globalAlpha = 1; }
+    fxc.restore();
+  }
   // The end line, one phrase per line ("One line." / "Every emotion." / "Every accent…").
   const phrases = [[]];
   C.words.slice(0, C.text_words).forEach(w => { phrases[phrases.length - 1].push(w); if (/[.…؟!]$/.test(w.w)) phrases.push([]); });
@@ -133,9 +161,13 @@
   css(flagRow, { top: L.flagsY + 'px' });
   const flagEls = [...flagRow.querySelectorAll('img')];
   const everyIdx = (() => { const k = C.words.findIndex((w, j) => j > 2 && /^(كل|Every)/.test(w.w)); return k < 0 ? Math.max(0, C.words.length - 3) : k; })();
-  const endLogo = el('img', 'endlogo', stage); endLogo.src = logo.src; css(endLogo, { height: L.logoH + 'px', top: L.logoY + 'px' });
+  // The end logo: the page draws the bars; the wordmark is the logo file without them.
+  const VB = AR ? 307 : 400; const LK = L.logoH / 128;
+  const wordmark = el('img', 'wordmark', stage); wordmark.src = AR ? 'assets/wordmark-ar-light.svg' : 'assets/wordmark-light.svg';
+  const endLeft = L.W / 2 - VB * LK / 2;
+  css(wordmark, { left: endLeft + 'px', top: L.logoY + 'px', width: VB * LK + 'px', height: L.logoH + 'px' });
+  const endBars = { x: endLeft + (14 + 64) * LK, y: L.logoY + 64 * LK };
   const url = el('div', 'url', stage, 'listenai.studio'); css(url, { top: L.urlY + 'px' });
-  const btn = el('div', 'btn', stage, AR ? 'جرّب إسمع الآن' : 'Try Listen now'); css(btn, { top: L.btnY + 'px' });
 
   // Where each list row sits: centred on the current take, easing between takes.
   const listPos = t => {
@@ -161,8 +193,8 @@
   function seek(t) {
     const i = sceneAt(t); const s = S[i];
     const outro = E.inOut3(prog(t, C.start - .05, .45)); // the speaker steps back before the end line
-    // The end line stays until just before the logo, then hands over.
-    const toLogo = E.inOut3(prog(t, C.logo_at - .35, .3));
+    // The end line stays until the orb starts back towards the logo.
+    const toLogo = E.inOut3(prog(t, C.contract_at - .3, .35));
     // The first frame is already the composed shot; it only settles.
     const intro = E.out5(prog(t, -.6, 1.1));
 
@@ -252,22 +284,40 @@
     });
     chevs.forEach((c, k) => css(c, { left: (X(L.line.x - 44) - (AR ? 22 : 0)) + 'px', top: (L.line.y + (k ? 8 : -30)) + 'px', opacity: lin * (1 - outro) }));
 
-    // End card: the end line rises word by word, then gives way to the logo.
-    const ev = t >= C.start - .2;
+    // End card: the portrait turns into the orb, the orb fills the frame, the end line
+    // rises in white word by word, then the orb comes back and becomes the logo.
+    fxc.clearRect(0, 0, L.W, L.H);
+    const appear = E.inOut3(prog(t, C.orb_at, .3));
+    const grow = E.inOut5(prog(t, C.orb_at + .2, .8));
+    const back = E.inOut5(prog(t, C.contract_at, .85));
+    const morph = prog(t, C.logo_at - .1, .7);
+    const bigD = 2 * Math.hypot(L.W, L.H) * .62, endD = 2 * 64 * LK;
+    if (t >= C.orb_at) {
+      if (morph <= 0) {
+        let d = D * Math.pow(bigD / D, grow), cx = lerp(X(L.pr.x), L.W / 2, grow), cy = lerp(L.pr.y, L.H / 2, grow);
+        if (back > 0) { d = bigD * Math.pow(endD / bigD, back); cx = lerp(L.W / 2, endBars.x, back); cy = lerp(L.H / 2, endBars.y, back); }
+        fxc.globalAlpha = appear;
+        ORB.draw(fxc, cx, cy, d, { time: t * .9, level: .25 + .5 * grow * (1 - back), grain: d > ORB.MAX ? 0 : 1, colors: orbColors(grow * (1 - back)) });
+        fxc.globalAlpha = 1;
+      } else {
+        drawBars(endBars.x, endBars.y, endD / 2, LK, morph, t);
+      }
+    }
+    const ev = t >= C.orb_at;
     endText.style.display = ev && toLogo < .999 ? 'block' : 'none';
     endWords.forEach((w, j) => {
-      const a = E.out5(prog(t, Math.max(C.words[j].s - .1, C.start + .35), .5));
+      const a = E.out5(prog(t, Math.max(C.words[j].s - .1, C.orb_at + .85), .5));
       css(w, { opacity: a * (1 - toLogo), transform: `translateY(${(1 - a) * 36 - toLogo * 30}px)`, filter: a < .995 || toLogo > .005 ? `blur(${((1 - a) * 10 + toLogo * 8).toFixed(2)}px)` : 'none' });
     });
     flagRow.style.display = ev && toLogo < .999 ? 'flex' : 'none';
     flagEls.forEach((f, j) => {
-      const a = E.spring(prog(t, C.words[everyIdx].s + j * .06, .6));
+      const a = E.spring(prog(t, Math.max(C.words[everyIdx].s, C.orb_at + 1) + j * .06, .6));
       css(f, { opacity: clamp(a * 1.4) * (1 - toLogo), transform: `translateY(${(1 - a) * 24 - toLogo * 20}px) scale(${.7 + .3 * a})` });
     });
-    const lg = E.out5(prog(t, C.logo_at - .02, .7));
-    css(endLogo, { display: lg > .001 ? 'block' : 'none', opacity: lg, transform: `translateX(-50%) translateY(${(1 - lg) * 24}px) scale(${lerp(.94, 1, lg)})`, filter: `blur(${((1 - lg) * 10).toFixed(2)}px)` });
-    const u = E.out5(prog(t, C.logo_at + .35, .6)); css(url, { opacity: u, transform: `translateY(${(1 - u) * 16}px)` });
-    const b = E.spring(prog(t, C.logo_at + .55, .7)); css(btn, { opacity: clamp(b * 1.3), transform: `translateX(-50%) scale(${.9 + .1 * b})` });
+    // The wordmark slides out of the bars, then the address.
+    const wm = E.out5(prog(t, C.logo_at + .5, .8));
+    css(wordmark, { display: wm > .001 ? 'block' : 'none', opacity: wm, clipPath: `inset(0 ${((1 - wm) * 100).toFixed(2)}% 0 0)` });
+    const u = E.out5(prog(t, C.logo_at + .85, .8)); css(url, { opacity: u, transform: `translateY(${(1 - u) * 18}px)` });
   }
 
   window.seek = seek;

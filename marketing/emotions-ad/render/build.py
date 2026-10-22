@@ -9,6 +9,7 @@ Output (in <out dir>/<cut>-<length>-<ratio>): timeline.js, mix.wav, the page and
 """
 
 import json
+import re
 import pathlib
 import shutil
 import subprocess
@@ -18,11 +19,16 @@ import numpy as np
 import soundfile as sf
 from PIL import Image, ImageFilter
 
+sys.dont_write_bytecode = True  # no __pycache__ next to the scripts this one borrows from
+
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
+PROMPTS = ROOT / "marketing/prompts-film/render"
 sys.path.insert(0, str(ROOT / "marketing/launch-ad/render"))
+sys.path.insert(0, str(PROMPTS))
 import sound  # noqa: E402  (the launch ad's synth: music, whooshes, ticks)
 from sound import SR  # noqa: E402
+import orbshader  # noqa: E402  (the prompts films' orb)
 
 TRACK = HERE.parent / "track"
 FPS = 60
@@ -58,6 +64,9 @@ SHORT = {
     "ar": ["emo-ar-eg", "emo-ar-iq", "emo-ar-ma", "emo-ar-ae", "emo-ar-kw"],
     "en": ["emo-en-au", "emo-en-ie", "emo-en-ny", "emo-en-za", "emo-en-in"],
 }
+# Each cut stays in its own language: the Arabic cut's English take and the
+# English cut's Arabic take are left out.
+OTHER_LANGUAGE = {"emo-ar-en", "emo-en-eg"}
 # Quiet deliveries get quieter music.
 MUSIC_GAIN = {"Whisper": 0.45, "Sob": 0.55, "Movie trailer": 0.7}
 
@@ -111,16 +120,17 @@ def script_words(text, heard):
 
 
 def voice_track(cut, length):
-    """The voice and its takes, in this cut's time."""
+    """The voice and its takes, in this cut's time: the cut's takes joined, each
+    with a little room around it, then the end line."""
     meta = json.loads((TRACK / f"emotions-{cut}.json").read_text(encoding="utf-8"))
     audio = load(TRACK / f"emotions-{cut}.wav")
     takes = [dict(t, words=script_words(t["text"], t["words"])) for t in meta["takes"]]
-    if length == "full":
-        out = np.concatenate([np.zeros((int(LEAD * SR), 2)), audio])
-        shift = lambda x: round(x + LEAD, 3)  # noqa: E731
-        return out, [dict(t, start=shift(t["start"]), end=shift(t["end"]),
-                          words=[dict(w, start=shift(w["start"]), end=shift(w["end"])) for w in t["words"]]) for t in takes]
-    pick = SHORT[cut] + [takes[-1]["slug"]]
+    *lines, end = takes
+    pick = SHORT[cut] if length == "short" else [t["slug"] for t in lines if t["slug"] not in OTHER_LANGUAGE]
+    pick = pick + [end["slug"]]
+    # Silence between one take's voice and the next: as in the joined track for the
+    # full cut, a little more for the short one; the end line always gets 0.9 s.
+    between = 0.5 if length == "full" else 0.75
     by = {t["slug"]: t for t in takes}
     parts, placed, at = [np.zeros((int(LEAD * SR), 2))], [], LEAD
     for k, slug in enumerate(pick):
@@ -135,7 +145,7 @@ def voice_track(cut, length):
                            words=[dict(w, start=move(w["start"]), end=move(w["end"])) for w in t["words"]]))
         parts.append(seg)
         at += len(seg) / SR
-        gap = 0.45 if k == len(pick) - 2 else 0.3
+        gap = (0.9 if k == len(pick) - 2 else between) - 0.45
         parts.append(np.zeros((int(gap * SR), 2)))
         at += gap
     return np.concatenate(parts), placed
@@ -144,9 +154,6 @@ def voice_track(cut, length):
 def build(cut, length, out_dir, ratio):
     vo, takes = voice_track(cut, length)
     *lines, end = takes
-    duration = round(end["end"] + 2.6, 3)
-    n = int((duration + 1.0) * SR)
-    vo = np.pad(vo, ((0, max(0, n - len(vo))), (0, 0)))[:n]
 
     scenes = []
     for i, t in enumerate(lines):
@@ -176,6 +183,14 @@ def build(cut, length, out_dir, ratio):
     k = next((j for j, w in enumerate(cta["words"]) if w["w"].startswith(("منصة", "Listen", "إسمع"))), len(cta["words"]))
     cta["text_words"] = k
     cta["text_out"] = round(cta["words"][k]["s"] if k < len(cta["words"]) else cta["logo_at"], 3)
+    # The end, as in the prompts films: the portrait becomes the Listen orb, the orb
+    # fills the frame behind the end line, then shrinks back and splits into the
+    # logo's bars as the brand is said; the wordmark and the address follow.
+    cta["orb_at"] = round(cta["start"] - 0.2, 3)
+    cta["contract_at"] = round(cta["logo_at"] - 0.95, 3)
+    duration = round(max(end["end"] + 2.6, cta["logo_at"] + 3.4), 3)
+    n = int((duration + 1.0) * SR)
+    vo = np.pad(vo, ((0, max(0, n - len(vo))), (0, 0)))[:n]
 
     # ── Music: a calm bed under the takes, the groove for the end line ──
     sections = [(0, cta["start"] - 0.5, "intro"), (cta["start"] - 0.5, cta["start"] + 0.1, "hold"),
@@ -198,6 +213,7 @@ def build(cut, length, out_dir, ratio):
         sound.add(sfx, sound.tick(1.2), sc["start"] + 0.05, 0.5)
         sound.add(sfx, sound.pop(pitch=1.0 + 0.04 * (i % 5), pan=0.25 if i % 2 else -0.25), sc["start"] + 0.12, 0.05)
     sound.add(sfx, sound.whoosh(0.6, pan_from=0.4, pan_to=-0.4), cta["start"] - 0.35, 0.12)
+    sound.add(sfx, sound.whoosh(0.7, rising=False, pan_from=-0.3, pan_to=0.3), cta["contract_at"] - 0.1, 0.12)
     typing = [round(w["s"], 3) for w in cta["words"]]
     sound.add(sfx, sound.butter(sound.impact(0.5), "lowpass", 150), cta["logo_at"], 0.32)
     sound.add(sfx, sound.shimmer(), cta["logo_at"] + 0.1, 0.25)
@@ -249,6 +265,9 @@ def build(cut, length, out_dir, ratio):
     # ── Page and assets ──
     for name in ("ad.html", "ad.js", "ad.css"):
         shutil.copy(HERE / name, out / name)
+    # The Listen orb: the site's shader, drawn as in the prompts films.
+    shutil.copy(PROMPTS / "orb.js", out / "orb.js")
+    orbshader.write(ROOT, out)
     shutil.copytree(ROOT / "marketing/launch-ad/render/fonts", out / "fonts", dirs_exist_ok=True)
     assets = out / "assets"
     assets.mkdir(exist_ok=True)
@@ -260,6 +279,10 @@ def build(cut, length, out_dir, ratio):
         shutil.copy(ROOT / f"public/images/flags/{sc['flag']}.svg", assets / f"{sc['flag']}.svg")
     for logo in ("logo-ar-light.svg", "logo-light.svg", "icon-128.svg"):
         shutil.copy(ROOT / f"public/images/{logo}", assets / logo)
+    for logo in ("logo-ar-light.svg", "logo-light.svg"):
+        # The wordmark alone: the bars are drawn by the page so they can come out of the orb.
+        svg = (ROOT / f"public/images/{logo}").read_text(encoding="utf-8")
+        (assets / logo.replace("logo", "wordmark")).write_text(re.sub(r"<g transform.*?</g>", "", svg, flags=re.S), encoding="utf-8")
     grain = assets / "grain.png"
     if not grain.exists():
         noise = np.random.default_rng(3).normal(128, 42, (512, 512)).clip(0, 255).astype(np.uint8)

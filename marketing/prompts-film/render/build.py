@@ -26,6 +26,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 FILM = HERE.parent
 ROOT = HERE.parents[2]
 sys.path.insert(0, str(HERE))
+import orbshader  # noqa: E402
 import score  # noqa: E402
 from score import SR, sound  # noqa: E402
 
@@ -306,14 +307,8 @@ def build(film, out_dir, style=None, audio_only=False):
     # ── Page, portraits and assets ──
     for name in ("film.html", "film.js", "film.css", "orb.js"):
         shutil.copy(HERE / name, out / name)
-    # The orbs are the site's own (public/js/listen-orbs.js): the same shader, with
-    # its grain made optional, since the page adds its own over the whole frame.
-    site = (ROOT / "public/js/listen-orbs.js").read_text(encoding="utf-8")
-    frag = re.search(r"var FRAG = (\[.*?\])\.join\('\\n'\);", site, re.S).group(1)
-    frag = frag.replace("uniform float uLift;", "uniform float uLift; uniform float uGrain;")
-    frag = frag.replace("col += (g - 0.5) * 0.05;", "col += (g - 0.5) * 0.05 * uGrain;")
-    assert "uGrain;" in frag and "* uGrain" in frag, "the site's orb shader changed: update build.py"
-    (out / "orb-shader.js").write_text("window.ORB_FRAG = " + frag + ".join('\\n');\n", encoding="utf-8")
+    # The orbs are the site's own (public/js/listen-orbs.js).
+    orbshader.write(ROOT, out)
     shutil.copytree(ROOT / "marketing/launch-ad/render/fonts", out / "fonts", dirs_exist_ok=True)
     assets = out / "assets"
     assets.mkdir(exist_ok=True)

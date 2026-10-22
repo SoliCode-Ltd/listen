@@ -48,14 +48,13 @@ body { font-family: 'Alexandria', system-ui, sans-serif; color: var(--ink); }
 .chev { position: absolute; width: 22px; height: 22px; color: var(--faint); }
 
 /* End card */
-.endtext { position: absolute; left: 0; right: 0; text-align: center; font-weight: 500; letter-spacing: -1.2px; line-height: 1.25; padding: 0 90px; }
+.endtext { position: absolute; left: 0; right: 0; text-align: center; font-weight: 600; letter-spacing: -1.2px; line-height: 1.25; padding: 0 90px;
+  color: #fff; text-shadow: 0 6px 40px rgba(18, 9, 74, .35); }
 .endtext.ar { letter-spacing: 0; line-height: 1.5; }
 .endtext .w { display: inline-block; white-space: pre; }
 .endtext .ph { display: block; }
 .endtext .v { color: var(--violet); }
-.endlogo { position: absolute; left: 50%; }
+.wordmark { position: absolute; }
 .url { position: absolute; left: 0; right: 0; text-align: center; font-size: 30px; font-weight: 400; color: var(--ink-2); letter-spacing: .3px; direction: ltr; }
-.btn { position: absolute; left: 50%; padding: 26px 64px; border-radius: 999px; font-size: 32px; font-weight: 500; white-space: nowrap;
-  background: var(--ink); color: #fff; box-shadow: 0 18px 40px rgba(16,16,20,.18); }
 .flagrow { position: absolute; left: 0; right: 0; display: flex; justify-content: center; gap: 18px; direction: ltr; }
-.flagrow img { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 4px #fff, 0 10px 24px rgba(30,24,70,.14); }
+.flagrow img { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px rgba(255,255,255,.9), 0 10px 24px rgba(18,9,74,.3); }
