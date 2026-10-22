@@ -1379,45 +1379,81 @@
  },
  "pf-en-16": {
   "script": "All sorted! Anything else I can help with? Have a lovely day!",
-  "heard": "Subtitles by the Amara .org community",
+  "heard": "All sorted. Anything else I can help with? Have a lovely day!",
   "duration": 4.15,
   "md5": "2c98f5e57030edab75a4635023578c2e",
   "words": [
    {
-    "w": "Subtitles",
-    "start": 0.92,
-    "end": 1.32,
-    "p": 0.654
+    "w": "All",
+    "start": 0.0,
+    "end": 0.28,
+    "p": 0.707
    },
    {
-    "w": "by",
-    "start": 1.32,
-    "end": 1.58,
-    "p": 0.945
+    "w": "sorted.",
+    "start": 0.28,
+    "end": 0.64,
+    "p": 0.986
    },
    {
-    "w": "the",
-    "start": 1.58,
-    "end": 1.72,
-    "p": 0.881
+    "w": "Anything",
+    "start": 1.02,
+    "end": 1.26,
+    "p": 0.995
    },
    {
-    "w": "Amara",
-    "start": 1.72,
-    "end": 1.92,
+    "w": "else",
+    "start": 1.26,
+    "end": 1.54,
+    "p": 0.997
+   },
+   {
+    "w": "I",
+    "start": 1.54,
+    "end": 1.68,
+    "p": 0.977
+   },
+   {
+    "w": "can",
+    "start": 1.68,
+    "end": 1.78,
+    "p": 0.989
+   },
+   {
+    "w": "help",
+    "start": 1.78,
+    "end": 1.94,
+    "p": 0.999
+   },
+   {
+    "w": "with?",
+    "start": 1.94,
+    "end": 2.16,
+    "p": 0.995
+   },
+   {
+    "w": "Have",
+    "start": 2.64,
+    "end": 2.92,
+    "p": 0.991
+   },
+   {
+    "w": "a",
+    "start": 2.92,
+    "end": 3.04,
     "p": 1.0
    },
    {
-    "w": ".org",
-    "start": 1.92,
-    "end": 2.0,
-    "p": 1.0
+    "w": "lovely",
+    "start": 3.04,
+    "end": 3.36,
+    "p": 0.996
    },
    {
-    "w": "community",
-    "start": 2.0,
-    "end": 2.0,
-    "p": 1.0
+    "w": "day!",
+    "start": 3.36,
+    "end": 3.66,
+    "p": 0.997
    }
   ]
  }
