@@ -1,7 +1,7 @@
 """Builds one cut of the emotions ad: the voice track (whole, or the short
 cut's takes joined), music and sound design, and the timeline the motion
-graphics page plays. One voice says one line again and again; every take is a
-new emotion and a new dialect.
+graphics page plays. One line said again and again; every take is a new
+emotion and a new dialect, shown by a speaker from that dialect.
 
     python build.py <cut: ar|en> <length: full|short> <out dir> [--ratio 9x16|16x9]
 
@@ -28,10 +28,19 @@ TRACK = HERE.parent / "track"
 FPS = 60
 LEAD = 0.55  # seconds of picture before the first take
 
-# The voice of each cut, as the product names it, and its site avatar.
-VOICE = {
-    "ar": dict(name="فهد", avatar="ar-fahad"),
-    "en": dict(name="Daisy", avatar="en-daisy"),
+# Each take is shown by a site speaker from that dialect (their avatar's dress
+# fits it): name in Arabic and English, and the avatar file.
+CAST = {
+    "emo-ar-sa": ("سلطان", "Sultan", "ar-sultan"), "emo-ar-lb": ("رائد", "Raed", "ar-raed"),
+    "emo-ar-eg": ("علاء", "Alaa", "ar-alaa"), "emo-ar-iq": ("فيصل", "Faisal", "ar-faisal"),
+    "emo-ar-ma": ("منصور", "Mansour", "ar-mansour"), "emo-ar-ae": ("نواف", "Nawaf", "ar-nawaf"),
+    "emo-ar-tn": ("عثمان", "Othman", "ar-othman"), "emo-ar-kw": ("سعود", "Saud", "ar-saud"),
+    "emo-ar-en": ("كاليب", "Caleb", "en-caleb"),
+    "emo-en-us": ("ديزي", "Daisy", "en-daisy"), "emo-en-gb": ("أليس", "Alice", "en-alice"),
+    "emo-en-au": ("فريا", "Freya", "en-freya"), "emo-en-ie": ("سيينا", "Sienna", "en-sienna"),
+    "emo-en-ny": ("ويلو", "Willow", "en-willow"), "emo-en-za": ("فيبي", "Phoebe", "en-phoebe"),
+    "emo-en-ca": ("روبي", "Ruby", "en-ruby"), "emo-en-in": ("لونا", "Luna", "en-luna"),
+    "emo-en-eg": ("سمية", "Sumaya", "ar-sumaya"),
 }
 # Each take's flag and the colour of the light behind the face (by emotion).
 FLAGS = {"ar-SA": "sa", "ar-LB": "lb", "ar-EG": "eg", "ar-IQ": "iq", "ar-MA": "ma", "ar-AE": "ae", "ar-TN": "tn",
@@ -143,7 +152,8 @@ def build(cut, length, out_dir, ratio):
     for i, t in enumerate(lines):
         dialect_ar, emo_ar = t["label_ar"].split(" · ")
         dialect_en, emo_en = t["label_en"].split(" · ")
-        scenes.append(dict(slug=t["slug"], lang=t["dialect"][:2], flag=FLAGS[t["dialect"]], hue=HUES.get(emo_en, 255),
+        name_ar, name_en, avatar = CAST[t["slug"]]
+        scenes.append(dict(slug=t["slug"], name=name_ar if cut == "ar" else name_en, avatar=avatar, lang=t["dialect"][:2], flag=FLAGS[t["dialect"]], hue=HUES.get(emo_en, 255),
                            dialect=dialect_ar if cut == "ar" else dialect_en, emotion=emo_ar if cut == "ar" else emo_en,
                            emo_key=emo_en, vo_start=t["start"], vo_end=t["end"],
                            words=[dict(w=w["w"], s=w["start"], e=w["end"]) for w in t["words"]]))
@@ -222,7 +232,7 @@ def build(cut, length, out_dir, ratio):
         smooth[i] = prev + (amp[i] - prev) * (0.45 if amp[i] > prev else 0.12)
 
     timeline = dict(cut=cut, length=length, ui=cut, ratio=ratio, fps=FPS, duration=duration,
-                    voice=VOICE[cut], scenes=scenes, cta=cta, extra=EXTRA[cut], typing=typing,
+                    scenes=scenes, cta=cta, extra=EXTRA[cut], typing=typing,
                     amp=[round(float(min(a, 1.6)), 3) for a in smooth])
     (out / "timeline.js").write_text("window.TIMELINE = " + json.dumps(timeline, ensure_ascii=False) + ";\n", encoding="utf-8")
 
@@ -232,10 +242,11 @@ def build(cut, length, out_dir, ratio):
     shutil.copytree(ROOT / "marketing/launch-ad/render/fonts", out / "fonts", dirs_exist_ok=True)
     assets = out / "assets"
     assets.mkdir(exist_ok=True)
-    avatar = VOICE[cut]["avatar"]
-    im = Image.open(ROOT / f"public/images/speakers/{avatar}.webp").convert("RGB")
-    im.resize((900, 900), Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=2, percent=60, threshold=2)).save(assets / f"{avatar}.png")
     for sc in scenes:
+        target = assets / f"{sc['avatar']}.png"
+        if not target.exists():
+            im = Image.open(ROOT / f"public/images/speakers/{sc['avatar']}.webp").convert("RGB")
+            im.resize((900, 900), Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=2, percent=60, threshold=2)).save(target)
         shutil.copy(ROOT / f"public/images/flags/{sc['flag']}.svg", assets / f"{sc['flag']}.svg")
     for logo in ("logo-ar-light.svg", "logo-light.svg", "icon-128.svg"):
         shutil.copy(ROOT / f"public/images/{logo}", assets / logo)

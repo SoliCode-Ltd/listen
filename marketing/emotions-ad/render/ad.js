@@ -52,8 +52,8 @@
   const counter = el('div', 'counter', stage);
   css(counter, { top: L.counter.y + 'px' });
   const foot = el('div', 'foot', stage, AR
-    ? '<span class="a">صوت واحد. كل المشاعر.</span><span class="b">كل اللهجات، في استوديو إسمع</span>'
-    : '<span class="a">One voice. Every emotion.</span><span class="b">Every accent, in Listen Studio</span>');
+    ? '<span class="a">سطر واحد. كل المشاعر.</span><span class="b">كل اللهجات، في استوديو إسمع</span>'
+    : '<span class="a">One line. Every emotion.</span><span class="b">Every accent, in Listen Studio</span>');
   css(foot, { top: L.foot.y + 'px', alignItems: L.foot.centre ? 'center' : (AR ? 'flex-end' : 'flex-start') });
 
   // ── The speaker ────────────────────────────────────────────
@@ -61,10 +61,15 @@
   const ring = el('canvas', '', stage); ring.id = 'ring';
   ring.width = R * 2; ring.height = R * 2;
   css(ring, { width: R * 2 + 'px', height: R * 2 + 'px', left: (X(L.pr.x) - R) + 'px', top: (L.pr.y - R) + 'px' });
-  const portrait = el('div', 'portrait', stage, `<img src="assets/${T.voice.avatar}.png">`);
+  // Every take's speaker, stacked; the current one shows.
+  const portrait = el('div', 'portrait', stage, S.map(s => `<img src="assets/${s.avatar}.png">`).join(''));
+  const faces = [...portrait.querySelectorAll('img')];
   css(portrait, { width: D + 'px', height: D + 'px', left: (X(L.pr.x) - D / 2) + 'px', top: (L.pr.y - D / 2) + 'px' });
   const who = el('div', 'who', stage);
-  who.innerHTML = `<div class="name">${T.voice.name}</div><div class="dia"></div>`;
+  who.innerHTML = `<div class="name"></div><div class="dia"></div>`;
+  const nameBox = who.querySelector('.name');
+  const nameSlot = el('div', 'dslot', nameBox); css(nameSlot, { height: '44px', width: '800px' });
+  const nameRows = S.map(s => { const r = el('div', 'row', nameSlot, s.name); css(r, { position: 'absolute', left: 0, right: 0, top: 0, justifyContent: 'center' }); return r; });
   css(who, { left: (X(L.who.x) - 400) + 'px', width: '800px', top: L.who.y + 'px', alignItems: 'center' });
   const dia = who.querySelector('.dia');
   // One row per take (flag and dialect); they slide through the same slot.
@@ -190,7 +195,15 @@
     css(ring, { opacity: clamp(prog(t, .5, .6)) * (1 - outro), transform: `scale(${lerp(1, .85, outro)})` });
     drawRing(t, level, (hue % 360) / 720);
     css(who, { opacity: E.out5(prog(t, .3, .8)) * (1 - outro), transform: `translateY(${(1 - E.out5(prog(t, .3, .8))) * 20}px)` });
-    diaRows.forEach((r, k) => {
+    // A new face for every take: the old one blurs away as the new one settles in.
+    faces.forEach((f, k) => {
+      const inn = k === 0 ? 1 : E.out5(prog(t, S[k].start - .05, .45));
+      const gone = k + 1 < S.length ? E.inOut3(prog(t, S[k + 1].start - .05, .3)) : 0;
+      css(f, { position: 'absolute', inset: 0, opacity: clamp(inn * 1.3) * (1 - gone), transform: `scale(${lerp(1.08, 1, inn)})`,
+        filter: inn < .995 ? `blur(${((1 - inn) * 8).toFixed(2)}px)` : 'none', display: inn * (1 - gone) > .002 ? 'block' : 'none' });
+    });
+    [...nameRows, ...diaRows].forEach((r, kk) => {
+      const k = kk % S.length;
       // The new dialect rises in as the old one lifts away.
       const inn = k === 0 ? 1 : E.out5(prog(t, S[k].start, .5));
       const gone = k + 1 < S.length ? E.inOut3(prog(t, S[k + 1].start - .05, .35)) : 0;
