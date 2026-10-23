@@ -276,11 +276,11 @@ class PlanResource extends Resource
                                 \App\Services\Billing\KeptCredits::NEW_ONLY => 'New subscribers only',
                             ])
                             ->descriptions([
-                                \App\Services\Billing\KeptCredits::NEXT_PERIOD => 'Members on this plan now keep their current credits until the period they paid for ends (a yearly plan: until it renews). After that they get the new amount.',
-                                \App\Services\Billing\KeptCredits::NEW_ONLY => 'Members on this plan now keep their current credits for as long as they stay on it. Only people who subscribe from now on get the new amount.',
+                                \App\Services\Billing\KeptCredits::NEXT_PERIOD => 'Members on this plan now keep their current credits until the period they paid for renews (a yearly plan: once a year), including any days a late payment is retried. After that they get the new amount.',
+                                \App\Services\Billing\KeptCredits::NEW_ONLY => 'Members on this plan now keep their current credits for as long as they stay on it. Only people who subscribe from now on get the new amount, and so does a member who leaves the plan and comes back after their paid period ran out.',
                             ])
                             ->helperText(fn (?Plan $record): string => $record
-                                ? number_format(app(\App\Services\Billing\KeptCredits::class)->membersOn($record)).' members are on this plan now. Nothing changes for anyone in the period they are in.'
+                                ? number_format(app(\App\Services\Billing\KeptCredits::class)->membersOn($record)).' members are on this plan now. Nothing changes for anyone in the period they are in. Members in a free trial not paid yet count as new subscribers.'
                                 : '')
                             ->visible(fn (Get $get, ?Plan $record): bool => static::lowersCredits($get, $record))
                             ->required(fn (Get $get, ?Plan $record): bool => static::lowersCredits($get, $record))

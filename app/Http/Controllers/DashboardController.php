@@ -184,8 +184,9 @@ class DashboardController extends Controller
             'packOffer' => $packOffer,
             'planShowcase' => $planShowcase,
             // The plan's own pricing-page lines; "credit card not needed" means nothing once signed in.
+            // With credits kept from before the plan was lowered, its minutes are theirs.
             'planLines' => array_values(array_filter(
-                PlanPricingLines::forPlan($activePlan ?? new Plan, app()->getLocale()),
+                PlanPricingLines::forPlan(($quotaPlan?->getAttribute('kept_credits') ? $quotaPlan : $activePlan) ?? new Plan, app()->getLocale()),
                 fn (array $line): bool => $line['label'] !== __('ui.pricing.lines.label_card_needed'),
             )),
             'jobs' => $jobs,

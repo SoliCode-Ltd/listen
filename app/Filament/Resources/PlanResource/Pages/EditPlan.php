@@ -9,6 +9,7 @@ use App\Services\StripeProductSyncService;
 use Filament\Actions;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Support\Facades\Schema;
 
 class EditPlan extends EditRecord
 {
@@ -32,6 +33,18 @@ class EditPlan extends EditRecord
         $rawState = $this->form->getRawState();
         $this->creditsBefore = (int) $this->record->monthly_chars;
         $this->lowerCreditsFor = $rawState['lower_credits_for'] ?? null;
+
+        // Members can only keep their credits once the database has the columns for it.
+        if ($this->lowerCreditsFor !== null && (int) ($data['monthly_chars'] ?? $this->creditsBefore) < $this->creditsBefore
+            && ! Schema::hasColumns('subscriptions', KeptCredits::COLUMNS)) {
+            Notification::make()
+                ->title('Credits not lowered')
+                ->body('The database update for keeping members\' credits has not been run on this server yet. Run the migrations, then save again.')
+                ->danger()
+                ->persistent()
+                ->send();
+            $this->halt();
+        }
 
         // The hand-written lists are only in the form while "Use my own text instead"
         // is on; otherwise they are left exactly as saved.
@@ -73,19 +86,6 @@ class EditPlan extends EditRecord
 
     protected function afterSave(): void
     {
-        // Lowered credits: members on the plan now keep theirs as the admin chose.
-        if ($this->record && $this->lowerCreditsFor !== null && $this->creditsBefore !== null
-            && (int) $this->record->monthly_chars < $this->creditsBefore) {
-            $members = app(KeptCredits::class)->keepForCurrentMembers($this->record, $this->creditsBefore, $this->lowerCreditsFor);
-            Notification::make()
-                ->title('Credits lowered')
-                ->body($this->lowerCreditsFor === KeptCredits::NEW_ONLY
-                    ? number_format($members).' members on this plan keep their current credits for as long as they stay on it. New subscribers get the new amount.'
-                    : number_format($members).' members on this plan keep their current credits until their paid period ends, then get the new amount.')
-                ->success()
-                ->send();
-        }
-
         if ($this->record && (bool) $this->record->is_featured) {
             Plan::query()
                 ->whereKeyNot($this->record->getKey())
@@ -112,5 +112,21 @@ class EditPlan extends EditRecord
                     ->send();
             }
         }
+
+        // Lowered credits: members on the plan now keep theirs as the admin chose.
+        // Last, so their plan rows are held only until the save commits.
+        if ($this->record && $this->lowerCreditsFor !== null && $this->creditsBefore !== null
+            && (int) $this->record->monthly_chars < $this->creditsBefore) {
+            $members = app(KeptCredits::class)->keepForCurrentMembers($this->record, $this->creditsBefore, $this->lowerCreditsFor);
+            Notification::make()
+                ->title('Credits lowered')
+                ->body($this->lowerCreditsFor === KeptCredits::NEW_ONLY
+                    ? number_format($members).' members on this plan keep their current credits for as long as they stay on it. New subscribers get the new amount.'
+                    : number_format($members).' members on this plan keep their current credits until their paid period ends, then get the new amount.')
+                ->success()
+                ->send();
+        }
+        // Lowering it again asks again.
+        $this->data['lower_credits_for'] = null;
     }
 }
