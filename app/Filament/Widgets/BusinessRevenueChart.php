@@ -24,8 +24,8 @@ class BusinessRevenueChart extends ChartWidget
         $monthly = collect($this->stats()['monthly'] ?? []);
 
         $series = [
-            'stripe_started' => ['Stripe subscriptions started', 'rgba(16, 185, 129, 0.8)'],
-            'stripe_ended' => ['Stripe subscriptions ended', 'rgba(239, 68, 68, 0.8)'],
+            'stripe_started' => ['Card plans bought (no trial)', 'rgba(16, 185, 129, 0.8)'],
+            'stripe_ended' => ['Paid card plans ended', 'rgba(239, 68, 68, 0.8)'],
             'trials_started' => ['Trials started', 'rgba(245, 158, 11, 0.8)'],
             'trials_paid' => ['Trials paid', 'rgba(14, 165, 233, 0.8)'],
             'manual_approved' => ['Manual payments approved', 'rgba(139, 92, 246, 0.8)'],

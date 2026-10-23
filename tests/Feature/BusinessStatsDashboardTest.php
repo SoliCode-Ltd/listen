@@ -148,7 +148,10 @@ class BusinessStatsDashboardTest extends TestCase
 
         $this->assertSame(['Summary', 'Monthly', 'Cohorts', 'Plans', 'API usage', 'API by model (30d)', 'API by model (period)', 'API monthly', 'Plan quota usage', 'Countries', 'Regions', 'Breakdowns'], $names);
         $this->assertEquals(3, $summary['Total members (excl. admins)']);
-        $this->assertEquals(9, $summary['Est. MRR (USD, list price)']);
+        // No Stripe key in tests: the list-price estimate, and the sheet says which.
+        $this->assertSame('List-price estimate (Stripe not read)', $summary['MRR source']);
+        $this->assertEquals(9, $summary['MRR (USD)']);
+        $this->assertEquals(1, $summary['Paying by card']);
     }
 
     public function test_admin_dashboard_renders_and_downloads_report(): void
@@ -157,7 +160,7 @@ class BusinessStatsDashboardTest extends TestCase
 
         $this->actingAs($admin)->get('/admin')->assertOk()->assertSee('Investor report (PDF)')->assertSee('Raw data (Excel)');
         $this->assertSame(
-            ['ApiCostChart', 'ApiUsageBreakdown', 'ApiUsageKpis', 'BusinessBreakdowns', 'BusinessGrowthChart', 'BusinessGrowthKpis', 'BusinessProductKpis', 'BusinessRevenueChart', 'BusinessRevenueKpis', 'BusinessUsageChart'],
+            ['ApiCostChart', 'ApiUsageBreakdown', 'ApiUsageKpis', 'BusinessBreakdowns', 'BusinessGrowthChart', 'BusinessGrowthKpis', 'BusinessProductKpis', 'BusinessRevenueChart', 'BusinessRevenueKpis', 'BusinessUsageChart', 'ExpectedIncome'],
             collect(\Filament\Facades\Filament::getPanel('admin')->getWidgets())->map(fn ($w) => class_basename($w))->sort()->values()->all(),
             'Only the business widgets should be on the dashboard.'
         );
@@ -206,7 +209,8 @@ class BusinessStatsDashboardTest extends TestCase
 
         foreach ([
             \App\Filament\Widgets\BusinessGrowthKpis::class => 'Members',
-            \App\Filament\Widgets\BusinessRevenueKpis::class => 'Est. MRR',
+            \App\Filament\Widgets\BusinessRevenueKpis::class => 'MRR (estimate)',
+            \App\Filament\Widgets\ExpectedIncome::class => 'Expected monthly income',
             \App\Filament\Widgets\BusinessProductKpis::class => 'Failure rate',
             \App\Filament\Widgets\BusinessBreakdowns::class => 'Signup cohorts',
             \App\Filament\Widgets\BusinessGrowthChart::class => 'Growth',

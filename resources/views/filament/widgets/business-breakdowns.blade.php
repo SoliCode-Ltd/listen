@@ -54,7 +54,7 @@
         <div style="display: grid; gap: 1.5rem;">
             <x-filament::section>
                 <x-slot name="heading">Plans</x-slot>
-                <x-slot name="description">Members currently on each plan, paying Stripe subscriptions and estimated MRR at list price.</x-slot>
+                <x-slot name="description">Members on each plan now and how many of them pay (card or InstaPay / Vodafone Cash; trials and plans given free are not paying), the plan's card subscriptions, and their MRR {{ $mrrSource === 'stripe' ? 'from Stripe, after discounts' : 'estimated at list price (Stripe could not be read)' }}.</x-slot>
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
@@ -63,6 +63,7 @@
                                 <th class="px-3 py-2 text-start font-medium">Plan</th>
                                 <th class="px-3 py-2 text-end font-medium">Price / mo</th>
                                 <th class="px-3 py-2 text-end font-medium">Members</th>
+                                <th class="px-3 py-2 text-end font-medium">Paying</th>
                                 <th class="px-3 py-2 text-end font-medium">Stripe monthly</th>
                                 <th class="px-3 py-2 text-end font-medium">Stripe yearly</th>
                                 <th class="px-3 py-2 text-end font-medium">MRR</th>
@@ -77,8 +78,9 @@
                                             <span class="text-xs text-gray-400">(inactive)</span>
                                         @endunless
                                     </td>
-                                    <td class="px-3 py-2 text-end tabular-nums">${{ number_format($plan['price_monthly_usd'], 2) }}</td>
+                                    <td class="px-3 py-2 text-end tabular-nums">{{ $plan['price_monthly_usd'] === null ? '—' : '$'.number_format($plan['price_monthly_usd'], 2) }}</td>
                                     <td class="px-3 py-2 text-end tabular-nums">{{ number_format($plan['members']) }}</td>
+                                    <td class="px-3 py-2 text-end tabular-nums">{{ number_format($plan['paying'] ?? 0) }}</td>
                                     <td class="px-3 py-2 text-end tabular-nums">{{ number_format($plan['stripe_monthly']) }}</td>
                                     <td class="px-3 py-2 text-end tabular-nums">{{ number_format($plan['stripe_yearly']) }}</td>
                                     <td class="px-3 py-2 text-end tabular-nums">${{ number_format($plan['mrr_usd'], 2) }}</td>
