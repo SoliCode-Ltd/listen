@@ -147,7 +147,11 @@ class BillingEdgeCasesTest extends TestCase
 
         $this->subscribe($user, ['plan' => 'creator', 'end_trial' => true])
             ->assertStatus(422)
-            ->assertJsonMissingPath('requires_action');
+            ->assertJsonMissingPath('requires_action')
+            // No reason from the bank: a refusal, and the trial goes on.
+            ->assertJsonPath('decline', 'refused')
+            ->assertJsonPath('message', fn (string $message) => str_starts_with($message, "Your bank didn't allow this payment, so nothing was charged.")
+                && str_contains($message, 'Your free trial continues until'));
 
         $update = $this->stripe->last('post', '/v1/subscriptions/sub_edge');
         $this->assertSame('pending_if_incomplete', $update['payment_behavior']);
@@ -212,6 +216,53 @@ class BillingEdgeCasesTest extends TestCase
         $this->assertNotNull($this->stripe->last('post', '/v1/invoices/in_old/void'), 'Its open invoice could still be paid.');
     }
 
+    public function test_a_new_plan_the_bank_refuses_says_why_and_what_to_do(): void
+    {
+        $user = User::factory()->create();
+        $user->forceFill(['stripe_id' => 'cus_edge'])->save();
+        $this->stripe->failSubscriptionCreate = true;
+
+        $cases = [
+            'insufficient_funds' => ['no_funds', "Your card doesn't have enough money for this payment"],
+            'do_not_honor' => ['refused', "Your bank didn't allow this payment"],
+            'expired_card' => ['card_details', "The card details don't match your bank's records"],
+            'try_again_later' => ['try_again', "Your bank couldn't confirm the payment just now"],
+        ];
+        foreach ($cases as $code => [$kind, $start]) {
+            $this->stripe->cardError = ['code' => 'card_declined', 'decline_code' => $code];
+
+            $this->subscribe($user, ['plan' => 'starter', 'payment_method' => 'pm_edge'])
+                ->assertStatus(422)
+                ->assertJsonPath('ok', false)
+                ->assertJsonPath('decline', $kind)
+                ->assertJsonPath('message', fn (string $message) => str_starts_with($message, $start.', so nothing was charged.'));
+        }
+
+        // In Arabic, in the member's own words.
+        app()->setLocale('ar');
+        $this->stripe->cardError = ['code' => 'card_declined', 'decline_code' => 'insufficient_funds'];
+        $this->subscribe($user, ['plan' => 'starter', 'payment_method' => 'pm_edge'])
+            ->assertJsonPath('decline', 'no_funds')
+            ->assertJsonPath('message', __('ui.billing.decline_no_funds', [], 'ar'));
+    }
+
+    public function test_a_declined_first_payment_kept_out_of_date_by_cashier_is_looked_up(): void
+    {
+        $user = User::factory()->create();
+        $user->forceFill(['stripe_id' => 'cus_edge'])->save();
+        $this->stripe->cardError = ['code' => 'card_declined', 'decline_code' => 'insufficient_funds'];
+
+        // Cashier keeps the payment as it was before its confirmation failed: no reason on it.
+        $stale = \Stripe\PaymentIntent::constructFrom(['id' => 'pi_edge', 'object' => 'payment_intent', 'customer' => 'cus_edge', 'status' => 'requires_confirmation']);
+        $exception = new \Laravel\Cashier\Exceptions\IncompletePayment(new \Laravel\Cashier\Payment($stale), 'declined');
+
+        $kind = (new \ReflectionMethod(\App\Http\Controllers\BillingController::class, 'declineKind'))
+            ->invoke(app(\App\Http\Controllers\BillingController::class), $exception);
+
+        $this->assertSame('no_funds', $kind);
+        $this->assertNotNull($this->stripe->last('get', '/v1/payment_intents/pi_edge'), 'Stripe was not asked why the card was declined.');
+    }
+
     /** Moving from Starter to Creator: the plan shows as Creator once Stripe has it. */
     private function planFollowsStripe(User $user): void
     {
@@ -252,10 +303,13 @@ class BillingEdgeCasesTest extends TestCase
         $this->stripe->pendingAfterUpdate = true;
         $this->stripe->intentStatus = 'requires_payment_method';
 
+        $this->stripe->cardError = ['code' => 'card_declined', 'decline_code' => 'insufficient_funds'];
+
         $this->subscribe($user, ['plan' => 'creator'])
             ->assertStatus(422)
             ->assertJsonMissingPath('requires_action')
-            ->assertJsonPath('message', "Your card was declined, so nothing was charged and you're still on Starter. Please try another card.");
+            ->assertJsonPath('decline', 'no_funds')
+            ->assertJsonPath('message', "Your card doesn't have enough money for this payment, so nothing was charged. Top up the card and try again, or choose another option below. You're still on Starter.");
 
         $this->assertNotNull($this->stripe->last('post', '/v1/invoices/in_edge/void'), 'The unpaid plan change could still go through.');
         $this->assertSame('starter', app(PlanAccessService::class)->resolveActivePlanForUserId((int) $user->id)?->slug);
@@ -421,6 +475,9 @@ class ScriptedStripeClient implements ClientInterface
 
     public bool $failSubscriptionCreate = false;
 
+    /** Why the bank refused the card, as Stripe says it (code, decline_code). */
+    public array $cardError = [];
+
     public array $setupIntentMetadata = [];
 
     /** Subscriptions Stripe lists for the customer. */
@@ -463,7 +520,8 @@ class ScriptedStripeClient implements ClientInterface
         }
 
         if ($path === '/v1/payment_intents/pi_edge') {
-            return $this->json(['id' => 'pi_edge', 'object' => 'payment_intent', 'status' => $this->intentStatus, 'client_secret' => 'pi_edge_secret']);
+            return $this->json(['id' => 'pi_edge', 'object' => 'payment_intent', 'status' => $this->intentStatus, 'client_secret' => 'pi_edge_secret']
+                + ($this->cardError !== [] ? ['last_payment_error' => ['type' => 'card_error'] + $this->cardError] : []));
         }
 
         if ($path === '/v1/setup_intents/seti_edge') {
@@ -487,7 +545,7 @@ class ScriptedStripeClient implements ClientInterface
         }
 
         if ($path === '/v1/subscriptions' && $method === 'post' && $this->failSubscriptionCreate) {
-            return [json_encode(['error' => ['type' => 'card_error', 'message' => 'Your card was declined.']]), 402, []];
+            return [json_encode(['error' => ['type' => 'card_error', 'message' => 'Your card was declined.'] + $this->cardError]), 402, []];
         }
 
         return $this->json(['id' => 'obj_fake', 'object' => 'unknown']);

@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\CardDecline;
 use App\Services\Billing\RenewalGrace;
 use App\Services\Billing\SavedPaymentMethodRecorder;
 use App\Services\Billing\StripePricePlans;
@@ -31,6 +32,7 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Exceptions\IncompletePayment;
 use Stripe\Exception\ApiErrorException;
+use Stripe\Exception\CardException;
 
 class BillingController extends Controller
 {
@@ -541,11 +543,8 @@ class BillingController extends Controller
         } catch (IncompletePayment $exception) {
             $this->billingSyncService->syncIfStale($user, true);
             if (! $exception->payment->requiresAction()) {
-                // Declined: nothing to confirm in the browser, say so plainly.
-                return response()->json([
-                    'ok' => false,
-                    'message' => __('ui.backend.billing_card_declined'),
-                ], 422);
+                // Declined: nothing to confirm in the browser. Say why, and what to do next.
+                return $this->declined($this->declineKind($exception));
             }
 
             return response()->json([
@@ -564,6 +563,11 @@ class BillingController extends Controller
                 'ok' => false,
                 'message' => $firstMessage !== '' ? $firstMessage : __('ui.backend.billing_add_payment_method'),
             ], 422);
+        } catch (CardException $exception) {
+            // The bank refused the card before any payment was made (saving it, for example).
+            $this->billingSyncService->syncIfStale($user, true);
+
+            return $this->declined(CardDecline::kind($exception->getDeclineCode(), $exception->getStripeCode()));
         } catch (SubscriptionStillLiveException $exception) {
             Log::error('Checkout stopped: Stripe still charges this member for another subscription.', [
                 'user_id' => $user->id,
@@ -944,24 +948,52 @@ class BillingController extends Controller
             }
         }
         $this->billingSyncService->syncIfStale($user, true);
+        $kind = CardDecline::ofIntent($intent);
 
         if ($endTrial) {
-            return response()->json([
-                'ok' => false,
-                'message' => __('ui.backend.billing_trial_upgrade_declined', [
-                    'date' => $this->formatDateLabel($subscription->trial_ends_at?->toDateString()),
-                ]),
-            ], 422);
+            return $this->declined($kind, __('ui.billing.decline_trial_continues', [
+                'date' => $this->formatDateLabel($subscription->trial_ends_at?->toDateString()),
+            ]));
         }
 
         $currentPlan = $this->billingSubscriptionPlan($subscription)['plan'] ?? null;
 
+        return $this->declined($kind, __('ui.billing.decline_still_on_plan', [
+            'plan' => $currentPlan ? $this->planDisplayName($currentPlan) : __('ui.billing.plan'),
+        ]));
+    }
+
+    /**
+     * A card the bank refused: nothing was charged. The member reads why and
+     * what to do in their language; the kind (CardDecline) lets the page offer
+     * the next step, such as another way to pay or a smaller amount.
+     */
+    private function declined(string $kind, ?string $after = null): \Illuminate\Http\JsonResponse
+    {
         return response()->json([
             'ok' => false,
-            'message' => __('ui.backend.billing_plan_change_declined', [
-                'plan' => $currentPlan ? $this->planDisplayName($currentPlan) : __('ui.billing.plan'),
-            ]),
+            'decline' => $kind,
+            'message' => trim(__('ui.billing.decline_'.$kind).' '.(string) $after),
         ], 422);
+    }
+
+    /**
+     * Why the bank refused a new subscription's first payment. When Cashier's
+     * own confirmation of the payment fails, it keeps the payment as it was
+     * before, without the bank's answer: then Stripe is asked for it.
+     */
+    private function declineKind(IncompletePayment $exception): string
+    {
+        $intent = $exception->payment->asStripePaymentIntent();
+        if (empty($intent->last_payment_error)) {
+            try {
+                $intent = $exception->payment->asStripePaymentIntent(['latest_charge']);
+            } catch (\Throwable $error) {
+                Log::warning('Could not look up why a card was declined.', ['error' => $error->getMessage()]);
+            }
+        }
+
+        return CardDecline::ofIntent($intent);
     }
 
     /**
