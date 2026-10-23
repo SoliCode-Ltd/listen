@@ -80,7 +80,7 @@ class PricingLocalCurrencyTest extends TestCase
             ->assertSee($this->formatted(400, 'USD', 'ar'));
     }
 
-    public function test_egypts_prices_in_pounds_say_cards_are_charged_in_dollars(): void
+    public function test_egypts_prices_in_pounds_have_no_currency_note(): void
     {
         SiteSetting::set('pricing_forced_country_code', 'EG', 'billing');
         SiteSetting::set('pricing_exchange_rate_EGP', '50', 'billing');
@@ -90,7 +90,8 @@ class PricingLocalCurrencyTest extends TestCase
         foreach (['en', 'ar'] as $locale) {
             $this->pricingPage($locale)
                 ->assertSee('data-display-manual="1"', false)
-                ->assertSee(__('ui.pricing.currency_note_egp', [], $locale))
+                ->assertDontSee($locale === 'ar' ? 'الأسعار بالجنيه المصري' : 'Prices in EGP')
+                ->assertDontSee('class="currency-note"', false)
                 ->assertDontSee(__('ui.pricing.currency_note', ['currency' => 'EGP'], $locale))
                 ->assertDontSee('class="price-usd"', false);
         }

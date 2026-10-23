@@ -772,13 +772,11 @@
         $mainPlans = $pricingPlans;
       }
       // Prices in another currency are a guide: cards are charged each plan's price in US
-      // dollars. Egypt's prices in pounds are what paying in pounds costs; only a card
-      // payment is in dollars.
+      // dollars. Egypt's prices in pounds are what paying in pounds costs: no note.
       $shownPlan = reset($mainPlans) ?: [];
       $shownCurrency = (string) ($shownPlan['display_currency'] ?? 'USD');
       $currencyNote = match (true) {
-        $shownCurrency === 'USD' => '',
-        !empty($shownPlan['display_is_manual']) => __('ui.pricing.currency_note_egp'),
+        $shownCurrency === 'USD', !empty($shownPlan['display_is_manual']) => '',
         default => __('ui.pricing.currency_note', ['currency' => $shownCurrency]),
       };
       // "$9.00" reads as "$9"; "$86.40" keeps its cents.
