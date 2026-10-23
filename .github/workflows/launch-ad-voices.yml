@@ -22,9 +22,13 @@ on:
         type: string
         default: '40'
       from_key:
-        description: 'voice-previews only: first staging key to use (1 = GEMINI_TTS_API_KEY, 2 = _2 ...). The last key is never used: live keeps it.'
+        description: 'voice-previews only: first staging key to use (1 = GEMINI_TTS_API_KEY, 2 = _2 ...)'
         type: string
         default: '1'
+      use_last_key:
+        description: 'voice-previews only: also use the last key (by default live keeps it)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -41,6 +45,7 @@ jobs:
       AD: ${{ inputs.ad || 'launch-ad' }}
       MAX: ${{ inputs.max || '40' }}
       FROM_KEY: ${{ inputs.from_key || '1' }}
+      USE_LAST_KEY: ${{ inputs.use_last_key && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -94,10 +99,11 @@ jobs:
           KEY="${KEYS[0]}"
           if [ "$AD" = voice-previews ]; then
             # Only clips that are missing or whose line changed. Each key stops at its first
-            # quota error and the next key carries on; the last key is left for live.
+            # quota error and the next key carries on; the last key is left for live unless use_last_key.
             max="$(printf '%s' "$MAX" | tr -cd '0-9')"
             first="$(printf '%s' "$FROM_KEY" | tr -cd '0-9')"; first="${first:-1}"
-            last=$(( ${#KEYS[@]} > 1 ? ${#KEYS[@]} - 1 : 1 ))
+            last=${#KEYS[@]}
+            if [ -z "$USE_LAST_KEY" ] && [ "$last" -gt 1 ]; then last=$((last - 1)); fi
             for (( n = first; n <= last; n++ )); do
               echo "--- key $n of ${#KEYS[@]}"
               out="$(php artisan tts:showcase --set=previews --generate --pause=15 --max="$max" --key="${KEYS[$((n - 1))]}" 2>&1 || true)"
