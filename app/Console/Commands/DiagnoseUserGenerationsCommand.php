@@ -68,8 +68,11 @@ class DiagnoseUserGenerationsCommand extends Command
         if ($active && (int) $active->price_cents === 0 && $subs->contains(fn ($s) => (int) ($s->plan?->price_cents ?? 0) > 0)) {
             $this->warn('A paid subscription exists but is not active or its period ended, so the user is treated as Free.');
         }
-        if ($quota !== $active) {
-            $this->warn('Unpaid trial window: quotas come from '.$quota?->slug.' with overage off.');
+        if ($quota?->getAttribute('enforce_trial_minute_cap')) {
+            $this->warn('Unpaid trial window: quotas come from '.$quota->slug.' with overage off.');
+        }
+        if ($quota?->getAttribute('kept_credits')) {
+            $this->line('Credits kept from before the plan was lowered: '.number_format((int) $quota->monthly_chars).' a month (the plan gives '.number_format((int) $active?->monthly_chars).').');
         }
 
         $trial = BillingTrial::where('user_id', $user->id)->latest('id')->first();
