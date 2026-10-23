@@ -229,7 +229,7 @@ return [
             'text' => "Listen up. You've got three minutes left, and I know you've got more in you. Shoulders back, eyes forward. Finish this set, then you can rest."],
         ['slug' => 'en-nora', 'voice' => 'Leda', 'language' => 'en', 'dialect' => 'en-US-LA',
             'style' => 'A youthful, breathless, happy runner from south Louisiana.',
-            'text' => 'Hi! So, I just ran my first marathon, right through New Orleans, and my legs are basically jelly. <laugh> But that finish line, and the gumbo after? Totally worth it.'],
+            'text' => 'Hi! I just ran my first marathon, right through New Orleans, and my legs are jelly. <laugh> But that finish line, and the gumbo after? So worth it.'],
         ['slug' => 'en-ruby', 'voice' => 'Aoede', 'language' => 'en', 'dialect' => 'en-TT',
             'style' => 'A breezy, warm customer care agent from Trinidad.',
             'text' => 'Hi, thanks for calling, this is Ruby! I can see your order right here, and good news, it shipped this morning. Anything else I can help you with today?'],
