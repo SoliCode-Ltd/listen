@@ -1067,10 +1067,13 @@ class PlanResource extends Resource
             ->count() > 1;
     }
 
-    /** The form lowers a saved plan's monthly credits (not a pack's). */
+    /**
+     * The form lowers a paid plan's monthly credits. The free plan and packs are
+     * not asked: nobody paid for a period of them, so a change applies at once.
+     */
     public static function lowersCredits(Get $get, ?Plan $record): bool
     {
-        return $record !== null && $record->exists && ! $record->isPack()
+        return $record !== null && $record->exists && ! $record->isPack() && (int) $record->price_cents > 0
             && is_numeric($get('monthly_chars'))
             && (int) $get('monthly_chars') < (int) $record->monthly_chars;
     }

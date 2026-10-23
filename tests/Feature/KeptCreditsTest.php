@@ -86,6 +86,19 @@ class KeptCreditsTest extends TestCase
         $this->assertDatabaseMissing('subscriptions', ['kept_plan_id' => $this->basic->id]);
     }
 
+    public function test_the_free_plan_is_lowered_at_once_without_asking(): void
+    {
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+        $free = Plan::query()->where('slug', 'free')->firstOrFail();
+
+        Livewire::test(EditPlan::class, ['record' => $free->getRouteKey()])
+            ->fillForm(['monthly_chars' => 0])
+            ->assertFormFieldIsHidden('lower_credits_for')
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertSame(0, (int) $free->fresh()->monthly_chars);
+    }
+
     public function test_everyone_from_their_next_billing_period(): void
     {
         $current = $this->member($this->basic, daysLeft: 10);
