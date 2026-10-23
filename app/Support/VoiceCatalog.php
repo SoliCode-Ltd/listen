@@ -386,15 +386,20 @@ class VoiceCatalog
         $entries = [];
         foreach ($voices as $voice) {
             $dialect = trim((string) $voice->dialect);
-            $preview = self::existingAudio((string) $voice->preview_audio_path)
-                ?? self::existingAudio($sampleByVoice[$voice->internal_voice_id] ?? '');
+            $preview = self::existingAudio((string) $voice->preview_audio_path);
+            // The library preview: the speaker in the dialect, accent or language their avatar suggests.
+            $clip = $preview === null && $voice->tier === 'hd'
+                ? VoicePreviews::find((string) $voice->display_name, (string) $voice->language)
+                : null;
+            $preview ??= $clip['url'] ?? self::existingAudio($sampleByVoice[$voice->internal_voice_id] ?? '');
+            $shown = $dialect !== '' ? $dialect : (string) ($clip['dialect'] ?? '');
             $entries[self::keyFromId((int) $voice->id)] = [
                 'g' => strtolower((string) $voice->gender),
                 'a' => SpeakerAvatar::url((string) $voice->display_name, (string) $voice->language),
                 'l' => (string) $voice->language,
                 'c' => $dialect !== '' ? (ArabicDialects::countryOf($dialect) ?? EnglishAccents::countryOf($dialect)) : null,
-                'f' => $dialect !== '' ? VoiceFlag::url($dialect, $voice->country) : null,
-                'd' => $dialect !== '' ? VoiceFlag::label($dialect, $arabic) : '',
+                'f' => $shown !== '' ? VoiceFlag::url($shown, $dialect !== '' ? $voice->country : null) : null,
+                'd' => $shown !== '' ? VoicePreviews::label($shown, $arabic) : '',
                 'p' => $preview,
                 's' => (bool) $voice->is_featured,
             ];

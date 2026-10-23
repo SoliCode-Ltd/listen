@@ -13,10 +13,14 @@ on:
   workflow_dispatch:
     inputs:
       ad:
-        description: 'Which ad: launch-ad ("Which voice is real?"), emotions-ad ("One line. Every emotion.") or prompts-film (the prompts film)'
+        description: 'Which ad: launch-ad ("Which voice is real?"), emotions-ad ("One line. Every emotion."), prompts-film (the prompts film) or voice-previews (the voice library previews, database/seeders/data/voice_previews.php)'
         type: choice
-        options: [launch-ad, emotions-ad, prompts-film]
+        options: [launch-ad, emotions-ad, prompts-film, voice-previews]
         default: launch-ad
+      max:
+        description: 'voice-previews only: at most this many clips in this run (live shares the quota)'
+        type: string
+        default: '40'
 
 permissions:
   contents: write
@@ -31,6 +35,7 @@ jobs:
     timeout-minutes: 40
     env:
       AD: ${{ inputs.ad || 'launch-ad' }}
+      MAX: ${{ inputs.max || '40' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,6 +77,11 @@ jobs:
           rm -f ~/.ssh/id_gen
           if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
           echo "::add-mask::$KEY"
+          if [ "$AD" = voice-previews ]; then
+            # Only clips that are missing or whose line changed; stops at the first quota error.
+            php artisan tts:showcase --set=previews --generate --pause=15 --max="$(printf '%s' "$MAX" | tr -cd '0-9')" --key="$KEY" 2>&1 | grep -v '^\*' | cut -c1-200 || echo "Some clips failed (see above); the ones made are still committed."
+            exit 0
+          fi
           php artisan tts:showcase --set=ad --ad="$AD" --generate --pause=12 --key="$KEY" 2>&1 | grep -v '^\*' | cut -c1-200 || echo "Some clips failed (see above); the ones made are still committed."
           cp public/audio/$AD/*.wav "marketing/$AD/voices/"
           # The homepage sound environments are used too: their clean takes are transcribed with the ad's lines.
@@ -80,10 +90,12 @@ jobs:
           php -r '$o=[]; foreach (array_merge((require "marketing/'"$AD"'/lines.php")["samples"], '"$extra"') as $s) { $o[$s["slug"]] = ["language" => $s["language"], "text" => trim(preg_replace("/\s*<[^<>]+>\s*/u", " ", $s["text"]))]; } file_put_contents("/tmp/lines.json", json_encode($o, JSON_UNESCAPED_UNICODE));'
 
       - uses: actions/setup-python@v5
+        if: env.AD != 'voice-previews'
         with:
           python-version: '3.12'
 
       - name: Transcribe with word timings
+        if: env.AD != 'voice-previews'
         run: |
           pip install -q requests soundfile scipy faster-whisper==1.1.1
           python marketing/launch-ad/transcribe.py "marketing/$AD/voices" /tmp/lines.json "marketing/$AD/voices/words.json"
@@ -94,9 +106,10 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "marketing/$AD/voices"
+          if [ "$AD" = voice-previews ]; then git add public/audio/voice-previews; else git add "marketing/$AD/voices"; fi
           if git diff --cached --quiet; then echo "Nothing new"; exit 0; fi
           git diff --cached --stat
-          git commit -m "$AD: voices made with staging key 1, with word timings"
+          if [ "$AD" = voice-previews ]; then msg="Voice previews: clips made with staging key 1"; else msg="$AD: voices made with staging key 1, with word timings"; fi
+          git commit -m "$msg"
           git pull --rebase origin "${GITHUB_REF#refs/heads/}"
           git push origin HEAD:${GITHUB_REF#refs/heads/}
