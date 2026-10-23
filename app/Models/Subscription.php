@@ -17,6 +17,9 @@ class Subscription extends Model
         'billing_payment_state',
         'current_period_start',
         'current_period_end',
+        'kept_monthly_chars',
+        'kept_plan_id',
+        'kept_until',
         'billing_grace_ends_at',
         'billing_reminder_7d_sent_at',
         'billing_reminder_1d_sent_at',
@@ -27,6 +30,7 @@ class Subscription extends Model
     protected $casts = [
         'current_period_start' => 'datetime',
         'current_period_end' => 'datetime',
+        'kept_until' => 'datetime',
         'billing_grace_ends_at' => 'datetime',
         'billing_reminder_7d_sent_at' => 'datetime',
         'billing_reminder_1d_sent_at' => 'datetime',

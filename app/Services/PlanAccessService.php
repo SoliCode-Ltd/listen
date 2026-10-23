@@ -77,7 +77,8 @@ class PlanAccessService
                 return $quota;
             }
 
-            return $activePlan;
+            // Credits the member kept when an admin lowered their plan's (KeptCredits).
+            return $activePlan ? app(\App\Services\Billing\KeptCredits::class)->applyTo($activePlan, $userId) : null;
         }
 
         $openTrial = $this->unpaidTrialWindowQuery($userId)
@@ -221,12 +222,19 @@ class PlanAccessService
                 && $subscription->current_period_start !== null
                 && $subscription->current_period_end?->getTimestamp() === \Illuminate\Support\Carbon::instance($periodEnd)->getTimestamp();
 
+            // Credits kept from a lowered plan stay with that plan only, and only
+            // while it runs on: another plan, or coming back after it ended, starts afresh.
+            $keepsCredits = (int) $subscription->plan_id === (int) $plan->id
+                && (string) $subscription->status === 'active' && $status === 'active'
+                && ($subscription->current_period_end === null
+                    || $subscription->current_period_end->gte(now()->subDays((int) config('listen.billing.grace_days', 7))));
+
             $subscription->update([
                 'plan_id' => $plan->id,
                 'status' => $status,
                 'current_period_start' => $samePeriod ? $subscription->current_period_start : $periodStart,
                 'current_period_end' => $periodEnd,
-            ]);
+            ] + ($keepsCredits ? [] : ['kept_monthly_chars' => null, 'kept_plan_id' => null, 'kept_until' => null]));
         }
 
         if ($isFirstPaid) {
