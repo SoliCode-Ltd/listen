@@ -1266,6 +1266,7 @@ return [
             'male' => 'Male',
             'fine_tune' => 'Sound engineering',
             'play' => 'Play a preview of',
+            'preview_error' => 'This preview can’t play right now. Try again in a moment.',
             'favorite_add' => 'Add to favourites',
             'favorite_remove' => 'Remove from favourites',
             'no_favorites' => 'Tap the heart on a voice to keep it here.',

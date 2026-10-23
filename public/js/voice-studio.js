@@ -700,6 +700,15 @@
     try { (JSON.parse(window.localStorage.getItem(STORE) || '[]') || []).forEach(function (k) { favorites[k] = true; }); } catch (e) { /* no storage */ }
     var audio = null;
     var playing = '';
+    var loadingTimer = 0;
+    var frame = 0;
+    var warmed = {};
+    // Errors only: a screen reader is never told "playing" over the voice itself.
+    var status = document.createElement('p');
+    status.className = 'vs-sr';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    library.appendChild(status);
 
     function items() {
       return Array.prototype.filter.call(select.options, function (o) { return o.value && !o.hidden; }).map(function (o) {
@@ -731,26 +740,77 @@
         body: JSON.stringify({ voices: list })
       }).catch(function () { /* kept in this browser */ });
     }
+    // Previews: one shared player. Hovering a card shows the play button on the face;
+    // a click, tap, Enter or Space plays it (hover alone may not start sound), and a
+    // ring around the face shows how much is left. Stopping rewinds.
+    function playingCard() {
+      return playing ? grid.querySelector('.vs-voice[data-value="' + playing.replace(/["\\]/g, '') + '"]') : null;
+    }
     function stopPreview() {
-      if (audio) { audio.pause(); audio.currentTime = 0; }
+      clearTimeout(loadingTimer);
+      cancelAnimationFrame(frame);
+      if (audio) { audio.pause(); try { audio.currentTime = 0; } catch (e) { /* not loaded yet */ } }
       playing = '';
-      grid.querySelectorAll('.vs-voice.is-playing').forEach(function (c) { c.classList.remove('is-playing'); });
+      grid.querySelectorAll('.vs-voice.is-playing, .vs-voice.is-loading').forEach(function (c) {
+        c.classList.remove('is-playing', 'is-loading');
+        c.style.removeProperty('--vs-progress');
+        var b = c.querySelector('.vs-voice-play');
+        if (b) b.setAttribute('aria-pressed', 'false');
+      });
+    }
+    function progress() {
+      var card = playingCard();
+      if (card && audio && audio.duration) card.style.setProperty('--vs-progress', String(Math.min(1, audio.currentTime / audio.duration)));
+      frame = requestAnimationFrame(progress);
+    }
+    function failed() {
+      if (!playing) return;
+      stopPreview();
+      status.textContent = t(meta, 'preview_error');
+    }
+    function warm(item) {
+      if (!item.preview || warmed[item.value] || !window.fetch) return;
+      if (navigator.connection && navigator.connection.saveData) return;
+      warmed[item.value] = true;
+      fetch(item.preview, { credentials: 'same-origin', priority: 'low' }).catch(function () { warmed[item.value] = false; });
     }
     function togglePreview(item, card) {
       if (playing === item.value) { stopPreview(); return; }
       stopPreview();
+      status.textContent = '';
       if (!audio) {
         audio = new Audio();
         audio.preload = 'none';
         audio.addEventListener('ended', stopPreview);
-        audio.addEventListener('error', stopPreview);
+        audio.addEventListener('error', failed);
       }
       audio.src = item.preview;
       playing = item.value;
-      card.classList.add('is-playing');
+      var value = item.value;
+      // A spinner only if the clip is slow to start, so a cached one never flashes it.
+      loadingTimer = setTimeout(function () { var c = playingCard(); if (c && playing === value) c.classList.add('is-loading'); }, 180);
       var started = audio.play();
-      if (started && started.catch) started.catch(stopPreview);
+      var begin = function () {
+        if (playing !== value) return;
+        clearTimeout(loadingTimer);
+        var c = playingCard() || card;
+        c.classList.remove('is-loading');
+        c.classList.add('is-playing');
+        var b = c.querySelector('.vs-voice-play');
+        if (b) b.setAttribute('aria-pressed', 'true');
+        document.dispatchEvent(new CustomEvent('listen:audio-play', { detail: { source: audio } }));
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(progress);
+      };
+      if (started && started.then) started.then(begin, function (e) { if (playing === value && (!e || e.name !== 'AbortError')) failed(); });
+      else begin();
     }
+    // Another voice on the page, a new generation, a hidden tab or Esc: the preview stops.
+    document.addEventListener('listen:audio-play', function (e) { if (playing && (!e.detail || e.detail.source !== audio)) stopPreview(); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden && playing) stopPreview(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && playing) stopPreview(); });
+    var form = library.closest('form');
+    if (form) form.addEventListener('submit', function () { if (playing) stopPreview(); });
     function choose(value) {
       if (select.value === value) return;
       select.value = value;
@@ -769,21 +829,22 @@
       var avatar = item.avatar
         ? '<img src="' + escAttr(item.avatar) + '" alt="" width="64" height="64" loading="lazy" decoding="async">'
         : '<span class="vs-voice-initial">' + initial + '</span>';
+      // The play button sits on the face; the ring around it fills as the preview plays.
+      var play = item.preview
+        ? '<svg class="vs-voice-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="48" pathLength="100"/></svg>'
+          + '<button type="button" class="vs-voice-play" aria-pressed="' + (playing === item.value ? 'true' : 'false') + '" aria-label="' + escAttr(t(meta, 'play')) + ' ' + escAttr(item.label) + '">'
+          + '<span class="vs-voice-play-dot"><svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>'
+          + '<svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg></span></button>'
+        : '';
       var metaLine = [];
       if (item.mine) metaLine.push('<span class="vs-voice-badge">' + escAttr(t(meta, 'mine_badge')) + '</span>');
       // The gender filter above the cards already sorts by gender: no label on each card.
       el.innerHTML = '<button type="button" class="vs-voice-fav" aria-pressed="' + (favorites[item.value] ? 'true' : 'false') + '" aria-label="'
           + escAttr(t(meta, favorites[item.value] ? 'favorite_remove' : 'favorite_add')) + '">' + heart(favorites[item.value]) + '</button>'
-        + '<span class="vs-voice-avatar">' + avatar + (item.flag ? '<span class="vs-voice-flag"><img src="' + escAttr(item.flag) + '" alt="" width="18" height="18" loading="lazy"></span>' : '') + '</span>'
+        + '<span class="vs-voice-avatar">' + avatar + play + (item.flag ? '<span class="vs-voice-flag"><img src="' + escAttr(item.flag) + '" alt="" width="18" height="18" loading="lazy"></span>' : '') + '</span>'
         + '<span class="vs-voice-name">' + escAttr(item.label) + '</span>'
         + (metaLine.length ? '<span class="vs-voice-meta">' + metaLine.join('') + '</span>' : '')
         + (item.dialect ? '<span class="vs-voice-dialect">' + escAttr(item.dialect) + '</span>' : '')
-        + (item.preview
-          ? '<button type="button" class="vs-voice-play" aria-label="' + escAttr(t(meta, 'play')) + ' ' + escAttr(item.label) + '">'
-            + '<svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>'
-            + '<svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg>'
-            + '<span class="vs-voice-bars" aria-hidden="true"><i></i><i></i><i></i></span></button>'
-          : '')
         + '<svg class="vs-voice-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
       el.querySelector('.vs-voice-fav').addEventListener('click', function (e) {
         e.stopPropagation();
@@ -792,8 +853,16 @@
         saveFavorites();
         render();
       });
-      var play = el.querySelector('.vs-voice-play');
-      if (play) play.addEventListener('click', function (e) { e.stopPropagation(); togglePreview(item, el); });
+      var button = el.querySelector('.vs-voice-play');
+      if (button) {
+        button.addEventListener('click', function (e) { e.stopPropagation(); togglePreview(item, el); });
+        button.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
+        // Fetch the clip while the pointer rests on the card, so the click plays at once.
+        var hover = 0;
+        el.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') hover = setTimeout(function () { warm(item); }, 65); });
+        el.addEventListener('pointerleave', function () { clearTimeout(hover); });
+        button.addEventListener('pointerdown', function () { warm(item); });
+      }
       el.addEventListener('click', function () { if (!item.disabled) choose(item.value); });
       el.addEventListener('keydown', function (e) {
         if (e.target !== el) return;
@@ -835,7 +904,7 @@
         if (state.gender && !i.gender && !i.mine) return false;
         return !q || i.key.indexOf(q) !== -1;
       });
-      var key = JSON.stringify([state, select.value, playing, shown.map(function (i) { return i.value + (favorites[i.value] ? '*' : ''); })]);
+      var key = JSON.stringify([state, select.value, shown.map(function (i) { return i.value + (favorites[i.value] ? '*' : ''); })]);
       if (key === lastKey) return;
       var focusedValue = grid.contains(document.activeElement) && document.activeElement.closest('.vs-voice') ? document.activeElement.closest('.vs-voice').dataset.value : null;
       lastKey = key;

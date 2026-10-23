@@ -1141,8 +1141,7 @@ html[lang="ar"] .vs-tb-group { letter-spacing: 0; font-size: .8rem; }
 .vs-voice-fav svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; }
 .vs-voice-fav:hover { color: var(--a, #7659FA); background: color-mix(in oklab, var(--a, #7659FA) 10%, transparent); }
 .vs-voice-fav[aria-pressed="true"] { color: var(--a, #7659FA); }
-.vs-voice-fav:focus-visible,
-.vs-voice-play:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 1px; }
+.vs-voice-fav:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 1px; }
 .vs-voice-check {
   position: absolute;
   top: 8px;
@@ -1160,32 +1159,94 @@ html[lang="ar"] .vs-tb-group { letter-spacing: 0; font-size: .8rem; }
   opacity: 0;
 }
 .vs-voice.is-selected .vs-voice-check { opacity: 1; }
+/* Preview: a play badge on the face (always there on touch screens; on a mouse it
+   appears when the card is hovered or focused) and a ring that fills as it plays.
+   The triangle and the ring never mirror in Arabic. */
 .vs-voice-play {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: .3rem;
-  width: 100%;
-  min-height: 30px;
-  margin-top: .2rem;
-  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
-  border-radius: 9px;
-  background: color-mix(in oklab, var(--surface2) 60%, var(--surface));
-  color: var(--a, #7659FA);
+  position: absolute;
+  bottom: -3px;
+  inset-inline-start: -3px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.vs-voice-play svg { width: 15px; height: 15px; fill: currentColor; }
-.vs-voice-play .i-stop,
-.vs-voice-play .vs-voice-bars { display: none; }
-.vs-voice.is-playing .vs-voice-play { background: var(--a, #7659FA); border-color: transparent; color: #FFFFFF; }
+/* A 44px target around the small badge. */
+.vs-voice-play::before { content: ""; position: absolute; inset: -7px; border-radius: 50%; }
+.vs-voice-play-dot {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  color: var(--a, #7659FA);
+  box-shadow: 0 0 0 2px var(--surface), 0 4px 12px -4px rgba(25, 16, 74, .45);
+  transition: transform .15s ease, background-color .15s ease, color .15s ease, opacity .15s ease;
+}
+.vs-voice-play svg { width: 14px; height: 14px; fill: currentColor; }
+.vs-voice-play .i-play { margin-inline-start: 2px; }
+[dir="rtl"] .vs-voice-play .i-play { margin-inline-start: 0; margin-inline-end: 2px; }
+.vs-voice-play .i-stop { display: none; }
 .vs-voice.is-playing .vs-voice-play .i-play { display: none; }
-.vs-voice.is-playing .vs-voice-play .i-stop,
-.vs-voice.is-playing .vs-voice-play .vs-voice-bars { display: inline-flex; }
-.vs-voice-bars { align-items: flex-end; gap: 2px; height: 12px; }
-.vs-voice-bars i { display: block; width: 3px; height: 100%; border-radius: 2px; background: currentColor; animation: vs-bars .9s ease-in-out infinite; }
-.vs-voice-bars i:nth-child(2) { animation-delay: .15s; }
-.vs-voice-bars i:nth-child(3) { animation-delay: .3s; }
-@keyframes vs-bars { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+.vs-voice.is-playing .vs-voice-play .i-stop { display: block; }
+.vs-voice.is-playing .vs-voice-play-dot { background: var(--a, #7659FA); color: #FFFFFF; }
+.vs-voice-play:focus-visible { outline: none; }
+.vs-voice-play:focus-visible .vs-voice-play-dot { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--a, #7659FA); }
+.vs-voice-ring {
+  position: absolute;
+  inset: -5px;
+  z-index: 1;
+  width: calc(100% + 10px);
+  height: calc(100% + 10px);
+  transform: rotate(-90deg);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.vs-voice-ring circle {
+  fill: none;
+  stroke: var(--a, #7659FA);
+  stroke-width: 3.6;
+  stroke-linecap: round;
+  stroke-dasharray: 100 100;
+  stroke-dashoffset: calc(100 - var(--vs-progress, 0) * 100);
+}
+.vs-voice.is-playing .vs-voice-ring,
+.vs-voice.is-loading .vs-voice-ring { opacity: 1; }
+.vs-voice.is-loading .vs-voice-ring { animation: vs-ring-spin .9s linear infinite; }
+.vs-voice.is-loading .vs-voice-ring circle { stroke-dasharray: 22 78; stroke-dashoffset: 0; }
+@keyframes vs-ring-spin { to { transform: rotate(270deg); } }
+/* With a mouse: the whole face is the button, shown on hover like a player. */
+@media (hover: hover) and (pointer: fine) {
+  .vs-voice-play {
+    inset: 0;
+    width: auto;
+    height: auto;
+    background: rgba(18, 12, 48, 0);
+    transition: background-color .15s ease;
+  }
+  .vs-voice-play::before { content: none; }
+  .vs-voice-play-dot { width: 38px; height: 38px; opacity: 0; transform: scale(.85); }
+  .vs-voice-play svg { width: 16px; height: 16px; }
+  .vs-voice:hover .vs-voice-play,
+  .vs-voice-play:focus-visible,
+  .vs-voice.is-playing .vs-voice-play,
+  .vs-voice.is-loading .vs-voice-play { background: rgba(18, 12, 48, .32); }
+  .vs-voice:hover .vs-voice-play-dot,
+  .vs-voice-play:focus-visible .vs-voice-play-dot,
+  .vs-voice.is-playing .vs-voice-play-dot,
+  .vs-voice.is-loading .vs-voice-play-dot { opacity: 1; transform: none; }
+  .vs-voice-play:hover .vs-voice-play-dot { transform: scale(1.06); }
+}
+.vs-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .vs-lib-empty { margin: 1rem 0 .4rem; padding: 1.2rem; border: 1px dashed color-mix(in oklab, var(--line) 90%, transparent); border-radius: 14px; text-align: center; font-size: .88rem; color: var(--muted); }
 .vs-lib-empty[hidden] { display: none; }
 .vs-lib + .vs-pane { margin-top: 1.1rem; border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent); }
@@ -1195,7 +1256,7 @@ html[lang="ar"] .vs-tb-group { letter-spacing: 0; font-size: .8rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .vs-voice { transition: none; }
-  .vs-voice-bars i { animation: none; }
+  .vs-voice.is-loading .vs-voice-ring { animation: none; }
 }
 @media (max-width: 480px) {
   /* Two settings per row on phones. */
