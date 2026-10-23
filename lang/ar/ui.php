@@ -612,7 +612,6 @@ return [
         'decline_smaller_plan' => 'اختر خطة :plan · :amount',
         'decline_amount_month' => ':amount شهرياً',
         'decline_amount_year' => ':amount سنوياً',
-        'decline_buy_pack' => 'اشترِ :pack · :amount',
         'decline_other_card' => 'استخدم بطاقة أخرى',
         'decline_check_card' => 'تحقّق من بيانات البطاقة',
         'decline_try_again_button' => 'حاول مرة أخرى',

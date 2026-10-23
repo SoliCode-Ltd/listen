@@ -191,18 +191,4 @@ class BillingPageClientTest extends TestCase
             $page->assertSee('"decline_'.$kind.'":'.self::js($text), false);
         }
     }
-
-    public function test_the_pack_is_offered_after_a_decline_only_to_members_who_can_buy_one(): void
-    {
-        $this->pack();
-
-        $this->billingPage('en')->assertViewHas('packOffer', fn (?array $offer): bool => $offer !== null
-            && $offer['name'] === 'Premium Pack'
-            && $offer['amount'] === '$2.00'
-            && str_ends_with($offer['url'], '/billing/pack'));
-
-        $paid = User::factory()->create(['subscription_status_checked_at' => now()]);
-        app(\App\Services\PlanAccessService::class)->assignPlan($paid, Plan::query()->where('slug', 'starter')->firstOrFail(), 'active', now()->addMonth());
-        $this->actingAs($paid)->getLocalizedRoute('billing.page')->assertOk()->assertViewHas('packOffer', null);
-    }
 }

@@ -644,10 +644,6 @@
       min-height: 2.6rem;
       padding: .55rem .9rem;
       font-size: .9rem;
-      /* The pack offer is a link: the same type as the buttons beside it. */
-      font-size-adjust: none;
-      text-align: center;
-      text-decoration: none;
     }
     .decline-help-actions .btn img {
       height: 1.15rem;
@@ -1310,7 +1306,6 @@
       'decline_smaller_plan' => __('ui.billing.decline_smaller_plan'),
       'decline_amount_month' => __('ui.billing.decline_amount_month'),
       'decline_amount_year' => __('ui.billing.decline_amount_year'),
-      'decline_buy_pack' => __('ui.billing.decline_buy_pack'),
       'decline_other_card' => __('ui.billing.decline_other_card'),
       'decline_check_card' => __('ui.billing.decline_check_card'),
       'decline_try_again_button' => __('ui.billing.decline_try_again_button'),
@@ -1330,7 +1325,6 @@
     const trialOffer = @json($trialOffer ?? ['available' => false, 'quota' => []]);
     // Why a bank refused a card, by Stripe's decline code (App\Services\Billing\CardDecline).
     const declineCodes = @json(\App\Services\Billing\CardDecline::CODES);
-    const packOffer = @json($packOffer ?? null);
     const paymentBrandAssets = @json($paymentBrandAssets);
     const trialBtn = document.getElementById('trialBtn');
     const trialBtnDefaultText = trialBtn ? trialBtn.textContent.trim() : '';
@@ -1479,15 +1473,10 @@
     }
 
     function declineButton(label, onClick, options = {}) {
-      const tag = options.href ? 'a' : 'button';
-      const button = document.createElement(tag);
+      const button = document.createElement('button');
       button.className = options.primary ? 'btn btn-primary' : 'btn';
-      if (options.href) {
-        button.href = options.href;
-      } else {
-        button.type = 'button';
-        button.addEventListener('click', onClick);
-      }
+      button.type = 'button';
+      button.addEventListener('click', onClick);
       if (options.logo) {
         const img = document.createElement('img');
         img.src = options.logo;
@@ -1582,14 +1571,6 @@
               });
             },
             { action: 'smaller-plan' }
-          ));
-        }
-
-        if (packOffer?.url) {
-          buttons.push(declineButton(
-            withAmount(i18n.decline_buy_pack, { pack: String(packOffer.name || ''), amount: String(packOffer.amount || '') }),
-            null,
-            { href: packOffer.url, action: 'pack' }
           ));
         }
       }

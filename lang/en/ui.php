@@ -612,7 +612,6 @@ return [
         'decline_smaller_plan' => 'Choose :plan · :amount',
         'decline_amount_month' => ':amount a month',
         'decline_amount_year' => ':amount a year',
-        'decline_buy_pack' => 'Buy :pack · :amount',
         'decline_other_card' => 'Use another card',
         'decline_check_card' => 'Check the card details',
         'decline_try_again_button' => 'Try again',

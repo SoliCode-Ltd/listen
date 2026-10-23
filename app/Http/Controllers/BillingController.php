@@ -10,7 +10,6 @@ use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\CardDecline;
-use App\Services\Billing\CharPackService;
 use App\Services\Billing\RenewalGrace;
 use App\Services\Billing\SavedPaymentMethodRecorder;
 use App\Services\Billing\StripePricePlans;
@@ -47,7 +46,6 @@ class BillingController extends Controller
         private readonly SavedPaymentMethodRecorder $savedCards,
         private readonly TrialOutcomeService $trialOutcomes,
         private readonly StripePricePlans $stripePrices,
-        private readonly CharPackService $packs,
     ) {}
 
     public function index(Request $request)
@@ -87,31 +85,7 @@ class BillingController extends Controller
             // On a paid plan, another plan costs the difference today (the order details say how much).
             'paidPlanChange' => $stripeReady && $subscription && $subscription->valid() && ! $subscription->onTrial(),
             'paymentOverdueNotice' => $this->overdueRenewalNotice($user),
-            'packOffer' => $this->packOffer($user),
         ]);
-    }
-
-    /**
-     * The pack a member without a paid plan can buy instead, offered when a
-     * card has too little money for a plan. Null when they cannot buy one.
-     *
-     * @return array{name:string, amount:string, url:string}|null
-     */
-    private function packOffer(User $user): ?array
-    {
-        $pack = $this->packs->offeredPack();
-        if (! $pack || ! $this->packs->canBuy($user, $pack)) {
-            return null;
-        }
-
-        $locale = app()->getLocale();
-
-        // In US dollars, like the plans offered beside it: what a card is charged.
-        return [
-            'name' => (string) ($pack->getLocalizedName($locale) ?: $pack->name),
-            'amount' => $this->localizedPricingService->formatAmount(max(0, (int) $pack->getEffectivePriceCents()), 'USD', $locale),
-            'url' => route('billing.pack'),
-        ];
     }
 
     /**
