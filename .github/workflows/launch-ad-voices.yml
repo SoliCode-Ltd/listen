@@ -141,7 +141,7 @@ jobs:
           if [ "$AD" = voice-previews ]; then git add public/audio/voice-previews; else git add "marketing/$AD/voices"; fi
           if git diff --cached --quiet; then echo "Nothing new"; exit 0; fi
           git diff --cached --stat
-          if [ "$AD" = voice-previews ]; then msg="Voice previews: clips made with staging key 1"; else msg="$AD: voices made with staging key 1, with word timings"; fi
+          if [ "$AD" = voice-previews ]; then msg="Voice previews: clips made with the staging keys"; else msg="$AD: voices made with staging key 1, with word timings"; fi
           git commit -m "$msg"
           git pull --rebase origin "${GITHUB_REF#refs/heads/}"
           git push origin HEAD:${GITHUB_REF#refs/heads/}
