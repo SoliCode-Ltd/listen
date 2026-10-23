@@ -598,6 +598,24 @@ return [
         // Card checkout: when the card form cannot load, and the local price beside the dollar amount.
         'card_form_unavailable' => "The card payment form couldn't load. Check your connection, then reload the page to try again.",
         'card_local_about' => 'Charged in US dollars, about :amount',
+
+        // A card the bank refused (App\Services\Billing\CardDecline): what happened, then what to do.
+        'decline_no_funds' => "Your card doesn't have enough money for this payment, so nothing was charged. Top up the card and try again, or choose another option below.",
+        'decline_card_details' => "The card details don't match your bank's records, so nothing was charged. Check the card number, expiry date and CVC, then try again.",
+        'decline_try_again' => "Your bank couldn't confirm the payment just now, so nothing was charged. Wait a minute, then try again.",
+        'decline_refused' => "Your bank didn't allow this payment, so nothing was charged. Many banks block online payments in US dollars: ask your bank to allow them, or choose another option below.",
+        'decline_still_on_plan' => "You're still on :plan.",
+        'decline_trial_continues' => 'Your free trial continues until :date.',
+        'decline_options_title' => 'What you can do now',
+        'decline_pay_with' => 'Pay with :method',
+        'decline_pay_monthly' => 'Pay monthly instead · :amount',
+        'decline_smaller_plan' => 'Choose :plan · :amount',
+        'decline_amount_month' => ':amount a month',
+        'decline_amount_year' => ':amount a year',
+        'decline_buy_pack' => 'Buy :pack · :amount',
+        'decline_other_card' => 'Use another card',
+        'decline_check_card' => 'Check the card details',
+        'decline_try_again_button' => 'Try again',
     ],
 
     // ===== MANAGE SUBSCRIPTION PAGE =====
@@ -1647,9 +1665,6 @@ return [
         'account_blocked_with_reason' => 'Your account is currently blocked from accessing Listen. Reason: :reason. If you would like to request access again, please contact :email.',
         'translation_failed' => "The translation couldn't be made right now, so nothing was read and no characters were used. Please try again, or turn off translation and write the text in the voice's language.",
         'cloned_voice_daily_limit' => 'Cloned voices are in very high demand today. Please try again later, or use one of the studio voices for now.',
-        'billing_card_declined' => 'Your card was declined, so nothing was charged. Please try another card.',
-        'billing_trial_upgrade_declined' => 'Your card was declined, so nothing was charged and your free trial continues until :date.',
-        'billing_plan_change_declined' => "Your card was declined, so nothing was charged and you're still on :plan. Please try another card.",
         'billing_already_on_trial' => "You're already on the :plan free trial until :date. Nothing is charged until then, and you can cancel before it ends.",
         'billing_trial_end_confirm' => "You're on a free trial until :date. Switching to :plan now ends your trial and charges your card today. Continue?",
         'performance_style_required' => 'Choose a performance style to continue.',

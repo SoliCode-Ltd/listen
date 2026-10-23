@@ -598,6 +598,24 @@ return [
         // Card checkout: when the card form cannot load, and the local price beside the dollar amount.
         'card_form_unavailable' => 'تعذّر تحميل نموذج الدفع بالبطاقة. تحقّق من اتصالك، ثم أعد تحميل الصفحة وحاول مرة أخرى.',
         'card_local_about' => 'يُخصم بالدولار الأمريكي، أي نحو :amount',
+
+        // A card the bank refused (App\Services\Billing\CardDecline): what happened, then what to do.
+        'decline_no_funds' => 'لا يوجد رصيد كافٍ في بطاقتك لهذا الدفع، لذلك لم يُخصم أي مبلغ. اشحن البطاقة وحاول مرة أخرى، أو اختر خياراً آخر بالأسفل.',
+        'decline_card_details' => 'بيانات البطاقة لا تطابق ما لدى البنك، لذلك لم يُخصم أي مبلغ. تحقّق من رقم البطاقة وتاريخ الانتهاء ورمز التحقق (CVC)، ثم حاول مرة أخرى.',
+        'decline_try_again' => 'تعذّر على البنك تأكيد الدفع الآن، لذلك لم يُخصم أي مبلغ. انتظر دقيقة ثم حاول مرة أخرى.',
+        'decline_refused' => 'لم يسمح البنك بهذا الدفع، لذلك لم يُخصم أي مبلغ. كثير من البنوك تمنع الدفع الإلكتروني بالدولار الأمريكي: اطلب من البنك تفعيله، أو اختر خياراً آخر بالأسفل.',
+        'decline_still_on_plan' => 'ما زلت على خطة :plan.',
+        'decline_trial_continues' => 'تستمر فترتك التجريبية المجانية حتى :date.',
+        'decline_options_title' => 'ما يمكنك فعله الآن',
+        'decline_pay_with' => 'ادفع عبر :method',
+        'decline_pay_monthly' => 'ادفع شهرياً بدلاً من ذلك · :amount',
+        'decline_smaller_plan' => 'اختر خطة :plan · :amount',
+        'decline_amount_month' => ':amount شهرياً',
+        'decline_amount_year' => ':amount سنوياً',
+        'decline_buy_pack' => 'اشترِ :pack · :amount',
+        'decline_other_card' => 'استخدم بطاقة أخرى',
+        'decline_check_card' => 'تحقّق من بيانات البطاقة',
+        'decline_try_again_button' => 'حاول مرة أخرى',
     ],
 
     // ===== MANAGE SUBSCRIPTION PAGE =====
@@ -1650,9 +1668,6 @@ return [
         'account_blocked_with_reason' => 'حسابك محظور حالياً من الوصول إلى منصة إسمع. سبب الحظر: :reason. إذا كنت ترغب في طلب إعادة التفعيل، يرجى التواصل عبر :email.',
         'translation_failed' => 'تعذّرت الترجمة الآن، لذلك لم يُقرأ النص ولم تُحتسب أي أحرف. حاول مرة أخرى، أو أوقف الترجمة واكتب النص بلغة الصوت.',
         'cloned_voice_daily_limit' => 'تشهد الأصوات المستنسخة إقبالاً كبيراً اليوم. يُرجى المحاولة مرة أخرى لاحقاً، أو استخدام أحد أصوات الاستوديو في الوقت الحالي.',
-        'billing_card_declined' => 'تم رفض البطاقة، لذلك لم يتم خصم أي مبلغ. يرجى تجربة بطاقة أخرى.',
-        'billing_trial_upgrade_declined' => 'تم رفض البطاقة، لذلك لم يتم خصم أي مبلغ وتستمر الفترة التجريبية المجانية حتى :date.',
-        'billing_plan_change_declined' => 'تم رفض البطاقة، لذلك لم يتم خصم أي مبلغ وما زلت على خطة :plan. يرجى تجربة بطاقة أخرى.',
         'billing_already_on_trial' => 'أنت بالفعل في الفترة التجريبية المجانية لخطة :plan حتى :date. لن يتم خصم أي مبلغ حتى ذلك الحين، ويمكنك الإلغاء قبل انتهائها.',
         'billing_trial_end_confirm' => 'أنت في الفترة التجريبية المجانية حتى :date. الانتقال إلى خطة :plan الآن ينهي الفترة التجريبية ويخصم المبلغ من بطاقتك اليوم. هل تريد المتابعة؟',
         'performance_style_required' => 'اختر أسلوب الأداء للمتابعة.',
