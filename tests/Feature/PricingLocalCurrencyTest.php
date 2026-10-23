@@ -35,14 +35,14 @@ class PricingLocalCurrencyTest extends TestCase
         ]);
     }
 
-    public function test_local_prices_say_they_are_a_guide_and_show_only_the_local_price(): void
+    public function test_local_prices_show_only_the_local_price_with_no_currency_note(): void
     {
         SiteSetting::set('pricing_forced_country_code', 'MX', 'billing');
         Http::fake(['https://open.er-api.com/*' => Http::response(['result' => 'success', 'rates' => ['USD' => 1, 'MXN' => 18.4575]])]);
 
         foreach (['en', 'ar'] as $locale) {
             $this->pricingPage($locale)
-                ->assertSee(__('ui.pricing.currency_note', ['currency' => 'MXN'], $locale))
+                ->assertDontSee('class="currency-note"', false)
                 ->assertSee($this->formatted(7383, 'MXN', $locale))
                 // Only the visitor's own currency on the cards: no dollar price beside it.
                 ->assertDontSee('class="price-usd"', false);
@@ -92,7 +92,6 @@ class PricingLocalCurrencyTest extends TestCase
                 ->assertSee('data-display-manual="1"', false)
                 ->assertDontSee($locale === 'ar' ? 'الأسعار بالجنيه المصري' : 'Prices in EGP')
                 ->assertDontSee('class="currency-note"', false)
-                ->assertDontSee(__('ui.pricing.currency_note', ['currency' => 'EGP'], $locale))
                 ->assertDontSee('class="price-usd"', false);
         }
     }
