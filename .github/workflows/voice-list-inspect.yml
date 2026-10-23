@@ -3,7 +3,8 @@ name: Voice list inspect
 # Read-only: every voice in the studio's library on LIVE or STAGING (name,
 # language, gender, engine voice, dialect, avatar, preview file), one JSON line
 # each. Pipes scripts/support/voice_list_inspect.php over SSH into the app's own
-# PHP (READ ONLY database session). Nothing is written.
+# PHP (READ ONLY database session). Nothing is written. A push that changes
+# this workflow or the script runs it on LIVE.
 
 on:
   workflow_dispatch:
@@ -13,6 +14,11 @@ on:
         type: choice
         options: [live, staging]
         default: live
+  push:
+    branches: [claude/beautiful-sagan-df90b3]
+    paths:
+      - .github/workflows/voice-list-inspect.yml
+      - scripts/support/voice_list_inspect.php
 
 permissions:
   contents: read
