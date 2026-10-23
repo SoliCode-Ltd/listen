@@ -3,6 +3,8 @@
 namespace App\Services\Analytics;
 
 use App\Models\Plan;
+use App\Models\SiteSetting;
+use App\Services\Billing\StripePricePlans;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -35,6 +37,12 @@ class BusinessStatsService
     /** @var array<string, bool> */
     private array $schemaCache = [];
 
+    /** Members whose paid plan is on now, for this snapshot (planHolders()). */
+    private ?Collection $holders = null;
+
+    /** The card subscriptions per plan, from the revenue section, for the plans table. */
+    private array $cardsByPlan = [];
+
     public static function normalizeMonths(mixed $months): int
     {
         $months = (int) $months;
@@ -45,7 +53,7 @@ class BusinessStatsService
     public function snapshot(int $months = self::DEFAULT_MONTHS, bool $fresh = false): array
     {
         $months = self::normalizeMonths($months);
-        $key = "business_stats:v2:{$months}";
+        $key = "business_stats:v3:{$months}";
 
         if ($fresh) {
             Cache::forget($key);
@@ -57,8 +65,9 @@ class BusinessStatsService
     public function forget(): void
     {
         foreach (self::PERIODS as $months) {
-            Cache::forget("business_stats:v2:{$months}");
+            Cache::forget("business_stats:v3:{$months}");
         }
+        StripeRecurringRevenue::forget();
     }
 
     public function build(int $months = self::DEFAULT_MONTHS): array
@@ -66,6 +75,8 @@ class BusinessStatsService
         $this->driver = DB::connection()->getDriverName();
         $this->now = Carbon::now();
         $this->since = $this->now->copy()->subMonths($months - 1)->startOfMonth();
+        $this->holders = null;
+        $this->cardsByPlan = [];
 
         $snapshot = [
             'meta' => [
@@ -242,30 +253,43 @@ class BusinessStatsService
         return $data;
     }
 
+    /**
+     * Who pays, and how much comes in each month.
+     *
+     * Paying members are the members whose paid plan is on right now and was
+     * paid for, by card or by InstaPay / Vodafone Cash; members in a free
+     * trial and plans an admin gave without a payment are counted beside them,
+     * never as paying. MRR is what the card subscriptions really charge
+     * (after discounts, at the price each member kept), read from Stripe;
+     * only when Stripe cannot be read is it estimated from the plans' list
+     * prices, and the dashboard says so.
+     */
     private function revenue(): array
     {
         $memberIds = $this->memberQuery()->select('id');
+        $members = $this->memberQuery()->count();
+        $holders = $this->planHolders();
+        $kinds = array_merge(['card' => 0, 'manual' => 0, 'trial' => 0, 'granted' => 0], $holders->countBy('kind')->all());
+        $paying = $kinds['card'] + $kinds['manual'];
 
-        // App-side plan assignment covers Stripe and manual (InstaPay) customers alike.
-        $onPlan = $this->pairs(
-            DB::table('subscriptions')
-                ->join('plans', 'plans.id', '=', 'subscriptions.plan_id')
-                ->whereIn('subscriptions.user_id', $memberIds)
-                ->where('subscriptions.status', 'active'),
-            'plans.name'
-        );
-        $freeName = Plan::query()->where('price_cents', 0)->pluck('name')->all();
-        $paidMembers = collect($onPlan)->except($freeName)->sum();
+        $planNames = Plan::query()->pluck('name', 'id');
+        $freeName = (string) (Plan::query()->where('price_cents', 0)->orderBy('id')->value('name') ?: 'Free');
+        $byPlan = $holders->countBy(fn (array $h) => (string) ($planNames[$h['plan_id']] ?? 'Unknown plan'))->sortDesc()->all();
 
         $data = [
-            'members_on_paid_plans' => $paidMembers,
-            'paid_conversion' => $this->ratio($paidMembers, max(1, $this->memberQuery()->count())),
-            'members_by_plan' => $onPlan,
+            'members_on_paid_plans' => $paying,
+            'paid_conversion' => $this->ratio($paying, max(1, $members)),
+            'plan_holders' => $kinds,
+            'members_by_plan' => [$freeName => max(0, $members - $holders->count())] + $byPlan,
             'stripe_by_status' => [],
             'paying_stripe' => 0,
             'paying_by_plan' => [],
             'mrr_cents' => 0,
+            'mrr_source' => 'none',
             'unmapped_prices' => 0,
+            'arpu_cents' => 0,
+            'canceled_30d' => 0,
+            'recurring' => null,
         ];
 
         if (! $this->hasTable('billing_subscriptions')) {
@@ -277,7 +301,42 @@ class BusinessStatsService
             'stripe_status'
         );
 
-        $priceMap = $this->stripePriceMap();
+        $recurring = StripeRecurringRevenue::configured() ? app(StripeRecurringRevenue::class)->summary() : null;
+        if ($recurring['ok'] ?? false) {
+            // Members pay now on subscriptions that renew, and on ones that run until their paid time ends.
+            $data['recurring'] = $recurring;
+            $data['mrr_source'] = 'stripe';
+            $data['paying_stripe'] = $recurring['kinds']['renewing']['count'] + $recurring['kinds']['cancelling']['count'];
+            $data['mrr_cents'] = (int) (($recurring['kinds']['renewing']['monthly_cents']['usd'] ?? 0)
+                + ($recurring['kinds']['cancelling']['monthly_cents']['usd'] ?? 0));
+            foreach ($recurring['by_plan'] as $row) {
+                $count = $row['renewing'] + $row['cancelling'];
+                $data['paying_by_plan'][$row['plan'].' ('.$row['cycle'].')'] = $count;
+                $this->addCards($row['plan_id'], $row['plan'], $row['cycle'], $count, (int) ($row['monthly_cents']['usd'] ?? 0));
+            }
+        } else {
+            $data['recurring_error'] = $recurring['error'] ?? 'Stripe is not configured.';
+            $data = array_merge($data, $this->listPriceMrr($memberIds));
+        }
+        arsort($data['paying_by_plan']);
+
+        $data['arpu_cents'] = $data['paying_stripe'] > 0 ? (int) round($data['mrr_cents'] / $data['paying_stripe']) : 0;
+        $data['canceled_30d'] = $this->endedPaidSubscriptions()
+            ->whereBetween('billing_subscriptions.ends_at', [$this->now->copy()->subDays(30), $this->now])
+            ->count();
+
+        return $data;
+    }
+
+    /**
+     * When Stripe cannot be read: the local copy of the card subscriptions at
+     * their plans' list prices. Old prices still count for their plan; a
+     * subscription set to cancel counts until it ends. Discounts are not known here.
+     */
+    private function listPriceMrr(Builder $memberIds): array
+    {
+        $prices = app(StripePricePlans::class);
+        $data = ['mrr_source' => 'list_price', 'mrr_cents' => 0, 'paying_stripe' => 0, 'paying_by_plan' => [], 'unmapped_prices' => 0];
         $paying = DB::table('billing_subscriptions')
             ->whereIn('user_id', $memberIds)
             ->whereIn('stripe_status', ['active', 'past_due'])
@@ -285,26 +344,150 @@ class BusinessStatsService
             ->pluck('stripe_price');
 
         foreach ($paying as $price) {
-            if (! isset($priceMap[$price])) {
+            $match = rescue(fn () => $prices->planFor((string) $price), null, false);
+            $data['paying_stripe']++;
+            if (! $match) {
                 $data['unmapped_prices']++;
+                $this->addCards(null, 'Unknown price', 'monthly', 1, 0);
 
                 continue;
             }
-            [$name, $cycle, $monthlyCents] = $priceMap[$price];
-            $label = "{$name} ({$cycle})";
+            $plan = $match['plan'];
+            $monthly = $match['cycle'] === 'yearly'
+                ? (int) round(((int) $plan->price_cents * 12 * (100 - SiteSetting::yearlyDiscountPercent()) / 100) / 12)
+                : (int) $plan->price_cents;
+            $label = "{$plan->name} ({$match['cycle']})";
             $data['paying_by_plan'][$label] = ($data['paying_by_plan'][$label] ?? 0) + 1;
-            $data['mrr_cents'] += $monthlyCents;
+            $data['mrr_cents'] += $monthly;
+            $this->addCards((int) $plan->id, (string) $plan->name, $match['cycle'], 1, $monthly);
         }
-        arsort($data['paying_by_plan']);
-
-        $data['paying_stripe'] = $paying->count();
-        $data['arpu_cents'] = $data['paying_stripe'] > 0 ? (int) round($data['mrr_cents'] / $data['paying_stripe']) : 0;
-        $data['canceled_30d'] = DB::table('billing_subscriptions')->whereIn('user_id', $memberIds)
-            ->whereNotNull('ends_at')
-            ->whereBetween('ends_at', [$this->now->copy()->subDays(30), $this->now])
-            ->count();
 
         return $data;
+    }
+
+    /**
+     * Card subscriptions for the plans table: per plan (or per price no plan
+     * knows), how many monthly and yearly, and what they bring each month.
+     */
+    private function addCards(?int $planId, string $name, string $cycle, int $count, int $monthlyCents): void
+    {
+        $key = $planId ?? 'other:'.$name;
+        $row = &$this->cardsByPlan[$key];
+        $row ??= ['name' => $name, 'monthly' => 0, 'yearly' => 0, 'mrr' => 0];
+        $row[$cycle === 'yearly' ? 'yearly' : 'monthly'] += $count;
+        $row['mrr'] += $monthlyCents;
+        unset($row);
+    }
+
+    /**
+     * Members whose paid plan is on right now, decided the way the app decides
+     * it (PlanAccessService): their plan row is active and its period has not
+     * ended, or a card subscription is still running for them, or a refused
+     * renewal is in its grace days. Each is paid by card, paid by InstaPay /
+     * Vodafone Cash, in a free trial, or given by an admin without a payment.
+     *
+     * @return Collection<int, array{plan_id: int, kind: string}> keyed by user id
+     */
+    private function planHolders(): Collection
+    {
+        if ($this->holders !== null) {
+            return $this->holders;
+        }
+
+        $now = $this->now;
+        $running = fn (array $statuses) => DB::table('billing_subscriptions')
+            ->whereIn('stripe_status', $statuses)
+            ->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>', $now));
+        $hasCards = $this->hasTable('billing_subscriptions');
+
+        $rows = DB::table('subscriptions')
+            ->join('plans', 'plans.id', '=', 'subscriptions.plan_id')
+            ->whereIn('subscriptions.user_id', $this->memberQuery()->select('id'))
+            ->whereIn('subscriptions.id', DB::table('subscriptions')->selectRaw('max(id)')->groupBy('user_id'))
+            ->where('subscriptions.status', 'active')
+            ->where('plans.price_cents', '>', 0)
+            ->where(function ($q) use ($now, $running, $hasCards) {
+                $q->whereNull('subscriptions.current_period_end')
+                    ->orWhere('subscriptions.current_period_end', '>=', $now)
+                    ->orWhere(fn ($grace) => $grace->where('subscriptions.billing_payment_state', 'past_due')
+                        ->where('subscriptions.billing_grace_ends_at', '>', $now));
+                if ($hasCards) {
+                    $q->orWhereIn('subscriptions.user_id', $running(['active', 'trialing', 'past_due'])->select('user_id'));
+                }
+            })
+            ->get(['subscriptions.user_id', 'subscriptions.plan_id']);
+
+        $card = $hasCards ? $running(['active', 'past_due'])->pluck('user_id')->flip() : collect();
+        $trial = ($hasCards ? $running(['trialing'])->pluck('user_id') : collect())
+            ->merge($this->hasTable('billing_trials')
+                ? DB::table('billing_trials')->where('status', 'trialing')->whereNull('paid_at')->where('trial_ends_at', '>', $now)->pluck('user_id')
+                : [])
+            ->flip();
+        $manual = $this->hasTable('manual_payment_requests')
+            ? DB::table('manual_payment_requests')->where('status', 'approved')->get(['user_id', 'plan_id'])
+                ->map(fn ($r) => $r->user_id.':'.$r->plan_id)->flip()
+            : collect();
+
+        return $this->holders = $rows->mapWithKeys(fn ($r) => [(int) $r->user_id => [
+            'plan_id' => (int) $r->plan_id,
+            'kind' => match (true) {
+                isset($card[$r->user_id]) => 'card',
+                isset($trial[$r->user_id]) => 'trial',
+                isset($manual[$r->user_id.':'.$r->plan_id]) => 'manual',
+                default => 'granted',
+            },
+        ]]);
+    }
+
+    /**
+     * Card subscriptions that were paid for and have ended: not a checkout
+     * whose first payment failed, and not a free trial cancelled before it charged.
+     */
+    private function endedPaidSubscriptions(): Builder
+    {
+        return $this->paidCardSubscriptions()->whereNotNull('billing_subscriptions.ends_at')
+            ->where('billing_subscriptions.ends_at', '<=', $this->now);
+    }
+
+    /**
+     * Card subscriptions that took a payment: every one except checkouts whose
+     * first payment failed and free trials that ended without charging.
+     */
+    private function paidCardSubscriptions(): Builder
+    {
+        $query = DB::table('billing_subscriptions')
+            ->whereIn('billing_subscriptions.user_id', $this->memberQuery()->select('id'))
+            ->whereNotIn('billing_subscriptions.stripe_status', ['incomplete', 'incomplete_expired']);
+
+        if ($this->hasTable('billing_trials')) {
+            $query->whereNotExists(fn ($q) => $q->selectRaw('1')->from('billing_trials')
+                ->whereColumn('billing_trials.stripe_subscription_id', 'billing_subscriptions.stripe_id')
+                ->whereNull('billing_trials.paid_at'));
+        }
+
+        return $query;
+    }
+
+    /**
+     * Members who have paid at least once: a card subscription that charged,
+     * a paid trial, or an approved InstaPay / Vodafone Cash payment.
+     *
+     * @return Collection<int, true> keyed by user id
+     */
+    private function everPaidMembers(): Collection
+    {
+        $ids = $this->planHolders()->filter(fn (array $h) => in_array($h['kind'], ['card', 'manual'], true))->keys();
+        if ($this->hasTable('billing_subscriptions')) {
+            $ids = $ids->merge($this->paidCardSubscriptions()->pluck('billing_subscriptions.user_id'));
+        }
+        if ($this->hasTable('billing_trials')) {
+            $ids = $ids->merge(DB::table('billing_trials')->whereNotNull('paid_at')->pluck('user_id'));
+        }
+        if ($this->hasTable('manual_payment_requests')) {
+            $ids = $ids->merge(DB::table('manual_payment_requests')->where('status', 'approved')->pluck('user_id'));
+        }
+
+        return $ids->map(fn ($id) => (int) $id)->unique()->flip()->map(fn () => true);
     }
 
     private function trials(): array
@@ -365,9 +548,14 @@ class BusinessStatsService
                 ->where('created_at', '>=', $this->now->copy()->subDays(30))->count();
             $data['demo_visitors'] = DB::table('demo_voice_generations')->distinct()->count('primary_identity_hash');
             if ($this->hasColumn('demo_voice_generations', 'user_id')) {
-                $data['demo_visitors_signed_up'] = DB::table('demo_voice_generations')
-                    ->whereNotNull('user_id')->distinct()->count('primary_identity_hash');
-                $data['demo_signup_rate'] = $this->ratio($data['demo_visitors_signed_up'], $data['demo_visitors']);
+                // The demo needs an account, so the step that matters is demo to a payment.
+                $demoMembers = DB::table('demo_voice_generations')
+                    ->whereIn('user_id', $this->memberQuery()->select('id'))
+                    ->distinct()->pluck('user_id')->map(fn ($id) => (int) $id);
+                $paid = $this->everPaidMembers();
+                $data['demo_members'] = $demoMembers->count();
+                $data['demo_members_paid'] = $demoMembers->filter(fn (int $id) => isset($paid[$id]))->count();
+                $data['demo_paid_rate'] = $this->ratio($data['demo_members_paid'], $data['demo_members']);
             }
         }
 
@@ -447,8 +635,14 @@ class BusinessStatsService
 
         $memberIds = $this->memberQuery()->select('id');
         if ($this->hasTable('billing_subscriptions')) {
-            $fill(DB::table('billing_subscriptions')->whereIn('user_id', $memberIds), 'created_at', ['stripe_started' => 'count(*)']);
-            $fill(DB::table('billing_subscriptions')->whereIn('user_id', $memberIds)->where('ends_at', '<=', $this->now), 'ends_at', ['stripe_ended' => 'count(*)']);
+            // Bought straight away (a trial that paid is counted under trials_paid), and paid ones that ended.
+            $bought = $this->paidCardSubscriptions();
+            if ($this->hasTable('billing_trials')) {
+                $bought->whereNotExists(fn ($q) => $q->selectRaw('1')->from('billing_trials')
+                    ->whereColumn('billing_trials.stripe_subscription_id', 'billing_subscriptions.stripe_id'));
+            }
+            $fill($bought, 'billing_subscriptions.created_at', ['stripe_started' => 'count(*)']);
+            $fill($this->endedPaidSubscriptions(), 'billing_subscriptions.ends_at', ['stripe_ended' => 'count(*)']);
         }
         if ($this->hasTable('billing_trials')) {
             $trials = fn () => DB::table('billing_trials')->where('is_admin_test', false)->whereIn('user_id', $memberIds);
@@ -560,13 +754,11 @@ class BusinessStatsService
                 ->where('audio_generations.created_at', '>=', $this->now->copy()->subDays(30))
                 ->selectRaw("coalesce(users.country_code, '') as c, count(distinct audio_generations.user_id) as n")
                 ->groupBy('c')->pluck('n', 'c');
-            $paying = DB::table('subscriptions')
-                ->join('plans', 'plans.id', '=', 'subscriptions.plan_id')
-                ->join('users', 'users.id', '=', 'subscriptions.user_id')
-                ->where('subscriptions.status', 'active')
-                ->where('plans.price_cents', '>', 0)
-                ->when($this->hasColumn('users', 'is_admin'), fn ($q) => $q->where('users.is_admin', false))
-                ->selectRaw("coalesce(users.country_code, '') as c, count(distinct users.id) as n")
+            // Paying members only (card or InstaPay / Vodafone Cash), as in the revenue section.
+            $payingIds = $this->planHolders()->filter(fn (array $h) => in_array($h['kind'], ['card', 'manual'], true))->keys()->all();
+            $paying = $this->memberQuery()
+                ->whereIn('users.id', $payingIds ?: [0])
+                ->selectRaw("coalesce(users.country_code, '') as c, count(*) as n")
                 ->groupBy('c')->pluck('n', 'c');
 
             $rows = [];
@@ -629,42 +821,50 @@ class BusinessStatsService
         return $data;
     }
 
+    /**
+     * Each plan: who is on it now, who pays for it, its card subscriptions and
+     * what they bring each month (from the revenue section: Stripe, or the
+     * list-price estimate when Stripe cannot be read).
+     */
     private function plans(): array
     {
-        $memberIds = $this->memberQuery()->select('id');
-        $onPlan = DB::table('subscriptions')
-            ->whereIn('user_id', $memberIds)
-            ->where('status', 'active')
-            ->selectRaw('plan_id, count(*) as n')
-            ->groupBy('plan_id')
-            ->pluck('n', 'plan_id');
+        $holders = $this->planHolders();
+        $members = $this->memberQuery()->count();
 
-        $priceMap = $this->stripePriceMap();
-        $stripeByPlan = [];
-        if ($this->hasTable('billing_subscriptions')) {
-            $paying = DB::table('billing_subscriptions')
-                ->whereIn('user_id', $memberIds)
-                ->whereIn('stripe_status', ['active', 'past_due'])
-                ->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>', $this->now))
-                ->pluck('stripe_price');
-            foreach ($paying as $price) {
-                if (isset($priceMap[$price])) {
-                    [, $cycle, $monthlyCents, $planId] = $priceMap[$price];
-                    $stripeByPlan[$planId][$cycle] = ($stripeByPlan[$planId][$cycle] ?? 0) + 1;
-                    $stripeByPlan[$planId]['mrr'] = ($stripeByPlan[$planId]['mrr'] ?? 0) + $monthlyCents;
-                }
+        $cards = $this->cardsByPlan;
+
+        $rows = Plan::query()->subscriptionPlans()->orderBy('price_cents')->get()->map(function (Plan $plan) use ($holders, $members, $cards) {
+            $on = $holders->where('plan_id', $plan->id);
+
+            return [
+                'plan' => $plan->name,
+                'active' => (bool) $plan->is_active,
+                'price_monthly_usd' => round(((int) $plan->price_cents) / 100, 2),
+                'members' => (int) $plan->price_cents > 0 ? $on->count() : max(0, $members - $holders->count()),
+                'paying' => $on->whereIn('kind', ['card', 'manual'])->count(),
+                'stripe_monthly' => (int) ($cards[$plan->id]['monthly'] ?? 0),
+                'stripe_yearly' => (int) ($cards[$plan->id]['yearly'] ?? 0),
+                'mrr_usd' => round(((int) ($cards[$plan->id]['mrr'] ?? 0)) / 100, 2),
+            ];
+        })->values();
+
+        // Card subscriptions on a price no plan knows: listed, never dropped.
+        foreach ($cards as $key => $card) {
+            if (is_string($key)) {
+                $rows->push([
+                    'plan' => $card['name'].' (price not linked to a plan)',
+                    'active' => false,
+                    'price_monthly_usd' => null,
+                    'members' => 0,
+                    'paying' => 0,
+                    'stripe_monthly' => (int) ($card['monthly'] ?? 0),
+                    'stripe_yearly' => (int) ($card['yearly'] ?? 0),
+                    'mrr_usd' => round(((int) ($card['mrr'] ?? 0)) / 100, 2),
+                ]);
             }
         }
 
-        return Plan::query()->orderBy('price_cents')->get()->map(fn (Plan $plan) => [
-            'plan' => $plan->name,
-            'active' => (bool) $plan->is_active,
-            'price_monthly_usd' => round(((int) $plan->price_cents) / 100, 2),
-            'members' => (int) ($onPlan[$plan->id] ?? 0),
-            'stripe_monthly' => (int) ($stripeByPlan[$plan->id]['monthly'] ?? 0),
-            'stripe_yearly' => (int) ($stripeByPlan[$plan->id]['yearly'] ?? 0),
-            'mrr_usd' => round(((int) ($stripeByPlan[$plan->id]['mrr'] ?? 0)) / 100, 2),
-        ])->values()->all();
+        return $rows->all();
     }
 
     // ---------------------------------------------------------------------
@@ -689,27 +889,6 @@ class BusinessStatsService
         }
 
         return $query;
-    }
-
-    /**
-     * Stripe price id => [plan name, cycle, monthly-equivalent cents, plan id].
-     *
-     * @return array<string, array{0: string, 1: string, 2: int, 3: int}>
-     */
-    private function stripePriceMap(): array
-    {
-        $map = [];
-        foreach (Plan::all() as $plan) {
-            if ($plan->stripe_price_monthly) {
-                $map[$plan->stripe_price_monthly] = [$plan->name, 'monthly', (int) $plan->price_cents, $plan->id];
-            }
-            if ($plan->stripe_price_yearly) {
-                $yearly = rescue(fn () => $plan->getEffectiveYearlyPriceCents(), (int) $plan->price_cents * 12, false);
-                $map[$plan->stripe_price_yearly] = [$plan->name, 'yearly', (int) round($yearly / 12), $plan->id];
-            }
-        }
-
-        return $map;
     }
 
     /**

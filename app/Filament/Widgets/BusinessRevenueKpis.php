@@ -34,21 +34,32 @@ class BusinessRevenueKpis extends BaseWidget
         $manualTotals = collect($manual['approved_by_currency'] ?? [])
             ->map(fn ($amount, $currency) => $currency.' '.number_format($amount, 2))
             ->implode(' · ');
+        $holders = $revenue['plan_holders'] ?? [];
+        $fromStripe = ($revenue['mrr_source'] ?? '') === 'stripe';
 
         return [
-            Stat::make('Est. MRR', static::money($mrr))
-                ->description('ARR '.static::money($mrr * 12).' · Stripe list prices')
+            Stat::make($fromStripe ? 'MRR' : 'MRR (estimate)', static::money($mrr))
+                ->description($fromStripe
+                    ? 'ARR '.static::money($mrr * 12).' · what card plans charge after discounts, incl. cancelled ones until they end'
+                    : 'Stripe could not be read: plans\' list prices, before discounts')
                 ->descriptionIcon('heroicon-m-banknotes')
-                ->color('success'),
-            Stat::make('Paying Stripe subscriptions', number_format($revenue['paying_stripe'] ?? 0))
+                ->color($fromStripe ? 'success' : 'warning'),
+            Stat::make('Paid card subscriptions', number_format($revenue['paying_stripe'] ?? 0))
                 ->description('ARPU '.static::money($revenue['arpu_cents'] ?? 0).' / month')
                 ->descriptionIcon('heroicon-m-credit-card')
                 ->chart($monthly->pluck('stripe_started')->all()),
-            Stat::make('Members on paid plans', number_format($revenue['members_on_paid_plans'] ?? 0))
-                ->description(static::percent($revenue['paid_conversion'] ?? 0).' free-to-paid conversion · Stripe + manual')
+            Stat::make('Paying members', number_format($revenue['members_on_paid_plans'] ?? 0))
+                ->description(sprintf(
+                    '%s of members · %s card · %s InstaPay / Vodafone Cash · not counted: %s in trial, %s given free',
+                    static::percent($revenue['paid_conversion'] ?? 0),
+                    number_format($holders['card'] ?? 0),
+                    number_format($holders['manual'] ?? 0),
+                    number_format($holders['trial'] ?? 0),
+                    number_format($holders['granted'] ?? 0),
+                ))
                 ->descriptionIcon('heroicon-m-arrow-up-circle'),
-            Stat::make('Subscriptions ended (30 days)', number_format($revenue['canceled_30d'] ?? 0))
-                ->description('Stripe subscriptions that ended')
+            Stat::make('Paid subscriptions ended (30 days)', number_format($revenue['canceled_30d'] ?? 0))
+                ->description('Card plans that were paid for and ended · failed checkouts and unpaid trials not counted')
                 ->descriptionIcon('heroicon-m-arrow-down-circle')
                 ->color(($revenue['canceled_30d'] ?? 0) > 0 ? 'danger' : 'gray'),
             Stat::make('Open trials', number_format($trials['open'] ?? 0))

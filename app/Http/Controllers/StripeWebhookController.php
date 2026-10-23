@@ -94,6 +94,11 @@ class StripeWebhookController extends Controller
 
             $trialOutcomeService->handleStripeEvent($event);
             $stripeWebhookEmailService->sendForEvent($event);
+
+            // A subscription or a payment changed: the dashboard's income figures are read again.
+            if (str_starts_with($type, 'customer.subscription.') || str_starts_with($type, 'invoice.') || $type === 'charge.refunded') {
+                app(\App\Services\Analytics\BusinessStatsService::class)->forget();
+            }
         } catch (\Throwable $exception) {
             if ($handlingCacheKey !== null) {
                 Cache::forget($handlingCacheKey);

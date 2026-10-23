@@ -51,8 +51,8 @@ class BusinessProductKpis extends BaseWidget
                 ->description(number_format($channels['demo_visitors'] ?? 0).' demo visitors all time')
                 ->descriptionIcon('heroicon-m-play')
                 ->chart($monthly->pluck('demo_generations')->all()),
-            Stat::make('Demo → signup', static::percent($channels['demo_signup_rate'] ?? 0))
-                ->description(number_format($channels['demo_visitors_signed_up'] ?? 0).' demo visitors created an account')
+            Stat::make('Demo → paid', static::percent($channels['demo_paid_rate'] ?? 0))
+                ->description(number_format($channels['demo_members_paid'] ?? 0).' of '.number_format($channels['demo_members'] ?? 0).' members who tried the demo have paid')
                 ->descriptionIcon('heroicon-m-user-plus'),
             Stat::make('Translated requests', static::percent($g['translate_share_30d'] ?? 0))
                 ->description(number_format($g['cloned_voices'] ?? 0).' cloned voices in total')
