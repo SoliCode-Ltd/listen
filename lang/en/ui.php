@@ -260,7 +260,6 @@ return [
         'billed_yearly_total' => ':total billed yearly',
         'or_yearly' => 'or :price/mo billed yearly',
         // Prices shown in another currency: cards are charged in US dollars.
-        'currency_note' => 'Prices in :currency are a guide at today\'s exchange rate. Cards are charged the plan\'s price in US dollars, so your statement depends on your bank\'s rate and fees.',
         'market_label' => 'Pricing market',
         'market_note_egypt' => 'Egyptian visitors see local manual-payment pricing in EGP.',
         'market_note_default' => 'Prices shown in the exact checkout fallback currency.',
