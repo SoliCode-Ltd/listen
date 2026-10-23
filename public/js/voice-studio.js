@@ -831,7 +831,7 @@
         : '<span class="vs-voice-initial">' + initial + '</span>';
       // The play button sits on the face; the ring around it fills as the preview plays.
       var play = item.preview
-        ? '<svg class="vs-voice-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="48" pathLength="100"/></svg>'
+        ? '<span class="vs-voice-ring" aria-hidden="true"></span>'
           + '<button type="button" class="vs-voice-play" aria-pressed="' + (playing === item.value ? 'true' : 'false') + '" aria-label="' + escAttr(t(meta, 'play')) + ' ' + escAttr(item.label) + '">'
           + '<span class="vs-voice-play-dot"><svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>'
           + '<svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg></span></button>'
