@@ -76,6 +76,9 @@ class VoicePreviewsTest extends TestCase
     {
         $lines = collect(VoicePreviews::lines());
 
+        // No two speakers share a dialect, accent or language: the library is a tour of them.
+        $this->assertSame($lines->count(), $lines->pluck('dialect')->unique()->count(), 'Two speakers share '.$lines->pluck('dialect')->duplicates()->implode(', '));
+
         $this->assertGreaterThanOrEqual(15, $lines->where('language', 'ar')->pluck('dialect')->unique()->count());
         $this->assertGreaterThanOrEqual(15, $lines->where('language', 'en')->pluck('dialect')->unique()->count());
         $this->assertGreaterThanOrEqual(8, $lines->whereNotIn('language', ['ar', 'en'])->pluck('language')->unique()->count());
@@ -146,11 +149,11 @@ class VoicePreviewsTest extends TestCase
         }
 
         $this->assertStringContainsString('audio/voice-previews/ar-fahad.mp3?v=', (string) $byName['Fahad']['p']);
-        $this->assertSame('Saudi (Najdi)', $byName['Fahad']['d']);
+        $this->assertSame('Saudi (Najdi Bedouin)', $byName['Fahad']['d']);
         $this->assertStringEndsWith('images/flags/sa.svg', (string) $byName['Fahad']['f']);
 
         $this->assertStringContainsString('audio/voice-previews/en-chloe.mp3?v=', (string) $byName['Chloe']['p']);
-        $this->assertSame('French', $byName['Chloe']['d']);
+        $this->assertSame('French (France)', $byName['Chloe']['d']);
         $this->assertStringEndsWith('images/flags/fr.svg', (string) $byName['Chloe']['f']);
 
         // A clip made from an older line is not offered.
@@ -158,8 +161,8 @@ class VoicePreviewsTest extends TestCase
         $this->assertSame('', $byName['Ziad']['d']);
 
         $arabic = array_values(VoiceCatalog::libraryEntries(true));
-        $this->assertSame('سعودي (نجدي)', $arabic[0]['d']);
-        $this->assertSame('الفرنسية', $arabic[2]['d']);
+        $this->assertSame('سعودي (نجدي بدوي)', $arabic[0]['d']);
+        $this->assertSame('الفرنسية (فرنسا)', $arabic[2]['d']);
     }
 
     private function voice(string $name, string $language, string $gender, string $engine): Voice

@@ -18,12 +18,15 @@ final class VoicePreviews
      * @var array<string, array{en: string, ar: string, prompt: string}>
      */
     public const NATIVE = [
-        'fr-FR' => ['en' => 'French', 'ar' => 'الفرنسية', 'prompt' => 'French as spoken in Paris, France'],
+        'fr-FR' => ['en' => 'French (France)', 'ar' => 'الفرنسية (فرنسا)', 'prompt' => 'French as spoken in Paris, France'],
+        'fr-CA' => ['en' => 'French (Quebec)', 'ar' => 'الفرنسية (كيبيك)', 'prompt' => 'Quebec French as spoken in Montreal, Canada'],
         'es-ES' => ['en' => 'Spanish (Spain)', 'ar' => 'الإسبانية (إسبانيا)', 'prompt' => 'Peninsular Spanish as spoken in Madrid, Spain'],
         'es-MX' => ['en' => 'Spanish (Mexico)', 'ar' => 'الإسبانية (المكسيك)', 'prompt' => 'Mexican Spanish as spoken in Mexico City'],
         'de-DE' => ['en' => 'German', 'ar' => 'الألمانية', 'prompt' => 'Standard German as spoken in Germany'],
         'it-IT' => ['en' => 'Italian', 'ar' => 'الإيطالية', 'prompt' => 'Standard Italian as spoken in Italy'],
         'pt-BR' => ['en' => 'Portuguese (Brazil)', 'ar' => 'البرتغالية (البرازيل)', 'prompt' => 'Brazilian Portuguese as spoken in Rio de Janeiro and São Paulo'],
+        'pt-PT' => ['en' => 'Portuguese (Portugal)', 'ar' => 'البرتغالية (البرتغال)', 'prompt' => 'European Portuguese as spoken in Lisbon, Portugal'],
+        'nl-NL' => ['en' => 'Dutch', 'ar' => 'الهولندية', 'prompt' => 'Dutch as spoken in the Netherlands'],
         'tr-TR' => ['en' => 'Turkish', 'ar' => 'التركية', 'prompt' => 'Turkish as spoken in Istanbul'],
         'ru-RU' => ['en' => 'Russian', 'ar' => 'الروسية', 'prompt' => 'Russian as spoken in Moscow'],
         'hi-IN' => ['en' => 'Hindi', 'ar' => 'الهندية', 'prompt' => 'Hindi as spoken in Delhi, India'],
