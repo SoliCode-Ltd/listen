@@ -511,7 +511,8 @@ class RenewalGrace
         return $paid !== null && (int) $paid->price_cents > 0 && ! $paid->isPack();
     }
 
-    private static function graceDays(): int
+    /** How many days a failed renewal keeps the plan on (the site setting). */
+    public static function graceDays(): int
     {
         return max(1, (int) SiteSetting::get('billing_grace_days', config('listen.billing.grace_days', 7)));
     }

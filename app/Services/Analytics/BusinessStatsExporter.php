@@ -63,13 +63,18 @@ class BusinessStatsExporter
             ['Engagement', 'Active last 30 days', $engagement['active_30d'] ?? 0],
             ['Engagement', 'Generations per active member (30d)', $engagement['generations_per_active_member_30d'] ?? 0],
             ['Engagement', 'Share of generations by top 10% members', $this->pct($engagement['top_10pct_share'] ?? 0)],
-            ['Revenue', 'Members on paid plans', $revenue['members_on_paid_plans'] ?? 0],
+            ['Revenue', 'Paying members (card + local payment)', $revenue['members_on_paid_plans'] ?? 0],
+            ['Revenue', 'Paying by card', $revenue['plan_holders']['card'] ?? 0],
+            ['Revenue', 'Paying by local payment', $revenue['plan_holders']['manual'] ?? 0],
+            ['Revenue', 'On a paid plan in a free trial (not paying)', $revenue['plan_holders']['trial'] ?? 0],
+            ['Revenue', 'On a paid plan given free (not paying)', $revenue['plan_holders']['granted'] ?? 0],
             ['Revenue', 'Free-to-paid conversion', $this->pct($revenue['paid_conversion'] ?? 0)],
-            ['Revenue', 'Paying Stripe subscriptions', $revenue['paying_stripe'] ?? 0],
-            ['Revenue', 'Est. MRR (USD, list price)', round(($revenue['mrr_cents'] ?? 0) / 100, 2)],
-            ['Revenue', 'Est. ARR (USD, list price)', round(($revenue['mrr_cents'] ?? 0) * 12 / 100, 2)],
-            ['Revenue', 'ARPU (USD / paying sub / month)', round(($revenue['arpu_cents'] ?? 0) / 100, 2)],
-            ['Revenue', 'Stripe subscriptions ended (30d)', $revenue['canceled_30d'] ?? 0],
+            ['Revenue', 'Paid card subscriptions', $revenue['paying_stripe'] ?? 0],
+            ['Revenue', 'MRR source', ($revenue['mrr_source'] ?? '') === 'stripe' ? 'Stripe, after discounts' : 'List-price estimate (Stripe not read)'],
+            ['Revenue', 'MRR (USD)', round(($revenue['mrr_cents'] ?? 0) / 100, 2)],
+            ['Revenue', 'ARR (USD)', round(($revenue['mrr_cents'] ?? 0) * 12 / 100, 2)],
+            ['Revenue', 'ARPU (USD / paid card subscription / month)', round(($revenue['arpu_cents'] ?? 0) / 100, 2)],
+            ['Revenue', 'Paid card subscriptions ended (30d)', $revenue['canceled_30d'] ?? 0],
             ['Trials', 'Open trials', $trials['open'] ?? 0],
             ['Trials', 'Paid trials', $trials['paid'] ?? 0],
             ['Trials', 'Trial conversion (paid / finished)', $this->pct($trials['conversion'] ?? 0)],
@@ -87,12 +92,31 @@ class BusinessStatsExporter
             ['Growth', 'Demo generations total', $channels['demo_generations_total'] ?? 0],
             ['Growth', 'Demo generations (30d)', $channels['demo_generations_30d'] ?? 0],
             ['Growth', 'Demo visitors', $channels['demo_visitors'] ?? 0],
-            ['Growth', 'Demo visitors who signed up', $channels['demo_visitors_signed_up'] ?? 0],
+            ['Growth', 'Members who used the demo', $channels['demo_members'] ?? 0],
+            ['Growth', 'Of them, members who have paid', $channels['demo_members_paid'] ?? 0],
             ['Growth', 'Referral visits', $channels['referral_visits'] ?? 0],
             ['Growth', 'Contact messages (30d)', $channels['contact_messages_30d'] ?? 0],
         ];
         foreach ($manual['approved_by_currency'] ?? [] as $currency => $amount) {
             $summary[] = ['Manual payments', "Approved total ({$currency})", $amount];
+        }
+        if ($recurring = $revenue['recurring'] ?? null) {
+            $usd = fn (array $cents) => round(($cents['usd'] ?? 0) / 100, 2);
+            $kinds = $recurring['kinds'];
+            array_push($summary,
+                ['Expected income', 'Renewing card subscriptions', $recurring['expected']['count']],
+                ['Expected income', 'Expected monthly income before fees (USD)', $usd($recurring['expected']['gross_cents'])],
+                ['Expected income', 'Card fee rate (last 90 days)', $recurring['fees']['rate'] === null ? '' : $this->pct($recurring['fees']['rate'])],
+                ['Expected income', 'Expected monthly income after fees (USD)', $usd($recurring['expected']['net_cents'])],
+                ['Expected income', 'Due in the next 30 days after fees (USD)', $usd($recurring['due_30d']['net_cents'])],
+                ['Expected income', 'Cancelled, still in paid time', $kinds['cancelling']['count']],
+                ['Expected income', 'Cancelled: monthly value that stops (USD)', $usd($kinds['cancelling']['monthly_cents'])],
+                ['Expected income', 'In trial', $kinds['trialing']['count']],
+                ['Expected income', 'Trials: monthly value if they pay (USD)', $usd($kinds['trialing']['monthly_cents'])],
+                ['Expected income', 'Overdue renewals', $kinds['past_due']['count']],
+                ['Expected income', 'Overdue: monthly value unpaid (USD)', $usd($kinds['past_due']['monthly_cents'])],
+                ['Expected income', 'Read from Stripe at', $recurring['generated_at']],
+            );
         }
 
         $sheets = [

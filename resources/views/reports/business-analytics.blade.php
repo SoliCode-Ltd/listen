@@ -462,11 +462,11 @@
 <div class="page">
   <div class="eyebrow">06 · Revenue</div>
   <div class="h1">Revenue and unit economics</div>
-  <div class="lead">Recurring revenue at list price from active subscriptions, plan mix, and what the voice infrastructure costs to serve.</div>
+  <div class="lead">Recurring revenue from card subscriptions {{ ($revenue['mrr_source'] ?? '') === 'stripe' ? 'at what they actually charge, after discounts' : 'estimated at list price' }}, plan mix, and what the voice infrastructure costs to serve.</div>
 
   <table class="kpis">
     <tr>
-      <td class="kpi"><div class="k">Monthly revenue (MRR)</div><div class="v">{{ $r->money($mrr) }}</div><div class="n">Card subscriptions at list price</div></td>
+      <td class="kpi"><div class="k">Monthly revenue (MRR)</div><div class="v">{{ $r->money($mrr) }}</div><div class="n">{{ ($revenue['mrr_source'] ?? '') === 'stripe' ? 'Card subscriptions, after discounts' : 'Card subscriptions, list-price estimate' }}</div></td>
       <td class="kpi"><div class="k">Annual run rate</div><div class="v">{{ $r->money($mrr * 12) }}</div><div class="n">MRR × 12</div></td>
       <td class="kpi"><div class="k">Paying members</div><div class="v">{{ $r->num($revenue['members_on_paid_plans'] ?? 0) }}</div><div class="n">{{ $r->pct($revenue['paid_conversion'] ?? 0, 2) }} of all members</div></td>
       <td class="kpi"><div class="k">Revenue per subscriber</div><div class="v">{{ $r->money(($revenue['arpu_cents'] ?? 0) / 100) }}</div><div class="n">Per month</div></td>
@@ -482,6 +482,7 @@
             <th>Plan</th>
             <th class="num">Price / month</th>
             <th class="num">Members</th>
+            <th class="num">Paying</th>
             <th class="num">Card, monthly</th>
             <th class="num">Card, yearly</th>
             <th class="num">MRR</th>
@@ -489,11 +490,12 @@
         </thead>
         <tbody>
           @foreach ($plans as $plan)
-            @continue(! $plan['active'] && ! $plan['members'])
+            @continue(! $plan['active'] && ! $plan['members'] && ! $plan['mrr_usd'])
             <tr>
               <td>{{ $plan['plan'] }}</td>
-              <td class="num">{{ $plan['price_monthly_usd'] > 0 ? $r->money($plan['price_monthly_usd']) : 'Free' }}</td>
+              <td class="num">{{ $plan['price_monthly_usd'] === null ? '—' : ($plan['price_monthly_usd'] > 0 ? $r->money($plan['price_monthly_usd']) : 'Free') }}</td>
               <td class="num">{{ $r->num($plan['members']) }}</td>
+              <td class="num">{{ $r->num($plan['paying'] ?? 0) }}</td>
               <td class="num">{{ $r->num($plan['stripe_monthly']) }}</td>
               <td class="num">{{ $r->num($plan['stripe_yearly']) }}</td>
               <td class="num">{{ $r->money($plan['mrr_usd']) }}</td>
@@ -502,6 +504,7 @@
           <tr class="total">
             <td>Total</td><td></td>
             <td class="num">{{ $r->num(array_sum(array_column($plans, 'members'))) }}</td>
+            <td class="num">{{ $r->num(array_sum(array_column($plans, 'paying'))) }}</td>
             <td class="num">{{ $r->num(array_sum(array_column($plans, 'stripe_monthly'))) }}</td>
             <td class="num">{{ $r->num(array_sum(array_column($plans, 'stripe_yearly'))) }}</td>
             <td class="num">{{ $r->money(array_sum(array_column($plans, 'mrr_usd'))) }}</td>
@@ -548,6 +551,9 @@
             <tr><td>Free demo generations, lifetime</td><td class="num">{{ $r->num($channels['demo_generations_total']) }}</td></tr>
             <tr><td>Free demo generations, 30 days</td><td class="num">{{ $r->num($channels['demo_generations_30d'] ?? 0) }}</td></tr>
             <tr><td>Unique demo visitors</td><td class="num">{{ $r->num($channels['demo_visitors'] ?? 0) }}</td></tr>
+            @isset($channels['demo_paid_rate'])
+              <tr><td>Demo users who went on to pay</td><td class="num">{{ $r->pct($channels['demo_paid_rate']) }}</td></tr>
+            @endisset
             @isset($channels['referral_visits'])
               <tr><td>Referral link visits</td><td class="num">{{ $r->num($channels['referral_visits']) }}</td></tr>
             @endisset
@@ -574,7 +580,8 @@
     <dt>Active member</dt><dd>A member who created at least one audio file in the period.</dd>
     <dt>Activation rate</dt><dd>Members who have ever created audio, divided by all members.</dd>
     <dt>Generation</dt><dd>One text-to-speech request by a member that produced, or tried to produce, an audio file. Free web-demo plays are reported separately.</dd>
-    <dt>Monthly recurring revenue (MRR)</dt><dd>Active and past-due card subscriptions at list price, with yearly plans counted at one twelfth. Local (manual) payments are listed separately and are not included in MRR.</dd>
+    <dt>Monthly recurring revenue (MRR)</dt><dd>What the active card subscriptions charge at their next bill, after discounts and at the price each member kept, read from the payment processor; yearly plans count at one twelfth. Subscriptions set to cancel count until their paid time ends; free trials and overdue renewals do not count. Local (manual) payments are listed separately and are not included in MRR.</dd>
+    <dt>Paying member</dt><dd>A member whose paid plan is active now and was paid for, by card or by local payment. Members in a free trial and plans given without a payment are not counted.</dd>
     <dt>Annual run rate</dt><dd>MRR multiplied by twelve.</dd>
     <dt>Voice API cost</dt><dd>What the speech providers charge for the audio produced, using the cost recorded per request or, where none was recorded, provider list prices.</dd>
     <dt>Gross margin after API cost</dt><dd>MRR minus voice API cost for the last 30 days, divided by MRR. Hosting and other costs are not included.</dd>

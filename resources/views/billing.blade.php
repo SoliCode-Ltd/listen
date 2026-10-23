@@ -617,6 +617,40 @@
       color: color-mix(in oklab, var(--danger) 85%, var(--text));
     }
 
+    /* ── After a declined card: what else the member can do ── */
+    .decline-help {
+      margin-top: .6rem;
+      padding: .8rem .9rem .9rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: color-mix(in oklab, var(--a) 4%, var(--surface));
+    }
+    .decline-help[hidden] {
+      display: none;
+    }
+    .decline-help-title {
+      margin: 0 0 .6rem;
+      font-size: .85rem;
+      font-weight: 600;
+      color: color-mix(in oklab, var(--text) 80%, var(--muted));
+    }
+    .decline-help-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .decline-help-actions .btn {
+      flex: 1 1 auto;
+      min-height: 2.6rem;
+      padding: .55rem .9rem;
+      font-size: .9rem;
+    }
+    .decline-help-actions .btn img {
+      height: 1.15rem;
+      width: auto;
+      margin-inline-end: .45rem;
+    }
+
     /* ── Quote sidebar ── */
     .quote-section {
       display: flex;
@@ -1157,6 +1191,10 @@
             <a class="btn" href="{{ route('manage-subscription.page') }}">{{ __('ui.billing.manage_subscription') }}</a>
           </div>
           <div id="message" class="message {{ $initialMessageType }}" role="status">{{ $initialMessageText }}</div>
+          <div class="decline-help" id="declineHelp" hidden>
+            <p class="decline-help-title">{{ __('ui.billing.decline_options_title') }}</p>
+            <div class="decline-help-actions" id="declineActions"></div>
+          </div>
         </form>
       </div>
 
@@ -1259,6 +1297,18 @@
       'order_fallback_hint' => __('ui.billing.order_fallback_hint', ['plan' => $activePlanName]),
       'card_form_unavailable' => __('ui.billing.card_form_unavailable'),
       'card_local_about' => __('ui.billing.card_local_about'),
+      'decline_no_funds' => __('ui.billing.decline_no_funds'),
+      'decline_card_details' => __('ui.billing.decline_card_details'),
+      'decline_try_again' => __('ui.billing.decline_try_again'),
+      'decline_refused' => __('ui.billing.decline_refused'),
+      'decline_pay_with' => __('ui.billing.decline_pay_with'),
+      'decline_pay_monthly' => __('ui.billing.decline_pay_monthly'),
+      'decline_smaller_plan' => __('ui.billing.decline_smaller_plan'),
+      'decline_amount_month' => __('ui.billing.decline_amount_month'),
+      'decline_amount_year' => __('ui.billing.decline_amount_year'),
+      'decline_other_card' => __('ui.billing.decline_other_card'),
+      'decline_check_card' => __('ui.billing.decline_check_card'),
+      'decline_try_again_button' => __('ui.billing.decline_try_again_button'),
     ];
   @endphp
   <script>
@@ -1273,6 +1323,9 @@
     const gadsConversionSendTo = @json(\App\Support\SeoHelper::googleAdsConversionSendTo());
     const gadsTrialConversionSendTo = @json(\App\Support\SeoHelper::googleAdsTrialConversionSendTo());
     const trialOffer = @json($trialOffer ?? ['available' => false, 'quota' => []]);
+    // Why a bank refused a card, by Stripe's decline code (App\Services\Billing\CardDecline).
+    const declineCodes = @json(\App\Services\Billing\CardDecline::CODES);
+    const paymentBrandAssets = @json($paymentBrandAssets);
     const trialBtn = document.getElementById('trialBtn');
     const trialBtnDefaultText = trialBtn ? trialBtn.textContent.trim() : '';
     const checkoutChoice = document.getElementById('checkoutChoice');
@@ -1281,6 +1334,8 @@
     const trialNote = document.getElementById('trialNote');
 
     const messageBox = document.getElementById('message');
+    const declineHelp = document.getElementById('declineHelp');
+    const declineActions = document.getElementById('declineActions');
     const subscribeBtn = document.getElementById('subscribeBtn');
     const planSelect = document.getElementById('plan');
     const cycleSelect = document.getElementById('cycle');
@@ -1360,13 +1415,15 @@
       if (hasArabicChars(raw) || !isArabicLocale) return raw;
 
       const lowered = raw.toLowerCase();
+      // A refusal is never "invalid details": the member would retype the same card.
+      if (lowered.includes('insufficient funds')) return i18n.decline_no_funds;
+      if (lowered.includes('declined')) return i18n.decline_refused;
+
       const invalidCard =
         lowered.includes('card number') ||
         lowered.includes('cvc') ||
         lowered.includes('expiry') ||
         lowered.includes('expired card') ||
-        lowered.includes('insufficient funds') ||
-        lowered.includes('declined') ||
         lowered.includes('invalid card') ||
         lowered.includes('incomplete');
 
@@ -1379,11 +1436,177 @@
     }
 
     function setMessage(type, text) {
+      hideDeclineHelp();
       messageBox.className = 'message';
       messageBox.textContent = '';
       if (!text) return;
       messageBox.classList.add(type === 'error' ? 'error' : 'success');
       messageBox.textContent = text;
+    }
+
+    // ── A card the bank refused: why, and what else the member can do ──
+
+    // The kind of decline (no_funds, card_details, try_again, refused) for an error from Stripe.js.
+    function declineKindOf(stripeError) {
+      return declineCodes[String(stripeError?.decline_code || '').toLowerCase()]
+        || declineCodes[String(stripeError?.code || '').toLowerCase()]
+        || 'refused';
+    }
+
+    // An error that carries the decline's kind, so the page can offer the next step.
+    function declineError(kind, message) {
+      const error = new Error(String(message || i18n['decline_' + kind] || i18n.decline_refused));
+      error.declineKind = kind;
+      return error;
+    }
+
+    // Stripe.js says why the bank refused: our words, in the page's language.
+    function stripeDeclineError(stripeError) {
+      const kind = declineKindOf(stripeError);
+      return declineError(kind, i18n['decline_' + kind]);
+    }
+
+    function hideDeclineHelp() {
+      if (!declineHelp) return;
+      declineHelp.hidden = true;
+      if (declineActions) declineActions.textContent = '';
+    }
+
+    function declineButton(label, onClick, options = {}) {
+      const button = document.createElement('button');
+      button.className = options.primary ? 'btn btn-primary' : 'btn';
+      button.type = 'button';
+      button.addEventListener('click', onClick);
+      if (options.logo) {
+        const img = document.createElement('img');
+        img.src = options.logo;
+        img.alt = '';
+        img.setAttribute('aria-hidden', 'true');
+        button.appendChild(img);
+      }
+      button.appendChild(document.createTextNode(label));
+      if (options.method) button.dataset.declineAction = 'method-' + options.method;
+      else if (options.action) button.dataset.declineAction = options.action;
+      return button;
+    }
+
+    function withAmount(template, values) {
+      let text = String(template || '');
+      Object.keys(values).forEach(function(key) {
+        const value = key === 'amount' ? `⁦${values[key]}⁩` : String(values[key]);
+        text = text.replace(':' + key, value);
+      });
+      return text;
+    }
+
+    // Moves the member to another choice on this form, then to the Pay button.
+    function chooseInstead(change) {
+      change();
+      setMessage('', '');
+      subscribeBtn?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      subscribeBtn?.focus({ preventScroll: true });
+    }
+
+    function selectPaymentMethod(method) {
+      const input = paymentMethodInputs.find(function(item) { return String(item.value) === method; });
+      if (!input || input.disabled) return;
+      input.checked = true;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      setMessage('', '');
+      manualPanel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function showDeclineHelp(kind) {
+      if (!declineHelp || !declineActions) return;
+      declineActions.textContent = '';
+      const selected = selectedMeta();
+      const plan = currentPlan();
+      const cycle = String(cycleSelect?.value || 'monthly');
+      const buttons = [];
+
+      // In Egypt: pay the same plan from a wallet or bank app instead of the card.
+      ['instapay', 'vodafone_cash'].forEach(function(method) {
+        const methodConfig = plan?.payment_methods?.[method];
+        const input = paymentMethodInputs.find(function(item) { return String(item.value) === method; });
+        if (!methodConfig || methodConfig.available !== true || !input) return;
+        buttons.push(declineButton(
+          withAmount(i18n.decline_pay_with, { method: String(methodConfig.label || method) }),
+          function() { selectPaymentMethod(method); },
+          { method, logo: paymentBrandAssets?.[method] || '' }
+        ));
+      });
+
+      // Too little money on the card: a smaller amount today. Only for a new plan:
+      // a member changing plans is offered no step down, which would charge nothing.
+      if (kind === 'no_funds' && !planChange.enabled && selected) {
+        if (cycle === 'yearly' && plan?.payment_methods?.stripe?.monthly && cycleMonthlyOption && !cycleMonthlyOption.disabled) {
+          buttons.push(declineButton(
+            withAmount(i18n.decline_pay_monthly, { amount: cardCharge(plan.payment_methods.stripe.monthly).amount }),
+            function() {
+              chooseInstead(function() {
+                cycleSelect.value = 'monthly';
+                cycleSelect.dispatchEvent(new Event('change', { bubbles: true }));
+              });
+            },
+            { action: 'monthly' }
+          ));
+        }
+
+        const price = function(item) { return Number(item?.payment_methods?.stripe?.[cycle]?.base_usd_cents || item?.payment_methods?.stripe?.[cycle]?.amount_cents || 0); };
+        const smaller = Object.values(planCatalog)
+          .filter(function(item) { return item.slug !== plan?.slug && price(item) > 0 && price(item) < price(plan); })
+          .sort(function(a, b) { return price(b) - price(a); })[0];
+        if (smaller) {
+          buttons.push(declineButton(
+            // Its price for the same cycle, said as a month or a year beside "monthly instead".
+            String(i18n.decline_smaller_plan || '')
+              .replace(':plan', String(smaller.localized_name || smaller.name || ''))
+              .replace(':amount', withAmount(cycle === 'yearly' ? i18n.decline_amount_year : i18n.decline_amount_month, {
+                amount: cardCharge(smaller.payment_methods.stripe[cycle]).amount,
+              })),
+            function() {
+              chooseInstead(function() {
+                planSelect.value = String(smaller.slug);
+                planSelect.dispatchEvent(new Event('change', { bubbles: true }));
+              });
+            },
+            { action: 'smaller-plan' }
+          ));
+        }
+      }
+
+      if (kind === 'try_again') {
+        buttons.unshift(declineButton(i18n.decline_try_again_button, function() {
+          setMessage('', '');
+          document.getElementById('billingForm')?.requestSubmit();
+        }, { primary: true, action: 'try-again' }));
+      }
+
+      if (card) {
+        buttons.push(declineButton(kind === 'card_details' ? i18n.decline_check_card : i18n.decline_other_card, function() {
+          if (selectedMethod() !== 'stripe') selectPaymentMethod('stripe');
+          if (kind !== 'card_details') card.clear();
+          setMessage('', '');
+          stripeContainer?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.focus();
+        }, { action: 'card' }));
+      }
+
+      if (!buttons.length) return;
+      buttons.forEach(function(button) { declineActions.appendChild(button); });
+      declineHelp.hidden = false;
+      // On a phone the options can sit below the screen: bring them into view.
+      declineHelp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // Shows an error from the payment; a declined card also gets what to do next.
+    function showPaymentError(error, fallback) {
+      if (error?.declineKind) {
+        setMessage('error', error.message);
+        showDeclineHelp(error.declineKind);
+        return;
+      }
+      setMessage('error', normalizeStripeMessage(error?.message, fallback));
     }
 
     function currentPlan() {
@@ -1976,6 +2199,7 @@
           },
         });
         if (confirmed.error) {
+          if (confirmed.error.type === 'card_error') throw stripeDeclineError(confirmed.error);
           throw new Error(normalizeStripeMessage(confirmed.error.message, i18n.payment_auth_failed));
         }
 
@@ -1996,7 +2220,7 @@
         leaving = true;
         window.location.href = '{{ route('manage-subscription.page') }}';
       } catch (error) {
-        setMessage('error', normalizeStripeMessage(error?.message, i18n.upgrade_failed));
+        showPaymentError(error, i18n.upgrade_failed);
       } finally {
         // On the way to the next page the button stays off.
         if (!leaving) {
@@ -2107,6 +2331,8 @@
             paymentMethod ? { payment_method: paymentMethod } : undefined
           );
           if (confirmation.error) {
+            // After the bank's check the card can still be refused (not enough money, for example).
+            if (confirmation.error.type === 'card_error') throw stripeDeclineError(confirmation.error);
             throw new Error(normalizeStripeMessage(confirmation.error.message, i18n.payment_auth_failed));
           }
 
@@ -2117,6 +2343,9 @@
           return;
         }
 
+        if (response.data?.decline) {
+          throw declineError(String(response.data.decline), response.data.message);
+        }
         if (!response.ok || response.data?.ok === false) {
           throw new Error(response.data?.message || i18n.upgrade_failed);
         }
@@ -2130,7 +2359,7 @@
         window.location.href = '{{ route('manage-subscription.page') }}';
       } catch (error) {
         // Includes the server's 409 while another payment of this member is going through.
-        setMessage('error', normalizeStripeMessage(error?.message, i18n.upgrade_failed));
+        showPaymentError(error, i18n.upgrade_failed);
       } finally {
         // On the way to the next page Pay stays off; otherwise it comes back.
         if (!leaving) setSubscribeButtonBusy(false);

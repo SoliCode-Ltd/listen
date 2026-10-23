@@ -119,7 +119,10 @@ class MemberCountryTest extends TestCase
             return $user;
         };
         $eg1 = $make('EG', 'a@gmail.com', $free);
-        $make('EG', 'b@hotmail.co.uk', $paid);
+        // Paid by InstaPay: paying. A plan given free would not be.
+        $payer = $make('EG', 'b@hotmail.co.uk', $paid);
+        DB::table('manual_payment_requests')->insert(['user_id' => $payer->id, 'plan_id' => $paid, 'billing_cycle' => 'monthly', 'payment_method' => 'instapay',
+            'status' => 'approved', 'currency' => 'EGP', 'expected_amount_minor' => 45000, 'created_at' => now(), 'updated_at' => now()]);
         $make('SA', 'c@company.sa', $free);
         $make(null, 'd@gmail.com', $free);
         User::factory()->create(['country_code' => 'US', 'is_admin' => true, 'email' => 'admin@x.com']);

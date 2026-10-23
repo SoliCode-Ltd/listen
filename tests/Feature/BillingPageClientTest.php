@@ -169,4 +169,26 @@ class BillingPageClientTest extends TestCase
             ->assertJsonPath('message', __('ui.pack.card_processing', [], 'ar'))
             ->assertJsonMissingPath('reason');
     }
+
+    public function test_a_declined_card_is_told_why_and_offered_what_to_do_next(): void
+    {
+        $page = $this->billingPage('ar')
+            // The decline codes come from one list (CardDecline), in the page and on the server.
+            ->assertSee('"insufficient_funds":"no_funds"', false)
+            ->assertSee('<div class="decline-help" id="declineHelp" hidden>', false)
+            // The server's answer, and Stripe.js after the bank's check or a trial's card check.
+            ->assertSee('if (response.data?.decline) {', false)
+            ->assertSee("if (confirmation.error.type === 'card_error') throw stripeDeclineError(confirmation.error);", false)
+            ->assertSee("if (confirmed.error.type === 'card_error') throw stripeDeclineError(confirmed.error);", false)
+            ->assertSee('showPaymentError(error, i18n.upgrade_failed);', false)
+            // A refusal is never "invalid card details".
+            ->assertSee("if (lowered.includes('insufficient funds')) return i18n.decline_no_funds;", false)
+            ->assertDontSee("lowered.includes('declined') ||", false);
+
+        foreach (['no_funds', 'card_details', 'try_again', 'refused'] as $kind) {
+            $text = __('ui.billing.decline_'.$kind, [], 'ar');
+            $this->assertMatchesRegularExpression('/\p{Arabic}/u', $text);
+            $page->assertSee('"decline_'.$kind.'":'.self::js($text), false);
+        }
+    }
 }

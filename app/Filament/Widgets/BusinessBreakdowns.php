@@ -30,9 +30,10 @@ class BusinessBreakdowns extends Widget
             'statErrors' => $s['errors'] ?? [],
             'cohorts' => $s['cohorts'] ?? [],
             'plans' => $s['plans'] ?? [],
+            'mrrSource' => $revenue['mrr_source'] ?? 'none',
             'breakdowns' => array_filter([
                 'Members by plan' => $revenue['members_by_plan'] ?? [],
-                'Paying Stripe subscriptions' => $revenue['paying_by_plan'] ?? [],
+                'Paid card subscriptions' => $revenue['paying_by_plan'] ?? [],
                 'Generations per member' => $engagement['generations_per_member'] ?? [],
                 'Signup method' => $members['signup_method'] ?? [],
                 'Target language (30 days)' => $g['by_language_30d'] ?? [],

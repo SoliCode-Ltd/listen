@@ -268,6 +268,24 @@ class PlanResource extends Resource
                             ->afterStateHydrated(fn (Forms\Components\TextInput $component, Get $get) => $component->state(\App\Support\Credits::minutesFor((int) $get('monthly_chars'))))
                             ->dehydrateStateUsing(fn (Get $get): int => \App\Support\Credits::minutesFor((int) $get('monthly_chars')))
                             ->helperText('Set by the credits ('.number_format(\App\Support\Credits::PER_MINUTE).' credits = 1 minute of audio). Credits are charged for the real length of each audio, so members always get exactly these minutes.'),
+                        // Lowering the credits: who gets the lower amount (App\Services\Billing\KeptCredits).
+                        Forms\Components\Radio::make('lower_credits_for')
+                            ->label('You are lowering the credits. Who gets the lower amount?')
+                            ->options([
+                                \App\Services\Billing\KeptCredits::NEXT_PERIOD => 'Everyone, from their next billing period',
+                                \App\Services\Billing\KeptCredits::NEW_ONLY => 'New subscribers only',
+                            ])
+                            ->descriptions([
+                                \App\Services\Billing\KeptCredits::NEXT_PERIOD => 'Members on this plan now keep their current credits until the period they paid for renews (a yearly plan: once a year), including any days a late payment is retried. After that they get the new amount.',
+                                \App\Services\Billing\KeptCredits::NEW_ONLY => 'Members on this plan now keep their current credits for as long as they stay on it. Only people who subscribe from now on get the new amount, and so does a member who leaves the plan and comes back after their paid period ran out.',
+                            ])
+                            ->helperText(fn (?Plan $record): string => $record
+                                ? number_format(app(\App\Services\Billing\KeptCredits::class)->membersOn($record)).' members are on this plan now. Nothing changes for anyone in the period they are in. Members in a free trial not paid yet count as new subscribers.'
+                                : '')
+                            ->visible(fn (Get $get, ?Plan $record): bool => static::lowersCredits($get, $record))
+                            ->required(fn (Get $get, ?Plan $record): bool => static::lowersCredits($get, $record))
+                            ->dehydrated(false)
+                            ->columnSpanFull(),
                         Forms\Components\TextInput::make('monthly_requests')
                             ->label('Monthly Requests')
                             ->numeric()
@@ -1047,5 +1065,16 @@ class PlanResource extends Resource
         return Plan::query()
             ->where(fn ($query) => $query->where('stripe_price_monthly', $priceId)->orWhere('stripe_price_yearly', $priceId))
             ->count() > 1;
+    }
+
+    /**
+     * The form lowers a paid plan's monthly credits. The free plan and packs are
+     * not asked: nobody paid for a period of them, so a change applies at once.
+     */
+    public static function lowersCredits(Get $get, ?Plan $record): bool
+    {
+        return $record !== null && $record->exists && ! $record->isPack() && (int) $record->price_cents > 0
+            && is_numeric($get('monthly_chars'))
+            && (int) $get('monthly_chars') < (int) $record->monthly_chars;
     }
 }
