@@ -188,12 +188,13 @@
     .studio.is-dragging .studio-head { scale: 1.14; }
     .studio-wave input:focus-visible ~ .studio-head { box-shadow: 0 0 0 4px var(--surface), 0 0 0 7px var(--brand-accent); }
     .studio-stations { position: relative; height: 60px; margin-top: 8px; }
+    /* The line runs as far as the playhead can go, like the voice above it. */
     .studio-stations::before {
       content: "";
       position: absolute;
       top: 18px;
-      left: 0;
-      right: 0;
+      inset-inline-start: var(--track-from, 0);
+      inset-inline-end: var(--track-to, 0);
       height: 2px;
       border-radius: 2px;
       background: var(--line);
@@ -516,7 +517,7 @@
       grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: center;
       gap: 1.25rem 1.5rem;
-      margin: .25rem auto 0;
+      margin: clamp(1.5rem, 3vw, 2.25rem) auto 0;
       padding: 1.35rem 1.6rem;
       background: var(--surface);
       border: 1px solid var(--line);
@@ -1715,6 +1716,8 @@
         .filter(function (n, i, all) { return all.indexOf(n) === i; })
         .sort(function (a, b) { return a - b; });
       slider.max = String(stops.length - 1);
+      studio.style.setProperty('--track-from', (LEAD * 100) + '%');
+      studio.style.setProperty('--track-to', ((1 - END) * 100) + '%');
 
       // The plans as orbs along the track.
       studio.querySelectorAll('.studio-station').forEach(function (station) {
@@ -1723,7 +1726,8 @@
       });
 
       // The voice: words of a few syllables each and the short pauses between them, the
-      // same every time. It is drawn to the track's own width in whole pixels.
+      // same every time. It is drawn in whole pixels from the lowest point the playhead
+      // can reach to the highest, so it is empty at the start and full at the last plan.
       var voice = (function () {
         var seed = 11, out = [];
         function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
@@ -1741,9 +1745,9 @@
       })();
       var W = 0, H = 0;
       function drawVoice() {
-        var pitch = W < 520 ? 5 : 6, bar = pitch / 2;
-        var n = Math.max(1, Math.floor((W - bar) / pitch) + 1);
-        var x0 = (W - ((n - 1) * pitch + bar)) / 2 + bar / 2, mid = H / 2, d = '';
+        var pitch = W < 520 ? 5 : 6, bar = pitch / 2, from = LEAD * W, span = (END - LEAD) * W;
+        var n = Math.max(1, Math.floor((span - bar) / pitch) + 1);
+        var x0 = from + (span - ((n - 1) * pitch + bar)) / 2 + bar / 2, mid = H / 2, d = '';
         for (var i = 0; i < n; i++) {
           var h = Math.max(0.5, voice[i % voice.length] * (H * 0.84 - bar)) / 2;
           var x = (x0 + i * pitch).toFixed(1);
