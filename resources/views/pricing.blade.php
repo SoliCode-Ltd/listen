@@ -396,25 +396,28 @@
     .plan-card .plan-btn.btn-outline { background: var(--brand-accent); color: #fff; border-color: transparent; box-shadow: var(--lift); }
     .plan-card .plan-btn:not(.btn-disabled):hover { background: var(--brand-hover); transform: translateY(-1px); }
 
-    /* Minutes and the credits behind them, on one line. */
+    /* Minutes and the credits behind them, on one line and set alike: each number at the
+       same size and weight, each unit after it at the same size, both centred on the line. */
     .plan-quota {
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
-      align-items: baseline;
+      align-items: center;
       gap: .4rem 1rem;
       padding: 1rem 0;
       border-top: 1px solid color-mix(in srgb, var(--brand-accent) 14%, var(--line));
       font-size: .9rem;
       font-weight: 600;
+      line-height: 1.5;
     }
-    .plan-minutes { display: flex; align-items: baseline; flex-wrap: wrap; gap: .1rem .4rem; }
-    .plan-minutes-number { font-size: 1.25rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
-    .plan-minutes-unit { color: var(--muted); font-size: .84rem; font-weight: 500; }
-    .plan-quota-credits { display: inline-flex; align-items: center; gap: .4rem; color: var(--muted); font-size: .82rem; font-weight: 500; cursor: help; }
-    .plan-quota-coin { font-size: 1rem; flex: none; }
-    .plan-quota-amount { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: .25rem; }
-    .plan-quota-number { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .plan-minutes,
+    .plan-quota-amount { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 .35rem; }
+    .plan-minutes-number,
+    .plan-quota-number { color: var(--text); font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .plan-minutes-unit,
+    .plan-quota-unit { color: var(--muted); font-size: .84rem; font-weight: 500; }
+    .plan-quota-credits { display: inline-flex; align-items: center; gap: .4rem; cursor: help; }
+    .plan-quota-coin { font-size: 1.05rem; flex: none; }
 
     /* The plan's lines: the label on one side, its value on the other. */
     .plan-features {
