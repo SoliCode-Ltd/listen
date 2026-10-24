@@ -15,7 +15,9 @@
  * card ([data-orb-host]) quickens and brightens it; a voice playing in its card
  * ([data-vp-track]), on its stage or anywhere in its section ([data-orb-follow])
  * makes it light up, flow with the voice, ripple with the loudness and breathe
- * a halo around it.
+ * a halo around it. An orb in a hidden part of the page ([inert]) is not drawn,
+ * and a page can hold every orb still for a moment (ListenOrbs.hold) while
+ * something else needs each frame, such as a slider being dragged.
  */
 (function () {
   'use strict';
@@ -134,6 +136,8 @@
       lift: 0,
       speed: 1,
       size: 0,
+      css: 0,
+      glow: '',
       visible: false,
       hover: false,
     };
@@ -141,10 +145,14 @@
     return el.__orb;
   }
 
+  // An orb's size in the layout, measured when it changes (not on every frame, which
+  // would make the browser lay the page out again for each orb).
+  function measure(o) {
+    o.css = Math.max(o.el.offsetWidth, o.el.offsetHeight);
+  }
   function sizeOf(o) {
-    var rect = o.el.getBoundingClientRect();
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
-    return Math.max(8, Math.min(MAX, Math.round(Math.max(rect.width, rect.height) * dpr)));
+    return Math.max(8, Math.min(MAX, Math.round(o.css * dpr)));
   }
 
   function draw(o) {
@@ -186,14 +194,15 @@
     return -1;
   }
 
-  var frame = 0, last = 0, idle = 0, beat = false;
+  var frame = 0, last = 0, idle = 0, beat = false, held = false;
   function tick(now) {
     var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
     last = now;
+    if (held) { frame = requestAnimationFrame(tick); return; }
     beat = !beat;
     var any = false;
     orbs.forEach(function (o) {
-      if (!o.visible) return;
+      if (!o.visible || o.el.closest('[inert]')) return;
       any = true;
       var voice = voiceLevel(o);
       var playing = voice >= 0;
@@ -207,7 +216,8 @@
       o.speed += (targetSpeed - o.speed) * Math.min(1, dt * 4);
       o.time += dt * o.speed;
       // The halo around a playing orb breathes with it (CSS reads --orb-glow).
-      o.el.style.setProperty('--orb-glow', o.level.toFixed(3));
+      var glow = o.level.toFixed(3);
+      if (glow !== o.glow) { o.glow = glow; o.el.style.setProperty('--orb-glow', glow); }
       // A resting orb is drawn every other frame: the same slow drift for half the work.
       if (beat && !chosen && !playing && !o.hover && o.lift < 0.005 && o.level < 0.005) return;
       draw(o);
@@ -226,6 +236,7 @@
     entries.forEach(function (entry) {
       var o = state(entry.target);
       o.visible = entry.isIntersecting;
+      if (o.visible) measure(o);
       if (o.visible && sizeOf(o) !== o.size) draw(o);
     });
     wake();
@@ -234,7 +245,7 @@
   // An orb that grows or shrinks (a picked orb rises) is drawn again at its new size.
   var resized = [], resizeFrame = 0;
   var ro = 'ResizeObserver' in window ? new ResizeObserver(function (entries) {
-    entries.forEach(function (entry) { var o = entry.target.__orb; if (o && o.visible) resized.push(o); });
+    entries.forEach(function (entry) { var o = entry.target.__orb; if (o) { measure(o); if (o.visible) resized.push(o); } });
     if (!resizeFrame) {
       resizeFrame = requestAnimationFrame(function () {
         resizeFrame = 0;
@@ -253,6 +264,7 @@
     host.addEventListener('pointerleave', function () { o.hover = false; });
     host.addEventListener('focusin', function () { o.hover = true; wake(); });
     host.addEventListener('focusout', function (e) { if (!host.contains(e.relatedTarget)) o.hover = false; });
+    measure(o);
     if (io) { io.observe(el); } else { o.visible = true; draw(o); }
     if (ro) ro.observe(el);
   }
@@ -272,11 +284,17 @@
     var resizeTimer = 0;
     window.addEventListener('resize', function () {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(function () { orbs.forEach(function (o) { if (o.visible) draw(o); }); }, 150);
+      resizeTimer = setTimeout(function () { orbs.forEach(function (o) { if (o.visible) { measure(o); draw(o); } }); }, 150);
     });
   }
 
-  window.ListenOrbs = { scan: scan, wake: wake };
+  // Every orb keeps its frame while held, and goes on from there when let go.
+  function hold(on) {
+    held = !!on;
+    if (!held) wake();
+  }
+
+  window.ListenOrbs = { scan: scan, wake: wake, hold: hold };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();

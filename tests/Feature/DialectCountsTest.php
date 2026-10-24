@@ -133,14 +133,17 @@ class DialectCountsTest extends TestCase
         // pattern => [what the studio has, whether the page says "more than"]
         $claims = [
             '/more than (\d+) (?:Arabic|regional)/u' => [$arabic, true],
-            '/(\d+)\+ (?:Arabic|regional|[Dd]ialects)/u' => [$arabic, false],
+            '/(\d+)\+ (?:Arabic|regional|[Dd]ialects(?! and accents))/u' => [$arabic, false],
             '/أكثر من (\d+) (?:لكنة|لهجة) (?:عربية|محلية)/u' => [$arabic, true],
-            '/\+(\d+) (?:لهجة|لكنة (?:عربية|محلية))/u' => [$arabic, false],
+            '/\+(\d+) (?:لهجة(?! ولكنة)|لكنة (?:عربية|محلية))/u' => [$arabic, false],
             '/more than (\d+) (?:English )?accents/u' => [$english, true],
             '/(\d+)\+ English/u' => [$english, false],
             '/أكثر من (\d+) لكنة(?! (?:عربية|محلية))/u' => [$english, true],
             '/\+(\d+) لكنة(?! (?:عربية|محلية))/u' => [$english, false],
             '/(\d+)\+ accents/u' => [$arabic + $english, false],
+            // Dialects and accents together: the Arabic dialects and the English accents.
+            '/(\d+)\+ dialects and accents/u' => [$arabic + $english, false],
+            '/\+(\d+) لهجة ولكنة/u' => [$arabic + $english, false],
             '/أكثر من (\d+) لهجة ولكنة/u' => [$arabic + $english, true],
             '/(\d+)\+ (?:[Pp]erformance )?styles/u' => [$styles, false],
             '/أكثر من (\d+) أسلوب/u' => [$styles, true],

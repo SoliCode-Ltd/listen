@@ -57,16 +57,18 @@ class VoiceOrbsTest extends TestCase
         foreach (array_unique($slugs[1]) as $slug) {
             $this->assertStringContainsString('data-orb="'.Orbs::forPlan($slug).'"', $html, $slug);
         }
-        // Only the recommended plan's orb is alive; its card is held in a violet ring, not filled.
+        // The recommended plan is the one shown first, and only its orb is alive.
         $this->assertSame(1, substr_count($html, 'plan-orb is-live'));
-        $page->assertSee('box-shadow: 0 0 0 2px var(--brand-accent)', false);
+        $this->assertMatchesRegularExpression('/class="plan-card popular[^"]*is-active"/', $html);
 
-        // No two orbs on the page look alike: every plan, the teams band and the closing panel
-        // each have their own colours.
+        // No two orbs look alike: every plan, the teams band and the closing panel each have
+        // their own colours (a plan's orb shows on the track, in the panel and in the list).
         preg_match_all('/data-orb="([a-z_]+)" data-orb-colors="([^"]+)"/', $html, $orbs);
         $this->assertContains('teams', $orbs[1]);
         $this->assertContains('listen', $orbs[1]);
-        $this->assertSame(count($orbs[2]), count(array_unique($orbs[2])), implode(', ', $orbs[1]));
+        $palettes = array_unique(array_map(fn ($name, $colors) => $name.'='.$colors, $orbs[1], $orbs[2]));
+        $this->assertSame(count(array_unique($orbs[1])), count($palettes), implode(', ', $palettes));
+        $this->assertSame(count($palettes), count(array_unique($orbs[2])), implode(', ', $palettes));
         // Hovering a card wakes its orb: every plan card, the teams band and the closing panel.
         $this->assertSame(4, preg_match_all('/class="plan-card[^"]*" data-orb-host/', $html));
         $this->assertMatchesRegularExpression('/class="team-band[^>]*data-orb-host/', $html);
