@@ -77,10 +77,6 @@ class GeminiTtsProvider implements TtsProviderInterface
      * @var array<string, string>
      */
     private const VOICE_ALIAS_MAP = [
-        // Abeer moved to the lighter Zephyr (owner, 2026-10-24): Pulcherrima sounded like a man.
-        // Her id keeps its old name, so past audio, favourites and API calls still find her.
-        'ar-gemini-hd-pulcherrima' => 'Zephyr',
-
         // Arabic branded aliases (legacy)
         'rawaa' => 'Kore',
         'basem' => 'Puck',
@@ -89,71 +85,9 @@ class GeminiTtsProvider implements TtsProviderInterface
         'souad' => 'Leda',
         'tariq' => 'Orus',
         'lamis' => 'Zephyr',
-
-        // Arabic Gemini display names -> canonical voice
-        'fatima'     => 'Achernar',   // female
-        'nawaf'      => 'Achird',     // male
-        'sultan'     => 'Algenib',    // male
-        'turki'      => 'Algieba',    // male
-        'faisal'     => 'Alnilam',    // male
-        'khadija'    => 'Aoede',      // female
-        'ruqaya'     => 'Autonoe',    // female
-        'sumaya'     => 'Callirrhoe', // female
-        'waleed'     => 'Charon',     // male
-        'walid'      => 'Charon',     // male (transliteration variant)
-        'maha'       => 'Despina',    // female
-        'mansour'    => 'Enceladus',  // male
-        'aisha'      => 'Erinome',    // female
-        'saud'       => 'Fenrir',     // male
-        'duaa'       => 'Gacrux',     // female
-        'fahad'      => 'Iapetus',    // male
-        'lamya'      => 'Kore',       // female
-        'lubna'      => 'Laomedeia',  // female
-        'noura'      => 'Leda',       // female
-        'abdulaziz'  => 'Orus',       // male
-        'othman'     => 'Puck',       // male
-        'abeer'      => 'Zephyr',     // female (was Pulcherrima, which sounded like a man)
-        'mishary'    => 'Rasalgethi', // male
-        'hamed'      => 'Sadachbia',  // male
-        'tamim'      => 'Sadaltager', // male
-        'hazem'      => 'Schedar',    // male
-        'manal'      => 'Sulafat',    // female
-        'raed'       => 'Umbriel',    // male
-        'jumana'     => 'Vindemiatrix', // female
-        'sawsan'     => 'Zephyr',     // female
-        'yasser'     => 'Zubenelgenubi', // male
-
-        // English Gemini display names -> canonical voice
-        'alice'      => 'Achernar',   // female
-        'oliver'     => 'Achird',     // male
-        'george'     => 'Algenib',    // male
-        'oscar'      => 'Algieba',    // male
-        'charlie'    => 'Alnilam',    // male
-        'ruby'       => 'Aoede',      // female
-        'ivy'        => 'Autonoe',    // female
-        'maya'       => 'Callirrhoe', // female
-        'theodore'   => 'Charon',     // male
-        'luna'       => 'Despina',    // female
-        'arthur'     => 'Enceladus',  // male
-        'willow'     => 'Erinome',    // female
-        'finn'       => 'Fenrir',     // male
-        'isla'       => 'Gacrux',     // female
-        'miles'      => 'Iapetus',    // male
-        'daisy'      => 'Kore',       // female
-        'poppy'      => 'Laomedeia',  // female
-        'sienna'     => 'Leda',       // female
-        'nathan'     => 'Orus',       // male
-        'dylan'      => 'Puck',       // male
-        'freya'      => 'Pulcherrima',// female
-        'ryan'       => 'Rasalgethi', // male
-        'adrian'     => 'Sadachbia',  // male
-        'caleb'      => 'Sadaltager', // male
-        'marcus'     => 'Schedar',    // male
-        'phoebe'     => 'Sulafat',    // female
-        'vincent'    => 'Umbriel',    // male
-        'rose'       => 'Vindemiatrix', // female
-        'clara'      => 'Zephyr',     // female
-        'philip'     => 'Zubenelgenubi', // male,
+        // Old names and spellings of speakers (a speaker's own name finds them in SpeakerVoices).
+        'walid' => 'Charon',
+        'hazem' => 'Schedar',
     ];
 
     /**
@@ -1168,10 +1102,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             );
             $speakerVoiceConfigs[] = [
                 'speaker' => $speakerName,
-                // A library voice is named the 3.8 way; a studio voice as before.
-                'voiceConfig' => in_array($voice, self::VOICES, true)
-                    ? ['prebuiltVoiceConfig' => ['voiceName' => $voice]]
-                    : ['voice' => $voice],
+                'voiceConfig' => self::dialogueVoiceConfig($voice),
             ];
         }
 
@@ -1905,10 +1836,14 @@ class GeminiTtsProvider implements TtsProviderInterface
         $resolved = '';
         $detectedGender = null;
 
-        // 0. A premium speaker with a voice of their own (App\Support\SpeakerVoices).
+        // 0. A premium speaker (by id or name) has a voice of their own (App\Support\SpeakerVoices);
+        //    that voice itself (a library id dubbing passes on) is used as is.
         $assigned = SpeakerVoices::find($voiceName);
         if ($assigned !== null) {
             return $assigned;
+        }
+        if ($voiceName !== '' && SpeakerVoices::isAssigned($voiceName)) {
+            return $voiceName;
         }
 
         // 1. Already a known raw Gemini voice name -> use directly.
@@ -1979,11 +1914,23 @@ class GeminiTtsProvider implements TtsProviderInterface
     }
 
     /**
-     * "male" or "female" for a stock Gemini voice name, or null when unknown.
+     * A dialogue speaker's voice: a library voice is named the 3.8 way, a studio voice as before.
+     *
+     * @return array<string, mixed>
+     */
+    public static function dialogueVoiceConfig(string $voice): array
+    {
+        return in_array($voice, self::VOICES, true)
+            ? ['prebuiltVoiceConfig' => ['voiceName' => $voice]]
+            : ['voice' => $voice];
+    }
+
+    /**
+     * "male" or "female" for a studio voice or a speaker's library voice, or null when unknown.
      */
     public static function voiceGender(string $voiceName): ?string
     {
-        return self::VOICE_GENDER_MAP[$voiceName] ?? null;
+        return self::VOICE_GENDER_MAP[$voiceName] ?? SpeakerVoices::genderOf($voiceName);
     }
 
     private function normalizeGender(mixed $gender): string

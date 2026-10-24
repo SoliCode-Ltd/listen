@@ -12,8 +12,8 @@ class SpeakerVoicesTest extends TestCase
     {
         parent::setUp();
         SpeakerVoices::set([
-            'ar-Gemini-HD-Orus' => 'ar-001-advisor-3',
-            'en-Gemini-HD-Iapetus' => 'en-gb-advisor-9',
+            'ar-Gemini-HD-Orus' => ['name' => 'Abdulaziz', 'gender' => 'male', 'voice' => 'ar-001-advisor-3'],
+            'en-Gemini-HD-Iapetus' => ['name' => 'Miles', 'gender' => 'male', 'voice' => 'en-gb-advisor-9'],
         ]);
     }
 
@@ -27,6 +27,8 @@ class SpeakerVoicesTest extends TestCase
     {
         $this->assertSame('ar-001-advisor-3', $this->invoke('resolveGeminiVoice', 'ar-Gemini-HD-Orus', 'male'));
         $this->assertSame('en-gb-advisor-9', $this->invoke('resolveGeminiVoice', 'EN-GEMINI-HD-IAPETUS', 'male'));
+        $this->assertSame('ar-001-advisor-3', $this->invoke('resolveGeminiVoice', 'Abdulaziz', 'male'), 'by name too');
+        $this->assertSame('male', GeminiTtsProvider::voiceGender('en-gb-advisor-9'));
         // A speaker with no voice of their own keeps the one in their id.
         $this->assertSame('Kore', $this->invoke('resolveGeminiVoice', 'ar-Gemini-HD-Kore', 'female'));
     }
@@ -52,7 +54,7 @@ class SpeakerVoicesTest extends TestCase
     public function test_every_assigned_voice_is_used_once(): void
     {
         SpeakerVoices::forget();
-        $voices = array_values(SpeakerVoices::all());
+        $voices = array_map('strtolower', array_column(SpeakerVoices::all(), 'voice'));
         $this->assertSame(count($voices), count(array_unique($voices)), 'two speakers share a voice');
     }
 

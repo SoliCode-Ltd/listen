@@ -307,7 +307,7 @@ class GenerateShowcaseSamplesCommand extends Command
             $parts = [];
             $voices = [];
             foreach ($sample['speakers'] as $speaker) {
-                $voices[] = ['speaker' => $speaker['name'], 'voiceConfig' => ['prebuiltVoiceConfig' => ['voiceName' => $speaker['voice']]]];
+                $voices[] = ['speaker' => $speaker['name'], 'voiceConfig' => GeminiTtsProvider::dialogueVoiceConfig($speaker['voice'])];
             }
             foreach ($this->turns($sample) as $turn) {
                 $speaker = collect($sample['speakers'])->firstWhere('name', $turn['speaker']);

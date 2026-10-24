@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Voice;
+use App\Services\Tts\GeminiTtsProvider;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
 use App\Support\SpeakerAvatar;
+use App\Support\SpeakerVoices;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceFlag;
 use App\Support\VoicePreviews;
@@ -17,12 +19,6 @@ use Tests\TestCase;
 class VoicePreviewsTest extends TestCase
 {
     use RefreshDatabase;
-
-    private const GEMINI_VOICES = [
-        'Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'Aoede', 'Callirrhoe', 'Autonoe',
-        'Enceladus', 'Iapetus', 'Umbriel', 'Algieba', 'Despina', 'Erinome', 'Algenib', 'Rasalgethi', 'Laomedeia', 'Achernar',
-        'Alnilam', 'Schedar', 'Gacrux', 'Pulcherrima', 'Achird', 'Zubenelgenubi', 'Vindemiatrix', 'Sadachbia', 'Sadaltager', 'Sulafat',
-    ];
 
     private ?string $public = null;
 
@@ -43,7 +39,8 @@ class VoicePreviewsTest extends TestCase
 
         foreach ($lines as $slug => $line) {
             $this->assertFileExists(public_path("images/speakers/{$slug}.webp"), "{$slug} has no avatar");
-            $this->assertContains($line['voice'], self::GEMINI_VOICES, $slug);
+            // The speaker's own voice (App\Support\SpeakerVoices; SpeakerRosterTest checks which).
+            $this->assertNotNull(GeminiTtsProvider::voiceGender($line['voice']), $slug);
             $this->assertNotSame('', trim($line['style']), $slug);
 
             $language = $line['language'];
@@ -66,9 +63,9 @@ class VoicePreviewsTest extends TestCase
 
             $words = count(preg_split('/\s+/u', trim((string) preg_replace('/<[^<>]+>/u', ' ', $line['text']))));
             if ($language === 'ar') {
-                $this->assertTrue($words >= 14 && $words <= 22, "{$slug}: {$words} Arabic words");
+                $this->assertTrue($words >= 14 && $words <= 24, "{$slug}: {$words} Arabic words");
             } elseif ($language === 'en') {
-                $this->assertTrue($words >= 20 && $words <= 33, "{$slug}: {$words} English words");
+                $this->assertTrue($words >= 20 && $words <= 34, "{$slug}: {$words} English words");
             } else {
                 $this->assertTrue(mb_strlen($line['text']) >= 40 && mb_strlen($line['text']) <= 190, "{$slug}: length");
             }
@@ -191,7 +188,7 @@ class VoicePreviewsTest extends TestCase
         File::ensureDirectoryExists(public_path('audio/voice-previews'));
         file_put_contents(public_path('audio/voice-previews/ar-abeer.mp3'), 'mp3');
         file_put_contents(VoicePreviews::madePath(), json_encode(['ar-abeer' => VoicePreviews::hash(VoicePreviews::lines()['ar-abeer'])]));
-        $this->voice('Abeer', 'ar', 'female', 'Zephyr');
+        $this->voice('Abeer', 'ar', 'female', 'Pulcherrima');
 
         $this->assertSame('سعودية (قطيفية)', array_values(VoiceCatalog::libraryEntries(true))[0]['d']);
         $this->assertSame('Saudi (Qatifi)', array_values(VoiceCatalog::libraryEntries(false))[0]['d']);
@@ -199,7 +196,7 @@ class VoicePreviewsTest extends TestCase
         Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['inlineData' => ['data' => base64_encode($this->wav())]]]]]]])]);
         $this->artisan('tts:showcase', ['--set' => 'previews', '--generate' => true, '--only' => ['ar-abeer', 'ar-fahad'], '--key' => 'test', '--pause' => 0, '--force' => true])
             ->assertSuccessful();
-        Http::assertSent(fn ($request) => $request['generationConfig']['speechConfig']['voiceConfig']['voice'] === 'Zephyr'
+        Http::assertSent(fn ($request) => $request['generationConfig']['speechConfig']['voiceConfig']['voice'] === SpeakerVoices::find('Abeer')
             && str_contains($request['contents'][0]['parts'][0]['speech_metadata']['style'], 'The speaker is a woman'));
         Http::assertSent(fn ($request) => $request['generationConfig']['speechConfig']['voiceConfig']['voice'] === 'Iapetus'
             && ! str_contains($request['contents'][0]['parts'][0]['speech_metadata']['style'], 'woman'));

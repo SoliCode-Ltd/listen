@@ -13,9 +13,9 @@ on:
   workflow_dispatch:
     inputs:
       ad:
-        description: 'Which ad: launch-ad ("Which voice is real?"), emotions-ad ("One line. Every emotion."), prompts-film (the prompts film) or voice-previews (the voice library previews, database/seeders/data/voice_previews.php)'
+        description: 'Which ad: launch-ad ("Which voice is real?"), emotions-ad ("One line. Every emotion."), prompts-film (the prompts film), voice-previews (the voice library previews, database/seeders/data/voice_previews.php) or speaker-avatars (the missing speaker avatars, with the image model)'
         type: choice
-        options: [launch-ad, emotions-ad, prompts-film, voice-previews, voice-library-test]
+        options: [launch-ad, emotions-ad, prompts-film, voice-previews, voice-library-test, speaker-avatars]
         default: launch-ad
       max:
         description: 'voice-previews only: at most this many clips per key (live shares the quota)'
@@ -98,6 +98,23 @@ jobs:
           echo "${#KEYS[@]} Gemini key(s) on staging."
           first_key="$(printf '%s' "$FROM_KEY" | tr -cd '0-9')"; first_key="${first_key:-1}"
           KEY="${KEYS[$(( first_key <= ${#KEYS[@]} ? first_key - 1 : 0 ))]}"
+          if [ "$AD" = speaker-avatars ]; then
+            # The speakers come from the seeder, in a throwaway database; only missing avatars are drawn.
+            # A key that fails leaves its avatars to the next key.
+            export DB_CONNECTION=sqlite DB_DATABASE="$PWD/database/avatars.sqlite"
+            touch "$DB_DATABASE"
+            php artisan migrate --force --no-interaction > /dev/null
+            php artisan db:seed --class=VoiceSeeder --force --no-interaction > /dev/null
+            first="$(printf '%s' "$FROM_KEY" | tr -cd '0-9')"; first="${first:-1}"
+            for (( n = first; n <= ${#KEYS[@]}; n++ )); do
+              echo "--- key $n of ${#KEYS[@]}"
+              out="$(php artisan speakers:avatars --key="${KEYS[$((n - 1))]}" --pause=3 2>&1 || true)"
+              printf '%s\n' "$out" | cut -c1-200
+              grep -q '^fail' <<<"$out" || break
+            done
+            rm -f "$DB_DATABASE"
+            exit 0
+          fi
           if [ "$AD" = voice-previews ]; then
             # Only clips that are missing or whose line changed. Each key stops at its first
             # quota error and the next key carries on; the last key is left for live unless use_last_key.
@@ -123,12 +140,12 @@ jobs:
           php -r '$o=[]; foreach (array_merge((require "marketing/'"$AD"'/lines.php")["samples"], '"$extra"') as $s) { $o[$s["slug"]] = ["language" => $s["language"], "text" => trim(preg_replace("/\s*<[^<>]+>\s*/u", " ", $s["text"]))]; } file_put_contents("/tmp/lines.json", json_encode($o, JSON_UNESCAPED_UNICODE));'
 
       - uses: actions/setup-python@v5
-        if: env.AD != 'voice-previews'
+        if: env.AD != 'voice-previews' && env.AD != 'speaker-avatars'
         with:
           python-version: '3.12'
 
       - name: Transcribe with word timings
-        if: env.AD != 'voice-previews'
+        if: env.AD != 'voice-previews' && env.AD != 'speaker-avatars'
         run: |
           pip install -q requests soundfile scipy faster-whisper==1.1.1
           python marketing/launch-ad/transcribe.py "marketing/$AD/voices" /tmp/lines.json "marketing/$AD/voices/words.json"
@@ -139,10 +156,18 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ "$AD" = voice-previews ]; then git add public/audio/voice-previews; else git add "marketing/$AD/voices"; fi
+          case "$AD" in
+            voice-previews) git add public/audio/voice-previews ;;
+            speaker-avatars) git add public/images/speakers ;;
+            *) git add "marketing/$AD/voices" ;;
+          esac
           if git diff --cached --quiet; then echo "Nothing new"; exit 0; fi
           git diff --cached --stat
-          if [ "$AD" = voice-previews ]; then msg="Voice previews: clips made with the staging keys"; else msg="$AD: voices made with staging key 1, with word timings"; fi
+          case "$AD" in
+            voice-previews) msg="Voice previews: clips made with the staging keys" ;;
+            speaker-avatars) msg="Speaker avatars: drawn with the staging keys" ;;
+            *) msg="$AD: voices made with staging key 1, with word timings" ;;
+          esac
           git commit -m "$msg"
           git pull --rebase origin "${GITHUB_REF#refs/heads/}"
           git push origin HEAD:${GITHUB_REF#refs/heads/}

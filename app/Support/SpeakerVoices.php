@@ -5,25 +5,55 @@ namespace App\Support;
 /**
  * Which Gemini voice each premium speaker speaks with, so no two speakers
  * share a voice. Most come from Gemini's Extended Voice Library (ids like
- * en-gb-advisor-9). Keyed by the speaker's internal_voice_id, which never
- * changes, so history, favourites and API calls keep finding them.
+ * en-gb-tutor-9). Keyed by the speaker's internal_voice_id, which never
+ * changes, so history, favourites and API calls keep finding them; a
+ * speaker's display name finds them too.
  * Data: database/seeders/data/speaker_voices.php.
  */
 final class SpeakerVoices
 {
-    /** @var array<string, string>|null voice by lower-case internal id */
+    /** @var array<string, array{name: string, gender: string, voice: string}>|null by lower-case internal id */
     private static ?array $byId = null;
 
+    /** @var array<string, string>|null lower-case display name => lower-case internal id */
+    private static ?array $byName = null;
+
+    /** @var array<string, string>|null voice => gender */
+    private static ?array $genders = null;
+
     /**
-     * The speaker's own voice, or null for a speaker with none assigned.
+     * The voice of the speaker with this internal id or display name, or null for one with none assigned.
      */
-    public static function find(?string $internalVoiceId): ?string
+    public static function find(?string $speaker): ?string
     {
-        return self::all()[strtolower(trim((string) $internalVoiceId))] ?? null;
+        $key = strtolower(trim((string) $speaker));
+        $byId = self::all();
+
+        return ($byId[$key] ?? $byId[self::$byName[$key] ?? ''] ?? null)['voice'] ?? null;
     }
 
     /**
-     * @return array<string, string>
+     * Whether this is a voice a speaker was given (a library id passed on as is, e.g. by dubbing).
+     */
+    public static function isAssigned(string $voice): bool
+    {
+        self::all();
+
+        return isset(self::$genders[$voice]);
+    }
+
+    /**
+     * "male" or "female" for a voice a speaker was given, or null.
+     */
+    public static function genderOf(string $voice): ?string
+    {
+        self::all();
+
+        return self::$genders[$voice] ?? null;
+    }
+
+    /**
+     * @return array<string, array{name: string, gender: string, voice: string}>
      */
     public static function all(): array
     {
@@ -37,15 +67,23 @@ final class SpeakerVoices
     /**
      * Use these assignments instead of the data file (tests).
      *
-     * @param  array<string, string>  $speakers  voice by internal id
+     * @param  array<string, array{name: string, gender: string, voice: string}>  $speakers  by internal id
      */
     public static function set(array $speakers): void
     {
         self::$byId = array_change_key_case($speakers, CASE_LOWER);
+        self::$byName = [];
+        self::$genders = [];
+        foreach (self::$byId as $id => $speaker) {
+            self::$byName[strtolower($speaker['name'])] = $id;
+            self::$genders[$speaker['voice']] = $speaker['gender'];
+        }
     }
 
     public static function forget(): void
     {
         self::$byId = null;
+        self::$byName = null;
+        self::$genders = null;
     }
 }
