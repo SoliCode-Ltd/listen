@@ -402,6 +402,18 @@ class BillingEdgeCasesTest extends TestCase
         $this->assertNull($this->stripe->last('post', '/v1/subscriptions/sub_edge'), 'A preview changed the subscription.');
     }
 
+    public function test_a_past_payment_reads_in_local_money_with_the_dollars_in_brackets(): void
+    {
+        \App\Models\SiteSetting::set('pricing_forced_country_code', 'EG', 'billing');
+        \App\Models\SiteSetting::set('pricing_exchange_rate_EGP', '50', 'billing');
+        $controller = app(\App\Http\Controllers\BillingController::class);
+        $context = app(\App\Services\LocalizedPricingService::class)->resolveCountryContext(request());
+        $format = new \ReflectionMethod($controller, 'formatChargedAmount');
+
+        $shown = str_replace(["\u{2066}", "\u{2069}", "\u{a0}"], ['', '', ' '], $format->invoke($controller, 1980, 'USD', $context, 'en'));
+        $this->assertSame('EGP 990 ($19.80)', $shown);
+    }
+
     public function test_order_details_are_in_local_money_only(): void
     {
         \App\Models\SiteSetting::set('pricing_forced_country_code', 'EG', 'billing');

@@ -1929,15 +1929,17 @@ class BillingController extends Controller
     }
 
     /**
-     * What the card was actually charged (Stripe charges USD), with today's
-     * local-currency estimate beside it, so past amounts never change.
+     * A past payment in the member's own money first, as every price on the site
+     * reads, and the dollars the card really paid in brackets after it, so it
+     * matches the bank statement: "EGP 1,095 (US$19.80)".
      */
     private function formatChargedAmount(int $amountCents, string $stripeCurrency, array $countryContext, string $locale): string
     {
         $charged = $this->formatInvoiceTotalLabel($amountCents, $stripeCurrency);
         $local = $this->formatLocalizedInvoiceAmount($amountCents, $stripeCurrency, $countryContext, $locale);
 
-        return $local !== $charged ? $charged.' (≈ '.$local.')' : $charged;
+        // Each amount kept in its own reading order inside an Arabic line.
+        return $local !== $charged ? "\u{2066}{$local}\u{2069} (\u{2066}{$charged}\u{2069})" : $charged;
     }
 
     private function resolveInvoicePurposeLabel(mixed $stripeInvoice, string $locale = 'en'): string
