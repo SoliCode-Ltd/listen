@@ -8,6 +8,7 @@ use App\Support\ArabicDialects;
 use App\Support\SpeechLanguages;
 use App\Support\EnglishAccents;
 use App\Support\GeminiTtsModel;
+use App\Support\SpeakerVoices;
 use App\Support\GeminiVocalTags;
 use App\Support\JoinPauses;
 use App\Support\PaceAndPitch;
@@ -1172,6 +1173,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         string $voiceName,
         string $languageCode,
     ): array {
+        $voiceName = $this->voiceForModel($voiceName, $model);
         if (GeminiTtsModel::usesStructuredSpeech($model)) {
             $part = ['text' => $text];
             if (trim($stylePrompt) !== '') {
@@ -1267,16 +1269,16 @@ class GeminiTtsProvider implements TtsProviderInterface
                 $speakerName = 'Speaker';
             }
 
+            $voice = $this->voiceForModel($this->resolveGeminiVoice(
+                (string) ($speaker['voice_name'] ?? $speaker['voice'] ?? ''),
+                $speaker['gender'] ?? null,
+            ), $model);
             $speakerVoiceConfigs[] = [
                 'speaker' => $speakerName,
-                'voiceConfig' => [
-                    'prebuiltVoiceConfig' => [
-                        'voiceName' => $this->resolveGeminiVoice(
-                            (string) ($speaker['voice_name'] ?? $speaker['voice'] ?? ''),
-                            $speaker['gender'] ?? null,
-                        ),
-                    ],
-                ],
+                // A library voice is named the 3.8 way; a studio voice as before.
+                'voiceConfig' => in_array($voice, self::VOICES, true)
+                    ? ['prebuiltVoiceConfig' => ['voiceName' => $voice]]
+                    : ['voice' => $voice],
             ];
         }
 
@@ -2020,6 +2022,12 @@ class GeminiTtsProvider implements TtsProviderInterface
         $resolved = '';
         $detectedGender = null;
 
+        // 0. A premium speaker with a voice of their own (App\Support\SpeakerVoices).
+        $assigned = SpeakerVoices::find($voiceName);
+        if ($assigned !== null) {
+            return $assigned['voice'];
+        }
+
         // 1. Already a known raw Gemini voice name -> use directly.
         if ($voiceName !== '' && in_array($voiceName, self::VOICES, true)) {
             $resolved = $voiceName;
@@ -2105,6 +2113,19 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         return SpeechLanguages::speechCode($normalized) ?? 'en-US';
+    }
+
+    /**
+     * A library voice (only the 3.8 models know them) becomes the speaker's
+     * studio fallback on the older model.
+     */
+    private function voiceForModel(string $voice, string $model): string
+    {
+        if (GeminiTtsModel::usesStructuredSpeech($model) || in_array($voice, self::VOICES, true)) {
+            return $voice;
+        }
+
+        return SpeakerVoices::fallbackFor($voice) ?? $this->defaultVoiceForGender(null);
     }
 
     /**
