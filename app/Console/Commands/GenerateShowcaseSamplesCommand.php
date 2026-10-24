@@ -296,9 +296,9 @@ class GenerateShowcaseSamplesCommand extends Command
 
         if (! $isDialogue) {
             $style = trim($this->accentDirection($language, $sample['dialect']).' '.$sample['style']);
-            $asChild = GeminiTtsProvider::asSpeaker((string) ($sample['speaker'] ?? ''), $style);
-            if ($asChild !== $style) {
-                $style = $asChild;
+            $aged = GeminiTtsProvider::asSpeaker((string) ($sample['speaker'] ?? ''), $style);
+            if ($aged !== $style) {
+                $style = $aged;
             } elseif (($sample['speaker_gender'] ?? null) === 'female') {
                 // A deep, mature or punchy direction can make a woman's voice sound like a man's.
                 $style .= ' The speaker is a woman: keep a natural, clearly female voice.';

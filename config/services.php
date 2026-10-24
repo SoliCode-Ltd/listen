@@ -106,6 +106,14 @@ return [
         // came back without audio). The pieces are joined like a single voice's.
         'max_dialogue_chars_per_request' => (int) env('GEMINI_TTS_MAX_DIALOGUE_CHARS_PER_REQUEST', 1500),
 
+        // A child speaker is a light grown-up voice directed to sound like a child,
+        // and over a long piece it drifts back to its own age. A child is read in
+        // shorter pieces (a dialogue with a child too), each with the child's
+        // direction, and a piece pitched below a child's voice (Hz) is taken again.
+        'child_max_chars_per_request' => (int) env('GEMINI_TTS_CHILD_MAX_CHARS_PER_REQUEST', 300),
+        'child_max_dialogue_chars_per_request' => (int) env('GEMINI_TTS_CHILD_MAX_DIALOGUE_CHARS_PER_REQUEST', 600),
+        'child_min_pitch' => (float) env('GEMINI_TTS_CHILD_MIN_PITCH', 220),
+
         // Optional HTTP(S) proxy for voice replication only, e.g. when the
         // server's country is not supported. Example: http://user:pass@host:3128
         'voice_proxy' => env('GEMINI_VOICE_PROXY', ''),

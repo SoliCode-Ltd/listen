@@ -112,7 +112,11 @@ class SpeakerRosterTest extends TestCase
         $this->assertStringStartsWith('The speaker is a real girl of about eight or nine', GeminiTtsProvider::asSpeaker('ar-Gemini-HD-Malak', 'Warm and happy.'));
         $this->assertStringEndsWith('Warm and happy.', GeminiTtsProvider::asSpeaker('Malak', 'Warm and happy.'));
         $this->assertStringContainsString('real boy', GeminiTtsProvider::asSpeaker('Alfie', ''));
+        $this->assertStringContainsString("Keep the same child's voice from the first word to the last", GeminiTtsProvider::asSpeaker('Malak', ''));
         $this->assertSame('Warm and happy.', GeminiTtsProvider::asSpeaker('ar-Gemini-HD-Orus', 'Warm and happy.'), 'grown-ups unchanged');
+        $this->assertStringStartsWith('The speaker is an older man in his late sixties', GeminiTtsProvider::asSpeaker('ar-Gemini-HD-Ghassan', 'Calm.'));
+        $this->assertStringEndsWith('Calm.', GeminiTtsProvider::asSpeaker('Ghassan', 'Calm.'));
+        $this->assertStringContainsString('older woman in her late sixties', GeminiTtsProvider::asSpeaker('Fadwa', ''));
 
         \Illuminate\Support\Facades\Storage::fake('public');
         $key = ['key' => 'k', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1];
@@ -140,6 +144,59 @@ class SpeakerRosterTest extends TestCase
         $parts = $bodies[1]['contents'][0]['parts'];
         $this->assertStringContainsString('real boy', $parts[0]['speech_metadata']['style']);
         $this->assertStringNotContainsString('real boy', $parts[1]['speech_metadata']['style'] ?? '');
+    }
+
+    public function test_a_childs_long_text_or_dialogue_is_made_in_short_pieces_so_the_child_stays_a_child(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $key = ['key' => 'k', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1];
+        $keys = \Mockery::mock(\App\Services\Tts\GeminiKeyManager::class);
+        $keys->shouldReceive('getAllKeys')->andReturn([$key]);
+        $keys->shouldReceive('getAvailableKey')->andReturn($key);
+        $keys->shouldReceive('recordUsage')->andReturnNull();
+        $this->app->instance(\App\Services\Tts\GeminiKeyManager::class, $keys);
+        config(['services.gemini_tts.dialect_rewrite' => false, 'services.gemini_tts.check_pieces' => false]);
+        $bodies = [];
+        \Illuminate\Support\Facades\Http::fake(function ($request) use (&$bodies) {
+            $bodies[] = $request->data();
+
+            return \Illuminate\Support\Facades\Http::response(['candidates' => [['content' => ['parts' => [[
+                'inlineData' => ['mimeType' => 'audio/l16', 'data' => base64_encode(pack('v*', 0, 1200, 2400, 1200, 0, -1200))],
+            ]]]]]]);
+        });
+
+        // About 700 characters: one piece for a grown-up, short pieces for a child, each a child's.
+        $long = str_repeat('Grandma, guess what happened at school today. ', 15);
+        app(GeminiTtsProvider::class)->synthesize($long, 'en', ['voice_name' => 'en-Gemini-HD-Charon']);
+        $this->assertCount(1, $bodies);
+        $bodies = [];
+        app(GeminiTtsProvider::class)->synthesize($long, 'en', ['voice_name' => 'en-Gemini-HD-Emily']);
+        $this->assertGreaterThanOrEqual(3, count($bodies));
+        foreach ($bodies as $body) {
+            $this->assertStringContainsString('real girl', $body['contents'][0]['parts'][0]['speech_metadata']['style']);
+        }
+
+        // A dialogue shorter than one grown-up dialogue request, with a child in it: in pieces.
+        $script = implode("\n", array_map(fn (int $i): string => $i % 2
+            ? 'Theodore: Splendid, tell me more about that rocket of yours.'
+            : 'Alfie: It goes really high, past the clouds and the moon!', range(0, 13)));
+        $this->assertLessThan(1500, mb_strlen($script));
+        $bodies = [];
+        app(GeminiTtsProvider::class)->synthesize($script, 'en', ['speakers' => [
+            ['name' => 'Alfie', 'voice_name' => 'en-Gemini-HD-Alfie'],
+            ['name' => 'Theodore', 'voice_name' => 'en-Gemini-HD-Charon'],
+        ]]);
+        $this->assertGreaterThan(1, count($bodies));
+        foreach ($bodies as $body) {
+            foreach ($body['contents'][0]['parts'] as $part) {
+                $style = $part['speech_metadata']['style'] ?? '';
+                if ($part['speech_metadata']['speaker'] === 'Alfie') {
+                    $this->assertStringContainsString('real boy', $style);
+                } else {
+                    $this->assertStringContainsString('older man in his late sixties', $style, 'Theodore is an elder');
+                }
+            }
+        }
     }
 
     public function test_homepage_clips_use_each_speakers_own_voice(): void
