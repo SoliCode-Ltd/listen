@@ -225,7 +225,7 @@ return [
         'hours_and_minutes' => ':hours و:minutes',
         'minutes_live' => ':minutes دقيقة شهريًا: باقة :plan',
         'all_plans' => 'كل الباقات',
-        'voices_proof' => 'أكثر من :count لهجة ولكنة في كل باقة',
+        'voices_proof' => '+:count لهجة ولكنة في كل باقة',
         'monthly' => 'شهري',
         'yearly' => 'سنوي',
         'annual_saves' => 'الخطة السنوية توفّر 20%',
