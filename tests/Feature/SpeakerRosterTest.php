@@ -66,7 +66,7 @@ class SpeakerRosterTest extends TestCase
         $names = $speakers->map(fn (Voice $v): string => strtolower((string) $v->display_name));
         $this->assertSame([], $names->duplicates()->values()->all(), 'two speakers share a name');
 
-        $catalog = collect(VoiceCatalog::publicCatalog('hd', 'gemini'))->flatten(1)->keyBy('name');
+        $catalog = collect(VoiceCatalog::publicCatalog('hd', 'gemini'))->flatten(1)->keyBy('key');
         foreach ($speakers as $speaker) {
             $id = (string) $speaker->internal_voice_id;
             $slug = SpeakerAvatar::slug((string) $speaker->display_name, (string) $speaker->language);
@@ -76,7 +76,7 @@ class SpeakerRosterTest extends TestCase
             $this->assertArrayHasKey($slug, $lines, "{$id} has no preview line");
             $this->assertSame($speaker->provider_voice_id, $lines[$slug]['voice'], "{$slug}: the preview is in the speaker's own voice");
             $this->assertFileExists(public_path("images/speakers/{$slug}.webp"), "{$slug} has no avatar");
-            $this->assertNotSame($speaker->display_name, $catalog[$id]['label_ar'], "{$id} has no Arabic name");
+            $this->assertNotSame($speaker->display_name, $catalog[VoiceCatalog::keyFromId((int) $speaker->id)]['label_ar'], "{$id} has no Arabic name");
         }
     }
 

@@ -62,7 +62,7 @@ class DialogueModeTest extends TestCase
         $this->assertNotNull($speech, 'a speech request was sent');
         $cast = $speech['body']['generationConfig']['speechConfig']['multiSpeakerVoiceConfig']['speakerVoiceConfigs'] ?? [];
         $this->assertSame(['سلطان', 'نورة'], array_column($cast, 'speaker'));
-        $this->assertCount(2, array_unique(array_map(fn ($s) => $s['voiceConfig']['prebuiltVoiceConfig']['voiceName'], $cast)));
+        $this->assertCount(2, array_unique(array_map(fn ($s) => $this->voiceOf($s), $cast)));
 
         // Each line goes to its own speaker, without the names read aloud.
         $parts = $speech['body']['contents'][0]['parts'];
@@ -322,7 +322,7 @@ class DialogueModeTest extends TestCase
         $speech = collect($this->requests)->filter(fn ($r) => isset($r['body']['generationConfig']['speechConfig']['multiSpeakerVoiceConfig']))->values();
         $this->assertGreaterThan(1, $speech->count(), 'made in pieces');
         $casts = $speech->map(fn ($r) => array_map(
-            fn ($c) => $c['speaker'].'='.$c['voiceConfig']['prebuiltVoiceConfig']['voiceName'],
+            fn ($c) => $c['speaker'].'='.$this->voiceOf($c),
             $r['body']['generationConfig']['speechConfig']['multiSpeakerVoiceConfig']['speakerVoiceConfigs'],
         ))->unique(fn ($cast) => implode('|', $cast));
         $this->assertCount(1, $casts, 'the same speakers and voices in every piece');
@@ -395,6 +395,16 @@ class DialogueModeTest extends TestCase
     /**
      * @return array{0: array<string, mixed>, 1: array<string, mixed>}
      */
+    /**
+     * The voice a dialogue speaker is given: a studio voice or a library voice.
+     *
+     * @param  array<string, mixed>  $speaker
+     */
+    private function voiceOf(array $speaker): string
+    {
+        return $speaker['voiceConfig']['prebuiltVoiceConfig']['voiceName'] ?? $speaker['voiceConfig']['voice'];
+    }
+
     private function twoPremiumVoices(string $language): array
     {
         $voices = array_values(array_filter(VoiceCatalog::publicCatalog()[$language], fn ($v) => ($v['tier'] ?? '') === 'hd'));
