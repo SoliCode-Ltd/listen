@@ -1,0 +1,104 @@
+name: Voice age test
+
+# Long readings by child and elder speakers (scripts/tts/age_test.php), made
+# with the staging Gemini keys twice: with main's speech code (before) and with
+# this branch's (after), to hear whether a voice keeps its age from the first
+# word to the last. Owner-approved (2026-10-24): about 9,000 characters in all.
+# Speech counts against the keys' quota, which staging shares with live, so it
+# runs only by hand, or when this test itself changes on the branch (a workflow
+# must be on main before it can be run by hand); the last key is left for live.
+# The keys are read over SSH, masked in the log and never stored; the readings
+# are a run artifact, never committed.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/beautiful-sagan-df90b3]
+    paths:
+      - scripts/tts/age_test.php
+      - .github/workflows/voice-age-test.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: bcmath, intl, mbstring, pdo_sqlite, sqlite3, gd, zip
+          coverage: none
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
+      - name: Install dependencies
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+          touch database/database.sqlite
+          php artisan migrate --force --no-interaction > /dev/null
+
+      - name: Staging keys
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_gen
+          chmod 600 ~/.ssh/id_gen
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; grep -E '^GEMINI_TTS_API_KEY(_[0-9]+)?=' .env | sed -E 's/^GEMINI_TTS_API_KEY=/GEMINI_TTS_API_KEY_1=/' | sort -t_ -k5 -n | cut -d= -f2-"
+          mapfile -t RAW < <(ssh -i ~/.ssh/id_gen -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote")
+          rm -f ~/.ssh/id_gen
+          KEYS=()
+          for k in "${RAW[@]}"; do
+            k="$(printf '%s' "$k" | tr -d "\"' \r\n")"
+            [ -z "$k" ] && continue
+            echo "::add-mask::$k"
+            dup=0; for seen in "${KEYS[@]}"; do [ "$seen" = "$k" ] && dup=1; done
+            [ "$dup" = 0 ] && KEYS+=("$k")
+          done
+          if [ "${#KEYS[@]}" -eq 0 ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
+          # Every key but the last, which live keeps; the speech code moves on when one runs out.
+          use=$(( ${#KEYS[@]} > 1 ? ${#KEYS[@]} - 1 : 1 ))
+          echo "Using ${use} of ${#KEYS[@]} staging keys."
+          sed -i '/^GEMINI_TTS_API_KEY/d' .env
+          for (( n = 1; n <= use; n++ )); do
+            if [ "$n" = 1 ]; then echo "GEMINI_TTS_API_KEY=${KEYS[0]}" >> .env; else echo "GEMINI_TTS_API_KEY_${n}=${KEYS[$((n - 1))]}" >> .env; fi
+          done
+
+      - name: Before (main's speech code)
+        run: |
+          git checkout origin/main -- app config
+          php scripts/tts/age_test.php age-test/before
+          grep -h "taken again" storage/logs/*.log 2>/dev/null | cut -c1-300 || true
+          git checkout HEAD -- app config
+          rm -f storage/logs/*.log
+
+      - name: After (this branch's speech code)
+        run: |
+          php scripts/tts/age_test.php age-test/after
+          grep -h "taken again" storage/logs/*.log 2>/dev/null | cut -c1-300 || true
+
+      - name: Keys out of .env
+        if: always()
+        run: sed -i '/^GEMINI_TTS_API_KEY/d' .env
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: age-test
+          path: age-test
