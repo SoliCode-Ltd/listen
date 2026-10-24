@@ -40,7 +40,7 @@ concurrency:
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 300
     env:
       AD: ${{ inputs.ad || 'launch-ad' }}
       MAX: ${{ inputs.max || '40' }}
@@ -124,7 +124,7 @@ jobs:
             if [ -z "$USE_LAST_KEY" ] && [ "$last" -gt 1 ]; then last=$((last - 1)); fi
             for (( n = first; n <= last; n++ )); do
               echo "--- key $n of ${#KEYS[@]}"
-              out="$(php artisan tts:showcase --set=previews --generate --pause=15 --max="$max" --key="${KEYS[$((n - 1))]}" 2>&1 || true)"
+              out="$(php artisan tts:showcase --set=previews --generate --pause=10 --max="$max" --key="${KEYS[$((n - 1))]}" 2>&1 || true)"
               printf '%s\n' "$out" | grep -v '^\*' | cut -c1-200
               # Done, or this key made all that was left: stop. Out of quota or at its limit: next key.
               grep -q '^0 preview' <<<"$out" && break
