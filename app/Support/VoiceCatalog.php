@@ -315,6 +315,21 @@ class VoiceCatalog
         'Tomasz' => 'توماش',
         'Valentina' => 'فالنتينا',
         'Yuki' => 'يوكي',
+        // Children
+        'Alfie' => 'ألفي',
+        'Anaya' => 'أنايا',
+        'Emily' => 'إيميلي',
+        'Hessa' => 'حصة',
+        'Karam' => 'كرم',
+        'Lulu' => 'لولو',
+        'Malak' => 'ملك',
+        'Matilda' => 'ماتيلدا',
+        'Max' => 'ماكس',
+        'Mustafa' => 'مصطفى',
+        'Rayan' => 'ريان',
+        'Rory' => 'روري',
+        'Yasmine' => 'ياسمين',
+        'Yazan' => 'يزن',
     ];
 
     /**

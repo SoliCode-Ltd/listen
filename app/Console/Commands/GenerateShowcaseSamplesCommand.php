@@ -203,7 +203,9 @@ class GenerateShowcaseSamplesCommand extends Command
             if ($current && ! $this->option('force')) {
                 continue;
             }
-            $samples[] = $line + ['kind' => 'single', 'sign_off' => false, 'speaker_gender' => GeminiTtsProvider::voiceGender($line['voice'])];
+            $samples[] = $line + ['kind' => 'single', 'sign_off' => false, 'speaker_gender' => GeminiTtsProvider::voiceGender($line['voice']),
+                // The speaker (by the name in the slug): a child speaks as a child.
+                'speaker' => substr($slug, 3)];
         }
         $max = max(0, (int) $this->option('max'));
         $this->info(count($samples).' preview(s) to make'.($max > 0 && count($samples) > $max ? ", {$max} in this run" : '').'.');
@@ -294,7 +296,10 @@ class GenerateShowcaseSamplesCommand extends Command
 
         if (! $isDialogue) {
             $style = trim($this->accentDirection($language, $sample['dialect']).' '.$sample['style']);
-            if (($sample['speaker_gender'] ?? null) === 'female') {
+            $asChild = GeminiTtsProvider::asSpeaker((string) ($sample['speaker'] ?? ''), $style);
+            if ($asChild !== $style) {
+                $style = $asChild;
+            } elseif (($sample['speaker_gender'] ?? null) === 'female') {
                 // A deep, mature or punchy direction can make a woman's voice sound like a man's.
                 $style .= ' The speaker is a woman: keep a natural, clearly female voice.';
             }

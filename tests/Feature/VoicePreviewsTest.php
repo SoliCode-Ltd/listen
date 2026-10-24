@@ -74,7 +74,8 @@ class VoicePreviewsTest extends TestCase
 
     public function test_arabic_and_english_speakers_are_spread_over_many_dialects_and_languages(): void
     {
-        $lines = collect(VoicePreviews::lines());
+        // Children come on top, in dialects grown-ups already speak.
+        $lines = collect(VoicePreviews::lines())->reject(fn (array $line, string $slug): bool => (SpeakerVoices::speaker(substr($slug, 3))['age'] ?? null) === 'child');
 
         // No two speakers share a dialect, accent or language: the library is a tour of them.
         $this->assertSame($lines->count(), $lines->pluck('dialect')->unique()->count(), 'Two speakers share '.$lines->pluck('dialect')->duplicates()->implode(', '));

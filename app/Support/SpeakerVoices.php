@@ -36,6 +36,19 @@ final class SpeakerVoices
     }
 
     /**
+     * The speaker with this internal id or display name, or null.
+     *
+     * @return array{name: string, gender: string, age?: string, voice: string}|null
+     */
+    public static function speaker(?string $speaker): ?array
+    {
+        $key = strtolower(trim((string) $speaker));
+        $byId = self::all();
+
+        return $byId[$key] ?? $byId[self::$byName[$key] ?? ''] ?? null;
+    }
+
+    /**
      * The speaker's age group (child, young, middle or elder: how their avatar
      * looks), or null for a speaker with none.
      */

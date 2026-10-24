@@ -34,7 +34,9 @@ class SpeakerRosterTest extends TestCase
 
     public function test_every_dialect_accent_and_native_language_has_one_speaker(): void
     {
-        $dialects = array_column(VoicePreviews::lines(), 'dialect');
+        // Children come on top, in dialects grown-ups already speak.
+        $adults = array_filter(VoicePreviews::lines(), fn (string $slug): bool => (SpeakerVoices::speaker(substr($slug, 3))['age'] ?? null) !== 'child', ARRAY_FILTER_USE_KEY);
+        $dialects = array_column($adults, 'dialect');
 
         $this->assertSame(count($dialects), count(array_unique($dialects)), 'two speakers share a dialect');
         $expected = [...array_keys(ArabicDialects::ALL), ...array_keys(EnglishAccents::ALL), ...array_keys(VoicePreviews::NATIVE)];
@@ -97,6 +99,47 @@ class SpeakerRosterTest extends TestCase
             $this->assertStringContainsString('data-vs-lib-age="'.$age.'"', $page);
         }
         $this->assertStringContainsString('aria-label="Middle-aged"', $page);
+    }
+
+    public function test_a_child_speaker_always_speaks_as_a_child_alone_or_in_a_dialogue(): void
+    {
+        $children = array_filter(SpeakerVoices::all(), fn (array $s): bool => ($s['age'] ?? null) === 'child');
+        $this->assertGreaterThanOrEqual(12, count($children));
+        foreach ($children as $id => $child) {
+            $this->assertArrayHasKey(SpeakerAvatar::slug($child['name'], substr($id, 0, 2)), VoicePreviews::lines(), $id);
+        }
+
+        $this->assertStringStartsWith('The speaker is a real girl of about eight or nine', GeminiTtsProvider::asSpeaker('ar-Gemini-HD-Malak', 'Warm and happy.'));
+        $this->assertStringEndsWith('Warm and happy.', GeminiTtsProvider::asSpeaker('Malak', 'Warm and happy.'));
+        $this->assertStringContainsString('real boy', GeminiTtsProvider::asSpeaker('Alfie', ''));
+        $this->assertSame('Warm and happy.', GeminiTtsProvider::asSpeaker('ar-Gemini-HD-Orus', 'Warm and happy.'), 'grown-ups unchanged');
+
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $key = ['key' => 'k', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1];
+        $keys = \Mockery::mock(\App\Services\Tts\GeminiKeyManager::class);
+        $keys->shouldReceive('getAllKeys')->andReturn([$key]);
+        $keys->shouldReceive('getAvailableKey')->andReturn($key);
+        $keys->shouldReceive('recordUsage')->andReturnNull();
+        $this->app->instance(\App\Services\Tts\GeminiKeyManager::class, $keys);
+        config(['services.gemini_tts.dialect_rewrite' => false]);
+        $bodies = [];
+        \Illuminate\Support\Facades\Http::fake(function ($request) use (&$bodies) {
+            $bodies[] = $request->data();
+
+            return \Illuminate\Support\Facades\Http::response(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'audio/mpeg', 'data' => base64_encode("\xFF\xFB\x90\xC4".str_repeat("\0", 64))]]]]]]]);
+        });
+
+        app(GeminiTtsProvider::class)->synthesize('Hello there, Grandma!', 'en', ['voice_name' => 'en-Gemini-HD-Emily']);
+        $this->assertStringContainsString('real girl', $bodies[0]['contents'][0]['parts'][0]['speech_metadata']['style']);
+        $this->assertSame(SpeakerVoices::find('Emily'), $bodies[0]['generationConfig']['speechConfig']['voiceConfig']['voice']);
+
+        app(GeminiTtsProvider::class)->synthesize("Alfie: Look at my rocket!\nTheodore: Splendid.", 'en', ['speakers' => [
+            ['name' => 'Alfie', 'voice_name' => 'en-Gemini-HD-Alfie'],
+            ['name' => 'Theodore', 'voice_name' => 'en-Gemini-HD-Charon'],
+        ]]);
+        $parts = $bodies[1]['contents'][0]['parts'];
+        $this->assertStringContainsString('real boy', $parts[0]['speech_metadata']['style']);
+        $this->assertStringNotContainsString('real boy', $parts[1]['speech_metadata']['style'] ?? '');
     }
 
     public function test_homepage_clips_use_each_speakers_own_voice(): void

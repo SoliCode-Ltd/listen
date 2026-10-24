@@ -515,6 +515,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                 $dialect,
                 $pitch,
             );
+        $stylePrompt = self::asSpeaker((string) ($voiceConfig['voice_name'] ?? ''), $stylePrompt);
         $stylePrompt = GeminiVocalTags::withCues($stylePrompt, $voiceConfig['vocal_cues'] ?? []);
         $endpoint = $this->buildEndpoint($model);
 
@@ -866,18 +867,20 @@ class GeminiTtsProvider implements TtsProviderInterface
                 $pitch,
             );
         // A speaker with their own dialect or accent gets their own direction, so two
-        // people can talk in two dialects (a Saudi host and an Egyptian guest).
+        // people can talk in two dialects (a Saudi host and an Egyptian guest); a child
+        // speaker always speaks as a child.
         $speakerStyles = [];
         foreach ($speakers as $speaker) {
             $name = trim((string) ($speaker['name'] ?? $speaker['id'] ?? ''));
             $own = trim((string) ($speaker['dialect'] ?? ''));
-            if ($name === '' || $own === '') {
+            $voice = (string) ($speaker['voice_name'] ?? $speaker['voice'] ?? '');
+            if ($name === '' || ($own === '' && self::asSpeaker($voice, '') === '')) {
                 continue;
             }
-            $speakerStyle = $customPrompt !== ''
+            $speakerStyle = $own === '' ? $stylePrompt : ($customPrompt !== ''
                 ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $own)
-                : $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $own, $pitch);
-            $speakerStyles[$name] = GeminiVocalTags::forPerformance($text, $speakerStyle)['style'];
+                : $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $own, $pitch));
+            $speakerStyles[$name] = GeminiVocalTags::forPerformance($text, self::asSpeaker($voice, $speakerStyle))['style'];
         }
 
         // Moods and delivery tags direct their own turn only (structuredDialogueParts()).
@@ -1911,6 +1914,21 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         return $resolved;
+    }
+
+    /**
+     * A child speaker (App\Support\SpeakerVoices) always speaks as a child: the
+     * direction leads whatever else is asked. Anyone else's direction is unchanged.
+     */
+    public static function asSpeaker(string $speaker, string $direction): string
+    {
+        $who = SpeakerVoices::speaker($speaker);
+        if (($who['age'] ?? null) !== 'child') {
+            return $direction;
+        }
+        $child = ($who['gender'] ?? '') === 'female' ? 'girl' : 'boy';
+
+        return trim("The speaker is a real {$child} of about eight or nine: a child's small, high, bright voice with natural childish rhythm and energy, never an adult imitating a child. ".$direction);
     }
 
     /**

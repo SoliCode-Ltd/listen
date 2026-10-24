@@ -1,7 +1,8 @@
 <?php
 
 /*
- * The premium speakers added so every Arabic dialect and English accent has one
+ * The premium speakers added so every Arabic dialect and English accent has one,
+ * and the children
  * (database/seeders/VoiceSeeder, migration 2026_10_30_120000). Their voices are in
  * speaker_voices.php, their preview lines in voice_previews.php, and `look`
  * draws their avatar (`php artisan speakers:avatars`): the place they are from
@@ -226,5 +227,34 @@ return [
             'look' => 'Portuguese man in his 30s, dark tousled hair and a short beard, chambray shirt with rolled sleeves under a dark green apron, cheerful broad smile'],
         ['id' => 'en-Gemini-HD-Andriy', 'name' => 'Andriy', 'gender' => 'male', 'language' => 'en', 'dialect' => 'en-UA',
             'look' => 'Ukrainian man in his 40s, light brown hair cut short and neat stubble, heather-grey knit sweater over a navy collared shirt, gentle reassuring half-smile'],
+        // Children: they always speak as a child.
+        ['id' => 'ar-Gemini-HD-Malak', 'name' => 'Malak', 'gender' => 'female', 'language' => 'ar', 'dialect' => 'ar-EG', 'age' => 'child',
+            'look' => 'Egyptian girl of about eight, curly dark hair in two puffy pigtails with pink bows, pink T-shirt with a little giraffe on it, big excited open-mouthed smile'],
+        ['id' => 'ar-Gemini-HD-Rayan', 'name' => 'Rayan', 'gender' => 'male', 'language' => 'ar', 'dialect' => 'ar-SA', 'age' => 'child',
+            'look' => 'Saudi boy of about nine, short neat black hair, small white thobe, proud shy smile'],
+        ['id' => 'ar-Gemini-HD-Hessa', 'name' => 'Hessa', 'gender' => 'female', 'language' => 'ar', 'dialect' => 'ar-AE', 'age' => 'child',
+            'look' => 'Emirati girl of about eight, long dark hair in a single braid with a white ribbon, mint-green summer dress, bubbly delighted smile'],
+        ['id' => 'ar-Gemini-HD-Karam', 'name' => 'Karam', 'gender' => 'male', 'language' => 'ar', 'dialect' => 'ar-LB', 'age' => 'child',
+            'look' => 'Lebanese boy of about nine, messy brown hair, red hoodie, cheeky gap-toothed grin'],
+        ['id' => 'ar-Gemini-HD-Yasmine', 'name' => 'Yasmine', 'gender' => 'female', 'language' => 'ar', 'dialect' => 'ar-MA', 'age' => 'child',
+            'look' => 'Moroccan girl of about eight, dark curls held back with a yellow headband, embroidered sky-blue kaftan top, proud beaming smile'],
+        ['id' => 'ar-Gemini-HD-Mustafa', 'name' => 'Mustafa', 'gender' => 'male', 'language' => 'ar', 'dialect' => 'ar-IQ', 'age' => 'child',
+            'look' => 'Iraqi boy of about ten, short black hair, blue-and-white striped polo shirt, excited open-mouthed smile'],
+        ['id' => 'ar-Gemini-HD-Lulu', 'name' => 'Lulu', 'gender' => 'female', 'language' => 'ar', 'dialect' => 'ar-SY', 'age' => 'child',
+            'look' => 'Syrian girl of about seven, short brown bob with a red hair clip, floral cotton dress, sweet pleading smile'],
+        ['id' => 'ar-Gemini-HD-Yazan', 'name' => 'Yazan', 'gender' => 'male', 'language' => 'ar', 'dialect' => 'ar-XA', 'age' => 'child',
+            'look' => 'Arab boy of about ten, neat short black hair, round glasses, white shirt under a navy sweater vest, thoughtful little smile'],
+        ['id' => 'en-Gemini-HD-Emily', 'name' => 'Emily', 'gender' => 'female', 'language' => 'en', 'dialect' => 'en-US', 'age' => 'child',
+            'look' => 'American girl of about seven, red hair in two braids, freckles, purple T-shirt, gap-toothed giggling smile'],
+        ['id' => 'en-Gemini-HD-Alfie', 'name' => 'Alfie', 'gender' => 'male', 'language' => 'en', 'dialect' => 'en-GB', 'age' => 'child',
+            'look' => 'British boy of about nine, sandy blond hair, navy school jumper over a white collar, eager grin'],
+        ['id' => 'en-Gemini-HD-Matilda', 'name' => 'Matilda', 'gender' => 'female', 'language' => 'en', 'dialect' => 'en-AU', 'age' => 'child',
+            'look' => 'Australian girl of about eight, sun-bleached blonde ponytail, yellow T-shirt, delighted laugh'],
+        ['id' => 'en-Gemini-HD-Max', 'name' => 'Max', 'gender' => 'male', 'language' => 'en', 'dialect' => 'en-US-MW', 'age' => 'child',
+            'look' => 'American boy of about eight, curly brown hair, green soccer jersey, proud wide grin'],
+        ['id' => 'en-Gemini-HD-Anaya', 'name' => 'Anaya', 'gender' => 'female', 'language' => 'en', 'dialect' => 'en-IN', 'age' => 'child',
+            'look' => 'Indian girl of about nine, long black hair in a braid with a small flower clip, mustard-yellow kurta with tiny mirrors, excited smile'],
+        ['id' => 'en-Gemini-HD-Rory', 'name' => 'Rory', 'gender' => 'male', 'language' => 'en', 'dialect' => 'en-IE', 'age' => 'child',
+            'look' => 'Irish boy of about nine, curly ginger hair, freckles, blue raincoat, wonder-struck smile'],
     ],
 ];

@@ -2,7 +2,7 @@
 
 /*
  * The Gemini voice of every premium speaker (App\Support\SpeakerVoices), keyed by
- * internal_voice_id: their display name, gender and age (young, middle or elder,
+ * internal_voice_id: their display name, gender and age (child, young, middle or elder,
  * as their avatar looks), and a voice of their own: a
  * studio voice (Kore ...) or an Extended Voice Library id (en-gb-tutor-9 ...).
  * The homepage speakers keep the voices of their homepage clips, so an Arabic
@@ -251,5 +251,21 @@ return [
         'en-Gemini-HD-Tomasz' => ['name' => 'Tomasz', 'gender' => 'male', 'age' => 'elder', 'voice' => 'pl-pl-podcaster-6'],
         'en-Gemini-HD-Valentina' => ['name' => 'Valentina', 'gender' => 'female', 'age' => 'middle', 'voice' => 'es-419-assistant-2'],
         'en-Gemini-HD-Yuki' => ['name' => 'Yuki', 'gender' => 'female', 'age' => 'elder', 'voice' => 'ja-jp-advisor-11'],
+        // Arabic: children (they always speak as a child)
+        'ar-Gemini-HD-Hessa' => ['name' => 'Hessa', 'gender' => 'female', 'age' => 'child', 'voice' => 'en-ca-training-4'],
+        'ar-Gemini-HD-Karam' => ['name' => 'Karam', 'gender' => 'male', 'age' => 'child', 'voice' => 'en-gb-commercial-1'],
+        'ar-Gemini-HD-Lulu' => ['name' => 'Lulu', 'gender' => 'female', 'age' => 'child', 'voice' => 'en-ie-csagent-2'],
+        'ar-Gemini-HD-Malak' => ['name' => 'Malak', 'gender' => 'female', 'age' => 'child', 'voice' => 'ar-eg-training-7'],
+        'ar-Gemini-HD-Mustafa' => ['name' => 'Mustafa', 'gender' => 'male', 'age' => 'child', 'voice' => 'en-gb-csagent-6'],
+        'ar-Gemini-HD-Rayan' => ['name' => 'Rayan', 'gender' => 'male', 'age' => 'child', 'voice' => 'en-ie-assistant-6'],
+        'ar-Gemini-HD-Yasmine' => ['name' => 'Yasmine', 'gender' => 'female', 'age' => 'child', 'voice' => 'en-ie-concierge-7'],
+        'ar-Gemini-HD-Yazan' => ['name' => 'Yazan', 'gender' => 'male', 'age' => 'child', 'voice' => 'en-au-csagent-5'],
+        // English: children (they always speak as a child)
+        'en-Gemini-HD-Alfie' => ['name' => 'Alfie', 'gender' => 'male', 'age' => 'child', 'voice' => 'en-gb-csagent-8'],
+        'en-Gemini-HD-Anaya' => ['name' => 'Anaya', 'gender' => 'female', 'age' => 'child', 'voice' => 'en-in-storyteller-5'],
+        'en-Gemini-HD-Emily' => ['name' => 'Emily', 'gender' => 'female', 'age' => 'child', 'voice' => 'en-us-training-11'],
+        'en-Gemini-HD-Matilda' => ['name' => 'Matilda', 'gender' => 'female', 'age' => 'child', 'voice' => 'en-au-concierge-6'],
+        'en-Gemini-HD-Max' => ['name' => 'Max', 'gender' => 'male', 'age' => 'child', 'voice' => 'en-us-concierge-13'],
+        'en-Gemini-HD-Rory' => ['name' => 'Rory', 'gender' => 'male', 'age' => 'child', 'voice' => 'en-ie-training-6'],
     ],
 ];
