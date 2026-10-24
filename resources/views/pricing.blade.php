@@ -116,6 +116,8 @@
       border: 1px solid var(--line);
       border-radius: 28px;
     }
+    /* Scrolled to from the plan list, they stop just under the site's bar. */
+    .studio, .studio-plan { scroll-margin-top: 76px; }
     .studio-mixer { display: flex; flex-direction: column; padding: clamp(1.4rem, 3vw, 2.4rem); }
     /* Wide screens: the track stays beside the plan's details while they scroll by. */
     @media (min-width: 1001px) {
@@ -1941,9 +1943,13 @@
         p.addEventListener('click', function () {
           var plan = plans.filter(function (q) { return q.slug === p.getAttribute('data-pick'); })[0];
           if (plan) go(pos(plan.minutes), { exact: plan.minutes }); else showPlan(p.getAttribute('data-pick'));
+          // From the list under it: in one column, straight to that plan's card (its price
+          // and button); side by side, to the track and the card together.
           if (p.classList.contains('plan-pick')) {
-            var b = studio.getBoundingClientRect();
-            if (b.top < 0 || b.top > window.innerHeight * 0.4) studio.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+            var oneColumn = window.matchMedia('(max-width: 1000px)').matches;
+            var target = oneColumn ? studio.querySelector('.studio-plan') : studio;
+            var b = target.getBoundingClientRect();
+            if (oneColumn || b.top < 0 || b.top > window.innerHeight * 0.4) target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
           }
         });
       });
