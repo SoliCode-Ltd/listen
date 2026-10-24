@@ -4,8 +4,10 @@
  * The Gemini voice of every premium speaker (App\Support\SpeakerVoices), keyed by
  * internal_voice_id: their display name and gender, and a voice of their own: a
  * studio voice (Kore ...) or an Extended Voice Library id (en-gb-tutor-9 ...).
- * No two speakers share a voice. Picked to fit each speaker's gender, age,
- * role and dialect: Egyptian voices for the Egyptian dialects, Modern Standard
+ * The homepage speakers keep the voices of their homepage clips, so an Arabic
+ * and an English one can share a studio voice; otherwise no two speakers
+ * share a voice, and within a language none do. Picked to fit each speaker's
+ * gender, age, role and dialect: Egyptian voices for the Egyptian dialects, Modern Standard
  * Arabic ones for Fusha, Glasgow English for Scotland, French for a French
  * accent and so on. The library has no Turkish, Russian, Chinese, Persian or
  * Thai voices: those speakers have a neutral American one and are directed.
@@ -14,7 +16,7 @@
 
 return [
     'speakers' => [
-        // Arabic: the homepage speakers, with their studio voices (Abeer has a lighter one of her own)
+        // Arabic: the homepage speakers, with the voices of their homepage clips (Abeer has a lighter one of her own)
         'ar-Gemini-HD-Orus' => ['name' => 'Abdulaziz', 'gender' => 'male', 'voice' => 'Orus'],
         'ar-Gemini-HD-Pulcherrima' => ['name' => 'Abeer', 'gender' => 'female', 'voice' => 'ar-eg-commercial-10'],
         'ar-Gemini-HD-Erinome' => ['name' => 'Aisha', 'gender' => 'female', 'voice' => 'Erinome'],
@@ -37,9 +39,9 @@ return [
         'ar-Gemini-HD-Puck' => ['name' => 'Othman', 'gender' => 'male', 'voice' => 'Puck'],
         'ar-Gemini-HD-Umbriel' => ['name' => 'Raed', 'gender' => 'male', 'voice' => 'Umbriel'],
         'ar-Gemini-HD-Autonoe' => ['name' => 'Ruqaya', 'gender' => 'female', 'voice' => 'Autonoe'],
-        'ar-Gemini-HD-Fenrir' => ['name' => 'Saud', 'gender' => 'male', 'voice' => 'Algenib'],
+        'ar-Gemini-HD-Fenrir' => ['name' => 'Saud', 'gender' => 'male', 'voice' => 'Fenrir'],
         'ar-Gemini-HD-Zephyr' => ['name' => 'Sawsan', 'gender' => 'female', 'voice' => 'Zephyr'],
-        'ar-Gemini-HD-Algenib' => ['name' => 'Sultan', 'gender' => 'male', 'voice' => 'Fenrir'],
+        'ar-Gemini-HD-Algenib' => ['name' => 'Sultan', 'gender' => 'male', 'voice' => 'Algenib'],
         'ar-Gemini-HD-Callirrhoe' => ['name' => 'Sumaya', 'gender' => 'female', 'voice' => 'Callirrhoe'],
         'ar-Gemini-HD-Sadaltager' => ['name' => 'Tamim', 'gender' => 'male', 'voice' => 'Sadaltager'],
         'ar-Gemini-HD-Algieba' => ['name' => 'Turki', 'gender' => 'male', 'voice' => 'Algieba'],
@@ -164,37 +166,37 @@ return [
         'ar-Gemini-HD-Yunus' => ['name' => 'Yunus', 'gender' => 'male', 'voice' => 'ar-eg-tutor-6'],
         'ar-Gemini-HD-Zahraa' => ['name' => 'Zahraa', 'gender' => 'female', 'voice' => 'ar-001-techagent-11'],
         'ar-Gemini-HD-Zohra' => ['name' => 'Zohra', 'gender' => 'female', 'voice' => 'ar-eg-assistant-5'],
-        // English: the homepage speakers
-        'en-Gemini-HD-Sadachbia' => ['name' => 'Adrian', 'gender' => 'male', 'voice' => 'es-419-podcaster-1'],
-        'en-Gemini-HD-Achernar' => ['name' => 'Alice', 'gender' => 'female', 'voice' => 'en-gb-concierge-6'],
-        'en-Gemini-HD-Enceladus' => ['name' => 'Arthur', 'gender' => 'male', 'voice' => 'en-gb-csagent-12'],
-        'en-Gemini-HD-Sadaltager' => ['name' => 'Caleb', 'gender' => 'male', 'voice' => 'en-us-tutor-4'],
-        'en-Gemini-HD-Alnilam' => ['name' => 'Charlie', 'gender' => 'male', 'voice' => 'sw-ke-assistant-2'],
-        'en-Gemini-HD-Zephyr' => ['name' => 'Clara', 'gender' => 'female', 'voice' => 'de-de-podcaster-2'],
-        'en-Gemini-HD-Kore' => ['name' => 'Daisy', 'gender' => 'female', 'voice' => 'en-us-veda'],
-        'en-Gemini-HD-Puck' => ['name' => 'Dylan', 'gender' => 'male', 'voice' => 'en-us-brio'],
-        'en-Gemini-HD-Fenrir' => ['name' => 'Finn', 'gender' => 'male', 'voice' => 'en-nz-commercial-1'],
-        'en-Gemini-HD-Pulcherrima' => ['name' => 'Freya', 'gender' => 'female', 'voice' => 'nl-nl-csagent-1'],
-        'en-Gemini-HD-Algenib' => ['name' => 'George', 'gender' => 'male', 'voice' => 'en-gb-training-1'],
-        'en-Gemini-HD-Gacrux' => ['name' => 'Isla', 'gender' => 'female', 'voice' => 'en-gb-training-7'],
-        'en-Gemini-HD-Autonoe' => ['name' => 'Ivy', 'gender' => 'female', 'voice' => 'en-ca-assistant-5'],
-        'en-Gemini-HD-Despina' => ['name' => 'Luna', 'gender' => 'female', 'voice' => 'hi-in-podcaster-4'],
-        'en-Gemini-HD-Schedar' => ['name' => 'Marcus', 'gender' => 'male', 'voice' => 'en-gb-tutor-8'],
-        'en-Gemini-HD-Callirrhoe' => ['name' => 'Maya', 'gender' => 'female', 'voice' => 'ja-jp-podcaster-2'],
-        'en-Gemini-HD-Iapetus' => ['name' => 'Miles', 'gender' => 'male', 'voice' => 'en-us-csagent-12'],
-        'en-Gemini-HD-Orus' => ['name' => 'Nathan', 'gender' => 'male', 'voice' => 'hi-in-advisor-11'],
-        'en-Gemini-HD-Achird' => ['name' => 'Oliver', 'gender' => 'male', 'voice' => 'en-za-tutor-4'],
-        'en-Gemini-HD-Algieba' => ['name' => 'Oscar', 'gender' => 'male', 'voice' => 'en-gb-storyteller-1'],
-        'en-Gemini-HD-Zubenelgenubi' => ['name' => 'Philip', 'gender' => 'male', 'voice' => 'ko-kr-training-5'],
-        'en-Gemini-HD-Sulafat' => ['name' => 'Phoebe', 'gender' => 'female', 'voice' => 'sw-ke-advisor-4'],
-        'en-Gemini-HD-Laomedeia' => ['name' => 'Poppy', 'gender' => 'female', 'voice' => 'en-gb-tutor-15'],
-        'en-Gemini-HD-Vindemiatrix' => ['name' => 'Rose', 'gender' => 'female', 'voice' => 'sw-ke-csagent-5'],
-        'en-Gemini-HD-Aoede' => ['name' => 'Ruby', 'gender' => 'female', 'voice' => 'en-us-csagent-2'],
-        'en-Gemini-HD-Rasalgethi' => ['name' => 'Ryan', 'gender' => 'male', 'voice' => 'en-ie-concierge-2'],
-        'en-Gemini-HD-Leda' => ['name' => 'Sienna', 'gender' => 'female', 'voice' => 'en-ie-commercial-1'],
-        'en-Gemini-HD-Charon' => ['name' => 'Theodore', 'gender' => 'male', 'voice' => 'en-gb-tutor-9'],
-        'en-Gemini-HD-Umbriel' => ['name' => 'Vincent', 'gender' => 'male', 'voice' => 'fr-ca-training-4'],
-        'en-Gemini-HD-Erinome' => ['name' => 'Willow', 'gender' => 'female', 'voice' => 'en-us-training-1'],
+        // English: the homepage speakers, with the voices of their homepage clips
+        'en-Gemini-HD-Sadachbia' => ['name' => 'Adrian', 'gender' => 'male', 'voice' => 'Sadachbia'],
+        'en-Gemini-HD-Achernar' => ['name' => 'Alice', 'gender' => 'female', 'voice' => 'Achernar'],
+        'en-Gemini-HD-Enceladus' => ['name' => 'Arthur', 'gender' => 'male', 'voice' => 'Enceladus'],
+        'en-Gemini-HD-Sadaltager' => ['name' => 'Caleb', 'gender' => 'male', 'voice' => 'Sadaltager'],
+        'en-Gemini-HD-Alnilam' => ['name' => 'Charlie', 'gender' => 'male', 'voice' => 'Alnilam'],
+        'en-Gemini-HD-Zephyr' => ['name' => 'Clara', 'gender' => 'female', 'voice' => 'Zephyr'],
+        'en-Gemini-HD-Kore' => ['name' => 'Daisy', 'gender' => 'female', 'voice' => 'Kore'],
+        'en-Gemini-HD-Puck' => ['name' => 'Dylan', 'gender' => 'male', 'voice' => 'Puck'],
+        'en-Gemini-HD-Fenrir' => ['name' => 'Finn', 'gender' => 'male', 'voice' => 'Fenrir'],
+        'en-Gemini-HD-Pulcherrima' => ['name' => 'Freya', 'gender' => 'female', 'voice' => 'Pulcherrima'],
+        'en-Gemini-HD-Algenib' => ['name' => 'George', 'gender' => 'male', 'voice' => 'Algenib'],
+        'en-Gemini-HD-Gacrux' => ['name' => 'Isla', 'gender' => 'female', 'voice' => 'Gacrux'],
+        'en-Gemini-HD-Autonoe' => ['name' => 'Ivy', 'gender' => 'female', 'voice' => 'Autonoe'],
+        'en-Gemini-HD-Despina' => ['name' => 'Luna', 'gender' => 'female', 'voice' => 'Despina'],
+        'en-Gemini-HD-Schedar' => ['name' => 'Marcus', 'gender' => 'male', 'voice' => 'Schedar'],
+        'en-Gemini-HD-Callirrhoe' => ['name' => 'Maya', 'gender' => 'female', 'voice' => 'Callirrhoe'],
+        'en-Gemini-HD-Iapetus' => ['name' => 'Miles', 'gender' => 'male', 'voice' => 'Iapetus'],
+        'en-Gemini-HD-Orus' => ['name' => 'Nathan', 'gender' => 'male', 'voice' => 'Orus'],
+        'en-Gemini-HD-Achird' => ['name' => 'Oliver', 'gender' => 'male', 'voice' => 'Achird'],
+        'en-Gemini-HD-Algieba' => ['name' => 'Oscar', 'gender' => 'male', 'voice' => 'Algieba'],
+        'en-Gemini-HD-Zubenelgenubi' => ['name' => 'Philip', 'gender' => 'male', 'voice' => 'Zubenelgenubi'],
+        'en-Gemini-HD-Sulafat' => ['name' => 'Phoebe', 'gender' => 'female', 'voice' => 'Sulafat'],
+        'en-Gemini-HD-Laomedeia' => ['name' => 'Poppy', 'gender' => 'female', 'voice' => 'Laomedeia'],
+        'en-Gemini-HD-Vindemiatrix' => ['name' => 'Rose', 'gender' => 'female', 'voice' => 'Vindemiatrix'],
+        'en-Gemini-HD-Aoede' => ['name' => 'Ruby', 'gender' => 'female', 'voice' => 'Aoede'],
+        'en-Gemini-HD-Rasalgethi' => ['name' => 'Ryan', 'gender' => 'male', 'voice' => 'Rasalgethi'],
+        'en-Gemini-HD-Leda' => ['name' => 'Sienna', 'gender' => 'female', 'voice' => 'Leda'],
+        'en-Gemini-HD-Charon' => ['name' => 'Theodore', 'gender' => 'male', 'voice' => 'Charon'],
+        'en-Gemini-HD-Umbriel' => ['name' => 'Vincent', 'gender' => 'male', 'voice' => 'Umbriel'],
+        'en-Gemini-HD-Erinome' => ['name' => 'Willow', 'gender' => 'female', 'voice' => 'Erinome'],
         // English: the speakers first named after the Chirp3 voices
         'en-US-Chirp3-HD-Iapetus' => ['name' => 'Aiden', 'gender' => 'male', 'voice' => 'en-ie-techagent-3'],
         'en-US-Chirp3-HD-Laomedeia' => ['name' => 'Aria', 'gender' => 'female', 'voice' => 'jv-id-concierge-1'],

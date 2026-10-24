@@ -51,8 +51,16 @@ class SpeakerRosterTest extends TestCase
 
         $this->assertCount(count(SpeakerVoices::all()), $speakers);
         $this->assertTrue($speakers->every(fn (Voice $v): bool => $v->provider === 'gemini'), 'every premium speaker is shown in the library');
-        $voices = $speakers->map(fn (Voice $v): string => strtolower((string) $v->provider_voice_id));
-        $this->assertSame([], $voices->duplicates()->values()->all(), 'two speakers share a voice');
+        foreach ($speakers->groupBy('language') as $language => $group) {
+            $voices = $group->map(fn (Voice $v): string => strtolower((string) $v->provider_voice_id));
+            $this->assertSame([], $voices->duplicates()->values()->all(), "two {$language} speakers share a voice");
+        }
+        // Across the languages only homepage speakers share one: the studio voice of their homepage clips.
+        $shared = $speakers->groupBy(fn (Voice $v): string => strtolower((string) $v->provider_voice_id))->filter(fn ($group): bool => $group->count() > 1);
+        foreach ($shared->flatten() as $speaker) {
+            $this->assertStringContainsString('-Gemini-HD-', (string) $speaker->internal_voice_id, $speaker->display_name);
+            $this->assertNotNull(GeminiTtsProvider::voiceGender((string) $speaker->provider_voice_id));
+        }
         $names = $speakers->map(fn (Voice $v): string => strtolower((string) $v->display_name));
         $this->assertSame([], $names->duplicates()->values()->all(), 'two speakers share a name');
 
@@ -88,9 +96,12 @@ class SpeakerRosterTest extends TestCase
                 }
             }
         }
+        // The hero opens with Sultan in a more striking voice than his other clips (kept as it is).
+        $heroOnly = ['ar:Sultan' => 'Fenrir'];
         foreach (HeroCast::CAST as $language => $people) {
             foreach ($people as $person) {
-                $this->assertSame($own[$language.':'.$person['name']], $person['voice'], "hero {$person['name']}");
+                $key = $language.':'.$person['name'];
+                $this->assertSame($heroOnly[$key] ?? $own[$key], $person['voice'], "hero {$person['name']}");
                 $checked++;
             }
         }

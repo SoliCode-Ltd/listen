@@ -51,11 +51,18 @@ class SpeakerVoicesTest extends TestCase
         $this->assertSame(['prebuiltVoiceConfig' => ['voiceName' => 'Zephyr']], $configs[1]['voiceConfig']);
     }
 
-    public function test_every_assigned_voice_is_used_once(): void
+    public function test_no_two_speakers_of_a_language_share_a_voice(): void
     {
         SpeakerVoices::forget();
-        $voices = array_map('strtolower', array_column(SpeakerVoices::all(), 'voice'));
-        $this->assertSame(count($voices), count(array_unique($voices)), 'two speakers share a voice');
+        $byLanguage = [];
+        foreach (SpeakerVoices::all() as $id => $speaker) {
+            $byLanguage[substr($id, 0, 2)][] = strtolower($speaker['voice']);
+        }
+
+        $this->assertSame(['ar', 'en'], array_keys($byLanguage));
+        foreach ($byLanguage as $language => $voices) {
+            $this->assertSame(count($voices), count(array_unique($voices)), "two {$language} speakers share a voice");
+        }
     }
 
     private function invoke(string $method, mixed ...$args): mixed
