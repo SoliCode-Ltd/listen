@@ -93,7 +93,7 @@ foreach ([
     'listen.audio.force_async_chars', 'listen.billing.grace_days', 'listen.billing.creator_trial', 'listen.billing.pre_renewal_reminder_days',
     'listen.billing.daily_limit_timezone', 'listen.tts.mode', 'listen.tts.fallback_enabled', 'listen.api.requests_per_minute', 'listen.api.concurrency',
     'listen.api.daily_share', 'listen.cost_guardrails', 'services.gemini_tts.max_chars_per_request', 'services.gemini_tts.max_dialogue_chars_per_request',
-    'services.gemini_tts.model', 'app.url', 'app.locale',
+    'app.url', 'app.locale',
 ] as $key) {
     echo '  ', str_pad($key, 48), $j(config($key)), "\n";
 }

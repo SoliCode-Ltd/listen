@@ -2,10 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\SiteSetting;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiTtsProvider;
-use App\Support\GeminiTtsModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -32,7 +30,6 @@ class DialoguePiecesTest extends TestCase
 
         Storage::fake('public');
         config(['services.gemini_tts.dialect_rewrite' => false, 'services.gemini_tts.retry_pause_ms' => 0]);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $key = ['key' => 'test-gemini-key', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1];
         $manager = \Mockery::mock(GeminiKeyManager::class);
         $manager->shouldReceive('getAllKeys')->andReturn([$key]);
@@ -165,33 +162,9 @@ class DialoguePiecesTest extends TestCase
         $this->assertSame(['Hello there!', 'Hi, good to see you.'], array_column($this->requests[0]['body']['contents'][0]['parts'], 'text'));
     }
 
-    public function test_the_older_prompt_model_gets_the_pieces_too_each_line_with_its_speaker_name(): void
-    {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::CURRENT, 'tts');
-        $lines = [];
-        for ($i = 1; $i <= 60; $i++) {
-            $lines[] = ($i % 2 === 1 ? 'Sara' : 'Omar').": This is line number {$i} of our long conversation today.";
-        }
-
-        $this->dialogue(implode("\n", $lines));
-
-        $this->assertGreaterThan(1, count($this->requests));
-        $pieceOf = $this->pieceOfEachLine($lines);
-        foreach ($this->requests as $request) {
-            $this->assertSame(self::CAST, $this->voices($request));
-            $this->assertArrayHasKey('languageCode', $request['body']['generationConfig']['speechConfig']);
-        }
-        // Every line, with its name, in exactly one piece; the pieces in the order of the script.
-        $this->assertSame(array_keys($lines), array_keys($pieceOf));
-        $sorted = $pieceOf;
-        sort($sorted);
-        $this->assertSame($sorted, array_values($pieceOf));
-    }
-
     public function test_a_mood_on_a_turn_of_its_own_stays_in_the_piece_of_the_words_it_directs(): void
     {
         // Small pieces, so the turn of the mood alone would end the first piece.
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::CURRENT, 'tts');
         config(['services.gemini_tts.max_dialogue_chars_per_request' => 300]);
         $lines = [
             'Sara: '.str_repeat('a', 60).' '.str_repeat('b', 66),
@@ -202,13 +175,15 @@ class DialoguePiecesTest extends TestCase
 
         $this->dialogue(implode("\n", $lines));
 
-        $pieceOf = $this->pieceOfEachLine($lines);
         $this->assertCount(2, $this->requests);
-        $this->assertSame([0, 0, 1, 1], array_values($pieceOf), 'the mood is not left at the end of the piece before');
+        $this->assertSame([0, 0, 1], array_values($this->pieceOfEachLine($lines)), 'the mood is not left at the end of the piece before');
+        $directed = $this->requests[1]['body']['contents'][0]['parts'][0];
+        $this->assertSame(str_repeat('e', 70).' '.str_repeat('f', 69), $directed['text']);
+        $this->assertStringContainsString('scared', $directed['speech_metadata']['style']);
     }
 
     /**
-     * In which request each line was sent (older model: the lines are in the prompt).
+     * In which request each spoken line was sent (a turn of moods alone is not spoken).
      *
      * @param  array<int, string>  $lines
      * @return array<int, int>
@@ -217,10 +192,11 @@ class DialoguePiecesTest extends TestCase
     {
         $where = [];
         foreach ($this->requests as $n => $request) {
-            $prompt = $request['body']['contents'][0]['parts'][0]['text'];
-            foreach ($lines as $i => $line) {
-                if (str_contains($prompt, $line)) {
-                    $where[$i][] = $n;
+            foreach ($request['body']['contents'][0]['parts'] as $part) {
+                foreach ($lines as $i => $line) {
+                    if ($part['text'] === trim(explode(':', $line, 2)[1]) && $part['speech_metadata']['speaker'] === explode(':', $line, 2)[0]) {
+                        $where[$i][] = $n;
+                    }
                 }
             }
         }

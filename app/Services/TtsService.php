@@ -259,10 +259,7 @@ class TtsService
             if (ArabicDialects::isPlainFusha($config['dialect'] ?? null) || $fushaSpeaker) {
                 $parts[] = 'fusha:formal';
             }
-            $model = GeminiTtsModel::resolve();
-            if ($model !== GeminiTtsModel::CURRENT) {
-                $parts[] = 'model:'.$model;
-            }
+            $parts[] = 'model:'.GeminiTtsModel::resolve();
 
             // Every speed and pitch step but 1.0x and 0 now has its own direction
             // (0.9x, 1.1x and 1.2x used to sound like 1.0x), so older recordings are not reused.

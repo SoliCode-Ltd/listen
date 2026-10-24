@@ -8,7 +8,6 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\TtsRoutingService;
-use App\Support\GeminiTtsModel;
 use App\Support\VoiceCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -33,7 +32,6 @@ class DialogueModeTest extends TestCase
         Storage::fake('public');
         $this->seed(\Database\Seeders\VoiceSeeder::class);
         SiteSetting::set('tts_mode', TtsRoutingService::MODE_HYBRID, 'tts');
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
 
         $key = ['key' => 'test-gemini-key', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1];
         $manager = \Mockery::mock(GeminiKeyManager::class);

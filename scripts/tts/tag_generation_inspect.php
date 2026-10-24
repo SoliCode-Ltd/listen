@@ -6,7 +6,6 @@
  */
 
 use App\Models\AudioGeneration;
-use App\Models\SiteSetting;
 use Illuminate\Contracts\Console\Kernel;
 
 ini_set('display_errors', 'stderr');
@@ -18,8 +17,6 @@ $app->make(Kernel::class)->bootstrap();
 $out = [
     'meta' => [
         'generated_at' => now()->toIso8601String(),
-        'gemini_tts_model_setting' => SiteSetting::get('gemini_tts_model', null),
-        'gemini_tts_model_config' => config('services.gemini_tts.model'),
         'resolved_model' => class_exists(\App\Support\GeminiTtsModel::class) ? \App\Support\GeminiTtsModel::resolve() : null,
         'code_has_vocal_tags' => class_exists(\App\Support\GeminiVocalTags::class),
         'code_has_parts' => class_exists(\App\Support\GeminiVocalTags::class) && method_exists(\App\Support\GeminiVocalTags::class, 'parts'),

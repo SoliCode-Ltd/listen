@@ -48,7 +48,6 @@ class TtsSettings extends Page implements HasForms
 
             // Gemini config
             'gemini_api_key_set' => count(app(\App\Services\Tts\GeminiKeyManager::class)->getAllKeys()) > 0,
-            'gemini_tts_model' => GeminiTtsModel::resolve(),
             'gemini_default_voice' => SiteSetting::get('gemini_default_voice', config('services.gemini_tts.default_voice', 'Kore')),
             'gemini_timeout_seconds' => (int) SiteSetting::get('gemini_timeout_seconds', config('listen.tts.gemini_timeout_seconds', 30)),
 
@@ -115,14 +114,12 @@ class TtsSettings extends Page implements HasForms
                     ]),
 
                 Forms\Components\Section::make('Gemini TTS Configuration')
-                    ->description('Choose the Gemini speech model. The next HD generation uses the model you save here.')
+                    ->description('Every HD voice speaks with Gemini\'s latest speech model. Standard voices stay on Google Cloud.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Select::make('gemini_tts_model')
+                        Forms\Components\Placeholder::make('gemini_tts_model')
                             ->label('Gemini model')
-                            ->options(GeminiTtsModel::options())
-                            ->required()
-                            ->helperText('Current keeps Gemini 2.5. Newest is Gemini 3.8 Flash. Newest Lite is Gemini 3.8 Flash-Lite. Standard voices stay on Google Cloud. Every HD voice uses this choice.'),
+                            ->content(GeminiTtsModel::LATEST.' (always the latest)'),
                         Forms\Components\Placeholder::make('gemini_api_key_status')
                             ->label('Gemini API Key')
                             ->content(fn (Forms\Get $get): string => $get('gemini_api_key_set')
@@ -288,7 +285,6 @@ class TtsSettings extends Page implements HasForms
         $scalarKeys = [
             'tts_mode',
             StandardVoiceEngine::SETTING_KEY,
-            'gemini_tts_model',
             'gemini_default_voice',
             'gemini_timeout_seconds',
             'tts_default_voice_ar',

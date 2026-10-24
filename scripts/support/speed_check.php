@@ -39,7 +39,7 @@ $keyCount = count(app(GeminiKeyManager::class)->getAllKeys());
 $together = max(1, min(max(1, (int) config('services.gemini_tts.max_parallel_total', 12)), $parallel * max(1, $keyCount)));
 echo "== How a long premium voice is made ==\n";
 printf("Model: %s. Pieces of up to %d characters, %d at a time on each key and %d in all; a piece waits up to %d s; %d key(s).\n",
-    (string) config('services.gemini_tts.model'), $maxChars, $parallel, $together, (int) config('services.gemini_tts.timeout_seconds', 60), $keyCount);
+    \App\Support\GeminiTtsModel::resolve(), $maxChars, $parallel, $together, (int) config('services.gemini_tts.timeout_seconds', 60), $keyCount);
 printf("Made after the reply from %d characters; piece check %s.\n\n",
     (int) config('listen.audio.force_async_chars', 2500), config('services.gemini_tts.check_pieces', true) ? 'on' : 'off');
 

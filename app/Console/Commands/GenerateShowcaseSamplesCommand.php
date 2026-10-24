@@ -377,7 +377,7 @@ class GenerateShowcaseSamplesCommand extends Command
      */
     private function requestPcm(array $payload, string $key): string
     {
-        $endpoint = rtrim((string) config('services.gemini_tts.endpoint'), '/').'/models/'.GeminiTtsModel::FLASH.':generateContent';
+        $endpoint = rtrim((string) config('services.gemini_tts.endpoint'), '/').'/models/'.GeminiTtsModel::LATEST.':generateContent';
         $lastError = 'no attempt';
 
         for ($attempt = 1; $attempt <= 3; $attempt++) {
@@ -538,7 +538,7 @@ class GenerateShowcaseSamplesCommand extends Command
                 'metadata' => [
                     'showcase' => true,
                     'slug' => $sample['slug'],
-                    'model' => GeminiTtsModel::FLASH,
+                    'model' => GeminiTtsModel::LATEST,
                     'sign_off' => $signOff[$language.($isDialogue ? '_dialogue' : '')],
                     'speaker_name' => implode(' & ', array_column($speakers, 'name')),
                     'speaker_name_ar' => implode(' و', array_map(fn (array $s): string => $s['name_ar'] ?? $s['name'], $speakers)),

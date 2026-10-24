@@ -28,9 +28,8 @@ use Illuminate\Support\Str;
 /**
  * Gemini TTS Provider.
  *
- * Uses the Gemini model selected in TTS settings.
- * Gemini 2.5 keeps the legacy prompt. Gemini 3.8 speaks the transcript
- * verbatim and takes delivery instructions in speech metadata.
+ * Uses Gemini's latest speech model (GeminiTtsModel). It speaks the
+ * transcript verbatim and takes delivery instructions in speech metadata.
  *
  * API: Google AI Generative Language API
  */
@@ -360,37 +359,6 @@ class GeminiTtsProvider implements TtsProviderInterface
         'ar-LY-MS' => 'Misrati Libyan Arabic (Misrata)',
     ];
 
-    /** @var array<int, string> */
-    private const SUPPORTED_LANGUAGE_CODES = [
-        'ar-XA',
-        'bn-BD',
-        'de-DE',
-        'en-AU',
-        'en-GB',
-        'en-IN',
-        'en-US',
-        'es-US',
-        'fr-FR',
-        'gu-IN',
-        'hi-IN',
-        'id-ID',
-        'it-IT',
-        'ja-JP',
-        'kn-IN',
-        'ko-KR',
-        'ml-IN',
-        'mr-IN',
-        'nl-NL',
-        'pl-PL',
-        'pt-BR',
-        'ru-RU',
-        'ta-IN',
-        'te-IN',
-        'th-TH',
-        'tr-TR',
-        'vi-VN',
-    ];
-
     /** Performance style prompts for Arabic synthesis */
     private const ARABIC_STYLE_HINTS = [
         'neutral'        => 'Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone. Maintain natural Arabic speech rhythm and pacing.',
@@ -539,32 +507,28 @@ class GeminiTtsProvider implements TtsProviderInterface
         $speakers = $voiceConfig['speakers'] ?? null;
         $isDialogue = is_array($speakers) && count($speakers) > 1;
 
-        // Sound tags: <laugh> for Gemini 3.8, [laugh] for the older prompt model.
-        // Delivery tags ([excited]) split a single voice's script into parts,
-        // each read with its own direction; in a dialogue each directs its own turn.
-        if (GeminiTtsModel::usesStructuredSpeech($model)) {
-            if ($isDialogue) {
-                // Each line is rewritten into its speaker's dialect, as a single voice's script is.
-                if ($this->isArabicLanguage($targetLanguage) && config('services.gemini_tts.dialect_rewrite', true)) {
-                    $text = $this->dialogueInDialects($text, $speakers, trim((string) ($voiceConfig['dialect'] ?? '')));
-                }
-                // Moods stay where they are written: structuredDialogueParts() gives each to its turn.
-                $text = GeminiVocalTags::tagSounds($text);
-            } else {
-                // A dialect lives in its words as much as its accent: the script is
-                // rewritten into the chosen Arabic variety first, as for cloned voices.
-                $dialect = trim((string) ($voiceConfig['dialect'] ?? ''));
-                if ($dialect !== '' && $this->isArabicLanguage($targetLanguage) && config('services.gemini_tts.dialect_rewrite', true)) {
-                    $text = app(VoiceCloningService::class)->speakableText($text, $dialect);
-                }
-                $voiceConfig['vocal_parts'] = GeminiVocalTags::parts($text);
-                $text = implode(' ', array_column($voiceConfig['vocal_parts'], 'text'));
+        // Sound tags are written <laugh>. Delivery tags ([excited]) split a single
+        // voice's script into parts, each read with its own direction; in a
+        // dialogue each directs its own turn.
+        if ($isDialogue) {
+            // Each line is rewritten into its speaker's dialect, as a single voice's script is.
+            if ($this->isArabicLanguage($targetLanguage) && config('services.gemini_tts.dialect_rewrite', true)) {
+                $text = $this->dialogueInDialects($text, $speakers, trim((string) ($voiceConfig['dialect'] ?? '')));
             }
-            if (trim(GeminiVocalTags::strip($text)) === '') {
-                throw new \RuntimeException('TTS text is empty.');
-            }
+            // Moods stay where they are written: structuredDialogueParts() gives each to its turn.
+            $text = GeminiVocalTags::tagSounds($text);
         } else {
-            $text = GeminiVocalTags::forLegacyModel($text);
+            // A dialect lives in its words as much as its accent: the script is
+            // rewritten into the chosen Arabic variety first, as for cloned voices.
+            $dialect = trim((string) ($voiceConfig['dialect'] ?? ''));
+            if ($dialect !== '' && $this->isArabicLanguage($targetLanguage) && config('services.gemini_tts.dialect_rewrite', true)) {
+                $text = app(VoiceCloningService::class)->speakableText($text, $dialect);
+            }
+            $voiceConfig['vocal_parts'] = GeminiVocalTags::parts($text);
+            $text = implode(' ', array_column($voiceConfig['vocal_parts'], 'text'));
+        }
+        if (trim(GeminiVocalTags::strip($text)) === '') {
+            throw new \RuntimeException('TTS text is empty.');
         }
 
         if ($isDialogue) {
@@ -601,10 +565,6 @@ class GeminiTtsProvider implements TtsProviderInterface
         $performanceStyle = trim((string) ($voiceConfig['performance_style'] ?? $voiceConfig['style'] ?? 'neutral'));
         $emotion = trim((string) ($voiceConfig['emotion'] ?? 'neutral'));
         $speed = (float) ($voiceConfig['speed'] ?? 1.0);
-        $languageCode = $this->resolveLanguageCode(
-            $targetLanguage,
-            isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? $voiceConfig['dialect'] : null,
-        );
 
         // The member's own style_prompt (then the dialect and speed they picked), otherwise
         // a direction built from dialect, emotion, style, speed, and pitch.
@@ -612,7 +572,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         $dialect = isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? trim($voiceConfig['dialect']) : null;
         $pitch = (float) ($voiceConfig['pitch'] ?? 0.0);
         $stylePrompt = $customPrompt !== ''
-            ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $dialect, GeminiTtsModel::usesStructuredSpeech($model))
+            ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $dialect)
             : $this->buildStylePrompt(
                 $performanceStyle,
                 $emotion,
@@ -620,7 +580,6 @@ class GeminiTtsProvider implements TtsProviderInterface
                 $speed,
                 $dialect,
                 $pitch,
-                GeminiTtsModel::usesStructuredSpeech($model),
             );
         $stylePrompt = GeminiVocalTags::withCues($stylePrompt, $voiceConfig['vocal_cues'] ?? []);
         $endpoint = $this->buildEndpoint($model);
@@ -650,9 +609,9 @@ class GeminiTtsProvider implements TtsProviderInterface
             // The pieces one stretch of the script (one direction) is cut into are told they
             // are one reading; a mood tag's own part changes the delivery on purpose.
             $n = $seen[$partIndex] = ($seen[$partIndex] ?? -1) + 1;
-            $style = $inPart[$partIndex] > 1 && GeminiTtsModel::usesStructuredSpeech($model) ? self::continuing($partStyle, $n, $inPart[$partIndex]) : $partStyle;
+            $style = $inPart[$partIndex] > 1 ? self::continuing($partStyle, $n, $inPart[$partIndex]) : $partStyle;
             $performed = GeminiVocalTags::forPerformance($chunk['text'], $style);
-            $payloads[] = $this->buildSingleSpeakerPayload($model, $performed['text'], $performed['style'], $voiceName, $languageCode);
+            $payloads[] = $this->buildSingleSpeakerPayload($performed['text'], $performed['style'], $voiceName);
             // The part of the script it reads ([whispering] …): each part keeps its own level.
             $groups[] = $partIndex;
             // The pause after it, from where its text ends: a sentence, a comma, a line, or mid-sentence.
@@ -960,11 +919,10 @@ class GeminiTtsProvider implements TtsProviderInterface
         $speed = (float) ($voiceConfig['speed'] ?? 1.0);
         $pitch = (float) ($voiceConfig['pitch'] ?? 0.0);
         $dialect = isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? trim($voiceConfig['dialect']) : null;
-        $languageCode = $this->resolveLanguageCode($targetLanguage, $dialect);
 
         $customPrompt = trim((string) ($voiceConfig['style_prompt'] ?? ''));
         $stylePrompt = $customPrompt !== ''
-            ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $dialect, GeminiTtsModel::usesStructuredSpeech($model))
+            ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $dialect)
             : $this->buildStylePrompt(
                 $performanceStyle,
                 $emotion,
@@ -972,9 +930,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                 $speed,
                 $dialect,
                 $pitch,
-                GeminiTtsModel::usesStructuredSpeech($model),
             );
-        $structured = GeminiTtsModel::usesStructuredSpeech($model);
         // A speaker with their own dialect or accent gets their own direction, so two
         // people can talk in two dialects (a Saudi host and an Egyptian guest).
         $speakerStyles = [];
@@ -985,16 +941,14 @@ class GeminiTtsProvider implements TtsProviderInterface
                 continue;
             }
             $speakerStyle = $customPrompt !== ''
-                ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $own, $structured)
-                : $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $own, $pitch, $structured);
-            $speakerStyles[$name] = $structured ? GeminiVocalTags::forPerformance($text, $speakerStyle)['style'] : $speakerStyle;
+                ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $own)
+                : $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $own, $pitch);
+            $speakerStyles[$name] = GeminiVocalTags::forPerformance($text, $speakerStyle)['style'];
         }
 
         // Moods and delivery tags direct their own turn only (structuredDialogueParts()).
-        if ($structured) {
-            $performed = GeminiVocalTags::forPerformance($text, $stylePrompt);
-            [$text, $stylePrompt] = [$performed['text'], $performed['style']];
-        }
+        $performed = GeminiVocalTags::forPerformance($text, $stylePrompt);
+        [$text, $stylePrompt] = [$performed['text'], $performed['style']];
         // A long dialogue is made in pieces split at speaker turns, each with the same
         // speakers and voices (dialoguePieces()), and joined in order as a single voice's
         // pieces are: written to a file as they come, with the pause a reader takes
@@ -1003,7 +957,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         $pauses = [];
         foreach ($this->dialoguePieces($text, $speakers) as $piece) {
             $cast = array_map(fn (array $speaker): string => trim((string) ($speaker['name'] ?? $speaker['id'] ?? '')), $piece['speakers']);
-            $payloads[] = $this->buildDialoguePayload($model, $piece['text'], $stylePrompt, $piece['speakers'], $languageCode, array_intersect_key($speakerStyles, array_flip($cast)));
+            $payloads[] = $this->buildDialoguePayload($piece['text'], $stylePrompt, $piece['speakers'], array_intersect_key($speakerStyles, array_flip($cast)));
             $pauses[] = JoinPauses::after($piece['text']);
         }
 
@@ -1166,54 +1120,25 @@ class GeminiTtsProvider implements TtsProviderInterface
     /**
      * @return array<string, mixed>
      */
-    private function buildSingleSpeakerPayload(
-        string $model,
-        string $text,
-        string $stylePrompt,
-        string $voiceName,
-        string $languageCode,
-    ): array {
-        $voiceName = $this->voiceForModel($voiceName, $model);
-        if (GeminiTtsModel::usesStructuredSpeech($model)) {
-            $part = ['text' => $text];
-            if (trim($stylePrompt) !== '') {
-                $part['speech_metadata'] = ['style' => $stylePrompt];
-            }
-
-            return [
-                'contents' => [
-                    [
-                        'role' => 'user',
-                        'parts' => [$part],
-                    ],
-                ],
-                'generationConfig' => [
-                    'responseModalities' => ['AUDIO'],
-                    'speechConfig' => [
-                        'voiceConfig' => [
-                            'voice' => $voiceName,
-                        ],
-                    ],
-                ],
-            ];
+    private function buildSingleSpeakerPayload(string $text, string $stylePrompt, string $voiceName): array
+    {
+        $part = ['text' => $text];
+        if (trim($stylePrompt) !== '') {
+            $part['speech_metadata'] = ['style' => $stylePrompt];
         }
 
         return [
             'contents' => [
                 [
-                    'parts' => [
-                        ['text' => $this->legacyPrompt($stylePrompt, $text)],
-                    ],
+                    'role' => 'user',
+                    'parts' => [$part],
                 ],
             ],
             'generationConfig' => [
                 'responseModalities' => ['AUDIO'],
                 'speechConfig' => [
-                    'languageCode' => $languageCode,
                     'voiceConfig' => [
-                        'prebuiltVoiceConfig' => [
-                            'voiceName' => $voiceName,
-                        ],
+                        'voice' => $voiceName,
                     ],
                 ],
             ],
@@ -1221,45 +1146,13 @@ class GeminiTtsProvider implements TtsProviderInterface
     }
 
     /**
-     * The older prompt model reads the direction and the script as one block of
-     * text. The direction is written as director's notes under their own heading,
-     * set apart from the transcript, so the voice performs it instead of reading it
-     * aloud. A dialogue speaker with their own dialect gets a speaker note: never a
-     * "Name: ..." line, which the model takes for a line of the script.
-     *
-     * @param  array<string, string>  $speakerNotes  direction per speaker name
-     */
-    private function legacyPrompt(string $direction, string $transcript, array $speakerNotes = []): string
-    {
-        $direction = trim($direction);
-        if ($direction === '' && $speakerNotes === []) {
-            return trim($transcript);
-        }
-
-        $notes = "### DIRECTOR'S NOTES\nThese notes direct the performance. Never read them aloud; read aloud only the transcript below, exactly as written.";
-        if ($direction !== '') {
-            $notes .= "\n".$direction;
-        }
-        if ($speakerNotes !== []) {
-            $notes .= "\n\n### SPEAKER NOTES";
-            foreach ($speakerNotes as $name => $note) {
-                $notes .= "\n- For the lines of {$name} only, never read aloud — ".trim((string) $note);
-            }
-        }
-
-        return $notes."\n\n### TRANSCRIPT\n".trim($transcript);
-    }
-
-    /**
      * @param  array<int, array<string, mixed>>  $speakers
      * @return array<string, mixed>
      */
     private function buildDialoguePayload(
-        string $model,
         string $text,
         string $stylePrompt,
         array $speakers,
-        string $languageCode,
         array $speakerStyles = [],
     ): array {
         $speakerVoiceConfigs = [];
@@ -1269,10 +1162,10 @@ class GeminiTtsProvider implements TtsProviderInterface
                 $speakerName = 'Speaker';
             }
 
-            $voice = $this->voiceForModel($this->resolveGeminiVoice(
+            $voice = $this->resolveGeminiVoice(
                 (string) ($speaker['voice_name'] ?? $speaker['voice'] ?? ''),
                 $speaker['gender'] ?? null,
-            ), $model);
+            );
             $speakerVoiceConfigs[] = [
                 'speaker' => $speakerName,
                 // A library voice is named the 3.8 way; a studio voice as before.
@@ -1282,30 +1175,20 @@ class GeminiTtsProvider implements TtsProviderInterface
             ];
         }
 
-        // The older model gets director's and speaker notes set apart from the script.
-        $parts = GeminiTtsModel::usesStructuredSpeech($model)
-            ? $this->structuredDialogueParts($text, $speakers, $stylePrompt, $speakerStyles)
-            : [['text' => $this->legacyPrompt($stylePrompt, $text, $speakerStyles)]];
-
-        $speechConfig = [
-            'multiSpeakerVoiceConfig' => [
-                'speakerVoiceConfigs' => $speakerVoiceConfigs,
-            ],
-        ];
-        if (! GeminiTtsModel::usesStructuredSpeech($model)) {
-            $speechConfig = ['languageCode' => $languageCode] + $speechConfig;
-        }
-
         return [
             'contents' => [
                 [
                     'role' => 'user',
-                    'parts' => $parts,
+                    'parts' => $this->structuredDialogueParts($text, $speakers, $stylePrompt, $speakerStyles),
                 ],
             ],
             'generationConfig' => [
                 'responseModalities' => ['AUDIO'],
-                'speechConfig' => $speechConfig,
+                'speechConfig' => [
+                    'multiSpeakerVoiceConfig' => [
+                        'speakerVoiceConfigs' => $speakerVoiceConfigs,
+                    ],
+                ],
             ],
         ];
     }
@@ -1736,7 +1619,7 @@ class GeminiTtsProvider implements TtsProviderInterface
      *
      * Without $withFallback, nothing picked gives an empty direction (see ownDirection()).
      */
-    private function buildStylePrompt(string $style, string $emotion, string $targetLanguage, float $speed, ?string $dialect = null, float $pitch = 0.0, bool $structuredSpeech = false, bool $withFallback = true): string
+    private function buildStylePrompt(string $style, string $emotion, string $targetLanguage, float $speed, ?string $dialect = null, float $pitch = 0.0, bool $withFallback = true): string
     {
         $style = strtolower(trim($style));
         $emotion = strtolower(trim($emotion));
@@ -1819,7 +1702,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             // The language travels in the style text as well (the newer model takes no language code).
             $name = SpeechLanguages::englishName($targetLanguage);
             $prompt .= " Speak in {$name} (".SpeechLanguages::nativeName($targetLanguage)."), with natural native pronunciation and rhythm. Read the transcript exactly as written; do not translate it or switch to another language.";
-        } elseif ($structuredSpeech && ! $isArabic) {
+        } elseif (! $isArabic) {
             $accentName = match ($dialectCode) {
                 'EN-US' => 'American English',
                 'EN-GB' => 'British English',
@@ -1839,9 +1722,9 @@ class GeminiTtsProvider implements TtsProviderInterface
      * the speed they picked follow it, so writing their own words no longer loses
      * those choices. Style, emotion and pitch are left to their words.
      */
-    private function ownDirection(string $customPrompt, string $targetLanguage, float $speed, ?string $dialect, bool $structuredSpeech): string
+    private function ownDirection(string $customPrompt, string $targetLanguage, float $speed, ?string $dialect): string
     {
-        $picked = $this->buildStylePrompt('', 'neutral', $targetLanguage, $speed, $dialect, 0.0, $structuredSpeech, false);
+        $picked = $this->buildStylePrompt('', 'neutral', $targetLanguage, $speed, $dialect, 0.0, false);
 
         return trim(trim($customPrompt).' '.$picked);
     }
@@ -2025,7 +1908,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         // 0. A premium speaker with a voice of their own (App\Support\SpeakerVoices).
         $assigned = SpeakerVoices::find($voiceName);
         if ($assigned !== null) {
-            return $assigned['voice'];
+            return $assigned;
         }
 
         // 1. Already a known raw Gemini voice name -> use directly.
@@ -2093,39 +1976,6 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         return $resolved;
-    }
-
-    private function resolveLanguageCode(string $targetLanguage, ?string $dialect): string
-    {
-        $candidate = trim((string) $dialect);
-        if ($candidate !== '' && in_array($candidate, self::SUPPORTED_LANGUAGE_CODES, true)) {
-            return $candidate;
-        }
-        // A regional accent (en-GB-SC) falls back to its country's code (en-GB).
-        $base = implode('-', array_slice(explode('-', $candidate), 0, 2));
-        if ($base !== $candidate && in_array($base, self::SUPPORTED_LANGUAGE_CODES, true)) {
-            return $base;
-        }
-
-        $normalized = strtolower(trim($targetLanguage));
-        if (str_starts_with($normalized, 'ar')) {
-            return 'ar-XA';
-        }
-
-        return SpeechLanguages::speechCode($normalized) ?? 'en-US';
-    }
-
-    /**
-     * A library voice (only the 3.8 models know them) becomes the speaker's
-     * studio fallback on the older model.
-     */
-    private function voiceForModel(string $voice, string $model): string
-    {
-        if (GeminiTtsModel::usesStructuredSpeech($model) || in_array($voice, self::VOICES, true)) {
-            return $voice;
-        }
-
-        return SpeakerVoices::fallbackFor($voice) ?? $this->defaultVoiceForGender(null);
     }
 
     /**
@@ -2210,7 +2060,7 @@ class GeminiTtsProvider implements TtsProviderInterface
 
     /**
      * Estimate USD cost for Gemini TTS.
-     * Gemini 2.5 Flash Preview TTS pricing (as of 2025): input text charged per character.
+     * Input text is charged per character.
      */
     private function estimateCost(int $charCount): float
     {

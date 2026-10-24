@@ -2,12 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\SiteSetting;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Services\VoiceCloningService;
 use App\Support\ArabicDialects;
-use App\Support\GeminiTtsModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -60,7 +58,6 @@ class OwnDirectionTest extends TestCase
 
     public function test_own_words_lead_then_the_picked_dialect_and_speed_follow(): void
     {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
 
         app(GeminiTtsProvider::class)->synthesize('كان يا ما كان في قديم الزمان.', 'ar', [
             'voice_name' => 'Kore',
@@ -89,7 +86,6 @@ class OwnDirectionTest extends TestCase
 
     public function test_an_english_accent_and_the_speed_follow_the_own_words(): void
     {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
 
         app(GeminiTtsProvider::class)->synthesize('Once upon a time.', 'en', [
             'voice_name' => 'Kore', 'style_prompt' => self::OWN, 'dialect' => 'en-GB', 'speed' => 1.3,
@@ -102,7 +98,6 @@ class OwnDirectionTest extends TestCase
 
     public function test_own_words_alone_when_nothing_else_was_picked(): void
     {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
 
         app(GeminiTtsProvider::class)->synthesize('مرحبا بكم.', 'ar', ['voice_name' => 'Kore', 'style_prompt' => self::OWN]);
 
@@ -111,7 +106,6 @@ class OwnDirectionTest extends TestCase
 
     public function test_each_dialogue_speaker_gets_the_own_words_then_their_dialect_and_the_speed(): void
     {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
 
         app(GeminiTtsProvider::class)->synthesize("سلطان: هلا والله!\nنورة: أهلاً بيك.", 'ar', [
             'style_prompt' => self::OWN,
@@ -132,26 +126,6 @@ class OwnDirectionTest extends TestCase
         $this->assertStringContainsString('Saudi Arabic (Gulf dialect)', $saudi);
         $this->assertStringContainsString('Cairene Egyptian', $egyptian);
         $this->assertLessThan(strpos($saudi, self::SLOW), strpos($saudi, 'Saudi Arabic'), 'the dialect, then the speed');
-    }
-
-    public function test_the_older_prompt_model_reads_the_own_words_first_too(): void
-    {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::CURRENT, 'tts');
-
-        app(GeminiTtsProvider::class)->synthesize('مرحبا بكم في البرنامج.', 'ar', [
-            'voice_name' => 'Kore', 'style_prompt' => self::OWN, 'dialect' => 'ar-EG', 'speed' => 0.7,
-        ]);
-
-        $prompt = $this->bodies[0]['contents'][0]['parts'][0]['text'];
-        $own = strpos($prompt, self::OWN);
-        $dialect = strpos($prompt, 'Voice dialect: Egyptian Arabic.');
-        $speed = strpos($prompt, self::SLOW);
-        $this->assertNotFalse($own);
-        $this->assertNotFalse($dialect);
-        $this->assertNotFalse($speed);
-        $this->assertLessThan($dialect, $own, 'their words lead');
-        $this->assertLessThan($speed, $dialect);
-        $this->assertStringContainsString('مرحبا بكم في البرنامج.', $prompt);
     }
 
     public function test_a_cloned_voice_reads_the_own_words_first_then_the_accent_and_speed(): void

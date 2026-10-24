@@ -2,10 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\SiteSetting;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiTtsProvider;
-use App\Support\GeminiTtsModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -33,7 +31,6 @@ class DialogueTagsTest extends TestCase
 
         Storage::fake('public');
         config(['services.gemini_tts.dialect_rewrite' => false]);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $key = ['key' => 'test-gemini-key', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1];
         $manager = \Mockery::mock(GeminiKeyManager::class);
         $manager->shouldReceive('getAllKeys')->andReturn([$key]);

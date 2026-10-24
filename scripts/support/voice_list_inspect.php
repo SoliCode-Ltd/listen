@@ -27,8 +27,8 @@ if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
     DB::statement('SET SESSION TRANSACTION READ ONLY');
 }
 
-// The speech model premium voices use (the admin's choice, else the config default).
-echo json_encode(['setting' => 'gemini_tts_model', 'saved' => \App\Models\SiteSetting::get(\App\Support\GeminiTtsModel::SETTING_KEY, ''), 'in_use' => \App\Support\GeminiTtsModel::resolve()]).PHP_EOL;
+// The speech model premium voices use (always Gemini's latest).
+echo json_encode(['model_in_use' => \App\Support\GeminiTtsModel::resolve()]).PHP_EOL;
 
 $voices = Voice::query()->orderBy('language')->orderBy('tier')->orderBy('display_name')->get();
 $active = 0;
