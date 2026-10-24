@@ -17,7 +17,7 @@
       text-align: center;
       padding: 2.4rem 1rem 1.8rem;
     }
-    /* One line, its second half in the brand's violet, as on the home page. */
+    /* One line, one colour: the words carry it. */
     .page-hero h1 {
       margin: 0 auto .7rem;
       max-width: none;
@@ -31,7 +31,6 @@
       letter-spacing: 0;
       line-height: 1.35;
     }
-    .page-hero h1 .accent { color: var(--brand-accent); }
     .page-hero .lead {
       color: var(--muted);
       max-width: 64ch;
@@ -103,9 +102,9 @@
     /* ── The minutes track and the plan that fits ──
        One card: on one side the visitor picks how many minutes of voice they need on
        a voice track (the plans sit on it as orbs); on the other, the plan that fits,
-       which is that plan's own card, as the admin set it up. Moving between plans is
-       one smooth motion: the playhead glides, the bars fill in a sweep, the number
-       counts, and the plan's card fades across. */
+       which is that plan's own card, as the admin set it up. One script moves the
+       playhead, the filled part of the voice, the number and the plan together, frame
+       by frame, so they never drift apart. */
     .studio {
       --ease-out: cubic-bezier(.22, 1, .36, 1);
       display: grid;
@@ -116,17 +115,19 @@
       background: var(--surface);
       border: 1px solid var(--line);
       border-radius: 28px;
-      box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 40px 80px -42px color-mix(in srgb, var(--brand-accent) 40%, transparent);
     }
     .studio-mixer { display: flex; flex-direction: column; padding: clamp(1.4rem, 3vw, 2.4rem); }
     /* Wide screens: the track stays beside the plan's details while they scroll by. */
     @media (min-width: 1001px) {
       .studio-mixer { position: sticky; top: 84px; align-self: start; }
+      .studio-track { margin-top: 1.9rem; }
+      .studio-wave { height: 128px; }
+      .studio-proof { margin-top: 1.8rem; }
     }
     .studio-top { display: flex; justify-content: space-between; align-items: center; gap: .75rem 1rem; flex-wrap: wrap; }
     .studio-label { color: var(--muted); font-size: .95rem; font-weight: 500; }
     .studio .billing-toggle button { min-height: 38px; padding: 0 1rem; font-size: .88rem; }
-    .studio-amount { display: flex; align-items: baseline; flex-wrap: wrap; gap: .35rem .55rem; margin-top: 1.1rem; }
+    .studio-amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .55rem; margin-top: 1.1rem; }
     /* The number box is as wide as its digits, so the unit sits right after them. */
     .studio-amount input {
       field-sizing: content;
@@ -146,102 +147,103 @@
     }
     .studio-amount input:focus-visible { outline: none; text-decoration: underline 3px var(--brand-accent); text-underline-offset: 10px; }
     .studio-unit { font-size: 1.25rem; font-weight: 600; }
-    .studio-about { color: var(--muted); font-size: .98rem; margin-inline-start: .45rem; }
+    /* How long that is, on its own line, so a longer phrase never pushes the track down. */
+    .studio-about { margin: .45rem 0 0; min-height: 1.6em; color: var(--muted); font-size: .98rem; line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* The track: a voice waveform on the card itself, with a round playhead, and the
-       plans as stops on a thin timeline under it. */
-    .studio-track { position: relative; margin-top: 1.9rem; }
-    .studio-wave { position: relative; height: 104px; }
-    .studio-wave svg { display: block; width: 100%; height: 100%; overflow: visible; }
+    /* The track: a voice note on the card itself (words and the pauses between them),
+       a round playhead, and the plans as stops on a thin line under it. */
+    .studio-track { position: relative; margin-top: 1.5rem; }
+    .studio-wave { position: relative; height: 104px; cursor: ew-resize; touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    .studio-wave svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
     html[dir="rtl"] .studio-wave svg { transform: scaleX(-1); }
-    .studio-wave rect {
-      fill: color-mix(in srgb, var(--muted) 32%, transparent);
-      transform-box: fill-box;
-      transform-origin: center;
-      transition: fill .4s var(--ease-out);
-    }
-    .studio-wave rect.on { fill: var(--brand-accent); }
+    .studio-bars-base { stroke: color-mix(in srgb, var(--muted) 34%, transparent); }
+    .studio-bars-fill { stroke: var(--brand-accent); }
     .studio-wave input {
       position: absolute;
-      inset: -8px 0;
+      inset: 0;
       width: 100%;
-      height: calc(100% + 16px);
+      height: 100%;
       margin: 0;
       opacity: 0;
-      cursor: ew-resize;
+      pointer-events: none;
     }
     .studio-head {
       position: absolute;
       top: 50%;
       left: 0;
-      width: 30px;
-      height: 30px;
-      margin: -15px 0 0 -15px;
+      width: 28px;
+      height: 28px;
+      margin: -14px 0 0 -14px;
       border-radius: 50%;
       background: var(--brand-accent);
+      box-shadow: 0 0 0 4px var(--surface), 0 3px 10px rgba(16, 24, 40, .22);
       pointer-events: none;
-      box-shadow: 0 0 0 5px var(--surface), 0 0 0 6px color-mix(in srgb, var(--brand-accent) 30%, transparent), 0 10px 22px -6px var(--brand-accent);
-      transition: left .5s var(--ease-out), transform .2s ease;
+      will-change: translate;
+      transition: scale .2s var(--ease-out), box-shadow .2s ease;
     }
-    .studio-head::after { content: ""; position: absolute; inset: 10px; border-radius: 50%; background: #fff; }
-    .studio.is-dragging .studio-head { transition: left .14s ease-out, transform .2s ease; transform: scale(1.12); }
-    .studio-wave input:focus-visible ~ .studio-head { box-shadow: 0 0 0 5px var(--surface), 0 0 0 8px var(--brand-accent); }
-    .studio-stations { position: relative; height: 54px; margin-top: 10px; }
+    .studio-head::after { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: #fff; }
+    .studio.is-dragging .studio-head { scale: 1.14; }
+    .studio-wave input:focus-visible ~ .studio-head { box-shadow: 0 0 0 4px var(--surface), 0 0 0 7px var(--brand-accent); }
+    .studio-stations { position: relative; height: 60px; margin-top: 8px; }
     .studio-stations::before {
       content: "";
       position: absolute;
-      top: 17px;
-      left: 6%;
-      right: 6%;
+      top: 18px;
+      left: 0;
+      right: 0;
       height: 2px;
       border-radius: 2px;
-      background: linear-gradient(90deg, transparent, var(--line) 8%, var(--line) 92%, transparent);
+      background: var(--line);
     }
+    /* Each stop is a 44px target; its orb is drawn at full size and shrunk when not chosen. */
     .studio-station {
       position: absolute;
-      top: 6px;
+      top: 0;
       display: grid;
       justify-items: center;
-      gap: 4px;
-      padding: 0;
+      gap: 2px;
+      min-width: 44px;
+      padding: 4px 6px 0;
       border: 0;
       background: none;
       color: var(--muted);
       font: inherit;
       cursor: pointer;
       translate: -50% 0;
-      transition: color .3s ease;
+      -webkit-tap-highlight-color: transparent;
+      transition: color .25s ease;
     }
-    .studio-station .orb { --orb-size: 22px; box-shadow: 0 0 0 4px var(--surface); transition: transform .45s cubic-bezier(.34, 1.56, .64, 1); }
-    .studio-station-name { font-size: .78rem; line-height: 1.25; white-space: nowrap; text-align: center; }
+    .studio-station .orb { --orb-size: 30px; box-shadow: 0 0 0 4px var(--surface); transform: scale(.72); transition: transform .35s cubic-bezier(.34, 1.4, .64, 1); }
+    .studio-station-name { font-size: .78rem; line-height: 1.25; white-space: nowrap; text-align: center; transition: opacity .25s ease; }
     .studio-station:hover { color: var(--text); }
     .studio-station.is-on { color: var(--text); font-weight: 600; }
-    .studio-station.is-on .orb { transform: scale(1.4); }
-    .studio-station-crown { position: absolute; top: -13px; left: 50%; width: 14px; height: 14px; translate: -50% 0; transition: top .45s cubic-bezier(.34, 1.56, .64, 1); }
-    .studio-station.is-on .studio-station-crown { top: -18px; }
+    .studio-station.is-on .orb { transform: none; }
+    .studio-station-crown { position: absolute; top: -12px; left: 50%; width: 14px; height: 14px; translate: -50% 0; transform: translateY(4px); transition: transform .35s cubic-bezier(.34, 1.4, .64, 1); }
+    .studio-station.is-on .studio-station-crown { transform: none; }
 
-    /* The plan that fits: the plan's own card, one at a time, fading across. */
+    /* The plan that fits: the plan's own card, one at a time. The old one goes quickly and
+       the new one comes in just after it, so two cards never show at once. */
     .studio-plan {
       position: relative;
       overflow: clip;
       padding: clamp(1.3rem, 2.4vw, 1.9rem) clamp(1.3rem, 3vw, 2.4rem);
-      background:
-        radial-gradient(70% 50% at 50% 0%, color-mix(in srgb, var(--brand-accent) 13%, transparent), transparent 72%),
-        color-mix(in srgb, var(--brand-accent) 5%, var(--surface));
+      background: color-mix(in srgb, var(--brand-accent) 4%, var(--surface));
       border-inline-start: 1px solid var(--line);
     }
-    .plan-stage { display: grid; }
+    /* One column as wide as the panel: a long line on any card wraps instead of widening it. */
+    .plan-stage { display: grid; grid-template-columns: minmax(0, 1fr); container-type: inline-size; }
     .plan-card {
       grid-area: 1 / 1;
+      min-width: 0;
       position: relative;
       display: flex;
       flex-direction: column;
       opacity: 0;
       visibility: hidden;
-      transform: translateY(12px) scale(.985);
-      transition: opacity .45s var(--ease-out), transform .55s var(--ease-out), visibility 0s linear .45s;
+      transform: translateY(8px);
+      transition: opacity .14s ease-in, transform .14s ease-in, visibility 0s linear .14s;
     }
-    .plan-card.is-active { opacity: 1; visibility: visible; transform: none; transition-delay: .08s, .08s, 0s; }
+    .plan-card.is-active { opacity: 1; visibility: visible; transform: none; transition: opacity .3s var(--ease-out) .12s, transform .42s var(--ease-out) .12s, visibility 0s; }
     .plan-top { display: flex; flex-direction: column; align-items: center; text-align: center; }
     .plan-badges { display: flex; flex-direction: column; align-items: center; gap: .55rem; margin-bottom: .55rem; }
     .plan-orb { --orb-size: 84px; box-shadow: 0 22px 40px -22px color-mix(in srgb, var(--o0) 75%, transparent); }
@@ -273,6 +275,12 @@
     .plan-pricing > * { grid-column: 1 / -1; justify-self: center; }
     .plan-pricing > .price-row { grid-column: 1; grid-row: 1; }
     .plan-pricing > .price-original-row { grid-column: 2; grid-row: 1; }
+    /* A narrow card: the old price goes under the new one. */
+    @container (max-width: 300px) {
+      .plan-pricing { grid-template-columns: auto; }
+      .plan-pricing > .price-original-row { grid-column: 1; grid-row: 2; }
+      .price-amount { font-size: 2.3rem; }
+    }
     .price-original-row { display: inline-flex; align-items: baseline; }
     .price-original { color: var(--muted); font-size: 1.05rem; font-weight: 500; text-decoration: line-through; text-decoration-thickness: 1.5px; }
     /* The line under the price already says how much is off. */
@@ -328,11 +336,11 @@
       gap: .35rem;
       width: 196px;
       padding: .42rem 0;
-      background: linear-gradient(90deg, #5B3CF0, #8B5CF6 55%, #B45CE6);
+      background: var(--brand-accent);
       color: #fff;
       font-size: .78rem;
       font-weight: 700;
-      box-shadow: 0 8px 18px -8px rgba(76, 45, 235, .65);
+      box-shadow: 0 2px 6px rgba(16, 24, 40, .18);
       transform: rotate(45deg);
       transition: opacity .35s ease, transform .45s cubic-bezier(.22, 1, .36, 1);
     }
@@ -451,11 +459,11 @@
       font: inherit;
       text-align: center;
       cursor: pointer;
-      transition: border-color .3s ease, box-shadow .3s ease, transform .3s var(--ease-out, ease);
+      transition: border-color .25s ease, box-shadow .25s ease;
     }
-    .plan-pick:hover { transform: translateY(-3px); box-shadow: 0 18px 36px -24px color-mix(in srgb, var(--brand-accent) 55%, transparent); }
+    .plan-pick:hover { border-color: var(--line-strong); }
     .plan-pick:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; }
-    .plan-pick.is-on { border-color: var(--brand-accent); box-shadow: 0 0 0 1px var(--brand-accent), 0 18px 36px -22px color-mix(in srgb, var(--brand-accent) 70%, transparent); }
+    .plan-pick.is-on { border-color: var(--brand-accent); box-shadow: 0 0 0 1px var(--brand-accent); }
     .plan-pick { position: relative; }
     .plan-pick-crown {
       position: absolute;
@@ -467,12 +475,11 @@
       gap: .3rem;
       padding: .22rem .7rem;
       border-radius: var(--radius-full);
-      background: linear-gradient(90deg, #5B3CF0, #8B5CF6 55%, #B45CE6);
+      background: var(--brand-accent);
       color: #fff;
       font-size: .72rem;
       font-weight: 700;
       white-space: nowrap;
-      box-shadow: 0 6px 14px -6px rgba(76, 45, 235, .6);
     }
     .plan-pick-crown .crown { width: 13px; height: 13px; }
     .plan-pick .orb { --orb-size: 60px; margin-bottom: .6rem; }
@@ -484,9 +491,9 @@
     /* Phones: the shown plan and its button stay in reach at the bottom. */
     .plan-bar { display: none; }
 
-    /* One entrance: the waveform rises bar by bar, once. */
-    @keyframes bar-rise { from { transform: scaleY(.08); opacity: .3; } to { transform: none; opacity: 1; } }
-    .studio.is-ready .studio-wave rect { animation: bar-rise .7s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 6ms); }
+    /* The page's one entrance: the voice rises from its centre line, once. */
+    @keyframes wave-in { from { opacity: 0; scale: 1 .15; } to { opacity: 1; scale: 1 1; } }
+    .studio.is-ready .studio-wave svg { animation: wave-in .7s var(--ease-out) both; }
     @media (prefers-reduced-motion: reduce) {
       .studio *, .plan-card, .plan-pick, .plan-bar { transition: none !important; animation: none !important; }
     }
@@ -638,8 +645,9 @@
     .compare-table tbody tr:not(.compare-group-row):hover td.is-popular { background: color-mix(in oklab, var(--a) 7%, var(--surface)); }
     .compare-tick { width: 1.15rem; height: 1.15rem; fill: none; stroke: var(--ok); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
     .compare-no { color: color-mix(in oklab, var(--muted) 70%, transparent); font-weight: 500; }
-    /* Wide screens: the plan names, prices and buttons stay in view while you read down. */
-    @media (min-width: 1100px) {
+    /* Wide screens, once the whole table fits: the plan names, prices and buttons stay in
+       view while you read down. Narrower, the table scrolls sideways in its own box. */
+    @media (min-width: 1280px) {
       .compare-scroll { overflow: visible; }
       .compare-table thead th { top: 64px; }
       .compare-table thead th:first-child { border-start-start-radius: var(--card-radius); }
@@ -774,11 +782,6 @@
     .trial-pill-text { color: var(--muted); font-weight: 500; }
     .trial-pill-text strong { color: var(--accent-text); font-weight: 800; }
 
-    .reveal { opacity: 0; transform: translateY(14px); transition: opacity .5s ease, transform .5s ease; }
-    .reveal.show { opacity: 1; transform: translateY(0); }
-    @media (prefers-reduced-motion: reduce) {
-      .reveal { transition: none; transform: none; }
-    }
 
     /* ── Smaller screens ── */
     @media (max-width: 1000px) {
@@ -789,11 +792,19 @@
     @media (max-width: 640px) {
       .studio { border-radius: 22px; }
       .studio-station-name { font-size: .7rem; }
-      .studio-station:not(.is-on) .studio-station-name { visibility: hidden; }
+      .studio-station:not(.is-on) .studio-station-name { opacity: 0; }
+      .studio .billing-toggle { width: 100%; }
       .plan-picker-list { grid-template-columns: 1fr; gap: 10px; }
       .plan-pick { grid-template-columns: auto 1fr auto; justify-items: start; column-gap: 1rem; padding: 1rem 1.1rem; text-align: start; }
       .plan-pick .orb { --orb-size: 44px; grid-row: span 2; margin: 0; }
       .plan-pick-price { grid-column: 3; grid-row: 1 / span 2; align-self: center; margin: 0; }
+      /* A narrower strap on a narrow card, clear of the plan's orb and name. */
+      .plan-ribbon { top: 14px; inset-inline-end: -44px; width: 150px; padding: .3rem 0; font-size: .7rem; }
+      .plan-ribbon .crown { width: 12px; height: 12px; }
+    }
+    /* One column: the plan's card is under the track, so its name, price and button stay
+       in reach at the bottom while the card is out of view. */
+    @media (max-width: 1000px) {
       .plan-bar {
         display: flex;
         position: fixed;
@@ -978,7 +989,7 @@
       // The cards show the minutes on their own, above the lines.
       $pricingHiddenLabels = array_merge(array_keys($commonLines), [__('ui.pricing.lines.label_voice_minutes')]);
     @endphp
-    <section class="page-hero reveal">
+    <section class="page-hero">
       @if(session('notice'))
         <p class="page-notice" role="status">{{ session('notice') }}</p>
       @endif
@@ -993,7 +1004,7 @@
           </span>
         </div>
       @endif
-      <h1>{{ __('ui.pricing.hero_title') }} <span class="accent">{{ __('ui.pricing.hero_title_accent') }}</span></h1>
+      <h1>{{ __('ui.pricing.hero_title') }} {{ __('ui.pricing.hero_title_accent') }}</h1>
       <p class="lead">{{ __('ui.pricing.hero_subtitle') }}</p>
     </section>
 
@@ -1041,11 +1052,15 @@
           <div class="studio-amount">
             <input id="studioMinutes" inputmode="numeric" autocomplete="off" value="{{ number_format($shownMinutes) }}" aria-describedby="studioAbout">
             <span class="studio-unit">{{ __('ui.pricing.minutes_unit') }}</span>
-            <span class="studio-about" id="studioAbout"></span>
           </div>
+          <p class="studio-about" id="studioAbout"></p>
           <div class="studio-track">
             <div class="studio-wave" id="studioWave">
-              <svg id="studioBars" viewBox="0 0 1000 86" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <svg id="studioBars" aria-hidden="true" focusable="false">
+                <defs><clipPath id="studioFillClip"><rect id="studioFillEdge" x="0" y="-20" width="0" height="200"/></clipPath></defs>
+                <path class="studio-bars-base" fill="none" stroke-linecap="round"/>
+                <path class="studio-bars-fill" fill="none" stroke-linecap="round" clip-path="url(#studioFillClip)"/>
+              </svg>
               <input id="studioSlider" type="range" min="0" max="0" step="1" value="0" aria-label="{{ __('ui.pricing.minutes_track') }}">
               <span class="studio-head" id="studioHead"></span>
             </div>
@@ -1077,7 +1092,7 @@
 
     @if(count($mainPlans) > 1)
       <section class="plan-picker" aria-labelledby="planPickerTitle">
-        <h2 class="section-title reveal" id="planPickerTitle">{{ __('ui.pricing.all_plans') }}</h2>
+        <h2 class="section-title" id="planPickerTitle">{{ __('ui.pricing.all_plans') }}</h2>
         <div class="plan-picker-list" style="--count: {{ min(5, count($mainPlans)) }}">
           @foreach($mainPlans as $index => $plan)
             @php
@@ -1099,7 +1114,7 @@
     @endif
 
     {{-- More than the biggest plan, or a whole team: by talking to us. --}}
-    <section class="team-band reveal" data-count="{{ $planCount }}" aria-labelledby="teamTitle" data-orb-host>
+    <section class="team-band" data-count="{{ $planCount }}" aria-labelledby="teamTitle" data-orb-host>
       <x-orb name="teams" class="team-orb" />
       <div>
         <h2 id="teamTitle">{{ __('ui.pricing.team_title') }}</h2>
@@ -1110,9 +1125,9 @@
 
     @if(count($comparePlans) > 1 && $compareRows !== [])
       <section class="compare" id="compare" aria-labelledby="compareTitle">
-        <h2 class="section-title reveal" id="compareTitle">{{ __('ui.pricing.compare_title') }}</h2>
-        <p class="section-subtitle reveal">{{ __('ui.pricing.compare_subtitle') }}</p>
-        <div class="compare-scroll reveal" role="region" aria-labelledby="compareTitle" tabindex="0">
+        <h2 class="section-title" id="compareTitle">{{ __('ui.pricing.compare_title') }}</h2>
+        <p class="section-subtitle">{{ __('ui.pricing.compare_subtitle') }}</p>
+        <div class="compare-scroll" role="region" aria-labelledby="compareTitle" tabindex="0">
           <table class="compare-table">
             <thead>
               <tr>
@@ -1166,24 +1181,24 @@
     @endif
 
     <section class="features-section">
-      <h2 class="section-title reveal">{{ __('ui.pricing.included_title') }}</h2>
-      <p class="section-subtitle reveal">{{ __('ui.pricing.included_subtitle') }}</p>
+      <h2 class="section-title">{{ __('ui.pricing.included_title') }}</h2>
+      <p class="section-subtitle">{{ __('ui.pricing.included_subtitle') }}</p>
       <div class="features-grid">
-        <article class="feature-card reveal">
+        <article class="feature-card">
           <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3M8 22h8"/>
           </svg>
           <h3>{{ __('ui.pricing.feature1_title') }}</h3>
           <p>{{ __('ui.pricing.feature1_body') }}</p>
         </article>
-        <article class="feature-card reveal">
+        <article class="feature-card">
           <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M4 5h8M8 3v2M10.5 5c-.8 3.6-3 6.4-6.5 8M6.5 9c1.2 2 3 3.4 5.5 4.2"/><path d="M12.5 21l4-9 4 9M14 18h5"/>
           </svg>
           <h3>{{ __('ui.pricing.feature2_title') }}</h3>
           <p>{{ __('ui.pricing.feature2_body') }}</p>
         </article>
-        <article class="feature-card reveal">
+        <article class="feature-card">
           <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M10 3.5a2 2 0 0 1 4 0V5h3.5A1.5 1.5 0 0 1 19 6.5V10h-1.5a2 2 0 0 0 0 4H19v3.5a1.5 1.5 0 0 1-1.5 1.5H14v-1.5a2 2 0 0 0-4 0V19H6.5A1.5 1.5 0 0 1 5 17.5V14h1.5a2 2 0 0 0 0-4H5V6.5A1.5 1.5 0 0 1 6.5 5H10z"/>
           </svg>
@@ -1194,12 +1209,12 @@
     </section>
 
     <section class="faq-section" aria-labelledby="faqTitle">
-      <div class="faq-intro reveal">
+      <div class="faq-intro">
         <h2 class="section-title" id="faqTitle">{{ __('ui.pricing.faq_title') }}</h2>
         <p>{{ __('ui.pricing.faq_subtitle') }}</p>
         <a class="faq-contact" href="{{ route('contact') }}">{{ __('ui.pricing.faq_contact') }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </div>
-      <div class="faq-list reveal">
+      <div class="faq-list">
         @foreach($faqNumbers as $faq)
           <details class="faq-item" @if($loop->first) open @endif>
             <summary>
@@ -1367,20 +1382,6 @@
 
       updatePrices();
       updateUpgradeLinks();
-
-      var revealElements = document.querySelectorAll('.reveal');
-      var revealObserver = new IntersectionObserver(function(entries) {
-        entries.forEach(function(entry, index) {
-          if (entry.isIntersecting) {
-            setTimeout(function() {
-              entry.target.classList.add('show');
-            }, index * 60);
-            revealObserver.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.1 });
-
-      revealElements.forEach(function(el) { revealObserver.observe(el); });
     })();
   </script>
   @php
@@ -1448,8 +1449,12 @@
   <script>
     /* ── The minutes track: pick minutes, see the plan that fits ──
        The plans sit on the track evenly spaced, the minutes between two plans on a
-       log scale, so 15 and 2,500 minutes both fit. The playhead moves between round
-       stops; the plan shown is the smallest one that covers the minutes chosen. */
+       log scale, so 15 and 2,500 minutes both fit. One loop moves everything: the
+       playhead, the filled part of the voice, the number and the plan follow the same
+       position in the same frame, so nothing lags behind anything else. A drag follows
+       the hand; a click, a key, a plan or a typed number glides there; close to a plan
+       the playhead settles on it. The plan shown is the smallest one that covers the
+       minutes chosen. */
     (function () {
       var studio = document.getElementById('studio');
       if (!studio) return;
@@ -1468,9 +1473,9 @@
 
       // One plan's card at a time; its orb comes alive.
       function showPlan(slug) {
-        picks.forEach(function (p) { p.classList.toggle('is-on', p.getAttribute('data-pick') === slug); });
         if (slug === shownSlug) return;
         shownSlug = slug;
+        picks.forEach(function (p) { p.classList.toggle('is-on', p.getAttribute('data-pick') === slug); });
         cards.forEach(function (card) {
           var on = card.getAttribute('data-plan-slug') === slug;
           card.classList.toggle('is-active', on);
@@ -1480,6 +1485,7 @@
           if (on && ribbon) ribbon.hidden = !card.classList.contains('popular');
         });
         refreshBar();
+        syncBar();
       }
 
       // The bar at the bottom on phones: the shown plan, its price and its own button.
@@ -1503,13 +1509,21 @@
           action.appendChild(copy);
         }
       }
-      var panel = studio.querySelector('.studio-plan');
-      if (bar && panel && 'IntersectionObserver' in window) {
-        new IntersectionObserver(function (entries) {
-          var show = !entries[0].isIntersecting;
-          bar.classList.toggle('is-shown', show);
-          document.body.classList.toggle('has-plan-bar', show && window.matchMedia('(max-width: 640px)').matches);
-        }, { threshold: 0.15 }).observe(panel);
+      // It shows while the shown plan's own button is out of view (the bottom of the screen,
+      // where the bar sits, counts as out of view, so the two never swap back and forth).
+      function syncBar() {
+        if (!bar || !('IntersectionObserver' in window)) return;
+        var action = shownCard() && shownCard().querySelector('.plan-action');
+        var show = !(action && action.__inView);
+        bar.classList.toggle('is-shown', show);
+        document.body.classList.toggle('has-plan-bar', show && window.matchMedia('(max-width: 1000px)').matches);
+      }
+      if (bar && 'IntersectionObserver' in window) {
+        var watch = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) { entry.target.__inView = entry.isIntersecting; });
+          syncBar();
+        }, { rootMargin: '0px 0px -90px 0px' });
+        cards.forEach(function (card) { var action = card.querySelector('.plan-action'); if (action) watch.observe(action); });
       }
 
       // A new billing cycle: the price lifts in, and the bar follows.
@@ -1539,21 +1553,43 @@
       var head = document.getElementById('studioHead');
       var wave = document.getElementById('studioWave');
       var svg = document.getElementById('studioBars');
+      var edge = document.getElementById('studioFillEdge');
+      var voicePaths = [svg.querySelector('.studio-bars-base'), svg.querySelector('.studio-bars-fill')];
+
+      // Where minutes sit on the track (0 = its start, 1 = its end), and back. The first
+      // plan sits right at the start (fewer minutes take a short lead-in before it), the
+      // last near the end, and the plans in between are evenly spaced.
       var minM = Math.max(1, Math.floor(plans[0].minutes / 3));
       var maxM = plans[plans.length - 1].minutes;
       var anchors = [minM].concat(plans.map(function (p) { return p.minutes; }));
-      // The first plan sits right at the start (fewer minutes take a short lead-in before
-      // it), the last at the end, and the plans in between are evenly spaced.
-      var START = 0.06, END = 0.94, LEAD = 0.015;
-      function between(m, lo, hi) { return Math.max(0, Math.min(1, Math.log(m / lo) / (Math.log(hi / lo) || 1))); }
+      var START = 0.06, END = 0.94, LEAD = 0.015, GAPS = anchors.length - 2;
+      function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+      function between(m, lo, hi) { return clamp(Math.log(m / lo) / (Math.log(hi / lo) || 1), 0, 1); }
       function pos(m) {
         if (m <= anchors[1]) return LEAD + (START - LEAD) * between(Math.max(m, minM), minM, anchors[1]);
-        var gaps = anchors.length - 2;
         for (var i = 2; i < anchors.length; i++) {
-          if (m <= anchors[i]) return START + (END - START) * (i - 2 + between(m, anchors[i - 1], anchors[i])) / gaps;
+          if (m <= anchors[i]) return START + (END - START) * (i - 2 + between(m, anchors[i - 1], anchors[i])) / GAPS;
         }
         return END;
       }
+      function minutesAt(f) {
+        if (f <= START) return minM * Math.pow(anchors[1] / minM, clamp((f - LEAD) / (START - LEAD), 0, 1));
+        var u = clamp((f - START) / (END - START), 0, 1) * GAPS;
+        var i = Math.min(GAPS - 1, Math.floor(u));
+        return anchors[i + 1] * Math.pow(anchors[i + 2] / anchors[i + 1], u - i);
+      }
+      // What the number shows at a point: a plan's own minutes on its stop, else a round
+      // figure (1, 5, 10, 25 or 50 at a time as the minutes grow).
+      function shownAt(f) {
+        for (var i = 0; i < plans.length; i++) if (Math.abs(pos(plans[i].minutes) - f) < 0.0015) return plans[i].minutes;
+        var m = minutesAt(f);
+        var step = m < 30 ? 1 : m < 100 ? 5 : m < 500 ? 10 : m < 2000 ? 25 : 50;
+        return clamp(Math.round(m / step) * step, minM, maxM);
+      }
+      function planFor(m) {
+        return plans.filter(function (p) { return m <= p.minutes; })[0] || plans[plans.length - 1];
+      }
+      // The keys move one round figure at a time, stopping at every plan.
       var NICE = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 100, 120, 150, 200, 250, 300, 400, 500, 600, 750, 1000, 1250, 1500, 1750, 2000, 2500, 3000, 4000, 5000, 7500, 10000, 15000, 20000, 25000, 50000];
       var stops = NICE.filter(function (n) { return n >= minM && n <= maxM; }).concat(anchors)
         .filter(function (n, i, all) { return all.indexOf(n) === i; })
@@ -1566,20 +1602,43 @@
         if (plan) station.style.left = ((rtl ? 1 - pos(plan.minutes) : pos(plan.minutes)) * 100) + '%';
       });
 
-      // The waveform, drawn once.
-      var N = 110, rects = [];
-      for (var i = 0; i < N; i++) {
-        var env = 0.32 + 0.68 * Math.abs(Math.sin(i * 0.075 + 0.6));
-        var h = 6 + 70 * env * Math.abs(Math.sin(i * 0.63) * Math.cos(i * 0.21 + 1.1));
-        var r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        r.setAttribute('x', (i * 1000 / N + 2.2).toFixed(2));
-        r.setAttribute('width', (1000 / N - 4.4).toFixed(2));
-        r.setAttribute('y', (43 - h / 2).toFixed(2));
-        r.setAttribute('height', h.toFixed(2));
-        r.setAttribute('rx', '3');
-        r.style.setProperty('--i', String(i));
-        svg.appendChild(r);
-        rects.push(r);
+      // The voice: words of a few syllables each and the short pauses between them, the
+      // same every time. It is drawn to the track's own width in whole pixels.
+      var voice = (function () {
+        var seed = 11, out = [];
+        function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+        while (out.length < 400) {
+          var len = 4 + Math.floor(rnd() * 9), loud = 0.55 + rnd() * 0.45, syllables = 1 + Math.floor(rnd() * 3);
+          for (var j = 0; j < len; j++) {
+            var k = (j + 0.5) / len;
+            var shape = Math.pow(Math.sin(Math.PI * k), 0.7) * (0.6 + 0.4 * Math.abs(Math.sin(Math.PI * syllables * k)));
+            out.push(Math.max(0.07, loud * shape * (0.82 + rnd() * 0.36)));
+          }
+          var pause = rnd() < 0.2 ? 3 + Math.floor(rnd() * 2) : 1 + Math.floor(rnd() * 2);
+          for (var g = 0; g < pause; g++) out.push(0.04);
+        }
+        return out;
+      })();
+      var W = 0, H = 0;
+      function drawVoice() {
+        var pitch = W < 520 ? 5 : 6, bar = pitch / 2;
+        var n = Math.max(1, Math.floor((W - bar) / pitch) + 1);
+        var x0 = (W - ((n - 1) * pitch + bar)) / 2 + bar / 2, mid = H / 2, d = '';
+        for (var i = 0; i < n; i++) {
+          var h = Math.max(0.5, voice[i % voice.length] * (H * 0.84 - bar)) / 2;
+          var x = (x0 + i * pitch).toFixed(1);
+          d += 'M' + x + ' ' + (mid - h).toFixed(1) + 'V' + (mid + h).toFixed(1);
+        }
+        svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+        edge.setAttribute('height', String(H + 40));
+        voicePaths.forEach(function (path) { path.setAttribute('d', d); path.setAttribute('stroke-width', String(bar)); });
+      }
+      function measure() {
+        var w = wave.clientWidth, h = wave.clientHeight;
+        if (!w || (w === W && h === H)) return;
+        W = w; H = h;
+        drawVoice();
+        if (cur !== null) render();
       }
 
       function plural(list, n) {
@@ -1604,104 +1663,178 @@
       function fit() { if (!sizes) input.style.width = (String(input.value).length + 0.15) + 'ch'; }
       input.addEventListener('input', fit);
 
-      // The number counts to its new value.
-      var shownMinutes = null, raf = 0;
-      function countTo(to) {
-        var from = shownMinutes === null ? to : shownMinutes;
-        shownMinutes = to;
-        if (document.activeElement === input) return;
-        cancelAnimationFrame(raf);
-        if (reduced || from === to) { input.value = fmt(to); fit(); return; }
-        var start = performance.now();
-        (function step(now) {
-          var k = Math.min(1, (now - start) / 450), e = 1 - Math.pow(1 - k, 3);
-          input.value = fmt(from + (to - from) * e);
-          fit();
-          if (k < 1) raf = requestAnimationFrame(step);
-        })(start);
-      }
-
-      var x = null, announce = 0;
       var live = document.createElement('p');
       live.className = 'sr-only';
       live.setAttribute('aria-live', 'polite');
       live.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap';
       studio.appendChild(live);
 
-      function set(m) {
-        m = Math.max(minM, Math.min(maxM, Math.round(m) || minM));
+      // The motion. cur is where the playhead is drawn, goal where it is going; each
+      // frame closes part of the gap, which reads as a glide that slows into place.
+      // A drag closes it almost at once, so the playhead stays under the hand.
+      var cur = null, goal = 0, exact = null, lockedPlan = null, ease = 0.1;
+      var frame = 0, last = 0, shownMinutes = null, announced = null, announce = 0;
+      // The page's orbs keep still while the track moves, so every frame goes to the track.
+      function still(on) { if (window.ListenOrbs && window.ListenOrbs.hold) window.ListenOrbs.hold(on); }
+      function go(f, opts) {
+        opts = opts || {};
+        goal = clamp(f, LEAD, END);
+        exact = opts.exact == null ? null : opts.exact;
+        ease = reduced ? 0 : (opts.drag ? 0.018 : 0.1);
+        // A glide shows where it is going straight away, not every plan it passes.
+        lockedPlan = opts.drag ? null : planFor(exact != null ? exact : shownAt(goal)).slug;
+        if (lockedPlan) showPlan(lockedPlan);
+        if (cur === null || !ease) { cur = goal; cancelAnimationFrame(frame); frame = 0; render(); return; }
+        if (!frame) { last = 0; still(true); frame = requestAnimationFrame(tick); }
+      }
+      function tick(now) {
+        var dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
+        last = now;
+        cur += (goal - cur) * (1 - Math.exp(-dt / ease));
+        if (Math.abs(goal - cur) * W < 0.25) cur = goal;
+        render();
+        frame = cur === goal ? 0 : requestAnimationFrame(tick);
+        if (!frame && !(press && press.live)) still(false);
+      }
+      function render() {
+        var x = cur * W;
+        // The position on its own property, so growing the playhead while dragged never moves it.
+        head.style.translate = (rtl ? W - x : x).toFixed(2) + 'px 0';
+        edge.setAttribute('width', x.toFixed(2));
+        var settled = cur === goal;
+        var m = settled && exact != null ? exact : shownAt(cur);
+        if (m !== shownMinutes) {
+          shownMinutes = m;
+          if (document.activeElement !== input) { input.value = fmt(m); fit(); }
+          var text = t.about.replace(':time', duration(m));
+          if (about.textContent !== text) about.textContent = text;
+        }
+        if (!lockedPlan) showPlan(planFor(m).slug);
+        if (settled) settle(m);
+      }
+      // At rest: the slider's own value for keys and screen readers, said once.
+      function settle(m) {
+        lockedPlan = null;
         var k = 0;
-        stops.forEach(function (s, i) { if (Math.abs(pos(s) - pos(m)) < Math.abs(pos(stops[k]) - pos(m))) k = i; });
+        stops.forEach(function (s, i) { if (Math.abs(s - m) < Math.abs(stops[k] - m)) k = i; });
         slider.value = String(k);
-        var next = pos(m), from = x === null ? next : x;
-        // The bars fill in a sweep, from where the playhead was to where it goes.
-        rects.forEach(function (rect, i) {
-          var c = (i + 0.5) / N, on = c <= next;
-          if (rect.classList.contains('on') !== on) {
-            rect.style.transitionDelay = reduced || x === null ? '0ms'
-              : Math.round(Math.abs(c - from) / Math.max(0.001, Math.abs(next - from)) * 320) + 'ms';
-            rect.classList.toggle('on', on);
-          }
-        });
-        x = next;
-        head.style.left = ((rtl ? 1 - next : next) * 100) + '%';
-        countTo(m);
-        about.textContent = t.about.replace(':time', duration(m));
-        var plan = plans.filter(function (p) { return m <= p.minutes; })[0] || plans[plans.length - 1];
-        showPlan(plan.slug);
-        var sentence = t.live.replace(':minutes', fmt(m)).replace(':plan', plan.name);
+        var sentence = t.live.replace(':minutes', fmt(m)).replace(':plan', planFor(m).name);
         slider.setAttribute('aria-valuetext', sentence);
+        if (announced === sentence) return;
+        announced = sentence;
         clearTimeout(announce);
         announce = setTimeout(function () { live.textContent = sentence; }, 500);
       }
+      function heading() { return exact != null ? exact : shownAt(goal); }
 
-      // Keyboard: one stop per arrow (the slider is the track for screen readers and keys).
-      slider.addEventListener('input', function () { set(stops[+slider.value]); });
+      // Keys: one round figure per arrow (left is more in Arabic, where the track runs
+      // right to left), a whole plan per Page Up / Page Down, the ends with Home / End.
+      slider.addEventListener('keydown', function (e) {
+        var now = heading(), next;
+        var more = e.key === 'ArrowUp' || e.key === (rtl ? 'ArrowLeft' : 'ArrowRight');
+        var less = e.key === 'ArrowDown' || e.key === (rtl ? 'ArrowRight' : 'ArrowLeft');
+        var marks = plans.map(function (p) { return p.minutes; });
+        if (more) next = stops.filter(function (s) { return s > now; })[0];
+        else if (less) next = stops.filter(function (s) { return s < now; }).pop();
+        else if (e.key === 'PageUp') next = marks.filter(function (s) { return s > now; })[0];
+        else if (e.key === 'PageDown') next = marks.filter(function (s) { return s < now; }).pop();
+        else if (e.key === 'Home') next = minM;
+        else if (e.key === 'End') next = maxM;
+        else return;
+        e.preventDefault();
+        if (next != null) go(pos(next), { exact: next });
+      });
+      // Assistive technology may set the value itself.
+      slider.addEventListener('input', function () {
+        var m = stops[+slider.value];
+        if (m != null) go(pos(m), { exact: m });
+      });
 
-      // Pointer: the stop nearest to where the track is touched, also while dragging.
-      function fromPointer(e) {
-        var box = wave.getBoundingClientRect();
-        var f = (e.clientX - box.left) / box.width;
+      // Pointer. A mouse acts at once; a finger only once it clearly moves sideways (or
+      // taps), so scrolling the page over the track never changes the plan.
+      var DETENT = 0.022, press = null, box = null;
+      function toward(clientX, drag) {
+        var f = (clientX - box.left) / box.width;
         if (rtl) f = 1 - f;
-        var best = stops[0];
-        stops.forEach(function (s) { if (Math.abs(pos(s) - f) < Math.abs(pos(best) - f)) best = s; });
-        set(best);
+        f = clamp(f, LEAD, END);
+        var near = null;
+        plans.forEach(function (p) {
+          var d = Math.abs(pos(p.minutes) - f);
+          if (d < DETENT && (!near || d < near.d)) near = { d: d, minutes: p.minutes };
+        });
+        if (near) go(pos(near.minutes), { exact: near.minutes, drag: drag });
+        else go(f, { drag: drag });
       }
-      slider.style.pointerEvents = 'none';
-      wave.style.cursor = 'ew-resize';
-      wave.style.touchAction = 'pan-y';
-      wave.addEventListener('pointerdown', function (e) {
+      function begin(e) {
+        press.live = true;
+        try { wave.setPointerCapture(e.pointerId); } catch (err) {}
         studio.classList.add('is-dragging');
-        wave.setPointerCapture(e.pointerId);
+        still(true);
         slider.focus({ preventScroll: true });
-        fromPointer(e);
+        toward(e.clientX, false);
+      }
+      function end(e) {
+        if (!press || e.pointerId !== press.id) return;
+        var tap = !press.live && e.type === 'pointerup';
+        if (press.live) {
+          studio.classList.remove('is-dragging');
+          if (!frame) still(false);
+        }
+        press = null;
+        if (tap) { slider.focus({ preventScroll: true }); toward(e.clientX, false); }
+      }
+      wave.addEventListener('pointerdown', function (e) {
+        if (e.button > 0 || press) return;
+        box = wave.getBoundingClientRect();
+        press = { id: e.pointerId, x: e.clientX, y: e.clientY, live: false };
+        if (e.pointerType === 'mouse') { e.preventDefault(); begin(e); }
       });
-      wave.addEventListener('pointermove', function (e) { if (wave.hasPointerCapture(e.pointerId)) fromPointer(e); });
-      ['pointerup', 'pointercancel'].forEach(function (type) {
-        wave.addEventListener(type, function () { studio.classList.remove('is-dragging'); });
+      wave.addEventListener('pointermove', function (e) {
+        if (!press || e.pointerId !== press.id) return;
+        if (!press.live) {
+          var dx = Math.abs(e.clientX - press.x), dy = Math.abs(e.clientY - press.y);
+          if (dx > 6 && dx > dy) { begin(e); } else if (dy > 10) { press = null; }
+          return;
+        }
+        toward(e.clientX, true);
       });
+      wave.addEventListener('pointerup', end);
+      wave.addEventListener('pointercancel', end);
+      // Only the track's own capture ending counts (a finger's first capture is on the
+      // shape it touched, and moving it to the track ends that one).
+      wave.addEventListener('lostpointercapture', function (e) { if (e.target === wave) end(e); });
 
       // Typing a number (Arabic or Western digits).
       function typed() {
         var digits = String(input.value).replace(/[٠-٩]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }).replace(/[^\d]/g, '');
-        if (digits !== '') { shownMinutes = null; set(+digits); input.value = fmt(Math.max(minM, Math.min(maxM, +digits))); }
+        if (digits === '') { input.value = fmt(shownMinutes); fit(); return; }
+        var m = clamp(+digits, minM, maxM);
+        input.value = fmt(m);
+        fit();
+        go(pos(m), { exact: m });
       }
       input.addEventListener('change', typed);
       input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); typed(); } });
+      input.addEventListener('blur', function () { input.value = fmt(shownMinutes); fit(); });
 
       // A plan's orb on the track, or its card below, moves the track to it.
       picks.forEach(function (p) {
         p.addEventListener('click', function () {
           var plan = plans.filter(function (q) { return q.slug === p.getAttribute('data-pick'); })[0];
-          if (plan) set(plan.minutes); else showPlan(p.getAttribute('data-pick'));
+          if (plan) go(pos(plan.minutes), { exact: plan.minutes }); else showPlan(p.getAttribute('data-pick'));
           if (p.classList.contains('plan-pick')) {
-            var box = studio.getBoundingClientRect();
-            if (box.top < 0 || box.top > window.innerHeight * 0.4) studio.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+            var b = studio.getBoundingClientRect();
+            if (b.top < 0 || b.top > window.innerHeight * 0.4) studio.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
           }
         });
       });
 
-      set(+String(input.value).replace(/[^\d]/g, '') || plans[0].minutes);
+      measure();
+      if ('ResizeObserver' in window) new ResizeObserver(measure).observe(wave);
+      else window.addEventListener('resize', measure);
+      var start = +String(input.value).replace(/[^\d]/g, '') || plans[0].minutes;
+      go(pos(start), { exact: start });
+      clearTimeout(announce); // said only once the visitor moves it
       requestAnimationFrame(function () { studio.classList.add('is-ready'); });
     })();
   </script>

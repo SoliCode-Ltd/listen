@@ -54,6 +54,11 @@ class PricingMinutesTrackTest extends TestCase
             $this->assertMatchesRegularExpression('/class="plan-card popular[^"]*is-active" data-orb-host\s+data-plan-slug="starter"/', $html);
             $this->assertSame(3, preg_match_all('/data-orb-host\s+inert/', $html));
 
+            // The heading is one colour, and the track is a voice in two layers: the chosen part fills in.
+            $this->assertStringNotContainsString('class="accent"', $html);
+            $this->assertStringContainsString('class="studio-bars-base"', $html);
+            $this->assertStringContainsString('class="studio-bars-fill"', $html);
+
             // The orbs on the track and the list under the card pick a plan.
             $this->assertSame(4, substr_count($html, 'class="studio-station"'));
             $this->assertSame(4, substr_count($html, 'class="plan-pick"'));
