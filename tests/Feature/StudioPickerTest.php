@@ -182,7 +182,7 @@ class StudioPickerTest extends TestCase
         $this->assertSame('ar', $entry['l']);
         $this->assertSame('SA', $entry['c']);
         $this->assertStringEndsWith('/images/flags/sa.svg', $entry['f']);
-        $this->assertSame('سعودي (حجازي)', $entry['d']);
+        $this->assertSame('سعودية (حجازية)', $entry['d'], 'a woman: the dialect in the feminine');
         $this->assertNull($entry['p'], 'no preview when the file is missing');
         $this->assertSame(['voice_999'], $meta['favorites']);
         $this->assertStringEndsWith('/dashboard/favorite-voices', $meta['favoritesUrl']);
