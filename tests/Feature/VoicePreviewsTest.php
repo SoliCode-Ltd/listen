@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\Voice;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
+use App\Support\SpeakerAvatar;
 use App\Support\VoiceCatalog;
+use App\Support\VoiceFlag;
 use App\Support\VoicePreviews;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
@@ -30,6 +32,7 @@ class VoicePreviewsTest extends TestCase
             File::deleteDirectory($this->public);
         }
         VoicePreviews::forget();
+        SpeakerAvatar::forget();
         parent::tearDown();
     }
 
@@ -163,6 +166,43 @@ class VoicePreviewsTest extends TestCase
         $arabic = array_values(VoiceCatalog::libraryEntries(true));
         $this->assertSame('سعودي (نجدي بدوي)', $arabic[0]['d']);
         $this->assertSame('الفرنسية (فرنسا)', $arabic[2]['d']);
+    }
+
+    public function test_a_womans_dialect_is_named_in_the_feminine_in_arabic(): void
+    {
+        $this->assertSame('مصرية (صعيدية)', VoiceFlag::label('ar-EG-SA', true, true));
+        $this->assertSame('مصري (صعيدي)', VoiceFlag::label('ar-EG-SA', true));
+        $this->assertSame('سعودية (قطيفية)', VoiceFlag::label('ar-SA-QT', true, true));
+        $this->assertSame('عُمانية (صورية، ساحلية)', VoiceFlag::label('ar-OM-SR', true, true));
+        $this->assertSame('قطرية (حضرية قديمة)', VoiceFlag::label('ar-QA-OL', true, true));
+        $this->assertSame('أمريكية (عامة)', VoiceFlag::label('en-US', true, true));
+        // Places and words that already agree stay as they are.
+        $this->assertSame('عربية أناضولية (هاتاي)', VoiceFlag::label('ar-TR-HT', true, true));
+        $this->assertSame('بريطانية (الغرب الريفي)', VoiceFlag::label('en-GB-WC', true, true));
+        $this->assertSame('فصحى (إخبارية)', VoiceFlag::label('ar-XA-NW', true, true));
+        $this->assertSame('بلكنة فرنسية', VoiceFlag::label('en-FR', true, true));
+        // English pages are unchanged.
+        $this->assertSame('Egyptian (Saidi)', VoiceFlag::label('ar-EG-SA', false, true));
+    }
+
+    public function test_a_woman_in_the_library_has_a_feminine_dialect_and_is_asked_for_as_a_woman(): void
+    {
+        $this->usePublicPath();
+        File::ensureDirectoryExists(public_path('audio/voice-previews'));
+        file_put_contents(public_path('audio/voice-previews/ar-abeer.mp3'), 'mp3');
+        file_put_contents(VoicePreviews::madePath(), json_encode(['ar-abeer' => VoicePreviews::hash(VoicePreviews::lines()['ar-abeer'])]));
+        $this->voice('Abeer', 'ar', 'female', 'Pulcherrima');
+
+        $this->assertSame('سعودية (قطيفية)', array_values(VoiceCatalog::libraryEntries(true))[0]['d']);
+        $this->assertSame('Saudi (Qatifi)', array_values(VoiceCatalog::libraryEntries(false))[0]['d']);
+
+        Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['inlineData' => ['data' => base64_encode($this->wav())]]]]]]])]);
+        $this->artisan('tts:showcase', ['--set' => 'previews', '--generate' => true, '--only' => ['ar-abeer', 'ar-fahad'], '--key' => 'test', '--pause' => 0, '--force' => true])
+            ->assertSuccessful();
+        Http::assertSent(fn ($request) => $request['generationConfig']['speechConfig']['voiceConfig']['voice'] === 'Pulcherrima'
+            && str_contains($request['contents'][0]['parts'][0]['speech_metadata']['style'], 'The speaker is a woman'));
+        Http::assertSent(fn ($request) => $request['generationConfig']['speechConfig']['voiceConfig']['voice'] === 'Iapetus'
+            && ! str_contains($request['contents'][0]['parts'][0]['speech_metadata']['style'], 'woman'));
     }
 
     private function voice(string $name, string $language, string $gender, string $engine): Voice

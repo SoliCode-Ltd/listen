@@ -2103,6 +2103,14 @@ class GeminiTtsProvider implements TtsProviderInterface
         return SpeechLanguages::speechCode($normalized) ?? 'en-US';
     }
 
+    /**
+     * "male" or "female" for a stock Gemini voice name, or null when unknown.
+     */
+    public static function voiceGender(string $voiceName): ?string
+    {
+        return self::VOICE_GENDER_MAP[$voiceName] ?? null;
+    }
+
     private function normalizeGender(mixed $gender): string
     {
         $normalized = strtolower(trim((string) $gender));

@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Services\Tts\GeminiTtsProvider;
+
 /**
  * The five speakers in the hero conversation for each page language. Each
  * says one line about Listen in their own dialect or accent, and visitors
@@ -106,7 +108,7 @@ final class HeroCast
                 'language' => $language,
                 'avatar' => SpeakerAvatar::url($person['name'], $language),
                 'dialect' => $person['dialect'],
-                'dialect_label' => VoiceFlag::label($person['dialect'], $arabicUi),
+                'dialect_label' => VoiceFlag::label($person['dialect'], $arabicUi, GeminiTtsProvider::voiceGender($person['voice']) === 'female'),
                 'flag' => VoiceFlag::url($person['dialect']),
                 // Delivery tags like <laugh> are spoken, not shown.
                 'line' => trim((string) preg_replace('/\s*<[^<>]+>\s*/u', ' ', $person['line'])),

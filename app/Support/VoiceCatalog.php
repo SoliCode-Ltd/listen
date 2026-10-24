@@ -399,7 +399,7 @@ class VoiceCatalog
                 'l' => (string) $voice->language,
                 'c' => $dialect !== '' ? (ArabicDialects::countryOf($dialect) ?? EnglishAccents::countryOf($dialect)) : null,
                 'f' => $shown !== '' ? VoiceFlag::url($shown, $dialect !== '' ? $voice->country : null) : null,
-                'd' => $shown !== '' ? VoicePreviews::label($shown, $arabic) : '',
+                'd' => $shown !== '' ? VoicePreviews::label($shown, $arabic, strtolower((string) $voice->gender) === 'female') : '',
                 'p' => $preview,
                 's' => (bool) $voice->is_featured,
             ];

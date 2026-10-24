@@ -84,13 +84,14 @@ final class VoicePreviews
     }
 
     /**
-     * Localised name of a preview's dialect, accent or language.
+     * Localised name of a preview's dialect, accent or language (feminine in
+     * Arabic for a woman: "سعودية (نجدية)").
      */
-    public static function label(string $dialect, bool $arabic): string
+    public static function label(string $dialect, bool $arabic, bool $female = false): string
     {
         return isset(self::NATIVE[$dialect])
             ? self::NATIVE[$dialect][$arabic ? 'ar' : 'en']
-            : VoiceFlag::label($dialect, $arabic);
+            : VoiceFlag::label($dialect, $arabic, $female);
     }
 
     /**

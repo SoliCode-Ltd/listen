@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\SiteSetting;
 use App\Models\VoiceSample;
+use App\Services\Tts\GeminiTtsProvider;
 use App\Support\ArabicDialects;
 use App\Support\AudioEffects;
 use App\Support\EnglishAccents;
@@ -202,7 +203,7 @@ class GenerateShowcaseSamplesCommand extends Command
             if ($current && ! $this->option('force')) {
                 continue;
             }
-            $samples[] = $line + ['kind' => 'single', 'sign_off' => false];
+            $samples[] = $line + ['kind' => 'single', 'sign_off' => false, 'speaker_gender' => GeminiTtsProvider::voiceGender($line['voice'])];
         }
         $max = max(0, (int) $this->option('max'));
         $this->info(count($samples).' preview(s) to make'.($max > 0 && count($samples) > $max ? ", {$max} in this run" : '').'.');
@@ -293,6 +294,10 @@ class GenerateShowcaseSamplesCommand extends Command
 
         if (! $isDialogue) {
             $style = trim($this->accentDirection($language, $sample['dialect']).' '.$sample['style']);
+            if (($sample['speaker_gender'] ?? null) === 'female') {
+                // A deep, mature or punchy direction can make a woman's voice sound like a man's.
+                $style .= ' The speaker is a woman: keep a natural, clearly female voice.';
+            }
             $speechConfig = ['voiceConfig' => ['voice' => $sample['voice']]];
             $parts = [['text' => $sample['text'], 'speech_metadata' => ['style' => $style]]];
             if ($sample['sign_off'] ?? true) {
