@@ -1269,7 +1269,7 @@ return [
         ],
         'library' => [
             'title' => 'Voice library',
-            'hint' => 'Every speaker can speak any dialect or accent you choose. Each sample is in the speaker’s own.',
+            'hint' => 'Every speaker can speak any dialect or accent you choose.',
             'all' => 'All voices',
             'favorites' => 'Favourites',
             'mine' => 'My voices',
