@@ -191,7 +191,7 @@ class VoicePreviewsTest extends TestCase
         File::ensureDirectoryExists(public_path('audio/voice-previews'));
         file_put_contents(public_path('audio/voice-previews/ar-abeer.mp3'), 'mp3');
         file_put_contents(VoicePreviews::madePath(), json_encode(['ar-abeer' => VoicePreviews::hash(VoicePreviews::lines()['ar-abeer'])]));
-        $this->voice('Abeer', 'ar', 'female', 'Pulcherrima');
+        $this->voice('Abeer', 'ar', 'female', 'Zephyr');
 
         $this->assertSame('سعودية (قطيفية)', array_values(VoiceCatalog::libraryEntries(true))[0]['d']);
         $this->assertSame('Saudi (Qatifi)', array_values(VoiceCatalog::libraryEntries(false))[0]['d']);
@@ -199,7 +199,7 @@ class VoicePreviewsTest extends TestCase
         Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['inlineData' => ['data' => base64_encode($this->wav())]]]]]]])]);
         $this->artisan('tts:showcase', ['--set' => 'previews', '--generate' => true, '--only' => ['ar-abeer', 'ar-fahad'], '--key' => 'test', '--pause' => 0, '--force' => true])
             ->assertSuccessful();
-        Http::assertSent(fn ($request) => $request['generationConfig']['speechConfig']['voiceConfig']['voice'] === 'Pulcherrima'
+        Http::assertSent(fn ($request) => $request['generationConfig']['speechConfig']['voiceConfig']['voice'] === 'Zephyr'
             && str_contains($request['contents'][0]['parts'][0]['speech_metadata']['style'], 'The speaker is a woman'));
         Http::assertSent(fn ($request) => $request['generationConfig']['speechConfig']['voiceConfig']['voice'] === 'Iapetus'
             && ! str_contains($request['contents'][0]['parts'][0]['speech_metadata']['style'], 'woman'));

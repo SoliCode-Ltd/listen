@@ -37,7 +37,7 @@ return [
         ['slug' => 'ar-saad', 'voice' => 'Schedar', 'language' => 'ar', 'dialect' => 'ar-SA-NJ',
             'style' => 'An even, relaxed podcast host from Najran.',
             'text' => 'يا مرحبا بكم في حلقة جديدة. اليوم بنسولف عن نجران، عن نخيلها وقلاعها الطين، وعن ناسها الطيبين، فخلكم معنا.'],
-        ['slug' => 'ar-abeer', 'voice' => 'Pulcherrima', 'language' => 'ar', 'dialect' => 'ar-SA-QT',
+        ['slug' => 'ar-abeer', 'voice' => 'Zephyr', 'language' => 'ar', 'dialect' => 'ar-SA-QT',
             'style' => "A young woman's bright, friendly radio ad voice from Qatif, light and smiling.",
             'text' => 'لا يفوتكم! عرض آخر الأسبوع بدا اليوم، وكل شي بنص السعر. اشكثر تنتظرون؟ الكمية وايد محدودة، تعالوا بدري!'],
         ['slug' => 'ar-fatima', 'voice' => 'Achernar', 'language' => 'ar', 'dialect' => 'ar-SA',

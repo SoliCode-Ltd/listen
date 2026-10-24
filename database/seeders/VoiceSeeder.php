@@ -162,7 +162,8 @@ class VoiceSeeder extends Seeder
                     ['id' => 'ar-Gemini-HD-Leda', 'gender' => 'female', 'display_name' => 'Noura', 'provider_voice_id' => 'Leda'],
                     ['id' => 'ar-Gemini-HD-Orus', 'gender' => 'male', 'display_name' => 'Abdulaziz', 'provider_voice_id' => 'Orus'],
                     ['id' => 'ar-Gemini-HD-Puck', 'gender' => 'male', 'display_name' => 'Othman', 'provider_voice_id' => 'Puck'],
-                    ['id' => 'ar-Gemini-HD-Pulcherrima', 'gender' => 'female', 'display_name' => 'Abeer', 'provider_voice_id' => 'Pulcherrima'],
+                    // Abeer speaks with Zephyr: Pulcherrima sounded like a man. The id keeps its old name.
+                    ['id' => 'ar-Gemini-HD-Pulcherrima', 'gender' => 'female', 'display_name' => 'Abeer', 'provider_voice_id' => 'Zephyr'],
                     ['id' => 'ar-Gemini-HD-Rasalgethi', 'gender' => 'male', 'display_name' => 'Mishary', 'provider_voice_id' => 'Rasalgethi'],
                     ['id' => 'ar-Gemini-HD-Sadachbia', 'gender' => 'male', 'display_name' => 'Hamed', 'provider_voice_id' => 'Sadachbia'],
                     ['id' => 'ar-Gemini-HD-Sadaltager', 'gender' => 'male', 'display_name' => 'Tamim', 'provider_voice_id' => 'Sadaltager'],

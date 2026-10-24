@@ -1,7 +1,8 @@
 name: Hero voices generate
 
-# Makes the homepage hero clips listed in SLUGS with this branch's lines
-# (App\Support\HeroCast), using Gemini key 1 from STAGING's .env
+# Makes the homepage clips named in the slugs input (hero clips from
+# App\Support\HeroCast, or samples from database/seeders/data/showcase_samples.php)
+# with this branch's lines, using Gemini key 1 from STAGING's .env
 # (GEMINI_TTS_API_KEY, the owner's choice), and commits the MP3s back to this
 # branch. The key is read over SSH, masked in the log and never stored.
 # Speech requests count against that key's quota, which staging shares with
@@ -9,6 +10,11 @@ name: Hero voices generate
 
 on:
   workflow_dispatch:
+    inputs:
+      slugs:
+        description: 'Clips to make, by slug, space-separated (hero clips or homepage samples, e.g. ar-sy-aleppo-kibbeh)'
+        type: string
+        default: 'hero-ar-sultan'
 
 permissions:
   contents: write
@@ -18,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SLUGS: hero-ar-sultan
+  SLUGS: ${{ inputs.slugs || 'hero-ar-sultan' }}
 
 jobs:
   generate:
@@ -64,7 +70,7 @@ jobs:
           if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
           echo "::add-mask::$KEY"
           echo "Using staging key 1 (ending ${KEY: -4})"
-          only=""; for s in $SLUGS; do only="$only --only=$s"; done
+          only=""; for s in $(printf '%s' "$SLUGS" | tr -cd 'a-z0-9 -'); do only="$only --only=$s"; done
           php artisan tts:showcase --generate --force --pause=20 --key="$KEY" $only 2>&1 | grep -v '^\*' | cut -c1-160
 
       - name: Commit the clips
@@ -72,8 +78,8 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/audio/showcase/hero-*.mp3
+          git add public/audio/showcase/*.mp3
           if git diff --cached --quiet; then echo "No new clips"; exit 1; fi
           git diff --cached --stat
-          git commit -m "Hero voices: new lines made with staging key 1"
+          git commit -m "Homepage clips: $SLUGS made with staging key 1"
           git push origin HEAD:${GITHUB_REF#refs/heads/}

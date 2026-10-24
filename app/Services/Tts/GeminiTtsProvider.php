@@ -77,6 +77,10 @@ class GeminiTtsProvider implements TtsProviderInterface
      * @var array<string, string>
      */
     private const VOICE_ALIAS_MAP = [
+        // Abeer moved to the lighter Zephyr (owner, 2026-10-24): Pulcherrima sounded like a man.
+        // Her id keeps its old name, so past audio, favourites and API calls still find her.
+        'ar-gemini-hd-pulcherrima' => 'Zephyr',
+
         // Arabic branded aliases (legacy)
         'rawaa' => 'Kore',
         'basem' => 'Puck',
@@ -108,7 +112,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         'noura'      => 'Leda',       // female
         'abdulaziz'  => 'Orus',       // male
         'othman'     => 'Puck',       // male
-        'abeer'      => 'Pulcherrima',// female
+        'abeer'      => 'Zephyr',     // female (was Pulcherrima, which sounded like a man)
         'mishary'    => 'Rasalgethi', // male
         'hamed'      => 'Sadachbia',  // male
         'tamim'      => 'Sadaltager', // male
