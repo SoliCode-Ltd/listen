@@ -192,7 +192,7 @@ return [
             'text' => 'أهلا فيكن بطرابلس! هلّق رح نروح عالسوق القديم ناكل حلاوة الجبن، كتير طيبة، ما في متلها بكل لبنان.'],
 
         ['slug' => 'ar-sy-aleppo-kibbeh', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-SY-AL', 'gender' => 'female',
-            'voice' => 'ar-eg-commercial-10', 'speaker' => 'Abeer', 'speaker_ar' => 'عبير',
+            'voice' => 'ar-eg-csagent-3', 'speaker' => 'Abeer', 'speaker_ar' => 'عبير',
             'title' => 'Aleppo kitchen', 'title_ar' => 'مطبخ حلبي', 'emotion' => 'warm',
             'style' => 'A warm woman from Aleppo talking about her family recipe. Strong imala, lengthened vowels, affectionate.',
             'text' => 'أهلين يا حبابين! هلّق بدّي احكيلكن عن الكبة الحلبية، والله شي ما بينوصف، تعالوا لعنّا عحلب وجرّبوها.'],
