@@ -27,8 +27,9 @@ if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
     DB::statement('SET SESSION TRANSACTION READ ONLY');
 }
 
-// The speech model premium voices use (always Gemini's latest).
-echo json_encode(['model_in_use' => \App\Support\GeminiTtsModel::resolve()]).PHP_EOL;
+// The speech model premium voices use (always Gemini's latest), and the speech mode
+// (hybrid: the premium speakers are the Gemini ones; google: the Chirp3 ones).
+echo json_encode(['model_in_use' => \App\Support\GeminiTtsModel::resolve(), 'tts_mode' => \App\Models\SiteSetting::get('tts_mode', config('listen.tts.mode', 'google'))]).PHP_EOL;
 
 $voices = Voice::query()->orderBy('language')->orderBy('tier')->orderBy('display_name')->get();
 $active = 0;
