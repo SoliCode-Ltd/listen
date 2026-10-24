@@ -15,7 +15,7 @@ on:
       ad:
         description: 'Which ad: launch-ad ("Which voice is real?"), emotions-ad ("One line. Every emotion."), prompts-film (the prompts film) or voice-previews (the voice library previews, database/seeders/data/voice_previews.php)'
         type: choice
-        options: [launch-ad, emotions-ad, prompts-film, voice-previews]
+        options: [launch-ad, emotions-ad, prompts-film, voice-previews, voice-library-test]
         default: launch-ad
       max:
         description: 'voice-previews only: at most this many clips per key (live shares the quota)'
