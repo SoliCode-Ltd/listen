@@ -91,32 +91,27 @@ class BillingPageClientTest extends TestCase
             ->assertSee('throw new Error(response.data?.message || i18n.upgrade_failed);', false);
     }
 
-    public function test_a_card_is_shown_the_dollar_amount_it_is_charged(): void
+    public function test_a_card_is_shown_the_price_in_the_visitors_own_currency_only(): void
     {
         SiteSetting::set('pricing_forced_country_code', 'EG', 'billing');
         SiteSetting::set('pricing_exchange_rate_EGP', '50', 'billing');
 
-        // What the page gets: the local price, and the dollar price the Stripe price charges.
+        // The page gets the local price; it is the amount shown, with no dollar price beside it.
         $page = $this->billingPage('en')
             ->assertViewHas('plans', function (array $plans): bool {
                 $monthly = collect($plans)->firstWhere('slug', 'starter')['payment_methods']['stripe']['monthly'];
 
-                return $monthly['is_converted'] === true
-                    && $monthly['charge_currency'] === 'USD'
-                    && $monthly['base_usd_formatted'] === '$9.00'
-                    && str_replace("\u{a0}", ' ', $monthly['amount_formatted']) === 'EGP 450';
+                return str_replace("\u{a0}", ' ', $monthly['amount_formatted']) === 'EGP 450';
             });
 
-        $page->assertSee('<p class="hint amount-about" id="quoteAmountAbout" hidden></p>', false)
-            ->assertSee("if (meta?.is_converted && inDollars && meta?.base_usd_formatted) {", false)
-            ->assertSee('return { amount: String(meta.base_usd_formatted), local: String(meta.amount_formatted || \'\') };', false)
-            ->assertSee("const charge = selected.method === 'stripe' ? cardCharge(selected.meta)", false)
-            ->assertSee('const amount = cardCharge(cycle === \'yearly\' ? plan?.yearly : plan?.monthly).amount;', false);
+        $page->assertSee("return { amount: String(meta?.amount_formatted || '') };", false)
+            ->assertSee('let amountText = cardCharge(selected.meta).amount || \'-\';', false)
+            ->assertSee('const amount = cardCharge(cycle === \'yearly\' ? plan?.yearly : plan?.monthly).amount;', false)
+            ->assertDontSee('quoteAmountAbout', false)
+            ->assertDontSee('base_usd_formatted)', false)
+            ->assertDontSee('US dollars');
 
-        $this->assertSame('Charged in US dollars, about EGP 450', __('ui.billing.card_local_about', ['amount' => 'EGP 450'], 'en'));
-        $arabic = __('ui.billing.card_local_about', [], 'ar');
-        $this->assertStringContainsString(':amount', $arabic);
-        $this->assertMatchesRegularExpression('/\p{Arabic}/u', $arabic);
+        $this->billingPage('ar')->assertDontSee('بالدولار الأمريكي');
     }
 
     public function test_the_pack_page_keeps_pay_off_while_the_bank_processes_and_without_stripe_js(): void

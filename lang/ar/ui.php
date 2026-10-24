@@ -505,13 +505,11 @@ return [
         'order_renews_month' => 'ثم :amount شهريًا بدءًا من :date.',
         'order_renews_year' => 'ثم :amount سنويًا بدءًا من :date.',
         'order_credit_left' => 'يُضاف :amount إلى رصيد حسابك ويُستخدم في التجديدات القادمة.',
-        'order_charged_as' => 'المبلغ الذي يُخصم من بطاقتك: :amount.',
         'order_loading' => 'جارٍ حساب مبلغ اليوم...',
         'order_fallback_label' => 'بحد أقصى',
         'order_fallback_hint' => 'تدفع اليوم ثمن الخطة الجديدة مطروحًا منه رصيد المدة غير المستخدمة من خطة :plan.',
         'trial_quote_hint' => 'ثم :amount في :date ما لم تلغِ قبل ذلك.',
-        'discount_quote_hint' => ':terms. السعر الكامل يبدأ من :date ما لم تلغِ قبل ذلك.',
-        'discount_quote_hint_forever' => ':terms.',
+        'discount_quote_hint' => ':terms.',
         // إنستاباي / فودافون كاش: دفعة واحدة لا تتجدد تلقائياً.
         'discount_quote_hint_manual_month' => 'خصم :percent% على هذه الدفعة. السعر المعتاد :price شهرياً.',
         'discount_quote_hint_manual_year' => 'خصم :percent% على هذه الدفعة. السعر المعتاد :price سنوياً.',
@@ -609,15 +607,14 @@ return [
         'admin_request_missing_relation' => 'طلب الدفع لا يحتوي على المستخدم أو الخطة بشكل صحيح.',
         'manual_locked_to_egypt' => 'طرق الدفع اليدوي متاحة حالياً لمصر فقط.',
 
-        // Card checkout: when the card form cannot load, and the local price beside the dollar amount.
+        // Card checkout: when the card form cannot load.
         'card_form_unavailable' => 'تعذّر تحميل نموذج الدفع بالبطاقة. تحقّق من اتصالك، ثم أعد تحميل الصفحة وحاول مرة أخرى.',
-        'card_local_about' => 'يُخصم بالدولار الأمريكي، أي نحو :amount',
 
         // A card the bank refused (App\Services\Billing\CardDecline): what happened, then what to do.
         'decline_no_funds' => 'لا يوجد رصيد كافٍ في بطاقتك لهذا الدفع، لذلك لم يُخصم أي مبلغ. اشحن البطاقة وحاول مرة أخرى، أو اختر خياراً آخر بالأسفل.',
         'decline_card_details' => 'بيانات البطاقة لا تطابق ما لدى البنك، لذلك لم يُخصم أي مبلغ. تحقّق من رقم البطاقة وتاريخ الانتهاء ورمز التحقق (CVC)، ثم حاول مرة أخرى.',
         'decline_try_again' => 'تعذّر على البنك تأكيد الدفع الآن، لذلك لم يُخصم أي مبلغ. انتظر دقيقة ثم حاول مرة أخرى.',
-        'decline_refused' => 'لم يسمح البنك بهذا الدفع، لذلك لم يُخصم أي مبلغ. كثير من البنوك تمنع الدفع الإلكتروني بالدولار الأمريكي: اطلب من البنك تفعيله، أو اختر خياراً آخر بالأسفل.',
+        'decline_refused' => 'لم يسمح البنك بهذا الدفع، لذلك لم يُخصم أي مبلغ. كثير من البنوك تمنع الدفع الإلكتروني الدولي: اطلب من البنك تفعيله، أو اختر خياراً آخر بالأسفل.',
         'decline_still_on_plan' => 'ما زلت على خطة :plan.',
         'decline_trial_continues' => 'تستمر فترتك التجريبية المجانية حتى :date.',
         'decline_options_title' => 'ما يمكنك فعله الآن',
@@ -1935,7 +1932,7 @@ return [
         'pay_subtitle' => 'تُضاف الأحرف إلى حسابك فور نجاح الدفع.',
         'pay_by_card' => 'البطاقة',
         'pay_amount' => 'ادفع :amount',
-        'card_note' => 'تُخصم مرة واحدة بالدولار الأمريكي، ولا يتجدد شيء.',
+        'card_note' => 'تُخصم مرة واحدة، ولا يتجدد شيء.',
         'pay_locally' => 'الدفع بالجنيه المصري',
         'pay_with' => 'ادفع :amount عبر :method',
         'manual_note' => 'حوّل المبلغ وارفع إيصال التحويل، وسنضيف باقتك فور تأكيده.',

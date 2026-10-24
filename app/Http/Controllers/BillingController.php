@@ -241,7 +241,7 @@ class BillingController extends Controller
             $cycle = $this->billingSubscriptionPlan($subscription)['cycle'] ?? null;
             $since = $subscription->created_at ? $this->formatCarbonDate($subscription->created_at) : null;
             if ($upcoming) {
-                $next = ['amount' => $upcoming['charged'] ?? $upcoming['total'], 'date' => $upcoming['date'] ?? null, 'discount' => $upcoming['discount'] ?? null, 'manual' => false];
+                $next = ['amount' => $upcoming['total'], 'date' => $upcoming['date'] ?? null, 'discount' => $upcoming['discount'] ?? null, 'manual' => false];
             }
         } elseif ($manual && ! empty($manual['plan_slug'])) {
             $payments = \App\Models\ManualPaymentRequest::query()
@@ -1129,7 +1129,6 @@ class BillingController extends Controller
             $lines[] = ['kind' => 'credit', 'label' => __('ui.billing.order_balance_line'), 'amount' => $money($balanceUsed)];
         }
 
-        $charged = $this->formatInvoiceTotalLabel($due, $currency);
         $shown = $money($due);
 
         return response()->json([
@@ -1139,8 +1138,6 @@ class BillingController extends Controller
             'lines' => $lines,
             'total' => $shown,
             'total_cents' => $due,
-            // Shown in local money, charged in the price's currency: say what the card pays.
-            'charged' => $due > 0 && $charged !== $shown ? $charged : null,
             'credit_left' => $total < 0 ? $money($total) : null,
             'renews_on' => $renews > 0 ? $this->formatCarbonDate(Carbon::createFromTimestamp($renews)) : null,
         ]);
@@ -1533,9 +1530,9 @@ class BillingController extends Controller
     }
 
     /**
-     * For each cycle at checkout: what the discount covers and when the full
-     * price starts, e.g. "30% off your first month, then $9.00/month. Full price
-     * from 17 Nov 2026 unless you cancel before."
+     * For each cycle at checkout: what the discount covers and the price after it,
+     * e.g. "30% off your first month, then EGP 450/month." (no date: the line says
+     * how long the discount lasts).
      *
      * InstaPay / Vodafone Cash pay once and never renew by themselves, so their
      * note ("manual_monthly", "manual_yearly") says the discount is on this payment.
@@ -1556,10 +1553,7 @@ class BillingController extends Controller
         foreach ($fullCents as $cycle => $cents) {
             $price = (string) $this->localizedPricingService->convertedQuoteFromUsd($cents, $cycle, $countryContext, 'stripe', $locale)['amount_formatted'];
             $terms = DiscountTerms::line($plan, $cycle, $cycle === 'yearly' ? min(99, $promoPercent + $yearlyPercent) : $promoPercent, $price);
-            $from = DiscountTerms::fullPriceFrom($plan, $cycle);
-            $hints[$cycle] = $from
-                ? __('ui.billing.discount_quote_hint', ['terms' => $terms, 'date' => $this->formatCarbonDate($from)])
-                : __('ui.billing.discount_quote_hint_forever', ['terms' => $terms]);
+            $hints[$cycle] = __('ui.billing.discount_quote_hint', ['terms' => $terms]);
 
             $egp = $this->localizedPricingService->convertUsdMinorToCurrency($cents, 'EGP');
             $hints['manual_'.$cycle] = __('ui.billing.discount_quote_hint_manual_'.($cycle === 'yearly' ? 'year' : 'month'), [
@@ -1788,7 +1782,6 @@ class BillingController extends Controller
 
             return [
                 'total' => $this->formatLocalizedInvoiceAmount($totalCents, $currency, $countryContext, $locale),
-                'charged' => $this->formatChargedAmount($totalCents, $currency, $countryContext, $locale),
                 'discount' => $this->discountLabel($stripeInvoice, $currency),
                 'currency' => $currency,
                 'date' => $periodEndTs > 0 ? $this->formatCarbonDate(Carbon::createFromTimestamp($periodEndTs)) : null,

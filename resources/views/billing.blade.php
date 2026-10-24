@@ -1207,8 +1207,6 @@
         <div class="quote-highlight">
           <small id="quoteAmountLabel">{{ __('ui.billing.amount_to_be_charged') }}</small>
           <p class="amount" id="quoteAmount" dir="ltr">-</p>
-          {{-- The card is charged in US dollars: the price in the visitor's own currency, for reference. --}}
-          <p class="hint amount-about" id="quoteAmountAbout" hidden></p>
           <p class="hint" id="quoteHint">{{ __('ui.billing.select_plan_for_preview') }}</p>
         </div>
 
@@ -1291,12 +1289,10 @@
       'order_renews_month' => __('ui.billing.order_renews_month'),
       'order_renews_year' => __('ui.billing.order_renews_year'),
       'order_credit_left' => __('ui.billing.order_credit_left'),
-      'order_charged_as' => __('ui.billing.order_charged_as'),
       'order_loading' => __('ui.billing.order_loading'),
       'order_fallback_label' => __('ui.billing.order_fallback_label'),
       'order_fallback_hint' => __('ui.billing.order_fallback_hint', ['plan' => $activePlanName]),
       'card_form_unavailable' => __('ui.billing.card_form_unavailable'),
-      'card_local_about' => __('ui.billing.card_local_about'),
       'decline_no_funds' => __('ui.billing.decline_no_funds'),
       'decline_card_details' => __('ui.billing.decline_card_details'),
       'decline_try_again' => __('ui.billing.decline_try_again'),
@@ -1357,7 +1353,6 @@
     const paymentMethodInputs = Array.from(document.querySelectorAll('input[name="payment_method_choice"]'));
 
     const quoteAmount = document.getElementById('quoteAmount');
-    const quoteAmountAbout = document.getElementById('quoteAmountAbout');
     const quoteAmountLabel = document.getElementById('quoteAmountLabel');
     const quoteHint = document.getElementById('quoteHint');
     const quotePlan = document.getElementById('quotePlan');
@@ -1679,21 +1674,9 @@
       return intervalCount > 1 ? `${i18n.every} ${intervalCount} ${unit}` : `${i18n.every} ${unit}`;
     }
 
-    // The card is charged in US dollars (the plan's Stripe price). Where prices show
-    // in the visitor's own currency, the card's amount is the dollar price it is
-    // really charged, and the local price is shown beside it as "about".
+    // Every amount on the page is in the visitor's own currency, as on the pricing page.
     function cardCharge(meta) {
-      const inDollars = String(meta?.charge_currency || 'USD').toUpperCase() === 'USD';
-      if (meta?.is_converted && inDollars && meta?.base_usd_formatted) {
-        return { amount: String(meta.base_usd_formatted), local: String(meta.amount_formatted || '') };
-      }
-      return { amount: String(meta?.amount_formatted || ''), local: '' };
-    }
-
-    function showCardAbout(local) {
-      if (!quoteAmountAbout) return;
-      quoteAmountAbout.textContent = local ? String(i18n.card_local_about || '').replace(':amount', `\u2066${local}\u2069`) : '';
-      quoteAmountAbout.hidden = !local;
+      return { amount: String(meta?.amount_formatted || '') };
     }
 
     function syncPaymentMethods() {
@@ -1797,7 +1780,7 @@
       const ready = Boolean(trialBtn && trialOffer.enabled && trialOffer.available)
         && selectedMethod() === 'stripe'
         && planCycles.indexOf(cycle) !== -1;
-      // A trial is followed by a card payment, in US dollars.
+      // A trial is followed by a card payment.
       const amount = cardCharge(cycle === 'yearly' ? plan?.yearly : plan?.monthly).amount;
       const end = new Date();
       end.setDate(end.getDate() + Number(trialOffer.days || 7));
@@ -1874,7 +1857,6 @@
       const selected = selectedMeta();
       if (!selected) {
         quoteAmount.textContent = '-';
-        showCardAbout('');
         quoteAmountLabel.textContent = i18n.amount_to_be_charged;
         quotePlan.textContent = '-';
         quoteMethod.textContent = '-';
@@ -1885,11 +1867,9 @@
         return;
       }
 
-      const charge = selected.method === 'stripe' ? cardCharge(selected.meta) : { amount: String(selected.meta.amount_formatted || ''), local: '' };
-      let amountText = charge.amount || '-';
+      let amountText = cardCharge(selected.meta).amount || '-';
       const amountBidi = `\u2066${amountText}\u2069`;
       quoteAmount.textContent = amountText;
-      showCardAbout(charge.local);
       quoteAmountLabel.textContent = selected.method === 'stripe'
         ? i18n.amount_to_be_charged
         : i18n.manual_exact_amount;
@@ -1911,7 +1891,6 @@
       if (isTrialCheckout()) {
         const trial = trialState();
         quoteAmount.textContent = trial.zeroPlain;
-        showCardAbout('');
         quoteAmountLabel.textContent = i18n.due_today;
         quoteHint.textContent = String(i18n.trial_quote_hint || '')
           .replace(':amount', trial.amount)
@@ -1957,7 +1936,6 @@
       if (!planChange.cache[planChangeKey(selected)]) {
         quoteAmountLabel.textContent = i18n.due_today;
         quoteAmount.textContent = '\u2026';
-        showCardAbout('');
         quoteHint.textContent = i18n.order_loading;
       }
 
@@ -1973,10 +1951,8 @@
         if (seq !== planChange.seq) return;
         // No preview: the most it can be is the new plan's price, less the credit.
         orderDetails.hidden = true;
-        const charge = cardCharge(selected.meta);
         quoteAmountLabel.textContent = i18n.order_fallback_label;
-        quoteAmount.textContent = charge.amount || '-';
-        showCardAbout(charge.local);
+        quoteAmount.textContent = cardCharge(selected.meta).amount || '-';
         quoteHint.textContent = i18n.order_fallback_hint;
       });
     }
@@ -1998,9 +1974,7 @@
       orderDetails.hidden = false;
 
       quoteAmountLabel.textContent = i18n.due_today;
-      // The order is shown in local money; the note below says what the card pays.
       quoteAmount.textContent = String(data.total || '-');
-      showCardAbout('');
       const notes = [];
       if (discountHint) {
         notes.push(discountHint);
@@ -2010,7 +1984,6 @@
           .replace(':date', String(data.renews_on)));
       }
       if (data.credit_left) notes.push(String(i18n.order_credit_left).replace(':amount', isolate(data.credit_left)));
-      if (data.charged) notes.push(String(i18n.order_charged_as).replace(':amount', isolate(data.charged)));
       quoteHint.textContent = notes.join(' ');
     }
 
