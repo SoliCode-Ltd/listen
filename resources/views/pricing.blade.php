@@ -446,7 +446,13 @@
     .studio-faces img:nth-child(n+16) { display: none; }
     .studio-proof > :last-child { white-space: nowrap; }
     @media (max-width: 1360px) { .studio-faces img:nth-child(n+14) { display: none; } }
-    @media (max-width: 640px) { .studio-proof > :last-child { white-space: normal; } }
+    /* Phones: one line. The text keeps to its line and the avatars take the room left,
+       as many whole faces as fit (the rest wrap onto a hidden second row). */
+    @media (max-width: 640px) {
+      .studio-proof { gap: .6rem; font-size: .84rem; }
+      .studio-faces { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; height: 28px; overflow: hidden; }
+      .studio-faces img { width: 28px; height: 28px; margin-inline-start: -8px; box-shadow: none; }
+    }
     @media (max-width: 1200px) { .studio-faces img:nth-child(n+11) { display: none; } }
     @media (max-width: 640px) { .studio-faces img:nth-child(n+7) { display: none; } }
     .plan-picker { max-width: 1200px; margin: 0 auto; padding-top: clamp(3rem, 6vw, 4.5rem); }
