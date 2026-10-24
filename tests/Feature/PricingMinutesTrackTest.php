@@ -79,6 +79,23 @@ class PricingMinutesTrackTest extends TestCase
         $this->assertSame('creator', $slugs[$pick[2]]);
     }
 
+    public function test_a_member_on_the_featured_plan_still_sees_its_crown_and_strap(): void
+    {
+        $member = \App\Models\User::factory()->create();
+        app(\App\Services\PlanAccessService::class)->assignPlan($member, Plan::query()->where('slug', 'starter')->firstOrFail());
+
+        $html = $this->actingAs($member)->getLocalizedRoute('pricing')->assertOk()->getContent();
+
+        // Their own plan is shown first, as the featured one, with the strap, the crown on
+        // the track and the crown tab in the list.
+        $this->assertMatchesRegularExpression('/class="plan-card popular[^"]*is-current[^"]*is-active" data-orb-host\s+data-plan-slug="starter"/', $html);
+        $this->assertDoesNotMatchRegularExpression('/id="planRibbon"\s+hidden/', $html);
+        $this->assertSame(1, substr_count($html, 'class="crown studio-station-crown"'));
+        $this->assertSame(1, substr_count($html, 'class="plan-pick-crown"'));
+        preg_match('/data-plans="([^"]+)"/', $html, $track);
+        $this->assertSame(['starter'], array_column(array_filter(json_decode(html_entity_decode($track[1]), true), fn ($p) => $p['popular']), 'slug'));
+    }
+
     public function test_the_page_never_shows_a_price_per_minute(): void
     {
         foreach (['en' => ['per minute', '/min'], 'ar' => ['للدقيقة', 'لكل دقيقة']] as $locale => $phrases) {

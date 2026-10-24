@@ -459,6 +459,7 @@
     @media (max-width: 1200px) { .studio-faces img:nth-child(n+11) { display: none; } }
     @media (max-width: 640px) { .studio-faces img:nth-child(n+7) { display: none; } }
     .plan-picker { max-width: 1200px; margin: 0 auto; padding-top: clamp(3rem, 6vw, 4.5rem); }
+    .plan-picker .section-title { margin-bottom: clamp(1.75rem, 3vw, 2.5rem); }
     .plan-picker-list { display: grid; grid-template-columns: repeat(var(--count, 5), minmax(0, 1fr)); gap: 14px; }
     .plan-pick {
       display: grid;
@@ -984,7 +985,8 @@
           'is_current' => $isCurrent,
           'is_free' => $isFree,
           'is_lower' => $isLower,
-          'is_popular' => !empty($plan['is_popular']) && !$isCurrent,
+          // The featured plan keeps its crown and strap for the member already on it too.
+          'is_popular' => !empty($plan['is_popular']),
           'trial_monthly' => in_array('monthly', $trialCycles, true),
           'trial_yearly' => in_array('yearly', $trialCycles, true),
         ];
