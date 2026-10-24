@@ -54,6 +54,11 @@ jobs:
           echo "Fields of one voice: $(jq -c '.[0] | keys' out/all.json)"
           jq -c '[.[] | select(((.languageCode // .language_code // "") | test("^(ar|en)"; "i")))]' out/all.json > out/ar-en.json
           echo "Arabic and English voices: $(jq length out/ar-en.json)"
+          echo "== One voice in full (GET /v1beta/voices/{id}) =="
+          for id in ar-001-advisor-3 achernar; do
+            curl -sS "https://generativelanguage.googleapis.com/v1beta/voices/$id" -H "x-goog-api-key: $KEY" \
+              | jq -c 'with_entries(if (.value | type) == "string" and (.value | length) > 200 then .value = ("<" + (.value | length | tostring) + " chars>") else . end)'
+          done
           echo "== By language, accent and gender =="
           jq -r '.[] | [(.languageCode // .language_code), (.accent // "-"), (.gender // "-")] | @tsv' out/ar-en.json | sort | uniq -c | sort -k2
           echo "== Every voice =="
