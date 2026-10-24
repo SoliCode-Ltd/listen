@@ -582,18 +582,7 @@ class PlanResource extends Resource
                                     ->columnSpan(1),
                             ])
                             ->columns(3)
-                            ->afterStateHydrated(function (Forms\Components\Repeater $component, ?Plan $record) {
-                                if (!$record) return;
-
-                                // If already has custom features, use them
-                                $existing = $record->features_en;
-                                if (is_array($existing) && !empty($existing)) {
-                                    $component->state(self::normalizeRepeaterItems($existing));
-                                    return;
-                                }
-
-                                $component->state(self::normalizeRepeaterItems(PlanPricingLines::automatic($record, 'en')));
-                            })
+                            ->afterStateHydrated(fn (Forms\Components\Repeater $component, ?Plan $record) => self::hydrateOwnLines($component, $record, 'en'))
                             ->addActionLabel('Add Feature')
                             ->defaultItems(0)
                             // Drag a line by its handle; the arrows still move it one place.
@@ -642,18 +631,7 @@ class PlanResource extends Resource
                                     ->columnSpan(1),
                             ])
                             ->columns(3)
-                            ->afterStateHydrated(function (Forms\Components\Repeater $component, ?Plan $record) {
-                                if (!$record) return;
-
-                                // If already has custom features, use them
-                                $existing = $record->features_ar;
-                                if (is_array($existing) && !empty($existing)) {
-                                    $component->state(self::normalizeRepeaterItems($existing));
-                                    return;
-                                }
-
-                                $component->state(self::normalizeRepeaterItems(PlanPricingLines::automatic($record, 'ar')));
-                            })
+                            ->afterStateHydrated(fn (Forms\Components\Repeater $component, ?Plan $record) => self::hydrateOwnLines($component, $record, 'ar'))
                             ->addActionLabel('إضافة خاصية')
                             ->defaultItems(0)
                             // Drag a line by its handle; the arrows still move it one place.
@@ -1041,7 +1019,26 @@ class PlanResource extends Resource
     }
 
     /**
-     * Normalize repeater state to a numerically indexed array for Livewire reorder operations.
+     * A card's own lines in the editor: the ones written for it, else the automatic
+     * ones to start from. Each line is keyed the way the repeater keys its items, so
+     * dragging one sends keys it knows (numbered keys broke the drag with a 500).
+     */
+    private static function hydrateOwnLines(Forms\Components\Repeater $component, ?Plan $record, string $locale): void
+    {
+        if (! $record) {
+            return;
+        }
+
+        $lines = self::normalizeRepeaterItems($record->{'features_'.$locale});
+        if ($lines === []) {
+            $lines = self::normalizeRepeaterItems(PlanPricingLines::automatic($record, $locale));
+        }
+
+        $component->state(collect($lines)->mapWithKeys(fn (array $line): array => [(string) \Illuminate\Support\Str::uuid() => $line])->all());
+    }
+
+    /**
+     * Repeater lines as a plain list, in their order, for saving.
      *
      * @param  mixed  $items
      * @return array<int, array{label?: string, value?: string, icon?: string}>

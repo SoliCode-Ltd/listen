@@ -68,6 +68,26 @@ class PlanOwnLinesTest extends TestCase
         $this->assertStringContainsString('x-sortable-handle', $html);
     }
 
+    public function test_a_dragged_line_is_saved_in_its_new_place(): void
+    {
+        $plan = $this->plan('creator', 2200,
+            [['label' => 'Voice quality', 'value' => 'HD', 'icon' => 'mic'], ['label' => 'Generations per day', 'value' => '200', 'icon' => 'activity']],
+            [['label' => 'جودة الصوت', 'value' => 'متميزة', 'icon' => 'mic'], ['label' => 'التوليدات يوميا', 'value' => '200', 'icon' => 'activity']]);
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+
+        $page = Livewire::test(EditPlan::class, ['record' => $plan->getRouteKey()]);
+        foreach (['features_en', 'features_ar'] as $list) {
+            // The browser sends the lines' keys in their new order.
+            $page->callFormComponentAction($list, 'reorder', arguments: ['items' => array_reverse(array_keys($page->get('data.'.$list)))])
+                ->assertHasNoFormErrors();
+        }
+        $page->call('save')->assertHasNoFormErrors();
+
+        $plan->refresh();
+        $this->assertSame(['Generations per day', 'Voice quality'], array_column($plan->features_en, 'label'));
+        $this->assertSame(['التوليدات يوميا', 'جودة الصوت'], array_column($plan->features_ar, 'label'));
+    }
+
     /**
      * @param  array<int, array<string, string>>|null  $english
      * @param  array<int, array<string, string>>|null  $arabic
