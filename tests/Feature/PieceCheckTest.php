@@ -89,6 +89,32 @@ class PieceCheckTest extends TestCase
         $this->assertContains('pace', PieceCheck::problems($faster, $faster['seconds'], ['pace' => $voice['pace'], 'pitch' => $voice['pitch']]));
     }
 
+    public function test_a_childs_take_pitched_like_a_grown_ups_is_taken_again(): void
+    {
+        $this->needsFfmpeg();
+        $first = $this->slice(0, 13);
+        $grownUp = PieceCheck::measure($this->wav($first));
+        $childWav = $this->changed($first, 'asetrate=24000*1.6,aresample=24000,atempo=0.625');
+        $child = PieceCheck::measure($childWav);
+        $floor = $grownUp['pitch'] * 1.3;
+
+        $this->assertSame(['pitch'], PieceCheck::problems($grownUp, $grownUp['seconds'], ['floor' => $floor]));
+        $this->assertSame([], PieceCheck::problems($child, $child['seconds'], ['floor' => $floor]));
+
+        $asked = [];
+        $history = ['paces' => [], 'pitches' => []];
+        $report = PieceCheck::emptyReport();
+        $kept = PieceCheck::review([['bytes' => $this->wav($first)]], [['expected' => $grownUp['seconds'], 'pauses' => false, 'floor' => $floor]], function (int $k) use (&$asked, $childWav): array {
+            $asked[] = $k;
+
+            return ['bytes' => $childWav];
+        }, $history, $report);
+
+        $this->assertSame([0], $asked);
+        $this->assertSame($childWav, $kept[0]['bytes'], "the child's take is kept");
+        $this->assertSame(1, $report['reasons']['pitch']);
+    }
+
     public function test_the_odd_take_of_a_round_is_taken_again_and_the_better_take_kept(): void
     {
         $pieces = [$this->slice(0, 9), $this->slice(9, 18), $this->slice(18, 27)];

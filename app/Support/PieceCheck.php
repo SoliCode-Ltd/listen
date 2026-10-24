@@ -149,10 +149,12 @@ final class PieceCheck
     /**
      * Why a take stands out, if it does: 'short', 'long', 'silence', 'pace'
      * or 'pitch'. $expected is the seconds its text needs; $voice is the
-     * median pace and pitch of the voice's pieces, when there are enough.
+     * median pace and pitch of the voice's pieces, when there are enough, and
+     * the lowest pitch the voice may have ('floor': a child's, so a take that
+     * drifted to a grown-up's voice is taken again).
      *
      * @param  array{seconds: float, silence: float, pace: ?float, pitch: ?float}  $take
-     * @param  array{pace?: ?float, pitch?: ?float}  $voice
+     * @param  array{pace?: ?float, pitch?: ?float, floor?: ?float}  $voice
      * @return array<int, string>
      */
     public static function problems(array $take, float $expected, array $voice = [], bool $pausesAsked = false): array
@@ -172,7 +174,10 @@ final class PieceCheck
             if (($take['pace'] ?? null) !== null && ! empty($voice['pace']) && abs($take['pace'] / $voice['pace'] - 1) > self::PACE_DIFFERENCE) {
                 $problems[] = 'pace';
             }
-            if ($take['pitch'] !== null && ! empty($voice['pitch']) && abs(12 * log($take['pitch'] / $voice['pitch'], 2)) > self::PITCH_SEMITONES) {
+            if ($take['pitch'] !== null && (
+                (! empty($voice['pitch']) && abs(12 * log($take['pitch'] / $voice['pitch'], 2)) > self::PITCH_SEMITONES)
+                || (! empty($voice['floor']) && $take['pitch'] < $voice['floor'])
+            )) {
                 $problems[] = 'pitch';
             }
         }
@@ -190,7 +195,7 @@ final class PieceCheck
      * $report counts what was taken again and why.
      *
      * @param  array<int, array{bytes: string, mime_type?: ?string}>  $takes  by piece
-     * @param  array<int, array{expected: float, pauses: bool, part?: int}>  $texts  by piece
+     * @param  array<int, array{expected: float, pauses: bool, part?: int, floor?: float}>  $texts  by piece
      * @param  callable(int): array{bytes: string, mime_type?: ?string}  $retake
      * @param  array{paces: array<int, array<int, float>>, pitches: array<int, array<int, float>>}  $history  by part
      * @param  array{pieces: int, retaken: int, kept_retake: int, reasons: array<string, int>}  $report
@@ -225,6 +230,7 @@ final class PieceCheck
             $voice = [
                 'pace' => count($paces[$part] ?? []) >= self::PIECES_TO_JUDGE_BY ? self::median($paces[$part]) : null,
                 'pitch' => count($pitches[$part] ?? []) >= self::PIECES_TO_JUDGE_BY ? self::median($pitches[$part]) : null,
+                'floor' => $texts[$k]['floor'] ?? null,
             ];
             $expected = (float) ($texts[$k]['expected'] ?? 0);
             $problems = $m === null ? [] : self::problems($m, $expected, $voice, (bool) ($texts[$k]['pauses'] ?? false));
@@ -381,6 +387,9 @@ final class PieceCheck
         }
         if ($take['pitch'] !== null && ! empty($voice['pitch'])) {
             $distance += abs(log($take['pitch'] / $voice['pitch'], 2));
+        }
+        if ($take['pitch'] !== null && ! empty($voice['floor']) && $take['pitch'] < $voice['floor']) {
+            $distance += log($voice['floor'] / $take['pitch'], 2);
         }
 
         return $distance + $take['silence'] / 10;

@@ -520,8 +520,16 @@ class GeminiTtsProvider implements TtsProviderInterface
         $endpoint = $this->buildEndpoint($model);
 
         // Long outputs end with finishReason OTHER and no audio, so long
-        // texts are read in pieces and the audio is joined.
+        // texts are read in pieces and the audio is joined. A child is read in
+        // shorter pieces, each with the child's direction, so the voice never
+        // has long enough to drift back to a grown-up's, and a piece pitched
+        // lower than a child's voice is taken again (PieceCheck).
         $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
+        $child = self::isChild((string) ($voiceConfig['voice_name'] ?? ''));
+        if ($child) {
+            $maxChars = min($maxChars, max(200, (int) config('services.gemini_tts.child_max_chars_per_request', 300)));
+        }
+        $floor = $child ? ['floor' => (float) config('services.gemini_tts.child_min_pitch', 220)] : [];
         $pieces = [];
         foreach ($voiceConfig['vocal_parts'] ?? [['text' => $text, 'cues' => []]] as $partIndex => $part) {
             $partStyle = GeminiVocalTags::withCues($stylePrompt, $part['cues']);
@@ -552,7 +560,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             // The pause after it, from where its text ends: a sentence, a comma, a line, or mid-sentence.
             $pauses[] = JoinPauses::after($chunk['text'], $chunk['gap']);
             // What its take is checked against (PieceCheck): the seconds its text needs, and its part.
-            $texts[] = self::pieceText($chunk['text'], $speed, $voiceConfig) + ['part' => $partIndex];
+            $texts[] = self::pieceText($chunk['text'], $speed, $voiceConfig) + ['part' => $partIndex] + $floor;
         }
 
         $checked = null;
@@ -632,7 +640,7 @@ class GeminiTtsProvider implements TtsProviderInterface
      * counts them.
      *
      * @param  array<int, array<string, mixed>>  $payloads
-     * @param  array<int, array{expected: float, pauses: bool, part: int}>  $texts
+     * @param  array<int, array{expected: float, pauses: bool, part: int, floor?: float}>  $texts
      * @param  array{pieces: int, retaken: int, kept_retake: int, reasons: array<string, int>}|null  $report
      * @return \Generator<int, array{bytes:string,mime_type:?string}>
      */
@@ -940,6 +948,13 @@ class GeminiTtsProvider implements TtsProviderInterface
         $names = array_keys($byName);
         $pairs = count($names) > 2;
         $max = max(300, (int) config('services.gemini_tts.max_dialogue_chars_per_request', 1500));
+        // A dialogue with a child in it is made in shorter pieces, so the child stays a child.
+        foreach ($byName as $speaker) {
+            if (self::isChild((string) ($speaker['voice_name'] ?? $speaker['voice'] ?? ''))) {
+                $max = min($max, max(300, (int) config('services.gemini_tts.child_max_dialogue_chars_per_request', 600)));
+                break;
+            }
+        }
         if (! $pairs && mb_strlen($text) <= $max) {
             return [['text' => $text, 'speakers' => $speakers]];
         }
@@ -1917,18 +1932,31 @@ class GeminiTtsProvider implements TtsProviderInterface
     }
 
     /**
-     * A child speaker (App\Support\SpeakerVoices) always speaks as a child: the
-     * direction leads whatever else is asked. Anyone else's direction is unchanged.
+     * A child or elder speaker (App\Support\SpeakerVoices) keeps their age from
+     * the first word to the last: the direction leads whatever else is asked. A
+     * child is a light grown-up voice playing a child, which drifts back to its
+     * own age over a long reading unless told otherwise. Anyone else's direction
+     * is unchanged.
      */
     public static function asSpeaker(string $speaker, string $direction): string
     {
         $who = SpeakerVoices::speaker($speaker);
-        if (($who['age'] ?? null) !== 'child') {
-            return $direction;
-        }
-        $child = ($who['gender'] ?? '') === 'female' ? 'girl' : 'boy';
+        $female = ($who['gender'] ?? '') === 'female';
+        $age = match ($who['age'] ?? null) {
+            'child' => 'The speaker is a real '.($female ? 'girl' : 'boy')." of about eight or nine: a child's small, high, bright voice with natural childish rhythm and energy, never an adult imitating a child. Keep the same child's voice from the first word to the last, however long the reading.",
+            'elder' => 'The speaker is an older '.($female ? 'woman in her' : 'man in his').' late sixties: the settled, slightly weathered voice of that age, natural and steady, never shaky or exaggerated. Keep that age from the first word to the last.',
+            default => '',
+        };
 
-        return trim("The speaker is a real {$child} of about eight or nine: a child's small, high, bright voice with natural childish rhythm and energy, never an adult imitating a child. ".$direction);
+        return $age === '' ? $direction : trim($age.' '.$direction);
+    }
+
+    /**
+     * Whether the speaker is a child (App\Support\SpeakerVoices).
+     */
+    private static function isChild(string $speaker): bool
+    {
+        return (SpeakerVoices::speaker($speaker)['age'] ?? null) === 'child';
     }
 
     /**
