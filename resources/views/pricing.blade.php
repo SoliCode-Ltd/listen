@@ -187,12 +187,12 @@
     .studio-head::after { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: #fff; }
     .studio.is-dragging .studio-head { scale: 1.14; }
     .studio-wave input:focus-visible ~ .studio-head { box-shadow: 0 0 0 4px var(--surface), 0 0 0 7px var(--brand-accent); }
-    .studio-stations { position: relative; height: 60px; margin-top: 8px; }
+    .studio-stations { position: relative; height: 66px; margin-top: 8px; }
     /* The line runs as far as the playhead can go, like the voice above it. */
     .studio-stations::before {
       content: "";
       position: absolute;
-      top: 18px;
+      top: 21px;
       inset-inline-start: var(--track-from, 0);
       inset-inline-end: var(--track-to, 0);
       height: 2px;
@@ -217,12 +217,12 @@
       -webkit-tap-highlight-color: transparent;
       transition: color .25s ease;
     }
-    .studio-station .orb { --orb-size: 30px; box-shadow: 0 0 0 4px var(--surface); transform: scale(.72); transition: transform .35s cubic-bezier(.34, 1.4, .64, 1); }
+    .studio-station .orb { --orb-size: 36px; box-shadow: 0 0 0 4px var(--surface); transform: scale(.72); transition: transform .35s cubic-bezier(.34, 1.4, .64, 1); }
     .studio-station-name { font-size: .78rem; line-height: 1.25; white-space: nowrap; text-align: center; transition: opacity .25s ease; }
     .studio-station:hover { color: var(--text); }
     .studio-station.is-on { color: var(--text); font-weight: 600; }
     .studio-station.is-on .orb { transform: none; }
-    .studio-station-crown { position: absolute; top: -12px; left: 50%; width: 14px; height: 14px; translate: -50% 0; transform: translateY(4px); transition: transform .35s cubic-bezier(.34, 1.4, .64, 1); }
+    .studio-station-crown { position: absolute; top: -12px; left: 50%; width: 14px; height: 14px; translate: -50% 0; transform: translateY(5px); transition: transform .35s cubic-bezier(.34, 1.4, .64, 1); }
     .studio-station.is-on .studio-station-crown { transform: none; }
 
     /* The plan that fits: the plan's own card, one at a time. The old one goes quickly and
