@@ -1495,6 +1495,53 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
   .vs-lib .vs-lib-gender { flex: 1 1 100%; }
 }
 
+/* Age, under search and gender: the same segmented shape, a quieter choice
+   (tinted, not filled) so it reads as the second filter. Scrolls sideways
+   rather than wrapping when the labels are long. */
+.vs-lib-age {
+  display: flex;
+  gap: 2px;
+  margin-top: .5rem;
+  padding: .2rem;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 11px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.vs-lib-age::-webkit-scrollbar { display: none; }
+.vs-lib-age button {
+  flex: 1 0 auto;
+  height: 32px;
+  padding: 0 .65rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: .8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.vs-lib-age button[hidden] { display: none; }
+.vs-lib-age button:hover { color: var(--text); }
+.vs-lib-age button[aria-pressed="true"] {
+  background: color-mix(in oklab, var(--a, #7659FA) 12%, transparent);
+  border-color: color-mix(in oklab, var(--a, #7659FA) 35%, transparent);
+  color: var(--a, #7659FA);
+}
+.vs-lib-age button:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 1px; }
+.vs-age-short { display: none; }
+@media (max-width: 600px) {
+  /* Phones: every age fits on one row. */
+  .vs-lib-age button { flex: 1 1 auto; padding: 0 .4rem; font-size: .76rem; }
+}
+@media (max-width: 420px) {
+  /* Small phones: the short names (the full ones are their accessible names). */
+  .vs-age-long { display: none; }
+  .vs-age-short { display: inline; }
+}
+
 /* Dashboard: language, dialect, style and emotion always in a 2 × 2 grid. */
 #generateVoiceSection .vs-setbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 

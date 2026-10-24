@@ -474,7 +474,7 @@ class VoiceCatalog
      * where it is from and a recording to preview it, when there is one
      * (the voice's own preview, else a single-speaker sample of it).
      *
-     * @return array<string, array{g: string, a: ?string, l: string, c: ?string, f: ?string, d: string, p: ?string, s: bool}>
+     * @return array<string, array{g: string, y: ?string, a: ?string, l: string, c: ?string, f: ?string, d: string, p: ?string, s: bool}>
      */
     public static function libraryEntries(bool $arabic): array
     {
@@ -505,6 +505,8 @@ class VoiceCatalog
             $shown = $dialect !== '' ? $dialect : (string) ($clip['dialect'] ?? '');
             $entries[self::keyFromId((int) $voice->id)] = [
                 'g' => strtolower((string) $voice->gender),
+                // Age group (child, young, middle, elder) for the library's age filter.
+                'y' => SpeakerVoices::ageOf((string) $voice->internal_voice_id),
                 'a' => SpeakerAvatar::url((string) $voice->display_name, (string) $voice->language),
                 'l' => (string) $voice->language,
                 'c' => $dialect !== '' ? (ArabicDialects::countryOf($dialect) ?? EnglishAccents::countryOf($dialect)) : null,

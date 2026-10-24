@@ -12,7 +12,10 @@ namespace App\Support;
  */
 final class SpeakerVoices
 {
-    /** @var array<string, array{name: string, gender: string, voice: string}>|null by lower-case internal id */
+    /** Age groups, youngest first, as the library filters them. */
+    public const AGES = ['child', 'young', 'middle', 'elder'];
+
+    /** @var array<string, array{name: string, gender: string, age?: string, voice: string}>|null by lower-case internal id */
     private static ?array $byId = null;
 
     /** @var array<string, string>|null lower-case display name => lower-case internal id */
@@ -30,6 +33,15 @@ final class SpeakerVoices
         $byId = self::all();
 
         return ($byId[$key] ?? $byId[self::$byName[$key] ?? ''] ?? null)['voice'] ?? null;
+    }
+
+    /**
+     * The speaker's age group (child, young, middle or elder: how their avatar
+     * looks), or null for a speaker with none.
+     */
+    public static function ageOf(?string $internalVoiceId): ?string
+    {
+        return self::all()[strtolower(trim((string) $internalVoiceId))]['age'] ?? null;
     }
 
     /**
@@ -53,7 +65,7 @@ final class SpeakerVoices
     }
 
     /**
-     * @return array<string, array{name: string, gender: string, voice: string}>
+     * @return array<string, array{name: string, gender: string, age?: string, voice: string}>
      */
     public static function all(): array
     {
@@ -67,7 +79,7 @@ final class SpeakerVoices
     /**
      * Use these assignments instead of the data file (tests).
      *
-     * @param  array<string, array{name: string, gender: string, voice: string}>  $speakers  by internal id
+     * @param  array<string, array{name: string, gender: string, age?: string, voice: string}>  $speakers  by internal id
      */
     public static function set(array $speakers): void
     {

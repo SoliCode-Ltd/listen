@@ -66,6 +66,12 @@
         <button type="button" data-vs-lib-gender="male" aria-pressed="false">{{ __('ui.dashboard.library.male') }}</button>
       </div>
     </div>
+    {{-- Age, with the gender: an age shows only when the language has speakers of that age. --}}
+    <div class="vs-lib-age" role="group" aria-label="{{ __('ui.dashboard.library.age') }}">
+      @foreach (['any', ...\App\Support\SpeakerVoices::AGES] as $vsAge)
+        <button type="button" data-vs-lib-age="{{ $vsAge === 'any' ? '' : $vsAge }}" aria-pressed="{{ $vsAge === 'any' ? 'true' : 'false' }}" aria-label="{{ __('ui.dashboard.library.age_'.$vsAge) }}" @if($vsAge !== 'any') hidden @endif><span class="vs-age-long">{{ __('ui.dashboard.library.age_'.$vsAge) }}</span><span class="vs-age-short" aria-hidden="true">{{ __('ui.dashboard.library.age_short.'.$vsAge) }}</span></button>
+      @endforeach
+    </div>
     <div class="vs-lib-grid" data-vs-lib-grid role="listbox" aria-label="{{ __('ui.dashboard.speaker') }}"></div>
     <p class="vs-lib-empty" data-vs-lib-empty hidden></p>
   </div>

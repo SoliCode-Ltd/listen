@@ -691,9 +691,10 @@
     var search = library.querySelector('[data-vs-lib-search]');
     var tabs = library.querySelectorAll('[data-vs-lib-tab]');
     var genders = library.querySelectorAll('[data-vs-lib-gender]');
+    var ages = library.querySelectorAll('[data-vs-lib-age]');
     if (!select || !grid) return;
     var voices = meta.voices || {};
-    var state = { tab: 'all', gender: '', query: '' };
+    var state = { tab: 'all', gender: '', age: '', query: '' };
     var STORE = 'listen.studio.favorites';
     var favorites = {};
     (meta.favorites || []).forEach(function (k) { favorites[k] = true; });
@@ -718,9 +719,9 @@
         // "Name (Cloned voice)": the card says it with its own badge.
         if (mine) label = label.replace(/\s*\([^()]*\)\s*$/, '');
         return {
-          value: o.value, label: label, mine: mine, gender: v.g || '', avatar: v.a || o.dataset.avatar || '',
+          value: o.value, label: label, mine: mine, gender: v.g || '', age: v.y || '', avatar: v.a || o.dataset.avatar || '',
           flag: v.f || '', dialect: v.d || '', preview: v.p || '', featured: !!v.s, disabled: o.disabled,
-          key: fold(label + ' ' + (v.d || '') + ' ' + (v.g ? t(meta, v.g) : '') + ' ' + o.value)
+          key: fold(label + ' ' + (v.d || '') + ' ' + (v.g ? t(meta, v.g) : '') + ' ' + (v.y ? t(meta, 'age_' + v.y) : '') + ' ' + o.value)
         };
       });
     }
@@ -894,6 +895,14 @@
         if (n) n.textContent = counts[key] ? String(counts[key]) : '';
       });
       if (state.tab === 'mine' && counts.mine === 0) state.tab = 'all';
+      // An age shows only when the language has speakers of that age (children, elders ...).
+      var hasAge = {};
+      all.forEach(function (i) { if (i.age) hasAge[i.age] = true; });
+      ages.forEach(function (b) { if (b.dataset.vsLibAge) b.hidden = !hasAge[b.dataset.vsLibAge]; });
+      if (state.age && !hasAge[state.age]) {
+        state.age = '';
+        ages.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.vsLibAge === '' ? 'true' : 'false'); });
+      }
       tabs.forEach(function (tab) { tab.setAttribute('aria-selected', tab.dataset.vsLibTab === state.tab ? 'true' : 'false'); });
       var q = fold(state.query);
       var shown = all.filter(function (i) {
@@ -902,6 +911,7 @@
         if (state.tab === 'favorites' && !favorites[i.value]) return false;
         if (state.gender && i.gender && i.gender !== state.gender) return false;
         if (state.gender && !i.gender && !i.mine) return false;
+        if (state.age && i.age !== state.age) return false;
         return !q || i.key.indexOf(q) !== -1;
       });
       var key = JSON.stringify([state, select.value, shown.map(function (i) { return i.value + (favorites[i.value] ? '*' : ''); })]);
@@ -916,7 +926,7 @@
         if (again) again.focus({ preventScroll: true });
       }
       empty.hidden = shown.length > 0;
-      empty.textContent = state.tab === 'favorites' && !q && !state.gender ? t(meta, 'no_favorites') : (all.length ? t(meta, 'no_results') : t(meta, 'no_voices'));
+      empty.textContent = state.tab === 'favorites' && !q && !state.gender && !state.age ? t(meta, 'no_favorites') : (all.length ? t(meta, 'no_results') : t(meta, 'no_voices'));
     }
     tabs.forEach(function (tab) {
       tab.addEventListener('click', function () { state.tab = tab.dataset.vsLibTab; render(); });
@@ -925,6 +935,13 @@
       b.addEventListener('click', function () {
         state.gender = b.dataset.vsLibGender;
         genders.forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+        render();
+      });
+    });
+    ages.forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.age = b.dataset.vsLibAge;
+        ages.forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
         render();
       });
     });

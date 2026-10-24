@@ -78,6 +78,27 @@ class SpeakerRosterTest extends TestCase
         }
     }
 
+    public function test_every_speaker_has_an_age_and_the_library_filters_by_it(): void
+    {
+        foreach (SpeakerVoices::all() as $id => $speaker) {
+            $this->assertContains($speaker['age'] ?? null, SpeakerVoices::AGES, $id);
+        }
+
+        (new VoiceSeeder)->run();
+        $entries = VoiceCatalog::libraryEntries(false);
+        $ages = array_count_values(array_filter(array_column($entries, 'y')));
+        foreach (['young', 'middle', 'elder'] as $age) {
+            $this->assertGreaterThan(5, $ages[$age] ?? 0, "{$age} speakers in the library");
+        }
+
+        $user = \App\Models\User::factory()->create(['email_verified_at' => now()]);
+        $page = $this->actingAs($user)->getLocalizedRoute('dashboard')->assertOk()->getContent();
+        foreach (['', 'young', 'middle', 'elder'] as $age) {
+            $this->assertStringContainsString('data-vs-lib-age="'.$age.'"', $page);
+        }
+        $this->assertStringContainsString('aria-label="Middle-aged"', $page);
+    }
+
     public function test_homepage_clips_use_each_speakers_own_voice(): void
     {
         $own = [];
