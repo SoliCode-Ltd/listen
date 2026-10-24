@@ -351,7 +351,7 @@ class HomeController extends Controller
         // Once per page: a visitor's country can take a few seconds to look up.
         $countryContext = $this->localizedPricingService->resolveCountryContext($request);
 
-        return view($request->query('v') === '2' ? 'pricing-v2' : 'pricing', [
+        return view('pricing', [
             'pricingPlans' => $this->pricingPlans($countryContext),
             'activePlanSlug' => $activePlanSlug,
             'countryContext' => $countryContext,

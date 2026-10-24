@@ -211,8 +211,21 @@ return [
 
     // ===== PRICING PAGE =====
     'pricing' => [
-        'hero_title' => 'باقات واضحة لكل مشروع صوتي',
-        'hero_subtitle' => 'اختر الباقة حسب دقائق الصوت التي تحتاجها كل شهر. الباقات الأعلى تتيح نصوصاً أطول وميزات أكثر.',
+        'hero_title' => 'ادفع مقابل الدقائق',
+        'hero_title_accent' => 'التي تحتاجها.',
+        'hero_subtitle' => 'اختر دقائقك الشهرية. غيّر باقتك أو ألغها في أي وقت.',
+        'minutes_label' => 'دقائق شهريًا',
+        'minutes_unit' => 'دقيقة',
+        'minutes_track' => 'شريط الدقائق',
+        'offer_ends_on' => 'ينتهي العرض :date',
+        'countdown_units' => 'يوم|ساعة|دقيقة|ثانية',
+        'minutes_about' => 'نحو :time',
+        'hours_count' => ':count ساعة|ساعة|ساعتان|:count ساعات|:count ساعة|:count ساعة',
+        'minutes_count' => ':count دقيقة|دقيقة|دقيقتان|:count دقائق|:count دقيقة|:count دقيقة',
+        'hours_and_minutes' => ':hours و:minutes',
+        'minutes_live' => ':minutes دقيقة شهريًا: باقة :plan',
+        'all_plans' => 'كل الباقات',
+        'voices_proof' => 'أكثر من :count لهجة ولكنة في كل باقة',
         'monthly' => 'شهري',
         'yearly' => 'سنوي',
         'annual_saves' => 'الخطة السنوية توفّر 20%',

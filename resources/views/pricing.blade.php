@@ -11,17 +11,18 @@
       margin: 0 auto;
     }
 
-    /* The title on the page's own background: no extra light or texture behind it. */
+    /* The title on the page's own background, short, so the minutes track and the
+       plan's button fit on the first screen. */
     .page-hero {
       text-align: center;
-      padding: 4.75rem 1rem 3rem;
+      padding: 2.4rem 1rem 1.8rem;
     }
-    /* One calm line on wide screens, the size every inner page's title uses. */
+    /* Two lines, the second in the brand's violet, as on the home page. */
     .page-hero h1 {
-      margin: 0 auto .9rem;
+      margin: 0 auto .7rem;
       max-width: 26ch;
-      font-size: var(--page-title-size);
-      font-weight: 600;
+      font-size: clamp(2rem, 3.3vw, 2.75rem);
+      font-weight: 700;
       line-height: 1.12;
       letter-spacing: -.03em;
       text-wrap: balance;
@@ -30,21 +31,18 @@
       letter-spacing: 0;
       line-height: 1.35;
     }
+    .page-hero h1 .accent { display: block; color: var(--brand-accent); }
     .page-hero .lead {
       color: var(--muted);
       max-width: 58ch;
-      margin: 0 auto 2rem;
-      font-size: 1.08rem;
+      margin: 0 auto;
+      font-size: 1.05rem;
       line-height: 1.65;
       text-wrap: pretty;
     }
 
     /* Monthly / yearly switch: a quiet segmented control like the language switch,
        the chosen half on a raised chip, the saving on the yearly one. */
-    .billing-wrapper {
-      display: flex;
-      justify-content: center;
-    }
     .billing-toggle {
       display: inline-grid;
       grid-template-columns: 1fr 1fr;
@@ -102,56 +100,151 @@
       font-weight: 700;
     }
 
-    /* ── Plan cards ──
-       Monthly plans in one aligned row (CSS subgrid: every card's badge, name, price,
-       button, minutes and lines start at the same height). Never narrower than they
-       read well: four plans fill the row, five or six go three to a row, and smaller
-       screens take two, then one. */
-    .plans-grid {
-      --cols: 4;
+    /* ── The minutes track and the plan that fits ──
+       One card: on one side the visitor picks how many minutes of voice they need on
+       a voice track (the plans sit on it as orbs); on the other, the plan that fits,
+       which is that plan's own card, as the admin set it up. Moving between plans is
+       one smooth motion: the playhead glides, the bars fill in a sweep, the number
+       counts, and the plan's card fades across. */
+    .studio {
+      --ease-out: cubic-bezier(.22, 1, .36, 1);
       display: grid;
-      grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-      column-gap: 1.25rem;
-      row-gap: 0;
-      align-items: stretch;
-      margin-inline: auto;
-    }
-    .plans-grid[data-count="1"] { --cols: 1; max-width: 440px; }
-    .plans-grid[data-count="2"] { --cols: 2; max-width: 900px; }
-    .plans-grid[data-count="3"] { --cols: 3; max-width: 1200px; }
-    .plans-grid[data-count="5"],
-    .plans-grid[data-count="6"] { --cols: 6; max-width: 1200px; }
-    .plans-grid[data-count="5"] > .plan-card,
-    .plans-grid[data-count="6"] > .plan-card { grid-column: span 2; }
-    /* Five plans: the last two sit centred under the first three. */
-    .plans-grid[data-count="5"] > .plan-card:nth-child(4) { grid-column: 2 / span 2; }
-    .plan-card {
-      position: relative;
-      display: grid;
-      grid-row: span 5;
-      grid-template-rows: subgrid;
-      row-gap: 0;
-      margin-bottom: 1.25rem;
-      padding: 1.75rem 1.6rem 1.6rem;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, .95fr);
+      max-width: 1240px;
+      margin: 0 auto;
+      overflow: clip;
       background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: var(--card-radius);
-      box-shadow: var(--card-shadow);
-      transition: border-color .2s ease;
+      border-radius: 28px;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 40px 80px -42px color-mix(in srgb, var(--brand-accent) 40%, transparent);
     }
-    .plan-card:hover {
-      border-color: color-mix(in oklab, var(--text) 18%, var(--line));
+    .studio-mixer { display: flex; flex-direction: column; padding: clamp(1.4rem, 3vw, 2.4rem); }
+    /* Wide screens: the track stays beside the plan's details while they scroll by. */
+    @media (min-width: 1001px) {
+      .studio-mixer { position: sticky; top: 84px; align-self: start; }
     }
-    /* The recommended plan: the same white card, held in a violet ring, with its orb alive. */
-    .plan-card.popular {
-      border-color: transparent;
-      box-shadow: 0 0 0 2px var(--brand-accent), 0 30px 60px -36px rgba(76, 45, 235, .5);
+    .studio-top { display: flex; justify-content: space-between; align-items: center; gap: .75rem 1rem; flex-wrap: wrap; }
+    .studio-label { color: var(--muted); font-size: .95rem; font-weight: 500; }
+    .studio .billing-toggle button { min-height: 38px; padding: 0 1rem; font-size: .88rem; }
+    .studio-amount { display: flex; align-items: baseline; flex-wrap: wrap; gap: .35rem .55rem; margin-top: 1.1rem; }
+    /* The number box is as wide as its digits, so the unit sits right after them. */
+    .studio-amount input {
+      field-sizing: content;
+      width: auto;
+      min-width: 1ch;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--text);
+      font: inherit;
+      font-size: clamp(3.4rem, 6.6vw, 5.2rem);
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -.02em;
+      font-variant-numeric: tabular-nums;
+      -moz-appearance: textfield;
     }
-    .plan-card.popular:hover { border-color: transparent; box-shadow: 0 0 0 2px var(--brand-accent), 0 34px 64px -34px rgba(76, 45, 235, .55); }
-    .plan-top { display: flex; flex-direction: column; align-items: flex-start; }
-    /* Every card opens with its orb, so the plan names line up. */
-    .plan-badges { display: flex; align-items: center; justify-content: space-between; align-self: stretch; gap: .75rem; margin-bottom: 1rem; }
-    .plan-orb { --orb-size: 48px; box-shadow: 0 10px 20px -12px color-mix(in srgb, var(--o0) 70%, transparent); }
+    .studio-amount input:focus-visible { outline: none; text-decoration: underline 3px var(--brand-accent); text-underline-offset: 10px; }
+    .studio-unit { font-size: 1.25rem; font-weight: 600; }
+    .studio-about { color: var(--muted); font-size: .98rem; margin-inline-start: .45rem; }
+
+    /* The track: a voice waveform on the card itself, with a round playhead, and the
+       plans as stops on a thin timeline under it. */
+    .studio-track { position: relative; margin-top: 1.9rem; }
+    .studio-wave { position: relative; height: 104px; }
+    .studio-wave svg { display: block; width: 100%; height: 100%; overflow: visible; }
+    html[dir="rtl"] .studio-wave svg { transform: scaleX(-1); }
+    .studio-wave rect {
+      fill: color-mix(in srgb, var(--muted) 32%, transparent);
+      transform-box: fill-box;
+      transform-origin: center;
+      transition: fill .4s var(--ease-out);
+    }
+    .studio-wave rect.on { fill: var(--brand-accent); }
+    .studio-wave input {
+      position: absolute;
+      inset: -8px 0;
+      width: 100%;
+      height: calc(100% + 16px);
+      margin: 0;
+      opacity: 0;
+      cursor: ew-resize;
+    }
+    .studio-head {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 30px;
+      height: 30px;
+      margin: -15px 0 0 -15px;
+      border-radius: 50%;
+      background: var(--brand-accent);
+      pointer-events: none;
+      box-shadow: 0 0 0 5px var(--surface), 0 0 0 6px color-mix(in srgb, var(--brand-accent) 30%, transparent), 0 10px 22px -6px var(--brand-accent);
+      transition: left .5s var(--ease-out), transform .2s ease;
+    }
+    .studio-head::after { content: ""; position: absolute; inset: 10px; border-radius: 50%; background: #fff; }
+    .studio.is-dragging .studio-head { transition: left .14s ease-out, transform .2s ease; transform: scale(1.12); }
+    .studio-wave input:focus-visible ~ .studio-head { box-shadow: 0 0 0 5px var(--surface), 0 0 0 8px var(--brand-accent); }
+    .studio-stations { position: relative; height: 54px; margin-top: 10px; }
+    .studio-stations::before {
+      content: "";
+      position: absolute;
+      top: 17px;
+      left: 6%;
+      right: 6%;
+      height: 2px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, transparent, var(--line) 8%, var(--line) 92%, transparent);
+    }
+    .studio-station {
+      position: absolute;
+      top: 6px;
+      display: grid;
+      justify-items: center;
+      gap: 4px;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--muted);
+      font: inherit;
+      cursor: pointer;
+      translate: -50% 0;
+      transition: color .3s ease;
+    }
+    .studio-station .orb { --orb-size: 22px; box-shadow: 0 0 0 4px var(--surface); transition: transform .45s cubic-bezier(.34, 1.56, .64, 1); }
+    .studio-station-name { font-size: .78rem; line-height: 1.25; white-space: nowrap; text-align: center; }
+    .studio-station:hover { color: var(--text); }
+    .studio-station.is-on { color: var(--text); font-weight: 600; }
+    .studio-station.is-on .orb { transform: scale(1.4); }
+    .studio-station-crown { position: absolute; top: -13px; left: 50%; width: 14px; height: 14px; translate: -50% 0; transition: top .45s cubic-bezier(.34, 1.56, .64, 1); }
+    .studio-station.is-on .studio-station-crown { top: -18px; }
+
+    /* The plan that fits: the plan's own card, one at a time, fading across. */
+    .studio-plan {
+      position: relative;
+      overflow: clip;
+      padding: clamp(1.3rem, 2.4vw, 1.9rem) clamp(1.3rem, 3vw, 2.4rem);
+      background:
+        radial-gradient(70% 50% at 50% 0%, color-mix(in srgb, var(--brand-accent) 13%, transparent), transparent 72%),
+        color-mix(in srgb, var(--brand-accent) 5%, var(--surface));
+      border-inline-start: 1px solid var(--line);
+    }
+    .plan-stage { display: grid; }
+    .plan-card {
+      grid-area: 1 / 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(12px) scale(.985);
+      transition: opacity .45s var(--ease-out), transform .55s var(--ease-out), visibility 0s linear .45s;
+    }
+    .plan-card.is-active { opacity: 1; visibility: visible; transform: none; transition-delay: .08s, .08s, 0s; }
+    .plan-top { display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .plan-badges { display: flex; flex-direction: column; align-items: center; gap: .55rem; margin-bottom: .55rem; }
+    .plan-orb { --orb-size: 84px; box-shadow: 0 22px 40px -22px color-mix(in srgb, var(--o0) 75%, transparent); }
     .popular-badge {
       display: inline-flex;
       align-items: center;
@@ -162,83 +255,93 @@
       font-size: .78rem;
       font-weight: 700;
     }
-    .plan-name {
-      margin: 0;
-      font-size: 1.35rem;
-      font-weight: 600;
-      letter-spacing: -.02em;
-    }
+    .plan-fit { color: color-mix(in oklab, var(--ok) 60%, var(--text)); font-size: .88rem; font-weight: 600; }
+    .plan-name { margin: .1rem 0 0; font-size: 1.85rem; font-weight: 700; letter-spacing: -.02em; }
     html[dir="rtl"] .plan-name { letter-spacing: 0; }
-    .plan-desc {
-      margin: .4rem 0 0;
-      color: var(--muted);
-      font-size: .9rem;
-      line-height: 1.55;
-      min-height: 3.1em;
-    }
+    .plan-desc { margin: .35rem auto 0; max-width: 34ch; color: var(--muted); font-size: .92rem; line-height: 1.6; }
 
+    /* The price, the old price struck beside it, then the offer in one line. */
     .plan-pricing {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: .3rem;
-      padding: 1.35rem 0 1.4rem;
+      display: grid;
+      grid-template-columns: auto auto;
+      justify-content: center;
+      align-items: baseline;
+      gap: .3rem .6rem;
+      padding: .9rem 0 1rem;
+      text-align: center;
     }
-    .price-original-row { display: inline-flex; align-items: center; gap: .5rem; }
-    .price-original {
-      color: var(--muted);
-      font-size: .95rem;
-      text-decoration: line-through;
-      text-decoration-thickness: 1.5px;
-    }
-    .price-off {
-      padding: .12rem .5rem;
-      border-radius: var(--radius-full);
-      background: color-mix(in oklab, var(--ok) 15%, transparent);
-      color: color-mix(in oklab, var(--ok) 50%, var(--text));
-      font-size: .76rem;
-      font-weight: 700;
-    }
-    .price-row { display: flex; align-items: baseline; gap: .35rem; }
-    .price-amount {
-      font-size: clamp(2.5rem, 3.2vw, 3.1rem);
-      font-weight: 600;
-      line-height: 1;
-      letter-spacing: -.045em;
-      font-variant-numeric: tabular-nums;
-    }
+    .plan-pricing > * { grid-column: 1 / -1; justify-self: center; }
+    .plan-pricing > .price-row { grid-column: 1; grid-row: 1; }
+    .plan-pricing > .price-original-row { grid-column: 2; grid-row: 1; }
+    .price-original-row { display: inline-flex; align-items: baseline; }
+    .price-original { color: var(--muted); font-size: 1.05rem; font-weight: 500; text-decoration: line-through; text-decoration-thickness: 1.5px; }
+    /* The line under the price already says how much is off. */
+    .price-off { display: none; }
+    .price-row { display: flex; align-items: baseline; justify-content: center; gap: .35rem; }
+    .price-amount { font-size: clamp(2.5rem, 3.4vw, 3rem); font-weight: 700; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
     .price-period { color: var(--muted); font-size: .95rem; font-weight: 500; }
-    .price-note { color: var(--muted); font-size: .84rem; min-height: 0; }
+    /* The price changes with a short lift when the billing cycle changes. */
+    .price-amount.is-changing { animation: price-in .45s var(--ease-out); }
+    @keyframes price-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .price-note { color: var(--muted); font-size: .86rem; }
     .price-note:empty { display: none; }
     .price-note.savings { color: color-mix(in oklab, var(--ok) 50%, var(--text)); font-weight: 600; }
 
-    /* The offer in one box: what it is, the price after it, and when it ends. */
-    .discount-terms {
-      display: flex;
-      flex-direction: column;
-      gap: .15rem;
-      align-self: stretch;
-      margin-top: .55rem;
-      padding: .75rem .9rem .8rem;
-      border-radius: .75rem;
-      background: var(--surface2);
-    }
-    .discount-terms-offer { color: var(--accent-text); font-size: .88rem; font-weight: 700; line-height: 1.45; }
-    .discount-terms-then { color: var(--muted); font-size: .82rem; line-height: 1.45; }
+    /* The offer as one sentence ("10% off your first month. Then EGP 1,218/month"),
+       and when it ends, small, under it. */
+    .discount-terms { display: flex; flex-wrap: wrap; justify-content: center; max-width: 38ch; margin-top: .15rem; font-size: .88rem; line-height: 1.6; }
+    .discount-terms-offer { color: var(--accent-text); font-weight: 650; }
+    .discount-terms-then { color: var(--muted); }
+    .discount-terms-then::before { content: ".\00a0"; color: var(--muted); }
+    html[dir="rtl"] .discount-terms-then::before { content: "،\00a0"; }
     .discount-terms-then[hidden] { display: none; }
-    .offer-ends {
-      display: inline-flex;
-      align-items: center;
-      gap: .4rem;
-      margin-top: .45rem;
-      padding-top: .5rem;
-      border-top: 1px dashed var(--line-strong);
-      color: var(--text);
-      font-size: .82rem;
-      font-weight: 600;
-    }
+    /* When the offer ends: the day, then the time left to it, counting down. */
+    .offer-ends { display: flex; flex-basis: 100%; flex-direction: column; align-items: center; gap: .45rem; margin-top: .65rem; }
     .offer-ends[hidden] { display: none; }
-    .offer-ends svg { flex: none; width: 15px; height: 15px; fill: none; stroke: var(--accent-text); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .offer-ends-when { display: inline-flex; align-items: center; gap: .4rem; color: var(--text); font-size: .84rem; font-weight: 600; }
+    .offer-ends-when svg { flex: none; width: 15px; height: 15px; fill: none; stroke: #D9921C; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .offer-ends-clock { display: inline-flex; gap: .35rem; direction: ltr; }
+    html[dir="rtl"] .offer-ends-clock { direction: rtl; }
+    .offer-ends-clock:empty { display: none; }
+    .offer-ends-unit {
+      display: grid;
+      justify-items: center;
+      min-width: 3.1rem;
+      padding: .3rem .45rem .25rem;
+      border-radius: 10px;
+      background: color-mix(in srgb, #F2B544 16%, var(--surface));
+      border: 1px solid color-mix(in srgb, #F2B544 38%, transparent);
+    }
+    .offer-ends-unit b { font-size: 1rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--text); }
+    .offer-ends-unit small { font-size: .64rem; font-weight: 600; color: color-mix(in srgb, #8A5A0E 70%, var(--text)); }
+    .offer-ends-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+    /* The most popular plan: a ribbon across the panel's corner, with a crown. */
+    .plan-ribbon {
+      position: absolute;
+      top: 26px;
+      inset-inline-end: -46px;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .35rem;
+      width: 196px;
+      padding: .42rem 0;
+      background: linear-gradient(90deg, #5B3CF0, #8B5CF6 55%, #B45CE6);
+      color: #fff;
+      font-size: .78rem;
+      font-weight: 700;
+      box-shadow: 0 8px 18px -8px rgba(76, 45, 235, .65);
+      transform: rotate(45deg);
+      transition: opacity .35s ease, transform .45s cubic-bezier(.22, 1, .36, 1);
+    }
+    html[dir="rtl"] .plan-ribbon { transform: rotate(-45deg); }
+    .plan-ribbon[hidden] { display: flex; opacity: 0; transform: rotate(45deg) translateY(-14px); pointer-events: none; }
+    html[dir="rtl"] .plan-ribbon[hidden] { transform: rotate(-45deg) translateY(-14px); }
+    .crown { flex: none; width: 15px; height: 15px; fill: #FFD36B; stroke: #E8A41F; stroke-width: 1.2; stroke-linejoin: round; }
+    /* Its own small badge is not needed in the panel: the ribbon says it. */
+    .plan-card .popular-badge { display: none; }
 
     .plan-trial-chip {
       display: inline-flex;
@@ -253,12 +356,12 @@
       font-weight: 700;
     }
     .plan-trial-chip svg { width: .85rem; height: .85rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-    .plans-grid.is-yearly [data-trial-monthly-only],
-    .plans-grid:not(.is-yearly) [data-trial-yearly-only] {
+    .studio.is-yearly [data-trial-monthly-only],
+    .studio:not(.is-yearly) [data-trial-yearly-only] {
       display: none !important;
     }
 
-    .plan-action { padding-bottom: 1.4rem; }
+    .plan-action { padding-bottom: 1.2rem; }
     .plan-btn {
       display: flex;
       align-items: center;
@@ -271,53 +374,36 @@
       font-weight: 600;
       text-align: center;
       text-decoration: none;
-      transition: background-color .2s ease, border-color .2s ease, color .2s ease;
+      transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .2s ease, box-shadow .2s ease;
     }
     .plan-btn.btn-primary { background: var(--brand-accent); color: #fff; border: 1px solid transparent; box-shadow: var(--lift); }
     .plan-btn.btn-primary:hover { background: var(--brand-hover); }
-    .plan-btn.btn-outline {
-      background: transparent;
-      color: var(--text);
-      border: 1px solid var(--line-strong);
-    }
+    .plan-btn.btn-outline { background: transparent; color: var(--text); border: 1px solid var(--line-strong); }
     .plan-btn.btn-outline:hover { border-color: color-mix(in oklab, var(--text) 45%, transparent); background: color-mix(in oklab, var(--text) 4%, transparent); }
     .plan-btn:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
     .plan-btn.plan-btn-sm { min-height: 38px; padding: .4rem .75rem; font-size: .84rem; }
-    .plan-btn.btn-disabled {
-      background: var(--surface2);
-      color: var(--muted);
-      border: 1px solid var(--line);
-      cursor: default;
-    }
+    .plan-btn.btn-disabled { background: var(--surface2); color: var(--muted); border: 1px solid var(--line); cursor: default; }
+    /* In the panel the shown plan's button is the page's main action: always filled. */
+    .plan-card .plan-btn { min-height: 52px; font-size: 1.02rem; }
+    .plan-card .plan-btn.btn-outline { background: var(--brand-accent); color: #fff; border-color: transparent; box-shadow: var(--lift); }
+    .plan-card .plan-btn:not(.btn-disabled):hover { background: var(--brand-hover); transform: translateY(-1px); }
 
-    /* Minutes first, the credits behind them second. */
+    /* Minutes and the credits behind them, on one line. */
     .plan-quota {
       display: flex;
-      flex-direction: column;
-      gap: .4rem;
-      padding: 1.2rem 0;
-      border-top: 1px solid var(--line);
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: .4rem 1rem;
+      padding: 1rem 0;
+      border-top: 1px solid color-mix(in srgb, var(--brand-accent) 14%, var(--line));
       font-size: .9rem;
       font-weight: 600;
     }
-    .plan-minutes { display: flex; align-items: baseline; flex-wrap: wrap; gap: .1rem .45rem; }
-    .plan-minutes-number {
-      font-size: 1.6rem;
-      font-weight: 600;
-      line-height: 1.1;
-      letter-spacing: -.02em;
-      font-variant-numeric: tabular-nums;
-    }
-    .plan-minutes-unit { color: var(--muted); font-size: .86rem; font-weight: 500; }
-    .plan-quota-credits {
-      display: inline-flex;
-      align-items: center;
-      gap: .4rem;
-      color: var(--muted);
-      font-size: .82rem;
-      font-weight: 500;
-      cursor: help;
-    }
+    .plan-minutes { display: flex; align-items: baseline; flex-wrap: wrap; gap: .1rem .4rem; }
+    .plan-minutes-number { font-size: 1.25rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .plan-minutes-unit { color: var(--muted); font-size: .84rem; font-weight: 500; }
+    .plan-quota-credits { display: inline-flex; align-items: center; gap: .4rem; color: var(--muted); font-size: .82rem; font-weight: 500; cursor: help; }
     .plan-quota-coin { font-size: 1rem; flex: none; }
     .plan-quota-amount { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: .25rem; }
     .plan-quota-number { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -326,51 +412,84 @@
     .plan-features {
       list-style: none;
       margin: 0;
-      padding: 1.1rem 0 0;
-      border-top: 1px solid var(--line);
+      padding: 1rem 0 0;
+      border-top: 1px solid color-mix(in srgb, var(--brand-accent) 14%, var(--line));
       display: flex;
       flex-direction: column;
-      gap: .7rem;
+      gap: .65rem;
     }
-    /* A long label wraps on its own side; the value stays on one line, on the other. */
-    .plan-features li {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: .75rem;
-      font-size: .88rem;
-    }
-    .feature-label {
-      display: inline-flex;
-      align-items: flex-start;
-      flex: 1 1 auto;
-      min-width: 0;
-      gap: .5rem;
-      color: var(--muted);
-      line-height: 1.4;
-    }
-    .feature-label svg {
-      flex: none;
-      width: 1rem;
-      height: 1rem;
-      margin-top: .12rem;
-      fill: none;
-      stroke: currentColor;
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-    .feature-value {
-      flex: none;
-      max-width: 55%;
-      color: var(--text);
-      font-weight: 650;
-      line-height: 1.4;
-      text-align: end;
-    }
+    .plan-features li { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; font-size: .88rem; }
+    .feature-label { display: inline-flex; align-items: flex-start; flex: 1 1 auto; min-width: 0; gap: .5rem; color: var(--muted); line-height: 1.4; }
+    .feature-label svg { flex: none; width: 1rem; height: 1rem; margin-top: .12rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .feature-value { flex: none; max-width: 55%; color: var(--text); font-weight: 650; line-height: 1.4; text-align: end; }
     .plan-features li.is-tick .feature-label { color: var(--text); font-weight: 600; }
     .plan-features li.is-tick .feature-label svg { color: var(--ok); stroke-width: 2.6; }
 
+    /* At the foot of the track: the voices every plan has. Under the card: every plan to pick from. */
+    .studio-proof { display: flex; align-items: center; gap: .8rem; margin: 1.4rem 0 0; color: var(--muted); font-size: .9rem; }
+    .studio-faces { display: flex; flex: none; }
+    .studio-faces img { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--surface); margin-inline-start: -9px; background: var(--surface2); box-shadow: 0 2px 8px rgba(15, 23, 42, .12); }
+    .studio-faces img:first-child { margin-inline-start: 0; }
+    .studio-proof { flex-wrap: nowrap; }
+    .studio-faces img:nth-child(n+16) { display: none; }
+    .studio-proof > :last-child { white-space: nowrap; }
+    @media (max-width: 1360px) { .studio-faces img:nth-child(n+14) { display: none; } }
+    @media (max-width: 640px) { .studio-proof > :last-child { white-space: normal; } }
+    @media (max-width: 1200px) { .studio-faces img:nth-child(n+11) { display: none; } }
+    @media (max-width: 640px) { .studio-faces img:nth-child(n+7) { display: none; } }
+    .plan-picker { max-width: 1200px; margin: 0 auto; padding-top: clamp(3rem, 6vw, 4.5rem); }
+    .plan-picker-list { display: grid; grid-template-columns: repeat(var(--count, 5), minmax(0, 1fr)); gap: 14px; }
+    .plan-pick {
+      display: grid;
+      justify-items: center;
+      gap: .2rem;
+      padding: 1.4rem 1rem 1.25rem;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: inherit;
+      font: inherit;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .3s ease, box-shadow .3s ease, transform .3s var(--ease-out, ease);
+    }
+    .plan-pick:hover { transform: translateY(-3px); box-shadow: 0 18px 36px -24px color-mix(in srgb, var(--brand-accent) 55%, transparent); }
+    .plan-pick:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; }
+    .plan-pick.is-on { border-color: var(--brand-accent); box-shadow: 0 0 0 1px var(--brand-accent), 0 18px 36px -22px color-mix(in srgb, var(--brand-accent) 70%, transparent); }
+    .plan-pick { position: relative; }
+    .plan-pick-crown {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      translate: -50% 0;
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      padding: .22rem .7rem;
+      border-radius: var(--radius-full);
+      background: linear-gradient(90deg, #5B3CF0, #8B5CF6 55%, #B45CE6);
+      color: #fff;
+      font-size: .72rem;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 6px 14px -6px rgba(76, 45, 235, .6);
+    }
+    .plan-pick-crown .crown { width: 13px; height: 13px; }
+    .plan-pick .orb { --orb-size: 60px; margin-bottom: .6rem; }
+    .plan-pick-name { font-size: 1.08rem; font-weight: 700; }
+    .plan-pick-minutes { color: var(--muted); font-size: .88rem; }
+    .plan-pick-price { margin-top: .55rem; font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .plan-pick-price small { color: var(--muted); font-size: .8rem; font-weight: 500; margin-inline-start: .2rem; }
+
+    /* Phones: the shown plan and its button stay in reach at the bottom. */
+    .plan-bar { display: none; }
+
+    /* One entrance: the waveform rises bar by bar, once. */
+    @keyframes bar-rise { from { transform: scaleY(.08); opacity: .3; } to { transform: none; opacity: 1; } }
+    .studio.is-ready .studio-wave rect { animation: bar-rise .7s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 6ms); }
+    @media (prefers-reduced-motion: reduce) {
+      .studio *, .plan-card, .plan-pick, .plan-bar { transition: none !important; animation: none !important; }
+    }
 
     /* Under the cards, as wide as their row: more minutes or a whole team, by talking to us. */
     .team-band {
@@ -662,24 +781,42 @@
     }
 
     /* ── Smaller screens ── */
-    @media (max-width: 1240px) {
-      .plans-grid[data-count="4"],
-      .plans-grid[data-count="5"],
-      .plans-grid[data-count="6"] { --cols: 2; max-width: 900px; }
-      .plans-grid[data-count="5"] > .plan-card,
-      .plans-grid[data-count="6"] > .plan-card,
-      .plans-grid[data-count="5"] > .plan-card:nth-child(4) { grid-column: auto; }
-    }
     @media (max-width: 1000px) {
-      .plans-grid[data-count="3"] { --cols: 2; max-width: 900px; }
+      .studio { grid-template-columns: 1fr; }
+      .studio-plan { border-inline-start: 0; border-top: 1px solid var(--line); }
+      .plan-picker-list { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
     }
-    /* Two to a row with an odd plan left over: it sits centred under the pair. */
-    @media (min-width: 641px) and (max-width: 1240px) {
-      .plans-grid[data-count="5"] > .plan-card:last-child,
-      .plans-grid[data-count="3"] > .plan-card:last-child { grid-column: 1 / -1; width: calc(50% - .625rem); justify-self: center; }
-    }
-    @media (min-width: 1001px) {
-      .plans-grid[data-count="3"] > .plan-card:last-child { grid-column: auto; width: auto; }
+    @media (max-width: 640px) {
+      .studio { border-radius: 22px; }
+      .studio-station-name { font-size: .7rem; }
+      .studio-station:not(.is-on) .studio-station-name { visibility: hidden; }
+      .plan-picker-list { grid-template-columns: 1fr; gap: 10px; }
+      .plan-pick { grid-template-columns: auto 1fr auto; justify-items: start; column-gap: 1rem; padding: 1rem 1.1rem; text-align: start; }
+      .plan-pick .orb { --orb-size: 44px; grid-row: span 2; margin: 0; }
+      .plan-pick-price { grid-column: 3; grid-row: 1 / span 2; align-self: center; margin: 0; }
+      .plan-bar {
+        display: flex;
+        position: fixed;
+        inset: auto 0 0;
+        z-index: 80;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: .7rem 1rem calc(.7rem + env(safe-area-inset-bottom));
+        background: color-mix(in srgb, var(--surface) 92%, transparent);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-top: 1px solid var(--line);
+        transform: translateY(110%);
+        transition: transform .35s cubic-bezier(.22, 1, .36, 1);
+      }
+      .plan-bar.is-shown { transform: none; }
+      .plan-bar-name { display: block; font-weight: 700; }
+      .plan-bar-price { color: var(--muted); font-size: .86rem; }
+      .plan-bar .plan-btn { width: auto; min-height: 44px; padding: .5rem 1.3rem; background: var(--brand-accent); color: #fff; border-color: transparent; }
+      .plan-bar .plan-btn.btn-disabled { background: var(--surface2); color: var(--muted); }
+      /* The chat button moves up while the bar is shown, so it never covers the button. */
+      body.has-plan-bar .wa-widget { bottom: calc(84px + env(safe-area-inset-bottom)) !important; transition: bottom .35s ease; }
     }
     @media (max-width: 1240px) {
       .team-band[data-count="4"],
@@ -698,10 +835,6 @@
     @media (max-width: 600px) {
       .pricing-page { width: min(100% - 2rem, 1320px); }
       .page-hero { padding: 2.25rem 0 1.5rem; }
-      .plans-grid[data-count] { --cols: 1; max-width: 520px; }
-      .plans-grid[data-count] > .plan-card { grid-column: auto !important; width: auto !important; }
-      .plan-card { padding: 1.35rem 1.15rem 1.2rem; }
-      .plan-desc { min-height: 0; }
       .page-hero { padding-top: 2.75rem; }
       .billing-toggle button { padding: 0 .9rem; }
       .compare, .features-section, .faq-section { padding-top: 4rem; }
@@ -860,28 +993,110 @@
           </span>
         </div>
       @endif
-      <h1>{{ __('ui.pricing.hero_title') }}</h1>
+      <h1>{{ __('ui.pricing.hero_title') }} <span class="accent">{{ __('ui.pricing.hero_title_accent') }}</span></h1>
       <p class="lead">{{ __('ui.pricing.hero_subtitle') }}</p>
-      <div class="billing-wrapper">
-        <div class="billing-toggle" id="billingToggle" role="group" aria-label="{{ __('ui.pricing.monthly') }} / {{ __('ui.pricing.yearly') }}">
-          <span class="billing-indicator" aria-hidden="true"></span>
-          <button type="button" id="monthlyBtn" class="active" aria-pressed="true">{{ __('ui.pricing.monthly') }}</button>
-          <button type="button" id="yearlyBtn" aria-pressed="false">
-            {{ __('ui.pricing.yearly') }}
-            @if(($yearlyDiscountPercent ?? 0) > 0)
-              <span class="toggle-save">{{ __('ui.pricing.yearly_save', ['percent' => (int) $yearlyDiscountPercent]) }}</span>
-            @endif
-          </button>
+    </section>
+
+    @php
+      $planCount = min(6, max(1, count($mainPlans)));
+      // The plans on the minutes track, fewest minutes first.
+      $trackPlans = collect($mainPlans)
+        ->map(fn ($p, $i) => ['slug' => (string) $p['slug'], 'name' => $planDisplayName($p), 'minutes' => \App\Support\Credits::minutesFor((int) ($p['monthly_chars'] ?? 0)), 'popular' => $planState($p, $i)['is_popular']])
+        ->filter(fn ($p) => $p['minutes'] > 0)
+        ->sortBy('minutes')->values();
+      // The plan shown first: the recommended one, else the member's own, else the first.
+      $mainSlugList = array_column($mainPlans, 'slug');
+      $shownSlug = (collect($mainPlans)->first(fn ($p, $i) => $planState($p, $i)['is_popular']) ?? [])['slug']
+        ?? (in_array($activePlanSlug, $mainSlugList, true) ? $activePlanSlug : ($mainSlugList[0] ?? null));
+      $shownPopular = (bool) ($trackPlans->firstWhere('slug', $shownSlug)['popular'] ?? false);
+      $crownSvg = '<svg class="crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8.5l4.2 3.6L12 4.5l4.3 7.6 4.2-3.6-1.8 9H5.3z"/><rect x="5.3" y="18.6" width="13.4" height="2" rx="1"/></svg>';
+      $shownMinutes = (int) ($trackPlans->firstWhere('slug', $shownSlug)['minutes'] ?? ($trackPlans->first()['minutes'] ?? 0));
+      $studioI18n = [
+        'about' => __('ui.pricing.minutes_about'),
+        'hours' => explode('|', __('ui.pricing.hours_count')),
+        'minutes' => explode('|', __('ui.pricing.minutes_count')),
+        'hours_and_minutes' => __('ui.pricing.hours_and_minutes'),
+        'live' => __('ui.pricing.minutes_live'),
+      ];
+      $proofFaces = ['ar-ahmed', 'ar-amal', 'en-amelia', 'ar-ali', 'ar-aisha', 'en-adrian', 'ar-layla', 'ar-omar', 'en-alice', 'ar-nour',
+        'ar-khaled', 'ar-mariam', 'en-alexander', 'ar-salma', 'ar-youssef', 'en-anastasia', 'ar-hassan', 'ar-rania'];
+    @endphp
+    <section class="studio {{ $trackPlans->count() < 2 ? 'is-single' : '' }}" id="studio" aria-label="{{ __('ui.pricing.minutes_label') }}"
+             data-plans="{{ json_encode($trackPlans) }}" data-i18n="{{ json_encode($studioI18n) }}">
+      <div class="studio-mixer">
+        <div class="studio-top">
+          <label class="studio-label" for="studioMinutes">{{ __('ui.pricing.minutes_label') }}</label>
+          <div class="billing-toggle" id="billingToggle" role="group" aria-label="{{ __('ui.pricing.monthly') }} / {{ __('ui.pricing.yearly') }}">
+            <span class="billing-indicator" aria-hidden="true"></span>
+            <button type="button" id="monthlyBtn" class="active" aria-pressed="true">{{ __('ui.pricing.monthly') }}</button>
+            <button type="button" id="yearlyBtn" aria-pressed="false">
+              {{ __('ui.pricing.yearly') }}
+              @if(($yearlyDiscountPercent ?? 0) > 0)
+                <span class="toggle-save">{{ __('ui.pricing.yearly_save', ['percent' => (int) $yearlyDiscountPercent]) }}</span>
+              @endif
+            </button>
+          </div>
+        </div>
+        @if($trackPlans->count() >= 2)
+          <div class="studio-amount">
+            <input id="studioMinutes" inputmode="numeric" autocomplete="off" value="{{ number_format($shownMinutes) }}" aria-describedby="studioAbout">
+            <span class="studio-unit">{{ __('ui.pricing.minutes_unit') }}</span>
+            <span class="studio-about" id="studioAbout"></span>
+          </div>
+          <div class="studio-track">
+            <div class="studio-wave" id="studioWave">
+              <svg id="studioBars" viewBox="0 0 1000 86" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <input id="studioSlider" type="range" min="0" max="0" step="1" value="0" aria-label="{{ __('ui.pricing.minutes_track') }}">
+              <span class="studio-head" id="studioHead"></span>
+            </div>
+            <div class="studio-stations" aria-hidden="true">
+              @foreach($trackPlans as $trackPlan)
+                <button type="button" class="studio-station" data-pick="{{ $trackPlan['slug'] }}" tabindex="-1">
+                  @if($trackPlan['popular']){!! str_replace('class="crown"', 'class="crown studio-station-crown"', $crownSvg) !!}@endif
+                  <x-orb :name="\App\Support\Orbs::forPlan($trackPlan['slug'])" />
+                  <span class="studio-station-name">{{ $trackPlan['name'] }}</span>
+                </button>
+              @endforeach
+            </div>
+          </div>
+        @endif
+        <p class="studio-proof">
+          <span class="studio-faces" aria-hidden="true">@foreach($proofFaces as $face)<img src="{{ asset('images/speakers/'.$face.'.webp') }}" alt="" width="32" height="32" loading="lazy">@endforeach</span>
+          <span>{{ __('ui.pricing.voices_proof', ['count' => \App\Support\DialectCounts::arabic() + \App\Support\DialectCounts::english()]) }}</span>
+        </p>
+      </div>
+      <div class="studio-plan">
+        <div class="plan-ribbon" id="planRibbon" @unless($shownPopular) hidden @endunless>{!! $crownSvg !!}{{ __('ui.pricing.most_popular') }}</div>
+        <div class="plan-stage">
+          @foreach($mainPlans as $index => $plan)
+            @include('components._plan-card', ['plan' => $plan, 'index' => $index, 'isShown' => $plan['slug'] === $shownSlug])
+          @endforeach
         </div>
       </div>
     </section>
 
-    @php $planCount = min(6, max(1, count($mainPlans))); @endphp
-    <section class="plans-grid" data-count="{{ $planCount }}">
-      @foreach($mainPlans as $index => $plan)
-        @include('components._plan-card', ['plan' => $plan, 'index' => $index])
-      @endforeach
-    </section>
+    @if(count($mainPlans) > 1)
+      <section class="plan-picker" aria-labelledby="planPickerTitle">
+        <h2 class="section-title reveal" id="planPickerTitle">{{ __('ui.pricing.all_plans') }}</h2>
+        <div class="plan-picker-list" style="--count: {{ min(5, count($mainPlans)) }}">
+          @foreach($mainPlans as $index => $plan)
+            @php
+              $pickPopular = $planState($plan, $index)['is_popular'];
+              $pickMonthly = $wholePrice((string) ($plan['display_price_monthly_formatted'] ?? ''));
+              $pickYearly = $wholePrice((string) ($plan['display_price_yearly_monthly_formatted'] ?? $pickMonthly));
+              $pickMinutes = \App\Support\Credits::minutesFor((int) ($plan['monthly_chars'] ?? 0));
+            @endphp
+            <button type="button" class="plan-pick" data-pick="{{ $plan['slug'] }}" aria-controls="studio">
+              @if($pickPopular)<span class="plan-pick-crown">{!! $crownSvg !!}{{ __('ui.pricing.most_popular') }}</span>@endif
+              <x-orb :name="\App\Support\Orbs::forPlan((string) $plan['slug'])" />
+              <span class="plan-pick-name">{{ $planDisplayName($plan) }}</span>
+              <span class="plan-pick-minutes">{{ trans_choice('ui.pricing.minutes_count', $pickMinutes, ['count' => number_format($pickMinutes)]) }}</span>
+              <span class="plan-pick-price"><span dir="ltr" data-monthly="{{ $pickMonthly }}" data-yearly="{{ $pickYearly }}" data-compare-price>{{ $pickMonthly }}</span><small>{{ __('ui.pricing.per_month_short') }}</small></span>
+            </button>
+          @endforeach
+        </div>
+      </section>
+    @endif
 
     {{-- More than the biggest plan, or a whole team: by talking to us. --}}
     <section class="team-band reveal" data-count="{{ $planCount }}" aria-labelledby="teamTitle" data-orb-host>
@@ -1006,6 +1221,12 @@
         :secondary="['href' => route('register'), 'label' => __('ui.pricing.create_free_account')]" />
     @endauth
   </main>
+
+  {{-- Phones: the plan shown above and its button, kept at the bottom while the panel is out of view. --}}
+  <div class="plan-bar" id="planBar" aria-hidden="true">
+    <div><span class="plan-bar-name" id="planBarName"></span><span class="plan-bar-price" id="planBarPrice"></span></div>
+    <div id="planBarAction"></div>
+  </div>
 
   @include('components.footer')
   @include('components.scripts')
@@ -1132,7 +1353,7 @@
         monthlyBtn.setAttribute('aria-pressed', yearly ? 'false' : 'true');
         yearlyBtn.setAttribute('aria-pressed', yearly ? 'true' : 'false');
         billingToggle.classList.toggle('yearly', yearly);
-        document.querySelectorAll('.plans-grid').forEach(function(el) {
+        document.querySelectorAll('.studio').forEach(function(el) {
           el.classList.toggle('is-yearly', yearly);
         });
         updatePrices();
@@ -1176,6 +1397,7 @@
       var lines = document.querySelectorAll('.offer-ends[data-ends]');
       if (!lines.length) return;
       var forms = @json($offerEndsForms);
+      var units = { on: @json(__('ui.pricing.offer_ends_on')), list: @json(explode('|', __('ui.pricing.countdown_units'))) };
       var arabic = document.documentElement.lang === 'ar';
       // The same plural rules the server uses (Laravel's): six forms in Arabic, two in English.
       function form(list, n) {
@@ -1188,6 +1410,23 @@
         }
         return String(list[Math.min(i, list.length - 1)] || '').replace(':count', String(n));
       }
+      // The day it ends, in the visitor's own time zone and language.
+      var dateFormat = new Intl.DateTimeFormat(arabic ? 'ar-EG-u-nu-latn' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+      lines.forEach(function(el) {
+        var date = el.querySelector('.offer-ends-date');
+        var at = new Date(el.getAttribute('data-ends'));
+        if (date && !isNaN(at)) date.textContent = units.on.replace(':date', dateFormat.format(at));
+      });
+      // The time left, to that same moment: days, hours, minutes (hours, minutes, seconds on the last day).
+      function pad(n) { return (n < 10 ? '0' : '') + n; }
+      function clock(el, seconds) {
+        var box = el.querySelector('.offer-ends-clock');
+        if (!box) return;
+        var d = Math.floor(seconds / 86400), h = Math.floor(seconds % 86400 / 3600), m = Math.floor(seconds % 3600 / 60), s = seconds % 60;
+        var parts = d > 0 ? [[d, units.list[0]], [h, units.list[1]], [m, units.list[2]]] : [[h, units.list[1]], [m, units.list[2]], [s, units.list[3]]];
+        var html = parts.map(function(p) { return '<span class="offer-ends-unit"><b>' + pad(p[0]) + '</b><small>' + p[1] + '</small></span>'; }).join('');
+        if (box.innerHTML !== html) box.innerHTML = html;
+      }
       function refresh() {
         var any = false;
         lines.forEach(function(el) {
@@ -1199,10 +1438,271 @@
             : form(forms.minutes, Math.max(1, Math.ceil(seconds / 60)));
           var out = el.querySelector('.offer-ends-text');
           if (out && out.textContent !== text) out.textContent = text;
+          clock(el, seconds);
         });
-        if (any) setTimeout(refresh, 30000);
+        if (any) setTimeout(refresh, 1000);
       }
       refresh();
+    })();
+  </script>
+  <script>
+    /* ── The minutes track: pick minutes, see the plan that fits ──
+       The plans sit on the track evenly spaced, the minutes between two plans on a
+       log scale, so 15 and 2,500 minutes both fit. The playhead moves between round
+       stops; the plan shown is the smallest one that covers the minutes chosen. */
+    (function () {
+      var studio = document.getElementById('studio');
+      if (!studio) return;
+      var plans = JSON.parse(studio.getAttribute('data-plans') || '[]');
+      var t = JSON.parse(studio.getAttribute('data-i18n') || '{}');
+      var cards = Array.prototype.slice.call(studio.querySelectorAll('.plan-card'));
+      var picks = Array.prototype.slice.call(document.querySelectorAll('[data-pick]'));
+      var rtl = document.documentElement.dir === 'rtl';
+      var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var shownSlug = null;
+      var ribbon = document.getElementById('planRibbon');
+      var fmt = function (n) { return Math.round(n).toLocaleString('en'); };
+      function shownCard() {
+        return cards.filter(function (c) { return c.classList.contains('is-active'); })[0] || cards[0];
+      }
+
+      // One plan's card at a time; its orb comes alive.
+      function showPlan(slug) {
+        picks.forEach(function (p) { p.classList.toggle('is-on', p.getAttribute('data-pick') === slug); });
+        if (slug === shownSlug) return;
+        shownSlug = slug;
+        cards.forEach(function (card) {
+          var on = card.getAttribute('data-plan-slug') === slug;
+          card.classList.toggle('is-active', on);
+          if (on) { card.removeAttribute('inert'); } else { card.setAttribute('inert', ''); }
+          var orb = card.querySelector('.plan-orb');
+          if (orb) orb.classList.toggle('is-live', on);
+          if (on && ribbon) ribbon.hidden = !card.classList.contains('popular');
+        });
+        refreshBar();
+      }
+
+      // The bar at the bottom on phones: the shown plan, its price and its own button.
+      var bar = document.getElementById('planBar');
+      function refreshBar() {
+        if (!bar) return;
+        var card = shownCard();
+        if (!card) return;
+        var name = card.querySelector('.plan-name');
+        var price = card.querySelector('.price-value');
+        var period = card.querySelector('.price-period');
+        document.getElementById('planBarName').textContent = name ? name.textContent.trim() : '';
+        document.getElementById('planBarPrice').textContent = price ? (price.textContent.trim() + ' ' + (period ? period.textContent.trim() : '')) : '';
+        var action = document.getElementById('planBarAction');
+        action.innerHTML = '';
+        var button = card.querySelector('.plan-btn');
+        if (button) {
+          var copy = button.cloneNode(true);
+          copy.removeAttribute('data-upgrade-link');
+          copy.setAttribute('tabindex', '-1');
+          action.appendChild(copy);
+        }
+      }
+      var panel = studio.querySelector('.studio-plan');
+      if (bar && panel && 'IntersectionObserver' in window) {
+        new IntersectionObserver(function (entries) {
+          var show = !entries[0].isIntersecting;
+          bar.classList.toggle('is-shown', show);
+          document.body.classList.toggle('has-plan-bar', show && window.matchMedia('(max-width: 640px)').matches);
+        }, { threshold: 0.15 }).observe(panel);
+      }
+
+      // A new billing cycle: the price lifts in, and the bar follows.
+      ['monthlyBtn', 'yearlyBtn'].forEach(function (id) {
+        var button = document.getElementById(id);
+        if (!button) return;
+        button.addEventListener('click', function () {
+          var price = shownCard() && shownCard().querySelector('.price-amount');
+          if (price && !reduced) { price.classList.remove('is-changing'); void price.offsetWidth; price.classList.add('is-changing'); }
+          refreshBar();
+        });
+      });
+
+      var first = shownCard();
+      shownSlug = first ? first.getAttribute('data-plan-slug') : null;
+      picks.forEach(function (p) { p.classList.toggle('is-on', p.getAttribute('data-pick') === shownSlug); });
+      refreshBar();
+
+      var slider = document.getElementById('studioSlider');
+      if (plans.length < 2 || !slider) {
+        picks.forEach(function (p) { p.addEventListener('click', function () { showPlan(p.getAttribute('data-pick')); }); });
+        return;
+      }
+
+      var input = document.getElementById('studioMinutes');
+      var about = document.getElementById('studioAbout');
+      var head = document.getElementById('studioHead');
+      var wave = document.getElementById('studioWave');
+      var svg = document.getElementById('studioBars');
+      var minM = Math.max(1, Math.floor(plans[0].minutes / 3));
+      var maxM = plans[plans.length - 1].minutes;
+      var anchors = [minM].concat(plans.map(function (p) { return p.minutes; }));
+      // The first plan sits right at the start (fewer minutes take a short lead-in before
+      // it), the last at the end, and the plans in between are evenly spaced.
+      var START = 0.06, END = 0.94, LEAD = 0.015;
+      function between(m, lo, hi) { return Math.max(0, Math.min(1, Math.log(m / lo) / (Math.log(hi / lo) || 1))); }
+      function pos(m) {
+        if (m <= anchors[1]) return LEAD + (START - LEAD) * between(Math.max(m, minM), minM, anchors[1]);
+        var gaps = anchors.length - 2;
+        for (var i = 2; i < anchors.length; i++) {
+          if (m <= anchors[i]) return START + (END - START) * (i - 2 + between(m, anchors[i - 1], anchors[i])) / gaps;
+        }
+        return END;
+      }
+      var NICE = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 100, 120, 150, 200, 250, 300, 400, 500, 600, 750, 1000, 1250, 1500, 1750, 2000, 2500, 3000, 4000, 5000, 7500, 10000, 15000, 20000, 25000, 50000];
+      var stops = NICE.filter(function (n) { return n >= minM && n <= maxM; }).concat(anchors)
+        .filter(function (n, i, all) { return all.indexOf(n) === i; })
+        .sort(function (a, b) { return a - b; });
+      slider.max = String(stops.length - 1);
+
+      // The plans as orbs along the track.
+      studio.querySelectorAll('.studio-station').forEach(function (station) {
+        var plan = plans.filter(function (p) { return p.slug === station.getAttribute('data-pick'); })[0];
+        if (plan) station.style.left = ((rtl ? 1 - pos(plan.minutes) : pos(plan.minutes)) * 100) + '%';
+      });
+
+      // The waveform, drawn once.
+      var N = 110, rects = [];
+      for (var i = 0; i < N; i++) {
+        var env = 0.32 + 0.68 * Math.abs(Math.sin(i * 0.075 + 0.6));
+        var h = 6 + 70 * env * Math.abs(Math.sin(i * 0.63) * Math.cos(i * 0.21 + 1.1));
+        var r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        r.setAttribute('x', (i * 1000 / N + 2.2).toFixed(2));
+        r.setAttribute('width', (1000 / N - 4.4).toFixed(2));
+        r.setAttribute('y', (43 - h / 2).toFixed(2));
+        r.setAttribute('height', h.toFixed(2));
+        r.setAttribute('rx', '3');
+        r.style.setProperty('--i', String(i));
+        svg.appendChild(r);
+        rects.push(r);
+      }
+
+      function plural(list, n) {
+        var i;
+        if (rtl) {
+          var m = n % 100;
+          i = n === 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : (m >= 3 && m <= 10) ? 3 : (m >= 11 && m <= 99) ? 4 : 5;
+        } else {
+          i = n === 1 ? 0 : 1;
+        }
+        return String(list[Math.min(i, list.length - 1)] || '').replace(':count', fmt(n));
+      }
+      function duration(m) {
+        var hours = Math.floor(m / 60), rest = m % 60;
+        if (!hours) return plural(t.minutes, m);
+        if (!rest) return plural(t.hours, hours);
+        return t.hours_and_minutes.replace(':hours', plural(t.hours, hours)).replace(':minutes', plural(t.minutes, rest));
+      }
+
+      // The number box is as wide as its digits (where the browser cannot size it itself).
+      var sizes = window.CSS && CSS.supports && CSS.supports('field-sizing', 'content');
+      function fit() { if (!sizes) input.style.width = (String(input.value).length + 0.15) + 'ch'; }
+      input.addEventListener('input', fit);
+
+      // The number counts to its new value.
+      var shownMinutes = null, raf = 0;
+      function countTo(to) {
+        var from = shownMinutes === null ? to : shownMinutes;
+        shownMinutes = to;
+        if (document.activeElement === input) return;
+        cancelAnimationFrame(raf);
+        if (reduced || from === to) { input.value = fmt(to); fit(); return; }
+        var start = performance.now();
+        (function step(now) {
+          var k = Math.min(1, (now - start) / 450), e = 1 - Math.pow(1 - k, 3);
+          input.value = fmt(from + (to - from) * e);
+          fit();
+          if (k < 1) raf = requestAnimationFrame(step);
+        })(start);
+      }
+
+      var x = null, announce = 0;
+      var live = document.createElement('p');
+      live.className = 'sr-only';
+      live.setAttribute('aria-live', 'polite');
+      live.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap';
+      studio.appendChild(live);
+
+      function set(m) {
+        m = Math.max(minM, Math.min(maxM, Math.round(m) || minM));
+        var k = 0;
+        stops.forEach(function (s, i) { if (Math.abs(pos(s) - pos(m)) < Math.abs(pos(stops[k]) - pos(m))) k = i; });
+        slider.value = String(k);
+        var next = pos(m), from = x === null ? next : x;
+        // The bars fill in a sweep, from where the playhead was to where it goes.
+        rects.forEach(function (rect, i) {
+          var c = (i + 0.5) / N, on = c <= next;
+          if (rect.classList.contains('on') !== on) {
+            rect.style.transitionDelay = reduced || x === null ? '0ms'
+              : Math.round(Math.abs(c - from) / Math.max(0.001, Math.abs(next - from)) * 320) + 'ms';
+            rect.classList.toggle('on', on);
+          }
+        });
+        x = next;
+        head.style.left = ((rtl ? 1 - next : next) * 100) + '%';
+        countTo(m);
+        about.textContent = t.about.replace(':time', duration(m));
+        var plan = plans.filter(function (p) { return m <= p.minutes; })[0] || plans[plans.length - 1];
+        showPlan(plan.slug);
+        var sentence = t.live.replace(':minutes', fmt(m)).replace(':plan', plan.name);
+        slider.setAttribute('aria-valuetext', sentence);
+        clearTimeout(announce);
+        announce = setTimeout(function () { live.textContent = sentence; }, 500);
+      }
+
+      // Keyboard: one stop per arrow (the slider is the track for screen readers and keys).
+      slider.addEventListener('input', function () { set(stops[+slider.value]); });
+
+      // Pointer: the stop nearest to where the track is touched, also while dragging.
+      function fromPointer(e) {
+        var box = wave.getBoundingClientRect();
+        var f = (e.clientX - box.left) / box.width;
+        if (rtl) f = 1 - f;
+        var best = stops[0];
+        stops.forEach(function (s) { if (Math.abs(pos(s) - f) < Math.abs(pos(best) - f)) best = s; });
+        set(best);
+      }
+      slider.style.pointerEvents = 'none';
+      wave.style.cursor = 'ew-resize';
+      wave.style.touchAction = 'pan-y';
+      wave.addEventListener('pointerdown', function (e) {
+        studio.classList.add('is-dragging');
+        wave.setPointerCapture(e.pointerId);
+        slider.focus({ preventScroll: true });
+        fromPointer(e);
+      });
+      wave.addEventListener('pointermove', function (e) { if (wave.hasPointerCapture(e.pointerId)) fromPointer(e); });
+      ['pointerup', 'pointercancel'].forEach(function (type) {
+        wave.addEventListener(type, function () { studio.classList.remove('is-dragging'); });
+      });
+
+      // Typing a number (Arabic or Western digits).
+      function typed() {
+        var digits = String(input.value).replace(/[٠-٩]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }).replace(/[^\d]/g, '');
+        if (digits !== '') { shownMinutes = null; set(+digits); input.value = fmt(Math.max(minM, Math.min(maxM, +digits))); }
+      }
+      input.addEventListener('change', typed);
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); typed(); } });
+
+      // A plan's orb on the track, or its card below, moves the track to it.
+      picks.forEach(function (p) {
+        p.addEventListener('click', function () {
+          var plan = plans.filter(function (q) { return q.slug === p.getAttribute('data-pick'); })[0];
+          if (plan) set(plan.minutes); else showPlan(p.getAttribute('data-pick'));
+          if (p.classList.contains('plan-pick')) {
+            var box = studio.getBoundingClientRect();
+            if (box.top < 0 || box.top > window.innerHeight * 0.4) studio.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+          }
+        });
+      });
+
+      set(+String(input.value).replace(/[^\d]/g, '') || plans[0].minutes);
+      requestAnimationFrame(function () { studio.classList.add('is-ready'); });
     })();
   </script>
 </body>

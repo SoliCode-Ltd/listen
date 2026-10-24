@@ -210,8 +210,21 @@ return [
 
     // ===== PRICING PAGE =====
     'pricing' => [
-        'hero_title' => 'Simple plans for every voice project',
-        'hero_subtitle' => 'Pick a plan by the minutes of audio you need each month. Higher plans add longer texts and more features.',
+        'hero_title' => 'Pay for the minutes',
+        'hero_title_accent' => 'you need.',
+        'hero_subtitle' => 'Pick your monthly minutes. Change or cancel any time.',
+        'minutes_label' => 'Minutes a month',
+        'minutes_unit' => 'minutes',
+        'minutes_track' => 'Minutes track',
+        'offer_ends_on' => 'Offer ends :date',
+        'countdown_units' => 'days|hrs|min|sec',
+        'minutes_about' => 'about :time',
+        'hours_count' => ':count h',
+        'minutes_count' => ':count min',
+        'hours_and_minutes' => ':hours :minutes',
+        'minutes_live' => ':minutes minutes a month: :plan',
+        'all_plans' => 'All plans',
+        'voices_proof' => ':count dialects and accents on every plan',
         'monthly' => 'Monthly',
         'yearly' => 'Yearly',
         'annual_saves' => 'Annual plan saves 20%',

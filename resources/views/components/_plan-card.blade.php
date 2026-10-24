@@ -30,7 +30,7 @@
   // A price in another currency is a guide: the card also shows the US-dollar price
   // a card is really charged, for each cycle.
 @endphp
-<div class="plan-card {{ $isPopular ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} {{ $isCurrent ? 'is-current' : '' }} reveal" data-orb-host
+<div class="plan-card {{ $isPopular ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} {{ $isCurrent ? 'is-current' : '' }} {{ ($isShown ?? false) ? 'is-active' : '' }}" data-orb-host @unless($isShown ?? false) inert @endunless
      data-plan-slug="{{ $plan['slug'] }}"
      data-is-free="{{ $isFree ? '1' : '0' }}"
      data-is-pack="{{ $isPack ? '1' : '0' }}"
@@ -52,7 +52,7 @@
   <div class="plan-top">
     {{-- Each plan's orb, and the badge on the recommended one; the popular orb moves gently. --}}
     <div class="plan-badges">
-      <x-orb :name="\App\Support\Orbs::forPlan((string) $plan['slug'])" @class(['plan-orb', 'is-live' => $isPopular]) />
+      <x-orb :name="\App\Support\Orbs::forPlan((string) $plan['slug'])" @class(['plan-orb', 'is-live' => $isShown ?? false]) />
       @if($isPopular)
         <span class="popular-badge">{{ __('ui.pricing.most_popular') }}</span>
       @endif
@@ -90,8 +90,18 @@
         @if($discountEndsAt)
           @php $endsText = $offerEndsText($discountEndsAt); @endphp
           @if($endsText !== '')
+            {{-- The day the offer ends (the page writes it in the visitor's own time zone),
+                 and the time left to that same moment, counting down. --}}
+            @php
+              $endsOn = \Illuminate\Support\Carbon::parse($discountEndsAt)->locale(app()->getLocale())
+                ->translatedFormat(app()->getLocale() === 'ar' ? 'l j F' : 'l, j F');
+            @endphp
             <span class="offer-ends" data-ends="{{ $discountEndsAt }}">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9.5 2.5h5"/></svg>
+              <span class="offer-ends-when" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9.5 2.5h5"/></svg>
+                <span class="offer-ends-date">{{ __('ui.pricing.offer_ends_on', ['date' => $endsOn]) }}</span>
+              </span>
+              <span class="offer-ends-clock" aria-hidden="true"></span>
               <span class="offer-ends-text">{{ $endsText }}</span>
             </span>
           @endif
