@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Http;
  * One illustrated avatar per speaker, all in the Listen brand style: a soft 3D
  * character with headphones on the violet-to-blue brand gradient. Each speaker
  * gets their own look (age, hair, clothing, expression) chosen from their name,
- * and the speakers in the homepage samples dress for their dialect's region.
+ * the speakers in the homepage samples dress for their dialect's region, and
+ * the speakers added for every dialect have a look written for their place.
  *
  * Generating uses the Gemini image model (--key or GEMINI_TTS_API_KEY) and
  * writes public/images/speakers/{language}-{name}.webp.
@@ -131,6 +132,11 @@ class GenerateSpeakerAvatarsCommand extends Command
         if (isset(self::CAST[$castKey]['look'])) {
             return self::CAST[$castKey]['look'].'.'.$suffix;
         }
+        // The speakers added for every dialect and accent are drawn for their place and voice.
+        $own = $this->looks()[$castKey] ?? null;
+        if ($own !== null) {
+            return $own.'.'.$suffix;
+        }
 
         $female = strtolower($gender) === 'female';
         $region = $regions[$castKey] ?? null;
@@ -177,6 +183,26 @@ class GenerateSpeakerAvatarsCommand extends Command
         $outfit = $this->pick($name, 71, ['a hoodie', 'a flannel shirt', 'a crisp white shirt', 'a bomber jacket', 'a crew-neck sweater', 'a denim shirt', 'a varsity jacket']);
 
         return "{$people} man {$age}, {$hair}, {$face}, {$outfit}{$glasses}, {$expression}.{$suffix}";
+    }
+
+    /** @var array<string, string>|null */
+    private ?array $looks = null;
+
+    /**
+     * The look of each speaker in database/seeders/data/more_speakers.php, keyed "ar:Name" / "en:Name".
+     *
+     * @return array<string, string>
+     */
+    private function looks(): array
+    {
+        if ($this->looks === null) {
+            $this->looks = [];
+            foreach ((require database_path('seeders/data/more_speakers.php'))['speakers'] as $speaker) {
+                $this->looks[$speaker['language'].':'.$speaker['name']] = rtrim($speaker['look'], '.');
+            }
+        }
+
+        return $this->looks;
     }
 
     private function regionPeople(?string $region, bool $female): string

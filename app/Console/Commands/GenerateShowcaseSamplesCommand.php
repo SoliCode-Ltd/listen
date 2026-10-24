@@ -4,11 +4,13 @@ namespace App\Console\Commands;
 
 use App\Models\SiteSetting;
 use App\Models\VoiceSample;
+use App\Services\Tts\GeminiTtsProvider;
 use App\Support\ArabicDialects;
 use App\Support\AudioEffects;
 use App\Support\EnglishAccents;
 use App\Support\GeminiTtsModel;
 use App\Support\HeroCast;
+use App\Support\VoicePreviews;
 use Illuminate\Console\Command;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -30,10 +32,12 @@ class GenerateShowcaseSamplesCommand extends Command
         {--import : Create or update the voice_samples rows for the MP3s on disk}
         {--key= : Gemini API key for --generate (default: GEMINI_TTS_API_KEY)}
         {--only=* : Only these sample slugs}
-        {--set=showcase : Which samples: showcase (dialects, accents, dialogues), environments (the sound environments section) or ad (the launch ad, marketing/launch-ad/lines.php)}
+        {--set=showcase : Which samples: showcase (dialects, accents, dialogues), environments (the sound environments section), ad (the launch ad, marketing/launch-ad/lines.php) or previews (the voice library, database/seeders/data/voice_previews.php)}
+        {--ad=launch-ad : ad set only: which ad folder under marketing/ (launch-ad, emotions-ad)}
         {--render : environments set only: place each clean clip in its sound environment}
         {--force : Regenerate MP3s that already exist}
         {--keep-old : On import, leave the older homepage samples active}
+        {--max=0 : previews set only: make at most this many clips in this run (0 = all)}
         {--pause=7 : Seconds between Gemini requests}';
 
     protected $description = 'Generate and import the Gemini 3.8 homepage showcase samples (dialects, accents, dialogues)';
@@ -49,6 +53,9 @@ class GenerateShowcaseSamplesCommand extends Command
     /** mp3 for the site; wav (lossless, 48 kHz) for the launch ad, which is mixed and encoded again later. */
     private string $ext = 'mp3';
 
+    /** Voice library previews: small mono MP3s that start at once, remade whenever their line changes. */
+    private bool $preview = false;
+
     public function handle(): int
     {
         if ($this->option('set') === 'environments') {
@@ -56,6 +63,9 @@ class GenerateShowcaseSamplesCommand extends Command
         }
         if ($this->option('set') === 'ad') {
             return $this->ad();
+        }
+        if ($this->option('set') === 'previews') {
+            return $this->previews();
         }
 
         if (! $this->option('generate') && ! $this->option('import')) {
@@ -86,8 +96,9 @@ class GenerateShowcaseSamplesCommand extends Command
     /**
      * @param  array<int, array<string, mixed>>  $samples
      * @param  array<string, string>  $signOff
+     * @param  (callable(array<string, mixed>): void)|null  $made  called after each clip is saved
      */
-    private function generate(array $samples, array $signOff): bool
+    private function generate(array $samples, array $signOff, ?callable $made = null): bool
     {
         $key = trim((string) ($this->option('key') ?: config('services.gemini_tts.api_key')));
         if ($key === '') {
@@ -103,7 +114,7 @@ class GenerateShowcaseSamplesCommand extends Command
 
         foreach ($samples as $sample) {
             $target = public_path($this->dir.'/'.$sample['slug'].'.'.$this->ext);
-            if (is_file($target) && ! $this->option('force')) {
+            if (is_file($target) && ! $this->option('force') && ! $this->preview) {
                 $this->line("skip  {$sample['slug']} (exists)");
 
                 continue;
@@ -117,9 +128,17 @@ class GenerateShowcaseSamplesCommand extends Command
                 $pcm = $this->requestPcm($this->payload($sample, $signOff), $key);
                 $this->encodeMp3($pcm, $target);
                 $this->info("made  {$sample['slug']} (".round($this->durationOf($target), 1).'s)');
+                if ($made !== null) {
+                    $made($sample);
+                }
             } catch (\Throwable $e) {
                 $failed++;
                 $this->error("fail  {$sample['slug']}: ".$e->getMessage());
+                if (str_starts_with($e->getMessage(), 'HTTP 429')) {
+                    // Live reads with the same quota: stop instead of spending what is left.
+                    $this->warn('Gemini quota reached: stopping here. Run again later for the rest.');
+                    break;
+                }
             }
         }
 
@@ -131,8 +150,8 @@ class GenerateShowcaseSamplesCommand extends Command
     }
 
     /**
-     * The launch ad's voices (marketing/launch-ad/lines.php): one Gemini request
-     * each, no sign-off, saved as WAV in public/audio/launch-ad.
+     * An ad's voices (marketing/<ad>/lines.php, --ad=launch-ad by default): one
+     * Gemini request each, no sign-off, saved as WAV in public/audio/<ad>.
      */
     private function ad(): int
     {
@@ -141,16 +160,66 @@ class GenerateShowcaseSamplesCommand extends Command
 
             return self::INVALID;
         }
-        $samples = (require base_path('marketing/launch-ad/lines.php'))['samples'];
+        $ad = (string) $this->option('ad');
+        if (preg_match('/^[a-z0-9-]+$/', $ad) !== 1 || ! is_file(base_path("marketing/{$ad}/lines.php"))) {
+            $this->error("No marketing/{$ad}/lines.php.");
+
+            return self::INVALID;
+        }
+        $samples = (require base_path("marketing/{$ad}/lines.php"))['samples'];
         $only = array_filter((array) $this->option('only'));
         if ($only !== []) {
             $samples = array_values(array_filter($samples, fn (array $s): bool => in_array($s['slug'], $only, true)));
         }
         $samples = array_map(fn (array $s): array => $s + ['kind' => 'single', 'sign_off' => false], $samples);
-        $this->dir = self::AD_DIR;
+        $this->dir = $ad === 'launch-ad' ? self::AD_DIR : "audio/{$ad}";
         $this->ext = 'wav';
 
         return $this->generate($samples, ['en' => '', 'ar' => '']) ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * The voice library previews (database/seeders/data/voice_previews.php):
+     * one Gemini request each, no sign-off, saved as small MP3s in
+     * public/audio/voice-previews. Only clips that are missing or whose line
+     * changed are made; made.json records the line each clip was made from.
+     */
+    private function previews(): int
+    {
+        if (! $this->option('generate')) {
+            $this->error('Pass --generate.');
+
+            return self::INVALID;
+        }
+        $file = VoicePreviews::madePath();
+        $made = is_file($file) ? (array) json_decode((string) file_get_contents($file), true) : [];
+        $only = array_filter((array) $this->option('only'));
+        $samples = [];
+        foreach (VoicePreviews::lines() as $slug => $line) {
+            if ($only !== [] && ! in_array($slug, $only, true)) {
+                continue;
+            }
+            $current = ($made[$slug] ?? null) === VoicePreviews::hash($line) && is_file(public_path(VoicePreviews::DIR."/{$slug}.mp3"));
+            if ($current && ! $this->option('force')) {
+                continue;
+            }
+            $samples[] = $line + ['kind' => 'single', 'sign_off' => false, 'speaker_gender' => GeminiTtsProvider::voiceGender($line['voice']),
+                // The speaker (by the name in the slug): a child speaks as a child.
+                'speaker' => substr($slug, 3)];
+        }
+        $max = max(0, (int) $this->option('max'));
+        $this->info(count($samples).' preview(s) to make'.($max > 0 && count($samples) > $max ? ", {$max} in this run" : '').'.');
+        if ($max > 0) {
+            $samples = array_slice($samples, 0, $max);
+        }
+        $this->dir = VoicePreviews::DIR;
+        $this->preview = true;
+
+        return $this->generate($samples, ['en' => '', 'ar' => ''], function (array $sample) use (&$made, $file): void {
+            $made[$sample['slug']] = VoicePreviews::hash($sample);
+            ksort($made);
+            file_put_contents($file, json_encode($made, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
+        }) ? self::SUCCESS : self::FAILURE;
     }
 
     /**
@@ -221,12 +290,19 @@ class GenerateShowcaseSamplesCommand extends Command
     {
         $language = $sample['language'];
         $isDialogue = ($sample['kind'] ?? 'single') === 'dialogue';
-        $closing = $signOff[$language.($isDialogue ? '_dialogue' : '')];
+        $closing = $signOff[$language.($isDialogue ? '_dialogue' : '')] ?? '';
         $closingStyle = $this->accentDirection($language, $sample['dialect'])
             .' Calm, clear, friendly sign-off at a natural pace, like the closing line of a professional production.';
 
         if (! $isDialogue) {
             $style = trim($this->accentDirection($language, $sample['dialect']).' '.$sample['style']);
+            $asChild = GeminiTtsProvider::asSpeaker((string) ($sample['speaker'] ?? ''), $style);
+            if ($asChild !== $style) {
+                $style = $asChild;
+            } elseif (($sample['speaker_gender'] ?? null) === 'female') {
+                // A deep, mature or punchy direction can make a woman's voice sound like a man's.
+                $style .= ' The speaker is a woman: keep a natural, clearly female voice.';
+            }
             $speechConfig = ['voiceConfig' => ['voice' => $sample['voice']]];
             $parts = [['text' => $sample['text'], 'speech_metadata' => ['style' => $style]]];
             if ($sample['sign_off'] ?? true) {
@@ -236,7 +312,7 @@ class GenerateShowcaseSamplesCommand extends Command
             $parts = [];
             $voices = [];
             foreach ($sample['speakers'] as $speaker) {
-                $voices[] = ['speaker' => $speaker['name'], 'voiceConfig' => ['prebuiltVoiceConfig' => ['voiceName' => $speaker['voice']]]];
+                $voices[] = ['speaker' => $speaker['name'], 'voiceConfig' => GeminiTtsProvider::dialogueVoiceConfig($speaker['voice'])];
             }
             foreach ($this->turns($sample) as $turn) {
                 $speaker = collect($sample['speakers'])->firstWhere('name', $turn['speaker']);
@@ -259,6 +335,9 @@ class GenerateShowcaseSamplesCommand extends Command
 
     private function accentDirection(string $language, ?string $code): string
     {
+        if (isset(VoicePreviews::NATIVE[(string) $code])) {
+            return 'Language: '.VoicePreviews::NATIVE[$code]['prompt'].'. Speak it as a native speaker born and raised there, with natural native pronunciation, rhythm and intonation. No English accent.';
+        }
         if ($language === 'ar') {
             $name = ArabicDialects::prompt($code);
             if ($name === null) {
@@ -303,7 +382,7 @@ class GenerateShowcaseSamplesCommand extends Command
      */
     private function requestPcm(array $payload, string $key): string
     {
-        $endpoint = rtrim((string) config('services.gemini_tts.endpoint'), '/').'/models/'.GeminiTtsModel::FLASH.':generateContent';
+        $endpoint = rtrim((string) config('services.gemini_tts.endpoint'), '/').'/models/'.GeminiTtsModel::LATEST.':generateContent';
         $lastError = 'no attempt';
 
         for ($attempt = 1; $attempt <= 3; $attempt++) {
@@ -347,11 +426,18 @@ class GenerateShowcaseSamplesCommand extends Command
         // Gemini 3.8 replies with a WAV file; older replies were bare 24 kHz PCM.
         $input = str_starts_with($pcm, 'RIFF') ? [] : ['-f', 's16le', '-ar', '24000', '-ac', '1'];
 
+        // A preview starts almost at once (40 ms) and is small: mono, 24 kHz like the voice itself, 64 kbps.
+        $edges = $this->preview ? 'adelay=40,apad=pad_dur=0.25' : 'adelay=120,apad=pad_dur=0.4';
+        $codec = match (true) {
+            $this->ext === 'wav' => ['-ar', '48000', '-c:a', 'pcm_s16le'],
+            $this->preview => ['-ac', '1', '-ar', '24000', '-c:a', 'libmp3lame', '-b:a', '64k'],
+            default => ['-ar', '44100', '-c:a', 'libmp3lame', '-b:a', '128k'],
+        };
         $process = new Process([
             $ffmpeg, '-y', '-hide_banner', '-loglevel', 'error',
             ...$input, '-i', $raw,
-            '-af', 'silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse,loudnorm=I=-16:TP=-1.5:LRA=11,adelay=120,apad=pad_dur=0.4',
-            ...($this->ext === 'wav' ? ['-ar', '48000', '-c:a', 'pcm_s16le'] : ['-ar', '44100', '-c:a', 'libmp3lame', '-b:a', '128k']), $target,
+            '-af', 'silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse,loudnorm=I=-16:TP=-1.5:LRA=11,'.$edges,
+            ...$codec, $target,
         ]);
         $process->setTimeout(120)->run();
         @unlink($raw);
@@ -457,7 +543,7 @@ class GenerateShowcaseSamplesCommand extends Command
                 'metadata' => [
                     'showcase' => true,
                     'slug' => $sample['slug'],
-                    'model' => GeminiTtsModel::FLASH,
+                    'model' => GeminiTtsModel::LATEST,
                     'sign_off' => $signOff[$language.($isDialogue ? '_dialogue' : '')],
                     'speaker_name' => implode(' & ', array_column($speakers, 'name')),
                     'speaker_name_ar' => implode(' و', array_map(fn (array $s): string => $s['name_ar'] ?? $s['name'], $speakers)),

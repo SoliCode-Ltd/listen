@@ -2,11 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\SiteSetting;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Services\VoiceCloningService;
-use App\Support\GeminiTtsModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Http;
@@ -96,7 +94,6 @@ class SpeedAndPitchDirectionsTest extends TestCase
 
     public function test_every_speed_step_of_the_studio_slider_sends_its_own_direction(): void
     {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $steps = $this->sliderSteps('speed');
         $this->assertSame(array_keys(self::SPEED), array_map(fn (float $step) => number_format($step, 1), $steps), 'the studio offers exactly these speeds');
 
@@ -120,7 +117,6 @@ class SpeedAndPitchDirectionsTest extends TestCase
 
     public function test_every_pitch_step_of_the_studio_slider_sends_its_own_direction(): void
     {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $steps = $this->sliderSteps('pitch');
         $this->assertSame(array_keys(self::PITCH), array_map('intval', $steps), 'the studio offers exactly these pitches');
 
@@ -161,24 +157,12 @@ class SpeedAndPitchDirectionsTest extends TestCase
 
     public function test_values_between_steps_are_read_at_the_nearest_step(): void
     {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
 
         // The developer API takes any value from 0.5 to 2 and from -10 to 10.
         $this->assertStringContainsString(self::SPEED['1.2'], $this->styleSentFor(['speed' => 1.15]));
         $this->assertStringContainsString(self::SPEED['0.9'], $this->styleSentFor(['speed' => 0.85]));
         $this->assertStringContainsString(self::PITCH[-2], $this->styleSentFor(['pitch' => -2.4]));
         $this->assertStringNotContainsString('pace', $this->styleSentFor(['speed' => 1.02]));
-    }
-
-    public function test_the_older_prompt_model_gets_the_same_directions(): void
-    {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::CURRENT, 'tts');
-
-        app(GeminiTtsProvider::class)->synthesize('A short line.', 'en', ['voice_name' => 'Kore', 'speed' => 1.1, 'pitch' => -1]);
-
-        $prompt = end($this->bodies)['contents'][0]['parts'][0]['text'];
-        $this->assertStringContainsString(self::SPEED['1.1'], $prompt);
-        $this->assertStringContainsString(self::PITCH[-1], $prompt);
     }
 
     public function test_cloned_voices_get_the_same_directions(): void

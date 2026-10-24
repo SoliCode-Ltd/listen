@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Voice;
+use App\Support\SpeakerVoices;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -31,9 +32,12 @@ class VoiceSeeder extends Seeder
                     ['id' => 'ar-XA-Wavenet-D', 'gender' => 'female'],
                 ],
             ],
+            // Premium speakers first named after the Chirp3 voices. They speak with Gemini
+            // like the others (database/seeders/data/speaker_voices.php); the ids stay.
             [
                 'language' => 'ar',
                 'tier' => 'hd',
+                'provider' => 'gemini',
                 'voices' => [
                     ['id' => 'ar-XA-Chirp3-HD-Achernar', 'gender' => 'female'],
                     ['id' => 'ar-XA-Chirp3-HD-Achird', 'gender' => 'male'],
@@ -102,6 +106,7 @@ class VoiceSeeder extends Seeder
             [
                 'language' => 'en',
                 'tier' => 'hd',
+                'provider' => 'gemini',
                 'voices' => [
                     ['id' => 'en-US-Chirp3-HD-Achernar', 'gender' => 'female'],
                     ['id' => 'en-US-Chirp3-HD-Achird', 'gender' => 'male'],
@@ -162,6 +167,7 @@ class VoiceSeeder extends Seeder
                     ['id' => 'ar-Gemini-HD-Leda', 'gender' => 'female', 'display_name' => 'Noura', 'provider_voice_id' => 'Leda'],
                     ['id' => 'ar-Gemini-HD-Orus', 'gender' => 'male', 'display_name' => 'Abdulaziz', 'provider_voice_id' => 'Orus'],
                     ['id' => 'ar-Gemini-HD-Puck', 'gender' => 'male', 'display_name' => 'Othman', 'provider_voice_id' => 'Puck'],
+                    // Abeer has a lighter voice of her own: Pulcherrima sounded like a man. The id keeps its old name.
                     ['id' => 'ar-Gemini-HD-Pulcherrima', 'gender' => 'female', 'display_name' => 'Abeer', 'provider_voice_id' => 'Pulcherrima'],
                     ['id' => 'ar-Gemini-HD-Rasalgethi', 'gender' => 'male', 'display_name' => 'Mishary', 'provider_voice_id' => 'Rasalgethi'],
                     ['id' => 'ar-Gemini-HD-Sadachbia', 'gender' => 'male', 'display_name' => 'Hamed', 'provider_voice_id' => 'Sadachbia'],
@@ -213,6 +219,9 @@ class VoiceSeeder extends Seeder
                     ['id' => 'en-Gemini-HD-Zubenelgenubi', 'gender' => 'male', 'display_name' => 'Philip', 'provider_voice_id' => 'Zubenelgenubi'],
                 ],
             ],
+
+            // ─── More premium speakers: one for every dialect and accent ─── provider: gemini
+            ...self::moreSpeakers(),
         ];
 
         $namePools = [
@@ -253,6 +262,23 @@ class VoiceSeeder extends Seeder
                 Voice::query()->create($voice + ['is_active' => true]);
             }
         }, 3);
+    }
+
+    /**
+     * The speakers added so every Arabic dialect and English accent has one
+     * (database/seeders/data/more_speakers.php), as voice groups.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function moreSpeakers(): array
+    {
+        $groups = [];
+        foreach ((require database_path('seeders/data/more_speakers.php'))['speakers'] as $speaker) {
+            $groups[$speaker['language']] ??= ['language' => $speaker['language'], 'tier' => 'hd', 'provider' => 'gemini', 'voices' => []];
+            $groups[$speaker['language']]['voices'][] = ['id' => $speaker['id'], 'gender' => $speaker['gender'], 'display_name' => $speaker['name']];
+        }
+
+        return array_values($groups);
     }
 
     /**
@@ -298,6 +324,8 @@ class VoiceSeeder extends Seeder
                     $indexes[$language][$gender]++;
                 }
 
+                // A premium speaker speaks with their own voice (App\Support\SpeakerVoices).
+                $ownVoice = $groupProvider === 'gemini' ? SpeakerVoices::find($voiceId) : null;
                 $rows[] = [
                     'language' => $language,
                     'gender' => $gender,
@@ -305,7 +333,7 @@ class VoiceSeeder extends Seeder
                     'display_name' => $displayName,
                     'internal_voice_id' => $voiceId,
                     'provider' => $groupProvider,
-                    'provider_voice_id' => $explicitProviderVoiceId !== '' ? $explicitProviderVoiceId : $voiceId,
+                    'provider_voice_id' => $ownVoice ?? ($explicitProviderVoiceId !== '' ? $explicitProviderVoiceId : $voiceId),
                 ];
             }
         }
@@ -351,7 +379,7 @@ class VoiceSeeder extends Seeder
 
             $engineTokens = match (true) {
                 $tier === 'standard' => ['-standard-', '-wavenet-'],
-                $tier === 'hd' && $provider === 'gemini' => ['-gemini-hd-'],
+                $tier === 'hd' && $provider === 'gemini' => ['-gemini-hd-', '-chirp3-hd-'],
                 $tier === 'hd' => ['-chirp3-hd-'],
                 default => throw new \RuntimeException("Unknown tier in VoiceSeeder: {$tier}"),
             };

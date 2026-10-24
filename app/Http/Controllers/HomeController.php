@@ -1916,7 +1916,7 @@ class HomeController extends Controller
                 'name' => $isArabicLocale ? (string) ($speaker['name_ar'] ?? $name) : $name,
                 'avatar' => SpeakerAvatar::url($name, $language),
                 'gender' => (string) ($speaker['gender'] ?? ''),
-                'dialect' => VoiceFlag::label($speaker['dialect'] ?? $sample->dialect, $isArabicLocale),
+                'dialect' => VoiceFlag::label($speaker['dialect'] ?? $sample->dialect, $isArabicLocale, ($speaker['gender'] ?? '') === 'female'),
                 'flag' => VoiceFlag::url($speaker['dialect'] ?? $sample->dialect),
             ];
         }
@@ -1954,7 +1954,7 @@ class HomeController extends Controller
             'language' => $language,
             'dialect' => (string) $sample->dialect,
             'region' => VoiceFlag::region($sample->dialect),
-            'dialect_label' => VoiceFlag::label($sample->dialect, $isArabicLocale),
+            'dialect_label' => VoiceFlag::label($sample->dialect, $isArabicLocale, $sample->gender === 'female'),
             'flag' => VoiceFlag::url($sample->dialect, $sample->country),
             'speaker' => $speakerName,
             'avatar' => SpeakerAvatar::url($avatarName, $language),

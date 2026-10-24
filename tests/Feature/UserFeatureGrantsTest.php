@@ -13,7 +13,6 @@ use App\Models\UserFeatureGrant;
 use App\Services\TranslationService;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
-use App\Support\GeminiTtsModel;
 use App\Support\PlanFeatures;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
@@ -86,7 +85,6 @@ class UserFeatureGrantsTest extends TestCase
     {
         $this->seed(VoiceSeeder::class);
         SiteSetting::set('tts_mode', TtsRoutingService::MODE_HYBRID, 'tts');
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $this->fakeSpeech();
         $plan = $this->plan(VoiceTier::HD);
         $trial = $this->memberOf($plan);

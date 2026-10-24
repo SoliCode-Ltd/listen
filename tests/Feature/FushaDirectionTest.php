@@ -2,12 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\SiteSetting;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Services\VoiceCloningService;
 use App\Support\ArabicDialects;
-use App\Support\GeminiTtsModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -54,7 +52,6 @@ class FushaDirectionTest extends TestCase
 
     public function test_fusha_is_asked_for_as_formal_arabic_only(): void
     {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
 
         $style = $this->styleFor('ar-XA');
 
@@ -72,7 +69,6 @@ class FushaDirectionTest extends TestCase
 
     public function test_a_regional_dialect_keeps_its_regional_wording(): void
     {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
 
         foreach (['ar-SA' => 'Saudi Arabic (Gulf dialect)', 'ar-EG' => 'Egyptian Arabic', 'ar-MA' => 'Moroccan Arabic (Maghrebi)'] as $code => $name) {
             $style = $this->styleFor($code);
@@ -83,7 +79,6 @@ class FushaDirectionTest extends TestCase
 
     public function test_in_a_dialogue_the_fusha_speaker_is_formal_and_the_other_regional(): void
     {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
 
         app(GeminiTtsProvider::class)->synthesize("المذيع: مساء الخير.\nسلطان: هلا والله.", 'ar', [
             'speakers' => [
@@ -96,17 +91,6 @@ class FushaDirectionTest extends TestCase
         $this->assertStringContainsString(self::FORMAL, $parts[0]['speech_metadata']['style']);
         $this->assertStringNotContainsString('regional', $parts[0]['speech_metadata']['style']);
         $this->assertStringContainsString(self::REGIONAL, $parts[1]['speech_metadata']['style']);
-    }
-
-    public function test_the_older_prompt_model_asks_for_formal_fusha_too(): void
-    {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::CURRENT, 'tts');
-
-        app(GeminiTtsProvider::class)->synthesize('مرحبا بكم.', 'ar', ['voice_name' => 'Kore', 'dialect' => 'ar-XA']);
-
-        $prompt = $this->bodies[0]['contents'][0]['parts'][0]['text'];
-        $this->assertStringContainsString('Voice dialect: Modern Standard Arabic (Fusha). '.self::FORMAL, $prompt);
-        $this->assertStringNotContainsString('regional', $prompt);
     }
 
     public function test_cloned_voices_already_ask_fusha_for_formal_pronunciation(): void

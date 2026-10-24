@@ -54,7 +54,7 @@ foreach ($top as $i => $t) {
 }
 
 echo "== Settings ==\n";
-foreach (['credit_periods_from', 'tts_mode', 'gemini_tts_model', 'demo_char_allowance'] as $key) {
+foreach (['credit_periods_from', 'tts_mode', 'demo_char_allowance'] as $key) {
     $value = $db('site_settings')->where('key', $key)->value('value');
     echo '  ', str_pad($key, 22), ($value === null || $value === '' ? '(not set)' : $value), "\n";
 }

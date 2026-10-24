@@ -1,0 +1,410 @@
+{
+ "duration": 39.32,
+ "takes": [
+  {
+   "slug": "emo-en-us",
+   "dialect": "en-US",
+   "label_ar": "أمريكي · عادي",
+   "label_en": "American · Neutral",
+   "text": "You have no idea what happened!",
+   "start": 0.4,
+   "end": 3.3,
+   "words": [
+    {
+     "w": "You",
+     "start": 0.34,
+     "end": 0.58
+    },
+    {
+     "w": "have",
+     "start": 0.58,
+     "end": 0.8
+    },
+    {
+     "w": "no",
+     "start": 0.8,
+     "end": 1.2
+    },
+    {
+     "w": "idea",
+     "start": 1.2,
+     "end": 1.72
+    },
+    {
+     "w": "what",
+     "start": 1.72,
+     "end": 2.36
+    },
+    {
+     "w": "happened!",
+     "start": 2.36,
+     "end": 2.82
+    }
+   ]
+  },
+  {
+   "slug": "emo-en-gb",
+   "dialect": "en-GB",
+   "label_ar": "بريطاني · همس",
+   "label_en": "British · Whisper",
+   "text": "You have no idea what happened!",
+   "start": 3.8,
+   "end": 6.57,
+   "words": [
+    {
+     "w": "You",
+     "start": 3.72,
+     "end": 3.88
+    },
+    {
+     "w": "have",
+     "start": 3.88,
+     "end": 4.12
+    },
+    {
+     "w": "no",
+     "start": 4.12,
+     "end": 4.52
+    },
+    {
+     "w": "idea",
+     "start": 4.52,
+     "end": 5.08
+    },
+    {
+     "w": "what",
+     "start": 5.08,
+     "end": 5.68
+    },
+    {
+     "w": "happened!",
+     "start": 5.68,
+     "end": 6.1
+    }
+   ]
+  },
+  {
+   "slug": "emo-en-au",
+   "dialect": "en-AU",
+   "label_ar": "أسترالي · ضحك",
+   "label_en": "Australian · Laugh",
+   "text": "You have no idea what happened!",
+   "start": 7.07,
+   "end": 12.15,
+   "words": [
+    {
+     "w": "You",
+     "start": 7.01,
+     "end": 8.45
+    },
+    {
+     "w": "have",
+     "start": 8.45,
+     "end": 8.95
+    },
+    {
+     "w": "no",
+     "start": 8.95,
+     "end": 9.65
+    },
+    {
+     "w": "idea",
+     "start": 9.65,
+     "end": 10.45
+    },
+    {
+     "w": "what",
+     "start": 10.45,
+     "end": 10.89
+    },
+    {
+     "w": "happened!",
+     "start": 10.89,
+     "end": 11.33
+    }
+   ]
+  },
+  {
+   "slug": "emo-en-ie",
+   "dialect": "en-IE",
+   "label_ar": "أيرلندي · بكاء",
+   "label_en": "Irish · Sob",
+   "text": "You have no idea what happened…",
+   "start": 12.65,
+   "end": 15.7,
+   "words": [
+    {
+     "w": "You",
+     "start": 12.59,
+     "end": 13.63
+    },
+    {
+     "w": "have",
+     "start": 13.63,
+     "end": 13.95
+    },
+    {
+     "w": "no",
+     "start": 13.95,
+     "end": 14.19
+    },
+    {
+     "w": "idea",
+     "start": 14.19,
+     "end": 14.53
+    },
+    {
+     "w": "what",
+     "start": 14.53,
+     "end": 14.87
+    },
+    {
+     "w": "happened.",
+     "start": 14.87,
+     "end": 15.27
+    }
+   ]
+  },
+  {
+   "slug": "emo-en-ny",
+   "dialect": "en-US-NY",
+   "label_ar": "نيويورك · صراخ",
+   "label_en": "New York · Shout",
+   "text": "You have no idea what happened!",
+   "start": 16.2,
+   "end": 18.68,
+   "words": [
+    {
+     "w": "You",
+     "start": 16.14,
+     "end": 16.32
+    },
+    {
+     "w": "have",
+     "start": 16.32,
+     "end": 16.56
+    },
+    {
+     "w": "no",
+     "start": 16.56,
+     "end": 16.88
+    },
+    {
+     "w": "idea",
+     "start": 16.88,
+     "end": 17.38
+    },
+    {
+     "w": "what",
+     "start": 17.38,
+     "end": 17.7
+    },
+    {
+     "w": "happened!",
+     "start": 17.7,
+     "end": 18.16
+    }
+   ]
+  },
+  {
+   "slug": "emo-en-za",
+   "dialect": "en-ZA",
+   "label_ar": "جنوب أفريقي · سخرية",
+   "label_en": "South African · Sarcastic",
+   "text": "You have no idea what happened…",
+   "start": 19.18,
+   "end": 22.74,
+   "words": [
+    {
+     "w": "You",
+     "start": 19.12,
+     "end": 20.04
+    },
+    {
+     "w": "have",
+     "start": 20.04,
+     "end": 20.38
+    },
+    {
+     "w": "no",
+     "start": 20.38,
+     "end": 20.72
+    },
+    {
+     "w": "idea",
+     "start": 20.72,
+     "end": 21.48
+    },
+    {
+     "w": "what",
+     "start": 21.48,
+     "end": 21.96
+    },
+    {
+     "w": "happened.",
+     "start": 21.96,
+     "end": 22.32
+    }
+   ]
+  },
+  {
+   "slug": "emo-en-ca",
+   "dialect": "en-CA",
+   "label_ar": "كندي · إعلان فيلم",
+   "label_en": "Canadian · Movie trailer",
+   "text": "You have no idea… what happened.",
+   "start": 23.24,
+   "end": 27.8,
+   "words": [
+    {
+     "w": "You",
+     "start": 23.18,
+     "end": 23.46
+    },
+    {
+     "w": "have",
+     "start": 23.46,
+     "end": 23.72
+    },
+    {
+     "w": "no",
+     "start": 23.72,
+     "end": 24.16
+    },
+    {
+     "w": "idea…",
+     "start": 24.16,
+     "end": 25.48
+    },
+    {
+     "w": "what",
+     "start": 25.48,
+     "end": 26.52
+    },
+    {
+     "w": "happened.",
+     "start": 26.52,
+     "end": 27.16
+    }
+   ]
+  },
+  {
+   "slug": "emo-en-in",
+   "dialect": "en-IN",
+   "label_ar": "هندي · حماس",
+   "label_en": "Indian · Excited",
+   "text": "You have no idea what happened!",
+   "start": 28.3,
+   "end": 30.06,
+   "words": [
+    {
+     "w": "You",
+     "start": 28.24,
+     "end": 28.46
+    },
+    {
+     "w": "have",
+     "start": 28.46,
+     "end": 28.6
+    },
+    {
+     "w": "no",
+     "start": 28.6,
+     "end": 28.84
+    },
+    {
+     "w": "idea",
+     "start": 28.84,
+     "end": 29.16
+    },
+    {
+     "w": "what",
+     "start": 29.16,
+     "end": 29.4
+    },
+    {
+     "w": "happened!",
+     "start": 29.4,
+     "end": 29.68
+    }
+   ]
+  },
+  {
+   "slug": "emo-en-eg",
+   "dialect": "ar-EG",
+   "label_ar": "مصري · حماس",
+   "label_en": "Egyptian Arabic · Excited",
+   "text": "مش هتصدّق اللي حصل!",
+   "start": 30.56,
+   "end": 32.04,
+   "words": [
+    {
+     "w": "مش",
+     "start": 30.5,
+     "end": 30.74
+    },
+    {
+     "w": "هتصدّق",
+     "start": 30.74,
+     "end": 31.3
+    },
+    {
+     "w": "اللي",
+     "start": 31.3,
+     "end": 31.46
+    },
+    {
+     "w": "حصل!",
+     "start": 31.46,
+     "end": 31.74
+    }
+   ]
+  },
+  {
+   "slug": "emo-en-cta",
+   "dialect": "en-US",
+   "label_ar": "",
+   "label_en": "",
+   "text": "One line. Every emotion. Every accent… Listen.",
+   "start": 32.94,
+   "end": 38.62,
+   "words": [
+    {
+     "w": "One",
+     "start": 32.88,
+     "end": 33.18
+    },
+    {
+     "w": "line.",
+     "start": 33.18,
+     "end": 33.72
+    },
+    {
+     "w": "Every",
+     "start": 33.72,
+     "end": 34.72
+    },
+    {
+     "w": "emotion.",
+     "start": 34.72,
+     "end": 35.06
+    },
+    {
+     "w": "Every",
+     "start": 35.4,
+     "end": 36.34
+    },
+    {
+     "w": "accent…",
+     "start": 36.34,
+     "end": 37.2
+    },
+    {
+     "w": "Listen.",
+     "start": 37.2,
+     "end": 38.18
+    }
+   ]
+  }
+ ]
+}

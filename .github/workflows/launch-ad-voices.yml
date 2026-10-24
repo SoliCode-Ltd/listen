@@ -11,18 +11,41 @@ name: Launch ad voices
 
 on:
   workflow_dispatch:
+    inputs:
+      ad:
+        description: 'Which ad: launch-ad ("Which voice is real?"), emotions-ad ("One line. Every emotion."), prompts-film (the prompts film), voice-previews (the voice library previews, database/seeders/data/voice_previews.php) or speaker-avatars (the missing speaker avatars, with the image model)'
+        type: choice
+        options: [launch-ad, emotions-ad, prompts-film, voice-previews, voice-library-test, speaker-avatars]
+        default: launch-ad
+      max:
+        description: 'voice-previews only: at most this many clips per key (live shares the quota)'
+        type: string
+        default: '40'
+      from_key:
+        description: 'Staging key to use (1 = GEMINI_TTS_API_KEY, 2 = _2 ...); voice-previews moves on to the next key when one runs out'
+        type: string
+        default: '1'
+      use_last_key:
+        description: 'voice-previews only: also use the last key (by default live keeps it)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 concurrency:
-  group: launch-ad-voices
+  group: ad-voices-${{ inputs.ad }}
   cancel-in-progress: false
 
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 300
+    env:
+      AD: ${{ inputs.ad || 'launch-ad' }}
+      MAX: ${{ inputs.max || '40' }}
+      FROM_KEY: ${{ inputs.from_key || '1' }}
+      USE_LAST_KEY: ${{ inputs.use_last_key && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,7 +66,7 @@ jobs:
           cp .env.example .env
           php artisan key:generate --no-interaction
 
-      - name: Generate with staging key 1
+      - name: Generate with the staging keys
         env:
           SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
           SSH_USER: ${{ secrets.STAGING_SSH_USER }}
@@ -51,33 +74,81 @@ jobs:
           APP_PATH: ${{ secrets.STAGING_APP_PATH }}
         run: |
           set -euo pipefail
-          mkdir -p public/audio/launch-ad marketing/launch-ad/voices
-          cp marketing/launch-ad/voices/*.wav public/audio/launch-ad/ 2>/dev/null || true
+          mkdir -p "public/audio/$AD" "marketing/$AD/voices"
+          cp marketing/$AD/voices/*.wav "public/audio/$AD/" 2>/dev/null || true
           SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
           SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_gen
           chmod 600 ~/.ssh/id_gen
           ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; grep -E '^GEMINI_TTS_API_KEY(_1)?=' .env | head -n 1 | cut -d= -f2-"
-          KEY="$(ssh -i ~/.ssh/id_gen -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" | tr -d "\"' \r\n")"
+          # Every key in order (GEMINI_TTS_API_KEY, then _2, _3 ...), values only, one per line.
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; grep -E '^GEMINI_TTS_API_KEY(_[0-9]+)?=' .env | sed -E 's/^GEMINI_TTS_API_KEY=/GEMINI_TTS_API_KEY_1=/' | sort -t_ -k5 -n | cut -d= -f2-"
+          mapfile -t RAW < <(ssh -i ~/.ssh/id_gen -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote")
           rm -f ~/.ssh/id_gen
-          if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
-          echo "::add-mask::$KEY"
-          php artisan tts:showcase --set=ad --generate --pause=12 --key="$KEY" 2>&1 | grep -v '^\*' | cut -c1-200 || echo "Some clips failed (see above); the ones made are still committed."
-          cp public/audio/launch-ad/*.wav marketing/launch-ad/voices/
+          KEYS=()
+          for k in "${RAW[@]}"; do
+            k="$(printf '%s' "$k" | tr -d "\"' \r\n")"
+            [ -z "$k" ] && continue
+            echo "::add-mask::$k"
+            dup=0; for seen in "${KEYS[@]}"; do [ "$seen" = "$k" ] && dup=1; done
+            [ "$dup" = 0 ] && KEYS+=("$k")
+          done
+          if [ "${#KEYS[@]}" -eq 0 ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
+          echo "${#KEYS[@]} Gemini key(s) on staging."
+          first_key="$(printf '%s' "$FROM_KEY" | tr -cd '0-9')"; first_key="${first_key:-1}"
+          KEY="${KEYS[$(( first_key <= ${#KEYS[@]} ? first_key - 1 : 0 ))]}"
+          if [ "$AD" = speaker-avatars ]; then
+            # The speakers come from the seeder, in a throwaway database; only missing avatars are drawn.
+            # A key that fails leaves its avatars to the next key.
+            export DB_CONNECTION=sqlite DB_DATABASE="$PWD/database/avatars.sqlite"
+            touch "$DB_DATABASE"
+            php artisan migrate --force --no-interaction > /dev/null
+            php artisan db:seed --class=VoiceSeeder --force --no-interaction > /dev/null
+            first="$(printf '%s' "$FROM_KEY" | tr -cd '0-9')"; first="${first:-1}"
+            for (( n = first; n <= ${#KEYS[@]}; n++ )); do
+              echo "--- key $n of ${#KEYS[@]}"
+              out="$(php artisan speakers:avatars --key="${KEYS[$((n - 1))]}" --pause=3 2>&1 || true)"
+              printf '%s\n' "$out" | cut -c1-200
+              grep -q '^fail' <<<"$out" || break
+            done
+            rm -f "$DB_DATABASE"
+            exit 0
+          fi
+          if [ "$AD" = voice-previews ]; then
+            # Only clips that are missing or whose line changed. Each key stops at its first
+            # quota error and the next key carries on; the last key is left for live unless use_last_key.
+            max="$(printf '%s' "$MAX" | tr -cd '0-9')"
+            first="$(printf '%s' "$FROM_KEY" | tr -cd '0-9')"; first="${first:-1}"
+            last=${#KEYS[@]}
+            if [ -z "$USE_LAST_KEY" ] && [ "$last" -gt 1 ]; then last=$((last - 1)); fi
+            for (( n = first; n <= last; n++ )); do
+              echo "--- key $n of ${#KEYS[@]}"
+              out="$(php artisan tts:showcase --set=previews --generate --pause=10 --max="$max" --key="${KEYS[$((n - 1))]}" 2>&1 || true)"
+              printf '%s\n' "$out" | grep -v '^\*' | cut -c1-200
+              # Done, or this key made all that was left: stop. Out of quota or at its limit: next key.
+              grep -q '^0 preview' <<<"$out" && break
+              grep -q -e 'quota reached' -e ' in this run\.' <<<"$out" || break
+            done
+            exit 0
+          fi
+          php artisan tts:showcase --set=ad --ad="$AD" --generate --pause=12 --key="$KEY" 2>&1 | grep -v '^\*' | cut -c1-200 || echo "Some clips failed (see above); the ones made are still committed."
+          cp public/audio/$AD/*.wav "marketing/$AD/voices/"
           # The homepage sound environments are used too: their clean takes are transcribed with the ad's lines.
-          for f in public/audio/environments/clean/env-*.mp3; do ffmpeg -v error -y -i "$f" -ar 48000 -ac 1 "marketing/launch-ad/voices/$(basename "$f" .mp3).wav"; done
-          php -r '$o=[]; foreach (array_merge((require "marketing/launch-ad/lines.php")["samples"], (require "database/seeders/data/environment_samples.php")["samples"]) as $s) { $o[$s["slug"]] = ["language" => $s["language"], "text" => trim(preg_replace("/\s*<[^<>]+>\s*/u", " ", $s["text"]))]; } file_put_contents("/tmp/lines.json", json_encode($o, JSON_UNESCAPED_UNICODE));'
+          if [ "$AD" = launch-ad ]; then for f in public/audio/environments/clean/env-*.mp3; do ffmpeg -v error -y -i "$f" -ar 48000 -ac 1 "marketing/launch-ad/voices/$(basename "$f" .mp3).wav"; done; fi
+          extra='[]'; [ "$AD" = launch-ad ] && extra='(require "database/seeders/data/environment_samples.php")["samples"]'
+          php -r '$o=[]; foreach (array_merge((require "marketing/'"$AD"'/lines.php")["samples"], '"$extra"') as $s) { $o[$s["slug"]] = ["language" => $s["language"], "text" => trim(preg_replace("/\s*<[^<>]+>\s*/u", " ", $s["text"]))]; } file_put_contents("/tmp/lines.json", json_encode($o, JSON_UNESCAPED_UNICODE));'
 
       - uses: actions/setup-python@v5
+        if: env.AD != 'voice-previews' && env.AD != 'speaker-avatars'
         with:
           python-version: '3.12'
 
       - name: Transcribe with word timings
+        if: env.AD != 'voice-previews' && env.AD != 'speaker-avatars'
         run: |
           pip install -q requests soundfile scipy faster-whisper==1.1.1
-          python marketing/launch-ad/transcribe.py marketing/launch-ad/voices /tmp/lines.json marketing/launch-ad/voices/words.json
+          python marketing/launch-ad/transcribe.py "marketing/$AD/voices" /tmp/lines.json "marketing/$AD/voices/words.json"
 
       - name: Commit the voices
         if: always()
@@ -85,9 +156,18 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add marketing/launch-ad/voices
+          case "$AD" in
+            voice-previews) git add public/audio/voice-previews ;;
+            speaker-avatars) git add public/images/speakers ;;
+            *) git add "marketing/$AD/voices" ;;
+          esac
           if git diff --cached --quiet; then echo "Nothing new"; exit 0; fi
           git diff --cached --stat
-          git commit -m "Launch ad: voices made with staging key 1, with word timings"
+          case "$AD" in
+            voice-previews) msg="Voice previews: clips made with the staging keys" ;;
+            speaker-avatars) msg="Speaker avatars: drawn with the staging keys" ;;
+            *) msg="$AD: voices made with staging key 1, with word timings" ;;
+          esac
+          git commit -m "$msg"
           git pull --rebase origin "${GITHUB_REF#refs/heads/}"
           git push origin HEAD:${GITHUB_REF#refs/heads/}

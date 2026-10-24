@@ -534,25 +534,6 @@ class GeminiVocalTags
     }
 
     /**
-     * Gemini 2.5 reads the script as a prompt, so sounds stay as
-     * bracketed directions it understands, written as [laugh].
-     */
-    public static function forLegacyModel(string $text): string
-    {
-        $text = (string) preg_replace_callback(
-            '/\[([^\[\]\n]{1,'.self::MAX_CUE_LENGTH.'})\]/u',
-            fn (array $m) => ($tag = self::delivery($m[1])) !== null ? '['.$tag.']' : $m[0],
-            $text,
-        );
-
-        return (string) preg_replace_callback(
-            '/<([^<>\s](?:[^<>\n]{0,'.(self::MAX_CUE_LENGTH - 2).'}[^<>\s])?)>/u',
-            fn (array $m) => ($tag = self::canonical($m[1])) !== null ? '['.$tag.']' : $m[0],
-            $text,
-        );
-    }
-
-    /**
      * Remove Gemini tags for engines that would read them aloud.
      */
     public static function strip(string $text): string

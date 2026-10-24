@@ -48,7 +48,7 @@ class GeminiModelSwitchSafetyTest extends TestCase
         $this->app->instance(GeminiKeyManager::class, $manager);
     }
 
-    public function test_default_model_reuses_cache_and_a_new_model_generates_again(): void
+    public function test_the_latest_model_speaks_and_the_same_request_is_answered_from_the_cache(): void
     {
         $this->useHybridMode();
         $captured = $this->fakeBothProviders();
@@ -59,49 +59,20 @@ class GeminiModelSwitchSafetyTest extends TestCase
         $second = app(TtsService::class)->synthesizeAdvanced(self::TRANSCRIPT_AR, 'ar', $options, $plan);
 
         $this->assertSame('gemini', $first['provider']);
-        $this->assertSame(GeminiTtsModel::CURRENT, $first['model']);
+        $this->assertSame(GeminiTtsModel::LATEST, $first['model']);
         $this->assertSame('cache', $second['provider']);
-        $this->assertSame(GeminiTtsModel::CURRENT, $second['model']);
+        $this->assertSame(GeminiTtsModel::LATEST, $second['model']);
         $this->assertCount(1, $captured->requests);
-        $this->assertStringContainsString(self::TRANSCRIPT_AR, $captured->requests[0]['body']['contents'][0]['parts'][0]['text']);
-        $this->assertStringContainsString('Cairene Egyptian', $captured->requests[0]['body']['contents'][0]['parts'][0]['text']);
-
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
-        $third = app(TtsService::class)->synthesizeAdvanced(self::TRANSCRIPT_AR, 'ar', $options, $plan);
-
-        $this->assertSame('gemini', $third['provider']);
-        $this->assertSame(GeminiTtsModel::FLASH, $third['model']);
-        $this->assertCount(2, $captured->requests);
-        $this->assertStringContainsString('/models/'.GeminiTtsModel::FLASH.':generateContent', $captured->requests[1]['url']);
-        $part = $captured->requests[1]['body']['contents'][0]['parts'][0];
+        $this->assertStringContainsString('/models/'.GeminiTtsModel::LATEST.':generateContent', $captured->requests[0]['url']);
+        $part = $captured->requests[0]['body']['contents'][0]['parts'][0];
         $this->assertSame(self::TRANSCRIPT_AR, $part['text']);
         $this->assertStringContainsString('Cairene Egyptian', $part['speech_metadata']['style']);
         $this->assertStringNotContainsString('Voice dialect', $part['text']);
     }
 
-    public function test_lite_model_is_a_separate_cache_entry(): void
-    {
-        $this->useHybridMode();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
-        $captured = $this->fakeBothProviders();
-        $plan = $this->paidPlan();
-        $options = $this->arabicOptions();
-
-        app(TtsService::class)->synthesizeAdvanced(self::TRANSCRIPT_AR, 'ar', $options, $plan);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH_LITE, 'tts');
-        $lite = app(TtsService::class)->synthesizeAdvanced(self::TRANSCRIPT_AR, 'ar', $options, $plan);
-
-        $this->assertSame(GeminiTtsModel::FLASH_LITE, $lite['model']);
-        $this->assertSame('gemini', $lite['provider']);
-        $this->assertCount(2, $captured->requests);
-        $this->assertStringContainsString(GeminiTtsModel::FLASH_LITE, $captured->requests[1]['url']);
-        $this->assertSame(self::TRANSCRIPT_AR, $captured->requests[1]['body']['contents'][0]['parts'][0]['text']);
-    }
-
     public function test_arabic_custom_prompt_reaches_gemini_and_is_not_cached_as_the_built_style(): void
     {
         $this->useHybridMode();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $captured = $this->fakeBothProviders();
         $plan = $this->paidPlan();
         $prompt = 'Speak like a Cairo street vendor talking to a friend.';
@@ -129,7 +100,6 @@ class GeminiModelSwitchSafetyTest extends TestCase
     public function test_dialogue_cast_and_custom_prompt_change_the_request(): void
     {
         $this->useHybridMode();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $captured = $this->fakeBothProviders();
         $plan = $this->paidPlan();
         $script = "Sara: إزيك\nWaleed: كويس";
@@ -159,7 +129,7 @@ class GeminiModelSwitchSafetyTest extends TestCase
         $this->assertStringNotContainsString('Sara:', $captured->requests[2]['body']['contents'][0]['parts'][0]['text']);
     }
 
-    public function test_english_accent_stays_in_style_metadata_on_the_new_models(): void
+    public function test_english_accent_stays_in_style_metadata(): void
     {
         $this->useHybridMode();
         $captured = $this->fakeBothProviders();
@@ -175,34 +145,22 @@ class GeminiModelSwitchSafetyTest extends TestCase
             'pitch' => 6,
         ];
 
-        $current = app(TtsService::class)->synthesizeAdvanced(self::TRANSCRIPT_EN, 'en', $options, $plan);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
-        $flash = app(TtsService::class)->synthesizeAdvanced(self::TRANSCRIPT_EN, 'en', $options, $plan);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH_LITE, 'tts');
-        $lite = app(TtsService::class)->synthesizeAdvanced(self::TRANSCRIPT_EN, 'en', $options, $plan);
+        $result = app(TtsService::class)->synthesizeAdvanced(self::TRANSCRIPT_EN, 'en', $options, $plan);
 
-        $this->assertSame(GeminiTtsModel::CURRENT, $current['model']);
-        $this->assertSame('en-GB', $captured->requests[0]['body']['generationConfig']['speechConfig']['languageCode']);
-        $this->assertStringContainsString(self::TRANSCRIPT_EN, $captured->requests[0]['body']['contents'][0]['parts'][0]['text']);
-        $this->assertStringNotContainsString('Voice accent:', $captured->requests[0]['body']['contents'][0]['parts'][0]['text']);
-
-        foreach ([1 => $flash, 2 => $lite] as $index => $result) {
-            $part = $captured->requests[$index]['body']['contents'][0]['parts'][0];
-            $this->assertSame('gemini', $result['provider']);
-            $this->assertSame(self::TRANSCRIPT_EN, $part['text']);
-            $this->assertStringContainsString('British English', $part['speech_metadata']['style']);
-            $this->assertStringContainsString('faster pace', $part['speech_metadata']['style']);
-            $this->assertStringContainsString('higher-pitched', $part['speech_metadata']['style']);
-            $this->assertStringContainsString('Emotional tone:', $part['speech_metadata']['style']);
-            $this->assertArrayNotHasKey('languageCode', $captured->requests[$index]['body']['generationConfig']['speechConfig']);
-        }
+        $part = $captured->requests[0]['body']['contents'][0]['parts'][0];
+        $this->assertSame('gemini', $result['provider']);
+        $this->assertSame(self::TRANSCRIPT_EN, $part['text']);
+        $this->assertStringContainsString('British English', $part['speech_metadata']['style']);
+        $this->assertStringContainsString('faster pace', $part['speech_metadata']['style']);
+        $this->assertStringContainsString('higher-pitched', $part['speech_metadata']['style']);
+        $this->assertStringContainsString('Emotional tone:', $part['speech_metadata']['style']);
+        $this->assertArrayNotHasKey('languageCode', $captured->requests[0]['body']['generationConfig']['speechConfig']);
     }
 
     public function test_standard_tier_uses_google_and_google_mode_keeps_hd_on_gemini(): void
     {
         $captured = $this->fakeBothProviders();
         $plan = $this->paidPlan();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         SiteSetting::set('tts_mode', TtsRoutingService::MODE_HYBRID, 'tts');
 
         $standard = app(TtsService::class)->synthesizeAdvanced(
@@ -225,13 +183,12 @@ class GeminiModelSwitchSafetyTest extends TestCase
         $this->assertSame('gemini', $googleMode['provider']);
         $this->assertCount(2, $captured->requests);
         $this->assertStringContainsString('texttospeech.googleapis.com', $captured->requests[0]['url']);
-        $this->assertStringContainsString('/models/'.GeminiTtsModel::FLASH.':generateContent', $captured->requests[1]['url']);
+        $this->assertStringContainsString('/models/'.GeminiTtsModel::LATEST.':generateContent', $captured->requests[1]['url']);
     }
 
     public function test_a_failed_gemini_request_is_not_cached_and_never_read_by_google(): void
     {
         $this->useHybridMode();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $geminiCalls = 0;
         $googleCalls = 0;
         Http::fake(function ($request) use (&$geminiCalls, &$googleCalls) {
@@ -260,7 +217,7 @@ class GeminiModelSwitchSafetyTest extends TestCase
 
         $this->assertFalse($retried['fallback_used']);
         $this->assertSame('gemini', $retried['provider']);
-        $this->assertSame(GeminiTtsModel::FLASH, $retried['model']);
+        $this->assertSame(GeminiTtsModel::LATEST, $retried['model']);
         $this->assertSame(2, $geminiCalls, 'the failure was not cached');
         $this->assertSame(0, $googleCalls);
     }
@@ -274,10 +231,8 @@ class GeminiModelSwitchSafetyTest extends TestCase
         $emotions = TtsStudioConfig::emotionValues();
         $buildStyle = $reflection->getMethod('buildStylePrompt');
         $buildPayload = $reflection->getMethod('buildSingleSpeakerPayload');
-        $resolveLanguage = $reflection->getMethod('resolveLanguageCode');
         $buildStyle->setAccessible(true);
         $buildPayload->setAccessible(true);
-        $resolveLanguage->setAccessible(true);
 
         foreach (TtsStudioConfig::dialectValues('ar') as $code) {
             $this->assertArrayHasKey($code, $dialects, $code.' is offered in the studio but has no Gemini dialect prompt.');
@@ -287,7 +242,6 @@ class GeminiModelSwitchSafetyTest extends TestCase
         }
 
         $failures = [];
-        $models = [GeminiTtsModel::CURRENT, GeminiTtsModel::FLASH, GeminiTtsModel::FLASH_LITE];
         $cases = [];
         foreach ($dialects as $dialect => $dialectName) {
             $cases[] = ['ar', $dialect, $dialectName];
@@ -296,89 +250,66 @@ class GeminiModelSwitchSafetyTest extends TestCase
             $cases[] = ['en', $dialect, $dialectName];
         }
 
-        foreach ($models as $model) {
-            $structured = GeminiTtsModel::usesStructuredSpeech($model);
-            foreach ($cases as [$language, $dialect, $dialectName]) {
-                // Every emotion and every style with every dialect, paired in turn:
-                // the prompt pieces are independent, so the full product adds nothing.
-                $pairs = max(count($emotions), count($styles));
-                for ($i = 0; $i < $pairs; $i++) {
-                    $emotion = $emotions[$i % count($emotions)];
-                    $style = $styles[$i % count($styles)];
-                    $prompt = $buildStyle->invoke(
-                        $provider,
-                        $style,
-                        $emotion,
-                        $language,
-                        1.0,
-                        $dialect,
-                        0.0,
-                        $structured,
-                    );
-                    $languageCode = $resolveLanguage->invoke($provider, $language, $dialect);
-                    $transcript = $language === 'ar' ? self::TRANSCRIPT_AR : self::TRANSCRIPT_EN;
-                    $payload = $buildPayload->invoke($provider, $model, $transcript, $prompt, 'Kore', $languageCode);
-                    $part = $payload['contents'][0]['parts'][0];
-                    $spoken = (string) $part['text'];
-                    $label = "{$model} {$language} {$dialect} {$emotion} {$style}";
+        foreach ($cases as [$language, $dialect, $dialectName]) {
+            // Every emotion and every style with every dialect, paired in turn:
+            // the prompt pieces are independent, so the full product adds nothing.
+            $pairs = max(count($emotions), count($styles));
+            for ($i = 0; $i < $pairs; $i++) {
+                $emotion = $emotions[$i % count($emotions)];
+                $style = $styles[$i % count($styles)];
+                $prompt = $buildStyle->invoke(
+                    $provider,
+                    $style,
+                    $emotion,
+                    $language,
+                    1.0,
+                    $dialect,
+                    0.0,
+                );
+                $transcript = $language === 'ar' ? self::TRANSCRIPT_AR : self::TRANSCRIPT_EN;
+                $payload = $buildPayload->invoke($provider, $transcript, $prompt, 'Kore');
+                $part = $payload['contents'][0]['parts'][0];
+                $spoken = (string) $part['text'];
+                $label = "{$language} {$dialect} {$emotion} {$style}";
 
-                    if ($spoken === '' || ! str_contains($spoken, $transcript)) {
-                        $failures[] = "{$label} dropped the transcript";
-                    }
-                    if (str_contains($spoken, 'speech_metadata')) {
-                        $failures[] = "{$label} leaked metadata into speech";
-                    }
+                if ($spoken === '' || ! str_contains($spoken, $transcript)) {
+                    $failures[] = "{$label} dropped the transcript";
+                }
+                if (str_contains($spoken, 'speech_metadata')) {
+                    $failures[] = "{$label} leaked metadata into speech";
+                }
 
-                    if ($structured) {
-                        if ($spoken !== $transcript) {
-                            $failures[] = "{$label} would speak the instructions";
-                        }
-                        $styleText = (string) ($part['speech_metadata']['style'] ?? '');
-                        if ($styleText === '') {
-                            $failures[] = "{$label} has no style metadata";
-                        }
-                        if ($language === 'ar' && ! str_contains($styleText, $dialectName)) {
-                            $failures[] = "{$label} lost the dialect name";
-                        }
-                        if ($dialect === 'ar-EG' && ! str_contains($styleText, 'Cairene Egyptian')) {
-                            $failures[] = "{$label} lost the Egyptian lock";
-                        } elseif ($language === 'ar' && ! str_starts_with(strtoupper($dialect), 'AR-XA') && $dialect !== 'ar-EG' && ! str_contains($styleText, 'Do not switch to Modern Standard Arabic')) {
-                            $failures[] = "{$label} lost the colloquial lock";
-                        }
-                        // Fusha and its registers (news, classical, White Arabic).
-                        if (str_starts_with(strtoupper($dialect), 'AR-XA') && str_contains($styleText, 'Do not switch to Modern Standard Arabic')) {
-                            $failures[] = "{$label} pushed Fusha away from Fusha";
-                        }
-                        if ($language === 'en' && ! str_contains($styleText, $dialectName)) {
-                            $failures[] = "{$label} lost the English accent";
-                        }
-                        if ($emotion !== 'neutral' && ! str_contains($styleText, 'Emotional tone:')) {
-                            $failures[] = "{$label} lost the emotion";
-                        }
-                        if (isset($payload['generationConfig']['speechConfig']['languageCode'])) {
-                            $failures[] = "{$label} sent languageCode to a structured model";
-                        }
-                    } else {
-                        if (! str_contains($spoken, 'Voice dialect:') && $language === 'ar') {
-                            $failures[] = "{$label} dropped the dialect from the legacy prompt";
-                        }
-                        if ($language === 'en' && str_contains($spoken, 'Voice accent:')) {
-                            $failures[] = "{$label} changed the legacy English prompt";
-                        }
-                        $sentCode = $payload['generationConfig']['speechConfig']['languageCode'] ?? '';
-                        if ($language === 'ar' && $sentCode !== 'ar-XA') {
-                            $failures[] = "{$label} sent {$sentCode} instead of ar-XA";
-                        }
-                        // A regional accent (en-GB-SC, en-AU-BR) is sent as its country's code.
-                        $expectedCode = in_array(substr($dialect, 0, 5), ['en-US', 'en-GB', 'en-AU', 'en-IN'], true) ? substr($dialect, 0, 5) : 'en-US';
-                        if ($language === 'en' && $sentCode !== $expectedCode) {
-                            $failures[] = "{$label} sent {$sentCode} instead of {$expectedCode}";
-                        }
-                    }
+                if ($spoken !== $transcript) {
+                    $failures[] = "{$label} would speak the instructions";
+                }
+                $styleText = (string) ($part['speech_metadata']['style'] ?? '');
+                if ($styleText === '') {
+                    $failures[] = "{$label} has no style metadata";
+                }
+                if ($language === 'ar' && ! str_contains($styleText, $dialectName)) {
+                    $failures[] = "{$label} lost the dialect name";
+                }
+                if ($dialect === 'ar-EG' && ! str_contains($styleText, 'Cairene Egyptian')) {
+                    $failures[] = "{$label} lost the Egyptian lock";
+                } elseif ($language === 'ar' && ! str_starts_with(strtoupper($dialect), 'AR-XA') && $dialect !== 'ar-EG' && ! str_contains($styleText, 'Do not switch to Modern Standard Arabic')) {
+                    $failures[] = "{$label} lost the colloquial lock";
+                }
+                // Fusha and its registers (news, classical, White Arabic).
+                if (str_starts_with(strtoupper($dialect), 'AR-XA') && str_contains($styleText, 'Do not switch to Modern Standard Arabic')) {
+                    $failures[] = "{$label} pushed Fusha away from Fusha";
+                }
+                if ($language === 'en' && ! str_contains($styleText, $dialectName)) {
+                    $failures[] = "{$label} lost the English accent";
+                }
+                if ($emotion !== 'neutral' && ! str_contains($styleText, 'Emotional tone:')) {
+                    $failures[] = "{$label} lost the emotion";
+                }
+                if (isset($payload['generationConfig']['speechConfig']['languageCode'])) {
+                    $failures[] = "{$label} sent languageCode to a structured model";
+                }
 
-                    if (count($failures) > 12) {
-                        break 3;
-                    }
+                if (count($failures) > 12) {
+                    break 2;
                 }
             }
         }
@@ -389,7 +320,6 @@ class GeminiModelSwitchSafetyTest extends TestCase
     public function test_dialogue_gemini_refuses_fails_instead_of_being_read_by_one_standard_voice(): void
     {
         $this->useHybridMode();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $googleCalls = 0;
         Http::fake(function ($request) use (&$googleCalls) {
             if (str_contains($request->url(), 'generativelanguage')) {
@@ -444,17 +374,15 @@ class GeminiModelSwitchSafetyTest extends TestCase
             [1.0, 12.0, 'very high-pitched'],
         ];
 
-        foreach ([GeminiTtsModel::FLASH, GeminiTtsModel::FLASH_LITE] as $model) {
-            foreach ($extremes as [$speed, $pitch, $phrase]) {
-                $prompt = $buildStyle->invoke($provider, 'sports_commentator', 'angry', 'ar', $speed, 'ar-MA', $pitch, true);
-                $payload = $buildPayload->invoke($provider, $model, self::TRANSCRIPT_AR, $prompt, 'Kore', 'ar-XA');
-                $part = $payload['contents'][0]['parts'][0];
+        foreach ($extremes as [$speed, $pitch, $phrase]) {
+            $prompt = $buildStyle->invoke($provider, 'sports_commentator', 'angry', 'ar', $speed, 'ar-MA', $pitch);
+            $payload = $buildPayload->invoke($provider, self::TRANSCRIPT_AR, $prompt, 'Kore');
+            $part = $payload['contents'][0]['parts'][0];
 
-                $this->assertSame(self::TRANSCRIPT_AR, $part['text'], $model);
-                $this->assertStringContainsString($phrase, $part['speech_metadata']['style']);
-                $this->assertStringContainsString('Moroccan Arabic', $part['speech_metadata']['style']);
-                $this->assertStringContainsString('Do not switch to Modern Standard Arabic', $part['speech_metadata']['style']);
-            }
+            $this->assertSame(self::TRANSCRIPT_AR, $part['text']);
+            $this->assertStringContainsString($phrase, $part['speech_metadata']['style']);
+            $this->assertStringContainsString('Moroccan Arabic', $part['speech_metadata']['style']);
+            $this->assertStringContainsString('Do not switch to Modern Standard Arabic', $part['speech_metadata']['style']);
         }
     }
 
@@ -472,10 +400,7 @@ class GeminiModelSwitchSafetyTest extends TestCase
                 return Http::response(['audioContent' => base64_encode('google-audio')]);
             }
 
-            $mime = str_contains($request->url(), GeminiTtsModel::CURRENT) ? 'audio/l16' : 'audio/wav';
-            $bytes = $mime === 'audio/wav' ? $this->wavBytes() : $this->pcmBytes();
-
-            return Http::response($this->geminiBody($mime, $bytes));
+            return Http::response($this->geminiBody('audio/wav', $this->wavBytes()));
         });
 
         return $captured;

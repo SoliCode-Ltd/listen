@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\SiteSetting;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Support\GeminiTtsModel;
@@ -41,7 +40,7 @@ class GeminiKeyRotationTest extends TestCase
     public function test_a_key_out_for_the_day_is_skipped_until_the_reset(): void
     {
         $manager = $this->threeKeys();
-        $model = GeminiTtsModel::FLASH;
+        $model = GeminiTtsModel::LATEST;
 
         $this->assertSame('GEMINI_TTS_API_KEY', $manager->getAvailableKey($model)['name']);
         $manager->markOutForToday('GEMINI_TTS_API_KEY', $model);
@@ -78,23 +77,22 @@ class GeminiKeyRotationTest extends TestCase
 
         $manager->markOutForSpendingCap('GEMINI_TTS_API_KEY');
 
-        foreach ([GeminiTtsModel::FLASH, GeminiTtsModel::CURRENT, 'gemini-3.5-flash'] as $model) {
+        foreach ([GeminiTtsModel::LATEST, 'gemini-2.5-flash-preview-tts', 'gemini-3.5-flash'] as $model) {
             $this->assertTrue($manager->isOutForToday('GEMINI_TTS_API_KEY', $model), $model);
             $this->assertSame('GEMINI_TTS_API_KEY_2', $manager->getAvailableKey($model)['name'], $model);
         }
-        $this->assertSame(['GEMINI_TTS_API_KEY_2', 'GEMINI_TTS_API_KEY_3', 'GEMINI_TTS_API_KEY'], array_column($manager->keysInOrder(GeminiTtsModel::FLASH), 'name'), 'a capped key goes last');
+        $this->assertSame(['GEMINI_TTS_API_KEY_2', 'GEMINI_TTS_API_KEY_3', 'GEMINI_TTS_API_KEY'], array_column($manager->keysInOrder(GeminiTtsModel::LATEST), 'name'), 'a capped key goes last');
 
         $this->travel(59)->minutes();
-        $this->assertTrue($manager->isOutForToday('GEMINI_TTS_API_KEY', GeminiTtsModel::FLASH), 'not tried again within the hour');
+        $this->assertTrue($manager->isOutForToday('GEMINI_TTS_API_KEY', GeminiTtsModel::LATEST), 'not tried again within the hour');
         $this->travel(2)->minutes();
-        $this->assertFalse($manager->isOutForToday('GEMINI_TTS_API_KEY', GeminiTtsModel::FLASH), 'tried again after it, in case the cap was raised');
+        $this->assertFalse($manager->isOutForToday('GEMINI_TTS_API_KEY', GeminiTtsModel::LATEST), 'tried again after it, in case the cap was raised');
     }
 
     public function test_stock_voice_moves_on_from_a_capped_key_and_stays_off_it(): void
     {
         Storage::fake('public');
         config(['services.gemini_tts.api_key' => '', 'services.gemini_tts.voice_retry_pause' => false, 'services.gemini_tts.dialect_rewrite' => false]);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $this->threeKeys();
         $calls = [];
         Http::fake(function ($request) use (&$calls) {
@@ -121,7 +119,6 @@ class GeminiKeyRotationTest extends TestCase
         $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-14 12:00:00', 'America/Los_Angeles'));
         Storage::fake('public');
         config(['services.gemini_tts.api_key' => '', 'services.gemini_tts.voice_retry_pause' => false, 'services.gemini_tts.dialect_rewrite' => false]);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $this->threeKeys();
         $calls = [];
         Http::fake(function ($request) use (&$calls) {
@@ -149,7 +146,6 @@ class GeminiKeyRotationTest extends TestCase
             'services.gemini_tts.api_key' => '', 'services.gemini_tts.dialect_rewrite' => false,
             'services.gemini_tts.retry_pause_ms' => 0, 'services.gemini_tts.max_chars_per_request' => 200,
         ]);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $manager = $this->threeKeys();
         $calls = ['k1' => 0, 'k2' => 0, 'k3' => 0];
         Http::fake(function ($request) use (&$calls) {
@@ -180,7 +176,6 @@ class GeminiKeyRotationTest extends TestCase
             'services.gemini_tts.api_key' => '', 'services.gemini_tts.dialect_rewrite' => false,
             'services.gemini_tts.retry_pause_ms' => 0, 'services.gemini_tts.max_chars_per_request' => 200,
         ]);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $this->threeKeys();
         $calls = ['k1' => 0, 'k2' => 0, 'k3' => 0];
         Http::fake(function ($request) use (&$calls) {
@@ -240,10 +235,9 @@ class GeminiKeyRotationTest extends TestCase
     {
         Storage::fake('public');
         config(['services.gemini_tts.api_key' => '', 'services.gemini_tts.voice_retry_pause' => false, 'services.gemini_tts.dialect_rewrite' => false]);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $manager = $this->threeKeys();
-        $manager->markOutForToday('GEMINI_TTS_API_KEY', GeminiTtsModel::FLASH);
-        $manager->markOutForToday('GEMINI_TTS_API_KEY_2', GeminiTtsModel::FLASH);
+        $manager->markOutForToday('GEMINI_TTS_API_KEY', GeminiTtsModel::LATEST);
+        $manager->markOutForToday('GEMINI_TTS_API_KEY_2', GeminiTtsModel::LATEST);
         $calls = [];
         Http::fake(function ($request) use (&$calls) {
             $key = $request->header('x-goog-api-key')[0] ?? '';
@@ -257,6 +251,6 @@ class GeminiKeyRotationTest extends TestCase
         app(GeminiTtsProvider::class)->synthesize('مرحبا بكم', 'ar', ['voice_name' => 'Kore']);
         $this->assertSame('k3', $calls[0], 'the only key with room was tried first');
         $this->assertNotContains('k3', array_slice($calls, 1), 'then the refused key is set aside');
-        $this->assertTrue($manager->isOutForToday('GEMINI_TTS_API_KEY_3', GeminiTtsModel::FLASH));
+        $this->assertTrue($manager->isOutForToday('GEMINI_TTS_API_KEY_3', GeminiTtsModel::LATEST));
     }
 }

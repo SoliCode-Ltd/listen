@@ -103,7 +103,7 @@ class StudioPickerTest extends TestCase
     public function test_fusha_registers_stay_formal_and_new_delivery_tags_direct_the_reading(): void
     {
         $prompt = (new ReflectionClass(GeminiTtsProvider::class))->getMethod('buildStylePrompt')
-            ->invoke(app(GeminiTtsProvider::class), 'news', 'serious', 'ar', 1.0, 'ar-XA-NW', 0.0, true);
+            ->invoke(app(GeminiTtsProvider::class), 'news', 'serious', 'ar', 1.0, 'ar-XA-NW', 0.0);
         $this->assertStringContainsString('TV news bulletin', $prompt);
         $this->assertStringNotContainsString('Do not switch to Modern Standard Arabic', $prompt);
 
@@ -182,7 +182,7 @@ class StudioPickerTest extends TestCase
         $this->assertSame('ar', $entry['l']);
         $this->assertSame('SA', $entry['c']);
         $this->assertStringEndsWith('/images/flags/sa.svg', $entry['f']);
-        $this->assertSame('سعودي (حجازي)', $entry['d']);
+        $this->assertSame('سعودية (حجازية)', $entry['d'], 'a woman: the dialect in the feminine');
         $this->assertNull($entry['p'], 'no preview when the file is missing');
         $this->assertSame(['voice_999'], $meta['favorites']);
         $this->assertStringEndsWith('/dashboard/favorite-voices', $meta['favoritesUrl']);

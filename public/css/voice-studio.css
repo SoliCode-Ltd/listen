@@ -1141,8 +1141,7 @@ html[lang="ar"] .vs-tb-group { letter-spacing: 0; font-size: .8rem; }
 .vs-voice-fav svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; }
 .vs-voice-fav:hover { color: var(--a, #7659FA); background: color-mix(in oklab, var(--a, #7659FA) 10%, transparent); }
 .vs-voice-fav[aria-pressed="true"] { color: var(--a, #7659FA); }
-.vs-voice-fav:focus-visible,
-.vs-voice-play:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 1px; }
+.vs-voice-fav:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 1px; }
 .vs-voice-check {
   position: absolute;
   top: 8px;
@@ -1160,32 +1159,98 @@ html[lang="ar"] .vs-tb-group { letter-spacing: 0; font-size: .8rem; }
   opacity: 0;
 }
 .vs-voice.is-selected .vs-voice-check { opacity: 1; }
+/* Preview: a play badge on the face (always there on touch screens; on a mouse it
+   appears when the card is hovered or focused) and a ring that fills as it plays.
+   The ring is drawn on the avatar's own outline, so it stays centred at every
+   size; the triangle and the ring never mirror in Arabic. */
+.vs-voice-flag { z-index: 3; }
 .vs-voice-play {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: .3rem;
-  width: 100%;
-  min-height: 30px;
-  margin-top: .2rem;
-  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
-  border-radius: 9px;
-  background: color-mix(in oklab, var(--surface2) 60%, var(--surface));
-  color: var(--a, #7659FA);
+  position: absolute;
+  bottom: -2px;
+  inset-inline-start: -2px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.vs-voice-play svg { width: 15px; height: 15px; fill: currentColor; }
-.vs-voice-play .i-stop,
-.vs-voice-play .vs-voice-bars { display: none; }
-.vs-voice.is-playing .vs-voice-play { background: var(--a, #7659FA); border-color: transparent; color: #FFFFFF; }
+/* A 44px target around the small badge. */
+.vs-voice-play::before { content: ""; position: absolute; inset: -9px; border-radius: 50%; }
+.vs-voice-play-dot {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  color: var(--a, #7659FA);
+  box-shadow: 0 0 0 2px var(--surface), 0 3px 10px -4px rgba(25, 16, 74, .45);
+  transition: transform .15s ease, background-color .15s ease, color .15s ease, opacity .15s ease;
+}
+.vs-voice-play svg { width: 11px; height: 11px; fill: currentColor; }
+.vs-voice-play .i-play { margin-inline-start: 1.5px; }
+[dir="rtl"] .vs-voice-play .i-play { margin-inline-start: 0; margin-inline-end: 1.5px; }
+.vs-voice-play .i-stop { display: none; }
 .vs-voice.is-playing .vs-voice-play .i-play { display: none; }
-.vs-voice.is-playing .vs-voice-play .i-stop,
-.vs-voice.is-playing .vs-voice-play .vs-voice-bars { display: inline-flex; }
-.vs-voice-bars { align-items: flex-end; gap: 2px; height: 12px; }
-.vs-voice-bars i { display: block; width: 3px; height: 100%; border-radius: 2px; background: currentColor; animation: vs-bars .9s ease-in-out infinite; }
-.vs-voice-bars i:nth-child(2) { animation-delay: .15s; }
-.vs-voice-bars i:nth-child(3) { animation-delay: .3s; }
-@keyframes vs-bars { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+.vs-voice.is-playing .vs-voice-play .i-stop { display: block; }
+.vs-voice.is-playing .vs-voice-play-dot { background: var(--a, #7659FA); color: #FFFFFF; }
+.vs-voice-play:focus-visible { outline: none; }
+.vs-voice-play:focus-visible .vs-voice-play-dot { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--a, #7659FA); }
+/* The ring: a circle 6px wider than the face, cut to a 3px band that covers the
+   face's own thin outline (3 to 4.5px out). Filled clockwise from the top. */
+.vs-voice-ring {
+  position: absolute;
+  inset: -6px;
+  z-index: 1;
+  border-radius: 50%;
+  background: conic-gradient(var(--a, #7659FA) calc(var(--vs-progress, 0) * 1turn), color-mix(in oklab, var(--a, #7659FA) 20%, transparent) 0);
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px), #000 calc(100% - 1px), transparent calc(100% - .5px));
+  mask: radial-gradient(closest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px), #000 calc(100% - 1px), transparent calc(100% - .5px));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.vs-voice.is-playing .vs-voice-ring,
+.vs-voice.is-loading .vs-voice-ring { opacity: 1; }
+/* While the ring shows, it takes the place of the thin outline. */
+.vs-voice.is-playing .vs-voice-avatar > img,
+.vs-voice.is-playing .vs-voice-initial,
+.vs-voice.is-loading .vs-voice-avatar > img,
+.vs-voice.is-loading .vs-voice-initial { box-shadow: 0 0 0 3px var(--surface); }
+.vs-voice.is-loading .vs-voice-ring {
+  background: conic-gradient(var(--a, #7659FA) 0 .22turn, color-mix(in oklab, var(--a, #7659FA) 20%, transparent) 0);
+  animation: vs-ring-spin .9s linear infinite;
+}
+@keyframes vs-ring-spin { to { transform: rotate(1turn); } }
+/* With a mouse: the whole face is the button, shown on hover like a player. */
+@media (hover: hover) and (pointer: fine) {
+  .vs-voice-play {
+    inset: 0;
+    width: auto;
+    height: auto;
+    background: rgba(18, 12, 48, 0);
+    transition: background-color .15s ease;
+  }
+  .vs-voice-play::before { content: none; }
+  .vs-voice-play-dot { width: 30px; height: 30px; opacity: 0; transform: scale(.85); box-shadow: 0 4px 12px -4px rgba(25, 16, 74, .5); }
+  .vs-voice-play svg { width: 12px; height: 12px; }
+  .vs-voice:hover .vs-voice-play,
+  .vs-voice-play:focus-visible,
+  .vs-voice.is-playing .vs-voice-play,
+  .vs-voice.is-loading .vs-voice-play { background: rgba(18, 12, 48, .22); }
+  .vs-voice:hover .vs-voice-play-dot,
+  .vs-voice-play:focus-visible .vs-voice-play-dot,
+  .vs-voice.is-playing .vs-voice-play-dot,
+  .vs-voice.is-loading .vs-voice-play-dot { opacity: 1; transform: none; }
+  .vs-voice-play:hover .vs-voice-play-dot { transform: scale(1.06); }
+}
+.vs-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .vs-lib-empty { margin: 1rem 0 .4rem; padding: 1.2rem; border: 1px dashed color-mix(in oklab, var(--line) 90%, transparent); border-radius: 14px; text-align: center; font-size: .88rem; color: var(--muted); }
 .vs-lib-empty[hidden] { display: none; }
 .vs-lib + .vs-pane { margin-top: 1.1rem; border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent); }
@@ -1195,7 +1260,7 @@ html[lang="ar"] .vs-tb-group { letter-spacing: 0; font-size: .8rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .vs-voice { transition: none; }
-  .vs-voice-bars i { animation: none; }
+  .vs-voice.is-loading .vs-voice-ring { animation: none; }
 }
 @media (max-width: 480px) {
   /* Two settings per row on phones. */
@@ -1430,6 +1495,53 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
   .vs-lib .vs-lib-gender { flex: 1 1 100%; }
 }
 
+/* Age, under search and gender: the same segmented shape, a quieter choice
+   (tinted, not filled) so it reads as the second filter. Scrolls sideways
+   rather than wrapping when the labels are long. */
+.vs-lib-age {
+  display: flex;
+  gap: 2px;
+  margin-top: .5rem;
+  padding: .2rem;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 11px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.vs-lib-age::-webkit-scrollbar { display: none; }
+.vs-lib-age button {
+  flex: 1 0 auto;
+  height: 32px;
+  padding: 0 .65rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: .8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.vs-lib-age button[hidden] { display: none; }
+.vs-lib-age button:hover { color: var(--text); }
+.vs-lib-age button[aria-pressed="true"] {
+  background: color-mix(in oklab, var(--a, #7659FA) 12%, transparent);
+  border-color: color-mix(in oklab, var(--a, #7659FA) 35%, transparent);
+  color: var(--a, #7659FA);
+}
+.vs-lib-age button:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 1px; }
+.vs-age-short { display: none; }
+@media (max-width: 600px) {
+  /* Phones: every age fits on one row. */
+  .vs-lib-age button { flex: 1 1 auto; padding: 0 .4rem; font-size: .76rem; }
+}
+@media (max-width: 420px) {
+  /* Small phones: the short names (the full ones are their accessible names). */
+  .vs-age-long { display: none; }
+  .vs-age-short { display: inline; }
+}
+
 /* Dashboard: language, dialect, style and emotion always in a 2 × 2 grid. */
 #generateVoiceSection .vs-setbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
@@ -1450,6 +1562,8 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
 .vs-lib .vs-voice-initial { width: 78px; height: 78px; font-size: 1.7rem; }
 .vs-lib .vs-voice-flag { width: 24px; height: 24px; }
 .vs-lib .vs-voice-name { margin-top: .45rem; font-size: .95rem; }
+/* A long dialect or accent wraps to a second line instead of being cut. */
+.vs-lib .vs-voice-dialect { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; white-space: normal; text-wrap: balance; line-height: 1.35; }
 @media (max-width: 480px) {
   .vs-lib .vs-voice-avatar,
   .vs-lib .vs-voice-avatar > img,

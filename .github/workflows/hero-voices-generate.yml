@@ -1,14 +1,21 @@
 name: Hero voices generate
 
-# Makes the homepage hero clips listed in SLUGS with this branch's lines
-# (App\Support\HeroCast), using Gemini key 1 from STAGING's .env
-# (GEMINI_TTS_API_KEY, the owner's choice), and commits the MP3s back to this
-# branch. The key is read over SSH, masked in the log and never stored.
+# Makes the homepage clips named in the slugs input (hero clips from
+# App\Support\HeroCast, or samples from database/seeders/data/showcase_samples.php)
+# with this branch's lines, using the Gemini keys from STAGING's .env (key 1
+# first; when one runs out of quota the next carries on, the last key is left
+# for live), and commits the MP3s back to this branch. The keys are read over
+# SSH, masked in the log and never stored.
 # Speech requests count against that key's quota, which staging shares with
 # live: run it by hand (on the branch to commit to), only when the owner asks.
 
 on:
   workflow_dispatch:
+    inputs:
+      slugs:
+        description: 'Clips to make, by slug, space-separated (hero clips or homepage samples, e.g. ar-sy-aleppo-kibbeh)'
+        type: string
+        default: 'hero-ar-sultan'
 
 permissions:
   contents: write
@@ -18,12 +25,12 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SLUGS: hero-ar-sultan
+  SLUGS: ${{ inputs.slugs || 'hero-ar-sultan' }}
 
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,7 +51,7 @@ jobs:
           cp .env.example .env
           php artisan key:generate --no-interaction
 
-      - name: Generate with staging key 1
+      - name: Generate with the staging keys
         env:
           SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
           SSH_USER: ${{ secrets.STAGING_SSH_USER }}
@@ -58,22 +65,37 @@ jobs:
           printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_gen
           chmod 600 ~/.ssh/id_gen
           ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; grep -E '^GEMINI_TTS_API_KEY(_1)?=' .env | head -n 1 | cut -d= -f2-"
-          KEY="$(ssh -i ~/.ssh/id_gen -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" | tr -d "\"' \r\n")"
+          # Every key in order (GEMINI_TTS_API_KEY, then _2, _3 ...), values only, one per line.
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; grep -E '^GEMINI_TTS_API_KEY(_[0-9]+)?=' .env | sed -E 's/^GEMINI_TTS_API_KEY=/GEMINI_TTS_API_KEY_1=/' | sort -t_ -k5 -n | cut -d= -f2-"
+          mapfile -t RAW < <(ssh -i ~/.ssh/id_gen -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote")
           rm -f ~/.ssh/id_gen
-          if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
-          echo "::add-mask::$KEY"
-          echo "Using staging key 1 (ending ${KEY: -4})"
-          only=""; for s in $SLUGS; do only="$only --only=$s"; done
-          php artisan tts:showcase --generate --force --pause=20 --key="$KEY" $only 2>&1 | grep -v '^\*' | cut -c1-160
+          KEYS=()
+          for k in "${RAW[@]}"; do
+            k="$(printf '%s' "$k" | tr -d "\"' \r\n")"
+            [ -z "$k" ] && continue
+            echo "::add-mask::$k"
+            dup=0; for seen in "${KEYS[@]}"; do [ "$seen" = "$k" ] && dup=1; done
+            [ "$dup" = 0 ] && KEYS+=("$k")
+          done
+          if [ "${#KEYS[@]}" -eq 0 ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
+          last=${#KEYS[@]}; [ "$last" -gt 1 ] && last=$((last - 1))
+          # The named clips are made again: their old files go first, then each key makes what is still missing.
+          only=""; for s in $(printf '%s' "$SLUGS" | tr -cd 'a-z0-9 -'); do only="$only --only=$s"; rm -f "public/audio/showcase/$s.mp3"; done
+          for (( n = 1; n <= last; n++ )); do
+            echo "--- key $n of ${#KEYS[@]}"
+            out="$(php artisan tts:showcase --generate --pause=20 --key="${KEYS[$((n - 1))]}" $only 2>&1 || true)"
+            printf '%s\n' "$out" | grep -v '^\*' | cut -c1-160
+            grep -q 'HTTP 429' <<<"$out" || break
+          done
 
       - name: Commit the clips
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/audio/showcase/hero-*.mp3
+          git add public/audio/showcase/*.mp3
           if git diff --cached --quiet; then echo "No new clips"; exit 1; fi
           git diff --cached --stat
-          git commit -m "Hero voices: new lines made with staging key 1"
+          git commit -m "Homepage clips: made again with the staging keys" -m "$SLUGS"
+          git pull --rebase origin "${GITHUB_REF#refs/heads/}"
           git push origin HEAD:${GITHUB_REF#refs/heads/}

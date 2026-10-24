@@ -1,0 +1,60 @@
+@import url("fonts/fonts.css");
+
+/* A quiet studio: white light on cool grey, ink type, one violet accent. */
+:root {
+  --ground: #EEEEF1;
+  --ink: #101014;
+  --ink-2: #44434D;
+  --muted: #9A99A3;
+  --faint: #C9C8D0;
+  --hair: rgba(16, 16, 20, .09);
+  --violet: #5B3DF5;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: var(--W); height: var(--H); overflow: hidden; background: var(--ground); -webkit-font-smoothing: antialiased; }
+body { font-family: 'Alexandria', system-ui, sans-serif; color: var(--ink); }
+#stage { position: relative; width: var(--W); height: var(--H); overflow: hidden; background: var(--ground); }
+.layer { position: absolute; inset: 0; pointer-events: none; }
+.abs { position: absolute; }
+
+#light { position: absolute; border-radius: 50%; }
+#grain { background-image: url(assets/grain.png); background-size: 512px 512px; opacity: .045; mix-blend-mode: multiply; }
+
+/* Corners */
+.logo { position: absolute; }
+
+/* The speaker */
+.portrait { position: absolute; border-radius: 50%; overflow: hidden; background: linear-gradient(240deg, #2FA1FC 0%, #4390FB 45%, #6E5CFD 100%);
+  box-shadow: 0 30px 80px rgba(30, 24, 70, .16), 0 2px 6px rgba(30, 24, 70, .06); }
+.portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#ring { position: absolute; }
+.who { position: absolute; display: flex; flex-direction: column; gap: 14px; }
+.who .name { font-size: 40px; font-weight: 500; letter-spacing: -.4px; line-height: 1; }
+.who .dia { position: relative; font-size: 26px; font-weight: 400; color: var(--ink-2); }
+.dslot { position: relative; display: block; }
+.dslot .row { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+.dslot .row img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1px var(--hair); }
+
+/* The list of deliveries */
+.list { position: absolute; }
+.item { position: absolute; white-space: nowrap; font-weight: 300; color: var(--muted); line-height: 1; }
+.item .br { color: var(--violet); font-weight: 300; }
+
+/* The line */
+.line { position: absolute; font-weight: 500; letter-spacing: -.6px; line-height: 1.3; text-wrap: balance; }
+.line.ar { letter-spacing: 0; line-height: 1.55; }
+.line .w { display: inline-block; white-space: pre; }
+.chev { position: absolute; width: 22px; height: 22px; color: var(--faint); }
+
+/* End card */
+.endtext { position: absolute; left: 0; right: 0; text-align: center; font-weight: 600; letter-spacing: -1.2px; line-height: 1.25; padding: 0 90px;
+  color: #fff; text-shadow: 0 6px 40px rgba(18, 9, 74, .35); }
+.endtext.ar { letter-spacing: 0; line-height: 1.5; }
+.endtext .w { display: inline-block; white-space: pre; }
+.endtext .ph { display: block; }
+.endtext .v { color: var(--violet); }
+.wordmark { position: absolute; }
+.url { position: absolute; left: 0; right: 0; text-align: center; font-size: 30px; font-weight: 400; color: var(--ink-2); letter-spacing: .3px; direction: ltr; }
+.flagrow { position: absolute; left: 0; right: 0; display: flex; justify-content: center; gap: 18px; direction: ltr; }
+.flagrow img { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px rgba(255,255,255,.9), 0 10px 24px rgba(18,9,74,.3); }

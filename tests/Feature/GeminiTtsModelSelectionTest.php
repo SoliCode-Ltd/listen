@@ -33,30 +33,8 @@ class GeminiTtsModelSelectionTest extends TestCase
         $this->app->instance(GeminiKeyManager::class, $manager);
     }
 
-    public function test_default_model_keeps_the_current_gemini_request(): void
+    public function test_the_latest_model_speaks_only_the_transcript_and_saves_mp3(): void
     {
-        $captured = $this->fakeAudio('audio/l16', $this->pcmBytes());
-
-        $result = app(GeminiTtsProvider::class)->synthesize('مرحبا', 'ar', [
-            'voice_name' => 'Kore',
-            'performance_style' => 'cinematic',
-            'emotion' => 'warm',
-        ]);
-
-        $this->assertSame(GeminiTtsModel::CURRENT, $result['model']);
-        $this->assertStringContainsString('/models/'.GeminiTtsModel::CURRENT.':generateContent', $captured->url);
-        $this->assertSame('Kore', $captured->body['generationConfig']['speechConfig']['voiceConfig']['prebuiltVoiceConfig']['voiceName']);
-        $spoken = $captured->body['contents'][0]['parts'][0]['text'];
-        $this->assertStringContainsString('مرحبا', $spoken);
-        $this->assertStringContainsString('Emotional tone', $spoken);
-        $saved = Storage::disk('public')->get($result['audio_path']);
-        $this->assertStringEndsWith('.mp3', $result['audio_path']);
-        $this->assertTrue(\App\Support\ShareableAudio::isMp3($saved));
-    }
-
-    public function test_newest_model_speaks_only_the_transcript_and_saves_mp3(): void
-    {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $wav = $this->wavBytes();
         $captured = $this->fakeAudio('audio/wav', $wav);
 
@@ -67,8 +45,8 @@ class GeminiTtsModelSelectionTest extends TestCase
             'speed' => 0.85,
         ]);
 
-        $this->assertSame(GeminiTtsModel::FLASH, $result['model']);
-        $this->assertStringContainsString('/models/'.GeminiTtsModel::FLASH.':generateContent', $captured->url);
+        $this->assertSame(GeminiTtsModel::LATEST, $result['model']);
+        $this->assertStringContainsString('/models/'.GeminiTtsModel::LATEST.':generateContent', $captured->url);
         $part = $captured->body['contents'][0]['parts'][0];
         $this->assertSame('مرحبا بك', $part['text']);
         $this->assertArrayNotHasKey('prebuiltVoiceConfig', $captured->body['generationConfig']['speechConfig']['voiceConfig']);
@@ -81,30 +59,23 @@ class GeminiTtsModelSelectionTest extends TestCase
         $this->assertNotSame($wav, $saved);
     }
 
-    public function test_lite_model_and_unknown_value_are_handled_safely(): void
+    public function test_an_older_model_once_saved_in_the_settings_is_not_used(): void
     {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH_LITE, 'tts');
-        $captured = $this->fakeAudio('audio/wav', $this->wavBytes());
+        foreach (['gemini-2.5-flash-preview-tts', 'gemini-3.8-flash-lite-tts', 'gemini-not-a-model'] as $saved) {
+            SiteSetting::set('gemini_tts_model', $saved, 'tts');
+            $captured = $this->fakeAudio('audio/wav', $this->wavBytes());
 
-        $lite = app(GeminiTtsProvider::class)->synthesize('Hello there', 'en', [
-            'voice_name' => 'Kore',
-        ]);
-        $this->assertSame(GeminiTtsModel::FLASH_LITE, $lite['model']);
-        $this->assertStringContainsString(GeminiTtsModel::FLASH_LITE, $captured->url);
+            $result = app(GeminiTtsProvider::class)->synthesize('Hello there', 'en', [
+                'voice_name' => 'Kore',
+            ]);
 
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, 'gemini-not-a-model', 'tts');
-        $fallback = $this->fakeAudio('audio/l16', $this->pcmBytes());
-        $result = app(GeminiTtsProvider::class)->synthesize('Hello there', 'en', [
-            'voice_name' => 'Kore',
-        ]);
-
-        $this->assertSame(GeminiTtsModel::CURRENT, $result['model']);
-        $this->assertStringContainsString(GeminiTtsModel::CURRENT, $fallback->url);
+            $this->assertSame(GeminiTtsModel::LATEST, $result['model'], $saved);
+            $this->assertStringContainsString('/models/'.GeminiTtsModel::LATEST.':generateContent', $captured->url, $saved);
+        }
     }
 
-    public function test_newest_dialogue_does_not_read_speaker_labels(): void
+    public function test_a_dialogue_does_not_read_speaker_labels(): void
     {
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $captured = $this->fakeAudio('audio/wav', $this->wavBytes());
 
         app(GeminiTtsProvider::class)->synthesize("Sara: مرحبا\nWaleed: أهلا", 'ar', [

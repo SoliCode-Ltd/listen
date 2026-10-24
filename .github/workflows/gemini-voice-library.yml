@@ -1,0 +1,71 @@
+name: Gemini voice library
+
+# Read-only. Lists the Gemini 3.8 Extended Voice Library (GET /v1beta/voices,
+# prebuilt catalogue voices) with key 1 from STAGING's .env and keeps every
+# voice of every language as an artifact, so each Listen speaker can be given
+# a voice of their own. Makes no audio and uses no speech quota; the key is
+# read over SSH, masked in the log and never stored.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/beautiful-sagan-df90b3]
+    paths: [.github/workflows/gemini-voice-library.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: List the voices
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_gen
+          chmod 600 ~/.ssh/id_gen
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; grep -E '^GEMINI_TTS_API_KEY(_1)?=' .env | head -n 1 | cut -d= -f2-"
+          KEY="$(ssh -i ~/.ssh/id_gen -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" | tr -d "\"' \r\n")"
+          rm -f ~/.ssh/id_gen
+          if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
+          echo "::add-mask::$KEY"
+          mkdir -p out
+          token=""; page=0
+          while :; do
+            page=$((page + 1))
+            curl -sS -G "https://generativelanguage.googleapis.com/v1beta/voices" -H "x-goog-api-key: $KEY" \
+              --data-urlencode "type=prebuilt" --data-urlencode "page_size=1000" ${token:+--data-urlencode "page_token=$token"} > "out/page-$page.json"
+            if jq -e '.error' "out/page-$page.json" > /dev/null; then jq '.error | {code, status, message}' "out/page-$page.json"; exit 1; fi
+            token="$(jq -r '.nextPageToken // .next_page_token // empty' "out/page-$page.json")"
+            [ -z "$token" ] || [ "$page" -ge 20 ] && break
+          done
+          jq -s '[.[] | (.voices // [])[]]' out/page-*.json > out/all.json
+          echo "Voices in the library: $(jq length out/all.json)"
+          echo "Fields of one voice: $(jq -c '.[0] | keys' out/all.json)"
+          jq -c '[.[] | select(((.languageCode // .language_code // "") | test("^(ar|en)"; "i")))]' out/all.json > out/ar-en.json
+          echo "Arabic and English voices: $(jq length out/ar-en.json)"
+          echo "== One voice in full (GET /v1beta/voices/{id}) =="
+          for id in ar-001-advisor-3 achernar; do
+            curl -sS "https://generativelanguage.googleapis.com/v1beta/voices/$id" -H "x-goog-api-key: $KEY" \
+              | jq -c 'with_entries(if (.value | type) == "string" and (.value | length) > 200 then .value = ("<" + (.value | length | tostring) + " chars>") else . end)'
+          done
+          echo "== By language and gender =="
+          jq -r '.[] | [(.languageCode // .language_code), (.gender // "-")] | @tsv' out/all.json | sort | uniq -c | sort -k2
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gemini-voice-library
+          path: |
+            out/ar-en.json
+            out/all.json
+          retention-days: 7

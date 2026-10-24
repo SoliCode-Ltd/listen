@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Plan;
-use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\TranslationService;
@@ -13,7 +12,6 @@ use App\Services\Tts\GoogleCloudTtsProvider;
 use App\Services\VoiceCloningService;
 use App\Support\ArabicDialects;
 use App\Support\DialectCounts;
-use App\Support\GeminiTtsModel;
 use App\Support\GeminiVocalTags;
 use App\Support\TtsStudioConfig;
 use App\Support\VoiceTier;
@@ -66,13 +64,10 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertSame($text, $prepared['text']);
         $this->assertSame([], $prepared['cues']);
         $this->assertSame($text, GeminiVocalTags::strip($text));
-        $this->assertSame($text, GeminiVocalTags::forLegacyModel($text));
     }
 
-    public function test_older_model_and_standard_voices(): void
+    public function test_standard_voices_drop_the_tags(): void
     {
-        $this->assertSame('Hi [laugh] there [short pause] ok <happy>', GeminiVocalTags::forLegacyModel('Hi <laugh> there <short pause> ok <happy>'));
-
         $clean = GoogleCloudTtsProvider::stripPerformanceMarkup("Hi <laugh> there.\n<Short Pause> Ok <sigh>, fine.");
         $this->assertSame("Hi there.\nOk, fine.", $clean);
     }
@@ -80,7 +75,6 @@ class GeminiVocalTagsTest extends TestCase
     public function test_gemini_38_request_carries_tags_in_the_text_and_moods_in_the_style(): void
     {
         $this->fakeGeminiKeys();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $captured = $this->fakeAudio();
 
         app(GeminiTtsProvider::class)->synthesize('[excited] We did it! [laughs] يا سلام.', 'ar', [
@@ -97,7 +91,6 @@ class GeminiVocalTagsTest extends TestCase
     public function test_gemini_38_custom_prompt_keeps_the_cues_too(): void
     {
         $this->fakeGeminiKeys();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $captured = $this->fakeAudio();
 
         app(GeminiTtsProvider::class)->synthesize('[nervous] Hello <gasp> there.', 'en', [
@@ -114,7 +107,6 @@ class GeminiVocalTagsTest extends TestCase
     public function test_gemini_38_dialogue_keeps_tags_on_each_turn(): void
     {
         $this->fakeGeminiKeys();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $captured = $this->fakeAudio();
 
         app(GeminiTtsProvider::class)->synthesize("Sara: [laughs] You came!\nOmar: [sighs] Finally.", 'en', [
@@ -134,24 +126,10 @@ class GeminiVocalTagsTest extends TestCase
     public function test_only_tags_is_rejected_as_empty(): void
     {
         $this->fakeGeminiKeys();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $this->fakeAudio();
 
         $this->expectExceptionMessage('TTS text is empty.');
         app(GeminiTtsProvider::class)->synthesize('[excited] <laugh>', 'en', ['voice_name' => 'Kore']);
-    }
-
-    public function test_gemini_25_request_gets_bracketed_directions(): void
-    {
-        $this->fakeGeminiKeys();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::CURRENT, 'tts');
-        $captured = $this->fakeAudio();
-
-        app(GeminiTtsProvider::class)->synthesize('Hello <laugh> friend.', 'en', ['voice_name' => 'Kore']);
-
-        $spoken = $captured->bodies[0]['contents'][0]['parts'][0]['text'];
-        $this->assertStringContainsString('Hello [laugh] friend.', $spoken);
-        $this->assertStringNotContainsString('<laugh>', $spoken);
     }
 
     public function test_cloned_voice_gets_tags_in_the_text_and_moods_in_the_style(): void
@@ -278,7 +256,6 @@ class GeminiVocalTagsTest extends TestCase
 
         // Vowel marks and the ة/ه, أ/ا spellings people type either way.
         $this->assertSame('<laugh> <laugh> <sigh> <short pause>', GeminiVocalTags::prepare('<ضحكه> <ضَحْكة> <تنهيده> <وقفه قصيرة>')['text']);
-        $this->assertSame('مرحبا [sigh]', GeminiVocalTags::forLegacyModel('مرحبا <تنهيدة>'));
         $this->assertSame('مرحبا بك.', GoogleCloudTtsProvider::stripPerformanceMarkup('مرحبا <تنهيدة> بك.'));
         $this->assertSame('ضحكة', GeminiVocalTags::label('laugh', 'ar'));
         $this->assertSame('laugh', GeminiVocalTags::label('laugh', 'en'));
@@ -287,7 +264,6 @@ class GeminiVocalTagsTest extends TestCase
     public function test_arabic_tags_reach_gemini_as_english_tags(): void
     {
         $this->fakeGeminiKeys();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $captured = $this->fakeAudio();
 
         app(GeminiTtsProvider::class)->synthesize('يا سلام! <ضحكة> ما توقعت هذا. <وقفة طويلة> يلا.', 'ar', ['voice_name' => 'Kore']);
@@ -314,7 +290,6 @@ class GeminiVocalTagsTest extends TestCase
     public function test_delivery_tags_split_the_script_into_directed_parts(): void
     {
         $this->fakeGeminiKeys();
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $captured = $this->fakeAudio();
 
         app(GeminiTtsProvider::class)->synthesize('مرحبا بكم. [متحمس] فزنا بالمباراة! <ضحكة> [هادئ] والآن لنرتاح.', 'ar', [
@@ -340,7 +315,6 @@ class GeminiVocalTagsTest extends TestCase
             $this->assertSame($tag, GeminiVocalTags::delivery(strtoupper($tag)), $tag);
             $this->assertNull(GeminiVocalTags::canonical($name), 'delivery names never clash with sounds: '.$name);
         }
-        $this->assertSame('Hi [excited] there', GeminiVocalTags::forLegacyModel('Hi [متحمس] there'));
         $this->assertSame('Hi there.', GoogleCloudTtsProvider::stripPerformanceMarkup('Hi [متحمس] there.'));
         $this->assertSame('متحمس', GeminiVocalTags::deliveryLabel('excited', 'ar'));
     }
@@ -504,7 +478,6 @@ class GeminiVocalTagsTest extends TestCase
     {
         $this->fakeGeminiKeys();
         config(['services.gemini_tts.dialect_rewrite' => true, 'services.gemini_tts.api_key' => 'test-key']);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $bodies = [];
         Http::fake(function ($request) use (&$bodies) {
             $bodies[] = ['url' => $request->url(), 'body' => $request->data()];
@@ -534,7 +507,6 @@ class GeminiVocalTagsTest extends TestCase
     {
         $this->fakeGeminiKeys();
         config(['services.gemini_tts.dialect_rewrite' => true, 'services.gemini_tts.api_key' => 'test-key']);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $bodies = [];
         Http::fake(function ($request) use (&$bodies) {
             $bodies[] = ['url' => $request->url(), 'body' => $request->data()];
@@ -573,7 +545,6 @@ class GeminiVocalTagsTest extends TestCase
     {
         $this->fakeGeminiKeys();
         config(['services.gemini_tts.dialect_rewrite' => true, 'services.gemini_tts.api_key' => 'test-key']);
-        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $bodies = [];
         Http::fake(function ($request) use (&$bodies) {
             $bodies[] = ['url' => $request->url(), 'body' => $request->data()];
