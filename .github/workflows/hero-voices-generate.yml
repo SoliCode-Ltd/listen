@@ -82,4 +82,5 @@ jobs:
           if git diff --cached --quiet; then echo "No new clips"; exit 1; fi
           git diff --cached --stat
           git commit -m "Homepage clips: $SLUGS made with staging key 1"
+          git pull --rebase origin "${GITHUB_REF#refs/heads/}"
           git push origin HEAD:${GITHUB_REF#refs/heads/}
