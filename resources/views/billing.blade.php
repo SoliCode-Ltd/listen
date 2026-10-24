@@ -427,17 +427,6 @@
       color: var(--muted);
       margin-top: .15rem;
     }
-    #card-element {
-      padding: .8rem;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--surface);
-      transition: border-color .15s ease, box-shadow .15s ease;
-    }
-    #card-element:focus-within {
-      border-color: var(--a);
-      box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 12%, transparent);
-    }
     .card-error {
       margin-top: .4rem;
       font-size: .95rem;
@@ -1130,7 +1119,7 @@
                   <span class="saved-card-hint">{{ __('ui.billing.enter_new_card_optional') }}</span>
                 </div>
               @endif
-              <div id="card-element"></div>
+              <x-card-fields id="card" />
               <div id="card-error" class="card-error" aria-live="polite"></div>
               <label class="save-card-checkbox">
                 <input type="checkbox" id="saveCard" checked>
@@ -1580,10 +1569,10 @@
       if (card) {
         buttons.push(declineButton(kind === 'card_details' ? i18n.decline_check_card : i18n.decline_other_card, function() {
           if (selectedMethod() !== 'stripe') selectPaymentMethod('stripe');
-          if (kind !== 'card_details') card.clear();
+          if (kind !== 'card_details') cardForm.clear();
           setMessage('', '');
           stripeContainer?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          card.focus();
+          cardForm.focus();
         }, { action: 'card' }));
       }
 
@@ -2055,22 +2044,19 @@
     const cardFormMissing = Boolean(stripeKey) && !stripe;
     const cardUnavailableText = cardFormMissing ? i18n.card_form_unavailable : i18n.stripe_not_configured;
     const elements = stripe ? stripe.elements() : null;
-    const card = elements
-      ? elements.create('card', {
-          hidePostalCode: true,
-          style: resolveCardStyle(),
+    // The card in three boxes (components/card-fields): the number, the expiry date and
+    // the code. Stripe takes the card from the number field and reads the other two with it.
+    let cardComplete = false;
+    const cardForm = elements
+      ? window.ListenCardFields(elements, 'card', resolveCardStyle(), (state) => {
+          cardComplete = state.complete;
+          cardError.textContent = state.error
+            ? normalizeStripeMessage(state.error.message, i18n.invalid_card_details)
+            : '';
         })
       : null;
-
-    let cardComplete = false;
-    card?.mount('#card-element');
+    const card = cardForm ? cardForm.card : null;
     if (cardFormMissing && cardError) cardError.textContent = cardUnavailableText;
-    card?.on('change', (event) => {
-      cardComplete = Boolean(event.complete);
-      cardError.textContent = event.error
-        ? normalizeStripeMessage(event.error.message, i18n.invalid_card_details)
-        : '';
-    });
 
     if (card && 'MutationObserver' in window) {
       let currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -2078,7 +2064,7 @@
         const nextTheme = document.documentElement.getAttribute('data-theme') || 'dark';
         if (nextTheme === currentTheme) return;
         currentTheme = nextTheme;
-        card.update({ style: resolveCardStyle() });
+        cardForm.update({ style: resolveCardStyle() });
       });
       observer.observe(document.documentElement, {
         attributes: true,

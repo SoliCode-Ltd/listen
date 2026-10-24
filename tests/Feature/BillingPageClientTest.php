@@ -114,6 +114,37 @@ class BillingPageClientTest extends TestCase
         $this->billingPage('ar')->assertDontSee('بالدولار الأمريكي');
     }
 
+    public function test_cards_are_typed_in_three_boxes_and_the_pack_is_priced_in_local_money(): void
+    {
+        config(['services.stripe.key' => 'pk_test_dummy', 'services.stripe.secret' => 'sk_test_dummy']);
+        SiteSetting::set('pricing_forced_country_code', 'EG', 'billing');
+        SiteSetting::set('pricing_exchange_rate_EGP', '50', 'billing');
+        $this->pack();
+
+        // The number, the expiry date and the code, each in its own labelled box.
+        $boxes = fn (string $id) => ['id="'.$id.'-number"', 'id="'.$id.'-expiry"', 'id="'.$id.'-cvc"'];
+        $billing = $this->billingPage('ar');
+        foreach ($boxes('card') as $box) {
+            $billing->assertSee($box, false);
+        }
+        $billing->assertSee(__('ui.billing.card_number', [], 'ar'))
+            ->assertSee(__('ui.billing.card_expiry', [], 'ar'))
+            ->assertSee(__('ui.billing.card_cvc', [], 'ar'))
+            ->assertSee("window.ListenCardFields(elements, 'card', resolveCardStyle()", false)
+            ->assertDontSee("elements.create('card',", false);
+
+        // The pack page too, with its price in the visitor's own money.
+        $pack = $this->actingAs(User::factory()->create(['subscription_status_checked_at' => now()]))
+            ->getLocalizedRoute('billing.pack')->assertOk()
+            ->assertSee("window.ListenCardFields(stripe.elements(), 'pack-card', cardStyle()", false);
+        foreach ($boxes('pack-card') as $box) {
+            $pack->assertSee($box, false);
+        }
+        preg_match('/class="pack-amount"[^>]*>([^<]*)</u', (string) $pack->getContent(), $price);
+        $this->assertStringContainsString('ج.م', $price[1]);
+        $this->assertStringNotContainsString('$', $price[1]);
+    }
+
     public function test_the_pack_page_keeps_pay_off_while_the_bank_processes_and_without_stripe_js(): void
     {
         $this->pack();
