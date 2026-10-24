@@ -17,10 +17,10 @@
       text-align: center;
       padding: 2.4rem 1rem 1.8rem;
     }
-    /* Two lines, the second in the brand's violet, as on the home page. */
+    /* One line, its second half in the brand's violet, as on the home page. */
     .page-hero h1 {
       margin: 0 auto .7rem;
-      max-width: 26ch;
+      max-width: none;
       font-size: clamp(2rem, 3.3vw, 2.75rem);
       font-weight: 700;
       line-height: 1.12;
@@ -31,10 +31,10 @@
       letter-spacing: 0;
       line-height: 1.35;
     }
-    .page-hero h1 .accent { display: block; color: var(--brand-accent); }
+    .page-hero h1 .accent { color: var(--brand-accent); }
     .page-hero .lead {
       color: var(--muted);
-      max-width: 58ch;
+      max-width: 64ch;
       margin: 0 auto;
       font-size: 1.05rem;
       line-height: 1.65;
@@ -299,7 +299,7 @@
     .offer-ends { display: flex; flex-basis: 100%; flex-direction: column; align-items: center; gap: .45rem; margin-top: .65rem; }
     .offer-ends[hidden] { display: none; }
     .offer-ends-when { display: inline-flex; align-items: center; gap: .4rem; color: var(--text); font-size: .84rem; font-weight: 600; }
-    .offer-ends-when svg { flex: none; width: 15px; height: 15px; fill: none; stroke: #D9921C; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .offer-ends-when svg { flex: none; width: 15px; height: 15px; fill: none; stroke: var(--accent-text); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .offer-ends-clock { display: inline-flex; gap: .35rem; direction: ltr; }
     html[dir="rtl"] .offer-ends-clock { direction: rtl; }
     .offer-ends-clock:empty { display: none; }
@@ -309,11 +309,11 @@
       min-width: 3.1rem;
       padding: .3rem .45rem .25rem;
       border-radius: 10px;
-      background: color-mix(in srgb, #F2B544 16%, var(--surface));
-      border: 1px solid color-mix(in srgb, #F2B544 38%, transparent);
+      background: color-mix(in srgb, var(--brand-accent) 7%, var(--surface));
+      border: 1px solid color-mix(in srgb, var(--brand-accent) 22%, transparent);
     }
-    .offer-ends-unit b { font-size: 1rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--text); }
-    .offer-ends-unit small { font-size: .64rem; font-weight: 600; color: color-mix(in srgb, #8A5A0E 70%, var(--text)); }
+    .offer-ends-unit b { font-size: 1rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--accent-text); }
+    .offer-ends-unit small { font-size: .64rem; font-weight: 600; color: color-mix(in srgb, var(--accent-text) 55%, var(--muted)); }
     .offer-ends-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
     /* The most popular plan: a ribbon across the panel's corner, with a crown. */
