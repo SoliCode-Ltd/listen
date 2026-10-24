@@ -1,10 +1,10 @@
 name: Gemini voice library
 
 # Read-only. Lists the Gemini 3.8 Extended Voice Library (GET /v1beta/voices,
-# prebuilt catalogue voices) with key 1 from STAGING's .env, keeps the Arabic
-# and English ones, and prints them by language, accent and gender, so each
-# Listen speaker can be given a voice of their own. Makes no audio and uses no
-# speech quota; the key is read over SSH, masked in the log and never stored.
+# prebuilt catalogue voices) with key 1 from STAGING's .env and keeps every
+# voice of every language as an artifact, so each Listen speaker can be given
+# a voice of their own. Makes no audio and uses no speech quota; the key is
+# read over SSH, masked in the log and never stored.
 
 on:
   workflow_dispatch:
@@ -59,13 +59,13 @@ jobs:
             curl -sS "https://generativelanguage.googleapis.com/v1beta/voices/$id" -H "x-goog-api-key: $KEY" \
               | jq -c 'with_entries(if (.value | type) == "string" and (.value | length) > 200 then .value = ("<" + (.value | length | tostring) + " chars>") else . end)'
           done
-          echo "== By language, accent and gender =="
-          jq -r '.[] | [(.languageCode // .language_code), (.accent // "-"), (.gender // "-")] | @tsv' out/ar-en.json | sort | uniq -c | sort -k2
-          echo "== Every voice =="
-          jq -r '.[] | [(.id // .name), (.displayName // .display_name // ""), (.languageCode // .language_code), (.regionCode // .region_code // "-"), (.accent // "-"), (.gender // "-"), (.pitch // "-"), ((.persona // []) | if type == "array" then join("/") else . end), ((.description // "") | .[0:110])] | @tsv' out/ar-en.json | sort -t$'\t' -k3,3 -k5,5 -k6,6
+          echo "== By language and gender =="
+          jq -r '.[] | [(.languageCode // .language_code), (.gender // "-")] | @tsv' out/all.json | sort | uniq -c | sort -k2
 
       - uses: actions/upload-artifact@v4
         with:
           name: gemini-voice-library
-          path: out/ar-en.json
+          path: |
+            out/ar-en.json
+            out/all.json
           retention-days: 7
