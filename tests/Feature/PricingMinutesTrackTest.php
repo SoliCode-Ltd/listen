@@ -66,6 +66,19 @@ class PricingMinutesTrackTest extends TestCase
         }
     }
 
+    public function test_phones_compare_two_plans_starting_with_the_one_on_the_track(): void
+    {
+        $html = $this->getLocalizedRoute('pricing')->assertOk()->getContent();
+
+        // Two pickers above the table; the plan the track shows and the next one up come first.
+        $this->assertSame(2, substr_count($html, 'class="compare-pick"'));
+        preg_match('/class="compare-table" data-pick="(\d+),(\d+)"/', $html, $pick);
+        preg_match_all('/class="compare-plan[^"]*" data-col="(\d+)" data-slug="([a-z_]+)"/', $html, $columns);
+        $slugs = array_combine($columns[1], $columns[2]);
+        $this->assertSame('starter', $slugs[$pick[1]]);
+        $this->assertSame('creator', $slugs[$pick[2]]);
+    }
+
     public function test_the_page_never_shows_a_price_per_minute(): void
     {
         foreach (['en' => ['per minute', '/min'], 'ar' => ['للدقيقة', 'لكل دقيقة']] as $locale => $phrases) {

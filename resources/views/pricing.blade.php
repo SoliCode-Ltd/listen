@@ -147,7 +147,8 @@
     }
     .studio-amount input:focus-visible { outline: none; text-decoration: underline 3px var(--brand-accent); text-underline-offset: 10px; }
     .studio-unit { font-size: 1.25rem; font-weight: 600; }
-    /* How long that is, on its own line, so a longer phrase never pushes the track down. */
+    /* How long that is in hours, on its own line (kept when empty, under an hour), so the
+       track never moves up or down. */
     .studio-about { margin: .45rem 0 0; min-height: 1.6em; color: var(--muted); font-size: .98rem; line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* The track: a voice note on the card itself (words and the pauses between them),
@@ -646,6 +647,78 @@
     .compare-table tbody tr:not(.compare-group-row):hover th,
     .compare-table tbody tr:not(.compare-group-row):hover td { background: color-mix(in oklab, var(--text) 2.5%, var(--surface)); }
     .compare-table tbody tr:not(.compare-group-row):hover td.is-popular { background: color-mix(in oklab, var(--a) 7%, var(--surface)); }
+    /* Phones: two plans side by side, each picked in the row above them (it stays in view
+       under the site's bar while reading down); the table then fits the screen. */
+    .compare-pick-row { display: none; }
+    @media (max-width: 640px) {
+      .compare-scroll.is-picked { overflow: clip; }
+      .compare-table.is-picked { min-width: 0; table-layout: fixed; font-size: .86rem; }
+      .compare-table.is-picked .is-off { display: none; }
+      .compare-table.is-picked .compare-pick-row { display: table-row; }
+      .compare-table.is-picked thead tr:not(.compare-pick-row) th { position: static; padding: .9rem .45rem 1rem; }
+      .compare-table.is-picked th[scope="row"],
+      .compare-table.is-picked thead th:first-child { position: static; width: 30%; min-width: 0; }
+      .compare-table.is-picked .compare-pick-label { width: 30%; }
+      .compare-table.is-picked .compare-plan { min-width: 0; }
+      .compare-table.is-picked .compare-plan-name { display: none; }
+      .compare-table.is-picked .compare-plan-price { flex-wrap: wrap; margin: .1rem 0 .6rem; }
+      .compare-table.is-picked .compare-plan-price b { font-size: 1.15rem; }
+      .compare-table.is-picked td,
+      .compare-table.is-picked th[scope="row"] { padding: .75rem .45rem; }
+      .compare-table.is-picked th[scope="row"] { padding-inline-start: .9rem; }
+      .compare-table.is-picked .compare-group span { inset-inline-start: .9rem; }
+      .compare-pick-row td {
+        position: sticky;
+        top: 64px;
+        z-index: 4;
+        padding: .6rem .3rem;
+        background: var(--surface);
+        border-bottom: 1px solid var(--line);
+        vertical-align: middle;
+      }
+      .compare-pick-row td:first-child { padding-inline-start: .8rem; color: var(--muted); font-size: .84rem; font-weight: 600; text-align: start; }
+      .compare-pick-cell { position: relative; }
+      .compare-pick-face {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 46px;
+        padding-block: .3rem;
+        padding-inline: .55rem 1.45rem;
+        border: 1px solid var(--line-strong);
+        border-radius: 21px;
+        background: var(--surface);
+        color: var(--text);
+        font-size: .85rem;
+        font-weight: 700;
+        line-height: 1.25;
+        text-align: center;
+        overflow-wrap: anywhere;
+      }
+      .compare-pick-face::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        inset-inline-end: .8rem;
+        width: 6px;
+        height: 6px;
+        border-right: 1.8px solid var(--muted);
+        border-bottom: 1.8px solid var(--muted);
+        transform: translateY(-70%) rotate(45deg);
+      }
+      .compare-pick {
+        position: absolute;
+        inset: .6rem .3rem;
+        width: calc(100% - .6rem);
+        height: calc(100% - 1.2rem);
+        margin: 0;
+        opacity: 0;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      .compare-pick:focus-visible + .compare-pick-face { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+    }
     .compare-tick { width: 1.15rem; height: 1.15rem; fill: none; stroke: var(--ok); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
     .compare-no { color: color-mix(in oklab, var(--muted) 70%, transparent); font-weight: 500; }
     /* Wide screens, once the whole table fits: the plan names, prices and buttons stay in
@@ -789,6 +862,10 @@
     /* ── Smaller screens ── */
     @media (max-width: 1000px) {
       .studio { grid-template-columns: 1fr; }
+      /* One column: the minutes come first, and the monthly / yearly switch sits last, right
+         above the plan's card whose price it changes. */
+      .studio-top { display: contents; }
+      .studio .billing-toggle { order: 5; align-self: flex-start; margin-top: 1.5rem; }
       .studio-plan { border-inline-start: 0; border-top: 1px solid var(--line); }
       .plan-picker-list { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
     }
@@ -796,7 +873,7 @@
       .studio { border-radius: 22px; }
       .studio-station-name { font-size: .7rem; }
       .studio-station:not(.is-on) .studio-station-name { opacity: 0; }
-      .studio .billing-toggle { width: 100%; }
+      .studio .billing-toggle { width: 100%; align-self: stretch; }
       .plan-picker-list { grid-template-columns: 1fr; gap: 10px; }
       .plan-pick { grid-template-columns: auto 1fr auto; justify-items: start; column-gap: 1rem; padding: 1rem 1.1rem; text-align: start; }
       .plan-pick .orb { --orb-size: 44px; grid-row: span 2; margin: 0; }
@@ -830,6 +907,7 @@
       .plan-bar .plan-btn { width: auto; min-height: 44px; padding: .5rem 1.3rem; background: var(--brand-accent); color: #fff; border-color: transparent; }
       .plan-bar .plan-btn.btn-disabled { background: var(--surface2); color: var(--muted); }
       /* The chat button moves up while the bar is shown, so it never covers the button. */
+      body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
       body.has-plan-bar .wa-widget { bottom: calc(84px + env(safe-area-inset-bottom)) !important; transition: bottom .35s ease; }
     }
     @media (max-width: 1240px) {
@@ -848,8 +926,14 @@
     }
     @media (max-width: 600px) {
       .pricing-page { width: min(100% - 2rem, 1320px); }
-      .page-hero { padding: 2.25rem 0 1.5rem; }
-      .page-hero { padding-top: 2.75rem; }
+      .page-hero { padding: 1.75rem 0 1.4rem; }
+      .page-hero .lead { font-size: .95rem; line-height: 1.6; }
+      /* The three things every plan has, as compact rows: the icon beside its title. */
+      .features-grid { gap: .75rem; }
+      .feature-card { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: .9rem; padding: 1.1rem; }
+      .feature-icon { grid-row: span 2; width: 2.3rem; height: 2.3rem; margin: 0; }
+      .feature-card h3 { margin: .15rem 0 .3rem; font-size: 1rem; }
+      .feature-card p { font-size: .9rem; line-height: 1.6; }
       .billing-toggle button { padding: 0 .9rem; }
       .compare, .features-section, .faq-section { padding-top: 4rem; }
       .compare-table th[scope="row"], .compare-table thead th:first-child { min-width: 150px; }
@@ -1126,63 +1210,7 @@
       <a class="team-btn" href="{{ route('contact', ['topic' => 'billing']) }}">{{ __('ui.pricing.team_cta') }}</a>
     </section>
 
-    @if(count($comparePlans) > 1 && $compareRows !== [])
-      <section class="compare" id="compare" aria-labelledby="compareTitle">
-        <h2 class="section-title" id="compareTitle">{{ __('ui.pricing.compare_title') }}</h2>
-        <p class="section-subtitle">{{ __('ui.pricing.compare_subtitle') }}</p>
-        <div class="compare-scroll" role="region" aria-labelledby="compareTitle" tabindex="0">
-          <table class="compare-table">
-            <thead>
-              <tr>
-                <th scope="col" class="compare-corner">{{ __('ui.pricing.compare_feature') }}</th>
-                @foreach($comparePlans as $compareIndex => $comparePlan)
-                  @php
-                    // Its place among all the plans, as on the cards (for "current plan" and "downgrade").
-                    $compareAt = (int) array_search($comparePlan['slug'], array_column($pricingPlans, 'slug'), true);
-                    $comparePopular = $planState($comparePlan, $compareAt)['is_popular'];
-                    $compareMonthly = $wholePrice((string) ($comparePlan['display_price_monthly_formatted'] ?? ''));
-                    $compareYearly = $wholePrice((string) ($comparePlan['display_price_yearly_monthly_formatted'] ?? $compareMonthly));
-                  @endphp
-                  <th scope="col" class="compare-plan {{ $comparePopular ? 'is-popular' : '' }}">
-                    <span class="compare-plan-badge">{{ $comparePopular ? __('ui.pricing.most_popular') : '' }}</span>
-                    <span class="compare-plan-name">{{ $planDisplayName($comparePlan) }}</span>
-                    <span class="compare-plan-price" dir="ltr">
-                      <b data-compare-price data-monthly="{{ $compareMonthly }}" data-yearly="{{ $compareYearly }}">{{ $compareMonthly }}</b><small>{{ __('ui.pricing.per_month_short') }}</small>
-                    </span>
-                    @include('components._plan-button', ['plan' => $comparePlan, 'index' => $compareAt, 'small' => true])
-                  </th>
-                @endforeach
-              </tr>
-            </thead>
-            @foreach($compareGroups as $groupTitle => $groupRows)
-              <tbody>
-                <tr class="compare-group-row">
-                  <th scope="rowgroup" class="compare-group" colspan="{{ count($comparePlans) + 1 }}"><span>{{ $groupTitle }}</span></th>
-                </tr>
-                @foreach($groupRows as $label => $values)
-                  <tr>
-                    <th scope="row"><span class="compare-row-label">{{ $label }}</span></th>
-                    @foreach($comparePlans as $comparePlan)
-                      @php $cell = $values[$comparePlan['slug']] ?? null; @endphp
-                      <td class="{{ !empty($comparePlan['is_popular']) ? 'is-popular' : '' }}">
-                        @if($cell === null)
-                          <span class="compare-no" aria-label="{{ __('ui.pricing.compare_not_included') }}">—</span>
-                        @elseif($cell === '' || $cell === $includedMark)
-                          <svg class="compare-tick" viewBox="0 0 24 24" role="img" aria-label="{{ $includedMark }}"><path d="M20 6 9 17l-5-5"/></svg>
-                        @else
-                          {{ $cell }}
-                        @endif
-                      </td>
-                    @endforeach
-                  </tr>
-                @endforeach
-              </tbody>
-            @endforeach
-          </table>
-        </div>
-      </section>
-    @endif
-
+    {{-- What every plan has, right after the plans; the full comparison follows for those who want it. --}}
     <section class="features-section">
       <h2 class="section-title">{{ __('ui.pricing.included_title') }}</h2>
       <p class="section-subtitle">{{ __('ui.pricing.included_subtitle') }}</p>
@@ -1210,6 +1238,86 @@
         </article>
       </div>
     </section>
+
+    @if(count($comparePlans) > 1 && $compareRows !== [])
+      <section class="compare" id="compare" aria-labelledby="compareTitle">
+        <h2 class="section-title" id="compareTitle">{{ __('ui.pricing.compare_title') }}</h2>
+        <p class="section-subtitle">{{ __('ui.pricing.compare_subtitle') }}</p>
+        <div class="compare-scroll" role="region" aria-labelledby="compareTitle" tabindex="0">
+          @php
+            // Phones show two plans side by side, picked above the table: first the plan the
+            // track shows, then the next one up (the one before it when it is the last).
+            $compareFirst = max(0, (int) array_search($shownSlug, array_column($comparePlans, 'slug'), true));
+            $compareSecond = $compareFirst + 1 < count($comparePlans) ? $compareFirst + 1 : max(0, $compareFirst - 1);
+          @endphp
+          <table class="compare-table" data-pick="{{ $compareFirst }},{{ $compareSecond }}">
+            <thead>
+              @if(count($comparePlans) > 2)
+                <tr class="compare-pick-row">
+                  <td class="compare-pick-label">{{ __('ui.pricing.compare_pick') }}</td>
+                  @foreach(['compare_pick_first', 'compare_pick_second'] as $pickLabel)
+                    <td class="compare-pick-cell">
+                      {{-- The phone's own list opens from the select; the name shows on the face
+                           under it, where a long name can take two lines. --}}
+                      <select class="compare-pick" aria-label="{{ __('ui.pricing.'.$pickLabel) }}">
+                        @foreach($comparePlans as $pickIndex => $pickPlan)
+                          <option value="{{ $pickIndex }}">{{ $planDisplayName($pickPlan) }}</option>
+                        @endforeach
+                      </select>
+                      <span class="compare-pick-face" aria-hidden="true"></span>
+                    </td>
+                  @endforeach
+                </tr>
+              @endif
+              <tr>
+                <th scope="col" class="compare-corner">{{ __('ui.pricing.compare_feature') }}</th>
+                @foreach($comparePlans as $compareIndex => $comparePlan)
+                  @php
+                    // Its place among all the plans, as on the cards (for "current plan" and "downgrade").
+                    $compareAt = (int) array_search($comparePlan['slug'], array_column($pricingPlans, 'slug'), true);
+                    $comparePopular = $planState($comparePlan, $compareAt)['is_popular'];
+                    $compareMonthly = $wholePrice((string) ($comparePlan['display_price_monthly_formatted'] ?? ''));
+                    $compareYearly = $wholePrice((string) ($comparePlan['display_price_yearly_monthly_formatted'] ?? $compareMonthly));
+                  @endphp
+                  <th scope="col" class="compare-plan {{ $comparePopular ? 'is-popular' : '' }}" data-col="{{ $compareIndex }}" data-slug="{{ $comparePlan['slug'] }}">
+                    <span class="compare-plan-badge">{{ $comparePopular ? __('ui.pricing.most_popular') : '' }}</span>
+                    <span class="compare-plan-name">{{ $planDisplayName($comparePlan) }}</span>
+                    <span class="compare-plan-price" dir="ltr">
+                      <b data-compare-price data-monthly="{{ $compareMonthly }}" data-yearly="{{ $compareYearly }}">{{ $compareMonthly }}</b><small>{{ __('ui.pricing.per_month_short') }}</small>
+                    </span>
+                    @include('components._plan-button', ['plan' => $comparePlan, 'index' => $compareAt, 'small' => true])
+                  </th>
+                @endforeach
+              </tr>
+            </thead>
+            @foreach($compareGroups as $groupTitle => $groupRows)
+              <tbody>
+                <tr class="compare-group-row">
+                  <th scope="rowgroup" class="compare-group" colspan="{{ count($comparePlans) + 1 }}"><span>{{ $groupTitle }}</span></th>
+                </tr>
+                @foreach($groupRows as $label => $values)
+                  <tr>
+                    <th scope="row"><span class="compare-row-label">{{ $label }}</span></th>
+                    @foreach($comparePlans as $compareIndex => $comparePlan)
+                      @php $cell = $values[$comparePlan['slug']] ?? null; @endphp
+                      <td class="{{ !empty($comparePlan['is_popular']) ? 'is-popular' : '' }}" data-col="{{ $compareIndex }}">
+                        @if($cell === null)
+                          <span class="compare-no" aria-label="{{ __('ui.pricing.compare_not_included') }}">—</span>
+                        @elseif($cell === '' || $cell === $includedMark)
+                          <svg class="compare-tick" viewBox="0 0 24 24" role="img" aria-label="{{ $includedMark }}"><path d="M20 6 9 17l-5-5"/></svg>
+                        @else
+                          {{ $cell }}
+                        @endif
+                      </td>
+                    @endforeach
+                  </tr>
+                @endforeach
+              </tbody>
+            @endforeach
+          </table>
+        </div>
+      </section>
+    @endif
 
     <section class="faq-section" aria-labelledby="faqTitle">
       <div class="faq-intro">
@@ -1489,6 +1597,7 @@
         });
         refreshBar();
         syncBar();
+        document.dispatchEvent(new CustomEvent('listen:pricing-plan', { detail: { slug: slug } }));
       }
 
       // The bar at the bottom on phones: the shown plan, its price and its own button.
@@ -1709,7 +1818,8 @@
         if (m !== shownMinutes) {
           shownMinutes = m;
           if (document.activeElement !== input) { input.value = fmt(m); fit(); }
-          var text = t.about.replace(':time', duration(m));
+          // Only once it adds something: in hours (under an hour it would repeat the number).
+          var text = m >= 60 ? t.about.replace(':time', duration(m)) : '';
           if (about.textContent !== text) about.textContent = text;
         }
         if (!lockedPlan) showPlan(planFor(m).slug);
@@ -1839,6 +1949,68 @@
       go(pos(start), { exact: start });
       clearTimeout(announce); // said only once the visitor moves it
       requestAnimationFrame(function () { studio.classList.add('is-ready'); });
+    })();
+  </script>
+  <script>
+    /* ── Phones: two plans side by side in the comparison ──
+       The plan the track shows and the next one up, until the visitor picks their own two
+       above the table. The other plans' columns are left out, so the table fits the screen. */
+    (function () {
+      var table = document.querySelector('.compare-table[data-pick]');
+      var picks = table ? table.querySelectorAll('.compare-pick') : [];
+      if (picks.length < 2) return;
+      var wrap = table.closest('.compare-scroll');
+      var heads = Array.prototype.slice.call(table.querySelectorAll('thead th[data-col]'));
+      var slugs = heads.map(function (th) { return th.getAttribute('data-slug'); });
+      var rows = Array.prototype.slice.call(table.querySelectorAll('tr')).filter(function (row) { return row.querySelector('[data-col]'); });
+      var groups = table.querySelectorAll('th.compare-group');
+      var phone = window.matchMedia('(max-width: 640px)');
+      var chosen = table.getAttribute('data-pick').split(',').map(Number), touched = false, moved = false, wait = 0;
+      function rank(cell) {
+        var c = +cell.getAttribute('data-col'), k = chosen.indexOf(c);
+        return !phone.matches ? c : (k < 0 ? 2 + c : k);
+      }
+      function apply() {
+        var on = phone.matches;
+        Array.prototype.forEach.call(picks, function (select, side) {
+          select.value = String(chosen[side]);
+          var face = select.nextElementSibling;
+          if (face) face.textContent = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
+        });
+        table.classList.toggle('is-picked', on);
+        if (wrap) wrap.classList.toggle('is-picked', on);
+        if (!on && !moved) return;
+        moved = on;
+        rows.forEach(function (row) {
+          Array.prototype.slice.call(row.querySelectorAll('[data-col]'))
+            .sort(function (a, b) { return rank(a) - rank(b); })
+            .forEach(function (cell) {
+              row.appendChild(cell);
+              cell.classList.toggle('is-off', on && chosen.indexOf(+cell.getAttribute('data-col')) < 0);
+            });
+        });
+        Array.prototype.forEach.call(groups, function (g) { g.colSpan = on ? 3 : heads.length + 1; });
+      }
+      Array.prototype.forEach.call(picks, function (select, side) {
+        select.addEventListener('change', function () {
+          var value = +select.value;
+          // Picking the plan the other side shows swaps the two.
+          if (value === chosen[1 - side]) chosen[1 - side] = chosen[side];
+          chosen[side] = value;
+          touched = true;
+          apply();
+        });
+      });
+      // Until then it follows the track (once the track rests, not on every plan it passes).
+      document.addEventListener('listen:pricing-plan', function (e) {
+        var i = slugs.indexOf(e.detail && e.detail.slug);
+        if (touched || i < 0) return;
+        chosen = [i, i + 1 < slugs.length ? i + 1 : Math.max(0, i - 1)];
+        clearTimeout(wait);
+        wait = setTimeout(apply, 400);
+      });
+      if (phone.addEventListener) phone.addEventListener('change', apply); else if (phone.addListener) phone.addListener(apply);
+      apply();
     })();
   </script>
 </body>
