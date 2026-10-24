@@ -22,7 +22,7 @@ on:
         type: string
         default: '40'
       from_key:
-        description: 'voice-previews only: first staging key to use (1 = GEMINI_TTS_API_KEY, 2 = _2 ...)'
+        description: 'Staging key to use (1 = GEMINI_TTS_API_KEY, 2 = _2 ...); voice-previews moves on to the next key when one runs out'
         type: string
         default: '1'
       use_last_key:
@@ -96,7 +96,8 @@ jobs:
           done
           if [ "${#KEYS[@]}" -eq 0 ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
           echo "${#KEYS[@]} Gemini key(s) on staging."
-          KEY="${KEYS[0]}"
+          first_key="$(printf '%s' "$FROM_KEY" | tr -cd '0-9')"; first_key="${first_key:-1}"
+          KEY="${KEYS[$(( first_key <= ${#KEYS[@]} ? first_key - 1 : 0 ))]}"
           if [ "$AD" = voice-previews ]; then
             # Only clips that are missing or whose line changed. Each key stops at its first
             # quota error and the next key carries on; the last key is left for live unless use_last_key.
