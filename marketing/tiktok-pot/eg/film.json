@@ -1,0 +1,123 @@
+{
+ "title": "إسمع: الحلة (مصري)",
+ "formats": [
+  "9x16"
+ ],
+ "cast": {
+  "mum": "ar-nada",
+  "son": "ar-karim"
+ },
+ "studio": "pg-eg",
+ "cues": [
+  {
+   "type": "hook",
+   "clip": "eg-angry",
+   "from": 0,
+   "to": 4.2,
+   "style": "angry",
+   "headline": [
+    "جملة واحدة…",
+    "بأي إحساس، وبأي لهجة"
+   ],
+   "text": "أنا قايلالك ألف مرة…\nما تاكلش من الحلة\nقبل الغدا!",
+   "pot": "الحلة",
+   "at": 0.16,
+   "len": 3.816
+  },
+  {
+   "type": "emotion",
+   "clip": "eg-whisper",
+   "from": 1.9,
+   "to": 4.33,
+   "label": "بتوشوش",
+   "style": "whisper",
+   "text": "ما تاكلش من الحلة\nقبل الغدا!",
+   "pot": "الحلة",
+   "at": 4.136,
+   "len": 1.921
+  },
+  {
+   "type": "emotion",
+   "clip": "eg-laughcry",
+   "from": 4.55,
+   "to": 7.15,
+   "label": "بتضحك وبتعيّط",
+   "style": "laughcry",
+   "text": "ما تاكلش من الحلة\nقبل الغدا!",
+   "pot": "الحلة",
+   "at": 6.217,
+   "len": 2.483
+  },
+  {
+   "type": "dialect",
+   "clip": "eg-in-saudi",
+   "from": 1.74,
+   "to": 4.18,
+   "label": "سعودي",
+   "flag": "sa",
+   "text": "لا تاكل من القدر\nقبل الغدا!",
+   "pot": "القدر",
+   "at": 8.86,
+   "len": 2.525
+  },
+  {
+   "type": "dialect",
+   "clip": "eg-in-lebanese",
+   "from": 1.52,
+   "to": 3.79,
+   "label": "لبناني",
+   "flag": "lb",
+   "text": "ما تاكل من الطنجرة\nقبل الغدا!",
+   "pot": "الطنجرة",
+   "at": 11.546,
+   "len": 2.163
+  },
+  {
+   "type": "dialect",
+   "clip": "eg-in-fusha",
+   "from": 1.78,
+   "to": 4.48,
+   "label": "فصحى",
+   "text": "لا تأكلْ من القِدرِ\nقبلَ الغداء!",
+   "pot": "القِدرِ",
+   "at": 13.868,
+   "len": 2.221
+  },
+  {
+   "type": "talk",
+   "clip": "eg-son",
+   "who": "son",
+   "gap": 0.35,
+   "text": "يا ماما دي معلقة واحدة بس!",
+   "at": 16.44,
+   "len": 1.96
+  },
+  {
+   "type": "talk",
+   "clip": "eg-mum-last",
+   "who": "mum",
+   "gap": 0.12,
+   "text": "واحدة؟! الحلة فاضية!",
+   "at": 18.52,
+   "len": 2.996
+  },
+  {
+   "type": "studio",
+   "hold": 5.4,
+   "gap": 0.25,
+   "at": 21.516,
+   "boxes": "eg"
+  },
+  {
+   "type": "end",
+   "hold": 3.2,
+   "gap": 0.0,
+   "title": "جرّب لهجتك",
+   "question": "إنت لهجتك إيه؟ اكتبها في الكومنتات",
+   "at": 27.166
+  }
+ ],
+ "duration": 30.37,
+ "poster": 10.06,
+ "start": 0.0
+}

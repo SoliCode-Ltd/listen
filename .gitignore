@@ -36,3 +36,5 @@ Homestead.yaml
 Thumbs.db
 /marketing/launch-ad/out/
 /marketing/social/out/
+/marketing/tiktok-pot/out/
+/marketing/tiktok-pot/*/audio/*.wav

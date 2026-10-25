@@ -1,0 +1,129 @@
+{
+ "title": "إسمع: القدر (خليجي)",
+ "formats": [
+  "9x16"
+ ],
+ "cast": {
+  "mum": "ar-duaa",
+  "son": "ar-nawaf"
+ },
+ "studio": "pg-sa",
+ "cues": [
+  {
+   "type": "hook",
+   "clip": "sa-angry",
+   "from": 0.3,
+   "to": 3.64,
+   "style": "angry",
+   "headline": [
+    "جملة وحدة…",
+    "بأي إحساس، وبأي لهجة"
+   ],
+   "text": "قلت لك ألف مرة…\nلا تاكل من القدر\nقبل الغدا!",
+   "pot": "القدر",
+   "at": 0.16,
+   "len": 3.349
+  },
+  {
+   "type": "emotion",
+   "clip": "sa-whisper",
+   "from": 1.5,
+   "to": 3.67,
+   "label": "توشوش",
+   "style": "whisper",
+   "text": "لا تاكل من القدر\nقبل الغدا!",
+   "pot": "القدر",
+   "at": 3.669,
+   "len": 2.054
+  },
+  {
+   "type": "emotion",
+   "clip": "sa-laughcry",
+   "from": 2.74,
+   "to": 5.28,
+   "label": "تضحك وتبكي",
+   "style": "laughcry",
+   "text": "لا تاكل من القدر\nقبل الغدا!",
+   "pot": "القدر",
+   "at": 5.883,
+   "len": 2.618
+  },
+  {
+   "type": "dialect",
+   "clip": "sa-in-egyptian",
+   "from": 1.66,
+   "to": 3.87,
+   "label": "مصري",
+   "flag": "eg",
+   "text": "ما تاكلش من الحلة\nقبل الغدا!",
+   "pot": "الحلة",
+   "at": 8.661,
+   "len": 1.665
+  },
+  {
+   "type": "dialect",
+   "clip": "sa-in-emirati",
+   "from": 1.44,
+   "to": 3.69,
+   "label": "إماراتي",
+   "flag": "ae",
+   "text": "لا تاكل من الجدر\nقبل الغدا!",
+   "pot": "الجدر",
+   "at": 10.486,
+   "len": 1.837
+  },
+  {
+   "type": "dialect",
+   "clip": "sa-in-fusha",
+   "from": 1.72,
+   "to": 4.93,
+   "label": "فصحى",
+   "text": "لا تأكلْ من القِدرِ\nقبلَ الغداء!",
+   "pot": "القِدرِ",
+   "at": 12.483,
+   "len": 2.971
+  },
+  {
+   "type": "talk",
+   "clip": "sa-son",
+   "who": "son",
+   "gap": 0.35,
+   "text": "يمه بس ملعقة وحدة!",
+   "at": 15.804,
+   "len": 1.373
+  },
+  {
+   "type": "talk",
+   "clip": "sa-mum-last",
+   "who": "mum",
+   "gap": 0.12,
+   "text": "وحدة؟! القدر فاضي!",
+   "at": 17.297,
+   "len": 3.501
+  },
+  {
+   "type": "studio",
+   "hold": 5.4,
+   "gap": 0.25,
+   "at": 20.799,
+   "steps": [
+    "اختر اللهجة",
+    "اكتب جملتك",
+    "أضف إحساس",
+    "وصوت ضحكة",
+    "واضغط توليد"
+   ],
+   "boxes": "sa"
+  },
+  {
+   "type": "end",
+   "hold": 3.2,
+   "title": "جرّب لهجتك",
+   "question": "وش لهجتك؟ اكتبها في الكومنتات",
+   "at": 26.449
+  }
+ ],
+ "duration": 29.65,
+ "poster": 9.86,
+ "start": 0.0
+}

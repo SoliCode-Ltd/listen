@@ -1,0 +1,63 @@
+{
+ "title": "إسمع: الحلة (قصير)",
+ "formats": [
+  "9x16"
+ ],
+ "cast": {
+  "mum": "ar-nada",
+  "son": "ar-karim"
+ },
+ "studio": "pg-eg",
+ "cues": [
+  {
+   "type": "hook",
+   "clip": "eg-angry",
+   "from": 0,
+   "to": 4.2,
+   "style": "angry",
+   "headline": [
+    "جملة واحدة…",
+    "بأي إحساس، وبأي لهجة"
+   ],
+   "text": "أنا قايلالك ألف مرة…\nما تاكلش من الحلة\nقبل الغدا!",
+   "pot": "الحلة",
+   "at": 0.16,
+   "len": 3.816
+  },
+  {
+   "type": "emotion",
+   "clip": "eg-whisper",
+   "from": 1.9,
+   "to": 4.33,
+   "label": "بتوشوش",
+   "style": "whisper",
+   "text": "ما تاكلش من الحلة\nقبل الغدا!",
+   "pot": "الحلة",
+   "at": 4.136,
+   "len": 1.921
+  },
+  {
+   "type": "emotion",
+   "clip": "eg-laughcry",
+   "from": 4.55,
+   "to": 7.15,
+   "label": "بتضحك وبتعيّط",
+   "style": "laughcry",
+   "text": "ما تاكلش من الحلة\nقبل الغدا!",
+   "pot": "الحلة",
+   "at": 6.217,
+   "len": 2.483
+  },
+  {
+   "type": "end",
+   "hold": 3.2,
+   "gap": 0.2,
+   "title": "جرّب لهجتك",
+   "question": "إنت لهجتك إيه؟ اكتبها في الكومنتات",
+   "at": 8.7
+  }
+ ],
+ "duration": 12.1,
+ "poster": 1.0,
+ "start": 0.0
+}
