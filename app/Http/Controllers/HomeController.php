@@ -292,7 +292,28 @@ class HomeController extends Controller
             $cards[$key] = $card;
         }
 
-        return array_values($cards + $previews);
+        // The page shows twelve at a time: take turns between the regions, so the first
+        // twelve already span the map (Egypt, the first market, then the Gulf ...).
+        $order = $language === 'ar'
+            ? ['nile', 'gulf', 'levant', 'maghreb', 'iraq_yemen', 'fusha']
+            : ['americas', 'uk_ie', 'asia_pacific', 'africa', 'other', 'languages'];
+        $byRegion = array_fill_keys($order, []);
+        foreach ($cards + $previews as $card) {
+            $byRegion[$card['region']][] = $card;
+        }
+        $mixed = [];
+        for ($turn = 0; $byRegion !== []; $turn++) {
+            foreach ($byRegion as $region => $list) {
+                if (! isset($list[$turn])) {
+                    unset($byRegion[$region]);
+
+                    continue;
+                }
+                $mixed[] = $list[$turn];
+            }
+        }
+
+        return $mixed;
     }
 
     /**

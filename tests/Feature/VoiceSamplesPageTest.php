@@ -125,6 +125,32 @@ class VoiceSamplesPageTest extends TestCase
         $ar->assertDontSee('data-vp-region="languages"', false);
     }
 
+    public function test_voices_show_twelve_at_a_time_starting_across_the_map(): void
+    {
+        $this->artisan('tts:showcase', ['--import' => true]);
+
+        app()->setLocale('ar');
+        $page = $this->getLocalizedRoute('samples')->assertOk();
+        $html = $page->getContent();
+        $voices = $page->viewData('voices');
+
+        // The first twelve take turns between the regions, Egypt first.
+        $this->assertSame('nile', $voices[0]['region']);
+        $this->assertCount(6, array_unique(array_column(array_slice($voices, 0, 12), 'region')));
+
+        // Twelve cards shown in the voices grid, the rest behind "Show more".
+        $grid = substr($html, strpos($html, 'id="arabic-dialects"'), strpos($html, 'id="long-reads"') - strpos($html, 'id="arabic-dialects"'));
+        $this->assertStringContainsString('data-vp-page="12" data-vp-filter="all"', $grid);
+        $this->assertSame(12, preg_match_all('/<article class="vs-card[^"]*"[^>]*data-language="[a-z]+"\s*>/', $grid));
+        $this->assertSame(count($voices), substr_count($grid, '<article class="vs-card'));
+        $this->assertMatchesRegularExpression('/data-vp-more-cards\s*>اعرض المزيد من الأصوات<\/button>/u', $grid);
+
+        // Moods: at most twelve of the first mood.
+        $moods = substr($html, strpos($html, 'id="moods"'));
+        $this->assertLessThanOrEqual(12, preg_match_all('/<article class="vs-card[^"]*"[^>]*data-language="[a-z]+"\s*>/', $moods));
+        $this->assertStringContainsString('data-vp-page="12"', $moods);
+    }
+
     public function test_every_preview_has_a_card_title_and_mood(): void
     {
         $previews = array_keys(\App\Support\VoicePreviews::lines());
@@ -178,7 +204,7 @@ class VoiceSamplesPageTest extends TestCase
         // "Show all" opens the samples page at the matching section, instead of expanding in place.
         $home->assertSee('class="vs-more-btn" href="'.route('samples').'#english-accents"', false);
         $home->assertSee('class="vs-more-btn" href="'.route('samples').'#conversations"', false);
-        $home->assertDontSee('data-vp-more', false);
+        $home->assertDontSee('<button type="button" class="vs-more-btn"', false);
 
         app()->setLocale('ar');
         $this->getLocalizedRoute('home')->assertOk()
