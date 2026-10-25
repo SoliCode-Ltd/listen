@@ -57,42 +57,49 @@ const rings: Ringed[] = [];
 const steps: { text: string; at: number }[] = [];
 const players: Player[] = [];
 let typing = [0, 0], tap = -1;
-const look = (t: number, x: number, y: number, z: number) => cam.push([t, x, y, z]);
+// Close up, the page always fills the frame (no background around the window): the camera is
+// kept far enough inside the page for its zoom. A wide shot (the page smaller than the frame)
+// stays centred.
+const fit = (x: number, y: number, z: number) => {
+  const hx = W / 2 / (WIN * z), hy = H / 2 / (PAGE_H * z);
+  const keep = (v: number, h: number) => (h < 0.5 ? Math.min(Math.max(v, h), 1 - h) : 0.5);
+  return [keep(x, hx), keep(y, hy)];
+};
+const look = (t: number, x: number, y: number, z: number) => { const [fx, fy] = fit(x, y, z); cam.push([t, fx, fy, z]); };
 const hold = (t: number) => { const [, x, y, z] = cam[cam.length - 1]; look(t, x, y, z); };
 const step = (text: string, at: number) => { if (!steps.length || steps[steps.length - 1].text !== text) steps.push({ text, at }); };
 
-// a voice playing: the camera reads its input, then moves down to the player
+// a voice playing: one close shot with its input at the top and the player at the bottom, pushing
+// in slowly; a ring on the input as it starts, then on the player
+const SIDE = 0.645; // the input's side of the page (it is right-aligned), with the player's words
 const playing = (slug: string, b: Beat, from: number) => {
   const v = T.voices[slug];
-  const line = lineOf(v), [lx, ly] = centre(line), [, ry] = centre(v.row);
   const audio = b.audio as number, len = b.end - audio;
-  rings.push({ box: line, a: from + 0.25, b: audio + 0.9, r: 10 });
-  look(from + 0.4, lx, ly, 2.8);
-  hold(audio + len * 0.42);
-  look(audio + len * 0.42 + 0.6, 0.6, ry - 0.07, 2.7);
+  rings.push({ box: lineOf(v), a: from + 0.25, b: audio + len * 0.4, r: 10 }, { box: v.row, a: audio + len * 0.45, b: b.end, r: 26 });
+  look(from + 0.45, SIDE, 1, 2.85);
+  look(b.end, SIDE, 1, 2.95);
   players.push({ row: v.row, audio, lead: b.lead as number, play: v.play, until: b.end });
 };
 
 for (const b of TL.beats) {
   const s = b.start;
   if (b.kind === 'open') {
-    const v = T.voices[b.slug as string], [lx, ly] = centre(lineOf(v));
     shots.push({ img: `tour/res-${b.slug}.png`, at: s });
-    look(s, lx, ly + 0.02, 2.6);
+    look(s, SIDE, 1, 2.6);
     step(STEP.open, s);
     playing(b.slug as string, b, s);
   } else if (b.kind === 'library' && !b.slug) {
     hold(s);
-    look(s + 0.45, 0.5, 0.5, 1.05);
-    hold(s + 0.6);
-    look(s + 1.1, 0.24, 0.29, 2.6);
+    look(s + 0.5, 0.5, 0.5, 1.1);
+    hold(s + 0.65);
+    look(s + 1.15, 0.24, 0.29, 2.8);
     shots.push({ img: 'studio/v2-0.png', at: s + 0.2 }, { img: 'studio/v2-1.png', at: s + 1.0 }, { img: 'studio/v2-2.png', at: s + 1.5 });
     rings.push({ box: V2.search, a: s + 1.0, b: s + 1.45, r: 12 }, { box: V2.card, a: s + 1.55, b: b.end, r: 16 });
     step(STEP.library, s);
   } else if (b.kind === 'dialect') {
     shots.push({ img: 'tour/opt-dialect.png', at: s });
     hold(s);
-    look(s + 0.4, 0.5, 0.52, 2.0);
+    look(s + 0.4, 0.6, 0.5, 2.6);
     rings.push({ box: T.voices['sumaya-excited'].item as Box, a: s + 0.45, b: b.end, r: 12 });
     step(STEP.dialect, s);
   } else if (b.kind === 'type') {
@@ -103,14 +110,14 @@ for (const b of TL.beats) {
     rings.push({ box: V2.emoTag, a: s + 1.0, b: s + 1.45, r: 5 }, { box: V2.soundTag, a: s + 1.5, b: b.end, r: 5 });
     step(STEP.type, s);
   } else if (b.kind === 'generate') {
-    const v = T.voices['sumaya-excited'], [, ry] = centre(v.row);
+    const v = T.voices['sumaya-excited'];
     hold(s);
-    look(s + 0.3, 0.46, 0.59, 2.6);
+    look(s + 0.3, 0.5, 0.59, 2.9);
     rings.push({ box: V2.button, a: s + 0.1, b: s + 0.55, r: 8 }, { box: v.result, a: s + 1.15, b: b.end, r: 16 });
     tap = s + 0.35;
     shots.push({ img: 'studio/v2-8.png', at: s + 0.45 }, { img: 'tour/res-sumaya-excited.png', at: s + 1.0 });
     hold(s + 0.95);
-    look(s + 1.35, 0.6, ry - 0.07, 2.5);
+    look(s + 1.35, SIDE, 1, 2.85);
     step(STEP.generate, s);
   } else if (b.slug && b.kind !== 'voice') {
     // an option, before its voice
@@ -118,13 +125,13 @@ for (const b of TL.beats) {
     hold(s);
     if (b.kind === 'library') {
       shots.push({ img: `tour/pick-${b.slug}.png`, at: s });
-      look(s + 0.4, 0.36, 0.26, 2.2);
+      look(s + 0.4, 0.36, 0.26, 2.6);
       rings.push({ box: v.card, a: s + 0.35, b: s + 0.85, r: 16 }, { box: v.dialect, a: s + 0.85, b: b.end, r: 10 });
     } else {
       shots.push({ img: `tour/opt-${b.kind}.png`, at: s });
       const [ix, iy] = centre(v.item as Box);
-      if (b.kind === 'style') look(s + 0.4, 0.5, 0.5, 2.0);
-      else look(s + 0.4, ix, iy - 0.04, 2.6);
+      if (b.kind === 'style') look(s + 0.4, 0.6, 0.5, 2.6);
+      else look(s + 0.4, ix, iy - 0.04, 2.9);
       rings.push({ box: v.item as Box, a: s + 0.45, b: b.end, r: 8 });
     }
     step(OPTION[b.slug], s);
@@ -136,7 +143,7 @@ for (const b of TL.beats) {
     const rows = union(T.history.rows), [hx, hy] = centre(rows);
     shots.push({ img: 'tour/history.png', at: s });
     hold(s);
-    look(s + 0.45, Math.min(hx + 0.12, 0.6), hy, 2.4);
+    look(s + 0.45, Math.min(hx + 0.12, 0.6), hy, 2.7);
     rings.push({ box: rows, a: s + 0.5, b: b.end, r: 14 });
     step(STEP.history, s);
   } else if (b.kind === 'end') {
