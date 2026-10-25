@@ -37,6 +37,18 @@
     .card-input.StripeElement--invalid { border-color: var(--danger); }
   </style>
   <script>
+    // Stripe draws the boxes in its own frame, which does not take the page's font:
+    // it is given the site font (App\Support\SiteFont) to load and use, so the card
+    // reads like the rest of the page.
+    window.ListenSiteFont = { cssSrc: @json(\App\Support\SiteFont::stylesheetUrl()), family: @json(\App\Support\SiteFont::stack()) };
+    window.ListenCardElements = function (stripe) {
+      return stripe.elements({ fonts: [{ cssSrc: window.ListenSiteFont.cssSrc }] });
+    };
+    var listenCardStyle = function (style) {
+      var styled = Object.assign({}, style || {});
+      styled.base = Object.assign({ fontFamily: window.ListenSiteFont.family }, styled.base || {});
+      return styled;
+    };
     window.ListenCardFields = function (elements, id, style, onChange) {
       var order = ['number', 'expiry', 'cvc'];
       var types = { number: 'cardNumber', expiry: 'cardExpiry', cvc: 'cardCvc' };
@@ -44,7 +56,7 @@
       var fields = {}, done = {}, errors = {};
       order.forEach(function (key) {
         var box = document.getElementById(id + '-' + key);
-        var field = elements.create(types[key], Object.assign({ style: style }, extra[key]));
+        var field = elements.create(types[key], Object.assign({ style: listenCardStyle(style) }, extra[key]));
         field.mount(box);
         // Its label puts the cursor in it (a label cannot point into Stripe's frame).
         var label = box.previousElementSibling;
@@ -65,7 +77,11 @@
         card: fields.number,
         clear: function () { order.forEach(function (k) { fields[k].clear(); }); },
         focus: function () { fields.number.focus(); },
-        update: function (options) { order.forEach(function (k) { fields[k].update(options); }); },
+        update: function (options) {
+          var next = Object.assign({}, options);
+          if (next.style) next.style = listenCardStyle(next.style);
+          order.forEach(function (k) { fields[k].update(next); });
+        },
       };
     };
   </script>

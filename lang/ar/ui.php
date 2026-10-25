@@ -510,7 +510,6 @@ return [
         'order_renews_year' => 'ثم :amount سنويًا بدءًا من :date.',
         'order_credit_left' => 'يُضاف :amount إلى رصيد حسابك ويُستخدم في التجديدات القادمة.',
         'order_loading' => 'جارٍ حساب مبلغ اليوم...',
-        'order_fallback_label' => 'بحد أقصى',
         'order_fallback_hint' => 'تدفع اليوم ثمن الخطة الجديدة مطروحًا منه رصيد المدة غير المستخدمة من خطة :plan.',
         'trial_quote_hint' => 'ثم :amount في :date ما لم تلغِ قبل ذلك.',
         'discount_quote_hint' => ':terms.',

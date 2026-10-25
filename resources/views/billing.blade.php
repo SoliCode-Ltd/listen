@@ -676,6 +676,9 @@
       unicode-bidi: isolate;
       display: inline-block;
     }
+    .quote-highlight small:empty {
+      display: none;
+    }
     .quote-highlight .hint {
       margin: .35rem 0 0;
       color: var(--muted);
@@ -833,6 +836,10 @@
         grid-row: 1;
         grid-column: 2;
         font-size: 1.4rem;
+      }
+      .quote-slot .quote-highlight small:empty + .amount {
+        grid-column: 1 / -1;
+        justify-self: start;
       }
       .quote-slot .quote-highlight .hint {
         grid-column: 1 / -1;
@@ -1354,7 +1361,6 @@
       'order_renews_year' => __('ui.billing.order_renews_year'),
       'order_credit_left' => __('ui.billing.order_credit_left'),
       'order_loading' => __('ui.billing.order_loading'),
-      'order_fallback_label' => __('ui.billing.order_fallback_label'),
       'order_fallback_hint' => __('ui.billing.order_fallback_hint', ['plan' => $activePlanName]),
       'card_form_unavailable' => __('ui.billing.card_form_unavailable'),
       'decline_no_funds' => __('ui.billing.decline_no_funds'),
@@ -2035,7 +2041,7 @@
         if (seq !== planChange.seq) return;
         // No preview: the most it can be is the new plan's price, less the credit.
         orderDetails.hidden = true;
-        quoteAmountLabel.textContent = i18n.order_fallback_label;
+        quoteAmountLabel.textContent = '';
         quoteAmount.textContent = cardCharge(selected.meta).amount || '-';
         quoteHint.textContent = i18n.order_fallback_hint;
       });
@@ -2138,7 +2144,7 @@
     }
     const cardFormMissing = Boolean(stripeKey) && !stripe;
     const cardUnavailableText = cardFormMissing ? i18n.card_form_unavailable : i18n.stripe_not_configured;
-    const elements = stripe ? stripe.elements() : null;
+    const elements = stripe ? window.ListenCardElements(stripe) : null;
     // The card in three boxes (components/card-fields): the number, the expiry date and
     // the code. Stripe takes the card from the number field and reads the other two with it.
     let cardComplete = false;
