@@ -12,27 +12,28 @@ export type Voice = {
   emotion: string;       // the feeling, in the studio's words
   use: string;           // what it's for
   palette: string;       // the orb's colours (theme.PALETTES)
-  text: string;          // what is said (live sound tags removed)
+  text: string;          // what is said (live sound tags removed); \n where the line breaks on screen
   start: number;         // when the voice starts in the ad (s)
   end: number;
   words?: number[];      // when each word starts (s, from the start of the clip)
+  size?: number;         // the line's text size, when it needs more rows than two (default 74)
 };
 
 export const HOOK = { title: 'اكتب أي جملة.', sub: 'واسمعها بأي لهجة…\nوبأي إحساس.', end: 3.0 };
 
 export const VOICES: Voice[] = [
   { slug: 'sumaya-excited', name: 'سمية', avatar: 'ar-sumaya', flag: 'eg', dialect: 'مصرية (قاهرية)', emotion: 'متحمسة', use: 'إعلان سوشيال', palette: 'emotions',
-    text: 'يا جماعة الحقوا! العرض ده مش هيتكرر تاني… بجد!', start: 3.0, end: 5.7 },
+    text: 'يا جماعة الحقوا!\nالعرض ده مش هيتكرر\nتاني… بجد!', size: 68, start: 3.0, end: 5.7 },
   { slug: 'abdulaziz-proud', name: 'عبدالعزيز', avatar: 'ar-abdulaziz', flag: 'sa', dialect: 'سعودي (قصيمي)', emotion: 'فخور', use: 'فيلم براند', palette: 'pro',
-    text: 'من قلب نجد… للعالم كله. هذي قصتنا.', start: 5.7, end: 8.4 },
-  { slug: 'sawsan-warm', name: 'سوسن', avatar: 'ar-sawsan', flag: 'lb', dialect: 'لبنانية', emotion: 'دافئة', use: 'قصة', palette: 'longform',
-    text: 'كان في مرّة… بنت زغيرة، بتحلم تغنّي عالمسرح.', start: 8.4, end: 11.1 },
+    text: 'من قلب نجد… للعالم كله.\nهذي قصتنا.', start: 5.7, end: 8.4 },
+  { slug: 'sawsan-warm', name: 'سوسن', avatar: 'ar-sawsan', flag: 'lb', dialect: 'لبنانية', emotion: 'حنونة', use: 'قصة', palette: 'longform',
+    text: 'كان في مرّة… بنت زغيرة،\nبتحلم تغنّي عالمسرح.', start: 8.4, end: 11.1 },
   { slug: 'abdelilah-laugh', name: 'عبد الإله', avatar: 'ar-abdelilah', flag: 'ma', dialect: 'مغربي (مراكشي)', emotion: 'بيضحك', use: 'كوميديا', palette: 'arabic',
-    text: 'واش بصّح؟ لا لا، هادشي بزاف عليّا!', start: 11.1, end: 13.8 },
+    text: 'واش بصّح؟\nلا لا، هادشي بزاف عليّا!', start: 11.1, end: 13.8 },
   { slug: 'sundus-sad', name: 'سندس', avatar: 'ar-sundus', flag: 'iq', dialect: 'عراقية (بغدادية)', emotion: 'حزينة', use: 'دراما', palette: 'dialogue',
-    text: 'ما توقعت يوم… تروح وتخليني وحدي.', start: 13.8, end: 16.5 },
+    text: 'ما توقعت يوم…\nتروح وتخليني وحدي.', start: 13.8, end: 16.5 },
   { slug: 'hamed-whisper', name: 'حامد', avatar: 'ar-hamed', flag: 'ae', dialect: 'إماراتي', emotion: 'يوشوش', use: 'إثارة', palette: 'places',
-    text: 'سمعت؟ في حد ورا الباب… لا تتحرك.', start: 16.5, end: 19.2 },
+    text: 'سمعت؟ في حد ورا الباب…\nلا تتحرك.', start: 16.5, end: 19.2 },
 ];
 
 // The studio how-to, then the end card.

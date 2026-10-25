@@ -7,8 +7,9 @@ import { levelAt } from './level';
 
 // The hook and the six voices on one stage. One orb stays through it all: it changes colour for
 // each speaker and ripples with their voice. Everything else has its own row, so nothing ever
-// sits on anything else: chips (feeling, use) at the top, the orb, the speaker's card, the line.
-const ROW = { chips: 196, orb: 300, orbSize: 600, card: 984, line: 1226 };
+// sits on anything else: chips (feeling, use) at the top, the orb with room above and below it,
+// the speaker centred under it, the line. All above the area TikTok covers with its own buttons.
+const ROW = { chips: 168, orb: 344, orbSize: 560, card: 994, line: 1188 };
 
 const ease = Easing.bezier(0.16, 1, 0.3, 1);
 const inOut = (t: number, a: number, b: number) => interpolate(t, [a, b], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: ease });
@@ -27,38 +28,44 @@ const Chip: React.FC<{ children: React.ReactNode; strong?: boolean }> = ({ child
   }}>{children}</div>
 );
 
+// The speaker, centred under the orb: the avatar with their flag, their name and dialect. No box.
 const SpeakerCard: React.FC<{ v: Voice }> = ({ v }) => (
-  <div style={{
-    display: 'flex', alignItems: 'center', gap: 32, width: 860, padding: '26px 34px', borderRadius: 40,
-    background: C.card, border: `2px solid ${C.line}`, boxShadow: '0 24px 60px rgba(36, 19, 138, 0.10)',
-  }}>
-    <div style={{ position: 'relative', width: 124, height: 124, flex: 'none' }}>
-      <Img src={staticFile(`speakers/${v.avatar}.webp`)} style={{ width: 124, height: 124, borderRadius: '50%', border: `4px solid ${C.accentSoft}` }} />
-      <Img src={staticFile(`flags/${v.flag}.svg`)} style={{ position: 'absolute', left: -4, bottom: -2, width: 48, height: 48, borderRadius: '50%', border: '4px solid #fff', objectFit: 'cover' }} />
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 26 }}>
+    <div style={{ position: 'relative', width: 112, height: 112, flex: 'none' }}>
+      <Img src={staticFile(`speakers/${v.avatar}.webp`)} style={{ width: 112, height: 112, borderRadius: '50%', boxShadow: '0 14px 34px rgba(36, 19, 138, 0.18)' }} />
+      <Img src={staticFile(`flags/${v.flag}.svg`)} style={{ position: 'absolute', left: -2, bottom: -2, width: 42, height: 42, borderRadius: '50%', border: `4px solid ${C.bg}`, objectFit: 'cover' }} />
     </div>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
-      <div style={{ fontSize: 60, fontWeight: 700, color: C.ink, lineHeight: 1.3 }}>{v.name}</div>
-      <div style={{ fontSize: 40, fontWeight: 500, color: C.muted, lineHeight: 1.3 }}>{v.dialect}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div style={{ fontSize: 56, fontWeight: 700, color: C.ink, lineHeight: 1.3 }}>{v.name}</div>
+      <div style={{ fontSize: 38, fontWeight: 500, color: C.muted, lineHeight: 1.3 }}>{v.dialect}</div>
     </div>
   </div>
 );
 
-// The line, word by word: each word darkens as it is said.
+// The line, word by word: each word darkens as it is said. Rows break where the script says (\n).
 const Line: React.FC<{ v: Voice; t: number }> = ({ v, t }) => {
-  const words = v.text.split(' ');
+  const rows = v.text.split('\n').map((r) => r.trim().split(' '));
+  const count = rows.flat().length;
   const lt = t - v.start;
   const span = Math.max(0.6, v.end - v.start - 0.5);
+  const size = v.size ?? 74;
+  let wi = 0;
   return (
-    <div style={{ width: 920, textAlign: 'center', fontSize: 78, fontWeight: 700, lineHeight: 1.45, color: C.faint }}>
-      {words.map((w, i) => {
-        const at = v.words?.[i] ?? (i / words.length) * span;
-        const lit = inOut(lt, at - 0.02, at + 0.14);
-        return (
-          <span key={i} style={{ color: interpolate(lit, [0, 1], [0, 1]) > 0.5 ? C.ink : C.faint, opacity: 0.55 + 0.45 * lit }}>
-            {w}{i < words.length - 1 ? ' ' : ''}
-          </span>
-        );
-      })}
+    <div style={{ width: 940, textAlign: 'center', fontSize: size, fontWeight: 700, lineHeight: 1.45, whiteSpace: 'nowrap' }}>
+      {rows.map((row, r) => (
+        <div key={r}>
+          {row.map((w, i) => {
+            const at = v.words?.[wi] ?? (wi / count) * span;
+            wi++;
+            const lit = inOut(lt, at - 0.02, at + 0.14);
+            return (
+              <span key={i} style={{ color: lit > 0.5 ? C.ink : C.faint, opacity: 0.55 + 0.45 * lit }}>
+                {w}{i < row.length - 1 ? ' ' : ''}
+              </span>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 };
