@@ -7,7 +7,7 @@ import { levelAt } from './level';
 
 // The hook and the six voices on one stage. One orb stays through it all: it changes colour for
 // each speaker and ripples with their voice. Everything else has its own row, so nothing ever
-// sits on anything else: chips (feeling, use) at the top, the orb with room above and below it,
+// sits on anything else: what the voice is for at the top, the orb with room above and below it,
 // the speaker centred under it, the line. All above the area TikTok covers with its own buttons.
 const ROW = { chips: 168, orb: 344, orbSize: 560, card: 994, line: 1188 };
 
@@ -20,11 +20,10 @@ const enter = (t: number, a: number, b: number, dy = 36) => {
   return { opacity: k * (1 - out), translate: `0px ${(1 - k) * dy - out * 24}px` };
 };
 
-const Chip: React.FC<{ children: React.ReactNode; strong?: boolean }> = ({ children, strong }) => (
+const Chip: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div style={{
-    padding: '18px 34px', borderRadius: 999, fontSize: 44, fontWeight: strong ? 700 : 600, lineHeight: 1.2,
-    background: strong ? C.accentSoft : C.card, color: strong ? C.accent : C.ink,
-    border: `2px solid ${strong ? '#DCD3FF' : C.line}`, boxShadow: strong ? 'none' : '0 6px 24px rgba(36, 19, 138, 0.06)',
+    padding: '18px 34px', borderRadius: 999, fontSize: 44, fontWeight: 600, lineHeight: 1.2,
+    background: C.card, color: C.ink, border: `2px solid ${C.line}`, boxShadow: '0 6px 24px rgba(36, 19, 138, 0.06)',
   }}>{children}</div>
 );
 
@@ -42,26 +41,46 @@ const SpeakerCard: React.FC<{ v: Voice }> = ({ v }) => (
   </div>
 );
 
-// The line, word by word: each word darkens as it is said. Rows break where the script says (\n).
+// The line exactly as it was typed in the studio, tags and all, marked as the studio's editor
+// marks them: a feeling tag in amber, a sound tag in violet. Each word darkens as it is said and
+// each tag as it is performed. Rows break where the script says (\n).
+const MARK = { delivery: 'rgba(242, 181, 68, 0.28)', sound: 'rgba(106, 69, 242, 0.16)' };
+type Token = { kind: 'word' | 'delivery' | 'sound'; text: string };
+const tokens = (row: string): Token[] =>
+  row.trim().split(/(\[[^\]]+\]|<[^>]+>)/).flatMap((piece): Token[] => {
+    if (piece.startsWith('[')) return [{ kind: 'delivery', text: piece }];
+    if (piece.startsWith('<')) return [{ kind: 'sound', text: piece }];
+    return piece.split(' ').filter(Boolean).map((text) => ({ kind: 'word' as const, text }));
+  });
+
 const Line: React.FC<{ v: Voice; t: number }> = ({ v, t }) => {
-  const rows = v.text.split('\n').map((r) => r.trim().split(' '));
-  const count = rows.flat().length;
+  const rows = v.input.split('\n').map(tokens);
+  const all = rows.flat();
+  const count = all.filter((k) => k.kind === 'word').length;
   const lt = t - v.start;
   const span = Math.max(0.6, v.end - v.start - 0.5);
-  const size = v.size ?? 74;
-  let wi = 0;
+  const wordAt = (i: number) => v.words?.[i] ?? (i / count) * span;
+  const size = v.size ?? 68;
+  let wi = 0, si = 0;
   return (
-    <div style={{ width: 940, textAlign: 'center', fontSize: size, fontWeight: 700, lineHeight: 1.45, whiteSpace: 'nowrap' }}>
+    <div style={{ width: 940, textAlign: 'center', fontSize: size, fontWeight: 700, lineHeight: 1.5, whiteSpace: 'nowrap' }}>
       {rows.map((row, r) => (
         <div key={r}>
-          {row.map((w, i) => {
-            const at = v.words?.[wi] ?? (wi / count) * span;
-            wi++;
+          {row.map((k, i) => {
+            // a feeling tag is performed from the start, a sound just before the word after it
+            const at = k.kind === 'word' ? wordAt(wi++) : k.kind === 'delivery' ? 0 : v.sounds?.[si++] ?? Math.max(0, wordAt(wi) - 0.3);
             const lit = inOut(lt, at - 0.02, at + 0.14);
+            const gap = i < row.length - 1 ? ' ' : '';
+            if (k.kind === 'word') {
+              return <span key={i} style={{ color: lit > 0.5 ? C.ink : C.faint, opacity: 0.55 + 0.45 * lit }}>{k.text}{gap}</span>;
+            }
             return (
-              <span key={i} style={{ color: lit > 0.5 ? C.ink : C.faint, opacity: 0.55 + 0.45 * lit }}>
-                {w}{i < row.length - 1 ? ' ' : ''}
-              </span>
+              <React.Fragment key={i}>
+                <span style={{
+                  fontWeight: 600, color: C.ink, opacity: 0.6 + 0.4 * lit, padding: '0 0.14em', borderRadius: 14,
+                  background: MARK[k.kind], boxShadow: `0 0 0 3px ${MARK[k.kind]}`,
+                }}>{k.text}</span>{gap}
+              </React.Fragment>
             );
           })}
         </div>
@@ -112,7 +131,6 @@ export const Stage: React.FC = () => {
       {v && (
         <>
           <div style={{ position: 'absolute', top: ROW.chips, width: '100%', display: 'flex', justifyContent: 'center', gap: 18, ...enter(t, v.start - 0.05, v.end, 24) }}>
-            <Chip strong>{v.emotion}</Chip>
             <Chip>{v.use}</Chip>
           </div>
           <div style={{ position: 'absolute', top: ROW.card, width: '100%', display: 'flex', justifyContent: 'center', ...enter(t, v.start + 0.06, v.end, 40) }}>

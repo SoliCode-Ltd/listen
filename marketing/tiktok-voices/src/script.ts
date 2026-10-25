@@ -1,7 +1,7 @@
 // The ad's script: six speakers from the voice library, each in their own dialect, each with a
 // different feeling, each doing something people make with إسمع. Times are in seconds; the
-// voice clips are made by `php artisan tts:showcase --set=ad --ad=tiktok-voices --generate`
-// (marketing/tiktok-voices/lines.php) and the times below come from them (build step).
+// voice clips are made the way the studio's Generate button makes them, from the input shown
+// on screen (marketing/tiktok-voices/generate.php), and the times below come from them.
 
 export type Voice = {
   slug: string;          // the clip
@@ -9,31 +9,34 @@ export type Voice = {
   avatar: string;        // public/speakers/<avatar>.webp
   flag: string;          // public/flags/<flag>.svg
   dialect: string;       // as the site labels it
-  emotion: string;       // the feeling, in the studio's words
   use: string;           // what it's for
   palette: string;       // the orb's colours (theme.PALETTES)
-  text: string;          // what is said (live sound tags removed); \n where the line breaks on screen
+  // Exactly what was typed in the studio to make the clip: a feeling tag in square brackets
+  // ([متحمس]), sound tags in angle brackets (<ضحكة>), the words. \n where the line breaks on screen.
+  input: string;
   start: number;         // when the voice starts in the ad (s)
   end: number;
   words?: number[];      // when each word starts (s, from the start of the clip)
-  size?: number;         // the line's text size, when it needs more rows than two (default 74)
+  sounds?: number[];     // when each sound tag is heard (s, from the start of the clip)
+  size?: number;         // the line's text size (default 68)
 };
 
 export const HOOK = { title: 'اكتب أي جملة.', sub: 'واسمعها بأي لهجة…\nوبأي إحساس.', end: 3.0 };
 
+// Each clip is made in the studio from its input, the speaker and the dialect, nothing else.
 export const VOICES: Voice[] = [
-  { slug: 'sumaya-excited', name: 'سمية', avatar: 'ar-sumaya', flag: 'eg', dialect: 'مصرية (قاهرية)', emotion: 'متحمسة', use: 'إعلان سوشيال', palette: 'emotions',
-    text: 'يا جماعة الحقوا!\nالعرض ده مش هيتكرر\nتاني… بجد!', size: 68, start: 3.0, end: 5.7 },
-  { slug: 'abdulaziz-proud', name: 'عبدالعزيز', avatar: 'ar-abdulaziz', flag: 'sa', dialect: 'سعودي (قصيمي)', emotion: 'فخور', use: 'فيلم براند', palette: 'pro',
-    text: 'من قلب نجد… للعالم كله.\nهذي قصتنا.', start: 5.7, end: 8.4 },
-  { slug: 'sawsan-warm', name: 'سوسن', avatar: 'ar-sawsan', flag: 'lb', dialect: 'لبنانية', emotion: 'حنونة', use: 'قصة', palette: 'longform',
-    text: 'كان في مرّة… بنت زغيرة،\nبتحلم تغنّي عالمسرح.', start: 8.4, end: 11.1 },
-  { slug: 'abdelilah-laugh', name: 'عبد الإله', avatar: 'ar-abdelilah', flag: 'ma', dialect: 'مغربي (مراكشي)', emotion: 'بيضحك', use: 'كوميديا', palette: 'arabic',
-    text: 'واش بصّح؟\nلا لا، هادشي بزاف عليّا!', start: 11.1, end: 13.8 },
-  { slug: 'sundus-sad', name: 'سندس', avatar: 'ar-sundus', flag: 'iq', dialect: 'عراقية (بغدادية)', emotion: 'حزينة', use: 'دراما', palette: 'dialogue',
-    text: 'ما توقعت يوم…\nتروح وتخليني وحدي.', start: 13.8, end: 16.5 },
-  { slug: 'hamed-whisper', name: 'حامد', avatar: 'ar-hamed', flag: 'ae', dialect: 'إماراتي', emotion: 'يوشوش', use: 'إثارة', palette: 'places',
-    text: 'سمعت؟ في حد ورا الباب…\nلا تتحرك.', start: 16.5, end: 19.2 },
+  { slug: 'sumaya-excited', name: 'سمية', avatar: 'ar-sumaya', flag: 'eg', dialect: 'مصرية (قاهرية)', use: 'إعلان سوشيال', palette: 'emotions',
+    input: '[متحمس] يا جماعة الحقوا!\n<ضحكة خفيفة> العرض ده\nمش هيتكرر تاني… بجد!', start: 3.0, end: 5.7 },
+  { slug: 'abdulaziz-proud', name: 'عبدالعزيز', avatar: 'ar-abdulaziz', flag: 'sa', dialect: 'سعودي (قصيمي)', use: 'فيلم براند', palette: 'pro',
+    input: '[بفخر] من قلب نجد…\nللعالم كله.\nهذي قصتنا.', start: 5.7, end: 8.4 },
+  { slug: 'sawsan-calm', name: 'سوسن', avatar: 'ar-sawsan', flag: 'lb', dialect: 'لبنانية', use: 'قصص أطفال', palette: 'longform',
+    input: '[هادئ] كان في مرّة…\nبنت زغيرة، بتحلم\nتغنّي عالمسرح.', start: 8.4, end: 11.1 },
+  { slug: 'abdelilah-surprised', name: 'عبد الإله', avatar: 'ar-abdelilah', flag: 'ma', dialect: 'مغربي (مراكشي)', use: 'كوميديا', palette: 'arabic',
+    input: '[متفاجئ] واش بصّح؟\n<ضحكة> لا لا،\nهادشي بزاف عليّا!', start: 11.1, end: 13.8 },
+  { slug: 'sundus-sad', name: 'سندس', avatar: 'ar-sundus', flag: 'iq', dialect: 'عراقية (بغدادية)', use: 'دراما', palette: 'dialogue',
+    input: '[حزين] <تنهيدة>\nما توقعت يوم…\nتروح وتخليني وحدي.', start: 13.8, end: 16.5 },
+  { slug: 'hamed-whisper', name: 'حامد', avatar: 'ar-hamed', flag: 'ae', dialect: 'إماراتي', use: 'إثارة', palette: 'places',
+    input: '[هامس] سمعت؟\nفي حد ورا الباب…\nلا تتحرك.', start: 16.5, end: 19.2 },
 ];
 
 // The studio how-to, then the end card.
