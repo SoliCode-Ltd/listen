@@ -249,6 +249,11 @@
       play(pressed);
       return;
     }
+    var more = event.target.closest('[data-vp-more-cards]');
+    if (more) {
+      showPage(more.closest('section').querySelector('[data-vp-page]'), true);
+      return;
+    }
     var chip = event.target.closest('[data-vp-region]');
     if (chip) {
       var region = chip.getAttribute('data-vp-region');
@@ -256,11 +261,36 @@
       var grid = section.querySelector('.vs-grid');
       chip.parentElement.querySelectorAll('[data-vp-region]').forEach(function (c) { c.setAttribute('aria-selected', c === chip ? 'true' : 'false'); });
       grid.classList.toggle('is-filtered', region !== 'all');
+      if (grid.hasAttribute('data-vp-page')) {
+        grid.setAttribute('data-vp-filter', region);
+        showPage(grid, false);
+        return;
+      }
       grid.querySelectorAll('.vs-card').forEach(function (card) {
         card.hidden = region !== 'all' && card.getAttribute('data-region') !== region;
         if (card.hidden && current === card) { audio.pause(); stop(); rest(card); }
       });
     }
   });
+
+  // A grid shown a page at a time (the samples page): the first cards of the chosen region
+  // or mood, and "Show more" adds as many again, until none is left.
+  function showPage(grid, next) {
+    if (!grid) return;
+    var size = +grid.getAttribute('data-vp-page') || 12;
+    var filter = grid.getAttribute('data-vp-filter') || 'all';
+    var shown = next ? (+grid.getAttribute('data-vp-shown') || size) + size : size;
+    var matching = 0;
+    grid.querySelectorAll('.vs-card').forEach(function (card) {
+      var match = filter === 'all' || card.getAttribute('data-region') === filter;
+      card.hidden = !match || matching >= shown;
+      if (match) matching++;
+      if (card.hidden && current === card) { audio.pause(); stop(); rest(card); }
+    });
+    grid.setAttribute('data-vp-shown', String(shown));
+    var button = grid.closest('section').querySelector('[data-vp-more-cards]');
+    if (!button) return;
+    button.hidden = matching <= shown;
+  }
 })();
 </script>

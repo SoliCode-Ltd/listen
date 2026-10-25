@@ -571,6 +571,7 @@ html:not([data-theme="light"]) .vs-speech::after {
   cursor: pointer;
   transition: border-color .15s ease, background-color .15s ease;
 }
+.vs-more-btn[hidden] { display: none; }
 .vs-more-btn:hover { border-color: color-mix(in oklab, var(--text) 45%, var(--line-strong)); background: color-mix(in oklab, var(--text) 3%, var(--surface)); }
 
 /* ───────────── Dialogues ───────────── */

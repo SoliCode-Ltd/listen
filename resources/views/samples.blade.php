@@ -13,6 +13,8 @@
   arsort($moodCounts);
   $moods = array_keys($moodCounts);
   $firstMood = $moods[0] ?? '';
+  // Cards shown at first in the voices and moods sections; "Show more" adds as many again.
+  $pageSize = 12;
   $moodLabel = static function (string $mood): string {
     $key = 'ui.samples.moods.'.$mood;
     return __($key) !== $key ? __($key) : ucfirst($mood);
@@ -379,11 +381,13 @@
             @endforeach
           </div>
         @endif
-        <div class="vs-grid">
+        {{-- Twelve voices at a time: "Show more" brings the next twelve (of the chosen region). --}}
+        <div class="vs-grid" data-vp-page="{{ $pageSize }}" data-vp-filter="all">
           @foreach($voices as $sample)
-            @include('components.home.voice-card', ['sample' => $sample])
+            @include('components.home.voice-card', ['sample' => $sample, 'cardHidden' => $loop->index >= $pageSize])
           @endforeach
         </div>
+        @include('components.samples-more', ['left' => count($voices) - $pageSize])
       </section>
     @endif
 
@@ -421,11 +425,14 @@
             <button type="button" class="vs-chip" role="tab" aria-selected="{{ $mood === $firstMood ? 'true' : 'false' }}" data-vp-region="{{ $mood }}">{{ $moodLabel($mood) }}</button>
           @endforeach
         </div>
-        <div class="vs-grid is-filtered">
+        @php $moodAt = 0; @endphp
+        <div class="vs-grid is-filtered" data-vp-page="{{ $pageSize }}" data-vp-filter="{{ $firstMood }}">
           @foreach($moodVoices as $sample)
-            @include('components.home.voice-card', ['sample' => $sample, 'filterKey' => $sample['emotion'], 'cardHidden' => $sample['emotion'] !== $firstMood])
+            @php $inMood = $sample['emotion'] === $firstMood; @endphp
+            @include('components.home.voice-card', ['sample' => $sample, 'filterKey' => $sample['emotion'], 'cardHidden' => ! $inMood || $moodAt++ >= $pageSize])
           @endforeach
         </div>
+        @include('components.samples-more', ['left' => ($moodCounts[$firstMood] ?? 0) - $pageSize])
       </section>
     @endif
 
