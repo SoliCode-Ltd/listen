@@ -23,7 +23,7 @@ export const Ad: React.FC = () => {
         <Studio duration={STUDIO.end - STUDIO.start} steps={STUDIO.steps} />
       </Sequence>
       <Sequence from={f(END.start)} name="End card">
-        <EndCard title={END.title} question={END.question} />
+        <EndCard title={END.title} question={END.question} start={END.start} />
       </Sequence>
       <VoiceTrack />
       {/* a soft fade from white at the very start, so the first frame is already composed */}

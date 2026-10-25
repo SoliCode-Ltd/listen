@@ -38,3 +38,6 @@ Thumbs.db
 /marketing/social/out/
 /marketing/tiktok-pot/out/
 /marketing/tiktok-pot/*/audio/*.wav
+/marketing/tiktok-voices/public/audio/*.wav
+/marketing/tiktok-voices/sound/audio/
+__pycache__/

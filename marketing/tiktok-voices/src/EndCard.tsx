@@ -2,16 +2,19 @@ import React from 'react';
 import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame } from 'remotion';
 import { C, FONT, FPS, PALETTES, W } from './theme';
 import { Orb } from './Orb';
+import { levelAt } from './level';
 
-// The end card: the Listen orb, the logo, the invitation, the address, the question.
-export const EndCard: React.FC<{ title: string; question: string }> = ({ title, question }) => {
+// The end card: the Listen orb (rippling with Sumaya's clip, which plays on under it), the logo,
+// the invitation, the address, the question. `start`: when the card starts in the ad (s).
+export const EndCard: React.FC<{ title: string; question: string; start: number }> = ({ title, question, start }) => {
   const t = useCurrentFrame() / FPS;
+  const level = levelAt(start + t);
   const k = (a: number) => interpolate(t, [a, a + 0.6], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.16, 1, 0.3, 1) });
   const rise = (a: number, dy = 40) => ({ opacity: k(a), translate: `0px ${(1 - k(a)) * dy}px` });
   return (
     <AbsoluteFill style={{ fontFamily: FONT, direction: 'rtl', alignItems: 'center' }}>
       <div style={{ position: 'absolute', top: 330, left: (W - 420) / 2, scale: `${0.85 + 0.15 * k(0)}`, opacity: k(0), filter: 'drop-shadow(0 40px 80px rgba(118, 89, 250, 0.3))' }}>
-        <Orb size={420} palette={PALETTES.listen} time={t * 1.4 + 20} level={0.25 + 0.15 * Math.sin(t * 4)} seed={2.1} />
+        <Orb size={420} palette={PALETTES.listen} time={t * 1.4 + 20} level={0.18 + 0.7 * level} seed={2.1} />
       </div>
       <div style={{ position: 'absolute', top: 820, ...rise(0.15, 30) }}>
         <Img src={staticFile('brand/logo-ar-light.svg')} style={{ height: 120 }} />

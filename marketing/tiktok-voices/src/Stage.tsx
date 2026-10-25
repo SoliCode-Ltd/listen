@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill, Easing, Img, interpolate, spring, staticFile, useCurrentFrame } from 'remotion';
 import { C, FONT, FPS, PALETTES, W } from './theme';
 import { Orb, mixPalette } from './Orb';
-import { HOOK, VOICES, Voice } from './script';
+import { HOOK, TimedVoice, VOICES } from './script';
 import { levelAt } from './level';
 
 // The hook and the six voices on one stage. One orb stays through it all: it changes colour for
@@ -28,7 +28,7 @@ const Chip: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 // The speaker, centred under the orb: the avatar with their flag, their name and dialect. No box.
-const SpeakerCard: React.FC<{ v: Voice }> = ({ v }) => (
+const SpeakerCard: React.FC<{ v: TimedVoice }> = ({ v }) => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 26 }}>
     <div style={{ position: 'relative', width: 112, height: 112, flex: 'none' }}>
       <Img src={staticFile(`speakers/${v.avatar}.webp`)} style={{ width: 112, height: 112, borderRadius: '50%', boxShadow: '0 14px 34px rgba(36, 19, 138, 0.18)' }} />
@@ -53,13 +53,9 @@ const tokens = (row: string): Token[] =>
     return piece.split(' ').filter(Boolean).map((text) => ({ kind: 'word' as const, text }));
   });
 
-const Line: React.FC<{ v: Voice; t: number }> = ({ v, t }) => {
+const Line: React.FC<{ v: TimedVoice; t: number }> = ({ v, t }) => {
   const rows = v.input.split('\n').map(tokens);
-  const all = rows.flat();
-  const count = all.filter((k) => k.kind === 'word').length;
-  const lt = t - v.start;
-  const span = Math.max(0.6, v.end - v.start - 0.5);
-  const wordAt = (i: number) => v.words?.[i] ?? (i / count) * span;
+  const lt = t - v.audio;
   const size = v.size ?? 68;
   let wi = 0, si = 0;
   return (
@@ -67,8 +63,8 @@ const Line: React.FC<{ v: Voice; t: number }> = ({ v, t }) => {
       {rows.map((row, r) => (
         <div key={r}>
           {row.map((k, i) => {
-            // a feeling tag is performed from the start, a sound just before the word after it
-            const at = k.kind === 'word' ? wordAt(wi++) : k.kind === 'delivery' ? 0 : v.sounds?.[si++] ?? Math.max(0, wordAt(wi) - 0.3);
+            // a feeling tag is performed from the first word, a sound tag when it is heard
+            const at = k.kind === 'word' ? v.words[wi++] : k.kind === 'delivery' ? v.words[0] : v.sounds[si++];
             const lit = inOut(lt, at - 0.02, at + 0.14);
             const gap = i < row.length - 1 ? ' ' : '';
             if (k.kind === 'word') {
