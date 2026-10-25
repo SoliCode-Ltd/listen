@@ -1,7 +1,7 @@
 @php
   $voiceShowcaseCss = public_path('css/voice-showcase.css');
   $isArabicUi = app()->getLocale() === 'ar';
-  $regionOrder = ['fusha', 'gulf', 'levant', 'nile', 'iraq_yemen', 'maghreb', 'americas', 'uk_ie', 'africa', 'asia_pacific', 'other'];
+  $regionOrder = ['fusha', 'gulf', 'levant', 'nile', 'iraq_yemen', 'maghreb', 'americas', 'uk_ie', 'africa', 'asia_pacific', 'other', 'languages'];
   // The regions present in a list of cards, in the order the homepage uses.
   $regionsOf = static function (array $cards) use ($regionOrder): array {
     $regions = array_values(array_unique(array_column($cards, 'region')));

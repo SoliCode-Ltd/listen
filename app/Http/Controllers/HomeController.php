@@ -37,12 +37,14 @@ use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
 use App\Support\SpeakerAvatar;
+use App\Support\SpeakerVoices;
 use App\Support\SpeechLanguages;
 use App\Support\TtsStudioConfig;
 use App\Support\VideoDubbing;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceFlag;
+use App\Support\VoicePreviews;
 use App\Support\VoiceTier;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Request;
@@ -235,7 +237,7 @@ class HomeController extends Controller
 
         // Each page holds its own language: Arabic samples on the Arabic page, English on the English one.
         // The key names the data's shape, so a deploy never reads a copy cached by older code.
-        $data = Cache::remember('samples_page:v3:'.$language, 300, function () use ($isArabicLocale, $language): array {
+        $data = Cache::remember('samples_page:v4:'.$language, 300, function () use ($isArabicLocale, $language): array {
             $cards = VoiceSample::query()
                 ->active()
                 ->whereIn('category', ['hero', 'dialogue'])
@@ -247,13 +249,14 @@ class HomeController extends Controller
                 ->get()
                 ->filter(fn (VoiceSample $sample): bool => trim((string) $sample->audio_path) !== '')
                 ->map(fn (VoiceSample $sample): array => $this->showcaseCard($sample, $isArabicLocale));
-            $singles = $cards->where('kind', 'single')->values()->all();
+            $showcase = $cards->where('kind', 'single')->values()->all();
+            $singles = $this->samplesVoiceCards($showcase, $language, $isArabicLocale);
 
             return [
                 'voices' => $singles,
                 'moodVoices' => array_values(array_filter($singles, fn (array $card): bool => $card['emotion'] !== '')),
                 'dialogues' => $cards->where('kind', 'dialogue')->values()->all(),
-                'stageCast' => $this->samplesStageCast($singles, $language),
+                'stageCast' => $this->samplesStageCast($showcase, $language),
             ];
         });
 
@@ -261,6 +264,91 @@ class HomeController extends Controller
             'environments' => $this->environmentSamples($language),
             'longReads' => LongFormSamples::forPage($language),
         ]);
+    }
+
+    /**
+     * The samples page's voices: every speaker once, in their own dialect or accent
+     * (the one their avatar and voice library preview speak), so every dialect is
+     * heard. A homepage sample in that dialect is used, else the speaker's preview; a
+     * speaker with no preview keeps their first homepage sample. Homepage samples in
+     * another dialect stay on the homepage and the stage.
+     *
+     * @param  array<int, array<string, mixed>>  $showcase  the homepage's single-voice samples
+     * @return array<int, array<string, mixed>>
+     */
+    private function samplesVoiceCards(array $showcase, string $language, bool $isArabicLocale): array
+    {
+        $previews = [];
+        foreach ($this->samplesPreviewCards($language, $isArabicLocale) as $card) {
+            $previews[$card['avatar'] ?: mb_strtolower($card['speaker'])] = $card;
+        }
+        $cards = [];
+        foreach ($showcase as $card) {
+            $key = $card['avatar'] ?: mb_strtolower($card['speaker']);
+            $own = $previews[$key] ?? null;
+            if (isset($cards[$key]) || ($own !== null && $own['dialect'] !== $card['dialect'])) {
+                continue;
+            }
+            $cards[$key] = $card;
+        }
+
+        return array_values($cards + $previews);
+    }
+
+    /**
+     * The voice library's previews (the speakers' own ten-second lines) as cards for
+     * the samples page, in its language, with their titles and moods from
+     * voice_preview_cards.php. Speakers whose line is in another language (French,
+     * Japanese ...) are grouped as "other languages".
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function samplesPreviewCards(string $language, bool $isArabicLocale): array
+    {
+        $speakers = [];
+        foreach (SpeakerVoices::all() as $id => $speaker) {
+            $speakers[SpeakerAvatar::slug($speaker['name'], substr($id, 0, 2))] = $speaker;
+        }
+        $titles = (require database_path('seeders/data/voice_preview_cards.php'))['cards'];
+
+        $cards = [];
+        foreach (VoicePreviews::lines() as $slug => $line) {
+            $speaker = $speakers[$slug] ?? null;
+            if (! str_starts_with($slug, $language.'-') || $speaker === null || ! isset($titles[$slug])) {
+                continue;
+            }
+            $preview = VoicePreviews::find($speaker['name'], $language);
+            $avatar = SpeakerAvatar::url($speaker['name'], $language);
+            if ($preview === null) {
+                continue;
+            }
+            $dialect = (string) $line['dialect'];
+            $female = $speaker['gender'] === 'female';
+            [$title, $mood] = $titles[$slug];
+            $cards[] = [
+                'id' => crc32($slug),
+                'slug' => $slug,
+                'kind' => 'single',
+                'emotion' => $mood,
+                'title' => $title,
+                'language' => (string) $line['language'],
+                'dialect' => $dialect,
+                'region' => isset(VoicePreviews::NATIVE[$dialect]) ? 'languages' : VoiceFlag::region($dialect),
+                'dialect_label' => VoicePreviews::label($dialect, $isArabicLocale, $female),
+                'flag' => VoiceFlag::url($dialect),
+                'speaker' => $isArabicLocale ? VoiceCatalog::arabicName($speaker['name']) : $speaker['name'],
+                'avatar' => $avatar,
+                'gender' => (string) $speaker['gender'],
+                'speakers' => [],
+                'turns' => [],
+                // Vocal tags such as <laugh> are performed, not shown.
+                'text' => trim((string) preg_replace('/\s*<[^<>\n]{1,24}>\s*/u', ' ', (string) $line['text'])),
+                'audio_url' => $preview['url'],
+                'duration' => 0,
+            ];
+        }
+
+        return $cards;
     }
 
     /**

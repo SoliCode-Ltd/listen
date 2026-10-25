@@ -144,6 +144,7 @@ return [
         'region_africa' => 'Africa',
         'region_asia_pacific' => 'Asia-Pacific',
         'region_other' => 'More accents',
+        'region_languages' => 'Other languages',
         'dialogue_more' => 'Show all conversations',
         'env_title' => 'Put your voice anywhere',
         'env_body' => 'With Sound Environments: a goal in a packed stadium, a call at the airport, a phone call, an old radio, a deep cave. The same voice is placed in a real space, in stereo, with the sound of the place around it. Switch between clean and in the place to hear the difference.',
