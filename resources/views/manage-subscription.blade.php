@@ -810,7 +810,7 @@
     }
 
     const stripe = stripeKey && typeof Stripe === 'function' ? Stripe(stripeKey, { locale: isArabicLocale ? 'ar' : 'en' }) : null;
-    const elements = stripe ? stripe.elements() : null;
+    const elements = stripe ? window.ListenCardElements(stripe) : null;
     // The new card in three boxes (components/card-fields): the number, the expiry date
     // and the code. Stripe takes the card from the number field and reads the other two with it.
     let cardComplete = false;

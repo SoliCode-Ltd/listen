@@ -131,12 +131,16 @@ class BillingPageClientTest extends TestCase
             ->assertSee(__('ui.billing.card_expiry', [], 'ar'))
             ->assertSee(__('ui.billing.card_cvc', [], 'ar'))
             ->assertSee("window.ListenCardFields(elements, 'card', resolveCardStyle()", false)
+            // Stripe's boxes are drawn in the site font, like the rest of the page.
+            ->assertSee('const elements = stripe ? window.ListenCardElements(stripe) : null;', false)
+            ->assertSee('window.ListenSiteFont = { cssSrc:', false)
+            ->assertSee('family=Alexandria', false)
             ->assertDontSee("elements.create('card',", false);
 
         // The pack page too, with its price in the visitor's own money.
         $pack = $this->actingAs(User::factory()->create(['subscription_status_checked_at' => now()]))
             ->getLocalizedRoute('billing.pack')->assertOk()
-            ->assertSee("window.ListenCardFields(stripe.elements(), 'pack-card', cardStyle()", false);
+            ->assertSee("window.ListenCardFields(window.ListenCardElements(stripe), 'pack-card', cardStyle()", false);
         foreach ($boxes('pack-card') as $box) {
             $pack->assertSee($box, false);
         }

@@ -400,32 +400,36 @@
       fill: none;
       stroke: none;
     }
+    /* The saved card: the check beside two lines, what is used and how to change it. */
     .saved-card-notice {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: auto 1fr;
       align-items: center;
-      gap: .4rem;
+      gap: .1rem .65rem;
       padding: .7rem .9rem;
       margin-bottom: .65rem;
       border-radius: var(--radius);
-      background: color-mix(in oklab, var(--success) 8%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--success) 25%, transparent);
+      background: color-mix(in oklab, var(--ok) 8%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--ok) 28%, transparent);
       font-size: .95rem;
+      line-height: 1.5;
       color: var(--fg);
     }
     .saved-card-notice .saved-card-icon {
-      color: var(--success);
-      font-weight: 700;
+      grid-row: 1 / span 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .saved-card-notice strong {
       color: var(--fg);
       font-weight: 600;
+      white-space: nowrap;
     }
     .saved-card-notice .saved-card-hint {
-      flex-basis: 100%;
+      grid-column: 2;
       font-size: .82rem;
       color: var(--muted);
-      margin-top: .15rem;
     }
     .card-error {
       margin-top: .4rem;
@@ -676,6 +680,9 @@
       unicode-bidi: isolate;
       display: inline-block;
     }
+    .quote-highlight small:empty {
+      display: none;
+    }
     .quote-highlight .hint {
       margin: .35rem 0 0;
       color: var(--muted);
@@ -797,7 +804,41 @@
       }
       .quote-section {
         position: static;
-        order: -1;
+      }
+      /* The summary inside the form: what is due, right before paying. The plan,
+         cycle and payment method are chosen just above, so they are not repeated. */
+      .quote-slot:empty {
+        display: none;
+      }
+      .quote-slot .quote-section {
+        padding: 0;
+        border: 0;
+        background: none;
+        box-shadow: none;
+        animation: none;
+        gap: .6rem;
+      }
+      .quote-slot .quote-section > .card-header,
+      .quote-slot .quote-details {
+        display: none;
+      }
+      .quote-slot .quote-highlight {
+        text-align: center;
+        padding: .85rem 1rem;
+      }
+      .quote-slot .quote-highlight small {
+        margin: 0 0 .15rem;
+        font-size: .82rem;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+      .quote-slot .quote-highlight .amount {
+        font-size: 1.5rem;
+      }
+      .quote-slot .quote-highlight .hint {
+        margin: .25rem 0 0;
+        font-size: .85rem;
+        line-height: 1.5;
       }
       .form-row {
         grid-template-columns: 1fr;
@@ -836,8 +877,36 @@
         width: 100%;
         max-width: 100%;
       }
+      /* The account at a glance: one quiet box of three lines, not three cards. */
       .status-grid {
         grid-template-columns: 1fr;
+        gap: 0;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+      .status-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 1rem;
+        border: 0;
+        border-radius: 0;
+        background: none;
+        padding: .6rem .9rem;
+      }
+      .status-item + .status-item {
+        border-top: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+      }
+      .status-item small {
+        margin: 0;
+        font-size: .82rem;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+      .status-item b {
+        font-size: .92rem;
+        text-align: end;
       }
       .stripe-container {
         padding: .75rem;
@@ -881,9 +950,12 @@
       }
       return $display;
     };
-    $activePlanName = $planNameBySlug($activePlan?->slug ?? 'free', $activePlan?->name ?? __('ui.dashboard.free_plan'));
+    // The names the pricing page shows (the admin's name for this language first).
+    $activePlanName = $activePlan
+      ? ($activePlan->getLocalizedName() ?: $planNameBySlug($activePlan->slug, $activePlan->name))
+      : __('ui.dashboard.free_plan');
     $plansForUi = collect($plans)->map(function (array $plan) use ($planNameBySlug, $normalizeTierLabel): array {
-      $plan['localized_name'] = $planNameBySlug((string) ($plan['slug'] ?? ''), (string) ($plan['name'] ?? ''));
+      $plan['localized_name'] = ($plan['localized_name'] ?? '') ?: $planNameBySlug((string) ($plan['slug'] ?? ''), (string) ($plan['name'] ?? ''));
       $plan['localized_voice_tier'] = $normalizeTierLabel((string) ($plan['voice_tier'] ?? ''));
       return $plan;
     })->values()->all();
@@ -935,7 +1007,7 @@
         <small>{{ __('ui.billing.saved_card') }}</small>
         <b>
           @if($defaultPaymentMethod)
-            {{ strtoupper((string) ($defaultPaymentMethod->card->brand ?? 'card')) }} **** {{ $defaultPaymentMethod->card->last4 ?? '' }}
+            <bdi dir="ltr">{{ strtoupper((string) ($defaultPaymentMethod->card->brand ?? 'card')) }} •••• {{ $defaultPaymentMethod->card->last4 ?? '' }}</bdi>
           @else
             {{ __('ui.billing.not_saved') }}
           @endif
@@ -962,7 +1034,7 @@
                 @if($hasUpgradePlans)
                   @foreach($upgradePlansForUi as $plan)
                     <option value="{{ $plan['slug'] }}" {{ $selectedPlanValue === $plan['slug'] ? 'selected' : '' }}>
-                      {{ $plan['localized_name'] }} - {{ $plan['localized_voice_tier'] }}
+                      {{ $plan['localized_name'] }}
                     </option>
                   @endforeach
                 @else
@@ -1042,6 +1114,9 @@
             </div>
           </div>
 
+          {{-- Phones: the charge summary moves here, between the choices and paying (quoteSlot script). --}}
+          <div class="quote-slot" id="quoteSlot"></div>
+
           <div class="checkout-panel">
             <div class="manual-panel" id="manualPanel">
               <div class="manual-proof-card manual-main-card">
@@ -1102,7 +1177,7 @@
               </div>
               @if($defaultPaymentMethod)
                 <div class="saved-card-notice">
-                  <span class="saved-card-icon" style="display: flex; align-items: center; justify-content: center;">
+                  <span class="saved-card-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20">
                       <defs>
                         <linearGradient id="savedCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1115,7 +1190,7 @@
                       <path d="M8.5 12L10.5 14.5L16 9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
                     </svg>
                   </span>
-                  <span>{{ __('ui.billing.using_saved_card') }} <strong>{{ strtoupper($defaultPaymentMethod->card->brand) }} **** {{ $defaultPaymentMethod->card->last4 }}</strong></span>
+                  <span>{{ __('ui.billing.using_saved_card') }} <strong><bdi dir="ltr">{{ strtoupper($defaultPaymentMethod->card->brand) }} •••• {{ $defaultPaymentMethod->card->last4 }}</bdi></strong></span>
                   <span class="saved-card-hint">{{ __('ui.billing.enter_new_card_optional') }}</span>
                 </div>
               @endif
@@ -1187,7 +1262,7 @@
         </form>
       </div>
 
-      <div class="card quote-section">
+      <div class="card quote-section" id="quoteSection">
         <div class="card-header">
           <h2>{{ __('ui.billing.charge_preview') }}</h2>
           <p>{{ __('ui.billing.charge_preview_hint') }}</p>
@@ -1279,7 +1354,6 @@
       'order_renews_year' => __('ui.billing.order_renews_year'),
       'order_credit_left' => __('ui.billing.order_credit_left'),
       'order_loading' => __('ui.billing.order_loading'),
-      'order_fallback_label' => __('ui.billing.order_fallback_label'),
       'order_fallback_hint' => __('ui.billing.order_fallback_hint', ['plan' => $activePlanName]),
       'card_form_unavailable' => __('ui.billing.card_form_unavailable'),
       'decline_no_funds' => __('ui.billing.decline_no_funds'),
@@ -1340,6 +1414,26 @@
     const manualQrWrap = document.getElementById('manualQrWrap');
     const manualQrImage = document.getElementById('manualQrImage');
     const paymentMethodInputs = Array.from(document.querySelectorAll('input[name="payment_method_choice"]'));
+
+    // Tablets and phones: the charge summary sits in the form, after the plan and
+    // payment choices and right before paying; wider screens keep it beside the form.
+    (function placeQuote() {
+      const quoteSection = document.getElementById('quoteSection');
+      const quoteSlot = document.getElementById('quoteSlot');
+      if (!quoteSection || !quoteSlot || !window.matchMedia) return;
+      const home = quoteSection.parentElement;
+      const narrow = window.matchMedia('(max-width: 980px)');
+      const place = function() {
+        if (narrow.matches) {
+          if (quoteSection.parentElement !== quoteSlot) quoteSlot.appendChild(quoteSection);
+        } else if (quoteSection.parentElement !== home) {
+          home.appendChild(quoteSection);
+        }
+      };
+      place();
+      if (narrow.addEventListener) narrow.addEventListener('change', place);
+      else if (narrow.addListener) narrow.addListener(place);
+    })();
 
     const quoteAmount = document.getElementById('quoteAmount');
     const quoteAmountLabel = document.getElementById('quoteAmountLabel');
@@ -1940,7 +2034,7 @@
         if (seq !== planChange.seq) return;
         // No preview: the most it can be is the new plan's price, less the credit.
         orderDetails.hidden = true;
-        quoteAmountLabel.textContent = i18n.order_fallback_label;
+        quoteAmountLabel.textContent = '';
         quoteAmount.textContent = cardCharge(selected.meta).amount || '-';
         quoteHint.textContent = i18n.order_fallback_hint;
       });
@@ -2043,7 +2137,7 @@
     }
     const cardFormMissing = Boolean(stripeKey) && !stripe;
     const cardUnavailableText = cardFormMissing ? i18n.card_form_unavailable : i18n.stripe_not_configured;
-    const elements = stripe ? stripe.elements() : null;
+    const elements = stripe ? window.ListenCardElements(stripe) : null;
     // The card in three boxes (components/card-fields): the number, the expiry date and
     // the code. Stripe takes the card from the number field and reads the other two with it.
     let cardComplete = false;

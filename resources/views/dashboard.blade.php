@@ -2363,9 +2363,9 @@
       }
       return $text;
     };
-    $activePlanDisplayName = $activePlan?->isPack()
-      ? $activePlan->getLocalizedName(app()->getLocale())
-      : $planNameBySlug($activePlan?->slug ?? 'free', $activePlan?->name ?? __('ui.dashboard.free_plan'));
+    $activePlanDisplayName = $activePlan
+      ? ($activePlan->getLocalizedName(app()->getLocale()) ?: $planNameBySlug($activePlan->slug, $activePlan->name))
+      : __('ui.dashboard.free_plan');
     $packMode = ($usageSnapshot['mode'] ?? 'monthly') === 'pack';
     $packEndsOn = !empty($usageSnapshot['pack_expires_at'])
       ? \Illuminate\Support\Carbon::parse($usageSnapshot['pack_expires_at'])->locale(app()->getLocale())->translatedFormat('j F Y')

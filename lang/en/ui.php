@@ -509,7 +509,6 @@ return [
         'order_renews_year' => 'Then :amount a year from :date.',
         'order_credit_left' => ':amount goes to your account credit and pays your next renewals.',
         'order_loading' => "Working out today's amount...",
-        'order_fallback_label' => 'At most',
         'order_fallback_hint' => 'Today you pay the new plan less a credit for the unused time on :plan.',
         'trial_quote_hint' => 'Then :amount on :date unless you cancel before.',
         'discount_quote_hint' => ':terms.',

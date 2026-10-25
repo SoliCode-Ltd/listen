@@ -26,7 +26,6 @@ use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Laravel\Cashier\Cashier;
@@ -1145,9 +1144,7 @@ class BillingController extends Controller
 
     private function planDisplayName(Plan $plan): string
     {
-        $key = 'ui.pricing.plan_name_'.$plan->slug;
-
-        return Lang::has($key) ? (string) __($key) : (string) $plan->name;
+        return $plan->getLocalizedName() ?: (string) $plan->name;
     }
 
     private function invoicePaymentIntent(mixed $invoice): ?object
@@ -1455,6 +1452,8 @@ class BillingController extends Controller
                 $checkoutPlan = [
                     'slug' => $slug,
                     'name' => (string) $plan->name,
+                    // The name the pricing page shows (the admin's name for this language first).
+                    'localized_name' => $plan->getLocalizedName($locale) ?: (string) $plan->name,
                     'voice_tier' => VoiceTier::label((string) $plan->voice_tier),
                     'monthly' => $monthly,
                     'yearly' => $yearly,

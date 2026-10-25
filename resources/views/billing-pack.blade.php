@@ -178,7 +178,7 @@
       // The card in three boxes (components/card-fields): the number, the expiry date and
       // the code. Stripe takes the card from the number field and reads the other two with it.
       let cardComplete = false;
-      const cardForm = window.ListenCardFields(stripe.elements(), 'pack-card', cardStyle(), (state) => {
+      const cardForm = window.ListenCardFields(window.ListenCardElements(stripe), 'pack-card', cardStyle(), (state) => {
         cardComplete = state.complete;
         const [text, reason] = state.error ? stripeText(state.error, i18n.incomplete) : ['', ''];
         setNotice(text, reason);
