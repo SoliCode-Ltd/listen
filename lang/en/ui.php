@@ -1993,6 +1993,7 @@ return [
         'moods_lead' => 'Choose a mood and hear how the voices deliver it.',
         'moods_label' => 'Moods',
         'show_more' => 'Show more voices',
+        'show_more_conversations' => 'Show more conversations',
         'conversations_title' => 'Conversations',
         'conversations_lead' => 'Two voices in one recording, each line in its own speaker\'s voice.',
         'environments_title' => 'Sound environments',

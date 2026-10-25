@@ -1996,6 +1996,7 @@ return [
         'moods_lead' => 'اختر شعوراً واسمع كيف تؤديه الأصوات.',
         'moods_label' => 'المشاعر',
         'show_more' => 'اعرض المزيد من الأصوات',
+        'show_more_conversations' => 'اعرض المزيد من الحوارات',
         'conversations_title' => 'حوارات',
         'conversations_lead' => 'صوتان في تسجيل واحد، وكل سطر بصوت صاحبه.',
         'environments_title' => 'البيئات الصوتية',

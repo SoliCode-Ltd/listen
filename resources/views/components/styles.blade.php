@@ -64,6 +64,10 @@ html[data-theme="light"] {
 }
 
 * { box-sizing: border-box; }
+/* On touch screens a tap shows the control's own pressed or chosen state, not the
+   browser's grey box (which ignores rounded corners and flickers); and no double-tap zoom wait. */
+html { -webkit-tap-highlight-color: transparent; }
+a, button, [role="tab"], [role="button"], summary, label, select { touch-action: manipulation; }
 html, body {
   margin: 0;
   padding: 0;

@@ -121,7 +121,7 @@ html[data-theme="light"] .vs-art-glow { opacity: .55; }
   z-index: 1;
   transition: box-shadow .2s ease;
 }
-.vs-cast-mark:hover { box-shadow: 0 0 0 10px rgba(118, 89, 250, .16), 0 14px 30px -14px rgba(76, 45, 235, .7); }
+@media (hover: hover) { .vs-cast-mark:hover { box-shadow: 0 0 0 10px rgba(118, 89, 250, .16), 0 14px 30px -14px rgba(76, 45, 235, .7); } }
 .vs-cast-mark:focus-visible, .vs-speaker-photo:focus-visible { outline: 3px solid var(--brand-subtle); outline-offset: 4px; }
 /* The Listen orb fills the mark; the white bars sit on it. */
 .vs-cast-mark .vs-cast-orb { position: absolute; inset: 0; --orb-size: 100%; box-shadow: none; }
@@ -445,7 +445,7 @@ html:not([data-theme="light"]) .vs-speech::after {
   box-shadow: var(--lift);
   transition: background-color .15s ease, transform .15s ease, box-shadow .15s ease;
 }
-.vs-play:hover { background: var(--brand-hover); transform: scale(1.05); }
+@media (hover: hover) { .vs-play:hover { background: var(--brand-hover); transform: scale(1.05); } }
 .vs-play:active { transform: scale(.96); }
 .vs-play:focus-visible, .vs-more-btn:focus-visible { outline: 2px solid var(--brand-subtle); outline-offset: 3px; }
 .vs-play .vs-icon-pause, .is-playing .vs-play .vs-icon-play { display: none; }
@@ -510,7 +510,7 @@ html:not([data-theme="light"]) .vs-speech::after {
   cursor: pointer;
   transition: border-color .2s ease, box-shadow .2s ease;
 }
-.vs-card:hover { border-color: color-mix(in oklab, var(--text) 18%, var(--line)); }
+@media (hover: hover) { .vs-card:hover { border-color: color-mix(in oklab, var(--text) 18%, var(--line)); } }
 .vs-card.is-playing {
   border-color: var(--brand-accent);
   box-shadow: 0 0 0 3px var(--vs-soft);
@@ -572,7 +572,7 @@ html:not([data-theme="light"]) .vs-speech::after {
   transition: border-color .15s ease, background-color .15s ease;
 }
 .vs-more-btn[hidden] { display: none; }
-.vs-more-btn:hover { border-color: color-mix(in oklab, var(--text) 45%, var(--line-strong)); background: color-mix(in oklab, var(--text) 3%, var(--surface)); }
+@media (hover: hover) { .vs-more-btn:hover { border-color: color-mix(in oklab, var(--text) 45%, var(--line-strong)); background: color-mix(in oklab, var(--text) 3%, var(--surface)); } }
 
 /* ───────────── Dialogues ───────────── */
 .vs-dialogue-grid {
@@ -592,7 +592,7 @@ html:not([data-theme="light"]) .vs-speech::after {
   cursor: pointer;
   transition: border-color .2s ease, box-shadow .2s ease;
 }
-.vs-dialogue:hover { border-color: color-mix(in oklab, var(--text) 18%, var(--line)); }
+@media (hover: hover) { .vs-dialogue:hover { border-color: color-mix(in oklab, var(--text) 18%, var(--line)); } }
 .vs-dialogue.is-playing {
   border-color: var(--brand-accent);
   box-shadow: 0 0 0 3px var(--vs-soft);
@@ -720,7 +720,7 @@ html:not([data-theme="light"]) .vs-speech::after {
   cursor: pointer;
   transition: color .15s ease, border-color .15s ease, background-color .15s ease;
 }
-.vs-chip:hover { color: var(--text); border-color: color-mix(in oklab, var(--text) 45%, var(--line-strong)); }
+@media (hover: hover) { .vs-chip:hover { color: var(--text); border-color: color-mix(in oklab, var(--text) 45%, var(--line-strong)); } }
 .vs-chip[aria-selected="true"] { background: var(--brand-accent); border-color: var(--brand-accent); color: #FFFFFF; }
 .vs-chip:focus-visible { outline: 2px solid var(--brand-subtle); outline-offset: 2px; }
 .vs-card[hidden] { display: none !important; }
@@ -735,22 +735,37 @@ html:not([data-theme="light"]) .vs-speech::after {
   .vs-dialogue-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 640px) {
-  /* Phones: cards and dialogues scroll sideways instead of stacking. */
-  .vs-grid, .vs-dialogue-grid {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-    margin-inline: -3vw;
-    padding: 4px 3vw 12px;
-    scroll-padding-inline: 3vw;
-  }
-  .vs-grid::-webkit-scrollbar, .vs-dialogue-grid::-webkit-scrollbar { display: none; }
-  .vs-card { flex: 0 0 82%; scroll-snap-align: start; }
-  .vs-dialogue { flex: 0 0 88%; scroll-snap-align: start; }
-  .vs-card:hover { transform: none; }
+  /* Phones: the cards stack in one column, nothing hidden off to the side, and a
+     "Show more" (or "Show all") under them. The homepage shows six voices, then three
+     conversations; the samples page twelve voices at a time. */
+  .vs-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .vs-card { gap: 10px; padding: 14px; }
+  .vs-card .vs-avatar-lg { width: 46px; height: 46px; }
+  .vs-card-text, .vs-card-text:lang(ar) { font-size: .95rem; line-height: 1.6; }
+  .vs-card .vs-card-foot { gap: 12px; padding: 6px 12px 6px 6px; }
+  [dir="rtl"] .vs-card .vs-card-foot { padding: 6px 6px 6px 12px; }
+  .vs-card .vs-play { width: 42px; height: 42px; }
+  .vs-card .vs-wave { height: 28px; }
+  .vs-grid:not(.is-filtered):not([data-vp-page]) .vs-card:nth-child(n+7) { display: none; }
+  .vs-dialogue-grid { gap: 14px; }
+  .vs-dialogue-grid:not([data-vp-page]) .vs-dialogue:nth-child(n+4) { display: none; }
 }
+/* A press answers at once on touch screens, in place of the browser's grey flash. */
+.vs-chip, .vs-more-btn, .vs-play { transition-property: color, border-color, background-color, transform; transition-duration: .15s; }
+.vs-chip:active, .vs-more-btn:active { transform: scale(.96); }
+.vs-play:active { transform: scale(.92); }
+.vs-card:active, .vs-dialogue:active { border-color: color-mix(in oklab, var(--text) 22%, var(--line)); }
+/* Cards brought in by a chip or "Show more" fade in instead of popping in. */
+.vs-card.is-entering, .vs-dialogue.is-entering { animation: vs-enter .28s ease-out both; }
+@keyframes vs-enter { from { opacity: 0; transform: translateY(6px); } }
+/* A row of chips wider than the screen fades at the side that has more. */
+.vs-chips.is-fade-left { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px); mask-image: linear-gradient(to right, transparent, #000 36px); }
+.vs-chips.is-fade-right { -webkit-mask-image: linear-gradient(to left, transparent, #000 36px); mask-image: linear-gradient(to left, transparent, #000 36px); }
+.vs-chips.is-fade-left.is-fade-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+.vs-dialogue[hidden] { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
+  .vs-card.is-entering, .vs-dialogue.is-entering { animation: none; }
+  .vs-chip:active, .vs-more-btn:active, .vs-play:active { transform: none; }
   .vs-art *, .vs-art *::before, .vs-art *::after { animation: none !important; }
   .is-playing .vs-play::after { animation: none; }
   .vs-card:hover, .vs-play:hover { transform: none; }
@@ -779,7 +794,7 @@ html:not([data-theme="light"]) .vs-speech::after {
   overflow: hidden;
   transition: border-color .2s ease, box-shadow .2s ease;
 }
-.vs-env:hover { border-color: color-mix(in oklab, var(--text) 18%, var(--line)); }
+@media (hover: hover) { .vs-env:hover { border-color: color-mix(in oklab, var(--text) 18%, var(--line)); } }
 .vs-env.is-playing {
   border-color: var(--env-a);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--env-a) 22%, transparent);
@@ -858,7 +873,7 @@ html:not([data-theme="light"]) .vs-speech::after {
   cursor: pointer;
   transition: background-color .15s ease, color .15s ease;
 }
-.vs-env-switch button:hover { color: var(--text); }
+@media (hover: hover) { .vs-env-switch button:hover { color: var(--text); } }
 .vs-env-switch button[aria-pressed="true"] {
   background: var(--vs-card);
   color: var(--text);
@@ -869,7 +884,7 @@ html:not([data-theme="light"]) .vs-env-switch button[aria-pressed="true"] { back
 html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-pressed="true"] { color: var(--env-b); }
 .vs-env-switch button:focus-visible { outline: 2px solid var(--brand-subtle); outline-offset: 2px; }
 .vs-env .vs-play { background: var(--env-a); box-shadow: var(--lift); }
-.vs-env .vs-play:hover { background: color-mix(in srgb, var(--env-a) 85%, #000); }
+@media (hover: hover) { .vs-env .vs-play:hover { background: color-mix(in srgb, var(--env-a) 85%, #000); } }
 .vs-env.is-playing .vs-play::after { border-color: var(--env-a); }
 .vs-env .vs-wave-fill i { background: linear-gradient(180deg, var(--env-b), var(--env-a)); }
 .vs-env-cta-wrap { display: flex; justify-content: center; margin-top: 1.75rem; }
@@ -888,7 +903,7 @@ html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-
   box-shadow: var(--lift);
   transition: background-color .15s ease, transform .15s ease;
 }
-.vs-env-cta:hover { background: var(--brand-hover); transform: translateY(-1px); color: #FFFFFF; }
+@media (hover: hover) { .vs-env-cta:hover { background: var(--brand-hover); transform: translateY(-1px); color: #FFFFFF; } }
 .vs-env-cta:focus-visible { outline: 2px solid var(--brand-subtle); outline-offset: 3px; }
 
 @media (max-width: 1024px) {
@@ -946,7 +961,7 @@ html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-
     0 0 calc(var(--orb-glow) * 64px) calc(var(--orb-glow) * 10px) color-mix(in srgb, var(--o2) 45%, transparent);
   transition: width .55s cubic-bezier(.2, .8, .2, 1), height .55s cubic-bezier(.2, .8, .2, 1), transform .3s ease;
 }
-.tour-pick:hover .tour-orb { transform: scale(1.04); }
+@media (hover: hover) { .tour-pick:hover .tour-orb { transform: scale(1.04); } }
 .tour-item.is-picked .tour-orb { --orb-size: clamp(170px, 17vw, 236px); transform: none; }
 .tour-play {
   position: absolute;
@@ -1135,7 +1150,7 @@ html[dir="rtl"] .vs-long-lane.is-made .vs-long-fill { background: linear-gradien
 /* The player: a long recording needs a place to jump to, and the time. */
 .vs-long-player { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .vs-long .vs-play { background: var(--vs-long-a); }
-.vs-long .vs-play:hover { background: color-mix(in srgb, var(--vs-long-a) 82%, #000); }
+@media (hover: hover) { .vs-long .vs-play:hover { background: color-mix(in srgb, var(--vs-long-a) 82%, #000); } }
 .vs-long.is-playing .vs-play::after { border-color: var(--vs-long-a); }
 .vs-long .vs-play .vs-icon-pause, .vs-long.is-playing .vs-play .vs-icon-play { display: none; }
 .vs-long.is-playing .vs-play .vs-icon-pause { display: block; }
