@@ -72,6 +72,9 @@ class PricingMinutesTrackTest extends TestCase
 
         // Two pickers above the table; the plan the track shows and the next one up come first.
         $this->assertSame(2, substr_count($html, 'class="compare-pick"'));
+        // A tap reaches the select (it opens the phone's own list): the face under it lets taps through.
+        $this->assertMatchesRegularExpression('/\.compare-pick-face \{[^}]*pointer-events: none;/', $html);
+        $this->assertMatchesRegularExpression('/\.compare-pick \{[^}]*z-index: 1;/', $html);
         preg_match('/class="compare-table" data-pick="(\d+),(\d+)"/', $html, $pick);
         preg_match_all('/class="compare-plan[^"]*" data-col="(\d+)" data-slug="([a-z_]+)"/', $html, $columns);
         $slugs = array_combine($columns[1], $columns[2]);

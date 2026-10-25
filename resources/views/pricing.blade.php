@@ -705,6 +705,7 @@
         line-height: 1.25;
         text-align: center;
         overflow-wrap: anywhere;
+        pointer-events: none;
       }
       .compare-pick-face::after {
         content: "";
@@ -717,8 +718,10 @@
         border-bottom: 1.8px solid var(--muted);
         transform: translateY(-70%) rotate(45deg);
       }
+      /* On top of the face, so a tap opens the phone's own list. */
       .compare-pick {
         position: absolute;
+        z-index: 1;
         inset: .6rem .3rem;
         width: calc(100% - .6rem);
         height: calc(100% - 1.2rem);
