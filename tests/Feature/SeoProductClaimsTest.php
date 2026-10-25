@@ -24,7 +24,8 @@ class SeoProductClaimsTest extends TestCase
             foreach (['en', 'ar'] as $locale) {
                 $text = SeoHelper::title('', $page, $locale).' '.SeoHelper::description($page, $locale);
                 $this->assertDoesNotMatchRegularExpression('/\bfree\b|مجان/iu', $text, "{$page} ({$locale}): {$text}");
-                $this->assertDoesNotMatchRegularExpression('/\b50\b|\b18 English|خمسين|18 لكنة/u', $text, "{$page} ({$locale}): {$text}");
+                // The old accent counts; "50+ emotions" is the emotions list, counted in DialectCountsTest.
+                $this->assertDoesNotMatchRegularExpression('/\b50\b(?!\+? (?:emotions|شعور))|\b18 English|خمسين|18 لكنة/u', $text, "{$page} ({$locale}): {$text}");
             }
         }
     }
@@ -112,7 +113,7 @@ class SeoProductClaimsTest extends TestCase
 
         $pages = [['seo.text-to-speech', []], ['seo.text-to-speech-arabic', []], ['seo.ai-text-to-speech', []], ['seo.ai-voice-generator', []],
             ['seo.arabic-dialects', []], ['seo.english-accents', []], ['seo.dialect', ['dialect' => 'saudi']], ['seo.accent', ['accent' => 'british']],
-            ['home', []], ['samples', []]];
+            ['home', []], ['samples', []], ['seo.features', []], ['pricing', []]];
         foreach ($pages as [$route, $params]) {
             foreach (['en', 'ar'] as $locale) {
                 // "All Arabic dialects" links to the list of the ones Listen has, and stays.

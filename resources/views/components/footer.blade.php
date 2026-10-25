@@ -72,6 +72,7 @@
         <div class="footer-column">
           <h4>{{ __('ui.footer.product') }}</h4>
           <ul>
+            <li><a href="{{ route('seo.features') }}">{{ __('ui.nav.features') }}</a></li>
             <li><a href="{{ route('samples') }}">{{ __('ui.nav.samples') }}</a></li>
             <li><a href="{{ route('pricing') }}">{{ __('ui.nav.pricing') }}</a></li>
             @if($showDemoFooterLink)

@@ -1,4 +1,7 @@
-@include('components.page-head', ['pageTitle' => __('ui.seo.home_title'), 'page' => 'home'])
+@php
+  $homeFaq = \App\Support\HomeFaq::items();
+@endphp
+@include('components.page-head', ['pageTitle' => __('ui.seo.home_title'), 'page' => 'home', 'faqItems' => $homeFaq])
   @php
     $voiceShowcaseCss = public_path('css/voice-showcase.css');
   @endphp
@@ -1086,6 +1089,10 @@
         </article>
       </div>
     </section>
+
+    {{-- What the studio is and does, in short: the same questions are the page's FAQ structured data. --}}
+    <x-faq-section id="homeFaq" :title="__('ui.home_faq.title')" :subtitle="__('ui.home_faq.subtitle')" :items="$homeFaq"
+      :contact="false" :more="['href' => route('seo.features'), 'label' => __('ui.home_faq.all_features')]" />
 
     @auth
       <x-closing-panel :title="__('ui.landing.cta_title')" :body="__('ui.landing.cta_subtitle')"

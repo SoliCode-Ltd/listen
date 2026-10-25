@@ -34,6 +34,7 @@ use App\Support\EmailVerification;
 use App\Support\FreeAllowance;
 use App\Support\PlanPricingLines;
 use App\Support\SeoDialectPages;
+use App\Support\SeoFeaturesPage;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
 use App\Support\SpeakerAvatar;
@@ -511,6 +512,21 @@ class HomeController extends Controller
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
             // English pages play an English voice, Arabic pages a Fusha one: no single dialect is favoured.
             'sample' => $locale === 'ar' ? SeoDialectPages::sample('fusha', $locale) : SeoEnglishPages::sample('american'),
+        ]);
+    }
+
+    /** Everything the studio does, with every count and list from its own catalogs. */
+    public function featuresPage(Request $request)
+    {
+        $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
+        $content = SeoFeaturesPage::content($locale);
+
+        return view('seo.landing-page', [
+            'page' => SeoFeaturesPage::PAGE,
+            'pageContent' => $content,
+            'faqItems' => $content['faqs'],
+            'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
+            'sample' => $locale === 'ar' ? SeoDialectPages::sample('egyptian', $locale) : SeoEnglishPages::sample('american'),
         ]);
     }
 
