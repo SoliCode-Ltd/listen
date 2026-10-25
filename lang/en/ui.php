@@ -212,7 +212,7 @@ return [
     'pricing' => [
         'hero_title' => 'Pay for the minutes',
         'hero_title_accent' => 'you need.',
-        'hero_subtitle' => 'Choose how many minutes of voice you need each month and we\'ll show you the plan that fits. Every plan has the premium voices, and you can change or cancel any time.',
+        'hero_subtitle' => 'Choose how many minutes of voice you need each month and we\'ll show you the plan that fits. You can change or cancel any time.',
         'minutes_label' => 'Minutes a month',
         'minutes_unit' => 'minutes',
         'minutes_track' => 'Minutes track',
