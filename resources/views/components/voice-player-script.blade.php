@@ -260,6 +260,7 @@
       var section = chip.closest('section');
       var grid = section.querySelector('.vs-grid');
       chip.parentElement.querySelectorAll('[data-vp-region]').forEach(function (c) { c.setAttribute('aria-selected', c === chip ? 'true' : 'false'); });
+      centre(chip);
       grid.classList.toggle('is-filtered', region !== 'all');
       if (grid.hasAttribute('data-vp-page')) {
         grid.setAttribute('data-vp-filter', region);
@@ -267,10 +268,51 @@
         return;
       }
       grid.querySelectorAll('.vs-card').forEach(function (card) {
+        var was = card.hidden;
         card.hidden = region !== 'all' && card.getAttribute('data-region') !== region;
         if (card.hidden && current === card) { audio.pause(); stop(); rest(card); }
+        if (was && !card.hidden) enter(card);
       });
     }
+  });
+
+  // A card brought into view fades in.
+  function enter(card) {
+    card.classList.remove('is-entering');
+    void card.offsetWidth;
+    card.classList.add('is-entering');
+  }
+  document.addEventListener('animationend', function (event) {
+    if (event.target.classList && event.target.classList.contains('is-entering')) event.target.classList.remove('is-entering');
+  });
+
+  // A row of chips wider than the screen: the tapped chip glides to the middle, and the
+  // row fades at the side that has more chips to swipe to.
+  function centre(chip) {
+    var row = chip.parentElement;
+    if (row.scrollWidth <= row.clientWidth + 1) return;
+    var c = chip.getBoundingClientRect(), r = row.getBoundingClientRect();
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    row.scrollBy({ left: (c.left + c.width / 2) - (r.left + r.width / 2), behavior: reduce ? 'auto' : 'smooth' });
+  }
+  function fade(row) {
+    var items = row.children;
+    if (!items.length) return;
+    var r = row.getBoundingClientRect();
+    var left = Infinity, right = -Infinity;
+    Array.prototype.forEach.call(items, function (item) {
+      var b = item.getBoundingClientRect();
+      if (b.width) { left = Math.min(left, b.left); right = Math.max(right, b.right); }
+    });
+    row.classList.toggle('is-fade-left', left < r.left - 1);
+    row.classList.toggle('is-fade-right', right > r.right + 1);
+  }
+  document.querySelectorAll('.vs-chips').forEach(function (row) {
+    fade(row);
+    row.addEventListener('scroll', function () { fade(row); }, { passive: true });
+  });
+  ['resize', 'load'].forEach(function (type) {
+    window.addEventListener(type, function () { document.querySelectorAll('.vs-chips').forEach(fade); });
   });
 
   // A grid shown a page at a time (the samples page): the first cards of the chosen region
@@ -281,11 +323,13 @@
     var filter = grid.getAttribute('data-vp-filter') || 'all';
     var shown = next ? (+grid.getAttribute('data-vp-shown') || size) + size : size;
     var matching = 0;
-    grid.querySelectorAll('.vs-card').forEach(function (card) {
+    grid.querySelectorAll('.vs-card, .vs-dialogue').forEach(function (card) {
       var match = filter === 'all' || card.getAttribute('data-region') === filter;
+      var was = card.hidden;
       card.hidden = !match || matching >= shown;
       if (match) matching++;
       if (card.hidden && current === card) { audio.pause(); stop(); rest(card); }
+      if (was && !card.hidden) enter(card);
     });
     grid.setAttribute('data-vp-shown', String(shown));
     var button = grid.closest('section').querySelector('[data-vp-more-cards]');

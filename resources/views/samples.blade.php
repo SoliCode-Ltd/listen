@@ -251,7 +251,7 @@
       text-decoration: none;
       white-space: nowrap;
     }
-    .samples-jump a:hover { color: var(--text); background: var(--surface2); }
+    @media (hover: hover) { .samples-jump a:hover { color: var(--text); background: var(--surface2); } }
     .samples-jump a[aria-current="true"] { color: var(--accent-text); background: color-mix(in oklab, var(--a) 10%, transparent); }
     .samples-jump b { font-size: .78rem; font-weight: 700; font-variant-numeric: tabular-nums; }
     .samples-jump a:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
@@ -445,11 +445,13 @@
             <p class="vs-lead">{{ __('ui.samples.conversations_lead') }}</p>
           </div>
         </div>
-        <div class="vs-dialogue-grid">
+        {{-- Four conversations at a time. --}}
+        <div class="vs-dialogue-grid" data-vp-page="4" data-vp-filter="all">
           @foreach($dialogues as $dialogue)
-            @include('components.home.dialogue-card', ['dialogue' => $dialogue])
+            @include('components.home.dialogue-card', ['dialogue' => $dialogue, 'cardHidden' => $loop->index >= 4])
           @endforeach
         </div>
+        @include('components.samples-more', ['left' => count($dialogues) - 4, 'label' => 'ui.samples.show_more_conversations'])
       </section>
     @endif
 

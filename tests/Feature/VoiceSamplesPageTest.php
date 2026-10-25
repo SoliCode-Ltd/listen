@@ -145,6 +145,18 @@ class VoiceSamplesPageTest extends TestCase
         $this->assertSame(count($voices), substr_count($grid, '<article class="vs-card'));
         $this->assertMatchesRegularExpression('/data-vp-more-cards\s*>اعرض المزيد من الأصوات<\/button>/u', $grid);
 
+        // Conversations: four at a time.
+        $conversations = substr($html, strpos($html, 'id="conversations"'), strpos($html, 'id="sound-environments"') - strpos($html, 'id="conversations"'));
+        $this->assertStringContainsString('data-vp-page="4"', $conversations);
+        $this->assertSame(4, preg_match_all('/<article class="vs-dialogue[^"]*"[^>]*data-language="[a-z]+"\s*>/', $conversations));
+        $this->assertStringContainsString('اعرض المزيد من الحوارات', $conversations);
+
+        // Phones: cards stack in one column (no sideways scrolling), and a tap shows no grey box.
+        $css = (string) file_get_contents(public_path('css/voice-showcase.css'));
+        $this->assertStringContainsString('.vs-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }', $css);
+        $this->assertDoesNotMatchRegularExpression('/\.vs-grid[^{]*\{[^}]*overflow-x: auto/', $css);
+        $this->assertStringContainsString('-webkit-tap-highlight-color: transparent', $html);
+
         // Moods: at most twelve of the first mood.
         $moods = substr($html, strpos($html, 'id="moods"'));
         $this->assertLessThanOrEqual(12, preg_match_all('/<article class="vs-card[^"]*"[^>]*data-language="[a-z]+"\s*>/', $moods));

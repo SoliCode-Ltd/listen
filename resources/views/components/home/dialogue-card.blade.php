@@ -1,11 +1,11 @@
 {{-- A two-voice dialogue as a script: each line with its speaker's avatar and name, lit in
      time with the voice. Used by the homepage and the voice samples page.
-     $dialogue: a showcase card with speakers and turns. $cardClass: extra classes. --}}
+     $dialogue: a showcase card with speakers and turns. $cardClass: extra classes. $cardHidden: hidden at first. --}}
 @php
   $vsUntagged = fn (string $text): string => trim((string) preg_replace('/\s*<[^<>\n]{1,24}>\s*/u', ' ', $text));
 @endphp
 @php $vsPair = $dialogue['speakers']; @endphp
-<article class="vs-dialogue{{ $cardClass ?? '' }}" data-vp-track data-vp-dialogue data-src="{{ $dialogue['audio_url'] }}" data-language="{{ $dialogue['language'] }}">
+<article class="vs-dialogue{{ $cardClass ?? '' }}" data-vp-track data-vp-dialogue data-src="{{ $dialogue['audio_url'] }}" data-language="{{ $dialogue['language'] }}" @if(!empty($cardHidden)) hidden @endif>
   <header class="vs-dialogue-head">
     <span class="vs-avatar-pair" aria-hidden="true">
       @foreach(array_slice($vsPair, 0, 2) as $si => $speaker)
