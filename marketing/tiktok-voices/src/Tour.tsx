@@ -39,7 +39,8 @@ const lineOf = (v: VoiceBoxes): Box => {
 };
 
 const STEP: Record<string, string> = {
-  open: 'جرّبنا استوديو إسمع', library: 'اختار من 155 صوت', dialect: '147 لهجة من 24 دولة',
+  // the dialects: the site's own count, Arabic dialects and English accents together (147 + 66)
+  open: 'جرّبنا استوديو إسمع', library: 'اختار الصوت اللي يعجبك', dialect: 'أكتر من 200 لهجة ولكنة',
   type: 'اكتب… وزوّد إحساس وضحكة', generate: 'ودوس توليد', history: 'وكل أصواتك محفوظة',
 };
 const OPTION: Record<string, string> = {
