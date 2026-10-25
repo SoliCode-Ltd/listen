@@ -110,14 +110,14 @@
   }
  ],
  "studio": {
-  "start": 36.171,
-  "end": 47.471,
+  "start": 35.921,
+  "end": 47.221,
   "result": 9.0,
-  "replay": 45.471
+  "replay": 45.221
  },
  "end": {
-  "start": 47.471,
-  "end": 51.15
+  "start": 47.221,
+  "end": 50.9
  },
- "duration": 51.15
+ "duration": 50.9
 }

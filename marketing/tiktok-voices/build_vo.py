@@ -31,6 +31,7 @@ RESULT = 9.0    # seconds into the studio: the voice is ready in the player
 REPLAY = 0.3    # it plays this long after
 TO_END = 2.0    # the end card comes in this long after it starts playing (it plays on under it)
 END_MIN = 3.4   # the end card stays at least this long
+OVERLAP = 0.25  # the studio rises in while the last voice's line leaves
 
 
 def load(slug):
@@ -72,7 +73,7 @@ def main():
                        "sounds": [round(v - lead, 3) for v in w.get("sounds", [])]})
         pieces.append((audio, seg))
         t = end
-    studio = t
+    studio = t - OVERLAP
     replay = studio + RESULT + REPLAY
     first = pieces[0][1]
     pieces.append((replay, first))
