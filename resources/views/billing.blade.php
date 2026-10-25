@@ -819,31 +819,20 @@
         display: none;
       }
       .quote-slot .quote-highlight {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        align-items: center;
-        gap: .15rem 1rem;
-        text-align: start;
-        padding: .8rem 1rem;
+        text-align: center;
+        padding: .85rem 1rem;
       }
       .quote-slot .quote-highlight small {
-        margin: 0;
+        margin: 0 0 .15rem;
         font-size: .82rem;
         letter-spacing: 0;
         text-transform: none;
       }
       .quote-slot .quote-highlight .amount {
-        grid-row: 1;
-        grid-column: 2;
-        font-size: 1.4rem;
-      }
-      .quote-slot .quote-highlight small:empty + .amount {
-        grid-column: 1 / -1;
-        justify-self: start;
+        font-size: 1.5rem;
       }
       .quote-slot .quote-highlight .hint {
-        grid-column: 1 / -1;
-        margin: .1rem 0 0;
+        margin: .25rem 0 0;
         font-size: .85rem;
         line-height: 1.5;
       }
