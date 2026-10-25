@@ -400,32 +400,36 @@
       fill: none;
       stroke: none;
     }
+    /* The saved card: the check beside two lines, what is used and how to change it. */
     .saved-card-notice {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: auto 1fr;
       align-items: center;
-      gap: .4rem;
+      gap: .1rem .65rem;
       padding: .7rem .9rem;
       margin-bottom: .65rem;
       border-radius: var(--radius);
-      background: color-mix(in oklab, var(--success) 8%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--success) 25%, transparent);
+      background: color-mix(in oklab, var(--ok) 8%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--ok) 28%, transparent);
       font-size: .95rem;
+      line-height: 1.5;
       color: var(--fg);
     }
     .saved-card-notice .saved-card-icon {
-      color: var(--success);
-      font-weight: 700;
+      grid-row: 1 / span 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .saved-card-notice strong {
       color: var(--fg);
       font-weight: 600;
+      white-space: nowrap;
     }
     .saved-card-notice .saved-card-hint {
-      flex-basis: 100%;
+      grid-column: 2;
       font-size: .82rem;
       color: var(--muted);
-      margin-top: .15rem;
     }
     .card-error {
       margin-top: .4rem;
@@ -1003,7 +1007,7 @@
         <small>{{ __('ui.billing.saved_card') }}</small>
         <b>
           @if($defaultPaymentMethod)
-            {{ strtoupper((string) ($defaultPaymentMethod->card->brand ?? 'card')) }} **** {{ $defaultPaymentMethod->card->last4 ?? '' }}
+            <bdi dir="ltr">{{ strtoupper((string) ($defaultPaymentMethod->card->brand ?? 'card')) }} •••• {{ $defaultPaymentMethod->card->last4 ?? '' }}</bdi>
           @else
             {{ __('ui.billing.not_saved') }}
           @endif
@@ -1173,7 +1177,7 @@
               </div>
               @if($defaultPaymentMethod)
                 <div class="saved-card-notice">
-                  <span class="saved-card-icon" style="display: flex; align-items: center; justify-content: center;">
+                  <span class="saved-card-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20">
                       <defs>
                         <linearGradient id="savedCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1186,7 +1190,7 @@
                       <path d="M8.5 12L10.5 14.5L16 9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
                     </svg>
                   </span>
-                  <span>{{ __('ui.billing.using_saved_card') }} <strong>{{ strtoupper($defaultPaymentMethod->card->brand) }} **** {{ $defaultPaymentMethod->card->last4 }}</strong></span>
+                  <span>{{ __('ui.billing.using_saved_card') }} <strong><bdi dir="ltr">{{ strtoupper($defaultPaymentMethod->card->brand) }} •••• {{ $defaultPaymentMethod->card->last4 }}</bdi></strong></span>
                   <span class="saved-card-hint">{{ __('ui.billing.enter_new_card_optional') }}</span>
                 </div>
               @endif
