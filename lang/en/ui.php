@@ -477,6 +477,9 @@ return [
         'yearly_save_20' => 'Yearly (save 20%)',
         'cycle_with_discount' => ':cycle (save :percent%)',
         'credit_or_debit_card' => 'Credit or Debit Card',
+        'card_number' => 'Card number',
+        'card_expiry' => 'Expiry date',
+        'card_cvc' => 'Security code (CVC)',
         'using_saved_card' => 'Your saved card will be used.',
         'enter_new_card_optional' => 'Enter a new card below only if you want to change it.',
         'save_card_for_future' => 'Save this card for future payments',
@@ -504,13 +507,11 @@ return [
         'order_renews_month' => 'Then :amount a month from :date.',
         'order_renews_year' => 'Then :amount a year from :date.',
         'order_credit_left' => ':amount goes to your account credit and pays your next renewals.',
-        'order_charged_as' => 'Your card is charged :amount.',
         'order_loading' => "Working out today's amount...",
         'order_fallback_label' => 'At most',
         'order_fallback_hint' => 'Today you pay the new plan less a credit for the unused time on :plan.',
         'trial_quote_hint' => 'Then :amount on :date unless you cancel before.',
-        'discount_quote_hint' => ':terms. Full price from :date unless you cancel before.',
-        'discount_quote_hint_forever' => ':terms.',
+        'discount_quote_hint' => ':terms.',
         // InstaPay / Vodafone Cash: one payment that does not renew by itself.
         'discount_quote_hint_manual_month' => ':percent% off this payment. The regular price is :price/month.',
         'discount_quote_hint_manual_year' => ':percent% off this payment. The regular price is :price/year.',
@@ -609,15 +610,14 @@ return [
         'admin_request_missing_relation' => 'The payment request is missing its user or plan relationship.',
         'manual_locked_to_egypt' => 'Manual payment methods are currently available only for Egypt.',
 
-        // Card checkout: when the card form cannot load, and the local price beside the dollar amount.
+        // Card checkout: when the card form cannot load.
         'card_form_unavailable' => "The card payment form couldn't load. Check your connection, then reload the page to try again.",
-        'card_local_about' => 'Charged in US dollars, about :amount',
 
         // A card the bank refused (App\Services\Billing\CardDecline): what happened, then what to do.
         'decline_no_funds' => "Your card doesn't have enough money for this payment, so nothing was charged. Top up the card and try again, or choose another option below.",
         'decline_card_details' => "The card details don't match your bank's records, so nothing was charged. Check the card number, expiry date and CVC, then try again.",
         'decline_try_again' => "Your bank couldn't confirm the payment just now, so nothing was charged. Wait a minute, then try again.",
-        'decline_refused' => "Your bank didn't allow this payment, so nothing was charged. Many banks block online payments in US dollars: ask your bank to allow them, or choose another option below.",
+        'decline_refused' => "Your bank didn't allow this payment, so nothing was charged. Many banks block international online payments: ask your bank to allow them, or choose another option below.",
         'decline_still_on_plan' => "You're still on :plan.",
         'decline_trial_continues' => 'Your free trial continues until :date.',
         'decline_options_title' => 'What you can do now',
@@ -1932,7 +1932,7 @@ return [
         'pay_subtitle' => 'Your characters are added as soon as the payment goes through.',
         'pay_by_card' => 'Card',
         'pay_amount' => 'Pay :amount',
-        'card_note' => 'Charged once in US dollars. Nothing renews.',
+        'card_note' => 'Charged once. Nothing renews.',
         'pay_locally' => 'Pay in Egyptian pounds',
         'pay_with' => 'Pay :amount with :method',
         'manual_note' => 'Send the amount, upload the receipt, and we add your pack once we confirm it.',

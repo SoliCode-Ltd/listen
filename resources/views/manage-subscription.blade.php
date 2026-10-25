@@ -179,12 +179,6 @@
       fill: none;
       stroke: none;
     }
-    #card-element {
-      padding: .85rem;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--surface);
-    }
     .card-error {
       margin-top: .5rem;
       font-size: .85rem;
@@ -600,7 +594,7 @@
             </span>
             {{ __('ui.billing.credit_or_debit_card') }}
           </div>
-          <div id="card-element"></div>
+          <x-card-fields id="card" />
           <div id="card-error" class="card-error"></div>
           @if($stripeReady)
             <p class="card-hint">{{ __('ui.manage_subscription.card_used_for_future') }}</p>
@@ -817,21 +811,18 @@
 
     const stripe = stripeKey && typeof Stripe === 'function' ? Stripe(stripeKey, { locale: isArabicLocale ? 'ar' : 'en' }) : null;
     const elements = stripe ? stripe.elements() : null;
-    const card = elements
-      ? elements.create('card', {
-          hidePostalCode: true,
-          style: resolveCardStyle(),
+    // The new card in three boxes (components/card-fields): the number, the expiry date
+    // and the code. Stripe takes the card from the number field and reads the other two with it.
+    let cardComplete = false;
+    const cardForm = elements
+      ? window.ListenCardFields(elements, 'card', resolveCardStyle(), (state) => {
+          cardComplete = state.complete;
+          cardError.textContent = state.error
+            ? normalizeStripeMessage(state.error.message, i18n.invalid_card_details)
+            : '';
         })
       : null;
-
-    let cardComplete = false;
-    card?.mount('#card-element');
-    card?.on('change', (event) => {
-      cardComplete = Boolean(event.complete);
-      cardError.textContent = event.error
-        ? normalizeStripeMessage(event.error.message, i18n.invalid_card_details)
-        : '';
-    });
+    const card = cardForm ? cardForm.card : null;
 
     if (card && 'MutationObserver' in window) {
       let currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -839,7 +830,7 @@
         const nextTheme = document.documentElement.getAttribute('data-theme') || 'dark';
         if (nextTheme === currentTheme) return;
         currentTheme = nextTheme;
-        card.update({ style: resolveCardStyle() });
+        cardForm.update({ style: resolveCardStyle() });
       });
       observer.observe(document.documentElement, {
         attributes: true,

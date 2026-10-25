@@ -158,8 +158,10 @@ class DiscountTermsTest extends TestCase
                 $starter = collect($plans)->firstWhere('slug', 'starter');
                 $monthly = str_replace(["\u{2066}", "\u{2069}"], '', (string) ($starter['discount_terms']['monthly'] ?? ''));
 
+                // The offer and the price after it, nothing more (no "full price from" date).
                 return str_starts_with($monthly, '30% off your first 3 months, then')
-                    && str_contains($monthly, 'Full price from 17 Jan 2027');
+                    && str_ends_with($monthly, '/month.')
+                    && ! str_contains($monthly, 'Full price');
             });
 
         Carbon::setTestNow();

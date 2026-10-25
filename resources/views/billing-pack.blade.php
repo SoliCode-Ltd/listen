@@ -29,7 +29,6 @@
     .pack-option-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
     .pack-option-head strong { font-size: 1.05rem; }
     .pack-amount { font-weight: 800; font-size: 1.15rem; }
-    #pack-card-element { padding: .8rem .9rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
     .pack-error { color: #ff7a9a; min-height: 1.2em; font-size: .9rem; }
     .pack-error.is-info { color: var(--muted); }
     .pack-small { font-size: .85rem; color: var(--muted); }
@@ -92,7 +91,7 @@
                   <strong>{{ __('ui.pack.pay_by_card') }}</strong>
                   <span class="pack-amount" dir="ltr">{{ $cardPrice }}</span>
                 </div>
-                <div id="pack-card-element"></div>
+                <x-card-fields id="pack-card" />
                 <div class="pack-error" id="pack-card-error" role="alert"></div>
                 <button class="btn btn-primary" type="submit" id="pack-card-button">{{ __('ui.pack.pay_amount', ['amount' => "\u{2066}".$cardPrice."\u{2069}"]) }}</button>
                 <div class="pack-small">{{ __('ui.pack.card_note') }}</div>
@@ -176,15 +175,16 @@
         return;
       }
 
-      const card = stripe.elements().create('card', { hidePostalCode: true, style: cardStyle() });
+      // The card in three boxes (components/card-fields): the number, the expiry date and
+      // the code. Stripe takes the card from the number field and reads the other two with it.
       let cardComplete = false;
-      card.mount('#pack-card-element');
-      card.on('change', (event) => {
-        cardComplete = Boolean(event.complete);
-        const [text, reason] = event.error ? stripeText(event.error, i18n.incomplete) : ['', ''];
+      const cardForm = window.ListenCardFields(stripe.elements(), 'pack-card', cardStyle(), (state) => {
+        cardComplete = state.complete;
+        const [text, reason] = state.error ? stripeText(state.error, i18n.incomplete) : ['', ''];
         setNotice(text, reason);
       });
-      new MutationObserver(() => card.update({ style: cardStyle() }))
+      const card = cardForm.card;
+      new MutationObserver(() => cardForm.update({ style: cardStyle() }))
         .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
       async function post(url, payload) {

@@ -76,7 +76,8 @@ class CharPackController extends Controller
         return view('billing-pack', [
             'pack' => $pack,
             'packName' => $pack->getLocalizedName($locale),
-            'cardPrice' => $this->pricing->formatAmount((int) $pack->getEffectivePriceCents(), 'USD', 'en'),
+            // In the visitor's own currency, as the pricing page shows it (the card pays the dollars).
+            'cardPrice' => (string) $this->pricing->convertedQuoteFromUsd((int) $pack->getEffectivePriceCents(), 'monthly', $country, 'stripe', $locale)['amount_formatted'],
             'canBuy' => $this->packs->canBuy($user, $pack),
             'currentPlan' => $this->plans->resolveActivePlanForUserId((int) $user->id),
             'wallet' => $this->packs->summary((int) $user->id),
