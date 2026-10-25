@@ -21,14 +21,17 @@ class VoiceSamplesPageTest extends TestCase
 
         app()->setLocale('en');
         $en = $this->getLocalizedRoute('samples')->assertOk();
-        $this->assertCount(29, $en->viewData('voices'));
+        // Every speaker once, in their own accent.
+        $this->assertCount(87, $en->viewData('voices'));
         $this->assertCount(6, $en->viewData('dialogues'));
         $this->assertNotEmpty($en->viewData('moodVoices'));
         $this->assertCount(6, $en->viewData('environments'));
         $this->assertStageCast($en->viewData('stageCast'), 'en');
-        // English only: voices, moods, conversations, places and the stage.
+        // English only: voices, moods, conversations, places and the stage (the speakers
+        // who speak another language natively are grouped apart).
         foreach (['voices', 'moodVoices', 'dialogues', 'environments', 'stageCast'] as $key) {
-            $this->assertSame(['en'], array_values(array_unique(array_column($en->viewData($key), 'language'))), $key);
+            $english = array_filter($en->viewData($key), fn (array $card): bool => ($card['region'] ?? '') !== 'languages');
+            $this->assertSame(['en'], array_values(array_unique(array_column($english, 'language'))), $key);
         }
         $en->assertSeeInOrder(['id="english-accents"', 'id="moods"', 'id="conversations"', 'id="sound-environments"'], false);
         $en->assertDontSee('id="arabic-dialects"', false);
@@ -43,7 +46,7 @@ class VoiceSamplesPageTest extends TestCase
 
         app()->setLocale('ar');
         $ar = $this->getLocalizedRoute('samples')->assertOk();
-        $this->assertCount(38, $ar->viewData('voices'));
+        $this->assertCount(155, $ar->viewData('voices'));
         $this->assertCount(8, $ar->viewData('dialogues'));
         $this->assertCount(6, $ar->viewData('environments'));
         $this->assertStageCast($ar->viewData('stageCast'), 'ar');
@@ -56,6 +59,83 @@ class VoiceSamplesPageTest extends TestCase
         $ar->assertSee('سعودي (نجدي)');
         $ar->assertSee('data-vp-region="maghreb"', false);
         $ar->assertDontSee('images/speakers/en-', false);
+    }
+
+    public function test_the_voice_library_speakers_join_the_page_each_once(): void
+    {
+        $this->artisan('tts:showcase', ['--import' => true]);
+        $moods = array_keys(__('ui.samples.moods'));
+
+        foreach (['en' => 87, 'ar' => 155] as $language => $speakers) {
+            app()->setLocale($language);
+            $page = $this->getLocalizedRoute('samples')->assertOk();
+            $voices = $page->viewData('voices');
+
+            // No speaker, clip or line twice.
+            foreach (['avatar', 'audio_url', 'text'] as $key) {
+                $values = array_column($voices, $key);
+                $this->assertSame($values, array_values(array_unique($values)), $language.' '.$key);
+            }
+            // Every speaker is on the page once, in their own dialect or accent, so every one is heard.
+            $this->assertCount($speakers, $voices);
+            $own = [];
+            foreach (\App\Support\VoicePreviews::lines() as $slug => $line) {
+                if (str_starts_with($slug, $language.'-')) {
+                    $own[] = $line['dialect'];
+                }
+            }
+            $this->assertEqualsCanonicalizing(array_values(array_unique($own)), array_values(array_unique(array_column($voices, 'dialect'))));
+            foreach ($voices as $card) {
+                $this->assertNotNull($card['avatar'], $card['speaker']);
+                $this->assertContains($card['emotion'], $moods, $card['speaker']);
+                $this->assertNotSame('', $card['title'], $card['speaker']);
+            }
+            $this->assertCount(count($voices), $page->viewData('moodVoices'));
+        }
+
+        app()->setLocale('en');
+        $en = $this->getLocalizedRoute('samples')->assertOk();
+        $byAvatar = [];
+        foreach ($en->viewData('voices') as $card) {
+            $byAvatar[basename((string) parse_url($card['avatar'], PHP_URL_PATH))] = $card;
+        }
+        // Theodore's homepage sample is in his own accent (British): it stays, his preview is left out.
+        $this->assertStringNotContainsString('voice-previews', $byAvatar['en-theodore.webp']['audio_url']);
+        $en->assertDontSee('voice-previews/en-theodore.mp3', false);
+        // Daisy's homepage sample is in another accent: her own (Appalachian) preview is there instead.
+        $daisy = $byAvatar['en-daisy.webp'];
+        $this->assertStringContainsString('voice-previews/en-daisy.mp3', $daisy['audio_url']);
+        $this->assertSame(['en-US-AP', 'americas', 'Coach', 'confident'], [$daisy['dialect'], $daisy['region'], $daisy['title'], $daisy['emotion']]);
+        // Hannah has no homepage sample: her preview, as a trip leader.
+        $hannah = $byAvatar['en-hannah.webp'];
+        $this->assertStringContainsString('voice-previews/en-hannah.mp3', $hannah['audio_url']);
+        $this->assertSame(['americas', 'Trip leader', 'confident'], [$hannah['region'], $hannah['title'], $hannah['emotion']]);
+        // Chloe speaks French: in "Other languages", marked as French.
+        $chloe = $byAvatar['en-chloe.webp'];
+        $this->assertSame(['languages', 'fr', 'French (France)'], [$chloe['region'], $chloe['language'], $chloe['dialect_label']]);
+        $en->assertSee('data-vp-region="languages"', false);
+        $en->assertSee('Other languages');
+
+        app()->setLocale('ar');
+        $ar = $this->getLocalizedRoute('samples')->assertOk();
+        // An Arabic preview card: the speaker's Arabic name and title, in their region.
+        $ar->assertSee('voice-previews/ar-hassan.mp3', false);
+        $hassan = collect($ar->viewData('voices'))->first(fn (array $card): bool => str_contains($card['audio_url'], 'ar-hassan.mp3'));
+        $this->assertSame(['gulf', 'قبطان قارب', 'حسن'], [$hassan['region'], $hassan['title'], $hassan['speaker']]);
+        $ar->assertDontSee('data-vp-region="languages"', false);
+    }
+
+    public function test_every_preview_has_a_card_title_and_mood(): void
+    {
+        $previews = array_keys(\App\Support\VoicePreviews::lines());
+        $cards = (require database_path('seeders/data/voice_preview_cards.php'))['cards'];
+        $this->assertEqualsCanonicalizing($previews, array_keys($cards));
+        $moods = array_keys(__('ui.samples.moods'));
+        foreach ($cards as $slug => [$title, $mood]) {
+            $this->assertContains($mood, $moods, $slug);
+            // Arabic titles for the Arabic page, English ones for the English page.
+            $this->assertSame(str_starts_with($slug, 'ar-'), (bool) preg_match('/\p{Arabic}/u', $title), $slug);
+        }
     }
 
     /**

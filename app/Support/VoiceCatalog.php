@@ -547,6 +547,14 @@ class VoiceCatalog
             : null;
     }
 
+    /**
+     * A speaker's display name in Arabic ("Abdulaziz" => "عبدالعزيز"), or the name as it is.
+     */
+    public static function arabicName(string $displayName): string
+    {
+        return self::AR_NAME_MAP[$displayName] ?? $displayName;
+    }
+
     public static function voiceMeta(?string $voiceName): ?array
     {
         $voiceName = trim((string) $voiceName);
