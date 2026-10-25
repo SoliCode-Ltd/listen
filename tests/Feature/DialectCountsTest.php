@@ -162,7 +162,7 @@ class DialectCountsTest extends TestCase
         $pages = [
             ['home', []], ['samples', []], ['developers', []], ['pricing', []],
             ['seo.text-to-speech', []], ['seo.text-to-speech-arabic', []], ['seo.ai-text-to-speech', []], ['seo.ai-voice-generator', []],
-            ['seo.features', []], ['seo.arabic-dialects', []], ['seo.english-accents', []],
+            ['seo.arabic-dialects', []], ['seo.english-accents', []],
             ['seo.dialect', ['dialect' => 'egyptian']], ['seo.dialect', ['dialect' => 'fusha']],
             ['seo.accent', ['accent' => 'american']], ['seo.accent', ['accent' => 'arabic-accent']],
         ];

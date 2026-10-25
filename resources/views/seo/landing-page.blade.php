@@ -254,7 +254,6 @@
   @php
     $isArabic = app()->getLocale() === 'ar' || str_starts_with((string) app()->getLocale(), 'ar');
     $relatedLinks = [
-      ['label' => __('ui.nav.features'), 'url' => route('seo.features'), 'page' => 'features'],
       ['label' => __('ui.nav.text_to_speech'), 'url' => route('seo.text-to-speech'), 'page' => 'text_to_speech'],
       ['label' => __('ui.nav.ai_text_to_speech'), 'url' => route('seo.ai-text-to-speech'), 'page' => 'ai_text_to_speech'],
       ['label' => __('ui.nav.text_to_speech_arabic'), 'url' => route('seo.text-to-speech-arabic'), 'page' => 'text_to_speech_arabic'],
@@ -403,24 +402,6 @@
         </div>
       </section>
     @endif
-
-    {{-- The studio's choices by name (the features page): plain lists, in their pickers' groups. --}}
-    @foreach($pageContent['lists'] ?? [] as $list)
-      <section class="seo-section">
-        <h2>{{ $list['title'] }}</h2>
-        <p class="seo-lead">{{ $list['intro'] }}</p>
-        @foreach($list['groups'] as $group)
-          <div class="seo-region">
-            <h3>{{ $group['title'] }}</h3>
-            <ul class="seo-chips">
-              @foreach($group['items'] as $item)
-                <li><bdi>{{ $item }}</bdi></li>
-              @endforeach
-            </ul>
-          </div>
-        @endforeach
-      </section>
-    @endforeach
 
     @if(! empty($pageContent['use_cases']))
       <section class="seo-section">

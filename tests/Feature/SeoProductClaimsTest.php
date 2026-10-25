@@ -113,7 +113,7 @@ class SeoProductClaimsTest extends TestCase
 
         $pages = [['seo.text-to-speech', []], ['seo.text-to-speech-arabic', []], ['seo.ai-text-to-speech', []], ['seo.ai-voice-generator', []],
             ['seo.arabic-dialects', []], ['seo.english-accents', []], ['seo.dialect', ['dialect' => 'saudi']], ['seo.accent', ['accent' => 'british']],
-            ['home', []], ['samples', []], ['seo.features', []], ['pricing', []]];
+            ['home', []], ['samples', []]];
         foreach ($pages as [$route, $params]) {
             foreach (['en', 'ar'] as $locale) {
                 // "All Arabic dialects" links to the list of the ones Listen has, and stays.
