@@ -2,13 +2,12 @@ import React from 'react';
 import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame } from 'remotion';
 import { C, FONT, FPS, PALETTES, W } from './theme';
 import { Orb } from './Orb';
-import { levelAt } from './level';
 
-// The end card: the Listen orb (rippling with Sumaya's clip, which plays on under it), the logo,
-// the invitation, the address, the question. `start`: when the card starts in the ad (s).
-export const EndCard: React.FC<{ title: string; question: string; start: number }> = ({ title, question, start }) => {
+// The end card: the Listen orb (rippling with whatever plays under it), the logo, the invitation,
+// the address, the question. `level`: the sound's level (0..1) at a moment of the card (s).
+export const EndCard: React.FC<{ title: string; question: string; level: (t: number) => number }> = ({ title, question, level: levelOf }) => {
   const t = useCurrentFrame() / FPS;
-  const level = levelAt(start + t);
+  const level = levelOf(t);
   const k = (a: number) => interpolate(t, [a, a + 0.6], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.16, 1, 0.3, 1) });
   const rise = (a: number, dy = 40) => ({ opacity: k(a), translate: `0px ${(1 - k(a)) * dy}px` });
   return (

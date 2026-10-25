@@ -1,0 +1,187 @@
+{
+ "beats": [
+  {
+   "kind": "open",
+   "slug": "sumaya-excited",
+   "start": 0.0,
+   "audio": 0.45,
+   "lead": 0.169,
+   "end": 5.075
+  },
+  {
+   "kind": "library",
+   "start": 5.075,
+   "end": 7.275
+  },
+  {
+   "kind": "dialect",
+   "start": 7.275,
+   "end": 8.975
+  },
+  {
+   "kind": "type",
+   "start": 8.975,
+   "end": 11.075
+  },
+  {
+   "kind": "generate",
+   "start": 11.075,
+   "end": 12.875
+  },
+  {
+   "kind": "library",
+   "slug": "abdulaziz-proud",
+   "start": 12.875,
+   "end": 14.275
+  },
+  {
+   "kind": "voice",
+   "slug": "abdulaziz-proud",
+   "start": 14.275,
+   "audio": 14.725,
+   "lead": 0.111,
+   "end": 19.633
+  },
+  {
+   "kind": "style",
+   "slug": "sawsan-calm",
+   "start": 19.633,
+   "end": 21.033
+  },
+  {
+   "kind": "voice",
+   "slug": "sawsan-calm",
+   "start": 21.033,
+   "audio": 21.483,
+   "lead": 0.159,
+   "end": 26.186
+  },
+  {
+   "kind": "sounds",
+   "slug": "abdelilah-surprised",
+   "start": 26.186,
+   "end": 27.586
+  },
+  {
+   "kind": "voice",
+   "slug": "abdelilah-surprised",
+   "start": 27.586,
+   "audio": 28.036,
+   "lead": 0.012,
+   "end": 34.703
+  },
+  {
+   "kind": "feelings",
+   "slug": "sundus-sad",
+   "start": 34.703,
+   "end": 36.103
+  },
+  {
+   "kind": "voice",
+   "slug": "sundus-sad",
+   "start": 36.103,
+   "audio": 36.553,
+   "lead": 0.0,
+   "end": 44.002
+  },
+  {
+   "kind": "rhythm",
+   "slug": "hamed-whisper",
+   "start": 44.002,
+   "end": 45.402
+  },
+  {
+   "kind": "voice",
+   "slug": "hamed-whisper",
+   "start": 45.402,
+   "audio": 45.852,
+   "lead": 0.023,
+   "end": 49.971
+  },
+  {
+   "kind": "history",
+   "start": 49.971,
+   "end": 52.171
+  },
+  {
+   "kind": "end",
+   "start": 52.171,
+   "end": 55.371
+  }
+ ],
+ "sfx": [
+  [
+   5.075,
+   "tick-hi"
+  ],
+  [
+   7.275,
+   "tick-hi"
+  ],
+  [
+   8.975,
+   "tick-hi"
+  ],
+  [
+   11.075,
+   "tick-hi"
+  ],
+  [
+   11.425,
+   "tap"
+  ],
+  [
+   12.075,
+   "shimmer"
+  ],
+  [
+   12.875,
+   "tick-hi"
+  ],
+  [
+   13.375,
+   "tick-lo"
+  ],
+  [
+   19.633,
+   "tick-hi"
+  ],
+  [
+   20.133,
+   "tick-lo"
+  ],
+  [
+   26.186,
+   "tick-hi"
+  ],
+  [
+   26.686,
+   "tick-lo"
+  ],
+  [
+   34.703,
+   "tick-hi"
+  ],
+  [
+   35.203,
+   "tick-lo"
+  ],
+  [
+   44.002,
+   "tick-hi"
+  ],
+  [
+   44.502,
+   "tick-lo"
+  ],
+  [
+   49.671,
+   "sweep"
+  ],
+  [
+   52.171,
+   "bell"
+  ]
+ ],
+ "duration": 55.37
+}

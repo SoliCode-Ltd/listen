@@ -1,6 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame } from 'remotion';
 import boxesJson from '../public/studio/v2-boxes.json';
+import { BAR, BrowserBar, Key, Ring, StepChip, WIN, camera, clamp01, layout, ringOn } from './screen';
 import plan from './studio-plan.json';
 import { C, FONT, FPS, H, W } from './theme';
 
@@ -14,7 +15,7 @@ const B = boxesJson as unknown as Record<string, Box> & { size: [number, number]
 
 // [time, x, y, zoom]: wide, the library, the dialect, the text, the feelings, the text, the
 // sounds, the text, Generate, the player. Long moves pull back a little on the way.
-const CAM: [number, number, number, number][] = [
+const CAM: Key[] = [
   [0, 0.5, 0.5, 1.04], [0.6, 0.5, 0.5, 1.05], [1.15, 0.24, 0.29, 2.6], [1.9, 0.24, 0.3, 2.62],
   [2.35, 0.44, 0.27, 2.6], [2.95, 0.44, 0.27, 2.62], [3.25, 0.56, 0.3, 1.9], [3.55, 0.7, 0.33, 2.9],
   [4.45, 0.7, 0.33, 2.92], [4.85, 0.68, 0.38, 2.5], [5.35, 0.68, 0.38, 2.52], [5.75, 0.72, 0.33, 2.9],
@@ -35,27 +36,17 @@ const RINGS: [string, number, number, number][] = [
 const TYPE = plan.type;
 const TAP = plan.tap;
 
-const ease = Easing.bezier(0.65, 0, 0.35, 1);
-const clamp01 = { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' } as const;
-
-function camera(t: number) {
-  let i = 0;
-  while (i < CAM.length - 2 && t > CAM[i + 1][0]) i++;
-  const [t0, x0, y0, z0] = CAM[i], [t1, x1, y1, z1] = CAM[i + 1];
-  const p = interpolate(t, [t0, t1], [0, 1], { ...clamp01, easing: ease });
-  return { x: x0 + (x1 - x0) * p, y: y0 + (y1 - y0) * p, z: z0 * (z1 / z0) ** p };
-}
-
-const WIN = 980, BAR = 42, PAGE_H = WIN * (B.size[1] / B.size[0]);
+const PAGE_H = WIN * (B.size[1] / B.size[0]);
+const L = layout(PAGE_H);
 
 export const Studio: React.FC<{ duration: number; steps: string[] }> = ({ duration, steps }) => {
   const t = useCurrentFrame() / FPS;
   const rise = interpolate(t, [0, 0.7], [0, 1], { ...clamp01, easing: Easing.bezier(0.16, 1, 0.3, 1) });
   const out = interpolate(t, [duration - 0.35, duration], [0, 1], clamp01);
-  const cam = camera(t);
+  const cam = camera(CAM, t);
   const z = cam.z * (0.92 + 0.08 * rise);
-  const wx = (W - WIN) / 2, wy = (H - PAGE_H - BAR) / 2, px = wx, py = wy + BAR;
-  const fx = px + cam.x * WIN, fy = py + cam.y * PAGE_H;
+  const { wx, wy, py, box } = L;
+  const fx = wx + cam.x * WIN, fy = py + cam.y * PAGE_H;
   let si = 0;
   STATES.forEach((from, i) => { if (t >= from) si = i; });
   const fade = si === 0 ? 1 : interpolate(t, [STATES[si], STATES[si] + 0.15], [0, 1], clamp01);
@@ -63,7 +54,6 @@ export const Studio: React.FC<{ duration: number; steps: string[] }> = ({ durati
   let k = -1;
   STEP_AT.forEach((a, i) => { if (t >= a) k = i; });
   const stepIn = k >= 0 ? interpolate(t, [STEP_AT[k], STEP_AT[k] + 0.35], [0, 1], { ...clamp01, easing: Easing.bezier(0.16, 1, 0.3, 1) }) : 0;
-  const box = (b: Box) => ({ left: px + b.x * WIN, top: py + b.y * PAGE_H, width: b.w * WIN, height: b.h * PAGE_H });
   return (
     <AbsoluteFill style={{ fontFamily: FONT, direction: 'rtl', opacity: 1 - out }}>
       <div style={{
@@ -76,12 +66,7 @@ export const Studio: React.FC<{ duration: number; steps: string[] }> = ({ durati
           background: '#fff', boxShadow: '0 50px 120px rgba(36, 19, 138, 0.22), 0 8px 24px rgba(36, 19, 138, 0.08)',
           opacity: rise,
         }}>
-          <div style={{ height: BAR, background: '#F1F0F7', display: 'flex', alignItems: 'center', direction: 'ltr', padding: '0 18px', gap: 9 }}>
-            {['#FF5F57', '#FEBC2E', '#28C840'].map((c) => <div key={c} style={{ width: 12, height: 12, borderRadius: 6, background: c }} />)}
-            <div style={{ margin: '0 auto', width: 340, height: 24, borderRadius: 12, background: '#fff', fontSize: 13, fontWeight: 500, color: '#6B6880', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              listenai.studio/ar/dashboard
-            </div>
-          </div>
+          <BrowserBar />
           <div style={{ position: 'relative', width: WIN, height: PAGE_H }}>
             {si > 0 && fade < 1 && <Img src={staticFile(`studio/v2-${si - 1}.png`)} style={{ position: 'absolute', inset: 0, width: WIN, height: PAGE_H }} />}
             <Img src={staticFile(`studio/v2-${si}.png`)} style={{ position: 'absolute', inset: 0, width: WIN, height: PAGE_H, opacity: fade }} />
@@ -91,16 +76,11 @@ export const Studio: React.FC<{ duration: number; steps: string[] }> = ({ durati
         {si === 3 && typed < 1 && (
           <>
             <div style={{ position: 'absolute', ...box(B.line), background: '#fff', width: B.line.w * WIN * (1 - typed) + 3 }} />
-            <div style={{ position: 'absolute', left: px + (B.line.x + B.line.w * (1 - typed)) * WIN - 1, top: py + B.line.y * PAGE_H + 2, width: 1.4, height: B.line.h * PAGE_H - 4, background: C.accent }} />
+            <div style={{ position: 'absolute', left: wx + (B.line.x + B.line.w * (1 - typed)) * WIN - 1, top: py + B.line.y * PAGE_H + 2, width: 1.4, height: B.line.h * PAGE_H - 4, background: C.accent }} />
           </>
         )}
         {/* a ring on what each step touches */}
-        {RINGS.map(([key, a, b, r]) => {
-          const on = interpolate(t, [a, a + 0.3], [0, 1], { ...clamp01, easing: Easing.bezier(0.16, 1, 0.3, 1) }) * (1 - interpolate(t, [b, b + 0.25], [0, 1], clamp01));
-          if (on <= 0) return null;
-          const bb = box(B[key]), pad = 8 / z + (1 - on) * (6 / z);
-          return <div key={key} style={{ position: 'absolute', left: bb.left - pad, top: bb.top - pad, width: bb.width + pad * 2, height: bb.height + pad * 2, borderRadius: r, border: `${4 / z}px solid ${C.accent}`, opacity: on }} />;
-        })}
+        {RINGS.map(([key, a, b, r]) => <Ring key={key} at={box(B[key])} on={ringOn(t, a, b)} z={z} r={r} />)}
         {/* the tap on Generate */}
         {(() => {
           const tap = interpolate(t, [TAP, TAP + 0.55], [0, 1], clamp01);
@@ -110,13 +90,7 @@ export const Studio: React.FC<{ duration: number; steps: string[] }> = ({ durati
         })()}
       </div>
       {/* the step, in words, above the screen */}
-      {k >= 0 && (
-        <div style={{ position: 'absolute', top: 186, width: '100%', display: 'flex', justifyContent: 'center', opacity: stepIn * (1 - out), translate: `0px ${(1 - stepIn) * 24}px` }}>
-          <div style={{ padding: '20px 44px', borderRadius: 999, background: C.ink, color: '#fff', fontSize: 54, fontWeight: 700, lineHeight: 1.25, boxShadow: '0 18px 40px rgba(15, 14, 23, 0.22)' }}>
-            {steps[k]}
-          </div>
-        </div>
-      )}
+      {k >= 0 && <StepChip text={steps[k]} k={stepIn} opacity={1 - out} />}
     </AbsoluteFill>
   );
 };

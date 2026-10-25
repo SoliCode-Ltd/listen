@@ -41,3 +41,4 @@ Thumbs.db
 /marketing/tiktok-voices/public/audio/*.wav
 /marketing/tiktok-voices/sound/audio/
 __pycache__/
+/marketing/tiktok-voices/sound-tour/audio/

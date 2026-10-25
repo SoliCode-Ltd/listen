@@ -1,0 +1,936 @@
+{
+ "size": [
+  1920,
+  1563
+ ],
+ "voices": {
+  "sumaya-excited": {
+   "card": {
+    "x": 0.2846,
+    "y": 0.2858,
+    "w": 0.0725,
+    "h": 0.1027
+   },
+   "search": {
+    "x": 0.1843,
+    "y": 0.2177,
+    "w": 0.1741,
+    "h": 0.0269
+   },
+   "dialect": {
+    "x": 0.3952,
+    "y": 0.1568,
+    "w": 0.2083,
+    "h": 0.0384
+   },
+   "item": {
+    "x": 0.5826,
+    "y": 0.5394,
+    "w": 0.1492,
+    "h": 0.0435
+   },
+   "marks": [
+    {
+     "x": 0.7827,
+     "y": 0.3257,
+     "w": 0.0396,
+     "h": 0.0128
+    },
+    {
+     "x": 0.6544,
+     "y": 0.3257,
+     "w": 0.0617,
+     "h": 0.0128
+    }
+   ],
+   "text": {
+    "x": 0.3844,
+    "y": 0.3112,
+    "w": 0.4479,
+    "h": 0.2303
+   },
+   "button": {
+    "x": 0.3919,
+    "y": 0.5905,
+    "w": 0.1068,
+    "h": 0.0275
+   },
+   "result": {
+    "x": 0.038,
+    "y": 0.7549,
+    "w": 0.7948,
+    "h": 0.0697
+   },
+   "row": {
+    "x": 0.0485,
+    "y": 0.7828,
+    "w": 0.7738,
+    "h": 0.031
+   },
+   "play": [
+    [
+     0,
+     "play/sumaya-excited-000.jpg"
+    ],
+    [
+     0.171,
+     "play/sumaya-excited-001.jpg"
+    ],
+    [
+     0.35,
+     "play/sumaya-excited-002.jpg"
+    ],
+    [
+     0.604,
+     "play/sumaya-excited-003.jpg"
+    ],
+    [
+     0.93,
+     "play/sumaya-excited-004.jpg"
+    ],
+    [
+     1.202,
+     "play/sumaya-excited-005.jpg"
+    ],
+    [
+     1.458,
+     "play/sumaya-excited-006.jpg"
+    ],
+    [
+     1.644,
+     "play/sumaya-excited-007.jpg"
+    ],
+    [
+     1.921,
+     "play/sumaya-excited-008.jpg"
+    ],
+    [
+     2.147,
+     "play/sumaya-excited-009.jpg"
+    ],
+    [
+     2.338,
+     "play/sumaya-excited-010.jpg"
+    ],
+    [
+     2.506,
+     "play/sumaya-excited-011.jpg"
+    ],
+    [
+     2.682,
+     "play/sumaya-excited-012.jpg"
+    ],
+    [
+     2.883,
+     "play/sumaya-excited-013.jpg"
+    ],
+    [
+     3.154,
+     "play/sumaya-excited-014.jpg"
+    ],
+    [
+     3.374,
+     "play/sumaya-excited-015.jpg"
+    ],
+    [
+     3.562,
+     "play/sumaya-excited-016.jpg"
+    ],
+    [
+     3.759,
+     "play/sumaya-excited-017.jpg"
+    ],
+    [
+     3.955,
+     "play/sumaya-excited-018.jpg"
+    ],
+    [
+     4.237,
+     "play/sumaya-excited-019.jpg"
+    ],
+    [
+     4.444,
+     "play/sumaya-excited-020.jpg"
+    ]
+   ],
+   "duration": 4.55
+  },
+  "abdulaziz-proud": {
+   "card": {
+    "x": 0.2846,
+    "y": 0.2858,
+    "w": 0.0725,
+    "h": 0.1027
+   },
+   "search": {
+    "x": 0.1843,
+    "y": 0.2177,
+    "w": 0.1741,
+    "h": 0.0269
+   },
+   "dialect": {
+    "x": 0.3952,
+    "y": 0.1568,
+    "w": 0.2083,
+    "h": 0.0384
+   },
+   "marks": [
+    {
+     "x": 0.7993,
+     "y": 0.3257,
+     "w": 0.023,
+     "h": 0.0128
+    }
+   ],
+   "text": {
+    "x": 0.3844,
+    "y": 0.3112,
+    "w": 0.4479,
+    "h": 0.2303
+   },
+   "button": {
+    "x": 0.3919,
+    "y": 0.5905,
+    "w": 0.1068,
+    "h": 0.0275
+   },
+   "result": {
+    "x": 0.038,
+    "y": 0.7549,
+    "w": 0.7948,
+    "h": 0.0697
+   },
+   "row": {
+    "x": 0.0485,
+    "y": 0.7828,
+    "w": 0.7738,
+    "h": 0.031
+   },
+   "play": [
+    [
+     1.348,
+     "play/abdulaziz-proud-000.jpg"
+    ],
+    [
+     1.617,
+     "play/abdulaziz-proud-001.jpg"
+    ],
+    [
+     1.831,
+     "play/abdulaziz-proud-002.jpg"
+    ],
+    [
+     2.01,
+     "play/abdulaziz-proud-003.jpg"
+    ],
+    [
+     2.299,
+     "play/abdulaziz-proud-004.jpg"
+    ],
+    [
+     2.538,
+     "play/abdulaziz-proud-005.jpg"
+    ],
+    [
+     2.814,
+     "play/abdulaziz-proud-006.jpg"
+    ],
+    [
+     3.053,
+     "play/abdulaziz-proud-007.jpg"
+    ],
+    [
+     3.294,
+     "play/abdulaziz-proud-008.jpg"
+    ],
+    [
+     3.532,
+     "play/abdulaziz-proud-009.jpg"
+    ],
+    [
+     3.781,
+     "play/abdulaziz-proud-010.jpg"
+    ],
+    [
+     3.961,
+     "play/abdulaziz-proud-011.jpg"
+    ],
+    [
+     4.206,
+     "play/abdulaziz-proud-012.jpg"
+    ],
+    [
+     4.381,
+     "play/abdulaziz-proud-013.jpg"
+    ],
+    [
+     4.567,
+     "play/abdulaziz-proud-014.jpg"
+    ],
+    [
+     4.8,
+     "play/abdulaziz-proud-015.jpg"
+    ]
+   ],
+   "duration": 4.8
+  },
+  "sawsan-calm": {
+   "card": {
+    "x": 0.2846,
+    "y": 0.2858,
+    "w": 0.0725,
+    "h": 0.1027
+   },
+   "search": {
+    "x": 0.1843,
+    "y": 0.2177,
+    "w": 0.1741,
+    "h": 0.0269
+   },
+   "dialect": {
+    "x": 0.3952,
+    "y": 0.1568,
+    "w": 0.2083,
+    "h": 0.0384
+   },
+   "item": {
+    "x": 0.5826,
+    "y": 0.3754,
+    "w": 0.1492,
+    "h": 0.0435
+   },
+   "marks": [
+    {
+     "x": 0.7941,
+     "y": 0.3257,
+     "w": 0.0282,
+     "h": 0.0128
+    }
+   ],
+   "text": {
+    "x": 0.3844,
+    "y": 0.3112,
+    "w": 0.4479,
+    "h": 0.2303
+   },
+   "button": {
+    "x": 0.3919,
+    "y": 0.5905,
+    "w": 0.1068,
+    "h": 0.0275
+   },
+   "result": {
+    "x": 0.038,
+    "y": 0.7549,
+    "w": 0.7948,
+    "h": 0.0697
+   },
+   "row": {
+    "x": 0.0485,
+    "y": 0.7828,
+    "w": 0.7738,
+    "h": 0.031
+   },
+   "play": [
+    [
+     0,
+     "play/sawsan-calm-000.jpg"
+    ],
+    [
+     0.157,
+     "play/sawsan-calm-001.jpg"
+    ],
+    [
+     0.372,
+     "play/sawsan-calm-002.jpg"
+    ],
+    [
+     0.653,
+     "play/sawsan-calm-003.jpg"
+    ],
+    [
+     0.895,
+     "play/sawsan-calm-004.jpg"
+    ],
+    [
+     1.104,
+     "play/sawsan-calm-005.jpg"
+    ],
+    [
+     1.454,
+     "play/sawsan-calm-006.jpg"
+    ],
+    [
+     1.71,
+     "play/sawsan-calm-007.jpg"
+    ],
+    [
+     1.936,
+     "play/sawsan-calm-008.jpg"
+    ],
+    [
+     2.152,
+     "play/sawsan-calm-009.jpg"
+    ],
+    [
+     2.401,
+     "play/sawsan-calm-010.jpg"
+    ],
+    [
+     2.685,
+     "play/sawsan-calm-011.jpg"
+    ],
+    [
+     2.901,
+     "play/sawsan-calm-012.jpg"
+    ],
+    [
+     3.139,
+     "play/sawsan-calm-013.jpg"
+    ],
+    [
+     3.42,
+     "play/sawsan-calm-014.jpg"
+    ],
+    [
+     3.654,
+     "play/sawsan-calm-015.jpg"
+    ],
+    [
+     3.936,
+     "play/sawsan-calm-016.jpg"
+    ],
+    [
+     4.139,
+     "play/sawsan-calm-017.jpg"
+    ],
+    [
+     4.434,
+     "play/sawsan-calm-018.jpg"
+    ],
+    [
+     4.616,
+     "play/sawsan-calm-019.jpg"
+    ]
+   ],
+   "duration": 4.63
+  },
+  "abdelilah-surprised": {
+   "card": {
+    "x": 0.2846,
+    "y": 0.2858,
+    "w": 0.0725,
+    "h": 0.1027
+   },
+   "search": {
+    "x": 0.1843,
+    "y": 0.2177,
+    "w": 0.1741,
+    "h": 0.0269
+   },
+   "dialect": {
+    "x": 0.3952,
+    "y": 0.1568,
+    "w": 0.2083,
+    "h": 0.0384
+   },
+   "menu": {
+    "x": 0.7461,
+    "y": 0.2783,
+    "w": 0.0796,
+    "h": 0.0256
+   },
+   "item": {
+    "x": 0.6921,
+    "y": 0.3919,
+    "w": 0.1051,
+    "h": 0.0115
+   },
+   "marks": [
+    {
+     "x": 0.7856,
+     "y": 0.3257,
+     "w": 0.0367,
+     "h": 0.0128
+    },
+    {
+     "x": 0.7046,
+     "y": 0.3257,
+     "w": 0.0336,
+     "h": 0.0128
+    }
+   ],
+   "text": {
+    "x": 0.3844,
+    "y": 0.3112,
+    "w": 0.4479,
+    "h": 0.2303
+   },
+   "button": {
+    "x": 0.3919,
+    "y": 0.5905,
+    "w": 0.1068,
+    "h": 0.0275
+   },
+   "result": {
+    "x": 0.038,
+    "y": 0.7549,
+    "w": 0.7948,
+    "h": 0.0697
+   },
+   "row": {
+    "x": 0.0485,
+    "y": 0.7828,
+    "w": 0.7738,
+    "h": 0.031
+   },
+   "play": [
+    [
+     0,
+     "play/abdelilah-surprised-000.jpg"
+    ],
+    [
+     0.112,
+     "play/abdelilah-surprised-001.jpg"
+    ],
+    [
+     0.282,
+     "play/abdelilah-surprised-002.jpg"
+    ],
+    [
+     0.547,
+     "play/abdelilah-surprised-003.jpg"
+    ],
+    [
+     0.742,
+     "play/abdelilah-surprised-004.jpg"
+    ],
+    [
+     1.03,
+     "play/abdelilah-surprised-005.jpg"
+    ],
+    [
+     1.262,
+     "play/abdelilah-surprised-006.jpg"
+    ],
+    [
+     1.507,
+     "play/abdelilah-surprised-007.jpg"
+    ],
+    [
+     1.722,
+     "play/abdelilah-surprised-008.jpg"
+    ],
+    [
+     2.024,
+     "play/abdelilah-surprised-009.jpg"
+    ],
+    [
+     2.264,
+     "play/abdelilah-surprised-010.jpg"
+    ],
+    [
+     2.488,
+     "play/abdelilah-surprised-011.jpg"
+    ],
+    [
+     2.796,
+     "play/abdelilah-surprised-012.jpg"
+    ],
+    [
+     3.026,
+     "play/abdelilah-surprised-013.jpg"
+    ],
+    [
+     3.266,
+     "play/abdelilah-surprised-014.jpg"
+    ],
+    [
+     3.465,
+     "play/abdelilah-surprised-015.jpg"
+    ],
+    [
+     3.702,
+     "play/abdelilah-surprised-016.jpg"
+    ],
+    [
+     3.909,
+     "play/abdelilah-surprised-017.jpg"
+    ],
+    [
+     4.085,
+     "play/abdelilah-surprised-018.jpg"
+    ],
+    [
+     4.296,
+     "play/abdelilah-surprised-019.jpg"
+    ],
+    [
+     4.478,
+     "play/abdelilah-surprised-020.jpg"
+    ],
+    [
+     4.703,
+     "play/abdelilah-surprised-021.jpg"
+    ],
+    [
+     4.94,
+     "play/abdelilah-surprised-022.jpg"
+    ],
+    [
+     5.17,
+     "play/abdelilah-surprised-023.jpg"
+    ],
+    [
+     5.375,
+     "play/abdelilah-surprised-024.jpg"
+    ],
+    [
+     5.598,
+     "play/abdelilah-surprised-025.jpg"
+    ],
+    [
+     5.816,
+     "play/abdelilah-surprised-026.jpg"
+    ],
+    [
+     6.026,
+     "play/abdelilah-surprised-027.jpg"
+    ],
+    [
+     6.275,
+     "play/abdelilah-surprised-028.jpg"
+    ]
+   ],
+   "duration": 6.33
+  },
+  "sundus-sad": {
+   "card": {
+    "x": 0.2846,
+    "y": 0.2858,
+    "w": 0.0725,
+    "h": 0.1027
+   },
+   "search": {
+    "x": 0.1843,
+    "y": 0.2177,
+    "w": 0.1741,
+    "h": 0.0269
+   },
+   "dialect": {
+    "x": 0.3952,
+    "y": 0.1568,
+    "w": 0.2083,
+    "h": 0.0384
+   },
+   "menu": {
+    "x": 0.6732,
+    "y": 0.2783,
+    "w": 0.0687,
+    "h": 0.0256
+   },
+   "item": {
+    "x": 0.6084,
+    "y": 0.5262,
+    "w": 0.1051,
+    "h": 0.0115
+   },
+   "marks": [
+    {
+     "x": 0.7976,
+     "y": 0.3257,
+     "w": 0.0247,
+     "h": 0.0128
+    },
+    {
+     "x": 0.7609,
+     "y": 0.3257,
+     "w": 0.0344,
+     "h": 0.0128
+    }
+   ],
+   "text": {
+    "x": 0.3844,
+    "y": 0.3112,
+    "w": 0.4479,
+    "h": 0.2303
+   },
+   "button": {
+    "x": 0.3919,
+    "y": 0.5905,
+    "w": 0.1068,
+    "h": 0.0275
+   },
+   "result": {
+    "x": 0.038,
+    "y": 0.7549,
+    "w": 0.7948,
+    "h": 0.0697
+   },
+   "row": {
+    "x": 0.0485,
+    "y": 0.7828,
+    "w": 0.7738,
+    "h": 0.031
+   },
+   "play": [
+    [
+     1.182,
+     "play/sundus-sad-000.jpg"
+    ],
+    [
+     1.446,
+     "play/sundus-sad-001.jpg"
+    ],
+    [
+     1.711,
+     "play/sundus-sad-002.jpg"
+    ],
+    [
+     1.921,
+     "play/sundus-sad-003.jpg"
+    ],
+    [
+     2.191,
+     "play/sundus-sad-004.jpg"
+    ],
+    [
+     2.381,
+     "play/sundus-sad-005.jpg"
+    ],
+    [
+     2.647,
+     "play/sundus-sad-006.jpg"
+    ],
+    [
+     2.846,
+     "play/sundus-sad-007.jpg"
+    ],
+    [
+     3.049,
+     "play/sundus-sad-008.jpg"
+    ],
+    [
+     3.34,
+     "play/sundus-sad-009.jpg"
+    ],
+    [
+     3.518,
+     "play/sundus-sad-010.jpg"
+    ],
+    [
+     3.772,
+     "play/sundus-sad-011.jpg"
+    ],
+    [
+     4.048,
+     "play/sundus-sad-012.jpg"
+    ],
+    [
+     4.269,
+     "play/sundus-sad-013.jpg"
+    ],
+    [
+     4.557,
+     "play/sundus-sad-014.jpg"
+    ],
+    [
+     4.792,
+     "play/sundus-sad-015.jpg"
+    ],
+    [
+     5.079,
+     "play/sundus-sad-016.jpg"
+    ],
+    [
+     5.317,
+     "play/sundus-sad-017.jpg"
+    ],
+    [
+     5.564,
+     "play/sundus-sad-018.jpg"
+    ],
+    [
+     5.889,
+     "play/sundus-sad-019.jpg"
+    ],
+    [
+     6.144,
+     "play/sundus-sad-020.jpg"
+    ],
+    [
+     6.409,
+     "play/sundus-sad-021.jpg"
+    ],
+    [
+     6.605,
+     "play/sundus-sad-022.jpg"
+    ],
+    [
+     6.791,
+     "play/sundus-sad-023.jpg"
+    ],
+    [
+     7.079,
+     "play/sundus-sad-024.jpg"
+    ],
+    [
+     7.28,
+     "play/sundus-sad-025.jpg"
+    ]
+   ],
+   "duration": 7.28
+  },
+  "hamed-whisper": {
+   "card": {
+    "x": 0.2846,
+    "y": 0.2858,
+    "w": 0.0725,
+    "h": 0.1027
+   },
+   "search": {
+    "x": 0.1843,
+    "y": 0.2177,
+    "w": 0.1741,
+    "h": 0.0269
+   },
+   "dialect": {
+    "x": 0.3952,
+    "y": 0.1568,
+    "w": 0.2083,
+    "h": 0.0384
+   },
+   "menu": {
+    "x": 0.5752,
+    "y": 0.2783,
+    "w": 0.0938,
+    "h": 0.0256
+   },
+   "item": {
+    "x": 0.5355,
+    "y": 0.4601,
+    "w": 0.1051,
+    "h": 0.0115
+   },
+   "marks": [
+    {
+     "x": 0.7895,
+     "y": 0.3257,
+     "w": 0.0328,
+     "h": 0.0128
+    }
+   ],
+   "text": {
+    "x": 0.3844,
+    "y": 0.3112,
+    "w": 0.4479,
+    "h": 0.2303
+   },
+   "button": {
+    "x": 0.3919,
+    "y": 0.5905,
+    "w": 0.1068,
+    "h": 0.0275
+   },
+   "result": {
+    "x": 0.038,
+    "y": 0.7549,
+    "w": 0.7948,
+    "h": 0.0697
+   },
+   "row": {
+    "x": 0.0485,
+    "y": 0.7828,
+    "w": 0.7738,
+    "h": 0.031
+   },
+   "play": [
+    [
+     1.258,
+     "play/hamed-whisper-000.jpg"
+    ],
+    [
+     1.511,
+     "play/hamed-whisper-001.jpg"
+    ],
+    [
+     1.766,
+     "play/hamed-whisper-002.jpg"
+    ],
+    [
+     2.018,
+     "play/hamed-whisper-003.jpg"
+    ],
+    [
+     2.306,
+     "play/hamed-whisper-004.jpg"
+    ],
+    [
+     2.517,
+     "play/hamed-whisper-005.jpg"
+    ],
+    [
+     2.701,
+     "play/hamed-whisper-006.jpg"
+    ],
+    [
+     2.997,
+     "play/hamed-whisper-007.jpg"
+    ],
+    [
+     3.222,
+     "play/hamed-whisper-008.jpg"
+    ],
+    [
+     3.449,
+     "play/hamed-whisper-009.jpg"
+    ],
+    [
+     3.731,
+     "play/hamed-whisper-010.jpg"
+    ]
+   ],
+   "duration": 3.8
+  }
+ },
+ "history": {
+  "rows": [
+   {
+    "x": 0.0443,
+    "y": 0.1789,
+    "w": 0.7823,
+    "h": 0.0541
+   },
+   {
+    "x": 0.0443,
+    "y": 0.233,
+    "w": 0.7823,
+    "h": 0.0541
+   },
+   {
+    "x": 0.0443,
+    "y": 0.2871,
+    "w": 0.7823,
+    "h": 0.0541
+   },
+   {
+    "x": 0.0443,
+    "y": 0.3412,
+    "w": 0.7823,
+    "h": 0.0541
+   },
+   {
+    "x": 0.0443,
+    "y": 0.3953,
+    "w": 0.7823,
+    "h": 0.0541
+   },
+   {
+    "x": 0.0443,
+    "y": 0.4494,
+    "w": 0.7823,
+    "h": 0.0541
+   }
+  ]
+ }
+}

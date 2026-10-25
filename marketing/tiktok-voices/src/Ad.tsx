@@ -7,6 +7,7 @@ import { Studio } from './Studio';
 import { END, STUDIO, VOICES } from './script';
 import { FPS } from './theme';
 import { VoiceTrack } from './VoiceTrack';
+import { levelAt } from './level';
 
 // The whole ad: the light stage, the voices, the studio how-to, the end card.
 export const Ad: React.FC = () => {
@@ -23,9 +24,9 @@ export const Ad: React.FC = () => {
         <Studio duration={STUDIO.end - STUDIO.start} steps={STUDIO.steps} />
       </Sequence>
       <Sequence from={f(END.start)} name="End card">
-        <EndCard title={END.title} question={END.question} start={END.start} />
+        <EndCard title={END.title} question={END.question} level={(t) => levelAt(END.start + t)} />
       </Sequence>
-      <VoiceTrack />
+      <VoiceTrack src="audio/mix.wav" />
       {/* a soft fade from white at the very start, so the first frame is already composed */}
       <AbsoluteFill style={{ backgroundColor: '#fff', opacity: interpolate(frame, [0, 6], [0.6, 0], { extrapolateRight: 'clamp' }), pointerEvents: 'none' }} />
     </AbsoluteFill>
