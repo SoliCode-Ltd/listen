@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\SiteSetting;
 use App\Support\SeoHelper;
+use App\Support\SeoSettingDefaults;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -29,19 +30,19 @@ class SeoSettings extends Page implements HasForms
 
     public function mount(): void
     {
+        // The fields that follow the site's own text show it while nothing is saved.
+        $defaults = SeoSettingDefaults::all();
+        $saved = SiteSetting::query()->whereIn('key', array_keys($defaults))->pluck('value', 'key')->all();
+
         $state = [
             'canonical_url' => SiteSetting::get('canonical_url', config('app.url')),
             'meta_author' => SiteSetting::get('meta_author', ''),
             'meta_robots' => SiteSetting::get('meta_robots', 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'),
             'meta_title_template_en' => SiteSetting::get('meta_title_template_en', SiteSetting::get('meta_title_template', '%page_title% - Listen')),
             'meta_title_template_ar' => SiteSetting::get('meta_title_template_ar', '%page_title% - منصة إسمع'),
-            'meta_description_en' => SiteSetting::get('meta_description_en', SiteSetting::get('meta_description', SeoHelper::siteDescription('en'))),
-            'meta_description_ar' => SiteSetting::get('meta_description_ar', SeoHelper::siteDescription('ar')),
             'meta_keywords_en' => SiteSetting::get('meta_keywords_en', SiteSetting::get('meta_keywords', '')),
             'meta_keywords_ar' => SiteSetting::get('meta_keywords_ar', ''),
             'brand_name_ar' => SiteSetting::get('brand_name_ar', SeoHelper::siteName('ar')),
-            'site_seo_description_en' => SiteSetting::get('site_seo_description_en', SeoHelper::siteDescription('en')),
-            'site_seo_description_ar' => SiteSetting::get('site_seo_description_ar', SeoHelper::siteDescription('ar')),
 
             'seo_favicon_svg_url' => SiteSetting::get('seo_favicon_svg_url', ''),
             'seo_favicon_url' => SiteSetting::get('seo_favicon_url', ''),
@@ -75,59 +76,24 @@ class SeoSettings extends Page implements HasForms
             'baidu_site_verification' => SiteSetting::get('baidu_site_verification', ''),
             'naver_site_verification' => SiteSetting::get('naver_site_verification', ''),
 
-            'robots_txt' => SiteSetting::get('robots_txt', SeoHelper::defaultRobotsTxt()),
             'sitemap_paths' => SiteSetting::get('sitemap_paths', SeoHelper::defaultSitemapEntriesText()),
-            'sitemap_excluded_paths' => SiteSetting::get('sitemap_excluded_paths', SeoHelper::defaultSitemapExcludedPathsText()),
             'sitemap_include_non_indexable' => (string) SiteSetting::get('sitemap_include_non_indexable', '1') === '1',
 
             'enable_llms_txt' => (string) SiteSetting::get('enable_llms_txt', '1') === '1',
-            'llms_txt' => SiteSetting::get('llms_txt', SeoHelper::defaultLlmsTxt()),
         ];
 
-        foreach (SeoHelper::adminPageDefinitions() as $page => $meta) {
-            $state["seo_{$page}_title_en"] = SiteSetting::get(
-                "seo_{$page}_title_en",
-                SiteSetting::get("seo_{$page}_title", $this->pageDefault($page, 'title', 'en', (string) ($meta['title'] ?? '')))
-            );
-            $state["seo_{$page}_description_en"] = SiteSetting::get(
-                "seo_{$page}_description_en",
-                SiteSetting::get("seo_{$page}_description", $this->pageDefault($page, 'description', 'en', (string) ($meta['description'] ?? '')))
-            );
-            $state["seo_{$page}_keywords_en"] = SiteSetting::get(
-                "seo_{$page}_keywords_en",
-                SiteSetting::get("seo_{$page}_keywords", '')
-            );
-            $state["seo_{$page}_robots"] = SiteSetting::get("seo_{$page}_robots", (string) ($meta['robots'] ?? ''));
-            if ((bool) ($meta['indexable'] ?? false)) {
-                $state["seo_{$page}_sitemap_priority"] = SiteSetting::get(
-                    "seo_{$page}_sitemap_priority",
-                    (string) ($meta['sitemap_priority'] ?? '0.5')
-                );
-                $state["seo_{$page}_sitemap_change_frequency"] = SiteSetting::get(
-                    "seo_{$page}_sitemap_change_frequency",
-                    (string) ($meta['sitemap_change_frequency'] ?? 'weekly')
-                );
-            }
-
-            if (in_array('ar', SeoHelper::pageLocales($page), true)) {
-                $state["seo_{$page}_title_ar"] = SiteSetting::get(
-                    "seo_{$page}_title_ar",
-                    $this->pageDefault($page, 'title', 'ar')
-                );
-                $state["seo_{$page}_description_ar"] = SiteSetting::get(
-                    "seo_{$page}_description_ar",
-                    $this->pageDefault($page, 'description', 'ar')
-                );
-                $state["seo_{$page}_keywords_ar"] = SiteSetting::get("seo_{$page}_keywords_ar", '');
-            }
+        foreach ($defaults as $key => $default) {
+            $state[$key] = array_key_exists($key, $saved) ? $saved[$key] : $default;
         }
-
-        foreach ($this->landingPageLocales() as $page => $locales) {
-            foreach ($locales as $locale) {
-                $state["seo_landing_{$page}_content_{$locale}"] = SiteSetting::get(
-                    "seo_landing_{$page}_content_{$locale}",
-                    $this->landingPageDefaultJson($page, $locale)
-                );
+        // The titles of the pages kept out of search are saved as they are.
+        foreach (SeoHelper::adminPageDefinitions() as $page => $meta) {
+            foreach (in_array('ar', SeoHelper::pageLocales($page), true) ? ['en', 'ar'] : ['en'] as $locale) {
+                $key = "seo_{$page}_title_{$locale}";
+                if (! array_key_exists($key, $state)) {
+                    $state[$key] = SiteSetting::get($key, $locale === 'en'
+                        ? SiteSetting::get("seo_{$page}_title", SeoSettingDefaults::pageText($page, 'title', 'en', (string) ($meta['title'] ?? '')))
+                        : SeoSettingDefaults::pageText($page, 'title', 'ar'));
+                }
             }
         }
 
@@ -469,7 +435,7 @@ class SeoSettings extends Page implements HasForms
     {
         $schema = [];
 
-        foreach ($this->landingPageLocales() as $page => $locales) {
+        foreach (SeoSettingDefaults::LANDING_PAGES as $page => $locales) {
             $title = (string) (SeoHelper::pageDefinitions()[$page]['label'] ?? $page);
             $fields = [];
 
@@ -490,53 +456,21 @@ class SeoSettings extends Page implements HasForms
         return $schema;
     }
 
-    /**
-     * @return array<string, array<int, string>>
-     */
-    private function landingPageLocales(): array
-    {
-        return [
-            'ai_text_to_speech' => ['en', 'ar'],
-            'ai_voice_generator' => ['en', 'ar'],
-            'text_to_speech_arabic' => ['en', 'ar'],
-            'text_to_speech' => ['en', 'ar'],
-        ];
-    }
-
-    private function landingPageDefaultJson(string $page, string $locale): string
-    {
-        $content = SeoHelper::landingPageContentDefaults()[$page][$locale] ?? null;
-        if (! is_array($content) || $content === []) {
-            return '';
-        }
-
-        return (string) (json_encode(
-            $content,
-            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT
-        ) ?: '');
-    }
-
-    private function pageDefault(string $page, string $field, string $locale, string $fallback = ''): string
-    {
-        $definition = SeoHelper::pageDefinitions()[$page] ?? [];
-        $translationKey = (string) ($definition["{$field}_key"] ?? '');
-
-        if ($translationKey !== '') {
-            $translated = trim((string) __($translationKey, [], $locale));
-            if ($translated !== '' && $translated !== $translationKey) {
-                return $translated;
-            }
-        }
-
-        return $fallback;
-    }
-
     public function save(): void
     {
         $data = $this->form->getState();
+        // A field left as the site's own text is not saved (and a saved copy of
+        // it is let go), so the page keeps following that text when it improves.
+        $defaults = SeoSettingDefaults::all();
 
         foreach ($data as $key => $value) {
-            SiteSetting::set($key, is_bool($value) ? ($value ? '1' : '0') : (string) $value, 'seo');
+            $value = is_bool($value) ? ($value ? '1' : '0') : (string) $value;
+            if (array_key_exists($key, $defaults) && SeoSettingDefaults::matches($key, $value, $defaults[$key])) {
+                SeoSettingDefaults::forget($key);
+
+                continue;
+            }
+            SiteSetting::set($key, $value, 'seo');
         }
 
         SiteSetting::flushGroupCache('seo');

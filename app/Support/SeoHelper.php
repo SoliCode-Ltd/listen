@@ -1704,6 +1704,13 @@ HTML;
             return $configured;
         }
 
+        return self::defaultSiteDescription($locale);
+    }
+
+    /** The site's own description, from the studio's counts, before any text saved in the admin. */
+    public static function defaultSiteDescription(string $locale): string
+    {
+        $locale = self::normalizeLocale($locale);
         $dialogue = StudioFacts::dialoguePlans($locale) !== [];
 
         return $locale === 'ar'
