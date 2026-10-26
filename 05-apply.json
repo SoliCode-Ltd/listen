@@ -1,0 +1,206 @@
+{
+    "mode": "applied",
+    "backup_file": "seo-settings-20261026-164953.json",
+    "changes": {
+        "seo_home_title": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_home_description": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_home_title_en": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_home_title_ar": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_home_description_en": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_home_description_ar": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_pricing_title": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_pricing_description": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_pricing_title_en": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_pricing_title_ar": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_pricing_description_en": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_pricing_description_ar": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_ai_text_to_speech_description": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_ai_text_to_speech_description_en": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_ai_text_to_speech_description_ar": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_ai_voice_generator_description": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_ai_voice_generator_description_en": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_ai_voice_generator_description_ar": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_text_to_speech_arabic_title_ar": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_text_to_speech_arabic_description": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_text_to_speech_arabic_description_en": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_text_to_speech_arabic_description_ar": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_text_to_speech_title_en": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_text_to_speech_title_ar": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_text_to_speech_description_en": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_text_to_speech_description_ar": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_register_description_en": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "seo_register_description_ar": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "meta_description_en": {
+            "from": "",
+            "to": null,
+            "changed": true
+        },
+        "meta_description_ar": {
+            "from": null,
+            "to": null,
+            "changed": false
+        },
+        "meta_description": {
+            "from": "Listen — Convert text to natural speech with AI-powered TTS.",
+            "to": null,
+            "changed": true
+        },
+        "site_seo_description": {
+            "from": null,
+            "to": null,
+            "changed": false
+        }
+    },
+    "backup": {
+        "seo_home_title": null,
+        "seo_home_description": null,
+        "seo_home_title_en": null,
+        "seo_home_title_ar": null,
+        "seo_home_description_en": null,
+        "seo_home_description_ar": null,
+        "seo_pricing_title": null,
+        "seo_pricing_description": null,
+        "seo_pricing_title_en": null,
+        "seo_pricing_title_ar": null,
+        "seo_pricing_description_en": null,
+        "seo_pricing_description_ar": null,
+        "seo_ai_text_to_speech_description": null,
+        "seo_ai_text_to_speech_description_en": null,
+        "seo_ai_text_to_speech_description_ar": null,
+        "seo_ai_voice_generator_description": null,
+        "seo_ai_voice_generator_description_en": null,
+        "seo_ai_voice_generator_description_ar": null,
+        "seo_text_to_speech_arabic_title_ar": null,
+        "seo_text_to_speech_arabic_description": null,
+        "seo_text_to_speech_arabic_description_en": null,
+        "seo_text_to_speech_arabic_description_ar": null,
+        "seo_text_to_speech_title_en": null,
+        "seo_text_to_speech_title_ar": null,
+        "seo_text_to_speech_description_en": null,
+        "seo_text_to_speech_description_ar": null,
+        "seo_register_description_en": null,
+        "seo_register_description_ar": null,
+        "meta_description_en": {
+            "value": "",
+            "group": "seo"
+        },
+        "meta_description_ar": null,
+        "meta_description": {
+            "value": "Listen — Convert text to natural speech with AI-powered TTS.",
+            "group": "seo"
+        },
+        "site_seo_description": null
+    }
+}

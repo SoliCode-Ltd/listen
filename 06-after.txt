@@ -1,0 +1,22 @@
+== /en
+<title>AI Text to Speech Studio for Arabic Dialects and English Accents - Listen
+<meta name="description" content="Professional AI voice studio: 270 natural voices, 140+ Arabic dialects from 24 countries, 60+ English accents, 50+ emotions, 40+ performance styles, laughs and whispers written in the text, two-voice dialogue, voice cloning and an API."
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+== /ar
+<title>تحويل النص إلى صوت باللهجات العربية: استوديو أصوات احترافي - إسمع
+<meta name="description" content="استوديو أصوات احترافي بالذكاء الاصطناعي: مكتبة من 270 صوتاً، و140 لهجة عربية من 24 دولة وأكثر من 60 لكنة إنجليزية، وأكثر من 50 شعوراً وأكثر من 40 أسلوب أداء، وضحك وهمس تكتبه داخل النص، وحوارات بصوتين، واستنساخ الصوت، وواجهة برمجية."
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+== /en/pricing
+<title>Text to Speech Pricing: Plans for Creators and Teams - Listen
+<meta name="description" content="Monthly plans for the Listen voice studio. Every plan has all 200+ dialects and accents: hear the voices first, then pick the plan that fits."
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+== /ar/pricing
+<title>أسعار تحويل النص إلى صوت: باقات لصنّاع المحتوى والفرق - إسمع
+<meta name="description" content="باقات شهرية لاستوديو إسمع للأصوات. في كل باقة أكثر من 200 لهجة ولكنة: استمع إلى الأصوات أولاً ثم اختر الباقة المناسبة."
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+== /en/login
+<title>Sign In - Listen
+<meta name="description" content="Sign in to your Listen account and continue your voice generation workflow."
+<meta name="robots" content="noindex,nofollow,noarchive,nosnippet"
+== /robots.txt
+Sitemap: https://listenai.studio/sitemap.xml
