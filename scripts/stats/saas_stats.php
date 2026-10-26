@@ -440,4 +440,68 @@ $section('demo', function () use ($has, $ym, $since, $pairs) {
     return $data;
 });
 
+// What each plan sells, in the currencies members see, and how much of its
+// credits (15 a second) its paying members use each month. Aggregate only.
+$section('plan_economics', function () use ($members, $has) {
+    $pricing = app(\App\Services\LocalizedPricingService::class);
+    $plans = Plan::query()->orderBy('price_cents')->get();
+    $local = fn (int $usdMinor): array => collect(['EGP', 'SAR', 'AED', 'KWD'])
+        ->mapWithKeys(fn ($c) => [$c => rescue(fn () => $pricing->convertUsdMinorToCurrency($usdMinor, $c), null, false)])->all();
+
+    $rows = $plans->map(fn (Plan $p) => [
+        'slug' => $p->slug,
+        'active' => (bool) $p->is_active,
+        'usd_cents_monthly' => (int) $p->price_cents,
+        'usd_cents_yearly' => rescue(fn () => $p->getEffectiveYearlyPriceCents(), null, false),
+        'local_minor_monthly' => $local((int) $p->price_cents),
+        'egp_manual_quote_minor' => rescue(fn () => $pricing->egpPriceQuote($p, 'monthly')['amount_minor'] ?? null, null, false),
+        'credits_monthly' => (int) $p->monthly_chars,
+        'minutes_from_credits' => intdiv((int) $p->monthly_chars, 900),
+        'dubbing' => (bool) ($p->video_dubbing_enabled ?? false),
+        'cloning' => (bool) ($p->voice_cloning_enabled ?? false),
+    ])->values();
+
+    if (! $has('usage_counters')) {
+        return ['plans' => $rows];
+    }
+    $credits = $plans->pluck('monthly_chars', 'slug');
+    $paidPlanByUser = DB::table('subscriptions')->join('plans', 'plans.id', '=', 'subscriptions.plan_id')
+        ->whereIn('subscriptions.user_id', $members()->select('id'))
+        ->where('subscriptions.status', 'active')->where('plans.price_cents', '>', 0)
+        ->pluck('plans.slug', 'subscriptions.user_id');
+    $periods = DB::table('usage_counters')->whereIn('user_id', $paidPlanByUser->keys()->all())
+        ->where('period_ym', '>=', now()->subMonths(3)->format('Y-m'))
+        ->get(['user_id', 'period_ym', 'total_chars']);
+
+    $shares = [];
+    foreach ($periods as $row) {
+        $slug = $paidPlanByUser[$row->user_id] ?? null;
+        $allowance = (int) ($credits[$slug] ?? 0);
+        if ($slug === null || $allowance <= 0) {
+            continue;
+        }
+        $shares[$slug][] = (int) $row->total_chars / $allowance;
+    }
+    $usage = [];
+    foreach ($shares as $slug => $list) {
+        sort($list);
+        $at = fn (float $q) => round($list[(int) floor($q * (count($list) - 1))], 3);
+        $usage[$slug] = [
+            'member_months' => count($list),
+            'median_share_used' => $at(.5),
+            'p75' => $at(.75),
+            'p90' => $at(.9),
+            'max' => round(max($list), 3),
+            'over_50pct' => count(array_filter($list, fn ($s) => $s > .5)),
+            'over_100pct' => count(array_filter($list, fn ($s) => $s >= 1)),
+        ];
+    }
+
+    return [
+        'plans' => $rows,
+        'paying_members_by_plan' => $paidPlanByUser->countBy()->all(),
+        'usage_last_3_months' => $usage,
+    ];
+});
+
 echo json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
