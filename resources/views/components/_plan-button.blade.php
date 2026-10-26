@@ -10,6 +10,14 @@
   $yearlyUrl = $state['trial_yearly'] ? route('trial.start', ['plan' => $plan['slug'], 'billing_cycle' => 'yearly']) : $fallbackUrl('yearly');
   $monthlyLabel = $state['trial_monthly'] ? $trialLabel : $fallbackLabel;
   $yearlyLabel = $state['trial_yearly'] ? $trialLabel : $fallbackLabel;
+  // A first-month offer on the plan's card: the button names its price ("Start your first month
+  // for $19.80"); the bar on phones and the comparison table keep the short words.
+  $shortLabel = null;
+  if (!($small ?? false) && !$state['trial_monthly'] && !empty($plan['discount_first_month'])) {
+    $shortLabel = $monthlyLabel;
+    $firstMonthPrice = $wholePrice((string) ($plan['display_price_monthly_formatted'] ?? ''));
+    $monthlyLabel = __('ui.pricing.start_first_month', ['price' => "\u{2066}".$firstMonthPrice."\u{2069}"]);
+  }
   // The recommended plan gets the filled button; the others an outline.
   $buttonClass = 'plan-btn '.($small ?? false ? 'plan-btn-sm ' : '').($state['is_popular'] ? 'btn-primary' : 'btn-outline');
   $disabledClass = 'plan-btn '.($small ?? false ? 'plan-btn-sm ' : '').'btn-disabled';
@@ -37,5 +45,6 @@
     data-yearly-href="{{ $yearlyUrl }}"
     data-monthly-label="{{ $monthlyLabel }}"
     data-yearly-label="{{ $yearlyLabel }}"
+    @if($shortLabel) data-short-label="{{ $shortLabel }}" @endif
   >{{ $monthlyLabel }}</a>
 @endif
