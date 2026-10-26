@@ -125,6 +125,7 @@ return [
         'hero_play_one' => 'استمع إلى :name',
         'hero_listen' => 'استمع إلى الأصوات',
         'facts_label' => 'إسمع في لمحة',
+        'fact_voices' => 'صوت',
         'fact_dialects' => 'لهجة عربية',
         'fact_accents' => 'لكنة إنجليزية',
         'fact_places' => 'بيئة صوتية',

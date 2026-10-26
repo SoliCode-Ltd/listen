@@ -1,11 +1,19 @@
 {{--
   A small drawing above each figure in the homepage facts strip, showing what the
-  number means: real dialect greetings, the countries' accents, the places a voice
-  can be heard in, and one greeting said three ways. Decorative only.
+  number means: some of the library's own speakers, real dialect greetings, the
+  countries' accents, the places a voice can be heard in, and one greeting said
+  three ways. Decorative only.
 --}}
 @props(['kind'])
 <div class="fact-art fact-art-{{ $kind }}" aria-hidden="true">
   @switch($kind)
+    @case('voices')
+      <span class="fa-faces">
+        @foreach(['ar-sumaya', 'en-amelia', 'ar-abdulaziz', 'en-arthur', 'ar-sundus', 'ar-ahmed', 'en-aria'] as $i => $speaker)
+          <img src="{{ \App\Support\VersionedAsset::url('images/speakers/'.$speaker.'.webp') }}" alt="" width="38" height="38" loading="lazy" @class(['is-on' => $i === 2]) style="--i: {{ $i }}">
+        @endforeach
+      </span>
+      @break
     @case('dialects')
       {{-- "How are you?" as the Gulf, Egypt, the Levant and the Maghreb say it. --}}
       @foreach(['شلونك؟', 'إزيك؟', 'كيفك؟', 'لاباس؟'] as $i => $greeting)

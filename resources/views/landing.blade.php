@@ -481,6 +481,9 @@
     .fact + .fact {
       border-inline-start: 1px solid var(--line);
     }
+    .facts-grid-lead {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
     .fact-value {
       margin-top: 1rem;
       font-size: clamp(2.1rem, 3.6vw, 2.9rem);
@@ -539,6 +542,25 @@
     }
     .fa-flags img + img { margin-inline-start: -6px; }
     .fa-wave { width: 62%; height: 22px; fill: color-mix(in oklab, var(--a) 55%, var(--surface)); }
+    /* A few of the library's speakers, one stepped forward. */
+    .fact-art-voices { display: flex; align-items: center; justify-content: center; }
+    .fa-faces { display: flex; align-items: center; }
+    .fa-faces img {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 0 0 2.5px var(--surface), 0 4px 10px -4px rgba(20, 16, 50, .35);
+    }
+    .fa-faces img + img { margin-inline-start: -9px; }
+    .fa-faces img.is-on {
+      position: relative;
+      width: 50px;
+      height: 50px;
+      box-shadow: 0 0 0 2.5px var(--brand-accent), 0 0 0 5px var(--surface), 0 10px 20px -10px color-mix(in oklab, var(--a) 80%, transparent);
+    }
+    /* Five fit a column of five; the wider tile shows them all. */
+    .fa-faces img:nth-child(n + 6) { display: none; }
     .fact-art-places { display: flex; align-items: center; justify-content: center; gap: .5rem; }
     .fa-tile {
       display: grid;
@@ -569,10 +591,12 @@
     @media (prefers-reduced-motion: no-preference) {
       .facts.reveal:not(.show) .fa-bubble,
       .facts.reveal:not(.show) .fa-flags img,
+      .facts.reveal:not(.show) .fa-faces img,
       .facts.reveal:not(.show) .fa-tile,
       .facts.reveal:not(.show) .fa-say { opacity: 0; }
       .facts.show .fa-bubble { animation: faPop .5s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(.15s + var(--i) * 90ms); }
-      .facts.show .fa-flags img { animation: faSlide .45s ease-out both; animation-delay: calc(.15s + var(--i) * 60ms); }
+      .facts.show .fa-flags img,
+      .facts.show .fa-faces img { animation: faSlide .45s ease-out both; animation-delay: calc(.15s + var(--i) * 60ms); }
       .facts.show .fa-tile,
       .facts.show .fa-say { animation: faPop .45s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(.15s + var(--i) * 120ms); }
       .facts.show .fa-wave rect,
@@ -592,6 +616,12 @@
       .fact:nth-child(n + 3) {
         border-top: 1px solid var(--line);
       }
+      /* With the voices first: they take the top row, then two a row. */
+      .facts-grid-lead .fact-lead { grid-column: 1 / -1; }
+      .facts-grid-lead .fact:nth-child(3) { border-inline-start: 1px solid var(--line); }
+      .facts-grid-lead .fact:nth-child(2n) { border-inline-start: 0; }
+      .facts-grid-lead .fact:nth-child(n + 2) { border-top: 1px solid var(--line); }
+      .fa-faces img:nth-child(n + 6) { display: block; }
     }
     @media (max-width: 760px) {
       .fact {
@@ -604,6 +634,8 @@
       .fa-tile svg { width: 21px; height: 21px; }
       .fact-art-places { gap: .35rem; }
       .fa-flags img { width: 28px; height: 28px; }
+      .fa-faces img { width: 34px; height: 34px; }
+      .fa-faces img.is-on { width: 44px; height: 44px; }
       .fact-art-styles { gap: .8rem; padding-bottom: .85rem; }
       .fa-say-1 .fa-say-word { font-size: .72rem; }
       .fa-say-2 .fa-say-word { font-size: .92rem; }
@@ -955,17 +987,19 @@
       $factDialects = ['value' => \App\Support\DialectCounts::arabic(), 'label' => __('ui.landing.fact_dialects'), 'art' => 'dialects'];
       $factAccents = ['value' => \App\Support\DialectCounts::english(), 'label' => __('ui.landing.fact_accents'), 'art' => 'accents'];
       $facts = [
-        // The page's own language comes first.
+        // The voices lead, since nothing else on the page counts them.
+        ['value' => \App\Support\StudioFacts::roundedDown(\App\Support\StudioFacts::voices()), 'label' => __('ui.landing.fact_voices'), 'art' => 'voices', 'lead' => true],
+        // Then the page's own language.
         ...(app()->getLocale() === 'ar' ? [$factDialects, $factAccents] : [$factAccents, $factDialects]),
         ['value' => $factPlaces, 'label' => __('ui.landing.fact_places'), 'art' => 'places'],
         ['value' => (int) (floor(count(\App\Support\StudioChoices::STYLES) / 10) * 10), 'label' => __('ui.landing.fact_styles'), 'art' => 'styles'],
       ];
     @endphp
     <section class="facts reveal" aria-label="{{ __('ui.landing.facts_label') }}">
-      <ul class="facts-grid">
+      <ul class="facts-grid{{ $facts[0]['value'] > 0 ? ' facts-grid-lead' : '' }}">
         @foreach($facts as $fact)
           @if($fact['value'] > 0)
-            <li class="fact">
+            <li class="fact{{ ! empty($fact['lead']) ? ' fact-lead' : '' }}">
               <x-home.fact-art :kind="$fact['art']" />
               {{-- "140+" in English, "+140" in Arabic, as the rest of the copy writes it. --}}
               <strong class="fact-value"><bdi dir="ltr">{{ app()->getLocale() === 'ar' ? '+'.$fact['value'] : $fact['value'].'+' }}</bdi></strong>

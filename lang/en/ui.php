@@ -125,6 +125,7 @@ return [
         'hero_play_one' => 'Hear :name',
         'hero_listen' => 'Hear the voices',
         'facts_label' => 'Listen at a glance',
+        'fact_voices' => 'Voices',
         'fact_dialects' => 'Arabic dialects',
         'fact_accents' => 'English accents',
         'fact_places' => 'Sound environments',
