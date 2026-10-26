@@ -73,6 +73,13 @@ $changes = [
     // 2026_11_02 migration does the same).
     'meta_description_en' => null,
     'meta_description_ar' => null,
+
+    // The older shared fields from before English and Arabic were apart. The
+    // site reads one when its language's own field is empty, so an old English
+    // line ("Listen — Convert text to natural speech with AI-powered TTS.")
+    // still showed for English pages; deleted, the site's own text shows.
+    'meta_description' => null,
+    'site_seo_description' => null,
 ];
 
 if (($restore = getenv('RESTORE')) !== false && $restore !== '') {

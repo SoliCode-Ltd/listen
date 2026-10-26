@@ -173,6 +173,22 @@ final class StudioFacts
         return $limits->isEmpty() ? null : [$limits->min(), $limits->max()];
     }
 
+    /** Whether a plan on sale has voice cloning. */
+    public static function cloning(): bool
+    {
+        return self::cloningRange() !== null;
+    }
+
+    /** Whether "Dub my video" is open to everyone (until then only the admin sees it). */
+    public static function dubbing(): bool
+    {
+        try {
+            return VideoDubbing::audience() === VideoDubbing::AUDIENCE_EVERYONE;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     /**
      * Download formats: those every plan on sale has, and those only some have.
      *

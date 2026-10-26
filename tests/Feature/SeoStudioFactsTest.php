@@ -45,7 +45,7 @@ class SeoStudioFactsTest extends TestCase
     public function test_dialogue_and_cloning_are_described_only_while_a_plan_on_sale_has_them(): void
     {
         $this->assertNotContains('Two-voice dialogue in one recording, each speaker in their own dialect', SeoHelper::featureList('en'));
-        $this->assertNotContains('Voice cloning with the speaker\'s consent', SeoHelper::featureList('en'));
+        $this->assertNotContains('Voice cloning with the speaker\'s consent, speaking the dialect you choose', SeoHelper::featureList('en'));
         $this->assertStringNotContainsString('dialogue', SeoHelper::siteDescription('en'));
         $this->assertStringNotContainsString('Two-voice dialogue', (string) $this->get('/llms.txt')->getContent());
 
@@ -57,7 +57,9 @@ class SeoStudioFactsTest extends TestCase
         Plan::factory()->create(['slug' => 'old', 'name_en' => 'Old', 'price_cents' => 999, 'is_active' => false, 'dialogue_enabled' => true]);
 
         $this->assertContains('Two-voice dialogue in one recording, each speaker in their own dialect', SeoHelper::featureList('en'));
-        $this->assertContains('Voice cloning with the speaker\'s consent', SeoHelper::featureList('en'));
+        $this->assertContains('Voice cloning with the speaker\'s consent, speaking the dialect you choose', SeoHelper::featureList('en'));
+        $this->assertStringContainsString(', voice cloning, with emotions', SeoHelper::siteDescription('en'));
+        $this->assertStringContainsString('Members can clone their own voice', (string) $this->get('/llms.txt')->getContent());
         $this->assertStringContainsString('two-voice dialogue', SeoHelper::siteDescription('en'));
         $this->assertStringContainsString('وحوارات بصوتين', SeoHelper::siteDescription('ar'));
         $llms = (string) $this->get('/llms.txt')->getContent();
@@ -106,15 +108,40 @@ class SeoStudioFactsTest extends TestCase
         $countAr = StudioFacts::arabicCount($count, 'صوت', 'أصوات', 'صوتاً');
 
         $this->page('en', 'home')->assertOk()
-            ->assertSee('<meta name="description" content="Professional AI voice studio: '.$count.' natural voices, 140+ Arabic dialects', false);
+            ->assertSee('<meta name="description" content="Professional AI voice studio: '.$count.' natural voices, voice cloning and video dubbing in 140+ Arabic dialects', false);
         $this->page('ar', 'home')->assertOk()
-            ->assertSee('<meta name="description" content="استوديو أصوات احترافي بالذكاء الاصطناعي: مكتبة من '.$countAr.'، و140 لهجة عربية', false);
+            ->assertSee('<meta name="description" content="استوديو أصوات احترافي بالذكاء الاصطناعي: مكتبة من '.$countAr.'، واستنساخ الصوت، ودبلجة الفيديو، بـ140 لهجة عربية', false);
 
         $this->assertContains($count.' voices in Arabic and English', SeoHelper::featureList('en'));
         $this->assertContains('مكتبة من '.$countAr.' بالعربية والإنجليزية', SeoHelper::featureList('ar'));
         $this->assertStringContainsString("Its library has {$count} voices ({$arabic} Arabic and {$english} English).", (string) $this->get('/llms.txt')->getContent());
         $this->assertStringContainsString($count.' voices, ', SeoHelper::defaultSiteDescription('en'));
         $this->assertStringContainsString('مكتبة من '.$countAr, SeoHelper::defaultSiteDescription('ar'));
+    }
+
+    public function test_video_dubbing_is_described_and_its_page_searchable_only_once_it_is_open_to_everyone(): void
+    {
+        $dubbing = 'Video dubbing into the Arabic dialect or English accent you choose, keeping the music and sound effects';
+        $this->assertNotContains($dubbing, SeoHelper::featureList('en'));
+        $this->assertStringNotContainsString('video dubbing', SeoHelper::siteDescription('en'));
+        $this->assertStringNotContainsString('Video dubbing', (string) $this->get('/llms.txt')->getContent());
+        $this->assertStringContainsString('noindex', SeoHelper::robots('dub'));
+        $this->assertStringNotContainsString('dub-my-video', (string) $this->get('/sitemap.xml')->getContent());
+
+        SiteSetting::set('video_dubbing_audience', 'everyone', 'video_dubbing');
+
+        $this->assertContains($dubbing, SeoHelper::featureList('en'));
+        $this->assertContains('دبلجة الفيديو إلى اللهجة العربية أو اللكنة الإنجليزية التي تختارها، مع بقاء الموسيقى والمؤثرات', SeoHelper::featureList('ar'));
+        $this->assertStringContainsString(', video dubbing, with emotions', SeoHelper::siteDescription('en'));
+        $this->assertStringContainsString('، ودبلجة الفيديو', SeoHelper::siteDescription('ar'));
+        $llms = (string) $this->get('/llms.txt')->getContent();
+        $this->assertStringContainsString('It also dubs videos into an Arabic dialect or English accent.', $llms);
+        $this->assertStringContainsString('- Video dubbing: upload a short video', $llms);
+        $this->assertStringContainsString('/en/dub-my-video', $llms);
+        $this->assertStringNotContainsString('noindex', SeoHelper::robots('dub'));
+        $sitemap = (string) $this->get('/sitemap.xml')->getContent();
+        $this->assertStringContainsString('/en/dub-my-video', $sitemap);
+        $this->assertStringContainsString('/ar/dub-my-video', $sitemap);
     }
 
     public function test_an_arabic_count_takes_the_noun_its_last_two_digits_ask_for(): void
