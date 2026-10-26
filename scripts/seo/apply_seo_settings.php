@@ -67,9 +67,12 @@ $changes = [
     'seo_register_description_en' => null,
     'seo_register_description_ar' => null,
 
-    // The site-wide fallback description, used by pages without their own.
-    'meta_description_en' => 'Natural AI voices in Fusha, 140+ Arabic dialect accents and 60+ English accents, with emotions, performance styles and sound environments. Download MP3.',
-    'meta_description_ar' => 'أصوات طبيعية بالذكاء الاصطناعي بالفصحى وأكثر من 140 لكنة عربية وأكثر من 60 لكنة إنجليزية، مع المشاعر وأساليب الأداء وبيئات الصوت. حمّل MP3.',
+    // The site-wide fallback description, used by pages without their own. The
+    // text this script saved here in October named no voices, so it is deleted
+    // and the site's own description, which counts them, shows instead (the
+    // 2026_11_02 migration does the same).
+    'meta_description_en' => null,
+    'meta_description_ar' => null,
 ];
 
 if (($restore = getenv('RESTORE')) !== false && $restore !== '') {

@@ -74,10 +74,58 @@ final class StudioFacts
         return count(array_filter(AudioEffects::ALL, fn (array $row): bool => $row[1] !== 'clean'));
     }
 
+    /** Voices in the library, standard and premium, Arabic and English: "270 voices". */
+    public static function voices(): int
+    {
+        return self::arabicVoices() + self::englishVoices();
+    }
+
+    public static function arabicVoices(): int
+    {
+        return self::voiceCounts()['ar'] ?? 0;
+    }
+
+    public static function englishVoices(): int
+    {
+        return self::voiceCounts()['en'] ?? 0;
+    }
+
     /** "140+", "50+": a count rounded down to the ten, so the claim stays true. */
     public static function roundedDown(int $count): int
     {
         return intdiv($count, 10) * 10;
+    }
+
+    /**
+     * A number with its Arabic noun in the form the number takes, decided by its
+     * last two digits: «107 أصوات», «270 صوتاً», «200 صوت».
+     */
+    public static function arabicCount(int $count, string $singular, string $plural, string $accusative): string
+    {
+        $lastTwo = $count % 100;
+        $noun = match (true) {
+            $lastTwo >= 3 && $lastTwo <= 10 => $plural,
+            $lastTwo >= 11 => $accusative,
+            default => $singular,
+        };
+
+        return $count.' '.$noun;
+    }
+
+    /**
+     * Active voices by language, counted once a request.
+     *
+     * @return array<string, int>
+     */
+    private static function voiceCounts(): array
+    {
+        return once(function (): array {
+            try {
+                return array_map('count', VoiceCatalog::byLanguage());
+            } catch (\Throwable) {
+                return [];
+            }
+        });
     }
 
     /**

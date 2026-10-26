@@ -4,7 +4,7 @@ return [
     // ===== SEO =====
     'seo' => [
         'home_title' => 'AI Text to Speech Studio for Arabic Dialects and English Accents',
-        'home_description' => 'Professional AI voice studio: 140+ Arabic dialects from 24 countries, 60+ English accents, 50+ emotions, 40+ performance styles, laughs and whispers written in the text, two-voice dialogue, voice cloning and an API.',
+        'home_description' => 'Professional AI voice studio: :voices natural voices, 140+ Arabic dialects from 24 countries, 60+ English accents, 50+ emotions, 40+ performance styles, laughs and whispers written in the text, two-voice dialogue, voice cloning and an API.',
         'demo_title' => 'Listen Demo',
         'demo_description' => 'Try Listen\'s AI text to speech and hear natural voices in Arabic dialects and English accents.',
         'pricing_title' => 'Text to Speech Pricing: Plans for Creators and Teams',
