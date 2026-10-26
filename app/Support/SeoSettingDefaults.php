@@ -141,7 +141,7 @@ final class SeoSettingDefaults
         $translationKey = (string) ($definition["{$field}_key"] ?? '');
 
         if ($translationKey !== '') {
-            $translated = trim((string) __($translationKey, [], $locale));
+            $translated = trim((string) __($translationKey, SeoHelper::textCounts(), $locale));
             if ($translated !== '' && $translated !== $translationKey) {
                 return $translated;
             }

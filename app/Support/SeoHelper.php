@@ -766,16 +766,20 @@ class SeoHelper
         $cloning = StudioFacts::cloningRange();
         $formats = StudioFacts::downloadFormats();
         $downloads = $formats['every'] === [] ? '' : ' (' . implode(', ', $formats['every']) . ($formats['some'] !== [] ? ', with ' . implode(', ', $formats['some']) . ' on higher plans' : '') . ')';
+        $voices = StudioFacts::voices();
+        $library = $voices > 0 ? $voices . ' voices (' . StudioFacts::arabicVoices() . ' Arabic and ' . StudioFacts::englishVoices() . ' English)' : '';
 
         $lines = array_values(array_filter([
             "# {$siteName}",
             '',
-            '> Listen (Arabic: إسمع, also written منصة إسمع) is a professional AI voice studio for Arabic and English at ' . $base . ', made by SoliCode Ltd. It speaks '
+            '> Listen (Arabic: إسمع, also written منصة إسمع) is a professional AI voice studio for Arabic and English at ' . $base . ', made by SoliCode Ltd. '
+                . ($library !== '' ? 'Its library has ' . $library . '. ' : '') . 'It speaks '
                 . StudioFacts::arabicDialects() . ' spoken Arabic dialects from ' . StudioFacts::arabicCountries() . ' countries, Modern Standard Arabic in ' . StudioFacts::fushaStyles() . ' styles and '
                 . StudioFacts::englishAccents() . ' English accents: more than ' . StudioFacts::roundedDown(StudioFacts::dialectsAndAccents()) . ' dialects and accents, on every plan. '
                 . 'Every line can be directed with ' . StudioFacts::emotions() . ' emotions, ' . StudioFacts::styles() . ' performance styles and tags written inside the text.',
             '',
             '## What the studio does',
+            $library !== '' ? '- Voices: a library of ' . $library . ', men\'s and women\'s voices of different ages.' : null,
             '- Dialects and accents: Gulf, Levantine, Egyptian, Sudanese, Iraqi, Yemeni and Maghrebi Arabic dialects spoken in their own words, Modern Standard Arabic, and English accents from ' . StudioFacts::englishCountries() . ' countries.',
             '- Emotions and performance styles: ' . StudioFacts::emotions() . ' emotions and ' . StudioFacts::styles() . ' styles for a whole script (ads, trailers, audiobooks, bedtime stories, news, lessons and more).',
             '- Delivery tags inside the text: [excited], [whispering], [sad] and ' . (StudioFacts::deliveryTags() - 3) . ' more change the delivery from where they are written.',
@@ -920,7 +924,7 @@ class SeoHelper
 
         $translationKey = (string) ($definition["{$field}_key"] ?? '');
         if ($translationKey !== '') {
-            $translated = trim((string) __($translationKey, [], $locale));
+            $translated = trim((string) __($translationKey, self::textCounts(), $locale));
             if ($translated !== '' && $translated !== $translationKey) {
                 return $translated;
             }
@@ -932,6 +936,19 @@ class SeoHelper
     private static function containsArabic(string $value): bool
     {
         return (bool) preg_match('/[\x{0600}-\x{06FF}\x{0750}-\x{077F}\x{08A0}-\x{08FF}]/u', $value);
+    }
+
+    /**
+     * Counts a page's own title or description can name, so the number is the
+     * library's real one: ":voices" in English, ":voices_ar" with its Arabic noun.
+     *
+     * @return array<string, string>
+     */
+    public static function textCounts(): array
+    {
+        $voices = StudioFacts::voices();
+
+        return ['voices' => (string) $voices, 'voices_ar' => StudioFacts::arabicCount($voices, 'صوت', 'أصوات', 'صوتاً')];
     }
 
     /**
@@ -1379,8 +1396,10 @@ class SeoHelper
     public static function featureList(string $locale): array
     {
         $ar = $locale === 'ar';
+        $voices = StudioFacts::voices();
         $list = $ar ? [
             'تحويل النص إلى صوت بالعربية والإنجليزية',
+            $voices > 0 ? 'مكتبة من '.StudioFacts::arabicCount($voices, 'صوت', 'أصوات', 'صوتاً').' بالعربية والإنجليزية' : null,
             StudioFacts::arabicDialects().' لهجة عربية من '.StudioFacts::arabicCountries().' دولة، والعربية الفصحى بـ'.StudioFacts::fushaStyles().' أساليب',
             StudioFacts::englishAccents().' لكنة إنجليزية',
             StudioFacts::emotions().' شعوراً و'.StudioFacts::styles().' أسلوب أداء',
@@ -1388,12 +1407,14 @@ class SeoHelper
             'أصوات حيّة داخل النص مثل <ضحكة> و<تنهيدة> و<وقفة قصيرة> ('.StudioFacts::soundTags().' صوتاً)',
         ] : [
             'Text to speech in Arabic and English',
+            $voices > 0 ? $voices.' voices in Arabic and English' : null,
             StudioFacts::arabicDialects().' spoken Arabic dialects from '.StudioFacts::arabicCountries().' countries, plus Modern Standard Arabic in '.StudioFacts::fushaStyles().' styles',
             StudioFacts::englishAccents().' English accents',
             StudioFacts::emotions().' emotions and '.StudioFacts::styles().' performance styles',
             'Tags inside the text that change the delivery, such as [excited] or [whispering] ('.StudioFacts::deliveryTags().' tags)',
             'Live sounds written in the text, such as <laugh>, <sigh> or <short pause> ('.StudioFacts::soundTags().' sounds)',
         ];
+        $list = array_values(array_filter($list));
         if (StudioFacts::dialoguePlans($locale) !== []) {
             $list[] = $ar ? 'حوار بصوتين في تسجيل واحد، لكل متحدث لهجته' : 'Two-voice dialogue in one recording, each speaker in their own dialect';
         }
@@ -1712,10 +1733,11 @@ HTML;
     {
         $locale = self::normalizeLocale($locale);
         $dialogue = StudioFacts::dialoguePlans($locale) !== [];
+        $voices = StudioFacts::voices();
 
         return $locale === 'ar'
-            ? 'استوديو أصوات احترافي بالذكاء الاصطناعي للعربية والإنجليزية: '.DialectCounts::arabic().' لهجة عربية وأكثر من '.DialectCounts::english().' لكنة إنجليزية، مع المشاعر وأساليب الأداء ووسوم داخل النص'.($dialogue ? ' وحوارات بصوتين' : '').' وواجهة برمجية.'
-            : 'Professional AI voice studio for Arabic and English: '.DialectCounts::arabic().'+ Arabic dialects and '.DialectCounts::english().'+ English accents, with emotions, performance styles, tags inside the text, '.($dialogue ? 'two-voice dialogue ' : '').'and an API.';
+            ? 'استوديو أصوات احترافي بالذكاء الاصطناعي للعربية والإنجليزية: '.($voices > 0 ? 'مكتبة من '.StudioFacts::arabicCount($voices, 'صوت', 'أصوات', 'صوتاً').'، و' : '').DialectCounts::arabic().' لهجة عربية وأكثر من '.DialectCounts::english().' لكنة إنجليزية، مع المشاعر وأساليب الأداء ووسوم داخل النص'.($dialogue ? ' وحوارات بصوتين' : '').' وواجهة برمجية.'
+            : 'Professional AI voice studio for Arabic and English: '.($voices > 0 ? $voices.' voices, ' : '').DialectCounts::arabic().'+ Arabic dialects and '.DialectCounts::english().'+ English accents, with emotions, performance styles, tags inside the text, '.($dialogue ? 'two-voice dialogue ' : '').'and an API.';
     }
 
     public static function currentLocale(): string

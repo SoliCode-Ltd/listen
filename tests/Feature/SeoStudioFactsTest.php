@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Models\Voice;
 use App\Support\SeoHelper;
 use App\Support\StudioFacts;
+use Database\Seeders\VoiceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -91,6 +93,58 @@ class SeoStudioFactsTest extends TestCase
             ->assertSee('<meta name="description" content="استوديو أصوات احترافي بالذكاء الاصطناعي:', false);
         $this->page('en', 'pricing')->assertOk()
             ->assertSee('Every plan has all 200+ dialects and accents', false);
+    }
+
+    public function test_the_voice_count_comes_from_the_library_and_reaches_every_page_search_engines_read(): void
+    {
+        (new VoiceSeeder)->run();
+        $arabic = Voice::query()->where('is_active', true)->where('language', 'ar')->count();
+        $english = Voice::query()->where('is_active', true)->where('language', 'en')->count();
+        $this->assertGreaterThan(100, $arabic + $english);
+        $this->assertSame($arabic + $english, StudioFacts::voices());
+        $count = $arabic + $english;
+        $countAr = StudioFacts::arabicCount($count, 'صوت', 'أصوات', 'صوتاً');
+
+        $this->page('en', 'home')->assertOk()
+            ->assertSee('<meta name="description" content="Professional AI voice studio: '.$count.' natural voices, 140+ Arabic dialects', false);
+        $this->page('ar', 'home')->assertOk()
+            ->assertSee('<meta name="description" content="استوديو أصوات احترافي بالذكاء الاصطناعي: مكتبة من '.$countAr.'، و140 لهجة عربية', false);
+
+        $this->assertContains($count.' voices in Arabic and English', SeoHelper::featureList('en'));
+        $this->assertContains('مكتبة من '.$countAr.' بالعربية والإنجليزية', SeoHelper::featureList('ar'));
+        $this->assertStringContainsString("Its library has {$count} voices ({$arabic} Arabic and {$english} English).", (string) $this->get('/llms.txt')->getContent());
+        $this->assertStringContainsString($count.' voices, ', SeoHelper::defaultSiteDescription('en'));
+        $this->assertStringContainsString('مكتبة من '.$countAr, SeoHelper::defaultSiteDescription('ar'));
+    }
+
+    public function test_an_arabic_count_takes_the_noun_its_last_two_digits_ask_for(): void
+    {
+        $this->assertSame('3 أصوات', StudioFacts::arabicCount(3, 'صوت', 'أصوات', 'صوتاً'));
+        $this->assertSame('107 أصوات', StudioFacts::arabicCount(107, 'صوت', 'أصوات', 'صوتاً'));
+        $this->assertSame('11 صوتاً', StudioFacts::arabicCount(11, 'صوت', 'أصوات', 'صوتاً'));
+        $this->assertSame('270 صوتاً', StudioFacts::arabicCount(270, 'صوت', 'أصوات', 'صوتاً'));
+        $this->assertSame('200 صوت', StudioFacts::arabicCount(200, 'صوت', 'أصوات', 'صوتاً'));
+        $this->assertSame('102 صوت', StudioFacts::arabicCount(102, 'صوت', 'أصوات', 'صوتاً'));
+    }
+
+    public function test_the_old_site_wide_description_saved_in_october_gives_way_to_the_sites_own(): void
+    {
+        $migration = require database_path('migrations/2026_11_02_120000_seo_let_go_of_the_old_site_wide_description.php');
+        foreach ($migration::OCTOBER as $key => $text) {
+            SiteSetting::set($key, $text, 'seo');
+        }
+        $this->assertSame($migration::OCTOBER['meta_description_en'], SeoHelper::description('', 'en'));
+
+        $migration->up();
+
+        $this->assertFalse(SiteSetting::query()->whereIn('key', array_keys($migration::OCTOBER))->exists());
+        $this->assertSame(SeoHelper::siteDescription('en'), SeoHelper::description('', 'en'));
+        $this->assertStringNotContainsString('لكنة عربية', SeoHelper::description('', 'ar'));
+
+        // A description written differently in the admin stays.
+        SiteSetting::set('meta_description_en', 'Written in the admin.', 'seo');
+        $migration->up();
+        $this->assertSame('Written in the admin.', SiteSetting::query()->where('key', 'meta_description_en')->value('value'));
     }
 
     public function test_the_old_full_square_icons_give_way_to_the_bundled_ones_with_room_around_them(): void
