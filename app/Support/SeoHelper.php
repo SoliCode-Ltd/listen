@@ -209,17 +209,19 @@ class SeoHelper
                 'localized' => true,
                 'indexable' => false,
             ],
-            // Kept out of search results while it is being tried; open it to search when it launches.
+            // In search results once it is open to everyone; kept out while only the admin can try it.
             'dub' => [
                 'label' => 'Dub my video',
                 'title' => 'Dub My Video into Arabic or English',
                 'title_key' => 'ui.dub.seo_title',
                 'description' => 'Upload a short video and hear it dubbed into the Arabic dialect or English accent you choose.',
                 'description_key' => 'ui.dub.seo_description',
-                'robots' => 'noindex,nofollow,noarchive,nosnippet',
+                'robots' => StudioFacts::dubbing() ? self::DEFAULT_META_ROBOTS : 'noindex,nofollow,noarchive,nosnippet',
                 'path' => '/dub-my-video',
                 'localized' => true,
-                'indexable' => false,
+                'indexable' => StudioFacts::dubbing(),
+                'sitemap_priority' => 0.8,
+                'sitemap_change_frequency' => 'weekly',
             ],
             'login' => [
                 'label' => 'Login',
@@ -773,7 +775,10 @@ class SeoHelper
             "# {$siteName}",
             '',
             '> Listen (Arabic: إسمع, also written منصة إسمع) is a professional AI voice studio for Arabic and English at ' . $base . ', made by SoliCode Ltd. '
-                . ($library !== '' ? 'Its library has ' . $library . '. ' : '') . 'It speaks '
+                . ($library !== '' ? 'Its library has ' . $library . '. ' : '')
+                . ($cloning !== null ? 'Members can clone their own voice and have it speak the dialect they choose. ' : '')
+                . (StudioFacts::dubbing() ? 'It also dubs videos into an Arabic dialect or English accent. ' : '')
+                . 'It speaks '
                 . StudioFacts::arabicDialects() . ' spoken Arabic dialects from ' . StudioFacts::arabicCountries() . ' countries, Modern Standard Arabic in ' . StudioFacts::fushaStyles() . ' styles and '
                 . StudioFacts::englishAccents() . ' English accents: more than ' . StudioFacts::roundedDown(StudioFacts::dialectsAndAccents()) . ' dialects and accents, on every plan. '
                 . 'Every line can be directed with ' . StudioFacts::emotions() . ' emotions, ' . StudioFacts::styles() . ' performance styles and tags written inside the text.',
@@ -786,6 +791,7 @@ class SeoHelper
             '- Live sounds inside the text: <laugh>, <sigh>, <short pause> and ' . (StudioFacts::soundTags() - 3) . ' more are performed where they are written. Tags can be written in English or Arabic.',
             $dialoguePlans !== [] ? '- Two-voice dialogue: one recording with two speakers, each in their own voice and dialect (on ' . StudioFacts::planList($dialoguePlans, 'en') . ').' : null,
             $cloning !== null ? '- Voice cloning: clone a voice from a short recording, with the speaker\'s consent, and have it speak any dialect (' . ($cloning[0] === $cloning[1] ? $cloning[1] : $cloning[0] . ' to ' . $cloning[1]) . ' voices, depending on the plan).' : null,
+            StudioFacts::dubbing() ? "- Video dubbing: upload a short video and every line is re-voiced in the Arabic dialect or English accent you choose, on time with the picture; the music and sound effects stay. The first video is free with a small Listen mark; plans with dubbing download it without the mark ({$base}/en/dub-my-video)." : null,
             '- Sound environments: ' . StudioFacts::environments() . ' places, devices and creative spaces, plus a studio polish for the voice.',
             '- Speed and pitch control, and translation before speech.',
             '- Long scripts are read in parts and joined into one recording.',
@@ -805,6 +811,7 @@ class SeoHelper
             "- [Pricing]({$base}/en/pricing): monthly plans; new members can try the voices once in the demo first",
             "- [Developers]({$base}/en/developers): the text to speech API and its documentation",
             "- [Chrome extension]({$base}/en/browsers-extension): reads selected text on any web page",
+            StudioFacts::dubbing() ? "- [Dub my video]({$base}/en/dub-my-video): a video dubbed into the Arabic dialect or English accent you choose · [Arabic version]({$base}/ar/dub-my-video)" : null,
             "- [Contact]({$base}/en/contact-us)",
             '',
             '## Arabic dialects',
@@ -1418,8 +1425,11 @@ class SeoHelper
         if (StudioFacts::dialoguePlans($locale) !== []) {
             $list[] = $ar ? 'حوار بصوتين في تسجيل واحد، لكل متحدث لهجته' : 'Two-voice dialogue in one recording, each speaker in their own dialect';
         }
-        if (StudioFacts::cloningRange() !== null) {
-            $list[] = $ar ? 'استنساخ الصوت بموافقة صاحبه' : 'Voice cloning with the speaker\'s consent';
+        if (StudioFacts::cloning()) {
+            $list[] = $ar ? 'استنساخ الصوت بموافقة صاحبه، ويتكلم الصوت المستنسخ باللهجة التي تختارها' : 'Voice cloning with the speaker\'s consent, speaking the dialect you choose';
+        }
+        if (StudioFacts::dubbing()) {
+            $list[] = $ar ? 'دبلجة الفيديو إلى اللهجة العربية أو اللكنة الإنجليزية التي تختارها، مع بقاء الموسيقى والمؤثرات' : 'Video dubbing into the Arabic dialect or English accent you choose, keeping the music and sound effects';
         }
 
         return array_merge($list, $ar ? [
@@ -1734,10 +1744,16 @@ HTML;
         $locale = self::normalizeLocale($locale);
         $dialogue = StudioFacts::dialoguePlans($locale) !== [];
         $voices = StudioFacts::voices();
+        $cloning = StudioFacts::cloning();
+        $dubbing = StudioFacts::dubbing();
 
         return $locale === 'ar'
-            ? 'استوديو أصوات احترافي بالذكاء الاصطناعي للعربية والإنجليزية: '.($voices > 0 ? 'مكتبة من '.StudioFacts::arabicCount($voices, 'صوت', 'أصوات', 'صوتاً').'، و' : '').DialectCounts::arabic().' لهجة عربية وأكثر من '.DialectCounts::english().' لكنة إنجليزية، مع المشاعر وأساليب الأداء ووسوم داخل النص'.($dialogue ? ' وحوارات بصوتين' : '').' وواجهة برمجية.'
-            : 'Professional AI voice studio for Arabic and English: '.($voices > 0 ? $voices.' voices, ' : '').DialectCounts::arabic().'+ Arabic dialects and '.DialectCounts::english().'+ English accents, with emotions, performance styles, tags inside the text, '.($dialogue ? 'two-voice dialogue ' : '').'and an API.';
+            ? 'استوديو أصوات احترافي بالذكاء الاصطناعي للعربية والإنجليزية: '.($voices > 0 ? 'مكتبة من '.StudioFacts::arabicCount($voices, 'صوت', 'أصوات', 'صوتاً').'، و' : '').DialectCounts::arabic().' لهجة عربية وأكثر من '.DialectCounts::english().' لكنة إنجليزية'
+                .($cloning ? '، واستنساخ الصوت' : '').($dubbing ? '، ودبلجة الفيديو' : '')
+                .'، مع المشاعر وأساليب الأداء ووسوم داخل النص'.($dialogue ? ' وحوارات بصوتين' : '').' وواجهة برمجية.'
+            : 'Professional AI voice studio for Arabic and English: '.($voices > 0 ? $voices.' voices, ' : '').DialectCounts::arabic().'+ Arabic dialects and '.DialectCounts::english().'+ English accents'
+                .($cloning ? ', voice cloning' : '').($dubbing ? ', video dubbing' : '')
+                .', with emotions, performance styles, tags inside the text, '.($dialogue ? 'two-voice dialogue ' : '').'and an API.';
     }
 
     public static function currentLocale(): string
