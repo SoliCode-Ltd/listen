@@ -762,11 +762,33 @@ class SeoHelper
         $base = rtrim((string) SiteSetting::get('canonical_url', config('app.url')), '/');
         $siteName = self::siteName('en');
 
-        $lines = [
+        $dialoguePlans = StudioFacts::dialoguePlans('en');
+        $cloning = StudioFacts::cloningRange();
+        $formats = StudioFacts::downloadFormats();
+        $downloads = $formats['every'] === [] ? '' : ' (' . implode(', ', $formats['every']) . ($formats['some'] !== [] ? ', with ' . implode(', ', $formats['some']) . ' on higher plans' : '') . ')';
+
+        $lines = array_values(array_filter([
             "# {$siteName}",
             '',
-            '> Listen (Arabic: منصة إسمع) is an AI text to speech platform for Arabic and English at ' . $base . '. It speaks Modern Standard Arabic (Fusha), '
-                . DialectCounts::spokenArabic() . ' Arabic dialect accents from ' . (count(ArabicDialects::COUNTRIES) - 1) . ' countries and ' . count(EnglishAccents::ALL) . ' English accents, with emotion and performance styles, sound environments, translation and a Chrome extension.',
+            '> Listen (Arabic: إسمع, also written منصة إسمع) is a professional AI voice studio for Arabic and English at ' . $base . ', made by SoliCode Ltd. It speaks '
+                . StudioFacts::arabicDialects() . ' spoken Arabic dialects from ' . StudioFacts::arabicCountries() . ' countries, Modern Standard Arabic in ' . StudioFacts::fushaStyles() . ' styles and '
+                . StudioFacts::englishAccents() . ' English accents: more than ' . StudioFacts::roundedDown(StudioFacts::dialectsAndAccents()) . ' dialects and accents, on every plan. '
+                . 'Every line can be directed with ' . StudioFacts::emotions() . ' emotions, ' . StudioFacts::styles() . ' performance styles and tags written inside the text.',
+            '',
+            '## What the studio does',
+            '- Dialects and accents: Gulf, Levantine, Egyptian, Sudanese, Iraqi, Yemeni and Maghrebi Arabic dialects spoken in their own words, Modern Standard Arabic, and English accents from ' . StudioFacts::englishCountries() . ' countries.',
+            '- Emotions and performance styles: ' . StudioFacts::emotions() . ' emotions and ' . StudioFacts::styles() . ' styles for a whole script (ads, trailers, audiobooks, bedtime stories, news, lessons and more).',
+            '- Delivery tags inside the text: [excited], [whispering], [sad] and ' . (StudioFacts::deliveryTags() - 3) . ' more change the delivery from where they are written.',
+            '- Live sounds inside the text: <laugh>, <sigh>, <short pause> and ' . (StudioFacts::soundTags() - 3) . ' more are performed where they are written. Tags can be written in English or Arabic.',
+            $dialoguePlans !== [] ? '- Two-voice dialogue: one recording with two speakers, each in their own voice and dialect (on ' . StudioFacts::planList($dialoguePlans, 'en') . ').' : null,
+            $cloning !== null ? '- Voice cloning: clone a voice from a short recording, with the speaker\'s consent, and have it speak any dialect (' . ($cloning[0] === $cloning[1] ? $cloning[1] : $cloning[0] . ' to ' . $cloning[1]) . ' voices, depending on the plan).' : null,
+            '- Sound environments: ' . StudioFacts::environments() . ' places, devices and creative spaces, plus a studio polish for the voice.',
+            '- Speed and pitch control, and translation before speech.',
+            '- Long scripts are read in parts and joined into one recording.',
+            '- History: every voice is kept with its settings, to play again, reuse or download' . $downloads . '.',
+            "- API for developers: the same voices, dialects, emotions and tags from your own app ({$base}/en/developers).",
+            "- Chrome extension: reads selected text on any web page aloud ({$base}/en/browsers-extension).",
+            "- Plans are monthly; every plan has all the dialects and accents; new members can try the voices once in the demo ({$base}/en/pricing).",
             '',
             '## Official URLs',
             "- [Home (English)]({$base}/en): overview, voice samples",
@@ -777,12 +799,13 @@ class SeoHelper
             "- [AI voice generator]({$base}/en/ai-voice-generator)",
             "- [Voice samples]({$base}/en/voice-samples): samples of English accents, moods, conversations and sound environments, ready to play; the Arabic page ({$base}/ar/voice-samples) has samples of Arabic dialects",
             "- [Pricing]({$base}/en/pricing): monthly plans; new members can try the voices once in the demo first",
+            "- [Developers]({$base}/en/developers): the text to speech API and its documentation",
             "- [Chrome extension]({$base}/en/browsers-extension): reads selected text on any web page",
             "- [Contact]({$base}/en/contact-us)",
             '',
             '## Arabic dialects',
             "- [All Arabic dialects]({$base}/en/arabic-dialects) · [Arabic version]({$base}/ar/arabic-dialects)",
-        ];
+        ], fn (?string $line): bool => $line !== null));
 
         foreach (SeoDialectPages::PAGES as $slug => $row) {
             $lines[] = "- [{$row['en']}" . (SeoDialectPages::isFusha($slug) ? '' : ' Arabic') . " text to speech]({$base}/en/arabic-dialects/{$slug})";
@@ -1152,7 +1175,8 @@ class SeoHelper
         $organizationId = $homeUrl . '#organization';
         $websiteId = $homeUrl . '#website';
         $appId = $homeUrl . '#app';
-        $names = array_values(array_unique(array_filter([self::siteName('en'), 'Listen', 'Listen AI', 'إسمع', 'منصة إسمع'])));
+        // Its own names and its address: "Listen" alone is shared with unrelated apps.
+        $names = array_values(array_unique(array_filter([self::siteName('en'), 'Listen', 'ListenAI Studio', 'listenai.studio', 'إسمع', 'منصة إسمع'])));
         $alternateNames = array_values(array_filter($names, static fn (string $name): bool => $name !== $siteName));
 
         $graph = [
@@ -1163,7 +1187,15 @@ class SeoHelper
                 'alternateName' => $alternateNames,
                 'url' => $homeUrl,
                 'description' => self::siteDescription($locale),
+                'disambiguatingDescription' => self::disambiguatingDescription($locale),
                 'logo' => $logo !== '' ? $logo : null,
+                'parentOrganization' => ['@type' => 'Organization', 'name' => 'SoliCode Ltd'],
+                'contactPoint' => [
+                    '@type' => 'ContactPoint',
+                    'contactType' => 'customer support',
+                    'url' => self::pageUrl('contact', $locale),
+                    'availableLanguage' => ['ar', 'en'],
+                ],
                 'sameAs' => self::socialProfileUrls() ?: null,
             ], static fn ($value) => $value !== null && $value !== '' && $value !== []),
             [
@@ -1292,10 +1324,10 @@ class SeoHelper
             'operatingSystem' => 'Web, Chrome',
             'description' => self::siteDescription($locale),
             'inLanguage' => ['ar', 'en'],
-            'featureList' => $locale === 'ar'
-                ? ['تحويل النص إلى صوت بالعربية والإنجليزية', 'العربية الفصحى و'.DialectCounts::arabic().' لكنة عربية', 'أكثر من '.DialectCounts::english().' لكنة إنجليزية', 'أصوات عالية الدقة مع التحكم في المشاعر والأداء', 'بيئات صوتية مثل القاعة والهاتف والراديو', 'ترجمة قبل التحويل إلى صوت', 'إضافة لمتصفح كروم']
-                : ['Arabic and English text to speech', 'Modern Standard Arabic and '.DialectCounts::arabic().'+ Arabic accents', ''.DialectCounts::english().'+ English accents', 'HD voices with emotion and performance control', 'Sound environments such as hall, phone and radio', 'Translate before speech', 'Chrome extension'],
+            'disambiguatingDescription' => self::disambiguatingDescription($locale),
+            'featureList' => self::featureList($locale),
             'publisher' => ['@id' => $organizationId],
+            'softwareHelp' => ['@type' => 'WebPage', 'url' => self::pageUrl('developers', $locale)],
         ];
 
         $offers = self::planOffers();
@@ -1317,8 +1349,10 @@ class SeoHelper
     private static function planOffers(): ?array
     {
         try {
-            // Paid plans only: a $0 plan is the demo account, not an offer.
-            $prices = \App\Models\Plan::query()->where('is_active', true)->where('price_cents', '>', 0)->pluck('price_cents')->map(fn ($cents) => (int) $cents)->all();
+            // Paid monthly plans only: a $0 plan is the demo account, and a one-off pack is not a plan.
+            $prices = \App\Models\Plan::query()->where('is_active', true)->where('price_cents', '>', 0)
+                ->where(fn ($query) => $query->whereNull('kind')->orWhere('kind', 'subscription'))
+                ->pluck('price_cents')->map(fn ($cents) => (int) $cents)->all();
         } catch (\Throwable) {
             return null;
         }
@@ -1334,6 +1368,64 @@ class SeoHelper
             'highPrice' => number_format(max($prices) / 100, 2, '.', ''),
             'offerCount' => count($prices),
         ];
+    }
+
+    /**
+     * What the studio does, for the structured data: every count from its catalogs, and
+     * dialogue and cloning only while a plan on sale has them (StudioFacts).
+     *
+     * @return array<int, string>
+     */
+    public static function featureList(string $locale): array
+    {
+        $ar = $locale === 'ar';
+        $list = $ar ? [
+            'تحويل النص إلى صوت بالعربية والإنجليزية',
+            StudioFacts::arabicDialects().' لهجة عربية من '.StudioFacts::arabicCountries().' دولة، والعربية الفصحى بـ'.StudioFacts::fushaStyles().' أساليب',
+            StudioFacts::englishAccents().' لكنة إنجليزية',
+            StudioFacts::emotions().' شعوراً و'.StudioFacts::styles().' أسلوب أداء',
+            'وسوم داخل النص تغيّر الأداء مثل [متحمس] و[هامس] ('.StudioFacts::deliveryTags().' وسماً)',
+            'أصوات حيّة داخل النص مثل <ضحكة> و<تنهيدة> و<وقفة قصيرة> ('.StudioFacts::soundTags().' صوتاً)',
+        ] : [
+            'Text to speech in Arabic and English',
+            StudioFacts::arabicDialects().' spoken Arabic dialects from '.StudioFacts::arabicCountries().' countries, plus Modern Standard Arabic in '.StudioFacts::fushaStyles().' styles',
+            StudioFacts::englishAccents().' English accents',
+            StudioFacts::emotions().' emotions and '.StudioFacts::styles().' performance styles',
+            'Tags inside the text that change the delivery, such as [excited] or [whispering] ('.StudioFacts::deliveryTags().' tags)',
+            'Live sounds written in the text, such as <laugh>, <sigh> or <short pause> ('.StudioFacts::soundTags().' sounds)',
+        ];
+        if (StudioFacts::dialoguePlans($locale) !== []) {
+            $list[] = $ar ? 'حوار بصوتين في تسجيل واحد، لكل متحدث لهجته' : 'Two-voice dialogue in one recording, each speaker in their own dialect';
+        }
+        if (StudioFacts::cloningRange() !== null) {
+            $list[] = $ar ? 'استنساخ الصوت بموافقة صاحبه' : 'Voice cloning with the speaker\'s consent';
+        }
+
+        return array_merge($list, $ar ? [
+            StudioFacts::environments().' بيئة صوتية، ولمسة استوديو للصوت',
+            'التحكم في السرعة وطبقة الصوت',
+            'ترجمة قبل التحويل إلى صوت',
+            'نصوص طويلة تُجمع في تسجيل واحد',
+            'سجل للأصوات وإعادة استخدام وتحميل',
+            'واجهة برمجية للمطورين',
+            'إضافة لمتصفح كروم تقرأ أي صفحة بصوت عالٍ',
+        ] : [
+            StudioFacts::environments().' sound environments, plus a studio polish for the voice',
+            'Speed and pitch control',
+            'Translation before speech',
+            'Long scripts joined into one recording',
+            'History, reuse and downloads',
+            'Text to speech API for developers',
+            'Chrome extension that reads any web page aloud',
+        ]);
+    }
+
+    /** Which "Listen" this is: the voice studio at listenai.studio, not the other apps with the name. */
+    private static function disambiguatingDescription(string $locale): string
+    {
+        return $locale === 'ar'
+            ? 'إسمع (Listen) على listenai.studio: استوديو أصوات بالذكاء الاصطناعي للعربية والإنجليزية من SoliCode Ltd.'
+            : 'Listen (إسمع) at listenai.studio: the AI voice studio for Arabic and English by SoliCode Ltd.';
     }
 
     /**
@@ -1612,9 +1704,11 @@ HTML;
             return $configured;
         }
 
+        $dialogue = StudioFacts::dialoguePlans($locale) !== [];
+
         return $locale === 'ar'
-            ? 'منصة لتحويل النص إلى صوت بأصوات طبيعية بالفصحى واللهجات العربية واللكنات الإنجليزية، للمحتوى والإعلانات والتعليم والمنتجات.'
-            : 'AI text to speech with natural voices in Fusha, Arabic dialects and English accents, for content, ads, learning and products.';
+            ? 'استوديو أصوات احترافي بالذكاء الاصطناعي للعربية والإنجليزية: '.DialectCounts::arabic().' لهجة عربية وأكثر من '.DialectCounts::english().' لكنة إنجليزية، مع المشاعر وأساليب الأداء ووسوم داخل النص'.($dialogue ? ' وحوارات بصوتين' : '').' وواجهة برمجية.'
+            : 'Professional AI voice studio for Arabic and English: '.DialectCounts::arabic().'+ Arabic dialects and '.DialectCounts::english().'+ English accents, with emotions, performance styles, tags inside the text, '.($dialogue ? 'two-voice dialogue ' : '').'and an API.';
     }
 
     public static function currentLocale(): string

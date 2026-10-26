@@ -76,12 +76,12 @@ class DialectCountsTest extends TestCase
     public function test_every_number_written_in_the_language_files_matches_the_catalogs(): void
     {
         $arabic = [
-            '/more than (\d+) (?:Arabic|regional)/u', '/(\d+)\+ (?:Arabic|regional|[Dd]ialects)/u',
+            '/more than (\d+) (?:Arabic|regional)/u', '/(\d+)\+ (?:Arabic|regional|[Dd]ialects(?! and accents))/u',
             '/(\d+) (?:لكنة|لهجة) (?:عربية|محلية)/u', '/\x{2066}\+(\d+)\x{2069} لهجة/u',
         ];
         $english = ['/more than (\d+) English/u', '/(\d+)\+ English/u', '/(\d+) لكنة إنجليزية/u', '/بأكثر من (\d+) لكنة:/u'];
-        // Both together, as the homepage quotes them: "200+ accents".
-        $total = ['/(\d+)\+ accents/u', '/أكثر من (\d+) لهجة ولكنة/u'];
+        // Both together, as the homepage quotes them: "200+ accents", "200+ dialects and accents".
+        $total = ['/(\d+)\+ accents/u', '/(\d+)\+ dialects and accents/u', '/أكثر من (\d+) لهجة ولكنة/u'];
         $counts = ['arabic' => DialectCounts::arabic(), 'english' => DialectCounts::english(), 'total' => DialectCounts::arabic() + DialectCounts::english()];
         $found = ['arabic' => 0, 'english' => 0, 'total' => 0];
 
@@ -128,6 +128,7 @@ class DialectCountsTest extends TestCase
         $arabic = DialectCounts::spokenArabic();
         $english = count(EnglishAccents::ALL);
         $styles = count(TtsStudioConfig::performanceStyleValues());
+        $emotions = count(TtsStudioConfig::emotionCatalog());
         $environments = count(array_filter(AudioEffects::ALL, fn (array $row): bool => $row[1] !== 'clean'));
         $places = count(array_filter(AudioEffects::ALL, fn (array $row): bool => $row[1] === 'space'));
         // pattern => [what the studio has, whether the page says "more than"]
@@ -145,6 +146,10 @@ class DialectCountsTest extends TestCase
             '/(\d+)\+ dialects and accents/u' => [$arabic + $english, false],
             '/\+(\d+) لهجة ولكنة/u' => [$arabic + $english, false],
             '/أكثر من (\d+) لهجة ولكنة/u' => [$arabic + $english, true],
+            '/(\d+)\+ emotions/u' => [$emotions, false],
+            '/more than (\d+) emotions/u' => [$emotions, true],
+            '/أكثر من (\d+) شعور/u' => [$emotions, true],
+            '/\+(\d+) شعور/u' => [$emotions, false],
             '/(\d+)\+ (?:[Pp]erformance )?styles/u' => [$styles, false],
             '/أكثر من (\d+) أسلوب/u' => [$styles, true],
             '/\+(\d+) أسلوب/u' => [$styles, false],

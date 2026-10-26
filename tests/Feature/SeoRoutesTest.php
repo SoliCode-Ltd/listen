@@ -44,8 +44,9 @@ class SeoRoutesTest extends TestCase
         $text = (string) $this->get('/llms.txt')->assertOk()->getContent();
 
         // The spoken dialects, as the dialect hub counts them, not every catalog row but one: Fusha and its styles are named apart.
-        $this->assertStringContainsString('It speaks Modern Standard Arabic (Fusha), '.DialectCounts::spokenArabic().' Arabic dialect accents from '
-            .(count(ArabicDialects::COUNTRIES) - 1).' countries and '.count(EnglishAccents::ALL).' English accents', $text);
+        $this->assertStringContainsString('It speaks '.DialectCounts::spokenArabic().' spoken Arabic dialects from '
+            .(count(ArabicDialects::COUNTRIES) - 1).' countries, Modern Standard Arabic in '.(count(ArabicDialects::ALL) - DialectCounts::spokenArabic())
+            .' styles and '.count(EnglishAccents::ALL).' English accents', $text);
         $this->assertStringNotContainsString((count(ArabicDialects::ALL) - 1).' Arabic', $text);
         // The samples page plays the samples that were made, not one for every accent and dialect.
         $this->assertStringContainsString('samples of English accents, moods, conversations and sound environments, ready to play', $text);
@@ -158,7 +159,8 @@ class SeoRoutesTest extends TestCase
     {
         $response = $this->get('/favicon.ico')->assertStatus(301);
 
-        $this->assertStringContainsString('/favicon.svg?v=', (string) $response->headers->get('Location'));
+        // A bitmap, for the readers that ask for /favicon.ico and can't draw an SVG.
+        $this->assertStringContainsString('/favicon.png?v=', (string) $response->headers->get('Location'));
     }
 
     public function test_public_seo_landing_pages_and_extension_page_are_available(): void

@@ -24,7 +24,8 @@ class SeoProductClaimsTest extends TestCase
             foreach (['en', 'ar'] as $locale) {
                 $text = SeoHelper::title('', $page, $locale).' '.SeoHelper::description($page, $locale);
                 $this->assertDoesNotMatchRegularExpression('/\bfree\b|مجان/iu', $text, "{$page} ({$locale}): {$text}");
-                $this->assertDoesNotMatchRegularExpression('/\b50\b|\b18 English|خمسين|18 لكنة/u', $text, "{$page} ({$locale}): {$text}");
+                // The old accent counts; "50+ emotions" is the emotions list, counted in DialectCountsTest.
+                $this->assertDoesNotMatchRegularExpression('/\b50\b(?!\+? (?:emotions|شعور))|\b18 English|خمسين|18 لكنة/u', $text, "{$page} ({$locale}): {$text}");
             }
         }
     }
