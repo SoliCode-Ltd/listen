@@ -1,0 +1,59 @@
+name: Pronunciation experiment
+
+# On STAGING, with the owner's OK (it uses the shared speech quota): 12 short
+# voices comparing two directions for a member's saved words, each checked by a
+# text model that listens to it. The takes are kept with the run as MP3 files.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [solicode/nifty-knuth-gq5141]
+    paths:
+      - .github/workflows/pronunciation-experiment.yml
+      - scripts/tts/pronunciation_experiment.php
+
+permissions:
+  contents: read
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run on staging over SSH
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_experiment
+          chmod 600 ~/.ssh/id_experiment
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; php"
+          ssh -i ~/.ssh/id_experiment -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" < scripts/tts/pronunciation_experiment.php > result.json
+          rm -f ~/.ssh/id_experiment
+      - name: Results and takes
+        run: |
+          mkdir -p takes
+          python3 - <<'PY'
+          import json, base64
+          d = json.load(open('result.json'))
+          print(json.dumps(d['meta'], ensure_ascii=False))
+          for t in d['takes']:
+              name = f"{t['sentence']}-{t['voice'].split('-')[-1]}-{t['variant']}{t['take']}"
+              if t.get('mp3'):
+                  open(f'takes/{name}.mp3', 'wb').write(base64.b64decode(t['mp3']))
+              t.pop('mp3', None)
+              print(name, json.dumps({k: t.get(k) for k in ('expected', 'heard', 'error')}, ensure_ascii=False))
+          print('DIRECTIONS', json.dumps({f"{t['sentence']}-{t['variant']}": t['direction_start'] for t in d['takes']}, ensure_ascii=False))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pronunciation-takes
+          path: takes/
