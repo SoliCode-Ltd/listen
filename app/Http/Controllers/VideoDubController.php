@@ -367,6 +367,7 @@ class VideoDubController extends Controller
     /** @return array<string, mixed> An upload of this member's that is still open. */
     private function ownUpload(Request $request, string $id): array
     {
+        abort_if(VideoDubbing::off(), 404);
         $upload = Cache::get('dub-upload:'.$id);
         abort_unless(is_array($upload) && (int) $upload['user_id'] === (int) $request->user()->id, 404);
 
@@ -389,6 +390,9 @@ class VideoDubController extends Controller
     /** A dub of this member's, by the random code its links carry (never by its number). */
     private function ownDub(Request $request, string $code): VideoDub
     {
+        // Switched off: past dubs can't be followed, watched or downloaded either.
+        abort_if(VideoDubbing::off(), 404);
+
         return VideoDub::query()->where('code', $code)->where('user_id', (int) $request->user()->id)->firstOrFail();
     }
 }

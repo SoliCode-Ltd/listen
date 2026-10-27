@@ -34,17 +34,30 @@ final class VideoDubbing
 
     public const AUDIENCE_EVERYONE = 'everyone';
 
+    /** Switched off for everyone, the admin included. */
+    public const AUDIENCE_OFF = 'off';
+
     public static function audience(): string
     {
-        return SiteSetting::get('video_dubbing_audience', self::AUDIENCE_PREVIEW) === self::AUDIENCE_EVERYONE
-            ? self::AUDIENCE_EVERYONE
-            : self::AUDIENCE_PREVIEW;
+        $value = (string) SiteSetting::get('video_dubbing_audience', self::AUDIENCE_PREVIEW);
+
+        return in_array($value, [self::AUDIENCE_EVERYONE, self::AUDIENCE_OFF], true) ? $value : self::AUDIENCE_PREVIEW;
+    }
+
+    /** Off: no page, no studio in the demo or the dashboard, and no dubbed video to watch or download. */
+    public static function off(): bool
+    {
+        return self::audience() === self::AUDIENCE_OFF;
     }
 
     /** Whether this visitor can see the page at all. */
     public static function openTo(?User $user): bool
     {
-        return self::audience() === self::AUDIENCE_EVERYONE || VoiceCloningAccess::isPreviewAccount($user);
+        return match (self::audience()) {
+            self::AUDIENCE_EVERYONE => true,
+            self::AUDIENCE_OFF => false,
+            default => VoiceCloningAccess::isPreviewAccount($user),
+        };
     }
 
     public static function planIncludes(?Plan $plan): bool
