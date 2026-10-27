@@ -17,6 +17,8 @@ class PronunciationController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
+        // Switched off in the admin: a page left open can't save either.
+        abort_unless(Pronunciations::enabled(), 404);
         $data = $request->validate([
             'id' => ['nullable', 'integer'],
             'word' => ['required', 'string', 'max:'.Pronunciations::WORD_MAX],
@@ -61,6 +63,7 @@ class PronunciationController extends Controller
 
     public function destroy(Request $request, int $pronunciation): JsonResponse
     {
+        abort_unless(Pronunciations::enabled(), 404);
         $userId = (int) $request->user()->id;
         Pronunciation::query()->where('user_id', $userId)->whereKey($pronunciation)->delete();
 
