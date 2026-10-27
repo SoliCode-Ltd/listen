@@ -329,13 +329,19 @@
     .plan-picker.is-yearly .plan-pick-offer,
     .plan-picker:not(.is-yearly) .plan-pick-was { display: none; }
     .studio:not(.is-yearly) .plan-card.is-first-month .price-period { display: none; }
-    /* When the offer ends: in amber and counting down to the second, with room above it. */
+    /* When the offer ends: "Offer ends in" and a timer in amber, days : hours : minutes : seconds,
+       each number large with its unit small under it; on a narrow card the timer goes under the words. */
     .pricing-page { --offer-urgent: #FDB022; }
     html[data-theme="light"] .pricing-page { --offer-urgent: #B54708; }
-    .offer-ends { display: inline-flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .1rem .4rem; margin-top: .6rem; color: var(--offer-urgent); font-size: .86rem; font-weight: 600; }
+    .offer-ends { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .35rem .8rem; margin-top: .7rem; color: var(--offer-urgent); }
     .offer-ends[hidden] { display: none; }
-    .offer-ends svg { flex: none; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .offer-ends-clock { font-weight: 700; font-variant-numeric: tabular-nums; unicode-bidi: isolate; }
+    .offer-ends-label { display: inline-flex; align-items: center; gap: .4rem; font-size: .9rem; font-weight: 600; }
+    .offer-ends-label svg { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .offer-ends-clock { display: inline-flex; align-items: flex-start; gap: .3rem; }
+    .offer-ends-unit { display: grid; justify-items: center; min-width: 2.2rem; }
+    .offer-ends-unit b { font-size: 1.45rem; font-weight: 700; line-height: 1.1; letter-spacing: .01em; font-variant-numeric: tabular-nums; }
+    .offer-ends-unit small { margin-top: .15rem; color: var(--muted); font-size: .64rem; font-weight: 600; line-height: 1; }
+    .offer-ends-sep { font-size: 1.3rem; font-weight: 700; line-height: 1.15; opacity: .55; }
     .offer-ends-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
     /* The most popular plan: a ribbon across the panel's corner, with a crown. */
@@ -942,8 +948,9 @@
       .plan-bar-name { display: block; font-weight: 700; }
       .plan-bar-price { color: var(--muted); font-size: .86rem; }
       .plan-bar-price.has-offer { color: var(--text); font-weight: 600; }
+      .plan-bar-now { white-space: nowrap; }
       .plan-bar-price s { margin-inline-start: .4rem; color: var(--muted); font-size: .86rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: color-mix(in oklab, var(--danger) 85%, transparent); }
-      .plan-bar .plan-btn { width: auto; min-height: 44px; padding: .5rem 1.3rem; background: var(--brand-accent); color: #fff; border-color: transparent; }
+      .plan-bar .plan-btn { width: auto; min-height: 44px; padding: .5rem 1.3rem; white-space: nowrap; background: var(--brand-accent); color: #fff; border-color: transparent; }
       .plan-bar .plan-btn.btn-disabled { background: var(--surface2); color: var(--muted); }
       /* The chat button moves up while the bar is shown, so it never covers the button. */
       body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
@@ -1532,7 +1539,6 @@
       'days' => explode('|', __('ui.pricing.offer_ends_days')),
       'hours' => explode('|', __('ui.pricing.offer_ends_hours')),
       'minutes' => explode('|', __('ui.pricing.offer_ends_minutes')),
-      'left' => explode('|', __('ui.pricing.offer_days_left')),
     ];
   @endphp
   <script>
@@ -1541,7 +1547,7 @@
       var lines = document.querySelectorAll('.offer-ends[data-ends]');
       if (!lines.length) return;
       var forms = @json($offerEndsForms);
-      var endsIn = @json(__('ui.pricing.discount_offer_ends'));
+      var units = @json(explode('|', __('ui.pricing.countdown_units')));
       var arabic = document.documentElement.lang === 'ar';
       // The same plural rules the server uses (Laravel's): six forms in Arabic, two in English.
       function form(list, n) {
@@ -1556,8 +1562,16 @@
       }
       function pad(n) { return (n < 10 ? '0' : '') + n; }
       function set(el, text) { if (el && el.textContent !== text) el.textContent = text; }
-      // "Offer ends in", the days while there is more than one, then the clock to the second
-      // ("Offer ends in 3 days 04:12:33"). Screen readers get the time left in words.
+      // The timer: days : hours : minutes : seconds (the days only while there is more than one),
+      // each with its unit under it. Screen readers get the time left in words.
+      function clock(el, seconds) {
+        var box = el.querySelector('.offer-ends-clock');
+        if (!box) return;
+        var parts = [[Math.floor(seconds / 86400), units[0]], [Math.floor(seconds % 86400 / 3600), units[1]], [Math.floor(seconds % 3600 / 60), units[2]], [seconds % 60, units[3]]];
+        if (seconds < 86400) parts.shift();
+        var html = parts.map(function(p) { return '<span class="offer-ends-unit"><b>' + pad(p[0]) + '</b><small>' + p[1] + '</small></span>'; }).join('<span class="offer-ends-sep">:</span>');
+        if (box.innerHTML !== html) box.innerHTML = html;
+      }
       function refresh() {
         var any = false;
         lines.forEach(function(el) {
@@ -1567,9 +1581,7 @@
           var text = seconds >= 172800 ? form(forms.days, Math.floor(seconds / 86400))
             : seconds >= 3600 ? form(forms.hours, Math.floor(seconds / 3600))
             : form(forms.minutes, Math.max(1, Math.ceil(seconds / 60)));
-          var days = Math.floor(seconds / 86400), rest = seconds % 86400;
-          set(el.querySelector('.offer-ends-words'), endsIn + (days > 0 ? ' ' + form(forms.left, days) : ''));
-          set(el.querySelector('.offer-ends-clock'), pad(Math.floor(rest / 3600)) + ':' + pad(Math.floor(rest % 3600 / 60)) + ':' + pad(rest % 60));
+          clock(el, seconds);
           set(el.querySelector('.offer-ends-text'), text);
         });
         if (any) setTimeout(refresh, 1000);
@@ -1637,7 +1649,14 @@
         var shownPeriod = period && getComputedStyle(period).display !== 'none' ? ' ' + period.textContent.trim() : '';
         var barPrice = document.getElementById('planBarPrice');
         document.getElementById('planBarName').textContent = name ? name.textContent.trim() : '';
-        barPrice.textContent = price ? price.textContent.trim() + shownPeriod : '';
+        barPrice.textContent = '';
+        if (price) {
+          // The price and "/month" stay together; the struck price may go to the next line.
+          var now = document.createElement('span');
+          now.className = 'plan-bar-now';
+          now.textContent = price.textContent.trim() + shownPeriod;
+          barPrice.appendChild(now);
+        }
         barPrice.classList.toggle('has-offer', !!was);
         if (was && price) {
           var struck = document.createElement('s');
@@ -1651,6 +1670,9 @@
           var copy = button.cloneNode(true);
           copy.removeAttribute('data-upgrade-link');
           copy.setAttribute('tabindex', '-1');
+          // The bar is narrow: on yearly, the shorter "Get 20% off".
+          var barYearly = copy.getAttribute('data-bar-yearly-label');
+          if (barYearly && card.closest('.studio.is-yearly')) copy.textContent = barYearly;
           action.appendChild(copy);
         }
       }
