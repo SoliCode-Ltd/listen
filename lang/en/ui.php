@@ -218,8 +218,6 @@ return [
         'minutes_label' => 'Minutes a month',
         'minutes_unit' => 'minutes',
         'minutes_track' => 'Minutes track',
-        'offer_ends_on' => 'Offer ends :date',
-        'countdown_units' => 'days|hrs|min|sec',
         'minutes_about' => 'about :time',
         'hours_count' => ':count h',
         'minutes_count' => ':count min',
@@ -367,6 +365,8 @@ return [
         'discount_then_month' => 'Then :price/month',
         'discount_then_year' => 'Then :price/year',
         'discount_terms_join' => ', ',
+        'discount_chip' => ':percent% off',
+        'get_offer' => 'Get :percent% off',
         'lines' => [
             'label_voice_quality' => 'Voice quality',
             'label_max_chars_per_request' => 'Max text per generation',

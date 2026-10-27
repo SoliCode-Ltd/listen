@@ -10,6 +10,13 @@
   $yearlyUrl = $state['trial_yearly'] ? route('trial.start', ['plan' => $plan['slug'], 'billing_cycle' => 'yearly']) : $fallbackUrl('yearly');
   $monthlyLabel = $state['trial_monthly'] ? $trialLabel : $fallbackLabel;
   $yearlyLabel = $state['trial_yearly'] ? $trialLabel : $fallbackLabel;
+  // A plan on offer: its card's button says what is off ("Get 10% off"; on yearly, the offer and
+  // the yearly saving together, as its label says). Without an offer, the usual words.
+  $offPercent = !empty($plan['has_discount']) ? (int) ($plan['discount_percentage'] ?? 0) : 0;
+  if (!($small ?? false) && $offPercent > 0) {
+    if (!$state['trial_monthly']) $monthlyLabel = __('ui.pricing.get_offer', ['percent' => $offPercent]);
+    if (!$state['trial_yearly']) $yearlyLabel = __('ui.pricing.get_offer', ['percent' => min(99, $offPercent + (int) ($yearlyDiscountPercent ?? 20))]);
+  }
   // The recommended plan gets the filled button; the others an outline.
   $buttonClass = 'plan-btn '.($small ?? false ? 'plan-btn-sm ' : '').($state['is_popular'] ? 'btn-primary' : 'btn-outline');
   $disabledClass = 'plan-btn '.($small ?? false ? 'plan-btn-sm ' : '').'btn-disabled';
@@ -36,6 +43,5 @@
     data-monthly-href="{{ $monthlyUrl }}"
     data-yearly-href="{{ $yearlyUrl }}"
     data-monthly-label="{{ $monthlyLabel }}"
-    data-yearly-label="{{ $yearlyLabel }}"
-  >{{ $monthlyLabel }}</a>
+    data-yearly-label="{{ $yearlyLabel }}"  >{{ $monthlyLabel }}</a>
 @endif

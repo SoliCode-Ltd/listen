@@ -1434,6 +1434,8 @@ class HomeController extends Controller
                 'original_price_monthly_cents' => $originalMonthlyCents,
                 'original_price_monthly_formatted' => $originalMonthlyQuote ? (string) $originalMonthlyQuote['amount_formatted'] : null,
                 'discount_terms' => $discountTerms,
+                // Only the first month is cheaper: the card's price and button say "first month".
+                'discount_first_month' => $hasDiscount && $plan->discountDuration() === Plan::DISCOUNT_FIRST_PAYMENT,
                 'display_payment_method' => $manualMethod ?? 'stripe',
                 'display_currency' => (string) $displayMonthlyQuote['currency'],
                 'display_price_monthly_minor' => (int) $displayMonthlyQuote['amount_minor'],

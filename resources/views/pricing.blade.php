@@ -286,9 +286,9 @@
       .price-amount { font-size: 2.3rem; }
     }
     .price-original-row { display: inline-flex; align-items: baseline; }
-    .price-original { color: var(--muted); font-size: 1.05rem; font-weight: 500; text-decoration: line-through; text-decoration-thickness: 1.5px; }
-    /* The line under the price already says how much is off. */
-    .price-off { display: none; }
+    /* The full price, crossed out in red so it reads at a glance as the price before the offer. */
+    .pricing-page { --price-strike: color-mix(in oklab, var(--danger) 85%, transparent); }
+    .price-original { color: color-mix(in oklab, var(--muted) 70%, var(--text)); font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: var(--price-strike); }
     .price-row { display: flex; align-items: baseline; justify-content: center; gap: .35rem; }
     .price-amount { font-size: clamp(2.5rem, 3.4vw, 3rem); font-weight: 700; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
     .price-period { color: var(--muted); font-size: .95rem; font-weight: 500; }
@@ -299,33 +299,37 @@
     .price-note:empty { display: none; }
     .price-note.savings { color: color-mix(in oklab, var(--ok) 50%, var(--text)); font-weight: 600; }
 
-    /* The offer as one sentence ("10% off your first month. Then EGP 1,218/month"),
-       and when it ends, small, under it. */
-    .discount-terms { display: flex; flex-wrap: wrap; justify-content: center; max-width: 38ch; margin-top: .15rem; font-size: .88rem; line-height: 1.6; }
-    .discount-terms-offer { color: var(--accent-text); font-weight: 650; }
-    .discount-terms-then { color: var(--muted); }
-    .discount-terms-then::before { content: ".\00a0"; color: var(--muted); }
-    html[dir="rtl"] .discount-terms-then::before { content: "،\00a0"; }
-    .discount-terms-then[hidden] { display: none; }
-    /* When the offer ends: the day, then the time left to it, counting down. */
-    .offer-ends { display: flex; flex-basis: 100%; flex-direction: column; align-items: center; gap: .45rem; margin-top: .65rem; }
-    .offer-ends[hidden] { display: none; }
-    .offer-ends-when { display: inline-flex; align-items: center; gap: .4rem; color: var(--text); font-size: .84rem; font-weight: 600; }
-    .offer-ends-when svg { flex: none; width: 15px; height: 15px; fill: none; stroke: var(--accent-text); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .offer-ends-clock { display: inline-flex; gap: .35rem; direction: ltr; }
-    html[dir="rtl"] .offer-ends-clock { direction: rtl; }
-    .offer-ends-clock:empty { display: none; }
-    .offer-ends-unit {
-      display: grid;
-      justify-items: center;
-      min-width: 3.1rem;
-      padding: .3rem .45rem .25rem;
-      border-radius: 10px;
-      background: color-mix(in srgb, var(--brand-accent) 7%, var(--surface));
-      border: 1px solid color-mix(in srgb, var(--brand-accent) 22%, transparent);
+    /* The offer: a green label above the price ("10% off your first month"), the full price
+       struck through beside the price, and the time left under it. Only a first-month offer
+       drops "/month": that price is paid once. */
+    .plan-offer { display: flex; justify-content: center; margin-top: .9rem; }
+    .offer-label {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      max-width: 100%;
+      padding: .34rem .8rem;
+      border-radius: var(--radius-full);
+      background: color-mix(in oklab, var(--ok) 15%, transparent);
+      color: color-mix(in oklab, var(--ok) 48%, var(--text));
+      font-size: .84rem;
+      font-weight: 700;
+      line-height: 1.4;
+      text-align: center;
     }
-    .offer-ends-unit b { font-size: 1rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--accent-text); }
-    .offer-ends-unit small { font-size: .64rem; font-weight: 600; color: color-mix(in srgb, var(--accent-text) 55%, var(--muted)); }
+    .offer-label svg { flex: none; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .plan-offer + .plan-pricing { padding-top: .6rem; }
+    .studio:not(.is-yearly) .plan-card.is-first-month .price-period { display: none; }
+    /* When the offer ends: calm and still while more than a day is left; in the last day,
+       amber and counting down to the second. */
+    .pricing-page { --offer-urgent: #FDB022; }
+    html[data-theme="light"] .pricing-page { --offer-urgent: #B54708; }
+    .offer-ends { display: inline-flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .1rem .4rem; margin-top: .1rem; color: var(--muted); font-size: .86rem; font-weight: 600; }
+    .offer-ends[hidden] { display: none; }
+    .offer-ends.is-urgent { color: var(--offer-urgent); }
+    .offer-ends svg { flex: none; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .offer-ends-clock { font-weight: 700; font-variant-numeric: tabular-nums; unicode-bidi: isolate; }
+    .offer-ends-clock:empty { display: none; }
     .offer-ends-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
     /* The most popular plan: a ribbon across the panel's corner, with a crown. */
@@ -499,8 +503,21 @@
     .plan-pick .orb { --orb-size: 60px; margin-bottom: .6rem; }
     .plan-pick-name { font-size: 1.08rem; font-weight: 700; }
     .plan-pick-minutes { color: var(--muted); font-size: .88rem; }
-    .plan-pick-price { margin-top: .55rem; font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .plan-pick-cost { display: grid; justify-items: center; gap: .25rem; margin-top: .55rem; }
+    .plan-pick-price { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .plan-pick-price small { color: var(--muted); font-size: .8rem; font-weight: 500; margin-inline-start: .2rem; }
+    .plan-picker:not(.is-yearly) .plan-pick.is-first-month .plan-pick-price small { display: none; }
+    .plan-pick-offer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .2rem .45rem; }
+    .plan-pick-offer s { color: color-mix(in oklab, var(--muted) 70%, var(--text)); font-size: .9rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: var(--price-strike); white-space: nowrap; }
+    .plan-pick-off {
+      padding: .1rem .5rem;
+      border-radius: var(--radius-full);
+      background: color-mix(in oklab, var(--ok) 15%, transparent);
+      color: color-mix(in oklab, var(--ok) 48%, var(--text));
+      font-size: .72rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
 
     /* Phones: the shown plan and its button stay in reach at the bottom. */
     .plan-bar { display: none; }
@@ -890,7 +907,8 @@
       .plan-picker-list { grid-template-columns: 1fr; gap: 10px; }
       .plan-pick { grid-template-columns: auto 1fr auto; justify-items: start; column-gap: 1rem; padding: 1rem 1.1rem; text-align: start; }
       .plan-pick .orb { --orb-size: 44px; grid-row: span 2; margin: 0; }
-      .plan-pick-price { grid-column: 3; grid-row: 1 / span 2; align-self: center; margin: 0; }
+      .plan-pick-cost { grid-column: 3; grid-row: 1 / span 2; align-self: center; justify-items: end; margin: 0; }
+      .plan-pick-offer { justify-content: flex-end; }
       /* A narrower strap on a narrow card, clear of the plan's orb and name. */
       .plan-ribbon { top: 14px; inset-inline-end: -44px; width: 150px; padding: .3rem 0; font-size: .7rem; }
       .plan-ribbon .crown { width: 12px; height: 12px; }
@@ -917,6 +935,8 @@
       .plan-bar.is-shown { transform: none; }
       .plan-bar-name { display: block; font-weight: 700; }
       .plan-bar-price { color: var(--muted); font-size: .86rem; }
+      .plan-bar-price.has-offer { color: var(--text); font-weight: 600; }
+      .plan-bar-price s { margin-inline-start: .4rem; color: var(--muted); font-size: .86rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: color-mix(in oklab, var(--danger) 85%, transparent); }
       .plan-bar .plan-btn { width: auto; min-height: 44px; padding: .5rem 1.3rem; background: var(--brand-accent); color: #fff; border-color: transparent; }
       .plan-bar .plan-btn.btn-disabled { background: var(--surface2); color: var(--muted); }
       /* The chat button moves up while the bar is shown, so it never covers the button. */
@@ -1201,13 +1221,24 @@
               $pickMonthly = $wholePrice((string) ($plan['display_price_monthly_formatted'] ?? ''));
               $pickYearly = $wholePrice((string) ($plan['display_price_yearly_monthly_formatted'] ?? $pickMonthly));
               $pickMinutes = \App\Support\Credits::minutesFor((int) ($plan['monthly_chars'] ?? 0));
+              // A plan on offer: its full price struck through and how much is off, under the price.
+              $pickOffer = !empty($plan['has_discount']) && !empty($plan['original_price_monthly_formatted']);
+              $pickPercent = (int) ($plan['discount_percentage'] ?? 0);
             @endphp
-            <button type="button" class="plan-pick" data-pick="{{ $plan['slug'] }}" aria-controls="studio">
+            <button type="button" @class(['plan-pick', 'is-first-month' => !empty($plan['discount_first_month'])]) data-pick="{{ $plan['slug'] }}" aria-controls="studio">
               @if($pickPopular)<span class="plan-pick-crown">{!! $crownSvg !!}{{ __('ui.pricing.most_popular') }}</span>@endif
               <x-orb :name="\App\Support\Orbs::forPlan((string) $plan['slug'])" />
               <span class="plan-pick-name">{{ $planDisplayName($plan) }}</span>
               <span class="plan-pick-minutes">{{ trans_choice('ui.pricing.minutes_count', $pickMinutes, ['count' => number_format($pickMinutes)]) }}</span>
-              <span class="plan-pick-price"><span dir="ltr" data-monthly="{{ $pickMonthly }}" data-yearly="{{ $pickYearly }}" data-compare-price>{{ $pickMonthly }}</span><small>{{ __('ui.pricing.per_month_short') }}</small></span>
+              <span class="plan-pick-cost">
+                <span class="plan-pick-price"><span dir="ltr" data-monthly="{{ $pickMonthly }}" data-yearly="{{ $pickYearly }}" data-compare-price>{{ $pickMonthly }}</span><small>{{ __('ui.pricing.per_month_short') }}</small></span>
+                @if($pickOffer)
+                  <span class="plan-pick-offer">
+                    <s dir="ltr">{{ $wholePrice((string) $plan['original_price_monthly_formatted']) }}</s>
+                    <span class="plan-pick-off" data-discount-chip data-percent="{{ $pickPercent }}">{{ __('ui.pricing.discount_chip', ['percent' => $pickPercent]) }}</span>
+                  </span>
+                @endif
+              </span>
             </button>
           @endforeach
         </div>
@@ -1393,7 +1424,7 @@
       var upgradeLinks = document.querySelectorAll('[data-upgrade-link="1"]');
       var isYearly = false;
       var i18n = @json($pricingI18n);
-      var discountI18n = @json(['badge' => __('ui.pricing.discount_badge')]);
+      var discountI18n = @json(['chip' => __('ui.pricing.discount_chip')]);
       var yearlyDiscountPercent = {{ $yearlyDiscountPercent ?? 20 }};
 
       // A price inside an Arabic sentence keeps its own order ("3.20 US$", never "$US 3.20").
@@ -1410,18 +1441,11 @@
           var priceNote = card.querySelector('.price-note-text');
           if (!priceValue || !priceNote) return;
 
-          // How long the discount lasts and the regular price after it, for the cycle shown.
-          var terms = card.querySelector('.discount-terms');
-          if (terms) {
-            var cycle = isYearly ? 'yearly' : 'monthly';
-            var offer = terms.querySelector('.discount-terms-offer');
-            var then = terms.querySelector('.discount-terms-then');
-            var thenText = String(terms.getAttribute('data-then-' + cycle) || '');
-            if (offer) offer.textContent = String(terms.getAttribute('data-offer-' + cycle) || '');
-            if (then) {
-              then.textContent = thenText;
-              then.hidden = thenText === '';
-            }
+          // The offer's label, for the cycle shown ("10% off your first month", "28% off your first year").
+          var offer = card.querySelector('.offer-label');
+          if (offer) {
+            var offerText = offer.querySelector('.offer-label-text');
+            if (offerText) offerText.textContent = String(offer.getAttribute(isYearly ? 'data-offer-yearly' : 'data-offer-monthly') || '');
           }
 
           if (card.getAttribute('data-is-pack') === '1') {
@@ -1441,7 +1465,7 @@
             // The switch above already says "monthly": point to the yearly price instead,
             // unless the card is busy with its own offer.
             priceValue.textContent = displayMonthly;
-            priceNote.textContent = !terms && displayYearlyMonthly !== displayMonthly
+            priceNote.textContent = !offer && displayYearlyMonthly !== displayMonthly
               ? i18n.or_yearly.replace(':price', ltr(displayYearlyMonthly))
               : '';
             priceNote.className = 'price-note price-note-text';
@@ -1468,15 +1492,14 @@
         });
       }
 
+      // How much is off in the list of all plans ("10% off"; on yearly, the offer and the yearly saving together).
       function updateDiscountBadges() {
-        planCards.forEach(function(card) {
-          var ribbonText = card.querySelector('.discount-ribbon-text');
-          if (!ribbonText) return;
-          var basePercent = parseInt(card.getAttribute('data-discount-percent') || '0', 10);
+        document.querySelectorAll('[data-discount-chip]').forEach(function(chip) {
+          var basePercent = parseInt(chip.getAttribute('data-percent') || '0', 10);
           if (basePercent <= 0) return;
           // Business rule: show total discount as a direct deduction from the original total.
           var effectivePercent = isYearly ? Math.min(99, basePercent + yearlyDiscountPercent) : basePercent;
-          ribbonText.textContent = discountI18n.badge.replace(':percent', effectivePercent);
+          chip.textContent = discountI18n.chip.replace(':percent', effectivePercent);
         });
       }
 
@@ -1493,7 +1516,7 @@
         monthlyBtn.setAttribute('aria-pressed', yearly ? 'false' : 'true');
         yearlyBtn.setAttribute('aria-pressed', yearly ? 'true' : 'false');
         billingToggle.classList.toggle('yearly', yearly);
-        document.querySelectorAll('.studio').forEach(function(el) {
+        document.querySelectorAll('.studio, .plan-picker').forEach(function(el) {
           el.classList.toggle('is-yearly', yearly);
         });
         updatePrices();
@@ -1523,7 +1546,7 @@
       var lines = document.querySelectorAll('.offer-ends[data-ends]');
       if (!lines.length) return;
       var forms = @json($offerEndsForms);
-      var units = { on: @json(__('ui.pricing.offer_ends_on')), list: @json(explode('|', __('ui.pricing.countdown_units'))) };
+      var endsIn = @json(__('ui.pricing.discount_offer_ends'));
       var arabic = document.documentElement.lang === 'ar';
       // The same plural rules the server uses (Laravel's): six forms in Arabic, two in English.
       function form(list, n) {
@@ -1536,23 +1559,10 @@
         }
         return String(list[Math.min(i, list.length - 1)] || '').replace(':count', String(n));
       }
-      // The day it ends, in the visitor's own time zone and language.
-      var dateFormat = new Intl.DateTimeFormat(arabic ? 'ar-EG-u-nu-latn' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-      lines.forEach(function(el) {
-        var date = el.querySelector('.offer-ends-date');
-        var at = new Date(el.getAttribute('data-ends'));
-        if (date && !isNaN(at)) date.textContent = units.on.replace(':date', dateFormat.format(at));
-      });
-      // The time left, to that same moment: days, hours, minutes (hours, minutes, seconds on the last day).
       function pad(n) { return (n < 10 ? '0' : '') + n; }
-      function clock(el, seconds) {
-        var box = el.querySelector('.offer-ends-clock');
-        if (!box) return;
-        var d = Math.floor(seconds / 86400), h = Math.floor(seconds % 86400 / 3600), m = Math.floor(seconds % 3600 / 60), s = seconds % 60;
-        var parts = d > 0 ? [[d, units.list[0]], [h, units.list[1]], [m, units.list[2]]] : [[h, units.list[1]], [m, units.list[2]], [s, units.list[3]]];
-        var html = parts.map(function(p) { return '<span class="offer-ends-unit"><b>' + pad(p[0]) + '</b><small>' + p[1] + '</small></span>'; }).join('');
-        if (box.innerHTML !== html) box.innerHTML = html;
-      }
+      function set(el, text) { if (el && el.textContent !== text) el.textContent = text; }
+      // More than a day left: in words ("Offer ends in 3 days", "… in 29 hours"). The last day:
+      // "Offer ends in" and the clock, to the second, in colour.
       function refresh() {
         var any = false;
         lines.forEach(function(el) {
@@ -1562,9 +1572,11 @@
           var text = seconds >= 172800 ? form(forms.days, Math.floor(seconds / 86400))
             : seconds >= 3600 ? form(forms.hours, Math.floor(seconds / 3600))
             : form(forms.minutes, Math.max(1, Math.ceil(seconds / 60)));
-          var out = el.querySelector('.offer-ends-text');
-          if (out && out.textContent !== text) out.textContent = text;
-          clock(el, seconds);
+          var soon = seconds < 86400;
+          el.classList.toggle('is-urgent', soon);
+          set(el.querySelector('.offer-ends-words'), soon ? endsIn : text);
+          set(el.querySelector('.offer-ends-clock'), soon ? pad(Math.floor(seconds / 3600)) + ':' + pad(Math.floor(seconds % 3600 / 60)) + ':' + pad(seconds % 60) : '');
+          set(el.querySelector('.offer-ends-text'), text);
         });
         if (any) setTimeout(refresh, 1000);
       }
@@ -1623,8 +1635,18 @@
         var name = card.querySelector('.plan-name');
         var price = card.querySelector('.price-value');
         var period = card.querySelector('.price-period');
+        var was = card.querySelector('.price-original');
+        // The price as the card shows it: "/month" only when the card has it, the full price struck through on an offer.
+        var shownPeriod = period && getComputedStyle(period).display !== 'none' ? ' ' + period.textContent.trim() : '';
+        var barPrice = document.getElementById('planBarPrice');
         document.getElementById('planBarName').textContent = name ? name.textContent.trim() : '';
-        document.getElementById('planBarPrice').textContent = price ? (price.textContent.trim() + ' ' + (period ? period.textContent.trim() : '')) : '';
+        barPrice.textContent = price ? price.textContent.trim() + shownPeriod : '';
+        barPrice.classList.toggle('has-offer', !!was);
+        if (was && price) {
+          var struck = document.createElement('s');
+          struck.textContent = was.textContent.trim();
+          barPrice.appendChild(struck);
+        }
         var action = document.getElementById('planBarAction');
         action.innerHTML = '';
         var button = card.querySelector('.plan-btn');

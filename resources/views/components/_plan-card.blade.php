@@ -30,7 +30,7 @@
   // A price in another currency is a guide: the card also shows the US-dollar price
   // a card is really charged, for each cycle.
 @endphp
-<div class="plan-card {{ $isPopular ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} {{ $isCurrent ? 'is-current' : '' }} {{ ($isShown ?? false) ? 'is-active' : '' }}" data-orb-host @unless($isShown ?? false) inert @endunless
+<div class="plan-card {{ $isPopular ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} {{ !empty($plan['discount_first_month']) ? 'is-first-month' : '' }} {{ $isCurrent ? 'is-current' : '' }} {{ ($isShown ?? false) ? 'is-active' : '' }}" data-orb-host @unless($isShown ?? false) inert @endunless
      data-plan-slug="{{ $plan['slug'] }}"
      data-is-free="{{ $isFree ? '1' : '0' }}"
      data-is-pack="{{ $isPack ? '1' : '0' }}"
@@ -61,12 +61,23 @@
     <p class="plan-desc">{{ $planDescription($plan) }}</p>
   </div>
 
-  {{-- 2. Price, and the offer when there is one --}}
+  {{-- 2. Price, and the offer when there is one: its label above the price, the full price
+       struck through beside it, and the time left under it. --}}
+  @php
+    $terms = $hasDiscount && !$isFree && !$isPack ? ($plan['discount_terms'] ?? null) : null;
+  @endphp
+  @if($terms)
+    <div class="plan-offer">
+      <span class="offer-label" data-offer-monthly="{{ $terms['offer_monthly'] }}" data-offer-yearly="{{ $terms['offer_yearly'] }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>
+        <span class="offer-label-text">{{ $terms['offer_monthly'] }}</span>
+      </span>
+    </div>
+  @endif
   <div class="plan-pricing">
     @if($hasDiscount && !$isFree && $originalFormatted)
       <div class="price-original-row">
-        <span class="price-original" dir="ltr">{{ $originalFormatted }}</span>
-        <span class="price-off discount-ribbon-text">{{ __('ui.pricing.discount_badge', ['percent' => $discountPercent]) }}</span>
+        <s class="price-original" dir="ltr">{{ $originalFormatted }}</s>
       </div>
     @endif
     <div class="price-row">
@@ -76,37 +87,22 @@
       <span class="price-period">{{ $isPack ? __('ui.pack.one_time') : __('ui.pricing.per_month_short') }}</span>
     </div>
     <div class="price-note price-note-text"></div>
-    @if($hasDiscount && !$isFree && !$isPack && !empty($plan['discount_terms']))
+    @if($terms && $discountEndsAt)
       @php
-        $terms = $plan['discount_terms'];
+        $endsText = $offerEndsText($discountEndsAt);
+        $endsLeft = \Illuminate\Support\Carbon::parse($discountEndsAt)->getTimestamp() - now()->getTimestamp();
+        $endsSoon = $endsLeft < 86400;
       @endphp
-      {{-- How long the discount lasts and the regular price after it, for the cycle shown. --}}
-      {{-- The offer in one box: what it is, the price after it, and when it ends, in words. --}}
-      <div class="discount-terms"
-           data-offer-monthly="{{ $terms['offer_monthly'] }}" data-then-monthly="{{ $terms['then_monthly'] ?? '' }}"
-           data-offer-yearly="{{ $terms['offer_yearly'] }}" data-then-yearly="{{ $terms['then_yearly'] ?? '' }}">
-        <strong class="discount-terms-offer">{{ $terms['offer_monthly'] }}</strong>
-        <span class="discount-terms-then" @if(empty($terms['then_monthly'])) hidden @endif>{{ $terms['then_monthly'] ?? '' }}</span>
-        @if($discountEndsAt)
-          @php $endsText = $offerEndsText($discountEndsAt); @endphp
-          @if($endsText !== '')
-            {{-- The day the offer ends (the page writes it in the visitor's own time zone),
-                 and the time left to that same moment, counting down. --}}
-            @php
-              $endsOn = \Illuminate\Support\Carbon::parse($discountEndsAt)->locale(app()->getLocale())
-                ->translatedFormat(app()->getLocale() === 'ar' ? 'l j F' : 'l, j F');
-            @endphp
-            <span class="offer-ends" data-ends="{{ $discountEndsAt }}">
-              <span class="offer-ends-when" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9.5 2.5h5"/></svg>
-                <span class="offer-ends-date">{{ __('ui.pricing.offer_ends_on', ['date' => $endsOn]) }}</span>
-              </span>
-              <span class="offer-ends-clock" aria-hidden="true"></span>
-              <span class="offer-ends-text">{{ $endsText }}</span>
-            </span>
-          @endif
-        @endif
-      </div>
+      @if($endsText !== '')
+        {{-- The time left: calm in words while there is more than a day, then in colour,
+             counting down to the second (the page keeps it current). --}}
+        <span class="offer-ends {{ $endsSoon ? 'is-urgent' : '' }}" data-ends="{{ $discountEndsAt }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9.5 2.5h5"/></svg>
+          <span class="offer-ends-words" aria-hidden="true">{{ $endsSoon ? __('ui.pricing.discount_offer_ends') : $endsText }}</span>
+          <span class="offer-ends-clock" dir="ltr" aria-hidden="true">{{ $endsSoon ? sprintf('%02d:%02d:%02d', intdiv($endsLeft, 3600), intdiv($endsLeft % 3600, 60), $endsLeft % 60) : '' }}</span>
+          <span class="offer-ends-text">{{ $endsText }}</span>
+        </span>
+      @endif
     @endif
     @php
       $trialMonthly = $state['trial_monthly'];

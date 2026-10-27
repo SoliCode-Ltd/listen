@@ -100,25 +100,56 @@ class DiscountTermsTest extends TestCase
         $this->assertSame('3', (string) ($stripe->created['duration_in_months'] ?? ''));
     }
 
-    public function test_the_pricing_page_says_what_buyers_pay_after_the_discount(): void
+    public function test_the_pricing_page_shows_the_offer_above_the_full_price(): void
     {
+        Carbon::setTestNow('2026-10-20 12:00:00');
         Plan::factory()->create(['slug' => 'free', 'name' => 'Free', 'price_cents' => 0, 'is_active' => true]);
         Plan::factory()->create([
             'slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'is_active' => true,
             'discount_percentage' => 30, 'discount_ends_at' => now()->addWeek(),
         ]);
+        Plan::factory()->create(['slug' => 'pro', 'name' => 'Pro', 'price_cents' => 4900, 'is_active' => true]);
 
         $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
             ->get($this->localizedRoute('pricing'))
             ->assertOk()
-            ->assertSee('class="discount-terms"', false)
+            // The label above the price, for each cycle, and the full price struck through beside it.
+            ->assertSee('class="offer-label"', false)
             ->assertSee('30% off your first month')
-            ->assertSee('/month', false)
             ->assertSee('data-offer-yearly="50% off your first year"', false)
-            ->assertSee('data-then-yearly="Then', false);
+            ->assertSee('<s class="price-original" dir="ltr">', false)
+            // The button says what is off, for each cycle, and the list of plans shows the offer too.
+            ->assertSee('data-monthly-label="Get 30% off"', false)
+            ->assertSee('data-yearly-label="Get 50% off"', false)
+            ->assertSee('class="plan-pick is-first-month"', false)
+            ->assertSee('30% off')
+            // A week left: in words, not counting down yet.
+            ->assertSee('Offer ends in 7 days')
+            ->assertDontSee('class="offer-ends is-urgent"', false);
+
+        Carbon::setTestNow();
     }
 
-    public function test_egyptian_visitors_paying_by_instapay_see_the_note_too(): void
+    public function test_the_last_day_of_an_offer_counts_down(): void
+    {
+        Carbon::setTestNow('2026-10-20 12:00:00');
+        Plan::factory()->create(['slug' => 'free', 'name' => 'Free', 'price_cents' => 0, 'is_active' => true]);
+        Plan::factory()->create([
+            'slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'is_active' => true,
+            'discount_percentage' => 10, 'discount_ends_at' => now()->addHours(5),
+        ]);
+
+        $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
+            ->get($this->localizedRoute('pricing'))
+            ->assertOk()
+            ->assertSee('class="offer-ends is-urgent"', false)
+            ->assertSee('05:00:00')
+            ->assertSee('Offer ends in 5 hours');
+
+        Carbon::setTestNow();
+    }
+
+    public function test_egyptian_visitors_paying_by_instapay_see_the_offer_too(): void
     {
         SiteSetting::set('pricing_forced_country_code', 'EG', 'billing');
         SiteSetting::set('manual_instapay_enabled', '1', 'billing');
@@ -134,9 +165,11 @@ class DiscountTermsTest extends TestCase
         $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
             ->get($this->localizedRoute('pricing'))
             ->assertOk()
-            ->assertSee('class="discount-terms"', false)
+            ->assertSee('class="offer-label"', false)
             ->assertSee('خصم 10% على أول شهرين')
-            ->assertSee('شهرياً');
+            // Two months off: the price stays "a month"; the button says what is off.
+            ->assertDontSee('class="plan-pick is-first-month"', false)
+            ->assertSee('احصل على خصم 10%');
     }
 
     public function test_checkout_says_when_the_full_price_starts(): void
