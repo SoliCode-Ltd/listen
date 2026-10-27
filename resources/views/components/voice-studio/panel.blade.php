@@ -40,6 +40,8 @@
       // The member's pronunciations (studio and demo): ['items' => [...], 'url' => ..., 'limit' => ...].
       'pron' => $pronunciations ? $pronunciations + [
           'i18n' => __('ui.dashboard.pron'),
+          // Fusha reads the vowel on a word's last letter; spoken dialects (White Arabic too) drop it.
+          'fusha' => array_keys(array_filter(\App\Support\ArabicDialects::ALL, fn (array $d, string $code): bool => ($d['region'] ?? '') === 'fusha' && $code !== 'ar-XA-WH', ARRAY_FILTER_USE_BOTH)),
           // Recorded once with a studio voice, so hearing them costs the member nothing.
           'examples' => [
               'ar' => ['text' => __('ui.dashboard.pron.example_ar_text'), 'items' => [
