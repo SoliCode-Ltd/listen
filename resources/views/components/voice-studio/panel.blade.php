@@ -5,7 +5,7 @@
   style and emotion sit on the text box (voice-studio.setbar), and the tags
   in the toolbar above the text. Behaviour in js/voice-studio.js.
 --}}
-@props(['showTags' => true, 'tagsLock' => null, 'prefix' => ''])
+@props(['showTags' => true, 'tagsLock' => null, 'prefix' => '', 'pronunciations' => null])
 @php
   $vsAr = app()->getLocale() === 'ar';
   // Locked tags still show (dimmed, with an upgrade button) unless no plan on sale has them.
@@ -33,6 +33,8 @@
       'tagMenus' => $vsTagMenus,
       // The tags need the premium voices: without them the toolbar shows, locked.
       'tagsLock' => $tagsLock,
+      // The member's pronunciations (dashboard only): ['items' => [...], 'url' => ..., 'limit' => ...].
+      'pron' => $pronunciations ? $pronunciations + ['i18n' => __('ui.dashboard.pron')] : null,
       'i18n' => __('ui.dashboard.picker') + __('ui.dashboard.library') + [
           'upgrade_to_plan' => __('ui.dashboard.upgrade_to_plan'),
           'upgrade_to_unlock' => __('ui.dashboard.upgrade_to_unlock'),

@@ -151,6 +151,8 @@
     bell: 'M6 16.5V11a6 6 0 0 1 12 0v5.5l2 2H4zM10 21.5h4',
     map: 'M3 6.2 9 3.4l6 2.8 6-2.8v14.4l-6 2.8-6-2.8-6 2.8zM9 3.4v14.4M15 6.2v14.4',
     chat: 'M4 4h16v12H9.2L4 20zM8 8.8h8M8 12h5',
+    // A speech bubble with a vowel mark over a letter: how a word is said.
+    pron: 'M4 4h16v12H9.2L4 20zM8.5 12.4h7M10.6 9.2l3-1.4',
     spotlight: '<path d="M5 3l3.6 6.6h6.8L19 3"/><ellipse cx="12" cy="18.6" rx="7.6" ry="2.6"/><path d="M8.6 9.6 5.2 16.4M15.4 9.6l3.4 6.8"/>',
     flame: 'M12 2.5c.8 4 6 6 6 11.5a6 6 0 0 1-12 0c0-3 1.8-5 3-6 0 2 .9 3.2 2.2 3.2 0-3.6-.6-5.8.8-8.7z',
     podium: '<path d="M6 11h12l-1.8 10H7.8zM8.4 21h7.2"/><rect x="9.6" y="2.6" width="4.8" height="6" rx="2.4"/><path d="M12 8.6V11"/>',
