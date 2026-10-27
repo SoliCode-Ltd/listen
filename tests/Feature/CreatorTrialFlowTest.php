@@ -289,7 +289,7 @@ class CreatorTrialFlowTest extends TestCase
             ->assertSee('7 days free', false)
             ->assertSee('on any paid plan, cancel anytime.', false)
             ->assertSee('href="'.e(route('trial.start', ['plan' => 'creator'])).'"', false)
-            ->assertSee('data-yearly-href="'.e(route('register')).'"', false)
+            ->assertSee('data-yearly-href="'.e(route('register', ['plan' => 'creator', 'billing_cycle' => 'yearly'])).'"', false)
             ->assertDontSee('No charge today', false);
 
         $this->withoutMiddleware([
