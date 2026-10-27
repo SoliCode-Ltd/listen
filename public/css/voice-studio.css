@@ -1840,6 +1840,7 @@ html[dir="rtl"] .vs-pron-arrow { transform: scaleX(-1); }
 }
 .vs-pron-lastnote[hidden] { display: none; }
 .vs-pron-tip { margin: .9rem 0 0; font-size: .88rem; line-height: 1.7; color: var(--muted); }
+.vs-pron-limit { margin: .4rem 0 0; font-size: .85rem; line-height: 1.7; color: var(--muted); }
 .vs-pron-error { margin: .6rem 0 0; font-size: .9rem; font-weight: 600; color: var(--danger, #dc2626); }
 .vs-pron-error[hidden] { display: none; }
 .vs-pron-actions { display: flex; flex-wrap: wrap; gap: .5rem; }

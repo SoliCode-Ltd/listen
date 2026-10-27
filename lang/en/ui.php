@@ -1344,6 +1344,7 @@ return [
             'mark_dagger_alef' => 'ألف خنجرية',
             'mark_hamza_above' => 'همزة فوق',
             'mark_hamza_below' => 'همزة تحت',
+            'limit' => 'If the word still sounds the same, try rewording the sentence a little.',
             'example_title' => 'Hear the difference',
             'example_play' => 'Play “:word”',
             'example_ar_text' => 'The same letters «علم» are read three ways, and the vowel marks choose which. Without marks the voice picks one.',
