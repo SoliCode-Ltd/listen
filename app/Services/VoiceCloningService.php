@@ -570,8 +570,10 @@ class VoiceCloningService
      * The speech model reads the script word for word and copies the recording accent.
      * A chosen dialect is written into the script first, then spoken in that accent.
      * No dialect leaves the script unchanged.
+     *
+     * @param  list<string>  $keep  the member's pronunciations in the text: never respelled
      */
-    public function speakableText(string $text, ?string $dialect): string
+    public function speakableText(string $text, ?string $dialect, array $keep = []): string
     {
         $text = trim(GeminiVocalTags::normalizeMarkup(trim($text)));
         $instruction = $this->rewriteInstruction($dialect);
@@ -583,14 +585,15 @@ class VoiceCloningService
             return $text;
         }
 
-        $cacheKey = 'listen:clone-dialect:v3:'.sha1($instruction.'|'.$text);
+        // The words kept as written are part of the key: the same text without them may be respelled.
+        $cacheKey = 'listen:clone-dialect:v3:'.sha1($instruction.'|'.$text.($keep !== [] ? '|keep:'.json_encode(array_values($keep), JSON_UNESCAPED_UNICODE) : ''));
         $cached = Cache::get($cacheKey);
         if (is_string($cached) && $cached !== '') {
             return $cached;
         }
 
         // Tags are locked as [[0]], [[1]] … so the rewrite cannot drop or translate them.
-        $protected = GeminiVocalTags::protect($text);
+        $protected = GeminiVocalTags::protect($text, $keep);
         $rewritten = $this->rewriteInPieces($protected['text'], $instruction);
         if ($rewritten === null || $rewritten === '') {
             return $text;

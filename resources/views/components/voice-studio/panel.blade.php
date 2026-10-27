@@ -30,10 +30,12 @@
       'voices' => \App\Support\VoiceCatalog::libraryEntries($vsAr),
       'favorites' => \App\Http\Controllers\FavoriteVoicesController::forUser(auth()->user()),
       'favoritesUrl' => auth()->check() ? route('dashboard.favorite-voices') : null,
+      // For the panel's own saves (favourites, pronunciations): the demo's form has no token field.
+      'token' => csrf_token(),
       'tagMenus' => $vsTagMenus,
       // The tags need the premium voices: without them the toolbar shows, locked.
       'tagsLock' => $tagsLock,
-      // The member's pronunciations (dashboard only): ['items' => [...], 'url' => ..., 'limit' => ...].
+      // The member's pronunciations (studio and demo): ['items' => [...], 'url' => ..., 'limit' => ...].
       'pron' => $pronunciations ? $pronunciations + [
           'i18n' => __('ui.dashboard.pron'),
           // Recorded once with a studio voice, so hearing them costs the member nothing.

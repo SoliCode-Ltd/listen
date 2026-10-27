@@ -1363,6 +1363,8 @@ return [
             'error_empty' => 'Write the word and how to say it.',
             'error_same' => 'Write the pronunciation differently from the word, with vowel marks for example.',
             'error_full' => 'You have reached the most words you can save. Delete one to add another.',
+            'error_long' => 'That is too long. Write a word or two.',
+            'error_word' => 'Write one word or a short name (up to three words), without tag brackets.',
             'error_save' => 'Could not save. Please try again.',
             'close' => 'Close',
         ],

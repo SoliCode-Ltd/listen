@@ -881,9 +881,17 @@ class HomeController extends Controller
                     is_string($voiceOptions['provider']) ? $voiceOptions['provider'] : null,
                 );
             }
+            // As in the studio: abbreviations written out and the member's own pronunciations.
+            $forVoice = \App\Support\SpeechText::forVoice(
+                $textForSpeech,
+                $validated['target_language'],
+                (int) $request->user()->id,
+                $isDialogue ? array_column($voiceOptions['speakers'] ?? [], 'name') : [],
+            );
+            $voiceOptions['pronounce'] = $forVoice['keep'];
 
             $audio = $ttsService->synthesizeAdvanced(
-                $textForSpeech,
+                $forVoice['text'],
                 $validated['target_language'],
                 $voiceOptions,
                 $demoRoutingPlan,

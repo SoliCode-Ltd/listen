@@ -2713,7 +2713,7 @@
           </div>
 
           <aside class="vs-side">
-            <x-voice-studio.panel :tags-lock="$featureLocks['studio'] ?? null" :pronunciations="['items' => [], 'url' => url('/dashboard/pronunciations'), 'limit' => 200]">
+            <x-voice-studio.panel :tags-lock="$featureLocks['studio'] ?? null" :pronunciations="['items' => \App\Support\Pronunciations::panelItems(auth()->id()), 'url' => route('dashboard.pronunciations.save'), 'limit' => \App\Support\Pronunciations::LIMIT]">
               @if(\App\Support\AudioEffects::available())
                 <x-voice-studio.locked :lock="$featureLocks['effects'] ?? null">
                   <div class="vs-field vs-effect-field">

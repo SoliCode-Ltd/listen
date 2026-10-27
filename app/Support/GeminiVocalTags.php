@@ -655,16 +655,28 @@ class GeminiVocalTags
     }
 
     /**
-     * Swap tags for placeholders a translator leaves alone, and back.
+     * Swap tags for placeholders a translator leaves alone, and back. Words in
+     * $keep (a member's pronunciations, App\Support\Pronunciations) are locked
+     * the same way, so a dialect rewrite cannot respell them.
      *
+     * @param  list<string>  $keep
      * @return array{text: string, tags: array<int, string>}
      */
-    public static function protect(string $text): array
+    public static function protect(string $text, array $keep = []): array
     {
         $tags = [];
+        $keep = array_values(array_filter($keep, fn ($w): bool => is_string($w) && trim($w) !== ''));
+        usort($keep, fn (string $a, string $b): int => mb_strlen($b) <=> mb_strlen($a));
+        $words = $keep === [] ? '' : '|(?<![\p{L}\p{M}\p{N}])(?:'.implode('|', array_map(fn (string $w): string => preg_quote($w, '/'), $keep)).')(?![\p{L}\p{M}\p{N}])';
         $text = (string) preg_replace_callback(
-            '/\[([^\[\]\n]{1,'.self::MAX_CUE_LENGTH.'})\]|<([^<>\s](?:[^<>\n]{0,'.(self::MAX_CUE_LENGTH - 2).'}[^<>\s])?)>/u',
+            '/\[([^\[\]\n]{1,'.self::MAX_CUE_LENGTH.'})\]|<([^<>\s](?:[^<>\n]{0,'.(self::MAX_CUE_LENGTH - 2).'}[^<>\s])?)>'.$words.'/u',
             function (array $m) use (&$tags): string {
+                if (($m[1] ?? '') === '' && ($m[2] ?? '') === '') {
+                    // One of the member's words.
+                    $tags[] = $m[0];
+
+                    return ' [['.(count($tags) - 1).']] ';
+                }
                 $inner = isset($m[2]) && $m[2] !== '' ? $m[2] : $m[1];
                 if (trim($inner) !== '/' && self::canonical($inner) === null && self::delivery($inner) === null && ! self::looksLikeCue($inner)) {
                     return $m[0];

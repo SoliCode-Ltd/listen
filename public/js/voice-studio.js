@@ -703,7 +703,6 @@
     if (!cfg || !editor || !textarea) return null;
     var tr = function (key, vars) { return t({ i18n: cfg.i18n || {} }, key, vars); };
     var items = Array.isArray(cfg.items) ? cfg.items.slice() : [];
-    var token = (form.querySelector('input[name="_token"]') || {}).value || '';
 
     if (!toolbar) {
       toolbar = document.createElement('div');
@@ -895,6 +894,8 @@
     cancelBtn.addEventListener('click', function () { resetForm(); drawList(); wordIn.focus(); });
 
     function send(method, url, body) {
+      // Read when sent: the dashboard renews its form's token; the demo's form has none.
+      var token = (form.querySelector('input[name="_token"]') || {}).value || meta.token || '';
       return fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
@@ -1074,7 +1075,7 @@
       try { window.localStorage.setItem(STORE, JSON.stringify(list)); } catch (e) { /* no storage */ }
       if (!meta.favoritesUrl || !window.fetch) return;
       var tokenNode = document.querySelector('meta[name="csrf-token"]') || document.querySelector('input[name="_token"]');
-      var token = tokenNode ? (tokenNode.content || tokenNode.value || '') : '';
+      var token = (tokenNode ? (tokenNode.content || tokenNode.value || '') : '') || meta.token || '';
       fetch(meta.favoritesUrl, {
         method: 'PUT',
         credentials: 'same-origin',

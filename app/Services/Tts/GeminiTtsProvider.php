@@ -13,6 +13,7 @@ use App\Support\GeminiVocalTags;
 use App\Support\JoinPauses;
 use App\Support\PaceAndPitch;
 use App\Support\PieceCheck;
+use App\Support\Pronunciations;
 use App\Support\ShareableAudio;
 use App\Support\SpeechJoin;
 use App\Support\TextChunker;
@@ -440,6 +441,8 @@ class GeminiTtsProvider implements TtsProviderInterface
 
         $speakers = $voiceConfig['speakers'] ?? null;
         $isDialogue = is_array($speakers) && count($speakers) > 1;
+        // The member's pronunciations in this text (App\Support\Pronunciations), as they wrote them.
+        $keep = array_values(array_filter((array) ($voiceConfig['pronounce'] ?? []), fn ($w): bool => is_string($w) && $w !== ''));
 
         // Sound tags are written <laugh>. Delivery tags ([excited]) split a single
         // voice's script into parts, each read with its own direction; in a
@@ -447,7 +450,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         if ($isDialogue) {
             // Each line is rewritten into its speaker's dialect, as a single voice's script is.
             if ($this->isArabicLanguage($targetLanguage) && config('services.gemini_tts.dialect_rewrite', true)) {
-                $text = $this->dialogueInDialects($text, $speakers, trim((string) ($voiceConfig['dialect'] ?? '')));
+                $text = $this->dialogueInDialects($text, $speakers, trim((string) ($voiceConfig['dialect'] ?? '')), $keep);
             }
             // Moods stay where they are written: structuredDialogueParts() gives each to its turn.
             $text = GeminiVocalTags::tagSounds($text);
@@ -456,7 +459,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             // rewritten into the chosen Arabic variety first, as for cloned voices.
             $dialect = trim((string) ($voiceConfig['dialect'] ?? ''));
             if ($dialect !== '' && $this->isArabicLanguage($targetLanguage) && config('services.gemini_tts.dialect_rewrite', true)) {
-                $text = app(VoiceCloningService::class)->speakableText($text, $dialect);
+                $text = app(VoiceCloningService::class)->speakableText($text, $dialect, $keep);
             }
             $voiceConfig['vocal_parts'] = GeminiVocalTags::parts($text);
             $text = implode(' ', array_column($voiceConfig['vocal_parts'], 'text'));
@@ -554,7 +557,8 @@ class GeminiTtsProvider implements TtsProviderInterface
             $n = $seen[$partIndex] = ($seen[$partIndex] ?? -1) + 1;
             $style = $inPart[$partIndex] > 1 ? self::continuing($partStyle, $n, $inPart[$partIndex]) : $partStyle;
             $performed = GeminiVocalTags::forPerformance($chunk['text'], $style);
-            $payloads[] = $this->buildSingleSpeakerPayload($performed['text'], $performed['style'], $voiceName);
+            $pronounce = Pronunciations::direction($performed['text'], (array) ($voiceConfig['pronounce'] ?? []));
+            $payloads[] = $this->buildSingleSpeakerPayload($performed['text'], trim($performed['style'].' '.$pronounce), $voiceName);
             // The part of the script it reads ([whispering] …): each part keeps its own level.
             $groups[] = $partIndex;
             // The pause after it, from where its text ends: a sentence, a comma, a line, or mid-sentence.
@@ -902,7 +906,8 @@ class GeminiTtsProvider implements TtsProviderInterface
         $pauses = [];
         foreach ($this->dialoguePieces($text, $speakers) as $piece) {
             $cast = array_map(fn (array $speaker): string => trim((string) ($speaker['name'] ?? $speaker['id'] ?? '')), $piece['speakers']);
-            $payloads[] = $this->buildDialoguePayload($piece['text'], $stylePrompt, $piece['speakers'], array_intersect_key($speakerStyles, array_flip($cast)));
+            $pronounce = Pronunciations::direction($piece['text'], (array) ($voiceConfig['pronounce'] ?? []));
+            $payloads[] = $this->buildDialoguePayload($piece['text'], trim($stylePrompt.' '.$pronounce), $piece['speakers'], array_intersect_key($speakerStyles, array_flip($cast)));
             $pauses[] = JoinPauses::after($piece['text']);
         }
 
@@ -1239,8 +1244,9 @@ class GeminiTtsProvider implements TtsProviderInterface
      * If a rewrite does not come back line for line, those lines stay as written.
      *
      * @param  array<int, array<string, mixed>>  $speakers
+     * @param  list<string>  $keep  the member's pronunciations: never respelled
      */
-    private function dialogueInDialects(string $text, array $speakers, string $dialect): string
+    private function dialogueInDialects(string $text, array $speakers, string $dialect, array $keep = []): string
     {
         $own = [];
         foreach ($speakers as $speaker) {
@@ -1277,7 +1283,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                 break;
             }
             $block = implode("\n", $spokenLines);
-            $rewritten = $cloning->speakableText($block, $lineDialect);
+            $rewritten = $cloning->speakableText($block, $lineDialect, $keep);
             $newLines = array_values(array_filter(array_map('trim', preg_split("/\r\n|\n|\r/", $rewritten) ?: []), fn ($l) => $l !== ''));
             if ($rewritten === $block || count($newLines) !== count($spokenLines)) {
                 continue;
