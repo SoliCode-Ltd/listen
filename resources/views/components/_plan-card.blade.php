@@ -103,16 +103,17 @@
     @if($terms && $discountEndsAt)
       @php
         $endsText = $offerEndsText($discountEndsAt);
-        $endsLeft = \Illuminate\Support\Carbon::parse($discountEndsAt)->getTimestamp() - now()->getTimestamp();
-        $endsSoon = $endsLeft < 86400;
+        $endsLeft = max(0, \Illuminate\Support\Carbon::parse($discountEndsAt)->getTimestamp() - now()->getTimestamp());
+        $endsDays = intdiv($endsLeft, 86400);
+        $endsRest = $endsLeft % 86400;
       @endphp
       @if($endsText !== '')
-        {{-- The time left: calm in words while there is more than a day, then in colour,
-             counting down to the second (the page keeps it current). --}}
-        <span class="offer-ends {{ $endsSoon ? 'is-urgent' : '' }}" data-ends="{{ $discountEndsAt }}">
+        {{-- The time left, in colour and counting down to the second, the days first while there
+             is more than one ("Offer ends in 3 days 04:12:33"; the page keeps it current). --}}
+        <span class="offer-ends" data-ends="{{ $discountEndsAt }}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9.5 2.5h5"/></svg>
-          <span class="offer-ends-words" aria-hidden="true">{{ $endsSoon ? __('ui.pricing.discount_offer_ends') : $endsText }}</span>
-          <span class="offer-ends-clock" dir="ltr" aria-hidden="true">{{ $endsSoon ? sprintf('%02d:%02d:%02d', intdiv($endsLeft, 3600), intdiv($endsLeft % 3600, 60), $endsLeft % 60) : '' }}</span>
+          <span class="offer-ends-words" aria-hidden="true">{{ __('ui.pricing.discount_offer_ends') }}{{ $endsDays > 0 ? ' '.trans_choice('ui.pricing.offer_days_left', $endsDays) : '' }}</span>
+          <span class="offer-ends-clock" dir="ltr" aria-hidden="true">{{ sprintf('%02d:%02d:%02d', intdiv($endsRest, 3600), intdiv($endsRest % 3600, 60), $endsRest % 60) }}</span>
           <span class="offer-ends-text">{{ $endsText }}</span>
         </span>
       @endif

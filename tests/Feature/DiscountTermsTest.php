@@ -126,9 +126,10 @@ class DiscountTermsTest extends TestCase
             ->assertSee('class="plan-pick-was"', false)
             ->assertSee('class="plan-pick is-first-month"', false)
             ->assertSee('30% off')
-            // A week left: in words, not counting down yet.
+            // A week left: the days, then the clock counting down to the second.
+            ->assertSee('class="offer-ends"', false)
             ->assertSee('Offer ends in 7 days')
-            ->assertDontSee('class="offer-ends is-urgent"', false);
+            ->assertSee('00:00:00');
 
         Carbon::setTestNow();
     }
@@ -164,7 +165,8 @@ class DiscountTermsTest extends TestCase
         $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
             ->get($this->localizedRoute('pricing'))
             ->assertOk()
-            ->assertSee('class="offer-ends is-urgent"', false)
+            ->assertSee('class="offer-ends"', false)
+            ->assertDontSee('Offer ends in 0 days')
             ->assertSee('05:00:00')
             ->assertSee('Offer ends in 5 hours');
 
