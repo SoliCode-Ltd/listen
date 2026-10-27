@@ -704,7 +704,6 @@
   // marks, or spelled the way it sounds). The list is the member's; the server
   // applies it before a voice is read. Words from the list are underlined in
   // the text box, and a selected word can be added in one click.
-  // Every Arabic vowel mark, in three groups; each button shows the mark and its Arabic name.
   // Every Arabic vowel mark, in three groups; each button shows the mark on a letter, with its Arabic name.
   var PRON_MARKS = [
     ['short', [['َ', 'fatha', 'ب'], ['ُ', 'damma', 'ب'], ['ِ', 'kasra', 'ب'], ['ْ', 'sukun', 'ب']]],
@@ -712,6 +711,50 @@
     ['other', [['ّ', 'shadda', 'ب'], ['ٓ', 'madda', 'ا'], ['ٰ', 'dagger_alef', 'ه'], ['ٔ', 'hamza_above', 'ا'], ['ٕ', 'hamza_below', 'ا']]]
   ];
   var PRON_DIACRITICS = '\\u064B-\\u065F\\u0670\\u0640';
+  // Marks are given one letter at a time. A letter has one vowel (or sukun, or tanween),
+  // and may also have a shadda; madda and the hamzas sit only on the letters that carry them.
+  var PRON_VOWELS = '\u064B\u064C\u064D\u064E\u064F\u0650\u0652';
+  var PRON_SHADDA = '\u0651';
+  var PRON_SUKUN = '\u0652';
+  var PRON_HOSTS = { '\u0653': 'ا', '\u0655': 'ا', '\u0654': 'اويى' };
+  // Written in this order after the letter: hamza, shadda, vowel, then the rest.
+  var PRON_ORDER = { '\u0654': 0, '\u0655': 0, '\u0651': 1, '\u0670': 3, '\u0653': 3 };
+  function pronKind(mark) {
+    return PRON_VOWELS.indexOf(mark) >= 0 ? 'vowel' : mark === PRON_SHADDA ? 'shadda' : 'other';
+  }
+  // The word as letters, each with its marks; spaces and other characters are kept as they are.
+  function pronLetters(value) {
+    var out = [];
+    Array.prototype.forEach.call(String(value || ''), function (ch) {
+      var last = out[out.length - 1];
+      if (/[\u064B-\u065F\u0670]/.test(ch) && last && last.arabic) { last.marks.push(ch); return; }
+      out.push({ base: ch, marks: [], space: /\s/.test(ch), arabic: /[\u0621-\u063A\u0641-\u064A\u0671-\u06D3]/.test(ch) });
+    });
+    return out;
+  }
+  function pronJoin(letters) {
+    return letters.map(function (l) {
+      return l.base + l.marks.slice().sort(function (a, b) {
+        return (a in PRON_ORDER ? PRON_ORDER[a] : 2) - (b in PRON_ORDER ? PRON_ORDER[b] : 2);
+      }).join('');
+    }).join('');
+  }
+  // True when every vowel mark sits on the last letter of its word: the end of a word is
+  // seldom voiced, so the word is read as if it had no marks at all («ملكِ» is still «مَلَك»).
+  function pronLastOnly(letters) {
+    var marked = 0, lastOnly = true, word = [];
+    function endWord() {
+      word.forEach(function (l, i) {
+        if (!l.marks.some(function (m) { return pronKind(m) !== 'other'; })) return;
+        marked++;
+        if (i < word.length - 1 || word.length < 2) lastOnly = false;
+      });
+      word = [];
+    }
+    letters.forEach(function (l) { if (l.arabic) word.push(l); else endWord(); });
+    endWord();
+    return marked > 0 && lastOnly;
+  }
 
   // A word matches however it is written: with or without vowel marks, any form of alef, ى/ي and ة/ه.
   function pronPattern(word) {
@@ -785,7 +828,7 @@
     var marks = PRON_MARKS.map(function (group) {
       return '<div class="vs-pron-mark-group"><span class="vs-pron-mark-group-name">' + escAttr(tr('marks_' + group[0])) + '</span><div class="vs-pron-mark-row">'
         + group[1].map(function (m) {
-          return '<button type="button" class="vs-pron-mark" data-mark="' + m[0] + '" aria-label="' + escAttr(tr('mark_' + m[1])) + '">'
+          return '<button type="button" class="vs-pron-mark" data-mark="' + m[0] + '" data-host="' + m[2] + '" aria-pressed="false" aria-label="' + escAttr(tr('mark_' + m[1])) + '">'
             + '<span class="vs-pron-mark-glyph" aria-hidden="true" dir="rtl">' + m[2] + m[0] + '</span><span class="vs-pron-mark-name" dir="rtl">' + escAttr(tr('mark_' + m[1])) + '</span></button>';
         }).join('') + '</div></div>';
     }).join('');
@@ -803,7 +846,11 @@
       + '<svg class="vs-pron-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
       + '<label class="vs-pron-field"><span>' + escAttr(tr('spoken_label')) + '</span><input name="spoken" maxlength="80" autocomplete="off" spellcheck="false" dir="auto" placeholder=""></label>'
       + '</div>'
-      + '<div class="vs-pron-marks" role="group" aria-labelledby="vsPronMarksLabel"><span class="vs-pron-marks-label" id="vsPronMarksLabel">' + escAttr(tr('marks_label')) + '</span>' + marks + '</div>'
+      + '<div class="vs-pron-marks" role="group" aria-labelledby="vsPronMarksLabel"><span class="vs-pron-marks-label" id="vsPronMarksLabel">' + escAttr(tr('marks_label')) + '</span>'
+      + '<p class="vs-pron-letters-hint">' + escAttr(tr('letters_hint')) + '</p>'
+      + '<div class="vs-pron-letters" dir="rtl"></div>'
+      + '<p class="vs-pron-lastnote" role="status" hidden>' + escAttr(tr('last_only')) + '</p>'
+      + marks + '</div>'
       + '<p class="vs-pron-tip"></p>'
       + '</form>'
       + '<section class="vs-pron-saved" aria-labelledby="vsPronListTitle"><h3 id="vsPronListTitle">' + escAttr(tr('list_title')) + ' <small class="vs-pron-total"></small></h3>'
@@ -913,6 +960,8 @@
       saveBtn.textContent = tr('add');
       cancelBtn.hidden = true;
       showError('');
+      letterAt = 0;
+      drawLetters(false);
     }
     function startEdit(entry) {
       editing = entry;
@@ -922,6 +971,8 @@
       cancelBtn.hidden = false;
       showError('');
       drawList();
+      letterAt = 0;
+      drawLetters(false);
       spokenIn.focus();
     }
     cancelBtn.addEventListener('click', function () { resetForm(); drawList(); wordIn.focus(); });
@@ -964,19 +1015,106 @@
         .catch(function () { showError('error_save'); });
     }
 
-    // Vowel marks go in at the cursor of the "say it as" field.
-    var spokenCaret = null;
-    spokenIn.addEventListener('blur', function () { spokenCaret = [spokenIn.selectionStart, spokenIn.selectionEnd]; });
-    modal.querySelectorAll('.vs-pron-mark').forEach(function (b) {
-      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
-      b.addEventListener('click', function () {
-        var at = document.activeElement === spokenIn ? [spokenIn.selectionStart, spokenIn.selectionEnd] : (spokenCaret || [spokenIn.value.length, spokenIn.value.length]);
-        spokenIn.value = spokenIn.value.slice(0, at[0]) + b.dataset.mark + spokenIn.value.slice(at[1]);
-        var caret = at[0] + b.dataset.mark.length;
-        spokenIn.focus();
-        spokenIn.setSelectionRange(caret, caret);
-        spokenCaret = [caret, caret];
+    // Marks are given one letter at a time: the word's letters are buttons, the chosen one
+    // (the first, to begin with) takes the mark, and after a vowel the next letter is chosen.
+    var lettersBox = modal.querySelector('.vs-pron-letters');
+    var lastNote = modal.querySelector('.vs-pron-lastnote');
+    var markButtons = Array.prototype.slice.call(modal.querySelectorAll('.vs-pron-mark'));
+    var letterAt = 0;
+    function arabicIndexes(letters) {
+      return letters.map(function (l, i) { return l.arabic ? i : -1; }).filter(function (i) { return i >= 0; });
+    }
+    function drawLetters(focus) {
+      var letters = pronLetters(spokenIn.value);
+      var usable = arabicIndexes(letters);
+      if (usable.indexOf(letterAt) < 0) letterAt = usable.length ? usable[0] : -1;
+      lettersBox.innerHTML = '';
+      if (!usable.length) {
+        lettersBox.innerHTML = '<p class="vs-pron-letters-empty">' + escAttr(tr('letters_empty')) + '</p>';
+      }
+      letters.forEach(function (l, i) {
+        if (!usable.length) return;
+        if (l.space) { lettersBox.insertAdjacentHTML('beforeend', '<span class="vs-pron-letter-gap" aria-hidden="true"></span>'); return; }
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'vs-pron-letter' + (i === letterAt ? ' is-selected' : '');
+        b.textContent = pronJoin([l]);
+        b.disabled = !l.arabic;
+        b.setAttribute('aria-pressed', i === letterAt ? 'true' : 'false');
+        b.setAttribute('aria-label', tr('letter', { letter: pronJoin([l]) }));
+        b.addEventListener('click', function () { letterAt = i; drawLetters(true); });
+        lettersBox.appendChild(b);
       });
+      var chosen = letterAt >= 0 ? letters[letterAt] : null;
+      markButtons.forEach(function (b) {
+        var mark = b.dataset.mark;
+        var kind = pronKind(mark);
+        var fits = !!chosen && (!PRON_HOSTS[mark] || PRON_HOSTS[mark].indexOf(chosen.base) >= 0);
+        var on = !!chosen && chosen.marks.indexOf(mark) >= 0;
+        // Vowels and the shadda are shown on the chosen letter; the rest on a letter that carries them.
+        b.querySelector('.vs-pron-mark-glyph').textContent = (chosen && kind !== 'other' ? chosen.base : b.dataset.host) + mark;
+        b.disabled = !fits;
+        b.classList.toggle('is-on', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      lastNote.hidden = !pronLastOnly(letters);
+      if (focus) {
+        var sel = lettersBox.querySelector('.vs-pron-letter.is-selected');
+        if (sel) sel.focus({ preventScroll: true });
+      }
+    }
+    function setMark(mark) {
+      var letters = pronLetters(spokenIn.value);
+      var l = letters[letterAt];
+      if (!l || !l.arabic) return;
+      var kind = pronKind(mark);
+      var had = l.marks.indexOf(mark) >= 0;
+      var without = function (test) { l.marks = l.marks.filter(function (m) { return !test(m); }); };
+      if (had) {
+        without(function (m) { return m === mark; });
+      } else if (kind === 'vowel') {
+        without(function (m) { return pronKind(m) === 'vowel' || (mark === PRON_SUKUN && m === PRON_SHADDA); });
+        l.marks.push(mark);
+      } else if (kind === 'shadda') {
+        without(function (m) { return m === PRON_SUKUN; });
+        l.marks.push(mark);
+      } else {
+        without(function (m) { return (mark === '\u0654' && m === '\u0655') || (mark === '\u0655' && m === '\u0654'); });
+        l.marks.push(mark);
+      }
+      spokenIn.value = pronJoin(letters);
+      // A vowel given: on to the next letter, as the word is read.
+      if (!had && kind === 'vowel') {
+        var next = arabicIndexes(letters).filter(function (i) { return i > letterAt; })[0];
+        if (next != null) letterAt = next;
+      }
+      drawLetters(true);
+      showError('');
+    }
+    markButtons.forEach(function (b) {
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      b.addEventListener('click', function () { setMark(b.dataset.mark); });
+    });
+    // Arrow keys move along the letters, in reading order (right to left).
+    lettersBox.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      var usable = arabicIndexes(pronLetters(spokenIn.value));
+      var at = usable.indexOf(letterAt) + (e.key === 'ArrowLeft' ? 1 : -1);
+      if (at < 0 || at >= usable.length) return;
+      e.preventDefault();
+      letterAt = usable[at];
+      drawLetters(true);
+    });
+    spokenIn.addEventListener('input', function () { drawLetters(false); });
+    // A word typed in the first field is copied to the second while that one is untouched,
+    // so its letters are there to be marked straight away.
+    var mirrored = '';
+    wordIn.addEventListener('input', function () {
+      if (spokenIn.value === '' || spokenIn.value === mirrored) {
+        spokenIn.value = mirrored = wordIn.value;
+        letterAt = 0;
+        drawLetters(false);
+      }
     });
 
     function open() {
@@ -987,15 +1125,18 @@
         var known = items.filter(function (it) { var re = pronPattern(it.word); return re && re.test(picked); })[0];
         if (known) startEdit(known); else { wordIn.value = picked; spokenIn.value = picked; }
       }
+      letterAt = 0;
+      drawLetters(false);
       drawList();
       drawExample();
       drawForLanguage();
       modal.hidden = false;
       document.documentElement.classList.add('vs-modal-open');
       setTimeout(function () {
-        var target = picked ? spokenIn : wordIn;
-        target.focus();
-        if (picked) target.setSelectionRange(target.value.length, target.value.length);
+        // A selected word opens on its first letter, ready for its mark.
+        var first = picked && voiceLang() === 'ar' ? lettersBox.querySelector('.vs-pron-letter.is-selected') : null;
+        if (first) first.focus();
+        else (picked ? spokenIn : wordIn).focus();
       }, 30);
     }
     function close() {

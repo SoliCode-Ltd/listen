@@ -1775,6 +1775,65 @@ html[dir="rtl"] .vs-pron-arrow { transform: scaleX(-1); }
 .vs-pron-mark:hover .vs-pron-mark-name { color: color-mix(in oklab, var(--a, #7659FA) 80%, var(--text)); }
 .vs-pron-mark:hover { border-color: color-mix(in oklab, var(--a, #7659FA) 55%, var(--line)); background: color-mix(in oklab, var(--a, #7659FA) 7%, var(--surface)); }
 .vs-pron-mark:focus-visible, .vs-pron-save:focus-visible, .vs-pron-cancel:focus-visible, .vs-pron-row button:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 2px; }
+/* The chosen letter's own marks: clearly set, not to be taken for a hover. */
+.vs-pron-mark.is-on,
+.vs-pron-mark.is-on:hover { border-color: var(--a, #7659FA); background: color-mix(in oklab, var(--a, #7659FA) 18%, var(--surface)); box-shadow: inset 0 0 0 1px var(--a, #7659FA); }
+.vs-pron-mark.is-on .vs-pron-mark-glyph { color: color-mix(in oklab, var(--a, #7659FA) 70%, var(--text)); }
+.vs-pron-mark.is-on .vs-pron-mark-name { color: color-mix(in oklab, var(--a, #7659FA) 85%, var(--text)); font-weight: 700; }
+.vs-pron-mark:disabled { opacity: .35; cursor: not-allowed; }
+.vs-pron-mark:disabled:active { transform: none; }
+/* The word's letters: the chosen one takes the next mark. */
+.vs-pron-letters-hint { margin: -.3rem 0 0; font-size: .88rem; color: var(--muted); }
+.vs-pron-letters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .45rem;
+  min-height: 84px;
+  padding: .6rem;
+  border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--surface2) 55%, var(--surface));
+}
+.vs-pron-letter {
+  display: grid;
+  place-items: center;
+  min-width: 54px;
+  height: 66px;
+  padding: 0 .55rem;
+  border: 1.5px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1.8rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+.vs-pron-letter:hover { border-color: color-mix(in oklab, var(--a, #7659FA) 55%, var(--line)); }
+.vs-pron-letter.is-selected {
+  border-color: var(--a, #7659FA);
+  background: color-mix(in oklab, var(--a, #7659FA) 10%, var(--surface));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--a, #7659FA) 20%, transparent);
+  color: color-mix(in oklab, var(--a, #7659FA) 55%, var(--text));
+}
+.vs-pron-letter:disabled { opacity: .45; cursor: default; }
+.vs-pron-letter:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 3px; }
+.vs-pron-letter-gap { width: .9rem; }
+.vs-pron-letters-empty { margin: 0; padding: 0 .3rem; font-size: .9rem; color: var(--muted); }
+.vs-pron-lastnote {
+  margin: 0;
+  padding: .6rem .85rem;
+  border: 1px solid color-mix(in oklab, #f59e0b 40%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in oklab, #f59e0b 11%, var(--surface));
+  color: var(--text);
+  font-size: .9rem;
+  line-height: 1.7;
+}
+.vs-pron-lastnote[hidden] { display: none; }
 .vs-pron-tip { margin: .9rem 0 0; font-size: .95rem; line-height: 1.7; color: var(--muted); }
 .vs-pron-error { margin: .6rem 0 0; font-size: .95rem; font-weight: 600; color: var(--danger, #dc2626); }
 .vs-pron-error[hidden] { display: none; }
