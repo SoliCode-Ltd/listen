@@ -91,6 +91,40 @@ class VideoDubbingOffTest extends TestCase
         $this->assertStringNotContainsString('Video dubbing', (string) $this->get('/llms.txt')->getContent());
     }
 
+    public function test_lines_the_admin_typed_about_dubbing_leave_the_pricing_page_too(): void
+    {
+        $typed = Plan::factory()->create(['name' => 'Typed', 'slug' => 'typed', 'price_cents' => 1900, 'is_active' => true, 'video_dubbing_enabled' => true,
+            'pricing_use_custom_text' => true,
+            'features_en' => [['label' => 'Voice minutes', 'value' => '500 minutes', 'icon' => 'clock'], ['label' => 'Video dubbing', 'value' => '20 videos a month', 'icon' => 'mic']],
+            'features_ar' => [['label' => 'دقائق الصوت', 'value' => '500 دقيقة', 'icon' => 'clock'], ['label' => 'دبلجة الفيديو', 'value' => '20 فيديو شهرياً', 'icon' => 'mic']]]);
+        $extra = Plan::factory()->create(['name' => 'Extra', 'slug' => 'extra', 'price_cents' => 2900, 'is_active' => true,
+            'pricing_extra_lines_en' => [['label' => 'Dub my video', 'value' => 'Included'], ['label' => 'Priority support', 'value' => 'Included']]]);
+
+        $this->switchTo(VideoDubbing::AUDIENCE_EVERYONE);
+        $this->assertContains('Video dubbing', array_column(PlanPricingLines::forPlan($typed, 'en'), 'label'));
+        $this->assertContains('دبلجة الفيديو', array_column(PlanPricingLines::forPlan($typed, 'ar'), 'label'));
+        $this->assertContains('Dub my video', array_column(PlanPricingLines::forComparison($extra, 'en'), 'label'));
+
+        foreach ([VideoDubbing::AUDIENCE_OFF, VideoDubbing::AUDIENCE_PREVIEW] as $audience) {
+            $this->switchTo($audience);
+            $this->assertSame(['Voice minutes'], array_column(PlanPricingLines::forPlan($typed, 'en'), 'label'));
+            $this->assertSame(['دقائق الصوت'], array_column(PlanPricingLines::forPlan($typed, 'ar'), 'label'));
+            $this->assertNotContains('Dub my video', array_column(PlanPricingLines::forPlan($extra, 'en'), 'label'));
+            $this->assertNotContains('Dub my video', array_column(PlanPricingLines::forComparison($extra, 'en'), 'label'));
+            $this->assertContains('Priority support', array_column(PlanPricingLines::forComparison($extra, 'en'), 'label'));
+        }
+
+        app()->setLocale('en');
+        $this->switchTo(VideoDubbing::AUDIENCE_EVERYONE);
+        $this->get(route('pricing'))->assertOk()->assertSee('Video dubbing')->assertSee('Dub my video');
+
+        $this->switchTo(VideoDubbing::AUDIENCE_OFF);
+        $page = $this->get(route('pricing'))->assertOk()->assertSee('Priority support');
+        foreach (['Video dubbing', 'Dub my video', '20 videos a month'] as $text) {
+            $page->assertDontSee($text);
+        }
+    }
+
     public function test_the_admin_can_switch_it_off_and_back_on(): void
     {
         $this->actingAs(User::factory()->create(['is_admin' => true]));

@@ -75,7 +75,7 @@ class VideoDubbingSettings extends Page implements HasForms
                                 VideoDubbing::AUDIENCE_EVERYONE => 'Everyone',
                             ])
                             ->descriptions([
-                                VideoDubbing::AUDIENCE_OFF => 'Nobody can open it, the admin email included: no page, nothing in the demo or the dashboard, not on plan cards, in search descriptions or the sitemap, and members\' dubbed videos can\'t be watched or downloaded. Dubs already being made finish. Switch it back at any time; nothing is deleted.',
+                                VideoDubbing::AUDIENCE_OFF => 'Nobody can open it, the admin email included: no page, nothing in the demo or the dashboard, nothing on the pricing page (plan cards and the comparison table, lines typed on a plan included), in search descriptions or the sitemap, and members\' dubbed videos can\'t be watched or downloaded. Dubs already being made finish. Switch it back at any time; nothing is deleted.',
                                 VideoDubbing::AUDIENCE_PREVIEW => 'Only '.VoiceCloningAccess::PREVIEW_EMAIL.' can open it, to try it before launch. Everyone else gets "page not found".',
                                 VideoDubbing::AUDIENCE_EVERYONE => 'Free accounts get one free dub with the Listen mark; paid plans without dubbing (Starter and the like) see an upgrade instead. Plans with "Include video dubbing" switched on pay from their credits and download without the mark.',
                             ])
