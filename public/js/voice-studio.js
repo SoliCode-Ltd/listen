@@ -910,8 +910,11 @@
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'vs-pron-example-item';
-        b.innerHTML = '<span class="vs-pron-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path class="vs-pron-play-on" d="M8 5.5v13l11-6.5z"/><path class="vs-pron-play-off" d="M7.5 5.5h3v13h-3zM13.5 5.5h3v13h-3z"/></svg></span>'
-          + '<span class="vs-pron-example-words"><strong dir="auto">' + escAttr(it.spoken) + '</strong><small>' + escAttr(it.gloss || '') + '</small></span>';
+        // A card: the word, what it means, and a small listen button under them.
+        b.innerHTML = '<strong class="vs-pron-example-word" dir="auto">' + escAttr(it.spoken) + '</strong>'
+          + '<small class="vs-pron-example-gloss">' + escAttr(it.gloss || '') + '</small>'
+          + '<span class="vs-pron-example-listen" aria-hidden="true"><span class="vs-pron-play"><svg viewBox="0 0 24 24"><path class="vs-pron-play-on" d="M8 5.5v13l11-6.5z"/><path class="vs-pron-play-off" d="M7.5 5.5h3v13h-3zM13.5 5.5h3v13h-3z"/></svg></span>'
+          + '<span class="vs-pron-play-on">' + escAttr(tr('example_listen')) + '</span><span class="vs-pron-play-off">' + escAttr(tr('example_stop')) + '</span></span>';
         b.setAttribute('aria-label', tr('example_play', { word: it.spoken }));
         b.addEventListener('click', function () {
           if (exPlaying === b) { stopExample(); return; }
