@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Pronunciation;
+use App\Models\SiteSetting;
 use Illuminate\Support\Collection;
 
 /**
@@ -16,9 +17,15 @@ use Illuminate\Support\Collection;
  * of alef, ى/ي and ة/ه, any case; only whole words, never inside sound or
  * delivery tags. The panel's underline (public/js/voice-studio.js, pronPattern)
  * matches the same way.
+ *
+ * Switched on in Admin → TTS Settings ("Members' pronunciations"). Off: no
+ * «النطق» button, no saving, and voices are made from the text as written.
+ * Saved words are kept, and work again when it is switched back on.
  */
 final class Pronunciations
 {
+    public const SETTING = 'tts_pronunciations';
+
     public const LIMIT = 200;
 
     public const WORD_MAX = 60;
@@ -30,6 +37,24 @@ final class Pronunciations
 
     /** Tags the voice reads as directions, left as they are: <laugh>, [calm]. */
     private const TAG = '/(<[^<>\n]{1,40}>|\[[^\[\]\n]{1,40}\])/u';
+
+    /** Off until switched on, so the feature reaches no one by a deploy alone. */
+    public static function enabled(): bool
+    {
+        return (string) SiteSetting::get(self::SETTING, '0') === '1';
+    }
+
+    /**
+     * The «النطق» panel for the studio and the demo, or null (no button) while switched off.
+     *
+     * @return array{items: list<array<string, mixed>>, url: string, limit: int}|null
+     */
+    public static function panel(?int $userId): ?array
+    {
+        return self::enabled()
+            ? ['items' => self::panelItems($userId), 'url' => route('dashboard.pronunciations.save'), 'limit' => self::LIMIT]
+            : null;
+    }
 
     /** The word as a key: no vowel marks, one form of alef, ي for ى, ه for ة, lower case, single spaces. */
     public static function key(string $word): string
@@ -94,7 +119,7 @@ final class Pronunciations
      */
     public static function apply(string $text, ?int $userId, array $labels = []): array
     {
-        $entries = self::forUser($userId);
+        $entries = self::enabled() ? self::forUser($userId) : collect();
 
         return $entries->isEmpty() ? ['text' => $text, 'spoken' => []] : self::applyEntries($text, $entries, $labels);
     }

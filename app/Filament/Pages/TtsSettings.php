@@ -39,6 +39,7 @@ class TtsSettings extends Page implements HasForms
             'tts_mode' => SiteSetting::get('tts_mode', config('listen.tts.mode', 'google')),
             StandardVoiceEngine::SETTING_KEY => StandardVoiceEngine::current(),
             \App\Support\SpeechText::SETTING => \App\Support\SpeechText::enabled(),
+            \App\Support\Pronunciations::SETTING => \App\Support\Pronunciations::enabled(),
 
             // Gemini config
             'gemini_api_key_set' => count(app(\App\Services\Tts\GeminiKeyManager::class)->getAllKeys()) > 0,
@@ -107,6 +108,11 @@ class TtsSettings extends Page implements HasForms
                             ->label('Smooth abbreviations and punctuation')
                             ->helperText('Before a voice is read, abbreviations that would pause like the end of a sentence are written out (د. أحمد → دكتور أحمد, الساعة ٩ م → الساعة ٩ مساءً, Dr. Lee → Dr Lee, e.g. → for example), and doubled marks (!!! ؟؟) become one. Only abbreviations with one meaning where they stand are changed. The member\'s text in their history is never changed.')
                             ->default(true)
+                            ->columnSpanFull(),
+                        Forms\Components\Toggle::make(\App\Support\Pronunciations::SETTING)
+                            ->label('Members\' pronunciations (the «النطق» button)')
+                            ->helperText('On: members save how a word should be said, from the «النطق» button in the studio and the demo, and their new voices say it that way. Off: the button is gone, nothing can be saved, and every voice is made from the text as written, exactly as before. Saved words are kept and work again when switched back on. Separate from smoothing above.')
+                            ->default(false)
                             ->columnSpanFull(),
                     ]),
 
@@ -266,6 +272,7 @@ class TtsSettings extends Page implements HasForms
         $scalarKeys = [
             'tts_mode',
             \App\Support\SpeechText::SETTING,
+            \App\Support\Pronunciations::SETTING,
             StandardVoiceEngine::SETTING_KEY,
             'gemini_default_voice',
             'gemini_timeout_seconds',
