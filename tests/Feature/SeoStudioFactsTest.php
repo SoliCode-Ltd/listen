@@ -108,9 +108,9 @@ class SeoStudioFactsTest extends TestCase
         $countAr = StudioFacts::arabicCount($count, 'صوت', 'أصوات', 'صوتاً');
 
         $this->page('en', 'home')->assertOk()
-            ->assertSee('<meta name="description" content="Professional AI voice studio: '.$count.' natural voices, voice cloning and video dubbing in 140+ Arabic dialects', false);
+            ->assertSee('<meta name="description" content="Professional AI voice studio: '.$count.' natural voices, voice cloning in 140+ Arabic dialects', false);
         $this->page('ar', 'home')->assertOk()
-            ->assertSee('<meta name="description" content="استوديو أصوات احترافي بالذكاء الاصطناعي: مكتبة من '.$countAr.'، واستنساخ الصوت، ودبلجة الفيديو، بـ140 لهجة عربية', false);
+            ->assertSee('<meta name="description" content="استوديو أصوات احترافي بالذكاء الاصطناعي: مكتبة من '.$countAr.'، واستنساخ الصوت، بـ140 لهجة عربية', false);
 
         $this->assertContains($count.' voices in Arabic and English', SeoHelper::featureList('en'));
         $this->assertContains('مكتبة من '.$countAr.' بالعربية والإنجليزية', SeoHelper::featureList('ar'));
@@ -127,8 +127,10 @@ class SeoStudioFactsTest extends TestCase
         $this->assertStringNotContainsString('Video dubbing', (string) $this->get('/llms.txt')->getContent());
         $this->assertStringContainsString('noindex', SeoHelper::robots('dub'));
         $this->assertStringNotContainsString('dub-my-video', (string) $this->get('/sitemap.xml')->getContent());
+        $this->assertStringNotContainsString('dubbing', SeoHelper::description('home', 'en'));
 
         SiteSetting::set('video_dubbing_audience', 'everyone', 'video_dubbing');
+        $this->assertStringContainsString('voice cloning and video dubbing in 140+', SeoHelper::description('home', 'en'));
 
         $this->assertContains($dubbing, SeoHelper::featureList('en'));
         $this->assertContains('دبلجة الفيديو إلى اللهجة العربية أو اللكنة الإنجليزية التي تختارها، مع بقاء الموسيقى والمؤثرات', SeoHelper::featureList('ar'));

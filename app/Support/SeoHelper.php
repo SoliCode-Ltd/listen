@@ -948,14 +948,21 @@ class SeoHelper
     /**
      * Counts a page's own title or description can name, so the number is the
      * library's real one: ":voices" in English, ":voices_ar" with its Arabic noun.
+     * ":dubbing" and ":dubbing_ar" name video dubbing only while it is open to everyone.
      *
      * @return array<string, string>
      */
     public static function textCounts(): array
     {
         $voices = StudioFacts::voices();
+        $dubbing = StudioFacts::dubbing();
 
-        return ['voices' => (string) $voices, 'voices_ar' => StudioFacts::arabicCount($voices, 'صوت', 'أصوات', 'صوتاً')];
+        return [
+            'voices' => (string) $voices,
+            'voices_ar' => StudioFacts::arabicCount($voices, 'صوت', 'أصوات', 'صوتاً'),
+            'dubbing' => $dubbing ? ' and video dubbing' : '',
+            'dubbing_ar' => $dubbing ? '، ودبلجة الفيديو' : '',
+        ];
     }
 
     /**

@@ -70,10 +70,12 @@ class VideoDubbingSettings extends Page implements HasForms
                         Forms\Components\Radio::make('video_dubbing_audience')
                             ->label('Who can see the page')
                             ->options([
+                                VideoDubbing::AUDIENCE_OFF => 'Off for everyone',
                                 VideoDubbing::AUDIENCE_PREVIEW => 'Admin email only',
                                 VideoDubbing::AUDIENCE_EVERYONE => 'Everyone',
                             ])
                             ->descriptions([
+                                VideoDubbing::AUDIENCE_OFF => 'Nobody can open it, the admin email included: no page, nothing in the demo or the dashboard, nothing on the pricing page (plan cards and the comparison table, lines typed on a plan included), in search descriptions or the sitemap, and members\' dubbed videos can\'t be watched or downloaded. Dubs already being made finish. Switch it back at any time; nothing is deleted.',
                                 VideoDubbing::AUDIENCE_PREVIEW => 'Only '.VoiceCloningAccess::PREVIEW_EMAIL.' can open it, to try it before launch. Everyone else gets "page not found".',
                                 VideoDubbing::AUDIENCE_EVERYONE => 'Free accounts get one free dub with the Listen mark; paid plans without dubbing (Starter and the like) see an upgrade instead. Plans with "Include video dubbing" switched on pay from their credits and download without the mark.',
                             ])
@@ -279,7 +281,7 @@ class VideoDubbingSettings extends Page implements HasForms
     {
         $state = $this->form->getState();
         $audience = (string) ($state['video_dubbing_audience'] ?? VideoDubbing::AUDIENCE_PREVIEW);
-        SiteSetting::set('video_dubbing_audience', $audience === VideoDubbing::AUDIENCE_EVERYONE ? $audience : VideoDubbing::AUDIENCE_PREVIEW, self::GROUP);
+        SiteSetting::set('video_dubbing_audience', in_array($audience, [VideoDubbing::AUDIENCE_EVERYONE, VideoDubbing::AUDIENCE_OFF], true) ? $audience : VideoDubbing::AUDIENCE_PREVIEW, self::GROUP);
         SiteSetting::set('video_dubbing_max_upload_mb', max(10, (int) ($state['video_dubbing_max_upload_mb'] ?? 300)), self::GROUP);
         SiteSetting::set('video_dubbing_free_max_upload_mb', max(10, (int) ($state['video_dubbing_free_max_upload_mb'] ?? 300)), self::GROUP);
         SiteSetting::set('video_dubbing_free_max_seconds', max(5, min(180, (int) ($state['video_dubbing_free_max_seconds'] ?? 60))), self::GROUP);

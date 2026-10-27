@@ -134,7 +134,7 @@ final class PlanPricingLines
         if ($plan->pricing_use_custom_text) {
             $custom = $plan->getLocalizedFeatures($locale);
             if ($custom !== null) {
-                return array_values($custom);
+                return self::withoutDubbing(array_values($custom));
             }
         }
 
@@ -144,7 +144,7 @@ final class PlanPricingLines
 
         return array_merge(
             $automatic,
-            self::extraLines($plan->{'pricing_extra_lines_'.$locale} ?? [], $locale),
+            self::withoutDubbing(self::extraLines($plan->{'pricing_extra_lines_'.$locale} ?? [], $locale)),
         );
     }
 
@@ -166,8 +166,31 @@ final class PlanPricingLines
 
         return array_merge(
             $automatic,
-            self::extraLines($plan->{'pricing_extra_lines_'.$locale} ?? [], $locale),
+            self::withoutDubbing(self::extraLines($plan->{'pricing_extra_lines_'.$locale} ?? [], $locale)),
         );
+    }
+
+    /**
+     * Lines the admin wrote by hand that talk about video dubbing ("Video dubbing: 20
+     * videos", "دبلجة الفيديو") are left out while dubbing is not open to everyone, as
+     * the automatic dubbing line is: one switch in Video Dubbing → Settings hides it all.
+     *
+     * @param  array<int, mixed>  $lines
+     * @return array<int, mixed>
+     */
+    private static function withoutDubbing(array $lines): array
+    {
+        if (StudioFacts::dubbing()) {
+            return $lines;
+        }
+
+        return array_values(array_filter($lines, function (mixed $line): bool {
+            $text = is_array($line)
+                ? implode(' ', array_filter([$line['label'] ?? '', $line['value'] ?? '', $line['text'] ?? ''], 'is_string'))
+                : (is_string($line) ? $line : '');
+
+            return ! preg_match('/\bdub|دبلج/iu', $text);
+        }));
     }
 
     /**
