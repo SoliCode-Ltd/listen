@@ -114,15 +114,14 @@ class AudioGeneration extends Model
     }
 
     /**
+     * Everything the voice was made with, for the studio's "reuse" (the page then keeps
+     * only what the member's plan has today: DashboardController::reuseForPlan).
+     *
      * @return array<string, mixed>|null
      */
     public function reusableSettings(): ?array
     {
         $voiceTier = VoiceTier::normalize((string) ($this->voice_tier ?: VoiceTier::STANDARD));
-        if ($voiceTier !== VoiceTier::HD) {
-            return null;
-        }
-
         $snapshot = is_array($this->settings_snapshot) ? $this->settings_snapshot : [];
         $dialogueMetadata = is_array($this->dialogue_metadata) ? $this->dialogue_metadata : [];
         $voiceName = trim((string) ($snapshot['voice_name'] ?? $this->voice_name ?? ''));
@@ -132,13 +131,26 @@ class AudioGeneration extends Model
         }
 
         $voiceMeta = VoiceCatalog::voiceMeta($voiceName);
-        $settings = [
+        // A cloned voice is picked in the studio by its own name (cloned_12).
+        $voiceKey = $snapshot['voice_key'] ?? (is_array($voiceMeta) ? ($voiceMeta['key'] ?? null) : (str_starts_with($voiceName, 'cloned_') ? $voiceName : null));
+        $common = [
             'voice_name' => $voiceName,
-            'voice_key' => $snapshot['voice_key'] ?? (is_array($voiceMeta) ? ($voiceMeta['key'] ?? null) : null),
+            'voice_key' => $voiceKey,
             'voice_tier' => $voiceTier,
             'target_language' => trim((string) ($snapshot['target_language'] ?? $this->target_language)),
             'translate' => (bool) ($snapshot['translate'] ?? $this->translate),
-            'dialect' => $snapshot['dialect'] ?? $this->dialect,
+        ];
+        // A standard voice is made with no style, emotion, dialect or speed to choose.
+        if ($voiceTier !== VoiceTier::HD) {
+            return array_filter($common, static fn (mixed $value): bool => $value !== null && $value !== '');
+        }
+
+        $dialect = trim((string) ($snapshot['dialect'] ?? $this->dialect ?? ''));
+        $settings = $common + [
+            'dialect' => $dialect,
+            // Made with the dialect left on "Auto": it comes back as "Auto", not as the default dialect.
+            // (Only Arabic and English have dialects and accents to choose.)
+            'dialect_auto' => $dialect === '' && in_array($common['target_language'], ['ar', 'en'], true),
             'performance_style' => $snapshot['performance_style'] ?? $this->performance_style,
             'style_prompt' => $snapshot['style_prompt'] ?? $this->style_prompt,
             'emotion' => $snapshot['emotion'] ?? $this->emotion,
@@ -156,7 +168,7 @@ class AudioGeneration extends Model
         return array_filter($settings, static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
     }
 
-    public function hasReusablePremiumSettings(): bool
+    public function hasReusableSettings(): bool
     {
         return $this->reusableSettings() !== null;
     }

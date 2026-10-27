@@ -2651,7 +2651,7 @@
           $prefillDialogue = (string) old('is_dialogue', data_get($reusePreset ?? [], 'is_dialogue') ? '1' : '0');
         @endphp
         @if($reusePreset)
-          <div class="note">{{ __('ui.dashboard.reusing_settings_notice', ['number' => $reusePreset['display_number'] ?? $reusePreset['job_id']]) }}</div>
+          <div class="note">{{ __('ui.dashboard.reusing_settings_notice', ['number' => $reusePreset['display_number'] ?? $reusePreset['job_id']]) }}@if($reusePreset['plan_left_out'] ?? false) {{ __('ui.dashboard.reusing_settings_plan_note') }}@endif</div>
         @endif
 
         <form id="voiceForm" method="POST" action="{{ route('dashboard.queue') }}" class="vs-layout">
@@ -2874,8 +2874,8 @@
                   'error_message' => \App\Support\GenerationMessage::forDisplay($job->error_message),
                   'created_human' => $job->created_at?->diffForHumans(),
                   'created_at_ts' => $job->created_at?->getTimestamp(),
-                  'can_reuse_settings' => $job->hasReusablePremiumSettings(),
-                  'reuse_url' => $job->hasReusablePremiumSettings() ? route('dashboard', ['reuse' => $job->displayNumber()]).'#generateVoiceSection' : null,
+                  'can_reuse_settings' => $job->hasReusableSettings(),
+                  'reuse_url' => $job->hasReusableSettings() ? route('dashboard', ['reuse' => $job->displayNumber()]).'#generateVoiceSection' : null,
                   'is_demo_history' => false,
                 ]) }}">
                   <td>#{{ $job->displayNumber() }}</td>
@@ -2903,7 +2903,7 @@
                   <td>{{ $job->created_at?->diffForHumans() }}</td>
                   <td>
                     <div class="job-actions">
-                      @if($job->hasReusablePremiumSettings())
+                      @if($job->hasReusableSettings())
                         <a class="job-reuse-btn" href="{{ route('dashboard', ['reuse' => $job->displayNumber()]) }}#generateVoiceSection">{{ __('ui.dashboard.reuse_settings') }}</a>
                       @endif
                       <button
@@ -3356,6 +3356,8 @@
       performanceStyle: String(@json($prefillValue('performance_style')) || '').trim(),
       emotion: String(@json($prefillValue('emotion')) || '').trim(),
       dialect: String(@json($prefillValue('dialect')) || '').trim(),
+      // A reused voice made with the dialect on "Auto" keeps "Auto".
+      dialectAuto: @json((bool) data_get($reusePreset ?? [], 'dialect_auto')),
     };
     const studioDefaultsByLanguage = @json($studioDefaultsByLanguage ?? []);
     const studioDialectsByLanguageRaw = @json($studioDialectsByLanguage ?? []);
@@ -3507,10 +3509,12 @@
     }
 
     function applyStudioDefaults() {
+      let keepAutoDialect = false;
       if (!initialStudioValuesApplied) {
         setSelectValueIfAvailable(performanceStyleSelect, initialStudioValueByField.performanceStyle);
         setSelectValueIfAvailable(emotionSelect, initialStudioValueByField.emotion);
         setSelectValueIfAvailable(dialectSelect, initialStudioValueByField.dialect);
+        keepAutoDialect = initialStudioValueByField.dialectAuto;
         initialStudioValuesApplied = true;
       }
 
@@ -3519,7 +3523,7 @@
 
       // Style and emotion stay on "Default" until the member picks one;
       // the server fills in the site defaults for the language.
-      if (dialectSelect && !String(dialectSelect.value || '').trim()) {
+      if (dialectSelect && !keepAutoDialect && !String(dialectSelect.value || '').trim()) {
         setSelectValueIfAvailable(dialectSelect, defaults.dialect || '');
       }
     }
