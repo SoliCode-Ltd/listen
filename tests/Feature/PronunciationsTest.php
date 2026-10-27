@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\TtsSettings;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
 use App\Models\Plan;
 use App\Models\Pronunciation;
+use App\Models\SiteSetting;
 use App\Models\User;
 use App\Models\Voice;
 use App\Services\TranslationService;
@@ -17,11 +19,13 @@ use App\Support\GeminiVocalTags;
 use App\Support\Pronunciations;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
+use Livewire\Livewire;
 use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
 use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath;
 use Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect;
@@ -38,6 +42,14 @@ class PronunciationsTest extends TestCase
 
     /** @var list<array{text: string, options: array<string, mixed>}> */
     private array $spoken = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Off until switched on in the admin; the last test here checks it off.
+        SiteSetting::set(Pronunciations::SETTING, '1');
+    }
 
     // ──────────────────────────────────────────────────────────────────
     //  Finding the words
@@ -328,6 +340,68 @@ class PronunciationsTest extends TestCase
 
         $this->assertNotSame($plain, $mine);
         $this->assertSame($mine, $key->invoke($service, 'Hello Win', 'en', $config + ['pronounce' => ['Win']], 'gemini'));
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    //  Switched off in the admin
+    // ──────────────────────────────────────────────────────────────────
+
+    public function test_switched_off_everything_is_as_before_and_the_words_come_back_when_switched_on(): void
+    {
+        $this->seedFreePlan();
+        $this->fakeSpeech();
+        $member = User::factory()->create();
+        $saved = Pronunciation::query()->create(['user_id' => $member->id, 'word' => 'Nguyen', 'word_key' => 'nguyen', 'spoken' => 'Win']);
+        SiteSetting::set(Pronunciations::SETTING, '0');
+        $this->actingAs($member);
+
+        // No «النطق» button in the studio or the demo, and a page left open can't save or delete.
+        foreach (['dashboard', 'demo.page'] as $page) {
+            $html = $this->getLocalizedRoute($page)->assertOk()->getContent();
+            $this->assertStringContainsString('"pron":null', $html, $page);
+            $this->assertStringNotContainsString('"spoken":"Win"', $html, $page);
+        }
+        $this->save(['word' => 'Listen', 'spoken' => 'لِسِن'])->assertNotFound();
+        $this->remove($saved->id)->assertNotFound();
+        $this->assertSame(1, Pronunciation::query()->count(), 'the saved word is kept');
+
+        // The voice reads the text as written: no saved word, no direction about one.
+        $make = function () use ($member): void {
+            GenerateAudioJob::dispatchSync(AudioGeneration::create([
+                'user_id' => $member->id, 'input_text' => 'Meet Dr. Nguyen today!!', 'source_language' => 'en',
+                'target_language' => 'en', 'voice_tier' => 'standard', 'voice_name' => 'en-US-Wavenet-C',
+                'translate' => false, 'status' => 'queued',
+            ])->id);
+        };
+        $make();
+        $this->assertSame('Meet Dr Nguyen today!', $this->spoken[0]['text']);
+        $this->assertSame([], $this->spoken[0]['options']['pronounce'] ?? []);
+
+        // Switched back on: the word works again.
+        SiteSetting::set(Pronunciations::SETTING, '1');
+        $make();
+        $this->assertSame('Meet Dr Win today!', $this->spoken[1]['text']);
+        $this->assertSame(['Win'], $this->spoken[1]['options']['pronounce']);
+    }
+
+    public function test_the_admin_switches_it_off_and_on_in_tts_settings(): void
+    {
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(TtsSettings::class)
+            ->assertFormSet([Pronunciations::SETTING => true])
+            ->fillForm([Pronunciations::SETTING => false])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertFalse(Pronunciations::enabled());
+
+        Livewire::test(TtsSettings::class)
+            ->assertFormSet([Pronunciations::SETTING => false])
+            ->fillForm([Pronunciations::SETTING => true])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertTrue(Pronunciations::enabled());
     }
 
     // ──────────────────────────────────────────────────────────────────
