@@ -73,7 +73,7 @@ class AudioHistorySequenceAndReuseTest extends TestCase
         $response->assertDontSee('#35</td>', false);
     }
 
-    public function test_dashboard_shows_reuse_link_only_for_premium_records(): void
+    public function test_dashboard_shows_reuse_link_for_premium_and_standard_records(): void
     {
         Plan::factory()->free()->create([
             'monthly_chars' => 500000,
@@ -145,7 +145,8 @@ class AudioHistorySequenceAndReuseTest extends TestCase
         $response->assertOk();
         $response->assertSee('?reuse='.$premiumJob->user_sequence_number.'#generateVoiceSection', false);
         $response->assertSee(__('ui.dashboard.reuse_settings'));
-        $response->assertDontSee('?reuse='.$standardJob->user_sequence_number.'#generateVoiceSection', false);
+        // A standard voice is reused too: its speaker, language and text (ReuseLoadsEverythingTest).
+        $response->assertSee('?reuse='.$standardJob->user_sequence_number.'#generateVoiceSection', false);
     }
 
     public function test_dashboard_reuse_prefills_title_and_content_from_selected_record(): void
