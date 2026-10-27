@@ -1957,32 +1957,23 @@ html[dir="rtl"] .vs-pron-arrow { transform: scaleX(-1); }
 .vs-pron-example-item.is-playing { border-color: var(--a, #7659FA); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a, #7659FA) 16%, transparent); }
 .vs-pron-example-word { font-size: 1.35rem; font-weight: 700; line-height: 1.6; }
 .vs-pron-example-gloss { font-size: .8rem; line-height: 1.4; color: var(--muted); }
-.vs-pron-example-listen {
-  display: inline-flex;
-  align-items: center;
-  gap: .35rem;
-  margin-top: .55rem;
-  padding: .2rem .65rem .2rem .25rem;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--a, #7659FA) 10%, var(--surface));
-  color: color-mix(in oklab, var(--a, #7659FA) 80%, var(--text));
-  font-size: .78rem;
-  font-weight: 700;
-}
-html[dir="rtl"] .vs-pron-example-listen { padding: .2rem .25rem .2rem .65rem; }
 .vs-pron-play {
   display: grid;
   place-items: center;
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 30px;
+  height: 30px;
+  margin-top: .5rem;
   border-radius: 50%;
   background: var(--a, #7659FA);
+  transition: transform .15s ease;
 }
-.vs-pron-play svg { width: 10px; height: 10px; fill: #fff; }
+.vs-pron-example-item:hover .vs-pron-play { transform: scale(1.06); }
+.vs-pron-play svg { width: 13px; height: 13px; fill: #fff; }
 .vs-pron-play-off { display: none; }
 .vs-pron-example-item.is-playing .vs-pron-play-on { display: none; }
 .vs-pron-example-item.is-playing .vs-pron-play-off { display: inline; }
+@media (prefers-reduced-motion: reduce) { .vs-pron-example-item:hover .vs-pron-play { transform: none; } }
 @media (max-width: 640px) {
   .vs-pron .vs-modal-dialog { height: auto; }
   .vs-pron-add, .vs-pron-saved { padding-inline: 1rem; }

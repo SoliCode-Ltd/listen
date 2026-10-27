@@ -1350,8 +1350,6 @@ return [
             'mark_hamza_below' => 'همزة تحت',
             'example_title' => 'اسمع الفرق',
             'example_play' => 'تشغيل «:word»',
-            'example_listen' => 'استمع',
-            'example_stop' => 'إيقاف',
             'example_ar_text' => 'نفس الحروف «علم» تُقرأ بثلاث طرق، والتشكيل يحدّد أيّها. من غير تشكيل يختار الصوت واحدة منها.',
             'example_ar_gloss' => ['ilm' => 'معرفة', 'alam' => 'راية', 'alima' => 'عرَف'],
             'example_en_text' => 'كلمة «read» تُقال بطريقتين. اكتبها كما تُسمع لتختار: «reed» أو «red».',

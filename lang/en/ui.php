@@ -1346,8 +1346,6 @@ return [
             'mark_hamza_below' => 'همزة تحت',
             'example_title' => 'Hear the difference',
             'example_play' => 'Play “:word”',
-            'example_listen' => 'Play',
-            'example_stop' => 'Stop',
             'example_ar_text' => 'The same letters «علم» are read three ways, and the vowel marks choose which. Without marks the voice picks one.',
             'example_ar_gloss' => ['ilm' => 'knowledge', 'alam' => 'flag', 'alima' => 'he knew'],
             'example_en_text' => 'The word “read” is said two ways. Spell it the way it sounds to choose: “reed” or “red”.',
