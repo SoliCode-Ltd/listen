@@ -1744,6 +1744,7 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
 .vs-pron-arrow { width: 20px; height: 20px; margin-bottom: 16px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 html[dir="rtl"] .vs-pron-arrow { transform: scaleX(-1); }
 .vs-pron-marks { display: grid; gap: .6rem; margin-top: 1rem; }
+.vs-pron-marks[hidden] { display: none; }
 .vs-pron-marks-label { font-size: .95rem; font-weight: 700; color: var(--text); }
 .vs-pron-mark-group { display: grid; gap: .3rem; }
 .vs-pron-mark-group-name { font-size: .86rem; font-weight: 600; color: var(--muted); }

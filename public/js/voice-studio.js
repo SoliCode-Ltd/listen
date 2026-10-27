@@ -767,12 +767,12 @@
       + '<section class="vs-pron-example" aria-labelledby="vsPronExTitle" hidden><h3 id="vsPronExTitle">' + escAttr(tr('example_title')) + '</h3><p class="vs-pron-example-text"></p><div class="vs-pron-example-row"></div></section>'
       + '<form class="vs-pron-add" id="vsPronForm" novalidate>'
       + '<div class="vs-pron-fields">'
-      + '<label class="vs-pron-field"><span>' + escAttr(tr('word_label')) + '</span><input name="word" maxlength="60" autocomplete="off" spellcheck="false" dir="auto" placeholder="' + escAttr(tr('word_placeholder')) + '"></label>'
+      + '<label class="vs-pron-field"><span>' + escAttr(tr('word_label')) + '</span><input name="word" maxlength="60" autocomplete="off" spellcheck="false" dir="auto" placeholder=""></label>'
       + '<svg class="vs-pron-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
-      + '<label class="vs-pron-field"><span>' + escAttr(tr('spoken_label')) + '</span><input name="spoken" maxlength="80" autocomplete="off" spellcheck="false" dir="auto" placeholder="' + escAttr(tr('spoken_placeholder')) + '"></label>'
+      + '<label class="vs-pron-field"><span>' + escAttr(tr('spoken_label')) + '</span><input name="spoken" maxlength="80" autocomplete="off" spellcheck="false" dir="auto" placeholder=""></label>'
       + '</div>'
       + '<div class="vs-pron-marks" role="group" aria-labelledby="vsPronMarksLabel"><span class="vs-pron-marks-label" id="vsPronMarksLabel">' + escAttr(tr('marks_label')) + '</span>' + marks + '</div>'
-      + '<p class="vs-pron-tip">' + escAttr(tr('tip')) + '</p>'
+      + '<p class="vs-pron-tip"></p>'
       + '</form>'
       + '<section class="vs-pron-saved" aria-labelledby="vsPronListTitle"><h3 id="vsPronListTitle">' + escAttr(tr('list_title')) + ' <small class="vs-pron-total"></small></h3>'
       + '<ul class="vs-pron-list"></ul><p class="vs-pron-empty" hidden>' + escAttr(tr('empty')) + '</p>'
@@ -806,10 +806,22 @@
       if (exPlaying) exPlaying.classList.remove('is-playing');
       exPlaying = null;
     }
+    // The voice's language decides what helps: Arabic marks for an Arabic voice, an
+    // English spelling for an English one (the marks mean nothing to it).
+    function voiceLang() {
+      var langSelect = form.querySelector('select[name="target_language"]');
+      return langSelect && langSelect.value === 'en' ? 'en' : 'ar';
+    }
+    function drawForLanguage() {
+      var lang = voiceLang();
+      modal.querySelector('.vs-pron-marks').hidden = lang !== 'ar';
+      modal.querySelector('.vs-pron-tip').textContent = tr('tip_' + lang);
+      wordIn.placeholder = tr('word_placeholder_' + lang);
+      spokenIn.placeholder = tr('spoken_placeholder_' + lang);
+    }
     function drawExample() {
       stopExample();
-      var langSelect = form.querySelector('select[name="target_language"]');
-      var lang = langSelect && langSelect.value === 'en' ? 'en' : 'ar';
+      var lang = voiceLang();
       var ex = examples[lang];
       exBox.hidden = !ex || !ex.items || !ex.items.length;
       if (exBox.hidden) return;
@@ -950,6 +962,7 @@
       }
       drawList();
       drawExample();
+      drawForLanguage();
       modal.hidden = false;
       document.documentElement.classList.add('vs-modal-open');
       setTimeout(function () {
