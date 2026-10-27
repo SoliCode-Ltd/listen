@@ -247,6 +247,41 @@ class TtsStudioConfig
      * @param  array<string, mixed>  $input
      * @return array{performance_style: string, emotion: string}
      */
+    /**
+     * The choices a member left on "Default" (empty), read before withDefaultChoices() fills
+     * them, so that reusing the voice later brings back "Default" and not the value it stood for.
+     *
+     * @param  array<string, mixed>  $input
+     * @return list<string>
+     */
+    public static function leftOnDefault(array $input): array
+    {
+        return array_values(array_filter(['performance_style', 'emotion'], fn (string $field): bool => trim((string) ($input[$field] ?? '')) === ''));
+    }
+
+    /**
+     * Settings to reuse, with a choice that was left on "Default" taken out, so the studio shows
+     * "Default" again. Records made before this was kept ($onDefault null) don't say: a value
+     * equal to the language's default today is taken as left on default, as it reads the same.
+     *
+     * @param  array<string, mixed>  $settings
+     * @param  list<string>|null  $onDefault
+     * @return array<string, mixed>
+     */
+    public static function reusedAsChosen(array $settings, ?array $onDefault, ?string $language): array
+    {
+        $language = (string) ($language ?: 'ar');
+        $defaults = ['performance_style' => self::defaultPerformanceStyle($language), 'emotion' => self::defaultEmotion($language)];
+        foreach ($defaults as $field => $default) {
+            $value = trim((string) ($settings[$field] ?? ''));
+            if ($value !== '' && ($onDefault !== null ? in_array($field, $onDefault, true) : $value === $default)) {
+                unset($settings[$field]);
+            }
+        }
+
+        return $settings;
+    }
+
     public static function withDefaultChoices(array $input, ?string $language): array
     {
         $language = (string) ($language ?: 'ar');

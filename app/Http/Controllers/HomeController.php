@@ -780,7 +780,10 @@ class HomeController extends Controller
         $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
         $requestedTier = VoiceTier::normalize((string) ($request->input('voice_tier') ?? $defaultTier));
 
+        // Which choices were left on "Default", so reusing this voice in the studio brings back "Default".
+        $onDefault = null;
         if (VoiceTier::normalize($requestedTier) === VoiceTier::HD) {
+            $onDefault = TtsStudioConfig::leftOnDefault($request->only(['performance_style', 'emotion']));
             $request->merge(TtsStudioConfig::withDefaultChoices($request->only(['performance_style', 'emotion']), $request->input('target_language')));
         }
         $this->ensureRequiredStudioSelections($requestedTier, [
@@ -858,6 +861,7 @@ class HomeController extends Controller
                 'speed' => $validated['speed'] ?? 1.0,
                 'pitch' => $validated['pitch'] ?? 0.0,
             ], $demoPlan);
+            $studioOptions['on_default'] = $onDefault;
             $voiceMeta = VoiceCatalog::voiceMeta($voiceName);
 
             $voiceOptions = [
@@ -1923,6 +1927,7 @@ class HomeController extends Controller
                 'quota_limit_chars' => isset($quota['limit_chars']) ? (int) $quota['limit_chars'] : null,
                 'quota_remaining_chars' => isset($quota['remaining_chars']) ? (int) $quota['remaining_chars'] : null,
                 'metadata' => [
+                    'on_default' => is_array($studioOptions['on_default'] ?? null) ? $studioOptions['on_default'] : null,
                     'voice_meta' => is_array($voiceMeta) ? [
                         'gender' => $voiceMeta['gender'] ?? null,
                         'language' => $voiceMeta['language'] ?? null,

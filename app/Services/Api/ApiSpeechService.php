@@ -254,6 +254,7 @@ class ApiSpeechService
                     'performance_style' => $studio['performance_style'],
                     'style_prompt' => $studio['style_prompt'],
                     'emotion' => $studio['emotion'],
+                    'on_default' => $studio['on_default'] ?? null,
                     'speed' => $studio['speed'],
                     'pitch' => $studio['pitch'],
                     'audio_effect' => $spec['audio_effect'],
@@ -410,6 +411,8 @@ class ApiSpeechService
             'dialect' => $dialect !== '' ? $dialect : null,
             'performance_style' => $defaults['performance_style'],
             'emotion' => $defaults['emotion'],
+            // Which were left out of the request, so reusing the voice brings back "Default".
+            'on_default' => TtsStudioConfig::leftOnDefault(['performance_style' => $style, 'emotion' => $emotion]),
             'style_prompt' => $stylePrompt !== '' ? $stylePrompt : null,
             'speed' => $speed !== null ? (float) $speed : 1.0,
             'pitch' => $pitch !== null ? (float) $pitch : 0.0,

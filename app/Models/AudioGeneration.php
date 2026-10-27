@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Support\AudioFiles;
+use App\Support\TtsStudioConfig;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
 
@@ -148,6 +149,9 @@ class AudioGeneration extends Model
             // The environment chosen, also one that could not be added (GenerateAudioJob).
             'audio_effect' => $snapshot['audio_effect'] ?? $snapshot['audio_effect_not_added'] ?? null,
         ];
+
+        // A choice left on "Default" comes back as "Default", not as the value it stood for.
+        $settings = TtsStudioConfig::reusedAsChosen($settings, is_array($snapshot['on_default'] ?? null) ? $snapshot['on_default'] : null, $settings['target_language']);
 
         return array_filter($settings, static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
     }

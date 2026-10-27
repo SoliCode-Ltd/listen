@@ -141,7 +141,9 @@ class MessageReaderController extends Controller
         $processingMode = strtolower((string) config('listen.audio.processing', 'sync'));
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
         // Style and emotion left on "Default" get the site's defaults, as in the dashboard.
+        $onDefault = null;
         if (VoiceTier::normalize((string) ($request->input('voice_tier') ?? $planTier)) === VoiceTier::HD) {
+            $onDefault = TtsStudioConfig::leftOnDefault($request->only(['performance_style', 'emotion']));
             $request->merge(TtsStudioConfig::withDefaultChoices($request->only(['performance_style', 'emotion']), $request->input('target_language')));
         }
         $performanceStyleValues = TtsStudioConfig::performanceStyleValues();
@@ -278,6 +280,7 @@ class MessageReaderController extends Controller
                 'dialect' => $studioOptions['dialect'],
                 'emotion' => $studioOptions['emotion'],
                 'performance_style' => $studioOptions['performance_style'],
+                'on_default' => $onDefault,
                 'style_prompt' => $studioOptions['style_prompt'],
                 'speed' => $studioOptions['speed'],
                 'pitch' => $studioOptions['pitch'],
