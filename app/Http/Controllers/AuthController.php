@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Auth\PhoneAuthBridgeRequest;
+use App\Models\Plan;
 use App\Models\User;
 use App\Rules\NotDisposableEmail;
 use App\Services\BlockedUserService;
@@ -164,12 +165,32 @@ class AuthController extends Controller
     public function showRegister()
     {
         $request = request();
+        $this->rememberChosenPlan($request);
         $response = response()->view('auth.register', [
             'authSettings' => $this->authSettings->authUiPayload(),
         ]);
         $response->headers->set('Cache-Control', 'no-store, private');
 
         return $this->attachDeviceCookie($request, $response);
+    }
+
+    /**
+     * A visitor who picked a paid plan on the pricing page signs up first: its checkout
+     * is where they land after, whether they sign up, sign in or use Google.
+     */
+    private function rememberChosenPlan(Request $request): void
+    {
+        $slug = trim((string) $request->query('plan', ''));
+        if ($slug === '') {
+            return;
+        }
+        $plan = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->where('slug', $slug)->first();
+        if ($plan === null) {
+            return;
+        }
+
+        $cycle = $request->query('billing_cycle') === 'yearly' ? 'yearly' : 'monthly';
+        $request->session()->put('url.intended', route('billing.page', ['plan' => $plan->slug, 'billing_cycle' => $cycle]));
     }
 
     public function register(Request $request)

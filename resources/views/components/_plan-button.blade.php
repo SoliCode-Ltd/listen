@@ -3,9 +3,10 @@
   $state = $planState($plan, $index);
   $trialLabel = __('ui.pricing.start_trial_cta', ['days' => (int) ($trialPromo['days'] ?? 7)]);
   $fallbackLabel = auth()->check() ? __('ui.pricing.upgrade_now') : __('ui.pricing.get_started');
+  // A visitor signs up first; the plan and cycle go along, so they land on its checkout after.
   $fallbackUrl = static fn (string $cycle): string => auth()->check()
     ? route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => $cycle])
-    : route('register');
+    : route('register', ['plan' => $plan['slug'], 'billing_cycle' => $cycle]);
   $monthlyUrl = $state['trial_monthly'] ? route('trial.start', ['plan' => $plan['slug']]) : $fallbackUrl('monthly');
   $yearlyUrl = $state['trial_yearly'] ? route('trial.start', ['plan' => $plan['slug'], 'billing_cycle' => 'yearly']) : $fallbackUrl('yearly');
   $monthlyLabel = $state['trial_monthly'] ? $trialLabel : $fallbackLabel;
