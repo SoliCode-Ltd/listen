@@ -63,7 +63,8 @@
 
   {{-- 2. Price, and the offer when there is one: its label above the price, the full price
        struck through beside it, and the time left under it. An offer is for monthly billing
-       only, so on yearly all three go and the card shows the yearly price as usual. --}}
+       only, so on yearly all three go and the yearly price shows with the usual monthly price
+       struck through beside it. --}}
   @php
     $terms = $hasDiscount && !$isFree && !$isPack ? ($plan['discount_terms'] ?? null) : null;
   @endphp
@@ -75,10 +76,21 @@
       </span>
     </div>
   @endif
+  @php
+    // On yearly, the month's usual price struck through beside the yearly price per month, so the
+    // yearly saving reads like an offer.
+    $fullMonthlyFormatted = $originalFormatted ?? $displayMonthlyFormatted;
+    $yearlySaves = !$isFree && !$isPack && $yearlyCents > 0 && $yearlyCents < (int) ($plan['original_price_monthly_cents'] ?? $monthlyCents) * 12;
+  @endphp
   <div class="plan-pricing">
     @if($hasDiscount && !$isFree && $originalFormatted)
-      <div class="price-original-row">
+      <div class="price-original-row is-offer">
         <s class="price-original" dir="ltr">{{ $originalFormatted }}</s>
+      </div>
+    @endif
+    @if($yearlySaves)
+      <div class="price-original-row is-yearly">
+        <s class="price-original" dir="ltr">{{ $fullMonthlyFormatted }}</s>
       </div>
     @endif
     <div class="price-row">

@@ -319,12 +319,15 @@
     }
     .offer-label svg { flex: none; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
     .studio:not(.is-yearly) .plan-offer + .plan-pricing { padding-top: .6rem; }
-    /* An offer is for monthly billing only: on yearly the label, the struck price and the time
-       left go, here and in the list of all plans, and the yearly price shows as usual. */
+    /* An offer is for monthly billing only: on yearly the label, the offer's struck price and the
+       time left go, here and in the list of all plans. Yearly shows its price per month with the
+       usual monthly price struck through beside it instead. */
     .studio.is-yearly .plan-offer,
-    .studio.is-yearly .price-original-row,
+    .studio.is-yearly .price-original-row.is-offer,
+    .studio:not(.is-yearly) .price-original-row.is-yearly,
     .studio.is-yearly .offer-ends,
-    .plan-picker.is-yearly .plan-pick-offer { display: none; }
+    .plan-picker.is-yearly .plan-pick-offer,
+    .plan-picker:not(.is-yearly) .plan-pick-was { display: none; }
     .studio:not(.is-yearly) .plan-card.is-first-month .price-period { display: none; }
     /* When the offer ends: calm and still while more than a day is left; in the last day,
        amber and counting down to the second. */
@@ -514,7 +517,7 @@
     .plan-pick-price small { color: var(--muted); font-size: .8rem; font-weight: 500; margin-inline-start: .2rem; }
     .plan-picker:not(.is-yearly) .plan-pick.is-first-month .plan-pick-price small { display: none; }
     .plan-pick-offer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .2rem .45rem; }
-    .plan-pick-offer s { color: color-mix(in oklab, var(--muted) 70%, var(--text)); font-size: .9rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: var(--price-strike); white-space: nowrap; }
+    .plan-pick-offer s, .plan-pick-was s { color: color-mix(in oklab, var(--muted) 70%, var(--text)); font-size: .9rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: var(--price-strike); white-space: nowrap; }
     .plan-pick-off {
       padding: .1rem .5rem;
       border-radius: var(--radius-full);
@@ -1230,6 +1233,9 @@
               // A plan on offer: its full price struck through and how much is off, under the price.
               $pickOffer = !empty($plan['has_discount']) && !empty($plan['original_price_monthly_formatted']);
               $pickPercent = (int) ($plan['discount_percentage'] ?? 0);
+              // On yearly: the usual monthly price struck through under the yearly price per month.
+              $pickFullMonthly = $wholePrice((string) ($plan['original_price_monthly_formatted'] ?? $plan['display_price_monthly_formatted'] ?? ''));
+              $pickYearlySaves = $pickYearly !== '' && $pickYearly !== $pickFullMonthly;
             @endphp
             <button type="button" @class(['plan-pick', 'is-first-month' => !empty($plan['discount_first_month'])]) data-pick="{{ $plan['slug'] }}" aria-controls="studio">
               @if($pickPopular)<span class="plan-pick-crown">{!! $crownSvg !!}{{ __('ui.pricing.most_popular') }}</span>@endif
@@ -1243,6 +1249,9 @@
                     <s dir="ltr">{{ $wholePrice((string) $plan['original_price_monthly_formatted']) }}</s>
                     <span class="plan-pick-off">{{ __('ui.pricing.discount_chip', ['percent' => $pickPercent]) }}</span>
                   </span>
+                @endif
+                @if($pickYearlySaves)
+                  <span class="plan-pick-was"><s dir="ltr">{{ $pickFullMonthly }}</s></span>
                 @endif
               </span>
             </button>
@@ -1623,9 +1632,11 @@
         var name = card.querySelector('.plan-name');
         var price = card.querySelector('.price-value');
         var period = card.querySelector('.price-period');
-        var was = card.closest('.studio.is-yearly') ? null : card.querySelector('.price-original');
-        // The price as the card shows it: "/month" only when the card has it, the full price struck through on an
-        // offer (monthly billing only).
+        var was = Array.prototype.filter.call(card.querySelectorAll('.price-original'), function (el) {
+          return getComputedStyle(el.parentNode).display !== 'none';
+        })[0];
+        // The price as the card shows it: "/month" only when the card has it, and the struck price the card
+        // shows (an offer's full price on monthly, the usual monthly price on yearly).
         var shownPeriod = period && getComputedStyle(period).display !== 'none' ? ' ' + period.textContent.trim() : '';
         var barPrice = document.getElementById('planBarPrice');
         document.getElementById('planBarName').textContent = name ? name.textContent.trim() : '';

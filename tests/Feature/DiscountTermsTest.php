@@ -121,6 +121,9 @@ class DiscountTermsTest extends TestCase
             ->assertSee('data-monthly-label="Get 30% off"', false)
             ->assertSee('data-yearly-label="Get started"', false)
             ->assertDontSee('your first year')
+            // On yearly, each plan's usual monthly price is struck through beside its yearly price.
+            ->assertSee('class="price-original-row is-yearly"', false)
+            ->assertSee('class="plan-pick-was"', false)
             ->assertSee('class="plan-pick is-first-month"', false)
             ->assertSee('30% off')
             // A week left: in words, not counting down yet.
