@@ -7,6 +7,8 @@ use App\Models\CharGift;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
+use App\Models\User;
+use App\Services\Analytics\UsageInsights;
 use App\Services\Billing\RenewalGrace;
 use App\Services\PlanAccessService;
 use App\Support\PlanUsageGuard;
@@ -139,25 +141,16 @@ class UsageCounterResource extends Resource
                     ->label('Plan now')
                     ->options(fn (): array => ['paid' => 'Any paid plan', 'free' => 'Free']
                         + Plan::query()->subscriptionPlans()->where('price_cents', '>', 0)->orderBy('price_cents')->pluck('name', 'id')->all())
-                    ->query(function (Builder $query, array $data): Builder {
-                        $value = $data['value'] ?? null;
-                        if ($value === null || $value === '') {
-                            return $query;
-                        }
-                        $paidUserIds = self::activeSubscriptions()
-                            ->whereHas('plan', fn (Builder $plan) => $plan->where('price_cents', '>', 0))
-                            ->select('user_id');
-
-                        return match ($value) {
-                            'paid' => $query->whereIn('user_id', $paidUserIds),
-                            'free' => $query->whereNotIn('user_id', $paidUserIds),
-                            default => $query->whereIn('user_id', self::activeSubscriptions()->where('plan_id', (int) $value)->select('user_id')),
-                        };
-                    }),
+                    ->query(fn (Builder $query, array $data): Builder => self::onPlan($query, $data['value'] ?? null)),
                 Tables\Filters\Filter::make('gifted')
                     ->label('Received gifted credits')
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->where('bonus_chars', '>', 0)),
+                Tables\Filters\Filter::make('members_only')
+                    ->label('Leave out admin accounts')
+                    ->toggle()
+                    ->default()
+                    ->query(fn (Builder $query): Builder => self::withoutAdmins($query)),
                 Tables\Filters\Filter::make('active')
                     ->label('Generated at least once')
                     ->toggle()
@@ -207,6 +200,20 @@ class UsageCounterResource extends Resource
                         ->state(fn (UsageCounter $record): string => number_format((int) $record->bonus_chars)),
                     Infolists\Components\TextEntry::make('updated_at')->label('Last generation')->dateTime()->since(),
                 ]),
+            Infolists\Components\Section::make('What they made')
+                ->description('Every generation charged to this period, pack characters included: how often, what they chose and where.')
+                ->visible(fn (UsageCounter $record): bool => $record->user_id !== null)
+                ->schema([
+                    Infolists\Components\ViewEntry::make('insights')
+                        ->hiddenLabel()
+                        ->view('filament.infolists.usage-insights')
+                        ->state(function (UsageCounter $record): array {
+                            $generations = UsageInsights::period((int) $record->user_id, (string) $record->period_ym);
+                            $insights = app(UsageInsights::class);
+
+                            return ['summary' => $insights->summary($generations), 'breakdowns' => $insights->breakdowns($generations)];
+                        }),
+                ]),
             Infolists\Components\Section::make('Gifts this month')
                 ->visible(fn (UsageCounter $record): bool => (int) $record->bonus_chars > 0)
                 ->schema([
@@ -223,6 +230,37 @@ class UsageCounterResource extends Resource
             'index' => Pages\ListUsageCounters::route('/'),
             'view' => Pages\ViewUsageCounter::route('/{record}'),
         ];
+    }
+
+    /**
+     * Rows of members on a plan now: 'paid' (any paid plan), 'free', or a plan's id.
+     * Shared with the Monthly usage widgets, so they count what the table shows.
+     */
+    public static function onPlan(Builder $query, ?string $value, string $column = 'user_id'): Builder
+    {
+        if ($value === null || $value === '') {
+            return $query;
+        }
+
+        return match ($value) {
+            'paid' => $query->whereIn($column, self::payingMemberIds()),
+            'free' => $query->whereNotIn($column, self::payingMemberIds()),
+            default => $query->whereIn($column, self::activeSubscriptions()->where('plan_id', (int) $value)->select('user_id')),
+        };
+    }
+
+    /** Members on a paid plan now, as a subquery of user ids. */
+    public static function payingMemberIds(): Builder
+    {
+        return self::activeSubscriptions()
+            ->whereHas('plan', fn (Builder $plan) => $plan->where('price_cents', '>', 0))
+            ->select('user_id');
+    }
+
+    /** Leaves out admin accounts, so the team's own testing doesn't count as members' use. */
+    public static function withoutAdmins(Builder $query, string $column = 'user_id'): Builder
+    {
+        return $query->whereNotIn($column, User::query()->where('is_admin', true)->select('id'));
     }
 
     private static function activeSubscriptions(): Builder

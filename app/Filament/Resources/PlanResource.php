@@ -368,28 +368,11 @@ class PlanResource extends Resource
                             })
                             ->helperText('Price per extra audio minute (stored as cents).'),
                     ]),
-                Forms\Components\Section::make('TTS & Hybrid Engine')
-                    ->description('Controls which TTS engine users on this plan receive and advanced audio features.')
+                // The engine follows the voice type alone (Standard or HD), so a plan has no engine settings.
+                Forms\Components\Section::make('Studio features')
+                    ->description('Extra studio tools members on this plan can use.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Select::make('tts_provider_policy')
-                            ->label('TTS Provider Policy')
-                            ->options([
-                                'default' => 'Use Global Setting',
-                                'google_only' => 'Google Cloud TTS Only',
-                                'gemini_only' => 'Gemini TTS Only',
-                                'gemini_preferred' => 'Gemini Preferred',
-                            ])
-                            ->default('default')
-                            ->helperText('Kept for reference: it no longer changes the engine. Standard voices always use Google Cloud, and HD voices always use Gemini, never a standard voice.'),
-                        Forms\Components\Select::make('quality_tier')
-                            ->label('Audio Quality Tier')
-                            ->options([
-                                'standard' => 'Standard (WaveNet)',
-                                'high' => 'High (Gemini)',
-                            ])
-                            ->default('standard')
-                            ->helperText('Standard = Google WaveNet, High = Gemini 2.5 Flash.'),
                         Forms\Components\Toggle::make('dialogue_enabled')
                             ->label('Dialogue Mode')
                             ->helperText('Allow users to create multi-speaker dialogue audio.')
@@ -402,13 +385,6 @@ class PlanResource extends Resource
                             ->label('Sound environments')
                             ->helperText('Echo, hall, phone call, radio and the other effects on the whole recording. Needs ffmpeg on the server. Plans without it see the option locked, with an upgrade button.')
                             ->default(false),
-                        Forms\Components\TextInput::make('queue_priority_weight')
-                            ->label('Queue Priority Weight')
-                            ->numeric()
-                            ->minValue(0)
-                            ->maxValue(1000)
-                            ->default(0)
-                            ->helperText('Higher weight = higher priority in job queue (0-1000).'),
                     ]),
                 Forms\Components\Section::make('Downloads')
                     ->description('The audio file types members on this plan can download. With more than one, the download button opens a small menu.')
@@ -679,14 +655,6 @@ class PlanResource extends Resource
                     ->label('Requests/mo')
                     ->formatStateUsing(fn (int $state) => $state <= 0 ? 'Unlimited' : number_format($state))
                     ->sortable(),
-                Tables\Columns\TextColumn::make('quality_tier')
-                    ->label('Quality')
-                    ->badge()
-                    ->color(fn (?string $state): string => match ($state) {
-                        'high' => 'success',
-                        default => 'gray',
-                    })
-                    ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean()
@@ -695,21 +663,6 @@ class PlanResource extends Resource
                     ->label('Featured')
                     ->boolean()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('tts_provider_policy')
-                    ->label('TTS Policy')
-                    ->badge()
-                    ->color(fn (?string $state): string => match ($state) {
-                        'gemini_only', 'gemini_preferred' => 'success',
-                        'google_only' => 'info',
-                        default => 'gray',
-                    })
-                    ->formatStateUsing(fn (?string $state): string => match ($state) {
-                        'google_only' => 'Google',
-                        'gemini_only' => 'Gemini',
-                        'gemini_preferred' => 'Gemini+FB',
-                        default => 'Default',
-                    })
-                    ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\IconColumn::make('dialogue_enabled')
                     ->label('Dialogue')
                     ->boolean()

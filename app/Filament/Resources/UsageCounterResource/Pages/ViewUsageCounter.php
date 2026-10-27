@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\UsageCounterResource\Pages;
 
+use App\Filament\Resources\AudioGenerationResource;
 use App\Filament\Resources\SubscriptionResource;
 use App\Filament\Resources\UsageCounterResource;
 use App\Filament\Resources\UserResource;
@@ -29,6 +30,12 @@ class ViewUsageCounter extends ViewRecord
                 ->color('gray')
                 ->visible(fn (): bool => $this->record->user !== null)
                 ->url(fn (): string => UserResource::getUrl('edit', ['record' => $this->record->user])),
+            Actions\Action::make('openGenerations')
+                ->label('Their generations')
+                ->icon('heroicon-o-musical-note')
+                ->color('gray')
+                ->visible(fn (): bool => filled($this->record->user?->email))
+                ->url(fn (): string => AudioGenerationResource::getUrl('index', ['tableSearch' => $this->record->user->email])),
             Actions\Action::make('giftChars')
                 ->label('Gift characters')
                 ->icon('heroicon-o-gift')
