@@ -454,6 +454,19 @@
     .feature-label svg { flex: none; width: 1rem; height: 1rem; margin-top: .12rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .feature-value { flex: none; max-width: 55%; color: var(--text); font-weight: 650; line-height: 1.4; text-align: end; }
     .plan-features li.is-tick .feature-label { color: var(--text); font-weight: 600; }
+    /* Desktop: the card is wide, so its text reads a size up: the plan's line, the offer's label,
+       the minutes and credits, and the plan's lines. */
+    @media (min-width: 1001px) {
+      .plan-desc { font-size: 1.05rem; }
+      .offer-label { padding: .42rem 1rem; font-size: .98rem; gap: .5rem; }
+      .offer-label svg { width: 18px; height: 18px; }
+      .plan-minutes-number, .plan-quota-number { font-size: 1.15rem; }
+      .plan-minutes-unit, .plan-quota-unit { font-size: .95rem; }
+      .plan-quota-coin { font-size: 1.2rem; }
+      .plan-features { gap: .75rem; }
+      .plan-features li { font-size: .98rem; }
+      .feature-label svg { width: 1.1rem; height: 1.1rem; }
+    }
     .plan-features li.is-tick .feature-label svg { color: var(--ok); stroke-width: 2.6; }
 
     /* At the foot of the track: the voices every plan has. Under the card: every plan to pick from. */
