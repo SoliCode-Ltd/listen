@@ -41,7 +41,7 @@ class UsageCounterResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Monthly usage';
 
-    /** @var array<string, array{plan:?Plan, allowance:?int}> */
+    /** @var array<string, array{plan:?Plan, allowance:?int, current:bool}> */
     private static array $planCache = [];
 
     public static function canCreate(): bool
@@ -83,22 +83,13 @@ class UsageCounterResource extends Resource
                 Tables\Columns\TextColumn::make('period_ym')
                     ->label('Month')
                     ->formatStateUsing(fn (UsageCounter $record): string => $record->monthLabel())
+                    // A paid plan's credits restart on its own dates, so a month can end early.
+                    ->description(fn (UsageCounter $record): string => self::isCurrent($record) ? 'Current period' : 'Ended')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('total_chars')
                     ->label('Credits used')
                     ->sortable()
-                    ->formatStateUsing(function (UsageCounter $record): string {
-                        $allowance = self::allowance($record);
-                        if ($allowance === null) {
-                            return number_format((int) $record->total_chars);
-                        }
-                        if ($allowance <= 0) {
-                            return number_format((int) $record->total_chars).' · no monthly allowance now';
-                        }
-
-                        return number_format((int) $record->total_chars).' of '.number_format($allowance)
-                            .($allowance > 0 ? ' ('.self::percent($record, $allowance).'%)' : '');
-                    })
+                    ->formatStateUsing(fn (UsageCounter $record): string => self::creditsLabel($record))
                     ->color(function (UsageCounter $record): ?string {
                         $allowance = self::allowance($record);
                         if (! $allowance) {
@@ -108,7 +99,7 @@ class UsageCounterResource extends Resource
 
                         return $percent >= 90 ? 'danger' : ($percent >= 70 ? 'warning' : null);
                     })
-                    ->tooltip('This month shows the credits allowed (plan + gifts). Earlier months show what was used.'),
+                    ->tooltip('Credits used out of the credits allowed: the plan the member is on now, plus that period\'s gifts.'),
                 Tables\Columns\TextColumn::make('total_requests')
                     ->label('Generations')
                     ->numeric()
@@ -117,7 +108,7 @@ class UsageCounterResource extends Resource
                     ->label('Audio length')
                     ->formatStateUsing(fn (UsageCounter $record): string => $record->audioLabel()
                         .(self::allowance($record) ? ' of '.number_format(\App\Support\Credits::minutesFor((int) self::allowance($record))).' min' : ''))
-                    ->tooltip('The real length of the audio made this month. This month also shows the voice minutes the credits allow.')
+                    ->tooltip('The real length of the audio made in the period, out of the voice minutes its credits allow.')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('bonus_chars')
                     ->label('Gifted')
@@ -202,16 +193,10 @@ class UsageCounterResource extends Resource
                 ->schema([
                     Infolists\Components\TextEntry::make('total_chars')
                         ->label('Credits used')
-                        ->state(function (UsageCounter $record): string {
-                            $allowance = self::allowance($record);
-
-                            return $allowance === null
-                                ? number_format((int) $record->total_chars)
-                                : number_format((int) $record->total_chars).' of '.number_format($allowance).' ('.self::percent($record, $allowance).'%)';
-                        }),
+                        ->state(fn (UsageCounter $record): string => self::creditsLabel($record)),
                     Infolists\Components\TextEntry::make('remaining')
                         ->label('Left this month')
-                        ->visible(fn (UsageCounter $record): bool => self::allowance($record) !== null)
+                        ->visible(fn (UsageCounter $record): bool => self::isCurrent($record) && self::allowance($record) !== null)
                         ->state(fn (UsageCounter $record): string => number_format(max(0, (int) self::allowance($record) - (int) $record->total_chars))),
                     Infolists\Components\TextEntry::make('total_requests')->label('Generations')->numeric(),
                     Infolists\Components\TextEntry::make('total_seconds')
@@ -254,13 +239,34 @@ class UsageCounterResource extends Resource
         return self::planInfo($record)['plan'];
     }
 
+    /** "125,000 of 500,000 (25%)": the credits used out of the period's allowance. */
+    private static function creditsLabel(UsageCounter $record): string
+    {
+        $used = number_format((int) $record->total_chars);
+        $allowance = self::allowance($record);
+        if ($allowance === null) {
+            return $used;
+        }
+        if ($allowance <= 0) {
+            return $used.' · no monthly allowance';
+        }
+
+        return $used.' of '.number_format($allowance).' ('.self::percent($record, $allowance).'%)';
+    }
+
     /**
-     * The month's allowance (plan + gifts), for the current month only: the
-     * plan a member had in past months is not recorded.
+     * The period's allowance (plan + gifts). The plan a member had in an ended
+     * period is not recorded, so it is measured against the plan they are on now.
      */
     private static function allowance(UsageCounter $record): ?int
     {
         return self::planInfo($record)['allowance'];
+    }
+
+    /** Whether the row is the member's credit period running now (not one that has ended). */
+    private static function isCurrent(UsageCounter $record): bool
+    {
+        return self::planInfo($record)['current'];
     }
 
     private static function percent(UsageCounter $record, int $allowance): int
@@ -269,7 +275,10 @@ class UsageCounterResource extends Resource
     }
 
     /**
-     * @return array{plan:?Plan, allowance:?int}
+     * The member's plan, the credits the period allows and whether it is running now. An ended
+     * period is measured against the plan the member is on now, plus that period's gifts.
+     *
+     * @return array{plan:?Plan, allowance:?int, current:bool}
      */
     private static function planInfo(UsageCounter $record): array
     {
@@ -285,12 +294,12 @@ class UsageCounterResource extends Resource
         $plans = app(PlanAccessService::class);
         $plan = $record->user_id ? $plans->resolveActivePlanForUserId((int) $record->user_id) : null;
         $allowance = null;
-        if ($record->isCurrentMonth() && $record->user_id) {
+        if ($record->user_id) {
             $quota = $plans->resolveQuotaPlanForUserId((int) $record->user_id, $plans->resolveAccessPlanForUserId((int) $record->user_id));
             $allowance = PlanUsageGuard::charsLimit($quota, $record);
         }
 
-        return self::$planCache[$key] = ['plan' => $plan, 'allowance' => $allowance];
+        return self::$planCache[$key] = ['plan' => $plan, 'allowance' => $allowance, 'current' => $record->isCurrentMonth()];
     }
 
     private static function giftsList(UsageCounter $record): HtmlString

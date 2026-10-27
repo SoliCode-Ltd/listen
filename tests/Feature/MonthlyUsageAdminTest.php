@@ -47,11 +47,29 @@ class MonthlyUsageAdminTest extends TestCase
             ->assertSee('Sara')
             ->assertSee('Starter')
             ->assertSee('125,000 of 500,000 (25%)')
+            ->assertSee('Current period')
             ->assertSee(now()->format('F Y'));
 
         Livewire::test(\App\Filament\Widgets\MonthlyUsageStats::class)
             ->assertSee('Members who generated')
             ->assertSee('125,000');
+    }
+
+    public function test_an_ended_month_also_shows_its_percentage(): void
+    {
+        $member = User::factory()->create();
+        app(PlanAccessService::class)->assignPlan($member, $this->starter);
+        $old = UsageCounter::query()->create(['user_id' => $member->id, 'period_ym' => now()->subMonth()->format('Y-m'), 'total_chars' => 250000, 'total_requests' => 9]);
+
+        Livewire::test(ListUsageCounters::class)
+            ->filterTable('period_ym', now()->subMonth()->format('Y-m'))
+            ->assertCanSeeTableRecords([$old])
+            ->assertSee('250,000 of 500,000 (50%)')
+            ->assertSee('Ended');
+
+        Livewire::test(ViewUsageCounter::class, ['record' => $old->getRouteKey()])
+            ->assertSee('250,000 of 500,000 (50%)')
+            ->assertDontSee('Left this month');
     }
 
     public function test_it_opens_on_this_month_and_other_months_are_a_filter_away(): void
