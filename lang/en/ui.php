@@ -347,6 +347,7 @@ return [
         'offer_ends_days' => 'Offer ends in :count day|Offer ends in :count days',
         'offer_ends_hours' => 'Offer ends in :count hour|Offer ends in :count hours',
         'offer_ends_minutes' => 'Offer ends in :count minute|Offer ends in :count minutes',
+        'offer_days_left' => ':count day|:count days',
         'unit_days_short' => 'd',
         'unit_hours_short' => 'h',
         'unit_minutes_short' => 'm',

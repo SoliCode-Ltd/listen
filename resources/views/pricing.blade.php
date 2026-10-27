@@ -329,16 +329,13 @@
     .plan-picker.is-yearly .plan-pick-offer,
     .plan-picker:not(.is-yearly) .plan-pick-was { display: none; }
     .studio:not(.is-yearly) .plan-card.is-first-month .price-period { display: none; }
-    /* When the offer ends: calm and still while more than a day is left; in the last day,
-       amber and counting down to the second. */
+    /* When the offer ends: in amber and counting down to the second, with room above it. */
     .pricing-page { --offer-urgent: #FDB022; }
     html[data-theme="light"] .pricing-page { --offer-urgent: #B54708; }
-    .offer-ends { display: inline-flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .1rem .4rem; margin-top: .1rem; color: var(--muted); font-size: .86rem; font-weight: 600; }
+    .offer-ends { display: inline-flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .1rem .4rem; margin-top: .6rem; color: var(--offer-urgent); font-size: .86rem; font-weight: 600; }
     .offer-ends[hidden] { display: none; }
-    .offer-ends.is-urgent { color: var(--offer-urgent); }
     .offer-ends svg { flex: none; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .offer-ends-clock { font-weight: 700; font-variant-numeric: tabular-nums; unicode-bidi: isolate; }
-    .offer-ends-clock:empty { display: none; }
     .offer-ends-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
     /* The most popular plan: a ribbon across the panel's corner, with a crown. */
@@ -1535,6 +1532,7 @@
       'days' => explode('|', __('ui.pricing.offer_ends_days')),
       'hours' => explode('|', __('ui.pricing.offer_ends_hours')),
       'minutes' => explode('|', __('ui.pricing.offer_ends_minutes')),
+      'left' => explode('|', __('ui.pricing.offer_days_left')),
     ];
   @endphp
   <script>
@@ -1558,8 +1556,8 @@
       }
       function pad(n) { return (n < 10 ? '0' : '') + n; }
       function set(el, text) { if (el && el.textContent !== text) el.textContent = text; }
-      // More than a day left: in words ("Offer ends in 3 days", "… in 29 hours"). The last day:
-      // "Offer ends in" and the clock, to the second, in colour.
+      // "Offer ends in", the days while there is more than one, then the clock to the second
+      // ("Offer ends in 3 days 04:12:33"). Screen readers get the time left in words.
       function refresh() {
         var any = false;
         lines.forEach(function(el) {
@@ -1569,10 +1567,9 @@
           var text = seconds >= 172800 ? form(forms.days, Math.floor(seconds / 86400))
             : seconds >= 3600 ? form(forms.hours, Math.floor(seconds / 3600))
             : form(forms.minutes, Math.max(1, Math.ceil(seconds / 60)));
-          var soon = seconds < 86400;
-          el.classList.toggle('is-urgent', soon);
-          set(el.querySelector('.offer-ends-words'), soon ? endsIn : text);
-          set(el.querySelector('.offer-ends-clock'), soon ? pad(Math.floor(seconds / 3600)) + ':' + pad(Math.floor(seconds % 3600 / 60)) + ':' + pad(seconds % 60) : '');
+          var days = Math.floor(seconds / 86400), rest = seconds % 86400;
+          set(el.querySelector('.offer-ends-words'), endsIn + (days > 0 ? ' ' + form(forms.left, days) : ''));
+          set(el.querySelector('.offer-ends-clock'), pad(Math.floor(rest / 3600)) + ':' + pad(Math.floor(rest % 3600 / 60)) + ':' + pad(rest % 60));
           set(el.querySelector('.offer-ends-text'), text);
         });
         if (any) setTimeout(refresh, 1000);
