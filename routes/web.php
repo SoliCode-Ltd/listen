@@ -277,6 +277,9 @@ Route::group([
 
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::post('/dashboard/queue', [DashboardController::class, 'queue'])->middleware('throttle:studio-generate')->name('dashboard.queue');
+        // The member's pronunciations, from the studio's panel.
+        Route::post('/dashboard/pronunciations', [\App\Http\Controllers\PronunciationController::class, 'store'])->middleware('throttle:60,1')->name('dashboard.pronunciations.save');
+        Route::delete('/dashboard/pronunciations/{pronunciation}', [\App\Http\Controllers\PronunciationController::class, 'destroy'])->whereNumber('pronunciation')->middleware('throttle:60,1')->name('dashboard.pronunciations.delete');
         Route::post('/dashboard/generate', [DashboardController::class, 'queue'])->middleware('throttle:studio-generate')->name('dashboard.generate');
         Route::delete('/dashboard/jobs/{job}', [DashboardController::class, 'destroy'])->name('dashboard.jobs.destroy');
         Route::delete('/dashboard/demo-jobs/{generation}', [DashboardController::class, 'destroyDemo'])->name('dashboard.demo-jobs.destroy');

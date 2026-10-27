@@ -156,6 +156,10 @@ class TtsService
         if (array_key_exists('style_prompt', $options)) {
             $voiceConfig['style_prompt'] = $options['style_prompt'];
         }
+        // The member's pronunciations in the text (App\Support\Pronunciations): kept through any rewrite, named in the direction.
+        if (! empty($options['pronounce'])) {
+            $voiceConfig['pronounce'] = array_values((array) $options['pronounce']);
+        }
 
         $studio = $this->normalizeStudioStyleOptions($voiceConfig);
         $voiceConfig['performance_style'] = $studio['performance_style'];
@@ -251,6 +255,13 @@ class TtsService
             && StandardVoiceEngine::usesChirp()
         ) {
             $parts[] = 'standard:'.StandardVoiceEngine::CHIRP3_HD;
+        }
+
+        // A take told to keep a member's pronunciations is never another take's copy.
+        if (! empty($config['pronounce'])) {
+            $pronounce = array_values((array) $config['pronounce']);
+            sort($pronounce);
+            $parts[] = 'pronounce:'.sha1(json_encode($pronounce, JSON_UNESCAPED_UNICODE));
         }
 
         if ($provider === 'gemini') {

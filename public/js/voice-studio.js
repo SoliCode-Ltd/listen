@@ -35,6 +35,39 @@
     return esc(String(text == null ? '' : text)).replace(/"/g, '&quot;');
   }
 
+  // ---------- Saving from the panel (favourite voices, pronunciations) ----------
+  // The page's form token, read when sent: the dashboard renews its own; the demo's form has none.
+  function pageToken(meta) {
+    var node = document.querySelector('meta[name="csrf-token"]') || document.querySelector('input[name="_token"]');
+    return (node ? (node.content || node.value || '') : '') || meta.token || '';
+  }
+  // A page left open long holds an expired token and a save comes back 419: a fresh token
+  // is asked for (meta.tokenUrl), put in the page, and the save sent once more, so the
+  // member never has to reload the page to save.
+  function panelFetch(meta, url, options) {
+    function send() {
+      return fetch(url, Object.assign({}, options, {
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': pageToken(meta), 'X-Requested-With': 'XMLHttpRequest' }
+      }));
+    }
+    return send().then(function (res) {
+      if (res.status !== 419 || !meta.tokenUrl) return res;
+      return fetch(meta.tokenUrl, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          var token = data && data.token ? String(data.token) : '';
+          if (!token) return res;
+          meta.token = token;
+          document.querySelectorAll('input[name="_token"]').forEach(function (input) { input.value = token; });
+          var tag = document.querySelector('meta[name="csrf-token"]');
+          if (tag) tag.setAttribute('content', token);
+          return send();
+        })
+        .catch(function () { return res; });
+    });
+  }
+
   // ---------- Dropdowns: a styled button and list over each visible select ----------
   // The select stays the form field (page code fills it, reads it and sets it);
   // the list mirrors its options, and picking one sets it and fires "change".
@@ -666,6 +699,341 @@
     return bar;
   }
 
+  // ---------- How words are said: the member's own pronunciations ----------
+  // A word as it is written, and how every new voice should say it (with vowel
+  // marks, or spelled the way it sounds). The list is the member's; the server
+  // applies it before a voice is read. Words from the list are underlined in
+  // the text box, and a selected word can be added in one click.
+  // Every Arabic vowel mark, in three groups; each button shows the mark and its Arabic name.
+  // Every Arabic vowel mark, in three groups; each button shows the mark on a letter, with its Arabic name.
+  var PRON_MARKS = [
+    ['short', [['َ', 'fatha', 'ب'], ['ُ', 'damma', 'ب'], ['ِ', 'kasra', 'ب'], ['ْ', 'sukun', 'ب']]],
+    ['tanween', [['ً', 'tanween_fath', 'ب'], ['ٌ', 'tanween_damm', 'ب'], ['ٍ', 'tanween_kasr', 'ب']]],
+    ['other', [['ّ', 'shadda', 'ب'], ['ٓ', 'madda', 'ا'], ['ٰ', 'dagger_alef', 'ه'], ['ٔ', 'hamza_above', 'ا'], ['ٕ', 'hamza_below', 'ا']]]
+  ];
+  var PRON_DIACRITICS = '\\u064B-\\u065F\\u0670\\u0640';
+
+  // A word matches however it is written: with or without vowel marks, any form of alef, ى/ي and ة/ه.
+  function pronPattern(word) {
+    var bare = String(word || '').replace(new RegExp('[' + PRON_DIACRITICS + ']', 'g'), '').trim();
+    if (!bare) return null;
+    var body = '';
+    Array.prototype.forEach.call(bare, function (ch) {
+      var cls = /[اأإآٱ]/.test(ch) ? '[اأإآٱ]' : /[يى]/.test(ch) ? '[يى]' : /[هة]/.test(ch) ? '[هة]'
+        : /\s/.test(ch) ? '\\s+' : ch.replace(/[.*+?^${}()|[\]\\\/-]/g, '\\$&');
+      body += cls + '[' + PRON_DIACRITICS + ']*';
+    });
+    try {
+      return new RegExp('(?<![\\p{L}\\p{M}\\p{N}])' + body + '(?![\\p{L}\\p{M}\\p{N}])', 'giu');
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function buildPron(form, meta, toolbar, textarea) {
+    var cfg = meta.pron;
+    var editor = form.querySelector('[data-vs-editor]');
+    if (!cfg || !editor || !textarea) return null;
+    var tr = function (key, vars) { return t({ i18n: cfg.i18n || {} }, key, vars); };
+    var items = Array.isArray(cfg.items) ? cfg.items.slice() : [];
+
+    if (!toolbar) {
+      toolbar = document.createElement('div');
+      toolbar.className = 'vs-toolbar';
+      toolbar.setAttribute('role', 'toolbar');
+      editor.parentNode.insertBefore(toolbar, editor);
+    }
+    var item = document.createElement('div');
+    item.className = 'vs-tb-item vs-tb-pron';
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'vs-tb-btn';
+    button.setAttribute('aria-haspopup', 'dialog');
+    item.appendChild(button);
+    var upgrade = toolbar.querySelector('.vs-tb-upgrade');
+    toolbar.insertBefore(item, upgrade || null);
+
+    // The button says which word it will set when one word is selected.
+    var picked = '';
+    function selectedWord() {
+      var s = textarea.selectionStart, e = textarea.selectionEnd;
+      if (s == null || e == null || e <= s || e - s > 60) return '';
+      var w = textarea.value.slice(s, e).replace(/^[\s«»"'“”(\[]+|[\s«»"'“”)\].,،؛:!?؟]+$/g, '');
+      return w && w.split(/\s+/).length <= 3 && /[\p{L}]/u.test(w) && !/[<>\[\]\n]/.test(w) ? w : '';
+    }
+    function drawButton() {
+      var count = items.length;
+      button.innerHTML = icon('g-pron') + '<span class="vs-tb-label">' + escAttr(picked ? tr('button_word', { word: picked }) : tr('button')) + '</span>'
+        + (!picked && count ? '<small class="vs-tb-count">' + count + '</small>' : '');
+      button.classList.toggle('is-word', !!picked);
+    }
+    function onSelect() {
+      var w = selectedWord();
+      if (w !== picked) { picked = w; drawButton(); }
+    }
+    ['select', 'keyup', 'mouseup', 'touchend'].forEach(function (ev) { textarea.addEventListener(ev, onSelect); });
+    document.addEventListener('selectionchange', function () { if (document.activeElement === textarea) onSelect(); });
+    textarea.addEventListener('blur', function () {
+      // Kept while the button is pressed, so the click still knows the word.
+      setTimeout(function () { if (document.activeElement !== button && picked) { picked = ''; drawButton(); } }, 250);
+    });
+
+    // ---------- The dialog ----------
+    var modal = document.createElement('div');
+    modal.className = 'vs-modal vs-pron';
+    modal.hidden = true;
+    var marks = PRON_MARKS.map(function (group) {
+      return '<div class="vs-pron-mark-group"><span class="vs-pron-mark-group-name">' + escAttr(tr('marks_' + group[0])) + '</span><div class="vs-pron-mark-row">'
+        + group[1].map(function (m) {
+          return '<button type="button" class="vs-pron-mark" data-mark="' + m[0] + '" aria-label="' + escAttr(tr('mark_' + m[1])) + '">'
+            + '<span class="vs-pron-mark-glyph" aria-hidden="true" dir="rtl">' + m[2] + m[0] + '</span><span class="vs-pron-mark-name" dir="rtl">' + escAttr(tr('mark_' + m[1])) + '</span></button>';
+        }).join('') + '</div></div>';
+    }).join('');
+    // Hear the difference: the same letters read differently, from recordings made once.
+    var examples = cfg.examples || {};
+    modal.innerHTML = '<div class="vs-modal-backdrop" data-vs-close></div>'
+      + '<div class="vs-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="vsPronTitle" aria-describedby="vsPronHint">'
+      + '<header class="vs-modal-head"><span class="vs-modal-ico" aria-hidden="true">' + icon('g-pron') + '</span><div class="vs-modal-titles"><h2 id="vsPronTitle">' + escAttr(tr('title')) + '</h2><p id="vsPronHint">' + escAttr(tr('hint')) + '</p></div>'
+      + '<button type="button" class="vs-modal-close" data-vs-close aria-label="' + escAttr(tr('close')) + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>'
+      + '<div class="vs-pron-scroll">'
+      + '<section class="vs-pron-example" aria-labelledby="vsPronExTitle" hidden><h3 id="vsPronExTitle">' + escAttr(tr('example_title')) + '</h3><p class="vs-pron-example-text"></p><div class="vs-pron-example-row"></div></section>'
+      + '<form class="vs-pron-add" id="vsPronForm" novalidate>'
+      + '<div class="vs-pron-fields">'
+      + '<label class="vs-pron-field"><span>' + escAttr(tr('word_label')) + '</span><input name="word" maxlength="60" autocomplete="off" spellcheck="false" dir="auto" placeholder=""></label>'
+      + '<svg class="vs-pron-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
+      + '<label class="vs-pron-field"><span>' + escAttr(tr('spoken_label')) + '</span><input name="spoken" maxlength="80" autocomplete="off" spellcheck="false" dir="auto" placeholder=""></label>'
+      + '</div>'
+      + '<div class="vs-pron-marks" role="group" aria-labelledby="vsPronMarksLabel"><span class="vs-pron-marks-label" id="vsPronMarksLabel">' + escAttr(tr('marks_label')) + '</span>' + marks + '</div>'
+      + '<p class="vs-pron-tip"></p>'
+      + '</form>'
+      + '<section class="vs-pron-saved" aria-labelledby="vsPronListTitle"><h3 id="vsPronListTitle">' + escAttr(tr('list_title')) + ' <small class="vs-pron-total"></small></h3>'
+      + '<ul class="vs-pron-list"></ul><p class="vs-pron-empty" hidden>' + escAttr(tr('empty')) + '</p>'
+      + '<p class="vs-pron-note">' + escAttr(tr('foot')) + '</p></section>'
+      + '</div>'
+      // The add button stays in view however far the panel is scrolled.
+      + '<footer class="vs-pron-foot"><p class="vs-pron-error" role="alert" hidden></p>'
+      + '<div class="vs-pron-actions"><button type="submit" form="vsPronForm" class="vs-pron-save">' + escAttr(tr('add')) + '</button><button type="button" class="vs-pron-cancel" hidden>' + escAttr(tr('cancel')) + '</button></div></footer>'
+      + '</div>';
+    document.body.appendChild(modal);
+    var addForm = modal.querySelector('.vs-pron-add');
+    var wordIn = addForm.querySelector('input[name="word"]');
+    var spokenIn = addForm.querySelector('input[name="spoken"]');
+    var errorEl = modal.querySelector('.vs-pron-error');
+    var saveBtn = modal.querySelector('.vs-pron-save');
+    var cancelBtn = modal.querySelector('.vs-pron-cancel');
+    var list = modal.querySelector('.vs-pron-list');
+    var empty = modal.querySelector('.vs-pron-empty');
+    var total = modal.querySelector('.vs-pron-total');
+    var editing = null;
+    var opener = null;
+
+    // The example follows the voice's language: Arabic letters with vowel marks, or an English spelling.
+    var exBox = modal.querySelector('.vs-pron-example');
+    var exText = exBox.querySelector('.vs-pron-example-text');
+    var exRow = exBox.querySelector('.vs-pron-example-row');
+    var exAudio = null;
+    var exPlaying = null;
+    function stopExample() {
+      if (exAudio) exAudio.pause();
+      if (exPlaying) exPlaying.classList.remove('is-playing');
+      exPlaying = null;
+    }
+    // The voice's language decides what helps: Arabic marks for an Arabic voice, an
+    // English spelling for an English one (the marks mean nothing to it).
+    function voiceLang() {
+      var langSelect = form.querySelector('select[name="target_language"]');
+      return langSelect && langSelect.value === 'en' ? 'en' : 'ar';
+    }
+    function drawForLanguage() {
+      var lang = voiceLang();
+      modal.querySelector('.vs-pron-marks').hidden = lang !== 'ar';
+      modal.querySelector('.vs-pron-tip').textContent = tr('tip_' + lang);
+      wordIn.placeholder = tr('word_placeholder_' + lang);
+      spokenIn.placeholder = tr('spoken_placeholder_' + lang);
+    }
+    function drawExample() {
+      stopExample();
+      var lang = voiceLang();
+      var ex = examples[lang];
+      exBox.hidden = !ex || !ex.items || !ex.items.length;
+      if (exBox.hidden) return;
+      exText.textContent = ex.text || '';
+      exRow.innerHTML = '';
+      ex.items.forEach(function (it) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'vs-pron-example-item';
+        b.innerHTML = '<span class="vs-pron-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path class="vs-pron-play-on" d="M8 5.5v13l11-6.5z"/><path class="vs-pron-play-off" d="M7.5 5.5h3v13h-3zM13.5 5.5h3v13h-3z"/></svg></span>'
+          + '<span class="vs-pron-example-words"><strong dir="auto">' + escAttr(it.spoken) + '</strong><small>' + escAttr(it.gloss || '') + '</small></span>';
+        b.setAttribute('aria-label', tr('example_play', { word: it.spoken }));
+        b.addEventListener('click', function () {
+          if (exPlaying === b) { stopExample(); return; }
+          stopExample();
+          exAudio = exAudio || new Audio();
+          exAudio.src = it.audio;
+          exAudio.onended = stopExample;
+          exAudio.play().then(function () { exPlaying = b; b.classList.add('is-playing'); }).catch(stopExample);
+        });
+        exRow.appendChild(b);
+      });
+    }
+
+    function inText(entry) {
+      var re = pronPattern(entry.word);
+      return !!(re && re.test(textarea.value));
+    }
+    function drawList() {
+      list.innerHTML = '';
+      // Words in the text box now come first.
+      var sorted = items.slice().sort(function (a, b) { return (inText(b) ? 1 : 0) - (inText(a) ? 1 : 0); });
+      sorted.forEach(function (entry) {
+        var li = document.createElement('li');
+        li.className = 'vs-pron-row' + (editing && editing.id === entry.id ? ' is-editing' : '');
+        li.innerHTML = '<span class="vs-pron-pair"><span class="vs-pron-word" dir="auto">' + escAttr(entry.word) + '</span>'
+          + '<svg class="vs-pron-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
+          + '<span class="vs-pron-spoken" dir="auto">' + escAttr(entry.spoken) + '</span></span>'
+          + (inText(entry) ? '<span class="vs-pron-here">' + escAttr(tr('in_text')) + '</span>' : '')
+          + '<span class="vs-pron-row-actions"><button type="button" data-edit>' + escAttr(tr('edit')) + '</button>'
+          + '<button type="button" data-delete class="is-danger">' + escAttr(tr('delete')) + '</button></span>';
+        li.querySelector('[data-edit]').addEventListener('click', function () { startEdit(entry); });
+        li.querySelector('[data-delete]').addEventListener('click', function () { remove(entry); });
+        list.appendChild(li);
+      });
+      empty.hidden = items.length > 0;
+      total.textContent = items.length ? String(items.length) : '';
+    }
+    function showError(key) {
+      errorEl.textContent = key ? tr(key) : '';
+      errorEl.hidden = !key;
+    }
+    function resetForm() {
+      editing = null;
+      wordIn.value = '';
+      spokenIn.value = '';
+      saveBtn.textContent = tr('add');
+      cancelBtn.hidden = true;
+      showError('');
+    }
+    function startEdit(entry) {
+      editing = entry;
+      wordIn.value = entry.word;
+      spokenIn.value = entry.spoken;
+      saveBtn.textContent = tr('save');
+      cancelBtn.hidden = false;
+      showError('');
+      drawList();
+      spokenIn.focus();
+    }
+    cancelBtn.addEventListener('click', function () { resetForm(); drawList(); wordIn.focus(); });
+
+    function send(method, url, body) {
+      return panelFetch(meta, url, { method: method, body: body ? JSON.stringify(body) : undefined }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (!res.ok) { var err = new Error('save'); err.data = data; throw err; }
+          return data;
+        });
+      });
+    }
+    function applyItems(data) {
+      if (data && Array.isArray(data.items)) items = data.items;
+      drawList();
+      drawButton();
+      repaint();
+    }
+
+    addForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var word = wordIn.value.trim();
+      var spoken = spokenIn.value.trim();
+      if (!word || !spoken) { showError('error_empty'); (word ? spokenIn : wordIn).focus(); return; }
+      if (word === spoken) { showError('error_same'); spokenIn.focus(); return; }
+      if (!editing && items.length >= (cfg.limit || 200)) { showError('error_full'); return; }
+      saveBtn.disabled = true;
+      send('POST', cfg.url, { id: editing ? editing.id : null, word: word, spoken: spoken })
+        .then(function (data) { resetForm(); applyItems(data); wordIn.focus(); })
+        .catch(function (err) {
+          var msg = err.data && err.data.message;
+          errorEl.textContent = msg || tr('error_save');
+          errorEl.hidden = false;
+        })
+        .then(function () { saveBtn.disabled = false; });
+    });
+    function remove(entry) {
+      send('DELETE', cfg.url + '/' + encodeURIComponent(entry.id))
+        .then(applyItems)
+        .catch(function () { showError('error_save'); });
+    }
+
+    // Vowel marks go in at the cursor of the "say it as" field.
+    var spokenCaret = null;
+    spokenIn.addEventListener('blur', function () { spokenCaret = [spokenIn.selectionStart, spokenIn.selectionEnd]; });
+    modal.querySelectorAll('.vs-pron-mark').forEach(function (b) {
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      b.addEventListener('click', function () {
+        var at = document.activeElement === spokenIn ? [spokenIn.selectionStart, spokenIn.selectionEnd] : (spokenCaret || [spokenIn.value.length, spokenIn.value.length]);
+        spokenIn.value = spokenIn.value.slice(0, at[0]) + b.dataset.mark + spokenIn.value.slice(at[1]);
+        var caret = at[0] + b.dataset.mark.length;
+        spokenIn.focus();
+        spokenIn.setSelectionRange(caret, caret);
+        spokenCaret = [caret, caret];
+      });
+    });
+
+    function open() {
+      opener = document.activeElement;
+      resetForm();
+      if (picked) {
+        // The selected word, ready to be given its marks.
+        var known = items.filter(function (it) { var re = pronPattern(it.word); return re && re.test(picked); })[0];
+        if (known) startEdit(known); else { wordIn.value = picked; spokenIn.value = picked; }
+      }
+      drawList();
+      drawExample();
+      drawForLanguage();
+      modal.hidden = false;
+      document.documentElement.classList.add('vs-modal-open');
+      setTimeout(function () {
+        var target = picked ? spokenIn : wordIn;
+        target.focus();
+        if (picked) target.setSelectionRange(target.value.length, target.value.length);
+      }, 30);
+    }
+    function close() {
+      stopExample();
+      modal.hidden = true;
+      document.documentElement.classList.remove('vs-modal-open');
+      picked = '';
+      // Back to writing: the word stays where it was, no longer selected.
+      if (textarea.selectionEnd > textarea.selectionStart) textarea.setSelectionRange(textarea.selectionEnd, textarea.selectionEnd);
+      drawButton();
+      if (opener && opener.focus) opener.focus({ preventScroll: true });
+    }
+    modal.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('[data-vs-close]')) close(); });
+    modal.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); close(); } });
+    button.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    button.addEventListener('click', open);
+
+    // ---------- Underline the words in the text box ----------
+    var repaint = function () {};
+    drawButton();
+    return {
+      item: item,
+      onPaint: function (fn) { repaint = fn; },
+      // Called on the text box's coloured copy: underlines every word from the list.
+      mark: function (html) {
+        if (!items.length) return html;
+        return html.split(/(<mark[^>]*>[\s\S]*?<\/mark>)/).map(function (part) {
+          if (part.indexOf('<mark') === 0) return part;
+          items.forEach(function (entry) {
+            var re = pronPattern(esc(entry.word));
+            if (re) part = part.replace(re, function (m) { return '<mark class="t-pron">' + m + '</mark>'; });
+          });
+          return part;
+        }).join('');
+      }
+    };
+  }
+
   // The tags need the premium voices: the menus show, dimmed, beside an upgrade button.
   function lockToolbar(bar, lock, meta) {
     bar.classList.add('is-locked');
@@ -732,14 +1100,7 @@
       var list = Object.keys(favorites).filter(function (k) { return favorites[k]; }).slice(0, 100);
       try { window.localStorage.setItem(STORE, JSON.stringify(list)); } catch (e) { /* no storage */ }
       if (!meta.favoritesUrl || !window.fetch) return;
-      var tokenNode = document.querySelector('meta[name="csrf-token"]') || document.querySelector('input[name="_token"]');
-      var token = tokenNode ? (tokenNode.content || tokenNode.value || '') : '';
-      fetch(meta.favoritesUrl, {
-        method: 'PUT',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
-        body: JSON.stringify({ voices: list })
-      }).catch(function () { /* kept in this browser */ });
+      panelFetch(meta, meta.favoritesUrl, { method: 'PUT', body: JSON.stringify({ voices: list }) }).catch(function () { /* kept in this browser */ });
     }
     // Previews: one shared player. Hovering a card shows the play button on the face;
     // a click, tap, Enter or Space plays it (hover alone may not start sound), and a
@@ -1000,6 +1361,9 @@
     }
     var toolbar = buildToolbar(form, meta, insertTag);
     if (toolbar && meta.tagsLock) lockToolbar(toolbar, meta.tagsLock, meta);
+    // Pronunciations work on every voice and plan, so they stay when the tags are locked or hidden.
+    var pron = buildPron(form, meta, toolbar, textarea);
+    if (pron && !toolbar) toolbar = pron.item.parentNode;
 
     // Options the plan does not include stay visible but are never sent.
     form.querySelectorAll('[data-vs-locked] input, [data-vs-locked] select, [data-vs-locked] textarea, [data-vs-locked] button')
@@ -1009,12 +1373,14 @@
     var backdrop = form.querySelector('[data-vs-editor] [data-vs-backdrop]');
     if (backdrop && textarea) {
       var paint = function () {
-        backdrop.innerHTML = esc(textarea.value)
+        var html = esc(textarea.value)
           .replace(/&lt;([^&\n]{1,40}?)&gt;/g, '<mark class="t-sound">&lt;$1&gt;</mark>')
-          .replace(/\[([^\[\]\n]{1,40})\]/g, '<mark class="t-delivery">[$1]</mark>') + '\n ';
+          .replace(/\[([^\[\]\n]{1,40})\]/g, '<mark class="t-delivery">[$1]</mark>');
+        backdrop.innerHTML = (pron ? pron.mark(html) : html) + '\n ';
         backdrop.scrollTop = textarea.scrollTop;
       };
       textarea.addEventListener('input', paint);
+      if (pron) pron.onPaint(paint);
       textarea.addEventListener('scroll', function () { backdrop.scrollTop = textarea.scrollTop; });
       if (window.ResizeObserver) new ResizeObserver(paint).observe(textarea);
       // Pages also fill the box from code (samples, reuse), without an input event.
@@ -1027,7 +1393,9 @@
     var tier = form.querySelector('select[name="voice_tier"]');
     function applyTier() {
       var hd = !tier || tier.value === 'hd';
-      if (toolbar) toolbar.hidden = !hd;
+      // Standard voices take no tags; the pronunciation button stays.
+      if (toolbar && pron) toolbar.querySelectorAll('.vs-tb-item:not(.vs-tb-pron), .vs-tb-upgrade').forEach(function (el) { el.hidden = !hd; });
+      else if (toolbar) toolbar.hidden = !hd;
       form.querySelectorAll('[data-vs-hd-only]').forEach(function (el) { el.classList.toggle('vs-off', !hd); });
     }
     if (tier) tier.addEventListener('change', applyTier);

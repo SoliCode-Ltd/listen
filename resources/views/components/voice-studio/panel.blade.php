@@ -5,7 +5,7 @@
   style and emotion sit on the text box (voice-studio.setbar), and the tags
   in the toolbar above the text. Behaviour in js/voice-studio.js.
 --}}
-@props(['showTags' => true, 'tagsLock' => null, 'prefix' => ''])
+@props(['showTags' => true, 'tagsLock' => null, 'prefix' => '', 'pronunciations' => null])
 @php
   $vsAr = app()->getLocale() === 'ar';
   // Locked tags still show (dimmed, with an upgrade button) unless no plan on sale has them.
@@ -30,9 +30,29 @@
       'voices' => \App\Support\VoiceCatalog::libraryEntries($vsAr),
       'favorites' => \App\Http\Controllers\FavoriteVoicesController::forUser(auth()->user()),
       'favoritesUrl' => auth()->check() ? route('dashboard.favorite-voices') : null,
+      // For the panel's own saves (favourites, pronunciations): the demo's form has no token
+      // field, and a page left open long gets a fresh token from tokenUrl.
+      'token' => csrf_token(),
+      'tokenUrl' => auth()->check() ? route('dashboard.csrf-token') : null,
       'tagMenus' => $vsTagMenus,
       // The tags need the premium voices: without them the toolbar shows, locked.
       'tagsLock' => $tagsLock,
+      // The member's pronunciations (studio and demo): ['items' => [...], 'url' => ..., 'limit' => ...].
+      'pron' => $pronunciations ? $pronunciations + [
+          'i18n' => __('ui.dashboard.pron'),
+          // Recorded once with a studio voice, so hearing them costs the member nothing.
+          'examples' => [
+              'ar' => ['text' => __('ui.dashboard.pron.example_ar_text'), 'items' => [
+                  ['spoken' => 'عِلْم', 'gloss' => __('ui.dashboard.pron.example_ar_gloss.ilm'), 'audio' => asset('audio/pronunciation/ar-ilm.mp3')],
+                  ['spoken' => 'عَلَم', 'gloss' => __('ui.dashboard.pron.example_ar_gloss.alam'), 'audio' => asset('audio/pronunciation/ar-alam.mp3')],
+                  ['spoken' => 'عَلِمَ', 'gloss' => __('ui.dashboard.pron.example_ar_gloss.alima'), 'audio' => asset('audio/pronunciation/ar-alima.mp3')],
+              ]],
+              'en' => ['text' => __('ui.dashboard.pron.example_en_text'), 'items' => [
+                  ['spoken' => 'reed', 'gloss' => __('ui.dashboard.pron.example_en_gloss.reed'), 'audio' => asset('audio/pronunciation/en-reed.mp3')],
+                  ['spoken' => 'red', 'gloss' => __('ui.dashboard.pron.example_en_gloss.red'), 'audio' => asset('audio/pronunciation/en-red.mp3')],
+              ]],
+          ],
+      ] : null,
       'i18n' => __('ui.dashboard.picker') + __('ui.dashboard.library') + [
           'upgrade_to_plan' => __('ui.dashboard.upgrade_to_plan'),
           'upgrade_to_unlock' => __('ui.dashboard.upgrade_to_unlock'),

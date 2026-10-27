@@ -186,7 +186,7 @@
 
         {{-- Right: the voice library and fine-tuning (shared with the dashboard) --}}
         <aside class="vs-side reveal">
-          <x-voice-studio.panel :show-tags="true">
+          <x-voice-studio.panel :show-tags="true" :pronunciations="['items' => \App\Support\Pronunciations::panelItems(auth()->id()), 'url' => route('dashboard.pronunciations.save'), 'limit' => \App\Support\Pronunciations::LIMIT]">
             {{-- The library filters speakers by gender itself; the page script still reads this field. --}}
             <select id="voice_gender" class="vs-hidden-field" tabindex="-1" aria-hidden="true">
               <option value="all">{{ __('ui.demo.any') }}</option>

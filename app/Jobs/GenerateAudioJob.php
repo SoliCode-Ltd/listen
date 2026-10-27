@@ -26,6 +26,8 @@ use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\DialogueSpeakers;
 use App\Support\GenerationMessage;
+use App\Support\Pronunciations;
+use App\Support\SpeechText;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCloningAccess;
 use App\Support\VoiceCatalog;
@@ -189,6 +191,14 @@ class GenerateAudioJob implements ShouldQueue
                 (bool) $generation->translate,
             );
 
+            // What the voice reads: abbreviations written out, then the member's own pronunciations
+            // (App\Support\SpeechText::forVoice). Their text stays as they wrote it, for the history
+            // and for what they are charged.
+            $speakers = $generation->is_dialogue ? array_column((array) (($generation->dialogue_metadata ?? [])['speakers'] ?? []), 'name') : [];
+            $forVoice = SpeechText::forVoice($textForSpeech, $generation->target_language, $generation->user_id ? (int) $generation->user_id : null, array_map('strval', $speakers));
+            $spokenText = $forVoice['text'];
+            $keepAsWritten = $forVoice['keep'];
+
             // Use advanced synthesis with plan-aware routing
             $planAccessService = app(PlanAccessService::class);
             $plan = $generation->user_id ? $planAccessService->resolveAccessPlanForUserId((int) $generation->user_id) : null;
@@ -220,22 +230,23 @@ class GenerateAudioJob implements ShouldQueue
                 }
 
                 $voiceCloningService = app(VoiceCloningService::class);
-                $textForSpeech = $voiceCloningService->speakableText(
-                    $textForSpeech,
+                $spokenText = $voiceCloningService->speakableText(
+                    $spokenText,
                     $studioOptions['dialect'] ?? null,
+                    $keepAsWritten,
                 );
                 // Any of the site's keys with room today (each keeps its own copy of the voice).
                 $audio = $voiceCloningService->synthesizeForVoice(
                     $clonedVoice,
-                    $textForSpeech,
-                    $voiceCloningService->deliveryStyle(
+                    $spokenText,
+                    trim($voiceCloningService->deliveryStyle(
                         $studioOptions['dialect'] ?? null,
                         (string) ($studioOptions['performance_style'] ?? 'neutral'),
                         (string) ($studioOptions['emotion'] ?? 'neutral'),
                         $studioOptions['style_prompt'] ?? null,
                         (float) ($studioOptions['speed'] ?? 1),
                         (float) ($studioOptions['pitch'] ?? 0),
-                    ),
+                    ).' '.Pronunciations::direction($spokenText, $keepAsWritten)),
                 );
             } else {
                 $voiceMeta = VoiceCatalog::voiceMeta($generation->voice_name);
@@ -255,6 +266,7 @@ class GenerateAudioJob implements ShouldQueue
                     // The studio and the extension: the same text made again is a new take.
                     // A developer API request may still get the saved copy.
                     'fresh_take' => $generation->api_key_id === null,
+                    'pronounce' => $keepAsWritten,
                 ];
 
                 // Add dialogue speakers if applicable
@@ -273,7 +285,7 @@ class GenerateAudioJob implements ShouldQueue
                 }
 
                 $audio = $ttsService->synthesizeAdvanced(
-                    $textForSpeech,
+                    $spokenText,
                     $generation->target_language,
                     $voiceOptions,
                     $plan,
@@ -316,7 +328,7 @@ class GenerateAudioJob implements ShouldQueue
             // Done and charged together: a failure in between leaves neither, so a retry
             // never charges twice. A generation failed meanwhile (swept as stuck, its
             // credits already given back) is not delivered or charged.
-            $settled = DB::transaction(function () use ($generation, $audio, $actualSeconds, $measuredSeconds, $actualChars, $actualCredits, $reserved, $effect, $effectNotAdded): bool {
+            $settled = DB::transaction(function () use ($generation, $audio, $actualSeconds, $measuredSeconds, $actualChars, $actualCredits, $reserved, $effect, $effectNotAdded, $spokenText, $textForSpeech): bool {
                 $locked = AudioGeneration::query()->whereKey($generation->id)->lockForUpdate()->first();
                 if (! $locked || $locked->status !== 'processing') {
                     return false;
@@ -330,6 +342,10 @@ class GenerateAudioJob implements ShouldQueue
                 if (! empty($audio['pieces_check'])) {
                     // How the pieces of a long voice were checked, and how many were taken again (PieceCheck).
                     $snapshot['pieces_check'] = $audio['pieces_check'];
+                }
+                if ($spokenText !== $textForSpeech) {
+                    // What the voice read when it differs from the text (pronunciations, abbreviations), for support.
+                    $snapshot['spoken_text'] = mb_substr($spokenText, 0, 20000);
                 }
                 if ($effectNotAdded) {
                     // The history and the developer API read audio_effect as the voice's own,

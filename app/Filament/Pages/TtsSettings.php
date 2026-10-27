@@ -38,6 +38,7 @@ class TtsSettings extends Page implements HasForms
             // Global mode
             'tts_mode' => SiteSetting::get('tts_mode', config('listen.tts.mode', 'google')),
             StandardVoiceEngine::SETTING_KEY => StandardVoiceEngine::current(),
+            \App\Support\SpeechText::SETTING => \App\Support\SpeechText::enabled(),
 
             // Gemini config
             'gemini_api_key_set' => count(app(\App\Services\Tts\GeminiKeyManager::class)->getAllKeys()) > 0,
@@ -102,6 +103,11 @@ class TtsSettings extends Page implements HasForms
                             ->default(StandardVoiceEngine::WAVENET)
                             ->required()
                             ->helperText('Reads Standard-quality generations only: the free plan, and the demo if a visitor switches it to Standard. Paid plans and the demo default use HD (Gemini) and are not affected. With Chirp 3 HD, each standard voice in the picker is read by a matching Chirp 3 HD voice of the same language and gender. Pitch is ignored by Chirp 3 HD. Switch back at any time.'),
+                        Forms\Components\Toggle::make(\App\Support\SpeechText::SETTING)
+                            ->label('Smooth abbreviations and punctuation')
+                            ->helperText('Before a voice is read, abbreviations that would pause like the end of a sentence are written out (د. أحمد → دكتور أحمد, الساعة ٩ م → الساعة ٩ مساءً, Dr. Lee → Dr Lee, e.g. → for example), and doubled marks (!!! ؟؟) become one. Only abbreviations with one meaning where they stand are changed. The member\'s text in their history is never changed.')
+                            ->default(true)
+                            ->columnSpanFull(),
                     ]),
 
                 Forms\Components\Section::make('Gemini TTS Configuration')
@@ -259,6 +265,7 @@ class TtsSettings extends Page implements HasForms
         // Save scalar settings
         $scalarKeys = [
             'tts_mode',
+            \App\Support\SpeechText::SETTING,
             StandardVoiceEngine::SETTING_KEY,
             'gemini_default_voice',
             'gemini_timeout_seconds',
