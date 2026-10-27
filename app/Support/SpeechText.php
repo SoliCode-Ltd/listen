@@ -97,10 +97,12 @@ final class SpeechText
             // "etc." in the middle of a sentence; at its end the full stop stays.
             '/\betc\.(?=\s+\p{Ll}|\s*,)/u' => 'et cetera',
             // Times: "9 a.m. today" → "9 AM today"; at the end of a sentence the full stop stays.
-            '/(\d)\s*a\.m\.(?=\s+\p{Ll}|\s*,)/iu' => '$1 AM',
-            '/(\d)\s*p\.m\.(?=\s+\p{Ll}|\s*,)/iu' => '$1 PM',
-            '/(\d)\s*a\.m\.(?=\s*(?:$|\s\p{Lu}))/iu' => '$1 AM.',
-            '/(\d)\s*p\.m\.(?=\s*(?:$|\s\p{Lu}))/iu' => '$1 PM.',
+            // (Case is spelled out, not /i: with /i newer PCRE matches \p{Ll} to capitals too,
+            // and "9 a.m. Then" lost its full stop.)
+            '/(\d)\s*[aA]\.[mM]\.(?=\s+\p{Ll}|\s*,)/u' => '$1 AM',
+            '/(\d)\s*[pP]\.[mM]\.(?=\s+\p{Ll}|\s*,)/u' => '$1 PM',
+            '/(\d)\s*[aA]\.[mM]\.(?=\s*(?:$|\s\p{Lu}))/u' => '$1 AM.',
+            '/(\d)\s*[pP]\.[mM]\.(?=\s*(?:$|\s\p{Lu}))/u' => '$1 PM.',
         ];
 
         return (string) preg_replace(array_keys($replace), array_values($replace), $text);
