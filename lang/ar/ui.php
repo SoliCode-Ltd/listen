@@ -516,7 +516,6 @@ return [
         'discount_quote_hint' => ':terms.',
         // إنستاباي / فودافون كاش: دفعة واحدة لا تتجدد تلقائياً.
         'discount_quote_hint_manual_month' => 'خصم :percent% على هذه الدفعة. السعر المعتاد :price شهرياً.',
-        'discount_quote_hint_manual_year' => 'خصم :percent% على هذه الدفعة. السعر المعتاد :price سنوياً.',
         'trial_active_notice' => 'تجربة :plan نشطة. حتى يتم الدفع، الاستخدام محدود بحدود خطة :quota: :credits رصيد (:minutes دقيقة صوت) و:per_request حرف من النص في المرة الواحدة. ألغِ قبل انتهاء التجربة لتجنب الخصم.',
         'trial_canceled_notice' => 'تم إلغاء تجربة :plan، لذلك لن يتم الخصم. يمكنك الاستمرار في استخدامها حتى :date.',
         'trial_admin_test_title' => 'بطاقات اختبار للمسؤول',

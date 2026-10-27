@@ -113,14 +113,17 @@ class DiscountTermsTest extends TestCase
         $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
             ->get($this->localizedRoute('pricing'))
             ->assertOk()
-            // The label above the price, for each cycle, and the full price struck through beside it.
+            // The label above the price and the full price struck through beside it.
             ->assertSee('class="offer-label"', false)
             ->assertSee('30% off your first month')
-            ->assertSee('data-offer-yearly="50% off your first year"', false)
             ->assertSee('<s class="price-original" dir="ltr">', false)
-            // The button says what is off, for each cycle, and the list of plans shows the offer too.
+            // The button says what is off on monthly billing; yearly keeps its usual words.
             ->assertSee('data-monthly-label="Get 30% off"', false)
-            ->assertSee('data-yearly-label="Get 50% off"', false)
+            ->assertSee('data-yearly-label="Get started"', false)
+            ->assertDontSee('your first year')
+            // On yearly, each plan's usual monthly price is struck through beside its yearly price.
+            ->assertSee('class="price-original-row is-yearly"', false)
+            ->assertSee('class="plan-pick-was"', false)
             ->assertSee('class="plan-pick is-first-month"', false)
             ->assertSee('30% off')
             // A week left: in words, not counting down yet.
@@ -128,6 +131,25 @@ class DiscountTermsTest extends TestCase
             ->assertDontSee('class="offer-ends is-urgent"', false);
 
         Carbon::setTestNow();
+    }
+
+    public function test_an_offer_is_for_monthly_billing_only(): void
+    {
+        SiteSetting::set('billing_yearly_discount_percentage', '20', 'billing');
+        $plan = Plan::factory()->create([
+            'slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'is_active' => true,
+            'discount_percentage' => 50, 'discount_ends_at' => now()->addWeek(), 'stripe_coupon_id' => 'listen_starter_discount_50',
+        ]);
+
+        // A month is half price; a year keeps its usual 20% off, nothing more.
+        $this->assertSame(450, $plan->getEffectivePriceCents());
+        $this->assertSame(8640, $plan->getEffectiveYearlyPriceCents());
+
+        // Only a monthly checkout gets the offer's coupon.
+        $coupon = new ReflectionMethod(BillingController::class, 'resolveCheckoutCouponId');
+        $coupon->setAccessible(true);
+        $this->assertSame('listen_starter_discount_50', $coupon->invoke(app(BillingController::class), $plan, 'monthly'));
+        $this->assertNull($coupon->invoke(app(BillingController::class), $plan, 'yearly'));
     }
 
     public function test_the_last_day_of_an_offer_counts_down(): void
@@ -191,10 +213,13 @@ class DiscountTermsTest extends TestCase
                 $starter = collect($plans)->firstWhere('slug', 'starter');
                 $monthly = str_replace(["\u{2066}", "\u{2069}"], '', (string) ($starter['discount_terms']['monthly'] ?? ''));
 
-                // The offer and the price after it, nothing more (no "full price from" date).
+                // The offer and the price after it, nothing more (no "full price from" date),
+                // and nothing for yearly billing, which has no offer.
                 return str_starts_with($monthly, '30% off your first 3 months, then')
                     && str_ends_with($monthly, '/month.')
-                    && ! str_contains($monthly, 'Full price');
+                    && ! str_contains($monthly, 'Full price')
+                    && ! array_key_exists('yearly', $starter['discount_terms'])
+                    && ! array_key_exists('manual_yearly', $starter['discount_terms']);
             });
 
         Carbon::setTestNow();

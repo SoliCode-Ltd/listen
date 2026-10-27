@@ -151,7 +151,7 @@ class PlanResource extends Resource
                             }),
                     ]),
                 Forms\Components\Section::make('Discount / Promotion')
-                    ->description('Set a time-limited discount. The discounted price shows on the pricing page with a countdown timer, and the pricing page and checkout say exactly how long each buyer keeps it and what they pay after. After the offer ends, new buyers pay the normal price.')
+                    ->description('Set a time-limited discount for monthly billing. The discounted price shows on the pricing page with a countdown timer, and the pricing page and checkout say exactly how long each buyer keeps it and what they pay after. Yearly billing keeps its usual yearly discount, with no offer on top. After the offer ends, new buyers pay the normal price.')
                     ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('discount_percentage')
@@ -181,7 +181,7 @@ class PlanResource extends Resource
                             ->selectablePlaceholder(false)
                             ->reactive()
                             ->visible(fn (Get $get) => ! empty($get('discount_percentage')))
-                            ->helperText('Buyers who already have the discount keep what they bought. A yearly plan gets it on its first yearly payment, unless it is "for as long as they stay subscribed".'),
+                            ->helperText('Buyers who already have the discount keep what they bought. Monthly billing only: yearly buyers get the yearly discount instead.'),
                         Forms\Components\TextInput::make('discount_duration_months')
                             ->label('Number of months')
                             ->numeric()

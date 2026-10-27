@@ -515,7 +515,6 @@ return [
         'discount_quote_hint' => ':terms.',
         // InstaPay / Vodafone Cash: one payment that does not renew by itself.
         'discount_quote_hint_manual_month' => ':percent% off this payment. The regular price is :price/month.',
-        'discount_quote_hint_manual_year' => ':percent% off this payment. The regular price is :price/year.',
         'trial_active_notice' => 'Your :plan trial is active. Until it is paid, usage is capped at the :quota allowance: :credits credits (:minutes minutes of audio) and :per_request characters of text per voice. Cancel before the trial ends to avoid the charge.',
         'trial_canceled_notice' => 'Your :plan trial is canceled, so you will not be charged. You can keep using it until :date.',
         'trial_admin_test_title' => 'Admin test cards',

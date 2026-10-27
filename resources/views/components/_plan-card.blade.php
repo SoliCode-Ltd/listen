@@ -62,22 +62,35 @@
   </div>
 
   {{-- 2. Price, and the offer when there is one: its label above the price, the full price
-       struck through beside it, and the time left under it. --}}
+       struck through beside it, and the time left under it. An offer is for monthly billing
+       only, so on yearly all three go and the yearly price shows with the usual monthly price
+       struck through beside it. --}}
   @php
     $terms = $hasDiscount && !$isFree && !$isPack ? ($plan['discount_terms'] ?? null) : null;
   @endphp
   @if($terms)
     <div class="plan-offer">
-      <span class="offer-label" data-offer-monthly="{{ $terms['offer_monthly'] }}" data-offer-yearly="{{ $terms['offer_yearly'] }}">
+      <span class="offer-label">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>
         <span class="offer-label-text">{{ $terms['offer_monthly'] }}</span>
       </span>
     </div>
   @endif
+  @php
+    // On yearly, the month's usual price struck through beside the yearly price per month, so the
+    // yearly saving reads like an offer.
+    $fullMonthlyFormatted = $originalFormatted ?? $displayMonthlyFormatted;
+    $yearlySaves = !$isFree && !$isPack && $yearlyCents > 0 && $yearlyCents < (int) ($plan['original_price_monthly_cents'] ?? $monthlyCents) * 12;
+  @endphp
   <div class="plan-pricing">
     @if($hasDiscount && !$isFree && $originalFormatted)
-      <div class="price-original-row">
+      <div class="price-original-row is-offer">
         <s class="price-original" dir="ltr">{{ $originalFormatted }}</s>
+      </div>
+    @endif
+    @if($yearlySaves)
+      <div class="price-original-row is-yearly">
+        <s class="price-original" dir="ltr">{{ $fullMonthlyFormatted }}</s>
       </div>
     @endif
     <div class="price-row">

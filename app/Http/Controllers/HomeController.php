@@ -1400,21 +1400,12 @@ class HomeController extends Controller
 
             // How long the discount lasts, and the regular price after it in the
             // currency the card shows (the same amount as the crossed-out price).
+            // An offer is for monthly billing only: yearly keeps its usual saving.
             $discountTerms = null;
             if ($hasDiscount && $originalMonthlyQuote) {
-                $fullYearlyQuote = $this->localizedPricingService->convertedQuoteFromUsd(
-                    (int) round($baseMonthlyCents * 12 * (1 - $yearlyDiscountPercent / 100)),
-                    'yearly',
-                    $countryContext,
-                    'stripe',
-                    $locale
-                );
-                $yearlyPercent = min(99, $discountPercentage + $yearlyDiscountPercent);
                 $discountTerms = [
                     'offer_monthly' => DiscountTerms::offer($plan, 'monthly', $discountPercentage),
                     'then_monthly' => DiscountTerms::then($plan, 'monthly', (string) $originalMonthlyQuote['amount_formatted']),
-                    'offer_yearly' => DiscountTerms::offer($plan, 'yearly', $yearlyPercent),
-                    'then_yearly' => DiscountTerms::then($plan, 'yearly', (string) $fullYearlyQuote['amount_formatted']),
                 ];
             }
 
