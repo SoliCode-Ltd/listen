@@ -671,9 +671,12 @@
   // marks, or spelled the way it sounds). The list is the member's; the server
   // applies it before a voice is read. Words from the list are underlined in
   // the text box, and a selected word can be added in one click.
+  // Every Arabic vowel mark, in three groups; each button shows the mark and its Arabic name.
+  // Every Arabic vowel mark, in three groups; each button shows the mark on a letter, with its Arabic name.
   var PRON_MARKS = [
-    ['َ', 'fatha'], ['ُ', 'damma'], ['ِ', 'kasra'], ['ْ', 'sukun'],
-    ['ّ', 'shadda'], ['ً', 'tanween_fath'], ['ٌ', 'tanween_damm'], ['ٍ', 'tanween_kasr']
+    ['short', [['َ', 'fatha', 'ب'], ['ُ', 'damma', 'ب'], ['ِ', 'kasra', 'ب'], ['ْ', 'sukun', 'ب']]],
+    ['tanween', [['ً', 'tanween_fath', 'ب'], ['ٌ', 'tanween_damm', 'ب'], ['ٍ', 'tanween_kasr', 'ب']]],
+    ['other', [['ّ', 'shadda', 'ب'], ['ٓ', 'madda', 'ا'], ['ٰ', 'dagger_alef', 'ه'], ['ٔ', 'hamza_above', 'ا'], ['ٕ', 'hamza_below', 'ا']]]
   ];
   var PRON_DIACRITICS = '\\u064B-\\u065F\\u0670\\u0640';
 
@@ -747,42 +750,89 @@
     var modal = document.createElement('div');
     modal.className = 'vs-modal vs-pron';
     modal.hidden = true;
-    var marks = PRON_MARKS.map(function (m) {
-      return '<button type="button" class="vs-pron-mark" data-mark="' + m[0] + '" title="' + escAttr(tr('mark_' + m[1])) + '" aria-label="' + escAttr(tr('mark_' + m[1])) + '"><span>ـ' + m[0] + '</span></button>';
+    var marks = PRON_MARKS.map(function (group) {
+      return '<div class="vs-pron-mark-group"><span class="vs-pron-mark-group-name">' + escAttr(tr('marks_' + group[0])) + '</span><div class="vs-pron-mark-row">'
+        + group[1].map(function (m) {
+          return '<button type="button" class="vs-pron-mark" data-mark="' + m[0] + '" aria-label="' + escAttr(tr('mark_' + m[1])) + '">'
+            + '<span class="vs-pron-mark-glyph" aria-hidden="true" dir="rtl">' + m[2] + m[0] + '</span><span class="vs-pron-mark-name" dir="rtl">' + escAttr(tr('mark_' + m[1])) + '</span></button>';
+        }).join('') + '</div></div>';
     }).join('');
+    // Hear the difference: the same letters read differently, from recordings made once.
+    var examples = cfg.examples || {};
     modal.innerHTML = '<div class="vs-modal-backdrop" data-vs-close></div>'
       + '<div class="vs-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="vsPronTitle" aria-describedby="vsPronHint">'
       + '<header class="vs-modal-head"><span class="vs-modal-ico" aria-hidden="true">' + icon('g-pron') + '</span><div class="vs-modal-titles"><h2 id="vsPronTitle">' + escAttr(tr('title')) + '</h2><p id="vsPronHint">' + escAttr(tr('hint')) + '</p></div>'
       + '<button type="button" class="vs-modal-close" data-vs-close aria-label="' + escAttr(tr('close')) + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>'
       + '<div class="vs-pron-scroll">'
-      + '<form class="vs-pron-add" novalidate>'
+      + '<section class="vs-pron-example" aria-labelledby="vsPronExTitle" hidden><h3 id="vsPronExTitle">' + escAttr(tr('example_title')) + '</h3><p class="vs-pron-example-text"></p><div class="vs-pron-example-row"></div></section>'
+      + '<form class="vs-pron-add" id="vsPronForm" novalidate>'
       + '<div class="vs-pron-fields">'
       + '<label class="vs-pron-field"><span>' + escAttr(tr('word_label')) + '</span><input name="word" maxlength="60" autocomplete="off" spellcheck="false" dir="auto" placeholder="' + escAttr(tr('word_placeholder')) + '"></label>'
       + '<svg class="vs-pron-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
       + '<label class="vs-pron-field"><span>' + escAttr(tr('spoken_label')) + '</span><input name="spoken" maxlength="80" autocomplete="off" spellcheck="false" dir="auto" placeholder="' + escAttr(tr('spoken_placeholder')) + '"></label>'
       + '</div>'
-      + '<div class="vs-pron-marks"><span class="vs-pron-marks-label">' + escAttr(tr('marks_label')) + '</span><div class="vs-pron-mark-row" role="group" aria-label="' + escAttr(tr('marks_label')) + '">' + marks + '</div></div>'
+      + '<div class="vs-pron-marks" role="group" aria-labelledby="vsPronMarksLabel"><span class="vs-pron-marks-label" id="vsPronMarksLabel">' + escAttr(tr('marks_label')) + '</span>' + marks + '</div>'
       + '<p class="vs-pron-tip">' + escAttr(tr('tip')) + '</p>'
-      + '<p class="vs-pron-error" role="alert" hidden></p>'
-      + '<div class="vs-pron-actions"><button type="submit" class="vs-pron-save">' + escAttr(tr('add')) + '</button><button type="button" class="vs-pron-cancel" hidden>' + escAttr(tr('cancel')) + '</button></div>'
       + '</form>'
       + '<section class="vs-pron-saved" aria-labelledby="vsPronListTitle"><h3 id="vsPronListTitle">' + escAttr(tr('list_title')) + ' <small class="vs-pron-total"></small></h3>'
-      + '<ul class="vs-pron-list"></ul><p class="vs-pron-empty" hidden>' + escAttr(tr('empty')) + '</p></section>'
+      + '<ul class="vs-pron-list"></ul><p class="vs-pron-empty" hidden>' + escAttr(tr('empty')) + '</p>'
+      + '<p class="vs-pron-note">' + escAttr(tr('foot')) + '</p></section>'
       + '</div>'
-      + '<footer class="vs-pron-foot">' + escAttr(tr('foot')) + '</footer>'
+      // The add button stays in view however far the panel is scrolled.
+      + '<footer class="vs-pron-foot"><p class="vs-pron-error" role="alert" hidden></p>'
+      + '<div class="vs-pron-actions"><button type="submit" form="vsPronForm" class="vs-pron-save">' + escAttr(tr('add')) + '</button><button type="button" class="vs-pron-cancel" hidden>' + escAttr(tr('cancel')) + '</button></div></footer>'
       + '</div>';
     document.body.appendChild(modal);
     var addForm = modal.querySelector('.vs-pron-add');
     var wordIn = addForm.querySelector('input[name="word"]');
     var spokenIn = addForm.querySelector('input[name="spoken"]');
-    var errorEl = addForm.querySelector('.vs-pron-error');
-    var saveBtn = addForm.querySelector('.vs-pron-save');
-    var cancelBtn = addForm.querySelector('.vs-pron-cancel');
+    var errorEl = modal.querySelector('.vs-pron-error');
+    var saveBtn = modal.querySelector('.vs-pron-save');
+    var cancelBtn = modal.querySelector('.vs-pron-cancel');
     var list = modal.querySelector('.vs-pron-list');
     var empty = modal.querySelector('.vs-pron-empty');
     var total = modal.querySelector('.vs-pron-total');
     var editing = null;
     var opener = null;
+
+    // The example follows the voice's language: Arabic letters with vowel marks, or an English spelling.
+    var exBox = modal.querySelector('.vs-pron-example');
+    var exText = exBox.querySelector('.vs-pron-example-text');
+    var exRow = exBox.querySelector('.vs-pron-example-row');
+    var exAudio = null;
+    var exPlaying = null;
+    function stopExample() {
+      if (exAudio) exAudio.pause();
+      if (exPlaying) exPlaying.classList.remove('is-playing');
+      exPlaying = null;
+    }
+    function drawExample() {
+      stopExample();
+      var langSelect = form.querySelector('select[name="target_language"]');
+      var lang = langSelect && langSelect.value === 'en' ? 'en' : 'ar';
+      var ex = examples[lang];
+      exBox.hidden = !ex || !ex.items || !ex.items.length;
+      if (exBox.hidden) return;
+      exText.textContent = ex.text || '';
+      exRow.innerHTML = '';
+      ex.items.forEach(function (it) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'vs-pron-example-item';
+        b.innerHTML = '<span class="vs-pron-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path class="vs-pron-play-on" d="M8 5.5v13l11-6.5z"/><path class="vs-pron-play-off" d="M7.5 5.5h3v13h-3zM13.5 5.5h3v13h-3z"/></svg></span>'
+          + '<span class="vs-pron-example-words"><strong dir="auto">' + escAttr(it.spoken) + '</strong><small>' + escAttr(it.gloss || '') + '</small></span>';
+        b.setAttribute('aria-label', tr('example_play', { word: it.spoken }));
+        b.addEventListener('click', function () {
+          if (exPlaying === b) { stopExample(); return; }
+          stopExample();
+          exAudio = exAudio || new Audio();
+          exAudio.src = it.audio;
+          exAudio.onended = stopExample;
+          exAudio.play().then(function () { exPlaying = b; b.classList.add('is-playing'); }).catch(stopExample);
+        });
+        exRow.appendChild(b);
+      });
+    }
 
     function inText(entry) {
       var re = pronPattern(entry.word);
@@ -899,6 +949,7 @@
         if (known) startEdit(known); else { wordIn.value = picked; spokenIn.value = picked; }
       }
       drawList();
+      drawExample();
       modal.hidden = false;
       document.documentElement.classList.add('vs-modal-open');
       setTimeout(function () {
@@ -908,6 +959,7 @@
       }, 30);
     }
     function close() {
+      stopExample();
       modal.hidden = true;
       document.documentElement.classList.remove('vs-modal-open');
       picked = '';

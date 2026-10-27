@@ -34,7 +34,21 @@
       // The tags need the premium voices: without them the toolbar shows, locked.
       'tagsLock' => $tagsLock,
       // The member's pronunciations (dashboard only): ['items' => [...], 'url' => ..., 'limit' => ...].
-      'pron' => $pronunciations ? $pronunciations + ['i18n' => __('ui.dashboard.pron')] : null,
+      'pron' => $pronunciations ? $pronunciations + [
+          'i18n' => __('ui.dashboard.pron'),
+          // Recorded once with a studio voice, so hearing them costs the member nothing.
+          'examples' => [
+              'ar' => ['text' => __('ui.dashboard.pron.example_ar_text'), 'items' => [
+                  ['spoken' => 'عِلْم', 'gloss' => __('ui.dashboard.pron.example_ar_gloss.ilm'), 'audio' => asset('audio/pronunciation/ar-ilm.mp3')],
+                  ['spoken' => 'عَلَم', 'gloss' => __('ui.dashboard.pron.example_ar_gloss.alam'), 'audio' => asset('audio/pronunciation/ar-alam.mp3')],
+                  ['spoken' => 'عَلِمَ', 'gloss' => __('ui.dashboard.pron.example_ar_gloss.alima'), 'audio' => asset('audio/pronunciation/ar-alima.mp3')],
+              ]],
+              'en' => ['text' => __('ui.dashboard.pron.example_en_text'), 'items' => [
+                  ['spoken' => 'reed', 'gloss' => __('ui.dashboard.pron.example_en_gloss.reed'), 'audio' => asset('audio/pronunciation/en-reed.mp3')],
+                  ['spoken' => 'red', 'gloss' => __('ui.dashboard.pron.example_en_gloss.red'), 'audio' => asset('audio/pronunciation/en-red.mp3')],
+              ]],
+          ],
+      ] : null,
       'i18n' => __('ui.dashboard.picker') + __('ui.dashboard.library') + [
           'upgrade_to_plan' => __('ui.dashboard.upgrade_to_plan'),
           'upgrade_to_unlock' => __('ui.dashboard.upgrade_to_unlock'),

@@ -32,7 +32,7 @@ class GenerateShowcaseSamplesCommand extends Command
         {--import : Create or update the voice_samples rows for the MP3s on disk}
         {--key= : Gemini API key for --generate (default: GEMINI_TTS_API_KEY)}
         {--only=* : Only these sample slugs}
-        {--set=showcase : Which samples: showcase (dialects, accents, dialogues), environments (the sound environments section), ad (the launch ad, marketing/launch-ad/lines.php) or previews (the voice library, database/seeders/data/voice_previews.php)}
+        {--set=showcase : Which samples: showcase (dialects, accents, dialogues), environments (the sound environments section), ad (the launch ad, marketing/launch-ad/lines.php), previews (the voice library, database/seeders/data/voice_previews.php) or pronunciation (the studio pronunciation panel, database/seeders/data/pronunciation_examples.php)}
         {--ad=launch-ad : ad set only: which ad folder under marketing/ (launch-ad, emotions-ad)}
         {--render : environments set only: place each clean clip in its sound environment}
         {--force : Regenerate MP3s that already exist}
@@ -66,6 +66,9 @@ class GenerateShowcaseSamplesCommand extends Command
         }
         if ($this->option('set') === 'previews') {
             return $this->previews();
+        }
+        if ($this->option('set') === 'pronunciation') {
+            return $this->pronunciation();
         }
 
         if (! $this->option('generate') && ! $this->option('import')) {
@@ -220,6 +223,31 @@ class GenerateShowcaseSamplesCommand extends Command
             ksort($made);
             file_put_contents($file, json_encode($made, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
         }) ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * The pronunciation panel's examples (database/seeders/data/pronunciation_examples.php):
+     * one word each, one Gemini request each, saved as small MP3s in public/audio/pronunciation.
+     */
+    private function pronunciation(): int
+    {
+        if (! $this->option('generate')) {
+            $this->error('Pass --generate.');
+
+            return self::INVALID;
+        }
+        $samples = (require database_path('seeders/data/pronunciation_examples.php'))['samples'];
+        $only = array_filter((array) $this->option('only'));
+        if ($only !== []) {
+            $samples = array_values(array_filter($samples, fn (array $s): bool => in_array($s['slug'], $only, true)));
+        }
+        $samples = array_map(fn (array $s): array => $s + ['kind' => 'single', 'sign_off' => false,
+            'speaker_gender' => GeminiTtsProvider::voiceGender($s['voice'])], $samples);
+        $this->dir = 'audio/pronunciation';
+        // Small mono MP3s that start at once, like the voice library's previews.
+        $this->preview = true;
+
+        return $this->generate($samples, ['en' => '', 'ar' => '']) ? self::SUCCESS : self::FAILURE;
     }
 
     /**
