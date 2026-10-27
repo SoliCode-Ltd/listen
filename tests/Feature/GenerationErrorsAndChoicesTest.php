@@ -290,13 +290,25 @@ class GenerationErrorsAndChoicesTest extends TestCase
     public function test_failed_extension_generation_is_labelled_extension(): void
     {
         $user = User::factory()->create();
-        $item = TextItem::create(['user_id' => $user->id, 'source_type' => 'message', 'content' => 'Hi', 'language' => 'en', 'status' => 'queued']);
+        $item = TextItem::create(['user_id' => $user->id, 'source_type' => 'extension', 'content' => 'Hi', 'language' => 'en', 'status' => 'queued']);
         $generation = AudioGeneration::create($this->audioRow($user, ['status' => 'queued', 'text_item_id' => $item->id]));
         $this->fakeSpeechFailure('boom');
 
         $this->runJob($generation);
 
         $this->assertSame('extension', GenerationError::first()->source);
+    }
+
+    public function test_failed_studio_generation_is_labelled_dashboard(): void
+    {
+        $user = User::factory()->create();
+        $item = TextItem::create(['user_id' => $user->id, 'source_type' => 'message', 'content' => 'Hi', 'language' => 'en', 'status' => 'queued']);
+        $generation = AudioGeneration::create($this->audioRow($user, ['status' => 'queued', 'text_item_id' => $item->id]));
+        $this->fakeSpeechFailure('boom');
+
+        $this->runJob($generation);
+
+        $this->assertSame('dashboard', GenerationError::first()->source);
     }
 
     public function test_job_killed_by_a_timeout_is_recorded(): void

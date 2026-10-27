@@ -4,12 +4,19 @@ namespace Tests\Feature;
 
 use App\Filament\Resources\UsageCounterResource\Pages\ListUsageCounters;
 use App\Filament\Resources\UsageCounterResource\Pages\ViewUsageCounter;
+use App\Filament\Widgets\MonthlyUsageBreakdown;
+use App\Filament\Widgets\MonthlyUsageChart;
+use App\Filament\Widgets\MonthlyUsageStats;
+use App\Models\AudioGeneration;
 use App\Models\Plan;
 use App\Models\Subscription;
+use App\Models\TextItem;
 use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\Billing\CharGiftService;
 use App\Services\PlanAccessService;
+use App\Support\GenerationChoiceLabels;
+use App\Support\TtsStudioConfig;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -50,7 +57,8 @@ class MonthlyUsageAdminTest extends TestCase
             ->assertSee('Current period')
             ->assertSee(now()->format('F Y'));
 
-        Livewire::test(\App\Filament\Widgets\MonthlyUsageStats::class)
+        $this->generation($member, ['billable_chars' => 125000]);
+        Livewire::test(MonthlyUsageStats::class)
             ->assertSee('Members who generated')
             ->assertSee('125,000');
     }
@@ -122,8 +130,123 @@ class MonthlyUsageAdminTest extends TestCase
             ->assertSee('Sorry for the outage');
     }
 
+    public function test_the_numbers_follow_the_month_picked_and_compare_with_the_month_before(): void
+    {
+        $member = User::factory()->create();
+        $last = now()->subMonth()->format('Y-m');
+        foreach ([1000, 1000, 1000] as $chars) {
+            $this->generation($member, ['billable_chars' => $chars]);
+        }
+        $this->generation($member, ['billable_chars' => 700000, 'created_at' => now()->subMonth()->startOfMonth()->addDay()]);
+        $this->generation($member, ['billable_chars' => 77777, 'created_at' => now()->subMonth()->startOfMonth()->addDays(2)]);
+
+        Livewire::test(MonthlyUsageStats::class)
+            ->assertSee('3,000')
+            ->assertSee('+50% vs '.now()->subMonth()->format('F Y'));
+
+        Livewire::test(MonthlyUsageStats::class, ['tableFilters' => ['period_ym' => ['value' => $last]]])
+            ->assertSee('777,777')
+            ->assertDontSee('3,000');
+    }
+
+    public function test_admin_accounts_are_left_out_unless_asked_for(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true, 'email' => 'boss@example.test']);
+        $row = UsageCounter::query()->create(['user_id' => $admin->id, 'period_ym' => now()->format('Y-m'), 'total_chars' => 10, 'total_requests' => 1]);
+
+        Livewire::test(ListUsageCounters::class)
+            ->assertCanNotSeeTableRecords([$row])
+            ->filterTable('members_only', false)
+            ->assertCanSeeTableRecords([$row]);
+    }
+
+    public function test_the_month_shows_what_members_chose_and_where(): void
+    {
+        $member = User::factory()->create();
+        $emotion = (string) TtsStudioConfig::emotionCatalog()[0]['value'];
+        $studio = TextItem::create(['user_id' => $member->id, 'source_type' => 'message', 'content' => 'Hi', 'status' => 'done']);
+        $extension = TextItem::create(['user_id' => $member->id, 'source_type' => 'extension', 'content' => 'Hi', 'status' => 'done']);
+        $this->generation($member, ['text_item_id' => $studio->id, 'dialect' => 'ar-EG', 'emotion' => $emotion, 'is_dialogue' => true]);
+        $this->generation($member, ['text_item_id' => $extension->id, 'translate' => true]);
+        $this->generation($member, ['status' => 'failed']);
+        $this->generation(User::factory()->create(['is_admin' => true]), ['text_item_id' => $extension->id]);
+
+        Livewire::test(MonthlyUsageBreakdown::class)
+            ->assertSee('What members made in '.now()->format('F Y'))
+            ->assertSee('2 generations made')
+            ->assertSee('Studio')
+            ->assertSee('Browser extension')
+            ->assertSee('Dialogue (several speakers)')
+            ->assertSee('Translated, then read')
+            ->assertSee('Egyptian')
+            ->assertSee(GenerationChoiceLabels::emotion($emotion));
+
+        Livewire::test(MonthlyUsageChart::class)->assertOk();
+
+        Livewire::test(MonthlyUsageStats::class)
+            ->assertSee('Failed generations')
+            ->assertSee('33.3% of 3 tries')
+            ->assertSee('First-time creators');
+    }
+
+    public function test_paying_members_who_made_nothing_are_listed(): void
+    {
+        $busy = User::factory()->create(['email' => 'busy@example.test']);
+        $idle = User::factory()->create(['email' => 'idle@example.test']);
+        app(PlanAccessService::class)->assignPlan($busy, $this->starter);
+        app(PlanAccessService::class)->assignPlan($idle, $this->starter);
+        $this->generation($busy);
+
+        Livewire::test(MonthlyUsageStats::class)
+            ->assertSee('1 of 2')
+            ->assertSee('1 paying now made nothing');
+
+        Livewire::test(ListUsageCounters::class)
+            ->mountAction('idlePaying')
+            ->assertSee('idle@example.test')
+            ->assertDontSee('busy@example.test');
+    }
+
+    public function test_the_details_page_shows_what_the_member_made_in_the_period(): void
+    {
+        $member = User::factory()->create(['email' => 'maker@example.test']);
+        $row = UsageCounter::query()->create(['user_id' => $member->id, 'period_ym' => now()->format('Y-m'), 'total_chars' => 50, 'total_requests' => 2]);
+        $this->generation($member, ['dialect' => 'ar-EG', 'duration_seconds' => 12]);
+        $this->generation($member, ['duration_seconds' => 8]);
+        $this->generation($member, ['created_at' => now()->subMonths(2)]);
+
+        Livewire::test(ViewUsageCounter::class, ['record' => $row->getRouteKey()])
+            ->assertSee('What they made')
+            ->assertSee('Days with a generation')
+            ->assertSee('10.0 s')
+            ->assertSee('Egyptian')
+            ->assertSee('Their generations');
+    }
+
     public function test_rows_cannot_be_created_or_edited_by_hand(): void
     {
         $this->assertFalse(\App\Filament\Resources\UsageCounterResource::canCreate());
+    }
+
+    /** @param  array<string, mixed>  $overrides */
+    private function generation(User $user, array $overrides = []): AudioGeneration
+    {
+        $generation = AudioGeneration::query()->create(array_merge([
+            'user_id' => $user->id,
+            'input_text' => 'Hello there',
+            'source_language' => 'en',
+            'target_language' => 'en',
+            'voice_tier' => 'standard',
+            'voice_name' => 'en-US-Wavenet-C',
+            'translate' => false,
+            'status' => 'done',
+            'billable_chars' => 11,
+            'duration_seconds' => 3,
+        ], array_diff_key($overrides, ['created_at' => true])));
+        if (isset($overrides['created_at'])) {
+            $generation->forceFill(['created_at' => $overrides['created_at']])->save();
+        }
+
+        return $generation;
     }
 }

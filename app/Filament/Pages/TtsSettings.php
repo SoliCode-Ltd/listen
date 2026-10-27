@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Voice;
 use App\Support\GeminiTtsModel;
@@ -35,12 +34,6 @@ class TtsSettings extends Page implements HasForms
 
     public function mount(): void
     {
-        $plans = Plan::where('is_active', true)->pluck('name', 'slug')->toArray();
-        $planOverrides = [];
-        foreach ($plans as $slug => $name) {
-            $planOverrides[$slug] = SiteSetting::get("tts_plan_provider_{$slug}", '');
-        }
-
         $this->form->fill([
             // Global mode
             'tts_mode' => SiteSetting::get('tts_mode', config('listen.tts.mode', 'google')),
@@ -52,7 +45,6 @@ class TtsSettings extends Page implements HasForms
             'gemini_timeout_seconds' => (int) SiteSetting::get('gemini_timeout_seconds', config('listen.tts.gemini_timeout_seconds', 30)),
 
             // Per-plan overrides
-            'plan_overrides' => $planOverrides,
 
             // Studio defaults used by Dashboard + Demo
             'tts_default_voice_ar' => $this->resolveStoredOrFallbackDefaultVoice('ar'),
@@ -74,7 +66,6 @@ class TtsSettings extends Page implements HasForms
 
     public function form(Form $form): Form
     {
-        $plans = Plan::where('is_active', true)->pluck('name', 'slug')->toArray();
         $performanceStyleOptions = collect(TtsStudioConfig::performanceStyleCatalog())
             ->mapWithKeys(fn (array $row): array => [$row['value'] => $row['label']])
             ->all();
@@ -149,22 +140,6 @@ class TtsSettings extends Page implements HasForms
                             ->default(30)
                             ->helperText('Maximum time to wait for a Gemini API response. HD voices never fall back to Google Cloud.'),
                     ]),
-
-                Forms\Components\Section::make('Per-Plan Provider Overrides')
-                    ->description('Kept for reference: these no longer change the engine. Standard voices always use Google Cloud, and HD voices on every plan always use Gemini (never a standard voice).')
-                    ->visible(fn (Forms\Get $get): bool => $get('tts_mode') === 'hybrid')
-                    ->schema(
-                        collect($plans)->map(fn (string $name, string $slug) => Forms\Components\Select::make("plan_overrides.{$slug}")
-                            ->label("{$name} Plan")
-                            ->options([
-                                '' => 'Use Global Mode',
-                                'google_cloud' => 'Force Google Cloud TTS',
-                                'gemini' => 'Force Gemini TTS',
-                            ])
-                            ->default('')
-                            ->helperText("Override provider for the {$name} plan.")
-                        )->values()->toArray()
-                    ),
 
                 Forms\Components\Tabs::make('studio_focus_tabs')
                     ->tabs([
@@ -301,13 +276,6 @@ class TtsSettings extends Page implements HasForms
             if (array_key_exists($key, $data)) {
                 $value = $data[$key];
                 SiteSetting::set($key, is_bool($value) ? ($value ? '1' : '0') : (string) $value, $group);
-            }
-        }
-
-        // Save per-plan overrides
-        if (isset($data['plan_overrides']) && is_array($data['plan_overrides'])) {
-            foreach ($data['plan_overrides'] as $slug => $provider) {
-                SiteSetting::set("tts_plan_provider_{$slug}", (string) $provider, $group);
             }
         }
 

@@ -150,7 +150,8 @@ class GenerationErrorRecorder
     {
         if ($generation->text_item_id) {
             $type = TextItem::query()->whereKey($generation->text_item_id)->value('source_type');
-            if ($type === 'message') {
+            // The studio's text items are 'message' too, so only 'extension' is the extension.
+            if ($type === 'extension') {
                 return GenerationError::SOURCE_EXTENSION;
             }
             if ($type === 'api') {

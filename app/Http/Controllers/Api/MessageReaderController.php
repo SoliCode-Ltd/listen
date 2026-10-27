@@ -257,7 +257,8 @@ class MessageReaderController extends Controller
         $recorded = app(MemberUsageMeter::class)->reserve((int) $user->id, $quotaPlan, $estimate, fn (array $reservation): array => $this->audioGenerationRecorder->createForUser(
             (int) $user->id,
             [
-                'source_type' => 'message',
+                // The studio saves 'message'; this tells the browser extension's generations apart.
+                'source_type' => 'extension',
                 'title' => $validated['title'] ?? null,
                 'content' => $text,
                 'language' => $sourceLanguage,
