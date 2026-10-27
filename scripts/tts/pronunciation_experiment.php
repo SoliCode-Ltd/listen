@@ -4,10 +4,12 @@
  * On STAGING, with the owner's OK (it uses the shared speech quota): does the voice
  * say a member's saved word as saved? Round 1 showed that no direction in the style
  * overrides what the sentence means (12 of 12 read the word by its meaning). Round 2
- * (8 short voices) writes the saved word into the text itself, by its sound:
- *   C: in Latin letters, whole («malik»);
- *   D: in Latin letters, by syllable («ma-lik»);
- * with a direction first that such words are Arabic words to be said as written.
+ * (8 short voices) wrote the word into the text by its sound, in Latin letters: the voice
+ * still read it by the sentence's meaning. Round 3 (10 short voices, with the owner's OK):
+ *   isolate: the saved word made on its own, with nothing around it to suggest another
+ *            reading, and joined between the text before and after it (no pause);
+ *   plain / current: everyday cases (a brand, a foreign name, a word both readings fit),
+ *            made without the saved word, then with it as the studio does today.
  * A text model listens to each take and writes how each word was said. Nothing is
  * written to the database; the takes are printed (MP3, base64) for the run's files.
  */
@@ -99,70 +101,72 @@ $key = (string) (app(GeminiKeyManager::class)->getAvailableKey()['key'] ?? '');
 $base = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
 $style = TtsStudioConfig::defaultPerformanceStyle('ar');
 $emotion = TtsStudioConfig::defaultEmotion('ar');
-$female = (string) Voice::query()->where('language', 'ar')->where('provider', 'gemini')->where('gender', 'female')->where('is_active', true)->value('internal_voice_id');
-$voices = ['ar-Gemini-HD-Schedar' => 'male', $female => 'female'];
+$voiceName = 'ar-Gemini-HD-Schedar';
+$voice = $call('resolveGeminiVoice', [$voiceName, 'male']);
+$baseStyle = $call('asSpeaker', [$voiceName, $call('buildStylePrompt', [$style, $emotion, 'ar', 1.0, 'ar-EG', 0.0])]);
+$wordStyle = 'This is one word from the middle of a sentence being read: say only this word, exactly as written with every vowel mark, '
+    .'flowing at the pace of the sentence, with no pause before or after it and no emphasis. '.$baseStyle;
 
-$sentences = [
-    's1' => ['text' => 'قابلت ملك امبارح في النادي، وقالت لي إن Listen هيتكرر تاني الشهر الجاي.', 'saved' => [['word' => 'ملك', 'spoken' => 'مَلِك'], ['word' => 'Listen', 'spoken' => 'لِسِن']], 'voices' => array_keys($voices)],
-    's2' => ['text' => 'الولد كتب الدرس كله امبارح.', 'saved' => [['word' => 'كتب', 'spoken' => 'كُتُب']], 'voices' => ['ar-Gemini-HD-Schedar']],
+$malak = 'قابلت ملك امبارح في النادي، وقالت لي إن الحفلة هتبقى الشهر الجاي.';
+$katab = 'الولد كتب الدرس كله امبارح.';
+$brand = 'جرّبوا Listen النهارده، الصوت هيعجبكم.';
+$name = 'أهلاً بيكم، معاكم Nguyen من فريق الدعم.';
+$alam = 'الحصة الجاية هنتكلم عن علم جديد.';
+$cases = [
+    ['isolate-malik-1', $malak, [['word' => 'ملك', 'spoken' => 'مَلِك']], 'isolate'],
+    ['isolate-malik-2', $malak, [['word' => 'ملك', 'spoken' => 'مَلِك']], 'isolate'],
+    ['isolate-kutub', $katab, [['word' => 'كتب', 'spoken' => 'كُتُب']], 'isolate'],
+    ['brand-without', $brand, [], 'plain'],
+    ['brand-with', $brand, [['word' => 'Listen', 'spoken' => 'لِسِن']], 'current'],
+    ['name-without', $name, [], 'plain'],
+    ['name-with', $name, [['word' => 'Nguyen', 'spoken' => 'وِين']], 'current'],
+    ['alam-without', $alam, [], 'plain'],
+    ['alam-with', $alam, [['word' => 'علم', 'spoken' => 'عَلَم']], 'current'],
+    ['alam-isolate', $alam, [['word' => 'علم', 'spoken' => 'عَلَم']], 'isolate'],
 ];
 
-$out = ['meta' => ['model' => $model, 'style' => $style, 'emotion' => $emotion, 'female_voice' => $female, 'ffmpeg' => trim((string) @shell_exec('command -v ffmpeg'))], 'takes' => []];
-foreach ($sentences as $sid => $s) {
-    $applied = Pronunciations::applyEntries($s['text'], $s['saved']);
-    $guides = [];
-    foreach ($s['saved'] as $e) {
-        $guides[$e['spoken']] = soundGuide($e['spoken']);
+$speak = fn (string $text, string $direction): array => $call('requestAudio', [$endpoint, $call('buildSingleSpeakerPayload', [$text, $direction, $voice])]);
+$out = ['meta' => ['model' => $model, 'style' => $style, 'emotion' => $emotion, 'voice' => $voiceName], 'takes' => []];
+foreach ($cases as [$id, $text, $saved, $mode]) {
+    $applied = Pronunciations::applyEntries($text, $saved);
+    $row = ['case' => $id, 'mode' => $mode, 'text_sent' => $applied['text']];
+    try {
+        if ($mode === 'isolate') {
+            // Before | the saved word on its own | after, joined with no pause.
+            $word = $applied['spoken'][0];
+            $at = mb_strpos($applied['text'], $word);
+            $parts = array_values(array_filter([
+                ['text' => trim(mb_substr($applied['text'], 0, $at)), 'style' => $baseStyle],
+                ['text' => $word, 'style' => $wordStyle],
+                ['text' => trim(mb_substr($applied['text'], $at + mb_strlen($word))), 'style' => $baseStyle],
+            ], fn (array $p): bool => preg_match('/\p{L}/u', $p['text']) === 1));
+            $row['parts'] = array_column($parts, 'text');
+            $pieces = array_map(fn (array $p): array => $speak($p['text'], $p['style']), $parts);
+            $wav = SpeechJoin::toFile(array_map(fn ($a) => ['bytes' => $a['bytes'], 'mime_type' => $a['mime_type']], $pieces), array_fill(0, count($pieces), 0.02), [], 0.02, true)['path'];
+        } else {
+            $direction = $mode === 'current' ? trim($baseStyle.' '.Pronunciations::direction($applied['text'], $applied['spoken'])) : $baseStyle;
+            $audio = $speak($applied['text'], $direction);
+            $wav = SpeechJoin::toFile([['bytes' => $audio['bytes'], 'mime_type' => $audio['mime_type']]])['path'];
+        }
+        $heard = Http::timeout(90)->withHeaders(['x-goog-api-key' => $key])->post($base.'/models/gemini-3.5-flash:generateContent', [
+            'contents' => [['role' => 'user', 'parts' => [
+                ['inline_data' => ['mime_type' => 'audio/wav', 'data' => base64_encode((string) file_get_contents($wav))]],
+                // Not told the text, so the sentence's meaning cannot lead it.
+                ['text' => 'Listen to this Arabic audio. Return JSON with "transcript" (exactly what is said, word for word, in Arabic script with full vowel marks as pronounced) '
+                    .'and "latin" (the same, in Latin letters as a phonetic transcription of exactly the sounds you hear, word by word), and "joins" (one short line: does it sound like one natural sentence, or are there breaks or jumps?).'],
+            ]]],
+            'generationConfig' => ['responseMimeType' => 'application/json'],
+        ])->json('candidates.0.content.parts.0.text');
+        $row['heard'] = json_decode(trim((string) preg_replace('/^```(?:json)?|```$/m', '', (string) $heard)), true) ?? $heard;
+        $mp3 = $wav.'.mp3';
+        @shell_exec('ffmpeg -loglevel error -y -i '.escapeshellarg($wav).' -ac 1 -b:a 64k '.escapeshellarg($mp3));
+        $row['mp3'] = is_file($mp3) ? base64_encode((string) file_get_contents($mp3)) : null;
+        @unlink($wav);
+        @unlink($mp3);
+    } catch (Throwable $e) {
+        $row['error'] = get_class($e).': '.mb_substr($e->getMessage(), 0, 300);
     }
-    foreach ($s['voices'] as $voiceName) {
-        $baseStyle = $call('asSpeaker', [$voiceName, $call('buildStylePrompt', [$style, $emotion, 'ar', 1.0, 'ar-EG', 0.0])]);
-        // Each saved word in the text replaced by its sound, whole (C) or by syllable (D).
-        $syllables = fn (string $g): string => (string) preg_replace('/(?<=[aiu])(?=[^aiu\'-][aiu])/', '-', $g);
-        $texts = ['C' => $applied['text'], 'D' => $applied['text']];
-        $said = ['C' => [], 'D' => []];
-        foreach ($applied['spoken'] as $w) {
-            $texts['C'] = str_replace($w, $guides[$w], $texts['C']);
-            $texts['D'] = str_replace($w, $syllables($guides[$w]), $texts['D']);
-            $said['C'][] = $guides[$w];
-            $said['D'][] = $syllables($guides[$w]);
-        }
-        $directions = [];
-        foreach (['C', 'D'] as $v) {
-            $directions[$v] = 'Words written in Latin letters in this Arabic text are Arabic words spelled by their sound: say each exactly as spelled, '
-                .'with Arabic pronunciation and as part of the sentence, never as English words: '.implode(', ', array_map(fn ($x) => '"'.$x.'"', $said[$v])).'. '.$baseStyle;
-        }
-        $voice = $call('resolveGeminiVoice', [$voiceName, $voices[$voiceName] ?? null]);
-        foreach ($directions as $variant => $direction) {
-            // Two takes of your sentence on your voice; one elsewhere.
-            foreach ($sid === 's1' && $voiceName === 'ar-Gemini-HD-Schedar' ? [1, 2] : [1] as $take) {
-                $row = ['sentence' => $sid, 'voice' => $voiceName, 'variant' => $variant, 'take' => $take, 'text_sent' => $texts[$variant], 'direction_start' => mb_substr($direction, 0, 260)];
-                try {
-                    $audio = $call('requestAudio', [$endpoint, $call('buildSingleSpeakerPayload', [$texts[$variant], $direction, $voice])]);
-                    $wav = SpeechJoin::toFile([['bytes' => $audio['bytes'], 'mime_type' => $audio['mime_type']]])['path'];
-                    $words = implode(', ', array_column($s['saved'], 'word'));
-                    $heard = Http::timeout(90)->withHeaders(['x-goog-api-key' => $key])->post($base.'/models/gemini-3.5-flash:generateContent', [
-                        'contents' => [['role' => 'user', 'parts' => [
-                            ['inline_data' => ['mime_type' => 'audio/wav', 'data' => base64_encode((string) file_get_contents($wav))]],
-                            // Not told the text, so the sentence's meaning cannot lead it.
-                            ['text' => 'Listen to this Arabic audio. Return JSON with "transcript" (exactly what is said, word for word, in Arabic script with full vowel marks as pronounced) '
-                                .'and "latin" (the same, in Latin letters as a phonetic transcription of exactly the sounds you hear, word by word).'],
-                        ]]],
-                        'generationConfig' => ['responseMimeType' => 'application/json'],
-                    ])->json('candidates.0.content.parts.0.text');
-                    $row['heard'] = json_decode(trim((string) preg_replace('/^```(?:json)?|```$/m', '', (string) $heard)), true) ?? $heard;
-                    $row['expected'] = array_combine(array_column($s['saved'], 'word'), array_map(fn ($e) => $guides[$e['spoken']], $s['saved']));
-                    $mp3 = $wav.'.mp3';
-                    @shell_exec('ffmpeg -loglevel error -y -i '.escapeshellarg($wav).' -ac 1 -b:a 64k '.escapeshellarg($mp3));
-                    $row['mp3'] = is_file($mp3) ? base64_encode((string) file_get_contents($mp3)) : null;
-                    @unlink($wav);
-                    @unlink($mp3);
-                } catch (Throwable $e) {
-                    $row['error'] = get_class($e).': '.mb_substr($e->getMessage(), 0, 300);
-                }
-                $out['takes'][] = $row;
-            }
-        }
-    }
+    $out['takes'][] = $row;
 }
 
 echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
