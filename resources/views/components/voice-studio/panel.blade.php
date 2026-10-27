@@ -30,8 +30,10 @@
       'voices' => \App\Support\VoiceCatalog::libraryEntries($vsAr),
       'favorites' => \App\Http\Controllers\FavoriteVoicesController::forUser(auth()->user()),
       'favoritesUrl' => auth()->check() ? route('dashboard.favorite-voices') : null,
-      // For the panel's own saves (favourites, pronunciations): the demo's form has no token field.
+      // For the panel's own saves (favourites, pronunciations): the demo's form has no token
+      // field, and a page left open long gets a fresh token from tokenUrl.
       'token' => csrf_token(),
+      'tokenUrl' => auth()->check() ? route('dashboard.csrf-token') : null,
       'tagMenus' => $vsTagMenus,
       // The tags need the premium voices: without them the toolbar shows, locked.
       'tagsLock' => $tagsLock,

@@ -201,6 +201,40 @@ class PronunciationsTest extends TestCase
         $this->assertSame('Meet Dr Win today!', $generation->settings_snapshot['spoken_text'] ?? null);
     }
 
+    public function test_a_saved_word_is_used_by_the_next_voice_without_reloading_the_page(): void
+    {
+        Storage::fake('public');
+        $this->fakeSpeech();
+        $this->seedFreePlan();
+        $member = User::factory()->create();
+        $voice = Voice::query()->create([
+            'internal_voice_id' => 'en-US-Wavenet-C', 'language' => 'en', 'gender' => 'female', 'tier' => 'standard',
+            'display_name' => 'Emma', 'provider' => 'google_cloud', 'provider_voice_id' => 'en-US-Wavenet-C', 'is_active' => true,
+        ]);
+        $this->actingAs($member);
+        // Generate, as the studio's button sends it: the words are not in the request, the server reads them.
+        $generate = fn () => $this->postJsonLocalizedRoute('dashboard.queue', [
+            'content' => 'Meet Nguyen today.',
+            'target_language' => 'en',
+            'voice_tier' => 'standard',
+            'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
+        ])->assertOk()->assertJsonPath('ok', true);
+
+        $generate();
+        $this->save(['word' => 'Nguyen', 'spoken' => 'Win'])->assertOk();
+        $generate();
+        $id = (int) Pronunciation::query()->value('id');
+        $this->save(['id' => $id, 'word' => 'Nguyen', 'spoken' => 'New-yen'])->assertOk();
+        $generate();
+        $this->remove($id)->assertOk();
+        $generate();
+
+        $this->assertSame(
+            ['Meet Nguyen today.', 'Meet Win today.', 'Meet New-yen today.', 'Meet Nguyen today.'],
+            array_column($this->spoken, 'text'),
+        );
+    }
+
     public function test_the_demo_voice_reads_the_members_words_too(): void
     {
         Storage::fake('public');

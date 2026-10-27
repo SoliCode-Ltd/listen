@@ -35,6 +35,39 @@
     return esc(String(text == null ? '' : text)).replace(/"/g, '&quot;');
   }
 
+  // ---------- Saving from the panel (favourite voices, pronunciations) ----------
+  // The page's form token, read when sent: the dashboard renews its own; the demo's form has none.
+  function pageToken(meta) {
+    var node = document.querySelector('meta[name="csrf-token"]') || document.querySelector('input[name="_token"]');
+    return (node ? (node.content || node.value || '') : '') || meta.token || '';
+  }
+  // A page left open long holds an expired token and a save comes back 419: a fresh token
+  // is asked for (meta.tokenUrl), put in the page, and the save sent once more, so the
+  // member never has to reload the page to save.
+  function panelFetch(meta, url, options) {
+    function send() {
+      return fetch(url, Object.assign({}, options, {
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': pageToken(meta), 'X-Requested-With': 'XMLHttpRequest' }
+      }));
+    }
+    return send().then(function (res) {
+      if (res.status !== 419 || !meta.tokenUrl) return res;
+      return fetch(meta.tokenUrl, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          var token = data && data.token ? String(data.token) : '';
+          if (!token) return res;
+          meta.token = token;
+          document.querySelectorAll('input[name="_token"]').forEach(function (input) { input.value = token; });
+          var tag = document.querySelector('meta[name="csrf-token"]');
+          if (tag) tag.setAttribute('content', token);
+          return send();
+        })
+        .catch(function () { return res; });
+    });
+  }
+
   // ---------- Dropdowns: a styled button and list over each visible select ----------
   // The select stays the form field (page code fills it, reads it and sets it);
   // the list mirrors its options, and picking one sets it and fires "change".
@@ -894,14 +927,7 @@
     cancelBtn.addEventListener('click', function () { resetForm(); drawList(); wordIn.focus(); });
 
     function send(method, url, body) {
-      // Read when sent: the dashboard renews its form's token; the demo's form has none.
-      var token = (form.querySelector('input[name="_token"]') || {}).value || meta.token || '';
-      return fetch(url, {
-        method: method,
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'same-origin',
-        body: body ? JSON.stringify(body) : undefined
-      }).then(function (res) {
+      return panelFetch(meta, url, { method: method, body: body ? JSON.stringify(body) : undefined }).then(function (res) {
         return res.json().catch(function () { return {}; }).then(function (data) {
           if (!res.ok) { var err = new Error('save'); err.data = data; throw err; }
           return data;
@@ -1074,14 +1100,7 @@
       var list = Object.keys(favorites).filter(function (k) { return favorites[k]; }).slice(0, 100);
       try { window.localStorage.setItem(STORE, JSON.stringify(list)); } catch (e) { /* no storage */ }
       if (!meta.favoritesUrl || !window.fetch) return;
-      var tokenNode = document.querySelector('meta[name="csrf-token"]') || document.querySelector('input[name="_token"]');
-      var token = (tokenNode ? (tokenNode.content || tokenNode.value || '') : '') || meta.token || '';
-      fetch(meta.favoritesUrl, {
-        method: 'PUT',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
-        body: JSON.stringify({ voices: list })
-      }).catch(function () { /* kept in this browser */ });
+      panelFetch(meta, meta.favoritesUrl, { method: 'PUT', body: JSON.stringify({ voices: list }) }).catch(function () { /* kept in this browser */ });
     }
     // Previews: one shared player. Hovering a card shows the play button on the face;
     // a click, tap, Enter or Space plays it (hover alone may not start sound), and a
