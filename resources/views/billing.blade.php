@@ -1704,7 +1704,8 @@
       const promoPercent = plan && Boolean(plan.has_discount)
         ? Math.max(0, Math.min(99, Math.round(Number(plan.discount_percentage || 0))))
         : 0;
-      const yearlyPercent = Math.max(0, Math.min(99, promoPercent + Math.max(0, Math.min(99, yearlyDiscountPercent))));
+      // An offer is for monthly billing only: yearly keeps its usual saving.
+      const yearlyPercent = Math.max(0, Math.min(99, yearlyDiscountPercent));
 
       if (cycleMonthlyOption) {
         cycleMonthlyOption.textContent = cycleOptionLabel(i18n.monthly_label, promoPercent);

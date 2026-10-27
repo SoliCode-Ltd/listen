@@ -119,7 +119,7 @@ class BillingSettings extends Page implements HasForms
                             ->maxValue(99)
                             ->default(20)
                             ->suffix('%')
-                            ->helperText('Discount applied when users choose yearly billing (e.g. 20 = 20% off). Affects pricing page, checkout, and Stripe prices.')
+                            ->helperText('Discount applied when users choose yearly billing (e.g. 20 = 20% off). Affects pricing page, checkout, and Stripe prices. A plan\'s offer is for monthly billing only and never adds to this.')
                             ->live(onBlur: true)
                             ->afterStateUpdated(fn (Forms\Set $set, ?string $state) => $set('yearly_discount_preview', $state)),
                         Forms\Components\Placeholder::make('yearly_discount_preview')

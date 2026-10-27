@@ -62,13 +62,14 @@
   </div>
 
   {{-- 2. Price, and the offer when there is one: its label above the price, the full price
-       struck through beside it, and the time left under it. --}}
+       struck through beside it, and the time left under it. An offer is for monthly billing
+       only, so on yearly all three go and the card shows the yearly price as usual. --}}
   @php
     $terms = $hasDiscount && !$isFree && !$isPack ? ($plan['discount_terms'] ?? null) : null;
   @endphp
   @if($terms)
     <div class="plan-offer">
-      <span class="offer-label" data-offer-monthly="{{ $terms['offer_monthly'] }}" data-offer-yearly="{{ $terms['offer_yearly'] }}">
+      <span class="offer-label">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>
         <span class="offer-label-text">{{ $terms['offer_monthly'] }}</span>
       </span>

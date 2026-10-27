@@ -1529,108 +1529,47 @@ class BillingController extends Controller
     }
 
     /**
-     * For each cycle at checkout: what the discount covers and the price after it,
+     * At checkout, for monthly billing: what the discount covers and the price after it,
      * e.g. "30% off your first month, then EGP 450/month." (no date: the line says
-     * how long the discount lasts).
+     * how long the discount lasts). An offer is for monthly billing only, so yearly
+     * gets no note.
      *
      * InstaPay / Vodafone Cash pay once and never renew by themselves, so their
-     * note ("manual_monthly", "manual_yearly") says the discount is on this payment.
+     * note ("manual_monthly") says the discount is on this payment.
      *
      * @return array<string, string>
      */
     private function checkoutDiscountTerms(Plan $plan, array $countryContext, string $locale): array
     {
         $promoPercent = max(0, min(99, (int) $plan->discount_percentage));
-        $yearlyPercent = SiteSetting::yearlyDiscountPercent();
-        // The prices Stripe charges once the discount is used up.
-        $fullCents = [
-            'monthly' => (int) $plan->price_cents,
-            'yearly' => (int) round((int) $plan->price_cents * 12 * SiteSetting::yearlyDiscountMultiplier()),
-        ];
+        // The price Stripe charges once the discount is used up.
+        $fullCents = (int) $plan->price_cents;
 
-        $hints = [];
-        foreach ($fullCents as $cycle => $cents) {
-            $price = (string) $this->localizedPricingService->convertedQuoteFromUsd($cents, $cycle, $countryContext, 'stripe', $locale)['amount_formatted'];
-            $terms = DiscountTerms::line($plan, $cycle, $cycle === 'yearly' ? min(99, $promoPercent + $yearlyPercent) : $promoPercent, $price);
-            $hints[$cycle] = __('ui.billing.discount_quote_hint', ['terms' => $terms]);
+        $price = (string) $this->localizedPricingService->convertedQuoteFromUsd($fullCents, 'monthly', $countryContext, 'stripe', $locale)['amount_formatted'];
+        $egp = $this->localizedPricingService->convertUsdMinorToCurrency($fullCents, 'EGP');
 
-            $egp = $this->localizedPricingService->convertUsdMinorToCurrency($cents, 'EGP');
-            $hints['manual_'.$cycle] = __('ui.billing.discount_quote_hint_manual_'.($cycle === 'yearly' ? 'year' : 'month'), [
-                'percent' => $cycle === 'yearly' ? min(99, $promoPercent + $yearlyPercent) : $promoPercent,
+        return [
+            'monthly' => __('ui.billing.discount_quote_hint', ['terms' => DiscountTerms::line($plan, 'monthly', $promoPercent, $price)]),
+            'manual_monthly' => __('ui.billing.discount_quote_hint_manual_month', [
+                'percent' => $promoPercent,
                 'price' => "\u{2066}".$this->localizedPricingService->formatAmount($egp, 'EGP', $locale)."\u{2069}",
-            ]);
-        }
-
-        return $hints;
+            ]),
+        ];
     }
 
+    /**
+     * The plan's offer coupon, for monthly billing only: a yearly plan keeps its
+     * usual yearly saving and gets no offer on top.
+     */
     private function resolveCheckoutCouponId(Plan $plan, string $billingCycle): ?string
     {
-        if (! $plan->hasActiveDiscount()) {
+        if (! $plan->hasActiveDiscount() || strtolower(trim($billingCycle)) === 'yearly') {
             return null;
         }
 
-        $baseCouponId = trim((string) $plan->stripe_coupon_id);
-        $billingCycle = strtolower(trim($billingCycle));
-        if ($billingCycle !== 'yearly') {
-            return $baseCouponId !== '' ? $baseCouponId : null;
-        }
+        $couponId = trim((string) $plan->stripe_coupon_id);
 
-        $promoPercent = max(0, min(99, (int) $plan->discount_percentage));
-        $yearlyPercent = SiteSetting::yearlyDiscountPercent();
-        if ($promoPercent <= 0 || $yearlyPercent <= 0) {
-            return $baseCouponId !== '' ? $baseCouponId : null;
-        }
-
-        // Yearly Stripe price already includes yearly discount.
-        // Convert promo% to an equivalent coupon so total discount is additive on original total.
-        $denominator = max(1, 100 - $yearlyPercent);
-        $adjustedCouponPercent = max(0.01, min(99.99, round(($promoPercent / $denominator) * 100, 2)));
-        $duration = $plan->stripeCouponDuration();
-        $durationKey = $duration['duration'] === 'once' ? '' : '|'.$duration['duration'].($duration['duration_in_months'] ?? '');
-        $couponId = 'lis_y_'.substr(sha1($plan->slug.'|'.$promoPercent.'|'.$yearlyPercent.'|'.$adjustedCouponPercent.$durationKey), 0, 22);
-
-        try {
-            $existing = Cashier::stripe()->coupons->retrieve($couponId, []);
-            if ($existing && (bool) ($existing->valid ?? false)) {
-                return $couponId;
-            }
-        } catch (\Throwable) {
-            // Will create coupon below.
-        }
-
-        $couponData = $duration + [
-            'id' => $couponId,
-            'percent_off' => $adjustedCouponPercent,
-            'name' => $plan->name.' - Yearly additive promo',
-            'metadata' => [
-                'listen_plan_slug' => (string) $plan->slug,
-                'listen_plan_id' => (string) $plan->id,
-                'listen_cycle' => 'yearly',
-                'listen_promo_percent' => (string) $promoPercent,
-                'listen_yearly_percent' => (string) $yearlyPercent,
-                'listen_pricing_mode' => 'additive',
-            ],
-        ];
-
-        if ($plan->discount_ends_at) {
-            $couponData['redeem_by'] = $plan->discount_ends_at->getTimestamp();
-        }
-
-        try {
-            Cashier::stripe()->coupons->create($couponData);
-
-            return $couponId;
-        } catch (\Throwable $exception) {
-            Log::warning('Unable to create yearly additive coupon, falling back to base coupon.', [
-                'plan_slug' => $plan->slug,
-                'billing_cycle' => $billingCycle,
-                'adjusted_coupon_percent' => $adjustedCouponPercent,
-                'error' => $exception->getMessage(),
-            ]);
-
-            return $baseCouponId !== '' ? $baseCouponId : null;
-        }
+        return $couponId !== '' ? $couponId : null;
     }
 
     /**

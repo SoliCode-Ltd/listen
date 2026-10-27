@@ -10,12 +10,11 @@
   $yearlyUrl = $state['trial_yearly'] ? route('trial.start', ['plan' => $plan['slug'], 'billing_cycle' => 'yearly']) : $fallbackUrl('yearly');
   $monthlyLabel = $state['trial_monthly'] ? $trialLabel : $fallbackLabel;
   $yearlyLabel = $state['trial_yearly'] ? $trialLabel : $fallbackLabel;
-  // A plan on offer: its card's button says what is off ("Get 10% off"; on yearly, the offer and
-  // the yearly saving together, as its label says). Without an offer, the usual words.
+  // A plan on offer: its card's button says what is off ("Get 10% off"). An offer is for monthly
+  // billing only, so on yearly, and without an offer, the button keeps its usual words.
   $offPercent = !empty($plan['has_discount']) ? (int) ($plan['discount_percentage'] ?? 0) : 0;
-  if (!($small ?? false) && $offPercent > 0) {
-    if (!$state['trial_monthly']) $monthlyLabel = __('ui.pricing.get_offer', ['percent' => $offPercent]);
-    if (!$state['trial_yearly']) $yearlyLabel = __('ui.pricing.get_offer', ['percent' => min(99, $offPercent + (int) ($yearlyDiscountPercent ?? 20))]);
+  if (!($small ?? false) && $offPercent > 0 && !$state['trial_monthly']) {
+    $monthlyLabel = __('ui.pricing.get_offer', ['percent' => $offPercent]);
   }
   // The recommended plan gets the filled button; the others an outline.
   $buttonClass = 'plan-btn '.($small ?? false ? 'plan-btn-sm ' : '').($state['is_popular'] ? 'btn-primary' : 'btn-outline');
