@@ -347,7 +347,7 @@ return [
         'offer_ends_days' => 'Offer ends in :count day|Offer ends in :count days',
         'offer_ends_hours' => 'Offer ends in :count hour|Offer ends in :count hours',
         'offer_ends_minutes' => 'Offer ends in :count minute|Offer ends in :count minutes',
-        'offer_days_left' => ':count day|:count days',
+        'countdown_units' => 'days|hrs|min|sec',
         'unit_days_short' => 'd',
         'unit_hours_short' => 'h',
         'unit_minutes_short' => 'm',
@@ -368,6 +368,7 @@ return [
         'discount_terms_join' => ', ',
         'discount_chip' => ':percent% off',
         'get_offer' => 'Get :percent% off',
+        'get_yearly_offer' => 'Get :percent% off yearly',
         'lines' => [
             'label_voice_quality' => 'Voice quality',
             'label_max_chars_per_request' => 'Max text per generation',

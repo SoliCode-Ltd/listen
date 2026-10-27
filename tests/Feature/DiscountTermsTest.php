@@ -117,19 +117,20 @@ class DiscountTermsTest extends TestCase
             ->assertSee('class="offer-label"', false)
             ->assertSee('30% off your first month')
             ->assertSee('<s class="price-original" dir="ltr">', false)
-            // The button says what is off on monthly billing; yearly keeps its usual words.
+            // The button says what is off: the offer on monthly, the yearly saving on yearly.
             ->assertSee('data-monthly-label="Get 30% off"', false)
-            ->assertSee('data-yearly-label="Get started"', false)
+            ->assertSee('data-yearly-label="Get 20% off yearly"', false)
             ->assertDontSee('your first year')
             // On yearly, each plan's usual monthly price is struck through beside its yearly price.
             ->assertSee('class="price-original-row is-yearly"', false)
             ->assertSee('class="plan-pick-was"', false)
             ->assertSee('class="plan-pick is-first-month"', false)
             ->assertSee('30% off')
-            // A week left: the days, then the clock counting down to the second.
+            // A week left: a timer, days : hours : minutes : seconds, each with its unit.
             ->assertSee('class="offer-ends"', false)
             ->assertSee('Offer ends in 7 days')
-            ->assertSee('00:00:00');
+            ->assertSee('<b>07</b><small>days</small>', false)
+            ->assertSee('<b>00</b><small>sec</small>', false);
 
         Carbon::setTestNow();
     }
@@ -166,8 +167,9 @@ class DiscountTermsTest extends TestCase
             ->get($this->localizedRoute('pricing'))
             ->assertOk()
             ->assertSee('class="offer-ends"', false)
-            ->assertDontSee('Offer ends in 0 days')
-            ->assertSee('05:00:00')
+            // The last day: hours : minutes : seconds, no days.
+            ->assertSee('<b>05</b><small>hrs</small>', false)
+            ->assertDontSee('<small>days</small>', false)
             ->assertSee('Offer ends in 5 hours');
 
         Carbon::setTestNow();

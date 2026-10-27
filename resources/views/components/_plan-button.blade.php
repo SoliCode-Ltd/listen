@@ -16,6 +16,14 @@
   if (!($small ?? false) && $offPercent > 0 && !$state['trial_monthly']) {
     $monthlyLabel = __('ui.pricing.get_offer', ['percent' => $offPercent]);
   }
+  // On yearly, the card's button says what yearly billing saves, like an offer ("Get 20% off yearly");
+  // the narrow bar on phones says it shorter ("Get 20% off").
+  $yearlySavePercent = (int) ($yearlyDiscountPercent ?? 0);
+  $yearlyBarLabel = null;
+  if (!($small ?? false) && $yearlySavePercent > 0 && !$state['trial_yearly']) {
+    $yearlyLabel = __('ui.pricing.get_yearly_offer', ['percent' => $yearlySavePercent]);
+    $yearlyBarLabel = __('ui.pricing.get_offer', ['percent' => $yearlySavePercent]);
+  }
   // The recommended plan gets the filled button; the others an outline.
   $buttonClass = 'plan-btn '.($small ?? false ? 'plan-btn-sm ' : '').($state['is_popular'] ? 'btn-primary' : 'btn-outline');
   $disabledClass = 'plan-btn '.($small ?? false ? 'plan-btn-sm ' : '').'btn-disabled';
@@ -42,5 +50,7 @@
     data-monthly-href="{{ $monthlyUrl }}"
     data-yearly-href="{{ $yearlyUrl }}"
     data-monthly-label="{{ $monthlyLabel }}"
-    data-yearly-label="{{ $yearlyLabel }}"  >{{ $monthlyLabel }}</a>
+    data-yearly-label="{{ $yearlyLabel }}"
+    @if($yearlyBarLabel) data-bar-yearly-label="{{ $yearlyBarLabel }}" @endif
+  >{{ $monthlyLabel }}</a>
 @endif

@@ -348,7 +348,7 @@ return [
         'offer_ends_days' => 'ينتهي العرض اليوم|ينتهي العرض خلال يوم|ينتهي العرض خلال يومين|ينتهي العرض خلال :count أيام|ينتهي العرض خلال :count يوماً|ينتهي العرض خلال :count يوم',
         'offer_ends_hours' => 'ينتهي العرض الآن|ينتهي العرض خلال ساعة|ينتهي العرض خلال ساعتين|ينتهي العرض خلال :count ساعات|ينتهي العرض خلال :count ساعة|ينتهي العرض خلال :count ساعة',
         'offer_ends_minutes' => 'ينتهي العرض الآن|ينتهي العرض خلال دقيقة|ينتهي العرض خلال دقيقتين|ينتهي العرض خلال :count دقائق|ينتهي العرض خلال :count دقيقة|ينتهي العرض خلال :count دقيقة',
-        'offer_days_left' => ':count يوم|يوم|يومين|:count أيام|:count يوماً|:count يوم',
+        'countdown_units' => 'يوم|ساعة|دقيقة|ثانية',
         'unit_days_short' => 'ي',
         'unit_hours_short' => 'س',
         'unit_minutes_short' => 'د',
@@ -369,6 +369,7 @@ return [
         'discount_terms_join' => '، ',
         'discount_chip' => 'خصم :percent%',
         'get_offer' => 'احصل على خصم :percent%',
+        'get_yearly_offer' => 'احصل على خصم :percent% سنوياً',
         'lines' => [
             'label_voice_quality' => 'جودة الصوت',
             'label_max_chars_per_request' => 'أقصى نص في المرة الواحدة',

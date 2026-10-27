@@ -104,16 +104,24 @@
       @php
         $endsText = $offerEndsText($discountEndsAt);
         $endsLeft = max(0, \Illuminate\Support\Carbon::parse($discountEndsAt)->getTimestamp() - now()->getTimestamp());
-        $endsDays = intdiv($endsLeft, 86400);
-        $endsRest = $endsLeft % 86400;
+        $endsUnits = explode('|', __('ui.pricing.countdown_units'));
+        // Days : hours : minutes : seconds (the days only while there is more than one).
+        $endsParts = array_values(array_filter([
+          [intdiv($endsLeft, 86400), $endsUnits[0] ?? '', $endsLeft >= 86400],
+          [intdiv($endsLeft % 86400, 3600), $endsUnits[1] ?? '', true],
+          [intdiv($endsLeft % 3600, 60), $endsUnits[2] ?? '', true],
+          [$endsLeft % 60, $endsUnits[3] ?? '', true],
+        ], fn ($part) => $part[2]));
       @endphp
       @if($endsText !== '')
-        {{-- The time left, in colour and counting down to the second, the days first while there
-             is more than one ("Offer ends in 3 days 04:12:33"; the page keeps it current). --}}
+        {{-- The time left as a timer, in colour and counting down to the second: "Offer ends in"
+             and days : hours : minutes : seconds, each with its unit under it (the page keeps it current). --}}
         <span class="offer-ends" data-ends="{{ $discountEndsAt }}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9.5 2.5h5"/></svg>
-          <span class="offer-ends-words" aria-hidden="true">{{ __('ui.pricing.discount_offer_ends') }}{{ $endsDays > 0 ? ' '.trans_choice('ui.pricing.offer_days_left', $endsDays) : '' }}</span>
-          <span class="offer-ends-clock" dir="ltr" aria-hidden="true">{{ sprintf('%02d:%02d:%02d', intdiv($endsRest, 3600), intdiv($endsRest % 3600, 60), $endsRest % 60) }}</span>
+          <span class="offer-ends-label" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9.5 2.5h5"/></svg>
+            {{ __('ui.pricing.discount_offer_ends') }}
+          </span>
+          <span class="offer-ends-clock" aria-hidden="true">@foreach($endsParts as $i => [$count, $unit])@if($i > 0)<span class="offer-ends-sep">:</span>@endif<span class="offer-ends-unit"><b>{{ sprintf('%02d', $count) }}</b><small>{{ $unit }}</small></span>@endforeach</span>
           <span class="offer-ends-text">{{ $endsText }}</span>
         </span>
       @endif
