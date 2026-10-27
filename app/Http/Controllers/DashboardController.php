@@ -276,8 +276,11 @@ class DashboardController extends Controller
             return $this->rejectTierAccess($request);
         }
 
-        // Style and emotion left on "Default" get the site's defaults for the language.
+        // Style and emotion left on "Default" get the site's defaults for the language; which
+        // ones were left on it is kept, so reusing the voice brings back "Default".
+        $onDefault = null;
         if (VoiceTier::normalize($requestedTier) === VoiceTier::HD) {
+            $onDefault = TtsStudioConfig::leftOnDefault($request->only(['performance_style', 'emotion']));
             $request->merge(TtsStudioConfig::withDefaultChoices($request->only(['performance_style', 'emotion']), $request->input('target_language')));
         }
         $this->ensureRequiredStudioSelections($requestedTier, [
@@ -413,6 +416,7 @@ class DashboardController extends Controller
                 'performance_style' => $studioOptions['performance_style'],
                 'style_prompt' => $studioOptions['style_prompt'],
                 'emotion' => $studioOptions['emotion'],
+                'on_default' => $onDefault,
                 'speed' => $studioOptions['speed'],
                 'pitch' => $studioOptions['pitch'],
                 // Only on plans with sound environments (or a member given them for a while), and only when this server can add them.
@@ -1150,6 +1154,8 @@ class DashboardController extends Controller
             'pitch' => $demo->pitch !== null ? (float) $demo->pitch : null,
             'is_dialogue' => false,
         ];
+        $onDefault = data_get($demo->metadata, 'on_default');
+        $settings = TtsStudioConfig::reusedAsChosen($settings, is_array($onDefault) ? $onDefault : null, $settings['target_language']);
 
         $normalized = array_filter($settings, static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
 

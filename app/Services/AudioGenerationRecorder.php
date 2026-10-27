@@ -53,13 +53,17 @@ class AudioGenerationRecorder
             ]);
 
             $attributes['settings_snapshot'] = $this->buildSettingsSnapshot($attributes);
+            // Which choices were left on "Default" (TtsStudioConfig::leftOnDefault), for reuse.
+            if (is_array($attributes['on_default'] ?? null) && $attributes['settings_snapshot'] !== null) {
+                $attributes['settings_snapshot']['on_default'] = array_values($attributes['on_default']);
+            }
             // The credit period it was charged to (App\Support\CreditPeriod), so the
             // correction or refund after it is made goes to the same period.
             if (is_string($attributes['usage_period'] ?? null) && $attributes['usage_period'] !== '') {
                 $attributes['settings_snapshot'] = ($attributes['settings_snapshot'] ?? []) + ['usage_period' => $attributes['usage_period']];
             }
             // Kept in the settings only: the effect is added after the speech (GenerateAudioJob).
-            unset($attributes['audio_effect'], $attributes['usage_period']);
+            unset($attributes['audio_effect'], $attributes['usage_period'], $attributes['on_default']);
 
             $job = AudioGeneration::create($attributes);
 
