@@ -86,6 +86,17 @@ class DatabaseSeedingTest extends TestCase
         $this->assertStringNotContainsString('shown only this once', Artisan::output());
     }
 
+    public function test_the_printed_password_is_exactly_the_password_whatever_its_symbols(): void
+    {
+        // The console reads \< and \> as markup: printed raw, these lost their backslash.
+        foreach (['7uhK,T<;fhq\\>H)6W|4TcDQ|', 'i\\<}X9$<jc$ft*59uN)d~T/(', 'a</b>c<info>d'] as $password) {
+            $output = new \Symfony\Component\Console\Output\BufferedOutput;
+            $output->writeln(AdminSeeder::passwordLine($password));
+
+            $this->assertStringEndsWith('shown only this once: '.$password.PHP_EOL, $output->fetch());
+        }
+    }
+
     public function test_an_account_that_already_has_the_admin_email_is_left_as_it_is(): void
     {
         $existing = User::factory()->create(['email' => self::ADMIN_EMAIL, 'password' => 'their-own-password']);

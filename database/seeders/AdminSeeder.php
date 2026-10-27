@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 class AdminSeeder extends Seeder
 {
@@ -39,9 +40,18 @@ class AdminSeeder extends Seeder
         $admin->forceFill(['is_admin' => true])->save();
 
         if ($generated) {
-            $this->command?->warn('Admin account '.self::EMAIL.' created. Its password, shown only this once: '.$password);
+            $this->command?->warn(self::passwordLine($password));
         } else {
             $this->command?->info('Admin account '.self::EMAIL.' created with the password from ADMIN_SEED_PASSWORD.');
         }
+    }
+
+    /**
+     * The line that shows a new password once. The password is escaped: the console reads
+     * "\<" and "\>" as markup and would print a password with them wrong (about one in 160).
+     */
+    public static function passwordLine(string $password): string
+    {
+        return 'Admin account '.self::EMAIL.' created. Its password, shown only this once: '.OutputFormatter::escape($password);
     }
 }
