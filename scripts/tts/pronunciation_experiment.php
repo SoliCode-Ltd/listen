@@ -2,11 +2,12 @@
 
 /*
  * On STAGING, with the owner's OK (it uses the shared speech quota): does the voice
- * say a member's saved word as saved? Two sentences whose meaning points to another
- * reading, two voices, two directions, two takes each (12 short voices):
- *   A: today's direction, the words named at the end of the style;
- *   B: the words first, each with a Latin sound guide built from its marks, and that
- *      this overrides what the sentence suggests.
+ * say a member's saved word as saved? Round 1 showed that no direction in the style
+ * overrides what the sentence means (12 of 12 read the word by its meaning). Round 2
+ * (8 short voices) writes the saved word into the text itself, by its sound:
+ *   C: in Latin letters, whole («malik»);
+ *   D: in Latin letters, by syllable («ma-lik»);
+ * with a direction first that such words are Arabic words to be said as written.
  * A text model listens to each take and writes how each word was said. Nothing is
  * written to the database; the takes are printed (MP3, base64) for the run's files.
  */
@@ -115,24 +116,36 @@ foreach ($sentences as $sid => $s) {
     }
     foreach ($s['voices'] as $voiceName) {
         $baseStyle = $call('asSpeaker', [$voiceName, $call('buildStylePrompt', [$style, $emotion, 'ar', 1.0, 'ar-EG', 0.0])]);
-        $directions = [
-            'A' => trim($baseStyle.' '.Pronunciations::direction($applied['text'], $applied['spoken'])),
-            'B' => 'Pronunciation, to follow exactly even where the sentence suggests another word: '
-                .implode('; ', array_map(fn (string $w): string => '«'.$w.'» is said "'.$guides[$w].'"', $applied['spoken'])).'. '.$baseStyle,
-        ];
+        // Each saved word in the text replaced by its sound, whole (C) or by syllable (D).
+        $syllables = fn (string $g): string => (string) preg_replace('/(?<=[aiu])(?=[^aiu\'-][aiu])/', '-', $g);
+        $texts = ['C' => $applied['text'], 'D' => $applied['text']];
+        $said = ['C' => [], 'D' => []];
+        foreach ($applied['spoken'] as $w) {
+            $texts['C'] = str_replace($w, $guides[$w], $texts['C']);
+            $texts['D'] = str_replace($w, $syllables($guides[$w]), $texts['D']);
+            $said['C'][] = $guides[$w];
+            $said['D'][] = $syllables($guides[$w]);
+        }
+        $directions = [];
+        foreach (['C', 'D'] as $v) {
+            $directions[$v] = 'Words written in Latin letters in this Arabic text are Arabic words spelled by their sound: say each exactly as spelled, '
+                .'with Arabic pronunciation and as part of the sentence, never as English words: '.implode(', ', array_map(fn ($x) => '"'.$x.'"', $said[$v])).'. '.$baseStyle;
+        }
         $voice = $call('resolveGeminiVoice', [$voiceName, $voices[$voiceName] ?? null]);
         foreach ($directions as $variant => $direction) {
-            foreach ([1, 2] as $take) {
-                $row = ['sentence' => $sid, 'voice' => $voiceName, 'variant' => $variant, 'take' => $take, 'text_sent' => $applied['text'], 'direction_start' => mb_substr($direction, 0, 260)];
+            // Two takes of your sentence on your voice; one elsewhere.
+            foreach ($sid === 's1' && $voiceName === 'ar-Gemini-HD-Schedar' ? [1, 2] : [1] as $take) {
+                $row = ['sentence' => $sid, 'voice' => $voiceName, 'variant' => $variant, 'take' => $take, 'text_sent' => $texts[$variant], 'direction_start' => mb_substr($direction, 0, 260)];
                 try {
-                    $audio = $call('requestAudio', [$endpoint, $call('buildSingleSpeakerPayload', [$applied['text'], $direction, $voice])]);
+                    $audio = $call('requestAudio', [$endpoint, $call('buildSingleSpeakerPayload', [$texts[$variant], $direction, $voice])]);
                     $wav = SpeechJoin::toFile([['bytes' => $audio['bytes'], 'mime_type' => $audio['mime_type']]])['path'];
                     $words = implode(', ', array_column($s['saved'], 'word'));
                     $heard = Http::timeout(90)->withHeaders(['x-goog-api-key' => $key])->post($base.'/models/gemini-3.5-flash:generateContent', [
                         'contents' => [['role' => 'user', 'parts' => [
                             ['inline_data' => ['mime_type' => 'audio/wav', 'data' => base64_encode((string) file_get_contents($wav))]],
-                            ['text' => 'The speaker reads this text: «'.$s['text'].'». Return JSON with "transcript" (what is said, word for word, with full Arabic vowel marks as pronounced) '
-                                .'and "words": an object giving, for each of these written words, a Latin transliteration of exactly how the speaker pronounced it: '.$words.'.'],
+                            // Not told the text, so the sentence's meaning cannot lead it.
+                            ['text' => 'Listen to this Arabic audio. Return JSON with "transcript" (exactly what is said, word for word, in Arabic script with full vowel marks as pronounced) '
+                                .'and "latin" (the same, in Latin letters as a phonetic transcription of exactly the sounds you hear, word by word).'],
                         ]]],
                         'generationConfig' => ['responseMimeType' => 'application/json'],
                     ])->json('candidates.0.content.parts.0.text');

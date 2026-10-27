@@ -1,7 +1,7 @@
 name: Pronunciation experiment
 
-# On STAGING, with the owner's OK (it uses the shared speech quota): 12 short
-# voices comparing two directions for a member's saved words, each checked by a
+# On STAGING, with the owner's OK (it uses the shared speech quota): short
+# voices comparing ways to make the voice say a member's saved words, each checked by a
 # text model that listens to it. The takes are kept with the run as MP3 files.
 
 on:
