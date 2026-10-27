@@ -44,13 +44,16 @@ $admins = User::query()->where('is_admin', true)->pluck('id');
 $userId = (int) AudioGeneration::query()->whereIn('user_id', $admins)->latest('id')->value('user_id');
 $out['user_id'] = $userId;
 $out['pronunciations'] = Schema::hasTable('pronunciations')
-    ? \App\Models\Pronunciation::query()->where('user_id', $userId)->get(['id', 'word', 'word_key', 'spoken', 'created_at', 'updated_at'])->toArray()
+    ? \App\Models\Pronunciation::query()->where('user_id', $userId)->get(['id', 'word', 'word_key', 'spoken', 'created_at', 'updated_at'])
+        ->map(fn ($p) => $p->toArray() + ['spoken_codepoints' => implode(' ', array_map(fn ($c) => sprintf('U+%04X', mb_ord($c)), mb_str_split((string) $p->spoken)))])->all()
     : null;
+// Which deploy is on the server: the panel script's newest feature and the last-letter note.
+$out['meta']['panel_has_letters'] = str_contains((string) @file_get_contents($root.'/public/js/voice-studio.js'), 'pronLetters');
 
 $key = (string) (app(\App\Services\Tts\GeminiKeyManager::class)->getAvailableKey()['key'] ?? '');
 $base = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
 
-foreach (AudioGeneration::query()->where('user_id', $userId)->latest('id')->limit(4)->get() as $g) {
+foreach (AudioGeneration::query()->where('user_id', $userId)->latest('id')->limit(5)->get() as $g) {
     $text = (string) $g->input_text;
     $row = [
         'id' => $g->id,
