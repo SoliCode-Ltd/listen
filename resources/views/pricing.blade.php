@@ -467,6 +467,18 @@
       .plan-features li { font-size: .98rem; }
       .feature-label svg { width: 1.1rem; height: 1.1rem; }
     }
+    /* A narrow desktop card: the minutes and credits a little smaller, so they stay on one line. */
+    @media (min-width: 1001px) {
+      @container (max-width: 400px) {
+        .plan-quota { gap: .4rem .6rem; }
+        .plan-minutes-number, .plan-quota-number { font-size: 1rem; }
+        .plan-minutes-unit, .plan-quota-unit { font-size: .8rem; }
+        .plan-quota-coin { font-size: .95rem; }
+        .plan-quota-credits { gap: .3rem; }
+      }
+      /* The coin icon sets its own display inline, so this needs !important to win. */
+      @container (max-width: 340px) { .plan-quota-coin { display: none !important; } }
+    }
     .plan-features li.is-tick .feature-label svg { color: var(--ok); stroke-width: 2.6; }
 
     /* At the foot of the track: the voices every plan has. Under the card: every plan to pick from. */

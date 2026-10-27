@@ -261,7 +261,7 @@ return [
         'year' => 'yr',
         'save' => 'Save',
         'yearly_save' => 'Save :percent%',
-        'minutes_per_month' => 'minutes of audio a month',
+        'minutes_per_month' => 'minutes/month',
         'credits_count' => ':count credits',
         'compare_title' => 'Compare plans',
         'compare_subtitle' => 'Every limit and feature, side by side.',
