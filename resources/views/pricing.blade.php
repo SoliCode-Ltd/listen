@@ -286,7 +286,9 @@
       .price-amount { font-size: 2.3rem; }
     }
     .price-original-row { display: inline-flex; align-items: baseline; }
-    .price-original { color: var(--muted); font-size: 1.05rem; font-weight: 500; text-decoration: line-through; text-decoration-thickness: 1.5px; }
+    /* The full price, crossed out in red so it reads at a glance as the price before the offer. */
+    .pricing-page { --price-strike: color-mix(in oklab, var(--danger) 85%, transparent); }
+    .price-original { color: color-mix(in oklab, var(--muted) 70%, var(--text)); font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: var(--price-strike); }
     .price-row { display: flex; align-items: baseline; justify-content: center; gap: .35rem; }
     .price-amount { font-size: clamp(2.5rem, 3.4vw, 3rem); font-weight: 700; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
     .price-period { color: var(--muted); font-size: .95rem; font-weight: 500; }
@@ -399,8 +401,6 @@
     .plan-btn.btn-disabled { background: var(--surface2); color: var(--muted); border: 1px solid var(--line); cursor: default; }
     /* In the panel the shown plan's button is the page's main action: always filled. */
     .plan-card .plan-btn { min-height: 52px; font-size: 1.02rem; }
-    /* A narrow phone: "Start your first month for EGP 1,096" still on one line. */
-    @container (max-width: 320px) { .plan-card .plan-btn { padding-inline: .6rem; font-size: .92rem; } }
     .plan-card .plan-btn.btn-outline { background: var(--brand-accent); color: #fff; border-color: transparent; box-shadow: var(--lift); }
     .plan-card .plan-btn:not(.btn-disabled):hover { background: var(--brand-hover); transform: translateY(-1px); }
 
@@ -508,7 +508,7 @@
     .plan-pick-price small { color: var(--muted); font-size: .8rem; font-weight: 500; margin-inline-start: .2rem; }
     .plan-picker:not(.is-yearly) .plan-pick.is-first-month .plan-pick-price small { display: none; }
     .plan-pick-offer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .2rem .45rem; }
-    .plan-pick-offer s { color: var(--muted); font-size: .8rem; text-decoration-thickness: 1.5px; white-space: nowrap; }
+    .plan-pick-offer s { color: color-mix(in oklab, var(--muted) 70%, var(--text)); font-size: .9rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: var(--price-strike); white-space: nowrap; }
     .plan-pick-off {
       padding: .1rem .5rem;
       border-radius: var(--radius-full);
@@ -936,7 +936,7 @@
       .plan-bar-name { display: block; font-weight: 700; }
       .plan-bar-price { color: var(--muted); font-size: .86rem; }
       .plan-bar-price.has-offer { color: var(--text); font-weight: 600; }
-      .plan-bar-price s { margin-inline-start: .35rem; color: var(--muted); font-size: .8rem; font-weight: 400; }
+      .plan-bar-price s { margin-inline-start: .4rem; color: var(--muted); font-size: .86rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: color-mix(in oklab, var(--danger) 85%, transparent); }
       .plan-bar .plan-btn { width: auto; min-height: 44px; padding: .5rem 1.3rem; background: var(--brand-accent); color: #fff; border-color: transparent; }
       .plan-bar .plan-btn.btn-disabled { background: var(--surface2); color: var(--muted); }
       /* The chat button moves up while the bar is shown, so it never covers the button. */
@@ -1654,9 +1654,6 @@
           var copy = button.cloneNode(true);
           copy.removeAttribute('data-upgrade-link');
           copy.setAttribute('tabindex', '-1');
-          // The bar is narrow: the short words, not "Start your first month for …".
-          var short = copy.getAttribute('data-short-label');
-          if (short && copy.textContent === copy.getAttribute('data-monthly-label')) copy.textContent = short;
           action.appendChild(copy);
         }
       }

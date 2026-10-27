@@ -367,7 +367,7 @@ return [
         'discount_then_year' => 'ثم :price سنوياً',
         'discount_terms_join' => '، ',
         'discount_chip' => 'خصم :percent%',
-        'start_first_month' => 'ابدأ أول شهر بـ :price',
+        'get_offer' => 'احصل على خصم :percent%',
         'lines' => [
             'label_voice_quality' => 'جودة الصوت',
             'label_max_chars_per_request' => 'أقصى نص في المرة الواحدة',

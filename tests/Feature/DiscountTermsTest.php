@@ -118,8 +118,9 @@ class DiscountTermsTest extends TestCase
             ->assertSee('30% off your first month')
             ->assertSee('data-offer-yearly="50% off your first year"', false)
             ->assertSee('<s class="price-original" dir="ltr">', false)
-            // A first-month offer: the button names its price, and the list of plans shows it too.
-            ->assertSee('Start your first month for')
+            // The button says what is off, for each cycle, and the list of plans shows the offer too.
+            ->assertSee('data-monthly-label="Get 30% off"', false)
+            ->assertSee('data-yearly-label="Get 50% off"', false)
             ->assertSee('class="plan-pick is-first-month"', false)
             ->assertSee('30% off')
             // A week left: in words, not counting down yet.
@@ -166,9 +167,9 @@ class DiscountTermsTest extends TestCase
             ->assertOk()
             ->assertSee('class="offer-label"', false)
             ->assertSee('خصم 10% على أول شهرين')
-            // Two months off: the price stays "a month", and the button keeps its usual words.
+            // Two months off: the price stays "a month"; the button says what is off.
             ->assertDontSee('class="plan-pick is-first-month"', false)
-            ->assertDontSee('ابدأ أول شهر');
+            ->assertSee('احصل على خصم 10%');
     }
 
     public function test_checkout_says_when_the_full_price_starts(): void

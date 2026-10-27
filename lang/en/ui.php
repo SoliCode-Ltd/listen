@@ -366,7 +366,7 @@ return [
         'discount_then_year' => 'Then :price/year',
         'discount_terms_join' => ', ',
         'discount_chip' => ':percent% off',
-        'start_first_month' => 'Start your first month for :price',
+        'get_offer' => 'Get :percent% off',
         'lines' => [
             'label_voice_quality' => 'Voice quality',
             'label_max_chars_per_request' => 'Max text per generation',
