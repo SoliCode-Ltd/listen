@@ -1344,6 +1344,7 @@ return [
             'mark_dagger_alef' => 'ألف خنجرية',
             'mark_hamza_above' => 'همزة فوق',
             'mark_hamza_below' => 'همزة تحت',
+            'limit' => 'The voice follows your spelling for names, foreign words and words with more than one reading. Where the meaning of the sentence calls for another reading, it may read the word by its meaning.',
             'example_title' => 'Hear the difference',
             'example_play' => 'Play “:word”',
             'example_ar_text' => 'The same letters «علم» are read three ways, and the vowel marks choose which. Without marks the voice picks one.',

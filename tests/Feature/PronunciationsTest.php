@@ -287,6 +287,36 @@ class PronunciationsTest extends TestCase
         $this->assertStringContainsString('following every vowel mark and letter: «Win».', $bodies[1]);
     }
 
+    public function test_every_piece_of_a_long_voice_gets_the_same_direction(): void
+    {
+        Storage::fake('public');
+        config(['services.gemini_tts.dialect_rewrite' => false, 'services.gemini_tts.max_chars_per_request' => 200]);
+        $key = ['key' => 'test-gemini-key', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1];
+        $manager = \Mockery::mock(GeminiKeyManager::class);
+        $manager->shouldReceive('getAllKeys')->andReturn([$key]);
+        $manager->shouldReceive('getAvailableKey')->andReturn($key);
+        $manager->shouldReceive('keysInOrder')->andReturn([$key]);
+        $manager->shouldReceive('recordUsage')->andReturnNull();
+        $this->app->instance(GeminiKeyManager::class, $manager);
+        $pcm = pack('v*', ...array_fill(0, 2400, 0));
+        $wav = 'RIFF'.pack('V', 36 + strlen($pcm)).'WAVEfmt '.pack('VvvVVvv', 16, 1, 1, 24000, 48000, 2, 16).'data'.pack('V', strlen($pcm)).$pcm;
+        $styles = [];
+        Http::fake(function ($request) use ($wav, &$styles) {
+            $styles[] = (string) data_get($request->data(), 'contents.0.parts.0.speech_metadata.style');
+
+            return Http::response(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'audio/wav', 'data' => base64_encode($wav)]]]]]]]);
+        });
+
+        // The saved word is only in the first piece; the text runs on for several more.
+        $text = 'هذا عِلْم نافع للجميع. '.str_repeat('ونكمل الحديث عن الموضوع نفسه بهدوء وتأنٍ حتى نهايته. ', 12);
+        app(GeminiTtsProvider::class)->synthesize($text, 'ar', ['voice_name' => 'Kore', 'pronounce' => ['عِلْم']]);
+
+        $this->assertGreaterThan(1, count($styles), 'made in several pieces');
+        foreach ($styles as $style) {
+            $this->assertStringEndsWith('following every vowel mark and letter: «عِلْم».', $style, 'each piece is told the same, so the tone holds');
+        }
+    }
+
     public function test_the_shared_audio_cache_never_mixes_two_members_pronunciations(): void
     {
         $key = new \ReflectionMethod(TtsService::class, 'buildAdvancedCacheKey');

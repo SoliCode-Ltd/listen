@@ -852,6 +852,8 @@
       + '<p class="vs-pron-lastnote" role="status" hidden></p>'
       + marks + '</div>'
       + '<p class="vs-pron-tip"></p>'
+      // What the voice can and can't be made to do, said once and plainly.
+      + '<p class="vs-pron-limit">' + escAttr(tr('limit')) + '</p>'
       + '</form>'
       + '<section class="vs-pron-saved" aria-labelledby="vsPronListTitle"><h3 id="vsPronListTitle">' + escAttr(tr('list_title')) + ' <small class="vs-pron-total"></small></h3>'
       + '<ul class="vs-pron-list"></ul><p class="vs-pron-empty" hidden>' + escAttr(tr('empty')) + '</p>'

@@ -551,13 +551,15 @@ class GeminiTtsProvider implements TtsProviderInterface
         $texts = [];
         $inPart = array_count_values(array_column($pieces, 0));
         $seen = [];
+        // The member's pronunciations in the whole text, told to every piece alike: a piece
+        // with a different direction from its neighbours can change the voice's tone there.
+        $pronounce = Pronunciations::direction($text, (array) ($voiceConfig['pronounce'] ?? []));
         foreach ($pieces as [$partIndex, $chunk, $partStyle]) {
             // The pieces one stretch of the script (one direction) is cut into are told they
             // are one reading; a mood tag's own part changes the delivery on purpose.
             $n = $seen[$partIndex] = ($seen[$partIndex] ?? -1) + 1;
             $style = $inPart[$partIndex] > 1 ? self::continuing($partStyle, $n, $inPart[$partIndex]) : $partStyle;
             $performed = GeminiVocalTags::forPerformance($chunk['text'], $style);
-            $pronounce = Pronunciations::direction($performed['text'], (array) ($voiceConfig['pronounce'] ?? []));
             $payloads[] = $this->buildSingleSpeakerPayload($performed['text'], trim($performed['style'].' '.$pronounce), $voiceName);
             // The part of the script it reads ([whispering] …): each part keeps its own level.
             $groups[] = $partIndex;
@@ -904,9 +906,10 @@ class GeminiTtsProvider implements TtsProviderInterface
         // after each piece's last line.
         $payloads = [];
         $pauses = [];
+        // Every piece is told the same pronunciations (those in the whole dialogue), so the tone holds.
+        $pronounce = Pronunciations::direction($text, (array) ($voiceConfig['pronounce'] ?? []));
         foreach ($this->dialoguePieces($text, $speakers) as $piece) {
             $cast = array_map(fn (array $speaker): string => trim((string) ($speaker['name'] ?? $speaker['id'] ?? '')), $piece['speakers']);
-            $pronounce = Pronunciations::direction($piece['text'], (array) ($voiceConfig['pronounce'] ?? []));
             $payloads[] = $this->buildDialoguePayload($piece['text'], trim($stylePrompt.' '.$pronounce), $piece['speakers'], array_intersect_key($speakerStyles, array_flip($cast)));
             $pauses[] = JoinPauses::after($piece['text']);
         }
