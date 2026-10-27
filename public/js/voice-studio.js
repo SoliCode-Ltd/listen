@@ -849,7 +849,7 @@
       + '<div class="vs-pron-marks" role="group" aria-labelledby="vsPronMarksLabel"><span class="vs-pron-marks-label" id="vsPronMarksLabel">' + escAttr(tr('marks_label')) + '</span>'
       + '<p class="vs-pron-letters-hint">' + escAttr(tr('letters_hint')) + '</p>'
       + '<div class="vs-pron-letters" dir="rtl"></div>'
-      + '<p class="vs-pron-lastnote" role="status" hidden>' + escAttr(tr('last_only')) + '</p>'
+      + '<p class="vs-pron-lastnote" role="status" hidden></p>'
       + marks + '</div>'
       + '<p class="vs-pron-tip"></p>'
       + '</form>'
@@ -1057,11 +1057,21 @@
         b.classList.toggle('is-on', on);
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
-      lastNote.hidden = !pronLastOnly(letters);
+      // Only the last letter marked: in Fusha that vowel is read, in a spoken dialect it is not.
+      var dialect = noteDialect();
+      lastNote.hidden = dialect.fusha || !pronLastOnly(letters);
+      if (!lastNote.hidden) lastNote.textContent = dialect.name ? tr('last_only', { dialect: dialect.name }) : tr('last_only_any');
       if (focus) {
         var sel = lettersBox.querySelector('.vs-pron-letter.is-selected');
         if (sel) sel.focus({ preventScroll: true });
       }
+    }
+    // The dialect chosen in the studio: its name, and whether it is Fusha.
+    function noteDialect() {
+      var select = form.querySelector('select[name="dialect"]');
+      var code = select ? select.value : '';
+      var option = select && select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
+      return { fusha: (cfg.fusha || []).indexOf(code) >= 0, name: code && option ? option.textContent.trim() : '' };
     }
     function setMark(mark) {
       var letters = pronLetters(spokenIn.value);
