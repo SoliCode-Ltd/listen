@@ -465,6 +465,20 @@ class BillingEdgeCasesTest extends TestCase
             ->assertSee(__('ui.billing.order_usage_note', [], 'ar'));
     }
 
+    public function test_a_running_plan_is_changed_with_the_card_boxes_only(): void
+    {
+        // A plan change, a resumed plan or a trial's end can ask first: the phone wallet
+        // starts a new plan only.
+        $user = $this->userWithSubscription('active', 'price_starter_m');
+        $this->actingAs($user)->getLocalizedRoute('billing.page')->assertOk()
+            ->assertViewHas('walletPay', false)
+            ->assertDontSee('id="wallet-button"', false);
+
+        BillingSubscription::query()->where('stripe_id', 'sub_edge')->update(['stripe_status' => 'trialing', 'trial_ends_at' => now()->addDays(7)]);
+        $this->actingAs($user)->getLocalizedRoute('billing.page')->assertOk()
+            ->assertViewHas('walletPay', false);
+    }
+
     public function test_no_order_details_on_a_trial_or_the_same_plan(): void
     {
         $user = $this->userWithSubscription('active', 'price_starter_m');

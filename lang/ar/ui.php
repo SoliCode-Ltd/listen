@@ -485,6 +485,7 @@ return [
         'card_number' => 'رقم البطاقة',
         'card_expiry' => 'تاريخ الانتهاء',
         'card_cvc' => 'رمز الأمان (CVC)',
+        'wallet_or_card' => 'أو ادفع بالبطاقة',
         'using_saved_card' => 'سيتم استخدام بطاقتك المحفوظة.',
         'enter_new_card_optional' => 'أدخل بطاقة جديدة أدناه فقط إذا كنت ترغب في تغييرها.',
         'save_card_for_future' => 'حفظ هذه البطاقة للدفعات المستقبلية',
