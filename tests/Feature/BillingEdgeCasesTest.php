@@ -246,6 +246,32 @@ class BillingEdgeCasesTest extends TestCase
             ->assertJsonPath('message', __('ui.billing.decline_no_funds', [], 'ar'));
     }
 
+    public function test_a_card_from_a_phone_wallet_pays_for_a_new_plan_like_a_typed_card(): void
+    {
+        foreach (['google_pay', 'apple_pay'] as $wallet) {
+            $user = User::factory()->create();
+            $user->forceFill(['stripe_id' => 'cus_edge'])->save();
+            $this->stripe->wallet = $wallet;
+            $this->stripe->customerDefault = null;
+            $this->stripe->requests = [];
+            $this->stripe->failSubscriptionCreate = true;
+            $this->stripe->cardError = ['code' => 'card_declined', 'decline_code' => 'insufficient_funds'];
+
+            // It is a card: accepted, kept for the renewals, and charged for the plan.
+            $this->subscribe($user, ['plan' => 'starter', 'payment_method' => 'pm_edge', 'save_card' => true])
+                ->assertStatus(422)
+                ->assertJsonMissing(['message' => __('ui.backend.billing_only_cards_supported')])
+                ->assertJsonPath('decline', 'no_funds');
+
+            $this->assertNotNull($this->stripe->last('get', '/v1/payment_methods/pm_edge'), $wallet.': the card was not checked.');
+            $default = $this->stripe->last('post', '/v1/customers/cus_edge');
+            $this->assertSame('pm_edge', $default['invoice_settings']['default_payment_method'] ?? null, $wallet.': the card is not kept for the renewals.');
+            $create = $this->stripe->last('post', '/v1/subscriptions');
+            $this->assertNotNull($create, $wallet.': the plan was not charged.');
+            $this->assertSame('price_starter_m', $create['items'][0]['price'] ?? null);
+        }
+    }
+
     public function test_a_declined_first_payment_kept_out_of_date_by_cashier_is_looked_up(): void
     {
         $user = User::factory()->create();
@@ -516,6 +542,12 @@ class ScriptedStripeClient implements ClientInterface
     /** The invoice Stripe previews for a plan change. */
     public array $preview = [];
 
+    /** The phone wallet the card came from (google_pay, apple_pay), or none. */
+    public ?string $wallet = null;
+
+    /** The customer's saved default card. */
+    public ?string $customerDefault = 'pm_edge';
+
     public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
     {
         $method = strtolower($method);
@@ -564,11 +596,12 @@ class ScriptedStripeClient implements ClientInterface
         }
 
         if ($path === '/v1/customers/cus_edge') {
-            return $this->json(['id' => 'cus_edge', 'object' => 'customer', 'invoice_settings' => ['default_payment_method' => 'pm_edge']]);
+            return $this->json(['id' => 'cus_edge', 'object' => 'customer', 'invoice_settings' => ['default_payment_method' => $this->customerDefault]]);
         }
 
         if ($path === '/v1/payment_methods/pm_edge') {
-            return $this->json(['id' => 'pm_edge', 'object' => 'payment_method', 'type' => 'card', 'customer' => 'cus_edge', 'card' => ['brand' => 'visa', 'last4' => '4242']]);
+            return $this->json(['id' => 'pm_edge', 'object' => 'payment_method', 'type' => 'card', 'customer' => 'cus_edge', 'card' => ['brand' => 'visa', 'last4' => '4242']
+                + ($this->wallet ? ['wallet' => ['type' => $this->wallet, $this->wallet => (object) []]] : [])]);
         }
 
         if ($path === '/v1/subscriptions' && $method === 'post' && $this->failSubscriptionCreate) {
