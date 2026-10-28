@@ -405,33 +405,6 @@
       background: color-mix(in oklab, var(--ok) 10%, transparent);
       white-space: nowrap;
     }
-    .stripe-label {
-      display: inline-flex;
-      align-items: center;
-      gap: .4rem;
-      font-size: .95rem;
-      font-weight: 700;
-      color: var(--muted);
-      margin-bottom: .6rem;
-    }
-    .stripe-label svg {
-      width: 1rem;
-      height: 1rem;
-      fill: currentColor;
-    }
-    .stripe-label .card-icon {
-      width: 1.05rem;
-      height: 1.05rem;
-      display: inline-block;
-      flex-shrink: 0;
-    }
-    .stripe-label .card-icon svg {
-      width: 100%;
-      height: 100%;
-      display: block;
-      fill: none;
-      stroke: none;
-    }
     /* The saved card: the check beside two lines, what is used and how to change it. */
     .saved-card-notice {
       display: grid;
@@ -1107,7 +1080,7 @@
                         </svg>
                       </span>
                       <span class="method-copy">
-                        <span class="method-name">{{ __('ui.billing.payment_method_stripe') }}</span>
+                        <span class="method-name">{{ __('ui.billing.credit_or_debit_card') }}</span>
                       </span>
                     </div>
                   </div>
@@ -1207,24 +1180,6 @@
               @if($walletPay ?? false)
                 <x-wallet-button id="wallet" />
               @endif
-              <div class="stripe-label">
-                <span class="card-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <defs>
-                      <linearGradient id="billingCardGradient" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stop-color="#3B82F6"></stop>
-                        <stop offset="50%" stop-color="#8B5CF6"></stop>
-                        <stop offset="100%" stop-color="#F97316"></stop>
-                      </linearGradient>
-                    </defs>
-                    <rect x="2" y="4" width="20" height="16" rx="4" fill="url(#billingCardGradient)"></rect>
-                    <rect x="2" y="8" width="20" height="2" fill="rgba(255,255,255,.75)"></rect>
-                    <rect x="5" y="13" width="4.8" height="3.4" rx="1" fill="rgba(255,255,255,.92)"></rect>
-                    <rect x="11.5" y="14.2" width="7.3" height="1.1" rx=".55" fill="rgba(255,255,255,.88)"></rect>
-                  </svg>
-                </span>
-                {{ __('ui.billing.credit_or_debit_card') }}
-              </div>
               @if($defaultPaymentMethod)
                 <div class="saved-card-notice">
                   <span class="saved-card-icon">

@@ -13,7 +13,7 @@
 </div>
 @once
   <style>
-    .wallet-pay { display: grid; gap: .85rem; margin-bottom: 1rem; }
+    .wallet-pay { display: grid; gap: 1rem; margin-bottom: 1rem; }
     .wallet-pay[hidden] { display: none; }
     .wallet-or { display: flex; align-items: center; gap: .75rem; color: var(--muted); font-size: .85rem; }
     .wallet-or::before, .wallet-or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
