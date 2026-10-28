@@ -183,8 +183,8 @@
     html[dir="rtl"] .plan-name { letter-spacing: 0; }
     .plan-desc { margin: .35rem auto 0; max-width: 30ch; color: var(--muted); font-size: .92rem; line-height: 1.55; text-wrap: balance; }
 
-    /* The offer: a green label above the price ("30% off your first month"), the full price
-       struck through beside the price. */
+    /* The offer: a green label above the price ("30% off your first month", then the day it
+       ends), the full price struck through beside the price. */
     .plan-offer { display: flex; justify-content: center; align-items: flex-end; padding-top: 1.05rem; }
     /* Side by side, a card without an offer keeps the row empty so its price lines up. */
     .plan-offer.is-empty { display: none; padding-top: 0; }
@@ -204,6 +204,23 @@
       text-align: center;
     }
     .offer-label svg { flex: none; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    /* The day the offer ends, as the label's last part on a deeper green ("Until 30 Oct"). */
+    .offer-label:has(.offer-until) { align-items: stretch; padding-block: 0; padding-inline-end: 0; overflow: hidden; }
+    .offer-label:has(.offer-until) svg { align-self: center; }
+    .offer-label:has(.offer-until) .offer-label-text { padding-block: .34rem; }
+    .offer-until {
+      display: inline-flex;
+      align-items: center;
+      margin-inline-start: .35rem;
+      padding: .34rem .75rem;
+      background: color-mix(in oklab, var(--ok) 24%, transparent);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    @media (max-width: 400px) {
+      .offer-label { gap: .3rem; padding-inline: .65rem; font-size: .78rem; }
+      .offer-until { margin-inline-start: .25rem; padding-inline: .6rem; }
+    }
 
     /* The price with "/month" beside it, the price before the offer struck through next to them
        (under them when the card is too narrow), then a short note. */
@@ -229,32 +246,7 @@
     .pricing-page.is-yearly .plan-offer,
     .pricing-page.is-yearly .price-original-row.is-offer,
     .pricing-page:not(.is-yearly) .price-original-row.is-yearly,
-    .pricing-page.is-yearly .offer-ends,
-    .pricing-page.is-yearly .plans-countdown,
     .pricing-page.is-yearly .compare-plan-offer { display: none; }
-
-    /* When the offer ends, as a clock: the time left in the text colour with even-width figures,
-       each unit small and quiet under its number, thin colons between, and a short muted lead
-       above it. It counts down to the second. */
-    .plans-countdown { display: flex; justify-content: center; }
-    .offer-ends { display: flex; flex-direction: column; align-items: center; gap: .55rem; }
-    .offer-ends[hidden] { display: none; }
-    .offer-ends-label { color: var(--muted); font-size: .92rem; font-weight: 500; }
-    .offer-ends-clock { display: inline-flex; align-items: flex-start; direction: inherit; }
-    .offer-ends-unit { position: relative; display: inline-grid; justify-items: center; min-width: 3rem; line-height: 1.1; }
-    .offer-ends-unit + .offer-ends-unit { margin-inline-start: .9rem; }
-    .offer-ends-unit + .offer-ends-unit::before { content: ":"; position: absolute; inset-inline-start: -.7rem; top: .05em; color: var(--muted); opacity: .7; font-size: 1.5rem; font-weight: 400; line-height: 1.1; }
-    .offer-ends-unit b { color: var(--text); font-size: 1.75rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
-    .offer-ends-unit small { margin-top: .35rem; color: var(--muted); font-size: .74rem; font-weight: 500; }
-    .offer-ends-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-    /* Offers that end at different times: each card keeps its own, smaller clock. */
-    .plan-card .offer-ends { margin-top: .6rem; gap: .35rem; }
-    .plan-card .offer-ends-label { font-size: .8rem; }
-    .plan-card .offer-ends-unit { min-width: 2rem; }
-    .plan-card .offer-ends-unit + .offer-ends-unit { margin-inline-start: .45rem; }
-    .plan-card .offer-ends-unit + .offer-ends-unit::before { inset-inline-start: -.4rem; top: 0; font-size: 1rem; }
-    .plan-card .offer-ends-unit b { font-size: 1.08rem; }
-    .plan-card .offer-ends-unit small { margin-top: .2rem; font-size: .64rem; }
 
     .plan-trial-chip {
       display: inline-flex;
@@ -1056,10 +1048,6 @@
       .studio-faces { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; height: 28px; overflow: hidden; }
       .studio-faces img { width: 28px; height: 28px; margin-inline-start: -8px; box-shadow: none; }
       .studio-faces img:nth-child(n+7) { display: none; }
-      .offer-ends-unit { min-width: 2.6rem; }
-      .offer-ends-unit + .offer-ends-unit { margin-inline-start: .7rem; }
-      .offer-ends-unit + .offer-ends-unit::before { inset-inline-start: -.55rem; font-size: 1.3rem; }
-      .offer-ends-unit b { font-size: 1.45rem; }
     }
     @media (max-width: 1000px) {
       .team-band[data-count] { max-width: 820px; }
@@ -1126,14 +1114,6 @@
           'trial_monthly' => in_array('monthly', $trialCycles, true),
           'trial_yearly' => in_array('yearly', $trialCycles, true),
         ];
-      };
-      // When an offer ends, in words: "Offer ends in 4 days", "… in 7 hours", "… in 12 minutes".
-      $offerEndsText = static function (?string $endsAt): string {
-        $seconds = $endsAt ? \Illuminate\Support\Carbon::parse($endsAt)->getTimestamp() - now()->getTimestamp() : 0;
-        if ($seconds <= 0) return '';
-        if ($seconds >= 2 * 86400) return trans_choice('ui.pricing.offer_ends_days', intdiv($seconds, 86400));
-        if ($seconds >= 3600) return trans_choice('ui.pricing.offer_ends_hours', intdiv($seconds, 3600));
-        return trans_choice('ui.pricing.offer_ends_minutes', max(1, (int) ceil($seconds / 60)));
       };
       // The cards are the monthly plans; the plan to try the voices and one-time packs are not shown here.
       $mainPlans = array_filter($pricingPlans, fn ($pricingPlan) => empty($pricingPlan['is_pack']) && (int) ($pricingPlan['price_monthly_cents'] ?? 0) > 0);
@@ -1273,19 +1253,10 @@
         'live' => __('ui.pricing.minutes_live'),
       ];
       $proofFaces = ['ar-ahmed', 'ar-amal', 'en-amelia', 'ar-ali', 'ar-aisha', 'en-adrian', 'ar-layla', 'ar-omar', 'en-alice', 'ar-nour'];
-      // Every offer ending at the same time: one timer above the cards instead of one on each.
-      $offerEndTimes = collect($mainPlans)
-        ->filter(fn ($p, $i) => !empty($p['has_discount']) && !empty($p['discount_terms']) && !empty($p['discount_ends_at'])
-          && !$planState($p, $i)['is_free'] && !$planState($p, $i)['is_pack'])
-        ->map(fn ($p) => (string) $p['discount_ends_at'])->unique()->values();
-      $sharedOfferEnds = $offerEndTimes->count() === 1 && $offerEndsText($offerEndTimes->first()) !== '' ? $offerEndTimes->first() : null;
     @endphp
     <section class="plans" aria-labelledby="plansTitle">
       {{-- Named for screen readers only: the cards follow the title above. --}}
       <h2 class="plans-title" id="plansTitle">{{ __('ui.pricing.all_plans') }}</h2>
-      @if($sharedOfferEnds)
-        <div class="plans-countdown">@include('components._offer-ends', ['endsAt' => $sharedOfferEnds])</div>
-      @endif
 
       @if(count($mainPlans) > 1)
         {{-- Phones: every plan's name in one switch that stays under the site's bar while the cards
@@ -1675,62 +1646,6 @@
 
       updatePrices();
       updateUpgradeLinks();
-    })();
-  </script>
-  @php
-    // The offer-ends wording in every plural form, for the minute-by-minute update.
-    $offerEndsForms = [
-      'days' => explode('|', __('ui.pricing.offer_ends_days')),
-      'hours' => explode('|', __('ui.pricing.offer_ends_hours')),
-      'minutes' => explode('|', __('ui.pricing.offer_ends_minutes')),
-    ];
-  @endphp
-  <script>
-    /* ── When each offer ends, in words, kept current ── */
-    (function() {
-      var lines = document.querySelectorAll('.offer-ends[data-ends]');
-      if (!lines.length) return;
-      var forms = @json($offerEndsForms);
-      var units = @json(explode('|', __('ui.pricing.countdown_units')));
-      var arabic = document.documentElement.lang === 'ar';
-      // The same plural rules the server uses (Laravel's): six forms in Arabic, two in English.
-      function form(list, n) {
-        var i;
-        if (arabic) {
-          var m = n % 100;
-          i = n === 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : (m >= 3 && m <= 10) ? 3 : (m >= 11 && m <= 99) ? 4 : 5;
-        } else {
-          i = n === 1 ? 0 : 1;
-        }
-        return String(list[Math.min(i, list.length - 1)] || '').replace(':count', String(n));
-      }
-      function pad(n) { return (n < 10 ? '0' : '') + n; }
-      function set(el, text) { if (el && el.textContent !== text) el.textContent = text; }
-      // The line: days, hours, minutes and seconds (the days only while there is more than one),
-      // each number with its unit under it. Screen readers get the time left in words.
-      function clock(el, seconds) {
-        var box = el.querySelector('.offer-ends-clock');
-        if (!box) return;
-        var parts = [[Math.floor(seconds / 86400), units[0]], [Math.floor(seconds % 86400 / 3600), units[1]], [Math.floor(seconds % 3600 / 60), units[2]], [seconds % 60, units[3]]];
-        if (seconds < 86400) parts.shift();
-        var html = parts.map(function(p) { return '<span class="offer-ends-unit"><b>' + pad(p[0]) + '</b><small>' + p[1] + '</small></span>'; }).join('');
-        if (box.innerHTML !== html) box.innerHTML = html;
-      }
-      function refresh() {
-        var any = false;
-        lines.forEach(function(el) {
-          var seconds = Math.floor((new Date(el.getAttribute('data-ends')).getTime() - Date.now()) / 1000);
-          if (!(seconds > 0)) { el.hidden = true; return; }
-          any = true;
-          var text = seconds >= 172800 ? form(forms.days, Math.floor(seconds / 86400))
-            : seconds >= 3600 ? form(forms.hours, Math.floor(seconds / 3600))
-            : form(forms.minutes, Math.max(1, Math.ceil(seconds / 60)));
-          clock(el, seconds);
-          set(el.querySelector('.offer-ends-text'), text);
-        });
-        if (any) setTimeout(refresh, 1000);
-      }
-      refresh();
     })();
   </script>
   <script>
