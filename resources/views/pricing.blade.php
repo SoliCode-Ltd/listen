@@ -106,7 +106,7 @@
     .pricing-page { --ease-out: cubic-bezier(.22, 1, .36, 1); }
     .page-hero .billing-toggle { margin-top: 1.6rem; }
     .plans { padding-top: clamp(1.2rem, 2.5vw, 2rem); }
-    .plans .section-title { margin-bottom: 1.1rem; }
+    .plans-title { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     /* Phones: one card under another. */
     .plan-grid {
       display: grid;
@@ -1278,7 +1278,8 @@
       $sharedOfferEnds = $offerEndTimes->count() === 1 && $offerEndsText($offerEndTimes->first()) !== '' ? $offerEndTimes->first() : null;
     @endphp
     <section class="plans" aria-labelledby="plansTitle">
-      <h2 class="section-title" id="plansTitle">{{ __('ui.pricing.all_plans') }}</h2>
+      {{-- Named for screen readers only: the cards follow the title above. --}}
+      <h2 class="plans-title" id="plansTitle">{{ __('ui.pricing.all_plans') }}</h2>
       @if($sharedOfferEnds)
         <div class="plans-countdown">@include('components._offer-ends', ['endsAt' => $sharedOfferEnds])</div>
       @endif
