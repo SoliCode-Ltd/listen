@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\CaptureAdClickId;
 use App\Models\Plan;
 use App\Services\Billing\CharPackService;
 use App\Services\LocalizedPricingService;
@@ -153,6 +154,7 @@ class ManualPaymentController extends Controller
                     ['country_code' => $countryContext['country_code']]
                 ),
                 $request->file('proof_image'),
+                CaptureAdClickId::fromRequest($request),
             );
         } catch (DomainException $exception) {
             if ($request->expectsJson()) {

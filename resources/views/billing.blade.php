@@ -2427,7 +2427,8 @@
             throw new Error(responseMessage(response, i18n.upgrade_failed));
           }
 
-          await trackPurchaseConversion(selected.meta);
+          // Not a sale yet: the team still checks the proof. It is uploaded to
+          // Google Ads once approved (App\Services\Billing\AdsPurchases).
           setMessage('ok', response.data?.message || i18n.manual_request_received);
           proofInput.value = '';
           proofUploadArea?.classList.remove('has-file');

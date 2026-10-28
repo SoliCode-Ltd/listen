@@ -143,6 +143,7 @@ class User extends Authenticatable implements FilamentUser
             'password' => 'hashed',
             'api_key_created_at' => 'datetime',
             'subscription_status_checked_at' => 'datetime',
+            'ads_click_at' => 'datetime',
             'is_admin' => 'boolean',
             'is_blocked' => 'boolean',
             'blocked_at' => 'datetime',
