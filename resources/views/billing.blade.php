@@ -137,7 +137,8 @@
       position: relative;
       flex: 1;
       border: 2px solid var(--line);
-      border-radius: var(--radius-lg);
+      /* The fields' corners, so the box's edge runs straight under its label like theirs. */
+      border-radius: var(--radius);
       background: var(--surface);
       padding: .85rem .9rem;
       cursor: pointer;
@@ -159,7 +160,8 @@
     .payment-method-card.active {
       border-color: var(--a);
       background: color-mix(in oklab, var(--a) 4%, var(--surface));
-      box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 12%, transparent);
+      /* The highlight sits inside the border, so the chosen box lines up with the fields above. */
+      box-shadow: inset 0 0 0 1px var(--a);
     }
     .payment-method-card.unavailable {
       opacity: .35;
