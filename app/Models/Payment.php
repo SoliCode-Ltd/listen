@@ -45,17 +45,32 @@ class Payment extends Model
         'currency',
         'description',
         'paid_at',
+        'stripe_customer_id',
+        'stripe_payment_method_id',
+        'card_exp_month',
+        'card_exp_year',
+        'card_funding',
+        'card_fingerprint',
+        'card_cvc_check',
     ];
 
     protected $casts = [
         'amount_minor' => 'integer',
         'refunded_minor' => 'integer',
         'paid_at' => 'datetime',
+        'card_exp_month' => 'integer',
+        'card_exp_year' => 'integer',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** The card kept on file for the member's renewals and trials, when this payment's card is one. */
+    public function savedCard(): BelongsTo
+    {
+        return $this->belongsTo(SavedPaymentMethod::class, 'stripe_payment_method_id', 'stripe_payment_method_id');
     }
 
     public static function methodLabel(?string $method): string

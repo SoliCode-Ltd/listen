@@ -3,11 +3,13 @@
 namespace Tests\Feature;
 
 use App\Filament\Resources\PaymentResource\Pages\ListPayments;
+use App\Filament\Resources\PaymentResource\Pages\ViewPayment;
 use App\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions;
 use App\Filament\Widgets\BusinessPaymentMethods;
 use App\Models\ManualPaymentRequest;
 use App\Models\Payment;
 use App\Models\Plan;
+use App\Models\SavedPaymentMethod;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
@@ -75,8 +77,10 @@ class PaymentMethodsTest extends TestCase
             'id' => $id, 'object' => 'charge', 'customer' => $customer, 'status' => 'succeeded', 'paid' => true,
             'amount' => 1540, 'amount_refunded' => 0, 'currency' => 'usd', 'description' => 'Subscription creation',
             'created' => Carbon::parse('2026-10-28 17:36:13', 'UTC')->timestamp,
+            'payment_method' => 'pm_'.$id,
             'payment_method_details' => ['type' => 'card', 'card' => [
-                'brand' => 'visa', 'last4' => '6753', 'country' => 'SA',
+                'brand' => 'visa', 'last4' => '6753', 'country' => 'SA', 'exp_month' => 12, 'exp_year' => 2031,
+                'funding' => 'debit', 'fingerprint' => '8xYmLXZzQb8QHP4v', 'checks' => ['cvc_check' => null],
                 'wallet' => $wallet ? ['type' => $wallet] : null,
             ]],
         ], $extra);
@@ -127,6 +131,18 @@ class PaymentMethodsTest extends TestCase
         $this->assertSame('USD', $payment->currency);
         $this->assertSame('Subscription creation', $payment->description);
         $this->assertSame('2026-10-28 17:36:13', $payment->paid_at->utc()->format('Y-m-d H:i:s'));
+        // What the old Saved cards page showed, kept with the payment.
+        $this->assertSame(['cus_apple', 'pm_ch_apple', 12, 2031, 'debit', '8xYmLXZzQb8QHP4v', null], [$payment->stripe_customer_id,
+            $payment->stripe_payment_method_id, $payment->card_exp_month, $payment->card_exp_year, $payment->card_funding, $payment->card_fingerprint, $payment->card_cvc_check]);
+
+        // Its page shows the card and the card on file for renewals.
+        SavedPaymentMethod::query()->create(['user_id' => $member->id, 'stripe_customer_id' => 'cus_apple', 'stripe_payment_method_id' => 'pm_ch_apple',
+            'brand' => 'visa', 'last4' => '6753', 'purpose' => SavedPaymentMethod::PURPOSE_SUBSCRIPTION, 'is_default' => true, 'off_session_ready' => false]);
+        $this->admin();
+        Livewire::test(ViewPayment::class, ['record' => $payment->getKey()])->assertOk()
+            ->assertSee('Apple Pay')->assertSee('15.40 USD')->assertSee('Last 4')->assertSee('6753')->assertSee('12 / 2031')
+            ->assertSee('Debit')->assertSee('Saudi Arabia')->assertSee('8xYmLXZzQb8QHP4v')->assertSee('pm_ch_apple')->assertSee('cus_apple')
+            ->assertSee('Card on file')->assertSee('Subscription')->assertSee('Default card');
 
         $this->stripeCharges([$this->charge('ch_apple', 'cus_apple', 'apple_pay', ['amount_refunded' => 1540, 'refunded' => true])]);
         $this->webhook('evt_refund', 'charge.refunded', 'cus_apple', 'charge')->assertOk();
