@@ -29,6 +29,9 @@
         amount: Math.round(Number(options.amount)),
         currency: 'usd',
         paymentMethodCreation: 'manual',
+        // The buttons' words in the page's language, not the browser's: an Arabic page says
+        // its call to action in Arabic.
+        locale: String(document.documentElement.lang || '').toLowerCase().indexOf('ar') === 0 ? 'ar' : 'en',
         // The site's corners (--radius); the wallets draw their own marks in their own colours.
         appearance: { variables: { borderRadius: '8px' } },
       });
