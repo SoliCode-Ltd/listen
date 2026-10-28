@@ -155,6 +155,13 @@ class PaymentLedger
             'currency' => strtoupper((string) ($charge->currency ?? 'usd')),
             'description' => isset($charge->description) ? mb_substr((string) $charge->description, 0, 255) : null,
             'paid_at' => Carbon::createFromTimestamp((int) ($charge->created ?? time())),
+            'stripe_customer_id' => isset($charge->customer) ? (string) $charge->customer : null,
+            'stripe_payment_method_id' => isset($charge->payment_method) ? (string) $charge->payment_method : null,
+            'card_exp_month' => isset($card->exp_month) ? (int) $card->exp_month : null,
+            'card_exp_year' => isset($card->exp_year) ? (int) $card->exp_year : null,
+            'card_funding' => isset($card->funding) ? (string) $card->funding : null,
+            'card_fingerprint' => isset($card->fingerprint) ? (string) $card->fingerprint : null,
+            'card_cvc_check' => isset($card->checks->cvc_check) ? (string) $card->checks->cvc_check : null,
         ]);
 
         return (bool) $payment?->wasRecentlyCreated;
