@@ -44,7 +44,8 @@
        the chosen half on a raised chip, the saving on the yearly one. */
     .billing-toggle {
       display: inline-grid;
-      grid-template-columns: 1fr 1fr;
+      /* Both halves as wide as the wider one (yearly, with its saving), so neither is cut. */
+      grid-template-columns: repeat(2, minmax(max-content, 1fr));
       background: color-mix(in oklab, var(--text) 5%, transparent);
       border-radius: var(--radius-full);
       padding: 4px;
@@ -67,6 +68,15 @@
     .billing-toggle.yearly .billing-indicator { transform: translateX(100%); }
     html[dir="rtl"] .billing-indicator { left: auto; right: 4px; }
     html[dir="rtl"] .billing-toggle.yearly .billing-indicator { transform: translateX(-100%); }
+    /* Once the page has measured the chosen half, the chip takes exactly its place and size. */
+    .billing-toggle.is-measured .billing-indicator,
+    html[dir="rtl"] .billing-toggle.is-measured .billing-indicator {
+      left: 0;
+      right: auto;
+      width: var(--chip-w);
+      transform: translateX(var(--chip-x));
+      transition: transform .25s cubic-bezier(.4, 0, .2, 1), width .25s cubic-bezier(.4, 0, .2, 1);
+    }
     .billing-toggle button {
       position: relative;
       z-index: 1;
@@ -1640,6 +1650,7 @@
         monthlyBtn.setAttribute('aria-pressed', yearly ? 'false' : 'true');
         yearlyBtn.setAttribute('aria-pressed', yearly ? 'true' : 'false');
         billingToggle.classList.toggle('yearly', yearly);
+        placeChip();
         if (page) page.classList.toggle('is-yearly', yearly);
         updatePrices();
         updateUpgradeLinks();
@@ -1653,6 +1664,18 @@
           });
         }
       }
+
+      // The chip under the chosen half: its exact place and width, whatever the words' widths.
+      function placeChip() {
+        var active = isYearly ? yearlyBtn : monthlyBtn;
+        if (!active.offsetWidth) return;
+        billingToggle.style.setProperty('--chip-w', active.offsetWidth + 'px');
+        billingToggle.style.setProperty('--chip-x', active.offsetLeft + 'px');
+        billingToggle.classList.add('is-measured');
+      }
+      placeChip();
+      if ('ResizeObserver' in window) new ResizeObserver(placeChip).observe(billingToggle);
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeChip);
 
       monthlyBtn.addEventListener('click', function() { setBillingMode(false); });
       yearlyBtn.addEventListener('click', function() { setBillingMode(true); });
