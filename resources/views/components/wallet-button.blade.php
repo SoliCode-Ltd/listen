@@ -22,7 +22,7 @@
       var box = document.getElementById(id);
       if (!stripe || !box || !(Number(options.amount) > 0)) return null;
       var light = document.documentElement.getAttribute('data-theme') === 'light';
-      // Charged in US dollars, as the card boxes are: the wallet shows that amount.
+      // The wallet shows the amount charged, in the currency the card boxes charge in.
       var elements = stripe.elements({
         mode: options.mode,
         amount: Math.round(Number(options.amount)),
