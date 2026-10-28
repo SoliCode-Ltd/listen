@@ -28,10 +28,14 @@
         amount: Math.round(Number(options.amount)),
         currency: 'usd',
         paymentMethodCreation: 'manual',
+        // The site's corners (--radius); the wallets draw their own marks in their own colours.
+        appearance: { variables: { borderRadius: '8px' } },
       });
+      var type = options.buttonType || 'plain';
       var button = elements.create('expressCheckout', {
         paymentMethods: { link: 'never', paypal: 'never', amazonPay: 'never', klarna: 'never' },
         buttonTheme: { applePay: light ? 'black' : 'white', googlePay: light ? 'black' : 'white' },
+        buttonType: { applePay: type, googlePay: type },
         buttonHeight: 48,
       });
       var ready = false;

@@ -2486,6 +2486,7 @@
     walletButton = stripe && walletStartCents > 0 && window.ListenWalletButton
       ? window.ListenWalletButton(stripe, 'wallet', {
           mode: 'subscription',
+          buttonType: 'subscribe',
           amount: walletStartCents,
           billingDetails: { name: userName || undefined, email: userEmail || undefined },
           onConfirm: async function(paymentMethod, walletError) {

@@ -176,7 +176,7 @@ class BillingPageClientTest extends TestCase
             ->getLocalizedRoute('billing.pack')->assertOk()
             ->assertSee('<div class="wallet-pay" id="pack-wallet" hidden>', false)
             ->assertSee("window.ListenWalletButton(stripe, 'pack-wallet', {", false)
-            ->assertSee("mode: 'payment',\n        amount: 200,", false)
+            ->assertSee("mode: 'payment',\n        buttonType: 'buy',\n        amount: 200,", false)
             ->assertSee('await payWithCard(paymentMethodId);', false)
             ->assertSee('await payWithCard(method.paymentMethod.id);', false);
     }
