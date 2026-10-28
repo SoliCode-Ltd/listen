@@ -1,6 +1,6 @@
-{{-- When an offer ends, as one line counting down to the second: "Offer ends in" and the days,
+{{-- When an offer ends, as a clock counting down to the second: "Offer ends in" and the days,
      hours, minutes and seconds (the days only while there is more than one), each number with its
-     unit after it. The page keeps it current; screen readers get the time left in words. --}}
+     unit under it. The page keeps it current; screen readers get the time left in words. --}}
 @php
   $endsText = $offerEndsText($endsAt);
   $endsLeft = max(0, \Illuminate\Support\Carbon::parse($endsAt)->getTimestamp() - now()->getTimestamp());
@@ -14,10 +14,7 @@
 @endphp
 @if($endsText !== '')
   <span class="offer-ends" data-ends="{{ $endsAt }}">
-    <span class="offer-ends-label" aria-hidden="true">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9.5 2.5h5"/></svg>
-      {{ __('ui.pricing.discount_offer_ends') }}
-    </span>
+    <span class="offer-ends-label" aria-hidden="true">{{ __('ui.pricing.discount_offer_ends') }}</span>
     <span class="offer-ends-clock" aria-hidden="true">@foreach($endsParts as [$count, $unit])<span class="offer-ends-unit"><b>{{ sprintf('%02d', $count) }}</b><small>{{ $unit }}</small></span>@endforeach</span>
     <span class="offer-ends-text">{{ $endsText }}</span>
   </span>

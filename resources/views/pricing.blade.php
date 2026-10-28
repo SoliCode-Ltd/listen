@@ -233,24 +233,28 @@
     .pricing-page.is-yearly .plans-countdown,
     .pricing-page.is-yearly .compare-plan-offer { display: none; }
 
-    /* When the offer ends, as one line of text: "Offer ends in 02 days 11 hrs 53 min 37 sec",
-       each number in bold amber with its unit after it, counting down to the second. */
-    .pricing-page { --offer-urgent: #FDB022; }
-    html[data-theme="light"] .pricing-page { --offer-urgent: #B54708; }
+    /* When the offer ends, as a clock: the time left in the text colour with even-width figures,
+       each unit small and quiet under its number, thin colons between, and a short muted lead
+       above it. It counts down to the second. */
     .plans-countdown { display: flex; justify-content: center; }
-    .offer-ends { display: flex; align-items: baseline; justify-content: center; flex-wrap: wrap; gap: .25rem .6rem; font-size: 1.02rem; line-height: 1.5; }
+    .offer-ends { display: flex; flex-direction: column; align-items: center; gap: .55rem; }
     .offer-ends[hidden] { display: none; }
-    .offer-ends-label { display: inline-flex; align-items: center; gap: .4rem; align-self: center; color: var(--text); font-weight: 600; }
-    .offer-ends-label svg { flex: none; width: 18px; height: 18px; fill: none; stroke: var(--offer-urgent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .offer-ends-clock { display: inline-flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0 .6rem; }
-    .offer-ends-unit { display: inline-flex; align-items: baseline; gap: .22rem; white-space: nowrap; }
-    .offer-ends-unit b { color: var(--offer-urgent); font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .offer-ends-unit small { color: var(--muted); font-size: .92rem; font-weight: 500; }
+    .offer-ends-label { color: var(--muted); font-size: .92rem; font-weight: 500; }
+    .offer-ends-clock { display: inline-flex; align-items: flex-start; direction: inherit; }
+    .offer-ends-unit { position: relative; display: inline-grid; justify-items: center; min-width: 3rem; line-height: 1.1; }
+    .offer-ends-unit + .offer-ends-unit { margin-inline-start: .9rem; }
+    .offer-ends-unit + .offer-ends-unit::before { content: ":"; position: absolute; inset-inline-start: -.7rem; top: .05em; color: var(--muted); opacity: .7; font-size: 1.5rem; font-weight: 400; line-height: 1.1; }
+    .offer-ends-unit b { color: var(--text); font-size: 1.75rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+    .offer-ends-unit small { margin-top: .35rem; color: var(--muted); font-size: .74rem; font-weight: 500; }
     .offer-ends-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-    /* Offers that end at different times: each card keeps its own, smaller line. */
-    .plan-card .offer-ends { margin-top: .5rem; font-size: .9rem; }
-    .plan-card .offer-ends-unit b { font-size: 1.02rem; }
-    .plan-card .offer-ends-unit small { font-size: .82rem; }
+    /* Offers that end at different times: each card keeps its own, smaller clock. */
+    .plan-card .offer-ends { margin-top: .6rem; gap: .35rem; }
+    .plan-card .offer-ends-label { font-size: .8rem; }
+    .plan-card .offer-ends-unit { min-width: 2rem; }
+    .plan-card .offer-ends-unit + .offer-ends-unit { margin-inline-start: .45rem; }
+    .plan-card .offer-ends-unit + .offer-ends-unit::before { inset-inline-start: -.4rem; top: 0; font-size: 1rem; }
+    .plan-card .offer-ends-unit b { font-size: 1.08rem; }
+    .plan-card .offer-ends-unit small { margin-top: .2rem; font-size: .64rem; }
 
     .plan-trial-chip {
       display: inline-flex;
@@ -1052,10 +1056,10 @@
       .studio-faces { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; height: 28px; overflow: hidden; }
       .studio-faces img { width: 28px; height: 28px; margin-inline-start: -8px; box-shadow: none; }
       .studio-faces img:nth-child(n+7) { display: none; }
-      .offer-ends { font-size: .96rem; }
-      .offer-ends-clock { gap: 0 .5rem; }
-      .offer-ends-unit b { font-size: 1.12rem; }
-      .offer-ends-unit small { font-size: .86rem; }
+      .offer-ends-unit { min-width: 2.6rem; }
+      .offer-ends-unit + .offer-ends-unit { margin-inline-start: .7rem; }
+      .offer-ends-unit + .offer-ends-unit::before { inset-inline-start: -.55rem; font-size: 1.3rem; }
+      .offer-ends-unit b { font-size: 1.45rem; }
     }
     @media (max-width: 1000px) {
       .team-band[data-count] { max-width: 820px; }
@@ -1703,7 +1707,7 @@
       function pad(n) { return (n < 10 ? '0' : '') + n; }
       function set(el, text) { if (el && el.textContent !== text) el.textContent = text; }
       // The line: days, hours, minutes and seconds (the days only while there is more than one),
-      // each number with its unit after it. Screen readers get the time left in words.
+      // each number with its unit under it. Screen readers get the time left in words.
       function clock(el, seconds) {
         var box = el.querySelector('.offer-ends-clock');
         if (!box) return;
