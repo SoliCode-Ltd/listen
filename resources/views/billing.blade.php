@@ -446,7 +446,8 @@
       display: flex;
       align-items: center;
       gap: .5rem;
-      padding: .55rem .7rem;
+      /* Starts exactly where the sentence in the box under it starts (its padding and border). */
+      padding: .55rem calc(.85rem + 1px);
       border-radius: var(--radius);
       cursor: pointer;
       font-size: .95rem;
