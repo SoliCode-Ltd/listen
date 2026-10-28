@@ -34,10 +34,14 @@
       });
       var type = options.buttonType || 'plain';
       var narrow = Boolean(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
+      // An iPhone or iPad (iPadOS reports itself as a Mac with a touch screen) pays with its own
+      // wallet only: the other one is little used there and would ask to sign in first.
+      var appleTouch = /iPhone|iPad|iPod/.test(navigator.userAgent || '')
+        || (/Macintosh/.test(navigator.userAgent || '') && Number(navigator.maxTouchPoints || 0) > 1);
       var button = elements.create('expressCheckout', {
         // 'always': each wallet shows in other makers' browsers too (on a computer the phone
         // wallet is paid by scanning a code); on 'auto' each only showed in its own browser.
-        paymentMethods: { applePay: 'always', googlePay: 'always', link: 'never', paypal: 'never', amazonPay: 'never', klarna: 'never' },
+        paymentMethods: { applePay: 'always', googlePay: appleTouch ? 'never' : 'always', link: 'never', paypal: 'never', amazonPay: 'never', klarna: 'never' },
         buttonTheme: { applePay: light ? 'black' : 'white', googlePay: light ? 'black' : 'white' },
         buttonType: { applePay: type, googlePay: type },
         buttonHeight: 48,

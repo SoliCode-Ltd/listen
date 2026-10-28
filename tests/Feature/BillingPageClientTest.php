@@ -160,8 +160,10 @@ class BillingPageClientTest extends TestCase
             ->assertSee('<div class="wallet-pay" id="wallet" hidden>', false)
             ->assertSee(__('ui.billing.wallet_or_card', [], 'ar'))
             ->assertSee("elements.create('expressCheckout', {", false)
-            // Apple Pay in every desktop browser (paid from an iPhone), Google Pay in Safari and Firefox too.
-            ->assertSee("paymentMethods: { applePay: 'always', googlePay: 'always', link: 'never', paypal: 'never', amazonPay: 'never', klarna: 'never' },", false)
+            // Apple Pay in every desktop browser (paid from an iPhone), Google Pay in Safari and Firefox
+            // too, but an iPhone or iPad gets Apple Pay only.
+            ->assertSee("paymentMethods: { applePay: 'always', googlePay: appleTouch ? 'never' : 'always', link: 'never', paypal: 'never', amazonPay: 'never', klarna: 'never' },", false)
+            ->assertSee("var appleTouch = /iPhone|iPad|iPod/.test(navigator.userAgent || '')", false)
             // Both wallets side by side on a wide screen, one under the other on a phone, never in a menu.
             ->assertSee("layout: { maxColumns: narrow ? 1 : 2, overflow: 'never' },", false)
             // It is shown the US dollar amount charged today, never on a trial.
