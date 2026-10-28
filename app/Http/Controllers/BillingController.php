@@ -395,6 +395,8 @@ class BillingController extends Controller
         }
 
         $user = $request->user();
+        // The Google Ads click, for when Stripe says the invoice is paid (AdsPurchases).
+        app(\App\Services\Billing\AdsPurchases::class)->rememberClick($user, $request);
 
         $validated = $request->validate([
             'plan' => ['required', 'string', 'max:50'],

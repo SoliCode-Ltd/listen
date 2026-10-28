@@ -66,6 +66,8 @@ class SeoSettings extends Page implements HasForms
             'google_ads_conversion_send_to' => SiteSetting::get('google_ads_conversion_send_to', ''),
             'google_ads_trial_conversion_send_to' => SiteSetting::get('google_ads_trial_conversion_send_to', ''),
             'google_ads_trial_paid_conversion_name' => SiteSetting::get('google_ads_trial_paid_conversion_name', 'Trial converted'),
+            'google_ads_manual_purchase_conversion_name' => SiteSetting::get('google_ads_manual_purchase_conversion_name', 'Manual purchase'),
+            'google_ads_card_purchase_conversion_name' => SiteSetting::get('google_ads_card_purchase_conversion_name', 'Card purchase (server)'),
             'google_tag_head_code' => SiteSetting::get('google_tag_head_code', ''),
             'facebook_pixel_code' => SiteSetting::get('facebook_pixel_code', ''),
             'enable_structured_data' => (string) SiteSetting::get('enable_structured_data', '1') === '1',
@@ -288,6 +290,16 @@ class SeoSettings extends Page implements HasForms
                             ->label('Google Ads Trial Paid Conversion Name')
                             ->placeholder('Trial converted')
                             ->helperText('Must match the name of the "Import → Conversions from clicks" action in Google Ads. Used by Billing → Trials → Export paid trials for Google Ads.')
+                            ->maxLength(100),
+                        Forms\Components\TextInput::make('google_ads_manual_purchase_conversion_name')
+                            ->label('Google Ads Manual Purchase Conversion Name')
+                            ->placeholder('Manual purchase')
+                            ->helperText('InstaPay / Vodafone Cash payments from an ad click, counted once approved. Must match an "Import → Conversions from clicks" action (Primary). Used by Manual payments → Export purchases for Google Ads.')
+                            ->maxLength(100),
+                        Forms\Components\TextInput::make('google_ads_card_purchase_conversion_name')
+                            ->label('Google Ads Card Purchase (Server) Conversion Name')
+                            ->placeholder('Card purchase (server)')
+                            ->helperText('Card, Apple Pay and Google Pay payments from an ad click, as Stripe records them. The page already reports these, so keep this action Secondary in Google Ads. Used by Manual payments → Export purchases for Google Ads.')
                             ->maxLength(100),
                         Forms\Components\Textarea::make('google_tag_head_code')
                             ->label('Google Tag Head Code')

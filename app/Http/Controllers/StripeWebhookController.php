@@ -93,6 +93,7 @@ class StripeWebhookController extends Controller
             };
 
             $trialOutcomeService->handleStripeEvent($event);
+            app(\App\Services\Billing\AdsPurchases::class)->handleStripeEvent($event);
             $stripeWebhookEmailService->sendForEvent($event);
 
             // A subscription or a payment changed: the dashboard's income figures are read again.

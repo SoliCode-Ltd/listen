@@ -40,6 +40,7 @@ class ManualPaymentRequest extends Model
         'reviewed_by',
         'reviewer_notes',
         'approved_subscription_id',
+        'gclid',
     ];
 
     protected $casts = [
