@@ -2480,11 +2480,13 @@
     renderChargePreview();
 
     // The wallet's sheet hands over a card; paying with it takes the same steps as the card boxes.
-    const walletStart = walletCharge();
-    walletButton = stripe && walletStart && window.ListenWalletButton
+    // It is made even when the page opens on a trial or on InstaPay, so it can show once the
+    // member picks paying by card.
+    const walletStartCents = Number(currentPlan()?.payment_methods?.stripe?.[String(cycleSelect?.value || 'monthly')]?.base_usd_cents || 0);
+    walletButton = stripe && walletStartCents > 0 && window.ListenWalletButton
       ? window.ListenWalletButton(stripe, 'wallet', {
           mode: 'subscription',
-          amount: walletStart.amount,
+          amount: walletStartCents,
           billingDetails: { name: userName || undefined, email: userEmail || undefined },
           onConfirm: async function(paymentMethod, walletError) {
             if (walletError) {

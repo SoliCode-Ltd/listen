@@ -164,7 +164,9 @@ class BillingPageClientTest extends TestCase
             // Its card pays through the same steps as the card boxes, purchase conversion included.
             ->assertSee('leaving = await subscribeByCard(charge.selected, paymentMethod, true);', false)
             ->assertSee('leaving = await subscribeByCard(selected, paymentMethod, saveCardCheckbox ? saveCardCheckbox.checked : true);', false)
-            ->assertSee("if (paymentInFlight || !charge || !paymentMethod) return;", false);
+            ->assertSee("if (paymentInFlight || !charge || !paymentMethod) return;", false)
+            // Made even when the page opens on a trial or on InstaPay, so it can show once card is picked.
+            ->assertSee("const walletStartCents = Number(currentPlan()?.payment_methods?.stripe?.[String(cycleSelect?.value || 'monthly')]?.base_usd_cents || 0);", false);
         $this->assertMatchesRegularExpression('/\p{Arabic}/u', __('ui.billing.wallet_or_card', [], 'ar'));
         // The page's own words never name the wallets.
         $this->assertDoesNotMatchRegularExpression('/apple pay|google pay/i', strip_tags((string) $billing->getContent()));
