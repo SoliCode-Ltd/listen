@@ -219,6 +219,9 @@ class PaymentMethodsTest extends TestCase
             'amount_minor' => 100, 'currency' => 'USD', 'paid_at' => now()]);
 
         Livewire::test(ListPayments::class)->assertOk()->assertSee('Apple Pay')->assertSee('Visa •••• 6753 · SA')->assertSee('15.40 USD');
+        // Payments takes the place of the old "Saved cards" page (the cards stay kept for renewals).
+        $this->get('/admin/payments')->assertOk();
+        $this->get('/admin/saved-payment-methods')->assertNotFound();
         Livewire::test(ListSubscriptions::class)->assertOk()->assertSee('Paid with')->assertSee('Apple Pay')->assertSee('Card')
             ->filterTable('paid_with', Payment::METHOD_APPLE_PAY)->assertSee('Apple Member')->assertDontSee('Card Member');
 
