@@ -166,6 +166,8 @@ class BillingPageClientTest extends TestCase
             ->assertSee("var appleTouch = /iPhone|iPad|iPod/.test(navigator.userAgent || '')", false)
             // Both wallets side by side on a wide screen, one under the other on a phone, never in a menu.
             ->assertSee("layout: { maxColumns: narrow ? 1 : 2, overflow: 'never' },", false)
+            // Logos only: the wallets' own words would be in their fonts, not the site's.
+            ->assertSee("buttonType: { applePay: 'plain', googlePay: 'plain' },", false)
             // The buttons speak the page's language.
             ->assertSee("locale: String(document.documentElement.lang || '').toLowerCase().indexOf('ar') === 0 ? 'ar' : 'en',", false)
             // It is shown the US dollar amount charged today, never on a trial.
@@ -192,7 +194,7 @@ class BillingPageClientTest extends TestCase
             ->getLocalizedRoute('billing.pack')->assertOk()
             ->assertSee('<div class="wallet-pay" id="pack-wallet" hidden>', false)
             ->assertSee("window.ListenWalletButton(stripe, 'pack-wallet', {", false)
-            ->assertSee("mode: 'payment',\n        buttonType: 'buy',\n        amount: 200,", false)
+            ->assertSee("mode: 'payment',\n        amount: 200,", false)
             ->assertSee('await payWithCard(paymentMethodId);', false)
             ->assertSee('await payWithCard(method.paymentMethod.id);', false);
     }

@@ -212,6 +212,10 @@
       font-size: 1rem;
       font-weight: 700;
       line-height: 1.2;
+      /* Each choice's name on one line. */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* ── Checkout panels ── */
@@ -804,6 +808,12 @@
     }
 
     /* ── Responsive ── */
+    /* Too narrow for three names side by side: the choices go one under the other. */
+    @media (max-width: 1180px) {
+      .payment-method-grid {
+        flex-direction: column;
+      }
+    }
     @media (max-width: 980px) {
       .grid-layout {
         grid-template-columns: 1fr;
@@ -852,9 +862,6 @@
       .status-grid {
         grid-template-columns: 1fr 1fr 1fr;
         gap: .65rem;
-      }
-      .payment-method-grid {
-        flex-direction: column;
       }
       .manual-main-grid {
         grid-template-columns: 1fr;
@@ -2489,7 +2496,6 @@
     walletButton = stripe && walletStartCents > 0 && window.ListenWalletButton
       ? window.ListenWalletButton(stripe, 'wallet', {
           mode: 'subscription',
-          buttonType: 'subscribe',
           amount: walletStartCents,
           billingDetails: { name: userName || undefined, email: userEmail || undefined },
           onConfirm: async function(paymentMethod, walletError) {

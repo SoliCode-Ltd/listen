@@ -481,7 +481,7 @@ return [
         'yearly' => 'سنوي',
         'yearly_save_20' => 'سنوي (توفير 20%)',
         'cycle_with_discount' => ':cycle (توفير %:percent)',
-        'credit_or_debit_card' => 'بطاقة ائتمان أو بطاقة خصم',
+        'credit_or_debit_card' => 'بطاقة ائتمان أو خصم',
         'card_number' => 'رقم البطاقة',
         'card_expiry' => 'تاريخ الانتهاء',
         'card_cvc' => 'رمز الأمان (CVC)',

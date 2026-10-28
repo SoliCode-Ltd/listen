@@ -17,6 +17,9 @@
     .wallet-pay[hidden] { display: none; }
     .wallet-or { display: flex; align-items: center; gap: .75rem; color: var(--muted); font-size: .85rem; }
     .wallet-or::before, .wallet-or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+    /* The same lift on hover as the site's other buttons, for both wallets alike. */
+    .wallet-button iframe { transition: transform .2s ease; }
+    .wallet-button iframe:hover { transform: translateY(-1px); }
   </style>
   <script>
     window.ListenWalletButton = function (stripe, id, options) {
@@ -35,7 +38,6 @@
         // The site's corners (--radius); the wallets draw their own marks in their own colours.
         appearance: { variables: { borderRadius: '8px' } },
       });
-      var type = options.buttonType || 'plain';
       var narrow = Boolean(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
       // An iPhone or iPad (iPadOS reports itself as a Mac with a touch screen) pays with its own
       // wallet only: the other one is little used there and would ask to sign in first.
@@ -46,7 +48,9 @@
         // wallet is paid by scanning a code); on 'auto' each only showed in its own browser.
         paymentMethods: { applePay: 'always', googlePay: appleTouch ? 'never' : 'always', link: 'never', paypal: 'never', amazonPay: 'never', klarna: 'never' },
         buttonTheme: { applePay: light ? 'black' : 'white', googlePay: light ? 'black' : 'white' },
-        buttonType: { applePay: type, googlePay: type },
+        // Logos only: each wallet would write its words in its own font, never the site's,
+        // so the page's own words (in the site font) say what the buttons do.
+        buttonType: { applePay: 'plain', googlePay: 'plain' },
         buttonHeight: 48,
         // Side by side on a wide screen, one under the other on a phone; never hidden in a menu.
         layout: { maxColumns: narrow ? 1 : 2, overflow: 'never' },
