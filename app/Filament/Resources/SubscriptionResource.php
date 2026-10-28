@@ -6,6 +6,7 @@ use App\Filament\Resources\SubscriptionResource\Pages;
 use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
 use App\Models\CharGift;
+use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
@@ -39,7 +40,11 @@ class SubscriptionResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->whereHas('plan', fn (Builder $plan) => $plan->where('price_cents', '>', 0));
+            ->whereHas('plan', fn (Builder $plan) => $plan->where('price_cents', '>', 0))
+            // How the member last paid (Billing → Payments).
+            ->addSelect(['paid_with' => Payment::query()->select('method')
+                ->whereColumn('payments.user_id', 'subscriptions.user_id')
+                ->orderByDesc('paid_at')->orderByDesc('id')->limit(1)]);
     }
 
     /**
@@ -282,6 +287,14 @@ class SubscriptionResource extends Resource
                         'manual_override' => 'primary',
                         default => 'gray',
                     }),
+                Tables\Columns\TextColumn::make('paid_with')
+                    ->label('Paid with')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => Payment::methodLabel($state))
+                    ->color(fn (?string $state): string => Payment::methodColor($state))
+                    ->placeholder('—')
+                    ->tooltip('How the member last paid')
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('current_period_end')
                     ->label('Period Ends')
                     ->dateTime()
@@ -326,6 +339,12 @@ class SubscriptionResource extends Resource
                 Tables\Filters\SelectFilter::make('plan_id')
                     ->relationship('plan', 'name')
                     ->label('Plan'),
+                Tables\Filters\SelectFilter::make('paid_with')
+                    ->label('Has paid with')
+                    ->options(Payment::METHODS)
+                    ->query(fn (Builder $query, array $data) => filled($data['value'] ?? null)
+                        ? $query->whereIn('subscriptions.user_id', Payment::query()->select('user_id')->where('method', $data['value']))
+                        : $query),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),

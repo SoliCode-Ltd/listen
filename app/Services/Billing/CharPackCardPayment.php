@@ -131,7 +131,11 @@ class CharPackCardPayment
             || ($purchase->stripe_payment_intent_id && $intent['id'] === $purchase->stripe_payment_intent_id);
 
         if ($intent['status'] === 'succeeded' && $belongsHere && $intent['amount'] >= (int) $purchase->amount_minor) {
-            return ['status' => 'paid', 'purchase' => $this->packs->markPaid($purchase)];
+            $paid = $this->packs->markPaid($purchase);
+            // How it was paid, for Billing → Payments (no invoice event comes for a pack).
+            app(PaymentLedger::class)->syncStripeCustomer((string) ($intent['customer'] ?? ''));
+
+            return ['status' => 'paid', 'purchase' => $paid];
         }
 
         if (in_array($intent['status'], ['requires_action', 'requires_confirmation'], true) && $intent['client_secret']) {

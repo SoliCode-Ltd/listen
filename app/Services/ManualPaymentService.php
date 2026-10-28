@@ -10,6 +10,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\AdsPurchases;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\PaymentLedger;
 use App\Support\CreditPeriod;
 use DomainException;
 use Illuminate\Http\UploadedFile;
@@ -72,6 +73,8 @@ class ManualPaymentService
         $approved = $this->approveWhileLocked($manualPaymentRequest, $reviewer, $reviewerNotes);
         // Only now is it a sale: kept for the Google Ads upload when it came from an ad.
         app(AdsPurchases::class)->recordManualPayment($approved);
+        // How it was paid, for Billing → Payments and the dashboard.
+        app(PaymentLedger::class)->recordManualPayment($approved);
 
         return $approved;
     }
