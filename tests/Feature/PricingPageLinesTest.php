@@ -250,7 +250,8 @@ class PricingPageLinesTest extends TestCase
         // The prices at the top of the table are the ones on the cards.
         $page = $this->getLocalizedRoute('pricing')->getContent();
         preg_match_all('/data-display-monthly="([^"]+)"/', $page, $cardPrices);
-        preg_match_all('/data-compare-price data-monthly="([^"]+)"/', $page, $tablePrices);
+        preg_match('/<table class="compare-table".*?<\/thead>/s', $page, $tableHead);
+        preg_match_all('/data-compare-price data-monthly="([^"]+)"/', $tableHead[0] ?? '', $tablePrices);
         $this->assertSame($cardPrices[1], $tablePrices[1]);
 
         // A change in the admin reaches the cards and the table at once.

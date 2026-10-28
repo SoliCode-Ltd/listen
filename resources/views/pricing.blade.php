@@ -228,9 +228,7 @@
     .pricing-page:not(.is-yearly) .price-original-row.is-yearly,
     .pricing-page.is-yearly .offer-ends,
     .pricing-page.is-yearly .plans-countdown,
-    .pricing-page.is-yearly .plan-pick-offer,
-    .pricing-page.is-yearly .compare-plan-offer,
-    .pricing-page:not(.is-yearly) .plan-pick-was { display: none; }
+    .pricing-page.is-yearly .compare-plan-offer { display: none; }
 
     /* When the offer ends: "Offer ends in" and a timer in amber, days : hours : minutes : seconds,
        each number large on its own tile with its unit under it, readable at arm's length. */
@@ -350,54 +348,93 @@
     .plan-features li.is-tick .feature-label { color: var(--text); font-weight: 600; }
     .plan-features li.is-tick .feature-label svg { color: var(--ok); stroke-width: 2.6; }
 
-    /* Phones: every plan in one short row above the cards (name, minutes, price); a row goes
-       to its card. */
-    .plan-jump { display: none; }
-    .plan-pick {
-      position: relative;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto auto;
-      align-items: center;
-      column-gap: .9rem;
-      min-height: 58px;
-      padding: .8rem 1rem;
-      border-radius: 18px;
-      border: 1px solid var(--line);
-      background: var(--surface);
-      color: inherit;
-      text-decoration: none;
-      transition: border-color .25s ease, box-shadow .25s ease;
+    /* On phones a long card shows its first four lines, and a button for the rest. */
+    .plan-more { display: none; }
+    @media (max-width: 640px) {
+      .can-fold .plan-card:not(.is-open) .plan-features.is-long li:nth-child(n+5) { display: none; }
+      .can-fold .plan-card:not(.is-open) .plan-more { display: flex; }
+      .plan-more {
+        align-items: center;
+        justify-content: center;
+        gap: .35rem;
+        width: 100%;
+        min-height: 44px;
+        margin-top: .75rem;
+        padding: 0;
+        border: 0;
+        border-top: 1px solid var(--line);
+        background: none;
+        color: var(--accent-text);
+        font: inherit;
+        font-size: .9rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .plan-more svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+      .plan-more:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; border-radius: 8px; }
     }
-    .plan-pick:hover { border-color: var(--line-strong); }
-    .plan-pick:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; }
-    .plan-pick.is-popular { border-color: var(--brand-accent); box-shadow: 0 0 0 1px var(--brand-accent); }
-    .plan-pick.is-fit { border-color: var(--brand-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent) 26%, transparent); }
-    .plan-pick-crown {
-      position: absolute;
-      top: -11px;
-      left: 50%;
-      translate: -50% 0;
-      display: inline-flex;
-      align-items: center;
-      gap: .3rem;
-      padding: .18rem .65rem;
-      border-radius: var(--radius-full);
-      background: var(--brand-hover);
-      color: #fff;
-      font-size: .72rem;
-      font-weight: 700;
-      line-height: 1.3;
-      white-space: nowrap;
+
+    /* Phones: every plan's name in one switch, drawn like the monthly / yearly one, on a band
+       that stays under the site's bar while the cards scroll by (a hairline under it once it
+       is held there). The plan being read is the chosen one. */
+    .plan-tabs-bar { display: none; }
+    @media (max-width: 640px) {
+      .plan-tabs-bar {
+        position: sticky;
+        top: 64px;
+        z-index: 20;
+        display: block;
+        margin: 1.1rem calc(50% - 50vw) 0;
+        padding: 8px calc(50vw - 50%);
+        background: var(--bg);
+        transition: box-shadow .2s ease;
+      }
+      html[data-theme="light"] .plan-tabs-bar { background: var(--surface); }
+      .plan-tabs-bar.is-stuck { box-shadow: 0 1px 0 var(--line), 0 8px 16px -14px rgba(15, 23, 42, .3); }
+      .plan-tabs {
+        display: flex;
+        width: fit-content;
+        max-width: 100%;
+        margin: 0 auto;
+        padding: 4px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        border-radius: var(--radius-full);
+        background: color-mix(in oklab, var(--text) 5%, var(--bg));
+      }
+      .plan-tabs::-webkit-scrollbar { display: none; }
+      .plan-tab {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: .3rem;
+        min-height: 38px;
+        padding: 0 .62rem;
+        border-radius: var(--radius-full);
+        color: var(--muted);
+        font-size: .84rem;
+        font-weight: 600;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: background-color .2s ease, color .2s ease, box-shadow .2s ease;
+      }
+      .plan-tab .crown { width: 13px; height: 13px; }
+      /* The narrowest phones: a little tighter, so all five names still fit. */
+      @media (max-width: 380px) {
+        .plan-tab { padding: 0 .5rem; font-size: .8rem; }
+        .plan-tab .crown { width: 12px; height: 12px; }
+      }
+      .plan-tab.is-on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(15, 23, 42, .14), 0 0 0 1px rgba(15, 23, 42, .04); }
+      html:not([data-theme="light"]) .plan-tab.is-on { background: #2E2E3A; box-shadow: none; }
+      .plan-tab:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: -2px; }
+      /* A card reached from the switch stops under it. */
+      .plan-card { scroll-margin-top: 132px; }
     }
-    .plan-pick-crown .crown { width: 13px; height: 13px; }
-    .plan-pick-name { font-size: 1rem; font-weight: 700; line-height: 1.3; }
-    .plan-pick-minutes { color: var(--muted); font-size: .84rem; white-space: nowrap; }
-    .plan-pick-cost { display: grid; justify-items: end; gap: .15rem; }
-    .plan-pick-price { font-size: 1.08rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .plan-pick-price small { color: var(--muted); font-size: .76rem; font-weight: 500; margin-inline-start: .2rem; }
-    .plan-pick-offer { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: .2rem .4rem; }
-    .plan-pick-offer s, .plan-pick-was s, .compare-plan-offer s { color: color-mix(in oklab, var(--muted) 70%, var(--text)); font-size: .84rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: var(--price-strike); white-space: nowrap; }
-    .plan-pick-off {
+
+    /* How much is off, as a small green chip (the comparison table's header). */
+    .compare-plan-offer s { color: color-mix(in oklab, var(--muted) 70%, var(--text)); font-size: .84rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: var(--price-strike); white-space: nowrap; }
+    .offer-chip {
       padding: .1rem .5rem;
       border-radius: var(--radius-full);
       background: color-mix(in oklab, var(--ok) 15%, transparent);
@@ -574,7 +611,7 @@
     .studio.is-waiting .studio-wave svg { opacity: 0; }
     .studio.is-ready .studio-wave svg { animation: wave-in .7s var(--ease-out) both; }
     @media (prefers-reduced-motion: reduce) {
-      .studio *, .plan-card, .fit-plan, .plan-pick, .plan-bar, .price-amount { transition: none !important; animation: none !important; }
+      .studio *, .plan-card, .fit-plan, .plan-tab, .plan-bar, .price-amount { transition: none !important; animation: none !important; }
     }
 
     /* Under the cards, as wide as their row: more minutes or a whole team, by talking to us. */
@@ -984,9 +1021,16 @@
     }
     @media (max-width: 640px) {
       .page-hero .billing-toggle { width: min(100%, 360px); }
-      .plan-jump { display: grid; gap: 12px; max-width: 520px; margin: 1.6rem auto 0; }
-      .plan-card { padding: 1.75rem 1.25rem 1.4rem; border-radius: 22px; }
-      .plan-card + .plan-card.popular { margin-top: 6px; }
+      .plan-grid { margin-top: 1.5rem; }
+      .plan-card { padding: 1.6rem 1.2rem 1.25rem; border-radius: 22px; margin-bottom: 16px; }
+      .plan-card + .plan-card.popular { margin-top: 8px; }
+      .plan-orb { --orb-size: 52px; }
+      .plan-badges { margin-bottom: .6rem; }
+      .plan-name { font-size: 1.4rem; }
+      .plan-desc { font-size: .9rem; }
+      .plan-offer { padding-top: .9rem; }
+      .plan-pricing { padding: .65rem 0 1rem; }
+      .plan-action { padding-bottom: 1.1rem; }
       .studio { border-radius: 22px; }
       .studio-amount input { font-size: 2.6rem; border-radius: 16px; }
       .studio-wave { height: 96px; }
@@ -996,8 +1040,11 @@
       .studio-faces { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; height: 28px; overflow: hidden; }
       .studio-faces img { width: 28px; height: 28px; margin-inline-start: -8px; box-shadow: none; }
       .studio-faces img:nth-child(n+7) { display: none; }
-      .offer-ends { gap: .5rem; }
-      .offer-ends-unit { min-width: 2.9rem; }
+      .offer-ends { gap: .45rem .7rem; }
+      .offer-ends-label { font-size: .92rem; }
+      .offer-ends-unit { min-width: 2.65rem; padding: .4rem .25rem .36rem; border-radius: 10px; }
+      .offer-ends-unit b { font-size: 1.2rem; }
+      .offer-ends-unit small { margin-top: .26rem; font-size: .7rem; }
     }
     @media (max-width: 1000px) {
       .team-band[data-count] { max-width: 820px; }
@@ -1229,40 +1276,15 @@
       @endif
 
       @if(count($mainPlans) > 1)
-        {{-- Phones: every plan in one short row (name, minutes, price); a row goes to its card. --}}
-        <nav class="plan-jump" aria-labelledby="plansTitle">
-          @foreach($mainPlans as $index => $plan)
-            @php
-              $pickPopular = $planState($plan, $index)['is_popular'];
-              $pickMonthly = $wholePrice((string) ($plan['display_price_monthly_formatted'] ?? ''));
-              $pickYearly = $wholePrice((string) ($plan['display_price_yearly_monthly_formatted'] ?? $pickMonthly));
-              $pickMinutes = \App\Support\Credits::minutesFor((int) ($plan['monthly_chars'] ?? 0));
-              // A plan on offer: its full price struck through and how much is off, under the price.
-              $pickOffer = !empty($plan['has_discount']) && !empty($plan['original_price_monthly_formatted']);
-              $pickPercent = (int) ($plan['discount_percentage'] ?? 0);
-              // On yearly: the usual monthly price struck through under the yearly price per month.
-              $pickFullMonthly = $wholePrice((string) ($plan['original_price_monthly_formatted'] ?? $plan['display_price_monthly_formatted'] ?? ''));
-              $pickYearlySaves = $pickYearly !== '' && $pickYearly !== $pickFullMonthly;
-            @endphp
-            <a @class(['plan-pick', 'is-popular' => $pickPopular]) href="#plan-{{ $plan['slug'] }}" data-plan="{{ $plan['slug'] }}">
-              @if($pickPopular)<span class="plan-pick-crown">{!! $crownSvg !!}{{ __('ui.pricing.most_popular') }}</span>@endif
-              <span class="plan-pick-name">{{ $planDisplayName($plan) }}</span>
-              <span class="plan-pick-minutes">{{ trans_choice('ui.pricing.minutes_count', $pickMinutes, ['count' => number_format($pickMinutes)]) }}</span>
-              <span class="plan-pick-cost">
-                <span class="plan-pick-price"><span dir="ltr" data-monthly="{{ $pickMonthly }}" data-yearly="{{ $pickYearly }}" data-compare-price>{{ $pickMonthly }}</span><small>{{ __('ui.pricing.per_month_short') }}</small></span>
-                @if($pickOffer)
-                  <span class="plan-pick-offer">
-                    <s dir="ltr">{{ $wholePrice((string) $plan['original_price_monthly_formatted']) }}</s>
-                    <span class="plan-pick-off">{{ __('ui.pricing.discount_chip', ['percent' => $pickPercent]) }}</span>
-                  </span>
-                @endif
-                @if($pickYearlySaves)
-                  <span class="plan-pick-was"><s dir="ltr">{{ $pickFullMonthly }}</s></span>
-                @endif
-              </span>
-            </a>
-          @endforeach
-        </nav>
+        {{-- Phones: every plan's name in one switch that stays under the site's bar while the cards
+             scroll by; the plan being read is the chosen one, and a name goes to its card. --}}
+        <div class="plan-tabs-bar" id="planTabsBar">
+          <nav class="plan-tabs" id="planTabs" aria-labelledby="plansTitle">
+            @foreach($mainPlans as $index => $plan)
+              <a @class(['plan-tab', 'is-popular' => $planState($plan, $index)['is_popular']]) href="#plan-{{ $plan['slug'] }}" data-plan="{{ $plan['slug'] }}">@if($planState($plan, $index)['is_popular']){!! $crownSvg !!}@endif{{ $planDisplayName($plan) }}</a>
+            @endforeach
+          </nav>
+        </div>
       @endif
 
       <div class="plan-grid" id="planGrid" data-count="{{ count($mainPlans) }}">
@@ -1435,7 +1457,7 @@
                     @if(!empty($comparePlan['has_discount']) && !empty($comparePlan['original_price_monthly_formatted']))
                       <span class="compare-plan-offer">
                         <s dir="ltr">{{ $wholePrice((string) $comparePlan['original_price_monthly_formatted']) }}</s>
-                        <span class="plan-pick-off">{{ __('ui.pricing.discount_chip', ['percent' => (int) ($comparePlan['discount_percentage'] ?? 0)]) }}</span>
+                        <span class="offer-chip">{{ __('ui.pricing.discount_chip', ['percent' => (int) ($comparePlan['discount_percentage'] ?? 0)]) }}</span>
                       </span>
                     @endif
                     @include('components._plan-button', ['plan' => $comparePlan, 'index' => $compareAt, 'small' => true])
@@ -1688,7 +1710,8 @@
   </script>
   <script>
     /* ── The plans and the minutes calculator ──
-       A row in the phone list goes to its plan's card. In the calculator the plans sit on
+       Phones: the switch above the cards follows the card being read and a name goes to its
+       card; each card shows four lines until asked for the rest. In the calculator the plans sit on
        the track evenly spaced, the minutes between two plans on a log scale, so 15 and
        2,500 minutes both fit. One loop moves everything: the playhead, the filled part of
        the voice, the number and the plan follow the same position in the same frame, so
@@ -1707,29 +1730,86 @@
       var cardsReachEdge = window.matchMedia('(max-width: 1360px)');
       var all = function (root, selector) { return root ? Array.prototype.slice.call(root.querySelectorAll(selector)) : []; };
       var cards = all(grid, '.plan-card');
-      var rows = all(document, '.plan-pick[data-plan]');
+      var tabBox = document.getElementById('planTabs');
+      var tabs = all(tabBox, '.plan-tab[data-plan]');
       var fits = all(studio, '.fit-plan');
       var stations = all(studio, '.studio-station[data-pick]');
       var shownSlug = null, used = false;
 
-      // A row of the list goes to its plan's card, and the keyboard goes with it.
-      rows.forEach(function (row) {
-        row.addEventListener('click', function (e) {
-          var card = document.getElementById('plan-' + row.getAttribute('data-plan'));
-          if (!card) return;
-          e.preventDefault();
-          card.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
-          card.focus({ preventScroll: true });
+      // The switch on phones: one name chosen at a time, kept in view inside the switch.
+      var readingSlug = null, followFrom = 0;
+      function chooseTab(slug) {
+        if (!tabBox || slug === readingSlug) return;
+        readingSlug = slug;
+        tabs.forEach(function (tab) {
+          var on = tab.getAttribute('data-plan') === slug;
+          tab.classList.toggle('is-on', on);
+          if (on) {
+            tab.setAttribute('aria-current', 'true');
+            var box = tabBox.getBoundingClientRect(), it = tab.getBoundingClientRect();
+            var by = it.left < box.left + 8 ? it.left - box.left - 8 : (it.right > box.right - 8 ? it.right - box.right + 8 : 0);
+            if (by) tabBox.scrollBy({ left: by, behavior: reduced ? 'auto' : 'smooth' });
+          } else {
+            tab.removeAttribute('aria-current');
+          }
         });
-      });
+      }
+      if (tabs.length) {
+        chooseTab(tabs[0].getAttribute('data-plan'));
+        // A name goes to its card (the switch keeps that name while the page glides there).
+        tabs.forEach(function (tab) {
+          tab.addEventListener('click', function (e) {
+            var card = document.getElementById('plan-' + tab.getAttribute('data-plan'));
+            if (!card) return;
+            e.preventDefault();
+            chooseTab(tab.getAttribute('data-plan'));
+            followFrom = Date.now() + (reduced ? 0 : 900);
+            card.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+            card.focus({ preventScroll: true });
+          });
+        });
+        // The band under the site's bar gets its hairline once it is held there.
+        var tabBar = document.getElementById('planTabsBar'), barFrame = 0;
+        if (tabBar) {
+          var held = function () {
+            barFrame = 0;
+            var header = document.querySelector('.app-header');
+            var top = header ? header.getBoundingClientRect().bottom : 64;
+            tabBar.classList.toggle('is-stuck', tabBar.getBoundingClientRect().top <= top + 0.5 && window.scrollY > 0);
+          };
+          window.addEventListener('scroll', function () { if (!barFrame) barFrame = requestAnimationFrame(held); }, { passive: true });
+          held();
+        }
+        // The card crossing the upper middle of the screen is the one being read.
+        if ('IntersectionObserver' in window) {
+          var reading = new IntersectionObserver(function (entries) {
+            if (Date.now() < followFrom) return;
+            entries.forEach(function (entry) { if (entry.isIntersecting) chooseTab(entry.target.getAttribute('data-plan-slug')); });
+          }, { rootMargin: '-40% 0px -55% 0px' });
+          cards.forEach(function (card) { reading.observe(card); });
+        }
+      }
+
+      // Phones: the rest of a card's lines on request; the keyboard moves on to the first of them.
+      if (grid) {
+        grid.classList.add('can-fold');
+        all(grid, '.plan-more').forEach(function (button) {
+          button.addEventListener('click', function () {
+            var card = button.closest('.plan-card');
+            card.classList.add('is-open');
+            button.setAttribute('aria-expanded', 'true');
+            var next = card.querySelector('.plan-features li:nth-child(5)');
+            if (next) { next.setAttribute('tabindex', '-1'); next.focus({ preventScroll: true }); }
+          });
+        });
+      }
 
       function fitCard() {
         return fits.filter(function (f) { return f.classList.contains('is-active'); })[0] || fits[0];
       }
-      // The plan that fits: its card and its row get a ring, once the visitor has used the calculator.
+      // The plan that fits: its card gets a ring, once the visitor has used the calculator.
       function mark() {
         cards.forEach(function (c) { c.classList.toggle('is-fit', used && c.getAttribute('data-plan-slug') === shownSlug); });
-        rows.forEach(function (r) { r.classList.toggle('is-fit', used && r.getAttribute('data-plan') === shownSlug); });
       }
       function use() { if (!used) { used = true; mark(); } }
       // One plan in the calculator at a time; its orb comes alive.

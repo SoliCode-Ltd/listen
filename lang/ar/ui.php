@@ -225,6 +225,7 @@ return [
         'hours_and_minutes' => ':hours و:minutes',
         'minutes_live' => ':minutes دقيقة شهريًا: باقة :plan',
         'all_plans' => 'كل الباقات',
+        'show_all_lines' => 'اعرض كل الميزات',
         'voices_proof' => '+:count لهجة ولكنة في كل باقة',
         'monthly' => 'شهري',
         'yearly' => 'سنوي',

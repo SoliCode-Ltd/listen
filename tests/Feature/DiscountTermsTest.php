@@ -123,7 +123,6 @@ class DiscountTermsTest extends TestCase
             ->assertDontSee('your first year')
             // On yearly, each plan's usual monthly price is struck through beside its yearly price.
             ->assertSee('class="price-original-row is-yearly"', false)
-            ->assertSee('class="plan-pick-was"', false)
             ->assertSee('30% off')
             // The comparison table shows the offer under the plan's price too.
             ->assertSee('class="compare-plan-offer"', false)

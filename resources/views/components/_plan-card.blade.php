@@ -154,8 +154,11 @@
     @endif
   </div>
 
-  {{-- 5. What sets it apart --}}
-  <ul class="plan-features">
+  {{-- 5. What sets it apart: every line on wider screens; on phones the first four and a
+       button for the rest, when at least two more would wait behind it. --}}
+  @php $foldLines = count($cardLines) > 5; @endphp
+  <div class="plan-lines">
+  <ul @class(['plan-features', 'is-long' => $foldLines]) id="plan-lines-{{ $plan['slug'] }}">
     @foreach($cardLines as $feature)
       @php
         $iconSvg = $lineIcon($feature['icon'] ?? 'check');
@@ -173,4 +176,11 @@
     </li>
     @endforeach
   </ul>
+  @if($foldLines)
+    <button type="button" class="plan-more" aria-expanded="false" aria-controls="plan-lines-{{ $plan['slug'] }}">
+      {{ __('ui.pricing.show_all_lines') }}
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+  @endif
+  </div>
 </div>
