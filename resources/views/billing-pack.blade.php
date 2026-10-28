@@ -271,7 +271,6 @@
       // The wallet is shown the US dollar amount the card is charged.
       const wallet = window.ListenWalletButton ? window.ListenWalletButton(stripe, 'pack-wallet', {
         mode: 'payment',
-        buttonType: 'buy',
         amount: {{ (int) $pack->getEffectivePriceCents() }},
         onConfirm: async (paymentMethodId, walletError) => {
           if (walletError) return failed(...stripeText(walletError, i18n.failed));
