@@ -91,6 +91,7 @@
                   <strong>{{ __('ui.pack.pay_by_card') }}</strong>
                   <span class="pack-amount" dir="ltr">{{ $cardPrice }}</span>
                 </div>
+                <x-wallet-button id="pack-wallet" />
                 <x-card-fields id="pack-card" />
                 <div class="pack-error" id="pack-card-error" role="alert"></div>
                 <button class="btn btn-primary" type="submit" id="pack-card-button">{{ __('ui.pack.pay_amount', ['amount' => "\u{2066}".$cardPrice."\u{2069}"]) }}</button>
@@ -225,6 +226,29 @@
         button.textContent = buttonText;
       }
 
+      // Pays with a card from the boxes or from the phone wallet.
+      async function payWithCard(paymentMethodId) {
+        let response = await post(@json(route('billing.pack.card')), { payment_method: paymentMethodId });
+        if (await finish(response)) return;
+
+        if (response.status === 402 && response.data.requires_action) {
+          const check = await stripe.confirmCardPayment(response.data.client_secret);
+          if (check.error) return failed(...stripeText(check.error, i18n.failed));
+          response = await post(@json(route('billing.pack.card.confirm')), { purchase: response.data.purchase });
+          if (await finish(response)) return;
+        }
+
+        // The bank is still on it and the pack is added once it goes through:
+        // Pay stays off, so a second click never pays twice.
+        if (response.status === 202 && response.data.processing) {
+          button.textContent = i18n.processingButton;
+          setNotice(response.data.message || i18n.processing, '', true);
+          return;
+        }
+
+        failed(firstError(response.data), response.data && response.data.reason);
+      }
+
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (button.disabled) return;
@@ -238,29 +262,32 @@
           const method = await stripe.createPaymentMethod({ type: 'card', card });
           if (method.error) return failed(...stripeText(method.error, i18n.failed));
 
-          let response = await post(@json(route('billing.pack.card')), { payment_method: method.paymentMethod.id });
-          if (await finish(response)) return;
-
-          if (response.status === 402 && response.data.requires_action) {
-            const check = await stripe.confirmCardPayment(response.data.client_secret);
-            if (check.error) return failed(...stripeText(check.error, i18n.failed));
-            response = await post(@json(route('billing.pack.card.confirm')), { purchase: response.data.purchase });
-            if (await finish(response)) return;
-          }
-
-          // The bank is still on it and the pack is added once it goes through:
-          // Pay stays off, so a second click never pays twice.
-          if (response.status === 202 && response.data.processing) {
-            button.textContent = i18n.processingButton;
-            setNotice(response.data.message || i18n.processing, '', true);
-            return;
-          }
-
-          failed(firstError(response.data), response.data && response.data.reason);
+          await payWithCard(method.paymentMethod.id);
         } catch (_error) {
           failed(i18n.failed, '');
         }
       });
+
+      // The wallet is shown the US dollar amount the card is charged.
+      const wallet = window.ListenWalletButton ? window.ListenWalletButton(stripe, 'pack-wallet', {
+        mode: 'payment',
+        buttonType: 'buy',
+        amount: {{ (int) $pack->getEffectivePriceCents() }},
+        onConfirm: async (paymentMethodId, walletError) => {
+          if (walletError) return failed(...stripeText(walletError, i18n.failed));
+          if (button.disabled || !paymentMethodId) return;
+
+          button.disabled = true;
+          button.textContent = i18n.working;
+          setNotice('', '');
+          try {
+            await payWithCard(paymentMethodId);
+          } catch (_error) {
+            failed(i18n.failed, '');
+          }
+        },
+      }) : null;
+      if (wallet) wallet.show(true);
     })();
   </script>
   @endif

@@ -1157,6 +1157,9 @@
             </div>
 
             <div class="stripe-container" id="stripeContainer">
+              @if($walletPay ?? false)
+                <x-wallet-button id="wallet" />
+              @endif
               <div class="stripe-label">
                 <span class="card-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
@@ -1458,6 +1461,8 @@
     // True from the moment a payment (or a trial) is sent until its answer is in:
     // choosing another plan, cycle or method meanwhile never turns Pay back on.
     let paymentInFlight = false;
+    // The phone wallet button (components/wallet-button), made once the form is drawn.
+    let walletButton = null;
     const LIGHT_CARD_STYLE = {
       base: {
         color: '#13213d',
@@ -1850,6 +1855,24 @@
             .replace(':minutes', Number(quota.minutes || 0).toLocaleString('en-US'));
         }
       }
+      renderWallet();
+    }
+
+    // A wallet pays for a new plan by card, never for a trial. It is shown the US
+    // dollar amount charged today, the same amount the card boxes charge.
+    function walletCharge() {
+      const selected = selectedMeta();
+      if (!selected || selected.method !== 'stripe' || isTrialCheckout()) return null;
+      const amount = Number(selected.meta?.base_usd_cents || 0);
+      if (String(selected.meta?.charge_currency || '').toUpperCase() !== 'USD' || !(amount > 0)) return null;
+      return { selected: selected, amount: amount };
+    }
+
+    function renderWallet() {
+      if (!walletButton) return;
+      const charge = walletCharge();
+      if (charge) walletButton.setAmount(charge.amount);
+      walletButton.show(Boolean(charge));
     }
 
     function selectedCheckoutMode() {
@@ -2220,6 +2243,77 @@
       return sendAdsConversion(gadsConversionSendTo, meta, '');
     }
 
+    // Pays for the chosen plan with a card from the card boxes, the saved card (no
+    // payment method) or the phone wallet. True when the page is on its way to
+    // the next one, so Pay stays off.
+    async function subscribeByCard(selected, paymentMethod, saveCard) {
+      setSubscribeButtonBusy(true, i18n.finalizing_subscription);
+      const subscribeBody = {
+        plan: String(selected.plan.slug || ''),
+        billing_cycle: String(selected.cycle || 'monthly'),
+        payment_method: paymentMethod || null,
+        save_card: saveCard,
+      };
+      const prorationDate = planChangeProrationDate(selected);
+      if (prorationDate) subscribeBody.proration_date = prorationDate;
+      let response = await post('{{ route('billing.subscribe') }}', subscribeBody);
+
+      // A payment still overdue in its grace days is paid from Manage Subscription, never replaced here.
+      if (response.status === 409 && response.data?.payment_overdue) {
+        setMessage('error', String(response.data.message || ''));
+        window.setTimeout(function() {
+          window.location.href = String(response.data.manage_url || '{{ route('manage-subscription.page') }}');
+        }, 2500);
+        return true;
+      }
+
+      // On a free trial: the same plan charges nothing; another plan ends the trial only if the member agrees.
+      if (response.status === 409 && response.data?.already_on_trial) {
+        setMessage('ok', response.data.message);
+        return false;
+      }
+      if (response.status === 409 && response.data?.requires_trial_end_confirmation) {
+        if (!window.confirm(String(response.data.message || ''))) {
+          setMessage('', '');
+          return false;
+        }
+        response = await post('{{ route('billing.subscribe') }}', Object.assign({}, subscribeBody, { end_trial: true }));
+      }
+
+      if (response.status === 402 && response.data?.requires_action && response.data?.client_secret) {
+        setSubscribeButtonBusy(true, i18n.waiting_bank_confirmation);
+        const confirmation = await stripe.confirmCardPayment(
+          String(response.data.client_secret),
+          paymentMethod ? { payment_method: paymentMethod } : undefined
+        );
+        if (confirmation.error) {
+          // After the bank's check the card can still be refused (not enough money, for example).
+          if (confirmation.error.type === 'card_error') throw stripeDeclineError(confirmation.error);
+          throw new Error(normalizeStripeMessage(confirmation.error.message, i18n.payment_auth_failed));
+        }
+
+        await trackPurchaseConversion(selected.meta);
+        setMessage('ok', i18n.payment_confirmed_redirecting);
+        window.location.href = '{{ route('manage-subscription.page') }}';
+        return true;
+      }
+
+      if (response.data?.decline) {
+        throw declineError(String(response.data.decline), response.data.message);
+      }
+      if (!response.ok || response.data?.ok === false) {
+        throw new Error(response.data?.message || i18n.upgrade_failed);
+      }
+
+      // Only a real charge is a purchase (not a resumed plan or a card change).
+      if (response.data?.charged !== false) {
+        await trackPurchaseConversion(selected.meta);
+      }
+      setMessage('ok', response.data?.message || i18n.subscription_updated_redirecting);
+      window.location.href = '{{ route('manage-subscription.page') }}';
+      return true;
+    }
+
     trialBtn?.addEventListener('click', async () => {
       if (paymentInFlight) return;
       setMessage('', '');
@@ -2344,73 +2438,7 @@
           throw new Error(i18n.enter_card_details);
         }
 
-        setSubscribeButtonBusy(true, i18n.finalizing_subscription);
-        const subscribeBody = {
-          plan: String(selected.plan.slug || ''),
-          billing_cycle: String(selected.cycle || 'monthly'),
-          payment_method: paymentMethod || null,
-          save_card: saveCardCheckbox ? saveCardCheckbox.checked : true,
-        };
-        const prorationDate = planChangeProrationDate(selected);
-        if (prorationDate) subscribeBody.proration_date = prorationDate;
-        let response = await post('{{ route('billing.subscribe') }}', subscribeBody);
-
-        // A payment still overdue in its grace days is paid from Manage Subscription, never replaced here.
-        if (response.status === 409 && response.data?.payment_overdue) {
-          setMessage('error', String(response.data.message || ''));
-          leaving = true;
-          window.setTimeout(function() {
-            window.location.href = String(response.data.manage_url || '{{ route('manage-subscription.page') }}');
-          }, 2500);
-          return;
-        }
-
-        // On a free trial: the same plan charges nothing; another plan ends the trial only if the member agrees.
-        if (response.status === 409 && response.data?.already_on_trial) {
-          setMessage('ok', response.data.message);
-          return;
-        }
-        if (response.status === 409 && response.data?.requires_trial_end_confirmation) {
-          if (!window.confirm(String(response.data.message || ''))) {
-            setMessage('', '');
-            return;
-          }
-          response = await post('{{ route('billing.subscribe') }}', Object.assign({}, subscribeBody, { end_trial: true }));
-        }
-
-        if (response.status === 402 && response.data?.requires_action && response.data?.client_secret) {
-          setSubscribeButtonBusy(true, i18n.waiting_bank_confirmation);
-          const confirmation = await stripe.confirmCardPayment(
-            String(response.data.client_secret),
-            paymentMethod ? { payment_method: paymentMethod } : undefined
-          );
-          if (confirmation.error) {
-            // After the bank's check the card can still be refused (not enough money, for example).
-            if (confirmation.error.type === 'card_error') throw stripeDeclineError(confirmation.error);
-            throw new Error(normalizeStripeMessage(confirmation.error.message, i18n.payment_auth_failed));
-          }
-
-          await trackPurchaseConversion(selected.meta);
-          setMessage('ok', i18n.payment_confirmed_redirecting);
-          leaving = true;
-          window.location.href = '{{ route('manage-subscription.page') }}';
-          return;
-        }
-
-        if (response.data?.decline) {
-          throw declineError(String(response.data.decline), response.data.message);
-        }
-        if (!response.ok || response.data?.ok === false) {
-          throw new Error(response.data?.message || i18n.upgrade_failed);
-        }
-
-        // Only a real charge is a purchase (not a resumed plan or a card change).
-        if (response.data?.charged !== false) {
-          await trackPurchaseConversion(selected.meta);
-        }
-        setMessage('ok', response.data?.message || i18n.subscription_updated_redirecting);
-        leaving = true;
-        window.location.href = '{{ route('manage-subscription.page') }}';
+        leaving = await subscribeByCard(selected, paymentMethod, saveCardCheckbox ? saveCardCheckbox.checked : true);
       } catch (error) {
         // Includes the server's 409 while another payment of this member is going through.
         showPaymentError(error, i18n.upgrade_failed);
@@ -2450,6 +2478,39 @@
     syncPaymentMethods();
     renderMode();
     renderChargePreview();
+
+    // The wallet's sheet hands over a card; paying with it takes the same steps as the card boxes.
+    // It is made even when the page opens on a trial or on InstaPay, so it can show once the
+    // member picks paying by card.
+    const walletStartCents = Number(currentPlan()?.payment_methods?.stripe?.[String(cycleSelect?.value || 'monthly')]?.base_usd_cents || 0);
+    walletButton = stripe && walletStartCents > 0 && window.ListenWalletButton
+      ? window.ListenWalletButton(stripe, 'wallet', {
+          mode: 'subscription',
+          buttonType: 'subscribe',
+          amount: walletStartCents,
+          billingDetails: { name: userName || undefined, email: userEmail || undefined },
+          onConfirm: async function(paymentMethod, walletError) {
+            if (walletError) {
+              showPaymentError(walletError.type === 'card_error'
+                ? stripeDeclineError(walletError)
+                : new Error(normalizeStripeMessage(walletError.message, i18n.payment_auth_failed)), i18n.payment_auth_failed);
+              return;
+            }
+            const charge = walletCharge();
+            if (paymentInFlight || !charge || !paymentMethod) return;
+            setMessage('', '');
+            let leaving = false;
+            try {
+              leaving = await subscribeByCard(charge.selected, paymentMethod, true);
+            } catch (error) {
+              showPaymentError(error, i18n.upgrade_failed);
+            } finally {
+              if (!leaving) setSubscribeButtonBusy(false);
+            }
+          },
+        })
+      : null;
+    renderWallet();
 
     // Custom file upload area
     const proofUploadArea = document.getElementById('proofUploadArea');
