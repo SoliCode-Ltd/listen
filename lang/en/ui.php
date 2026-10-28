@@ -482,6 +482,7 @@ return [
         'cycle_with_discount' => ':cycle (save :percent%)',
         'credit_or_debit_card' => 'Credit or Debit Card',
         'card_number' => 'Card number',
+        'wallet_or_card' => 'or pay by card',
         'card_expiry' => 'Expiry date',
         'card_cvc' => 'Security code (CVC)',
         'using_saved_card' => 'Your saved card will be used.',

@@ -114,6 +114,33 @@ class BillingPageClientTest extends TestCase
         $this->billingPage('ar')->assertDontSee('بالدولار الأمريكي');
     }
 
+    public function test_apple_pay_and_google_pay_sit_above_the_card_boxes_and_pay_the_same_way(): void
+    {
+        config(['services.stripe.country' => 'GB']);
+        $this->pack();
+
+        // A plan: the wallet hands Pay its payment method, which goes to the server as a card's would.
+        $this->billingPage('ar')
+            ->assertSee('<div class="wallet-pay" id="billingWallet" hidden>', false)
+            ->assertSee(__('ui.billing.wallet_or_card', [], 'ar'))
+            ->assertSee("disableWallets: ['link', 'browserCard']", false)
+            ->assertSee("id: 'billingWallet',\n      country: \"GB\",", false)
+            ->assertSee("if (wallet) {\n          paymentMethod = wallet.id;", false)
+            // Only where today's charge is the plan's price: not a trial, nor a change from a paid plan.
+            ->assertSee("if (!selected || selected.method !== 'stripe' || isTrialCheckout() || planChange.enabled) return null;", false)
+            // The sheet shows the amount the card is charged: dollars, with any offer taken off.
+            ->assertSee("? Number(meta.base_usd_cents || 0)", false)
+            ->assertSee('settleWallet(wallet, false);', false);
+
+        // The pack: paid in dollars, the same request as the card boxes.
+        $this->actingAs(User::factory()->create(['subscription_status_checked_at' => now()]))
+            ->getLocalizedRoute('billing.pack')->assertOk()
+            ->assertSee('<div class="wallet-pay" id="pack-wallet" hidden>', false)
+            ->assertSee("country: \"GB\",\n        charge: { currency: 'USD', amount: 200, label: \"Premium Pack\" },", false)
+            ->assertSee('await payWith(methodId, settle);', false)
+            ->assertSee('await payWith(method.paymentMethod.id, () => {});', false);
+    }
+
     public function test_cards_are_typed_in_three_boxes_and_the_pack_is_priced_in_local_money(): void
     {
         config(['services.stripe.key' => 'pk_test_dummy', 'services.stripe.secret' => 'sk_test_dummy']);

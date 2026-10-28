@@ -91,6 +91,7 @@
                   <strong>{{ __('ui.pack.pay_by_card') }}</strong>
                   <span class="pack-amount" dir="ltr">{{ $cardPrice }}</span>
                 </div>
+                <x-wallet-pay id="pack-wallet" />
                 <x-card-fields id="pack-card" />
                 <div class="pack-error" id="pack-card-error" role="alert"></div>
                 <button class="btn btn-primary" type="submit" id="pack-card-button">{{ __('ui.pack.pay_amount', ['amount' => "\u{2066}".$cardPrice."\u{2069}"]) }}</button>
@@ -225,20 +226,13 @@
         button.textContent = buttonText;
       }
 
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        if (button.disabled) return;
-        if (!cardComplete) { setNotice(i18n.incomplete, ''); return; }
-
-        button.disabled = true;
-        button.textContent = i18n.working;
-        setNotice('', '');
-
+      // Pays with a card payment method, typed into the boxes or from Apple Pay / Google Pay.
+      // settle(ok) closes a wallet's sheet once our server has answered.
+      async function payWith(methodId, settle) {
         try {
-          const method = await stripe.createPaymentMethod({ type: 'card', card });
-          if (method.error) return failed(...stripeText(method.error, i18n.failed));
-
-          let response = await post(@json(route('billing.pack.card')), { payment_method: method.paymentMethod.id });
+          let response = await post(@json(route('billing.pack.card')), { payment_method: methodId });
+          const data = response.data || {};
+          settle(Boolean(data.ok || data.requires_action || data.processing));
           if (await finish(response)) return;
 
           if (response.status === 402 && response.data.requires_action) {
@@ -258,8 +252,43 @@
 
           failed(firstError(response.data), response.data && response.data.reason);
         } catch (_error) {
+          settle(false);
           failed(i18n.failed, '');
         }
+      }
+
+      function starting() {
+        if (button.disabled) return false;
+        button.disabled = true;
+        button.textContent = i18n.working;
+        setNotice('', '');
+        return true;
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (button.disabled) return;
+        if (!cardComplete) { setNotice(i18n.incomplete, ''); return; }
+        if (!starting()) return;
+
+        const method = await stripe.createPaymentMethod({ type: 'card', card }).catch(() => ({ error: {} }));
+        if (method.error) return failed(...stripeText(method.error, i18n.failed));
+        await payWith(method.paymentMethod.id, () => {});
+      });
+
+      // Apple Pay or Google Pay, where the phone or browser has one ready: the pack is paid in dollars.
+      window.ListenWalletPay(stripe, window.ListenCardElements(stripe), {
+        id: 'pack-wallet',
+        country: @json((string) config('services.stripe.country', 'US')),
+        charge: { currency: 'USD', amount: {{ (int) $pack->getEffectivePriceCents() }}, label: @json((string) $packName) },
+        theme: isLight() ? 'light' : 'dark',
+        onPay: async (methodId, done) => {
+          let closed = false;
+          const settle = (ok) => { if (!closed) { closed = true; done(ok ? 'success' : 'fail'); } };
+          if (!starting()) { settle(false); return; }
+          await payWith(methodId, settle);
+          settle(false);
+        },
       });
     })();
   </script>

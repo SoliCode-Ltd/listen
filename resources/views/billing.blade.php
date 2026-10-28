@@ -1194,6 +1194,7 @@
                   <span class="saved-card-hint">{{ __('ui.billing.enter_new_card_optional') }}</span>
                 </div>
               @endif
+              <x-wallet-pay id="billingWallet" />
               <x-card-fields id="card" />
               <div id="card-error" class="card-error" aria-live="polite"></div>
               <label class="save-card-checkbox">
@@ -1451,6 +1452,10 @@
       cache: {},
       seq: 0,
     };
+    // Apple Pay / Google Pay (components/wallet-pay), made once Stripe has loaded below.
+    let billingWallet = null;
+    // A wallet's payment method on its way through the Pay flow: { id, done, closed }.
+    let walletPayment = null;
     const i18n = @json($billingI18n);
     const localeCode = String(document.documentElement.lang || '').toLowerCase();
     const isArabicLocale = localeCode.startsWith('ar');
@@ -1948,6 +1953,7 @@
         quoteHint.textContent = currentPlan() ? i18n.payment_method_unavailable : i18n.no_upgrade_plans_available;
         renderManualPanel(null);
         renderPlanChange(null, '');
+        syncWallet(null);
         return;
       }
 
@@ -1983,6 +1989,34 @@
       renderManualPanel(selected);
       syncManualFields();
       renderPlanChange(selected, discountHint);
+      syncWallet(selected);
+    }
+
+    // What the wallet sheet shows: today's charge for a new card subscription, in the currency
+    // the card is charged in. Not for a trial or a change from a paid plan (those charge
+    // another amount today), nor for InstaPay / Vodafone Cash.
+    function walletCharge(selected) {
+      if (!selected || selected.method !== 'stripe' || isTrialCheckout() || planChange.enabled) return null;
+      const meta = selected.meta || {};
+      const currency = String(meta.charge_currency || '').toUpperCase();
+      const amount = currency === 'USD'
+        ? Number(meta.base_usd_cents || 0)
+        : (String(meta.currency || '').toUpperCase() === currency ? Number(meta.amount_cents || 0) : 0);
+      if (!currency || !(amount > 0)) return null;
+      const name = String(selected.plan.localized_name || selected.plan.name || selected.plan.slug || '');
+      return { currency: currency, amount: Math.round(amount), label: `${name} (${cycleLabel(meta)})` };
+    }
+
+    function syncWallet(selected) {
+      const charge = walletCharge(selected);
+      if (billingWallet) billingWallet.set(charge, Boolean(charge));
+    }
+
+    // Closes the wallet's sheet: a tick when the payment went ahead, a cross when it did not.
+    function settleWallet(payment, ok) {
+      if (!payment || payment.closed) return;
+      payment.closed = true;
+      payment.done(ok ? 'success' : 'fail');
     }
 
     function planChangeKey(selected) {
@@ -2153,6 +2187,20 @@
     const card = cardForm ? cardForm.card : null;
     if (cardFormMissing && cardError) cardError.textContent = cardUnavailableText;
 
+    // The wallet's payment method goes through Pay exactly as a card typed into the boxes.
+    billingWallet = elements && window.ListenWalletPay ? window.ListenWalletPay(stripe, elements, {
+      id: 'billingWallet',
+      country: @json((string) config('services.stripe.country', 'US')),
+      charge: walletCharge(selectedMeta()),
+      theme: document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark',
+      onPay: function(methodId, done) {
+        if (paymentInFlight) { done('fail'); return; }
+        walletPayment = { id: methodId, done: done, closed: false };
+        document.getElementById('billingForm')?.requestSubmit();
+      },
+    }) : null;
+    syncWallet(selectedMeta());
+
     if (card && 'MutationObserver' in window) {
       let currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
       const observer = new MutationObserver(() => {
@@ -2297,6 +2345,9 @@
       }
       setMessage('', '');
       let leaving = false;
+      // A wallet's payment (Apple Pay / Google Pay) is used once, for this Pay only.
+      const wallet = walletPayment;
+      walletPayment = null;
 
       try {
         const selected = selectedMeta();
@@ -2337,7 +2388,9 @@
         setSubscribeButtonBusy(true, i18n.processing_payment);
 
         let paymentMethod = '';
-        if (cardComplete) {
+        if (wallet) {
+          paymentMethod = wallet.id;
+        } else if (cardComplete) {
           setSubscribeButtonBusy(true, i18n.securing_card);
           paymentMethod = await collectCardPaymentMethod();
         } else if (!hasDefaultPaymentMethod) {
@@ -2354,6 +2407,12 @@
         const prorationDate = planChangeProrationDate(selected);
         if (prorationDate) subscribeBody.proration_date = prorationDate;
         let response = await post('{{ route('billing.subscribe') }}', subscribeBody);
+        // The wallet's sheet closes once our server has answered: a bank check, if any, comes after it.
+        settleWallet(wallet, !response.data?.decline && (
+          (response.ok && response.data?.ok !== false)
+          || (response.status === 402 && Boolean(response.data?.requires_action))
+          || (response.status === 409 && Boolean(response.data?.already_on_trial || response.data?.requires_trial_end_confirmation))
+        ));
 
         // A payment still overdue in its grace days is paid from Manage Subscription, never replaced here.
         if (response.status === 409 && response.data?.payment_overdue) {
@@ -2413,8 +2472,10 @@
         window.location.href = '{{ route('manage-subscription.page') }}';
       } catch (error) {
         // Includes the server's 409 while another payment of this member is going through.
+        settleWallet(wallet, false);
         showPaymentError(error, i18n.upgrade_failed);
       } finally {
+        settleWallet(wallet, false);
         // On the way to the next page Pay stays off; otherwise it comes back.
         if (!leaving) setSubscribeButtonBusy(false);
       }

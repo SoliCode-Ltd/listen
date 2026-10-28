@@ -126,6 +126,8 @@ return [
         'key' => env('STRIPE_KEY'),
         'secret' => env('STRIPE_SECRET'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        // The payment account's country, which Apple Pay and Google Pay need (components/wallet-pay).
+        'country' => env('STRIPE_COUNTRY', 'US'),
         // NOTE: Stripe Price IDs are now automatically managed via StripeProductSyncService.
         // Prices are stored in the plans table (stripe_price_monthly, stripe_price_yearly).
         // Use `php artisan stripe:sync-plans --all` to sync plans to Stripe.

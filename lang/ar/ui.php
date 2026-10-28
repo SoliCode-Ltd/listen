@@ -483,6 +483,7 @@ return [
         'cycle_with_discount' => ':cycle (توفير %:percent)',
         'credit_or_debit_card' => 'بطاقة ائتمان أو بطاقة خصم',
         'card_number' => 'رقم البطاقة',
+        'wallet_or_card' => 'أو ادفع بالبطاقة',
         'card_expiry' => 'تاريخ الانتهاء',
         'card_cvc' => 'رمز الأمان (CVC)',
         'using_saved_card' => 'سيتم استخدام بطاقتك المحفوظة.',
