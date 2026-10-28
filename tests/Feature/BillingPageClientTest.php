@@ -166,6 +166,8 @@ class BillingPageClientTest extends TestCase
             ->assertSee("var appleTouch = /iPhone|iPad|iPod/.test(navigator.userAgent || '')", false)
             // Both wallets side by side on a wide screen, one under the other on a phone, never in a menu.
             ->assertSee("layout: { maxColumns: narrow ? 1 : 2, overflow: 'never' },", false)
+            // The buttons speak the page's language.
+            ->assertSee("locale: String(document.documentElement.lang || '').toLowerCase().indexOf('ar') === 0 ? 'ar' : 'en',", false)
             // It is shown the US dollar amount charged today, never on a trial.
             ->assertSee("if (!selected || selected.method !== 'stripe' || isTrialCheckout()) return null;", false)
             ->assertSee("if (String(selected.meta?.charge_currency || '').toUpperCase() !== 'USD' || !(amount > 0)) return null;", false)

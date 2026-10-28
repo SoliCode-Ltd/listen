@@ -13,7 +13,7 @@
 </div>
 @once
   <style>
-    .wallet-pay { display: grid; gap: .85rem; margin-bottom: 1rem; }
+    .wallet-pay { display: grid; gap: 1rem; margin-bottom: 1rem; }
     .wallet-pay[hidden] { display: none; }
     .wallet-or { display: flex; align-items: center; gap: .75rem; color: var(--muted); font-size: .85rem; }
     .wallet-or::before, .wallet-or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
@@ -29,6 +29,9 @@
         amount: Math.round(Number(options.amount)),
         currency: 'usd',
         paymentMethodCreation: 'manual',
+        // The buttons' words in the page's language, not the browser's: an Arabic page says
+        // its call to action in Arabic.
+        locale: String(document.documentElement.lang || '').toLowerCase().indexOf('ar') === 0 ? 'ar' : 'en',
         // The site's corners (--radius); the wallets draw their own marks in their own colours.
         appearance: { variables: { borderRadius: '8px' } },
       });
