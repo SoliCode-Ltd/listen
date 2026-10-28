@@ -82,7 +82,7 @@
 
   <main class="container legal-page">
     @php
-      $effectiveDate = app()->getLocale() === 'ar' ? '19 أكتوبر 2026' : 'October 19, 2026';
+      $effectiveDate = app()->getLocale() === 'ar' ? '28 أكتوبر 2026' : 'October 28, 2026';
       $contactEmail = trim((string) \App\Models\SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio';
       $supportEmailLink = '<a href="mailto:'.e($contactEmail).'">'.e($contactEmail).'</a>';
     @endphp
@@ -105,6 +105,7 @@
           <li>{{ __('ui.legal.privacy.s1_8') }}</li>
           <li>{{ __('ui.legal.privacy.s1_9') }}</li>
           <li>{{ __('ui.legal.privacy.s1_10') }}</li>
+          <li>{{ __('ui.legal.privacy.s1_11') }}</li>
         </ul>
       </section>
 
@@ -115,6 +116,7 @@
           <li>{{ __('ui.legal.privacy.s2_2') }}</li>
           <li>{{ __('ui.legal.privacy.s2_3') }}</li>
           <li>{{ __('ui.legal.privacy.s2_4') }}</li>
+          <li>{{ __('ui.legal.privacy.s2_5') }}</li>
         </ul>
       </section>
 

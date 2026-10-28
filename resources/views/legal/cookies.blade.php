@@ -73,6 +73,10 @@
       background: var(--surface2);
       padding: .85rem 1rem;
     }
+    /* An odd last card takes the whole row. */
+    .cookie-card:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
     .cookie-card h3 {
       margin: 0 0 .35rem;
       font-size: .95rem;
@@ -106,7 +110,7 @@
 
   <main class="container legal-page">
     @php
-      $effectiveDate = app()->getLocale() === 'ar' ? '19 أكتوبر 2026' : 'October 19, 2026';
+      $effectiveDate = app()->getLocale() === 'ar' ? '28 أكتوبر 2026' : 'October 28, 2026';
       $contactEmail = trim((string) \App\Models\SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio';
       $supportEmailLink = '<a href="mailto:'.e($contactEmail).'">'.e($contactEmail).'</a>';
     @endphp
@@ -140,6 +144,10 @@
             <h3>{{ __('ui.legal.cookies.c4_title') }}</h3>
             <p>{{ __('ui.legal.cookies.c4_body') }}</p>
           </article>
+          <article class="cookie-card">
+            <h3>{{ __('ui.legal.cookies.c5_title') }}</h3>
+            <p>{{ __('ui.legal.cookies.c5_body') }}</p>
+          </article>
         </div>
       </section>
 
@@ -154,6 +162,7 @@
           <li>{{ __('ui.legal.cookies.s4_1') }}</li>
           <li>{{ __('ui.legal.cookies.s4_2') }}</li>
           <li>{{ __('ui.legal.cookies.s4_3') }}</li>
+          <li>{{ __('ui.legal.cookies.s4_4') }}</li>
         </ul>
       </section>
 
