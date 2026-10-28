@@ -446,8 +446,8 @@
       display: flex;
       align-items: center;
       gap: .5rem;
-      /* Starts exactly where the sentence in the box under it starts (its padding and border). */
-      padding: .55rem calc(.85rem + 1px);
+      /* Starts exactly at the edge of the box under it, like the card boxes above. */
+      padding: .55rem 0;
       border-radius: var(--radius);
       cursor: pointer;
       font-size: .95rem;
