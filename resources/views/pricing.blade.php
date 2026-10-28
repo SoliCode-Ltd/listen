@@ -299,12 +299,16 @@
     .plan-card .plan-btn.btn-primary:hover,
     .fit-plan .plan-btn.btn-primary:hover { transform: translateY(-1px); }
 
-    /* Minutes first, the credits behind them under them, each number a size above its unit. */
+    /* Minutes and the credits behind them on one line, minutes first, each number a size
+       above its unit; a narrow card sets them smaller to keep the line (the credits go under
+       the minutes only when even that is not enough). */
     .plan-quota {
       display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: .35rem;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: .3rem .6rem;
+      white-space: nowrap;
       padding: 1rem 0;
       border-top: 1px solid var(--line);
       font-size: .9rem;
@@ -317,8 +321,23 @@
     .plan-quota-number { color: var(--text); font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
     .plan-minutes-unit,
     .plan-quota-unit { color: var(--muted); font-size: .86rem; font-weight: 500; }
-    .plan-quota-credits { display: inline-flex; align-items: center; gap: .4rem; cursor: help; }
+    .plan-quota-credits { display: inline-flex; align-items: center; gap: .3rem; cursor: help; }
     .plan-quota-coin { font-size: 1rem; flex: none; }
+    .plan-minutes, .plan-quota-amount { flex-wrap: nowrap; }
+    .plan-quota { container-type: inline-size; }
+    @container (max-width: 360px) {
+      .plan-minutes-number { font-size: 1rem; }
+      .plan-quota-number { font-size: .86rem; }
+      .plan-minutes-unit, .plan-quota-unit { font-size: .76rem; }
+      .plan-quota-coin { font-size: .9rem; }
+    }
+    @container (max-width: 300px) {
+      .plan-quota { gap: .45rem; }
+      .plan-minutes-number { font-size: .94rem; }
+      .plan-quota-number { font-size: .82rem; }
+      .plan-minutes-unit, .plan-quota-unit { font-size: .7rem; }
+      .plan-quota-coin { display: none !important; }
+    }
 
     /* The plan's lines, all of them: the label on one side, its value on the other. */
     .plan-features {
