@@ -373,6 +373,38 @@
     .stripe-container.hidden {
       display: none;
     }
+    .payment-methods[hidden] {
+      display: none;
+    }
+    @media (min-width: 981px) {
+      .stripe-container { padding: 1.25rem 1.35rem; }
+    }
+    .pay-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
+      margin-bottom: 1rem;
+      padding-bottom: .85rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .pay-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--fg, var(--text));
+    }
+    .pay-secure {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .25rem .6rem;
+      border-radius: 999px;
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--ok);
+      background: color-mix(in oklab, var(--ok) 10%, transparent);
+      white-space: nowrap;
+    }
     .stripe-label {
       display: inline-flex;
       align-items: center;
@@ -1051,7 +1083,8 @@
             </div>
           </div>
 
-          <div class="payment-methods">
+          {{-- A choice only where there is one (Egypt): elsewhere card is the only way, and the card panel says so. --}}
+          <div class="payment-methods" @unless($showEgyptManualMethods) hidden @endunless>
             <div class="form-group">
               <label>{{ __('ui.billing.payment_method_label') }}</label>
               <div class="payment-method-grid" id="paymentMethodGrid">
@@ -1060,11 +1093,18 @@
                   <div class="method-title">
                     <div class="method-brand">
                       <span class="method-logo" aria-hidden="true">
-                        @if(!empty($paymentBrandAssets['stripe']))
-                          <img src="{{ $paymentBrandAssets['stripe'] }}" alt="{{ __('ui.billing.payment_method_stripe') }}">
-                        @else
-                          <span class="method-logo-fallback">Stripe</span>
-                        @endif
+                        <svg viewBox="0 0 24 24" width="28" height="28">
+                          <defs>
+                            <linearGradient id="methodCardGradient" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                              <stop offset="0%" stop-color="#3B82F6"></stop>
+                              <stop offset="50%" stop-color="#8B5CF6"></stop>
+                              <stop offset="100%" stop-color="#F97316"></stop>
+                            </linearGradient>
+                          </defs>
+                          <rect x="2" y="4" width="20" height="16" rx="4" fill="url(#methodCardGradient)"></rect>
+                          <rect x="2" y="8" width="20" height="2" fill="rgba(255,255,255,.75)"></rect>
+                          <rect x="5" y="13" width="4.8" height="3.4" rx="1" fill="rgba(255,255,255,.92)"></rect>
+                        </svg>
                       </span>
                       <span class="method-copy">
                         <span class="method-name">{{ __('ui.billing.payment_method_stripe') }}</span>
@@ -1157,6 +1197,13 @@
             </div>
 
             <div class="stripe-container" id="stripeContainer">
+              <div class="pay-head">
+                <span class="pay-title">{{ __('ui.billing.pay_title') }}</span>
+                <span class="pay-secure">
+                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="4.5" y="10" width="15" height="11" rx="2.5" fill="currentColor"/></svg>
+                  {{ __('ui.billing.pay_secure') }}
+                </span>
+              </div>
               @if($walletPay ?? false)
                 <x-wallet-button id="wallet" />
               @endif

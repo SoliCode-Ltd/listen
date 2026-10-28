@@ -151,6 +151,9 @@ class BillingPageClientTest extends TestCase
 
     public function test_a_new_plan_and_a_pack_can_be_paid_with_a_phone_wallet(): void
     {
+        // A visitor outside Egypt, where card is the only way to pay.
+        SiteSetting::set('pricing_forced_country_code', 'SA', 'billing');
+
         // Stripe's wallet button above the card boxes, in the page's language.
         $billing = $this->billingPage('ar')
             ->assertViewHas('walletPay', true)
@@ -168,6 +171,12 @@ class BillingPageClientTest extends TestCase
             // Made even when the page opens on a trial or on InstaPay, so it can show once card is picked.
             ->assertSee("const walletStartCents = Number(currentPlan()?.payment_methods?.stripe?.[String(cycleSelect?.value || 'monthly')]?.base_usd_cents || 0);", false);
         $this->assertMatchesRegularExpression('/\p{Arabic}/u', __('ui.billing.wallet_or_card', [], 'ar'));
+        // Outside Egypt the card is the only way to pay: no choice of one, and the card panel is headed instead.
+        $this->assertMatchesRegularExpression('/<div class="payment-methods"\s+hidden\s*>/', (string) $billing->getContent());
+        $billing->assertSee(__('ui.billing.pay_title', [], 'ar'))->assertSee(__('ui.billing.pay_secure', [], 'ar'));
+        // The page's words never name the card processor.
+        $visible = strip_tags((string) preg_replace('#<(script|style)\b[^>]*>.*?</\1>#s', '', (string) $billing->getContent()));
+        $this->assertDoesNotMatchRegularExpression('/Stripe|سترايب/u', $visible);
         // The page's own words never name the wallets.
         $this->assertDoesNotMatchRegularExpression('/apple pay|google pay/i', strip_tags((string) $billing->getContent()));
 
