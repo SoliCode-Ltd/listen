@@ -2243,74 +2243,6 @@
       return sendAdsConversion(gadsConversionSendTo, meta, '');
     }
 
-    trialBtn?.addEventListener('click', async () => {
-      if (paymentInFlight) return;
-      setMessage('', '');
-      let leaving = false;
-      try {
-        if (!stripe || !card) throw new Error(cardUnavailableText);
-        if (!cardComplete) throw new Error(i18n.enter_card_details);
-
-        paymentInFlight = true;
-        if (trialBtn) {
-          trialBtn.disabled = true;
-          trialBtn.classList.add('is-loading');
-          trialBtn.textContent = i18n.trial_starting;
-        }
-
-        const setupResponse = await post('{{ route('billing.trial.setup') }}', {
-          plan: String(currentPlan()?.slug || ''),
-          billing_cycle: String(cycleSelect?.value || 'monthly'),
-        });
-        if (!setupResponse.ok || setupResponse.data?.ok === false) {
-          throw new Error(responseMessage(setupResponse, i18n.upgrade_failed));
-        }
-
-        const confirmed = await stripe.confirmCardSetup(String(setupResponse.data.client_secret || ''), {
-          payment_method: {
-            card,
-            billing_details: {
-              name: userName || undefined,
-              email: userEmail || undefined,
-            },
-          },
-        });
-        if (confirmed.error) {
-          if (confirmed.error.type === 'card_error') throw stripeDeclineError(confirmed.error);
-          throw new Error(normalizeStripeMessage(confirmed.error.message, i18n.payment_auth_failed));
-        }
-
-        const confirmResponse = await post('{{ route('billing.trial.confirm') }}', {
-          setup_intent_id: String(confirmed.setupIntent?.id || ''),
-        });
-        if (!confirmResponse.ok || confirmResponse.data?.ok === false) {
-          throw new Error(responseMessage(confirmResponse, i18n.upgrade_failed));
-        }
-
-        setMessage('ok', confirmResponse.data?.message || i18n.trial_started_redirecting);
-        const trialPlan = currentPlan();
-        await sendAdsConversion(
-          gadsTrialConversionSendTo,
-          trialPlan ? trialPlan[String(cycleSelect?.value || 'monthly')] : null,
-          String(confirmed.setupIntent?.id || '')
-        );
-        leaving = true;
-        window.location.href = '{{ route('manage-subscription.page') }}';
-      } catch (error) {
-        showPaymentError(error, i18n.upgrade_failed);
-      } finally {
-        // On the way to the next page the button stays off.
-        if (!leaving) {
-          paymentInFlight = false;
-          if (trialBtn) {
-            trialBtn.disabled = false;
-            trialBtn.classList.remove('is-loading');
-            trialBtn.textContent = trialBtnDefaultText;
-          }
-        }
-      }
-    });
-
     // Pays for the chosen plan with a card from the card boxes, the saved card (no
     // payment method) or the phone wallet. True when the page is on its way to
     // the next one, so Pay stays off.
@@ -2381,6 +2313,74 @@
       window.location.href = '{{ route('manage-subscription.page') }}';
       return true;
     }
+
+    trialBtn?.addEventListener('click', async () => {
+      if (paymentInFlight) return;
+      setMessage('', '');
+      let leaving = false;
+      try {
+        if (!stripe || !card) throw new Error(cardUnavailableText);
+        if (!cardComplete) throw new Error(i18n.enter_card_details);
+
+        paymentInFlight = true;
+        if (trialBtn) {
+          trialBtn.disabled = true;
+          trialBtn.classList.add('is-loading');
+          trialBtn.textContent = i18n.trial_starting;
+        }
+
+        const setupResponse = await post('{{ route('billing.trial.setup') }}', {
+          plan: String(currentPlan()?.slug || ''),
+          billing_cycle: String(cycleSelect?.value || 'monthly'),
+        });
+        if (!setupResponse.ok || setupResponse.data?.ok === false) {
+          throw new Error(responseMessage(setupResponse, i18n.upgrade_failed));
+        }
+
+        const confirmed = await stripe.confirmCardSetup(String(setupResponse.data.client_secret || ''), {
+          payment_method: {
+            card,
+            billing_details: {
+              name: userName || undefined,
+              email: userEmail || undefined,
+            },
+          },
+        });
+        if (confirmed.error) {
+          if (confirmed.error.type === 'card_error') throw stripeDeclineError(confirmed.error);
+          throw new Error(normalizeStripeMessage(confirmed.error.message, i18n.payment_auth_failed));
+        }
+
+        const confirmResponse = await post('{{ route('billing.trial.confirm') }}', {
+          setup_intent_id: String(confirmed.setupIntent?.id || ''),
+        });
+        if (!confirmResponse.ok || confirmResponse.data?.ok === false) {
+          throw new Error(responseMessage(confirmResponse, i18n.upgrade_failed));
+        }
+
+        setMessage('ok', confirmResponse.data?.message || i18n.trial_started_redirecting);
+        const trialPlan = currentPlan();
+        await sendAdsConversion(
+          gadsTrialConversionSendTo,
+          trialPlan ? trialPlan[String(cycleSelect?.value || 'monthly')] : null,
+          String(confirmed.setupIntent?.id || '')
+        );
+        leaving = true;
+        window.location.href = '{{ route('manage-subscription.page') }}';
+      } catch (error) {
+        showPaymentError(error, i18n.upgrade_failed);
+      } finally {
+        // On the way to the next page the button stays off.
+        if (!leaving) {
+          paymentInFlight = false;
+          if (trialBtn) {
+            trialBtn.disabled = false;
+            trialBtn.classList.remove('is-loading');
+            trialBtn.textContent = trialBtnDefaultText;
+          }
+        }
+      }
+    });
 
     document.getElementById('billingForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
