@@ -137,7 +137,8 @@
       position: relative;
       flex: 1;
       border: 2px solid var(--line);
-      border-radius: var(--radius-lg);
+      /* The fields' corners, so the box's edge runs straight under its label like theirs. */
+      border-radius: var(--radius);
       background: var(--surface);
       padding: .85rem .9rem;
       cursor: pointer;
