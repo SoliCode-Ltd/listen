@@ -230,35 +230,24 @@
     .pricing-page.is-yearly .plans-countdown,
     .pricing-page.is-yearly .compare-plan-offer { display: none; }
 
-    /* When the offer ends: "Offer ends in" and a timer in amber, days : hours : minutes : seconds,
-       each number large on its own tile with its unit under it, readable at arm's length. */
+    /* When the offer ends, as one line of text: "Offer ends in 02 days 11 hrs 53 min 37 sec",
+       each number in bold amber with its unit after it, counting down to the second. */
     .pricing-page { --offer-urgent: #FDB022; }
     html[data-theme="light"] .pricing-page { --offer-urgent: #B54708; }
     .plans-countdown { display: flex; justify-content: center; }
-    .offer-ends { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .55rem .9rem; color: var(--offer-urgent); }
+    .offer-ends { display: flex; align-items: baseline; justify-content: center; flex-wrap: wrap; gap: .25rem .6rem; font-size: 1.02rem; line-height: 1.5; }
     .offer-ends[hidden] { display: none; }
-    .offer-ends-label { display: inline-flex; align-items: center; gap: .45rem; font-size: 1rem; font-weight: 700; }
-    .offer-ends-label svg { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .offer-ends-clock { display: inline-flex; align-items: center; gap: .3rem; }
-    .offer-ends-unit {
-      display: grid;
-      justify-items: center;
-      min-width: 3.1rem;
-      padding: .5rem .35rem .45rem;
-      border-radius: 12px;
-      background: color-mix(in oklab, var(--offer-urgent) 9%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--offer-urgent) 26%, transparent);
-    }
-    .offer-ends-unit b { font-size: 1.4rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-    .offer-ends-unit small { margin-top: .32rem; color: color-mix(in oklab, var(--text) 74%, var(--surface)); font-size: .74rem; font-weight: 600; line-height: 1; }
-    .offer-ends-sep { font-size: 1.2rem; font-weight: 700; line-height: 1; opacity: .6; }
+    .offer-ends-label { display: inline-flex; align-items: center; gap: .4rem; align-self: center; color: var(--text); font-weight: 600; }
+    .offer-ends-label svg { flex: none; width: 18px; height: 18px; fill: none; stroke: var(--offer-urgent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .offer-ends-clock { display: inline-flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0 .6rem; }
+    .offer-ends-unit { display: inline-flex; align-items: baseline; gap: .22rem; white-space: nowrap; }
+    .offer-ends-unit b { color: var(--offer-urgent); font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .offer-ends-unit small { color: var(--muted); font-size: .92rem; font-weight: 500; }
     .offer-ends-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-    /* Offers that end at different times: each card keeps its own, smaller timer. */
-    .plan-card .offer-ends { margin-top: .55rem; gap: .4rem .6rem; }
-    .plan-card .offer-ends-label { font-size: .88rem; }
-    .plan-card .offer-ends-unit { min-width: 2.5rem; padding: .35rem .2rem .3rem; border-radius: 10px; }
-    .plan-card .offer-ends-unit b { font-size: 1.12rem; }
-    .plan-card .offer-ends-unit small { font-size: .68rem; }
+    /* Offers that end at different times: each card keeps its own, smaller line. */
+    .plan-card .offer-ends { margin-top: .5rem; font-size: .9rem; }
+    .plan-card .offer-ends-unit b { font-size: 1.02rem; }
+    .plan-card .offer-ends-unit small { font-size: .82rem; }
 
     .plan-trial-chip {
       display: inline-flex;
@@ -463,30 +452,31 @@
       box-shadow: var(--card-shadow);
     }
     .studio-mixer { display: flex; flex-direction: column; min-width: 0; padding: clamp(1.4rem, 3vw, 2.4rem); }
-    /* The number in a box that reads as one to type in, the unit after it. */
-    .studio-amount { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .7rem; }
+    /* The number large and plain, on a thin line that marks it as one to type in (violet when
+       pointed at or typed in), the unit after it. */
+    .studio-amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .6rem; }
     .studio-amount input {
       field-sizing: content;
       width: auto;
       min-width: 2ch;
-      padding: .12em .32em;
-      border: 1.5px solid var(--line-strong);
-      border-radius: 18px;
-      background: var(--surface2);
+      padding: 0 .04em .02em;
+      border: 0;
+      border-bottom: 2px solid var(--line-strong);
+      border-radius: 0;
+      background: none;
       color: var(--text);
       font: inherit;
-      font-size: clamp(2.5rem, 4.6vw, 3.6rem);
+      font-size: clamp(3rem, 5.4vw, 4.4rem);
       font-weight: 700;
-      line-height: 1.1;
+      line-height: 1.08;
       letter-spacing: -.02em;
-      text-align: center;
       font-variant-numeric: tabular-nums;
       cursor: text;
-      transition: border-color .2s ease, box-shadow .2s ease;
+      transition: border-color .2s ease;
       -moz-appearance: textfield;
     }
-    .studio-amount input:hover { border-color: color-mix(in srgb, var(--brand-accent) 55%, var(--line-strong)); }
-    .studio-amount input:focus-visible { outline: none; border-color: var(--brand-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-accent) 22%, transparent); }
+    .studio-amount input:hover { border-bottom-color: color-mix(in srgb, var(--brand-accent) 60%, var(--line-strong)); }
+    .studio-amount input:focus-visible { outline: none; border-bottom-color: var(--brand-accent); }
     .studio-unit { font-size: 1.25rem; font-weight: 600; }
     /* How long that is in hours, on its own line (kept when empty, under an hour), so the
        track never moves up or down. */
@@ -1032,7 +1022,7 @@
       .plan-pricing { padding: .65rem 0 1rem; }
       .plan-action { padding-bottom: 1.1rem; }
       .studio { border-radius: 22px; }
-      .studio-amount input { font-size: 2.6rem; border-radius: 16px; }
+      .studio-amount input { font-size: 3rem; }
       .studio-wave { height: 96px; }
       /* Every plan's name on the track, on two lines when it needs them. */
       .studio-station-name { font-size: .7rem; white-space: normal; width: max-content; max-width: 4.7rem; }
@@ -1040,11 +1030,10 @@
       .studio-faces { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; height: 28px; overflow: hidden; }
       .studio-faces img { width: 28px; height: 28px; margin-inline-start: -8px; box-shadow: none; }
       .studio-faces img:nth-child(n+7) { display: none; }
-      .offer-ends { gap: .45rem .7rem; }
-      .offer-ends-label { font-size: .92rem; }
-      .offer-ends-unit { min-width: 2.65rem; padding: .4rem .25rem .36rem; border-radius: 10px; }
-      .offer-ends-unit b { font-size: 1.2rem; }
-      .offer-ends-unit small { margin-top: .26rem; font-size: .7rem; }
+      .offer-ends { font-size: .96rem; }
+      .offer-ends-clock { gap: 0 .5rem; }
+      .offer-ends-unit b { font-size: 1.12rem; }
+      .offer-ends-unit small { font-size: .86rem; }
     }
     @media (max-width: 1000px) {
       .team-band[data-count] { max-width: 820px; }
@@ -1681,14 +1670,14 @@
       }
       function pad(n) { return (n < 10 ? '0' : '') + n; }
       function set(el, text) { if (el && el.textContent !== text) el.textContent = text; }
-      // The timer: days : hours : minutes : seconds (the days only while there is more than one),
-      // each with its unit under it. Screen readers get the time left in words.
+      // The line: days, hours, minutes and seconds (the days only while there is more than one),
+      // each number with its unit after it. Screen readers get the time left in words.
       function clock(el, seconds) {
         var box = el.querySelector('.offer-ends-clock');
         if (!box) return;
         var parts = [[Math.floor(seconds / 86400), units[0]], [Math.floor(seconds % 86400 / 3600), units[1]], [Math.floor(seconds % 3600 / 60), units[2]], [seconds % 60, units[3]]];
         if (seconds < 86400) parts.shift();
-        var html = parts.map(function(p) { return '<span class="offer-ends-unit"><b>' + pad(p[0]) + '</b><small>' + p[1] + '</small></span>'; }).join('<span class="offer-ends-sep">:</span>');
+        var html = parts.map(function(p) { return '<span class="offer-ends-unit"><b>' + pad(p[0]) + '</b><small>' + p[1] + '</small></span>'; }).join('');
         if (box.innerHTML !== html) box.innerHTML = html;
       }
       function refresh() {
@@ -2028,7 +2017,7 @@
 
       // The number box is as wide as its digits (where the browser cannot size it itself).
       var sizes = window.CSS && CSS.supports && CSS.supports('field-sizing', 'content');
-      function fit() { if (!sizes) input.style.width = (String(input.value).length + 1.2) + 'ch'; }
+      function fit() { if (!sizes) input.style.width = (String(input.value).length + 0.3) + 'ch'; }
       input.addEventListener('input', fit);
 
       var live = document.createElement('p');
