@@ -224,6 +224,7 @@ return [
         'hours_and_minutes' => ':hours :minutes',
         'minutes_live' => ':minutes minutes a month: :plan',
         'all_plans' => 'All plans',
+        'show_all_lines' => 'Show all features',
         'voices_proof' => ':count+ dialects and accents on every plan',
         'monthly' => 'Monthly',
         'yearly' => 'Yearly',

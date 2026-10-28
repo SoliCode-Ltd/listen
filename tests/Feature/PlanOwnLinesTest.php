@@ -115,7 +115,7 @@ class PlanOwnLinesTest extends TestCase
     {
         $start = strpos($page, 'data-plan-slug="'.$slug.'"');
         $this->assertNotFalse($start, "The page has the {$slug} card.");
-        $list = strpos($page, '<ul class="plan-features">', $start);
+        $list = strpos($page, '<ul class="plan-features', $start);
         $end = strpos($page, '</ul>', (int) $list);
 
         return trim((string) preg_replace('/\s+/u', ' ', strip_tags(substr($page, (int) $list, $end - $list))));
