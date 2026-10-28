@@ -57,9 +57,10 @@ class VoiceOrbsTest extends TestCase
         foreach (array_unique($slugs[1]) as $slug) {
             $this->assertStringContainsString('data-orb="'.Orbs::forPlan($slug).'"', $html, $slug);
         }
-        // The recommended plan is the one shown first, and only its orb is alive.
+        // Only the recommended plan's orb is alive among the cards: its card's.
         $this->assertSame(1, substr_count($html, 'plan-orb is-live'));
-        $this->assertMatchesRegularExpression('/class="plan-card popular[^"]*is-active"/', $html);
+        preg_match('/<div class="plan-card popular.*?<\/h2>/s', $html, $popularTop);
+        $this->assertStringContainsString('plan-orb is-live', $popularTop[0] ?? '');
 
         // No two orbs look alike: every plan, the teams band and the closing panel each have
         // their own colours (a plan's orb shows on the track, in the panel and in the list).

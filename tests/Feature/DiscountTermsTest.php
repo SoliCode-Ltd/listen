@@ -124,10 +124,11 @@ class DiscountTermsTest extends TestCase
             // On yearly, each plan's usual monthly price is struck through beside its yearly price.
             ->assertSee('class="price-original-row is-yearly"', false)
             ->assertSee('class="plan-pick-was"', false)
-            ->assertSee('class="plan-pick is-first-month"', false)
             ->assertSee('30% off')
-            // A week left: a timer, days : hours : minutes : seconds, each with its unit.
-            ->assertSee('class="offer-ends"', false)
+            // The comparison table shows the offer under the plan's price too.
+            ->assertSee('class="compare-plan-offer"', false)
+            // A week left: one timer above the cards, days : hours : minutes : seconds, each with its unit.
+            ->assertSee('<div class="plans-countdown"><span class="offer-ends"', false)
             ->assertSee('Offer ends in 7 days')
             ->assertSee('<b>07</b><small>days</small>', false)
             ->assertSee('<b>00</b><small>sec</small>', false);
@@ -175,6 +176,32 @@ class DiscountTermsTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_offers_that_end_at_different_times_keep_a_timer_on_each_card(): void
+    {
+        Carbon::setTestNow('2026-10-20 12:00:00');
+        Plan::factory()->create(['slug' => 'free', 'name' => 'Free', 'price_cents' => 0, 'is_active' => true]);
+        Plan::factory()->create([
+            'slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'is_active' => true,
+            'discount_percentage' => 30, 'discount_ends_at' => now()->addDays(3),
+        ]);
+        Plan::factory()->create([
+            'slug' => 'pro', 'name' => 'Pro', 'price_cents' => 4900, 'is_active' => true,
+            'discount_percentage' => 20, 'discount_ends_at' => now()->addDays(5),
+        ]);
+
+        $html = $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
+            ->get($this->localizedRoute('pricing'))
+            ->assertOk()
+            ->assertDontSee('class="plans-countdown"', false)
+            ->getContent();
+
+        $this->assertSame(2, substr_count($html, 'class="offer-ends"'));
+        $this->assertStringContainsString('<b>03</b><small>days</small>', $html);
+        $this->assertStringContainsString('<b>05</b><small>days</small>', $html);
+
+        Carbon::setTestNow();
+    }
+
     public function test_egyptian_visitors_paying_by_instapay_see_the_offer_too(): void
     {
         SiteSetting::set('pricing_forced_country_code', 'EG', 'billing');
@@ -193,8 +220,7 @@ class DiscountTermsTest extends TestCase
             ->assertOk()
             ->assertSee('class="offer-label"', false)
             ->assertSee('خصم 10% على أول شهرين')
-            // Two months off: the price stays "a month"; the button says what is off.
-            ->assertDontSee('class="plan-pick is-first-month"', false)
+            // The button says what is off.
             ->assertSee('احصل على خصم 10%');
     }
 

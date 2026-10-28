@@ -8,9 +8,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * The pricing page: the visitor picks minutes on a voice track and sees the plan
- * that fits, which is that plan's own card as the admin set it up. Every monthly
- * plan is on the track and in the list under it; the recommended plan is shown first.
+ * The pricing page: every monthly plan as a card, side by side, then a calculator where
+ * the visitor picks minutes on a voice track and sees the plan that fits. Every monthly
+ * plan is a card, a row in the phones' list and a stop on the track; the calculator
+ * starts on the recommended plan.
  */
 class PricingMinutesTrackTest extends TestCase
 {
@@ -30,7 +31,7 @@ class PricingMinutesTrackTest extends TestCase
         }
     }
 
-    public function test_every_plan_is_on_the_track_and_the_recommended_one_is_shown_first(): void
+    public function test_every_plan_is_a_card_and_on_the_track_and_the_calculator_starts_on_the_recommended_one(): void
     {
         foreach (['en', 'ar'] as $locale) {
             app()->setLocale($locale);
@@ -47,21 +48,30 @@ class PricingMinutesTrackTest extends TestCase
             $this->assertSame(['basic', 'starter', 'creator', 'pro'], array_column($plans, 'slug'));
             $this->assertSame([15, 200, 500, 1250], array_column($plans, 'minutes'));
 
-            // Each plan's card once; the recommended one shown, the others out of reach until picked.
+            // Each plan's card once, all of them in reach, in the order the admin set; the
+            // recommended one with its badge.
             preg_match_all('/<div class="plan-card[^"]*"[^>]*data-plan-slug="([a-z_]+)"/', $html, $cards);
-            $this->assertSame([], array_diff(['basic', 'starter', 'creator', 'pro'], $cards[1]));
-            $this->assertSame(1, preg_match_all('/class="plan-card[^"]*is-active"/', $html));
-            $this->assertMatchesRegularExpression('/class="plan-card popular[^"]*is-active" data-orb-host\s+data-plan-slug="starter"/', $html);
-            $this->assertSame(3, preg_match_all('/data-orb-host\s+inert/', $html));
+            $this->assertSame(['basic', 'starter', 'creator', 'pro'], $cards[1]);
+            $this->assertStringContainsString('<div class="plan-grid" id="planGrid" data-count="4">', $html);
+            $this->assertSame(0, preg_match_all('/<div class="plan-card[^>]*\binert\b/', $html));
+            $this->assertMatchesRegularExpression('/class="plan-card popular[^"]*" data-orb-host\s+id="plan-starter"/', $html);
+            $this->assertSame(1, substr_count($html, 'class="popular-badge"'));
+
+            // The calculator starts on the recommended plan; the other plans wait out of reach.
+            preg_match_all('/class="fit-plan( is-active)?" data-fit-slug="([a-z_]+)" data-orb-host\s*(inert)?/', $html, $fits);
+            $this->assertSame(['basic', 'starter', 'creator', 'pro'], $fits[2]);
+            $this->assertSame(['', ' is-active', '', ''], $fits[1]);
+            $this->assertSame(['inert', '', 'inert', 'inert'], $fits[3]);
 
             // The heading is one colour, and the track is a voice in two layers: the chosen part fills in.
             $this->assertStringNotContainsString('class="accent"', $html);
             $this->assertStringContainsString('class="studio-bars-base"', $html);
             $this->assertStringContainsString('class="studio-bars-fill"', $html);
 
-            // The orbs on the track and the list under the card pick a plan.
+            // The orbs on the track pick a plan; each row of the phones' list goes to its card.
             $this->assertSame(4, substr_count($html, 'class="studio-station"'));
-            $this->assertSame(4, substr_count($html, 'class="plan-pick"'));
+            preg_match_all('/class="plan-pick( is-popular)?" href="#plan-([a-z_]+)"/', $html, $rows);
+            $this->assertSame(['basic', 'starter', 'creator', 'pro'], $rows[2]);
             $this->assertStringContainsString(__('ui.pricing.all_plans'), $html);
         }
     }
@@ -70,7 +80,7 @@ class PricingMinutesTrackTest extends TestCase
     {
         $html = $this->getLocalizedRoute('pricing')->assertOk()->getContent();
 
-        // Two pickers above the table; the plan the track shows and the next one up come first.
+        // Two pickers above the table; the plan the calculator starts on and the next one up come first.
         $this->assertSame(2, substr_count($html, 'class="compare-pick"'));
         // A tap reaches the select (it opens the phone's own list): the face under it lets taps through.
         $this->assertMatchesRegularExpression('/\.compare-pick-face \{[^}]*pointer-events: none;/', $html);
@@ -82,17 +92,18 @@ class PricingMinutesTrackTest extends TestCase
         $this->assertSame('creator', $slugs[$pick[2]]);
     }
 
-    public function test_a_member_on_the_featured_plan_still_sees_its_crown_and_strap(): void
+    public function test_a_member_on_the_featured_plan_still_sees_its_crown_and_badge(): void
     {
         $member = \App\Models\User::factory()->create();
         app(\App\Services\PlanAccessService::class)->assignPlan($member, Plan::query()->where('slug', 'starter')->firstOrFail());
 
         $html = $this->actingAs($member)->getLocalizedRoute('pricing')->assertOk()->getContent();
 
-        // Their own plan is shown first, as the featured one, with the strap, the crown on
-        // the track and the crown tab in the list.
-        $this->assertMatchesRegularExpression('/class="plan-card popular[^"]*is-current[^"]*is-active" data-orb-host\s+data-plan-slug="starter"/', $html);
-        $this->assertDoesNotMatchRegularExpression('/id="planRibbon"\s+hidden/', $html);
+        // Their own plan stays the featured one: its badge on the card, the crown on the track
+        // and the crown tab in the list, and the calculator starts on it.
+        $this->assertMatchesRegularExpression('/class="plan-card popular[^"]*is-current[^"]*" data-orb-host\s+id="plan-starter"/', $html);
+        $this->assertSame(1, substr_count($html, 'class="popular-badge"'));
+        $this->assertStringContainsString('class="fit-plan is-active" data-fit-slug="starter"', $html);
         $this->assertSame(1, substr_count($html, 'class="crown studio-station-crown"'));
         $this->assertSame(1, substr_count($html, 'class="plan-pick-crown"'));
         preg_match('/data-plans="([^"]+)"/', $html, $track);

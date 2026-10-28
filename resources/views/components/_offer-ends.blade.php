@@ -1,0 +1,24 @@
+{{-- When an offer ends, as a timer counting down to the second: "Offer ends in" and days : hours :
+     minutes : seconds (the days only while there is more than one), each number with its unit under
+     it. The page keeps it current; screen readers get the time left in words. --}}
+@php
+  $endsText = $offerEndsText($endsAt);
+  $endsLeft = max(0, \Illuminate\Support\Carbon::parse($endsAt)->getTimestamp() - now()->getTimestamp());
+  $endsUnits = explode('|', __('ui.pricing.countdown_units'));
+  $endsParts = array_values(array_filter([
+    [intdiv($endsLeft, 86400), $endsUnits[0] ?? '', $endsLeft >= 86400],
+    [intdiv($endsLeft % 86400, 3600), $endsUnits[1] ?? '', true],
+    [intdiv($endsLeft % 3600, 60), $endsUnits[2] ?? '', true],
+    [$endsLeft % 60, $endsUnits[3] ?? '', true],
+  ], fn ($part) => $part[2]));
+@endphp
+@if($endsText !== '')
+  <span class="offer-ends" data-ends="{{ $endsAt }}">
+    <span class="offer-ends-label" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9.5 2.5h5"/></svg>
+      {{ __('ui.pricing.discount_offer_ends') }}
+    </span>
+    <span class="offer-ends-clock" aria-hidden="true">@foreach($endsParts as $i => [$count, $unit])@if($i > 0)<span class="offer-ends-sep">:</span>@endif<span class="offer-ends-unit"><b>{{ sprintf('%02d', $count) }}</b><small>{{ $unit }}</small></span>@endforeach</span>
+    <span class="offer-ends-text">{{ $endsText }}</span>
+  </span>
+@endif
