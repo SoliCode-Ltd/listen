@@ -62,12 +62,16 @@
     <p class="plan-desc">{{ $planDescription($plan) }}</p>
   </div>
 
-  {{-- 2. Price, and the offer when there is one: its label above the price, the full price
-       struck through beside it, and the time left under it. An offer is for monthly billing
+  {{-- 2. Price, and the offer when there is one: its label above the price with the day it ends,
+       and the full price struck through beside the price. An offer is for monthly billing
        only, so on yearly all three go and the yearly price shows with the usual monthly price
        struck through beside it. --}}
   @php
     $terms = $hasDiscount && !$isFree && !$isPack ? ($plan['discount_terms'] ?? null) : null;
+    // The offer's last day, e.g. "30 Oct" («30 أكتوبر»). One ending at midnight ends the day before.
+    $offerUntil = $terms && $discountEndsAt
+      ? \Illuminate\Support\Carbon::parse($discountEndsAt)->subSecond()->locale(app()->getLocale())->translatedFormat('j M')
+      : null;
   @endphp
   {{-- Kept when there is no offer too, so every card's price starts at the same height. --}}
   @if($terms)
@@ -75,6 +79,9 @@
       <span class="offer-label">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>
         <span class="offer-label-text">{{ $terms['offer_monthly'] }}</span>
+        @if($offerUntil)
+          <span class="offer-until">{{ __('ui.pricing.offer_until', ['date' => $offerUntil]) }}</span>
+        @endif
       </span>
     </div>
   @else
@@ -106,10 +113,6 @@
       </div>
     </div>
     <div class="price-note price-note-text"></div>
-    {{-- One timer above the cards when every offer ends at the same time; else each card has its own. --}}
-    @if($terms && $discountEndsAt && empty($sharedOfferEnds))
-      @include('components._offer-ends', ['endsAt' => $discountEndsAt])
-    @endif
     @php
       $trialMonthly = $state['trial_monthly'];
       $trialYearly = $state['trial_yearly'];

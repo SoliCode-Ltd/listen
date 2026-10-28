@@ -344,6 +344,7 @@ return [
         'feature_label_custom_prompt' => 'Custom Prompt',
         'discount_badge' => 'Save :percent%',
         'discount_offer_ends' => 'Offer ends in',
+        'offer_until' => 'Until :date',
         'ends_in' => 'Ends in',
         'offer_ends_days' => 'Offer ends in :count day|Offer ends in :count days',
         'offer_ends_hours' => 'Offer ends in :count hour|Offer ends in :count hours',
