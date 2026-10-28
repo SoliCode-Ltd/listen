@@ -160,7 +160,7 @@ class BusinessStatsDashboardTest extends TestCase
 
         $this->actingAs($admin)->get('/admin')->assertOk()->assertSee('Investor report (PDF)')->assertSee('Raw data (Excel)');
         $this->assertSame(
-            ['ApiCostChart', 'ApiUsageBreakdown', 'ApiUsageKpis', 'BusinessBreakdowns', 'BusinessGrowthChart', 'BusinessGrowthKpis', 'BusinessProductKpis', 'BusinessRevenueChart', 'BusinessRevenueKpis', 'BusinessUsageChart', 'ExpectedIncome'],
+            ['ApiCostChart', 'ApiUsageBreakdown', 'ApiUsageKpis', 'BusinessBreakdowns', 'BusinessGrowthChart', 'BusinessGrowthKpis', 'BusinessPaymentMethods', 'BusinessProductKpis', 'BusinessRevenueChart', 'BusinessRevenueKpis', 'BusinessUsageChart', 'ExpectedIncome'],
             collect(\Filament\Facades\Filament::getPanel('admin')->getWidgets())->map(fn ($w) => class_basename($w))->sort()->values()->all(),
             'Only the business widgets should be on the dashboard.'
         );
