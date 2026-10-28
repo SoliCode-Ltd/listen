@@ -12,10 +12,12 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\Billing\AdsPurchases;
 use App\Services\Billing\PurchaseAdsConversionExport;
+use App\Services\Billing\TrialAdsConversionExport;
 use App\Services\ManualPaymentService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
@@ -227,5 +229,39 @@ class AdsPurchaseUploadTest extends TestCase
         $this->assertStringNotContainsString('trackPurchaseConversion', $manualBranch);
         // Card payments still are.
         $this->assertStringContainsString('await trackPurchaseConversion(selected.meta);', $billing);
+    }
+
+    public function test_an_ad_click_from_where_the_consent_rules_apply_is_never_kept_or_uploaded(): void
+    {
+        $land = fn () => $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
+            ->get($this->localizedRoute('pricing').'?gclid=Cj0-landing')->assertOk();
+        $paying = fn () => Request::create('https://listenai.studio/en/billing', 'POST', [], [CaptureAdClickId::COOKIE => 'Cj0-landing'], [], ['REMOTE_ADDR' => '8.8.4.4']);
+
+        foreach (['GB', 'DE', 'FR', 'CH', 'NO'] as $country) {
+            SiteSetting::set('pricing_forced_country_code', $country, 'billing');
+            $land()->assertCookieMissing(CaptureAdClickId::COOKIE);
+            // A click kept before, paid for from there: not sent either.
+            $this->assertNull(CaptureAdClickId::fromRequest($paying()), $country);
+        }
+
+        SiteSetting::set('pricing_forced_country_code', 'US', 'billing');
+        $land()->assertCookie(CaptureAdClickId::COOKIE, 'Cj0-landing');
+        $this->assertSame('Cj0-landing', CaptureAdClickId::fromRequest($paying()));
+
+        // A visitor whose country is not known (only their browser's language) is treated as one from there.
+        SiteSetting::set('pricing_forced_country_code', '', 'billing');
+        SiteSetting::set('pricing_ip_lookup_enabled', '0', 'billing');
+        $this->assertNull(CaptureAdClickId::fromRequest($paying()));
+
+        // Sales kept before this rule, from members there, stay out of both uploads.
+        $member = User::factory()->create(['country_code' => 'FR']);
+        AdsPurchase::query()->create(['user_id' => $member->id, 'source' => AdsPurchase::SOURCE_CARD, 'reference' => 'invoice:in_fr', 'gclid' => 'Cj0-fr',
+            'value_minor' => 2200, 'currency' => 'EUR', 'purchased_at' => now()]);
+        BillingTrial::query()->create([
+            'user_id' => $member->id, 'plan_id' => $this->creator->id, 'status' => BillingTrial::STATUS_PAID, 'gclid' => 'Cj0-fr-trial',
+            'stripe_subscription_id' => 'sub_fr', 'amount_cents' => 2200, 'paid_at' => now(),
+        ]);
+        $this->assertSame([], app(PurchaseAdsConversionExport::class)->rows());
+        $this->assertSame([], app(TrialAdsConversionExport::class)->rows());
     }
 }

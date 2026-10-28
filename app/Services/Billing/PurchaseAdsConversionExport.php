@@ -4,6 +4,7 @@ namespace App\Services\Billing;
 
 use App\Models\AdsPurchase;
 use App\Models\SiteSetting;
+use App\Support\Countries;
 
 /**
  * Purchases that came from a Google Ads click (AdsPurchases), in the Google Ads
@@ -41,6 +42,8 @@ class PurchaseAdsConversionExport
 
         return AdsPurchase::query()
             ->where('purchased_at', '>=', now()->subDays($days))
+            // Never a member from where the consent rules for ads apply.
+            ->whereDoesntHave('user', fn ($user) => $user->whereIn('country_code', Countries::ADS_CONSENT_REQUIRED))
             ->orderBy('purchased_at')
             ->orderBy('id')
             ->get()
