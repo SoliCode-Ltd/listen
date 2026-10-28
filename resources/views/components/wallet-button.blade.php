@@ -1,7 +1,8 @@
-{{-- Apple Pay and Google Pay: Stripe's own wallet button. It shows only on a device that
-     has one of them ready, and only once the wallet is switched on in Stripe and the
-     site's domain is registered there; until then the box stays hidden and the card
-     boxes work as before. The wallet hands over a card, so a page pays with it the same
+{{-- Apple Pay and Google Pay: Stripe's own wallet button. It shows wherever the wallet can
+     be used, also in a desktop browser of another make (Apple Pay in Chrome on Windows is paid
+     by scanning a code with an iPhone), once the wallet is switched on in Stripe and the
+     site's domain is registered there; where neither can be used the box stays hidden and
+     the card boxes work as before. The wallet hands over a card, so a page pays with it the same
      way as with the card boxes. A page makes it with
      ListenWalletButton(stripe, id, { mode, amount, billingDetails, onConfirm }) and
      shows it with .show(true) when paying by card is the choice. --}}
@@ -32,11 +33,16 @@
         appearance: { variables: { borderRadius: '8px' } },
       });
       var type = options.buttonType || 'plain';
+      var narrow = Boolean(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
       var button = elements.create('expressCheckout', {
-        paymentMethods: { link: 'never', paypal: 'never', amazonPay: 'never', klarna: 'never' },
+        // 'always': each wallet shows in other makers' browsers too (on a computer the phone
+        // wallet is paid by scanning a code); on 'auto' each only showed in its own browser.
+        paymentMethods: { applePay: 'always', googlePay: 'always', link: 'never', paypal: 'never', amazonPay: 'never', klarna: 'never' },
         buttonTheme: { applePay: light ? 'black' : 'white', googlePay: light ? 'black' : 'white' },
         buttonType: { applePay: type, googlePay: type },
         buttonHeight: 48,
+        // Side by side on a wide screen, one under the other on a phone; never hidden in a menu.
+        layout: { maxColumns: narrow ? 1 : 2, overflow: 'never' },
       });
       var ready = false;
       var wanted = false;
