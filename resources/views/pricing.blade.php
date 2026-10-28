@@ -100,14 +100,6 @@
     .billing-toggle button:hover { color: var(--text); }
     .billing-toggle button.active { color: var(--text); }
     .billing-toggle button:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
-    .toggle-save {
-      padding: .12rem .45rem;
-      border-radius: var(--radius-full);
-      background: color-mix(in oklab, var(--ok) 16%, transparent);
-      color: color-mix(in oklab, var(--ok) 50%, var(--text));
-      font-size: .74rem;
-      font-weight: 700;
-    }
 
     /* ── The plans ──
        Every plan as a card: three in a row and the others centred under them. A card's
@@ -115,6 +107,7 @@
        neighbours' (CSS subgrid), so the plans compare at a glance. */
     .pricing-page { --ease-out: cubic-bezier(.22, 1, .36, 1); }
     .page-hero .billing-toggle { margin-top: 1.6rem; }
+    .page-hero .billing-toggle button { min-width: 7.5rem; }
     .plans { padding-top: clamp(1.2rem, 2.5vw, 2rem); }
     .plans-title { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     /* Phones: one card under another. */
@@ -1247,12 +1240,8 @@
       <div class="billing-toggle" id="billingToggle" role="group" aria-label="{{ __('ui.pricing.monthly') }} / {{ __('ui.pricing.yearly') }}">
         <span class="billing-indicator" aria-hidden="true"></span>
         <button type="button" id="monthlyBtn" class="active" aria-pressed="true">{{ __('ui.pricing.monthly') }}</button>
-        <button type="button" id="yearlyBtn" aria-pressed="false">
-          {{ __('ui.pricing.yearly') }}
-          @if(($yearlyDiscountPercent ?? 0) > 0)
-            <span class="toggle-save">{{ __('ui.pricing.yearly_save', ['percent' => (int) $yearlyDiscountPercent]) }}</span>
-          @endif
-        </button>
+        {{-- The yearly saving shows on the cards (the usual price struck through, and the button). --}}
+        <button type="button" id="yearlyBtn" aria-pressed="false">{{ __('ui.pricing.yearly') }}</button>
       </div>
     </section>
 
