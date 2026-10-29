@@ -190,17 +190,18 @@ class AgentReadyTest extends TestCase
 
         $markdown = $response->getContent();
         $this->assertMatchesRegularExpression('/^# .*auth\.md/m', $markdown);
-        $this->assertStringContainsString('no OAuth sign-in', $markdown);
+        $this->assertStringContainsString('an agent cannot create a Listen account for itself', $markdown);
         $this->assertStringContainsString('X-Listen-Api-Key', $markdown);
         foreach (\App\Support\Api\ApiScopes::all() as $scope) {
             $this->assertStringContainsString('`'.$scope.'`', $markdown);
         }
-        // Nothing claims an OAuth server we do not run.
-        $this->get('/.well-known/oauth-authorization-server')->assertNotFound();
-        $this->get('/.well-known/oauth-protected-resource')->assertNotFound();
-        // The MCP server takes the same key.
+        // The MCP server takes the same key, or "Sign in with Listen", whose documents it names and serves.
         $this->assertStringContainsString('## MCP server', $markdown);
         $this->assertStringContainsString('`'.url('/mcp').'`', $markdown);
+        foreach (['/.well-known/oauth-authorization-server', '/.well-known/oauth-protected-resource/mcp'] as $document) {
+            $this->assertStringContainsString(url($document), $markdown);
+            $this->get($document)->assertOk();
+        }
     }
 
     public function test_every_discovery_file_points_to_the_mcp_server(): void

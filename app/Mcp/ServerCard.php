@@ -34,10 +34,12 @@ final class ServerCard
             'remotes' => [[
                 'type' => 'streamable-http',
                 'url' => url('/mcp'),
+                // A key, or nothing: apps that support OAuth sign in with Listen instead
+                // (the 401 points them to /.well-known/oauth-protected-resource/mcp).
                 'headers' => [[
                     'name' => 'Authorization',
-                    'description' => 'A Listen API key, made in the dashboard\'s Developer API section.',
-                    'isRequired' => true,
+                    'description' => 'A Listen API key, made in the dashboard\'s Developer API section. Apps that support OAuth can sign in with Listen instead.',
+                    'isRequired' => false,
                     'isSecret' => true,
                     'value' => 'Bearer {api_key}',
                     'variables' => ['api_key' => [
@@ -63,7 +65,7 @@ final class ServerCard
             'serverInfo' => ['name' => ListenServer::NAME, 'title' => ListenServer::NAME, 'version' => ListenServer::VERSION],
             'transport' => ['type' => 'streamable-http', 'endpoint' => url('/mcp')],
             'capabilities' => ['tools' => ['listChanged' => false]],
-            'authentication' => ['required' => true, 'schemes' => ['bearer']],
+            'authentication' => ['required' => true, 'schemes' => ['bearer', 'oauth2']],
         ];
     }
 

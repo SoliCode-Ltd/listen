@@ -189,11 +189,11 @@ return [
 
         'mcp' => [
             'title' => 'AI apps (MCP)',
-            'body' => 'Apps that support the Model Context Protocol (MCP) can use Listen directly. Ask the app for speech in plain words: it chooses the voice and the dialect, makes the audio and gives you a link to play it. It connects to `:url` with one of your API keys.',
-            'step1' => 'Create a key in your dashboard for the app. Give it only the permissions it needs, and a monthly credit limit if you want to cap what it spends.',
-            'step2' => 'In the app\'s MCP settings, add a server that connects over HTTP, with this address and the key in the `Authorization` header, as in the example.',
+            'body' => 'Apps that support the Model Context Protocol (MCP) can use Listen directly. Ask the app for speech in plain words: it chooses the voice and the dialect, makes the audio and gives you a link to play it. It connects to `:url`, signed in with your Listen account or with one of your API keys.',
+            'step1' => 'In the app\'s MCP settings, add a server that connects over HTTP, with this address.',
+            'step2' => 'When the app asks, sign in with Listen and allow it. An app without sign-in takes an API key instead: create one in your dashboard and put it in the `Authorization` header, as in the example.',
             'step3' => 'Ask for what you need, for example: "Read this ad in Egyptian Arabic, in a warm voice."',
-            'note' => 'Every recording uses your credits, as in the studio, and is kept in your history. Links to recordings work for as many days as your plan keeps your audio history; ask the app for a new link at any time.',
+            'note' => 'Every recording uses your credits, as in the studio, and is kept in your history. Links to recordings work for as many days as your plan keeps your audio history; ask the app for a new link at any time. Apps you sign in to are listed in your dashboard, under Developer API, where you can disconnect them. Signing in needs a paid plan with the premium voices.',
             'tools_title' => 'Tools',
             'tools_body' => 'The app sees only the tools its key\'s permissions allow.',
             'tools' => [

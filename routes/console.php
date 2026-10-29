@@ -32,6 +32,10 @@ Schedule::call(function (): void {
     }
 })->daily()->name('api-request-log-prune');
 
+// "Sign in with Listen" (App\Mcp\SignInWithListen): sign-in codes and tokens that
+// expired or were revoked (a disconnected app's) more than a week ago.
+Schedule::command('passport:purge --hours=168')->dailyAt('03:30')->withoutOverlapping(30);
+
 // Studio and extension: give back the credits of members' generations that got stuck.
 // The overlap lock lapses after 10 minutes, so a run that died never stops the next ones for long.
 Schedule::command('listen:expire-stuck-generations')->everyFiveMinutes()->withoutOverlapping(10);

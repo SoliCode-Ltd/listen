@@ -100,6 +100,13 @@ class RateLimitServiceProvider extends ServiceProvider
                 ? Limit::perMinute(ApiPlanAccess::requestsPerMinute($plan))->by('v1-generate:'.$apiKey->user_id)
                 : Limit::perMinute(ApiPlanAccess::readsPerMinute($plan))->by('v1-read:'.$apiKey->user_id);
         });
+
+        // "Sign in with Listen" (routes/ai.php): apps registering themselves and
+        // reading the OAuth documents, per address. An app does each a few times
+        // per connection; a burst is a script.
+        RateLimiter::for('mcp-oauth', fn (Request $request) => $request->isMethod('POST')
+            ? Limit::perMinute(5)->by('mcp-oauth-register:'.$request->ip())
+            : Limit::perMinute(30)->by('mcp-oauth:'.$request->ip()));
     }
 
     /**
