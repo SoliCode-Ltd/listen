@@ -879,7 +879,7 @@ class SeoHelper
             "- Developer API: OpenAPI description at {$base}/v1/openapi.json, API catalog at {$base}/.well-known/api-catalog.",
             "- Agent skill for making speech with the API: {$base}/.well-known/agent-skills/index.json",
         ], AgentDiscovery::mcpAvailable() ? [
-            "- MCP server for AI apps: {$base}/mcp (Streamable HTTP, signed in with a Listen API key); server card at {$base}/mcp/server-card",
+            "- MCP server for AI apps: {$base}/mcp (Streamable HTTP; sign in with Listen, or use a Listen API key); server card at {$base}/mcp/server-card",
         ] : [], [
             "- Everything agents can use here (ARD catalog): {$base}/.well-known/ai-catalog.json; how to get an API key: {$base}/auth.md",
             "- Sitemap: {$base}/sitemap.xml",

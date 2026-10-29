@@ -188,7 +188,7 @@
             <h2>{{ $plain('mcp.title') }}<a class="docs-anchor" href="#mcp" aria-hidden="true" tabindex="-1">#</a></h2>
             <p>{!! $t('mcp.body', [], ['url' => url('/mcp')]) !!}</p>
             <ol class="docs-steps">
-              <li><a href="{{ $keysUrl }}">{!! $t('mcp.step1') !!}</a></li>
+              <li>{!! $t('mcp.step1') !!}</li>
               <li>{!! $t('mcp.step2') !!}</li>
               <li>{!! $t('mcp.step3') !!}</li>
             </ol>

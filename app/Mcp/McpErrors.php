@@ -24,6 +24,9 @@ final class McpErrors
     public static function render(Throwable $e, Request $request): JsonResponse
     {
         $error = ApiErrorRenderer::toApiError($e);
+        $message = $error->errorCode === 'missing_api_key'
+            ? 'Sign in with Listen, or send a Listen API key as "Authorization: Bearer <key>".'
+            : $error->getMessage();
         $requestId = ApiErrorRenderer::requestId($request);
         $request->attributes->set('api_log', ['endpoint' => 'mcp', 'error_code' => $error->errorCode]);
 
@@ -39,7 +42,7 @@ final class McpErrors
                     $error->status >= 500 => -32603,
                     default => -32000,
                 },
-                'message' => $error->getMessage(),
+                'message' => $message,
                 'data' => ['type' => $error->type, 'code' => $error->errorCode, 'request_id' => $requestId] + $error->extra,
             ],
         ], $error->status, $error->headers + [

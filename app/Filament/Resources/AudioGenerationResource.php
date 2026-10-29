@@ -164,7 +164,7 @@ class AudioGenerationResource extends Resource
             ->description(fn (HasTable $livewire): string => 'Total audio length for these filters: '
                 .self::totalLengthLabel((int) $livewire->getFilteredTableQuery()->toBase()->reorder()->sum('duration_seconds')))
             // Where each one was asked for, and with which key, without a query per row.
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['textItem:id,source_type', 'apiKey:id,name']))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['textItem:id,source_type', 'apiKey:id,name,oauth_client_id']))
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->sortable(),
@@ -178,7 +178,7 @@ class AudioGenerationResource extends Resource
                     ->state(fn (AudioGeneration $record): string => GenerationSource::label($record->textItem?->source_type))
                     ->badge()
                     ->color(fn (AudioGeneration $record): string => GenerationSource::color($record->textItem?->source_type))
-                    ->description(fn (AudioGeneration $record): ?string => $record->apiKey ? 'Key: '.$record->apiKey->name : null)
+                    ->description(fn (AudioGeneration $record): ?string => self::keyLabel($record))
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('voice_name')
                     ->label('Voice')
@@ -315,16 +315,27 @@ class AudioGenerationResource extends Resource
         ];
     }
 
-    /** "AI app (MCP), key "Claude"": where it was asked for, and with which key. */
+    /** "AI app (MCP), signed in: Claude": where it was asked for, and with which key or app. */
     private static function sourceSummary(?AudioGeneration $record): string
     {
         if (! $record) {
             return '—';
         }
 
-        $key = $record->apiKey;
+        $key = self::keyLabel($record);
 
-        return GenerationSource::label($record->textItem?->source_type).($key ? ', key "'.$key->name.'"' : '');
+        return GenerationSource::label($record->textItem?->source_type).($key !== null ? ', '.lcfirst($key) : '');
+    }
+
+    /** "Key: Server key", or "Signed in: Claude" for an app connected with "Sign in with Listen". */
+    private static function keyLabel(AudioGeneration $record): ?string
+    {
+        $key = $record->apiKey;
+        if ($key === null) {
+            return null;
+        }
+
+        return ($key->isConnectedApp() ? 'Signed in: ' : 'Key: ').$key->name;
     }
 
     private static function dialogueSummary(?AudioGeneration $record): HtmlString

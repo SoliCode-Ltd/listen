@@ -235,7 +235,7 @@ class McpServerTest extends TestCase
 
         $this->get(AudioGenerationResource::getUrl('view', ['record' => $byApp]))
             ->assertOk()
-            ->assertSee('AI app (MCP), key &quot;Assistant key&quot;', false);
+            ->assertSee('AI app (MCP), key: Assistant key');
         $this->assertSame((int) $key->id, (int) $byApp->api_key_id);
     }
 

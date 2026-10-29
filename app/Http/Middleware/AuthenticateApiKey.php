@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Mcp\McpAccess;
 use App\Models\ApiKey;
 use App\Models\User;
 use App\Services\BillingSyncService;
@@ -57,6 +58,20 @@ class AuthenticateApiKey
             throw ApiError::invalidKey();
         }
 
+        $this->admit($request, $user, $apiKey);
+
+        return $next($request);
+    }
+
+    /**
+     * Lets the member's key in, or refuses it: a blocked member, a plan that
+     * does not include it, an unpaid trial. On the way it brings the plan up
+     * to date and puts the key, the plans and the member on the request.
+     * An AI app connected with "Sign in with Listen" (App\Mcp\ConnectedApps)
+     * comes in the same way, under the MCP server's plan rule.
+     */
+    public function admit(Request $request, User $user, ApiKey $apiKey): void
+    {
         if ($this->blockedUserService->isBlocked($user)) {
             $this->refused($request);
 
@@ -71,11 +86,16 @@ class AuthenticateApiKey
         }
 
         $plan = $this->planAccessService->resolveAccessPlanForUserId((int) $user->id);
-        $status = ApiPlanAccess::statusFor((int) $user->id, $plan);
+        $connectedApp = $apiKey->isConnectedApp();
+        $status = $connectedApp ? McpAccess::statusFor((int) $user->id, $plan) : ApiPlanAccess::statusFor((int) $user->id, $plan);
         if ($status !== ApiPlanAccess::OK) {
             $this->refused($request);
 
-            throw $status === ApiPlanAccess::TRIAL ? ApiError::notDuringTrial() : ApiError::notInPlan();
+            throw match (true) {
+                $status === ApiPlanAccess::TRIAL => ApiError::notDuringTrial(),
+                $connectedApp => McpAccess::notInPlan(),
+                default => ApiError::notInPlan(),
+            };
         }
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId((int) $user->id, $plan);
 
@@ -86,8 +106,6 @@ class AuthenticateApiKey
         $request->attributes->set('api_quota_plan', $quotaPlan);
         $request->attributes->set('listen_actor_user_id', (int) $user->id);
         $request->setUserResolver(static fn () => $user);
-
-        return $next($request);
     }
 
     /**
@@ -96,7 +114,7 @@ class AuthenticateApiKey
      * too many in a minute. Only refused requests count: a valid key from the
      * same server keeps working while an old one is still being sent.
      */
-    private function refused(Request $request): void
+    public function refused(Request $request): void
     {
         $failedKey = 'api-auth-failed:'.$request->ip();
         if (RateLimiter::tooManyAttempts($failedKey, self::FAILED_ATTEMPTS_PER_MINUTE)) {
