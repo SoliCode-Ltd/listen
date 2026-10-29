@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Services\Api\ApiSpeechService;
+use App\Support\Api\ApiScopes;
 
 /**
  * What the site publishes so AI agents can find and use the developer API:
@@ -11,7 +12,12 @@ use App\Services\Api\ApiSpeechService;
  *   its OpenAPI description, its guide and its health check;
  * - an agent skill at /.well-known/agent-skills/ (Agent Skills Discovery
  *   v0.2.0): short instructions an agent loads to make speech with the API,
- *   listed in an index with its SHA-256 digest.
+ *   listed in an index with its SHA-256 digest;
+ * - the ARD catalog at /.well-known/ai-catalog.json: every one of these,
+ *   with the questions each answers;
+ * - /auth.md: how an agent gets a key. A person makes it in the dashboard;
+ *   there is no OAuth server and no self-registration, and nothing here says
+ *   otherwise.
  *
  * Kept in step with routes/v1.php and App\Support\Api\OpenApiSpec.
  */
@@ -22,6 +28,9 @@ class AgentDiscovery
     public const SKILLS_SCHEMA = 'https://schemas.agentskills.io/discovery/0.2.0/schema.json';
 
     public const CATALOG_PROFILE = 'https://www.rfc-editor.org/info/rfc9727';
+
+    /** The ARD catalog's data model version (ai-catalog), not the ARD draft's. */
+    public const AI_CATALOG_VERSION = '1.0';
 
     /** @return array{linkset: list<array<string, mixed>>} */
     public static function apiCatalog(): array
@@ -35,6 +44,92 @@ class AgentDiscovery
             ],
             'status' => [['href' => url('/up'), 'type' => 'text/html']],
         ]]];
+    }
+
+    /**
+     * The ARD (Agentic Resource Discovery) catalog: what an agent can use here,
+     * each with the kind of request it serves.
+     *
+     * @return array{specVersion: string, host: array<string, string>, entries: list<array<string, mixed>>}
+     */
+    public static function aiCatalog(): array
+    {
+        $domain = (string) parse_url(url('/'), PHP_URL_HOST);
+        $entry = static fn (string $kind, string $name, string $title, string $type, string $url, string $description, array $queries): array => [
+            'identifier' => "urn:air:{$domain}:{$kind}:{$name}",
+            'displayName' => $title,
+            'type' => $type,
+            'url' => $url,
+            'description' => $description,
+            'representativeQueries' => $queries,
+        ];
+
+        return [
+            'specVersion' => self::AI_CATALOG_VERSION,
+            'host' => [
+                'displayName' => SeoHelper::siteName('en'),
+                'identifier' => rtrim(url('/'), '/'),
+            ],
+            'entries' => [
+                $entry('api', 'text-to-speech', 'Listen text to speech API', 'application/vnd.oai.openapi+json', url('/v1/openapi.json'),
+                    'Arabic and English text to speech over HTTP: voices, Arabic dialects, English accents, emotions, styles and two-voice dialogue. Needs an API key from a Listen account.',
+                    ['turn Arabic text into speech in the Egyptian dialect', 'make an English voiceover with a British accent', 'list Arabic voices and dialects', 'generate a two-voice dialogue as audio']),
+                $entry('skill', self::SKILL, 'Listen text to speech skill', 'text/markdown', url('/.well-known/agent-skills/'.self::SKILL.'/SKILL.md'),
+                    self::skillDescription(),
+                    ['how do I make Arabic speech with the Listen API', 'which headers does the Listen API need', 'how do I generate long Arabic audio in the background']),
+                $entry('catalog', 'api', 'Listen API catalog', 'application/linkset+json', url('/.well-known/api-catalog'),
+                    'Where the Listen API is, its OpenAPI description, its guide in English and Arabic, and its health check (RFC 9727).',
+                    ['where is the Listen API documentation', 'is the Listen API up']),
+                $entry('docs', 'llms', 'About Listen for AI assistants', 'text/plain', url('/llms.txt'),
+                    'What the Listen voice studio does, its official pages, its Arabic dialects and English accents.',
+                    ['what is Listen', 'which Arabic dialects does Listen support', 'how much does Listen cost']),
+            ],
+        ];
+    }
+
+    /** /auth.md: how an agent gets and uses credentials for the API, all true today. */
+    public static function authMarkdown(): string
+    {
+        $base = url('/v1');
+        $register = url('/en/register');
+        $guide = url('/en/developers');
+        $skill = url('/.well-known/agent-skills/'.self::SKILL.'/SKILL.md');
+        $scopes = implode("\n", array_map(static fn (string $scope): string => '  - `'.$scope.'`', ApiScopes::all()));
+
+        return <<<MD
+# Listen auth.md
+
+How AI agents and the developers who run them get access to the Listen text to speech API at `{$base}`.
+
+## Who registers
+
+A person, not the agent. There is no endpoint where an agent can create an account or a key for itself, and no OAuth sign-in. Ask the person you work for to:
+
+1. Create a Listen account at {$register} and choose a plan that includes the API.
+2. Open the dashboard's Developer API section and create an API key. Each key can be limited to some permissions and to a monthly number of credits.
+3. Give you the key in a safe way, such as an environment variable named `LISTEN_API_KEY`.
+
+## Credentials
+
+- Type: API key. Keys start with `lsk_live_`.
+- Send it as `X-Listen-Api-Key: <key>` or `Authorization: Bearer <key>` on every request. Nothing else is needed: no sessions, cookies or token exchange.
+- Permissions (scopes) a key can have:
+{$scopes}
+- A request the key is not allowed to make is refused with 403; a missing, wrong or revoked key gets 401.
+
+## Keeping it safe
+
+- Never print, log or commit the key.
+- The person can revoke a key in the dashboard at any time; make a new one there to rotate it.
+- Every generation is charged to the account's credits, the same balance as the web studio.
+
+## More
+
+- Every endpoint and field: {$base}/openapi.json
+- Guide: {$guide}
+- Agent skill: {$skill}
+
+MD;
     }
 
     public static function skillDescription(): string

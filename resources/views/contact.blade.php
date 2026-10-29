@@ -237,30 +237,30 @@
             </div>
           </fieldset>
 
-          <form id="contactForm" action="{{ route('contact.submit') }}" method="POST" class="contact-form">
+          <form id="contactForm" action="{{ route('contact.submit') }}" method="POST" class="contact-form" toolname="listen_contact" tooldescription="Send a message to the Listen team. They answer by email.">
             @csrf
             <div class="contact-row">
               <div class="contact-field">
                 <label for="name">{{ __('ui.contact.name') }}</label>
-                <input type="text" id="name" name="name" value="{{ old('name') }}" required autocomplete="name" placeholder="{{ __('ui.contact.name_placeholder') }}">
+                <input toolparamdescription="The sender's name." type="text" id="name" name="name" value="{{ old('name') }}" required autocomplete="name" placeholder="{{ __('ui.contact.name_placeholder') }}">
                 <span class="text-danger" data-error-for="name" @unless($errors->has('name')) style="display: none;" @endunless>{{ $errors->first('name') }}</span>
               </div>
               <div class="contact-field">
                 <label for="email">{{ __('ui.contact.email') }}</label>
-                <input type="email" id="email" name="email" value="{{ old('email') }}" required autocomplete="email" dir="ltr" placeholder="{{ __('ui.contact.email_placeholder') }}">
+                <input toolparamdescription="The email address the answer goes to." type="email" id="email" name="email" value="{{ old('email') }}" required autocomplete="email" dir="ltr" placeholder="{{ __('ui.contact.email_placeholder') }}">
                 <span class="text-danger" data-error-for="email" @unless($errors->has('email')) style="display: none;" @endunless>{{ $errors->first('email') }}</span>
               </div>
             </div>
 
             <div class="contact-field">
               <label for="subject">{{ __('ui.contact.subject') }}</label>
-              <input type="text" id="subject" name="subject" value="{{ old('subject', $contactTopic) }}" required placeholder="{{ __('ui.contact.subject_placeholder') }}">
+              <input toolparamdescription="What the message is about." type="text" id="subject" name="subject" value="{{ old('subject', $contactTopic) }}" required placeholder="{{ __('ui.contact.subject_placeholder') }}">
               <span class="text-danger" data-error-for="subject" @unless($errors->has('subject')) style="display: none;" @endunless>{{ $errors->first('subject') }}</span>
             </div>
 
             <div class="contact-field">
               <label for="message">{{ __('ui.contact.message') }}</label>
-              <textarea id="message" name="message" rows="6" required placeholder="{{ __('ui.contact.message_placeholder') }}">{{ old('message') }}</textarea>
+              <textarea toolparamdescription="The message." id="message" name="message" rows="6" required placeholder="{{ __('ui.contact.message_placeholder') }}">{{ old('message') }}</textarea>
               <span class="text-danger" data-error-for="message" @unless($errors->has('message')) style="display: none;" @endunless>{{ $errors->first('message') }}</span>
             </div>
 
