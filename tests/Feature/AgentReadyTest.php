@@ -195,9 +195,27 @@ class AgentReadyTest extends TestCase
         foreach (\App\Support\Api\ApiScopes::all() as $scope) {
             $this->assertStringContainsString('`'.$scope.'`', $markdown);
         }
-        // Nothing claims an OAuth server or an MCP server we do not run.
+        // Nothing claims an OAuth server we do not run.
         $this->get('/.well-known/oauth-authorization-server')->assertNotFound();
-        $this->get('/.well-known/mcp/server-card.json')->assertNotFound();
+        $this->get('/.well-known/oauth-protected-resource')->assertNotFound();
+        // The MCP server takes the same key.
+        $this->assertStringContainsString('## MCP server', $markdown);
+        $this->assertStringContainsString('`'.url('/mcp').'`', $markdown);
+    }
+
+    public function test_every_discovery_file_points_to_the_mcp_server(): void
+    {
+        $catalog = collect($this->get('/.well-known/ai-catalog.json')->json('entries'))->keyBy('type');
+        $this->assertSame(url('/mcp/server-card'), $catalog['application/mcp-server-card+json']['url']);
+
+        $linkset = collect($this->get('/.well-known/api-catalog')->json('linkset'))->keyBy('anchor');
+        $this->assertSame(url('/mcp/server-card'), $linkset[url('/mcp')]['service-desc'][0]['href']);
+
+        $this->assertStringContainsString(url('/mcp').' (Streamable HTTP', $this->get('/llms.txt')->getContent());
+        $this->assertStringContainsString('`'.url('/mcp').'`', $this->get('/.well-known/agent-skills/'.AgentDiscovery::SKILL.'/SKILL.md')->getContent());
+        // The skill index still matches the skill it lists.
+        $this->assertSame('sha256:'.hash('sha256', $this->get('/.well-known/agent-skills/'.AgentDiscovery::SKILL.'/SKILL.md')->getContent()),
+            $this->get('/.well-known/agent-skills/index.json')->json('skills.0.digest'));
     }
 
     public function test_pages_offer_their_tools_to_agents_in_the_browser(): void

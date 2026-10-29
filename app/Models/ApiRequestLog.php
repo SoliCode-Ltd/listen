@@ -77,15 +77,20 @@ class ApiRequestLog extends Model
                 }
                 RateLimiter::hit($anonymous, 60);
             }
-            $error = null;
-            $historyItemId = $response->headers->get('X-History-Item-Id');
-            if ($response->getStatusCode() >= 400 || $historyItemId === null) {
+            // What a request said about itself (the MCP server notes the tool it ran
+            // and the generation it made, which its JSON-RPC answer does not show).
+            $noted = (array) $request->attributes->get('api_log', []);
+            $error = $noted['error_code'] ?? null;
+            $historyItemId = $noted['history_item_id'] ?? $response->headers->get('X-History-Item-Id');
+            if ($noted === [] && ($response->getStatusCode() >= 400 || $historyItemId === null)) {
                 $body = json_decode((string) $response->getContent(), true);
                 if (is_array($body)) {
                     $error = is_array($body['error'] ?? null) ? ($body['error']['code'] ?? null) : null;
                     $historyItemId ??= $body['history_item_id'] ?? ($body['error']['history_item_id'] ?? null);
                 }
             }
+            $credits = $noted['credits'] ?? $response->headers->get('X-Credits-Used');
+            $characters = $noted['characters'] ?? $response->headers->get('X-Character-Count');
 
             self::query()->create([
                 'request_id' => $requestId,
@@ -93,13 +98,13 @@ class ApiRequestLog extends Model
                 'api_key_id' => $apiKey instanceof ApiKey ? $apiKey->id : null,
                 'method' => $request->method(),
                 'path' => mb_substr('/'.ltrim($request->path(), '/'), 0, 255),
-                'endpoint' => $request->route()?->getName(),
+                'endpoint' => $noted['endpoint'] ?? $request->route()?->getName(),
                 'status' => $response->getStatusCode(),
                 'error_code' => $error !== null ? mb_substr((string) $error, 0, 60) : null,
                 'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
                 'history_item_id' => is_numeric($historyItemId) ? (int) $historyItemId : null,
-                'credits' => is_numeric($response->headers->get('X-Credits-Used')) ? (int) $response->headers->get('X-Credits-Used') : null,
-                'characters' => is_numeric($response->headers->get('X-Character-Count')) ? (int) $response->headers->get('X-Character-Count') : null,
+                'credits' => is_numeric($credits) ? (int) $credits : null,
+                'characters' => is_numeric($characters) ? (int) $characters : null,
                 'replayed' => $response->headers->get('Idempotent-Replayed') === 'true',
                 'ip' => $request->ip(),
                 'user_agent' => mb_substr((string) $request->userAgent(), 0, 255) ?: null,

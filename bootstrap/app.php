@@ -103,6 +103,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 ? \App\Support\Api\ApiErrorRenderer::render($e, $request)
                 : null;
         });
+        // The MCP server (/mcp): the same refusals, as JSON-RPC errors.
+        $exceptions->render(function (\Throwable $e, Request $request) {
+            return \App\Mcp\McpErrors::appliesTo($request)
+                ? \App\Mcp\McpErrors::render($e, $request)
+                : null;
+        });
 
         // Stale CSRF tokens (mobile tab restored, back button, idle page) get a
         // retry instead of the bare "419 Page Expired" screen.

@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Services\Api\ApiSpeechService;
 use App\Support\Api\ApiScopes;
+use Illuminate\Support\Facades\Route;
 
 /**
  * What the site publishes so AI agents can find and use the developer API:
@@ -17,12 +18,20 @@ use App\Support\Api\ApiScopes;
  *   with the questions each answers;
  * - /auth.md: how an agent gets a key. A person makes it in the dashboard;
  *   there is no OAuth server and no self-registration, and nothing here says
- *   otherwise.
+ *   otherwise;
+ * - the MCP server at /mcp (routes/ai.php), once laravel/mcp is installed:
+ *   in each of the above, with its server card (App\Mcp\ServerCard).
  *
  * Kept in step with routes/v1.php and App\Support\Api\OpenApiSpec.
  */
 class AgentDiscovery
 {
+    /** Whether the MCP server is running here (its package is installed and its routes loaded). */
+    public static function mcpAvailable(): bool
+    {
+        return Route::has('mcp');
+    }
+
     public const SKILL = 'listen-text-to-speech';
 
     public const SKILLS_SCHEMA = 'https://schemas.agentskills.io/discovery/0.2.0/schema.json';
@@ -35,7 +44,7 @@ class AgentDiscovery
     /** @return array{linkset: list<array<string, mixed>>} */
     public static function apiCatalog(): array
     {
-        return ['linkset' => [[
+        $linkset = [[
             'anchor' => url('/v1'),
             'service-desc' => [['href' => url('/v1/openapi.json'), 'type' => 'application/vnd.oai.openapi+json']],
             'service-doc' => [
@@ -43,7 +52,21 @@ class AgentDiscovery
                 ['href' => url('/ar/developers'), 'type' => 'text/html', 'hreflang' => 'ar'],
             ],
             'status' => [['href' => url('/up'), 'type' => 'text/html']],
-        ]]];
+        ]];
+
+        if (self::mcpAvailable()) {
+            $linkset[] = [
+                'anchor' => url('/mcp'),
+                'service-desc' => [['href' => url('/mcp/server-card'), 'type' => 'application/mcp-server-card+json']],
+                'service-doc' => [
+                    ['href' => url('/en/developers').'#mcp', 'type' => 'text/html', 'hreflang' => 'en'],
+                    ['href' => url('/ar/developers').'#mcp', 'type' => 'text/html', 'hreflang' => 'ar'],
+                ],
+                'status' => [['href' => url('/up'), 'type' => 'text/html']],
+            ];
+        }
+
+        return ['linkset' => $linkset];
     }
 
     /**
@@ -74,6 +97,11 @@ class AgentDiscovery
                 $entry('api', 'text-to-speech', 'Listen text to speech API', 'application/vnd.oai.openapi+json', url('/v1/openapi.json'),
                     'Arabic and English text to speech over HTTP: voices, Arabic dialects, English accents, emotions, styles and two-voice dialogue. Needs an API key from a Listen account.',
                     ['turn Arabic text into speech in the Egyptian dialect', 'make an English voiceover with a British accent', 'list Arabic voices and dialects', 'generate a two-voice dialogue as audio']),
+                ...(self::mcpAvailable() ? [
+                    $entry('mcp', 'listen', 'Listen MCP server', 'application/mcp-server-card+json', url('/mcp/server-card'),
+                        'An MCP server for AI apps: list voices and dialects, make Arabic or English speech and get a link to play it. Signed in with a Listen API key.',
+                        ['make an Arabic voiceover from this script', 'read this text aloud in the Saudi dialect', 'how many Listen credits do I have left']),
+                ] : []),
                 $entry('skill', self::SKILL, 'Listen text to speech skill', 'text/markdown', url('/.well-known/agent-skills/'.self::SKILL.'/SKILL.md'),
                     self::skillDescription(),
                     ['how do I make Arabic speech with the Listen API', 'which headers does the Listen API need', 'how do I generate long Arabic audio in the background']),
@@ -95,6 +123,8 @@ class AgentDiscovery
         $guide = url('/en/developers');
         $skill = url('/.well-known/agent-skills/'.self::SKILL.'/SKILL.md');
         $scopes = implode("\n", array_map(static fn (string $scope): string => '  - `'.$scope.'`', ApiScopes::all()));
+        $mcp = self::mcpAvailable() ? "\n## MCP server\n\nAI apps that support MCP can connect to `".url('/mcp').'` (Streamable HTTP) with the same key, sent as `Authorization: Bearer <key>`. '
+            .'The tools a key shows are the ones its permissions allow. Server card: '.url('/mcp/server-card')."\n" : '';
 
         return <<<MD
 # Listen auth.md
@@ -116,7 +146,7 @@ A person, not the agent. There is no endpoint where an agent can create an accou
 - Permissions (scopes) a key can have:
 {$scopes}
 - A request the key is not allowed to make is refused with 403; a missing, wrong or revoked key gets 401.
-
+{$mcp}
 ## Keeping it safe
 
 - Never print, log or commit the key.
@@ -169,6 +199,9 @@ MD;
         $range = $voices > 0
             ? $voices.' voices, '.StudioFacts::arabicDialects().' Arabic dialects and '.StudioFacts::englishAccents().' English accents'
             : 'studio voices, Arabic dialects and English accents';
+        $mcp = self::mcpAvailable()
+            ? '- An app that supports MCP can connect to `'.url('/mcp').'` with the same key instead, sent as `Authorization: Bearer <key>`: its tools list voices, make speech and return a link to play it.'."\n"
+            : '';
 
         return <<<MD
 ---
@@ -191,7 +224,7 @@ Listen turns text into natural Arabic and English speech: {$range}, with emotion
 - Base URL: `{$base}`
 - Send the key as `X-Listen-Api-Key: <key>` or `Authorization: Bearer <key>`.
 - Every endpoint and field: `{$base}/openapi.json` (no key needed). Guide: {$guide}
-
+{$mcp}
 ## 1. Choose a voice
 
 ```bash
