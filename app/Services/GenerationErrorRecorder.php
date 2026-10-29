@@ -157,6 +157,9 @@ class GenerationErrorRecorder
             if ($type === 'api') {
                 return GenerationError::SOURCE_API;
             }
+            if ($type === 'mcp') {
+                return GenerationError::SOURCE_MCP;
+            }
         }
 
         return GenerationError::SOURCE_DASHBOARD;

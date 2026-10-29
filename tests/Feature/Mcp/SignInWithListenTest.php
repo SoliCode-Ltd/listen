@@ -2,11 +2,15 @@
 
 namespace Tests\Feature\Mcp;
 
+use App\Filament\Resources\AudioGenerationResource;
 use App\Models\ApiKey;
 use App\Models\ApiRequestLog;
+use App\Models\AudioGeneration;
 use App\Models\Plan;
 use App\Models\User;
 use App\Support\Credits;
+use App\Support\GenerationSource;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
@@ -111,11 +115,20 @@ class SignInWithListenTest extends TestCase
         $this->assertSame(Credits::forSeconds($this->audioSeconds), $this->keyCreditsSpent($connected));
         $this->assertSame(Credits::forSeconds($this->audioSeconds), $this->creditsSpent($user));
         $this->assertSame((int) $connected->id, (int) ApiRequestLog::query()->where('endpoint', 'mcp.text_to_speech')->sole()->api_key_id);
+        $made = AudioGeneration::query()->sole();
+        $this->assertSame(GenerationSource::MCP, $made->textItem->source_type);
 
         // The app renews its access without the member.
         $renewed = $this->post('/oauth/token', ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token'], 'client_id' => $clientId])->assertOk()->json();
         $this->mcp($renewed['access_token'], 'tools/list')->assertOk();
         $this->assertSame(1, ApiKey::query()->connectedApps()->count());
+
+        // Admin → Audio Generations names the app that made it.
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->get(AudioGenerationResource::getUrl('view', ['record' => $made]))
+            ->assertOk()
+            ->assertSee('AI app (MCP), signed in: Example AI');
     }
 
     public function test_disconnecting_an_app_ends_its_access_at_once(): void

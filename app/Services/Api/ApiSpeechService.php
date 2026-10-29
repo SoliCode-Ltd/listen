@@ -20,6 +20,7 @@ use App\Support\AudioEffects;
 use App\Support\AudioFormats;
 use App\Support\DialogueSpeakers;
 use App\Support\GeminiVocalTags;
+use App\Support\GenerationSource;
 use App\Support\PlanFeatures;
 use App\Support\PlanUsageGuard;
 use App\Support\SpeechLanguages;
@@ -153,6 +154,8 @@ class ApiSpeechService
             'dialogue_speakers' => $dialogue,
             'estimate' => $estimate,
             'output_format' => $format,
+            // Where it was asked for: the API, or an AI app through the MCP server (App\Mcp\McpCaller).
+            'source' => $request->attributes->get('listen_source') === GenerationSource::MCP ? GenerationSource::MCP : GenerationSource::API,
         ];
     }
 
@@ -233,7 +236,7 @@ class ApiSpeechService
             $recorded = $this->audioGenerationRecorder->createForUser(
                 $userId,
                 [
-                    'source_type' => 'api',
+                    'source_type' => $spec['source'] ?? GenerationSource::API,
                     'title' => $spec['title'],
                     'content' => $spec['text'],
                     'language' => $spec['source_language'],

@@ -2,7 +2,6 @@
 
 namespace App\Mcp\Servers;
 
-use App\Mcp\SpeechLinks;
 use App\Mcp\Tools\GetAccount;
 use App\Mcp\Tools\GetSpeech;
 use App\Mcp\Tools\GetVoiceOptions;
@@ -46,7 +45,6 @@ class ListenServer extends Server
 
     protected function boot(): void
     {
-        $days = SpeechLinks::DAYS;
         $perSecond = Credits::PER_SECOND;
 
         $this->instructions = <<<MD
@@ -55,7 +53,7 @@ class ListenServer extends Server
             To make speech:
             1. Call list_voices (filter by language) and choose a voice. Its language must match the text.
             2. If the person wants a dialect, accent, style or emotion, find its code with get_voice_options.
-            3. Call text_to_speech with the text exactly as it should be spoken. It returns a link the person can play or download for {$days} days: give them the link.
+            3. Call text_to_speech with the text exactly as it should be spoken. It returns a link the person can play or download, for as many days as their plan keeps audio history: give them the link.
             4. A long text may still be in progress: call get_speech with its history_item_id until it is completed.
 
             Every recording uses the person's Listen credits ({$perSecond} credits per second of audio), the same balance as the web studio. Make only the speech the person asked for, and check get_account before a long or repeated job.

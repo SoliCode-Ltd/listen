@@ -6,6 +6,7 @@ use App\Models\ApiKey;
 use App\Models\Plan;
 use App\Models\User;
 use App\Support\Api\ApiError;
+use App\Support\GenerationSource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -67,6 +68,8 @@ final class McpCaller
                 $call->attributes->set($attribute, $this->request->attributes->get($attribute));
             }
         }
+        // So what it makes is recorded as made by an AI app, not the API (App\Support\GenerationSource).
+        $call->attributes->set('listen_source', GenerationSource::MCP);
         $user = $this->user;
         $call->setUserResolver(static fn () => $user);
 

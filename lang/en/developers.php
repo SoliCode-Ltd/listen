@@ -193,7 +193,7 @@ return [
             'step1' => 'In the app\'s MCP settings, add a server that connects over HTTP, with this address.',
             'step2' => 'When the app asks, sign in with Listen and allow it. An app without sign-in takes an API key instead: create one in your dashboard and put it in the `Authorization` header, as in the example.',
             'step3' => 'Ask for what you need, for example: "Read this ad in Egyptian Arabic, in a warm voice."',
-            'note' => 'Every recording uses your credits, as in the studio, and is kept in your history. Links to recordings work for :days days; ask the app for a new link at any time. Apps you sign in to are listed in your dashboard, under Developer API, where you can disconnect them. Signing in needs a paid plan with the premium voices.',
+            'note' => 'Every recording uses your credits, as in the studio, and is kept in your history. Links to recordings work for as many days as your plan keeps your audio history; ask the app for a new link at any time. Apps you sign in to are listed in your dashboard, under Developer API, where you can disconnect them. Signing in needs a paid plan with the premium voices.',
             'tools_title' => 'Tools',
             'tools_body' => 'The app sees only the tools its key\'s permissions allow.',
             'tools' => [

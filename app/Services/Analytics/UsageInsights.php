@@ -5,6 +5,7 @@ namespace App\Services\Analytics;
 use App\Models\AudioGeneration;
 use App\Models\User;
 use App\Support\GenerationChoiceLabels;
+use App\Support\GenerationSource;
 use App\Support\VoiceTier;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -195,10 +196,11 @@ final class UsageInsights
     /** @return array<string, int> */
     private function sources(Builder $made): array
     {
-        $labels = ['message' => 'Studio', 'extension' => 'Browser extension', 'api' => 'Developer API'];
+        $labels = GenerationSource::labels();
+        // A key with no recorded source is the API's; an AI app (MCP) uses a key too.
         $rows = (clone $made)->toBase()
             ->leftJoin('text_items', 'text_items.id', '=', self::T.'text_item_id')
-            ->selectRaw('CASE WHEN '.self::T."api_key_id IS NOT NULL THEN 'api' ELSE COALESCE(text_items.source_type, '') END as choice, count(*) as n")
+            ->selectRaw("CASE WHEN text_items.source_type = '".GenerationSource::MCP."' THEN '".GenerationSource::MCP."' WHEN ".self::T."api_key_id IS NOT NULL THEN 'api' ELSE COALESCE(text_items.source_type, '') END as choice, count(*) as n")
             ->groupBy('choice')
             ->get();
 
