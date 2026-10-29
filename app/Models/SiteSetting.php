@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\SeoHelper;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
@@ -31,6 +32,9 @@ class SiteSetting extends Model
         );
 
         Cache::forget("site_setting.{$key}");
+        if (in_array($group, SeoHelper::SITEMAP_SETTING_GROUPS, true)) {
+            Cache::forget(SeoHelper::SITEMAP_CACHE);
+        }
     }
 
     /**
@@ -76,5 +80,8 @@ class SiteSetting extends Model
         }
 
         Cache::forget("site_settings_group.{$group}");
+        if (in_array($group, SeoHelper::SITEMAP_SETTING_GROUPS, true)) {
+            Cache::forget(SeoHelper::SITEMAP_CACHE);
+        }
     }
 }
