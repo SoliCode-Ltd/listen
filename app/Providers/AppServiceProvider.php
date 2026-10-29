@@ -41,6 +41,11 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         Cashier::ignoreRoutes();
+        // Installed now so one composer install on the servers covers the MCP server and
+        // "Sign in with Listen", which turns its routes on once its tables and keys exist.
+        if (class_exists(\Laravel\Passport\Passport::class)) {
+            \Laravel\Passport\Passport::ignoreRoutes();
+        }
         $this->app->bind(StripeTrialGateway::class, CashierStripeTrialGateway::class);
         $this->app->bind(\App\Services\Billing\StripePackGateway::class, \App\Services\Billing\CashierStripePackGateway::class);
         $this->app->bind(\App\Services\Billing\StripeCardUpdateGateway::class, \App\Services\Billing\CashierStripeCardUpdateGateway::class);
