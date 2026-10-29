@@ -9,6 +9,7 @@ use App\Models\TtsLog;
 use App\Support\AudioDuration;
 use App\Support\AudioUrl;
 use App\Support\GenerationChoiceLabels;
+use App\Support\GenerationSource;
 use App\Support\VoiceTier;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -16,6 +17,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 
 class AudioGenerationResource extends Resource
@@ -41,6 +43,10 @@ class AudioGenerationResource extends Resource
                             ->label('User Email')
                             ->disabled()
                             ->dehydrated(false),
+                        Forms\Components\Placeholder::make('source_label')
+                            ->label('Source')
+                            ->content(fn (?AudioGeneration $record): string => self::sourceSummary($record))
+                            ->visibleOn(['view', 'edit']),
                         Forms\Components\TextInput::make('text_item_id')
                             ->numeric(),
                         Forms\Components\TextInput::make('voice_name')
@@ -157,6 +163,8 @@ class AudioGenerationResource extends Resource
             // which made this page very slow.)
             ->description(fn (HasTable $livewire): string => 'Total audio length for these filters: '
                 .self::totalLengthLabel((int) $livewire->getFilteredTableQuery()->toBase()->reorder()->sum('duration_seconds')))
+            // Where each one was asked for, and with which key, without a query per row.
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['textItem:id,source_type', 'apiKey:id,name']))
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->sortable(),
@@ -165,6 +173,13 @@ class AudioGenerationResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->placeholder('-'),
+                Tables\Columns\TextColumn::make('source')
+                    ->label('Source')
+                    ->state(fn (AudioGeneration $record): string => GenerationSource::label($record->textItem?->source_type))
+                    ->badge()
+                    ->color(fn (AudioGeneration $record): string => GenerationSource::color($record->textItem?->source_type))
+                    ->description(fn (AudioGeneration $record): ?string => $record->apiKey ? 'Key: '.$record->apiKey->name : null)
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('voice_name')
                     ->label('Voice')
                     ->state(fn (AudioGeneration $record): array => GenerationChoiceLabels::spokenVoices($record))
@@ -223,6 +238,12 @@ class AudioGenerationResource extends Resource
                     ->sortable(),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('source')
+                    ->label('Source')
+                    ->options(GenerationSource::labels())
+                    ->query(fn (Builder $query, array $data): Builder => blank($data['value'] ?? null)
+                        ? $query
+                        : $query->whereHas('textItem', fn (Builder $text): Builder => $text->where('source_type', $data['value']))),
                 Tables\Filters\SelectFilter::make('status')
                     ->options(self::statusOptions()),
                 Tables\Filters\SelectFilter::make('voice_tier')
@@ -292,6 +313,18 @@ class AudioGenerationResource extends Resource
             VoiceTier::STANDARD => 'Standard',
             VoiceTier::HD => 'Premium (HD)',
         ];
+    }
+
+    /** "AI app (MCP), key "Claude"": where it was asked for, and with which key. */
+    private static function sourceSummary(?AudioGeneration $record): string
+    {
+        if (! $record) {
+            return '—';
+        }
+
+        $key = $record->apiKey;
+
+        return GenerationSource::label($record->textItem?->source_type).($key ? ', key "'.$key->name.'"' : '');
     }
 
     private static function dialogueSummary(?AudioGeneration $record): HtmlString

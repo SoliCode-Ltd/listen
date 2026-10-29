@@ -2,16 +2,22 @@
 
 namespace Tests\Feature\Mcp;
 
+use App\Filament\Resources\AudioGenerationResource;
+use App\Filament\Resources\AudioGenerationResource\Pages\ListAudioGenerations;
 use App\Jobs\GenerateAudioJob;
 use App\Models\ApiRequestLog;
 use App\Models\AudioGeneration;
 use App\Models\Plan;
+use App\Models\TextItem;
 use App\Models\User;
 use App\Support\Api\ApiScopes;
 use App\Support\Credits;
+use App\Support\GenerationSource;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
+use Livewire\Livewire;
 use Tests\Feature\Api\InteractsWithDeveloperApi;
 use Tests\TestCase;
 
@@ -111,6 +117,7 @@ class McpServerTest extends TestCase
         $this->assertSame('done', $generation->status);
         $this->assertSame((int) $key->id, (int) $generation->api_key_id);
         $this->assertSame('warm', $generation->emotion);
+        $this->assertSame(GenerationSource::MCP, $generation->textItem->source_type);
         $this->assertSame($credits, $this->creditsSpent($user));
         $this->assertSame($credits, $this->keyCreditsSpent($key));
 
@@ -202,6 +209,34 @@ class McpServerTest extends TestCase
             (string) $this->callTool($plain, 'get_speech', ['history_item_id' => $mine->id])->json('result.content.0.text'));
         $this->travel(400)->days();
         $this->get($speech['audio_url'])->assertOk();
+    }
+
+    /**
+     * Admin → Audio Generations tells apart what AI apps made from the
+     * studio, the extension and the API, with the key that made it.
+     */
+    public function test_the_admin_sees_where_each_recording_came_from(): void
+    {
+        $user = $this->member();
+        ['key' => $key, 'plain' => $plain] = $this->issueKey($user, null, null, 'Assistant key');
+        $this->callTool($plain, 'text_to_speech', ['text' => 'Made by an AI app.', 'voice_id' => self::voiceId($this->premiumVoice())])->assertJsonPath('result.isError', false);
+        $byApp = AudioGeneration::query()->sole();
+        $inStudio = $this->storedGeneration($user, ['text_item_id' => TextItem::create(['user_id' => $user->id, 'source_type' => GenerationSource::STUDIO, 'content' => 'Hi', 'status' => 'done'])->id]);
+        $inExtension = $this->storedGeneration($user, ['text_item_id' => TextItem::create(['user_id' => $user->id, 'source_type' => GenerationSource::EXTENSION, 'content' => 'Hi', 'status' => 'done'])->id]);
+
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(ListAudioGenerations::class)
+            ->assertSee(['AI app (MCP)', 'Key: Assistant key', 'Studio', 'Browser extension'])
+            ->filterTable('source', GenerationSource::MCP)
+            ->assertCanSeeTableRecords([$byApp])
+            ->assertCanNotSeeTableRecords([$inStudio, $inExtension]);
+
+        $this->get(AudioGenerationResource::getUrl('view', ['record' => $byApp]))
+            ->assertOk()
+            ->assertSee('AI app (MCP), key &quot;Assistant key&quot;', false);
+        $this->assertSame((int) $key->id, (int) $byApp->api_key_id);
     }
 
     public function test_refused_speech_is_a_tool_error_and_costs_nothing(): void
