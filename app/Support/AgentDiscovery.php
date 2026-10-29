@@ -16,9 +16,9 @@ use Illuminate\Support\Facades\Route;
  *   listed in an index with its SHA-256 digest;
  * - the ARD catalog at /.well-known/ai-catalog.json: every one of these,
  *   with the questions each answers;
- * - /auth.md: how an agent gets a key. A person makes it in the dashboard;
- *   there is no OAuth server and no self-registration, and nothing here says
- *   otherwise;
+ * - /auth.md: how an agent gets access. A person makes an API key in the
+ *   dashboard; on the MCP server an app can also "Sign in with Listen"
+ *   (OAuth, App\Mcp\SignInWithListen), which a person allows;
  * - the MCP server at /mcp (routes/ai.php), once laravel/mcp is installed:
  *   in each of the above, with its server card (App\Mcp\ServerCard).
  *
@@ -99,7 +99,7 @@ class AgentDiscovery
                     ['turn Arabic text into speech in the Egyptian dialect', 'make an English voiceover with a British accent', 'list Arabic voices and dialects', 'generate a two-voice dialogue as audio']),
                 ...(self::mcpAvailable() ? [
                     $entry('mcp', 'listen', 'Listen MCP server', 'application/mcp-server-card+json', url('/mcp/server-card'),
-                        'An MCP server for AI apps: list voices and dialects, make Arabic or English speech and get a link to play it. Signed in with a Listen API key.',
+                        'An MCP server for AI apps: list voices and dialects, make Arabic or English speech and get a link to play it. Sign in with Listen, or use a Listen API key.',
                         ['make an Arabic voiceover from this script', 'read this text aloud in the Saudi dialect', 'how many Listen credits do I have left']),
                 ] : []),
                 $entry('skill', self::SKILL, 'Listen text to speech skill', 'text/markdown', url('/.well-known/agent-skills/'.self::SKILL.'/SKILL.md'),
@@ -123,8 +123,31 @@ class AgentDiscovery
         $guide = url('/en/developers');
         $skill = url('/.well-known/agent-skills/'.self::SKILL.'/SKILL.md');
         $scopes = implode("\n", array_map(static fn (string $scope): string => '  - `'.$scope.'`', ApiScopes::all()));
-        $mcp = self::mcpAvailable() ? "\n## MCP server\n\nAI apps that support MCP can connect to `".url('/mcp').'` (Streamable HTTP) with the same key, sent as `Authorization: Bearer <key>`. '
-            .'The tools a key shows are the ones its permissions allow. Server card: '.url('/mcp/server-card')."\n" : '';
+        $mcp = '';
+        $who = 'Ask the person you work for to:';
+        if (self::mcpAvailable()) {
+            $site = rtrim(url('/'), '/');
+            $who = 'For the REST API, ask the person you work for to:';
+            $mcp = <<<MCP
+
+## MCP server
+
+AI apps that support MCP connect to `{$site}/mcp` (Streamable HTTP), in either of two ways:
+
+- With an API key, as above, sent as `Authorization: Bearer <key>`. The tools a key shows are the ones its permissions allow.
+- By signing in with Listen (OAuth 2.1). The app registers itself, then the person signs in on Listen and allows it. Paid plans with the premium voices only.
+
+Signing in with Listen:
+
+- A request without credentials gets 401 with a `WWW-Authenticate` header pointing to the protected resource metadata: {$site}/.well-known/oauth-protected-resource/mcp
+- Authorization server metadata: {$site}/.well-known/oauth-authorization-server
+- Dynamic client registration: `POST {$site}/oauth/register`. Clients are public (no secret). Redirect addresses must be https, http on localhost, or an app's own scheme.
+- Authorization code with PKCE (S256), scope `mcp:use`. Access tokens last an hour, refresh tokens 30 days.
+- The person sees which app asks and where it returns, and can disconnect it at any time in the dashboard. A connected app can make speech and read the voices, the history and the account. It cannot delete anything, and its tokens work on the MCP server only, not on `/v1`.
+- Server card: {$site}/mcp/server-card
+
+MCP;
+        }
 
         return <<<MD
 # Listen auth.md
@@ -133,7 +156,7 @@ How AI agents and the developers who run them get access to the Listen text to s
 
 ## Who registers
 
-A person, not the agent. There is no endpoint where an agent can create an account or a key for itself, and no OAuth sign-in. Ask the person you work for to:
+A person, not the agent: an agent cannot create a Listen account for itself. {$who}
 
 1. Create a Listen account at {$register} and choose a plan that includes the API.
 2. Open the dashboard's Developer API section and create an API key. Each key can be limited to some permissions and to a monthly number of credits.
@@ -200,7 +223,7 @@ MD;
             ? $voices.' voices, '.StudioFacts::arabicDialects().' Arabic dialects and '.StudioFacts::englishAccents().' English accents'
             : 'studio voices, Arabic dialects and English accents';
         $mcp = self::mcpAvailable()
-            ? '- An app that supports MCP can connect to `'.url('/mcp').'` with the same key instead, sent as `Authorization: Bearer <key>`: its tools list voices, make speech and return a link to play it.'."\n"
+            ? '- An app that supports MCP can connect to `'.url('/mcp').'` instead: it signs in with Listen (the person allows it) or sends the same key as `Authorization: Bearer <key>`. Its tools list voices, make speech and return a link to play it.'."\n"
             : '';
 
         return <<<MD

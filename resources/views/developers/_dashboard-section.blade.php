@@ -112,6 +112,10 @@
   .dapi-revoked summary { cursor: pointer; color: var(--muted); font-size: .9rem; font-weight: 600; }
   .dapi-revoked ul { list-style: none; margin: .5rem 0 0; padding: 0; }
   .dapi-revoked li { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: .5rem 0; border-bottom: 1px dashed color-mix(in oklab, var(--line) 70%, transparent); color: var(--muted); font-size: .88rem; }
+  .dapi-apps-intro { margin: -.4rem 0 1rem; color: var(--muted); font-size: .92rem; line-height: 1.55; }
+  .dapi-app { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+  .dapi-app > div { min-width: 0; }
+  .dapi-app-mark { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: color-mix(in oklab, var(--a) 8%, var(--surface)); color: var(--text); font-weight: 700; }
   .dapi-security { display: flex; gap: .65rem; align-items: flex-start; margin-top: .9rem; color: var(--muted); font-size: .88rem; line-height: 1.55; }
   .dapi-security svg { flex: none; width: 18px; height: 18px; margin-top: .1rem; fill: none; stroke: var(--a); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -406,6 +410,72 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z"/></svg>
           <span>{{ $k('security_body') }}</span>
         </p>
+      </article>
+    @endif
+
+    {{-- AI apps connected with "Sign in with Listen" (App\Mcp\ConnectedApps): each has a key of its own. --}}
+    @php
+      $c = fn (string $key, array $replace = []) => __('connect.'.$key, $replace);
+      $apps = $api['connected_apps'] ?? collect();
+      $appsStatus = $api['apps_status'] ?? null;
+    @endphp
+    @if($appsStatus !== null && ($appsStatus === \App\Support\Api\ApiPlanAccess::OK || $apps->isNotEmpty()))
+      <article class="page-card reveal dapi" id="developerApiApps">
+        <div class="dapi-keys-head">
+          <h2>{{ $c('apps_title') }} <small>{{ number_format($apps->count()) }}</small></h2>
+        </div>
+        <p class="dapi-apps-intro">{{ $c('apps_intro') }}</p>
+
+        <div class="dapi-list">
+          @forelse($apps as $connected)
+            @php
+              $appUsage = $api['month_usage']->get($connected->id);
+              $appCredits = (int) ($appUsage?->credits ?? 0);
+              $appRequests = (int) ($appUsage?->requests ?? 0);
+              $appLimit = $connected->monthly_credit_limit;
+            @endphp
+            <div class="dapi-key">
+              <div class="dapi-app">
+                <span class="dapi-app-mark" aria-hidden="true">{{ mb_strtoupper(mb_substr(trim((string) $connected->name) ?: '?', 0, 1)) }}</span>
+                <div>
+                  <span class="dapi-key-name">{{ $connected->name }}</span>
+                  <span class="dapi-key-mask">{{ $c('connected_on', ['date' => $date($connected->created_at)]) }}</span>
+                </div>
+              </div>
+              <div class="dapi-key-usage">
+                <div>{{ $appLimit ? $k('credits_of_limit', ['used' => number_format($appCredits), 'limit' => number_format($appLimit)]) : $k('credits_used', ['used' => number_format($appCredits)]) }}</div>
+                @if($appLimit)
+                  <div class="meter-track" aria-hidden="true"><div class="meter-fill" style="width: {{ min(100, $appCredits / max(1, $appLimit) * 100) }}%"></div></div>
+                @endif
+                <div>{{ $k('requests_count', ['count' => number_format($appRequests)]) }}</div>
+                <div>{{ $connected->last_used_at ? $k('last_used', ['time' => $connected->last_used_at->locale($locale)->diffForHumans()]) : $k('never') }}</div>
+              </div>
+              <div class="dapi-key-actions">
+                <button type="button" class="dapi-btn small" data-dapi-toggle="dapiEdit{{ $connected->id }}" aria-controls="dapiEdit{{ $connected->id }}" aria-expanded="false">{{ $k('edit') }}</button>
+                <form method="POST" action="{{ route('developers.keys.revoke', $connected) }}" data-dapi-confirm="{{ $c('disconnect_confirm') }}">
+                  @csrf
+                  @method('DELETE')
+                  <button type="submit" class="dapi-btn small danger">{{ $c('disconnect') }}</button>
+                </form>
+              </div>
+              <form method="POST" action="{{ route('developers.keys.update', $connected) }}" class="dapi-key-edit" id="dapiEdit{{ $connected->id }}" hidden>
+                @csrf
+                @method('PUT')
+                <div class="dapi-field">
+                  <label for="dapiName{{ $connected->id }}">{{ $k('name_label') }}</label>
+                  <input type="text" id="dapiName{{ $connected->id }}" name="name" maxlength="80" required value="{{ $connected->name }}">
+                </div>
+                <div class="dapi-field">
+                  <label for="dapiLimit{{ $connected->id }}">{{ $k('limit_label') }}</label>
+                  <input type="number" id="dapiLimit{{ $connected->id }}" name="monthly_credit_limit" min="1" step="1" inputmode="numeric" value="{{ $appLimit }}" placeholder="{{ $k('limit_placeholder') }}" dir="ltr">
+                </div>
+                <button type="submit" class="dapi-btn small primary">{{ $k('save') }}</button>
+              </form>
+            </div>
+          @empty
+            <p class="dapi-empty">{!! str_replace('@@', '<code data-code>'.e(url('/mcp')).'</code>', e($c('apps_empty', ['url' => '@@']))) !!}</p>
+          @endforelse
+        </div>
       </article>
     @endif
   </div>

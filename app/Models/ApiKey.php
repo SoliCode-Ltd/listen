@@ -89,6 +89,52 @@ class ApiKey extends Model
     }
 
     /**
+     * The key of an AI app the member connected with "Sign in with Listen"
+     * (App\Mcp\ConnectedApps). It has no plain value: the app signs in with
+     * its OAuth token, so it can never be sent as a key.
+     *
+     * @param  array<int, string>  $scopes
+     */
+    public static function forConnectedApp(User $user, string $name, string $oauthClientId, array $scopes): self
+    {
+        $key = new self([
+            'name' => mb_substr(trim($name), 0, 80) ?: 'AI app',
+            'scopes' => ApiScopes::normalize($scopes),
+        ]);
+        $key->forceFill([
+            'user_id' => $user->id,
+            'oauth_client_id' => $oauthClientId,
+            'key_hash' => self::hash('oauth:'.$oauthClientId.':'.Str::random(40)),
+            'last_four' => '',
+        ])->save();
+
+        return $key;
+    }
+
+    public function isConnectedApp(): bool
+    {
+        return $this->oauth_client_id !== null;
+    }
+
+    /**
+     * Keys made in the dashboard, not connected apps.
+     *
+     * @param  Builder<ApiKey>  $query
+     */
+    public function scopeIssued(Builder $query): void
+    {
+        $query->whereNull('oauth_client_id');
+    }
+
+    /**
+     * @param  Builder<ApiKey>  $query
+     */
+    public function scopeConnectedApps(Builder $query): void
+    {
+        $query->whereNotNull('oauth_client_id');
+    }
+
+    /**
      * The key for a plain value, when it exists and is not revoked.
      */
     public static function findActiveByPlain(string $plainKey): ?self
@@ -118,10 +164,10 @@ class ApiKey extends Model
         return ApiScopes::allows($this->scopes, $scope);
     }
 
-    /** What the member sees instead of the key: lsk_live_…abcd */
+    /** What the member sees instead of the key: lsk_live_…abcd (a connected app has no key to show). */
     public function maskedKey(): string
     {
-        return self::PREFIX.'…'.$this->last_four;
+        return $this->isConnectedApp() ? 'Sign in with Listen' : self::PREFIX.'…'.$this->last_four;
     }
 
     /** Credits this key spent in a credit period (App\Support\CreditPeriod key; default: its member's current one). */

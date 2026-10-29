@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mcp\ConnectedApps;
 use App\Models\ApiKey;
 use App\Models\Plan;
 use App\Models\User;
@@ -173,7 +174,7 @@ class DeveloperController extends Controller
         // The member's row is locked while counting, so parallel requests cannot pass the cap.
         $issued = DB::transaction(function () use ($user, $validated): ?array {
             User::query()->whereKey($user->id)->lockForUpdate()->first();
-            if (ApiKey::query()->where('user_id', $user->id)->active()->count() >= ApiKey::MAX_ACTIVE_PER_USER) {
+            if (ApiKey::query()->where('user_id', $user->id)->issued()->active()->count() >= ApiKey::MAX_ACTIVE_PER_USER) {
                 return null;
             }
 
@@ -222,6 +223,14 @@ class DeveloperController extends Controller
     public function revoke(Request $request, ApiKey $apiKey): RedirectResponse
     {
         $this->authorizeKey($request, $apiKey);
+
+        // A connected AI app loses its key and every token it holds.
+        if ($apiKey->isConnectedApp()) {
+            ConnectedApps::disconnect($apiKey);
+
+            return redirect()->to(self::section())->with('api_ok', __('connect.flash_disconnected'));
+        }
+
         $apiKey->revoke();
 
         return redirect()->to(self::section())->with('api_ok', __('developers.keys.flash_revoked'));

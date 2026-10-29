@@ -87,6 +87,11 @@ return Application::configure(basePath: dirname(__DIR__))
             before: \App\Http\Middleware\AuthenticateApiKey::class,
             prepend: \App\Http\Middleware\ApiRequestContext::class,
         );
+        // The MCP server (routes/ai.php) signs in with a key or an OAuth token, in the same place.
+        $middleware->prependToPriorityList(
+            before: \App\Http\Middleware\AuthenticateApiKey::class,
+            prepend: \App\Http\Middleware\AuthenticateMcp::class,
+        );
         // A friend opening a referral link is not signed in yet: the visit is recorded
         // (and the referral cookie set) before 'auth' sends them to sign in. Without
         // this, Laravel's priority order runs 'auth' first and the referral is lost.

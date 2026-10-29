@@ -41,11 +41,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         Cashier::ignoreRoutes();
-        // Installed now so one composer install on the servers covers the MCP server and
-        // "Sign in with Listen", which turns its routes on once its tables and keys exist.
-        if (class_exists(\Laravel\Passport\Passport::class)) {
-            \Laravel\Passport\Passport::ignoreRoutes();
-        }
+        \App\Mcp\SignInWithListen::register();
         $this->app->bind(StripeTrialGateway::class, CashierStripeTrialGateway::class);
         $this->app->bind(\App\Services\Billing\StripePackGateway::class, \App\Services\Billing\CashierStripePackGateway::class);
         $this->app->bind(\App\Services\Billing\StripeCardUpdateGateway::class, \App\Services\Billing\CashierStripeCardUpdateGateway::class);
@@ -92,6 +88,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, \App\Services\Geo\UserCountryRecorder::class);
+
+        // "Sign in with Listen" for AI apps on the MCP server.
+        \App\Mcp\SignInWithListen::configure();
 
         // No "All" in admin tables: 5,000 audio rows on one page is ~160 MB of
         // HTML and runs PHP out of memory. A saved "All" choice is dropped by
