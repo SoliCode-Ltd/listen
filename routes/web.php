@@ -141,8 +141,9 @@ Route::get('/llms.txt', function () {
         ->header('Content-Type', 'text/plain; charset=UTF-8');
 })->name('llms');
 
-// AI agents: the API catalog (RFC 9727) and the agent skill for the developer API, listed in
-// the skills index with its digest (App\Support\AgentDiscovery).
+// AI agents: the API catalog (RFC 9727), the agent skill for the developer API (listed in the
+// skills index with its digest), the ARD catalog of all of these, and auth.md, which says how
+// a person gets an agent its key (App\Support\AgentDiscovery).
 Route::get('/.well-known/api-catalog', function () {
     return response()->json(AgentDiscovery::apiCatalog(), 200, [
         'Content-Type' => 'application/linkset+json; profile="'.AgentDiscovery::CATALOG_PROFILE.'"',
@@ -166,6 +167,21 @@ Route::get('/.well-known/agent-skills/'.AgentDiscovery::SKILL.'/SKILL.md', funct
         'Cache-Control' => 'public, max-age=3600',
     ]);
 })->name('agents.skill');
+
+Route::get('/.well-known/ai-catalog.json', function () {
+    return response()->json(AgentDiscovery::aiCatalog(), 200, [
+        'Access-Control-Allow-Origin' => '*',
+        'Cache-Control' => 'public, max-age=3600',
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+})->name('agents.ai-catalog');
+
+Route::get('/auth.md', function () {
+    return response(AgentDiscovery::authMarkdown(), 200, [
+        'Content-Type' => 'text/markdown; charset=UTF-8',
+        'Access-Control-Allow-Origin' => '*',
+        'Cache-Control' => 'public, max-age=3600',
+    ]);
+})->name('agents.auth');
 
 Route::get('/site.webmanifest', function () {
     return response()->json(

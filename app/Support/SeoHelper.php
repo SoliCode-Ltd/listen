@@ -792,6 +792,7 @@ class SeoHelper
             ...$agents(self::AI_TRAINING_CRAWLERS),
             'Disallow: /',
             '',
+            'Agentmap: ' . url('/.well-known/ai-catalog.json'),
             'Sitemap: ' . url('/sitemap.xml'),
         ]);
     }
@@ -877,6 +878,7 @@ class SeoHelper
             '- Any public page can be read as Markdown: request it with the header Accept: text/markdown.',
             "- Developer API: OpenAPI description at {$base}/v1/openapi.json, API catalog at {$base}/.well-known/api-catalog.",
             "- Agent skill for making speech with the API: {$base}/.well-known/agent-skills/index.json",
+            "- Everything agents can use here (ARD catalog): {$base}/.well-known/ai-catalog.json; how to get an API key: {$base}/auth.md",
             "- Sitemap: {$base}/sitemap.xml",
         ]));
     }
@@ -1571,11 +1573,13 @@ class SeoHelper
 
     public static function llmsDiscoveryTag(): string
     {
+        // The ARD catalog of what agents can use here (App\Support\AgentDiscovery).
+        $catalog = '<link rel="ai-catalog" href="' . e(url('/.well-known/ai-catalog.json')) . '">';
         if (! self::llmsTxtEnabled()) {
-            return '';
+            return $catalog;
         }
 
-        return '<link rel="alternate" type="text/plain" title="LLMs" href="' . e(url('/llms.txt')) . '">';
+        return '<link rel="alternate" type="text/plain" title="LLMs" href="' . e(url('/llms.txt')) . '">' . "\n" . $catalog;
     }
 
     public static function faviconMetaTags(): string

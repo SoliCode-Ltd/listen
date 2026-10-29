@@ -157,4 +157,58 @@ class AgentReadyTest extends TestCase
             $this->assertStringNotContainsString($left, $markdown);
         }
     }
+
+    public function test_the_ard_catalog_lists_what_agents_can_use(): void
+    {
+        $response = $this->get('/.well-known/ai-catalog.json')->assertOk()->assertHeader('Access-Control-Allow-Origin', '*');
+        $this->assertStringStartsWith('application/json', (string) $response->headers->get('Content-Type'));
+
+        $catalog = $response->json();
+        $this->assertNotSame('', $catalog['specVersion']);
+        $this->assertNotSame('', $catalog['host']['displayName']);
+        $this->assertNotSame('', $catalog['host']['identifier']);
+        $domain = (string) parse_url(url('/'), PHP_URL_HOST);
+        foreach ($catalog['entries'] as $entry) {
+            $this->assertStringStartsWith("urn:air:{$domain}:", $entry['identifier']);
+            $this->assertNotSame('', $entry['displayName']);
+            $this->assertNotSame('', $entry['type']);
+            // Exactly one of url or data.
+            $this->assertTrue(isset($entry['url']) xor isset($entry['data']), $entry['identifier']);
+            $this->assertGreaterThanOrEqual(2, count($entry['representativeQueries']));
+            $this->assertLessThanOrEqual(5, count($entry['representativeQueries']));
+            $this->get((string) parse_url($entry['url'], PHP_URL_PATH))->assertOk();
+        }
+
+        $this->assertStringContainsString('Agentmap: '.url('/.well-known/ai-catalog.json'), $this->get('/robots.txt')->getContent());
+        $this->assertStringContainsString('<link rel="ai-catalog" href="'.url('/.well-known/ai-catalog.json').'">', $this->getLocalizedRoute('home')->getContent());
+    }
+
+    public function test_auth_md_says_a_person_makes_the_key_and_how_to_send_it(): void
+    {
+        $response = $this->get('/auth.md')->assertOk();
+        $this->assertStringStartsWith('text/markdown', (string) $response->headers->get('Content-Type'));
+
+        $markdown = $response->getContent();
+        $this->assertMatchesRegularExpression('/^# .*auth\.md/m', $markdown);
+        $this->assertStringContainsString('no OAuth sign-in', $markdown);
+        $this->assertStringContainsString('X-Listen-Api-Key', $markdown);
+        foreach (\App\Support\Api\ApiScopes::all() as $scope) {
+            $this->assertStringContainsString('`'.$scope.'`', $markdown);
+        }
+        // Nothing claims an OAuth server or an MCP server we do not run.
+        $this->get('/.well-known/oauth-authorization-server')->assertNotFound();
+        $this->get('/.well-known/mcp/server-card.json')->assertNotFound();
+    }
+
+    public function test_pages_offer_their_tools_to_agents_in_the_browser(): void
+    {
+        $page = $this->getLocalizedRoute('pricing')->assertOk()->getContent();
+        $this->assertStringContainsString('<script id="listen-webmcp">', $page);
+        $this->assertStringContainsString("name: 'listen_read_page'", $page);
+        $this->assertStringContainsString("name: 'listen_open_page'", $page);
+
+        $contact = $this->getLocalizedRoute('contact')->assertOk()->getContent();
+        $this->assertStringContainsString('toolname="listen_contact"', $contact);
+        $this->assertSame(4, substr_count($contact, 'toolparamdescription='));
+    }
 }
