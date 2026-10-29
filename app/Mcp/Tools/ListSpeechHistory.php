@@ -24,7 +24,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
  */
 #[Name('list_speech_history')]
 #[Title('List recent speech')]
-#[Description('List the person\'s recent Listen recordings, newest first, with links to play the finished ones (valid for '.SpeechLinks::DAYS.' days). Includes recordings made in the web studio.')]
+#[Description('List the person\'s recent Listen recordings, newest first, with links to play the finished ones (they work for as many days as their plan keeps audio history). Includes recordings made in the web studio.')]
 #[IsReadOnly]
 #[IsIdempotent]
 #[IsOpenWorld(false)]
@@ -58,7 +58,8 @@ class ListSpeechHistory extends ListenTool
             'before' => $input['before'] ?? null,
         ]));
 
-        $items = array_map(static fn (array $item): array => SpeechLinks::withLink($item), (array) $page['history']);
+        $days = SpeechLinks::daysFor($caller->user);
+        $items = array_map(static fn (array $item): array => SpeechLinks::withLink($item, $days), (array) $page['history']);
         $lines = array_map(static fn (array $item): string => '- #'.$item['history_item_id'].' '.($item['created_at'] ?? '').' '.$item['status']
             .($item['duration_seconds'] !== null ? ', '.$item['duration_seconds'].' s' : '')
             .($item['voice_name'] !== null ? ', '.$item['voice_name'] : '')

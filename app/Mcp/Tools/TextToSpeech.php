@@ -41,7 +41,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
  */
 #[Name('text_to_speech')]
 #[Title('Make speech')]
-#[Description('Turn Arabic or English text into speech with a Listen voice. Returns a link the person can play or download for '.SpeechLinks::DAYS.' days. Uses the account\'s credits: '.Credits::PER_SECOND.' credits per second of audio. Pick voice_id with list_voices first; dialect, style and emotion codes come from get_voice_options.')]
+#[Description('Turn Arabic or English text into speech with a Listen voice. Returns a link the person can play or download, for as many days as their plan keeps audio history. Uses the account\'s credits: '.Credits::PER_SECOND.' credits per second of audio. Pick voice_id with list_voices first; dialect, style and emotion codes come from get_voice_options.')]
 #[IsReadOnly(false)]
 #[IsDestructive(false)]
 #[IsIdempotent(false)]
@@ -122,7 +122,7 @@ class TextToSpeech extends ListenTool
             return Response::error('generation_failed: '.rtrim((string) ($item['error']['message'] ?? 'Voice generation failed.'), '.').'. No credits were charged. You can try again.');
         }
 
-        $speech = SpeechLinks::withLink($item) + ['credits_remaining' => self::creditsRemaining($generation, $caller)];
+        $speech = SpeechLinks::withLink($item, SpeechLinks::daysFor($caller->user)) + ['credits_remaining' => self::creditsRemaining($generation, $caller)];
 
         if ($item['status'] !== 'completed') {
             return Response::make([Response::text(implode("\n", [
@@ -138,7 +138,7 @@ class TextToSpeech extends ListenTool
                 name: SpeechLinks::fileName($historyItemId, $generation->audio_path),
                 mimeType: SpeechLinks::mimeType($generation->audio_path),
                 title: SpeechSummary::title($speech),
-                description: 'Speech made with Listen. The link works for '.SpeechLinks::DAYS.' days.',
+                description: 'Speech made with Listen; '.SpeechLinks::lasts($speech['audio_url_expires_at']).'.',
             ),
         ])->withStructuredContent($speech);
     }

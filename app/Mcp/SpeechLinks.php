@@ -2,29 +2,52 @@
 
 namespace App\Mcp;
 
+use App\Models\User;
 use App\Support\AudioFormats;
+use App\Support\VideoDubbing;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 
 /**
  * Links to a member's finished speech that anyone holding them can play or
- * download, for a week: the MCP server hands them to the AI assistant, which
- * shows them to the person. A link is signed, so it cannot be changed to
- * reach another recording, and a new one can be asked for at any time.
+ * download: the MCP server hands them to the AI assistant, which shows them
+ * to the person. A link works for as many days as the member's plan keeps
+ * their audio history (daysFor), and a new one can be asked for at any time.
+ * It is signed, so it cannot be changed to reach another recording.
  */
 final class SpeechLinks
 {
-    public const DAYS = 7;
-
-    /** @return array{url: string, expires_at: string} */
-    public static function sign(int $historyItemId): array
+    /**
+     * Days a link works: the member's plan's audio history (Admin → Plans →
+     * Recent Voices Retention, "Audio history" on the pricing page), as for
+     * their dubbed videos. 0: the plan keeps it always, so the link has no end.
+     */
+    public static function daysFor(User $user): int
     {
-        $expires = Carbon::now()->addDays(self::DAYS);
+        return VideoDubbing::keepDaysFor((int) $user->id);
+    }
+
+    /** @return array{url: string, expires_at: string|null} */
+    public static function sign(int $historyItemId, int $days): array
+    {
+        if ($days <= 0) {
+            return ['url' => URL::signedRoute('mcp.audio', ['generation' => $historyItemId]), 'expires_at' => null];
+        }
+
+        $expires = Carbon::now()->addDays($days);
 
         return [
             'url' => URL::temporarySignedRoute('mcp.audio', $expires, ['generation' => $historyItemId]),
             'expires_at' => $expires->toIso8601String(),
         ];
+    }
+
+    /** How long a link works, in words the assistant can pass on. */
+    public static function lasts(?string $expiresAt): string
+    {
+        return $expiresAt === null
+            ? 'the link has no end date'
+            : 'the link works until '.Carbon::parse($expiresAt)->utc()->format('j F Y');
     }
 
     /**
@@ -33,11 +56,12 @@ final class SpeechLinks
      * needs the key).
      *
      * @param  array<string, mixed>  $item
+     * @param  int  $days  daysFor() the member
      * @return array<string, mixed>
      */
-    public static function withLink(array $item): array
+    public static function withLink(array $item, int $days): array
     {
-        $link = ($item['audio_url'] ?? null) !== null ? self::sign((int) $item['history_item_id']) : null;
+        $link = ($item['audio_url'] ?? null) !== null ? self::sign((int) $item['history_item_id'], $days) : null;
         $item['audio_url'] = $link['url'] ?? null;
         $item['audio_url_expires_at'] = $link['expires_at'] ?? null;
 

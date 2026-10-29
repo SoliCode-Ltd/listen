@@ -192,7 +192,7 @@
               <li>{!! $t('mcp.step2') !!}</li>
               <li>{!! $t('mcp.step3') !!}</li>
             </ol>
-            <p class="docs-note">{!! $t('mcp.note', [], ['days' => \App\Mcp\SpeechLinks::DAYS]) !!}</p>
+            <p class="docs-note">{!! $t('mcp.note') !!}</p>
             <h4>{{ $plain('mcp.tools_title') }}</h4>
             <p>{{ $plain('mcp.tools_body') }}</p>
             <dl class="docs-params">

@@ -164,20 +164,44 @@ class McpServerTest extends TestCase
         $this->assertSame(Credits::forSeconds($this->audioSeconds), $this->creditsSpent($user));
     }
 
-    public function test_a_link_opens_only_its_own_recording_and_only_for_a_week(): void
+    public function test_a_link_opens_only_its_own_recording_and_only_while_the_plan_keeps_audio(): void
     {
         $user = $this->member();
         $plain = $this->issueKey($user)['plain'];
         $mine = $this->storedGeneration($user);
         $other = $this->storedGeneration($this->member());
 
-        $link = $this->callTool($plain, 'get_speech', ['history_item_id' => $mine->id])->json('result.structuredContent.audio_url');
+        // The plan keeps audio history for 7 days, so the link works for 7 days.
+        $speech = $this->callTool($plain, 'get_speech', ['history_item_id' => $mine->id])->json('result');
+        $link = $speech['structuredContent']['audio_url'];
+        $this->assertSame(now()->addDays(7)->toIso8601String(), $speech['structuredContent']['audio_url_expires_at']);
+        $this->assertStringContainsString('the link works until '.now()->addDays(7)->utc()->format('j F Y'), $speech['content'][0]['text']);
         $this->get($link)->assertOk();
         $this->get(str_replace('/mcp/audio/'.$mine->id, '/mcp/audio/'.$other->id, $link))->assertForbidden();
         $this->get(strtok($link, '?'))->assertForbidden();
 
         $this->travel(8)->days();
         $this->get($link)->assertForbidden();
+
+        // A plan that keeps audio for 30 days: 30 days.
+        $this->plan->update(['recent_voices_days' => 30]);
+        $link = $this->callTool($plain, 'get_speech', ['history_item_id' => $mine->id])->json('result.structuredContent.audio_url');
+        $this->travel(29)->days();
+        $this->get($link)->assertOk();
+        $this->travel(2)->days();
+        $this->get($link)->assertForbidden();
+
+        // A plan that keeps audio always: the link has no end date.
+        $this->travelBack();
+        $this->plan->update(['recent_voices_days' => 0]);
+        $speech = $this->callTool($plain, 'list_speech_history')->assertJsonPath('result.isError', false)->json('result.structuredContent.history.0');
+        $this->assertSame((int) $mine->id, $speech['history_item_id']);
+        $this->assertNull($speech['audio_url_expires_at']);
+        $this->assertStringNotContainsString('expires=', $speech['audio_url']);
+        $this->assertStringContainsString('the link has no end date',
+            (string) $this->callTool($plain, 'get_speech', ['history_item_id' => $mine->id])->json('result.content.0.text'));
+        $this->travel(400)->days();
+        $this->get($speech['audio_url'])->assertOk();
     }
 
     public function test_refused_speech_is_a_tool_error_and_costs_nothing(): void

@@ -18,7 +18,7 @@ final class SpeechSummary
 
         return implode("\n", [
             'Done: '.(int) $speech['duration_seconds'].' seconds of speech'.($speech['voice_name'] !== null ? ' with '.$speech['voice_name'] : '').$dialect.'.',
-            'Play or download it (the link works for '.SpeechLinks::DAYS.' days): '.$speech['audio_url'],
+            'Play or download it ('.SpeechLinks::lasts($speech['audio_url_expires_at'] ?? null).'): '.$speech['audio_url'],
             'History item '.$speech['history_item_id'].'. Credits used: '.number_format((int) $speech['credits_used']).'.'
                 .(isset($speech['credits_remaining']) ? ' Credits left: '.number_format((int) $speech['credits_remaining']).'.' : ''),
         ]);

@@ -193,7 +193,7 @@ return [
             'step1' => 'Create a key in your dashboard for the app. Give it only the permissions it needs, and a monthly credit limit if you want to cap what it spends.',
             'step2' => 'In the app\'s MCP settings, add a server that connects over HTTP, with this address and the key in the `Authorization` header, as in the example.',
             'step3' => 'Ask for what you need, for example: "Read this ad in Egyptian Arabic, in a warm voice."',
-            'note' => 'Every recording uses your credits, as in the studio, and is kept in your history. Links to recordings work for :days days; ask the app for a new link at any time.',
+            'note' => 'Every recording uses your credits, as in the studio, and is kept in your history. Links to recordings work for as many days as your plan keeps your audio history; ask the app for a new link at any time.',
             'tools_title' => 'Tools',
             'tools_body' => 'The app sees only the tools its key\'s permissions allow.',
             'tools' => [

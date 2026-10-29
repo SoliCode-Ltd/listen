@@ -24,7 +24,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
  */
 #[Name('get_speech')]
 #[Title('Get speech')]
-#[Description('Check on speech made earlier, by its history_item_id: whether it is ready, and a fresh link to play or download it (valid for '.SpeechLinks::DAYS.' days). Use it when text_to_speech said the speech was still being made, or when an old link has expired.')]
+#[Description('Check on speech made earlier, by its history_item_id: whether it is ready, and a fresh link to play or download it (it works for as many days as their plan keeps audio history). Use it when text_to_speech said the speech was still being made, or when an old link has expired.')]
 #[IsReadOnly]
 #[IsIdempotent]
 #[IsOpenWorld(false)]
@@ -46,7 +46,7 @@ class GetSpeech extends ListenTool
     protected function run(Request $request, McpCaller $caller): Response|ResponseFactory
     {
         $id = (string) (int) $request->validate(['history_item_id' => ['required', 'integer', 'min:1']])['history_item_id'];
-        $item = SpeechLinks::withLink($caller->call(HistoryController::class, 'show', 'GET', '/history/'.$id, [], [$id]));
+        $item = SpeechLinks::withLink($caller->call(HistoryController::class, 'show', 'GET', '/history/'.$id, [], [$id]), SpeechLinks::daysFor($caller->user));
         $caller->log($this->name(), ['history_item_id' => (int) $id]);
 
         $text = match ($item['status']) {
@@ -62,7 +62,7 @@ class GetSpeech extends ListenTool
                 name: SpeechLinks::fileName((int) $id, $path),
                 mimeType: SpeechLinks::mimeType($path),
                 title: SpeechSummary::title($item),
-                description: 'Speech made with Listen. The link works for '.SpeechLinks::DAYS.' days.');
+                description: 'Speech made with Listen; '.SpeechLinks::lasts($item['audio_url_expires_at']).'.');
         }
 
         return Response::make($contents)->withStructuredContent($item);
