@@ -1280,7 +1280,7 @@
 
     @if($trackPlans->count() >= 2)
       {{-- The calculator: the minutes a month the visitor needs, on a voice track, and the plan that fits. --}}
-      <section class="calc" aria-labelledby="studioTitle">
+      <section class="calc" aria-labelledby="studioTitle" data-markdown="skip">
         <h2 class="section-title" id="studioTitle"><label for="studioMinutes">{{ __('ui.pricing.minutes_label') }}</label></h2>
         <div class="studio" id="studio" data-plans="{{ json_encode($trackPlans) }}" data-i18n="{{ json_encode($studioI18n) }}">
           <div class="studio-mixer">

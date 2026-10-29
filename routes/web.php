@@ -13,8 +13,10 @@ use App\Http\Controllers\MediaController;
 use App\Http\Controllers\NewsletterUnsubscribeController;
 use App\Http\Controllers\VoiceCloningController;
 use App\Models\SiteSetting;
+use App\Support\AgentDiscovery;
 use App\Support\SeoHelper;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
 
@@ -59,51 +61,57 @@ Route::middleware('auth')->get('/admin-drive/google/connect', [\App\Http\Control
 Route::middleware('auth')->get('/admin-drive/google/callback', [\App\Http\Controllers\AdminDriveController::class, 'callback'])
     ->name('admin.drive.callback');
 
-// SEO: Sitemap
+// SEO: Sitemap. Building it reads every public page (about 170 addresses) and takes seconds,
+// longer than search engines and AI crawlers wait, so the finished file is kept for an hour
+// (or until a setting changes).
 Route::get('/sitemap.xml', function () {
-    $dom = new \DOMDocument('1.0', 'UTF-8');
-    $dom->formatOutput = true;
+    $xml = Cache::remember(SeoHelper::SITEMAP_CACHE, now()->addHour(), function (): string {
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $dom->formatOutput = true;
 
-    $xsl = $dom->createProcessingInstruction('xml-stylesheet', 'type="text/xsl" href="/sitemap.xsl"');
-    $dom->appendChild($xsl);
+        $xsl = $dom->createProcessingInstruction('xml-stylesheet', 'type="text/xsl" href="/sitemap.xsl"');
+        $dom->appendChild($xsl);
 
-    $urlset = $dom->createElementNS('http://www.sitemaps.org/schemas/sitemap/0.9', 'urlset');
-    $urlset->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:xhtml', 'http://www.w3.org/1999/xhtml');
-    $dom->appendChild($urlset);
+        $urlset = $dom->createElementNS('http://www.sitemaps.org/schemas/sitemap/0.9', 'urlset');
+        $urlset->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:xhtml', 'http://www.w3.org/1999/xhtml');
+        $dom->appendChild($urlset);
 
-    foreach (SeoHelper::publicSitemapEntries() as $entry) {
-        $urlNode = $dom->createElement('url');
-        $urlset->appendChild($urlNode);
+        foreach (SeoHelper::publicSitemapEntries() as $entry) {
+            $urlNode = $dom->createElement('url');
+            $urlset->appendChild($urlNode);
 
-        $locNode = $dom->createElement('loc');
-        $locNode->appendChild($dom->createTextNode((string) $entry['url']));
-        $urlNode->appendChild($locNode);
+            $locNode = $dom->createElement('loc');
+            $locNode->appendChild($dom->createTextNode((string) $entry['url']));
+            $urlNode->appendChild($locNode);
 
-        foreach ((array) ($entry['alternates'] ?? []) as $locale => $alternateUrl) {
-            $alternateNode = $dom->createElementNS('http://www.w3.org/1999/xhtml', 'xhtml:link');
-            $alternateNode->setAttribute('rel', 'alternate');
-            $alternateNode->setAttribute('hreflang', (string) $locale);
-            $alternateNode->setAttribute('href', (string) $alternateUrl);
-            $urlNode->appendChild($alternateNode);
+            foreach ((array) ($entry['alternates'] ?? []) as $locale => $alternateUrl) {
+                $alternateNode = $dom->createElementNS('http://www.w3.org/1999/xhtml', 'xhtml:link');
+                $alternateNode->setAttribute('rel', 'alternate');
+                $alternateNode->setAttribute('hreflang', (string) $locale);
+                $alternateNode->setAttribute('href', (string) $alternateUrl);
+                $urlNode->appendChild($alternateNode);
+            }
+
+            $lastmodNode = $dom->createElement('lastmod');
+            $lastmodValue = $entry['lastmod'] instanceof Carbon
+                ? $entry['lastmod']->toAtomString()
+                : Carbon::parse((string) $entry['lastmod'])->toAtomString();
+            $lastmodNode->appendChild($dom->createTextNode($lastmodValue));
+            $urlNode->appendChild($lastmodNode);
+
+            $changeFreqNode = $dom->createElement('changefreq');
+            $changeFreqNode->appendChild($dom->createTextNode((string) $entry['change_frequency']));
+            $urlNode->appendChild($changeFreqNode);
+
+            $priorityNode = $dom->createElement('priority');
+            $priorityNode->appendChild($dom->createTextNode(number_format((float) $entry['priority'], 1, '.', '')));
+            $urlNode->appendChild($priorityNode);
         }
 
-        $lastmodNode = $dom->createElement('lastmod');
-        $lastmodValue = $entry['lastmod'] instanceof Carbon
-            ? $entry['lastmod']->toAtomString()
-            : Carbon::parse((string) $entry['lastmod'])->toAtomString();
-        $lastmodNode->appendChild($dom->createTextNode($lastmodValue));
-        $urlNode->appendChild($lastmodNode);
+        return (string) $dom->saveXML();
+    });
 
-        $changeFreqNode = $dom->createElement('changefreq');
-        $changeFreqNode->appendChild($dom->createTextNode((string) $entry['change_frequency']));
-        $urlNode->appendChild($changeFreqNode);
-
-        $priorityNode = $dom->createElement('priority');
-        $priorityNode->appendChild($dom->createTextNode(number_format((float) $entry['priority'], 1, '.', '')));
-        $urlNode->appendChild($priorityNode);
-    }
-
-    return response($dom->saveXML(), 200, [
+    return response($xml, 200, [
         'Content-Type' => 'application/xml; charset=UTF-8',
         'X-Content-Type-Options' => 'nosniff',
     ]);
@@ -132,6 +140,32 @@ Route::get('/llms.txt', function () {
     return response(SeoHelper::llmsTxtContent() . "\n", 200)
         ->header('Content-Type', 'text/plain; charset=UTF-8');
 })->name('llms');
+
+// AI agents: the API catalog (RFC 9727) and the agent skill for the developer API, listed in
+// the skills index with its digest (App\Support\AgentDiscovery).
+Route::get('/.well-known/api-catalog', function () {
+    return response()->json(AgentDiscovery::apiCatalog(), 200, [
+        'Content-Type' => 'application/linkset+json; profile="'.AgentDiscovery::CATALOG_PROFILE.'"',
+        'Link' => '<'.url('/.well-known/api-catalog').'>; rel="api-catalog"',
+        'Access-Control-Allow-Origin' => '*',
+        'Cache-Control' => 'public, max-age=3600',
+    ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+})->name('agents.api-catalog');
+
+Route::get('/.well-known/agent-skills/index.json', function () {
+    return response()->json(AgentDiscovery::skillsIndex(), 200, [
+        'Access-Control-Allow-Origin' => '*',
+        'Cache-Control' => 'public, max-age=3600',
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+})->name('agents.skills');
+
+Route::get('/.well-known/agent-skills/'.AgentDiscovery::SKILL.'/SKILL.md', function () {
+    return response(AgentDiscovery::skillMarkdown(), 200, [
+        'Content-Type' => 'text/markdown; charset=UTF-8',
+        'Access-Control-Allow-Origin' => '*',
+        'Cache-Control' => 'public, max-age=3600',
+    ]);
+})->name('agents.skill');
 
 Route::get('/site.webmanifest', function () {
     return response()->json(

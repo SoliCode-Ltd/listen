@@ -101,7 +101,7 @@
         </div>
       @endif
       @if($yearlySaves)
-        <div class="price-original-row is-yearly">
+        <div class="price-original-row is-yearly" data-markdown="skip">
           <s class="price-original" dir="ltr">{{ $fullMonthlyFormatted }}</s>
         </div>
       @endif
