@@ -13,6 +13,12 @@ name: Server deploy
 #            environments and download formats) when the host has none.
 #   migrate: lists the pending migrations, then runs them (php artisan
 #            migrate --force). Only when the owner asks; deploy first.
+#   composer: installs the packages composer.lock lists (composer install;
+#            without the development tools unless the server already has them),
+#            makes the "Sign in with Listen" keys once (passport:keys, never
+#            replaced; readable like .env), then rebuilds the caches as deploy
+#            does. Only when the owner asks, after a deploy whose inspect said
+#            composer.lock changed.
 #   indexnow: tells Bing, Yandex, Naver and Seznam about every public page
 #            (php artisan seo:indexnow). Run on live after a deploy that adds pages.
 #   queue:   shows how the queue workers run, then makes sure a job is never
@@ -115,7 +121,7 @@ name: Server deploy
 #            stays on staging for the next runs; dub "clean" removes it. It uses
 #            the speech quota staging shares with live (about 25 requests a
 #            run): only when the owner has said yes.
-# New migrations and composer.lock changes are reported, not run.
+# New migrations and composer.lock changes are reported, not run (see migrate and composer).
 
 on:
   workflow_dispatch:
@@ -126,7 +132,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -212,7 +218,7 @@ jobs:
             done < server.txt
           fi
           echo "New or changed migrations:"; grep '^database/migrations/' diff.txt || echo "  none"
-          echo "composer.lock:"; grep -q '^composer.lock' diff.txt && echo "  CHANGED: run composer install by hand" || echo "  same"
+          echo "composer.lock:"; grep -q '^composer.lock' diff.txt && echo "  CHANGED: after the deploy, run this workflow with mode composer" || echo "  same"
           echo "ffmpeg (sound environments, download formats):"
           $S "$FIND; bash -s" <<'REMOTE' || true
           f="$(command -v ffmpeg || true)"; [ -x storage/app/bin/ffmpeg ] && f="$f storage/app/bin/ffmpeg"
@@ -223,6 +229,51 @@ jobs:
           if [ "$MODE" = migrate ]; then
             $S "$FIND; php artisan migrate:status --pending 2>/dev/null || php artisan migrate:status | grep -i pending || true"
             $S "$FIND; php artisan migrate --force"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = composer ]; then
+            # In bash with pipefail, so anything that fails stops here and fails the run.
+            $S "$FIND; bash -s" <<'REMOTE'
+          set -euo pipefail
+          # One step: its last lines when it works, all of its output and a FAILED line when it does not.
+          step() {
+            local lines="$1" out; shift
+            if ! out="$("$@" 2>&1)"; then
+              printf '%s\n' "$out"; echo "COMPOSER FAILED at: $*"; exit 1
+            fi
+            printf '%s\n' "$out" | tail -n "$lines"
+          }
+          # Which caches the server uses, noted first: composer's own scripts clear them (filament:upgrade).
+          c=0; [ -f bootstrap/cache/config.php ] && c=1
+          r=0; [ -f bootstrap/cache/routes-v7.php ] && r=1
+          composer=composer; command -v composer >/dev/null 2>&1 || composer="php $HOME/composer.phar"
+          # The development tools stay only on a server that already has them.
+          dev=--no-dev; grep -q '"dev": true' vendor/composer/installed.json 2>/dev/null && dev=
+          echo "== composer install ${dev:-(with the development tools, as before)} =="
+          step 15 $composer install $dev --no-interaction --prefer-dist --optimize-autoloader
+          # "Sign in with Listen" keys: made once and never replaced (new keys would sign every
+          # member's connected apps out). The web server reads them as it reads .env.
+          if php artisan list --raw 2>/dev/null | grep '^passport:keys' >/dev/null; then
+            if [ -f storage/oauth-private.key ]; then
+              echo "Sign-in keys: already there, kept"
+            else
+              step 1 php artisan passport:keys
+              chgrp --reference=.env storage/oauth-private.key storage/oauth-public.key 2>/dev/null || true
+              chmod 640 storage/oauth-private.key storage/oauth-public.key
+              echo "Sign-in keys: made"
+            fi
+            ls -l storage/oauth-private.key storage/oauth-public.key .env | awk '{print "  "$1" "$3":"$4" "$NF}'
+          fi
+          # Then the caches, as deploy rebuilds them (never the app cache; routes only with route:trans:cache).
+          step 6 php artisan optimize:clear --except=cache
+          step 1 php artisan route:trans:clear
+          if [ "$c" = 1 ]; then step 1 php artisan config:cache; fi
+          if [ "$r" = 1 ]; then step 1 php artisan route:trans:cache; fi
+          step 1 php artisan view:cache
+          php artisan queue:restart | tail -1 || true
+          echo "COMPOSER DONE"
+          REMOTE
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
