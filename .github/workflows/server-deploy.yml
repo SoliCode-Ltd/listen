@@ -129,6 +129,10 @@ name: Server deploy
 #            with the run (scripts/support/voice_design_test.php). It uses the
 #            speech quota staging shares with live (7 requests for 3 takes): only
 #            when the owner has said yes. Needs mode migrate first.
+#   voice-design-log: read-only. The last 30 "Voice design:" lines of the app's
+#            logs (what the speech service said when a design or a delete failed:
+#            the key's name, the reason and the service's own words; never a
+#            description or a member).
 # New migrations and composer.lock changes are reported, not run (see migrate and composer).
 # The "Run over SSH" script must stay under GitHub's 21,000-character limit for one
 # step (tests/Feature/ServerDeployWorkflowTest.php): longer remote work goes in
@@ -143,7 +147,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test, voice-design-log]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -535,6 +539,11 @@ jobs:
             ls -l voice-design-test
             rm -f ~/.ssh/id_deploy
             exit "$failed"
+          fi
+          if [ "$MODE" = voice-design-log ]; then
+            $S "$FIND; grep -h 'Voice design:' \$(ls -t storage/logs/*.log 2>/dev/null | head -3) 2>/dev/null | tail -n 30 | cut -c1-700" || echo "No Voice Design lines in the logs."
+            rm -f ~/.ssh/id_deploy
+            exit 0
           fi
           if [ "$MODE" != deploy ]; then exit 0; fi
           $S "$FIND; cat > storage/app/listen-deploy/bundle.tgz" < bundle.tgz
