@@ -198,6 +198,9 @@ jobs:
           MEMBER: ${{ inputs.member }}
           DUB: ${{ inputs.dub }}
           DESIGN: ${{ inputs.design }}
+          # What is deployed, as a variable: the script below must hold no ${{ }}
+          # of its own, or GitHub reads all of it as one expression (21,000 at most).
+          DEPLOY_REF: ${{ inputs.target == 'live' && 'main' || github.ref_name }}
           LIVE_HOST: ${{ secrets.LIVE_SSH_HOST }}
           LIVE_USER: ${{ secrets.LIVE_SSH_USER }}
           LIVE_KEY: ${{ secrets.LIVE_SSH_KEY }}
@@ -220,7 +223,7 @@ jobs:
           tool() { git fetch -q --depth=1 origin "$GITHUB_SHA" && git show "$GITHUB_SHA:scripts/support/$1"; }
           $S "$FIND; mkdir -p storage/app/listen-deploy"
           $S "$FIND; cat > storage/app/listen-deploy/manifest.md5" < manifest.md5
-          echo "== Files that differ from ${{ inputs.target == 'live' && 'main' || github.ref_name }} (or are missing) =="
+          echo "== Files that differ from $DEPLOY_REF (or are missing) =="
           $S "$FIND; md5sum -c --quiet storage/app/listen-deploy/manifest.md5 2>/dev/null | sed 's/: FAILED open or read/  (missing)/; s/: FAILED$/  (changed)/' | grep -v '^md5sum' | sort" | tee diff.txt || true
           echo "== $(wc -l < diff.txt) file(s) =="
           # Where each of those came from: when it last changed on the server, and whether it is main's copy.
@@ -536,7 +539,7 @@ jobs:
           if [ "$MODE" != deploy ]; then exit 0; fi
           $S "$FIND; cat > storage/app/listen-deploy/bundle.tgz" < bundle.tgz
           # In bash with pipefail, so anything that fails stops the deploy and fails the run.
-          $S "$FIND; bash -s" <<'REMOTE'
+          $S "$FIND; DEPLOY_REF='$DEPLOY_REF' bash -s" <<'REMOTE'
           set -euo pipefail
           trap 'rm -f storage/app/listen-deploy/bundle.tgz' EXIT
           # One artisan step: its last lines when it works, all of its output (artisan
@@ -562,7 +565,7 @@ jobs:
           if [ "$r" = 1 ]; then step 1 route:trans:cache; fi
           step 1 view:cache
           php artisan queue:restart | tail -1 || true
-          md5sum -c --quiet storage/app/listen-deploy/manifest.md5 >/dev/null 2>&1 && echo 'DEPLOYED: every file matches ${{ inputs.target == 'live' && 'main' || github.ref_name }}' || echo 'WARNING: some files still differ'
+          md5sum -c --quiet storage/app/listen-deploy/manifest.md5 >/dev/null 2>&1 && echo "DEPLOYED: every file matches $DEPLOY_REF" || echo 'WARNING: some files still differ'
           REMOTE
           rm -f ~/.ssh/id_deploy
       - name: Keep the test dub with the run
