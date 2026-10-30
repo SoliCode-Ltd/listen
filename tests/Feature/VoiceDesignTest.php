@@ -458,7 +458,8 @@ class VoiceDesignTest extends TestCase
     public function test_the_examples_command_records_each_character_and_deletes_its_voice(): void
     {
         $dir = public_path(VoiceDesign::EXAMPLES_DIR);
-        $before = glob($dir.'/*.mp3') ?: [];
+        // The real clip, committed with the code, is put back afterwards.
+        $real = is_file($dir.'/evil_ogre.mp3') ? file_get_contents($dir.'/evil_ogre.mp3') : null;
         $this->fakeEngine();
 
         try {
@@ -474,9 +475,7 @@ class VoiceDesignTest extends TestCase
             // The card now plays it, and picking the character can too.
             $this->assertContains('evil_ogre', array_column(VoiceDesign::showcase(), 'key'));
         } finally {
-            if (! in_array($dir.'/evil_ogre.mp3', $before, true)) {
-                @unlink($dir.'/evil_ogre.mp3');
-            }
+            $real !== null ? file_put_contents($dir.'/evil_ogre.mp3', $real) : @unlink($dir.'/evil_ogre.mp3');
         }
     }
 
