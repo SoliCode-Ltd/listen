@@ -742,16 +742,57 @@ class SeoHelper
     }
 
     /**
-     * Default robots.txt.
+     * Where the built sitemap is kept (routes/web.php). A changed SEO or video dubbing
+     * setting can add or hide a page, so changing one lets it go (App\Models\SiteSetting).
+     */
+    public const SITEMAP_CACHE = 'seo.sitemap_xml';
+
+    public const SITEMAP_SETTING_GROUPS = ['seo', 'video_dubbing'];
+
+    /** Crawlers that only collect pages to train AI models: kept out. */
+    public const AI_TRAINING_CRAWLERS = [
+        'GPTBot', 'ClaudeBot', 'anthropic-ai', 'CCBot', 'Applebot-Extended',
+        'Bytespider', 'meta-externalagent', 'cohere-training-data-crawler',
+    ];
+
+    /** AI search and assistant crawlers, which read pages to answer people: welcome. */
+    public const AI_ANSWER_CRAWLERS = [
+        'OAI-SearchBot', 'ChatGPT-User', 'Claude-SearchBot', 'Claude-User',
+        'PerplexityBot', 'Perplexity-User',
+    ];
+
+    /** Search engines and AI answers may use the pages; training AI models on them may not (contentsignals.org). */
+    public const CONTENT_SIGNAL = 'search=yes, ai-input=yes, ai-train=no';
+
+    /**
+     * Default robots.txt: everyone may read the public pages, with the content
+     * signal saying how; crawlers that only gather training data are kept out,
+     * and AI search and assistants are named so they know they are welcome.
      */
     public static function defaultRobotsTxt(): string
     {
+        $private = ['Disallow: /admin', 'Disallow: /livewire/'];
+        $agents = static fn (array $names): array => array_map(static fn (string $name): string => 'User-agent: ' . $name, $names);
+
         return implode("\n", [
+            '# Search engines and AI assistants may read and quote these pages.',
+            '# They may not be used to train AI models.',
             'User-agent: *',
+            'Content-Signal: ' . self::CONTENT_SIGNAL,
             'Allow: /',
-            'Disallow: /admin',
-            'Disallow: /livewire/',
+            ...$private,
             '',
+            '# AI search and assistants, answering people.',
+            ...$agents(self::AI_ANSWER_CRAWLERS),
+            'Content-Signal: ' . self::CONTENT_SIGNAL,
+            'Allow: /',
+            ...$private,
+            '',
+            '# Crawlers that only collect pages to train AI models.',
+            ...$agents(self::AI_TRAINING_CRAWLERS),
+            'Disallow: /',
+            '',
+            'Agentmap: ' . url('/.well-known/ai-catalog.json'),
             'Sitemap: ' . url('/sitemap.xml'),
         ]);
     }
@@ -834,6 +875,13 @@ class SeoHelper
             '## Notes for AI agents',
             '- Prefer canonical URLs from this domain.',
             '- English pages live under /en and Arabic pages under /ar; they are language alternates, not duplicates.',
+            '- Any public page can be read as Markdown: request it with the header Accept: text/markdown.',
+            "- Developer API: OpenAPI description at {$base}/v1/openapi.json, API catalog at {$base}/.well-known/api-catalog.",
+            "- Agent skill for making speech with the API: {$base}/.well-known/agent-skills/index.json",
+        ], AgentDiscovery::mcpAvailable() ? [
+            "- MCP server for AI apps: {$base}/mcp (Streamable HTTP; sign in with Listen, or use a Listen API key); server card at {$base}/mcp/server-card",
+        ] : [], [
+            "- Everything agents can use here (ARD catalog): {$base}/.well-known/ai-catalog.json; how to get an API key: {$base}/auth.md",
             "- Sitemap: {$base}/sitemap.xml",
         ]));
     }
@@ -1528,11 +1576,13 @@ class SeoHelper
 
     public static function llmsDiscoveryTag(): string
     {
+        // The ARD catalog of what agents can use here (App\Support\AgentDiscovery).
+        $catalog = '<link rel="ai-catalog" href="' . e(url('/.well-known/ai-catalog.json')) . '">';
         if (! self::llmsTxtEnabled()) {
-            return '';
+            return $catalog;
         }
 
-        return '<link rel="alternate" type="text/plain" title="LLMs" href="' . e(url('/llms.txt')) . '">';
+        return '<link rel="alternate" type="text/plain" title="LLMs" href="' . e(url('/llms.txt')) . '">' . "\n" . $catalog;
     }
 
     public static function faviconMetaTags(): string

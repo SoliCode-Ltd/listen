@@ -2,12 +2,14 @@
 
 namespace App\Services\Api;
 
+use App\Mcp\McpAccess;
 use App\Models\ApiKey;
 use App\Models\ApiKeyUsage;
 use App\Models\BillingSubscription;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\PlanAccessService;
+use App\Support\AgentDiscovery;
 use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiPlanAccess;
 use App\Support\CreditPeriod;
@@ -75,8 +77,12 @@ class ApiAccountSummary
             // (a plan paid by hand or given by the team, or a renewal not paid during
             // its grace days), the box says until when it runs.
             'plan_ends' => $credit['grace_ends_at'] !== null || self::planEndsWithPeriod($userId, $credit),
-            'active_keys' => $keys->whereNull('revoked_at')->values(),
-            'revoked_keys' => $keys->whereNotNull('revoked_at')->take(10)->values(),
+            // Keys made in the dashboard; AI apps connected with "Sign in with Listen" are listed apart.
+            'active_keys' => $keys->whereNull('revoked_at')->whereNull('oauth_client_id')->values(),
+            'revoked_keys' => $keys->whereNotNull('revoked_at')->whereNull('oauth_client_id')->take(10)->values(),
+            'connected_apps' => $keys->whereNull('revoked_at')->whereNotNull('oauth_client_id')->values(),
+            // Whether this member may connect AI apps (App\Mcp\McpAccess), when the MCP server runs here.
+            'apps_status' => AgentDiscovery::mcpAvailable() ? McpAccess::statusFor($userId, $plan) : null,
             'month_usage' => $monthUsage,
             'api_requests' => (int) $monthUsage->sum('requests'),
             'api_credits' => $apiCredits,

@@ -123,14 +123,12 @@ class DiscountTermsTest extends TestCase
             ->assertDontSee('your first year')
             // On yearly, each plan's usual monthly price is struck through beside its yearly price.
             ->assertSee('class="price-original-row is-yearly"', false)
-            ->assertSee('class="plan-pick-was"', false)
-            ->assertSee('class="plan-pick is-first-month"', false)
             ->assertSee('30% off')
-            // A week left: a timer, days : hours : minutes : seconds, each with its unit.
-            ->assertSee('class="offer-ends"', false)
-            ->assertSee('Offer ends in 7 days')
-            ->assertSee('<b>07</b><small>days</small>', false)
-            ->assertSee('<b>00</b><small>sec</small>', false);
+            // The comparison table shows the offer under the plan's price too.
+            ->assertSee('class="compare-plan-offer"', false)
+            // The label ends with the offer's last day; there is no countdown.
+            ->assertSee('<span class="offer-until">Until 27 Oct</span>', false)
+            ->assertDontSee('class="offer-ends"', false);
 
         Carbon::setTestNow();
     }
@@ -154,23 +152,46 @@ class DiscountTermsTest extends TestCase
         $this->assertNull($coupon->invoke(app(BillingController::class), $plan, 'yearly'));
     }
 
-    public function test_the_last_day_of_an_offer_counts_down(): void
+    public function test_an_offer_ending_at_midnight_shows_the_day_before(): void
     {
         Carbon::setTestNow('2026-10-20 12:00:00');
         Plan::factory()->create(['slug' => 'free', 'name' => 'Free', 'price_cents' => 0, 'is_active' => true]);
         Plan::factory()->create([
             'slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'is_active' => true,
-            'discount_percentage' => 10, 'discount_ends_at' => now()->addHours(5),
+            'discount_percentage' => 10, 'discount_ends_at' => Carbon::parse('2026-10-31 00:00:00'),
         ]);
 
+        // It ends as 31 October starts, so the last day to buy is the 30th.
         $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
             ->get($this->localizedRoute('pricing'))
             ->assertOk()
-            ->assertSee('class="offer-ends"', false)
-            // The last day: hours : minutes : seconds, no days.
-            ->assertSee('<b>05</b><small>hrs</small>', false)
-            ->assertDontSee('<small>days</small>', false)
-            ->assertSee('Offer ends in 5 hours');
+            ->assertSee('<span class="offer-until">Until 30 Oct</span>', false)
+            ->assertDontSee('Until 31 Oct');
+
+        Carbon::setTestNow();
+    }
+
+    public function test_offers_that_end_on_different_days_show_each_plans_own_day(): void
+    {
+        Carbon::setTestNow('2026-10-20 12:00:00');
+        Plan::factory()->create(['slug' => 'free', 'name' => 'Free', 'price_cents' => 0, 'is_active' => true]);
+        Plan::factory()->create([
+            'slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'is_active' => true,
+            'discount_percentage' => 30, 'discount_ends_at' => now()->addDays(3),
+        ]);
+        Plan::factory()->create([
+            'slug' => 'pro', 'name' => 'Pro', 'price_cents' => 4900, 'is_active' => true,
+            'discount_percentage' => 20, 'discount_ends_at' => now()->addDays(5),
+        ]);
+
+        $html = $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
+            ->get($this->localizedRoute('pricing'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertSame(2, substr_count($html, 'class="offer-until"'));
+        $this->assertStringContainsString('<span class="offer-until">Until 23 Oct</span>', $html);
+        $this->assertStringContainsString('<span class="offer-until">Until 25 Oct</span>', $html);
 
         Carbon::setTestNow();
     }
@@ -193,8 +214,7 @@ class DiscountTermsTest extends TestCase
             ->assertOk()
             ->assertSee('class="offer-label"', false)
             ->assertSee('خصم 10% على أول شهرين')
-            // Two months off: the price stays "a month"; the button says what is off.
-            ->assertDontSee('class="plan-pick is-first-month"', false)
+            // The button says what is off.
             ->assertSee('احصل على خصم 10%');
     }
 

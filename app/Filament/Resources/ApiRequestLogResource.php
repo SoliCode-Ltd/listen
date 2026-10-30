@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ApiRequestLogResource\Pages;
+use App\Mcp\Servers\ListenServer;
 use App\Models\ApiRequestLog;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -88,6 +89,9 @@ class ApiRequestLogResource extends Resource
                     ->options(fn (): array => collect(\Illuminate\Support\Facades\Route::getRoutes()->getRoutes())
                         ->map(fn (Route $route): ?string => $route->getName())
                         ->filter(fn (?string $name): bool => is_string($name) && str_starts_with($name, 'v1.'))
+                        // And the MCP server's tools (each call is logged as mcp.<tool>).
+                        ->merge(\Illuminate\Support\Facades\Route::has('mcp')
+                            ? array_map(fn (string $tool): string => 'mcp.'.$tool, ListenServer::toolNames()) : [])
                         ->unique()->sort()->mapWithKeys(fn (string $name): array => [$name => $name])->all()),
                 Tables\Filters\SelectFilter::make('error_code')->label('Error')
                     ->options(fn (): array => ApiRequestLog::query()->whereNotNull('error_code')->distinct()->orderBy('error_code')->pluck('error_code', 'error_code')->all()),

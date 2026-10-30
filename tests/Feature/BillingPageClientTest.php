@@ -149,6 +149,56 @@ class BillingPageClientTest extends TestCase
         $this->assertStringNotContainsString('$', $price[1]);
     }
 
+    public function test_a_new_plan_and_a_pack_can_be_paid_with_a_phone_wallet(): void
+    {
+        // A visitor outside Egypt, where card is the only way to pay.
+        SiteSetting::set('pricing_forced_country_code', 'SA', 'billing');
+
+        // Stripe's wallet button above the card boxes, in the page's language.
+        $billing = $this->billingPage('ar')
+            ->assertViewHas('walletPay', true)
+            ->assertSee('<div class="wallet-pay" id="wallet" hidden>', false)
+            ->assertSee(__('ui.billing.wallet_or_card', [], 'ar'))
+            ->assertSee("elements.create('expressCheckout', {", false)
+            // Apple Pay in every desktop browser (paid from an iPhone), Google Pay in Safari and Firefox
+            // too, but an iPhone or iPad gets Apple Pay only.
+            ->assertSee("paymentMethods: { applePay: 'always', googlePay: appleTouch ? 'never' : 'always', link: 'never', paypal: 'never', amazonPay: 'never', klarna: 'never' },", false)
+            ->assertSee("var appleTouch = /iPhone|iPad|iPod/.test(navigator.userAgent || '')", false)
+            // Both wallets side by side on a wide screen, one under the other on a phone, never in a menu.
+            ->assertSee("layout: { maxColumns: narrow ? 1 : 2, overflow: 'never' },", false)
+            // Logos only: the wallets' own words would be in their fonts, not the site's.
+            ->assertSee("buttonType: { applePay: 'plain', googlePay: 'plain' },", false)
+            // The buttons speak the page's language.
+            ->assertSee("locale: String(document.documentElement.lang || '').toLowerCase().indexOf('ar') === 0 ? 'ar' : 'en',", false)
+            // It is shown the US dollar amount charged today, never on a trial.
+            ->assertSee("if (!selected || selected.method !== 'stripe' || isTrialCheckout()) return null;", false)
+            ->assertSee("if (String(selected.meta?.charge_currency || '').toUpperCase() !== 'USD' || !(amount > 0)) return null;", false)
+            // Its card pays through the same steps as the card boxes, purchase conversion included.
+            ->assertSee('leaving = await subscribeByCard(charge.selected, paymentMethod, true);', false)
+            ->assertSee('leaving = await subscribeByCard(selected, paymentMethod, saveCardCheckbox ? saveCardCheckbox.checked : true);', false)
+            ->assertSee("if (paymentInFlight || !charge || !paymentMethod) return;", false)
+            // Made even when the page opens on a trial or on InstaPay, so it can show once card is picked.
+            ->assertSee("const walletStartCents = Number(currentPlan()?.payment_methods?.stripe?.[String(cycleSelect?.value || 'monthly')]?.base_usd_cents || 0);", false);
+        $this->assertMatchesRegularExpression('/\p{Arabic}/u', __('ui.billing.wallet_or_card', [], 'ar'));
+        // Outside Egypt the card is the only way to pay: no choice of one, and the card panel is headed instead.
+        $this->assertMatchesRegularExpression('/<div class="payment-methods"\s+hidden\s*>/', (string) $billing->getContent());
+        $billing->assertSee(__('ui.billing.pay_title', [], 'ar'))->assertSee(__('ui.billing.pay_secure', [], 'ar'));
+        // The page's words never name the card processor.
+        $visible = strip_tags((string) preg_replace('#<(script|style)\b[^>]*>.*?</\1>#s', '', (string) $billing->getContent()));
+        $this->assertDoesNotMatchRegularExpression('/Stripe|سترايب/u', $visible);
+        // The page's own words never name the wallets.
+        $this->assertDoesNotMatchRegularExpression('/apple pay|google pay/i', strip_tags((string) $billing->getContent()));
+
+        $this->pack();
+        $this->actingAs(User::factory()->create(['subscription_status_checked_at' => now()]))
+            ->getLocalizedRoute('billing.pack')->assertOk()
+            ->assertSee('<div class="wallet-pay" id="pack-wallet" hidden>', false)
+            ->assertSee("window.ListenWalletButton(stripe, 'pack-wallet', {", false)
+            ->assertSee("mode: 'payment',\n        amount: 200,", false)
+            ->assertSee('await payWithCard(paymentMethodId);', false)
+            ->assertSee('await payWithCard(method.paymentMethod.id);', false);
+    }
+
     public function test_the_pack_page_keeps_pay_off_while_the_bank_processes_and_without_stripe_js(): void
     {
         $this->pack();

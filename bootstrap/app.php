@@ -55,6 +55,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\EnsureUserIsNotBlocked::class,
             \App\Http\Middleware\CaptureAdClickId::class,
             \App\Http\Middleware\SecurityHeaders::class,
+            \App\Http\Middleware\ServePagesToAgents::class,
         ]);
 
         $middleware->alias([
@@ -86,6 +87,11 @@ return Application::configure(basePath: dirname(__DIR__))
             before: \App\Http\Middleware\AuthenticateApiKey::class,
             prepend: \App\Http\Middleware\ApiRequestContext::class,
         );
+        // The MCP server (routes/ai.php) signs in with a key or an OAuth token, in the same place.
+        $middleware->prependToPriorityList(
+            before: \App\Http\Middleware\AuthenticateApiKey::class,
+            prepend: \App\Http\Middleware\AuthenticateMcp::class,
+        );
         // A friend opening a referral link is not signed in yet: the visit is recorded
         // (and the referral cookie set) before 'auth' sends them to sign in. Without
         // this, Laravel's priority order runs 'auth' first and the referral is lost.
@@ -100,6 +106,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (\Throwable $e, Request $request) {
             return \App\Support\Api\ApiErrorRenderer::appliesTo($request)
                 ? \App\Support\Api\ApiErrorRenderer::render($e, $request)
+                : null;
+        });
+        // The MCP server (/mcp): the same refusals, as JSON-RPC errors.
+        $exceptions->render(function (\Throwable $e, Request $request) {
+            return \App\Mcp\McpErrors::appliesTo($request)
+                ? \App\Mcp\McpErrors::render($e, $request)
                 : null;
         });
 

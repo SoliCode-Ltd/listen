@@ -476,6 +476,12 @@ final class ApiDocs
             ),
             'quickstart' => self::highlighted(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId.'?output_format=mp3', $ttsBody, 'speech.mp3')),
             'env' => CodeHighlighter::html('export LISTEN_API_KEY="lsk_live_..."', 'bash'),
+            // How an AI app is pointed at the MCP server (routes/ai.php), in the settings shape most of them read.
+            'mcp_config' => CodeHighlighter::html($json(['mcpServers' => ['listen' => [
+                'type' => 'http',
+                'url' => url('/mcp'),
+                'headers' => ['Authorization' => 'Bearer lsk_live_...'],
+            ]]]), 'json'),
             'auth' => CodeHighlighter::html(
                 "curl \"{$baseUrl}/user/subscription\" \\\n  -H \"X-Listen-Api-Key: \$LISTEN_API_KEY\"\n\n# or\ncurl \"{$baseUrl}/user/subscription\" \\\n  -H \"Authorization: Bearer \$LISTEN_API_KEY\"",
                 'bash',

@@ -13,6 +13,12 @@ name: Server deploy
 #            environments and download formats) when the host has none.
 #   migrate: lists the pending migrations, then runs them (php artisan
 #            migrate --force). Only when the owner asks; deploy first.
+#   composer: installs the packages composer.lock lists (composer install;
+#            without the development tools unless the server already has them),
+#            makes the "Sign in with Listen" keys once (passport:keys, never
+#            replaced; readable like .env), then rebuilds the caches as deploy
+#            does. Only when the owner asks, after a deploy whose inspect said
+#            composer.lock changed.
 #   indexnow: tells Bing, Yandex, Naver and Seznam about every public page
 #            (php artisan seo:indexnow). Run on live after a deploy that adds pages.
 #   queue:   shows how the queue workers run, then makes sure a job is never
@@ -115,7 +121,10 @@ name: Server deploy
 #            stays on staging for the next runs; dub "clean" removes it. It uses
 #            the speech quota staging shares with live (about 25 requests a
 #            run): only when the owner has said yes.
-# New migrations and composer.lock changes are reported, not run.
+# New migrations and composer.lock changes are reported, not run (see migrate and composer).
+# The "Run over SSH" script must stay under GitHub's 21,000-character limit for one
+# step (tests/Feature/ServerDeployWorkflowTest.php): longer remote work goes in
+# scripts/support/ and is sent with tool().
 
 on:
   workflow_dispatch:
@@ -126,7 +135,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -212,7 +221,7 @@ jobs:
             done < server.txt
           fi
           echo "New or changed migrations:"; grep '^database/migrations/' diff.txt || echo "  none"
-          echo "composer.lock:"; grep -q '^composer.lock' diff.txt && echo "  CHANGED: run composer install by hand" || echo "  same"
+          echo "composer.lock:"; grep -q '^composer.lock' diff.txt && echo "  CHANGED: after the deploy, run this workflow with mode composer" || echo "  same"
           echo "ffmpeg (sound environments, download formats):"
           $S "$FIND; bash -s" <<'REMOTE' || true
           f="$(command -v ffmpeg || true)"; [ -x storage/app/bin/ffmpeg ] && f="$f storage/app/bin/ffmpeg"
@@ -223,6 +232,12 @@ jobs:
           if [ "$MODE" = migrate ]; then
             $S "$FIND; php artisan migrate:status --pending 2>/dev/null || php artisan migrate:status | grep -i pending || true"
             $S "$FIND; php artisan migrate --force"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = composer ]; then
+            # The packages, the sign-in keys once, then fresh caches (scripts/support/composer_install.sh).
+            tool composer_install.sh | $S "$FIND; bash -s"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi

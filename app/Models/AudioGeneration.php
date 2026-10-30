@@ -89,6 +89,12 @@ class AudioGeneration extends Model
         return $this->belongsTo(User::class);
     }
 
+    /** The developer API key, or the AI app's key, that asked for it. */
+    public function apiKey(): BelongsTo
+    {
+        return $this->belongsTo(ApiKey::class);
+    }
+
     public function displayNumber(): int
     {
         return (int) ($this->user_sequence_number ?: $this->id);

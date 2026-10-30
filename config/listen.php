@@ -159,6 +159,16 @@ return [
         'stuck_queued_minutes' => (int) env('LISTEN_API_STUCK_QUEUED_MINUTES', 60),
     ],
 
+    'mcp' => [
+        // The MCP server's text_to_speech (routes/ai.php) makes speech on the queue and
+        // waits this long for it before answering with its history item instead: well
+        // inside the minute AI apps usually give a tool.
+        'wait_seconds' => (int) env('LISTEN_MCP_WAIT_SECONDS', 40),
+        // Such waits at once, for the whole site: each holds a web worker. When all are
+        // in use, the tool answers at once with the history item to check later.
+        'waiting_slots' => (int) env('LISTEN_MCP_WAITING_SLOTS', 4),
+    ],
+
     'dubbing' => [
         // "Dub my video" (App\Http\Controllers\VideoDubController).
         'min_seconds' => (int) env('LISTEN_DUB_MIN_SECONDS', 3),

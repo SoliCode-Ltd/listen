@@ -23,6 +23,18 @@ class Countries
 
     public const UNKNOWN = 'Unknown';
 
+    /**
+     * Where Google's consent rules for ads ask for a visitor's yes first: the
+     * European Economic Area, the United Kingdom and Switzerland. The site does
+     * not ask yet, so an ad click from there is never kept or uploaded.
+     *
+     * @var list<string>
+     */
+    public const ADS_CONSENT_REQUIRED = [
+        'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU',
+        'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'IS', 'LI', 'NO', 'GB', 'CH',
+    ];
+
     /** Shorter names where the official one is long. */
     private const SHORT = [
         'AE' => 'UAE',
@@ -102,6 +114,11 @@ class Countries
         }
 
         return 'Rest of world';
+    }
+
+    public static function needsAdsConsent(?string $code): bool
+    {
+        return in_array(strtoupper(trim((string) $code)), self::ADS_CONSENT_REQUIRED, true);
     }
 
     public static function isArabWorld(?string $code): bool

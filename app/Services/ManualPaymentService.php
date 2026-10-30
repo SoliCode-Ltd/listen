@@ -8,7 +8,9 @@ use App\Models\ManualPaymentRequest;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\AdsPurchases;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\PaymentLedger;
 use App\Support\CreditPeriod;
 use DomainException;
 use Illuminate\Http\UploadedFile;
@@ -34,8 +36,9 @@ class ManualPaymentService
         array $quote,
         array $destinationSnapshot,
         ?UploadedFile $proofImage = null,
+        ?string $gclid = null,
     ): ManualPaymentRequest {
-        return DB::transaction(function () use ($user, $plan, $billingCycle, $paymentMethod, $quote, $destinationSnapshot, $proofImage) {
+        return DB::transaction(function () use ($user, $plan, $billingCycle, $paymentMethod, $quote, $destinationSnapshot, $proofImage, $gclid) {
             if ($this->hasPendingRequest($user, $plan, $billingCycle, $paymentMethod)) {
                 throw new DomainException(__('ui.billing.manual_pending_exists'));
             }
@@ -59,11 +62,24 @@ class ManualPaymentService
                 'destination_snapshot' => $destinationSnapshot,
                 'proof_path' => $proofPath,
                 'submitted_at' => now(),
+                // The Google Ads click the member came from: the sale is uploaded once approved.
+                'gclid' => $gclid,
             ]);
         });
     }
 
     public function approve(ManualPaymentRequest $manualPaymentRequest, User $reviewer, ?string $reviewerNotes = null): ManualPaymentRequest
+    {
+        $approved = $this->approveWhileLocked($manualPaymentRequest, $reviewer, $reviewerNotes);
+        // Only now is it a sale: kept for the Google Ads upload when it came from an ad.
+        app(AdsPurchases::class)->recordManualPayment($approved);
+        // How it was paid, for Billing → Payments and the dashboard.
+        app(PaymentLedger::class)->recordManualPayment($approved);
+
+        return $approved;
+    }
+
+    private function approveWhileLocked(ManualPaymentRequest $manualPaymentRequest, User $reviewer, ?string $reviewerNotes): ManualPaymentRequest
     {
         return DB::transaction(function () use ($manualPaymentRequest, $reviewer, $reviewerNotes) {
             /** @var ManualPaymentRequest $request */

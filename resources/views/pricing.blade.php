@@ -4,15 +4,15 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.pricing_title'), 'page' => 'pricing', 'faqItems' => array_map(fn ($n) => ['question' => __('ui.pricing.faq'.$n.'_q'), 'answer' => __('ui.pricing.faq'.$n.'_a')], $faqNumbers)])
   <style>
     /* ── Pricing page ───────────────────────────────────────────────
-       Plans in one aligned row: every card's name, price, button, minutes and
-       lines start at the same height (CSS subgrid), so plans compare at a glance. */
+       Every plan as a card, its parts lined up with its neighbours' (CSS subgrid),
+       then a calculator: pick the minutes you need and see the plan that fits. */
     .pricing-page {
       width: min(1440px, 94%);
       margin: 0 auto;
     }
 
-    /* The title on the page's own background, short, so the minutes track and the
-       plan's button fit on the first screen. */
+    /* The title on the page's own background, short, so the plans' prices and buttons
+       come into view on the first screen. */
     .page-hero {
       text-align: center;
       padding: 2.4rem 1rem 1.8rem;
@@ -44,7 +44,8 @@
        the chosen half on a raised chip, the saving on the yearly one. */
     .billing-toggle {
       display: inline-grid;
-      grid-template-columns: 1fr 1fr;
+      /* Both halves as wide as the wider one (yearly, with its saving), so neither is cut. */
+      grid-template-columns: repeat(2, minmax(max-content, 1fr));
       background: color-mix(in oklab, var(--text) 5%, transparent);
       border-radius: var(--radius-full);
       padding: 4px;
@@ -67,6 +68,15 @@
     .billing-toggle.yearly .billing-indicator { transform: translateX(100%); }
     html[dir="rtl"] .billing-indicator { left: auto; right: 4px; }
     html[dir="rtl"] .billing-toggle.yearly .billing-indicator { transform: translateX(-100%); }
+    /* Once the page has measured the chosen half, the chip takes exactly its place and size. */
+    .billing-toggle.is-measured .billing-indicator,
+    html[dir="rtl"] .billing-toggle.is-measured .billing-indicator {
+      left: 0;
+      right: auto;
+      width: var(--chip-w);
+      transform: translateX(var(--chip-x));
+      transition: transform .25s cubic-bezier(.4, 0, .2, 1), width .25s cubic-bezier(.4, 0, .2, 1);
+    }
     .billing-toggle button {
       position: relative;
       z-index: 1;
@@ -90,73 +100,411 @@
     .billing-toggle button:hover { color: var(--text); }
     .billing-toggle button.active { color: var(--text); }
     .billing-toggle button:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
-    .toggle-save {
-      padding: .12rem .45rem;
+
+    /* ── The plans ──
+       Every plan as a card: three in a row and the others centred under them. A card's
+       parts (name, offer, price, button, minutes, lines) start at the same height as its
+       neighbours' (CSS subgrid), so the plans compare at a glance. */
+    .pricing-page { --ease-out: cubic-bezier(.22, 1, .36, 1); }
+    .page-hero .billing-toggle { margin-top: 1.6rem; }
+    .page-hero .billing-toggle button { min-width: 7.5rem; }
+    .plans { padding-top: clamp(1.2rem, 2.5vw, 2rem); }
+    .plans-title { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    /* Phones: one card under another. */
+    .plan-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      column-gap: 20px;
+      max-width: 520px;
+      margin: 2.2rem auto 0;
+    }
+    .plan-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      margin-bottom: 24px;
+      padding: 1.9rem 1.5rem 1.6rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--card-shadow);
+      scroll-margin-top: 92px;
+      transition: border-color .3s ease, box-shadow .3s ease;
+    }
+    .plan-card:focus { outline: none; }
+    /* Tablets: two in a row, the last one centred when it is on its own. Desktops: three in a
+       row, and two plans centred under three. Each card spans six rows of the grid and shares
+       them with its neighbours, so their parts line up. */
+    @media (min-width: 641px) {
+      .plan-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 820px; }
+      .plan-grid[data-count="1"] { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 420px; }
+      .plan-card { grid-column: span 2; grid-row: span 6; display: grid; grid-template-rows: subgrid; row-gap: 0; }
+    }
+    @media (min-width: 641px) and (max-width: 1000px) {
+      .plan-grid:not([data-count="1"]) > .plan-card:last-child:nth-child(odd) { grid-column: 2 / span 2; }
+    }
+    @media (min-width: 1001px) {
+      .plan-grid:not([data-count="1"]):not([data-count="2"]):not([data-count="4"]) { grid-template-columns: repeat(6, minmax(0, 1fr)); max-width: 1200px; }
+      .plan-grid[data-count="5"] > .plan-card:nth-child(4) { grid-column: 2 / span 2; }
+    }
+    /* The recommended plan: a violet edge and its badge on the card's top edge. */
+    .plan-card.popular {
+      border-color: var(--brand-accent);
+      box-shadow: 0 0 0 1px var(--brand-accent), 0 28px 56px -34px color-mix(in srgb, var(--brand-accent) 60%, transparent);
+    }
+    /* The plan the minutes below fit, once the visitor has used them: a soft ring around its card. */
+    .plan-card.is-fit { border-color: var(--brand-accent); box-shadow: 0 0 0 1px var(--brand-accent), 0 0 0 6px color-mix(in srgb, var(--brand-accent) 30%, transparent); }
+    .plan-top { display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .plan-badges { display: flex; justify-content: center; margin-bottom: .75rem; }
+    .plan-orb { --orb-size: 60px; box-shadow: 0 16px 30px -18px color-mix(in srgb, var(--o0) 75%, transparent); }
+    .popular-badge {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .34rem .9rem;
       border-radius: var(--radius-full);
-      background: color-mix(in oklab, var(--ok) 16%, transparent);
-      color: color-mix(in oklab, var(--ok) 50%, var(--text));
-      font-size: .74rem;
+      background: var(--brand-hover);
+      color: #fff;
+      font-size: .8rem;
       font-weight: 700;
+      line-height: 1.3;
+      white-space: nowrap;
+      translate: -50% -50%;
+      box-shadow: 0 6px 14px -6px rgba(76, 45, 235, .55);
+    }
+    .popular-badge .crown { width: 14px; height: 14px; }
+    .crown { flex: none; width: 15px; height: 15px; fill: #FFD36B; stroke: #E8A41F; stroke-width: 1.2; stroke-linejoin: round; }
+    .plan-name { margin: 0; font-size: 1.5rem; font-weight: 700; line-height: 1.25; letter-spacing: -.02em; }
+    html[dir="rtl"] .plan-name { letter-spacing: 0; }
+    .plan-desc { margin: .35rem auto 0; max-width: 30ch; color: var(--muted); font-size: .92rem; line-height: 1.55; text-wrap: balance; }
+
+    /* The offer: a label above the price on the monthly / yearly switch's grey ("30% off your
+       first month", then the day it ends on a deeper grey), the full price struck through beside
+       the price. */
+    .plan-offer { display: flex; justify-content: center; align-items: flex-end; padding-top: 1.05rem; }
+    /* Side by side, a card without an offer keeps the row empty so its price lines up. */
+    .plan-offer.is-empty { display: none; padding-top: 0; }
+    @media (min-width: 641px) { .plan-offer.is-empty { display: flex; } }
+    .offer-label {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      max-width: 100%;
+      padding: .34rem .8rem;
+      border-radius: var(--radius-full);
+      background: color-mix(in oklab, var(--text) 5%, transparent);
+      color: var(--text);
+      font-size: .84rem;
+      font-weight: 700;
+      line-height: 1.4;
+      text-align: center;
+    }
+    .offer-label svg { flex: none; width: 15px; height: 15px; fill: none; stroke: var(--brand-accent); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    /* The day the offer ends, as the label's last part on a deeper grey ("Until 30 Oct"). */
+    .offer-label:has(.offer-until) { align-items: stretch; padding-block: 0; padding-inline-end: 0; overflow: hidden; }
+    .offer-label:has(.offer-until) svg { align-self: center; }
+    .offer-label:has(.offer-until) .offer-label-text { padding-block: .34rem; }
+    .offer-until {
+      display: inline-flex;
+      align-items: center;
+      margin-inline-start: .35rem;
+      padding: .34rem .75rem;
+      background: color-mix(in oklab, var(--text) 7%, transparent);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    @media (max-width: 400px) {
+      .offer-label { gap: .3rem; padding-inline: .65rem; font-size: .78rem; }
+      .offer-until { margin-inline-start: .25rem; padding-inline: .6rem; }
     }
 
-    /* ── The minutes track and the plan that fits ──
-       One card: on one side the visitor picks how many minutes of voice they need on
-       a voice track (the plans sit on it as orbs); on the other, the plan that fits,
-       which is that plan's own card, as the admin set it up. One script moves the
-       playhead, the filled part of the voice, the number and the plan together, frame
-       by frame, so they never drift apart. */
+    /* The price with "/month" beside it, the price before the offer struck through next to them
+       (under them when the card is too narrow), then a short note. */
+    .plan-pricing { display: flex; flex-direction: column; align-items: center; gap: .3rem; padding: .8rem 0 1.15rem; text-align: center; }
+    .price-line { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: .15rem .6rem; }
+    .price-line > .price-row { order: -1; }
+    .price-original-row { display: inline-flex; align-items: baseline; }
+    /* The full price, crossed out in red so it reads at a glance as the price before the offer. */
+    .pricing-page { --price-strike: color-mix(in oklab, var(--danger) 85%, transparent); }
+    .price-original { color: color-mix(in oklab, var(--muted) 70%, var(--text)); font-size: 1.2rem; font-weight: 600; font-variant-numeric: tabular-nums; text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: var(--price-strike); }
+    .price-row { display: flex; align-items: baseline; justify-content: center; gap: .35rem; }
+    .price-amount { display: inline-block; font-size: clamp(2.1rem, 2.7vw, 2.55rem); font-weight: 700; line-height: 1.05; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+    .price-period { color: var(--muted); font-size: .95rem; font-weight: 500; }
+    /* The prices change with a short lift when the billing cycle changes. */
+    .price-amount.is-changing { animation: price-in .45s var(--ease-out); }
+    @keyframes price-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .price-note { color: var(--muted); font-size: .86rem; line-height: 1.5; }
+    .price-note:empty { display: none; }
+    .price-note.savings { color: color-mix(in oklab, var(--ok) 50%, var(--text)); font-weight: 600; }
+    /* An offer is for monthly billing only: on yearly the label, the offer's struck price and the
+       time left go, on the cards, in the rows, in the table and in the calculator. Yearly shows its
+       price per month with the usual monthly price struck through beside it instead. */
+    .pricing-page.is-yearly .plan-offer,
+    .pricing-page.is-yearly .price-original-row.is-offer,
+    .pricing-page:not(.is-yearly) .price-original-row.is-yearly,
+    .pricing-page.is-yearly .compare-plan-offer { display: none; }
+
+    .plan-trial-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      margin-top: .35rem;
+      padding: .24rem .65rem;
+      border-radius: var(--radius-full);
+      background: color-mix(in oklab, var(--ok) 14%, transparent);
+      color: color-mix(in oklab, var(--ok) 50%, var(--text));
+      font-size: .78rem;
+      font-weight: 700;
+    }
+    .plan-trial-chip svg { width: .85rem; height: .85rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .pricing-page.is-yearly [data-trial-monthly-only],
+    .pricing-page:not(.is-yearly) [data-trial-yearly-only] {
+      display: none !important;
+    }
+
+    .plan-action { padding-bottom: 1.3rem; }
+    .plan-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 48px;
+      padding: .6rem 1rem;
+      border-radius: var(--btn-radius);
+      font-size: .95rem;
+      font-weight: 600;
+      text-align: center;
+      text-decoration: none;
+      transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .2s ease, box-shadow .2s ease;
+    }
+    .plan-btn.btn-primary { background: var(--brand-accent); color: #fff; border: 1px solid transparent; box-shadow: var(--lift); }
+    .plan-btn.btn-primary:hover { background: var(--brand-hover); }
+    .plan-btn.btn-outline { background: transparent; color: var(--text); border: 1px solid var(--line-strong); }
+    .plan-btn.btn-outline:hover { border-color: color-mix(in oklab, var(--text) 45%, transparent); background: color-mix(in oklab, var(--text) 4%, transparent); }
+    .plan-btn:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+    .plan-btn.plan-btn-sm { min-height: 38px; padding: .4rem .75rem; font-size: .84rem; }
+    .plan-btn.btn-disabled { background: var(--surface2); color: var(--muted); border: 1px solid var(--line); cursor: default; }
+    /* On the cards and in the calculator: the recommended plan's button filled, the others drawn in violet. */
+    .plan-card .plan-btn,
+    .fit-plan .plan-btn { min-height: 50px; font-size: 1rem; }
+    .plan-card .plan-btn.btn-outline,
+    .fit-plan .plan-btn.btn-outline { color: var(--accent-text); border: 1.5px solid color-mix(in srgb, var(--brand-accent) 70%, transparent); }
+    .plan-card .plan-btn.btn-outline:hover,
+    .fit-plan .plan-btn.btn-outline:hover { border-color: var(--brand-accent); background: color-mix(in srgb, var(--brand-accent) 8%, transparent); }
+    .plan-card .plan-btn.btn-primary:hover,
+    .fit-plan .plan-btn.btn-primary:hover { transform: translateY(-1px); }
+
+    /* Minutes and the credits behind them on one line, minutes first, each number a size
+       above its unit; a narrow card sets them smaller to keep the line (the credits go under
+       the minutes only when even that is not enough). */
+    .plan-quota {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: .3rem .6rem;
+      white-space: nowrap;
+      padding: 1rem 0;
+      border-top: 1px solid var(--line);
+      font-size: .9rem;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+    .plan-minutes,
+    .plan-quota-amount { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 .35rem; }
+    .plan-minutes-number { color: var(--text); font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .plan-quota-number { color: var(--text); font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .plan-minutes-unit,
+    .plan-quota-unit { color: var(--muted); font-size: .86rem; font-weight: 500; }
+    .plan-quota-credits { display: inline-flex; align-items: center; gap: .3rem; cursor: help; }
+    .plan-quota-coin { font-size: 1rem; flex: none; }
+    .plan-minutes, .plan-quota-amount { flex-wrap: nowrap; }
+    .plan-quota { container-type: inline-size; }
+    @container (max-width: 360px) {
+      .plan-minutes-number { font-size: 1rem; }
+      .plan-quota-number { font-size: .86rem; }
+      .plan-minutes-unit, .plan-quota-unit { font-size: .76rem; }
+      .plan-quota-coin { font-size: .9rem; }
+    }
+    @container (max-width: 300px) {
+      .plan-quota { gap: .45rem; }
+      .plan-minutes-number { font-size: .94rem; }
+      .plan-quota-number { font-size: .82rem; }
+      .plan-minutes-unit, .plan-quota-unit { font-size: .7rem; }
+      .plan-quota-coin { display: none !important; }
+    }
+
+    /* The plan's lines, all of them: the label on one side, its value on the other. */
+    .plan-features {
+      list-style: none;
+      margin: 0;
+      padding: 1rem 0 0;
+      border-top: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: .7rem;
+    }
+    .plan-features li { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; font-size: .9rem; }
+    .feature-label { display: inline-flex; align-items: flex-start; flex: 1 1 auto; min-width: 0; gap: .5rem; color: var(--muted); line-height: 1.4; }
+    .feature-label svg { flex: none; width: 1rem; height: 1rem; margin-top: .12rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .feature-value { flex: none; max-width: 55%; color: var(--text); font-weight: 650; line-height: 1.4; text-align: end; }
+    .plan-features li.is-tick .feature-label { color: var(--text); font-weight: 600; }
+    .plan-features li.is-tick .feature-label svg { color: var(--ok); stroke-width: 2.6; }
+
+    /* On phones a long card shows its first four lines, and a button for the rest. */
+    .plan-more { display: none; }
+    @media (max-width: 640px) {
+      .can-fold .plan-card:not(.is-open) .plan-features.is-long li:nth-child(n+5) { display: none; }
+      .can-fold .plan-card:not(.is-open) .plan-more { display: flex; }
+      .plan-more {
+        align-items: center;
+        justify-content: center;
+        gap: .35rem;
+        width: 100%;
+        min-height: 44px;
+        margin-top: .75rem;
+        padding: 0;
+        border: 0;
+        border-top: 1px solid var(--line);
+        background: none;
+        color: var(--accent-text);
+        font: inherit;
+        font-size: .9rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .plan-more svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+      .plan-more:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; border-radius: 8px; }
+    }
+
+    /* Phones: every plan's name in one switch, drawn like the monthly / yearly one, on a band
+       that stays under the site's bar while the cards scroll by (a hairline under it once it
+       is held there). The plan being read is the chosen one. */
+    .plan-tabs-bar { display: none; }
+    @media (max-width: 640px) {
+      .plan-tabs-bar {
+        position: sticky;
+        top: 64px;
+        z-index: 20;
+        display: block;
+        margin: 1.1rem calc(50% - 50vw) 0;
+        padding: 8px calc(50vw - 50%);
+        background: var(--bg);
+        transition: box-shadow .2s ease;
+      }
+      html[data-theme="light"] .plan-tabs-bar { background: var(--surface); }
+      .plan-tabs-bar.is-stuck { box-shadow: 0 1px 0 var(--line), 0 8px 16px -14px rgba(15, 23, 42, .3); }
+      .plan-tabs {
+        display: flex;
+        width: fit-content;
+        max-width: 100%;
+        margin: 0 auto;
+        padding: 4px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        border-radius: var(--radius-full);
+        background: color-mix(in oklab, var(--text) 5%, var(--bg));
+      }
+      .plan-tabs::-webkit-scrollbar { display: none; }
+      .plan-tab {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: .3rem;
+        min-height: 38px;
+        padding: 0 .62rem;
+        border-radius: var(--radius-full);
+        color: var(--muted);
+        font-size: .84rem;
+        font-weight: 600;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: background-color .2s ease, color .2s ease, box-shadow .2s ease;
+      }
+      .plan-tab .crown { width: 13px; height: 13px; }
+      /* The narrowest phones: a little tighter, so all five names still fit. */
+      @media (max-width: 380px) {
+        .plan-tab { padding: 0 .5rem; font-size: .8rem; }
+        .plan-tab .crown { width: 12px; height: 12px; }
+      }
+      .plan-tab.is-on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(15, 23, 42, .14), 0 0 0 1px rgba(15, 23, 42, .04); }
+      html:not([data-theme="light"]) .plan-tab.is-on { background: #2E2E3A; box-shadow: none; }
+      .plan-tab:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: -2px; }
+      /* A card reached from the switch stops under it. */
+      .plan-card { scroll-margin-top: 132px; }
+    }
+
+    /* How much is off, as a small green chip (the comparison table's header). */
+    .compare-plan-offer s { color: color-mix(in oklab, var(--muted) 70%, var(--text)); font-size: .84rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: var(--price-strike); white-space: nowrap; }
+    .offer-chip {
+      padding: .1rem .5rem;
+      border-radius: var(--radius-full);
+      background: color-mix(in oklab, var(--ok) 15%, transparent);
+      color: color-mix(in oklab, var(--ok) 45%, var(--text));
+      font-size: .72rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* ── The minutes calculator ──
+       Under the cards: the visitor sets how many minutes of voice they need on a voice track
+       (the plans sit on it as orbs) and sees the plan that fits beside it, with its price and
+       button; that plan's card above gets a ring. One script moves the playhead, the filled
+       part of the voice, the number and the plan together, frame by frame. */
+    .calc { padding-top: clamp(3.5rem, 7vw, 5.5rem); }
+    .calc .section-title label { cursor: pointer; }
     .studio {
-      --ease-out: cubic-bezier(.22, 1, .36, 1);
       display: grid;
-      grid-template-columns: minmax(0, 1.4fr) minmax(0, .95fr);
-      max-width: 1240px;
-      margin: 0 auto;
+      grid-template-columns: minmax(0, 1.65fr) minmax(290px, .85fr);
+      max-width: 1200px;
+      margin: 2rem auto 0;
       overflow: clip;
       background: var(--surface);
       border: 1px solid var(--line);
       border-radius: 28px;
+      box-shadow: var(--card-shadow);
     }
-    /* Scrolled to from the plan list, they stop just under the site's bar. */
-    .studio, .studio-plan { scroll-margin-top: 76px; }
-    .studio-mixer { display: flex; flex-direction: column; padding: clamp(1.4rem, 3vw, 2.4rem); }
-    /* Wide screens: the track stays beside the plan's details while they scroll by. */
-    @media (min-width: 1001px) {
-      .studio-mixer { position: sticky; top: 84px; align-self: start; }
-      .studio-track { margin-top: 1.9rem; }
-      .studio-wave { height: 128px; }
-      .studio-proof { margin-top: 1.8rem; }
-    }
-    .studio-top { display: flex; justify-content: space-between; align-items: center; gap: .75rem 1rem; flex-wrap: wrap; }
-    .studio-label { color: var(--muted); font-size: .95rem; font-weight: 500; }
-    .studio .billing-toggle button { min-height: 38px; padding: 0 1rem; font-size: .88rem; }
-    .studio-amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .55rem; margin-top: 1.1rem; }
-    /* The number box is as wide as its digits, so the unit sits right after them. */
+    .studio-mixer { display: flex; flex-direction: column; min-width: 0; padding: clamp(1.4rem, 3vw, 2.4rem); }
+    /* The number large and plain, on a thin line that marks it as one to type in (violet when
+       pointed at or typed in), the unit after it. */
+    .studio-amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .6rem; }
     .studio-amount input {
       field-sizing: content;
       width: auto;
-      min-width: 1ch;
-      padding: 0;
+      min-width: 2ch;
+      padding: 0 .04em .02em;
       border: 0;
+      border-bottom: 2px solid var(--line-strong);
+      border-radius: 0;
       background: none;
       color: var(--text);
       font: inherit;
-      font-size: clamp(3.4rem, 6.6vw, 5.2rem);
+      font-size: clamp(3rem, 5.4vw, 4.4rem);
       font-weight: 700;
-      line-height: 1;
+      line-height: 1.08;
       letter-spacing: -.02em;
       font-variant-numeric: tabular-nums;
+      cursor: text;
+      transition: border-color .2s ease;
       -moz-appearance: textfield;
     }
-    .studio-amount input:focus-visible { outline: none; text-decoration: underline 3px var(--brand-accent); text-underline-offset: 10px; }
+    .studio-amount input:hover { border-bottom-color: color-mix(in srgb, var(--brand-accent) 60%, var(--line-strong)); }
+    .studio-amount input:focus-visible { outline: none; border-bottom-color: var(--brand-accent); }
     .studio-unit { font-size: 1.25rem; font-weight: 600; }
     /* How long that is in hours, on its own line (kept when empty, under an hour), so the
        track never moves up or down. */
-    .studio-about { margin: .45rem 0 0; min-height: 1.6em; color: var(--muted); font-size: .98rem; line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .studio-about { margin: .55rem 0 0; min-height: 1.6em; color: var(--muted); font-size: .98rem; line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* The track: a voice note on the card itself (words and the pauses between them),
-       a round playhead, and the plans as stops on a thin line under it. */
-    .studio-track { position: relative; margin-top: 1.5rem; }
-    .studio-wave { position: relative; height: 104px; cursor: ew-resize; touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    /* The track: a voice note (words and the pauses between them), a round playhead, and the
+       plans as stops on a thin line under it. */
+    .studio-track { position: relative; margin-top: 1.4rem; }
+    .studio-wave { position: relative; height: 112px; cursor: ew-resize; touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
     .studio-wave svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
     html[dir="rtl"] .studio-wave svg { transform: scaleX(-1); }
     .studio-bars-base { stroke: color-mix(in srgb, var(--muted) 34%, transparent); }
@@ -187,7 +535,7 @@
     .studio-head::after { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: #fff; }
     .studio.is-dragging .studio-head { scale: 1.14; }
     .studio-wave input:focus-visible ~ .studio-head { box-shadow: 0 0 0 4px var(--surface), 0 0 0 7px var(--brand-accent); }
-    .studio-stations { position: relative; height: 66px; margin-top: 8px; }
+    .studio-stations { position: relative; height: 70px; margin-top: 8px; }
     /* The line runs as far as the playhead can go, like the voice above it. */
     .studio-stations::before {
       content: "";
@@ -218,352 +566,61 @@
       transition: color .25s ease;
     }
     .studio-station .orb { --orb-size: 36px; box-shadow: 0 0 0 4px var(--surface); transform: scale(.72); transition: transform .35s cubic-bezier(.34, 1.4, .64, 1); }
-    .studio-station-name { font-size: .78rem; line-height: 1.25; white-space: nowrap; text-align: center; transition: opacity .25s ease; }
+    .studio-station-name { font-size: .8rem; line-height: 1.25; white-space: nowrap; text-align: center; }
     .studio-station:hover { color: var(--text); }
     .studio-station.is-on { color: var(--text); font-weight: 600; }
     .studio-station.is-on .orb { transform: none; }
     .studio-station-crown { position: absolute; top: -12px; left: 50%; width: 14px; height: 14px; translate: -50% 0; transform: translateY(5px); transition: transform .35s cubic-bezier(.34, 1.4, .64, 1); }
     .studio-station.is-on .studio-station-crown { transform: none; }
 
-    /* The plan that fits: the plan's own card, one at a time. The old one goes quickly and
-       the new one comes in just after it, so two cards never show at once. */
-    .studio-plan {
-      position: relative;
-      overflow: clip;
-      padding: clamp(1.3rem, 2.4vw, 1.9rem) clamp(1.3rem, 3vw, 2.4rem);
-      background: color-mix(in srgb, var(--brand-accent) 4%, var(--surface));
+    /* At the foot of the track: the voices every plan has. */
+    .studio-proof { display: flex; flex-wrap: nowrap; align-items: center; gap: .8rem; margin: 1.5rem 0 0; color: var(--muted); font-size: .9rem; }
+    .studio-faces { display: flex; flex: none; }
+    .studio-faces img { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--surface); margin-inline-start: -9px; background: var(--surface2); box-shadow: 0 2px 8px rgba(15, 23, 42, .12); }
+    .studio-faces img:first-child { margin-inline-start: 0; }
+    .studio-faces img:nth-child(n+11) { display: none; }
+    .studio-proof > :last-child { white-space: nowrap; }
+
+    /* The plan that fits: one at a time. The old one goes quickly and the new one comes in just
+       after it, so two never show at once. */
+    .studio-fit {
+      display: grid;
+      align-items: center;
+      min-width: 0;
+      padding: clamp(1.4rem, 3vw, 2.2rem);
+      background: color-mix(in srgb, var(--brand-accent) 5%, var(--surface));
       border-inline-start: 1px solid var(--line);
     }
-    /* One column as wide as the panel: a long line on any card wraps instead of widening it. */
-    .plan-stage { display: grid; grid-template-columns: minmax(0, 1fr); container-type: inline-size; }
-    .plan-card {
+    .fit-stage { display: grid; grid-template-columns: minmax(0, 1fr); }
+    .fit-plan {
       grid-area: 1 / 1;
-      min-width: 0;
-      position: relative;
       display: flex;
       flex-direction: column;
+      align-items: center;
+      min-width: 0;
+      text-align: center;
       opacity: 0;
       visibility: hidden;
       transform: translateY(8px);
       transition: opacity .14s ease-in, transform .14s ease-in, visibility 0s linear .14s;
     }
-    .plan-card.is-active { opacity: 1; visibility: visible; transform: none; transition: opacity .3s var(--ease-out) .12s, transform .42s var(--ease-out) .12s, visibility 0s; }
-    .plan-top { display: flex; flex-direction: column; align-items: center; text-align: center; }
-    .plan-badges { display: flex; flex-direction: column; align-items: center; gap: .55rem; margin-bottom: .55rem; }
-    .plan-orb { --orb-size: 84px; box-shadow: 0 22px 40px -22px color-mix(in srgb, var(--o0) 75%, transparent); }
-    .popular-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: .3rem .75rem;
-      border-radius: var(--radius-full);
-      background: color-mix(in oklab, var(--brand-accent) 12%, transparent);
-      color: var(--accent-text);
-      font-size: .78rem;
-      font-weight: 700;
-    }
-    .plan-fit { color: color-mix(in oklab, var(--ok) 60%, var(--text)); font-size: .88rem; font-weight: 600; }
-    .plan-name { margin: .1rem 0 0; font-size: 1.85rem; font-weight: 700; letter-spacing: -.02em; }
-    html[dir="rtl"] .plan-name { letter-spacing: 0; }
-    .plan-desc { margin: .35rem auto 0; max-width: 34ch; color: var(--muted); font-size: .92rem; line-height: 1.6; }
+    .fit-plan.is-active { opacity: 1; visibility: visible; transform: none; transition: opacity .3s var(--ease-out) .12s, transform .42s var(--ease-out) .12s, visibility 0s; }
+    .fit-orb { --orb-size: 64px; margin-bottom: .75rem; box-shadow: 0 16px 30px -18px color-mix(in srgb, var(--o0) 75%, transparent); }
+    .fit-name { margin: 0; font-size: 1.55rem; font-weight: 700; line-height: 1.25; }
+    .fit-minutes { margin: .25rem 0 0; color: var(--muted); font-size: .92rem; }
+    .fit-minutes strong { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .fit-plan .price-line { margin: .9rem 0 1.2rem; }
 
-    /* The price, the old price struck beside it, then the offer in one line. */
-    .plan-pricing {
-      display: grid;
-      grid-template-columns: auto auto;
-      justify-content: center;
-      align-items: baseline;
-      gap: .3rem .6rem;
-      padding: .9rem 0 1rem;
-      text-align: center;
-    }
-    .plan-pricing > * { grid-column: 1 / -1; justify-self: center; }
-    .plan-pricing > .price-row { grid-column: 1; grid-row: 1; }
-    .plan-pricing > .price-original-row { grid-column: 2; grid-row: 1; }
-    /* A narrow card: the old price goes under the new one. */
-    @container (max-width: 300px) {
-      .plan-pricing { grid-template-columns: auto; }
-      .plan-pricing > .price-original-row { grid-column: 1; grid-row: 2; }
-      .price-amount { font-size: 2.3rem; }
-    }
-    .price-original-row { display: inline-flex; align-items: baseline; }
-    /* The full price, crossed out in red so it reads at a glance as the price before the offer. */
-    .pricing-page { --price-strike: color-mix(in oklab, var(--danger) 85%, transparent); }
-    .price-original { color: color-mix(in oklab, var(--muted) 70%, var(--text)); font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: var(--price-strike); }
-    .price-row { display: flex; align-items: baseline; justify-content: center; gap: .35rem; }
-    .price-amount { font-size: clamp(2.5rem, 3.4vw, 3rem); font-weight: 700; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-    .price-period { color: var(--muted); font-size: .95rem; font-weight: 500; }
-    /* The price changes with a short lift when the billing cycle changes. */
-    .price-amount.is-changing { animation: price-in .45s var(--ease-out); }
-    @keyframes price-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-    .price-note { color: var(--muted); font-size: .86rem; }
-    .price-note:empty { display: none; }
-    .price-note.savings { color: color-mix(in oklab, var(--ok) 50%, var(--text)); font-weight: 600; }
-
-    /* The offer: a green label above the price ("10% off your first month"), the full price
-       struck through beside the price, and the time left under it. Only a first-month offer
-       drops "/month": that price is paid once. */
-    .plan-offer { display: flex; justify-content: center; margin-top: .9rem; }
-    .offer-label {
-      display: inline-flex;
-      align-items: center;
-      gap: .4rem;
-      max-width: 100%;
-      padding: .34rem .8rem;
-      border-radius: var(--radius-full);
-      background: color-mix(in oklab, var(--ok) 15%, transparent);
-      color: color-mix(in oklab, var(--ok) 48%, var(--text));
-      font-size: .84rem;
-      font-weight: 700;
-      line-height: 1.4;
-      text-align: center;
-    }
-    .offer-label svg { flex: none; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-    .studio:not(.is-yearly) .plan-offer + .plan-pricing { padding-top: .6rem; }
-    /* An offer is for monthly billing only: on yearly the label, the offer's struck price and the
-       time left go, here and in the list of all plans. Yearly shows its price per month with the
-       usual monthly price struck through beside it instead. */
-    .studio.is-yearly .plan-offer,
-    .studio.is-yearly .price-original-row.is-offer,
-    .studio:not(.is-yearly) .price-original-row.is-yearly,
-    .studio.is-yearly .offer-ends,
-    .plan-picker.is-yearly .plan-pick-offer,
-    .plan-picker:not(.is-yearly) .plan-pick-was { display: none; }
-    .studio:not(.is-yearly) .plan-card.is-first-month .price-period { display: none; }
-    /* When the offer ends: "Offer ends in" and a timer in amber, days : hours : minutes : seconds,
-       each number large with its unit small under it; on a narrow card the timer goes under the words. */
-    .pricing-page { --offer-urgent: #FDB022; }
-    html[data-theme="light"] .pricing-page { --offer-urgent: #B54708; }
-    .offer-ends { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .35rem .8rem; margin-top: .7rem; color: var(--offer-urgent); }
-    .offer-ends[hidden] { display: none; }
-    .offer-ends-label { display: inline-flex; align-items: center; gap: .4rem; font-size: .9rem; font-weight: 600; }
-    .offer-ends-label svg { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .offer-ends-clock { display: inline-flex; align-items: flex-start; gap: .3rem; }
-    .offer-ends-unit { display: grid; justify-items: center; min-width: 2.2rem; }
-    .offer-ends-unit b { font-size: 1.45rem; font-weight: 700; line-height: 1.1; letter-spacing: .01em; font-variant-numeric: tabular-nums; }
-    .offer-ends-unit small { margin-top: .15rem; color: var(--muted); font-size: .64rem; font-weight: 600; line-height: 1; }
-    .offer-ends-sep { font-size: 1.3rem; font-weight: 700; line-height: 1.15; opacity: .55; }
-    .offer-ends-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-
-    /* The most popular plan: a ribbon across the panel's corner, with a crown. */
-    .plan-ribbon {
-      position: absolute;
-      top: 26px;
-      inset-inline-end: -46px;
-      z-index: 2;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: .35rem;
-      width: 196px;
-      padding: .42rem 0;
-      background: var(--brand-accent);
-      color: #fff;
-      font-size: .78rem;
-      font-weight: 700;
-      box-shadow: 0 2px 6px rgba(16, 24, 40, .18);
-      transform: rotate(45deg);
-      transition: opacity .35s ease, transform .45s cubic-bezier(.22, 1, .36, 1);
-    }
-    html[dir="rtl"] .plan-ribbon { transform: rotate(-45deg); }
-    .plan-ribbon[hidden] { display: flex; opacity: 0; transform: rotate(45deg) translateY(-14px); pointer-events: none; }
-    html[dir="rtl"] .plan-ribbon[hidden] { transform: rotate(-45deg) translateY(-14px); }
-    .crown { flex: none; width: 15px; height: 15px; fill: #FFD36B; stroke: #E8A41F; stroke-width: 1.2; stroke-linejoin: round; }
-    /* Its own small badge is not needed in the panel: the ribbon says it. */
-    .plan-card .popular-badge { display: none; }
-
-    .plan-trial-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: .35rem;
-      margin-top: .35rem;
-      padding: .24rem .65rem;
-      border-radius: var(--radius-full);
-      background: color-mix(in oklab, var(--ok) 14%, transparent);
-      color: color-mix(in oklab, var(--ok) 50%, var(--text));
-      font-size: .78rem;
-      font-weight: 700;
-    }
-    .plan-trial-chip svg { width: .85rem; height: .85rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-    .studio.is-yearly [data-trial-monthly-only],
-    .studio:not(.is-yearly) [data-trial-yearly-only] {
-      display: none !important;
-    }
-
-    .plan-action { padding-bottom: 1.2rem; }
-    .plan-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      min-height: 48px;
-      padding: .6rem 1rem;
-      border-radius: var(--btn-radius);
-      font-size: .95rem;
-      font-weight: 600;
-      text-align: center;
-      text-decoration: none;
-      transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .2s ease, box-shadow .2s ease;
-    }
-    .plan-btn.btn-primary { background: var(--brand-accent); color: #fff; border: 1px solid transparent; box-shadow: var(--lift); }
-    .plan-btn.btn-primary:hover { background: var(--brand-hover); }
-    .plan-btn.btn-outline { background: transparent; color: var(--text); border: 1px solid var(--line-strong); }
-    .plan-btn.btn-outline:hover { border-color: color-mix(in oklab, var(--text) 45%, transparent); background: color-mix(in oklab, var(--text) 4%, transparent); }
-    .plan-btn:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
-    .plan-btn.plan-btn-sm { min-height: 38px; padding: .4rem .75rem; font-size: .84rem; }
-    .plan-btn.btn-disabled { background: var(--surface2); color: var(--muted); border: 1px solid var(--line); cursor: default; }
-    /* In the panel the shown plan's button is the page's main action: always filled. */
-    .plan-card .plan-btn { min-height: 52px; font-size: 1.02rem; }
-    .plan-card .plan-btn.btn-outline { background: var(--brand-accent); color: #fff; border-color: transparent; box-shadow: var(--lift); }
-    .plan-card .plan-btn:not(.btn-disabled):hover { background: var(--brand-hover); transform: translateY(-1px); }
-
-    /* Minutes and the credits behind them, on one line and set alike: each number at the
-       same size and weight, each unit after it at the same size, both centred on the line. */
-    .plan-quota {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: .4rem 1rem;
-      padding: 1rem 0;
-      border-top: 1px solid color-mix(in srgb, var(--brand-accent) 14%, var(--line));
-      font-size: .9rem;
-      font-weight: 600;
-      line-height: 1.5;
-    }
-    .plan-minutes,
-    .plan-quota-amount { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 .35rem; }
-    .plan-minutes-number,
-    .plan-quota-number { color: var(--text); font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .plan-minutes-unit,
-    .plan-quota-unit { color: var(--muted); font-size: .84rem; font-weight: 500; }
-    .plan-quota-credits { display: inline-flex; align-items: center; gap: .4rem; cursor: help; }
-    .plan-quota-coin { font-size: 1.05rem; flex: none; }
-
-    /* The plan's lines: the label on one side, its value on the other. */
-    .plan-features {
-      list-style: none;
-      margin: 0;
-      padding: 1rem 0 0;
-      border-top: 1px solid color-mix(in srgb, var(--brand-accent) 14%, var(--line));
-      display: flex;
-      flex-direction: column;
-      gap: .65rem;
-    }
-    .plan-features li { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; font-size: .88rem; }
-    .feature-label { display: inline-flex; align-items: flex-start; flex: 1 1 auto; min-width: 0; gap: .5rem; color: var(--muted); line-height: 1.4; }
-    .feature-label svg { flex: none; width: 1rem; height: 1rem; margin-top: .12rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .feature-value { flex: none; max-width: 55%; color: var(--text); font-weight: 650; line-height: 1.4; text-align: end; }
-    .plan-features li.is-tick .feature-label { color: var(--text); font-weight: 600; }
-    /* Desktop: the card is wide, so its text reads a size up: the plan's line, the offer's label,
-       the minutes and credits, and the plan's lines. */
-    @media (min-width: 1001px) {
-      .plan-desc { font-size: 1.05rem; }
-      .offer-label { padding: .42rem 1rem; font-size: .98rem; gap: .5rem; }
-      .offer-label svg { width: 18px; height: 18px; }
-      .plan-minutes-number, .plan-quota-number { font-size: 1.15rem; }
-      .plan-minutes-unit, .plan-quota-unit { font-size: .95rem; }
-      .plan-quota-coin { font-size: 1.2rem; }
-      .plan-features { gap: .75rem; }
-      .plan-features li { font-size: .98rem; }
-      .feature-label svg { width: 1.1rem; height: 1.1rem; }
-    }
-    /* A narrow desktop card: the minutes and credits a little smaller, so they stay on one line. */
-    @media (min-width: 1001px) {
-      @container (max-width: 400px) {
-        .plan-quota { gap: .4rem .6rem; }
-        .plan-minutes-number, .plan-quota-number { font-size: 1rem; }
-        .plan-minutes-unit, .plan-quota-unit { font-size: .8rem; }
-        .plan-quota-coin { font-size: .95rem; }
-        .plan-quota-credits { gap: .3rem; }
-      }
-      /* The coin icon sets its own display inline, so this needs !important to win. */
-      @container (max-width: 340px) { .plan-quota-coin { display: none !important; } }
-    }
-    .plan-features li.is-tick .feature-label svg { color: var(--ok); stroke-width: 2.6; }
-
-    /* At the foot of the track: the voices every plan has. Under the card: every plan to pick from. */
-    .studio-proof { display: flex; align-items: center; gap: .8rem; margin: 1.4rem 0 0; color: var(--muted); font-size: .9rem; }
-    .studio-faces { display: flex; flex: none; }
-    .studio-faces img { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--surface); margin-inline-start: -9px; background: var(--surface2); box-shadow: 0 2px 8px rgba(15, 23, 42, .12); }
-    .studio-faces img:first-child { margin-inline-start: 0; }
-    .studio-proof { flex-wrap: nowrap; }
-    .studio-faces img:nth-child(n+16) { display: none; }
-    .studio-proof > :last-child { white-space: nowrap; }
-    @media (max-width: 1360px) { .studio-faces img:nth-child(n+14) { display: none; } }
-    /* Phones: one line. The text keeps to its line and the avatars take the room left,
-       as many whole faces as fit (the rest wrap onto a hidden second row). */
-    @media (max-width: 640px) {
-      .studio-proof { gap: .6rem; font-size: .84rem; }
-      .studio-faces { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; height: 28px; overflow: hidden; }
-      .studio-faces img { width: 28px; height: 28px; margin-inline-start: -8px; box-shadow: none; }
-    }
-    @media (max-width: 1200px) { .studio-faces img:nth-child(n+11) { display: none; } }
-    @media (max-width: 640px) { .studio-faces img:nth-child(n+7) { display: none; } }
-    .plan-picker { max-width: 1200px; margin: 0 auto; padding-top: clamp(3rem, 6vw, 4.5rem); }
-    .plan-picker .section-title { margin-bottom: clamp(1.75rem, 3vw, 2.5rem); }
-    .plan-picker-list { display: grid; grid-template-columns: repeat(var(--count, 5), minmax(0, 1fr)); gap: 14px; }
-    .plan-pick {
-      display: grid;
-      justify-items: center;
-      gap: .2rem;
-      padding: 1.4rem 1rem 1.25rem;
-      border-radius: 22px;
-      border: 1px solid var(--line);
-      background: var(--surface);
-      color: inherit;
-      font: inherit;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color .25s ease, box-shadow .25s ease;
-    }
-    .plan-pick:hover { border-color: var(--line-strong); }
-    .plan-pick:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; }
-    .plan-pick.is-on { border-color: var(--brand-accent); box-shadow: 0 0 0 1px var(--brand-accent); }
-    .plan-pick { position: relative; }
-    .plan-pick-crown {
-      position: absolute;
-      top: -12px;
-      left: 50%;
-      translate: -50% 0;
-      display: inline-flex;
-      align-items: center;
-      gap: .3rem;
-      padding: .22rem .7rem;
-      border-radius: var(--radius-full);
-      background: var(--brand-accent);
-      color: #fff;
-      font-size: .72rem;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-    .plan-pick-crown .crown { width: 13px; height: 13px; }
-    .plan-pick .orb { --orb-size: 60px; margin-bottom: .6rem; }
-    .plan-pick-name { font-size: 1.08rem; font-weight: 700; }
-    .plan-pick-minutes { color: var(--muted); font-size: .88rem; }
-    .plan-pick-cost { display: grid; justify-items: center; gap: .25rem; margin-top: .55rem; }
-    .plan-pick-price { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .plan-pick-price small { color: var(--muted); font-size: .8rem; font-weight: 500; margin-inline-start: .2rem; }
-    .plan-picker:not(.is-yearly) .plan-pick.is-first-month .plan-pick-price small { display: none; }
-    .plan-pick-offer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .2rem .45rem; }
-    .plan-pick-offer s, .plan-pick-was s { color: color-mix(in oklab, var(--muted) 70%, var(--text)); font-size: .9rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: var(--price-strike); white-space: nowrap; }
-    .plan-pick-off {
-      padding: .1rem .5rem;
-      border-radius: var(--radius-full);
-      background: color-mix(in oklab, var(--ok) 15%, transparent);
-      color: color-mix(in oklab, var(--ok) 48%, var(--text));
-      font-size: .72rem;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    /* Phones: the shown plan and its button stay in reach at the bottom. */
+    /* Phones: the plan that fits and its button stay in reach at the bottom once the cards and
+       the calculator are scrolled past. */
     .plan-bar { display: none; }
 
-    /* The page's one entrance: the voice rises from its centre line, once. */
+    /* The track's one entrance: the voice rises from its centre line when it comes into view. */
     @keyframes wave-in { from { opacity: 0; scale: 1 .15; } to { opacity: 1; scale: 1 1; } }
+    .studio.is-waiting .studio-wave svg { opacity: 0; }
     .studio.is-ready .studio-wave svg { animation: wave-in .7s var(--ease-out) both; }
     @media (prefers-reduced-motion: reduce) {
-      .studio *, .plan-card, .plan-pick, .plan-bar { transition: none !important; animation: none !important; }
+      .studio *, .plan-card, .fit-plan, .plan-tab, .plan-bar, .price-amount { transition: none !important; animation: none !important; }
     }
 
     /* Under the cards, as wide as their row: more minutes or a whole team, by talking to us. */
@@ -579,11 +636,11 @@
       border-radius: var(--card-radius);
       box-shadow: var(--card-shadow);
     }
-    .team-band[data-count="1"] { max-width: 440px; }
-    .team-band[data-count="2"] { max-width: 900px; }
-    .team-band[data-count="3"],
-    .team-band[data-count="5"],
-    .team-band[data-count="6"] { max-width: 1200px; }
+    /* As wide as the cards above it. */
+    .team-band { max-width: 1200px; }
+    .team-band[data-count="1"] { max-width: 420px; }
+    .team-band[data-count="2"],
+    .team-band[data-count="4"] { max-width: 820px; }
     .team-orb { --orb-size: 52px; }
     .team-band h2 { margin: 0 0 .2rem; font-size: 1.15rem; font-weight: 600; letter-spacing: -.01em; }
     html[dir="rtl"] .team-band h2 { letter-spacing: 0; }
@@ -673,6 +730,8 @@
     .compare-plan-price { display: flex; justify-content: center; align-items: baseline; gap: .2rem; margin: .2rem 0 .8rem; }
     .compare-plan-price b { font-size: 1.6rem; font-weight: 600; letter-spacing: -.035em; font-variant-numeric: tabular-nums; color: var(--text); }
     .compare-plan-price small { color: var(--muted); font-size: .8rem; font-weight: 500; }
+    /* A plan on offer: its full price struck through and how much is off, under the price. */
+    .compare-plan-offer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .2rem .4rem; margin: -.45rem 0 .75rem; }
     .compare-table thead th.is-popular {
       background: color-mix(in oklab, var(--a) 5%, var(--surface));
       box-shadow: inset 0 2px 0 var(--brand-accent);
@@ -787,7 +846,7 @@
       .compare-pick:focus-visible + .compare-pick-face { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
     }
     .compare-tick { width: 1.15rem; height: 1.15rem; fill: none; stroke: var(--ok); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
-    .compare-no { color: color-mix(in oklab, var(--muted) 70%, transparent); font-weight: 500; }
+    .compare-no { color: var(--muted); font-weight: 600; }
     /* Wide screens, once the whole table fits: the plan names, prices and buttons stay in
        view while you read down. Narrower, the table scrolls sideways in its own box. */
     @media (min-width: 1280px) {
@@ -928,31 +987,12 @@
 
     /* ── Smaller screens ── */
     @media (max-width: 1000px) {
-      .studio { grid-template-columns: 1fr; }
-      /* One column: the minutes come first, and the monthly / yearly switch sits last, right
-         above the plan's card whose price it changes. */
-      .studio-top { display: contents; }
-      .studio .billing-toggle { order: 5; align-self: flex-start; margin-top: 1.5rem; }
-      .studio-plan { border-inline-start: 0; border-top: 1px solid var(--line); }
-      .plan-picker-list { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-    }
-    @media (max-width: 640px) {
-      .studio { border-radius: 22px; }
-      .studio-station-name { font-size: .7rem; }
-      .studio-station:not(.is-on) .studio-station-name { opacity: 0; }
-      .studio .billing-toggle { width: 100%; align-self: stretch; }
-      .plan-picker-list { grid-template-columns: 1fr; gap: 10px; }
-      .plan-pick { grid-template-columns: auto 1fr auto; justify-items: start; column-gap: 1rem; padding: 1rem 1.1rem; text-align: start; }
-      .plan-pick .orb { --orb-size: 44px; grid-row: span 2; margin: 0; }
-      .plan-pick-cost { grid-column: 3; grid-row: 1 / span 2; align-self: center; justify-items: end; margin: 0; }
-      .plan-pick-offer { justify-content: flex-end; }
-      /* A narrower strap on a narrow card, clear of the plan's orb and name. */
-      .plan-ribbon { top: 14px; inset-inline-end: -44px; width: 150px; padding: .3rem 0; font-size: .7rem; }
-      .plan-ribbon .crown { width: 12px; height: 12px; }
-    }
-    /* One column: the plan's card is under the track, so its name, price and button stay
-       in reach at the bottom while the card is out of view. */
-    @media (max-width: 1000px) {
+      /* The calculator in one column: the plan that fits under the track. */
+      .studio { grid-template-columns: minmax(0, 1fr); }
+      .studio-fit { border-inline-start: 0; border-top: 1px solid var(--line); }
+      .fit-plan .price-line { margin-bottom: 1rem; }
+      .fit-plan .plan-btn { max-width: 420px; }
+      /* Below the cards and the calculator, the plan that fits stays in reach at the bottom. */
       .plan-bar {
         display: flex;
         position: fixed;
@@ -967,27 +1007,51 @@
         -webkit-backdrop-filter: blur(14px);
         border-top: 1px solid var(--line);
         transform: translateY(110%);
-        transition: transform .35s cubic-bezier(.22, 1, .36, 1);
+        visibility: hidden;
+        transition: transform .35s cubic-bezier(.22, 1, .36, 1), visibility 0s linear .35s;
       }
-      .plan-bar.is-shown { transform: none; }
+      .plan-bar.is-shown { transform: none; visibility: visible; transition: transform .35s cubic-bezier(.22, 1, .36, 1), visibility 0s; }
       .plan-bar-name { display: block; font-weight: 700; }
       .plan-bar-price { color: var(--muted); font-size: .86rem; }
       .plan-bar-price.has-offer { color: var(--text); font-weight: 600; }
       .plan-bar-now { white-space: nowrap; }
-      .plan-bar-price s { margin-inline-start: .4rem; color: var(--muted); font-size: .86rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: color-mix(in oklab, var(--danger) 85%, transparent); }
+      /* Spaced on both sides: the struck price runs left to right inside an Arabic line. */
+      .plan-bar-price s { margin: 0 .45rem; color: var(--muted); font-size: .86rem; font-weight: 600; text-decoration-thickness: 1.5px; text-decoration-color: color-mix(in oklab, var(--danger) 85%, transparent); }
       .plan-bar .plan-btn { width: auto; min-height: 44px; padding: .5rem 1.3rem; white-space: nowrap; background: var(--brand-accent); color: #fff; border-color: transparent; }
       .plan-bar .plan-btn.btn-disabled { background: var(--surface2); color: var(--muted); }
-      /* The chat button moves up while the bar is shown, so it never covers the button. */
       body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
-      body.has-plan-bar .wa-widget { bottom: calc(84px + env(safe-area-inset-bottom)) !important; transition: bottom .35s ease; }
+      body.has-plan-bar .wa-widget { bottom: calc(84px + env(safe-area-inset-bottom)) !important; }
     }
-    @media (max-width: 1240px) {
-      .team-band[data-count="4"],
-      .team-band[data-count="5"],
-      .team-band[data-count="6"] { max-width: 900px; }
+    /* The chat button steps aside while the plans and the calculator are on screen, wherever the
+       cards reach the screen's edge: it would cover a card's price or button. */
+    @media (max-width: 1360px) {
+      .wa-widget { transition: opacity .25s ease, transform .25s ease, bottom .35s ease; }
+      body.plans-in-view .wa-widget:not(.open) { opacity: 0; transform: translateY(14px) scale(.9); pointer-events: none; }
+    }
+    @media (max-width: 640px) {
+      .page-hero .billing-toggle { width: min(100%, 360px); }
+      .plan-grid { margin-top: 1.5rem; }
+      .plan-card { padding: 1.6rem 1.2rem 1.25rem; border-radius: 22px; margin-bottom: 16px; }
+      .plan-card + .plan-card.popular { margin-top: 8px; }
+      .plan-orb { --orb-size: 52px; }
+      .plan-badges { margin-bottom: .6rem; }
+      .plan-name { font-size: 1.4rem; }
+      .plan-desc { font-size: .9rem; }
+      .plan-offer { padding-top: .9rem; }
+      .plan-pricing { padding: .65rem 0 1rem; }
+      .plan-action { padding-bottom: 1.1rem; }
+      .studio { border-radius: 22px; }
+      .studio-amount input { font-size: 3rem; }
+      .studio-wave { height: 96px; }
+      /* Every plan's name on the track, on two lines when it needs them. */
+      .studio-station-name { font-size: .7rem; white-space: normal; width: max-content; max-width: 4.7rem; }
+      .studio-proof { gap: .6rem; font-size: .84rem; }
+      .studio-faces { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; height: 28px; overflow: hidden; }
+      .studio-faces img { width: 28px; height: 28px; margin-inline-start: -8px; box-shadow: none; }
+      .studio-faces img:nth-child(n+7) { display: none; }
     }
     @media (max-width: 1000px) {
-      .team-band[data-count="3"] { max-width: 900px; }
+      .team-band[data-count] { max-width: 820px; }
     }
     @media (max-width: 860px) {
       .features-grid { grid-template-columns: 1fr; }
@@ -1051,14 +1115,6 @@
           'trial_monthly' => in_array('monthly', $trialCycles, true),
           'trial_yearly' => in_array('yearly', $trialCycles, true),
         ];
-      };
-      // When an offer ends, in words: "Offer ends in 4 days", "… in 7 hours", "… in 12 minutes".
-      $offerEndsText = static function (?string $endsAt): string {
-        $seconds = $endsAt ? \Illuminate\Support\Carbon::parse($endsAt)->getTimestamp() - now()->getTimestamp() : 0;
-        if ($seconds <= 0) return '';
-        if ($seconds >= 2 * 86400) return trans_choice('ui.pricing.offer_ends_days', intdiv($seconds, 86400));
-        if ($seconds >= 3600) return trans_choice('ui.pricing.offer_ends_hours', intdiv($seconds, 3600));
-        return trans_choice('ui.pricing.offer_ends_minutes', max(1, (int) ceil($seconds / 60)));
       };
       // The cards are the monthly plans; the plan to try the voices and one-time packs are not shown here.
       $mainPlans = array_filter($pricingPlans, fn ($pricingPlan) => empty($pricingPlan['is_pack']) && (int) ($pricingPlan['price_monthly_cents'] ?? 0) > 0);
@@ -1165,6 +1221,13 @@
       @endif
       <h1>{{ __('ui.pricing.hero_title') }} {{ __('ui.pricing.hero_title_accent') }}</h1>
       <p class="lead">{{ __('ui.pricing.hero_subtitle') }}</p>
+      {{-- Monthly or yearly: every price on the page follows it. --}}
+      <div class="billing-toggle" id="billingToggle" role="group" aria-label="{{ __('ui.pricing.monthly') }} / {{ __('ui.pricing.yearly') }}">
+        <span class="billing-indicator" aria-hidden="true"></span>
+        <button type="button" id="monthlyBtn" class="active" aria-pressed="true">{{ __('ui.pricing.monthly') }}</button>
+        {{-- The yearly saving shows on the cards (the usual price struck through, and the button). --}}
+        <button type="button" id="yearlyBtn" aria-pressed="false">{{ __('ui.pricing.yearly') }}</button>
+      </div>
     </section>
 
     @php
@@ -1174,11 +1237,13 @@
         ->map(fn ($p, $i) => ['slug' => (string) $p['slug'], 'name' => $planDisplayName($p), 'minutes' => \App\Support\Credits::minutesFor((int) ($p['monthly_chars'] ?? 0)), 'popular' => $planState($p, $i)['is_popular']])
         ->filter(fn ($p) => $p['minutes'] > 0)
         ->sortBy('minutes')->values();
-      // The plan shown first: the recommended one, else the member's own, else the first.
+      // The plan the calculator starts on: the recommended one, else the member's own, else the first.
       $mainSlugList = array_column($mainPlans, 'slug');
       $shownSlug = (collect($mainPlans)->first(fn ($p, $i) => $planState($p, $i)['is_popular']) ?? [])['slug']
         ?? (in_array($activePlanSlug, $mainSlugList, true) ? $activePlanSlug : ($mainSlugList[0] ?? null));
-      $shownPopular = (bool) ($trackPlans->firstWhere('slug', $shownSlug)['popular'] ?? false);
+      if (!$trackPlans->contains('slug', $shownSlug)) {
+        $shownSlug = $trackPlans->first()['slug'] ?? $shownSlug;
+      }
       $crownSvg = '<svg class="crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8.5l4.2 3.6L12 4.5l4.3 7.6 4.2-3.6-1.8 9H5.3z"/><rect x="5.3" y="18.6" width="13.4" height="2" rx="1"/></svg>';
       $shownMinutes = (int) ($trackPlans->firstWhere('slug', $shownSlug)['minutes'] ?? ($trackPlans->first()['minutes'] ?? 0));
       $studioI18n = [
@@ -1188,103 +1253,102 @@
         'hours_and_minutes' => __('ui.pricing.hours_and_minutes'),
         'live' => __('ui.pricing.minutes_live'),
       ];
-      $proofFaces = ['ar-ahmed', 'ar-amal', 'en-amelia', 'ar-ali', 'ar-aisha', 'en-adrian', 'ar-layla', 'ar-omar', 'en-alice', 'ar-nour',
-        'ar-khaled', 'ar-mariam', 'en-alexander', 'ar-salma', 'ar-youssef', 'en-anastasia', 'ar-hassan', 'ar-rania'];
+      $proofFaces = ['ar-ahmed', 'ar-amal', 'en-amelia', 'ar-ali', 'ar-aisha', 'en-adrian', 'ar-layla', 'ar-omar', 'en-alice', 'ar-nour'];
     @endphp
-    <section class="studio {{ $trackPlans->count() < 2 ? 'is-single' : '' }}" id="studio" aria-label="{{ __('ui.pricing.minutes_label') }}"
-             data-plans="{{ json_encode($trackPlans) }}" data-i18n="{{ json_encode($studioI18n) }}">
-      <div class="studio-mixer">
-        <div class="studio-top">
-          <label class="studio-label" for="studioMinutes">{{ __('ui.pricing.minutes_label') }}</label>
-          <div class="billing-toggle" id="billingToggle" role="group" aria-label="{{ __('ui.pricing.monthly') }} / {{ __('ui.pricing.yearly') }}">
-            <span class="billing-indicator" aria-hidden="true"></span>
-            <button type="button" id="monthlyBtn" class="active" aria-pressed="true">{{ __('ui.pricing.monthly') }}</button>
-            <button type="button" id="yearlyBtn" aria-pressed="false">
-              {{ __('ui.pricing.yearly') }}
-              @if(($yearlyDiscountPercent ?? 0) > 0)
-                <span class="toggle-save">{{ __('ui.pricing.yearly_save', ['percent' => (int) $yearlyDiscountPercent]) }}</span>
-              @endif
-            </button>
-          </div>
+    <section class="plans" aria-labelledby="plansTitle">
+      {{-- Named for screen readers only: the cards follow the title above. --}}
+      <h2 class="plans-title" id="plansTitle">{{ __('ui.pricing.all_plans') }}</h2>
+
+      @if(count($mainPlans) > 1)
+        {{-- Phones: every plan's name in one switch that stays under the site's bar while the cards
+             scroll by; the plan being read is the chosen one, and a name goes to its card. --}}
+        <div class="plan-tabs-bar" id="planTabsBar">
+          <nav class="plan-tabs" id="planTabs" aria-labelledby="plansTitle">
+            @foreach($mainPlans as $index => $plan)
+              <a @class(['plan-tab', 'is-popular' => $planState($plan, $index)['is_popular']]) href="#plan-{{ $plan['slug'] }}" data-plan="{{ $plan['slug'] }}">@if($planState($plan, $index)['is_popular']){!! $crownSvg !!}@endif{{ $planDisplayName($plan) }}</a>
+            @endforeach
+          </nav>
         </div>
-        @if($trackPlans->count() >= 2)
-          <div class="studio-amount">
-            <input id="studioMinutes" inputmode="numeric" autocomplete="off" value="{{ number_format($shownMinutes) }}" aria-describedby="studioAbout">
-            <span class="studio-unit">{{ __('ui.pricing.minutes_unit') }}</span>
-          </div>
-          <p class="studio-about" id="studioAbout"></p>
-          <div class="studio-track">
-            <div class="studio-wave" id="studioWave">
-              <svg id="studioBars" aria-hidden="true" focusable="false">
-                <defs><clipPath id="studioFillClip"><rect id="studioFillEdge" x="0" y="-20" width="0" height="200"/></clipPath></defs>
-                <path class="studio-bars-base" fill="none" stroke-linecap="round"/>
-                <path class="studio-bars-fill" fill="none" stroke-linecap="round" clip-path="url(#studioFillClip)"/>
-              </svg>
-              <input id="studioSlider" type="range" min="0" max="0" step="1" value="0" aria-label="{{ __('ui.pricing.minutes_track') }}">
-              <span class="studio-head" id="studioHead"></span>
-            </div>
-            <div class="studio-stations" aria-hidden="true">
-              @foreach($trackPlans as $trackPlan)
-                <button type="button" class="studio-station" data-pick="{{ $trackPlan['slug'] }}" tabindex="-1">
-                  @if($trackPlan['popular']){!! str_replace('class="crown"', 'class="crown studio-station-crown"', $crownSvg) !!}@endif
-                  <x-orb :name="\App\Support\Orbs::forPlan($trackPlan['slug'])" />
-                  <span class="studio-station-name">{{ $trackPlan['name'] }}</span>
-                </button>
-              @endforeach
-            </div>
-          </div>
-        @endif
-        <p class="studio-proof">
-          <span class="studio-faces" aria-hidden="true">@foreach($proofFaces as $face)<img src="{{ asset('images/speakers/'.$face.'.webp') }}" alt="" width="32" height="32" loading="lazy">@endforeach</span>
-          <span>{{ __('ui.pricing.voices_proof', ['count' => \App\Support\DialectCounts::arabic() + \App\Support\DialectCounts::english()]) }}</span>
-        </p>
-      </div>
-      <div class="studio-plan">
-        <div class="plan-ribbon" id="planRibbon" @unless($shownPopular) hidden @endunless>{!! $crownSvg !!}{{ __('ui.pricing.most_popular') }}</div>
-        <div class="plan-stage">
-          @foreach($mainPlans as $index => $plan)
-            @include('components._plan-card', ['plan' => $plan, 'index' => $index, 'isShown' => $plan['slug'] === $shownSlug])
-          @endforeach
-        </div>
+      @endif
+
+      <div class="plan-grid" id="planGrid" data-count="{{ count($mainPlans) }}">
+        @foreach($mainPlans as $index => $plan)
+          @include('components._plan-card', ['plan' => $plan, 'index' => $index])
+        @endforeach
       </div>
     </section>
 
-    @if(count($mainPlans) > 1)
-      <section class="plan-picker" aria-labelledby="planPickerTitle">
-        <h2 class="section-title" id="planPickerTitle">{{ __('ui.pricing.all_plans') }}</h2>
-        <div class="plan-picker-list" style="--count: {{ min(5, count($mainPlans)) }}">
-          @foreach($mainPlans as $index => $plan)
-            @php
-              $pickPopular = $planState($plan, $index)['is_popular'];
-              $pickMonthly = $wholePrice((string) ($plan['display_price_monthly_formatted'] ?? ''));
-              $pickYearly = $wholePrice((string) ($plan['display_price_yearly_monthly_formatted'] ?? $pickMonthly));
-              $pickMinutes = \App\Support\Credits::minutesFor((int) ($plan['monthly_chars'] ?? 0));
-              // A plan on offer: its full price struck through and how much is off, under the price.
-              $pickOffer = !empty($plan['has_discount']) && !empty($plan['original_price_monthly_formatted']);
-              $pickPercent = (int) ($plan['discount_percentage'] ?? 0);
-              // On yearly: the usual monthly price struck through under the yearly price per month.
-              $pickFullMonthly = $wholePrice((string) ($plan['original_price_monthly_formatted'] ?? $plan['display_price_monthly_formatted'] ?? ''));
-              $pickYearlySaves = $pickYearly !== '' && $pickYearly !== $pickFullMonthly;
-            @endphp
-            <button type="button" @class(['plan-pick', 'is-first-month' => !empty($plan['discount_first_month'])]) data-pick="{{ $plan['slug'] }}" aria-controls="studio">
-              @if($pickPopular)<span class="plan-pick-crown">{!! $crownSvg !!}{{ __('ui.pricing.most_popular') }}</span>@endif
-              <x-orb :name="\App\Support\Orbs::forPlan((string) $plan['slug'])" />
-              <span class="plan-pick-name">{{ $planDisplayName($plan) }}</span>
-              <span class="plan-pick-minutes">{{ trans_choice('ui.pricing.minutes_count', $pickMinutes, ['count' => number_format($pickMinutes)]) }}</span>
-              <span class="plan-pick-cost">
-                <span class="plan-pick-price"><span dir="ltr" data-monthly="{{ $pickMonthly }}" data-yearly="{{ $pickYearly }}" data-compare-price>{{ $pickMonthly }}</span><small>{{ __('ui.pricing.per_month_short') }}</small></span>
-                @if($pickOffer)
-                  <span class="plan-pick-offer">
-                    <s dir="ltr">{{ $wholePrice((string) $plan['original_price_monthly_formatted']) }}</s>
-                    <span class="plan-pick-off">{{ __('ui.pricing.discount_chip', ['percent' => $pickPercent]) }}</span>
-                  </span>
+    @if($trackPlans->count() >= 2)
+      {{-- The calculator: the minutes a month the visitor needs, on a voice track, and the plan that fits. --}}
+      <section class="calc" aria-labelledby="studioTitle" data-markdown="skip">
+        <h2 class="section-title" id="studioTitle"><label for="studioMinutes">{{ __('ui.pricing.minutes_label') }}</label></h2>
+        <div class="studio" id="studio" data-plans="{{ json_encode($trackPlans) }}" data-i18n="{{ json_encode($studioI18n) }}">
+          <div class="studio-mixer">
+            <div class="studio-amount">
+              <input id="studioMinutes" inputmode="numeric" autocomplete="off" value="{{ number_format($shownMinutes) }}" aria-describedby="studioAbout">
+              <span class="studio-unit">{{ __('ui.pricing.minutes_unit') }}</span>
+            </div>
+            <p class="studio-about" id="studioAbout"></p>
+            <div class="studio-track">
+              <div class="studio-wave" id="studioWave">
+                <svg id="studioBars" aria-hidden="true" focusable="false">
+                  <defs><clipPath id="studioFillClip"><rect id="studioFillEdge" x="0" y="-20" width="0" height="200"/></clipPath></defs>
+                  <path class="studio-bars-base" fill="none" stroke-linecap="round"/>
+                  <path class="studio-bars-fill" fill="none" stroke-linecap="round" clip-path="url(#studioFillClip)"/>
+                </svg>
+                <input id="studioSlider" type="range" min="0" max="0" step="1" value="0" aria-label="{{ __('ui.pricing.minutes_track') }}">
+                <span class="studio-head" id="studioHead"></span>
+              </div>
+              <div class="studio-stations" aria-hidden="true">
+                @foreach($trackPlans as $trackPlan)
+                  <button type="button" class="studio-station" data-pick="{{ $trackPlan['slug'] }}" tabindex="-1">
+                    @if($trackPlan['popular']){!! str_replace('class="crown"', 'class="crown studio-station-crown"', $crownSvg) !!}@endif
+                    <x-orb :name="\App\Support\Orbs::forPlan($trackPlan['slug'])" />
+                    <span class="studio-station-name">{{ $trackPlan['name'] }}</span>
+                  </button>
+                @endforeach
+              </div>
+            </div>
+            <p class="studio-proof">
+              <span class="studio-faces" aria-hidden="true">@foreach($proofFaces as $face)<img src="{{ asset('images/speakers/'.$face.'.webp') }}" alt="" width="32" height="32" loading="lazy">@endforeach</span>
+              <span>{{ __('ui.pricing.voices_proof', ['count' => \App\Support\DialectCounts::arabic() + \App\Support\DialectCounts::english()]) }}</span>
+            </p>
+          </div>
+          {{-- The plan that fits the minutes, with its price and its own button. --}}
+          <div class="studio-fit">
+            <div class="fit-stage">
+              @foreach($mainPlans as $index => $plan)
+                @php
+                  $fitMinutes = \App\Support\Credits::minutesFor((int) ($plan['monthly_chars'] ?? 0));
+                  $fitShown = $plan['slug'] === $shownSlug;
+                  $fitMonthly = $wholePrice((string) ($plan['display_price_monthly_formatted'] ?? ''));
+                  $fitYearly = $wholePrice((string) ($plan['display_price_yearly_monthly_formatted'] ?? $fitMonthly));
+                  $fitOriginal = !empty($plan['has_discount']) && !empty($plan['original_price_monthly_formatted']) ? $wholePrice((string) $plan['original_price_monthly_formatted']) : null;
+                  $fitFullMonthly = $fitOriginal ?? $fitMonthly;
+                @endphp
+                @if($fitMinutes > 0)
+                  <div @class(['fit-plan', 'is-active' => $fitShown]) data-fit-slug="{{ $plan['slug'] }}" data-orb-host @unless($fitShown) inert @endunless>
+                    <x-orb :name="\App\Support\Orbs::forPlan((string) $plan['slug'])" @class(['fit-orb', 'is-live' => $fitShown]) />
+                    <p class="fit-name">{{ $planDisplayName($plan) }}</p>
+                    <p class="fit-minutes"><strong>{{ number_format($fitMinutes) }}</strong> {{ __('ui.pricing.minutes_per_month') }}</p>
+                    <div class="price-line">
+                      @if($fitOriginal)
+                        <div class="price-original-row is-offer"><s class="price-original" dir="ltr">{{ $fitOriginal }}</s></div>
+                      @endif
+                      @if($fitYearly !== $fitFullMonthly)
+                        <div class="price-original-row is-yearly"><s class="price-original" dir="ltr">{{ $fitFullMonthly }}</s></div>
+                      @endif
+                      <div class="price-row">
+                        <span class="price-main" dir="ltr"><span class="price-amount" data-compare-price data-monthly="{{ $fitMonthly }}" data-yearly="{{ $fitYearly }}">{{ $fitMonthly }}</span></span>
+                        <span class="price-period">{{ __('ui.pricing.per_month_short') }}</span>
+                      </div>
+                    </div>
+                    @include('components._plan-button', ['plan' => $plan, 'index' => $index])
+                  </div>
                 @endif
-                @if($pickYearlySaves)
-                  <span class="plan-pick-was"><s dir="ltr">{{ $pickFullMonthly }}</s></span>
-                @endif
-              </span>
-            </button>
-          @endforeach
+              @endforeach
+            </div>
+          </div>
         </div>
       </section>
     @endif
@@ -1335,7 +1399,7 @@
         <div class="compare-scroll" role="region" aria-labelledby="compareTitle" tabindex="0">
           @php
             // Phones show two plans side by side, picked above the table: first the plan the
-            // track shows, then the next one up (the one before it when it is the last).
+            // calculator starts on, then the next one up (the one before it when it is the last).
             $compareFirst = max(0, (int) array_search($shownSlug, array_column($comparePlans, 'slug'), true));
             $compareSecond = $compareFirst + 1 < count($comparePlans) ? $compareFirst + 1 : max(0, $compareFirst - 1);
           @endphp
@@ -1371,9 +1435,15 @@
                   <th scope="col" class="compare-plan {{ $comparePopular ? 'is-popular' : '' }}" data-col="{{ $compareIndex }}" data-slug="{{ $comparePlan['slug'] }}">
                     <span class="compare-plan-badge">{{ $comparePopular ? __('ui.pricing.most_popular') : '' }}</span>
                     <span class="compare-plan-name">{{ $planDisplayName($comparePlan) }}</span>
-                    <span class="compare-plan-price" dir="ltr">
-                      <b data-compare-price data-monthly="{{ $compareMonthly }}" data-yearly="{{ $compareYearly }}">{{ $compareMonthly }}</b><small>{{ __('ui.pricing.per_month_short') }}</small>
+                    <span class="compare-plan-price">
+                      <b dir="ltr" data-compare-price data-monthly="{{ $compareMonthly }}" data-yearly="{{ $compareYearly }}">{{ $compareMonthly }}</b><small>{{ __('ui.pricing.per_month_short') }}</small>
                     </span>
+                    @if(!empty($comparePlan['has_discount']) && !empty($comparePlan['original_price_monthly_formatted']))
+                      <span class="compare-plan-offer">
+                        <s dir="ltr">{{ $wholePrice((string) $comparePlan['original_price_monthly_formatted']) }}</s>
+                        <span class="offer-chip">{{ __('ui.pricing.discount_chip', ['percent' => (int) ($comparePlan['discount_percentage'] ?? 0)]) }}</span>
+                      </span>
+                    @endif
                     @include('components._plan-button', ['plan' => $comparePlan, 'index' => $compareAt, 'small' => true])
                   </th>
                 @endforeach
@@ -1437,7 +1507,7 @@
     @endauth
   </main>
 
-  {{-- Phones: the plan shown above and its button, kept at the bottom while the panel is out of view. --}}
+  {{-- Phones: the plan that fits and its button, kept at the bottom once the plans are scrolled past. --}}
   <div class="plan-bar" id="planBar" aria-hidden="true">
     <div><span class="plan-bar-name" id="planBarName"></span><span class="plan-bar-price" id="planBarPrice"></span></div>
     <div id="planBarAction"></div>
@@ -1466,6 +1536,8 @@
       var billingToggle = document.getElementById('billingToggle');
       var planCards = document.querySelectorAll('.plan-card');
       var upgradeLinks = document.querySelectorAll('[data-upgrade-link="1"]');
+      var page = document.querySelector('.pricing-page');
+      var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       var isYearly = false;
       var i18n = @json($pricingI18n);
 
@@ -1543,13 +1615,32 @@
         monthlyBtn.setAttribute('aria-pressed', yearly ? 'false' : 'true');
         yearlyBtn.setAttribute('aria-pressed', yearly ? 'true' : 'false');
         billingToggle.classList.toggle('yearly', yearly);
-        document.querySelectorAll('.studio, .plan-picker').forEach(function(el) {
-          el.classList.toggle('is-yearly', yearly);
-        });
+        placeChip();
+        if (page) page.classList.toggle('is-yearly', yearly);
         updatePrices();
         updateUpgradeLinks();
         updateComparePrices();
+        // The prices on the cards and in the calculator lift in.
+        if (!reduced) {
+          document.querySelectorAll('.plan-card .price-amount, .fit-plan .price-amount').forEach(function(el) {
+            el.classList.remove('is-changing');
+            void el.offsetWidth;
+            el.classList.add('is-changing');
+          });
+        }
       }
+
+      // The chip under the chosen half: its exact place and width, whatever the words' widths.
+      function placeChip() {
+        var active = isYearly ? yearlyBtn : monthlyBtn;
+        if (!active.offsetWidth) return;
+        billingToggle.style.setProperty('--chip-w', active.offsetWidth + 'px');
+        billingToggle.style.setProperty('--chip-x', active.offsetLeft + 'px');
+        billingToggle.classList.add('is-measured');
+      }
+      placeChip();
+      if ('ResizeObserver' in window) new ResizeObserver(placeChip).observe(billingToggle);
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeChip);
 
       monthlyBtn.addEventListener('click', function() { setBillingMode(false); });
       yearlyBtn.addEventListener('click', function() { setBillingMode(true); });
@@ -1558,188 +1649,211 @@
       updateUpgradeLinks();
     })();
   </script>
-  @php
-    // The offer-ends wording in every plural form, for the minute-by-minute update.
-    $offerEndsForms = [
-      'days' => explode('|', __('ui.pricing.offer_ends_days')),
-      'hours' => explode('|', __('ui.pricing.offer_ends_hours')),
-      'minutes' => explode('|', __('ui.pricing.offer_ends_minutes')),
-    ];
-  @endphp
   <script>
-    /* ── When each offer ends, in words, kept current ── */
-    (function() {
-      var lines = document.querySelectorAll('.offer-ends[data-ends]');
-      if (!lines.length) return;
-      var forms = @json($offerEndsForms);
-      var units = @json(explode('|', __('ui.pricing.countdown_units')));
-      var arabic = document.documentElement.lang === 'ar';
-      // The same plural rules the server uses (Laravel's): six forms in Arabic, two in English.
-      function form(list, n) {
-        var i;
-        if (arabic) {
-          var m = n % 100;
-          i = n === 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : (m >= 3 && m <= 10) ? 3 : (m >= 11 && m <= 99) ? 4 : 5;
-        } else {
-          i = n === 1 ? 0 : 1;
-        }
-        return String(list[Math.min(i, list.length - 1)] || '').replace(':count', String(n));
-      }
-      function pad(n) { return (n < 10 ? '0' : '') + n; }
-      function set(el, text) { if (el && el.textContent !== text) el.textContent = text; }
-      // The timer: days : hours : minutes : seconds (the days only while there is more than one),
-      // each with its unit under it. Screen readers get the time left in words.
-      function clock(el, seconds) {
-        var box = el.querySelector('.offer-ends-clock');
-        if (!box) return;
-        var parts = [[Math.floor(seconds / 86400), units[0]], [Math.floor(seconds % 86400 / 3600), units[1]], [Math.floor(seconds % 3600 / 60), units[2]], [seconds % 60, units[3]]];
-        if (seconds < 86400) parts.shift();
-        var html = parts.map(function(p) { return '<span class="offer-ends-unit"><b>' + pad(p[0]) + '</b><small>' + p[1] + '</small></span>'; }).join('<span class="offer-ends-sep">:</span>');
-        if (box.innerHTML !== html) box.innerHTML = html;
-      }
-      function refresh() {
-        var any = false;
-        lines.forEach(function(el) {
-          var seconds = Math.floor((new Date(el.getAttribute('data-ends')).getTime() - Date.now()) / 1000);
-          if (!(seconds > 0)) { el.hidden = true; return; }
-          any = true;
-          var text = seconds >= 172800 ? form(forms.days, Math.floor(seconds / 86400))
-            : seconds >= 3600 ? form(forms.hours, Math.floor(seconds / 3600))
-            : form(forms.minutes, Math.max(1, Math.ceil(seconds / 60)));
-          clock(el, seconds);
-          set(el.querySelector('.offer-ends-text'), text);
-        });
-        if (any) setTimeout(refresh, 1000);
-      }
-      refresh();
-    })();
-  </script>
-  <script>
-    /* ── The minutes track: pick minutes, see the plan that fits ──
-       The plans sit on the track evenly spaced, the minutes between two plans on a
-       log scale, so 15 and 2,500 minutes both fit. One loop moves everything: the
-       playhead, the filled part of the voice, the number and the plan follow the same
-       position in the same frame, so nothing lags behind anything else. A drag follows
-       the hand; a click, a key, a plan or a typed number glides there; close to a plan
-       the playhead settles on it. The plan shown is the smallest one that covers the
-       minutes chosen. */
+    /* ── The plans and the minutes calculator ──
+       Phones: the switch above the cards follows the card being read and a name goes to its
+       card; each card shows four lines until asked for the rest. In the calculator the plans sit on
+       the track evenly spaced, the minutes between two plans on a log scale, so 15 and
+       2,500 minutes both fit. One loop moves everything: the playhead, the filled part of
+       the voice, the number and the plan follow the same position in the same frame, so
+       nothing lags behind anything else. A drag follows the hand; a click, a key, a plan
+       or a typed number glides there; close to a plan the playhead settles on it. The plan
+       that fits is the smallest one that covers the minutes chosen; once the visitor has
+       used the calculator, its card above gets a ring too. */
     (function () {
       var studio = document.getElementById('studio');
-      if (!studio) return;
-      var plans = JSON.parse(studio.getAttribute('data-plans') || '[]');
-      var t = JSON.parse(studio.getAttribute('data-i18n') || '{}');
-      var cards = Array.prototype.slice.call(studio.querySelectorAll('.plan-card'));
-      var picks = Array.prototype.slice.call(document.querySelectorAll('[data-pick]'));
+      var grid = document.getElementById('planGrid');
+      var plansSection = grid && grid.closest('.plans');
+      var bar = document.getElementById('planBar');
       var rtl = document.documentElement.dir === 'rtl';
       var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      var shownSlug = null;
-      var ribbon = document.getElementById('planRibbon');
-      var fmt = function (n) { return Math.round(n).toLocaleString('en'); };
-      function shownCard() {
-        return cards.filter(function (c) { return c.classList.contains('is-active'); })[0] || cards[0];
+      var narrow = window.matchMedia('(max-width: 1000px)');
+      var cardsReachEdge = window.matchMedia('(max-width: 1360px)');
+      var all = function (root, selector) { return root ? Array.prototype.slice.call(root.querySelectorAll(selector)) : []; };
+      var cards = all(grid, '.plan-card');
+      var tabBox = document.getElementById('planTabs');
+      var tabs = all(tabBox, '.plan-tab[data-plan]');
+      var fits = all(studio, '.fit-plan');
+      var stations = all(studio, '.studio-station[data-pick]');
+      var shownSlug = null, used = false;
+
+      // The switch on phones: one name chosen at a time, kept in view inside the switch.
+      var readingSlug = null, followFrom = 0;
+      function chooseTab(slug) {
+        if (!tabBox || slug === readingSlug) return;
+        readingSlug = slug;
+        tabs.forEach(function (tab) {
+          var on = tab.getAttribute('data-plan') === slug;
+          tab.classList.toggle('is-on', on);
+          if (on) {
+            tab.setAttribute('aria-current', 'true');
+            var box = tabBox.getBoundingClientRect(), it = tab.getBoundingClientRect();
+            var by = it.left < box.left + 8 ? it.left - box.left - 8 : (it.right > box.right - 8 ? it.right - box.right + 8 : 0);
+            if (by) tabBox.scrollBy({ left: by, behavior: reduced ? 'auto' : 'smooth' });
+          } else {
+            tab.removeAttribute('aria-current');
+          }
+        });
+      }
+      if (tabs.length) {
+        chooseTab(tabs[0].getAttribute('data-plan'));
+        // A name goes to its card (the switch keeps that name while the page glides there).
+        tabs.forEach(function (tab) {
+          tab.addEventListener('click', function (e) {
+            var card = document.getElementById('plan-' + tab.getAttribute('data-plan'));
+            if (!card) return;
+            e.preventDefault();
+            chooseTab(tab.getAttribute('data-plan'));
+            followFrom = Date.now() + (reduced ? 0 : 900);
+            card.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+            card.focus({ preventScroll: true });
+          });
+        });
+        // The band under the site's bar gets its hairline once it is held there.
+        var tabBar = document.getElementById('planTabsBar'), barFrame = 0;
+        if (tabBar) {
+          var held = function () {
+            barFrame = 0;
+            var header = document.querySelector('.app-header');
+            var top = header ? header.getBoundingClientRect().bottom : 64;
+            tabBar.classList.toggle('is-stuck', tabBar.getBoundingClientRect().top <= top + 0.5 && window.scrollY > 0);
+          };
+          window.addEventListener('scroll', function () { if (!barFrame) barFrame = requestAnimationFrame(held); }, { passive: true });
+          held();
+        }
+        // The card crossing the upper middle of the screen is the one being read.
+        if ('IntersectionObserver' in window) {
+          var reading = new IntersectionObserver(function (entries) {
+            if (Date.now() < followFrom) return;
+            entries.forEach(function (entry) { if (entry.isIntersecting) chooseTab(entry.target.getAttribute('data-plan-slug')); });
+          }, { rootMargin: '-40% 0px -55% 0px' });
+          cards.forEach(function (card) { reading.observe(card); });
+        }
       }
 
-      // One plan's card at a time; its orb comes alive.
+      // Phones: the rest of a card's lines on request; the keyboard moves on to the first of them.
+      if (grid) {
+        grid.classList.add('can-fold');
+        all(grid, '.plan-more').forEach(function (button) {
+          button.addEventListener('click', function () {
+            var card = button.closest('.plan-card');
+            card.classList.add('is-open');
+            button.setAttribute('aria-expanded', 'true');
+            var next = card.querySelector('.plan-features li:nth-child(5)');
+            if (next) { next.setAttribute('tabindex', '-1'); next.focus({ preventScroll: true }); }
+          });
+        });
+      }
+
+      function fitCard() {
+        return fits.filter(function (f) { return f.classList.contains('is-active'); })[0] || fits[0];
+      }
+      // The plan that fits: its card gets a ring, once the visitor has used the calculator.
+      function mark() {
+        cards.forEach(function (c) { c.classList.toggle('is-fit', used && c.getAttribute('data-plan-slug') === shownSlug); });
+      }
+      function use() { if (!used) { used = true; mark(); } }
+      // One plan in the calculator at a time; its orb comes alive.
       function showPlan(slug) {
         if (slug === shownSlug) return;
         shownSlug = slug;
-        picks.forEach(function (p) { p.classList.toggle('is-on', p.getAttribute('data-pick') === slug); });
-        cards.forEach(function (card) {
-          var on = card.getAttribute('data-plan-slug') === slug;
-          card.classList.toggle('is-active', on);
-          if (on) { card.removeAttribute('inert'); } else { card.setAttribute('inert', ''); }
-          var orb = card.querySelector('.plan-orb');
+        stations.forEach(function (s) { s.classList.toggle('is-on', s.getAttribute('data-pick') === slug); });
+        fits.forEach(function (fit) {
+          var on = fit.getAttribute('data-fit-slug') === slug;
+          fit.classList.toggle('is-active', on);
+          if (on) { fit.removeAttribute('inert'); } else { fit.setAttribute('inert', ''); }
+          var orb = fit.querySelector('.fit-orb');
           if (orb) orb.classList.toggle('is-live', on);
-          if (on && ribbon) ribbon.hidden = !card.classList.contains('popular');
         });
+        mark();
         refreshBar();
-        syncBar();
         document.dispatchEvent(new CustomEvent('listen:pricing-plan', { detail: { slug: slug } }));
       }
 
-      // The bar at the bottom on phones: the shown plan, its price and its own button.
-      var bar = document.getElementById('planBar');
+      // The bar at the bottom on phones: the plan that fits, its price and its own button.
       function refreshBar() {
         if (!bar) return;
-        var card = shownCard();
-        if (!card) return;
-        var name = card.querySelector('.plan-name');
-        var price = card.querySelector('.price-value');
-        var period = card.querySelector('.price-period');
-        var was = Array.prototype.filter.call(card.querySelectorAll('.price-original'), function (el) {
+        var fit = fitCard();
+        if (!fit) return;
+        var name = fit.querySelector('.fit-name');
+        var price = fit.querySelector('.price-amount');
+        var period = fit.querySelector('.price-period');
+        var was = Array.prototype.filter.call(fit.querySelectorAll('.price-original'), function (el) {
           return getComputedStyle(el.parentNode).display !== 'none';
         })[0];
-        // The price as the card shows it: "/month" only when the card has it, and the struck price the card
-        // shows (an offer's full price on monthly, the usual monthly price on yearly).
-        var shownPeriod = period && getComputedStyle(period).display !== 'none' ? ' ' + period.textContent.trim() : '';
         var barPrice = document.getElementById('planBarPrice');
         document.getElementById('planBarName').textContent = name ? name.textContent.trim() : '';
         barPrice.textContent = '';
         if (price) {
-          // The price and "/month" stay together; the struck price may go to the next line.
+          // The price in its own direction ("15.40 US$", never "$US 15.40"), "/month" after it.
           var now = document.createElement('span');
+          var amount = document.createElement('span');
           now.className = 'plan-bar-now';
-          now.textContent = price.textContent.trim() + shownPeriod;
+          amount.dir = 'ltr';
+          amount.textContent = price.textContent.trim();
+          now.appendChild(amount);
+          if (period) now.appendChild(document.createTextNode(' ' + period.textContent.trim()));
           barPrice.appendChild(now);
         }
         barPrice.classList.toggle('has-offer', !!was);
         if (was && price) {
           var struck = document.createElement('s');
+          struck.dir = 'ltr';
           struck.textContent = was.textContent.trim();
           barPrice.appendChild(struck);
         }
         var action = document.getElementById('planBarAction');
         action.innerHTML = '';
-        var button = card.querySelector('.plan-btn');
+        var button = fit.querySelector('.plan-btn');
         if (button) {
           var copy = button.cloneNode(true);
           copy.removeAttribute('data-upgrade-link');
           copy.setAttribute('tabindex', '-1');
           // The bar is narrow: on yearly, the shorter "Get 20% off".
           var barYearly = copy.getAttribute('data-bar-yearly-label');
-          if (barYearly && card.closest('.studio.is-yearly')) copy.textContent = barYearly;
+          if (barYearly && fit.closest('.pricing-page.is-yearly')) copy.textContent = barYearly;
           action.appendChild(copy);
         }
       }
-      // It shows while the shown plan's own button is out of view (the bottom of the screen,
-      // where the bar sits, counts as out of view, so the two never swap back and forth).
+      // Phones and tablets: the bar shows once the plans and the calculator are scrolled past, and
+      // the chat button steps aside while the plans' rows and buttons are on screen.
+      var seen = { plans: false, studio: false }, pending = 0;
       function syncBar() {
-        if (!bar || !('IntersectionObserver' in window)) return;
-        var action = shownCard() && shownCard().querySelector('.plan-action');
-        var show = !(action && action.__inView);
+        pending = 0;
+        var near = seen.plans || seen.studio;
+        document.body.classList.toggle('plans-in-view', near && cardsReachEdge.matches);
+        if (!bar || !studio) return;
+        var show = !near && studio.getBoundingClientRect().bottom < 0;
         bar.classList.toggle('is-shown', show);
-        document.body.classList.toggle('has-plan-bar', show && window.matchMedia('(max-width: 1000px)').matches);
+        document.body.classList.toggle('has-plan-bar', show && narrow.matches);
       }
-      if (bar && 'IntersectionObserver' in window) {
+      if ('IntersectionObserver' in window) {
         var watch = new IntersectionObserver(function (entries) {
-          entries.forEach(function (entry) { entry.target.__inView = entry.isIntersecting; });
+          entries.forEach(function (entry) { seen[entry.target === studio ? 'studio' : 'plans'] = entry.isIntersecting; });
           syncBar();
         }, { rootMargin: '0px 0px -90px 0px' });
-        cards.forEach(function (card) { var action = card.querySelector('.plan-action'); if (action) watch.observe(action); });
+        if (plansSection) watch.observe(plansSection);
+        if (studio) watch.observe(studio);
+        // A jump back to the top passes nothing on the way, so the scroll itself is checked too
+        // (once a frame at most).
+        window.addEventListener('scroll', function () { if (!pending) pending = requestAnimationFrame(syncBar); }, { passive: true });
       }
-
-      // A new billing cycle: the price lifts in, and the bar follows.
+      // A new billing cycle: the bar follows.
       ['monthlyBtn', 'yearlyBtn'].forEach(function (id) {
         var button = document.getElementById(id);
-        if (!button) return;
-        button.addEventListener('click', function () {
-          var price = shownCard() && shownCard().querySelector('.price-amount');
-          if (price && !reduced) { price.classList.remove('is-changing'); void price.offsetWidth; price.classList.add('is-changing'); }
-          refreshBar();
-        });
+        if (button) button.addEventListener('click', refreshBar);
       });
 
-      var first = shownCard();
-      shownSlug = first ? first.getAttribute('data-plan-slug') : null;
-      picks.forEach(function (p) { p.classList.toggle('is-on', p.getAttribute('data-pick') === shownSlug); });
+      if (!studio) return;
+      var plans = JSON.parse(studio.getAttribute('data-plans') || '[]');
+      var t = JSON.parse(studio.getAttribute('data-i18n') || '{}');
+      var fmt = function (n) { return Math.round(n).toLocaleString('en'); };
+      var first = fitCard();
+      shownSlug = first ? first.getAttribute('data-fit-slug') : null;
+      stations.forEach(function (s) { s.classList.toggle('is-on', s.getAttribute('data-pick') === shownSlug); });
       refreshBar();
 
       var slider = document.getElementById('studioSlider');
-      if (plans.length < 2 || !slider) {
-        picks.forEach(function (p) { p.addEventListener('click', function () { showPlan(p.getAttribute('data-pick')); }); });
-        return;
-      }
-
       var input = document.getElementById('studioMinutes');
       var about = document.getElementById('studioAbout');
       var head = document.getElementById('studioHead');
@@ -1784,14 +1898,14 @@
       // The keys move one round figure at a time, stopping at every plan.
       var NICE = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 100, 120, 150, 200, 250, 300, 400, 500, 600, 750, 1000, 1250, 1500, 1750, 2000, 2500, 3000, 4000, 5000, 7500, 10000, 15000, 20000, 25000, 50000];
       var stops = NICE.filter(function (n) { return n >= minM && n <= maxM; }).concat(anchors)
-        .filter(function (n, i, all) { return all.indexOf(n) === i; })
+        .filter(function (n, i, list) { return list.indexOf(n) === i; })
         .sort(function (a, b) { return a - b; });
       slider.max = String(stops.length - 1);
       studio.style.setProperty('--track-from', (LEAD * 100) + '%');
       studio.style.setProperty('--track-to', ((1 - END) * 100) + '%');
 
       // The plans as orbs along the track.
-      studio.querySelectorAll('.studio-station').forEach(function (station) {
+      stations.forEach(function (station) {
         var plan = plans.filter(function (p) { return p.slug === station.getAttribute('data-pick'); })[0];
         if (plan) station.style.left = ((rtl ? 1 - pos(plan.minutes) : pos(plan.minutes)) * 100) + '%';
       });
@@ -1855,7 +1969,7 @@
 
       // The number box is as wide as its digits (where the browser cannot size it itself).
       var sizes = window.CSS && CSS.supports && CSS.supports('field-sizing', 'content');
-      function fit() { if (!sizes) input.style.width = (String(input.value).length + 0.15) + 'ch'; }
+      function fit() { if (!sizes) input.style.width = (String(input.value).length + 0.3) + 'ch'; }
       input.addEventListener('input', fit);
 
       var live = document.createElement('p');
@@ -1938,11 +2052,13 @@
         else if (e.key === 'End') next = maxM;
         else return;
         e.preventDefault();
+        use();
         if (next != null) go(pos(next), { exact: next });
       });
       // Assistive technology may set the value itself.
       slider.addEventListener('input', function () {
         var m = stops[+slider.value];
+        use();
         if (m != null) go(pos(m), { exact: m });
       });
 
@@ -1967,6 +2083,7 @@
         studio.classList.add('is-dragging');
         still(true);
         slider.focus({ preventScroll: true });
+        use();
         toward(e.clientX, false);
       }
       function end(e) {
@@ -1977,7 +2094,7 @@
           if (!frame) still(false);
         }
         press = null;
-        if (tap) { slider.focus({ preventScroll: true }); toward(e.clientX, false); }
+        if (tap) { slider.focus({ preventScroll: true }); use(); toward(e.clientX, false); }
       }
       wave.addEventListener('pointerdown', function (e) {
         if (e.button > 0 || press) return;
@@ -2007,25 +2124,19 @@
         var m = clamp(+digits, minM, maxM);
         input.value = fmt(m);
         fit();
+        use();
         go(pos(m), { exact: m });
       }
       input.addEventListener('change', typed);
       input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); typed(); } });
       input.addEventListener('blur', function () { input.value = fmt(shownMinutes); fit(); });
 
-      // A plan's orb on the track, or its card below, moves the track to it.
-      picks.forEach(function (p) {
-        p.addEventListener('click', function () {
-          var plan = plans.filter(function (q) { return q.slug === p.getAttribute('data-pick'); })[0];
-          if (plan) go(pos(plan.minutes), { exact: plan.minutes }); else showPlan(p.getAttribute('data-pick'));
-          // From the list under it: in one column, straight to that plan's card (its price
-          // and button); side by side, to the track and the card together.
-          if (p.classList.contains('plan-pick')) {
-            var oneColumn = window.matchMedia('(max-width: 1000px)').matches;
-            var target = oneColumn ? studio.querySelector('.studio-plan') : studio;
-            var b = target.getBoundingClientRect();
-            if (oneColumn || b.top < 0 || b.top > window.innerHeight * 0.4) target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
-          }
+      // A plan's orb on the track moves the track to it.
+      stations.forEach(function (station) {
+        station.addEventListener('click', function () {
+          var plan = plans.filter(function (q) { return q.slug === station.getAttribute('data-pick'); })[0];
+          use();
+          if (plan) go(pos(plan.minutes), { exact: plan.minutes });
         });
       });
 
@@ -2035,12 +2146,22 @@
       var start = +String(input.value).replace(/[^\d]/g, '') || plans[0].minutes;
       go(pos(start), { exact: start });
       clearTimeout(announce); // said only once the visitor moves it
-      requestAnimationFrame(function () { studio.classList.add('is-ready'); });
+      // The voice rises once, when the track comes into view.
+      if ('IntersectionObserver' in window && !reduced) {
+        studio.classList.add('is-waiting');
+        var rise = new IntersectionObserver(function (entries) {
+          if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
+          rise.disconnect();
+          studio.classList.remove('is-waiting');
+          studio.classList.add('is-ready');
+        }, { threshold: 0.35 });
+        rise.observe(wave);
+      }
     })();
   </script>
   <script>
     /* ── Phones: two plans side by side in the comparison ──
-       The plan the track shows and the next one up, until the visitor picks their own two
+       The plan the calculator shows and the next one up, until the visitor picks their own two
        above the table. The other plans' columns are left out, so the table fits the screen. */
     (function () {
       var table = document.querySelector('.compare-table[data-pick]');

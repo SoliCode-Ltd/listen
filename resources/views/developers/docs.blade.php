@@ -13,6 +13,8 @@
     $offered = $docs['offered'];
     $listed = fn (string $list) => \App\Support\Api\ApiDocs::listed($list, $offered, $arabic);
     $keysUrl = route('developers.keys');
+    // The MCP server is shown once it runs here (routes/ai.php, laravel/mcp).
+    $mcp = \App\Support\AgentDiscovery::mcpAvailable();
     $voiceName = $arabic && ($voice['name_ar'] ?? '') !== '' ? $voice['name_ar'] : $voice['name'];
     $contactEmail = trim((string) \App\Models\SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio';
     $supportEmail = '<a href="mailto:'.e($contactEmail).'" dir="ltr">'.e($contactEmail).'</a>';
@@ -23,6 +25,7 @@
         ['intro', $plain('intro.title')],
         ['quickstart', $plain('quickstart.title')],
         ['authentication', $plain('auth.title')],
+        ...($mcp ? [['mcp', $plain('mcp.title')]] : []),
         ['plans', $plain('plans.title')],
         ['credits', $plain('credits.title')],
       ],
@@ -177,6 +180,33 @@
           </div>
         </div>
       </section>
+
+      @if($mcp)
+      <section class="docs-section" id="mcp" data-section>
+        <div class="docs-row">
+          <div class="docs-text">
+            <h2>{{ $plain('mcp.title') }}<a class="docs-anchor" href="#mcp" aria-hidden="true" tabindex="-1">#</a></h2>
+            <p>{!! $t('mcp.body', [], ['url' => url('/mcp')]) !!}</p>
+            <ol class="docs-steps">
+              <li>{!! $t('mcp.step1') !!}</li>
+              <li>{!! $t('mcp.step2') !!}</li>
+              <li>{!! $t('mcp.step3') !!}</li>
+            </ol>
+            <p class="docs-note">{!! $t('mcp.note') !!}</p>
+            <h4>{{ $plain('mcp.tools_title') }}</h4>
+            <p>{{ $plain('mcp.tools_body') }}</p>
+            <dl class="docs-params">
+              @foreach(\App\Mcp\Servers\ListenServer::toolNames() as $tool)
+                <div class="docs-param"><dt><code dir="ltr">{{ $tool }}</code></dt><dd>{{ __('developers.docs.mcp.tools.'.$tool) }}</dd></div>
+              @endforeach
+            </dl>
+          </div>
+          <div class="docs-code">
+            @include('developers._docs-code', ['label' => $plain('mcp.config_label'), 'single' => $docs['mcp_config']])
+          </div>
+        </div>
+      </section>
+      @endif
 
       <section class="docs-section" id="plans" data-section>
         <div class="docs-text" style="max-width: none">

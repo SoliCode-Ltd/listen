@@ -83,6 +83,9 @@ class BillingController extends Controller
             'trialOffer' => $this->trialEligibility->offerFor($user),
             // On a paid plan, another plan costs the difference today (the order details say how much).
             'paidPlanChange' => $stripeReady && $subscription && $subscription->valid() && ! $subscription->onTrial(),
+            // Apple Pay and Google Pay start a new plan only: changing, resuming or ending
+            // the trial of a running one stays with the card boxes, which can ask first.
+            'walletPay' => $stripeReady && ! ($subscription && $subscription->valid()),
             'paymentOverdueNotice' => $this->overdueRenewalNotice($user),
         ]);
     }
@@ -392,6 +395,8 @@ class BillingController extends Controller
         }
 
         $user = $request->user();
+        // The Google Ads click, for when Stripe says the invoice is paid (AdsPurchases).
+        app(\App\Services\Billing\AdsPurchases::class)->rememberClick($user, $request);
 
         $validated = $request->validate([
             'plan' => ['required', 'string', 'max:50'],

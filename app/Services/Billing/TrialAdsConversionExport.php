@@ -4,6 +4,7 @@ namespace App\Services\Billing;
 
 use App\Models\BillingTrial;
 use App\Models\SiteSetting;
+use App\Support\Countries;
 
 /**
  * Paid trials that came from a Google Ads click, in the Google Ads
@@ -33,6 +34,8 @@ class TrialAdsConversionExport
             ->whereNotNull('gclid')
             ->whereNotNull('paid_at')
             ->where('paid_at', '>=', now()->subDays($days))
+            // Never a member from where the consent rules for ads apply.
+            ->whereDoesntHave('user', fn ($user) => $user->whereIn('country_code', Countries::ADS_CONSENT_REQUIRED))
             ->orderBy('paid_at')
             ->get()
             ->map(fn (BillingTrial $trial): array => [

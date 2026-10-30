@@ -30,7 +30,8 @@
   // A price in another currency is a guide: the card also shows the US-dollar price
   // a card is really charged, for each cycle.
 @endphp
-<div class="plan-card {{ $isPopular ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} {{ !empty($plan['discount_first_month']) ? 'is-first-month' : '' }} {{ $isCurrent ? 'is-current' : '' }} {{ ($isShown ?? false) ? 'is-active' : '' }}" data-orb-host @unless($isShown ?? false) inert @endunless
+<div class="plan-card {{ $isPopular ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} {{ $isCurrent ? 'is-current' : '' }}" data-orb-host
+     id="plan-{{ $plan['slug'] }}" tabindex="-1"
      data-plan-slug="{{ $plan['slug'] }}"
      data-is-free="{{ $isFree ? '1' : '0' }}"
      data-is-pack="{{ $isPack ? '1' : '0' }}"
@@ -50,31 +51,41 @@
 
   {{-- 1. Name and who it is for --}}
   <div class="plan-top">
-    {{-- Each plan's orb, and the badge on the recommended one; the popular orb moves gently. --}}
+    {{-- Each plan's orb; the recommended plan's moves gently and its badge sits on the card's top edge. --}}
     <div class="plan-badges">
-      <x-orb :name="\App\Support\Orbs::forPlan((string) $plan['slug'])" @class(['plan-orb', 'is-live' => $isShown ?? false]) />
+      <x-orb :name="\App\Support\Orbs::forPlan((string) $plan['slug'])" @class(['plan-orb', 'is-live' => $isPopular]) />
       @if($isPopular)
-        <span class="popular-badge">{{ __('ui.pricing.most_popular') }}</span>
+        <span class="popular-badge">{!! $crownSvg ?? '' !!}{{ __('ui.pricing.most_popular') }}</span>
       @endif
     </div>
     <h2 class="plan-name">{{ $planDisplayName($plan) }}</h2>
     <p class="plan-desc">{{ $planDescription($plan) }}</p>
   </div>
 
-  {{-- 2. Price, and the offer when there is one: its label above the price, the full price
-       struck through beside it, and the time left under it. An offer is for monthly billing
+  {{-- 2. Price, and the offer when there is one: its label above the price with the day it ends,
+       and the full price struck through beside the price. An offer is for monthly billing
        only, so on yearly all three go and the yearly price shows with the usual monthly price
        struck through beside it. --}}
   @php
     $terms = $hasDiscount && !$isFree && !$isPack ? ($plan['discount_terms'] ?? null) : null;
+    // The offer's last day, e.g. "30 Oct" («30 أكتوبر»). One ending at midnight ends the day before.
+    $offerUntil = $terms && $discountEndsAt
+      ? \Illuminate\Support\Carbon::parse($discountEndsAt)->subSecond()->locale(app()->getLocale())->translatedFormat('j M')
+      : null;
   @endphp
+  {{-- Kept when there is no offer too, so every card's price starts at the same height. --}}
   @if($terms)
     <div class="plan-offer">
       <span class="offer-label">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>
         <span class="offer-label-text">{{ $terms['offer_monthly'] }}</span>
+        @if($offerUntil)
+          <span class="offer-until">{{ __('ui.pricing.offer_until', ['date' => $offerUntil]) }}</span>
+        @endif
       </span>
     </div>
+  @else
+    <div class="plan-offer is-empty" aria-hidden="true"></div>
   @endif
   @php
     // On yearly, the month's usual price struck through beside the yearly price per month, so the
@@ -83,49 +94,25 @@
     $yearlySaves = !$isFree && !$isPack && $yearlyCents > 0 && $yearlyCents < (int) ($plan['original_price_monthly_cents'] ?? $monthlyCents) * 12;
   @endphp
   <div class="plan-pricing">
-    @if($hasDiscount && !$isFree && $originalFormatted)
-      <div class="price-original-row is-offer">
-        <s class="price-original" dir="ltr">{{ $originalFormatted }}</s>
+    <div class="price-line">
+      @if($hasDiscount && !$isFree && $originalFormatted)
+        <div class="price-original-row is-offer">
+          <s class="price-original" dir="ltr">{{ $originalFormatted }}</s>
+        </div>
+      @endif
+      @if($yearlySaves)
+        <div class="price-original-row is-yearly" data-markdown="skip">
+          <s class="price-original" dir="ltr">{{ $fullMonthlyFormatted }}</s>
+        </div>
+      @endif
+      <div class="price-row">
+        <span class="price-main" dir="ltr">
+          <span class="price-amount price-value">{{ $displayMonthlyFormatted }}</span>
+        </span>
+        <span class="price-period">{{ $isPack ? __('ui.pack.one_time') : __('ui.pricing.per_month_short') }}</span>
       </div>
-    @endif
-    @if($yearlySaves)
-      <div class="price-original-row is-yearly">
-        <s class="price-original" dir="ltr">{{ $fullMonthlyFormatted }}</s>
-      </div>
-    @endif
-    <div class="price-row">
-      <span class="price-main" dir="ltr">
-        <span class="price-amount price-value">{{ $displayMonthlyFormatted }}</span>
-      </span>
-      <span class="price-period">{{ $isPack ? __('ui.pack.one_time') : __('ui.pricing.per_month_short') }}</span>
     </div>
     <div class="price-note price-note-text"></div>
-    @if($terms && $discountEndsAt)
-      @php
-        $endsText = $offerEndsText($discountEndsAt);
-        $endsLeft = max(0, \Illuminate\Support\Carbon::parse($discountEndsAt)->getTimestamp() - now()->getTimestamp());
-        $endsUnits = explode('|', __('ui.pricing.countdown_units'));
-        // Days : hours : minutes : seconds (the days only while there is more than one).
-        $endsParts = array_values(array_filter([
-          [intdiv($endsLeft, 86400), $endsUnits[0] ?? '', $endsLeft >= 86400],
-          [intdiv($endsLeft % 86400, 3600), $endsUnits[1] ?? '', true],
-          [intdiv($endsLeft % 3600, 60), $endsUnits[2] ?? '', true],
-          [$endsLeft % 60, $endsUnits[3] ?? '', true],
-        ], fn ($part) => $part[2]));
-      @endphp
-      @if($endsText !== '')
-        {{-- The time left as a timer, in colour and counting down to the second: "Offer ends in"
-             and days : hours : minutes : seconds, each with its unit under it (the page keeps it current). --}}
-        <span class="offer-ends" data-ends="{{ $discountEndsAt }}">
-          <span class="offer-ends-label" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9.5 2.5h5"/></svg>
-            {{ __('ui.pricing.discount_offer_ends') }}
-          </span>
-          <span class="offer-ends-clock" aria-hidden="true">@foreach($endsParts as $i => [$count, $unit])@if($i > 0)<span class="offer-ends-sep">:</span>@endif<span class="offer-ends-unit"><b>{{ sprintf('%02d', $count) }}</b><small>{{ $unit }}</small></span>@endforeach</span>
-          <span class="offer-ends-text">{{ $endsText }}</span>
-        </span>
-      @endif
-    @endif
     @php
       $trialMonthly = $state['trial_monthly'];
       $trialYearly = $state['trial_yearly'];
@@ -170,8 +157,11 @@
     @endif
   </div>
 
-  {{-- 5. What sets it apart --}}
-  <ul class="plan-features">
+  {{-- 5. What sets it apart: every line on wider screens; on phones the first four and a
+       button for the rest, when at least two more would wait behind it. --}}
+  @php $foldLines = count($cardLines) > 5; @endphp
+  <div class="plan-lines">
+  <ul @class(['plan-features', 'is-long' => $foldLines]) id="plan-lines-{{ $plan['slug'] }}">
     @foreach($cardLines as $feature)
       @php
         $iconSvg = $lineIcon($feature['icon'] ?? 'check');
@@ -189,4 +179,11 @@
     </li>
     @endforeach
   </ul>
+  @if($foldLines)
+    <button type="button" class="plan-more" aria-expanded="false" aria-controls="plan-lines-{{ $plan['slug'] }}">
+      {{ __('ui.pricing.show_all_lines') }}
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+  @endif
+  </div>
 </div>

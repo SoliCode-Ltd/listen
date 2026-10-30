@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\ApiRequestLog;
 use App\Models\SiteSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -18,7 +19,7 @@ class LegalPagesTest extends TestCase
     public function test_the_privacy_policy_says_what_is_kept_and_where_it_goes(): void
     {
         $this->page('en', 'legal.privacy')
-            ->assertSee('Effective date: October 19, 2026')
+            ->assertSee('Effective date: October 28, 2026')
             ->assertSee('The text you convert is kept with its audio in your history until you delete it.')
             ->assertSee('Your generated audio stays in your history until you delete it.')
             ->assertSee('The text you convert goes to our speech and translation processing providers, and the recordings you make for voice cloning (your voice sample and your consent recording) go to our speech provider, only to make your audio.')
@@ -32,7 +33,7 @@ class LegalPagesTest extends TestCase
             ->assertDontSee('through your dashboard');
 
         $this->page('ar', 'legal.privacy')
-            ->assertSee('تاريخ السريان: 19 أكتوبر 2026')
+            ->assertSee('تاريخ السريان: 28 أكتوبر 2026')
             ->assertSee('يُحفظ النص الذي تحوّله مع صوته في سجلك إلى أن تحذفه.')
             ->assertSee('يبقى الصوت الذي تنشئه في سجلك إلى أن تحذفه.')
             ->assertSee('يُرسَل النص الذي تحوّله إلى مزودي معالجة الكلام والترجمة لدينا')
@@ -49,11 +50,32 @@ class LegalPagesTest extends TestCase
     public function test_the_cookie_policy_names_the_free_demos_device_cookie_and_fingerprint(): void
     {
         $this->page('en', 'legal.cookies')
-            ->assertSee('Effective date: October 19, 2026')
+            ->assertSee('Effective date: October 28, 2026')
             ->assertSee('including a device cookie and a fingerprint of your device (kept in a cookie and in your browser&#039;s storage), so the free demo is used only once per device', false);
         $this->page('ar', 'legal.cookies')
-            ->assertSee('تاريخ السريان: 19 أكتوبر 2026')
+            ->assertSee('تاريخ السريان: 28 أكتوبر 2026')
             ->assertSee('ومنها ملف تعريف ارتباط للجهاز وبصمة لجهازك (تُحفظ في ملف تعريف ارتباط وفي مساحة التخزين بمتصفحك)');
+    }
+
+    public function test_the_policies_say_what_an_ad_click_is_kept_for_and_where_it_is_not(): void
+    {
+        $this->page('en', 'legal.privacy')
+            ->assertSee('If you arrive from one of our ads, the ad click ID from the link you clicked, kept for up to 90 days')
+            ->assertSee('we share that ad click ID, with the time and amount of the payment, with our advertising partner. We never share your name, email or phone number for this, and we do not keep or share the ad click ID of visitors from the United Kingdom, the European Economic Area or Switzerland')
+            ->assertSee('We may use third-party services for analytics, advertising, sign-in and payment processing.');
+        $this->page('en', 'legal.cookies')
+            ->assertSee('Advertising Cookies')
+            ->assertSee('We do not set it for visitors from the United Kingdom, the European Economic Area or Switzerland.')
+            ->assertSee('Advertising partners may set cookies to measure how our ads perform.');
+
+        $this->page('ar', 'legal.privacy')
+            ->assertSee('إن وصلت إلينا من أحد إعلاناتنا، معرّف النقرة على الإعلان من الرابط الذي نقرت عليه، ويُحفظ مدة أقصاها 90 يوماً')
+            ->assertSee('ولا نحفظ معرّف النقرة ولا نشاركه لزوار المملكة المتحدة والمنطقة الاقتصادية الأوروبية وسويسرا')
+            ->assertSee('قد نستخدم خدمات طرف ثالث للتحليلات والإعلانات وتسجيل الدخول ومعالجة الدفع.');
+        $this->page('ar', 'legal.cookies')
+            ->assertSee('ملفات تعريف الارتباط الإعلانية')
+            ->assertSee('لا نضعه لزوار المملكة المتحدة والمنطقة الاقتصادية الأوروبية وسويسرا.')
+            ->assertSee('قد يضع شركاؤنا الإعلانيون ملفات تعريف ارتباط لقياس أداء إعلاناتنا.');
     }
 
     public function test_the_legal_pages_give_the_sites_own_mailbox(): void
@@ -85,7 +107,7 @@ class LegalPagesTest extends TestCase
         }
     }
 
-    private function page(string $locale, string $route): \Illuminate\Testing\TestResponse
+    private function page(string $locale, string $route): TestResponse
     {
         app()->setLocale($locale);
 
