@@ -35,6 +35,8 @@ final class PlanPricingLines
         'custom_prompt' => ['sliders', true],
         'sound_environments' => ['sliders', true],
         'voice_cloning' => ['star', true],
+        // Shown on every plan that includes it, once Voice Design is open to everyone.
+        'voice_design' => ['sliders', true],
         // Shown on every plan that includes dubbing, once Video Dubbing is open to everyone.
         'video_dubbing' => ['mic', true],
         'download_formats' => ['download', true],
@@ -286,6 +288,9 @@ final class PlanPricingLines
             'voice_cloning' => self::cloningOpen($plan)
                 ? trans_choice('ui.pricing.lines.cloning_voices', VoiceCloningService::maxVoicesForPlan($plan), [], $locale)
                 : null,
+            'voice_design' => VoiceDesign::planIncludes($plan) && VoiceDesign::audience() === VoiceDesign::AUDIENCE_EVERYONE
+                ? trans_choice('ui.pricing.lines.design_voices', VoiceDesign::maxVoices($plan), [], $locale)
+                : null,
             'download_formats' => implode(', ', array_map(
                 fn (string $format): string => explode(' ', AudioFormats::ALL[$format]['label'])[0],
                 AudioFormats::availableFor($plan),
@@ -326,6 +331,9 @@ final class PlanPricingLines
             'voice_cloning' => ! VoiceCloningService::planAllows($plan)
                 ? 'Hidden: this plan does not include voice cloning (or cloning is switched off site-wide).'
                 : 'Hidden: voice cloning is still a private preview, so members on this plan cannot use it yet.',
+            'voice_design' => VoiceDesign::planIncludes($plan)
+                ? 'Hidden: Voice Design is still for the admin only (Voice Design → Settings).'
+                : 'Hidden: this plan does not include Voice Design.',
             'topup' => 'Hidden: no top-up price is set.',
             'video_dubbing' => VideoDubbing::planIncludes($plan)
                 ? 'Hidden: Video Dubbing is still for the admin only (Video Dubbing → Settings).'

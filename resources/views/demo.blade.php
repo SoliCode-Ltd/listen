@@ -1,8 +1,15 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.demo_title'), 'page' => 'demo'])
   <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
   <link rel="stylesheet" href="{{ asset('css/demo-studio.css') }}?v={{ filemtime(public_path('css/demo-studio.css')) }}">
+  @php $demoModes = ($dubStudio ?? null) || ($voiceDesign ?? null); @endphp
+  @if($demoModes)
+    <link rel="stylesheet" href="{{ asset('css/studio-modes.css') }}?v={{ filemtime(public_path('css/studio-modes.css')) }}">
+  @endif
   @if($dubStudio ?? null)
     <link rel="stylesheet" href="{{ asset('css/dub-studio.css') }}?v={{ filemtime(public_path('css/dub-studio.css')) }}">
+  @endif
+  @if($voiceDesign ?? null)
+    <link rel="stylesheet" href="{{ asset('css/voice-design.css') }}?v={{ filemtime(public_path('css/voice-design.css')) }}">
   @endif
   <script>
     (() => {
@@ -45,15 +52,15 @@
     </section>
 
     {{-- ── Studio workspace: laid out like the dashboard generator ── --}}
-    <section class="studio-workspace" @if($dubStudio ?? null) data-studio-host data-studio="tts" @endif>
-      {{-- Text to speech or Dub a video: the same voices and choices, a script or a video. --}}
-      @if($dubStudio ?? null)
-        <x-dub.mode-switch />
+    <section class="studio-workspace" @if($demoModes) data-studio-host data-studio="tts" @endif>
+      {{-- Text to speech, Voice Design or Dub a video: a script, a voice of your own words, or a video. --}}
+      @if($demoModes)
+        <x-dub.mode-switch :design="(bool) ($voiceDesign ?? null)" :dub="(bool) ($dubStudio ?? null)" />
       @endif
       {{-- An email sign-up confirms its address first: what to do, with a button for a new link. --}}
       @include('components.verify-email-notice', ['verifyEmail' => $verifyEmail ?? null, 'verifyEmailTitle' => __('ui.verify_email.notice_title')])
       {{-- Quota --}}
-      <div class="s-card reveal" id="quotaBox" data-studio-pane="tts" style="padding:1rem 1.25rem">
+      <div class="s-card reveal" id="quotaBox" data-studio-pane="tts design" style="padding:1rem 1.25rem">
         <div class="quota-panel">
           <div class="q-head">
             <span class="q-label">{{ __('ui.demo.trial_allowance') }}</span>
@@ -241,6 +248,13 @@
           </div>
         </div>
       </div>
+
+      {{-- Voice Design's one take, paid from the demo's characters (components/voice-design/studio.blade.php). --}}
+      @if($voiceDesign ?? null)
+        <div class="demo-voice-design" data-studio-pane="design">
+          <x-voice-design.studio :studio="$voiceDesign" />
+        </div>
+      @endif
 
       {{-- The free dub: the same studio around a video (components/dub/studio.blade.php). --}}
       @if($dubStudio ?? null)
@@ -664,6 +678,8 @@
       currentQuota = normalizeQuotaState({ ...currentQuota, ...quota }, currentQuota);
       syncQuotaDisplay();
     }
+    // Voice Design spends the same characters (js/voice-design.js).
+    document.addEventListener('listen:demo-quota', (event) => renderQuota(event.detail));
 
     function syncQuotaDisplay() {
       const baseRemaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
@@ -1433,8 +1449,15 @@
     @endif
   @endauth
   <script src="{{ asset('js/voice-studio-icons.js') }}?v={{ filemtime(public_path('js/voice-studio-icons.js')) }}" defer></script>
+  @if($demoModes)
+    <script src="{{ asset('js/studio-modes.js') }}?v={{ filemtime(public_path('js/studio-modes.js')) }}" defer></script>
+  @endif
   @if($dubStudio ?? null)
     <script src="{{ asset('js/dub-studio.js') }}?v={{ filemtime(public_path('js/dub-studio.js')) }}" defer></script>
+  @endif
+  @if($voiceDesign ?? null)
+    @include('components.orb-script')
+    <script src="{{ asset('js/voice-design.js') }}?v={{ filemtime(public_path('js/voice-design.js')) }}" defer></script>
   @endif
   <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
 </body>

@@ -91,7 +91,7 @@
             </details>
           </div>
           <div class="vd-prompt">
-            <textarea id="vdDescription{{ $vd['demo'] ? 'Demo' : '' }}" name="description" rows="5" maxlength="{{ $vd['limits']['description_max'] }}" placeholder="{{ __('voice_design.prompt_placeholder') }}" data-vd-description required></textarea>
+            <textarea id="vdDescription{{ $vd['demo'] ? 'Demo' : '' }}" name="description" dir="auto" rows="5" maxlength="{{ $vd['limits']['description_max'] }}" placeholder="{{ __('voice_design.prompt_placeholder') }}" data-vd-description required></textarea>
             <div class="vd-prompt-foot">
               <span class="vd-count" data-vd-description-count dir="ltr">0 / {{ number_format($vd['limits']['description_max']) }}</span>
               <button type="button" class="vd-ghost-btn" data-vd-enhance>{!! $icon['spark'] !!}<span>{{ __('voice_design.write_for_me') }}</span></button>
@@ -140,7 +140,7 @@
           </label>
           <div class="vd-line-box" data-vd-line-box hidden>
             <label class="vd-label" for="vdLine{{ $vd['demo'] ? 'Demo' : '' }}">{{ __('voice_design.line_label') }}</label>
-            <textarea id="vdLine{{ $vd['demo'] ? 'Demo' : '' }}" name="line" rows="3" maxlength="{{ $vd['limits']['line_max'] }}" placeholder="{{ __('voice_design.line_placeholder') }}" data-vd-line></textarea>
+            <textarea id="vdLine{{ $vd['demo'] ? 'Demo' : '' }}" name="line" dir="auto" rows="3" maxlength="{{ $vd['limits']['line_max'] }}" placeholder="{{ __('voice_design.line_placeholder') }}" data-vd-line></textarea>
             <span class="vd-count" data-vd-line-count dir="ltr">0 / {{ number_format($vd['limits']['line_max']) }}</span>
           </div>
         </div>
@@ -241,14 +241,14 @@
         <header class="vd-results-head">
           <h3>{{ $vd['takes'] > 1 ? __('voice_design.takes_title') : __('voice_design.demo_voice_label') }}</h3>
           @if($vd['takes'] > 1)<p>{{ __('voice_design.takes_subtitle') }}</p>@endif
-          <blockquote class="vd-line-quote" data-vd-line-quote></blockquote>
+          <blockquote class="vd-line-quote" dir="auto" data-vd-line-quote></blockquote>
         </header>
         <ol class="vd-takes" data-vd-takes></ol>
 
         <form class="vd-keep" data-vd-keep hidden novalidate>
           <label class="vd-label" for="vdName{{ $vd['demo'] ? 'Demo' : '' }}">{{ __('voice_design.name_label') }}</label>
           <div class="vd-keep-row">
-            <input id="vdName{{ $vd['demo'] ? 'Demo' : '' }}" name="name" type="text" minlength="2" maxlength="50" placeholder="{{ __('voice_design.name_placeholder') }}" data-vd-name required>
+            <input id="vdName{{ $vd['demo'] ? 'Demo' : '' }}" name="name" type="text" dir="auto" minlength="2" maxlength="50" placeholder="{{ __('voice_design.name_placeholder') }}" data-vd-name required>
             <button type="submit" class="btn btn-primary" data-vd-save>{{ __('voice_design.save') }}</button>
             <button type="button" class="btn btn-ghost" data-vd-keep-cancel>{{ __('voice_design.cancel') }}</button>
           </div>

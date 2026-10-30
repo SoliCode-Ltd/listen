@@ -445,6 +445,44 @@ class PlanResource extends Resource
                             ->suffix('voices')
                             ->helperText('Leave this at 0 to use the site-wide default. Set 1–100 for an exact cap on this plan.'),
                     ]),
+                Forms\Components\Section::make('Voice Design')
+                    ->description('Members on this plan describe a voice in words, compare the takes and keep the ones they like, then use them in the studio. Each design is paid from the plan\'s credits: every take speaks a short line, charged like any premium audio. Who sees Voice Design at all: Voice Design → Settings.')
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\Toggle::make('voice_design_enabled')
+                            ->label('Include Voice Design')
+                            ->helperText('Off: members on this plan see what Voice Design does and the way to a plan that has it.')
+                            ->default(false)
+                            ->live()
+                            ->columnSpan(2),
+                        Forms\Components\TextInput::make('voice_design_max_voices')
+                            ->label('Designed voices a member keeps')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->default(0)
+                            ->required()
+                            ->suffix('voices')
+                            ->helperText('At the same time. 0: the site-wide number (Voice Design → Settings). A member deletes one to keep another.')
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('voice_design_enabled')),
+                        Forms\Components\TextInput::make('voice_design_monthly_voices')
+                            ->label('New voices a month')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->maxValue(1000)
+                            ->default(0)
+                            ->required()
+                            ->suffix('voices')
+                            ->helperText('New voices a member may keep in a credit month; deleting one does not give it back. 0: no monthly count.')
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('voice_design_enabled')),
+                        Forms\Components\Placeholder::make('voice_design_cost')
+                            ->label('What a design costs')
+                            ->content(fn (): string => \App\Support\VoiceDesign::costSummary())
+                            ->columnSpan(2)
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('voice_design_enabled')),
+                    ]),
                 Forms\Components\Section::make('Dub my video')
                     ->description('Members on this plan dub videos into an Arabic dialect and download them without the Listen mark. Each dub is paid from the plan\'s credits: one second of voice for each second of video (a 30-second video uses 30 seconds, 450 credits). Everyone else gets one free dub with the mark. Who sees the page at all: Video Dubbing → Settings.')
                     ->columns(3)
@@ -691,6 +729,17 @@ class PlanResource extends Resource
                     ->label('Voice Cloning')
                     ->boolean()
                     ->toggleable(isToggledHiddenByDefault: false),
+                Tables\Columns\TextColumn::make('voice_design_max_voices')
+                    ->label('Voice Design')
+                    ->formatStateUsing(function ($state, Plan $record): string {
+                        if (! $record->voice_design_enabled) {
+                            return 'Off';
+                        }
+                        $kept = (int) $state > 0 ? $state.' voices' : 'Site default';
+
+                        return (int) $record->voice_design_monthly_voices > 0 ? $kept.', '.$record->voice_design_monthly_voices.' new a month' : $kept;
+                    })
+                    ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('voice_cloning_max_voices')
                     ->label('Clone limit')
                     ->formatStateUsing(function ($state, Plan $record): string {
@@ -824,6 +873,7 @@ class PlanResource extends Resource
 
         foreach (['voice_tier', 'max_chars_per_request', 'monthly_chars', 'monthly_requests', 'processing_priority', 'commercial_use_allowed',
             'recent_voices_days', 'dialogue_enabled', 'custom_prompt_enabled', 'voice_cloning_enabled', 'voice_cloning_max_voices',
+            'voice_design_enabled', 'voice_design_max_voices', 'voice_design_monthly_voices',
             'download_formats', 'allow_overage'] as $field) {
             $plan->setAttribute($field, $get($field));
         }

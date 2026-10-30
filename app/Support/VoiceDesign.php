@@ -312,6 +312,62 @@ final class VoiceDesign
     }
 
     /**
+     * Seconds of audio a new voice's own sample is assumed to hold, for the
+     * admin's cost figures: the speech service sends one with every voice it
+     * makes, and its length is not published.
+     */
+    public const SAMPLE_SECONDS_ASSUMED = 10;
+
+    /**
+     * What one design costs us, for the admin (never shown to members): the
+     * takes speaking a typical written line, plus each new voice's own sample,
+     * at the speech service's list prices (App\Support\PlanCostEstimate), and
+     * what the member is charged for it in credits.
+     *
+     * @return array{takes:int, line_seconds:int, audio_seconds:int, credits:int, usd:float, usd_high:float, usd_2027:float, demo_usd:float, demo_usd_2027:float}
+     */
+    public static function costEstimate(?int $takes = null): array
+    {
+        $takes ??= self::takes();
+        // The longer of the two languages' lines, so the figures are the higher ones.
+        $lines = [self::estimate((string) trans('voice_design.fallback_line', [], 'ar'), 1), self::estimate((string) trans('voice_design.fallback_line', [], 'en'), 1)];
+        $line = $lines[0]['seconds'] >= $lines[1]['seconds'] ? $lines[0] : $lines[1];
+        $lineSeconds = $line['seconds'];
+        $perTake = $lineSeconds + self::SAMPLE_SECONDS_ASSUMED;
+        $usd = function (int $seconds, int $tokensPerSecond, ?\Illuminate\Support\Carbon $on = null): float {
+            $price = PlanCostEstimate::geminiPrices($on);
+
+            return round($seconds * $tokensPerSecond / 1_000_000 * $price['audio'], 4);
+        };
+        $later = \Illuminate\Support\Carbon::create(2027, 1, 1);
+
+        return [
+            'takes' => $takes,
+            'line_seconds' => $lineSeconds,
+            'audio_seconds' => $perTake * $takes,
+            'credits' => $line['credits'] * $takes,
+            'usd' => $usd($perTake * $takes, PlanCostEstimate::AUDIO_TOKENS_PER_SECOND),
+            'usd_high' => $usd($perTake * $takes, PlanCostEstimate::AUDIO_TOKENS_PER_SECOND_HIGH),
+            'usd_2027' => $usd($perTake * $takes, PlanCostEstimate::AUDIO_TOKENS_PER_SECOND_HIGH, $later),
+            'demo_usd' => $usd($perTake, PlanCostEstimate::AUDIO_TOKENS_PER_SECOND_HIGH),
+            'demo_usd_2027' => $usd($perTake, PlanCostEstimate::AUDIO_TOKENS_PER_SECOND_HIGH, $later),
+        ];
+    }
+
+    /** costEstimate() in a sentence, for the admin's plan and settings pages. */
+    public static function costSummary(?int $takes = null): string
+    {
+        $c = self::costEstimate($takes);
+
+        return sprintf(
+            'A design makes %d %s, each speaking a line of about %d seconds and coming with its own short sample (about %d seconds assumed): about %d seconds of audio, which costs us about $%s ($%s at the high token rate, $%s from January 2027). The member is charged %s credits. A demo design (one take) costs us about $%s ($%s from January 2027). Writing the line or the description is text only and costs a fraction of a cent. Keeping a voice costs nothing more, and speaking with it later costs the same as any premium voice.',
+            $c['takes'], $c['takes'] === 1 ? 'take' : 'takes', $c['line_seconds'], self::SAMPLE_SECONDS_ASSUMED, $c['audio_seconds'],
+            number_format($c['usd'], 3), number_format($c['usd_high'], 3), number_format($c['usd_2027'], 3),
+            number_format($c['credits']), number_format($c['demo_usd'], 3), number_format($c['demo_usd_2027'], 3),
+        );
+    }
+
+    /**
      * A take or a kept voice as the studio shows it.
      *
      * @return array<string, mixed>

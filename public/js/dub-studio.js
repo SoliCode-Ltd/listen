@@ -1,7 +1,7 @@
 /*
- * The dubbing studio (components/dub/studio.blade.php) and the switch between
- * it and the text studio (components/dub/mode-switch.blade.php), on the
- * "Dub my video" page, in the demo and on the dashboard.
+ * The dubbing studio (components/dub/studio.blade.php), on the "Dub my video"
+ * page, in the demo and on the dashboard. The switch between it and the text
+ * studio in the demo is js/studio-modes.js.
  *
  * The studio's card goes from the drop zone to the chosen video, then its
  * upload (with the percentage sent) and its dubbing (the server's own steps
@@ -14,36 +14,6 @@
  */
 (function () {
   'use strict';
-
-  var MODE_KEY = 'listen.studio.mode';
-
-  // ---------- Text to speech | Dub a video ----------
-  function initSwitch(sw) {
-    var host = sw.closest('[data-studio-host]');
-    if (!host) return;
-    var tabs = sw.querySelectorAll('[data-studio-tab]');
-    function set(mode, remember) {
-      host.setAttribute('data-studio', mode);
-      tabs.forEach(function (tab) { tab.setAttribute('aria-selected', tab.dataset.studioTab === mode ? 'true' : 'false'); });
-      if (remember) {
-        try { window.localStorage.setItem(MODE_KEY, mode); } catch (e) { /* no storage */ }
-        if (window.history && window.history.replaceState) {
-          window.history.replaceState(null, '', mode === 'dub' ? '#dub' : window.location.pathname + window.location.search);
-        }
-      }
-      document.dispatchEvent(new CustomEvent('listen:studio-mode', { detail: { mode: mode } }));
-    }
-    tabs.forEach(function (tab) {
-      tab.addEventListener('click', function () { set(tab.dataset.studioTab, true); });
-    });
-    var start = 'tts';
-    if (window.location.hash === '#dub') start = 'dub';
-    else {
-      try { if (window.localStorage.getItem(MODE_KEY) === 'dub') start = 'dub'; } catch (e) { /* no storage */ }
-    }
-    set(start, false);
-    requestAnimationFrame(function () { sw.classList.add('is-ready'); });
-  }
 
   // ---------- The device, as the demo works it out (App\Services\DemoLinkedAccounts) ----------
   var device = null;
@@ -594,7 +564,6 @@
   }
 
   function boot() {
-    document.querySelectorAll('[data-studio-switch]').forEach(initSwitch);
     document.querySelectorAll('[data-dub-studio]').forEach(initStudio);
   }
   // Pages load this file just before js/voice-studio.js (both deferred), so the selects

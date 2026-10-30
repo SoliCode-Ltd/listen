@@ -316,9 +316,9 @@
       el.className = 'vd-voice';
       el.setAttribute('data-vs-cast', '');
       el.innerHTML = '<div class="vd-voice-head">' + orbHtml(LIBRARY_ORBS[Number(voice.id) % LIBRARY_ORBS.length])
-        + '<div class="vd-voice-name"><strong>' + esc(voice.name) + '</strong><small>' + esc(voice.language === 'en' ? t.language_en : t.language_ar)
+        + '<div class="vd-voice-name"><strong dir="auto">' + esc(voice.name) + '</strong><small>' + esc(voice.language === 'en' ? t.language_en : t.language_ar)
         + (voice.created ? ' · ' + esc(fmt(t.created_on, { date: voice.created })) : '') + '</small></div></div>'
-        + '<p class="vd-voice-desc">' + esc(voice.description) + '</p>'
+        + '<p class="vd-voice-desc" dir="auto">' + esc(voice.description) + '</p>'
         + '<div class="vd-take-bar"><i></i></div>'
         + '<div class="vd-voice-foot"><button type="button" class="vd-play" aria-label="' + esc(t.play) + '">' + ICON_PLAY + '</button>'
         + '<button type="button" class="btn btn-primary" data-vd-use>' + esc(t.use_in_studio) + '</button>'

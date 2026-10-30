@@ -1,0 +1,69 @@
+/*
+ * The switch above the demo's studio (components/dub/mode-switch.blade.php): Text to speech,
+ * Voice Design and Dub a video, whichever are open. It sets data-studio on the closest
+ * [data-studio-host]; what belongs to modes carries data-studio-pane with their names
+ * ("tts", "design", "dub", or several, space separated). Behaviour: js/studio-modes.js.
+ */
+.studio-modes {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: .4rem;
+  padding: .35rem;
+  margin: 0 0 1.1rem;
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--surface2, var(--surface)) 80%, transparent);
+}
+.studio-mode {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .7rem .9rem;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+/* Animated once the page has opened on its side. */
+.studio-modes.is-ready .studio-mode { transition: background .18s ease, color .18s ease, box-shadow .18s ease; }
+.studio-mode:hover { color: var(--text); }
+.studio-mode[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(15, 12, 40, .06), 0 6px 18px -8px color-mix(in oklab, var(--a) 45%, transparent);
+}
+.studio-mode:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
+.studio-mode-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--a) 12%, transparent);
+  color: var(--a);
+}
+.studio-mode[aria-selected="true"] .studio-mode-icon { background: linear-gradient(135deg, var(--a), color-mix(in oklab, var(--b) 70%, #c084fc)); color: #fff; }
+.studio-mode-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+/* Wraps rather than cuts: Arabic letters that reach below the line (ى، ي، ج) need the room. */
+.studio-mode-text { display: grid; gap: .2rem; min-width: 0; line-height: 1.5; }
+.studio-mode-text strong { font-size: 1.02rem; line-height: 1.45; }
+.studio-mode-text small { font-size: .9rem; line-height: 1.55; color: color-mix(in oklab, var(--text) 62%, var(--muted)); overflow-wrap: anywhere; }
+
+/* Only what belongs to the chosen mode shows. */
+[data-studio-host][data-studio="tts"] [data-studio-pane]:not([data-studio-pane~="tts"]),
+[data-studio-host][data-studio="design"] [data-studio-pane]:not([data-studio-pane~="design"]),
+[data-studio-host][data-studio="dub"] [data-studio-pane]:not([data-studio-pane~="dub"]) { display: none !important; }
+
+@media (max-width: 560px) {
+  .studio-mode { padding: .6rem .65rem; gap: .55rem; flex-direction: column; text-align: center; }
+  .studio-mode-text small { display: none; }
+}
+@media (max-width: 380px) {
+  .studio-mode-icon { flex-basis: 32px; width: 32px; height: 32px; }
+  .studio-mode-text strong { font-size: .92rem; }
+}

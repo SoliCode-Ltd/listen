@@ -639,6 +639,10 @@ class HomeController extends Controller
             'upgradePlanSlug' => $upgradePlanSlug,
             // Dub a video, beside the text studio: the free dub (App\Support\VideoDubbing).
             'dubStudio' => VideoDubbing::openTo($member) ? VideoDubbing::studio($member, $request) : null,
+            // Voice Design, beside it too: one take from the demo's characters (App\Support\VoiceDesign).
+            'voiceDesign' => VoiceDesign::openTo($member)
+                ? VoiceDesign::studio($member, $this->planAccessService->resolveAccessPlanForUserId((int) $member->id), true)
+                : null,
         ]);
 
         return $this->attachDemoDeviceCookie($request, $response);
