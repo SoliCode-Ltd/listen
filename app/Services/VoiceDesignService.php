@@ -43,6 +43,22 @@ class VoiceDesignService
     /** What every take's display name starts with on the engine's side, so a lost one can be found. */
     public const DISPLAY_TAG = 'Listen design';
 
+    /**
+     * The server that made a voice (its address's host). Staging shares the
+     * speech keys with live and holds a copy of live's members, so a server
+     * only ever deletes on the engine the voices it made itself.
+     */
+    public static function siteTag(): string
+    {
+        return mb_substr((string) (parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'local'), 0, 60);
+    }
+
+    /** Whether this server made the voice, so may delete it on the engine. */
+    public static function madeHere(DesignedVoice $voice): bool
+    {
+        return data_get($voice->metadata, 'site') === self::siteTag();
+    }
+
     public function __construct(private readonly VoiceCloningService $voices) {}
 
     /**
@@ -153,6 +169,7 @@ class VoiceDesignService
                     'key_name' => $key['name'],
                     'take' => $take,
                     'metadata' => [
+                        'site' => self::siteTag(),
                         'projection' => $input['projection'],
                         'pace' => $input['pace'],
                         'variety' => $input['variety'],
@@ -198,9 +215,10 @@ class VoiceDesignService
 
     /**
      * Takes nobody kept, older than $minutes, deleted everywhere. Then, on
-     * each key, the engine's own list is read for takes this site made but
+     * each key, the engine's own list is read for takes this server made but
      * never heard back about (a reply lost on the way): those older than a
-     * day and unknown here are deleted too.
+     * day and unknown here are deleted too. Takes another server made are
+     * left to it (purge() only deletes this server's on the engine).
      *
      * @return array{drafts:int, strays:int}
      */
@@ -218,7 +236,7 @@ class VoiceDesignService
         $known = DesignedVoice::withTrashed()->whereNotNull('provider_voice_key')->pluck('provider_voice_key')->flip();
         foreach ($this->voices->apiKeys(self::MODEL) as $key) {
             foreach ($this->listDesigned($key) as $voice) {
-                if (! str_starts_with($voice['display_name'], self::DISPLAY_TAG) || isset($known[$voice['id']])
+                if (! str_starts_with($voice['display_name'], self::DISPLAY_TAG.' · '.self::siteTag().' · ') || isset($known[$voice['id']])
                     || ! preg_match('/ · (\d{12})$/', $voice['display_name'], $made)
                     || \Carbon\Carbon::createFromFormat('YmdHi', $made[1], 'UTC')->greaterThan(now()->subDay())) {
                     continue;
@@ -238,7 +256,10 @@ class VoiceDesignService
      */
     public function purge(DesignedVoice $voice, bool $keepRow = false): void
     {
-        $this->deleteRemote($voice->provider_voice_key, $voice->key_name);
+        // A voice another server made (live's, in staging's copy of the members) stays on the engine.
+        if (self::madeHere($voice)) {
+            $this->deleteRemote($voice->provider_voice_key, $voice->key_name);
+        }
         if (filled($voice->preview_audio_path)) {
             Storage::disk('public')->delete((string) $voice->preview_audio_path);
         }
@@ -275,8 +296,9 @@ class VoiceDesignService
             $voice = [
                 'model' => self::MODEL,
                 'type' => 'prompted',
-                // Tagged with when it was made, so voice-design:prune can tell a lost take from one being made.
-                'display_name' => self::DISPLAY_TAG.' · U'.$user->id.' · '.substr($batch, 0, 8).' · '.$take.' · '.now()->utc()->format('YmdHi'),
+                // Tagged with the server and when it was made, so voice-design:prune finds this server's
+                // lost takes only, and can tell one from a take still being made.
+                'display_name' => self::DISPLAY_TAG.' · '.self::siteTag().' · U'.$user->id.' · '.substr($batch, 0, 8).' · '.$take.' · '.now()->utc()->format('YmdHi'),
                 'prompted' => ['input' => $prompts[$take]],
             ];
             // Optional on the engine's side: left out if it refuses them.

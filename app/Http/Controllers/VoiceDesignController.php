@@ -109,7 +109,8 @@ class VoiceDesignController extends Controller
         $made = count($result['takes']);
         if ($made === 0) {
             $meter->giveBack($userId, $reservation);
-            RateLimiter::clear($rate);
+            // A design that made nothing does not count towards the hour.
+            RateLimiter::decrement($rate, 3600);
 
             return $this->error($this->failureMessage((string) $result['error_code']), 422);
         }

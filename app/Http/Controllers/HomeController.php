@@ -1141,16 +1141,22 @@ class HomeController extends Controller
 
             $quota = $this->demoQuotaForClient($request);
             $this->syncStoredDemoVoiceGenerationQuota($generation, $quota);
-            $plan = $this->planAccessService->resolveAccessPlanForUserId($userId);
+            // Keeping it is for plans with Voice Design; the demo shows the way to one. A take
+            // that cannot be kept is deleted at once (each holds one of a project's voices):
+            // the demo history keeps its audio.
+            $canKeep = VoiceDesign::allows($user, $this->planAccessService->resolveAccessPlanForUserId($userId));
+            $presented = array_merge(VoiceDesign::present($take), ['url' => AudioUrl::fromPath($audioPath)]);
+            if (! $canKeep) {
+                $designer->purge($take);
+            }
 
             return response()->json([
                 'ok' => true,
                 'line' => $line,
-                'take' => VoiceDesign::present($take),
+                'take' => $presented,
                 'audio_url' => AudioUrl::fromPath($audioPath),
                 'estimated_chars' => $estimate['chars'],
-                // Keeping it is for plans with Voice Design; the demo shows the way to one.
-                'can_keep' => VoiceDesign::allows($user, $plan),
+                'can_keep' => $canKeep,
                 'upgrade_url' => VoiceDesign::upgradeUrl(),
                 'quota' => $quota,
             ]);
