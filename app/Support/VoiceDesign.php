@@ -327,11 +327,12 @@ final class VoiceDesign
     }
 
     /**
-     * Seconds of audio a new voice's own sample is assumed to hold, for the
-     * admin's cost figures: the speech service sends one with every voice it
-     * makes, and its length is not published.
+     * Seconds of audio a new voice's own sample holds, for the admin's cost
+     * figures: the speech service sends one with every voice it makes and
+     * bills it as audio. Measured on the ten example voices (October 2026):
+     * 14 to 39 seconds, 27 on average, so 30 to stay on the high side.
      */
-    public const SAMPLE_SECONDS_ASSUMED = 10;
+    public const SAMPLE_SECONDS_ASSUMED = 30;
 
     /**
      * What one design costs us, for the admin (never shown to members): the
@@ -375,7 +376,7 @@ final class VoiceDesign
         $c = self::costEstimate($takes);
 
         return sprintf(
-            'A design makes %d %s, each speaking a line of about %d seconds and coming with its own short sample (about %d seconds assumed): about %d seconds of audio, which costs us about $%s ($%s at the high token rate, $%s from January 2027). The member is charged %s credits. A demo design (one take) costs us about $%s ($%s from January 2027). Writing the line or the description is text only and costs a fraction of a cent. Keeping a voice costs nothing more, and speaking with it later costs the same as any premium voice.',
+            'A design makes %d %s, each speaking a line of about %d seconds and coming with its own sample of the voice (up to about %d seconds, billed as audio): about %d seconds of audio, which costs us about $%s ($%s at the high token rate, $%s from January 2027). The member is charged %s credits. A demo design (one take) costs us about $%s ($%s from January 2027). Writing the line or the description is text only and costs a fraction of a cent. Keeping a voice costs nothing more, and speaking with it later costs the same as any premium voice.',
             $c['takes'], $c['takes'] === 1 ? 'take' : 'takes', $c['line_seconds'], self::SAMPLE_SECONDS_ASSUMED, $c['audio_seconds'],
             number_format($c['usd'], 3), number_format($c['usd_high'], 3), number_format($c['usd_2027'], 3),
             number_format($c['credits']), number_format($c['demo_usd'], 3), number_format($c['demo_usd_2027'], 3),

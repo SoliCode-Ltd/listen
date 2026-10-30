@@ -100,7 +100,18 @@ jobs:
           echo "== What each clip took (statuses, times, token use) =="
           cat report-*.json 2>/dev/null || true
 
+      # Kept with the run before the commit, so a failed push never loses clips the quota paid for.
+      - name: Keep the clips with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-design-examples
+          path: public/audio/voice-design/examples/*.mp3
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Commit the clips
+        env:
+          ONLY: ${{ inputs.only }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -108,6 +119,8 @@ jobs:
           git add public/audio/voice-design/examples/*.mp3
           if git diff --cached --quiet; then echo "No new clips"; exit 1; fi
           git diff --cached --stat
-          git commit -m "Voice Design: record the example characters for the card" -m "${{ inputs.only || 'every example' }}"
+          git commit -m "Voice Design: record the example characters for the card" -m "${ONLY:-every example}"
+          # The app writes some tracked files as it runs (the extension's config): not ours to commit.
+          git reset --hard HEAD
           git pull --rebase origin "${GITHUB_REF#refs/heads/}"
           git push origin HEAD:${GITHUB_REF#refs/heads/}
