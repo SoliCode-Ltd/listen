@@ -12,6 +12,7 @@ use App\Http\Controllers\ManualPaymentController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\NewsletterUnsubscribeController;
 use App\Http\Controllers\VoiceCloningController;
+use App\Http\Controllers\VoiceDesignController;
 use App\Models\SiteSetting;
 use App\Support\AgentDiscovery;
 use App\Support\SeoHelper;
@@ -290,6 +291,8 @@ Route::group([
             // Spending the demo needs a confirmed email (Google and phone sign-ins have one).
             Route::post('/demo', [HomeController::class, 'demo'])->middleware('demo.verified')->name('demo.run');
             Route::post('/preview', [HomeController::class, 'preview'])->middleware('demo.verified')->name('demo.preview');
+            // Voice Design's one take, beside the text studio (App\Support\VoiceDesign).
+            Route::post('/demo/voice-design', [HomeController::class, 'designVoice'])->middleware(['demo.verified', 'throttle:6,1,demo-voice-design'])->name('demo.voice-design');
         });
     });
 
@@ -374,6 +377,16 @@ Route::group([
             Route::post('/{id}/retry', [VoiceCloningController::class, 'retry'])->name('voice-cloning.retry');
             Route::post('/{id}/consent', [VoiceCloningController::class, 'replaceConsent'])->name('voice-cloning.consent');
             Route::delete('/{id}', [VoiceCloningController::class, 'destroy'])->name('voice-cloning.destroy');
+        });
+
+        // Voice Design: its own section of the dashboard. Who sees it and who may design: App\Support\VoiceDesign.
+        Route::prefix('dashboard/voice-design')->group(function (): void {
+            Route::get('/', [VoiceDesignController::class, 'index'])->name('voice-design.index');
+            // "Write it for me" is text only, so the demo's members may use it too.
+            Route::post('/enhance', [VoiceDesignController::class, 'enhance'])->middleware('throttle:20,1,voice-design-enhance')->name('voice-design.enhance');
+            Route::post('/', [VoiceDesignController::class, 'design'])->middleware('throttle:10,1,voice-design')->name('voice-design.design');
+            Route::post('/{id}/keep', [VoiceDesignController::class, 'keep'])->whereNumber('id')->middleware('throttle:30,1')->name('voice-design.keep');
+            Route::delete('/{id}', [VoiceDesignController::class, 'destroy'])->whereNumber('id')->middleware('throttle:30,1')->name('voice-design.destroy');
         });
 
         // Legacy user URL kept as redirect to dashboard voice-cloning section.

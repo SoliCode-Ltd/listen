@@ -1,5 +1,8 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.dashboard_title'), 'page' => 'dashboard'])
   <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
+  @if($voiceDesign ?? null)
+    <link rel="stylesheet" href="{{ asset('css/voice-design.css') }}?v={{ filemtime(public_path('css/voice-design.css')) }}">
+  @endif
   @if($dubStudio ?? null)
     <link rel="stylesheet" href="{{ asset('css/dub-studio.css') }}?v={{ filemtime(public_path('css/dub-studio.css')) }}">
   @endif
@@ -2409,6 +2412,13 @@
             <span class="dm-short">{{ __('ui.dub.nav_short') }}</span>
           </a>
           @endif
+          @if($voiceDesign ?? null)
+          <a class="dashboard-menu-link" href="#voiceDesignSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.7 4.6 4.8 1.7-4.8 1.7L12 16.1l-1.7-4.6-4.8-1.7 4.8-1.7z"/><path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>
+            <span class="dm-label">{{ __('voice_design.nav') }}</span>
+            <span class="dm-short">{{ __('voice_design.nav_short') }}</span>
+          </a>
+          @endif
           @if(($voiceCloningVisible ?? false) || ($voiceCloningUpgrade ?? false))
           <a class="dashboard-menu-link" href="#voiceCloningSection" data-dashboard-nav>
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.8 20a6.4 6.4 0 0 1 12.4 0M17.5 9.5a3 3 0 0 1 0 5M20 7a6.5 6.5 0 0 1 0 10"/></svg>
@@ -2766,6 +2776,10 @@
     </section>
 
     {{-- Dub a video: its own section, with what each dub took from the plan. --}}
+    @if($voiceDesign ?? null)
+      <x-voice-design.dashboard-section :studio="$voiceDesign" />
+    @endif
+
     @if($dubStudio ?? null)
       <x-dub.dashboard-section :dub="$dubStudio" :account="$dubAccount" />
     @endif
@@ -3346,6 +3360,18 @@
     const clonedVoices = @json(($voiceCloningVisible ?? false) ? ($clonedVoices ?? []) : []);
     const clonedVoiceGroupLabel = @json(($voiceCloningVisible ?? false) ? __('ui.voice_cloning.cloned_voice_group') : '');
     const clonedVoiceBadge = @json(($voiceCloningVisible ?? false) ? __('ui.voice_cloning.cloned_voice_label') : '');
+    // The member's designed voices (Voice Design), above every other voice.
+    const designedVoices = @json($designedVoices ?? []);
+    const designedVoiceGroupLabel = @json(__('voice_design.group_label'));
+    const designedVoiceBadge = @json(__('voice_design.badge'));
+    @php
+      $clonedVoiceSpeaks = [];
+      foreach (['ar-XA' => 'language_ar', 'en-US' => 'language_en_us', 'en-GB' => 'language_en_gb', 'en-AU' => 'language_en_au'] as $code => $languageKey) {
+          $clonedVoiceSpeaks[$code] = __('ui.dashboard.library.speaks', ['language' => __('ui.voice_cloning.'.$languageKey)]);
+      }
+    @endphp
+    // The line under a cloned voice's name in the library, as a designed voice has one.
+    const clonedVoiceSpeaks = @json($clonedVoiceSpeaks);
     const oldVoice = @json($prefillValue('voice_key'));
     const speechLanguageNames = @json(collect(\App\Support\SpeechLanguages::options(app()->getLocale() === 'ar'))->mapWithKeys(fn ($row) => [$row['value'] => $row['label']]));
     const defaultVoiceKeyByLanguage = {
@@ -3852,8 +3878,24 @@
       if (!voiceSelect) return;
       voiceSelect.innerHTML = '';
 
-      // The member's cloned voices come first, whatever the language: a cloned
-      // voice speaks the script it is given.
+      // The member's designed voices come first, then their cloned ones, whatever
+      // the language: each speaks the script it is given.
+      if ((designedVoices || []).length > 0) {
+        const group = document.createElement('optgroup');
+        group.label = designedVoiceGroupLabel;
+        for (const dv of designedVoices) {
+          const opt = document.createElement('option');
+          opt.value = dv.key;
+          opt.textContent = `${dv.name} (${designedVoiceBadge})`;
+          // Played, pictured and labelled in the voice library like the stock speakers.
+          if (dv.preview) opt.dataset.preview = dv.preview;
+          if (dv.avatar) opt.dataset.avatar = dv.avatar;
+          if (dv.tag) opt.dataset.dialect = dv.tag;
+          group.appendChild(opt);
+        }
+        voiceSelect.appendChild(group);
+      }
+
       const matchingCloned = clonedVoices || [];
       if (matchingCloned.length > 0) {
         const group = document.createElement('optgroup');
@@ -3862,12 +3904,13 @@
           const opt = document.createElement('option');
           opt.value = cv.key;
           opt.textContent = `${cv.name} (${clonedVoiceBadge})`;
+          if (clonedVoiceSpeaks[cv.language_code]) opt.dataset.dialect = clonedVoiceSpeaks[cv.language_code];
           group.appendChild(opt);
         }
         voiceSelect.appendChild(group);
       }
 
-      if (!voices.length && !matchingCloned.length) {
+      if (!voices.length && !matchingCloned.length && !(designedVoices || []).length) {
         voiceSelect.innerHTML = '<option value="">' + i18n.no_speakers + '</option>';
         preferredVoiceKeyByLanguage[lang] = '';
         return;
@@ -3888,7 +3931,7 @@
       }
 
       // Select appropriate default
-      const allKeys = [...matchingCloned.map(c => c.key), ...voices.map(v => v.key)];
+      const allKeys = [...(designedVoices || []).map(d => d.key), ...matchingCloned.map(c => c.key), ...voices.map(v => v.key)];
       if (allKeys.includes(current)) voiceSelect.value = current;
       else voiceSelect.value = allKeys[0] || '';
       preferredVoiceKeyByLanguage[lang] = String(voiceSelect.value || '').trim();
@@ -3971,6 +4014,7 @@
       if (document.getElementById('dialogueSelect')?.value === '1') return 'hd';
       const key = String(voiceSelect?.value || '');
       if (clonedVoices.some(function (entry) { return String(entry.key) === key; })) return 'hd';
+      if (designedVoices.some(function (entry) { return String(entry.key) === key; })) return 'hd';
       const list = voiceCatalog?.[voiceLanguageOf(normalizeLanguage(targetLanguage?.value || 'ar'))];
       const voice = (Array.isArray(list) ? list : []).find(function (v) { return String(v?.key) === key; });
 
@@ -4984,6 +5028,56 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     });
+
+    // "Use in studio" on a designed voice: the voice picked in the generator, in its language.
+    window.openDesignedVoiceInGenerator = function(voice) {
+      const id = String(voice?.id || '').trim();
+      if (!/^\d+$/.test(id) || !voiceSelect || !targetLanguage) return false;
+      const key = `designed_${id}`;
+      const lang = String(voice?.language || 'ar') === 'en' ? 'en' : 'ar';
+      if (!designedVoices.some((entry) => String(entry.key) === key)) {
+        designedVoices.unshift({ id: Number(id), name: String(voice?.name || '').trim() || `Voice ${id}`, language: lang, key, preview: voice?.url || '', avatar: voice?.avatar || '', tag: voice?.tag || '' });
+      }
+      preferredVoiceKeyByLanguage[lang] = key;
+      if (normalizeLanguage(targetLanguage.value) !== lang) {
+        targetLanguage.value = lang;
+        renderDialectOptions();
+        applyStudioDefaults();
+      }
+      renderVoiceOptions();
+      if (!setSelectValueIfAvailable(voiceSelect, key)) return false;
+      voiceSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      voiceSelect.classList.add('vc-speaker-picked');
+      setTimeout(() => voiceSelect.classList.remove('vc-speaker-picked'), 2200);
+      setActiveDashboardSection('generateVoiceSection');
+      try { window.localStorage.setItem('dashboard_active_section', 'generateVoiceSection'); } catch (e) { /* no storage */ }
+      history.replaceState(null, '', `${window.location.pathname}?designed_voice=${encodeURIComponent(id)}#generateVoiceSection`);
+      document.getElementById('generateVoiceSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      voiceSelect.focus({ preventScroll: true });
+      return true;
+    };
+
+    // A voice kept or deleted in the Voice Design section joins or leaves the voice list at once.
+    document.addEventListener('listen:designed-voice', function (event) {
+      const voice = event.detail || {};
+      const key = String(voice.key || '');
+      if (!key) return;
+      const at = designedVoices.findIndex((entry) => String(entry.key) === key);
+      if (voice.removed) {
+        if (at >= 0) designedVoices.splice(at, 1);
+      } else if (at < 0) {
+        designedVoices.unshift({ id: Number(voice.id), name: String(voice.name || ''), language: voice.language === 'en' ? 'en' : 'ar', key, preview: voice.url || '', avatar: voice.avatar || '', tag: voice.tag || '' });
+      }
+      const picked = String(voiceSelect?.value || '');
+      renderVoiceOptions();
+      if (picked && voiceSelect) setSelectValueIfAvailable(voiceSelect, picked);
+    });
+
+    (function openRequestedDesignedVoice() {
+      const id = String(new URLSearchParams(window.location.search).get('designed_voice') || '').trim();
+      const match = designedVoices.find((entry) => String(entry.id) === id);
+      if (match) window.openDesignedVoiceInGenerator(match);
+    })();
 
     (function openRequestedClonedVoice() {
       const params = new URLSearchParams(window.location.search);
@@ -6523,6 +6617,10 @@
   <script src="{{ asset('js/voice-studio-icons.js') }}?v={{ filemtime(public_path('js/voice-studio-icons.js')) }}" defer></script>
   @if($dubStudio ?? null)
     <script src="{{ asset('js/dub-studio.js') }}?v={{ filemtime(public_path('js/dub-studio.js')) }}" defer></script>
+  @endif
+  @if($voiceDesign ?? null)
+    @include('components.orb-script')
+    <script src="{{ asset('js/voice-design.js') }}?v={{ filemtime(public_path('js/voice-design.js')) }}" defer></script>
   @endif
   <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
 </body>

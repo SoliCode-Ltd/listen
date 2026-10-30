@@ -387,6 +387,7 @@ return [
             'label_developer_api' => 'واجهة المطورين',
             'label_voice_cloning' => 'استنساخ الأصوات',
             'label_video_dubbing' => 'دبلجة الفيديو',
+            'label_voice_design' => 'تصميم الصوت',
             'label_download_formats' => 'صيغ التحميل',
             'label_demo' => 'الصوت المتميز للتجربة',
             'label_card_needed' => 'بطاقة الائتمان',
@@ -407,6 +408,7 @@ return [
             'kept_no_limit' => 'بدون حد زمني',
             'kept_days' => 'بدون حد زمني|يوم واحد|يومان|:count أيام|:count يومًا|:count يوم',
             'cloning_voices' => 'بدون|صوت واحد|صوتان|:count أصوات|:count صوتًا|:count صوت',
+            'design_voices' => 'بدون|صوت مصمَّم واحد|صوتان مصمَّمان|:count أصوات مصمَّمة|:count صوتًا مصمَّمًا|:count صوت مصمَّم',
             'dubbing_videos' => '{1} فيديو واحد شهريًا، حتى :seconds ثانية للفيديو|{2} فيديوهان شهريًا، حتى :seconds ثانية للفيديو|[3,10] :count فيديوهات شهريًا، حتى :seconds ثانية للفيديو|[11,*] :count فيديو شهريًا، حتى :seconds ثانية للفيديو',
             'dubbing_open' => 'حتى :seconds ثانية للفيديو، من وقت الصوت',
             'topup_price' => ':price لكل مليون رصيد',
@@ -1307,6 +1309,10 @@ return [
             'favorites' => 'المفضلة',
             'mine' => 'أصواتي',
             'mine_badge' => 'صوتي',
+            // أصوات العضو، مميَّزة: صوت صمّمه بالكلمات، وصوت استنسخه من تسجيل.
+            'designed_badge' => 'مصمَّم',
+            'cloned_badge' => 'مستنسخ',
+            'speaks' => 'يتحدث :language',
             'search' => 'ابحث عن متحدث…',
             'gender' => 'الجنس',
             'any' => 'الكل',
@@ -1822,6 +1828,7 @@ return [
         // A limit that lasts (a spending cap, every key out for the day, the site's daily ceiling): told as high demand, with no minute promised.
         'premium_voices_our_limit' => 'تشهد الأصوات المميزة إقبالاً كبيراً في هذه اللحظة، فلم يُنشأ صوتك ولم يُخصم أي رصيد من حسابك. يُرجى المحاولة مرة أخرى بعد قليل.',
         'cloned_voices_our_limit' => 'تشهد الأصوات المستنسخة إقبالاً كبيراً في هذه اللحظة، فلم يُنشأ صوتك ولم يُخصم أي رصيد من حسابك. يُرجى المحاولة مرة أخرى بعد قليل.',
+        'designed_voices_our_limit' => 'تشهد الأصوات المصمَّمة إقبالاً كبيراً في هذه اللحظة، فلم يُنشأ صوتك ولم يُخصم أي رصيد من حسابك. يُرجى المحاولة مرة أخرى بعد قليل.',
         // The premium engine would not read the text: the same text fails again, so other wording is asked for.
         'premium_text_refused' => 'تعذّر على الأصوات المميزة قراءة هذا النص، ولم يُخصم أي رصيد من حسابك. يُرجى تعديل الصياغة قليلاً ثم إعادة التوليد.',
         'generation_stuck_refunded' => 'استغرق إنشاء هذا الصوت وقتاً أطول من المتوقع فأُوقِف، ولم يُخصم أي رصيد من حسابك. يُرجى المحاولة مرة أخرى.',

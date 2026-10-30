@@ -49,7 +49,8 @@ class VideoDubbingOffTest extends TestCase
         $this->assertFalse(VideoDubbing::openTo($preview));
         $this->get(route('dub.page'))->assertNotFound();
         $this->actingAs($preview)->get(route('dub.page'))->assertNotFound();
-        $this->actingAs($preview)->get(route('demo.page'))->assertOk()->assertDontSee('data-dub-studio', false)->assertDontSee('data-studio-switch', false);
+        // The switch above the demo may still offer Voice Design: never a dubbing tab.
+        $this->actingAs($preview)->get(route('demo.page'))->assertOk()->assertDontSee('data-dub-studio', false)->assertDontSee('data-studio-tab="dub"', false);
         $this->actingAs($preview)->get(route('dashboard'))->assertOk()->assertDontSee('id="dubVideoSection"', false)->assertDontSee('href="#dubVideoSection"', false);
         $this->actingAs($preview)->postJson(route('dub.upload.start'), ['name' => 'a.mp4', 'size' => 1000])->assertNotFound();
     }

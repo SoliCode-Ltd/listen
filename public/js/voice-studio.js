@@ -1237,13 +1237,15 @@
     function items() {
       return Array.prototype.filter.call(select.options, function (o) { return o.value && !o.hidden; }).map(function (o) {
         var v = voices[o.value] || {};
-        var mine = o.value.indexOf('cloned_') === 0;
+        // The member's own: cloned voices, and designed ones (whose take is their preview), each badged as what it is.
+        var kind = o.value.indexOf('designed_') === 0 ? 'designed' : (o.value.indexOf('cloned_') === 0 ? 'cloned' : '');
+        var mine = kind !== '';
         var label = String(o.textContent || '').trim();
         // "Name (Cloned voice)": the card says it with its own badge.
         if (mine) label = label.replace(/\s*\([^()]*\)\s*$/, '');
         return {
-          value: o.value, label: label, mine: mine, gender: v.g || '', age: v.y || '', avatar: v.a || o.dataset.avatar || '',
-          flag: v.f || '', dialect: v.d || '', preview: v.p || '', featured: !!v.s, disabled: o.disabled,
+          value: o.value, label: label, mine: mine, kind: kind, gender: v.g || '', age: v.y || '', avatar: v.a || o.dataset.avatar || '',
+          flag: v.f || '', dialect: v.d || o.dataset.dialect || '', preview: v.p || o.dataset.preview || '', featured: !!v.s, disabled: o.disabled,
           key: fold(label + ' ' + (v.d || '') + ' ' + (v.g ? t(meta, v.g) : '') + ' ' + (v.y ? t(meta, 'age_' + v.y) : '') + ' ' + o.value)
         };
       });
@@ -1354,12 +1356,12 @@
           + '<svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg></span></button>'
         : '';
       var metaLine = [];
-      if (item.mine) metaLine.push('<span class="vs-voice-badge">' + escAttr(t(meta, 'mine_badge')) + '</span>');
+      if (item.mine) metaLine.push('<span class="vs-voice-badge is-' + item.kind + '">' + escAttr(t(meta, item.kind + '_badge') || t(meta, 'mine_badge')) + '</span>');
       // The gender filter above the cards already sorts by gender: no label on each card.
       el.innerHTML = '<button type="button" class="vs-voice-fav" aria-pressed="' + (favorites[item.value] ? 'true' : 'false') + '" aria-label="'
           + escAttr(t(meta, favorites[item.value] ? 'favorite_remove' : 'favorite_add')) + '">' + heart(favorites[item.value]) + '</button>'
         + '<span class="vs-voice-avatar">' + avatar + play + (item.flag ? '<span class="vs-voice-flag"><img src="' + escAttr(item.flag) + '" alt="" width="18" height="18" loading="lazy"></span>' : '') + '</span>'
-        + '<span class="vs-voice-name">' + escAttr(item.label) + '</span>'
+        + '<span class="vs-voice-name" dir="auto">' + escAttr(item.label) + '</span>'
         + (metaLine.length ? '<span class="vs-voice-meta">' + metaLine.join('') + '</span>' : '')
         + (item.dialect ? '<span class="vs-voice-dialect">' + escAttr(item.dialect) + '</span>' : '')
         + '<svg class="vs-voice-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';

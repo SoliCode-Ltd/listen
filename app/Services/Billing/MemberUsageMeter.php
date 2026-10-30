@@ -118,6 +118,41 @@ class MemberUsageMeter
     }
 
     /**
+     * Gives back part of a reservation made with reserveCredits(): a request
+     * that delivered less than it reserved (a design with a take that never
+     * came). The request itself still counts. The caller gives back each
+     * part once.
+     *
+     * @param  array{period:string, billed_to_pack:bool, credits:int, seconds:int}  $reservation
+     */
+    public function giveBackPart(int $userId, array $reservation, int $credits, int $seconds): void
+    {
+        $credits = max(0, min((int) $reservation['credits'], $credits));
+        $seconds = max(0, min((int) $reservation['seconds'], $seconds));
+        if ($credits === 0 && $seconds === 0) {
+            return;
+        }
+
+        DB::transaction(function () use ($userId, $reservation, $credits, $seconds): void {
+            if ($reservation['billed_to_pack']) {
+                $this->charPackService->release($userId, $credits);
+
+                return;
+            }
+            $counter = UsageCounter::query()
+                ->where('user_id', $userId)
+                ->where('period_ym', $reservation['period'])
+                ->lockForUpdate()
+                ->first();
+            if ($counter) {
+                $counter->update(['total_chars' => max(0, (int) $counter->total_chars - $credits)]);
+                $counter->addSeconds(-$seconds);
+            }
+            $this->trialUsageRecorder->release($userId, ['credits' => $credits, 'seconds' => $seconds], false);
+        }, 3);
+    }
+
+    /**
      * The free plan's monthly credits and gifted credits need a confirmed
      * email; whoever pays or has paid never waits for it. Checked after the
      * limits, so a member without credits is told that first, and before

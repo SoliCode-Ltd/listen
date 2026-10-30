@@ -373,6 +373,29 @@ class VoiceCloningService
         }
     }
 
+    /**
+     * Speak with a voice that lives in one key's project only (a designed
+     * voice: it cannot be copied to another key and stay the same voice).
+     * Every request goes to that key; one out for today throws
+     * GeminiKeysOutException at once, so the member is told it is a limit on
+     * our side rather than a passing one.
+     *
+     * @return array<string, mixed> as synthesizeWithClonedVoice()
+     */
+    public function synthesizeOnKey(string $text, string $voiceId, string $style, ?string $keyName): array
+    {
+        if ($keyName !== null && app(GeminiKeyManager::class)->isOutForToday($keyName, self::MODEL)) {
+            throw new GeminiKeysOutException('Designed voice synthesis failed: the key that holds the voice is out for now.');
+        }
+
+        $this->pinnedKeyName = $keyName;
+        try {
+            return $this->synthesizeClonedPieces($text, $voiceId, $style);
+        } finally {
+            $this->pinnedKeyName = null;
+        }
+    }
+
     private function synthesizeClonedPieces(string $text, string $voiceCloningKey, string $style): array
     {
         $text = trim($text);
@@ -1504,7 +1527,7 @@ class VoiceCloningService
     /**
      * @return array<string, mixed>
      */
-    private function interactionPayload(string $text, string $voiceId, string $style): array
+    public function interactionPayload(string $text, string $voiceId, string $style): array
     {
         $content = [
             'type' => 'text',
@@ -1627,7 +1650,7 @@ class VoiceCloningService
     /**
      * @return array<string, mixed>
      */
-    private function httpOptions(): array
+    public function httpOptions(): array
     {
         $options = ['verify' => (bool) config('services.gemini_tts.verify_ssl', true)];
         $proxy = trim((string) config('services.gemini_tts.voice_proxy', ''));
@@ -1645,7 +1668,7 @@ class VoiceCloningService
      *
      * @return array<int, array{key: string, name: string}>
      */
-    private function apiKeys(?string $model = null): array
+    public function apiKeys(?string $model = null): array
     {
         try {
             $keys = app(GeminiKeyManager::class)->keysInOrder($model ?? self::MODEL, $this->preferredKeyName);
@@ -1677,7 +1700,7 @@ class VoiceCloningService
         return $this->findVoiceId($json);
     }
 
-    private function findVoiceId(mixed $value): ?string
+    public function findVoiceId(mixed $value): ?string
     {
         if (is_string($value)) {
             $value = trim($value);
@@ -1723,7 +1746,7 @@ class VoiceCloningService
     /**
      * @param  array<string, mixed>  $json
      */
-    private function extractAudioBytes(array $json): string
+    public function extractAudioBytes(array $json): string
     {
         $inline = data_get($json, 'output_audio.data')
             ?? data_get($json, 'outputAudio.data');
@@ -1776,7 +1799,7 @@ class VoiceCloningService
         return is_string($decoded) ? $decoded : '';
     }
 
-    private function ensurePlayableAudio(string $audio): string
+    public function ensurePlayableAudio(string $audio): string
     {
         if (str_starts_with($audio, 'RIFF') || str_starts_with($audio, 'ID3') || str_starts_with($audio, "\xFF\xFB")) {
             return $audio;
@@ -1961,7 +1984,7 @@ class VoiceCloningService
         };
     }
 
-    private function responseError(Response $response): string
+    public function responseError(Response $response): string
     {
         $message = $response->json('error.message')
             ?? $response->json('error.status')

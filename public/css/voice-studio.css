@@ -1115,6 +1115,8 @@ html[lang="ar"] .vs-tb-group { letter-spacing: 0; font-size: .8rem; }
 .vs-voice-gender.vs-g-female { background: color-mix(in oklab, #A48FFF 22%, transparent); color: color-mix(in oklab, #7659FA 85%, var(--text)); }
 .vs-voice-gender.vs-g-male { background: color-mix(in oklab, #4C6BF5 14%, transparent); color: color-mix(in oklab, #4C6BF5 85%, var(--text)); }
 .vs-voice-badge { background: color-mix(in oklab, var(--a, #7659FA) 14%, transparent); color: color-mix(in oklab, var(--a, #7659FA) 85%, var(--text)); }
+/* A cloned voice in teal, so it is never taken for one designed in words (violet). */
+.vs-voice-badge.is-cloned { background: color-mix(in oklab, #2DB7A6 18%, transparent); color: color-mix(in oklab, #15806F 80%, var(--text)); }
 .vs-voice-dialect {
   max-width: 100%;
   overflow: hidden;

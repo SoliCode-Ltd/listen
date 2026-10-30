@@ -43,3 +43,7 @@ Schedule::command('listen:expire-stuck-generations')->everyFiveMinutes()->withou
 // Dub my video: give back the credits of stuck dubs, move finished videos to Google Drive
 // and delete old server copies (App\Console\Commands\PruneVideoDubsCommand).
 Schedule::command('dubs:prune')->everyTenMinutes()->withoutOverlapping(30);
+
+// Voice Design: delete the takes nobody kept, so the speech projects keep room for voices
+// (App\Console\Commands\PruneDesignedVoicesCommand).
+Schedule::command('voice-design:prune')->everyThirtyMinutes()->withoutOverlapping(20);

@@ -121,6 +121,14 @@ name: Server deploy
 #            stays on staging for the next runs; dub "clean" removes it. It uses
 #            the speech quota staging shares with live (about 25 requests a
 #            run): only when the owner has said yes.
+#   voice-design-test: staging only. One real Voice Design with the branch's
+#            code, the way the dashboard makes one, for the admin email's account
+#            (input "design": the example character, cairo_grandma by default),
+#            with what each request took and what that costs; take 1 stays in the
+#            admin's library as "Staging test voice", and the takes' audio is kept
+#            with the run (scripts/support/voice_design_test.php). It uses the
+#            speech quota staging shares with live (7 requests for 3 takes): only
+#            when the owner has said yes. Needs mode migrate first.
 # New migrations and composer.lock changes are reported, not run (see migrate and composer).
 # The "Run over SSH" script must stay under GitHub's 21,000-character limit for one
 # step (tests/Feature/ServerDeployWorkflowTest.php): longer remote work goes in
@@ -135,7 +143,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -147,6 +155,10 @@ on:
         default: ""
       dub:
         description: "dub-test only: settings to change (voice=Kore dialect=ar-EG style= emotion= background=keep), or clean"
+        type: string
+        default: ""
+      design:
+        description: "voice-design-test only: the example character to design (cairo_grandma, evil_ogre, gulf_commentator ...)"
         type: string
         default: ""
 
@@ -185,6 +197,7 @@ jobs:
           CUSTOMER: ${{ inputs.customer }}
           MEMBER: ${{ inputs.member }}
           DUB: ${{ inputs.dub }}
+          DESIGN: ${{ inputs.design }}
           LIVE_HOST: ${{ secrets.LIVE_SSH_HOST }}
           LIVE_USER: ${{ secrets.LIVE_SSH_USER }}
           LIVE_KEY: ${{ secrets.LIVE_SSH_KEY }}
@@ -509,6 +522,17 @@ jobs:
             rm -f ~/.ssh/id_deploy
             exit "$failed"
           fi
+          if [ "$MODE" = voice-design-test ]; then
+            [ "$TARGET" = staging ] || { echo "voice-design-test runs on staging only"; exit 1; }
+            printf '%s' "$DESIGN" | grep -qE '^[a-z_]*$' || { echo "design: an example key such as cairo_grandma"; exit 1; }
+            failed=0
+            tool voice_design_test.php | $S "$FIND; VD='$DESIGN' php" || failed=1
+            mkdir -p voice-design-test
+            for t in 1 2 3; do $S "$FIND; cat storage/app/listen-deploy/voice-design-test/take-$t.* 2>/dev/null" > voice-design-test/take-$t.mp3 || true; [ -s voice-design-test/take-$t.mp3 ] || rm -f voice-design-test/take-$t.mp3; done
+            ls -l voice-design-test
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
           if [ "$MODE" != deploy ]; then exit 0; fi
           $S "$FIND; cat > storage/app/listen-deploy/bundle.tgz" < bundle.tgz
           # In bash with pipefail, so anything that fails stops the deploy and fails the run.
@@ -547,6 +571,14 @@ jobs:
         with:
           name: dub-test
           path: dub-test/
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Keep the test design's takes with the run
+        if: always() && inputs.mode == 'voice-design-test'
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-design-test
+          path: voice-design-test/
           if-no-files-found: ignore
           retention-days: 3
       - name: Check the public footer

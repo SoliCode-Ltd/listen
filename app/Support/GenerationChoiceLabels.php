@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
+use App\Models\DesignedVoice;
 
 /**
  * Turns what a generation stored (codes like ar-EG, promo, cloned_12) into
@@ -187,6 +188,12 @@ final class GenerationChoiceLabels
             $name = ClonedVoice::withTrashed()->whereKey($id)->value('name');
 
             return 'Cloned voice: '.($name !== null && trim((string) $name) !== '' ? trim((string) $name) : 'deleted')." (#{$id})";
+        }
+
+        if (($id = DesignedVoice::idFromKey($voiceName)) !== null) {
+            $name = DesignedVoice::withTrashed()->whereKey($id)->value('name');
+
+            return 'Designed voice: '.($name !== null && trim((string) $name) !== '' ? trim((string) $name) : 'deleted')." (#{$id})";
         }
 
         $meta = VoiceCatalog::voiceMeta($voiceName);

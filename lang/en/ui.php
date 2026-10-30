@@ -386,6 +386,7 @@ return [
             'label_developer_api' => 'Developer API',
             'label_voice_cloning' => 'Voice cloning',
             'label_video_dubbing' => 'Video dubbing',
+            'label_voice_design' => 'Voice Design',
             'label_download_formats' => 'Download formats',
             'label_demo' => 'Premium voice to try',
             'label_card_needed' => 'Credit card',
@@ -406,6 +407,7 @@ return [
             'kept_no_limit' => 'No time limit',
             'kept_days' => ':count day|:count days',
             'cloning_voices' => ':count voice|:count voices',
+            'design_voices' => ':count designed voice|:count designed voices',
             'dubbing_videos' => ':count video a month, up to :seconds s each|:count videos a month, up to :seconds s each',
             'dubbing_open' => 'Up to :seconds s a video, from your voice time',
             'topup_price' => ':price per 1M credits',
@@ -1303,6 +1305,10 @@ return [
             'favorites' => 'Favourites',
             'mine' => 'My voices',
             'mine_badge' => 'My voice',
+            // A member's own voices, told apart: one they designed in words, one cloned from a recording.
+            'designed_badge' => 'Designed',
+            'cloned_badge' => 'Cloned',
+            'speaks' => 'Speaks :language',
             'search' => 'Search speakers…',
             'gender' => 'Gender',
             'any' => 'All',
@@ -1819,6 +1825,7 @@ return [
         // A limit that lasts (a spending cap, every key out for the day, the site's daily ceiling): told as high demand, with no minute promised.
         'premium_voices_our_limit' => "Premium voices are in very high demand right now. Your voice wasn't created, and no credits were used. Please try again a little later.",
         'cloned_voices_our_limit' => "Cloned voices are in very high demand right now. Your voice wasn't created, and no credits were used. Please try again a little later.",
+        'designed_voices_our_limit' => "Designed voices are in very high demand right now. Your audio wasn't created, and no credits were used. Please try again a little later.",
         // The premium engine would not read the text: the same text fails again, so other wording is asked for.
         'premium_text_refused' => "The premium voices couldn't read this text, and no credits were used. Please reword it slightly, then generate again.",
         'generation_stuck_refunded' => 'This voice was taking longer than expected, so it was stopped, and no credits were used. Please try again.',
