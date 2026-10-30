@@ -121,6 +121,8 @@
 
     toggle.addEventListener('change', refresh);
     nameInputs.forEach(function (input) {
+      // A name the page came with (a reused dialogue) is the member's own: the text's lines use it.
+      if (String(input.value || '').trim()) input.dataset.touched = '1';
       input.addEventListener('input', function () { input.dataset.touched = '1'; updateGuide(); });
     });
     voiceSelects.forEach(function (select) {

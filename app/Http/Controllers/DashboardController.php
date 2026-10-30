@@ -77,7 +77,7 @@ class DashboardController extends Controller
                 ->where('user_sequence_number', $reuseDisplayNumber)
                 ->first();
 
-            if ($reuseSource?->hasReusablePremiumSettings()) {
+            if ($reuseSource?->hasReusableSettings()) {
                 $reusePreset = array_merge(
                     $reuseSource->reusableSettings() ?? [],
                     [
@@ -174,6 +174,13 @@ class DashboardController extends Controller
         // Dub a video, in its own section (App\Support\VideoDubbing).
         $dubStudio = VideoDubbing::openTo($request->user()) ? VideoDubbing::studio($request->user(), $request) : null;
 
+        // Options the plan lacks stay visible, dimmed, with an upgrade button.
+        $featureLocks = $this->featureLocks($activePlan, $planTier, $planShowcase, $dialogueEnabled);
+        if ($reusePreset !== null) {
+            $clonedKeys = $voiceCloningVoices->filter(fn (ClonedVoice $v) => $v->isReady())->map(fn (ClonedVoice $v) => 'cloned_'.$v->id)->values()->all();
+            $reusePreset = $this->reuseForPlan($reusePreset, $planTier, $featureLocks, $tierCatalog, $clonedKeys, $customPromptEnabled);
+        }
+
         $page = view('dashboard', [
             'dubStudio' => $dubStudio,
             'dubAccount' => $dubStudio ? VideoDubbing::account($request->user(), $dubStudio) : null,
@@ -222,8 +229,7 @@ class DashboardController extends Controller
                     'dialect' => TtsStudioConfig::defaultDialect('en'),
                 ],
             ],
-            // Options the plan lacks stay visible, dimmed, with an upgrade button.
-            'featureLocks' => $this->featureLocks($activePlan, $planTier, $planShowcase, $dialogueEnabled),
+            'featureLocks' => $featureLocks,
             // Hybrid TTS studio data
             'dialogueEnabled' => $dialogueEnabled,
             'customPromptEnabled' => $customPromptEnabled,
@@ -853,8 +859,8 @@ class DashboardController extends Controller
             'note' => $this->environmentNote($job),
             'created_human' => $job->created_at?->diffForHumans(),
             'created_at_ts' => $job->created_at?->getTimestamp(),
-            'can_reuse_settings' => $job->hasReusablePremiumSettings(),
-            'reuse_url' => $job->hasReusablePremiumSettings()
+            'can_reuse_settings' => $job->hasReusableSettings(),
+            'reuse_url' => $job->hasReusableSettings()
                 ? route('dashboard', ['reuse' => $job->displayNumber()]).'#generateVoiceSection'
                 : null,
             'is_demo_history' => false,
@@ -1056,6 +1062,52 @@ class DashboardController extends Controller
         ];
     }
 
+    /**
+     * Reuse brings back what the voice was made with, as far as the member's plan has it
+     * today: a speaker, option or mode the plan lacks is left out, so the studio shows
+     * what will be used (its default) rather than a choice that can't be made.
+     *
+     * @param  array<string, mixed>  $preset  AudioGeneration::reusableSettings() and the text
+     * @param  array<string, mixed>  $locks  featureLocks()
+     * @param  array<string, mixed>  $catalog  the plan's speakers by language
+     * @param  list<string>  $clonedKeys  the member's ready cloned voices (cloned_12)
+     * @return array<string, mixed> with plan_left_out: whether anything chosen was left out
+     */
+    private function reuseForPlan(array $preset, string $planTier, array $locks, array $catalog, array $clonedKeys, bool $customPrompt): array
+    {
+        $leave = [];
+        if ($planTier !== VoiceTier::HD) {
+            array_push($leave, 'dialect', 'dialect_auto', 'performance_style', 'style_prompt', 'emotion');
+        }
+        if (! $customPrompt) {
+            $leave[] = 'style_prompt';
+        }
+        if ($locks[PlanFeatures::STUDIO] ?? null) {
+            array_push($leave, 'speed', 'pitch');
+        }
+        if ($locks[PlanFeatures::DIALOGUE] ?? null) {
+            array_push($leave, 'is_dialogue', 'dialogue_speakers');
+        }
+        if ($locks[PlanFeatures::EFFECTS] ?? null) {
+            $leave[] = 'audio_effect';
+        }
+        $voiceKey = (string) ($preset['voice_key'] ?? '');
+        $speakers = $catalog[SpeechLanguages::voiceLanguage((string) ($preset['target_language'] ?? 'ar'))] ?? [];
+        if ($voiceKey !== '' && ! in_array($voiceKey, $clonedKeys, true) && ! collect($speakers)->contains('key', $voiceKey)) {
+            $leave[] = 'voice_key';
+        }
+
+        // Only a real choice counts as left out: not "off", nor normal speed and pitch.
+        $chosen = fn (string $key): bool => match ($key) {
+            'speed' => isset($preset[$key]) && (float) $preset[$key] !== 1.0,
+            'pitch' => isset($preset[$key]) && (float) $preset[$key] !== 0.0,
+            default => ! in_array($preset[$key] ?? null, [null, false, '', []], true),
+        };
+        $leftOut = array_filter(array_unique($leave), $chosen);
+
+        return ['plan_left_out' => $leftOut !== []] + array_diff_key($preset, array_flip($leave));
+    }
+
     private function planAllowsCustomPrompt(?Plan $plan): bool
     {
         return (bool) $plan?->allowsCustomPrompt();
@@ -1140,19 +1192,27 @@ class DashboardController extends Controller
         $voiceMeta = $voiceName !== '' ? VoiceCatalog::voiceMeta($voiceName) : null;
         $voiceKey = is_array($voiceMeta) ? trim((string) ($voiceMeta['key'] ?? '')) : '';
 
-        $settings = [
+        $common = [
             'voice_tier' => $voiceTier,
             'voice_name' => $voiceName !== '' ? $voiceName : null,
             'voice_key' => $voiceKey !== '' ? $voiceKey : null,
             'target_language' => $targetLanguage !== '' ? $targetLanguage : 'ar',
             'translate' => (bool) $demo->translate,
-            'dialect' => trim((string) ($demo->dialect ?? '')) ?: null,
+            'is_dialogue' => false,
+        ];
+        // As in AudioGeneration::reusableSettings(): a standard voice chooses no style, emotion, dialect or speed.
+        if ($voiceTier !== VoiceTier::HD) {
+            return array_filter($common, static fn (mixed $value): bool => $value !== null && $value !== '');
+        }
+        $dialect = trim((string) ($demo->dialect ?? ''));
+        $settings = $common + [
+            'dialect' => $dialect ?: null,
+            'dialect_auto' => $dialect === '' && in_array($common['target_language'], ['ar', 'en'], true),
             'performance_style' => trim((string) ($demo->performance_style ?? '')) ?: null,
             'style_prompt' => trim((string) ($demo->style_prompt ?? '')) ?: null,
             'emotion' => trim((string) ($demo->emotion ?? '')) ?: null,
             'speed' => $demo->speed !== null ? (float) $demo->speed : null,
             'pitch' => $demo->pitch !== null ? (float) $demo->pitch : null,
-            'is_dialogue' => false,
         ];
         $onDefault = data_get($demo->metadata, 'on_default');
         $settings = TtsStudioConfig::reusedAsChosen($settings, is_array($onDefault) ? $onDefault : null, $settings['target_language']);
