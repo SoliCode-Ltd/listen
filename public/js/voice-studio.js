@@ -1237,13 +1237,14 @@
     function items() {
       return Array.prototype.filter.call(select.options, function (o) { return o.value && !o.hidden; }).map(function (o) {
         var v = voices[o.value] || {};
-        var mine = o.value.indexOf('cloned_') === 0;
+        // The member's own: cloned voices, and designed ones (whose take is their preview).
+        var mine = o.value.indexOf('cloned_') === 0 || o.value.indexOf('designed_') === 0;
         var label = String(o.textContent || '').trim();
         // "Name (Cloned voice)": the card says it with its own badge.
         if (mine) label = label.replace(/\s*\([^()]*\)\s*$/, '');
         return {
           value: o.value, label: label, mine: mine, gender: v.g || '', age: v.y || '', avatar: v.a || o.dataset.avatar || '',
-          flag: v.f || '', dialect: v.d || '', preview: v.p || '', featured: !!v.s, disabled: o.disabled,
+          flag: v.f || '', dialect: v.d || '', preview: v.p || o.dataset.preview || '', featured: !!v.s, disabled: o.disabled,
           key: fold(label + ' ' + (v.d || '') + ' ' + (v.g ? t(meta, v.g) : '') + ' ' + (v.y ? t(meta, 'age_' + v.y) : '') + ' ' + o.value)
         };
       });

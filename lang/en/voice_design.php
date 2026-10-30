@@ -87,6 +87,7 @@ return [
     // The library.
     'library_title' => 'Your designed voices',
     'library_count' => ':count of :max',
+    'month_count' => ':count of :max new voice this month|:count of :max new voices this month',
     'library_empty' => 'The voices you keep appear here, ready in the studio’s voice list.',
     'use_in_studio' => 'Use in studio',
     'delete' => 'Delete',

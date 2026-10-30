@@ -87,6 +87,7 @@ return [
     // المكتبة.
     'library_title' => 'أصواتك المصمّمة',
     'library_count' => ':count من :max',
+    'month_count' => ':count من :max أصوات جديدة هذا الشهر',
     'library_empty' => 'الأصوات التي تحتفظ بها تظهر هنا، جاهزة في قائمة الأصوات في الاستوديو.',
     'use_in_studio' => 'استخدمه في الاستوديو',
     'delete' => 'حذف',
