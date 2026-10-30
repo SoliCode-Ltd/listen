@@ -23,6 +23,8 @@ use App\Services\Referral\ReferralQualificationService;
 use App\Services\TranslationService;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
+use App\Services\VoiceDesignService;
+use App\Support\AudioDuration;
 use App\Support\AudioEffects;
 use App\Support\HeroCast;
 use App\Support\LongFormSamples;
@@ -44,6 +46,7 @@ use App\Support\VideoDubbing;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceFlag;
+use App\Support\VoiceDesign;
 use App\Support\VoicePreviews;
 use App\Support\VoiceTier;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -1043,6 +1046,134 @@ class HomeController extends Controller
             return response()->json([
                 'ok' => false,
                 'message' => $e instanceof TranslationFailedException ? $e->getMessage() : __('ui.backend.demo_voice_generation_failed'),
+                'quota' => $quota ?: $this->demoQuotaForClient($request),
+            ], 422);
+        }
+    }
+
+    /**
+     * Voice Design in the demo, beside the text studio: one take of the voice
+     * the member described, speaking their line or one written for the
+     * character. It is paid from the demo's characters as a demo voice is (the
+     * line's characters), under the same limits and checks, and kept in the
+     * demo history. Keeping designed voices is for plans with Voice Design.
+     */
+    public function designVoice(Request $request, VoiceDesignService $designer)
+    {
+        $this->syncCurrentUserDeviceIdentity($request);
+        abort_unless(VoiceDesign::openTo($request->user()), 404);
+        $user = $request->user();
+        $userId = (int) $user->id;
+        $maxChars = $this->demoCharAllowance($request);
+        $quota = [];
+        $quotaReserved = false;
+        $estimate = ['chars' => 0];
+
+        try {
+            $validated = VoiceDesignController::validateDesign($request, min(VoiceDesign::MAX_PREVIEW, $maxChars));
+            $left = (int) $this->demoQuotaForClient($request)['total_remaining_chars'];
+            if ($left < VoiceDesign::MIN_PREVIEW) {
+                throw ValidationException::withMessages(['line' => $this->demoLimitExceededMessage($request, $maxChars)]);
+            }
+            @set_time_limit(120);
+            // A line written for the character fits in what is left of the demo.
+            $line = $validated['line'] ?? $designer->previewLine($validated['description'], $validated['language'], min(VoiceDesign::MAX_PREVIEW, $maxChars, $left));
+            $estimate = UsageEstimator::estimate($line);
+            if ($estimate['chars'] > $maxChars) {
+                throw ValidationException::withMessages(['line' => $this->demoLimitExceededMessage($request, $maxChars)]);
+            }
+
+            $quota = $this->enforceDemoPolicy($request, $estimate['chars'], true, true);
+            $quotaReserved = true;
+
+            $result = $designer->design($user, ['line' => $line] + $validated, 1);
+            $take = $result['takes'][0] ?? null;
+            if ($take === null) {
+                $quota = $this->rollbackDemoPolicy($request, $estimate['chars'], true);
+                $quotaReserved = false;
+
+                return response()->json([
+                    'ok' => false,
+                    'message' => VoiceDesignController::failureMessage((string) $result['error_code']),
+                    'quota' => $quota ?: $this->demoQuotaForClient($request),
+                ], 422);
+            }
+
+            // The demo history keeps its own copy: the take itself is cleared if it is not kept.
+            $audioPath = $this->storeDemoAudioCopy((string) $take->preview_audio_path);
+            $usedBase = $this->trialUsedCharsByUser($userId, $request);
+            $baseCharge = (int) min($estimate['chars'], max(0, $maxChars - $usedBase));
+            $rewardCharge = (int) max(0, $estimate['chars'] - $baseCharge);
+            $generation = $this->storeDemoVoiceGeneration(
+                $request,
+                ['target_language' => $validated['language'], 'voice_tier' => VoiceTier::HD],
+                $line,
+                $line,
+                SpeechLanguages::detect($line),
+                null,
+                [],
+                ['audio_path' => $audioPath, 'provider' => 'gemini', 'model' => VoiceDesignService::MODEL,
+                    'duration_seconds' => AudioDuration::wholeSeconds(data_get($take->metadata, 'seconds'))],
+                $quota,
+                $baseCharge,
+                $estimate['chars'],
+                $rewardCharge,
+                (int) $estimate['chars'],
+            );
+            $generation?->forceFill([
+                'voice_label' => __('voice_design.demo_voice_label'),
+                'metadata' => array_merge((array) $generation->metadata, ['voice_design' => [
+                    'description' => $validated['description'],
+                    'designed_voice_id' => $take->id,
+                ]]),
+            ])->save();
+            if ($rewardCharge > 0) {
+                app(DemoRewardLedgerService::class)->consume($user, $rewardCharge, $generation, 'demo_generation_overflow');
+            }
+            $quotaReserved = false;
+            if ($generation !== null) {
+                $this->releaseDemoReservation($userId, (int) $estimate['chars']);
+            }
+
+            $quota = $this->demoQuotaForClient($request);
+            $this->syncStoredDemoVoiceGenerationQuota($generation, $quota);
+            $plan = $this->planAccessService->resolveAccessPlanForUserId($userId);
+
+            return response()->json([
+                'ok' => true,
+                'line' => $line,
+                'take' => VoiceDesign::present($take),
+                'audio_url' => AudioUrl::fromPath($audioPath),
+                'estimated_chars' => $estimate['chars'],
+                // Keeping it is for plans with Voice Design; the demo shows the way to one.
+                'can_keep' => VoiceDesign::allows($user, $plan),
+                'upgrade_url' => VoiceDesign::upgradeUrl(),
+                'quota' => $quota,
+            ]);
+        } catch (ValidationException $e) {
+            if ($quotaReserved) {
+                $quota = $this->rollbackDemoPolicy($request, $estimate['chars'], true);
+            }
+            $first = collect($e->errors())->flatten()->first();
+
+            return response()->json([
+                'ok' => false,
+                'message' => is_string($first) && $first !== '' ? $first : __('ui.backend.request_validation_failed'),
+                'errors' => $e->errors(),
+                'quota' => $quota ?: $this->demoQuotaForClient($request),
+            ], 422);
+        } catch (\Throwable $e) {
+            if ($quotaReserved) {
+                $quota = $this->rollbackDemoPolicy($request, $estimate['chars'], true);
+            }
+            Log::error('Demo voice design failed unexpectedly.', [
+                'exception_class' => get_class($e),
+                'exception_message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'ok' => false,
+                'message' => __('voice_design.errors.our_side'),
                 'quota' => $quota ?: $this->demoQuotaForClient($request),
             ], 422);
         }

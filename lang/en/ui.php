@@ -1819,6 +1819,7 @@ return [
         // A limit that lasts (a spending cap, every key out for the day, the site's daily ceiling): told as high demand, with no minute promised.
         'premium_voices_our_limit' => "Premium voices are in very high demand right now. Your voice wasn't created, and no credits were used. Please try again a little later.",
         'cloned_voices_our_limit' => "Cloned voices are in very high demand right now. Your voice wasn't created, and no credits were used. Please try again a little later.",
+        'designed_voices_our_limit' => "Designed voices are in very high demand right now. Your audio wasn't created, and no credits were used. Please try again a little later.",
         // The premium engine would not read the text: the same text fails again, so other wording is asked for.
         'premium_text_refused' => "The premium voices couldn't read this text, and no credits were used. Please reword it slightly, then generate again.",
         'generation_stuck_refunded' => 'This voice was taking longer than expected, so it was stopped, and no credits were used. Please try again.',

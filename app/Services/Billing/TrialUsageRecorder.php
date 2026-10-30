@@ -28,8 +28,9 @@ class TrialUsageRecorder
 
     /**
      * @param  array{chars?:int,seconds?:int}  $estimate
+     * @param  bool  $request  false: only part of a request's credits come back, and the request still counts
      */
-    public function release(int $userId, array $estimate): void
+    public function release(int $userId, array $estimate, bool $request = true): void
     {
         $trial = $this->meteredTrial($userId);
         if (! $trial) {
@@ -39,7 +40,7 @@ class TrialUsageRecorder
         $seconds = max(0, (int) $trial->seconds_used - max(0, (int) ($estimate['seconds'] ?? 0)));
         $trial->forceFill([
             'chars_used' => max(0, (int) $trial->chars_used - max(0, (int) ($estimate['credits'] ?? $estimate['chars'] ?? 0))),
-            'requests_used' => max(0, (int) $trial->requests_used - 1),
+            'requests_used' => max(0, (int) $trial->requests_used - ($request ? 1 : 0)),
             'seconds_used' => $seconds,
             'minutes_used' => UsageCounter::minutesFor($seconds),
         ])->save();

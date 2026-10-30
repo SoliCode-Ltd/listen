@@ -1822,6 +1822,7 @@ return [
         // A limit that lasts (a spending cap, every key out for the day, the site's daily ceiling): told as high demand, with no minute promised.
         'premium_voices_our_limit' => 'تشهد الأصوات المميزة إقبالاً كبيراً في هذه اللحظة، فلم يُنشأ صوتك ولم يُخصم أي رصيد من حسابك. يُرجى المحاولة مرة أخرى بعد قليل.',
         'cloned_voices_our_limit' => 'تشهد الأصوات المستنسخة إقبالاً كبيراً في هذه اللحظة، فلم يُنشأ صوتك ولم يُخصم أي رصيد من حسابك. يُرجى المحاولة مرة أخرى بعد قليل.',
+        'designed_voices_our_limit' => 'تشهد الأصوات المصمَّمة إقبالاً كبيراً في هذه اللحظة، فلم يُنشأ صوتك ولم يُخصم أي رصيد من حسابك. يُرجى المحاولة مرة أخرى بعد قليل.',
         // The premium engine would not read the text: the same text fails again, so other wording is asked for.
         'premium_text_refused' => 'تعذّر على الأصوات المميزة قراءة هذا النص، ولم يُخصم أي رصيد من حسابك. يُرجى تعديل الصياغة قليلاً ثم إعادة التوليد.',
         'generation_stuck_refunded' => 'استغرق إنشاء هذا الصوت وقتاً أطول من المتوقع فأُوقِف، ولم يُخصم أي رصيد من حسابك. يُرجى المحاولة مرة أخرى.',

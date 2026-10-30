@@ -126,6 +126,11 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
         return $this->hasMany(ClonedVoice::class)->ready();
     }
 
+    public function designedVoices(): HasMany
+    {
+        return $this->hasMany(DesignedVoice::class);
+    }
+
     /** Keys for the developer API (/v1), separate from the extension key above. */
     public function apiKeys(): HasMany
     {

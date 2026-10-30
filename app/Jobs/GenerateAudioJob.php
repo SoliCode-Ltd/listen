@@ -6,6 +6,7 @@ use App\Exceptions\TranslationFailedException;
 use App\Models\ApiKeyUsage;
 use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
+use App\Models\DesignedVoice;
 use App\Models\Plan;
 use App\Models\TtsLog;
 use App\Models\TextItem;
@@ -20,6 +21,7 @@ use App\Services\Tts\GeminiKeysOutException;
 use App\Services\Tts\PremiumVoiceUnavailableException;
 use App\Services\TtsService;
 use App\Services\VoiceCloningService;
+use App\Services\VoiceDesignService;
 use App\Support\AudioDuration;
 use App\Support\AudioEffects;
 use App\Support\CreditPeriod;
@@ -30,6 +32,7 @@ use App\Support\Pronunciations;
 use App\Support\SpeechText;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCloningAccess;
+use App\Support\VoiceDesign;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -216,9 +219,40 @@ class GenerateAudioJob implements ShouldQueue
             // If voice_name is "cloned_{id}", use VoiceCloningService for synthesis
             // instead of the normal TTS routing pipeline.
             $isClonedVoice = str_starts_with((string) $generation->voice_name, 'cloned_');
+            // A designed voice ("designed_{id}", App\Support\VoiceDesign) is spoken the same way,
+            // on the one key whose project holds it.
+            $designedVoiceId = DesignedVoice::idFromKey($generation->voice_name);
             $audio = null;
 
-            if ($isClonedVoice) {
+            if ($designedVoiceId !== null) {
+                $designedVoice = DesignedVoice::query()->saved()
+                    ->whereKey($designedVoiceId)
+                    ->where('user_id', $generation->user_id)
+                    ->first();
+                if (! $designedVoice || ! VoiceDesign::allows($designedVoice->user, $plan)) {
+                    throw new \RuntimeException('Designed voice not found, or not on this plan.');
+                }
+
+                $voiceCloningService = app(VoiceCloningService::class);
+                $spokenText = $voiceCloningService->speakableText(
+                    $spokenText,
+                    $studioOptions['dialect'] ?? null,
+                    $keepAsWritten,
+                );
+                // The accent is part of the design: the direction carries only the delivery.
+                $audio = app(VoiceDesignService::class)->synthesize(
+                    $designedVoice,
+                    $spokenText,
+                    trim($voiceCloningService->deliveryStyle(
+                        null,
+                        (string) ($studioOptions['performance_style'] ?? 'neutral'),
+                        (string) ($studioOptions['emotion'] ?? 'neutral'),
+                        $studioOptions['style_prompt'] ?? null,
+                        (float) ($studioOptions['speed'] ?? 1),
+                        (float) ($studioOptions['pitch'] ?? 0),
+                    ).' '.Pronunciations::direction($spokenText, $keepAsWritten)),
+                );
+            } elseif ($isClonedVoice) {
                 $clonedVoiceId = (int) str_replace('cloned_', '', $generation->voice_name);
                 $clonedVoice = ClonedVoice::where('id', $clonedVoiceId)
                     ->where('user_id', $generation->user_id)
@@ -449,10 +483,10 @@ class GenerateAudioJob implements ShouldQueue
         if ($e instanceof TranslationFailedException) {
             return $e->getMessage();
         }
-        // A cloned voice has no other engine to fall back on.
-        if (str_starts_with((string) $generation->voice_name, 'cloned_')) {
+        // A cloned or designed voice has no other engine to fall back on.
+        if (str_starts_with((string) $generation->voice_name, 'cloned_') || DesignedVoice::isKey($generation->voice_name)) {
             if ($e instanceof GeminiKeysOutException) {
-                return GenerationMessage::stored('ui.backend.cloned_voices_our_limit');
+                return GenerationMessage::stored(DesignedVoice::isKey($generation->voice_name) ? 'ui.backend.designed_voices_our_limit' : 'ui.backend.cloned_voices_our_limit');
             }
             if (preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b/i', $e->getMessage())) {
                 return GenerationMessage::stored('ui.backend.premium_voices_busy');

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
+use App\Models\DesignedVoice;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Rules\DoesNotContainProfanity;
@@ -33,6 +34,7 @@ use App\Support\VideoDubbing;
 use App\Support\UsageSnapshot;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceCloningAccess;
+use App\Support\VoiceDesign;
 use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -174,14 +176,27 @@ class DashboardController extends Controller
         // Dub a video, in its own section (App\Support\VideoDubbing).
         $dubStudio = VideoDubbing::openTo($request->user()) ? VideoDubbing::studio($request->user(), $request) : null;
 
+        // Voice Design, in its own section; the voices kept join the studio's voice list.
+        $voiceDesign = VoiceDesign::openTo($request->user()) ? VoiceDesign::studio($request->user(), $activePlan) : null;
+        $designedVoices = array_map(fn (array $voice): array => [
+            'id' => $voice['id'],
+            'name' => (string) $voice['name'],
+            'language' => $voice['language'],
+            'key' => $voice['key'],
+            'preview' => $voice['url'],
+        ], $voiceDesign['voices'] ?? []);
+
         // Options the plan lacks stay visible, dimmed, with an upgrade button.
         $featureLocks = $this->featureLocks($activePlan, $planTier, $planShowcase, $dialogueEnabled);
         if ($reusePreset !== null) {
             $clonedKeys = $voiceCloningVoices->filter(fn (ClonedVoice $v) => $v->isReady())->map(fn (ClonedVoice $v) => 'cloned_'.$v->id)->values()->all();
+            $clonedKeys = [...$clonedKeys, ...array_column($designedVoices, 'key')];
             $reusePreset = $this->reuseForPlan($reusePreset, $planTier, $featureLocks, $tierCatalog, $clonedKeys, $customPromptEnabled);
         }
 
         $page = view('dashboard', [
+            'voiceDesign' => $voiceDesign,
+            'designedVoices' => $designedVoices,
             'dubStudio' => $dubStudio,
             'dubAccount' => $dubStudio ? VideoDubbing::account($request->user(), $dubStudio) : null,
             'verifyEmail' => $verifyEmail,
@@ -363,14 +378,25 @@ class DashboardController extends Controller
             }
         }
 
-        $voiceName = $clonedVoiceId
-            ? ('cloned_'.$clonedVoiceId)
-            : $this->normalizeVoiceSelection(
+        // A designed voice (designed_{id}): the member's own, on a plan with Voice Design.
+        $designedVoiceId = DesignedVoice::idFromKey($voiceKey);
+        if ($designedVoiceId !== null && (! VoiceDesign::allows($request->user(), $activePlan)
+            || ! DesignedVoice::query()->ownedBy($userId)->saved()->whereKey($designedVoiceId)->exists())) {
+            throw ValidationException::withMessages([
+                'voice_key' => __('ui.backend.dashboard_speaker_not_available'),
+            ]);
+        }
+
+        $voiceName = match (true) {
+            $clonedVoiceId !== null => 'cloned_'.$clonedVoiceId,
+            $designedVoiceId !== null => DesignedVoice::KEY_PREFIX.$designedVoiceId,
+            default => $this->normalizeVoiceSelection(
                 $validated['target_language'],
                 $voiceKey,
                 $requestedTier,
-            );
-        $voiceProvider = $clonedVoiceId ? 'gemini' : VoiceCatalog::providerForName($voiceName);
+            ),
+        };
+        $voiceProvider = $clonedVoiceId || $designedVoiceId ? 'gemini' : VoiceCatalog::providerForName($voiceName);
         $studioOptions = $this->sanitizeStudioOptionsForTier($requestedTier, [
             'dialect' => $validated['dialect'] ?? null,
             'performance_style' => $validated['performance_style'] ?? null,
@@ -906,6 +932,17 @@ class DashboardController extends Controller
                     'label' => $name,
                     'label_ar' => $name,
                 ];
+            });
+
+        DesignedVoice::withTrashed()
+            ->where('user_id', $userId)
+            ->whereNotNull('name')
+            ->get(['id', 'name'])
+            ->each(function (DesignedVoice $voice) use (&$map): void {
+                $name = trim((string) $voice->name);
+                if ($name !== '') {
+                    $map[$voice->voiceKey()] = ['key' => $voice->voiceKey(), 'label' => $name, 'label_ar' => $name];
+                }
             });
 
         return $map;

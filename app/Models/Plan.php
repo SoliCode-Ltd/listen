@@ -84,6 +84,10 @@ class Plan extends Model
         // Voice cloning
         'voice_cloning_enabled',
         'video_dubbing_enabled',
+        // Voice Design
+        'voice_design_enabled',
+        'voice_design_max_voices',
+        'voice_design_monthly_voices',
         'video_dubs_per_month',
         'video_dub_max_seconds',
         'voice_cloning_max_voices',
@@ -118,6 +122,9 @@ class Plan extends Model
         'discount_duration_months' => 'integer',
         'voice_cloning_enabled' => 'boolean',
         'video_dubbing_enabled' => 'boolean',
+        'voice_design_enabled' => 'boolean',
+        'voice_design_max_voices' => 'integer',
+        'voice_design_monthly_voices' => 'integer',
         'video_dubs_per_month' => 'integer',
         'video_dub_max_seconds' => 'integer',
         'voice_cloning_max_voices' => 'integer',
