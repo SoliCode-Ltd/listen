@@ -184,6 +184,8 @@ class DashboardController extends Controller
             'language' => $voice['language'],
             'key' => $voice['key'],
             'preview' => $voice['url'],
+            'avatar' => $voice['avatar'],
+            'tag' => $voice['tag'],
         ], $voiceDesign['voices'] ?? []);
 
         // Options the plan lacks stay visible, dimmed, with an upgrade button.

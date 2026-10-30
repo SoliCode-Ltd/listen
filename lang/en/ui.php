@@ -1305,6 +1305,10 @@ return [
             'favorites' => 'Favourites',
             'mine' => 'My voices',
             'mine_badge' => 'My voice',
+            // A member's own voices, told apart: one they designed in words, one cloned from a recording.
+            'designed_badge' => 'Designed',
+            'cloned_badge' => 'Cloned',
+            'speaks' => 'Speaks :language',
             'search' => 'Search speakers…',
             'gender' => 'Gender',
             'any' => 'All',

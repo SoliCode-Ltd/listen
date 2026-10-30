@@ -59,7 +59,7 @@ return [
     'design_again' => 'Design again',
     'designing' => 'Designing…',
     'cost' => ':credits credits',
-    'cost_hint' => 'Each take speaks the line once. Nothing is charged for a take that does not come.',
+    'cost_hint' => ':takes, each speaking the line once. A take that does not arrive is not charged.',
     'takes_count' => ':count take|:count takes',
     'safety_note' => 'Describe a character in your own words. Voices that imitate a real person are not allowed.',
 
@@ -94,6 +94,7 @@ return [
     'delete_confirm' => 'Delete this voice? It cannot be brought back, but the audio you already made with it stays in your history.',
     'deleted' => 'The voice was deleted.',
     'created_on' => 'Created :date',
+    'voice_meta' => ':speaks, made :date',
 
     // The voice picker in the studio.
     'group_label' => 'Your designed voices',
@@ -145,60 +146,80 @@ return [
             'description' => 'A warm Egyptian grandmother in her seventies from old Cairo. She speaks Egyptian Arabic slowly and affectionately, with a soft rasp and a smile you can hear.',
             'language' => 'ar',
             'orb' => 'arabic',
+            // What the example says on the Voice Design card (public/audio/voice-design/examples/cairo_grandma.mp3).
+            'line' => 'يا حبيبي تعالى اقعد جنبي، أنا عاملالك أحلى محشي النهارده، وعندي ليك حكاية هتعجبك أوي.',
         ],
         'gulf_commentator' => [
             'name' => 'Gulf Commentator',
             'description' => 'An electric Gulf Arabic football commentator in his thirties. Fast and breathless, his voice rising to a roar at every chance on goal.',
             'language' => 'ar',
             'orb' => 'dialogue',
+            // What the example says on the Voice Design card (public/audio/voice-design/examples/gulf_commentator.mp3).
+            'line' => 'يا سلام! تسديدة قوية من خارج المنطقة... جوووول! الله الله على هالهدف يا جماعة، شي ما يتصدّق!',
         ],
         'levant_storyteller' => [
             'name' => 'Levantine Storyteller',
             'description' => 'A gentle Levantine storyteller in his sixties, a hakawati from old Damascus. Warm, low and unhurried, savouring every word of the tale.',
             'language' => 'ar',
             'orb' => 'creator',
+            // What the example says on the Voice Design card (public/audio/voice-design/examples/levant_storyteller.mp3).
+            'line' => 'كان يا ما كان، بقديم الزمان، كان في تاجر بالشام قلبه أبيض متل التلج... اسمعوا شو صار معه.',
         ],
         'fusha_narrator' => [
             'name' => 'Documentary Narrator',
             'description' => 'A calm, authoritative narrator in his fifties speaking Modern Standard Arabic. Deep, clear and measured, like the voice of a nature documentary.',
             'language' => 'ar',
             'orb' => 'studio_max',
+            // What the example says on the Voice Design card (public/audio/voice-design/examples/fusha_narrator.mp3).
+            'line' => 'في قلب الصحراء الشاسعة، حيث تشتدّ حرارة النهار وتبرد الليالي، تبدأ رحلة البقاء من جديد.',
         ],
         'evil_ogre' => [
             'name' => 'Evil Ogre',
             'description' => 'A deep, booming voice of a massive ogre in his middle years. Thick, gravelly and theatrical: menacing and absurdly silly at once, with erratic bursts of maniacal energy.',
             'language' => 'en',
             'orb' => 'emotions',
+            // What the example says on the Voice Design card (public/audio/voice-design/examples/evil_ogre.mp3).
+            'line' => 'Who dares to cross MY bridge? Ha! I\'ll grind your bones for my breakfast... with a little jam on top!',
         ],
         'little_mouse' => [
             'name' => 'Little Mouse',
             'description' => 'A tiny, squeaky voice of a nervous little mouse. Quick, breathy and high-pitched, the words tumbling out in excited little bursts.',
             'language' => 'en',
             'orb' => 'starter',
+            // What the example says on the Voice Design card (public/audio/voice-design/examples/little_mouse.mp3).
+            'line' => 'Oh! Oh my whiskers, is that cheese? Real cheese? Quick, quick, before the cat wakes up!',
         ],
         'british_ceo' => [
             'name' => 'British CEO',
             'description' => 'A composed British woman in her fifties who runs a large company. Crisp, polished English with warm authority, a measured pace and not a word wasted.',
             'language' => 'en',
             'orb' => 'english',
+            // What the example says on the Voice Design card (public/audio/voice-design/examples/british_ceo.mp3).
+            'line' => 'Right. We have three priorities this quarter, and I intend to deliver every single one of them. Shall we begin?',
         ],
         'trailer_voice' => [
             'name' => 'Movie Trailer',
             'description' => 'A deep, resonant male narrator in his forties with a smooth, gravelly bass. Dramatic, slow and full of gravitas, every pause loaded with suspense.',
             'language' => 'en',
             'orb' => 'longform',
+            // What the example says on the Voice Design card (public/audio/voice-design/examples/trailer_voice.mp3).
+            'line' => 'In a world where silence was law... one voice dared to speak. This winter, everything changes.',
         ],
         'southern_woman' => [
             'name' => 'Southern Woman',
             'description' => 'A friendly woman in her sixties from the American South. A warm, unhurried drawl with a sweet, motherly lilt and a hint of mischief.',
             'language' => 'en',
             'orb' => 'places',
+            // What the example says on the Voice Design card (public/audio/voice-design/examples/southern_woman.mp3).
+            'line' => 'Well, bless your heart, sugar, come on in out of that heat. I just pulled a peach pie out of the oven.',
         ],
         'angry_pirate' => [
             'name' => 'Angry Pirate',
             'description' => 'A gruff old sea captain in his sixties, his voice worn rough by salt and shouting. Growling, impatient and loud, rolling every r.',
             'language' => 'en',
             'orb' => 'pro',
+            // What the example says on the Voice Design card (public/audio/voice-design/examples/angry_pirate.mp3).
+            'line' => 'Arrr! Who\'s been drinkin\' me rum? Swab that deck, ye scurvy dogs, or ye\'ll walk the plank by sundown!',
         ],
     ],
 ];

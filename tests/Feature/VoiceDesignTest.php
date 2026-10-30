@@ -237,6 +237,23 @@ class VoiceDesignTest extends TestCase
         $this->actingAs($member)->getLocalizedRoute('dashboard')->assertSee('designed_'.$kept->id, false);
     }
 
+    public function test_a_kept_voice_shows_in_my_voices_like_the_other_speakers(): void
+    {
+        $member = $this->member($this->designPlan);
+        $voice = $this->savedVoice($member);
+
+        $listed = $this->actingAs($member)->getLocalizedRoute('dashboard')->viewData('designedVoices');
+
+        $this->assertCount(1, $listed);
+        $this->assertSame('designed_'.$voice->id, $listed[0]['key']);
+        $this->assertSame('Captain', $listed[0]['name']);
+        // Its take to play, its face and its line under the name.
+        $this->assertSame(\App\Support\AudioUrl::fromPath($voice->preview_audio_path), $listed[0]['preview']);
+        $this->assertStringStartsWith('data:image/svg+xml;base64,', $listed[0]['avatar']);
+        $this->assertStringContainsString('<circle', base64_decode(substr($listed[0]['avatar'], strlen('data:image/svg+xml;base64,'))));
+        $this->assertSame(__('ui.dashboard.library.speaks', ['language' => __('voice_design.language_en')]), $listed[0]['tag']);
+    }
+
     public function test_a_full_library_cannot_keep_or_design_another(): void
     {
         $member = $this->member($this->designPlan);
@@ -435,6 +452,45 @@ class VoiceDesignTest extends TestCase
     }
 
     /* ------------------------------------------------------------ */
+    /*  The example characters                                       */
+    /* ------------------------------------------------------------ */
+
+    public function test_the_examples_command_records_each_character_and_deletes_its_voice(): void
+    {
+        $dir = public_path(VoiceDesign::EXAMPLES_DIR);
+        $before = glob($dir.'/*.mp3') ?: [];
+        $this->fakeEngine();
+
+        try {
+            $this->artisan('voice-design:examples', ['--key' => 'ci-key', '--only' => ['evil_ogre'], '--force' => true])->assertSuccessful();
+
+            $this->assertFileExists($dir.'/evil_ogre.mp3');
+            $create = $this->callsTo('POST', '/voices')[0];
+            $this->assertStringContainsString('massive ogre', $create['body']['voice']['prompted']['input']);
+            $this->assertStringContainsString(' · example · ', $create['body']['voice']['display_name']);
+            $this->assertSame(trans('voice_design.examples.evil_ogre.line', [], 'en'), $this->callsTo('POST', '/interactions')[0]['body']['input'][0]['content'][0]['text']);
+            $this->assertCount(1, $this->callsTo('DELETE', '/voices/voice_t1'));
+            Http::assertSent(fn (Request $r) => $r->hasHeader('x-goog-api-key', 'ci-key'));
+            // The card now plays it, and picking the character can too.
+            $this->assertContains('evil_ogre', array_column(VoiceDesign::showcase(), 'key'));
+        } finally {
+            if (! in_array($dir.'/evil_ogre.mp3', $before, true)) {
+                @unlink($dir.'/evil_ogre.mp3');
+            }
+        }
+    }
+
+    public function test_the_card_plays_the_admins_chosen_voices_before_the_examples(): void
+    {
+        $member = $this->member($this->designPlan);
+        $this->savedVoice($member)->forceFill(['is_showcase' => true, 'name' => 'Grandma Zeinab'])->save();
+
+        $names = array_column(VoiceDesign::showcase(), 'name');
+
+        $this->assertSame('Grandma Zeinab', $names[0]);
+    }
+
+    /* ------------------------------------------------------------ */
     /*  The admin                                                    */
     /* ------------------------------------------------------------ */
 
@@ -479,7 +535,8 @@ class VoiceDesignTest extends TestCase
         $this->savedVoice($member)->forceFill(['is_showcase' => true, 'name' => 'Grandma Zeinab'])->save();
         $this->savedVoice($member, DesignedVoice::DRAFT)->forceFill(['is_showcase' => true])->save();
 
-        $this->assertSame(['Grandma Zeinab'], array_column(VoiceDesign::showcase(), 'name'));
+        $chosen = array_values(array_filter(VoiceDesign::showcase(), fn (array $v): bool => $v['key'] === null));
+        $this->assertSame(['Grandma Zeinab'], array_column($chosen, 'name'));
     }
 
     public function test_the_studio_never_names_another_company(): void

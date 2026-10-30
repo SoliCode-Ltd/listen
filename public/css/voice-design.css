@@ -309,10 +309,8 @@
 .vd-library-head h2 { margin: 0; font-size: 1.15rem; }
 .vd-library-empty { margin: 0; padding: 1.4rem; border: 1px dashed var(--line); border-radius: 16px; color: var(--muted); text-align: center; }
 .vd-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: .9rem; }
-.vd-voice {
-  display: grid; gap: .75rem; padding: 1rem; border: 1px solid var(--line); border-radius: 18px; background: var(--surface2, var(--surface));
-  animation: vd-in .35s ease both;
-}
+.vd-voice { display: grid; gap: .75rem; padding: 1rem; border: 1px solid var(--line); border-radius: 18px; background: var(--surface2, var(--surface)); }
+.vd-voice.is-new { animation: vd-in .35s ease both; border-color: color-mix(in oklab, var(--a) 55%, var(--line)); }
 .vd-voice-head { display: flex; align-items: center; gap: .75rem; min-width: 0; }
 .vd-voice-head .orb { --orb-size: 46px; }
 .vd-voice-name { display: grid; gap: .1rem; min-width: 0; }
@@ -327,6 +325,36 @@
 .vd-icon-btn { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
 .vd-icon-btn:hover { color: var(--danger, #ee4a77); border-color: currentColor; }
 .vd-icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- Keyboard and touch ---------- */
+.vd-chip:focus-visible, .vd-ghost-btn:focus-visible, .vd-play:focus-visible, .vd-icon-btn:focus-visible,
+.vd-tips summary:focus-visible, .vd-shape summary:focus-visible {
+  outline: 2px solid var(--a); outline-offset: 2px;
+}
+.vd-shape summary:focus-visible { border-radius: 16px; }
+@media (pointer: coarse) {
+  .vd-chip { min-height: 40px; }
+  .vd-chip-icon { width: 40px; }
+  .vd-ghost-btn { min-height: 40px; }
+  .vd-icon-btn { width: 44px; height: 44px; }
+  .vd-slider input[type="range"] { height: 28px; }
+}
+
+/* ---------- Phones ---------- */
+@media (max-width: 560px) {
+  .vd-card { padding: 1rem; }
+  .vd-stage { min-height: 0; padding-block: 1.25rem; }
+  .vd-stage-art { height: 250px; }
+  .vd-orb { --orb-size: 132px; }
+  .vd-orb-play { width: 52px; height: 52px; }
+  .vd-cloud-chip { padding: .34rem .62rem; font-size: .74rem; }
+  .vd-cloud-chip:nth-child(3) { top: 28%; }
+  .vd-cloud-chip:nth-child(4) { top: 29%; }
+  .vd-cloud-chip:nth-child(5) { bottom: 24%; }
+  .vd-cloud-chip:nth-child(6) { bottom: 22%; }
+  .vd-prompt textarea { min-height: 120px; }
+  .vd-section-head h1 { font-size: clamp(1.7rem, 8vw, 2.1rem); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .vd-cloud-chip, .vd-orb-wrap.is-working .vd-orb, .vd-take, .vd-voice, .vd-steps li.is-active::before { animation: none; }

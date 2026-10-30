@@ -17,6 +17,7 @@
   'use strict';
 
   var TAKE_ORBS = ['listen', 'emotions', 'english'];
+  // As App\Support\VoiceDesign::VOICE_ORBS, for a voice the server sent without its orb.
   var LIBRARY_ORBS = ['arabic', 'emotions', 'english', 'dialogue', 'longform', 'creator', 'pro', 'places'];
   var ICON_PLAY = '<span class="vd-play-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg></span><span class="vd-pause-icon" aria-hidden="true"><i></i><i></i></span>';
   var ICON_TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l.8 12.2h9.4L17.5 7M10.2 10.5v5.5M13.8 10.5v5.5"/></svg>';
@@ -179,7 +180,8 @@
       if (workView) workView.hidden = state !== 'work';
       if (resultsView) resultsView.hidden = state !== 'results';
     }
-    function speakShowcase(i) {
+    // One voice of the card after another (chain), or just the one asked for.
+    function speakShowcase(i, chain) {
       var list = studio.showcase || [];
       if (!list.length) return;
       var item = list[i % list.length];
@@ -192,14 +194,20 @@
           cloud.forEach(function (chip) { chip.classList.remove('is-speaking'); });
           if (nowLine) nowLine.textContent = idleHint;
         },
-        onEnd: function () { if (i + 1 < list.length) speakShowcase(i + 1); }
+        onEnd: function () { if (chain !== false && i + 1 < list.length) speakShowcase(i + 1, true); }
       });
     }
     if (showButton) {
       showButton.addEventListener('click', function () {
         if (now && now.button === showButton) stop();
-        else speakShowcase(0);
+        else speakShowcase(0, true);
       });
+    }
+    // A character picked in the form says its line on the stage, while nothing else is showing there.
+    function previewExample(key) {
+      var at = (studio.showcase || []).map(function (v) { return v.key; }).indexOf(key);
+      if (at < 0 || stage.getAttribute('data-state') !== 'idle') return;
+      speakShowcase(at, false);
     }
 
     function working(on) {
@@ -311,13 +319,13 @@
       var empty = q('[data-vd-library-empty]');
       if (empty) empty.hidden = voices.length > 0;
     }
-    function card(voice) {
+    function card(voice, fresh) {
       var el = document.createElement('article');
-      el.className = 'vd-voice';
+      el.className = 'vd-voice' + (fresh ? ' is-new' : '');
       el.setAttribute('data-vs-cast', '');
-      el.innerHTML = '<div class="vd-voice-head">' + orbHtml(LIBRARY_ORBS[Number(voice.id) % LIBRARY_ORBS.length])
-        + '<div class="vd-voice-name"><strong dir="auto">' + esc(voice.name) + '</strong><small>' + esc(voice.language === 'en' ? t.language_en : t.language_ar)
-        + (voice.created ? ' · ' + esc(fmt(t.created_on, { date: voice.created })) : '') + '</small></div></div>'
+      el.innerHTML = '<div class="vd-voice-head">' + orbHtml(voice.orb || LIBRARY_ORBS[Number(voice.id) % LIBRARY_ORBS.length])
+        + '<div class="vd-voice-name"><strong dir="auto">' + esc(voice.name) + '</strong><small>'
+        + esc(voice.created ? fmt(t.voice_meta, { speaks: voice.tag || '', date: voice.created }) : (voice.tag || '')) + '</small></div></div>'
         + '<p class="vd-voice-desc" dir="auto">' + esc(voice.description) + '</p>'
         + '<div class="vd-take-bar"><i></i></div>'
         + '<div class="vd-voice-foot"><button type="button" class="vd-play" aria-label="' + esc(t.play) + '">' + ICON_PLAY + '</button>'
@@ -346,7 +354,7 @@
     function addToLibrary(voice, fresh) {
       if (!libraryGrid) return;
       if (fresh) voices.unshift(voice);
-      var el = card(voice);
+      var el = card(voice, fresh);
       if (fresh) libraryGrid.insertBefore(el, libraryGrid.firstChild);
       else libraryGrid.appendChild(el);
       drawOrbs(el);
@@ -406,6 +414,7 @@
       form.querySelectorAll('[data-vd-example]').forEach(function (chip) { chip.classList.toggle('is-picked', chip.getAttribute('data-vd-example') === example.key); });
       counters();
       description.focus();
+      previewExample(example.key);
     }
     form.querySelectorAll('[data-vd-example]').forEach(function (chip) {
       chip.addEventListener('click', function () {

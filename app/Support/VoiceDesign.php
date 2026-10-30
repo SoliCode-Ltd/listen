@@ -49,6 +49,12 @@ final class VoiceDesign
     /** The shaping sliders run from 0 to 100; 50 leaves the description as it is. */
     public const SLIDER_MIDDLE = 50;
 
+    /** Where each example character's clip is kept (made by voice-design:examples, committed with the code). */
+    public const EXAMPLES_DIR = 'audio/voice-design/examples';
+
+    /** The orbs kept voices wear (App\Support\Orbs), one after another by id. */
+    public const VOICE_ORBS = ['arabic', 'emotions', 'english', 'dialogue', 'longform', 'creator', 'pro', 'places'];
+
     public static function audience(): string
     {
         $value = (string) self::setting('voice_design_audience', self::AUDIENCE_PREVIEW);
@@ -268,19 +274,24 @@ final class VoiceDesign
      * palette (App\Support\Orbs). Both languages' members see all of them,
      * Arabic dialect characters first for an Arabic page.
      *
-     * @return list<array{key:string,name:string,description:string,language:string,orb:string}>
+     * Each says its line in its own voice (clip: null until voice-design:examples has made it).
+     *
+     * @return list<array{key:string,name:string,description:string,language:string,orb:string,line:string,clip:?string}>
      */
     public static function examples(?string $locale = null): array
     {
         $arabic = ($locale ?? app()->getLocale()) === 'ar';
         $rows = [];
         foreach (array_keys((array) trans('voice_design.examples', [], 'en')) as $key) {
+            $clip = self::EXAMPLES_DIR.'/'.$key.'.mp3';
             $rows[] = [
                 'key' => (string) $key,
                 'name' => (string) __('voice_design.examples.'.$key.'.name'),
                 'description' => (string) __('voice_design.examples.'.$key.'.description'),
                 'language' => (string) trans('voice_design.examples.'.$key.'.language', [], 'en'),
                 'orb' => (string) trans('voice_design.examples.'.$key.'.orb', [], 'en'),
+                'line' => (string) trans('voice_design.examples.'.$key.'.line', [], 'en'),
+                'clip' => is_file(public_path($clip)) ? VersionedAsset::url($clip) : null,
             ];
         }
         if ($arabic) {
@@ -291,24 +302,28 @@ final class VoiceDesign
     }
 
     /**
-     * The designed voices an admin chose to play on the Voice Design card:
-     * name, line and the take's audio.
+     * What the Voice Design card plays around its orb: the designed voices an
+     * admin chose (Admin → Designed voices → On the card), then the example
+     * characters, each saying its own line. key: the example's, so picking that
+     * character in the form plays it.
      *
-     * @return list<array{name:string,text:string,url:string,orb:string}>
+     * @return list<array{name:string,text:string,url:string,orb:string,key:?string}>
      */
     public static function showcase(): array
     {
-        $palettes = ['emotions', 'english', 'arabic', 'dialogue', 'longform', 'places'];
-
-        return rescue(fn () => DesignedVoice::query()->saved()->where('is_showcase', true)->whereNotNull('preview_audio_path')
+        $chosen = rescue(fn () => DesignedVoice::query()->saved()->where('is_showcase', true)->whereNotNull('preview_audio_path')
             ->orderBy('id')->limit(8)->get()
-            ->values()
-            ->map(fn (DesignedVoice $voice, int $i): array => [
+            ->map(fn (DesignedVoice $voice): array => [
                 'name' => (string) $voice->name,
                 'text' => (string) $voice->preview_text,
                 'url' => (string) AudioUrl::fromPath($voice->preview_audio_path),
-                'orb' => $palettes[$i % count($palettes)],
+                'orb' => self::orbFor($voice),
+                'key' => null,
             ])->all(), [], false);
+        $examples = array_map(fn (array $e): array => ['name' => $e['name'], 'text' => $e['line'], 'url' => (string) $e['clip'], 'orb' => $e['orb'], 'key' => $e['key']],
+            array_values(array_filter(self::examples(), fn (array $e): bool => $e['clip'] !== null)));
+
+        return array_slice([...$chosen, ...$examples], 0, 10);
     }
 
     /**
@@ -374,8 +389,14 @@ final class VoiceDesign
      */
     public static function present(DesignedVoice $voice): array
     {
+        $language = $voice->language === 'en' ? __('voice_design.language_en') : __('voice_design.language_ar');
+
         return [
             'id' => $voice->id,
+            'orb' => self::orbFor($voice),
+            // Its face in the studio's voice library and speaker menu, as the stock speakers have theirs.
+            'avatar' => self::avatar($voice),
+            'tag' => __('ui.dashboard.library.speaks', ['language' => $language]),
             'key' => $voice->voiceKey(),
             'take' => $voice->take,
             'name' => $voice->name,
@@ -387,6 +408,24 @@ final class VoiceDesign
             'seconds' => data_get($voice->metadata, 'seconds'),
             'created' => $voice->created_at?->locale(app()->getLocale() === 'ar' ? 'ar' : 'en')->isoFormat('D MMM YYYY'),
         ];
+    }
+
+    public static function orbFor(DesignedVoice $voice): string
+    {
+        return self::VOICE_ORBS[(int) $voice->id % count(self::VOICE_ORBS)];
+    }
+
+    /** The voice's orb as a small picture (an SVG data address), for the studio's voice cards. */
+    public static function avatar(DesignedVoice $voice): string
+    {
+        [$deep, $mid, $light, $glow] = Orbs::colors(self::orbFor($voice));
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs>'
+            .'<radialGradient id="o" cx="34%" cy="30%" r="78%"><stop offset="0" stop-color="'.$glow.'"/><stop offset=".3" stop-color="'.$light.'"/>'
+            .'<stop offset=".68" stop-color="'.$mid.'"/><stop offset="1" stop-color="'.$deep.'"/></radialGradient>'
+            .'<radialGradient id="r" cx="50%" cy="50%" r="50%"><stop offset=".82" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".28"/></radialGradient>'
+            .'</defs><circle cx="32" cy="32" r="32" fill="url(#o)"/><circle cx="32" cy="32" r="32" fill="url(#r)"/></svg>';
+
+        return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
 
     /**

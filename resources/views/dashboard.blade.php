@@ -3364,6 +3364,14 @@
     const designedVoices = @json($designedVoices ?? []);
     const designedVoiceGroupLabel = @json(__('voice_design.group_label'));
     const designedVoiceBadge = @json(__('voice_design.badge'));
+    @php
+      $clonedVoiceSpeaks = [];
+      foreach (['ar-XA' => 'language_ar', 'en-US' => 'language_en_us', 'en-GB' => 'language_en_gb', 'en-AU' => 'language_en_au'] as $code => $languageKey) {
+          $clonedVoiceSpeaks[$code] = __('ui.dashboard.library.speaks', ['language' => __('ui.voice_cloning.'.$languageKey)]);
+      }
+    @endphp
+    // The line under a cloned voice's name in the library, as a designed voice has one.
+    const clonedVoiceSpeaks = @json($clonedVoiceSpeaks);
     const oldVoice = @json($prefillValue('voice_key'));
     const speechLanguageNames = @json(collect(\App\Support\SpeechLanguages::options(app()->getLocale() === 'ar'))->mapWithKeys(fn ($row) => [$row['value'] => $row['label']]));
     const defaultVoiceKeyByLanguage = {
@@ -3879,7 +3887,10 @@
           const opt = document.createElement('option');
           opt.value = dv.key;
           opt.textContent = `${dv.name} (${designedVoiceBadge})`;
+          // Played, pictured and labelled in the voice library like the stock speakers.
           if (dv.preview) opt.dataset.preview = dv.preview;
+          if (dv.avatar) opt.dataset.avatar = dv.avatar;
+          if (dv.tag) opt.dataset.dialect = dv.tag;
           group.appendChild(opt);
         }
         voiceSelect.appendChild(group);
@@ -3893,6 +3904,7 @@
           const opt = document.createElement('option');
           opt.value = cv.key;
           opt.textContent = `${cv.name} (${clonedVoiceBadge})`;
+          if (clonedVoiceSpeaks[cv.language_code]) opt.dataset.dialect = clonedVoiceSpeaks[cv.language_code];
           group.appendChild(opt);
         }
         voiceSelect.appendChild(group);
@@ -5024,7 +5036,7 @@
       const key = `designed_${id}`;
       const lang = String(voice?.language || 'ar') === 'en' ? 'en' : 'ar';
       if (!designedVoices.some((entry) => String(entry.key) === key)) {
-        designedVoices.unshift({ id: Number(id), name: String(voice?.name || '').trim() || `Voice ${id}`, language: lang, key, preview: voice?.url || '' });
+        designedVoices.unshift({ id: Number(id), name: String(voice?.name || '').trim() || `Voice ${id}`, language: lang, key, preview: voice?.url || '', avatar: voice?.avatar || '', tag: voice?.tag || '' });
       }
       preferredVoiceKeyByLanguage[lang] = key;
       if (normalizeLanguage(targetLanguage.value) !== lang) {
@@ -5054,7 +5066,7 @@
       if (voice.removed) {
         if (at >= 0) designedVoices.splice(at, 1);
       } else if (at < 0) {
-        designedVoices.unshift({ id: Number(voice.id), name: String(voice.name || ''), language: voice.language === 'en' ? 'en' : 'ar', key, preview: voice.url || '' });
+        designedVoices.unshift({ id: Number(voice.id), name: String(voice.name || ''), language: voice.language === 'en' ? 'en' : 'ar', key, preview: voice.url || '', avatar: voice.avatar || '', tag: voice.tag || '' });
       }
       const picked = String(voiceSelect?.value || '');
       renderVoiceOptions();

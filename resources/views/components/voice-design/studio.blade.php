@@ -14,10 +14,9 @@
   $showcase = $vd['showcase'];
   $canDesign = $vd['allowed'] || $vd['demo'];
   // The characters floating around the orb: the voices it plays first, then examples, eight in all.
-  $cloud = array_slice(array_merge(
-      array_map(fn (array $v): array => ['name' => $v['name'], 'orb' => $v['orb']], $showcase),
-      array_map(fn (array $e): array => ['name' => $e['name'], 'orb' => $e['orb']], $examples),
-  ), 0, 8);
+  $cloud = array_slice(collect($showcase)->map(fn (array $v): array => ['name' => $v['name'], 'orb' => $v['orb']])
+      ->concat(collect($examples)->map(fn (array $e): array => ['name' => $e['name'], 'orb' => $e['orb']]))
+      ->unique('name')->values()->all(), 0, 8);
   $config = [
       'studio' => $vd,
       'csrf' => csrf_token(),
@@ -44,7 +43,7 @@
           'delete_confirm' => __('voice_design.delete_confirm'),
           'use_in_studio' => __('voice_design.use_in_studio'),
           'library_count' => __('voice_design.library_count', ['count' => ':count', 'max' => ':max']),
-          'created_on' => __('voice_design.created_on', ['date' => ':date']),
+          'voice_meta' => __('voice_design.voice_meta', ['speaks' => ':speaks', 'date' => ':date']),
           'language_ar' => __('voice_design.language_ar'),
           'language_en' => __('voice_design.language_en'),
           'demo_cost_note' => __('voice_design.demo_cost_note', ['count' => ':count']),
@@ -176,7 +175,7 @@
             @if($vd['demo'])
               {{ __('voice_design.demo_one_take') }}
             @else
-              <span data-vd-takes-label>{{ trans_choice('voice_design.takes_count', $vd['takes']) }}</span> · {{ __('voice_design.cost_hint') }}
+              {{ __('voice_design.cost_hint', ['takes' => trans_choice('voice_design.takes_count', $vd['takes'])]) }}
             @endif
           </p>
         </div>

@@ -59,6 +59,15 @@ class VoiceDesignService
         return data_get($voice->metadata, 'site') === self::siteTag();
     }
 
+    /**
+     * Every request the last design (or sample) sent: what it was for, how it
+     * answered, how long it took, and the token use the engine reported, so
+     * a test run can say what a design really costs (scripts/support/voice_design_test.php).
+     *
+     * @var list<array<string, mixed>>
+     */
+    public array $report = [];
+
     public function __construct(private readonly VoiceCloningService $voices) {}
 
     /**
@@ -117,6 +126,7 @@ class VoiceDesignService
     public function design(User $user, array $input, int $takes): array
     {
         $this->discardDrafts((int) $user->id);
+        $this->report = [];
         $batch = (string) Str::uuid();
         $takes = max(1, min(3, $takes));
         $failure = fn (string $error, string $code): array => ['batch' => $batch, 'takes' => [], 'spoken' => 0, 'error' => $error, 'error_code' => $code];
@@ -128,7 +138,7 @@ class VoiceDesignService
 
         $last = ['error' => 'The voice could not be designed.', 'code' => 'server'];
         foreach ($keys as $key) {
-            $created = $this->createTakes($key, $user, $input, $takes, $batch);
+            $created = $this->createTakes($key, 'U'.$user->id, $input, $takes, $batch);
             if ($created['voices'] === []) {
                 $last = ['error' => $created['error'], 'code' => $created['code']];
                 // Another key's project may have room, or a key Google refused.
@@ -187,6 +197,46 @@ class VoiceDesignService
         }
 
         return $failure($last['error'], $last['code']);
+    }
+
+    /**
+     * One voice made from a description, saying $line, as packaged audio
+     * (MP3 when this server can encode). The voice is deleted again at once:
+     * only its clip is kept (the example characters on the Voice Design card,
+     * voice-design:examples). Null when it could not be made.
+     *
+     * @param  array{key:string, name:string}|null  $key  a key to use instead of the site's
+     * @return array{bytes:string, extension:string, seconds:?float}|null
+     */
+    public function sample(string $description, string $language, string $line, ?array $key = null): ?array
+    {
+        $this->report = [];
+        $input = ['description' => $description, 'language' => $language, 'gender' => null, 'line' => $line,
+            'projection' => VoiceDesign::SLIDER_MIDDLE, 'pace' => VoiceDesign::SLIDER_MIDDLE, 'variety' => VoiceDesign::SLIDER_MIDDLE];
+        foreach ($key !== null ? [$key] : $this->keysWithRoom() as $k) {
+            $created = $this->createTakes($k, 'example', $input, 1, (string) Str::uuid());
+            $voice = $created['voices'][1] ?? null;
+            if ($voice === null) {
+                if (in_array($created['code'], ['quota', 'key', 'limit', 'network'], true)) {
+                    continue;
+                }
+
+                return null;
+            }
+            try {
+                $audio = $this->speakTakes($k, [1 => $voice], $line)[1] ?? null;
+            } finally {
+                $this->deleteRemote($voice['id'], $k['name'], $k);
+            }
+            if ($audio === null) {
+                return null;
+            }
+            $packaged = ShareableAudio::package($audio);
+
+            return $packaged + ['seconds' => AudioDuration::seconds($packaged['bytes'])];
+        }
+
+        return null;
     }
 
     /**
@@ -286,19 +336,19 @@ class VoiceDesignService
      * @param  array{description:string, language:string, gender:?string, line:string, projection:int, pace:int, variety:int}  $input
      * @return array{voices: array<int, array{id:string, sample:?string, prompt:string}>, error:string, code:string}
      */
-    private function createTakes(array $key, User $user, array $input, int $takes, string $batch): array
+    private function createTakes(array $key, string $owner, array $input, int $takes, string $batch): array
     {
         $prompts = [];
         foreach (range(1, $takes) as $take) {
             $prompts[$take] = VoiceDesign::enginePrompt($input['description'], $input['projection'], $input['pace'], $input['variety'], $take);
         }
-        $body = function (int $take, bool $full) use ($input, $prompts, $user, $batch): array {
+        $body = function (int $take, bool $full) use ($input, $prompts, $owner, $batch): array {
             $voice = [
                 'model' => self::MODEL,
                 'type' => 'prompted',
                 // Tagged with the server and when it was made, so voice-design:prune finds this server's
                 // lost takes only, and can tell one from a take still being made.
-                'display_name' => self::DISPLAY_TAG.' · '.self::siteTag().' · U'.$user->id.' · '.substr($batch, 0, 8).' · '.$take.' · '.now()->utc()->format('YmdHi'),
+                'display_name' => self::DISPLAY_TAG.' · '.self::siteTag().' · '.$owner.' · '.substr($batch, 0, 8).' · '.$take.' · '.now()->utc()->format('YmdHi'),
                 'prompted' => ['input' => $prompts[$take]],
             ];
             // Optional on the engine's side: left out if it refuses them.
@@ -332,10 +382,12 @@ class VoiceDesignService
                     continue;
                 }
                 $this->noteKeyState($key, $response);
+                $this->note('create', $take, $response);
                 $id = $response->successful() ? $this->voices->findVoiceId($response->json() ?? []) : null;
                 if ($id !== null) {
                     $sample = $this->voices->extractAudioBytes(['output_audio' => $response->json('sample_audio') ?? $response->json('sampleAudio')]);
                     $voices[$take] = ['id' => $id, 'sample' => $sample !== '' ? $this->voices->ensurePlayableAudio($sample) : null, 'prompt' => $prompts[$take]];
+                    $this->report[array_key_last($this->report)]['sample_seconds'] = $sample !== '' ? AudioDuration::seconds($voices[$take]['sample']) : null;
 
                     continue;
                 }
@@ -378,9 +430,11 @@ class VoiceDesignService
                 continue;
             }
             $this->noteKeyState($key, $response);
+            $this->note('speak', $take, $response);
             $bytes = $response->successful() ? $this->voices->extractAudioBytes($response->json() ?? []) : '';
             if ($bytes !== '') {
                 $audio[$take] = $this->voices->ensurePlayableAudio($bytes);
+                $this->report[array_key_last($this->report)]['audio_seconds'] = AudioDuration::seconds($audio[$take]);
             } else {
                 Log::info('Voice design: a take did not speak its line; its own sample is used.', [
                     'key' => $key['name'], 'take' => $take, 'status' => $response->status(),
@@ -424,6 +478,22 @@ class VoiceDesignService
             $this->voices->apiKeys(self::MODEL),
             fn (array $key): bool => ! $manager->isOutForToday((string) $key['name'], self::MODEL),
         ));
+    }
+
+    /** One request in the report: never the audio, only what describes it. */
+    private function note(string $step, int $take, Response $response): void
+    {
+        $stats = $response->handlerStats();
+        $json = $response->json();
+        $this->report[] = [
+            'step' => $step,
+            'take' => $take,
+            'status' => $response->status(),
+            'ms' => isset($stats['total_time']) ? (int) round($stats['total_time'] * 1000) : null,
+            // However the engine names it (Interactions: usage; generateContent: usageMetadata).
+            'usage' => is_array($json) ? ($json['usage'] ?? $json['usage_metadata'] ?? $json['usageMetadata'] ?? null) : null,
+            'error' => $response->successful() ? null : mb_substr($this->voices->responseError($response), 0, 200),
+        ];
     }
 
     /** A daily limit, a spending cap or a refused key set the key aside, as for every other voice. */
@@ -491,13 +561,13 @@ class VoiceDesignService
     }
 
     /** Deletes the engine's voice, on the key whose project holds it. A voice already gone is fine. */
-    private function deleteRemote(?string $voiceId, ?string $keyName): void
+    private function deleteRemote(?string $voiceId, ?string $keyName, ?array $given = null): void
     {
         $voiceId = trim((string) $voiceId);
         if ($voiceId === '' || ! str_starts_with($voiceId, 'voice_')) {
             return;
         }
-        $keys = $this->voices->apiKeys(self::MODEL);
+        $keys = $given !== null ? [$given] : $this->voices->apiKeys(self::MODEL);
         $key = collect($keys)->firstWhere('name', $keyName) ?? ($keyName === null ? ($keys[0] ?? null) : null);
         if ($key === null) {
             return;
