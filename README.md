@@ -23,6 +23,7 @@ Arabic pages use the `/ar` prefix, for example https://listenai.studio/ar.
 
 - Generate speech from the dashboard or the signed-in demo, in Arabic or English, with optional translation.
 - Choose Standard voices (Google Cloud WaveNet) or HD voices (Gemini), including Arabic dialects, emotion, and performance style.
+- Design a new voice from a description (Voice Design, on Gemini 3.8 prompted voices): compare up to three takes, keep one, and use it in the studio. Plans switch it on and set how many voices members keep and create a month; the demo makes one take.
 - Keep a history of generations, replay them, and reuse the settings from an earlier HD job.
 - Enforce plan limits: characters per request, monthly characters, monthly requests, and voice tier.
 - Subscribe with Stripe, or submit a manual payment, then view and download invoices.
