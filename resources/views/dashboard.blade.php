@@ -2392,7 +2392,8 @@
           </div>
           @if($vcStudioOpen)
           <div class="vc-meta">
-            <div class="vc-count">{{ trans_choice('ui.voice_cloning.voices_left', $voiceCloningMaxVoices, ['left' => max(0, $voiceCloningMaxVoices - $voiceCloningCount), 'max' => $voiceCloningMaxVoices]) }}</div>
+            <x-quota-meter class="vc-count" :left="$voiceCloningMaxVoices - $voiceCloningCount" :max="$voiceCloningMaxVoices"
+              :value="__('ui.voice_cloning.voices_left')" :caption="__('ui.voice_cloning.voices_left_caption')" />
           </div>
           @endif
         </header>
@@ -4680,7 +4681,6 @@
         upload: @json(__('ui.voice_cloning.upload_tab')),
         recording: @json(__('ui.voice_cloning.record_tab')),
       };
-      const countTemplate = {{ \Illuminate\Support\Js::from(trans_choice('ui.voice_cloning.voices_left', (int) ($voiceCloningMaxVoices ?? 0), ['left' => '__LEFT__', 'max' => '__MAX__'])) }};
       const processingHintText = @json(__('ui.voice_cloning.processing_hint'));
       const failedHintText = @json(__('ui.voice_cloning.processing_failed_generic'));
       const useInGeneratorText = @json(__('ui.voice_cloning.use_in_generator'));
@@ -4753,16 +4753,10 @@
         return input.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
       }
 
-      // What is left to make on the plan (a deleted voice keeps its place for a while: vcDeletedNote).
-      function formatCount() {
-        return countTemplate
-          .replace('__LEFT__', String(Math.max(0, MAX_VOICES - currentVoiceCount)))
-          .replace('__MAX__', String(MAX_VOICES));
-      }
-
       function updateCountUI() {
-        if (countText) {
-          countText.textContent = formatCount();
+        // What is left to make on the plan (a deleted voice keeps its place for a while: vcDeletedNote).
+        if (countText && window.ListenQuota) {
+          window.ListenQuota(countText, MAX_VOICES - currentVoiceCount, MAX_VOICES);
         }
 
         const canCreateMore = MAX_VOICES > 0 && currentVoiceCount < MAX_VOICES;

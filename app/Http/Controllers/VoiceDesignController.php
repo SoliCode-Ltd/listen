@@ -12,8 +12,10 @@ use App\Services\VoiceDesignService;
 use App\Support\CreditPeriod;
 use App\Support\UsageSnapshot;
 use App\Support\VoiceDesign;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rule;
@@ -134,7 +136,7 @@ class VoiceDesignController extends Controller
         /** @var User $user */
         $user = $request->user();
         abort_unless(VoiceDesign::openTo($user), 404);
-        $take = DesignedVoice::query()->ownedBy((int) $user->id)->drafts()->whereKey($id)->firstOrFail();
+        DesignedVoice::query()->ownedBy((int) $user->id)->drafts()->whereKey($id)->firstOrFail();
         $plan = $this->plans->resolveAccessPlanForUserId((int) $user->id);
         if (! VoiceDesign::allows($user, $plan)) {
             return $this->error(__('voice_design.upgrade_text'), 403);
@@ -142,17 +144,34 @@ class VoiceDesignController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'min:2', 'max:50', new DoesNotContainProfanity(app(ProfanityFilter::class))],
         ]);
-        if (($blocker = VoiceDesign::keepBlocker((int) $user->id, $plan)) !== null) {
-            return $this->error($blocker, 422);
-        }
 
-        $voice = $this->designer->keep($take, trim((string) $validated['name']));
+        // One keep at a time for each member, so two sent at once cannot both pass the plan's
+        // numbers (the voices kept, the new voices this month): the count is read again inside.
+        try {
+            $voice = Cache::lock('voice-design-keep:'.$user->id, 30)->block(10, function () use ($user, $plan, $id, $validated): DesignedVoice|string|null {
+                $take = DesignedVoice::query()->ownedBy((int) $user->id)->drafts()->whereKey($id)->first();
+                if ($take === null) {
+                    return null;
+                }
+
+                return VoiceDesign::keepBlocker((int) $user->id, $plan) ?? $this->designer->keep($take, trim((string) $validated['name']));
+            });
+        } catch (LockTimeoutException) {
+            return $this->error(__('voice_design.errors.busy'), 429);
+        }
+        if ($voice === null) {
+            abort(404);
+        }
+        if (is_string($voice)) {
+            return $this->error($voice, 422);
+        }
 
         return response()->json([
             'ok' => true,
             'message' => __('voice_design.kept', ['name' => $voice->name]),
             'voice' => VoiceDesign::present($voice),
             'kept_month' => VoiceDesign::keptThisMonth((int) $user->id),
+            'kept_total' => VoiceDesign::keptInTotal((int) $user->id),
         ]);
     }
 

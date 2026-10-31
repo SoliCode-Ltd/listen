@@ -11,9 +11,20 @@
         <h1><span class="grad-text">{{ __('voice_design.title') }}</span></h1>
         <p>{{ __('voice_design.subtitle') }}</p>
       </div>
-      @if($studio['allowed'] && $studio['monthly'] > 0)
+      @if($studio['allowed'] && $studio['unlimited'])
         <div class="vd-section-meta">
-          <span class="vd-pill" data-vd-month-left>{{ trans_choice('voice_design.month_left', $studio['monthly'], ['left' => max(0, $studio['monthly'] - $studio['kept_month']), 'max' => $studio['monthly']]) }}</span>
+          <x-quota-meter :value="__('voice_design.month_unlimited')" :caption="__('voice_design.month_unlimited_caption')" />
+        </div>
+      @elseif($studio['allowed'] && $studio['monthly'] > 0)
+        <div class="vd-section-meta">
+          <x-quota-meter data-vd-quota="month" :left="$studio['monthly'] - $studio['kept_month']" :max="$studio['monthly']"
+            :value="__('voice_design.month_left')" :caption="__('voice_design.month_left_caption')" />
+        </div>
+      @elseif($studio['allowed'])
+        {{-- The plan's designed voices in all: deleting one does not give it back. --}}
+        <div class="vd-section-meta">
+          <x-quota-meter data-vd-quota="total" :left="$studio['max_voices'] - $studio['kept_total']" :max="$studio['max_voices']"
+            :value="__('voice_design.total_left')" :caption="__('voice_design.total_left_caption')" />
         </div>
       @endif
     </header>

@@ -46,6 +46,7 @@ use App\Support\VideoDubbing;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceFlag;
+use App\Support\VoiceCloningAccess;
 use App\Support\VoiceDesign;
 use App\Support\VoicePreviews;
 use App\Support\VoiceTier;
@@ -663,6 +664,7 @@ class HomeController extends Controller
             // Voice Design, beside it too: one take from the demo's characters (App\Support\VoiceDesign).
             'voiceDesign' => VoiceDesign::openTo($member)
                 ? VoiceDesign::studio($member, $this->planAccessService->resolveAccessPlanForUserId((int) $member->id), true)
+                    + ['demo_used' => ! VoiceCloningAccess::isPreviewAccount($member) && $this->usedDemoDesign($this->demoLinkedUserIds((int) $member->id, $request))]
                 : null,
         ]);
 
@@ -1077,16 +1079,59 @@ class HomeController extends Controller
     }
 
     /**
-     * Voice Design in the demo, beside the text studio: one take of the voice
-     * the member described, speaking their line or one written for the
-     * character. It is paid from the demo's characters as a demo voice is (the
-     * line's characters), under the same limits and checks, and kept in the
-     * demo history. Keeping designed voices is for plans with Voice Design.
+     * Voice Design in the demo, beside the text studio: one try, one take of the
+     * voice the member described, speaking a line Listen writes for the character
+     * within the demo's characters. It is paid from those characters as a demo
+     * voice is, under the same limits and checks, and kept in the demo history.
+     * Keeping designed voices is for plans with Voice Design.
      */
     public function designVoice(Request $request, VoiceDesignService $designer)
     {
         $this->syncCurrentUserDeviceIdentity($request);
         abort_unless(VoiceDesign::openTo($request->user()), 404);
+        $user = $request->user();
+        // Listen writes the line, within the demo's characters: the member describes the voice, never the words.
+        $request->merge(['auto_line' => true, 'line' => null]);
+        if (VoiceCloningAccess::isPreviewAccount($user)) {
+            return $this->designDemoVoice($request, $designer);
+        }
+
+        // One try for each person, never more: counted over every account the text demo links to
+        // them (demoLinkedUserIds: the same browser or device, the same fingerprint through a VPN,
+        // accounts made in a row from one address), locked for that whole group so two of its
+        // accounts cannot try at the same moment.
+        $group = $this->demoLinkedUserIds((int) $user->id, $request);
+        $lock = Cache::lock('demo-voice-design:'.min($group), 150);
+        if (! $lock->get()) {
+            return response()->json(['ok' => false, 'message' => __('voice_design.errors.busy')], 429);
+        }
+        try {
+            if ($this->usedDemoDesign($group)) {
+                return response()->json(['ok' => false, 'message' => __('voice_design.errors.demo_used'), 'demo_used' => true], 422);
+            }
+
+            return $this->designDemoVoice($request, $designer);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Whether any of these accounts (a member and those the demo links to them,
+     * demoLinkedUserIds) has had the demo's one Voice Design try: a design that came back.
+     *
+     * @param  list<int>  $userIds
+     */
+    private function usedDemoDesign(array $userIds): bool
+    {
+        return DemoVoiceGeneration::query()
+            ->whereIn('user_id', $userIds)
+            ->whereNotNull('metadata->voice_design')
+            ->exists();
+    }
+
+    private function designDemoVoice(Request $request, VoiceDesignService $designer)
+    {
         $user = $request->user();
         $userId = (int) $user->id;
         $maxChars = $this->demoCharAllowance($request);
@@ -1179,6 +1224,8 @@ class HomeController extends Controller
                 'estimated_chars' => $estimate['chars'],
                 'can_keep' => $canKeep,
                 'upgrade_url' => VoiceDesign::upgradeUrl(),
+                // The demo's one try is used (the admin email tries as often as it likes).
+                'demo_used' => ! VoiceCloningAccess::isPreviewAccount($user),
                 'quota' => $quota,
             ]);
         } catch (ValidationException $e) {

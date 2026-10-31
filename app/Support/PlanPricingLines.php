@@ -136,7 +136,7 @@ final class PlanPricingLines
         if ($plan->pricing_use_custom_text) {
             $custom = $plan->getLocalizedFeatures($locale);
             if ($custom !== null) {
-                return self::withoutDubbing(array_values($custom));
+                return self::withoutClosed(array_values($custom));
             }
         }
 
@@ -146,7 +146,7 @@ final class PlanPricingLines
 
         return array_merge(
             $automatic,
-            self::withoutDubbing(self::extraLines($plan->{'pricing_extra_lines_'.$locale} ?? [], $locale)),
+            self::withoutClosed(self::extraLines($plan->{'pricing_extra_lines_'.$locale} ?? [], $locale)),
         );
     }
 
@@ -168,30 +168,35 @@ final class PlanPricingLines
 
         return array_merge(
             $automatic,
-            self::withoutDubbing(self::extraLines($plan->{'pricing_extra_lines_'.$locale} ?? [], $locale)),
+            self::withoutClosed(self::extraLines($plan->{'pricing_extra_lines_'.$locale} ?? [], $locale)),
         );
     }
 
     /**
-     * Lines the admin wrote by hand that talk about video dubbing ("Video dubbing: 20
-     * videos", "دبلجة الفيديو") are left out while dubbing is not open to everyone, as
-     * the automatic dubbing line is: one switch in Video Dubbing → Settings hides it all.
+     * Lines the admin wrote by hand about a feature not open to everyone yet are left
+     * out, as its automatic line is: video dubbing ("Video dubbing: 20 videos", "دبلجة
+     * الفيديو") until Video Dubbing → Settings opens it, Voice Design ("Voice Design: 10
+     * voices", "تصميم الأصوات") until Voice Design → Settings does.
      *
      * @param  array<int, mixed>  $lines
      * @return array<int, mixed>
      */
-    private static function withoutDubbing(array $lines): array
+    private static function withoutClosed(array $lines): array
     {
-        if (StudioFacts::dubbing()) {
+        $closed = array_filter([
+            StudioFacts::dubbing() ? null : '\bdub|دبلج',
+            VoiceDesign::audience() === VoiceDesign::AUDIENCE_EVERYONE ? null : 'voice design|design your own voices|تصميم (ال)?(صوت|أصوات)|صمّ?م أصواتك',
+        ]);
+        if ($closed === []) {
             return $lines;
         }
 
-        return array_values(array_filter($lines, function (mixed $line): bool {
+        return array_values(array_filter($lines, function (mixed $line) use ($closed): bool {
             $text = is_array($line)
                 ? implode(' ', array_filter([$line['label'] ?? '', $line['value'] ?? '', $line['text'] ?? ''], 'is_string'))
                 : (is_string($line) ? $line : '');
 
-            return ! preg_match('/\bdub|دبلج/iu', $text);
+            return ! preg_match('/'.implode('|', $closed).'/iu', $text);
         }));
     }
 
@@ -289,7 +294,7 @@ final class PlanPricingLines
                 ? trans_choice('ui.pricing.lines.cloning_voices', VoiceCloningService::maxVoicesForPlan($plan), [], $locale)
                 : null,
             'voice_design' => VoiceDesign::planIncludes($plan) && VoiceDesign::audience() === VoiceDesign::AUDIENCE_EVERYONE
-                ? trans_choice('ui.pricing.lines.design_voices', VoiceDesign::maxVoices($plan), [], $locale)
+                ? self::designValue(VoiceDesign::isUnlimited($plan), VoiceDesign::monthlyLimit($plan), VoiceDesign::maxVoices($plan), $locale)
                 : null,
             'download_formats' => implode(', ', array_map(
                 fn (string $format): string => explode(' ', AudioFormats::ALL[$format]['label'])[0],
@@ -342,6 +347,22 @@ final class PlanPricingLines
             'daily_requests' => 'Hidden: no daily limit is set (Usage Limits → Generations per day).',
             default => 'Hidden for this plan.',
         };
+    }
+
+    /**
+     * What a plan's Voice Design line says: no limit, the new voices a month, or (with no
+     * monthly count) the voices a member keeps.
+     */
+    public static function designValue(bool $unlimited, int $monthly, int $kept, string $locale): string
+    {
+        $locale = self::locale($locale);
+        if ($unlimited) {
+            return self::t('unlimited', $locale);
+        }
+
+        return $monthly > 0
+            ? trans_choice('ui.pricing.lines.design_voices_month', $monthly, [], $locale)
+            : trans_choice('ui.pricing.lines.design_voices', $kept, [], $locale);
     }
 
     private static function cloningOpen(Plan $plan): bool

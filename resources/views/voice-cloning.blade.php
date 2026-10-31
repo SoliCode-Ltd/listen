@@ -161,7 +161,8 @@
     {{-- ========== MAIN FEATURE UI ========== --}}
     @else
       {{-- Voice count --}}
-      <div class="vc-count">{{ trans_choice('ui.voice_cloning.voices_left', $maxVoices, ['left' => max(0, $maxVoices - $voiceCount), 'max' => $maxVoices]) }}</div>
+      <x-quota-meter class="vc-count" :left="$maxVoices - $voiceCount" :max="$maxVoices"
+        :value="__('ui.voice_cloning.voices_left')" :caption="__('ui.voice_cloning.voices_left_caption')" />
 
       {{-- Alert container for AJAX responses --}}
       <div id="vcAlerts"></div>

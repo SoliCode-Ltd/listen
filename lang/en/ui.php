@@ -409,7 +409,8 @@ return [
             'kept_no_limit' => 'No time limit',
             'kept_days' => ':count day|:count days',
             'cloning_voices' => ':count voice|:count voices',
-            'design_voices' => ':count designed voice|:count designed voices',
+            'design_voices' => ':count voice|:count voices',
+            'design_voices_month' => ':count voice a month|:count voices a month',
             'dubbing_videos' => ':count video a month, up to :seconds s each|:count videos a month, up to :seconds s each',
             'dubbing_open' => 'Up to :seconds s a video, from your voice time',
             'topup_price' => ':price per 1M credits',
@@ -1932,7 +1933,9 @@ return [
         'rate_limited' => 'Please wait a little before creating another voice.',
 
         'your_voices_title' => 'Your voices',
-        'voices_left' => ':left of :max voice left|:left of :max voices left',
+        // The meter at the top of the section (components/quota-meter).
+        'voices_left' => ':left of :max left',
+        'voices_left_caption' => 'Cloned voices on your plan',
         'status_pending' => 'Queued',
         'status_validating' => 'Checking',
         'status_processing' => 'Building',

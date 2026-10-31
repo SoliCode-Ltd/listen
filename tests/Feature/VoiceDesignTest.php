@@ -301,16 +301,24 @@ class VoiceDesignTest extends TestCase
         $this->assertSame(__('ui.dashboard.library.speaks', ['language' => __('voice_design.language_en')]), $listed[0]['tag']);
     }
 
-    public function test_a_full_library_cannot_keep_or_design_another(): void
+    public function test_the_plans_designed_voices_are_a_total_that_deleting_does_not_give_back(): void
     {
         $member = $this->member($this->designPlan);
-        $this->savedVoice($member);
-        $this->savedVoice($member);
+        $this->savedVoice($member, DesignedVoice::SAVED, 'voice_one');
+        $this->savedVoice($member, DesignedVoice::SAVED, 'voice_two')->delete();
         $this->fakeEngine();
 
+        // Two kept in all (one deleted since): the plan's two are used, and nothing is designed or charged.
         $this->actingAs($member)->postJsonLocalizedRoute('voice-design.design', $this->designInput())
-            ->assertStatus(422)->assertJson(['message' => __('voice_design.errors.library_full', ['max' => 2])]);
+            ->assertStatus(422)->assertJson(['message' => __('voice_design.errors.total_used', ['max' => 2])]);
         $this->assertSame([], $this->calls);
+
+        app()->setLocale('en');
+        $page = $this->actingAs($member)->getLocalizedRoute('dashboard')->assertOk();
+        $page->assertSee('0 of 2 left', false)->assertSee(__('voice_design.total_left_caption'), false);
+        $page->assertSee(__('voice_design.limit_total_title'), false)->assertSee(route('billing.page'), false);
+        $this->assertMatchesRegularExpression('/data-vd-submit\s+hidden disabled/', $page->getContent());
+        $this->assertStringContainsString(json_encode(__('voice_design.delete_total_note')), $page->getContent());
     }
 
     public function test_the_plans_new_voices_a_month_count_deleted_ones_too(): void
@@ -326,20 +334,21 @@ class VoiceDesignTest extends TestCase
 
     public function test_the_page_says_what_is_left_this_month_and_stops_designing_once_it_is_used(): void
     {
-        $this->designPlan->forceFill(['voice_design_max_voices' => 2, 'voice_design_monthly_voices' => 2])->save();
+        $this->designPlan->forceFill(['voice_design_max_voices' => 10, 'voice_design_monthly_voices' => 2])->save();
         $member = $this->member($this->designPlan);
         $this->savedVoice($member, DesignedVoice::SAVED, 'voice_one');
         app()->setLocale('en');
 
         $page = $this->actingAs($member)->getLocalizedRoute('dashboard')->assertOk();
-        $page->assertSee('1 of 2 new voices left this month', false);
+        $page->assertSee('1 of 2 left', false)->assertSee(__('voice_design.month_left_caption'), false);
         $this->assertMatchesRegularExpression('/data-vd-limit role="status"\s+hidden/', $page->getContent());
         $this->assertDoesNotMatchRegularExpression('/data-vd-submit\s+hidden disabled/', $page->getContent());
 
         // A second one kept, then deleted: room in the library, none in the month.
         $this->savedVoice($member, DesignedVoice::SAVED, 'voice_two')->delete();
         $page = $this->actingAs($member)->getLocalizedRoute('dashboard')->assertOk();
-        $page->assertSee('0 of 2 new voices left this month', false);
+        $page->assertSee('0 of 2 left', false);
+        $this->assertMatchesRegularExpression('/class="quota-meter is-empty"[^>]*data-vd-quota="month"/', $page->getContent());
         $page->assertSee(__('voice_design.limit_month_title'), false);
         $this->assertDoesNotMatchRegularExpression('/data-vd-limit role="status"\s+hidden/', $page->getContent());
         $this->assertMatchesRegularExpression('/data-vd-submit\s+hidden disabled/', $page->getContent());
@@ -354,7 +363,7 @@ class VoiceDesignTest extends TestCase
         $html = $this->actingAs($this->member($this->designPlan))->getLocalizedRoute('dashboard')->assertOk()->getContent();
 
         $this->assertStringContainsString(json_encode(__('voice_design.delete_month_note')), $html);
-        $this->assertStringContainsString("t.delete_confirm + (Number(studio.monthly || 0) > 0 ? '\\n\\n' + t.delete_month_note : '')", file_get_contents(public_path('js/voice-design.js')));
+        $this->assertStringContainsString("Number(studio.monthly || 0) > 0 ? t.delete_month_note : (studio.unlimited ? '' : t.delete_total_note)", file_get_contents(public_path('js/voice-design.js')));
     }
 
     public function test_the_public_pages_play_the_designed_voices_in_their_own_language(): void
@@ -401,7 +410,7 @@ class VoiceDesignTest extends TestCase
         $take = $this->savedVoice($member, DesignedVoice::DRAFT, 'voice_take');
 
         $this->actingAs($member)->postJsonLocalizedRoute('voice-design.keep', ['name' => 'Captain Two'], ['id' => $take->id])
-            ->assertOk()->assertJson(['kept_month' => 2]);
+            ->assertOk()->assertJson(['kept_month' => 2, 'kept_total' => 2]);
     }
 
     public function test_a_member_cannot_keep_or_delete_someone_elses_voice(): void
@@ -528,11 +537,49 @@ class VoiceDesignTest extends TestCase
         $this->assertSame(0, $this->creditsUsed($member));
     }
 
-    public function test_the_demo_refuses_a_line_longer_than_the_demo_allows(): void
+    public function test_the_demo_gives_one_try_speaking_a_line_listen_writes(): void
     {
-        $this->actingAs($this->member($this->freePlan))
-            ->postJsonLocalizedRoute('demo.voice-design', $this->designInput(['auto_line' => false, 'line' => str_repeat('A long line that runs on. ', 20)]))
-            ->assertStatus(422)->assertJson(['ok' => false]);
+        $member = $this->member($this->freePlan);
+        $device = ['X-Client-FP' => str_repeat('a1b2c3d4', 4)];
+        $this->fakeEngine();
+
+        // A line typed in is not used: Listen writes one within the demo's characters.
+        $this->actingAs($member)->withHeaders($device)
+            ->postJsonLocalizedRoute('demo.voice-design', $this->designInput(['auto_line' => false, 'line' => 'Words the member typed in themselves.']))
+            ->assertOk()->assertJson(['ok' => true, 'line' => self::LINE, 'demo_used' => true]);
+        $this->assertSame(self::LINE, $this->callsTo('POST', '/interactions')[0]['body']['input'][0]['content'][0]['text']);
+
+        // One try: a second is refused before anything is designed, on this account and on another on the same device.
+        $this->actingAs($member)->withHeaders($device)->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
+            ->assertStatus(422)->assertJson(['ok' => false, 'demo_used' => true, 'message' => __('voice_design.errors.demo_used')]);
+        $this->actingAs($this->member($this->freePlan))->withHeaders($device)->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
+            ->assertStatus(422)->assertJson(['demo_used' => true]);
+        // Or a new account made from the same address, on another device (a VPN changes the address
+        // later, not the one it signed up from), as the text demo links them.
+        $member->forceFill(['registration_ip' => '203.0.113.7'])->save();
+        $again = $this->member($this->freePlan);
+        $again->forceFill(['registration_ip' => '203.0.113.7'])->save();
+        $this->actingAs($again)->withHeaders(['X-Client-FP' => str_repeat('f9e8d7c6', 4)])->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
+            ->assertStatus(422)->assertJson(['demo_used' => true]);
+        $this->assertCount(1, $this->callsTo('POST', '/voices'));
+
+        // The demo then says the try is used, with the way to a plan, in place of the design button.
+        app()->setLocale('en');
+        $page = $this->actingAs($member)->getLocalizedRoute('demo.page')->assertOk();
+        $page->assertSee(__('voice_design.limit_demo_title'), false)->assertSee(__('voice_design.limit_cta'), false);
+        $this->assertMatchesRegularExpression('/data-vd-submit\s+hidden disabled/', $page->getContent());
+        $page->assertDontSee('name="line"', false);
+    }
+
+    public function test_the_admin_email_tries_the_demo_as_often_as_it_likes(): void
+    {
+        $admin = $this->member($this->freePlan, \App\Support\VoiceCloningAccess::PREVIEW_EMAIL);
+        $this->fakeEngine();
+
+        foreach ([1, 2] as $try) {
+            $this->actingAs($admin)->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
+                ->assertOk()->assertJson(['ok' => true, 'demo_used' => false]);
+        }
     }
 
     /* ------------------------------------------------------------ */
