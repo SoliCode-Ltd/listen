@@ -108,6 +108,8 @@ if ($mode === 'finish') {
         $line = [
             "#{$generation->id} {$generation->status}: {$generation->duration_seconds} s".($generation->duration_measured ? ' (measured)' : ' (estimated)'),
             'reserved '.(int) ($reserved['credits'] ?? 0).' credits',
+            // Where it was asked for, as Admin → Audio Generations shows it: api, or mcp for an AI app.
+            'source '.($generation->textItem?->source_type ?? 'not recorded'),
         ];
         if ($generation->tts_fallback_used) {
             $line[] = 'made by the backup engine';

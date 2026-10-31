@@ -12,9 +12,21 @@ name: Developer API smoke test
 # staging, checks the audio and the credits, and keeps the two MP3s with the
 # run. At the end it revokes the key and puts the member back on the free
 # plan, even when a step failed.
+#
+# With "via" set to mcp it makes ONE voice instead, through the MCP server
+# (/mcp), as an AI app does: it connects, lists the tools, asks text_to_speech
+# for the docs' Arabic sample, plays the link it gets back without the key,
+# and checks that /mcp refuses a request with no key. The finish step shows
+# how the generation was recorded (its source should be "mcp").
 
 on:
   workflow_dispatch:
+    inputs:
+      via:
+        description: "api: the docs' two samples through /v1 (two voices). mcp: ONE voice through the MCP server."
+        type: choice
+        options: [api, mcp]
+        default: api
 
 permissions:
   contents: read
@@ -53,6 +65,7 @@ jobs:
           echo "APP_FIND=for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done" >> "$GITHUB_ENV"
 
       - name: Two requests, as a customer
+        if: inputs.via != 'mcp'
         run: |
           set -uo pipefail
           ssh_app() { ssh -4 -i ~/.ssh/id_smoke -o BatchMode=yes -o ConnectTimeout=20 "$SSH_TARGET" "$APP_FIND; $1"; }
@@ -106,6 +119,76 @@ jobs:
           curl -4 -s --max-time 30 -H "X-Listen-Api-Key: $KEY" "$BASE/v1/user/subscription" \
             | jq -c '{plan: .plan.slug, credits_used: .credits.used, requests_this_month: .requests.used_this_month, key_credits: .api_key.credits_used_this_month}' 2>/dev/null | sed 's/^/  /'
 
+      - name: One voice through the MCP server, as an AI app
+        if: inputs.via == 'mcp'
+        run: |
+          set -uo pipefail
+          ssh_app() { ssh -4 -i ~/.ssh/id_smoke -o BatchMode=yes -o ConnectTimeout=20 "$SSH_TARGET" "$APP_FIND; $1"; }
+          fail() { echo "  FAILED: $1"; echo "SMOKE_FAILED=1" >> "$GITHUB_ENV"; }
+          out="$(ssh_app 'MODE=start php' < scripts/api/staging_smoke_member.php)"
+          KEY="$(printf '%s\n' "$out" | sed -n 's/^KEY=//p')"
+          printf '%s\n' "$out" | grep -vE '^(KEY|BODY_[A-Z]+)='
+          if [ -z "$KEY" ]; then fail "no test key"; exit 0; fi
+          echo "::add-mask::$KEY"
+          field() { printf '%s\n' "$out" | sed -n "s/^$1=//p"; }
+          field BODY_AR > ar.json
+          # One JSON-RPC call; the answer comes back as JSON or as one server-sent event.
+          rpc() {
+            curl -4 -s --max-time "$2" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
+              -H 'Accept: application/json, text/event-stream' -H 'MCP-Protocol-Version: 2025-06-18' \
+              --data "$1" "$BASE/mcp" | sed -n 's/^data: //p; /^{/p' | tail -1
+          }
+
+          echo "== 1. Without a key, /mcp refuses and says where to sign in =="
+          curl -4 -s -D noauth-headers.txt -o noauth.json --max-time 30 -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' "$BASE/mcp"
+          head -1 noauth-headers.txt | tr -d '\r' | sed 's/^/  /'
+          grep -i '^www-authenticate:' noauth-headers.txt | tr -d '\r' | sed 's/^/  /'
+          echo "  $(jq -c '.error' noauth.json 2>/dev/null || head -c 300 noauth.json)"
+          head -1 noauth-headers.txt | grep -q ' 401' || fail "/mcp without a key did not answer 401"
+
+          echo "== 2. Connect and list the tools =="
+          init="$(rpc '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"listen-smoke-test","version":"1.0"}}}' 30)"
+          echo "  $(printf '%s' "$init" | jq -c '{server: .result.serverInfo, protocol: .result.protocolVersion}' 2>/dev/null || printf '%s' "$init" | head -c 300)"
+          tools="$(rpc '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' 30 | jq -r '[.result.tools[].name] | join(", ")' 2>/dev/null)"
+          echo "  tools: ${tools:-none}"
+          case "$tools" in *text_to_speech*) ;; *) fail "text_to_speech is not listed"; exit 0 ;; esac
+
+          echo "== 3. text_to_speech: the docs' Arabic sample, once =="
+          call="$(jq -nc --arg voice "$(field VOICE_AR)" --slurpfile body ar.json \
+            '{jsonrpc:"2.0",id:3,method:"tools/call",params:{name:"text_to_speech",arguments:{text:$body[0].text,voice_id:$voice,dialect:$body[0].dialect,style:$body[0].style,emotion:$body[0].emotion,title:"MCP check"}}}')"
+          t0=$(date +%s)
+          answer="$(rpc "$call" 120)"
+          echo "  answered after $(( $(date +%s) - t0 )) s"
+          printf '%s' "$answer" > mcp-answer.json
+          echo "  isError: $(jq -r '.result.isError' mcp-answer.json 2>/dev/null)"
+          jq -r '.result.content[0].text // .error.message // empty' mcp-answer.json 2>/dev/null | sed 's/^/  | /'
+          jq -c '.result.structuredContent | {history_item_id, status, duration_seconds, credits_used, credits_remaining, audio_url_expires_at}' mcp-answer.json 2>/dev/null | sed 's/^/  /'
+          id="$(jq -r '.result.structuredContent.history_item_id // empty' mcp-answer.json 2>/dev/null)"
+          status="$(jq -r '.result.structuredContent.status // empty' mcp-answer.json 2>/dev/null)"
+          link="$(jq -r '.result.structuredContent.audio_url // empty' mcp-answer.json 2>/dev/null)"
+          if [ -z "$id" ]; then fail "text_to_speech gave no history item"; exit 0; fi
+
+          # A long wait comes back with the history item: ask get_speech until it is done.
+          t0=$(date +%s)
+          while [ "$status" != completed ] && [ "$status" != failed ] && [ $(( $(date +%s) - t0 )) -lt 300 ]; do
+            sleep 5
+            again="$(rpc "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"get_speech\",\"arguments\":{\"history_item_id\":$id}}}" 30)"
+            status="$(printf '%s' "$again" | jq -r '.result.structuredContent.status // "unknown"' 2>/dev/null || echo unknown)"
+            link="$(printf '%s' "$again" | jq -r '.result.structuredContent.audio_url // empty' 2>/dev/null)"
+          done
+          echo "  status: $status"
+          if [ "$status" != completed ] || [ -z "$link" ]; then fail "the speech ended $status"; exit 0; fi
+
+          echo "== 4. The link plays without the key =="
+          code="$(curl -4 -s -D audio-headers.txt -o mcp.mp3 -w '%{http_code}' --max-time 60 "$link" || echo 000)"
+          grep -iE '^(content-type|content-disposition|cache-control):' audio-headers.txt | tr -d '\r' | sed 's/^/  /'
+          echo "  HTTP $code, measured here: $(ffprobe -v error -show_entries format=duration -of csv=p=0 mcp.mp3 2>/dev/null || echo '?') s, $(stat -c %s mcp.mp3 2>/dev/null || echo 0) bytes"
+          [ "$code" = 200 ] || { rm -f mcp.mp3; fail "the link did not play"; }
+          code="$(curl -4 -s -o /dev/null -w '%{http_code}' --max-time 30 "${link%%\?*}" || echo 000)"
+          echo "  the same address without its signature: HTTP $code"
+          [ "$code" = 403 ] || fail "the link without its signature was not refused"
+
       - name: Put the test member back
         if: always()
         run: |
@@ -122,6 +205,7 @@ jobs:
           path: |
             en.mp3
             ar.mp3
+            mcp.mp3
           if-no-files-found: ignore
           retention-days: 30
 
@@ -129,4 +213,4 @@ jobs:
         if: always()
         run: |
           if [ "${SMOKE_FAILED:-0}" = 1 ]; then echo "The smoke test failed (see above)."; exit 1; fi
-          echo "Both voices were made and charged as expected."
+          if [ "${{ inputs.via }}" = mcp ]; then echo "The voice was made through the MCP server and its link plays."; else echo "Both voices were made and charged as expected."; fi
