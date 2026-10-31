@@ -185,8 +185,6 @@
       var list = studio.showcase || [];
       if (!list.length) return;
       var item = list[i % list.length];
-      cloud.forEach(function (chip) { chip.classList.toggle('is-speaking', chip.getAttribute('data-vd-cloud') === item.name); });
-      if (nowLine) nowLine.textContent = fmt(t.now_speaking, { name: item.name });
       play(item.url, {
         button: showButton,
         cast: stage,
@@ -196,6 +194,9 @@
         },
         onEnd: function () { if (chain !== false && i + 1 < list.length) speakShowcase(i + 1, true); }
       });
+      // After play(): starting it stops the voice before, whose onStop dims every chip.
+      cloud.forEach(function (chip) { chip.classList.toggle('is-speaking', chip.getAttribute('data-vd-cloud') === item.name); });
+      if (nowLine) nowLine.textContent = fmt(t.now_speaking, { name: item.name });
     }
     if (showButton) {
       showButton.addEventListener('click', function () {
@@ -327,9 +328,10 @@
         + '<div class="vd-voice-name"><strong dir="auto">' + esc(voice.name) + '</strong><small>'
         + esc(voice.created ? fmt(t.voice_meta, { speaks: voice.tag || '', date: voice.created }) : (voice.tag || '')) + '</small></div></div>'
         + '<p class="vd-voice-desc" dir="auto">' + esc(voice.description) + '</p>'
+        + '<div class="vd-mini"><button type="button" class="vd-play" aria-label="' + esc(t.play) + '">' + ICON_PLAY + '</button>'
         + '<div class="vd-take-bar"><i></i></div>'
-        + '<div class="vd-voice-foot"><button type="button" class="vd-play" aria-label="' + esc(t.play) + '">' + ICON_PLAY + '</button>'
-        + '<button type="button" class="btn btn-primary" data-vd-use>' + esc(t.use_in_studio) + '</button>'
+        + (voice.seconds ? '<span class="vd-time" dir="ltr">' + clock(voice.seconds) + '</span>' : '') + '</div>'
+        + '<div class="vd-voice-foot"><button type="button" class="btn btn-primary" data-vd-use>' + esc(t.use_in_studio) + '</button>'
         + '<button type="button" class="vd-icon-btn" data-vd-delete aria-label="' + esc(t.delete) + '" title="' + esc(t.delete) + '">' + ICON_TRASH + '</button></div>';
       var playButton = el.querySelector('.vd-play');
       playButton.addEventListener('click', function () { play(voice.url, { button: playButton, cast: el, bar: el.querySelector('.vd-take-bar i') }); });
@@ -397,13 +399,30 @@
       var takes = Number(studio.takes) || 1;
       var auto = !autoLine || autoLine.checked;
       var text = line ? line.value.trim() : '';
+      var about = auto || !text ? '≈ ' : '';
+      if (studio.demo) {
+        var chars = auto || !text ? Number((studio.typical_chars || {})[language()]) || 0 : text.length;
+        costValue.textContent = about + fmt(t.demo_cost, { count: chars.toLocaleString() });
+        return;
+      }
       var each = Number((studio.typical_credits || {})[language()]) || 0;
       if (!auto && text) {
         each = window.ListenAudioEstimate && window.ListenAudioEstimate.credits
           ? Number(window.ListenAudioEstimate.credits(text, { tier: 'hd' })) || 0
           : Math.ceil(text.length / 15) * 15;
       }
-      costValue.textContent = (auto || !text ? '≈ ' : '') + Math.round(each * takes).toLocaleString();
+      costValue.textContent = about + fmt(t.cost, { credits: Math.round(each * takes).toLocaleString() });
+    }
+    // The description grows with what is written, up to its largest size.
+    function grow() {
+      description.style.height = 'auto';
+      description.style.height = Math.min(description.scrollHeight + 2, 360) + 'px';
+    }
+    // The service refuses any voice of a child: say so before a design is asked for.
+    var childHint = q('[data-vd-child-hint]');
+    var CHILD = /(^|[^\p{L}])(?:[وفبلك]{1,2})?(child|children|kid|kids|toddler|baby|babies|infant|boy|schoolboy|schoolgirl|teen|teens|teenager|teenage|minor|طفل|طفلة|أطفال|الطفل|الطفلة|الأطفال|طفولي|طفولية|رضيع|رضيعة|صبي|صبية|مراهق|مراهقة|تلميذ|تلميذة)(?=$|[^\p{L}])|(^|[^\d])(1[0-7]|[1-9])[ -]?(year|yr)s?[ -]old/iu;
+    function childCheck() {
+      if (childHint) childHint.hidden = !CHILD.test(description.value);
     }
     function pickExample(example) {
       if (!example) return;
@@ -411,9 +430,15 @@
       description.value = example.description;
       var radio = form.querySelector('input[name="language"][value="' + example.language + '"]');
       if (radio) radio.checked = true;
-      form.querySelectorAll('[data-vd-example]').forEach(function (chip) { chip.classList.toggle('is-picked', chip.getAttribute('data-vd-example') === example.key); });
+      form.querySelectorAll('[data-vd-example]').forEach(function (chip) {
+        var picked = chip.getAttribute('data-vd-example') === example.key;
+        chip.classList.toggle('is-picked', picked);
+        if (picked) chip.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      });
       counters();
-      description.focus();
+      grow();
+      childCheck();
+      description.focus({ preventScroll: true });
       previewExample(example.key);
     }
     form.querySelectorAll('[data-vd-example]').forEach(function (chip) {
@@ -431,7 +456,47 @@
         form.querySelectorAll('[data-vd-example]').forEach(function (chip) { chip.classList.remove('is-picked'); });
       }
       counters();
+      grow();
+      childCheck();
     });
+
+    // Writing tips: closed by a click outside them or by Escape.
+    var tips = q('.vd-tips');
+    if (tips) {
+      document.addEventListener('click', function (event) { if (tips.open && !tips.contains(event.target)) tips.open = false; });
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && tips.open) { tips.open = false; var s = tips.querySelector('summary'); if (s) s.focus(); }
+      });
+    }
+
+    // The characters' row: arrows at the ends that have more, and the chip picked brought into view.
+    var chipsWrap = q('[data-vd-chips-wrap]');
+    var chipsRow = q('[data-vd-chips]');
+    function chipsEdges() {
+      if (!chipsWrap || !chipsRow) return;
+      var max = chipsRow.scrollWidth - chipsRow.clientWidth;
+      var at = Math.abs(chipsRow.scrollLeft);
+      var start = max > 2 && at > 2;
+      var end = max > 2 && at < max - 2;
+      chipsWrap.classList.toggle('has-start', start);
+      chipsWrap.classList.toggle('has-end', end);
+      chipsWrap.querySelectorAll('[data-vd-chips-step]').forEach(function (arrow) {
+        arrow.hidden = Number(arrow.getAttribute('data-vd-chips-step')) < 0 ? !start : !end;
+      });
+    }
+    if (chipsWrap && chipsRow) {
+      var rtl = getComputedStyle(chipsRow).direction === 'rtl';
+      chipsWrap.querySelectorAll('[data-vd-chips-step]').forEach(function (arrow) {
+        arrow.addEventListener('click', function () {
+          var step = Number(arrow.getAttribute('data-vd-chips-step')) * Math.max(160, chipsRow.clientWidth * 0.7);
+          chipsRow.scrollBy({ left: rtl ? -step : step });
+        });
+      });
+      chipsRow.addEventListener('scroll', chipsEdges, { passive: true });
+      window.addEventListener('resize', chipsEdges);
+      if (window.ResizeObserver) new ResizeObserver(chipsEdges).observe(chipsRow);
+      chipsEdges();
+    }
     if (line) line.addEventListener('input', counters);
     form.querySelectorAll('input[name="language"]').forEach(function (radio) { radio.addEventListener('change', cost); });
     if (autoLine) {
@@ -457,6 +522,8 @@
           lastExample = null;
           form.querySelectorAll('[data-vd-example]').forEach(function (chip) { chip.classList.remove('is-picked'); });
           counters();
+          grow();
+          childCheck();
         }
       }).catch(function (error) { showAlert(error.message); }).then(function () {
         enhance.disabled = false;
@@ -466,6 +533,19 @@
 
     form.addEventListener('submit', function (event) {
       event.preventDefault();
+      // A plan without Voice Design: the way to one that designs, instead of a design.
+      if (!submit) {
+        var unlock = q('[data-vd-unlock]');
+        var upgrade = q('[data-vd-upgrade]');
+        if (unlock) {
+          unlock.classList.remove('is-nudged');
+          void unlock.offsetWidth;
+          unlock.classList.add('is-nudged');
+          unlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        if (upgrade) upgrade.focus({ preventScroll: true });
+        return;
+      }
       showAlert('');
       var text = description.value.trim();
       if (text.length < Number(limits.description_min || 0)) { showAlert(t.description_short); description.focus(); return; }
@@ -509,6 +589,7 @@
     });
 
     counters();
+    grow();
   }
 
   function boot() { document.querySelectorAll('[data-vd]').forEach(init); }

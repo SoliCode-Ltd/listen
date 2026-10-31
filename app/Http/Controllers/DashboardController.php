@@ -176,8 +176,10 @@ class DashboardController extends Controller
         // Dub a video, in its own section (App\Support\VideoDubbing).
         $dubStudio = VideoDubbing::openTo($request->user()) ? VideoDubbing::studio($request->user(), $request) : null;
 
-        // Voice Design, in its own section; the voices kept join the studio's voice list.
-        $voiceDesign = VoiceDesign::openTo($request->user()) ? VoiceDesign::studio($request->user(), $activePlan) : null;
+        // Voice Design, in its own section; the voices kept join the studio's voice list. A plan
+        // without it gets the section to try only while a plan with it is on sale.
+        $voiceDesign = VoiceDesign::allows($request->user(), $activePlan) || VoiceDesign::showsUpgrade($request->user(), $activePlan)
+            ? VoiceDesign::studio($request->user(), $activePlan) : null;
         $designedVoices = array_map(fn (array $voice): array => [
             'id' => $voice['id'],
             'name' => (string) $voice['name'],

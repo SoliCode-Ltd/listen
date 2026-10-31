@@ -2,8 +2,9 @@
   Voice Design's studio (App\Support\VoiceDesign::studio()), in the dashboard's own section and
   as a tab of the demo. On one side the description and what shapes it; on the other the stage:
   an orb among characters before a design, then the takes to compare and the one to keep. A plan
-  without Voice Design gets what it does and the way to a plan with it in the form's place, while
-  the stage still plays the voices the admin chose to show. CSS: css/voice-design.css; behaviour:
+  without Voice Design gets the same form to try (writing a description, "Write it for me", picking
+  a character and hearing it on the stage), with the way to a plan that designs in place of the
+  design button. CSS: css/voice-design.css; behaviour:
   js/voice-design.js (which also needs components.orb-script on the page).
 --}}
 @props(['studio'])
@@ -12,11 +13,12 @@
   $arabic = app()->getLocale() === 'ar';
   $examples = $vd['examples'];
   $showcase = $vd['showcase'];
-  $canDesign = $vd['allowed'] || $vd['demo'];
-  // The characters floating around the orb: the voices it plays first, then examples, eight in all.
+  // A plan without Voice Design: everything to try, but its button leads to a plan that designs.
+  $locked = ! $vd['allowed'] && ! $vd['demo'];
+  // The characters floating around the orb: the voices it plays first, then examples, ten in all (eight on phones).
   $cloud = array_slice(collect($showcase)->map(fn (array $v): array => ['name' => $v['name'], 'orb' => $v['orb']])
       ->concat(collect($examples)->map(fn (array $e): array => ['name' => $e['name'], 'orb' => $e['orb']]))
-      ->unique('name')->values()->all(), 0, 8);
+      ->unique('name')->values()->all(), 0, 10);
   $config = [
       'studio' => $vd,
       'csrf' => csrf_token(),
@@ -34,7 +36,8 @@
           'design' => __('voice_design.design_button'),
           'writing' => __('voice_design.writing'),
           'write_for_me' => __('voice_design.write_for_me'),
-          'cost' => __('voice_design.cost', ['credits' => ':credits']),
+          'cost' => __('voice_design.summary_cost_value', ['credits' => ':credits']),
+          'demo_cost' => __('voice_design.summary_demo_cost_value', ['count' => ':count']),
           'takes_count' => [1 => trans_choice('voice_design.takes_count', 1), 2 => trans_choice('voice_design.takes_count', 2), 3 => trans_choice('voice_design.takes_count', 3)],
           'now_speaking' => __('voice_design.now_speaking', ['name' => ':name']),
           'kept' => __('voice_design.kept', ['name' => ':name']),
@@ -63,13 +66,16 @@
       'check' => '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor" opacity=".14"/><path d="M6 10.2 8.6 12.8 14.2 7.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       'sliders' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
       'shield' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l7 2.6v5.2c0 4.4-3 7.9-7 9.2-4-1.3-7-4.8-7-9.2V6.1z"/><path d="M9 12l2 2 4-4"/></svg>',
+      'layers' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 3.5 8.5 12 13l8.5-4.5z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5"/><path d="m3.5 16.5 8.5 4.5 8.5-4.5"/></svg>',
+      'chev' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5.5 6.5 6.5L9 18.5"/></svg>',
+      'info' => '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.2M12 7.8v.1"/></svg>',
+      'lock' => '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2.4"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>',
   ];
 @endphp
-<div class="vd" data-vd @class(['is-demo' => $vd['demo'], 'is-locked' => ! $canDesign])>
+<div class="vd" data-vd @class(['is-demo' => $vd['demo'], 'is-locked' => $locked])>
   <script type="application/json" data-vd-config>@json($config)</script>
 
   <div class="vd-grid">
-    @if($canDesign)
       <form class="vd-card vd-form" data-vd-form novalidate>
         <div class="vd-alert" data-vd-alert role="alert" hidden></div>
 
@@ -95,7 +101,9 @@
               <span class="vd-count" data-vd-description-count dir="ltr">0 / {{ number_format($vd['limits']['description_max']) }}</span>
               <button type="button" class="vd-ghost-btn" data-vd-enhance>{!! $icon['spark'] !!}<span>{{ __('voice_design.write_for_me') }}</span></button>
             </div>
-            <div class="vd-chips" role="group" aria-label="{{ __('voice_design.examples_label') }}">
+            <div class="vd-chips-wrap" data-vd-chips-wrap>
+            <button type="button" class="vd-chips-arrow is-prev" data-vd-chips-step="-1" tabindex="-1" aria-hidden="true" hidden>{!! $icon['chev'] !!}</button>
+            <div class="vd-chips" role="group" aria-label="{{ __('voice_design.examples_label') }}" data-vd-chips>
               <button type="button" class="vd-chip vd-chip-icon" data-vd-shuffle title="{{ __('voice_design.shuffle') }}" aria-label="{{ __('voice_design.shuffle') }}">{!! $icon['shuffle'] !!}</button>
               @foreach($examples as $example)
                 @php $c = \App\Support\Orbs::colors($example['orb']); @endphp
@@ -104,7 +112,10 @@
                 </button>
               @endforeach
             </div>
+            <button type="button" class="vd-chips-arrow is-next" data-vd-chips-step="1" tabindex="-1" aria-hidden="true" hidden>{!! $icon['chev'] !!}</button>
+            </div>
           </div>
+          <p class="vd-hint" data-vd-child-hint hidden>{!! $icon['info'] !!}<span>{{ __('voice_design.child_hint') }}</span></p>
         </div>
 
         {{-- Language and voice. --}}
@@ -158,50 +169,54 @@
             ] as $name => [$label, $low, $high])
               @continue($name === 'variety' && $vd['takes'] < 2)
               <div class="vd-slider">
-                <label for="vd{{ ucfirst($name) }}{{ $vd['demo'] ? 'Demo' : '' }}">{{ $label }}</label>
-                <input type="range" id="vd{{ ucfirst($name) }}{{ $vd['demo'] ? 'Demo' : '' }}" name="{{ $name }}" min="0" max="100" step="1" value="{{ \App\Support\VoiceDesign::SLIDER_MIDDLE }}">
-                <div class="vd-slider-ends" aria-hidden="true"><span>{{ $low }}</span><span>{{ $high }}</span></div>
+                <label class="vd-slider-label" for="vd{{ ucfirst($name) }}{{ $vd['demo'] ? 'Demo' : '' }}">{{ $label }}</label>
+                <span class="vd-slider-end is-low" aria-hidden="true">{{ $low }}</span>
+                <input type="range" id="vd{{ ucfirst($name) }}{{ $vd['demo'] ? 'Demo' : '' }}" name="{{ $name }}" min="0" max="100" step="1" value="{{ \App\Support\VoiceDesign::SLIDER_MIDDLE }}" aria-describedby="vd{{ ucfirst($name) }}Ends{{ $vd['demo'] ? 'Demo' : '' }}">
+                <span class="vd-slider-end is-high" aria-hidden="true">{{ $high }}</span>
+                <span class="vd-sr" id="vd{{ ucfirst($name) }}Ends{{ $vd['demo'] ? 'Demo' : '' }}">{{ $low }} – {{ $high }}</span>
               </div>
             @endforeach
           </div>
         </details>
 
         <div class="vd-actions">
+          @if($locked)
+          <div class="vd-unlock" data-vd-unlock>
+            <div class="vd-unlock-head">
+              <span class="vd-unlock-mark">{!! $icon['lock'] !!}</span>
+              <strong>{{ $vd['upgrade_plan'] ? __('voice_design.locked_title', ['plan' => $vd['upgrade_plan']]) : __('voice_design.locked_title_any') }}</strong>
+            </div>
+            <p>{{ __('voice_design.locked_text') }}</p>
+            <ul class="vd-unlock-points">
+              @foreach((array) __('voice_design.upgrade_points') as $point)
+                <li>{!! $icon['check'] !!}<span>{{ $point }}</span></li>
+              @endforeach
+            </ul>
+          </div>
+          <a class="btn btn-primary vd-design-btn" href="{{ $vd['upgrade_url'] }}" data-vd-upgrade>
+            {!! $icon['spark'] !!}<span>{{ $vd['upgrade_plan'] ? __('voice_design.upgrade_cta', ['plan' => $vd['upgrade_plan']]) : __('voice_design.upgrade_cta_any') }}</span>
+          </a>
+          @else
+          <div class="vd-summary">
+            <dl>
+              <div class="vd-summary-row">
+                <dt><x-credit-icon />{{ $vd['demo'] ? __('voice_design.summary_demo_cost') : __('voice_design.summary_cost') }}</dt>
+                <dd data-vd-cost-value>—</dd>
+              </div>
+              <div class="vd-summary-row">
+                <dt>{!! $icon['layers'] !!}{{ __('voice_design.summary_takes') }}</dt>
+                <dd>{{ __('voice_design.summary_takes_value', ['takes' => trans_choice('voice_design.takes_count', $vd['takes'])]) }}</dd>
+              </div>
+            </dl>
+            <p class="vd-summary-note">{{ $vd['demo'] ? __('voice_design.demo_one_take') : __('voice_design.summary_refund') }}</p>
+          </div>
           <button type="submit" class="btn btn-primary vd-design-btn" data-vd-submit>
-            <span data-vd-submit-label>{{ __('voice_design.design_button') }}</span>
-            <span class="vd-cost" data-vd-cost @if($vd['demo']) hidden @endif><x-credit-icon /><b data-vd-cost-value>—</b></span>
+            {!! $icon['spark'] !!}<span data-vd-submit-label>{{ __('voice_design.design_button') }}</span>
           </button>
-          <p class="vd-cost-hint">
-            @if($vd['demo'])
-              {{ __('voice_design.demo_one_take') }}
-            @else
-              {{ __('voice_design.cost_hint', ['takes' => trans_choice('voice_design.takes_count', $vd['takes'])]) }}
-            @endif
-          </p>
+          @endif
+          <p class="vd-safety">{!! $icon['shield'] !!}<span>{{ __('voice_design.safety_note') }}</span></p>
         </div>
-        <p class="vd-safety">{!! $icon['shield'] !!}<span>{{ __('voice_design.safety_note') }}</span></p>
       </form>
-    @else
-      {{-- A plan without Voice Design: what it does, and the way to a plan with it. --}}
-      <section class="vd-card vd-pitch" aria-labelledby="vdPitchTitle">
-        <span class="vd-pitch-mark">{!! $icon['spark'] !!}</span>
-        <h2 id="vdPitchTitle">{{ __('voice_design.upgrade_title') }}</h2>
-        <p>{{ __('voice_design.upgrade_text') }}</p>
-        <ul class="vd-pitch-points">
-          @foreach((array) __('voice_design.upgrade_points') as $point)
-            <li>{!! $icon['check'] !!}<span>{{ $point }}</span></li>
-          @endforeach
-        </ul>
-        <div class="vd-pitch-examples" aria-hidden="true">
-          @foreach(array_slice($examples, 0, 3) as $example)
-            <figure><figcaption>{{ $example['name'] }}</figcaption><blockquote>{{ \Illuminate\Support\Str::limit($example['description'], 120) }}</blockquote></figure>
-          @endforeach
-        </div>
-        <a class="btn btn-primary vd-pitch-cta" href="{{ $vd['upgrade_url'] }}">
-          {{ $vd['upgrade_plan'] ? __('voice_design.upgrade_cta', ['plan' => $vd['upgrade_plan']]) : __('voice_design.upgrade_cta_any') }}
-        </a>
-      </section>
-    @endif
 
     {{-- The stage. --}}
     <aside class="vd-card vd-stage" data-vd-stage data-vs-cast data-state="idle" aria-live="polite">

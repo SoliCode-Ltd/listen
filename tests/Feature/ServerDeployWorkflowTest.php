@@ -7,8 +7,8 @@ use Tests\TestCase;
 /**
  * The "Server deploy" workflow (.github/workflows/server-deploy.yml) must
  * start: GitHub refuses to run a workflow whose step script that uses
- * ${{ … }} is longer than 21,000 characters, and every support script a
- * mode sends to the server must exist.
+ * ${{ … }} is longer than 21,000 characters once read as an expression, and
+ * every support script a mode sends to the server must exist.
  */
 class ServerDeployWorkflowTest extends TestCase
 {
@@ -21,10 +21,39 @@ class ServerDeployWorkflowTest extends TestCase
         $this->assertNotEmpty($scripts);
         foreach ($scripts as $line => $script) {
             if (str_contains($script, '${{')) {
-                $this->assertLessThan(self::GITHUB_LIMIT, strlen($script),
-                    "The step script at line {$line} is too long for GitHub; move remote work to scripts/support/.");
+                $this->assertLessThan(self::GITHUB_LIMIT, strlen(self::asExpression($script)),
+                    "The step script at line {$line} is too long for GitHub; pass the \${{ }} values in env, or move remote work to scripts/support/.");
             }
         }
+    }
+
+    public function test_the_measure_counts_what_github_counts(): void
+    {
+        // GitHub turned this away at 20,830 characters: as an expression it is longer.
+        $script = str_repeat("echo 'a {b}'\n", 1000).'echo ${{ inputs.mode }}';
+
+        $this->assertSame("format('".str_repeat("echo ''a {{b}}''\n", 1000)."echo {0}', inputs.mode)", self::asExpression($script));
+    }
+
+    /**
+     * A script holding ${{ }} the way GitHub checks its length: one
+     * format('…', …) expression, with every ' { } of the plain text doubled.
+     */
+    private static function asExpression(string $script): string
+    {
+        $parts = preg_split('/\$\{\{(.*?)\}\}/s', $script, -1, PREG_SPLIT_DELIM_CAPTURE);
+        $text = '';
+        $args = '';
+        foreach ($parts as $i => $part) {
+            if ($i % 2 === 0) {
+                $text .= str_replace(["'", '{', '}'], ["''", '{{', '}}'], $part);
+            } else {
+                $text .= '{'.intdiv($i, 2).'}';
+                $args .= ', '.trim($part);
+            }
+        }
+
+        return "format('".$text."'".$args.')';
     }
 
     public function test_every_support_script_a_mode_sends_exists(): void
