@@ -74,7 +74,8 @@ class BusinessStatsService
     {
         $this->driver = DB::connection()->getDriverName();
         $this->now = Carbon::now();
-        $this->since = $this->now->copy()->subMonths($months - 1)->startOfMonth();
+        // The month's start first: from the 29th-31st, going back months first can overflow into the next month.
+        $this->since = $this->now->copy()->startOfMonth()->subMonths($months - 1);
         $this->holders = null;
         $this->cardsByPlan = [];
 

@@ -1332,8 +1332,11 @@
     if (form) form.addEventListener('submit', function () { if (playing) stopPreview(); });
     function choose(value) {
       if (select.value === value) return;
+      choosing = true;
       select.value = value;
       select.dispatchEvent(new Event('change', { bubbles: true }));
+      choosing = false;
+      lastValue = select.value;
       render();
     }
     function card(item) {
@@ -1398,6 +1401,40 @@
       });
       return el;
     }
+    function passes(i) {
+      var q = fold(state.query);
+      if (state.tab === 'all' && i.mine) return false;
+      if (state.tab === 'mine' && !i.mine) return false;
+      if (state.tab === 'favorites' && !favorites[i.value]) return false;
+      if (state.gender && i.gender && i.gender !== state.gender) return false;
+      if (state.gender && !i.gender && !i.mine) return false;
+      if (state.age && i.age !== state.age) return false;
+      return !q || i.key.indexOf(q) !== -1;
+    }
+    // A speaker set by the page rather than by a card (Use in studio on a cloned or designed
+    // voice, Reuse on a past generation, the page opening): its card comes first, in a tab and
+    // filters that show it, scrolled into view, so it is plain who will speak.
+    var choosing = false;
+    var pinned = '';
+    function reveal() {
+      var value = select.value;
+      var item = value ? items().filter(function (i) { return i.value === value; })[0] : null;
+      if (!item) { render(); return; }
+      pinned = value;
+      if (!passes(item)) {
+        state.tab = item.mine ? 'mine' : (state.tab === 'favorites' && favorites[value] ? 'favorites' : 'all');
+      }
+      if (!passes(item)) {
+        state.gender = '';
+        state.age = '';
+        state.query = '';
+        if (search) search.value = '';
+        genders.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.vsLibGender === '' ? 'true' : 'false'); });
+        ages.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.vsLibAge === '' ? 'true' : 'false'); });
+      }
+      render();
+      grid.scrollTop = 0;
+    }
     var lastKey = '';
     function render() {
       var all = items();
@@ -1422,16 +1459,11 @@
         ages.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.vsLibAge === '' ? 'true' : 'false'); });
       }
       tabs.forEach(function (tab) { tab.setAttribute('aria-selected', tab.dataset.vsLibTab === state.tab ? 'true' : 'false'); });
-      var q = fold(state.query);
-      var shown = all.filter(function (i) {
-        if (state.tab === 'all' && i.mine) return false;
-        if (state.tab === 'mine' && !i.mine) return false;
-        if (state.tab === 'favorites' && !favorites[i.value]) return false;
-        if (state.gender && i.gender && i.gender !== state.gender) return false;
-        if (state.gender && !i.gender && !i.mine) return false;
-        if (state.age && i.age !== state.age) return false;
-        return !q || i.key.indexOf(q) !== -1;
-      });
+      var shown = all.filter(passes);
+      // The speaker the page picked (Use in studio, Reuse ...) leads the cards.
+      for (var p = 1; p < shown.length; p++) {
+        if (shown[p].value === pinned) { shown.unshift(shown.splice(p, 1)[0]); break; }
+      }
       var key = JSON.stringify([state, select.value, shown.map(function (i) { return i.value + (favorites[i.value] ? '*' : ''); })]);
       if (key === lastKey) return;
       var focusedValue = grid.contains(document.activeElement) && document.activeElement.closest('.vs-voice') ? document.activeElement.closest('.vs-voice').dataset.value : null;
@@ -1467,7 +1499,11 @@
       search.addEventListener('input', function () { state.query = search.value; render(); });
       search.addEventListener('keydown', function (e) { if (e.key === 'Escape') { search.value = ''; state.query = ''; render(); } });
     }
-    select.addEventListener('change', render);
+    select.addEventListener('change', function () {
+      if (choosing) return;
+      lastValue = select.value;
+      reveal();
+    });
     // The page focuses the speaker field (a speaker chosen on the home page): show that card.
     select.addEventListener('focus', function () {
       var picked = grid.querySelector('.vs-voice.is-selected') || grid.querySelector('.vs-voice');
@@ -1478,8 +1514,8 @@
     }
     // Pages also set the speaker from code (language switch, reuse a generation).
     var lastValue = select.value;
-    setInterval(function () { if (select.value !== lastValue) { lastValue = select.value; render(); } }, 300);
-    render();
+    setInterval(function () { if (select.value !== lastValue) { lastValue = select.value; reveal(); } }, 300);
+    reveal();
   }
 
   function initPanel(panel) {

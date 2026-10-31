@@ -1,5 +1,8 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.dashboard_title'), 'page' => 'dashboard'])
   <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
+  @if(($voiceCloningVisible ?? false) || ($voiceCloningUpgrade ?? false))
+    <link rel="stylesheet" href="{{ asset('css/voice-cloning.css') }}?v={{ filemtime(public_path('css/voice-cloning.css')) }}">
+  @endif
   @if($voiceDesign ?? null)
     <link rel="stylesheet" href="{{ asset('css/voice-design.css') }}?v={{ filemtime(public_path('css/voice-design.css')) }}">
   @endif
@@ -18,594 +21,13 @@
       animation: float 12s ease-in-out infinite;
     }
 
-    /* Custom voice studio */
-    .vc-shell { margin-top: .5rem; min-width: 0; }
-    .vc-intro { margin-bottom: 1.5rem; }
-    .vc-intro p { margin: .55rem 0 0; color: var(--muted); line-height: 1.7; }
-    .vc-meta {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: .85rem 1.1rem;
-      margin-top: 1.15rem;
-    }
-    .vc-count { font-size: .9rem; color: var(--muted); margin: 0; white-space: nowrap; }
-    .vc-count-note { flex-basis: 100%; font-size: .85rem; color: var(--muted); margin: 0; }
-    .vc-reconsent-banner {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: .75rem;
-      padding: .85rem 1rem;
-      margin-bottom: 1rem;
-      border-radius: .8rem;
-      border: 1px solid color-mix(in oklab, var(--a) 32%, var(--line));
-      background: color-mix(in oklab, var(--a) 9%, var(--surface));
-    }
-    .vc-reconsent-banner[hidden] { display: none; }
-    .vc-reconsent-banner strong { display: block; font-size: .95rem; overflow-wrap: anywhere; }
-    .vc-reconsent-banner p { margin: .25rem 0 0; color: var(--muted); font-size: .84rem; }
-    .vc-segmented {
-      display: inline-flex;
-      padding: .2rem;
-      gap: .2rem;
-      border-radius: 999px;
-      border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
-      background: color-mix(in oklab, var(--surface2) 55%, var(--surface));
-    }
-    .vc-segment {
-      border: 0;
-      background: transparent;
-      color: var(--muted);
-      font: inherit;
-      font-weight: 700;
-      font-size: .84rem;
-      padding: .42rem .95rem;
-      min-height: 36px;
-      border-radius: 999px;
-      cursor: pointer;
-    }
-    .vc-segment.active { background: var(--a); color: #fff; }
-    .vc-consent-tips {
-      list-style: none;
-      margin: .85rem 0 0;
-      padding: 0;
-      font-size: .92rem;
-      line-height: 1.7;
-      color: var(--muted);
-      display: grid;
-      gap: .55rem;
-    }
-    .vc-consent-tips li { display: flex; align-items: flex-start; gap: .5rem; }
-    .vc-consent-tips li::before {
-      content: "";
-      width: .42rem;
-      height: .42rem;
-      margin-top: .38rem;
-      border-radius: 99px;
-      flex-shrink: 0;
-      background: var(--a);
-    }
-    .vc-playback {
-      display: none;
-      justify-content: center;
-      width: 100%;
-      margin-top: 1.15rem;
-    }
+    /* Voice cloning's section: public/css/voice-cloning.css. Two of its players' rules stay here, and
+       the studio's voice list flashes the cloned voice just picked. */
     .vc-playback.is-ready { display: flex; flex-wrap: wrap; }
-    .vc-playback[hidden] { display: none !important; }
     .vc-playback .custom-audio-notice:not(:empty) { flex-basis: 100%; text-align: center; }
-    .vc-preview-audio {
-      width: min(100%, 28rem);
-      max-width: 28rem;
-      margin-inline: auto;
-    }
-    .vc-recorder.countdown .vc-timer { color: var(--a); }
-    .vc-tech-detail { margin: -.25rem 0 .7rem; font-size: .76rem; color: var(--muted); }
-    .vc-tech-detail summary { cursor: pointer; font-weight: 700; }
-    .vc-tech-detail code {
-      display: block;
-      margin-top: .35rem;
-      padding: .5rem .6rem;
-      border-radius: .5rem;
-      background: color-mix(in oklab, var(--surface2) 70%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      text-align: left;
-      font-family: var(--font-mono);
-    }
     #voice_key.vc-speaker-picked {
       border-color: color-mix(in oklab, var(--a) 55%, var(--line));
       box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 22%, transparent);
-    }
-    .vc-notice {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem 1.25rem;
-      margin-top: 1rem;
-      padding: 1rem 1.05rem;
-      border-radius: 1rem;
-      text-align: start;
-      background: color-mix(in oklab, var(--surface) 88%, var(--a));
-      border: 1px solid color-mix(in oklab, var(--a) 28%, var(--line));
-      box-shadow: 0 10px 28px color-mix(in oklab, var(--a) 8%, transparent);
-      color: var(--text);
-    }
-    .vc-notice p {
-      margin: 0;
-      flex: 1;
-      min-width: 0;
-      font-size: .98rem;
-      line-height: 1.75;
-      font-weight: 600;
-    }
-    .vc-notice .btn {
-      flex: none;
-      min-height: 42px;
-      padding: .55rem 1rem;
-      white-space: nowrap;
-    }
-    .vc-alert { padding: 1rem 1.15rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: .98rem; line-height: 1.75; display: flex; align-items: flex-start; gap: .6rem; scroll-margin-top: 6.5rem; scroll-margin-bottom: 2rem; }
-    .vc-alert.success { background: color-mix(in oklab, #22c55e 12%, var(--surface)); border: 1px solid color-mix(in oklab, #22c55e 30%, var(--line)); color: #16a34a; }
-    .vc-alert.error { background: color-mix(in oklab, #ef4444 12%, var(--surface)); border: 1px solid color-mix(in oklab, #ef4444 30%, var(--line)); color: #dc2626; }
-    .vc-disabled-banner {
-      padding: 1.4rem;
-      border-radius: 1rem;
-      border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
-      background: color-mix(in oklab, var(--surface) 70%, transparent);
-      text-align: center;
-      margin-bottom: 1rem;
-    }
-    .vc-upgrade {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 100%;
-      margin: .35rem 0 0;
-      padding: 1.7rem 1.4rem 1.5rem;
-      border-radius: 1.25rem;
-      text-align: center;
-      border: 1px solid color-mix(in oklab, var(--a) 30%, var(--line));
-      background: var(--surface);
-      box-shadow: 0 16px 36px -24px color-mix(in oklab, var(--a) 30%, transparent);
-    }
-    .vc-upgrade-mark {
-      width: 3.4rem;
-      height: 3.4rem;
-      border-radius: 1rem;
-      display: grid;
-      place-items: center;
-      color: var(--a);
-      background: color-mix(in oklab, var(--a) 12%, var(--surface2));
-      border: 1px solid color-mix(in oklab, var(--a) 26%, transparent);
-    }
-    .vc-upgrade-mark svg {
-      width: 2rem;
-      height: 2rem;
-      display: block;
-    }
-    .vc-upgrade h2 {
-      margin: 1rem 0 .4rem;
-      max-width: 24rem;
-      font-size: clamp(1.2rem, 2.2vw, 1.45rem);
-      line-height: 1.35;
-    }
-    html[dir="rtl"] .vc-upgrade h2 {
-      line-height: 1.6;
-    }
-    .vc-upgrade > p {
-      margin: 0;
-      max-width: 38rem;
-      color: var(--muted);
-      font-size: 1rem;
-      line-height: 1.7;
-    }
-    html[dir="rtl"] .vc-upgrade > p {
-      font-size: 1.02rem;
-      line-height: 1.9;
-    }
-    .vc-upgrade .features-list {
-      list-style: none;
-      width: min(100%, 32rem);
-      margin: 1.15rem 0 0;
-      padding: .9rem 1rem;
-      display: grid;
-      gap: .7rem;
-      text-align: start;
-      border-radius: .9rem;
-      background: color-mix(in oklab, var(--surface2) 88%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
-    }
-    .vc-upgrade .features-list li {
-      display: flex;
-      align-items: flex-start;
-      gap: .65rem;
-      margin: 0;
-      font-size: .98rem;
-      line-height: 1.55;
-    }
-    html[dir="rtl"] .vc-upgrade .features-list li {
-      font-size: 1rem;
-      line-height: 1.8;
-    }
-    .vc-upgrade .features-list svg {
-      width: 1.15rem;
-      height: 1.15rem;
-      flex: none;
-      margin-top: .15rem;
-      color: var(--a);
-    }
-    .vc-upgrade .btn {
-      margin-top: 1.2rem;
-      min-height: 48px;
-      min-width: 11.5rem;
-      padding-inline: 1.45rem;
-    }
-    .vc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .85rem; margin-bottom: 1rem; }
-    .vc-card {
-      border-radius: 1rem;
-      border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
-      background: color-mix(in oklab, var(--surface) 72%, transparent);
-      padding: 1rem;
-      scroll-margin-top: 7rem;
-      transition: box-shadow .28s ease, border-color .28s ease;
-    }
-    .vc-card.vc-card-highlight {
-      border-color: color-mix(in oklab, var(--a) 55%, var(--line));
-      box-shadow: 0 0 0 2px color-mix(in oklab, var(--a) 24%, transparent);
-    }
-    .vc-card-header { display: flex; justify-content: space-between; gap: .5rem; align-items: flex-start; margin-bottom: .7rem; flex-wrap: wrap; }
-    .vc-card-name { margin: 0; font-size: 1rem; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
-    .vc-card-meta { font-size: .84rem; color: var(--muted); display: grid; gap: .2rem; margin-bottom: .7rem; }
-    .vc-status { display: inline-flex; align-items: center; gap: .35rem; padding: .16rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 700; border: 1px solid transparent; }
-    .vc-status.ready { color: #16a34a; background: color-mix(in oklab, #22c55e 14%, var(--surface)); border-color: color-mix(in oklab, #22c55e 28%, var(--line)); }
-    .vc-status.processing, .vc-status.pending, .vc-status.validating { color: var(--a); background: color-mix(in oklab, var(--a) 14%, var(--surface)); border-color: color-mix(in oklab, var(--a) 28%, var(--line)); }
-    .vc-status.failed { color: #dc2626; background: color-mix(in oklab, #ef4444 14%, var(--surface)); border-color: color-mix(in oklab, #ef4444 28%, var(--line)); }
-    .vc-status .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse-dot 1.4s ease-in-out infinite; }
-    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.35} }
-    .vc-card-actions { display: flex; flex-wrap: wrap; gap: .45rem; }
-    .vc-card-actions .btn { font-size: .82rem; padding: .38rem .72rem; }
-    .vc-progress { margin: .45rem 0 .7rem; }
-    .vc-progress.is-hidden { display: none; }
-    .vc-progress-track {
-      width: 100%;
-      height: 8px;
-      border-radius: 999px;
-      background: color-mix(in oklab, var(--line) 55%, transparent);
-      overflow: hidden;
-      border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
-    }
-    .vc-progress-fill {
-      height: 100%;
-      width: 0%;
-      border-radius: 999px;
-      background: linear-gradient(90deg, var(--a), var(--b));
-      transition: width .35s ease;
-    }
-    .vc-progress-meta {
-      margin-top: .38rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: .5rem;
-      font-size: .78rem;
-      color: var(--muted);
-      font-weight: 600;
-    }
-    .vc-progress-delay {
-      margin-top: .35rem;
-      font-size: .76rem;
-      color: color-mix(in oklab, #d97706 82%, var(--text));
-      display: none;
-    }
-    .vc-progress.is-delayed .vc-progress-delay { display: block; }
-    .vc-empty {
-      text-align: center;
-      border-radius: 1rem;
-      border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
-      background: color-mix(in oklab, var(--surface) 72%, transparent);
-      padding: 2rem 1.6rem;
-      margin: .4rem 0 1.5rem;
-    }
-    .vc-empty h3 { margin: 0 0 .55rem; }
-    .vc-empty p { margin: 0 auto 1.15rem; max-width: 38rem; color: var(--muted); line-height: 1.75; }
-    .vc-create-panel {
-      border-radius: 1rem;
-      border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
-      background: color-mix(in oklab, var(--surface) 72%, transparent);
-      padding: 1.4rem 1.45rem 1.5rem;
-      margin-top: 1.5rem;
-    }
-    .vc-create-panel h2 { margin: 0 0 .9rem; font-size: 1.08rem; }
-    .vc-form-group { margin-bottom: 1.2rem; }
-    .vc-form-group label { display: block; margin-bottom: .35rem; font-size: .88rem; font-weight: 700; }
-    .vc-tabs { display: flex; gap: .45rem; margin-bottom: .8rem; }
-    .vc-tab { border: 1px solid var(--line); border-radius: var(--radius); padding: .5rem .95rem; background: var(--surface); color: var(--muted); font-weight: 700; font-size: .82rem; cursor: pointer; }
-    .vc-tab.active { color: var(--text); border-color: color-mix(in oklab, var(--a) 40%, var(--line)); background: color-mix(in oklab, var(--a) 10%, var(--surface)); }
-    .vc-upload-zone {
-      border: 2px dashed color-mix(in oklab, var(--line) 80%, transparent);
-      border-radius: .9rem;
-      padding: 1.1rem;
-      text-align: center;
-      cursor: pointer;
-      position: relative;
-      transition: border-color .2s, background .2s;
-    }
-    .vc-upload-zone.dragover,
-    .vc-upload-zone:hover { border-color: var(--a); background: color-mix(in oklab, var(--a) 6%, var(--surface)); }
-    .vc-upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-    .vc-upload-zone p { margin: 0; color: var(--muted); font-size: .86rem; }
-    .vc-upload-zone .formats { margin-top: .35rem; font-size: .8rem; opacity: .8; }
-    .vc-file-info {
-      margin-top: .65rem;
-      border-radius: .7rem;
-      border: 1px solid color-mix(in oklab, var(--a) 28%, var(--line));
-      background: color-mix(in oklab, var(--a) 8%, var(--surface));
-      padding: .65rem .8rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: .6rem;
-      font-size: .85rem;
-    }
-    .vc-file-info span:first-child { min-width: 0; overflow-wrap: anywhere; }
-    .vc-file-info .remove { cursor: pointer; font: inherit; font-weight: 700; line-height: 1; color: var(--muted); flex-shrink: 0; background: none; border: 0; padding: 0 .2rem; }
-    .vc-file-info .remove:hover { color: #dc2626; }
-    .vc-file-info .remove:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; border-radius: 4px; }
-    .vc-recorder { text-align: center; border: 1px solid color-mix(in oklab, var(--line) 60%, transparent); border-radius: .9rem; padding: 1rem; background: color-mix(in oklab, var(--surface) 78%, transparent); }
-    .vc-recorder .rec-btn { width: 68px; height: 68px; border-radius: 999px; border: 3px solid var(--line); background: var(--surface); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; }
-    .vc-recorder .rec-btn:hover { border-color: var(--a); }
-    .vc-recorder .rec-btn.recording { border-color: #ef4444; box-shadow: 0 0 0 10px rgba(239,68,68,.14); }
-    .vc-recorder .rec-btn .inner { width: 24px; height: 24px; border-radius: 999px; background: #ef4444; transition: all .2s; }
-    .vc-recorder .rec-btn.recording .inner { border-radius: 4px; width: 20px; height: 20px; }
-    .vc-timer { margin: .7rem 0 .25rem; font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-    .vc-recorder .hint { margin: 0; color: var(--muted); font-size: .84rem; }
-    .vc-recorder .rec-actions { margin-top: .7rem; display: flex; justify-content: center; gap: .4rem; }
-    .vc-guidelines { border-radius: .8rem; border: 1px solid color-mix(in oklab, var(--a) 26%, var(--line)); background: color-mix(in oklab, var(--a) 7%, var(--surface)); padding: 1.05rem 1.15rem; margin-bottom: 1.25rem; }
-    .vc-guidelines h4 { margin: 0 0 .65rem; font-size: .92rem; color: var(--a); }
-    .vc-guidelines ul { list-style: none; margin: 0; padding: 0; font-size: .92rem; line-height: 1.7; color: var(--muted); display: grid; gap: .55rem; }
-    .vc-guidelines li { display: flex; align-items: flex-start; gap: .5rem; }
-    .vc-guidelines li::before {
-      content: "";
-      width: .42rem;
-      height: .42rem;
-      /* Centred on the first line of the tip, whatever the font size. */
-      margin-top: .6em;
-      margin-top: calc(.5lh - .21rem);
-      border-radius: 99px;
-      flex-shrink: 0;
-      background: var(--a);
-    }
-    .vc-consent { margin-top: 1rem; margin-bottom: .95rem; border-radius: .8rem; border: 1px solid color-mix(in oklab, var(--line) 70%, transparent); background: color-mix(in oklab, var(--surface2) 55%, var(--surface)); padding: .75rem .85rem; display: flex; align-items: flex-start; gap: .6rem; }
-    .vc-consent input[type=checkbox] { margin-top: .1rem; width: 18px; height: 18px; accent-color: var(--a); }
-    .vc-consent label { margin: 0; font-size: .85rem; line-height: 1.45; color: var(--text); min-width: 0; }
-    .vc-privacy { display: flex; align-items: flex-start; gap: .4rem; color: var(--muted); font-size: .8rem; margin-bottom: .95rem; }
-    .vc-privacy svg { width: 14px; height: 14px; margin-top: .1rem; opacity: .7; flex-shrink: 0; }
-    .vc-preview-pill {
-      display: inline-flex;
-      align-items: center;
-      margin-top: 0;
-      padding: .22rem .65rem;
-      border-radius: 999px;
-      font-size: .75rem;
-      font-weight: 700;
-      letter-spacing: .01em;
-      color: var(--a);
-      border: 1px solid color-mix(in oklab, var(--a) 32%, var(--line));
-      background: color-mix(in oklab, var(--a) 10%, var(--surface));
-    }
-    .vc-field-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 1.15rem; }
-    .vc-form-group input[type="text"],
-    .vc-form-group select,
-    .vc-language-value {
-      width: 100%;
-      border-radius: .8rem;
-      border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
-      background: color-mix(in oklab, var(--surface) 88%, transparent);
-      color: var(--text);
-      padding: .72rem .85rem;
-      font: inherit;
-      line-height: 1.45;
-    }
-    .vc-form-group input[type="text"]:focus,
-    .vc-form-group select:focus {
-      outline: none;
-      border-color: color-mix(in oklab, var(--a) 55%, var(--line));
-      box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent);
-    }
-    .vc-form-group .hint { margin: .35rem 0 0; color: var(--muted); font-size: .78rem; font-weight: 500; }
-    .vc-steps { display: flex; gap: .75rem; margin: 0 0 1.25rem; }
-    .vc-step {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      gap: .55rem;
-      border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
-      background: transparent;
-      color: var(--muted);
-      border-radius: .9rem;
-      padding: .55rem .7rem;
-      font-weight: 700;
-      font-size: .86rem;
-      cursor: pointer;
-      text-align: start;
-    }
-    .vc-step.active,
-    .vc-step.done {
-      color: var(--text);
-      border-color: color-mix(in oklab, var(--a) 46%, var(--line));
-      background: color-mix(in oklab, var(--a) 10%, var(--surface));
-    }
-    .vc-step.done .vc-step-index {
-      background: #16a34a;
-      color: #fff;
-    }
-    .vc-step-index {
-      width: 1.55rem;
-      height: 1.55rem;
-      border-radius: 999px;
-      display: grid;
-      place-items: center;
-      flex-shrink: 0;
-      background: color-mix(in oklab, var(--a) 16%, var(--surface));
-      color: var(--a);
-      font-size: .78rem;
-    }
-    .vc-step-panel[hidden] { display: none !important; }
-    .vc-script {
-      border-radius: 1rem;
-      padding: 1rem 1.05rem 1.05rem;
-      margin-bottom: .9rem;
-      background: color-mix(in oklab, var(--a) 6%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--a) 28%, var(--line));
-    }
-    .vc-script-toolbar { display: flex; justify-content: space-between; align-items: center; gap: .6rem; }
-    .vc-script h3 { margin: 0; font-size: .92rem; }
-    .vc-script p { margin: .55rem 0 0; font-size: 1.08rem; line-height: 1.75; font-weight: 650; }
-    #vcConsentScript {
-      padding: .15rem 0 .1rem;
-      letter-spacing: -.01em;
-    }
-    #vcConsentScript[dir="rtl"] {
-      font-family: var(--font-body-ar);
-      font-size: 1.28rem;
-      line-height: 2.05;
-    }
-    html[dir="rtl"] .vc-shell {
-      line-height: 1.8;
-    }
-    html[dir="rtl"] .vc-intro p,
-    html[dir="rtl"] .vc-empty p,
-    html[dir="rtl"] .vc-guidelines li,
-    html[dir="rtl"] .vc-consent-tips li,
-    html[dir="rtl"] .vc-notice p,
-    html[dir="rtl"] .vc-alert,
-    html[dir="rtl"] .vc-form-group label,
-    html[dir="rtl"] .vc-form-group .hint,
-    html[dir="rtl"] .vc-card-meta,
-    html[dir="rtl"] .vc-consent label,
-    html[dir="rtl"] .vc-recorder .hint {
-      font-size: 1rem;
-      line-height: 1.85;
-    }
-    .vc-script .hint { margin: .55rem 0 0; color: var(--muted); font-size: .8rem; }
-    .vc-or {
-      display: flex;
-      align-items: center;
-      gap: .7rem;
-      margin: .85rem 0 .15rem;
-      color: var(--muted);
-      font-size: .75rem;
-      font-weight: 700;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-    }
-    .vc-or::before,
-    .vc-or::after {
-      content: "";
-      flex: 1;
-      height: 1px;
-      background: color-mix(in oklab, var(--line) 80%, transparent);
-    }
-    html[dir="rtl"] .vc-or {
-      letter-spacing: 0;
-      text-transform: none;
-      font-size: .84rem;
-    }
-    .vc-copy {
-      border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
-      background: var(--surface);
-      color: var(--text);
-      border-radius: 999px;
-      padding: .28rem .7rem;
-      font-size: .75rem;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    .vc-range { margin-top: .45rem; font-size: .8rem; font-weight: 700; color: var(--muted); }
-    .vc-range.ok { color: #16a34a; }
-    .vc-range.bad { color: #dc2626; }
-    .vc-actions-row { display: flex; gap: .5rem; }
-    .vc-actions-row .btn { flex: 1; }
-    .vc-consent-block { margin-top: .2rem; }
-    .vc-bars { display: none; height: 18px; align-items: flex-end; justify-content: center; gap: 3px; margin-top: .45rem; }
-    .vc-recorder.live .vc-bars { display: flex; }
-    .vc-bars span {
-      width: 3px;
-      height: 6px;
-      border-radius: 99px;
-      background: var(--a);
-      animation: vc-bar .9s ease-in-out infinite;
-    }
-    .vc-bars span:nth-child(2) { animation-delay: .12s; }
-    .vc-bars span:nth-child(3) { animation-delay: .24s; }
-    .vc-bars span:nth-child(4) { animation-delay: .08s; }
-    .vc-bars span:nth-child(5) { animation-delay: .2s; }
-    @keyframes vc-bar {
-      0%, 100% { height: 5px; opacity: .45; }
-      50% { height: 16px; opacity: 1; }
-    }
-    @media (max-width: 720px) {
-      .vc-field-grid,
-      .vc-actions-row {
-        grid-template-columns: 1fr;
-        flex-direction: column;
-      }
-      .vc-steps { flex-direction: row; }
-      .vc-tab,
-      .vc-step { flex: 1 1 0; min-height: 44px; }
-      .vc-create-panel,
-      .vc-empty,
-      .vc-disabled-banner,
-      .vc-card {
-        padding: .9rem;
-      }
-      .vc-upgrade {
-        padding: 1.25rem 1rem 1.15rem;
-      }
-      .vc-tabs,
-      .vc-script-toolbar,
-      .vc-card-actions,
-      .vc-actions-row,
-      .vc-meta {
-        flex-wrap: wrap;
-      }
-      .vc-notice {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      .vc-actions-row .btn,
-      .vc-card-actions .btn,
-      .vc-upgrade .btn,
-      .vc-notice .btn,
-      #vcNextStep,
-      #vcEmptyState .btn {
-        width: 100%;
-        min-height: 44px;
-      }
-      .vc-script-toolbar { align-items: flex-start; }
-      .vc-copy { min-height: 36px; }
-      #vcConsentScript,
-      #vcConsentScript[dir="rtl"] {
-        font-size: 1rem;
-        line-height: 1.7;
-      }
-      .vc-grid { grid-template-columns: minmax(0, 1fr); }
-      .vc-upload-zone p,
-      .vc-guidelines li,
-      .vc-consent label,
-      .vc-privacy,
-      .vc-intro p,
-      .vc-notice {
-        overflow-wrap: anywhere;
-      }
-    }
-    @media (max-width: 420px) {
-      .vc-step { font-size: .8rem; padding: .5rem .6rem; }
-      .vc-recorder { padding: .85rem .6rem; }
-      .vc-shell h1 { font-size: 1.35rem; }
     }
     .bg-orb.a {
       width: 22rem;
@@ -2225,16 +1647,19 @@
       flex: 1 1 auto;
       min-width: 0;
       width: auto;
-      height: 40px;
+      /* No fixed height: with one, Chrome cuts Arabic letters below the line and marks above it. */
+      height: auto;
       min-height: 40px;
       margin: 0;
-      padding: 0 .8rem;
+      padding: .15rem .8rem;
       border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
       border-radius: 10px;
       background: var(--surface);
       color: var(--text);
       font: inherit;
       font-size: .92rem;
+      /* Tall enough that Arabic letters below the line and marks above it are not clipped. */
+      line-height: 2;
       box-shadow: none;
     }
     #generateVoiceSection .vs-name-row input:focus { outline: none; border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent); }
@@ -2957,21 +2382,20 @@
     @endphp
     <section id="voiceCloningSection" class="dashboard-panel" data-dashboard-section>
       <article class="page-card reveal vc-shell">
-        <div class="vc-intro">
-          <h1><span class="grad-text">{{ __('ui.voice_cloning.page_title') }}</span></h1>
-          <p>{{ __('ui.voice_cloning.page_subtitle') }}</p>
-          @if(($voiceCloningVisible ?? false) || $vcStudioOpen)
-          <div class="vc-meta">
-            @if(($voiceCloningVisible ?? false) && \App\Support\VoiceCloningAccess::isPreviewOnly())
-            <span class="vc-preview-pill">{{ __('ui.voice_cloning.preview_badge') }}</span>
-            @endif
+        <header class="vc-intro">
+          <div class="vc-intro-text">
+            <h1><span class="grad-text">{{ __('ui.voice_cloning.page_title') }}</span></h1>
+            <p>{{ __('ui.voice_cloning.page_subtitle') }}</p>
             @if($vcStudioOpen)
-            <div class="vc-count">{{ __('ui.voice_cloning.voice_count', ['count' => $voiceCloningCount, 'max' => $voiceCloningMaxVoices]) }}</div>
             <p class="vc-count-note" id="vcDeletedNote" aria-live="polite" @if(($voiceCloningDeletedNote ?? '') === '') hidden @endif>{{ $voiceCloningDeletedNote ?? '' }}</p>
             @endif
           </div>
+          @if($vcStudioOpen)
+          <div class="vc-meta">
+            <div class="vc-count">{{ trans_choice('ui.voice_cloning.voices_left', $voiceCloningMaxVoices, ['left' => max(0, $voiceCloningMaxVoices - $voiceCloningCount), 'max' => $voiceCloningMaxVoices]) }}</div>
+          </div>
           @endif
-        </div>
+        </header>
 
         @if($voiceCloningUpgrade ?? false)
           <section class="vc-upgrade" aria-labelledby="vcUpgradeTitle">
@@ -3014,7 +2438,227 @@
             </section>
           @endif
 
-          <h2 id="vcVoicesTitle" style="font-size:1.05rem;margin-bottom:.75rem;{{ ($voiceCloningList?->count() ?? 0) > 0 ? '' : 'display:none;' }}">{{ __('ui.voice_cloning.your_voices_title') }}</h2>
+
+          @if($vcStudioOpen)
+            {{-- The studio: the form beside a stage whose orb listens while either recorder records. --}}
+            <section class="vc-create-panel" id="vcCreatePanel" @if(! $vcCanCreate) style="display:none" @endif>
+              <div class="vc-form-card">
+                <h2 id="vcCreateTitle">{{ __('ui.voice_cloning.create_title') }}</h2>
+
+                <div class="vc-reconsent-banner" id="vcReconsentBanner" hidden>
+                  <div>
+                    <strong id="vcReconsentTitle"></strong>
+                    <p>{{ __('ui.voice_cloning.replace_consent_hint') }}</p>
+                  </div>
+                  <button type="button" class="btn btn-ghost" id="vcReconsentCancel">{{ __('ui.voice_cloning.cancel') }}</button>
+                </div>
+
+
+                <div class="vc-steps" role="tablist">
+                  <button type="button" class="vc-step active" id="vcStepSample" data-vc-step="1">
+                    <span class="vc-step-index">1</span>
+                    <span>{{ __('ui.voice_cloning.step_sample') }}</span>
+                  </button>
+                  <button type="button" class="vc-step" id="vcStepConsent" data-vc-step="2">
+                    <span class="vc-step-index">2</span>
+                    <span>{{ __('ui.voice_cloning.step_consent') }}</span>
+                  </button>
+                </div>
+
+                <form id="vcCreateForm" enctype="multipart/form-data" novalidate>
+                  @csrf
+                  <input type="hidden" name="source_type" id="vcSourceType" value="upload">
+                  <input type="hidden" name="audio_duration" id="vcAudioDuration" value="0">
+                  <input type="hidden" name="consent_duration" id="vcConsentDuration" value="0">
+
+                  <div class="vc-step-panel" data-vc-step-panel="1">
+                    <div class="vc-field-grid">
+                      <div class="vc-form-group">
+                        <label for="vcName">{{ __('ui.voice_cloning.voice_name_label') }}</label>
+                        <input type="text" id="vcName" name="name" minlength="2" maxlength="50" placeholder="{{ __('ui.voice_cloning.voice_name_placeholder') }}">
+                      </div>
+                      <div class="vc-form-group">
+                        <label id="vcLanguageLabel">{{ __('ui.voice_cloning.language_label') }}</label>
+                        <div class="vc-language-value" role="text" aria-labelledby="vcLanguageLabel">{{ app()->getLocale() === 'ar' ? __('ui.voice_cloning.language_ar') : __('ui.voice_cloning.language_en') }}</div>
+                        <input type="hidden" name="language_code" id="vcLanguage" value="{{ app()->getLocale() === 'ar' ? 'ar-XA' : 'en-US' }}">
+                      </div>
+                    </div>
+
+                    <div class="vc-tabs">
+                      <button type="button" class="vc-tab active" data-tab="upload">{{ __('ui.voice_cloning.upload_tab') }}</button>
+                      <button type="button" class="vc-tab" data-tab="recording">{{ __('ui.voice_cloning.record_tab') }}</button>
+                    </div>
+
+                    <div class="vc-tab-panel" id="vcUploadPanel">
+                      <div class="vc-upload-zone" id="vcUploadZone">
+                        <input type="file" name="audio_file" id="vcFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*" aria-label="{{ __('ui.voice_cloning.upload_label') }}">
+                        <svg class="vc-upload-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5V4.5M7.5 9 12 4.5 16.5 9"/><path d="M4.5 14.5v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
+                        <p>{{ __('ui.voice_cloning.upload_hint') }}</p>
+                        <p class="formats">{{ __('ui.voice_cloning.upload_formats') }} &middot; {{ __('ui.voice_cloning.upload_max_size', ['size' => $voiceCloningMaxUploadMb]) }}</p>
+                      </div>
+                      <div class="vc-file-info" id="vcFileInfo" style="display:none">
+                        <span id="vcFileName"></span>
+                        <button type="button" class="remove" id="vcFileRemove" aria-label="{{ __('ui.voice_cloning.remove_file') }}">&times;</button>
+                      </div>
+                      <p class="vc-range" id="vcSampleRange">{{ __('ui.voice_cloning.duration_range', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
+                    </div>
+
+                    <div class="vc-tab-panel" id="vcRecordPanel" style="display:none">
+                      <div class="vc-recorder" id="vcRecorder">
+                        <button type="button" class="rec-btn" id="vcRecBtn" aria-label="{{ __('ui.voice_cloning.record_start') }}">
+                          <span class="inner"></span>
+                        </button>
+                        <div class="vc-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+                        <div class="vc-timer" id="vcTimer">00:00</div>
+                        <p class="hint" id="vcRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
+                        <p class="hint vc-hint-note">{{ __('ui.voice_cloning.min_duration_note', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
+                        <div class="vc-playback" id="vcRecPlayback" hidden>
+                          <audio class="vc-preview-audio" id="vcRecPreview" controls preload="none" hidden aria-label="{{ __('ui.voice_cloning.listen_back') }}"></audio>
+                        </div>
+                        <div class="rec-actions" id="vcRecActions" style="display:none">
+                          <button type="button" class="btn btn-ghost" id="vcRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button type="button" class="btn btn-primary vc-next-btn" id="vcNextStep">{{ __('ui.voice_cloning.next_step') }}</button>
+                  </div>
+
+                  <div class="vc-step-panel" data-vc-step-panel="2" hidden>
+                    @php
+                      $vcConsentLocale = app()->getLocale() === 'ar' ? 'ar-XA' : 'en-US';
+                      $vcConsentText = $voiceCloningConsentScripts[$vcConsentLocale] ?? '';
+                    @endphp
+                    <div class="vc-form-group vc-consent-language">
+                      <label for="vcConsentLanguage">{{ __('ui.voice_cloning.consent_language_label') }}</label>
+                      <div class="vc-segmented" role="radiogroup" aria-label="{{ __('ui.voice_cloning.consent_language_label') }}">
+                        @if($vcConsentLocale === 'ar-XA')
+                          <button type="button" class="vc-segment active" data-consent-lang="ar-XA" role="radio" aria-checked="true">العربية</button>
+                        @else
+                          <button type="button" class="vc-segment active" data-consent-lang="en-US" role="radio" aria-checked="true">English</button>
+                        @endif
+                      </div>
+                      <input type="hidden" name="consent_language" id="vcConsentLanguage" value="{{ $vcConsentLocale }}">
+                      <p class="hint">{{ __('ui.voice_cloning.consent_language_hint') }}</p>
+                    </div>
+
+                    <div class="vc-script">
+                      <div class="vc-script-toolbar">
+                        <h3>{{ __('ui.voice_cloning.consent_title') }}</h3>
+                        <button type="button" class="vc-copy" id="vcCopyConsent">{{ __('ui.voice_cloning.consent_copy') }}</button>
+                      </div>
+                      <p id="vcConsentScript" dir="{{ $vcConsentLocale === 'ar-XA' ? 'rtl' : 'ltr' }}">{{ $vcConsentText }}</p>
+                      <p class="hint">{{ __('ui.voice_cloning.consent_script_hint') }}</p>
+                      <ul class="vc-consent-tips">
+                        <li>{{ __('ui.voice_cloning.consent_tip_1') }}</li>
+                        <li>{{ __('ui.voice_cloning.consent_tip_latin') }}</li>
+                        <li>{{ __('ui.voice_cloning.consent_tip_2') }}</li>
+                        <li>{{ __('ui.voice_cloning.consent_tip_3') }}</li>
+                      </ul>
+                    </div>
+
+                    <div class="vc-consent-block">
+                      <label>{{ __('ui.voice_cloning.consent_record_label') }}</label>
+                      <div class="vc-recorder" id="vcConsentRecorder">
+                        <button type="button" class="rec-btn" id="vcConsentRecBtn" aria-label="{{ __('ui.voice_cloning.consent_record_label') }}">
+                          <span class="inner"></span>
+                        </button>
+                        <div class="vc-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+                        <div class="vc-timer" id="vcConsentTimer">00:00</div>
+                        <p class="hint" id="vcConsentRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
+                        <div class="vc-playback" id="vcConsentPlayback" hidden>
+                          <audio class="vc-preview-audio" id="vcConsentPreview" controls preload="none" hidden aria-label="{{ __('ui.voice_cloning.listen_back') }}"></audio>
+                        </div>
+                        <div class="rec-actions" id="vcConsentRecActions" style="display:none">
+                          <button type="button" class="btn btn-ghost" id="vcConsentRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p class="vc-or">{{ __('ui.voice_cloning.consent_or') }}</p>
+                    <div class="vc-form-group">
+                      <label for="vcConsentFileInput">{{ __('ui.voice_cloning.consent_upload_label') }}</label>
+                      <div class="vc-upload-zone" id="vcConsentUploadZone">
+                        <input type="file" name="consent_audio" id="vcConsentFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*">
+                        <svg class="vc-upload-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5V4.5M7.5 9 12 4.5 16.5 9"/><path d="M4.5 14.5v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
+                        <p>{{ __('ui.voice_cloning.upload_hint') }}</p>
+                      </div>
+                      <div class="vc-file-info" id="vcConsentFileInfo" style="display:none">
+                        <span id="vcConsentFileName"></span>
+                        <button type="button" class="remove" id="vcConsentFileRemove" aria-label="{{ __('ui.voice_cloning.remove_file') }}">&times;</button>
+                      </div>
+                    </div>
+
+                    <div class="vc-consent">
+                      <input type="checkbox" id="vcConsent" name="consent_confirmed" value="1" required>
+                      <label for="vcConsent">{{ __('ui.voice_cloning.consent_label') }}</label>
+                    </div>
+
+                    <div class="vc-privacy">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      {{ __('ui.voice_cloning.privacy_note') }}
+                    </div>
+
+                    <div class="vc-actions-row">
+                      <button type="button" class="btn btn-ghost" id="vcBackStep">{{ __('ui.voice_cloning.back_step') }}</button>
+                      <button type="submit" class="btn btn-primary" id="vcSubmitBtn">
+                        <span id="vcSubmitText">{{ __('ui.voice_cloning.submit_button') }}</span>
+                        <span id="vcSubmitLoading" style="display:none">{{ __('ui.voice_cloning.submitting') }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              @php
+                // A cloned voice saying what it is, in the page's language (scripts/support/voice_cloning_examples.php),
+                // played by the orb's button once its clip exists.
+                $vcExampleLanguage = app()->getLocale() === 'ar' ? 'ar' : 'en';
+                $vcExample = is_file(public_path('audio/voice-cloning/examples/'.$vcExampleLanguage.'.mp3'))
+                    ? ['name' => __('ui.voice_cloning.example_name'), 'url' => \App\Support\VersionedAsset::url('audio/voice-cloning/examples/'.$vcExampleLanguage.'.mp3')]
+                    : null;
+              @endphp
+              <aside class="vc-stage" data-vc-stage data-vs-cast>
+                <div class="vc-stage-art">
+                  <div class="vc-stage-orb-wrap">
+                    <x-orb name="creator" class="vc-stage-orb is-live" />
+                    @if($vcExample)
+                      <button type="button" class="vc-orb-play" data-vc-example="{{ $vcExample['url'] }}" data-vc-example-name="{{ $vcExample['name'] }}" aria-pressed="false" aria-label="{{ __('ui.voice_cloning.examples_play') }}">
+                        <span class="vc-play-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg></span>
+                        <span class="vc-pause-icon" aria-hidden="true"><i></i><i></i></span>
+                      </button>
+                    @endif
+                  </div>
+                </div>
+                <p class="vc-stage-state">
+                  <span class="is-idle">{{ __('ui.voice_cloning.stage_idle', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</span>
+                  <span class="is-consent">{{ __('ui.voice_cloning.stage_consent') }}</span>
+                  <span class="is-recording">{{ __('ui.voice_cloning.stage_recording') }}</span>
+                  @if($vcExample)
+                    <span class="is-playing" data-vc-example-now data-template="{{ __('ui.voice_cloning.example_playing', ['name' => ':name']) }}"></span>
+                  @endif
+                </p>
+                <div class="vc-guidelines" id="vcGuidelines">
+                  <h4>{{ __('ui.voice_cloning.guidelines_title') }}</h4>
+                  <ul>
+                    <li>{{ __('ui.voice_cloning.guideline_1', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</li>
+                    <li>{{ __('ui.voice_cloning.guideline_2') }}</li>
+                    <li>{{ __('ui.voice_cloning.guideline_3') }}</li>
+                    <li>{{ __('ui.voice_cloning.guideline_4') }}</li>
+                    <li>{{ __('ui.voice_cloning.guideline_5') }}</li>
+                  </ul>
+                </div>
+
+              </aside>
+            </section>
+            <div class="vc-notice" id="vcLimitNotice" @if(! $vcAtLimit) style="display:none" @endif>
+              <p>{{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}</p>
+              <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.voice_cloning.upgrade_cta') }}</a>
+            </div><!-- /vcLimitNotice -->
+          @endif
+
+          {{-- The voices made: each ready in the studio's voice list. --}}
+          <h2 id="vcVoicesTitle" class="vc-library-title" @if(($voiceCloningList?->count() ?? 0) === 0) style="display:none;" @endif>{{ __('ui.voice_cloning.your_voices_title') }}</h2>
           <section class="vc-grid" id="vcVoiceGrid" style="{{ ($voiceCloningList?->count() ?? 0) > 0 ? '' : 'display:none;' }}">
             @foreach($voiceCloningList as $voice)
               @php
@@ -3034,6 +2678,7 @@
                     : '';
               @endphp
                 <article class="vc-card" data-voice-id="{{ $voice->id }}" data-voice-name="{{ $voice->name }}" data-language-code="{{ $voice->language_code }}" data-status="{{ $voice->status }}" data-created-ts="{{ $voice->created_at?->getTimestamp() }}" data-started-ts="{{ $voice->attemptStartedAt()?->getTimestamp() }}" data-failure-reason="{{ $voice->isFailed() ? \App\Services\VoiceCloningService::publicFailureMessage($voice) : '' }}">
+                  <span class="vc-card-avatar" aria-hidden="true"></span>
                   <div class="vc-card-header">
                     <h3 class="vc-card-name">{{ $voice->name }}</h3>
                     <span class="vc-status {{ $voice->status }}" role="status">
@@ -3058,7 +2703,7 @@
                     @endif
                   @endif
                   @if($voice->isProcessing())
-                    <div class="vc-processing-hint" style="font-size:.83rem;color:var(--muted);margin-bottom:.6rem">{{ __('ui.voice_cloning.processing_hint') }}</div>
+                    <div class="vc-processing-hint">{{ __('ui.voice_cloning.processing_hint') }}</div>
                   @endif
                   <div class="vc-progress {{ $voice->isProcessing() ? '' : 'is-hidden' }}" data-vc-progress>
                     <div class="vc-progress-track">
@@ -3086,6 +2731,7 @@
                         class="btn btn-ghost vc-delete-btn"
                         data-voice-id="{{ $voice->id }}"
                         data-confirm="{{ __('ui.voice_cloning.delete_confirm') }}"
+                        title="{{ __('ui.voice_cloning.delete_voice') }}"
                       >
                         {{ __('ui.voice_cloning.delete_voice') }}
                       </button>
@@ -3100,188 +2746,6 @@
               <p>{{ __('ui.voice_cloning.empty_subtitle') }}</p>
               <button type="button" class="btn btn-primary" onclick="document.getElementById('vcCreatePanel')?.scrollIntoView({behavior:'smooth', block:'start'})">{{ __('ui.voice_cloning.create_first') }}</button>
             </section>
-          @endif
-
-          @if($vcStudioOpen)
-            <section class="vc-create-panel" id="vcCreatePanel" @if(! $vcCanCreate) style="display:none" @endif>
-              <h2 id="vcCreateTitle">{{ __('ui.voice_cloning.create_title') }}</h2>
-
-              <div class="vc-reconsent-banner" id="vcReconsentBanner" hidden>
-                <div>
-                  <strong id="vcReconsentTitle"></strong>
-                  <p>{{ __('ui.voice_cloning.replace_consent_hint') }}</p>
-                </div>
-                <button type="button" class="btn btn-ghost" id="vcReconsentCancel">{{ __('ui.voice_cloning.cancel') }}</button>
-              </div>
-
-              <div class="vc-guidelines" id="vcGuidelines">
-                <h4>{{ __('ui.voice_cloning.guidelines_title') }}</h4>
-                <ul>
-                  <li>{{ __('ui.voice_cloning.guideline_1', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</li>
-                  <li>{{ __('ui.voice_cloning.guideline_2') }}</li>
-                  <li>{{ __('ui.voice_cloning.guideline_3') }}</li>
-                  <li>{{ __('ui.voice_cloning.guideline_4') }}</li>
-                  <li>{{ __('ui.voice_cloning.guideline_5') }}</li>
-                </ul>
-              </div>
-
-              <div class="vc-steps" role="tablist">
-                <button type="button" class="vc-step active" id="vcStepSample" data-vc-step="1">
-                  <span class="vc-step-index">1</span>
-                  <span>{{ __('ui.voice_cloning.step_sample') }}</span>
-                </button>
-                <button type="button" class="vc-step" id="vcStepConsent" data-vc-step="2">
-                  <span class="vc-step-index">2</span>
-                  <span>{{ __('ui.voice_cloning.step_consent') }}</span>
-                </button>
-              </div>
-
-              <form id="vcCreateForm" enctype="multipart/form-data" novalidate>
-                @csrf
-                <input type="hidden" name="source_type" id="vcSourceType" value="upload">
-                <input type="hidden" name="audio_duration" id="vcAudioDuration" value="0">
-                <input type="hidden" name="consent_duration" id="vcConsentDuration" value="0">
-
-                <div class="vc-step-panel" data-vc-step-panel="1">
-                  <div class="vc-field-grid">
-                    <div class="vc-form-group">
-                      <label for="vcName">{{ __('ui.voice_cloning.voice_name_label') }}</label>
-                      <input type="text" id="vcName" name="name" minlength="2" maxlength="50" placeholder="{{ __('ui.voice_cloning.voice_name_placeholder') }}">
-                    </div>
-                    <div class="vc-form-group">
-                      <label id="vcLanguageLabel">{{ __('ui.voice_cloning.language_label') }}</label>
-                      <div class="vc-language-value" role="text" aria-labelledby="vcLanguageLabel">{{ app()->getLocale() === 'ar' ? __('ui.voice_cloning.language_ar') : __('ui.voice_cloning.language_en') }}</div>
-                      <input type="hidden" name="language_code" id="vcLanguage" value="{{ app()->getLocale() === 'ar' ? 'ar-XA' : 'en-US' }}">
-                    </div>
-                  </div>
-
-                  <div class="vc-tabs">
-                    <button type="button" class="vc-tab active" data-tab="upload">{{ __('ui.voice_cloning.upload_tab') }}</button>
-                    <button type="button" class="vc-tab" data-tab="recording">{{ __('ui.voice_cloning.record_tab') }}</button>
-                  </div>
-
-                  <div class="vc-tab-panel" id="vcUploadPanel">
-                    <div class="vc-upload-zone" id="vcUploadZone">
-                      <input type="file" name="audio_file" id="vcFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*" aria-label="{{ __('ui.voice_cloning.upload_label') }}">
-                      <p>{{ __('ui.voice_cloning.upload_hint') }}</p>
-                      <p class="formats">{{ __('ui.voice_cloning.upload_formats') }} &middot; {{ __('ui.voice_cloning.upload_max_size', ['size' => $voiceCloningMaxUploadMb]) }}</p>
-                    </div>
-                    <div class="vc-file-info" id="vcFileInfo" style="display:none">
-                      <span id="vcFileName"></span>
-                      <button type="button" class="remove" id="vcFileRemove" aria-label="{{ __('ui.voice_cloning.remove_file') }}">&times;</button>
-                    </div>
-                    <p class="vc-range" id="vcSampleRange">{{ __('ui.voice_cloning.duration_range', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
-                  </div>
-
-                  <div class="vc-tab-panel" id="vcRecordPanel" style="display:none">
-                    <div class="vc-recorder" id="vcRecorder">
-                      <button type="button" class="rec-btn" id="vcRecBtn" aria-label="{{ __('ui.voice_cloning.record_start') }}">
-                        <span class="inner"></span>
-                      </button>
-                      <div class="vc-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-                      <div class="vc-timer" id="vcTimer">00:00</div>
-                      <p class="hint" id="vcRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
-                      <p class="hint" style="margin-top:.45rem">{{ __('ui.voice_cloning.min_duration_note', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
-                      <div class="vc-playback" id="vcRecPlayback" hidden>
-                        <audio class="vc-preview-audio" id="vcRecPreview" controls preload="none" hidden aria-label="{{ __('ui.voice_cloning.listen_back') }}"></audio>
-                      </div>
-                      <div class="rec-actions" id="vcRecActions" style="display:none">
-                        <button type="button" class="btn btn-ghost" id="vcRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button type="button" class="btn btn-primary" id="vcNextStep" style="width:100%;margin-top:.9rem">{{ __('ui.voice_cloning.next_step') }}</button>
-                </div>
-
-                <div class="vc-step-panel" data-vc-step-panel="2" hidden>
-                  @php
-                    $vcConsentLocale = app()->getLocale() === 'ar' ? 'ar-XA' : 'en-US';
-                    $vcConsentText = $voiceCloningConsentScripts[$vcConsentLocale] ?? '';
-                  @endphp
-                  <div class="vc-form-group vc-consent-language">
-                    <label for="vcConsentLanguage">{{ __('ui.voice_cloning.consent_language_label') }}</label>
-                    <div class="vc-segmented" role="radiogroup" aria-label="{{ __('ui.voice_cloning.consent_language_label') }}">
-                      @if($vcConsentLocale === 'ar-XA')
-                        <button type="button" class="vc-segment active" data-consent-lang="ar-XA" role="radio" aria-checked="true">العربية</button>
-                      @else
-                        <button type="button" class="vc-segment active" data-consent-lang="en-US" role="radio" aria-checked="true">English</button>
-                      @endif
-                    </div>
-                    <input type="hidden" name="consent_language" id="vcConsentLanguage" value="{{ $vcConsentLocale }}">
-                    <p class="hint">{{ __('ui.voice_cloning.consent_language_hint') }}</p>
-                  </div>
-
-                  <div class="vc-script">
-                    <div class="vc-script-toolbar">
-                      <h3>{{ __('ui.voice_cloning.consent_title') }}</h3>
-                      <button type="button" class="vc-copy" id="vcCopyConsent">{{ __('ui.voice_cloning.consent_copy') }}</button>
-                    </div>
-                    <p id="vcConsentScript" dir="{{ $vcConsentLocale === 'ar-XA' ? 'rtl' : 'ltr' }}">{{ $vcConsentText }}</p>
-                    <p class="hint">{{ __('ui.voice_cloning.consent_script_hint') }}</p>
-                    <ul class="vc-consent-tips">
-                      <li>{{ __('ui.voice_cloning.consent_tip_1') }}</li>
-                      <li>{{ __('ui.voice_cloning.consent_tip_latin') }}</li>
-                      <li>{{ __('ui.voice_cloning.consent_tip_2') }}</li>
-                      <li>{{ __('ui.voice_cloning.consent_tip_3') }}</li>
-                    </ul>
-                  </div>
-
-                  <div class="vc-consent-block">
-                    <label>{{ __('ui.voice_cloning.consent_record_label') }}</label>
-                    <div class="vc-recorder" id="vcConsentRecorder" style="margin-top:.45rem">
-                      <button type="button" class="rec-btn" id="vcConsentRecBtn" aria-label="{{ __('ui.voice_cloning.consent_record_label') }}">
-                        <span class="inner"></span>
-                      </button>
-                      <div class="vc-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-                      <div class="vc-timer" id="vcConsentTimer">00:00</div>
-                      <p class="hint" id="vcConsentRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
-                      <div class="vc-playback" id="vcConsentPlayback" hidden>
-                        <audio class="vc-preview-audio" id="vcConsentPreview" controls preload="none" hidden aria-label="{{ __('ui.voice_cloning.listen_back') }}"></audio>
-                      </div>
-                      <div class="rec-actions" id="vcConsentRecActions" style="display:none">
-                        <button type="button" class="btn btn-ghost" id="vcConsentRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p class="vc-or">{{ __('ui.voice_cloning.consent_or') }}</p>
-                  <div class="vc-form-group" style="margin-top:.15rem">
-                    <label for="vcConsentFileInput">{{ __('ui.voice_cloning.consent_upload_label') }}</label>
-                    <div class="vc-upload-zone" id="vcConsentUploadZone">
-                      <input type="file" name="consent_audio" id="vcConsentFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*">
-                      <p>{{ __('ui.voice_cloning.upload_hint') }}</p>
-                    </div>
-                    <div class="vc-file-info" id="vcConsentFileInfo" style="display:none">
-                      <span id="vcConsentFileName"></span>
-                      <button type="button" class="remove" id="vcConsentFileRemove" aria-label="{{ __('ui.voice_cloning.remove_file') }}">&times;</button>
-                    </div>
-                  </div>
-
-                  <div class="vc-consent">
-                    <input type="checkbox" id="vcConsent" name="consent_confirmed" value="1" required>
-                    <label for="vcConsent">{{ __('ui.voice_cloning.consent_label') }}</label>
-                  </div>
-
-                  <div class="vc-privacy">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    {{ __('ui.voice_cloning.privacy_note') }}
-                  </div>
-
-                  <div class="vc-actions-row">
-                    <button type="button" class="btn btn-ghost" id="vcBackStep">{{ __('ui.voice_cloning.back_step') }}</button>
-                    <button type="submit" class="btn btn-primary" id="vcSubmitBtn">
-                      <span id="vcSubmitText">{{ __('ui.voice_cloning.submit_button') }}</span>
-                      <span id="vcSubmitLoading" style="display:none">{{ __('ui.voice_cloning.submitting') }}</span>
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </section>
-            <div class="vc-notice" id="vcLimitNotice" @if(! $vcAtLimit) style="display:none" @endif>
-              <p>{{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}</p>
-              <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.voice_cloning.upgrade_cta') }}</a>
-            </div><!-- /vcLimitNotice -->
           @endif
         @endif
         @endif
@@ -4856,6 +4320,30 @@
     renderDialectOptions();
     applyStudioDefaults();
 
+    // After "Use in studio" or "Reuse": the studio, with the speaker's card (first in the voice
+    // library, js/voice-studio.js) on screen and focused, so it is plain who will speak. The
+    // studio's top when the card shows from there, otherwise the card in the middle of the screen.
+    function showPickedSpeaker() {
+      const section = document.getElementById('generateVoiceSection');
+      if (!section) return;
+      const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+      const card = section.querySelector('[data-vs-lib-grid] .vs-voice.is-selected');
+      if (!card) {
+        section.scrollIntoView({ behavior, block: 'start' });
+        return;
+      }
+      card.closest('[data-vs-lib-grid]').scrollTop = 0;
+      card.focus({ preventScroll: true });
+      const header = document.querySelector('.app-header')?.getBoundingClientRect().height || 0;
+      const sectionTop = section.getBoundingClientRect().top + window.scrollY - header - 12;
+      const box = card.getBoundingClientRect();
+      const cardBottom = box.bottom + window.scrollY;
+      const top = cardBottom - sectionTop <= window.innerHeight - header - 24
+        ? sectionTop
+        : box.top + window.scrollY - header - Math.max(12, (window.innerHeight - header - box.height) / 2);
+      window.scrollTo({ top: Math.max(0, top), behavior });
+    }
+
     function clonedVoiceLanguage(languageCode) {
       return String(languageCode || '').toLowerCase().startsWith('en') ? 'en' : 'ar';
     }
@@ -4879,6 +4367,7 @@
       renderVoiceOptions();
       if (!setSelectValueIfAvailable(voiceSelect, key)) return false;
       preferredVoiceKeyByLanguage[lang] = key;
+      voiceSelect.dispatchEvent(new Event('change', { bubbles: true }));
       voiceSelect.classList.add('vc-speaker-picked');
       setTimeout(() => voiceSelect.classList.remove('vc-speaker-picked'), 2200);
       setActiveDashboardSection('generateVoiceSection');
@@ -4889,8 +4378,7 @@
       if (`${window.location.pathname}${window.location.search}${window.location.hash}` !== nextUrl) {
         history.replaceState(null, '', nextUrl);
       }
-      document.getElementById('generateVoiceSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      voiceSelect.focus({ preventScroll: true });
+      showPickedSpeaker();
       return true;
     };
     updateTranslateHint();
@@ -5052,8 +4540,7 @@
       setActiveDashboardSection('generateVoiceSection');
       try { window.localStorage.setItem('dashboard_active_section', 'generateVoiceSection'); } catch (e) { /* no storage */ }
       history.replaceState(null, '', `${window.location.pathname}?designed_voice=${encodeURIComponent(id)}#generateVoiceSection`);
-      document.getElementById('generateVoiceSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      voiceSelect.focus({ preventScroll: true });
+      showPickedSpeaker();
       return true;
     };
 
@@ -5087,6 +4574,10 @@
       if (!match) return;
       window.openClonedVoiceInGenerator(match);
     })();
+    @if($reusePreset)
+      // "Reuse" on a past generation: its speaker's card shown too, once the library has drawn it.
+      window.addEventListener('load', function () { setTimeout(showPickedSpeaker, 60); });
+    @endif
   </script>
   @if(($voiceCloningVisible ?? false) && ($voiceCloningEnabledGlobally ?? false))
   <script>
@@ -5189,7 +4680,7 @@
         upload: @json(__('ui.voice_cloning.upload_tab')),
         recording: @json(__('ui.voice_cloning.record_tab')),
       };
-      const countTemplate = @json(__('ui.voice_cloning.voice_count', ['count' => '__COUNT__', 'max' => '__MAX__']));
+      const countTemplate = {{ \Illuminate\Support\Js::from(trans_choice('ui.voice_cloning.voices_left', (int) ($voiceCloningMaxVoices ?? 0), ['left' => '__LEFT__', 'max' => '__MAX__'])) }};
       const processingHintText = @json(__('ui.voice_cloning.processing_hint'));
       const failedHintText = @json(__('ui.voice_cloning.processing_failed_generic'));
       const useInGeneratorText = @json(__('ui.voice_cloning.use_in_generator'));
@@ -5262,9 +4753,10 @@
         return input.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
       }
 
+      // What is left to make on the plan (a deleted voice keeps its place for a while: vcDeletedNote).
       function formatCount() {
         return countTemplate
-          .replace('__COUNT__', String(currentVoiceCount))
+          .replace('__LEFT__', String(Math.max(0, MAX_VOICES - currentVoiceCount)))
           .replace('__MAX__', String(MAX_VOICES));
       }
 
@@ -5332,7 +4824,6 @@
           if (!hint) {
             hint = document.createElement('div');
             hint.className = 'vc-processing-hint';
-            hint.style.cssText = 'font-size:.83rem;color:var(--muted);margin-bottom:.6rem';
             const actions = card.querySelector('.vc-card-actions');
             card.insertBefore(hint, actions || null);
           }
@@ -5348,7 +4839,6 @@
           if (!hint) {
             hint = document.createElement('div');
             hint.className = 'vc-alert error vc-failure-hint';
-            hint.style.cssText = 'margin-bottom:.6rem;font-size:.82rem';
             const actions = card.querySelector('.vc-card-actions');
             card.insertBefore(hint, actions || null);
           }
@@ -5535,6 +5025,7 @@
         button.dataset.voiceId = String(card.dataset.voiceId || '');
         button.dataset.confirm = deleteConfirmText;
         button.textContent = deleteVoiceText;
+        button.title = deleteVoiceText;
         actions.appendChild(button);
       }
 
@@ -5663,6 +5154,7 @@
 
         return `
           <article class="vc-card" data-voice-id="${escapeHtml(voiceId)}" data-voice-name="${name}" data-language-code="${escapeHtml(languageCode)}" data-status="${escapeHtml(status)}" data-created-ts="${createdTs}" data-started-ts="${Number(voice?.started_at_ts || createdTs)}" data-failure-reason="${failureReason}">
+            <span class="vc-card-avatar" aria-hidden="true"></span>
             <div class="vc-card-header">
               <h3 class="vc-card-name">${name}</h3>
               <span class="vc-status ${escapeHtml(status)}" role="status">${isProcessing ? '<span class="dot"></span>' : ''}${statusLabel}</span>
@@ -5671,8 +5163,8 @@
               <span>{{ __('ui.voice_cloning.created_on') }} ${escapeHtml(createdLabel)}</span>
               <span>${metaLabel}</span>
             </div>
-            ${status === 'failed' ? `<div class="vc-alert error vc-failure-hint" style="margin-bottom:.6rem;font-size:.82rem">${failureReason}</div>` : ''}
-            ${isProcessing ? `<div class="vc-processing-hint" style="font-size:.83rem;color:var(--muted);margin-bottom:.6rem">${escapeHtml(processingHintText)}</div>` : ''}
+            ${status === 'failed' ? `<div class="vc-alert error vc-failure-hint">${failureReason}</div>` : ''}
+            ${isProcessing ? `<div class="vc-processing-hint">${escapeHtml(processingHintText)}</div>` : ''}
             <div class="vc-progress ${isProcessing ? '' : 'is-hidden'}" data-vc-progress>
               <div class="vc-progress-track">
                 <div class="vc-progress-fill" data-vc-progress-fill style="width: ${Math.round(percent)}%"></div>
@@ -5684,7 +5176,7 @@
               <div class="vc-progress-delay" data-vc-progress-delay></div>
             </div>
             <div class="vc-card-actions">
-              ${status === 'ready' ? `<a href="${GENERATOR_URL_BASE}?cloned_voice=${encodeURIComponent(voiceId)}#generateVoiceSection" class="btn btn-primary" data-vc-action="use">${escapeHtml(useInGeneratorText)}</a>` : `<button type="button" class="btn btn-ghost vc-delete-btn" data-voice-id="${escapeHtml(voiceId)}" data-confirm="${escapeHtml(deleteConfirmText)}">${escapeHtml(deleteVoiceText)}</button>`}
+              ${status === 'ready' ? `<a href="${GENERATOR_URL_BASE}?cloned_voice=${encodeURIComponent(voiceId)}#generateVoiceSection" class="btn btn-primary" data-vc-action="use">${escapeHtml(useInGeneratorText)}</a>` : `<button type="button" class="btn btn-ghost vc-delete-btn" data-voice-id="${escapeHtml(voiceId)}" data-confirm="${escapeHtml(deleteConfirmText)}" title="${escapeHtml(deleteVoiceText)}">${escapeHtml(deleteVoiceText)}</button>`}
             </div>
           </article>
         `;
@@ -6618,8 +6110,13 @@
   @if($dubStudio ?? null)
     <script src="{{ asset('js/dub-studio.js') }}?v={{ filemtime(public_path('js/dub-studio.js')) }}" defer></script>
   @endif
-  @if($voiceDesign ?? null)
+  @if(($voiceDesign ?? null) || ($voiceCloningVisible ?? false))
     @include('components.orb-script')
+  @endif
+  @if($voiceCloningVisible ?? false)
+    <script src="{{ asset('js/voice-cloning-stage.js') }}?v={{ filemtime(public_path('js/voice-cloning-stage.js')) }}" defer></script>
+  @endif
+  @if($voiceDesign ?? null)
     <script src="{{ asset('js/voice-design.js') }}?v={{ filemtime(public_path('js/voice-design.js')) }}" defer></script>
   @endif
   <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>

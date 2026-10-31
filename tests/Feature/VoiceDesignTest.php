@@ -188,6 +188,23 @@ class VoiceDesignTest extends TestCase
         $this->assertSame(1, (int) UsageCounter::query()->where('user_id', $member->id)->value('total_requests'));
     }
 
+    public function test_each_take_says_how_it_was_made_from_the_description(): void
+    {
+        $member = $this->member($this->designPlan);
+        $this->fakeEngine();
+
+        $takes = $this->actingAs($member)->postJsonLocalizedRoute('voice-design.design', $this->designInput(['variety' => 50]))->assertOk()->json('takes');
+
+        // The first follows the description as written (the one the page recommends); the others lean a way of their own.
+        $this->assertSame(
+            [1 => 'Closest to your description', 2 => 'A warmer, deeper variation', 3 => 'A brighter, crisper variation'],
+            collect($takes)->pluck('note', 'take')->all(),
+        );
+        $this->assertSame(['closest', 'bolder', 'freer'], [VoiceDesign::takeLean(90, 1), VoiceDesign::takeLean(90, 2), VoiceDesign::takeLean(90, 3)]);
+        // Close to the words: the takes after the first are more takes of the same description.
+        $this->assertSame(['closest', 'same', 'same'], [VoiceDesign::takeLean(10, 1), VoiceDesign::takeLean(10, 2), VoiceDesign::takeLean(10, 3)]);
+    }
+
     public function test_a_take_that_never_comes_is_not_charged(): void
     {
         $member = $this->member($this->designPlan);
@@ -305,6 +322,86 @@ class VoiceDesignTest extends TestCase
 
         $this->actingAs($member)->postJsonLocalizedRoute('voice-design.design', $this->designInput())
             ->assertStatus(422)->assertJson(['message' => trans_choice('voice_design.errors.month_used', 1, ['count' => 1])]);
+    }
+
+    public function test_the_page_says_what_is_left_this_month_and_stops_designing_once_it_is_used(): void
+    {
+        $this->designPlan->forceFill(['voice_design_max_voices' => 2, 'voice_design_monthly_voices' => 2])->save();
+        $member = $this->member($this->designPlan);
+        $this->savedVoice($member, DesignedVoice::SAVED, 'voice_one');
+        app()->setLocale('en');
+
+        $page = $this->actingAs($member)->getLocalizedRoute('dashboard')->assertOk();
+        $page->assertSee('1 of 2 new voices left this month', false);
+        $this->assertMatchesRegularExpression('/data-vd-limit role="status"\s+hidden/', $page->getContent());
+        $this->assertDoesNotMatchRegularExpression('/data-vd-submit\s+hidden disabled/', $page->getContent());
+
+        // A second one kept, then deleted: room in the library, none in the month.
+        $this->savedVoice($member, DesignedVoice::SAVED, 'voice_two')->delete();
+        $page = $this->actingAs($member)->getLocalizedRoute('dashboard')->assertOk();
+        $page->assertSee('0 of 2 new voices left this month', false);
+        $page->assertSee(__('voice_design.limit_month_title'), false);
+        $this->assertDoesNotMatchRegularExpression('/data-vd-limit role="status"\s+hidden/', $page->getContent());
+        $this->assertMatchesRegularExpression('/data-vd-submit\s+hidden disabled/', $page->getContent());
+        // The library's own count is gone: the pill above says what is left.
+        $page->assertDontSee('data-vd-library-count', false);
+    }
+
+    public function test_deleting_on_a_plan_with_a_monthly_number_says_it_does_not_give_one_back(): void
+    {
+        $this->designPlan->forceFill(['voice_design_monthly_voices' => 2])->save();
+        app()->setLocale('en');
+        $html = $this->actingAs($this->member($this->designPlan))->getLocalizedRoute('dashboard')->assertOk()->getContent();
+
+        $this->assertStringContainsString(json_encode(__('voice_design.delete_month_note')), $html);
+        $this->assertStringContainsString("t.delete_confirm + (Number(studio.monthly || 0) > 0 ? '\\n\\n' + t.delete_month_note : '')", file_get_contents(public_path('js/voice-design.js')));
+    }
+
+    public function test_the_public_pages_play_the_designed_voices_in_their_own_language(): void
+    {
+        app()->setLocale('en');
+        $samples = $this->getLocalizedRoute('samples')->assertOk();
+        $samples->assertSee('id="designed-voices"', false)->assertSee(__('voice_design.examples.evil_ogre.name'), false);
+        $samples->assertSee('audio/voice-design/examples/evil_ogre.mp3', false);
+        // Arabic voices on the Arabic page only.
+        $samples->assertDontSee('audio/voice-design/examples/cairo_grandma.mp3', false);
+        // The homepage tour: the Evil Ogre, as a designed voice.
+        $home = $this->getLocalizedRoute('home')->assertOk();
+        $home->assertSee(__('ui.landing.tour_designed_title'), false);
+        $this->assertMatchesRegularExpression('/data-tour-item="4"[^>]*data-src="[^"]*evil_ogre\.mp3/', $home->getContent());
+
+        app()->setLocale('ar');
+        $this->getLocalizedRoute('samples')->assertOk()
+            ->assertSee('audio/voice-design/examples/cairo_grandma.mp3', false)
+            ->assertDontSee('audio/voice-design/examples/evil_ogre.mp3', false);
+    }
+
+    public function test_the_public_pages_leave_designed_voices_out_until_voice_design_opens(): void
+    {
+        app()->setLocale('en');
+        $this->openTo(VoiceDesign::AUDIENCE_PREVIEW);
+        $this->getLocalizedRoute('samples')->assertOk()->assertDontSee('id="designed-voices"', false);
+        $this->getLocalizedRoute('home')->assertOk()->assertDontSee('evil_ogre.mp3', false);
+
+        // Open to everyone, but no plan has it yet: still out.
+        $this->openTo(VoiceDesign::AUDIENCE_EVERYONE);
+        $this->designPlan->forceFill(['voice_design_enabled' => false])->save();
+        $this->getLocalizedRoute('samples')->assertOk()->assertDontSee('id="designed-voices"', false);
+
+        // The admin email sees them first.
+        $admin = User::factory()->create(['email' => \App\Support\VoiceCloningAccess::PREVIEW_EMAIL]);
+        $this->actingAs($admin)->getLocalizedRoute('samples')->assertOk()->assertSee('id="designed-voices"', false);
+    }
+
+    public function test_keeping_a_voice_returns_the_months_new_voices_so_far(): void
+    {
+        $this->designPlan->forceFill(['voice_design_max_voices' => 5, 'voice_design_monthly_voices' => 3])->save();
+        $member = $this->member($this->designPlan);
+        $this->savedVoice($member, DesignedVoice::SAVED, 'voice_one')->delete();
+        $take = $this->savedVoice($member, DesignedVoice::DRAFT, 'voice_take');
+
+        $this->actingAs($member)->postJsonLocalizedRoute('voice-design.keep', ['name' => 'Captain Two'], ['id' => $take->id])
+            ->assertOk()->assertJson(['kept_month' => 2]);
     }
 
     public function test_a_member_cannot_keep_or_delete_someone_elses_voice(): void

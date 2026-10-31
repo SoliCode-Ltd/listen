@@ -224,7 +224,7 @@
 .vd-slider { display: contents; }
 .vd-slider-label { grid-column: 1 / -1; margin-top: .85rem !important; font-size: .9rem; font-weight: 700; line-height: 1.4; color: var(--text); }
 .vd-slider:first-child .vd-slider-label { margin-top: 0 !important; }
-.vd-slider-end { font-size: .8rem; line-height: 1.3; color: var(--muted); white-space: nowrap; }
+.vd-slider-end { font-size: .8rem; line-height: 1.6; color: var(--muted); white-space: nowrap; }
 .vd-slider-end.is-low { text-align: end; }
 
 /* The studio's own slider: a thin track, a dot at the middle (where the description is left as
@@ -269,10 +269,11 @@
 .vd-summary { padding: .2rem 1.1rem .8rem; border: 1px solid var(--line); border-radius: var(--vd-panel-radius); background: var(--surface); }
 .vd-summary dl { display: grid; margin: 0; }
 .vd-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid var(--line); }
-.vd-summary-row dt { display: flex; flex: none; align-items: center; gap: .6rem; color: var(--muted); font-size: .9rem; line-height: 1.4; white-space: nowrap; }
+/* The value stays on one line; on the narrowest phones its label wraps instead. */
+.vd-summary-row dt { display: flex; flex: 1 1 auto; align-items: center; gap: .6rem; color: var(--muted); font-size: .9rem; line-height: 1.4; overflow-wrap: normal; word-break: normal; }
 .vd-summary-row dt .credit-icon { font-size: 1.1rem; }
 .vd-summary-row dt svg { width: 18px; height: 18px; color: var(--a); }
-.vd-summary-row dd { margin: 0; color: var(--text); font-size: .95rem; font-weight: 700; line-height: 1.4; text-align: end; font-variant-numeric: tabular-nums; }
+.vd-summary-row dd { flex: none; margin: 0; color: var(--text); font-size: .95rem; font-weight: 700; line-height: 1.4; text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .vd-summary-note { margin: .7rem 0 0; color: var(--muted); font-size: .84rem; line-height: 1.55; }
 .vd-design-btn { display: inline-flex; align-items: center; justify-content: center; gap: .6rem; min-height: 54px; width: 100%; font-size: 1.02rem; }
 .vd-design-btn svg { width: 20px; height: 20px; }
@@ -387,31 +388,53 @@
   background: color-mix(in oklab, var(--a) 8%, transparent); color: var(--text); font-size: .95rem; line-height: 1.7;
 }
 .vd-line-quote:empty { display: none; }
-.vd-takes { display: grid; gap: .7rem; margin: 0; padding: 0; list-style: none; }
+.vd-takes { display: grid; gap: .85rem; margin: 0; padding: 0; list-style: none; }
 .vd-take {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .9rem;
-  padding: .75rem .9rem; border: 1px solid var(--line); border-radius: 18px; background: var(--surface);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1rem 1.1rem;
+  padding: 1.05rem 1.15rem; border: 1px solid var(--line); border-radius: 18px; background: var(--surface);
   animation: vd-in .4s ease both; animation-delay: calc(var(--n, 0) * 90ms);
   transition: border-color .2s ease, box-shadow .2s ease;
 }
+/* The one we recommend: the take that follows the description as written. */
+.vd-take.is-pick { border-color: color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 5%, var(--surface)); }
 .vd-take.is-chosen { border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 20%, transparent); }
 @keyframes vd-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.vd-take .orb { --orb-size: 52px; }
-.vd-take-main { display: grid; gap: .45rem; min-width: 0; }
-.vd-take-title { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; font-weight: 700; }
-.vd-take-title small { color: var(--muted); font-weight: 500; font-size: .8rem; }
-.vd-take-side { display: flex; align-items: center; gap: .5rem; }
-.vd-take-keep { white-space: nowrap; padding: .55rem 1rem; font-size: .88rem; }
+.vd-take .orb { --orb-size: 56px; align-self: start; }
+.vd-take-main { display: grid; gap: .35rem; min-width: 0; }
+.vd-take-head { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .6rem; }
+.vd-take-name { font-size: 1rem; line-height: 1.5; white-space: nowrap; }
+.vd-take-badge {
+  display: inline-flex; align-items: center; gap: .3rem; padding: .1rem .6rem; border-radius: 999px;
+  background: color-mix(in oklab, var(--a) 16%, transparent); color: var(--accent-text, var(--a));
+  font-size: .76rem; font-weight: 700; line-height: 1.8; white-space: nowrap;
+}
+.vd-take-badge svg { width: 12px; height: 12px; flex: none; fill: currentColor; }
+.vd-take-note { margin: 0; color: var(--muted); font-size: .86rem; line-height: 1.6; }
+.vd-take-note.is-sample { display: flex; align-items: flex-start; gap: .45rem; color: var(--text); }
+.vd-take-note.is-sample::before {
+  content: ''; width: 6px; height: 6px; flex: none; margin-top: calc(.5lh - 3px); border-radius: 50%; background: var(--warning, #f59e0b);
+}
+.vd-take-player { display: flex; align-items: center; gap: .7rem; margin-top: .3rem; }
+.vd-take-player .vd-play { width: 36px; height: 36px; }
+.vd-take-player .vd-take-bar { flex: 1; }
+/* Keep: quiet until a take is chosen, so the takes are heard before one is picked. */
+.vd-take-keep {
+  white-space: nowrap; min-height: 42px; padding: .5rem 1.05rem; font-size: .88rem;
+  border: 1px solid color-mix(in oklab, var(--a) 55%, var(--line)); background: transparent; color: var(--accent-text, var(--a));
+}
+.vd-take-keep:hover { background: color-mix(in oklab, var(--a) 10%, transparent); }
+.vd-take.is-chosen .vd-take-keep { background: var(--a); border-color: var(--a); color: #fff; }
 @media (max-width: 520px) {
-  .vd-take { grid-template-columns: auto minmax(0, 1fr); }
-  .vd-take-side { grid-column: 1 / -1; justify-content: space-between; }
+  .vd-take { grid-template-columns: auto minmax(0, 1fr); padding: 1rem; gap: .9rem; }
+  .vd-take .orb { --orb-size: 48px; }
+  .vd-take-keep { grid-column: 1 / -1; width: 100%; }
 }
 
 .vd-keep { display: grid; gap: var(--vd-label-gap); padding: 1rem; border-radius: var(--vd-panel-radius); border: 1px solid color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 6%, var(--surface)); }
 .vd-keep-row { display: flex; flex-wrap: wrap; gap: .5rem; }
 .vd .vd-keep-row input {
-  flex: 1 1 200px; min-width: 0; min-height: var(--vd-control); margin: 0; padding: .6rem .95rem; border-radius: 12px; border: 1px solid var(--line);
-  background: var(--surface); color: var(--text); font: inherit; box-shadow: none;
+  flex: 1 1 200px; min-width: 0; min-height: var(--vd-control); margin: 0; padding: .2rem .95rem; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--text); font: inherit; line-height: 2; box-shadow: none;
 }
 .vd .vd-keep-row input:focus { outline: 0; border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent); }
 .vd-keep-row .btn { min-height: var(--vd-control); white-space: nowrap; }
@@ -438,6 +461,18 @@
 .vd-unlock.is-nudged { animation: vd-nudge .6s ease; }
 @keyframes vd-nudge { 0%, 100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 a.vd-design-btn { text-decoration: none; }
+/* No more to keep now (the month's new voices used, or the library full): in place of the design button. */
+.vd-limit {
+  display: flex; align-items: flex-start; gap: .75rem; padding: .95rem 1.05rem;
+  border: 1px solid color-mix(in oklab, var(--a) 35%, var(--line)); border-radius: var(--vd-panel-radius);
+  background: color-mix(in oklab, var(--a) 6%, var(--surface));
+}
+.vd-limit[hidden] { display: none; }
+.vd-limit-mark { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 11px; background: color-mix(in oklab, var(--a) 16%, transparent); color: var(--accent-text, var(--a)); }
+.vd-limit-mark svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.vd-limit strong { display: block; font-size: .96rem; line-height: 1.5; }
+.vd-limit p { margin: .15rem 0 0; color: var(--muted); font-size: .88rem; line-height: 1.6; }
+.vd-design-btn[hidden], .vd-summary[hidden] { display: none; }
 
 /* ---------- The library ---------- */
 .vd-library { display: grid; gap: .9rem; }
@@ -450,10 +485,12 @@ a.vd-design-btn { text-decoration: none; }
 .vd-voice-head { display: flex; align-items: center; gap: .8rem; min-width: 0; }
 .vd-voice-head .orb { --orb-size: 46px; }
 .vd-voice-name { display: grid; gap: .15rem; min-width: 0; }
-.vd-voice-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.35; }
-.vd-voice-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: .8rem; line-height: 1.4; }
+/* Cut to one line, with room in the box for Arabic letters below and marks above the line. */
+.vd-voice-name strong, .vd-voice-name small { margin-block: -.5em -.4em; padding-block: .5em .4em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vd-voice-name strong { line-height: 1.35; }
+.vd-voice-name small { color: var(--muted); font-size: .8rem; line-height: 1.4; }
 .vd-voice-desc {
-  margin: 0; color: var(--muted); font-size: .87rem; line-height: 1.6; min-height: 3.2em;
+  margin: -.25em 0 -.3em; padding-block: .25em .3em; color: var(--muted); font-size: .87rem; line-height: 1.6; min-height: 3.75em;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 /* Its sample: play, the bar and the length, in one rounded strip. */

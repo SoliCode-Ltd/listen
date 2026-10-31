@@ -115,7 +115,7 @@ class ClonedVoiceSlotTest extends TestCase
         $until = now()->addDays(30);
 
         $page = $this->actingAs($this->member)->getLocalizedRoute('dashboard')->assertOk();
-        $page->assertSee(__('ui.voice_cloning.voice_count', ['count' => 1, 'max' => 1]), false);
+        $page->assertSee(trans_choice('ui.voice_cloning.voices_left', 1, ['left' => 0, 'max' => 1]), false);
         $page->assertSee(__('ui.voice_cloning.deleted_voice_counts', ['date' => $until->translatedFormat('j F Y')]), false);
         $this->assertMatchesRegularExpression('/id="vcLimitNotice"(?!\s+style="display:none")/', $page->getContent());
 

@@ -21,8 +21,11 @@
   };
   // Each page holds its own language: Arabic dialects on the Arabic page, English accents on the English one.
   $voiceSection = $isArabicUi ? ['id' => 'arabic-dialects', 'copy' => 'arabic'] : ['id' => 'english-accents', 'copy' => 'english'];
+  // Voices designed from a description (HomeController::designedVoices): none until Voice Design shows on the site.
+  $designedVoices = $designedVoices ?? [];
   $sections = array_values(array_filter([
     $voices !== [] ? ['id' => $voiceSection['id'], 'label' => __('ui.samples.'.$voiceSection['copy'].'_title'), 'count' => count($voices)] : null,
+    $designedVoices !== [] ? ['id' => 'designed-voices', 'label' => __('ui.samples.designed_title'), 'count' => count($designedVoices)] : null,
     $longReads !== [] ? ['id' => 'long-reads', 'label' => __('ui.samples.long_title'), 'count' => count($longReads)] : null,
     $moods !== [] ? ['id' => 'moods', 'label' => __('ui.samples.moods_title'), 'count' => count($moods)] : null,
     $dialogues !== [] ? ['id' => 'conversations', 'label' => __('ui.samples.conversations_title'), 'count' => count($dialogues)] : null,
@@ -388,6 +391,24 @@
           @endforeach
         </div>
         @include('components.samples-more', ['left' => count($voices) - $pageSize])
+      </section>
+    @endif
+
+    @if($designedVoices !== [])
+      {{-- Voices designed from a description in words, each saying its own line. --}}
+      <section class="samples-section" data-orb-follow id="designed-voices" aria-labelledby="designed-voices-title">
+        <div class="vs-head" data-orb-host>
+          <x-orb :name="'teams'" class="vs-head-orb" />
+          <div>
+            <h2 class="vs-title" id="designed-voices-title">{{ __('ui.samples.designed_title') }}</h2>
+            <p class="vs-lead">{{ __('ui.samples.designed_lead') }}</p>
+          </div>
+        </div>
+        <div class="vs-grid">
+          @foreach($designedVoices as $designed)
+            @include('components.home.designed-card', ['voice' => $designed])
+          @endforeach
+        </div>
       </section>
     @endif
 

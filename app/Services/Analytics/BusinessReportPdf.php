@@ -58,7 +58,7 @@ class BusinessReportPdf
     public function viewData(array $s): array
     {
         $generatedAt = Carbon::parse($s['meta']['generated_at'] ?? now());
-        $since = Carbon::parse($s['meta']['since'] ?? $generatedAt->copy()->subMonths(11)->startOfMonth());
+        $since = Carbon::parse($s['meta']['since'] ?? $generatedAt->copy()->startOfMonth()->subMonths(11));
         $members = $s['members'] ?? [];
         $engagement = $s['engagement'] ?? [];
         $generations = $s['generations'] ?? [];

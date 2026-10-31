@@ -445,7 +445,7 @@ class VoiceCloningTest extends TestCase
             ->getLocalizedRoute('dashboard');
 
         $dashboard->assertOk();
-        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 2, 'max' => 2]), false);
+        $dashboard->assertSee(trans_choice('ui.voice_cloning.voices_left', 2, ['left' => 0, 'max' => 2]), false);
         $dashboard->assertSee(__('ui.voice_cloning.limit_reached', ['max' => 2]), false);
         $dashboard->assertDontSee('Delete one to create another', false);
         $dashboard->assertSee('class="vc-notice" id="vcLimitNotice"', false);
@@ -485,6 +485,23 @@ class VoiceCloningTest extends TestCase
         $response->assertJsonFragment(['error' => __('ui.voice_cloning.limit_reached', ['max' => 2])]);
     }
 
+    public function test_the_stage_orb_plays_one_example_in_the_pages_language(): void
+    {
+        $this->paidPlan->update(['voice_cloning_enabled' => true]);
+
+        foreach (['en', 'ar'] as $language) {
+            app()->setLocale($language);
+            $html = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard')->assertOk()->getContent();
+
+            // The orb's own button plays it; there is no separate chip for it.
+            $this->assertSame(1, substr_count($html, 'data-vc-example="'));
+            $this->assertStringContainsString('audio/voice-cloning/examples/'.$language.'.mp3', $html);
+            $this->assertStringNotContainsString('audio/voice-cloning/examples/'.($language === 'ar' ? 'en' : 'ar').'.mp3', $html);
+            $this->assertStringNotContainsString('class="vc-example"', $html);
+            $this->assertMatchesRegularExpression('/class="vc-orb-play" data-vc-example="[^"]+" data-vc-example-name="'.preg_quote(e(__('ui.voice_cloning.example_name')), '/').'"/', $html);
+        }
+    }
+
     public function test_plan_max_of_zero_uses_the_site_default_for_the_preview_account(): void
     {
         SiteSetting::set('voice_cloning_max_per_user', 5);
@@ -497,7 +514,7 @@ class VoiceCloningTest extends TestCase
             ->getLocalizedRoute('dashboard');
 
         $dashboard->assertOk();
-        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 0, 'max' => 5]), false);
+        $dashboard->assertSee(trans_choice('ui.voice_cloning.voices_left', 5, ['left' => 5, 'max' => 5]), false);
         $dashboard->assertSee(__('ui.voice_cloning.create_title'), false);
         $dashboard->assertDontSee(__('ui.voice_cloning.limit_reached', ['max' => 0]), false);
         $html = $dashboard->getContent();
@@ -792,7 +809,7 @@ class VoiceCloningTest extends TestCase
             ->getLocalizedRoute('dashboard');
 
         $dashboard->assertOk();
-        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 0, 'max' => 1]), false);
+        $dashboard->assertSee(trans_choice('ui.voice_cloning.voices_left', 1, ['left' => 1, 'max' => 1]), false);
         $dashboard->assertSee(__('ui.voice_cloning.create_title'), false);
         $html = $dashboard->getContent();
         $this->assertDoesNotMatchRegularExpression('/id="vcCreatePanel"\s+style="display:none"/', $html);
@@ -1370,9 +1387,11 @@ class VoiceCloningTest extends TestCase
             ->postJsonLocalizedRoute('voice-cloning.store', $this->clonePayload('Closed Again'))
             ->assertNotFound();
 
+        // The admin still has the studio in preview, without a badge saying so (as Voice Design).
         $preview = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
         $preview->assertSee(__('ui.voice_cloning.page_title'), false);
-        $preview->assertSee(__('ui.voice_cloning.preview_badge'), false);
+        $preview->assertSee(__('ui.voice_cloning.create_title'), false);
+        $preview->assertDontSee(__('ui.voice_cloning.preview_badge'), false);
     }
 
     public function test_admin_can_switch_voice_cloning_between_preview_and_everyone(): void

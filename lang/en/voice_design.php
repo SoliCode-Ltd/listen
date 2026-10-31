@@ -44,7 +44,7 @@ return [
     'line_label' => 'What the voice says',
     'line_placeholder' => 'Type the line every take will speak…',
     'settings' => 'Shape the voice',
-    'settings_hint' => 'Fine-tune how the takes come out. The middle leaves your description as it is.',
+    'settings_hint' => 'Adjust the takes, or keep the middle.',
     'projection' => 'Projection',
     'projection_low' => 'Soft',
     'projection_high' => 'Powerful',
@@ -68,7 +68,7 @@ return [
     'summary_demo_cost' => 'From your demo characters',
     'summary_demo_cost_value' => ':count characters',
     'summary_takes' => 'You get',
-    'summary_takes_value' => ':takes speaking the same line',
+    'summary_takes_value' => ':takes to compare',
     'summary_refund' => 'Only takes that arrive are charged.',
 
     // While it works.
@@ -78,9 +78,19 @@ return [
 
     // The takes.
     'takes_title' => 'Pick your favourite take',
-    'takes_subtitle' => 'Each take is a voice of its own, speaking the same line.',
+    'takes_subtitle' => 'Each take is a voice of its own saying your line. Take 1 follows your description most closely.',
     'take_label' => 'Take :n',
-    'take_sample' => 'Its own sample',
+    'take_recommended' => 'Recommended',
+    // How each take was made from the description (App\Support\VoiceDesign::takeLean).
+    'take_notes' => [
+        'closest' => 'Closest to your description',
+        'same' => 'Another take on your description',
+        'warmer' => 'A warmer, deeper variation',
+        'brighter' => 'A brighter, crisper variation',
+        'bolder' => 'A bolder, richer variation',
+        'freer' => 'A lighter variation with a distinctive edge',
+    ],
+    'take_sample' => 'Says a sample of its own instead of your line',
     'play' => 'Play',
     'pause' => 'Pause',
     'keep' => 'Keep this voice',
@@ -94,12 +104,18 @@ return [
 
     // The library.
     'library_title' => 'Your designed voices',
-    'library_count' => ':count of :max',
-    'month_count' => ':count of :max new voice this month|:count of :max new voices this month',
+    'month_left' => ':left of :max new voice left this month|:left of :max new voices left this month',
+    // When no more can be designed: instead of the design button.
+    'limit_month_title' => 'You’ve used this month’s designed voices',
+    'limit_month_text' => 'More come with your next credit month.',
+    'limit_full_title' => 'Your library is full',
+    'limit_full_text' => 'Delete a voice below to design a new one.',
     'library_empty' => 'The voices you keep appear here, ready in the studio’s voice list.',
     'use_in_studio' => 'Use in studio',
     'delete' => 'Delete',
     'delete_confirm' => 'Delete this voice? It cannot be brought back, but the audio you already made with it stays in your history.',
+    // Added to it on a plan with a monthly number of new voices.
+    'delete_month_note' => 'Deleting it doesn’t give back one of this month’s new voices.',
     'deleted' => 'The voice was deleted.',
     'created_on' => 'Created :date',
     'voice_meta' => ':speaks, made :date',
@@ -182,6 +198,15 @@ return [
             'orb' => 'studio_max',
             // What the example says on the Voice Design card (public/audio/voice-design/examples/fusha_narrator.mp3).
             'line' => 'في قلب الصحراء الشاسعة، حيث تشتدّ حرارة النهار وتبرد الليالي، تبدأ رحلة البقاء من جديد.',
+        ],
+        // The Evil Ogre's Arabic cousin: the ghoul of the old desert tales, as a dubbed cartoon would play him.
+        'desert_ghoul' => [
+            'name' => 'Desert Ghoul',
+            'description' => 'A deep, booming voice of a huge ghoul from old Arabian desert tales, in his middle years. Thick, gravelly and theatrical, like a villain in a dubbed cartoon: menacing and absurdly silly at once, with sudden bursts of wild laughter. He speaks Modern Standard Arabic.',
+            'language' => 'ar',
+            'orb' => 'teams',
+            // What the example says on the Voice Design card (public/audio/voice-design/examples/desert_ghoul.mp3).
+            'line' => 'مَن ذا الذي يجرؤ على عبور جسري؟ ها ها ها! سأطحن عظامك وآكلها على الفطور... مع قليلٍ من العسل!',
         ],
         'evil_ogre' => [
             'name' => 'Evil Ogre',

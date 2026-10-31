@@ -96,10 +96,11 @@ class HomeController extends Controller
     /**
      * The homepage tour: one orb for each kind of voice Listen makes, each with
      * a real sample to hear, all in the page language: Arabic dialects on Arabic
-     * pages, English accents on English pages.
+     * pages, English accents on English pages. A voice designed from a sentence
+     * joins them while the public pages show Voice Design.
      *
      * @param  array<int, array<string, string>>  $environments
-     * @return array<int, array{key: string, src: string, more: string}>
+     * @return array<int, array{key: string, src: string, more: string, orb?: string}>
      */
     private function voiceTour(string $language, array $environments): array
     {
@@ -134,15 +135,34 @@ class HomeController extends Controller
         };
         $samplesPage = route('samples');
         $everyday = ['friendly', 'warm', 'conversational', 'confident'];
+        // A voice designed from one sentence: the Evil Ogre, and on Arabic pages his cousin the Desert Ghoul.
+        $designed = collect($this->designedVoices($language))->firstWhere('key', $language === 'ar' ? 'desert_ghoul' : 'evil_ogre');
 
-        return [
+        return array_values(array_filter([
             $language === 'ar'
                 ? ['key' => 'arabic', 'src' => $pick('ar', 'hero', $everyday), 'more' => $samplesPage.'#arabic-dialects']
                 : ['key' => 'english', 'src' => $pick('en', 'hero', $everyday), 'more' => $samplesPage.'#english-accents'],
             ['key' => 'emotions', 'src' => $pick($language, 'hero', ['excited', 'dramatic', 'happy', 'playful']), 'more' => $samplesPage.'#moods'],
             ['key' => 'dialogue', 'src' => $pick($language, 'dialogue', ['comedy', 'conversational', 'friendly']), 'more' => $samplesPage.'#conversations'],
             ['key' => 'places', 'src' => $this->environmentMorph($language) ?: (string) ($environments[0]['place_url'] ?? ''), 'more' => $samplesPage.'#sound-environments'],
-        ];
+            $designed ? ['key' => 'designed', 'orb' => 'teams', 'src' => (string) $designed['clip'], 'more' => $samplesPage.'#designed-voices'] : null,
+        ]));
+    }
+
+    /**
+     * Voice Design's example characters in the page's language, each designed from a description
+     * and saying its own line (public/audio/voice-design/examples), while the public pages show
+     * Voice Design (VoiceDesign::shownOnSite).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function designedVoices(string $language): array
+    {
+        if (! VoiceDesign::shownOnSite(request()->user())) {
+            return [];
+        }
+
+        return array_values(array_filter(VoiceDesign::examples($language), fn (array $example): bool => $example['language'] === $language && $example['clip'] !== null));
     }
 
     /**
@@ -266,6 +286,7 @@ class HomeController extends Controller
         return view('samples', $data + [
             'environments' => $this->environmentSamples($language),
             'longReads' => LongFormSamples::forPage($language),
+            'designedVoices' => $this->designedVoices($language),
         ]);
     }
 
