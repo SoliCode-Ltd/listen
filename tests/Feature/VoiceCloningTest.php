@@ -1370,9 +1370,11 @@ class VoiceCloningTest extends TestCase
             ->postJsonLocalizedRoute('voice-cloning.store', $this->clonePayload('Closed Again'))
             ->assertNotFound();
 
+        // The admin still has the studio in preview, without a badge saying so (as Voice Design).
         $preview = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
         $preview->assertSee(__('ui.voice_cloning.page_title'), false);
-        $preview->assertSee(__('ui.voice_cloning.preview_badge'), false);
+        $preview->assertSee(__('ui.voice_cloning.create_title'), false);
+        $preview->assertDontSee(__('ui.voice_cloning.preview_badge'), false);
     }
 
     public function test_admin_can_switch_voice_cloning_between_preview_and_everyone(): void
