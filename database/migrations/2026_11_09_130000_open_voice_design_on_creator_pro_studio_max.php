@@ -17,7 +17,7 @@ return new class extends Migration
      * monthly number. Voice Design opens to everyone (Voice Design → Settings),
      * and each of these plans' own pricing-card lines (Admin → Plans → Features
      * List) gets its line in English and Arabic ("Design your own voices: 10
-     * voices"), under the voice cloning line, in place of an earlier Voice
+     * voices", "تصميم الأصوات: 10 أصوات"), under the voice cloning line, in place of an earlier Voice
      * Design line. Every other plan has it switched off. A database with none of
      * these plans (a new install) is left alone.
      *
@@ -30,7 +30,7 @@ return new class extends Migration
     ];
 
     /** Labels a plan's Voice Design line has had, in either language, besides today's. */
-    private const EARLIER_LABELS = ['Voice Design', 'تصميم الصوت', 'تصميم الأصوات'];
+    private const EARLIER_LABELS = ['Voice Design', 'تصميم الصوت', 'صمّم أصواتك بالوصف'];
 
     public function up(): void
     {

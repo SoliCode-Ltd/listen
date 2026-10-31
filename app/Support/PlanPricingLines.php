@@ -176,7 +176,7 @@ final class PlanPricingLines
      * Lines the admin wrote by hand about a feature not open to everyone yet are left
      * out, as its automatic line is: video dubbing ("Video dubbing: 20 videos", "دبلجة
      * الفيديو") until Video Dubbing → Settings opens it, Voice Design ("Design your own
-     * voices: 10 voices", "صمّم أصواتك بالوصف", "تصميم الصوت") until Voice Design → Settings does.
+     * voices: 10 voices", "تصميم الأصوات", "تصميم الصوت") until Voice Design → Settings does.
      *
      * @param  array<int, mixed>  $lines
      * @return array<int, mixed>

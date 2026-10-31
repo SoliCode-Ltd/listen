@@ -52,7 +52,7 @@ class VoiceDesignGoLiveTest extends TestCase
             array_column($creator->fresh()->features_en, 'label'),
         );
         $this->assertSame(['label' => 'Design your own voices', 'value' => '10 voices', 'icon' => 'sliders'], $creator->fresh()->features_en[2]);
-        $this->assertSame(['label' => 'صمّم أصواتك بالوصف', 'value' => '10 أصوات', 'icon' => 'sliders'], $creator->fresh()->features_ar[2]);
+        $this->assertSame(['label' => 'تصميم الأصوات', 'value' => '10 أصوات', 'icon' => 'sliders'], $creator->fresh()->features_ar[2]);
         $this->assertSame(
             ['Generations per day', 'Voice cloning', 'Commercial use', 'Design your own voices'],
             array_column($pro->fresh()->features_en, 'label'),
@@ -64,7 +64,7 @@ class VoiceDesignGoLiveTest extends TestCase
 
         // The pricing card shows the plan's own lines, the designed voices among them.
         $this->assertContains('Design your own voices', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
-        $this->assertContains('صمّم أصواتك بالوصف', array_column(PlanPricingLines::forPlan($max->fresh(), 'ar'), 'label'));
+        $this->assertContains('تصميم الأصوات', array_column(PlanPricingLines::forPlan($max->fresh(), 'ar'), 'label'));
     }
 
     public function test_each_plan_keeps_only_its_voices_in_all_and_deleting_one_gives_none_back(): void
@@ -113,7 +113,7 @@ class VoiceDesignGoLiveTest extends TestCase
         SiteSetting::set('voice_design_audience', VoiceDesign::AUDIENCE_PREVIEW, VoiceDesign::GROUP);
 
         $this->assertNotContains('Design your own voices', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
-        $this->assertNotContains('صمّم أصواتك بالوصف', array_column(PlanPricingLines::forPlan($creator->fresh(), 'ar'), 'label'));
+        $this->assertNotContains('تصميم الأصوات', array_column(PlanPricingLines::forPlan($creator->fresh(), 'ar'), 'label'));
         $this->assertContains('Voice cloning', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
     }
 

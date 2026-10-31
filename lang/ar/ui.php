@@ -389,7 +389,7 @@ return [
             'label_developer_api' => 'واجهة المطورين',
             'label_voice_cloning' => 'استنساخ الأصوات',
             'label_video_dubbing' => 'دبلجة الفيديو',
-            'label_voice_design' => 'صمّم أصواتك بالوصف',
+            'label_voice_design' => 'تصميم الأصوات',
             'label_download_formats' => 'صيغ التحميل',
             'label_demo' => 'الصوت المتميز للتجربة',
             'label_card_needed' => 'بطاقة الائتمان',
