@@ -44,7 +44,7 @@ return [
     'line_label' => 'What the voice says',
     'line_placeholder' => 'Type the line every take will speak…',
     'settings' => 'Shape the voice',
-    'settings_hint' => 'Fine-tune how the takes come out. The middle leaves your description as it is.',
+    'settings_hint' => 'Adjust the takes, or keep the middle.',
     'projection' => 'Projection',
     'projection_low' => 'Soft',
     'projection_high' => 'Powerful',

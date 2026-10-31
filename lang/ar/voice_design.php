@@ -44,7 +44,7 @@ return [
     'line_label' => 'ما يقوله الصوت',
     'line_placeholder' => 'اكتب الجملة التي ستقولها كل نسخة…',
     'settings' => 'شكّل الصوت',
-    'settings_hint' => 'اضبط كيف تخرج النسخ. المنتصف يترك وصفك كما هو.',
+    'settings_hint' => 'اضبط النسخ. المنتصف يُبقي وصفك كما هو.',
     'projection' => 'قوة الصوت',
     'projection_low' => 'هادئ',
     'projection_high' => 'قوي',
