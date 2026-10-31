@@ -334,15 +334,21 @@
     // makes room in the library, not in the month.
     var keptMonth = Number(studio.kept_month || 0);
     function refreshLimits() {
-      if (studio.demo || !studio.allowed) return;
-      var monthly = Number(studio.monthly || 0);
-      // A plan with no limit (studio.unlimited) has neither.
-      var full = !studio.unlimited && voices.length >= Number(studio.max_voices || 0);
-      var kind = full ? 'full' : (monthly > 0 && keptMonth >= monthly ? 'month' : '');
-      if (monthly > 0) {
-        (root.closest('[data-dashboard-section]') || root).querySelectorAll('[data-vd-month-left]').forEach(function (meter) {
-          if (window.ListenQuota) window.ListenQuota(meter, monthly - keptMonth, monthly);
-        });
+      var kind = '';
+      if (studio.demo) {
+        // The demo's one try, once it is used.
+        kind = studio.demo_used ? 'demo' : '';
+      } else {
+        if (!studio.allowed) return;
+        var monthly = Number(studio.monthly || 0);
+        // A plan with no limit (studio.unlimited) has neither.
+        var full = !studio.unlimited && voices.length >= Number(studio.max_voices || 0);
+        kind = full ? 'full' : (monthly > 0 && keptMonth >= monthly ? 'month' : '');
+        if (monthly > 0) {
+          (root.closest('[data-dashboard-section]') || root).querySelectorAll('[data-vd-month-left]').forEach(function (meter) {
+            if (window.ListenQuota) window.ListenQuota(meter, monthly - keptMonth, monthly);
+          });
+        }
       }
       var box = q('[data-vd-limit]');
       if (box) {
@@ -356,6 +362,8 @@
       if (button) { button.hidden = !!kind; button.disabled = !!kind; }
       var summary = q('[data-vd-summary]');
       if (summary) summary.hidden = !!kind;
+      var link = q('[data-vd-limit-link]');
+      if (link) link.hidden = kind !== 'demo';
     }
     function card(voice, fresh) {
       var el = document.createElement('article');
@@ -611,6 +619,7 @@
       send(studio.urls.design, 'POST', body).then(function (res) {
         working(false);
         if (progress) progress.style.width = '100%';
+        if (res.demo_used) studio.demo_used = true;
         renderTakes(res.takes || (res.take ? [res.take] : []), res.line, res);
         if (studio.demo) {
           var note = q('[data-vd-demo-note]');
@@ -621,6 +630,7 @@
       }).catch(function (error) {
         working(false);
         setStage('idle');
+        if (error.payload && error.payload.demo_used) studio.demo_used = true;
         showAlert(error.message);
         if (error.payload && error.payload.quota) document.dispatchEvent(new CustomEvent('listen:demo-quota', { detail: error.payload.quota }));
       }).then(function () {

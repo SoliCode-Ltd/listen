@@ -115,6 +115,11 @@ return [
     'limit_month_text' => 'More come with your next credit month.',
     'limit_full_title' => 'Your library is full',
     'limit_full_text' => 'Delete a voice below to design a new one.',
+    'limit_demo_title' => 'You’ve had your free try',
+    'limit_demo_text' => 'Choose a plan with Voice Design to design voices and keep them for the studio.',
+    'limit_demo_cta' => 'See the plans',
+    // The demo: Listen writes the line the voice says.
+    'demo_line_note' => 'Listen writes a line that suits your character, within the demo’s characters.',
     'library_empty' => 'The voices you keep appear here, ready in the studio’s voice list.',
     'use_in_studio' => 'Use in studio',
     'delete' => 'Delete',
@@ -168,6 +173,7 @@ return [
         'line_too_long' => 'The line can be up to :max characters.',
         'enhance_failed' => 'We could not write a description right now. Please try again, or write your own.',
         'network' => 'The connection dropped. Please try again.',
+        'demo_used' => 'You’ve had your free Voice Design try. Choose a plan with Voice Design to design more.',
     ],
 
     // Characters to start from: shown in both languages; an Arabic page puts the Arabic ones first.

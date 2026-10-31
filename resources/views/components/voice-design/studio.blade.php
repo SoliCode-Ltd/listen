@@ -12,7 +12,10 @@
   $vd = $studio;
   // Why no more can be designed now, as App\Support\VoiceDesign::keepBlocker() refuses one: the library
   // full, or the month's new voices used (js/voice-design.js keeps it current as voices come and go).
-  $limit = ! $vd['allowed'] || $vd['demo'] ? null : match (true) {
+  $limit = match (true) {
+      // The demo: its one try, once it is used (HomeController::designVoice).
+      $vd['demo'] => ! empty($vd['demo_used']) ? 'demo' : null,
+      ! $vd['allowed'] => null,
       count($vd['voices']) >= $vd['max_voices'] => 'full',
       $vd['monthly'] > 0 && $vd['kept_month'] >= $vd['monthly'] => 'month',
       default => null,
@@ -58,6 +61,8 @@
           'limit_month_text' => __('voice_design.limit_month_text'),
           'limit_full_title' => __('voice_design.limit_full_title'),
           'limit_full_text' => __('voice_design.limit_full_text'),
+          'limit_demo_title' => __('voice_design.limit_demo_title'),
+          'limit_demo_text' => __('voice_design.limit_demo_text'),
           'voice_meta' => __('voice_design.voice_meta', ['speaks' => ':speaks', 'date' => ':date']),
           'language_ar' => __('voice_design.language_ar'),
           'language_en' => __('voice_design.language_en'),
@@ -150,7 +155,11 @@
           </fieldset>
         </div>
 
-        {{-- The line every take speaks: written for the character, or the member's. --}}
+        {{-- The line every take speaks: written for the character, or the member's. In the demo
+             Listen always writes it, within the demo's characters. --}}
+        @if($vd['demo'])
+          <p class="vd-line-note">{!! $icon['spark'] !!}<span>{{ __('voice_design.demo_line_note') }}</span></p>
+        @else
         <div class="vd-field vd-line">
           <label class="vd-switch">
             <input type="checkbox" name="auto_line" value="1" checked data-vd-auto-line>
@@ -166,6 +175,7 @@
             <span class="vd-count" data-vd-line-count dir="ltr">0 / {{ number_format($vd['limits']['line_max']) }}</span>
           </div>
         </div>
+        @endif
 
         {{-- Shape the voice: projection, pace, and how far the takes may wander from the words. --}}
         <details class="vd-shape">
@@ -222,17 +232,18 @@
             </dl>
             <p class="vd-summary-note">{{ $vd['demo'] ? __('voice_design.demo_one_take') : __('voice_design.summary_refund') }}</p>
           </div>
-          @if(! $vd['demo'])
-            {{-- No more to keep (the month's new voices used, or the library full): said here, in place
-                 of the design button, before credits are spent on takes that could not be kept. --}}
-            <div class="vd-limit" data-vd-limit role="status" @if($limit === null) hidden @endif>
-              <span class="vd-limit-mark">{!! $icon['lock'] !!}</span>
-              <div>
-                <strong data-vd-limit-title>{{ $limit ? __('voice_design.limit_'.$limit.'_title') : '' }}</strong>
-                <p data-vd-limit-text>{{ $limit ? __('voice_design.limit_'.$limit.'_text') : '' }}</p>
-              </div>
+          {{-- No more now (the month's new voices used, the library full, or the demo's one try had):
+               said here, in place of the design button, before anything is spent. --}}
+          <div class="vd-limit" data-vd-limit role="status" @if($limit === null) hidden @endif>
+            <span class="vd-limit-mark">{!! $icon['lock'] !!}</span>
+            <div>
+              <strong data-vd-limit-title>{{ $limit ? __('voice_design.limit_'.$limit.'_title') : '' }}</strong>
+              <p data-vd-limit-text>{{ $limit ? __('voice_design.limit_'.$limit.'_text') : '' }}</p>
+              @if($vd['demo'])
+                <a class="vd-limit-link" href="{{ $vd['upgrade_url'] }}" data-vd-limit-link @if($limit !== 'demo') hidden @endif>{{ __('voice_design.limit_demo_cta') }}</a>
+              @endif
             </div>
-          @endif
+          </div>
           <button type="submit" class="btn btn-primary vd-design-btn" data-vd-submit @if($limit !== null) hidden disabled @endif>
             {!! $icon['spark'] !!}<span data-vd-submit-label>{{ __('voice_design.design_button') }}</span>
           </button>

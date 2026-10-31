@@ -529,11 +529,42 @@ class VoiceDesignTest extends TestCase
         $this->assertSame(0, $this->creditsUsed($member));
     }
 
-    public function test_the_demo_refuses_a_line_longer_than_the_demo_allows(): void
+    public function test_the_demo_gives_one_try_speaking_a_line_listen_writes(): void
     {
-        $this->actingAs($this->member($this->freePlan))
-            ->postJsonLocalizedRoute('demo.voice-design', $this->designInput(['auto_line' => false, 'line' => str_repeat('A long line that runs on. ', 20)]))
-            ->assertStatus(422)->assertJson(['ok' => false]);
+        $member = $this->member($this->freePlan);
+        $device = ['X-Client-FP' => str_repeat('a1b2c3d4', 4)];
+        $this->fakeEngine();
+
+        // A line typed in is not used: Listen writes one within the demo's characters.
+        $this->actingAs($member)->withHeaders($device)
+            ->postJsonLocalizedRoute('demo.voice-design', $this->designInput(['auto_line' => false, 'line' => 'Words the member typed in themselves.']))
+            ->assertOk()->assertJson(['ok' => true, 'line' => self::LINE, 'demo_used' => true]);
+        $this->assertSame(self::LINE, $this->callsTo('POST', '/interactions')[0]['body']['input'][0]['content'][0]['text']);
+
+        // One try: a second is refused before anything is designed, on this account and on another on the same device.
+        $this->actingAs($member)->withHeaders($device)->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
+            ->assertStatus(422)->assertJson(['ok' => false, 'demo_used' => true, 'message' => __('voice_design.errors.demo_used')]);
+        $this->actingAs($this->member($this->freePlan))->withHeaders($device)->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
+            ->assertStatus(422)->assertJson(['demo_used' => true]);
+        $this->assertCount(1, $this->callsTo('POST', '/voices'));
+
+        // The demo then says the try is used, with the way to a plan, in place of the design button.
+        app()->setLocale('en');
+        $page = $this->actingAs($member)->getLocalizedRoute('demo.page')->assertOk();
+        $page->assertSee(__('voice_design.limit_demo_title'), false)->assertSee(__('voice_design.limit_demo_cta'), false);
+        $this->assertMatchesRegularExpression('/data-vd-submit\s+hidden disabled/', $page->getContent());
+        $page->assertDontSee('name="line"', false);
+    }
+
+    public function test_the_admin_email_tries_the_demo_as_often_as_it_likes(): void
+    {
+        $admin = $this->member($this->freePlan, \App\Support\VoiceCloningAccess::PREVIEW_EMAIL);
+        $this->fakeEngine();
+
+        foreach ([1, 2] as $try) {
+            $this->actingAs($admin)->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
+                ->assertOk()->assertJson(['ok' => true, 'demo_used' => false]);
+        }
     }
 
     /* ------------------------------------------------------------ */
