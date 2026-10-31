@@ -55,7 +55,7 @@
           'use_in_studio' => __('voice_design.use_in_studio'),
           'month_left' => trans_choice('voice_design.month_left', $vd['monthly'], ['left' => ':left', 'max' => $vd['monthly']]),
           'limit_month_title' => __('voice_design.limit_month_title'),
-          'limit_month_text' => __('voice_design.limit_month_text', ['date' => (string) ($vd['month_renews'] ?? '')]),
+          'limit_month_text' => __('voice_design.limit_month_text'),
           'limit_full_title' => __('voice_design.limit_full_title'),
           'limit_full_text' => __('voice_design.limit_full_text'),
           'voice_meta' => __('voice_design.voice_meta', ['speaks' => ':speaks', 'date' => ':date']),
@@ -229,7 +229,7 @@
               <span class="vd-limit-mark">{!! $icon['lock'] !!}</span>
               <div>
                 <strong data-vd-limit-title>{{ $limit ? __('voice_design.limit_'.$limit.'_title') : '' }}</strong>
-                <p data-vd-limit-text>{{ $limit === 'month' ? __('voice_design.limit_month_text', ['date' => (string) $vd['month_renews']]) : ($limit === 'full' ? __('voice_design.limit_full_text') : '') }}</p>
+                <p data-vd-limit-text>{{ $limit ? __('voice_design.limit_'.$limit.'_text') : '' }}</p>
               </div>
             </div>
           @endif

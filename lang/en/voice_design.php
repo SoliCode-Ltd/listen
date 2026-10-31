@@ -107,7 +107,7 @@ return [
     'month_left' => ':left of :max new voice left this month|:left of :max new voices left this month',
     // When no more can be designed: instead of the design button.
     'limit_month_title' => 'This month’s new voices are used',
-    'limit_month_text' => 'Deleting a voice doesn’t give one back. You can design again on :date.',
+    'limit_month_text' => 'Deleting a voice doesn’t give one back. More come with your next credit month.',
     'limit_full_title' => 'Your library is full',
     'limit_full_text' => 'Delete a voice below to design a new one.',
     'library_empty' => 'The voices you keep appear here, ready in the studio’s voice list.',
