@@ -16,8 +16,8 @@ return new class extends Migration
      * library holds as many as its month gives. Voice Design opens to everyone
      * (Voice Design → Settings), and each of these plans' own pricing-card lines
      * (Admin → Plans → Features List) gets its Voice Design line in English and
-     * Arabic, under the voice cloning line. Other plans stay as they are. A
-     * database with none of these plans (a new install) is left alone.
+     * Arabic, under the voice cloning line. Every other plan has it switched
+     * off. A database with none of these plans (a new install) is left alone.
      *
      * @var array<string, array{monthly:int, unlimited:bool}>
      */
@@ -63,7 +63,13 @@ return new class extends Migration
             $opened++;
         }
 
-        if ($opened > 0 && Schema::hasTable('site_settings')) {
+        if ($opened === 0) {
+            return;
+        }
+        // No other plan has it: its members try the tools and the demo's one take, and the
+        // design button leads to the cheapest of these plans.
+        DB::table('plans')->whereNotIn('slug', array_keys(self::PLANS))->update(['voice_design_enabled' => false, 'voice_design_unlimited' => false]);
+        if (Schema::hasTable('site_settings')) {
             SiteSetting::set('voice_design_audience', VoiceDesign::AUDIENCE_EVERYONE, VoiceDesign::GROUP);
         }
     }

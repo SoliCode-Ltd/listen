@@ -26,7 +26,9 @@ class VoiceDesignGoLiveTest extends TestCase
 
     public function test_going_live_opens_it_on_the_three_plans_with_their_numbers_and_their_own_card_lines(): void
     {
+        // Starter had it on to try (as on staging): going live switches it off.
         $starter = $this->plan('starter', 900);
+        $starter->forceFill(['voice_design_enabled' => true, 'voice_design_max_voices' => 2, 'voice_design_monthly_voices' => 2])->save();
         $creator = $this->plan('creator', 2200, withOwnLines: true);
         $pro = $this->plan('pro', 4900, withOwnLines: true);
         $max = $this->plan('studio_max', 9900, withOwnLines: true);
@@ -38,7 +40,8 @@ class VoiceDesignGoLiveTest extends TestCase
         $this->assertSame([true, 50, 50, false], $this->numbers($pro->fresh()));
         $this->assertTrue($max->fresh()->voice_design_enabled);
         $this->assertTrue(VoiceDesign::isUnlimited($max->fresh()));
-        $this->assertSame([false, 0, 0, false], $this->numbers($starter->fresh()));
+        $this->assertFalse($starter->fresh()->voice_design_enabled);
+        $this->assertSame(['creator', 'pro', 'studio_max'], Plan::query()->where('voice_design_enabled', true)->orderBy('price_cents')->pluck('slug')->all());
         $this->assertSame(VoiceDesign::AUDIENCE_EVERYONE, VoiceDesign::audience());
 
         // Each plan's own lines: Voice Design right under voice cloning, once, in both languages.
@@ -56,6 +59,35 @@ class VoiceDesignGoLiveTest extends TestCase
         // The pricing card shows the plan's own lines, Voice Design among them.
         $this->assertContains('Voice Design', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
         $this->assertContains('تصميم الصوت', array_column(PlanPricingLines::forPlan($max->fresh(), 'ar'), 'label'));
+    }
+
+    public function test_each_plan_keeps_only_its_months_new_voices_and_deleting_one_gives_none_back(): void
+    {
+        $creator = $this->plan('creator', 2200);
+        $pro = $this->plan('pro', 4900);
+        $max = $this->plan('studio_max', 9900);
+        $this->migrate();
+
+        foreach ([[$creator, 10], [$pro, 50], [$max, null]] as [$plan, $month]) {
+            $member = $this->member($plan->fresh());
+            // A month's voices less one, two of them deleted again: one more may still be kept.
+            $this->keptVoices($member, ($month ?? 120) - 1, deleted: 2);
+            $this->assertNull(VoiceDesign::keepBlocker((int) $member->id, $plan->fresh()), $plan->slug);
+            $this->keptVoices($member, 1, deleted: 0, from: 1000);
+            if ($month === null) {
+                $this->assertNull(VoiceDesign::keepBlocker((int) $member->id, $plan->fresh()), $plan->slug.' has no limit');
+            } else {
+                $this->assertSame(trans_choice('voice_design.errors.month_used', $month, ['count' => $month]), VoiceDesign::keepBlocker((int) $member->id, $plan->fresh()), $plan->slug);
+            }
+        }
+
+        // The server refuses the keep itself, not just the page.
+        $member = $this->member($creator->fresh());
+        $this->keptVoices($member, 10, deleted: 3);
+        $take = $this->keptVoices($member, 1, deleted: 0, from: 2000, draft: true);
+        $this->actingAs($member)->postJsonLocalizedRoute('voice-design.keep', ['name' => 'One more'], ['id' => $take->id])
+            ->assertStatus(422)->assertJson(['message' => trans_choice('voice_design.errors.month_used', 10, ['count' => 10])]);
+        $this->assertSame(DesignedVoice::DRAFT, $take->fresh()->status);
     }
 
     public function test_a_new_install_without_these_plans_stays_as_it_was(): void
@@ -83,15 +115,8 @@ class VoiceDesignGoLiveTest extends TestCase
     {
         $max = $this->plan('studio_max', 9900);
         $this->migrate();
-        $member = User::factory()->create(['subscription_status_checked_at' => now()]);
-        Subscription::query()->create(['user_id' => $member->id, 'plan_id' => $max->id, 'status' => 'active']);
-        foreach (range(1, 12) as $n) {
-            DesignedVoice::query()->create([
-                'user_id' => $member->id, 'status' => DesignedVoice::SAVED, 'batch' => 'b'.$n, 'name' => 'Voice '.$n,
-                'description' => 'A voice.', 'language' => 'en', 'provider_voice_key' => 'v'.$n, 'key_name' => 'GEMINI_TTS_API_KEY',
-                'take' => 1, 'kept_at' => now(), 'metadata' => ['site' => VoiceDesignService::siteTag()],
-            ]);
-        }
+        $member = $this->member($max->fresh());
+        $this->keptVoices($member, 12, deleted: 0);
 
         $this->assertNull(VoiceDesign::keepBlocker((int) $member->id, $max->fresh()));
         $this->assertSame(0, VoiceDesign::monthlyLimit($max->fresh()));
@@ -101,6 +126,34 @@ class VoiceDesignGoLiveTest extends TestCase
         $page = $this->actingAs($member)->getLocalizedRoute('dashboard')->assertOk();
         $page->assertSee(__('voice_design.month_unlimited_caption'), false);
         $this->assertDoesNotMatchRegularExpression('/data-vd-limit role="status"(?!\s+hidden)/', $page->getContent());
+    }
+
+    private function member(Plan $plan): User
+    {
+        $member = User::factory()->create(['subscription_status_checked_at' => now()]);
+        Subscription::query()->create(['user_id' => $member->id, 'plan_id' => $plan->id, 'status' => 'active']);
+
+        return $member;
+    }
+
+    /** Voices the member kept this month ($deleted of them deleted again), or one take still to keep. */
+    private function keptVoices(User $member, int $count, int $deleted, int $from = 0, bool $draft = false): DesignedVoice
+    {
+        $last = null;
+        foreach (range(1, $count) as $n) {
+            $id = $from + $n;
+            $last = DesignedVoice::query()->create([
+                'user_id' => $member->id, 'status' => $draft ? DesignedVoice::DRAFT : DesignedVoice::SAVED, 'batch' => 'b'.$member->id.'-'.$id,
+                'name' => $draft ? null : 'Voice '.$id, 'description' => 'A voice.', 'language' => 'en', 'provider_voice_key' => 'v'.$member->id.'-'.$id,
+                'key_name' => 'GEMINI_TTS_API_KEY', 'take' => 1, 'kept_at' => $draft ? null : now(),
+                'metadata' => ['site' => VoiceDesignService::siteTag()],
+            ]);
+            if ($n <= $deleted) {
+                $last->delete();
+            }
+        }
+
+        return $last;
     }
 
     private function migrate(): void
