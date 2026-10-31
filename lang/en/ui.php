@@ -1868,7 +1868,7 @@ return [
         'step_consent' => 'Consent',
         'voice_name_label' => 'Voice name',
         'voice_name_placeholder' => 'For example, My studio voice',
-        'language_label' => 'Language of the sample',
+        'language_label' => 'Sample language',
         'language_hint' => 'Record the sample in the language you want this voice to speak.',
         'language_ar' => 'Arabic',
         'language_en' => 'English',
