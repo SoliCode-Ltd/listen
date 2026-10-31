@@ -106,7 +106,7 @@ return [
     'library_title' => 'أصواتك المصمّمة',
     // العدّاد أعلى القسم (components/quota-meter).
     'month_left' => 'تبقّى :left من :max',
-    'month_left_caption' => 'أصوات جديدة هذا الشهر',
+    'month_left_caption' => 'أصوات مصمّمة هذا الشهر',
     // حين لا يمكن تصميم المزيد: بدل زر التصميم.
     'limit_month_title' => 'استخدمت أصواتك المصمّمة لهذا الشهر',
     'limit_month_text' => 'تتجدد أصواتك مع شهر رصيدك القادم.',

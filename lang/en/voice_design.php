@@ -106,7 +106,7 @@ return [
     'library_title' => 'Your designed voices',
     // The meter at the top of the section (components/quota-meter).
     'month_left' => ':left of :max left',
-    'month_left_caption' => 'New voices this month',
+    'month_left_caption' => 'Designed voices this month',
     // When no more can be designed: instead of the design button.
     'limit_month_title' => 'You’ve used this month’s designed voices',
     'limit_month_text' => 'More come with your next credit month.',
