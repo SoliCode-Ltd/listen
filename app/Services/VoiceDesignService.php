@@ -83,6 +83,9 @@ class VoiceDesignService
         $prompt = 'You write voice descriptions for a voice design studio. Rewrite the idea below as one or two vivid sentences that describe a single voice: '
             .'its age, gender, timbre and texture, accent, pace and personality. '.$speaks.' '
             .'Describe the sound only. Never name or imitate a real or famous person, and never quote lines for it to say. '
+            // The speech service refuses any voice of a child ("blocked by safety policies").
+            .'The voice is always an adult\'s: never describe a child, a baby or a teenager, and never give an age under 18. '
+            .'If the idea is a child, describe only the sound (small, high, bright, and its mood) without a child, a school, parents or an age. '
             .'Write in the same language as the idea. Answer with the description alone, without quotes, in under 400 characters.'
             ."\n\nIdea: ".trim($idea);
 

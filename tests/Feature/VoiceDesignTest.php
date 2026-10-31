@@ -80,23 +80,54 @@ class VoiceDesignTest extends TestCase
             ->assertSee('href="#voiceDesignSection"', false)
             ->assertSee(__('voice_design.prompt_label'))
             ->assertSee(__('voice_design.design_button'))
-            ->assertDontSee(__('voice_design.upgrade_title'));
+            ->assertSee('data-vd-submit', false)
+            ->assertDontSee('data-vd-upgrade', false);
     }
 
-    public function test_a_plan_without_it_sees_the_upgrade_to_the_cheapest_plan_that_has_it(): void
+    public function test_a_plan_without_it_tries_the_tools_and_upgrades_to_the_cheapest_plan_that_has_it(): void
     {
         $page = $this->actingAs($this->member($this->plainPlan))->getLocalizedRoute('dashboard');
 
+        // The form to try and the voices to hear, with the way to a plan that designs in place of the button.
         $page->assertOk()
             ->assertSee('id="voiceDesignSection"', false)
-            ->assertSee(__('voice_design.upgrade_title'))
+            ->assertSee('data-vd-form', false)
+            ->assertSee('data-vd-showcase', false)
+            ->assertSee(__('voice_design.write_for_me'))
+            ->assertSee(__('voice_design.locked_title', ['plan' => 'Creator']))
             ->assertSee(__('voice_design.upgrade_cta', ['plan' => 'Creator']))
             ->assertSee(route('billing.page', ['plan' => 'creator']), false)
-            ->assertDontSee('data-vd-form', false);
+            ->assertDontSee('data-vd-submit', false)
+            ->assertDontSee('data-vd-library', false);
 
         $this->actingAs($this->member($this->plainPlan))
             ->postJsonLocalizedRoute('voice-design.design', $this->designInput())
             ->assertForbidden();
+    }
+
+    public function test_it_reaches_members_only_once_the_owner_turns_it_on_for_a_plan(): void
+    {
+        // Every plan starts without it: "Everyone" still means the admin email alone.
+        $this->designPlan->forceFill(['voice_design_enabled' => false])->save();
+        $this->assertFalse(VoiceDesign::anyPlanIncludes());
+        $member = $this->member($this->plainPlan);
+        $admin = $this->member($this->plainPlan, VoiceCloningAccess::PREVIEW_EMAIL);
+
+        $this->actingAs($member)->getLocalizedRoute('dashboard')->assertOk()->assertDontSee('id="voiceDesignSection"', false);
+        $this->actingAs($this->member($this->freePlan))->getLocalizedRoute('demo.page')->assertOk()->assertDontSee('data-vd-config', false);
+        $this->actingAs($member)->postJsonLocalizedRoute('voice-design.enhance', ['idea' => 'a pirate'])->assertNotFound();
+        $this->actingAs($admin)->getLocalizedRoute('dashboard')->assertSee('data-vd-submit', false);
+
+        // Turned on for a plan that is not on sale: its members design, nobody else is asked to upgrade.
+        $this->designPlan->forceFill(['voice_design_enabled' => true, 'is_active' => false])->save();
+        $this->assertFalse(VoiceDesign::showsUpgrade($member, $this->plainPlan));
+        $this->actingAs($member)->getLocalizedRoute('dashboard')->assertDontSee('id="voiceDesignSection"', false);
+        $this->actingAs($this->member($this->designPlan))->getLocalizedRoute('dashboard')->assertSee('data-vd-submit', false);
+
+        // On sale: the others try it, with the way to it.
+        $this->designPlan->forceFill(['is_active' => true])->save();
+        $this->assertTrue(VoiceDesign::showsUpgrade($member, $this->plainPlan));
+        $this->actingAs($member)->getLocalizedRoute('dashboard')->assertSee('data-vd-upgrade', false);
     }
 
     public function test_the_preview_shows_it_to_the_admin_email_only_and_off_hides_it_from_everyone(): void
@@ -106,7 +137,6 @@ class VoiceDesignTest extends TestCase
         $other = $this->member($this->designPlan);
 
         $this->actingAs($admin)->getLocalizedRoute('dashboard')
-            ->assertSee(__('voice_design.preview_badge'))
             ->assertSee('data-vd-form', false);
         $this->actingAs($other)->getLocalizedRoute('dashboard')
             ->assertDontSee('id="voiceDesignSection"', false);

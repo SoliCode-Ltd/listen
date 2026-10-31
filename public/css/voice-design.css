@@ -1,11 +1,24 @@
 /*
  * Voice Design (components/voice-design/studio.blade.php): the dashboard's section and the
  * demo's tab. Uses the pages' colour tokens (--surface, --surface2, --line, --text, --muted,
- * --a), so it follows light and dark themes, and logical properties, so Arabic mirrors it.
+ * --a, --b), so it follows light and dark themes, and logical properties, so Arabic mirrors it.
+ * One control height, one label style and one spacing step for every field.
  */
 
+.vd {
+  --vd-control: 44px;
+  --vd-gap: 1.5rem;
+  --vd-label-gap: .6rem;
+  --vd-panel-radius: 16px;
+  /* Below the site's sticky header. */
+  --vd-sticky-top: 84px;
+  display: grid; gap: 1.75rem; min-width: 0;
+}
 .vd [hidden] { display: none !important; }
 .vd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* The site styles every label and input; inside Voice Design each control is styled on its own. */
+.vd label { margin: 0; }
+.vd fieldset { min-width: 0; }
 
 /* ---------- The section ---------- */
 .vd-section { display: grid; gap: 1.4rem; }
@@ -19,11 +32,9 @@
   border: 1px solid var(--line); background: var(--surface2, var(--surface));
   color: var(--muted); font-size: .85rem; font-weight: 600; white-space: nowrap;
 }
-.vd-pill.is-preview { color: var(--accent-text, var(--a)); border-color: color-mix(in oklab, var(--a) 45%, var(--line)); }
 
 /* ---------- Layout ---------- */
-.vd { display: grid; gap: 1.75rem; min-width: 0; }
-.vd-grid { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); gap: 1.25rem; align-items: stretch; }
+.vd-grid { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); gap: 1.25rem; align-items: start; }
 .vd-card {
   position: relative; min-width: 0;
   border: 1px solid var(--line); border-radius: var(--card-radius, 20px);
@@ -33,9 +44,11 @@
 @media (max-width: 1100px) { .vd-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- The form ---------- */
-.vd-form { display: grid; gap: 1.2rem; align-content: start; }
-.vd-field { display: grid; gap: .55rem; min-width: 0; border: 0; padding: 0; margin: 0; }
-.vd-label { font-size: .9rem; font-weight: 700; color: var(--text); padding: 0; }
+.vd-form { display: grid; gap: var(--vd-gap); align-content: start; }
+.vd-field { display: grid; gap: var(--vd-label-gap); min-width: 0; border: 0; padding: 0; margin: 0; }
+.vd-label { display: block; font-size: .92rem; font-weight: 700; line-height: 1.4; color: var(--text); padding: 0; }
+/* A legend is not a grid item, so the gap below it is its own. */
+.vd-seg-field > legend { float: none; margin: 0 0 var(--vd-label-gap); }
 .vd-label-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .vd-alert {
   padding: .8rem 1rem; border-radius: 14px; font-size: .92rem; line-height: 1.6;
@@ -44,85 +57,125 @@
 }
 .vd-alert.is-ok { border-color: color-mix(in oklab, var(--ok, #32c58d) 45%, var(--line)); background: color-mix(in oklab, var(--ok, #32c58d) 10%, transparent); }
 
+/* Writing tips: a popover under its link, closed by a click outside or Escape. */
 .vd-tips { position: relative; }
 .vd-tips summary {
-  list-style: none; cursor: pointer; font-size: .88rem; font-weight: 600;
-  color: var(--accent-text, var(--a)); text-decoration: underline; text-underline-offset: 3px;
+  list-style: none; cursor: pointer; font-size: .88rem; font-weight: 600; line-height: 1.4;
+  color: var(--accent-text, var(--a)); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
 }
 .vd-tips summary::-webkit-details-marker { display: none; }
+.vd-tips[open] summary { text-decoration-thickness: 2px; }
 .vd-tips-pop {
-  position: absolute; z-index: 20; inset-inline-end: 0; top: calc(100% + .5rem);
-  width: min(360px, 80vw); padding: 1rem 1.1rem; border-radius: 16px;
-  border: 1px solid var(--line); background: var(--surface);
-  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, .55);
+  position: absolute; z-index: 30; inset-inline-end: 0; top: calc(100% + .55rem);
+  width: min(380px, calc(100vw - 3rem)); padding: 1rem 1.15rem 1.05rem; border-radius: var(--vd-panel-radius);
+  border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  box-shadow: 0 22px 48px -20px rgba(15, 12, 40, .45);
 }
-.vd-tips-pop strong { display: block; margin-bottom: .45rem; }
-.vd-tips-pop ul { margin: 0; padding-inline-start: 1.1rem; display: grid; gap: .35rem; color: var(--muted); font-size: .88rem; line-height: 1.6; }
+.vd-tips-pop strong { display: block; margin-bottom: .5rem; font-size: .95rem; }
+.vd-tips-pop ul { margin: 0; padding-inline-start: 1.1rem; display: grid; gap: .4rem; color: var(--muted); font-size: .88rem; line-height: 1.6; }
 
+/* The description, its foot and the characters to start from. */
 .vd-prompt {
   border: 1px solid var(--line); border-radius: 18px; background: var(--surface);
   transition: border-color .15s ease, box-shadow .15s ease; min-width: 0;
 }
 .vd-prompt:focus-within { border-color: color-mix(in oklab, var(--a) 70%, var(--line)); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent); }
-.vd-prompt textarea, .vd-line-box textarea {
-  display: block; width: 100%; min-height: 136px; resize: vertical;
-  padding: 1rem 1.05rem .5rem; border: 0; outline: 0; background: transparent;
-  color: var(--text); font: inherit; font-size: 1rem; line-height: 1.7;
+.vd .vd-prompt textarea {
+  display: block; width: 100%; min-height: 132px; max-height: 360px; margin: 0; resize: none; overflow-y: auto;
+  padding: 1rem 1.1rem .4rem; border: 0; border-radius: 18px 18px 0 0; outline: 0; box-shadow: none; background: transparent;
+  color: var(--text); font: inherit; font-size: 1rem; line-height: 1.75;
 }
-.vd-prompt-foot { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .25rem .65rem .55rem 1.05rem; }
+.vd-prompt-foot { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .2rem .7rem .7rem 1.1rem; }
+[dir="rtl"] .vd-prompt-foot { padding: .2rem 1.1rem .7rem .7rem; }
 .vd-count { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .vd-count.is-over { color: var(--danger, #ee4a77); }
 
 .vd-ghost-btn {
-  display: inline-flex; align-items: center; gap: .45rem;
-  padding: .45rem .8rem; border-radius: 999px; border: 1px solid var(--line);
+  display: inline-flex; align-items: center; justify-content: center; gap: .45rem; min-height: 38px;
+  padding: .4rem .9rem; border-radius: 999px; border: 1px solid var(--line);
   background: var(--surface2, var(--surface)); color: var(--text);
-  font: inherit; font-size: .86rem; font-weight: 600; cursor: pointer;
-  transition: border-color .15s ease, color .15s ease;
+  font: inherit; font-size: .86rem; font-weight: 600; line-height: 1.2; white-space: nowrap; cursor: pointer;
+  transition: border-color .15s ease, color .15s ease, background .15s ease;
 }
 .vd-ghost-btn:hover:not(:disabled) { border-color: var(--a); color: var(--accent-text, var(--a)); }
 .vd-ghost-btn:disabled { opacity: .55; cursor: progress; }
-.vd-ghost-btn svg, .vd-chip-icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.vd-ghost-btn svg, .vd-chip-icon svg, .vd-chips-arrow svg, .vd-hint svg, .vd-summary dt svg, .vd-design-btn svg {
+  width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
 
+.vd-chips-wrap { position: relative; border-top: 1px solid var(--line); }
 .vd-chips {
-  display: flex; gap: .45rem; padding: .65rem; overflow-x: auto; scrollbar-width: thin;
-  border-top: 1px solid var(--line);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 24px), transparent);
-          mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 24px), transparent);
+  --vd-fade-start: 0px; --vd-fade-end: 0px; --vd-fade-to: right;
+  display: flex; gap: .45rem; padding: .7rem .75rem; overflow-x: auto; overscroll-behavior-x: contain; scroll-behavior: smooth;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to var(--vd-fade-to), transparent 0, #000 var(--vd-fade-start), #000 calc(100% - var(--vd-fade-end)), transparent 100%);
+          mask-image: linear-gradient(to var(--vd-fade-to), transparent 0, #000 var(--vd-fade-start), #000 calc(100% - var(--vd-fade-end)), transparent 100%);
 }
+.vd-chips::-webkit-scrollbar { display: none; }
+[dir="rtl"] .vd-chips { --vd-fade-to: left; }
+.vd-chips-wrap.has-start .vd-chips { --vd-fade-start: 56px; }
+.vd-chips-wrap.has-end .vd-chips { --vd-fade-end: 56px; }
+.vd-chips-arrow {
+  position: absolute; z-index: 2; top: 50%; translate: 0 -50%;
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer;
+  box-shadow: 0 4px 14px -6px rgba(15, 12, 40, .4);
+  transition: border-color .15s ease, color .15s ease;
+}
+.vd-chips-arrow:hover { border-color: var(--a); color: var(--accent-text, var(--a)); }
+.vd-chips-arrow.is-prev { inset-inline-start: .35rem; }
+.vd-chips-arrow.is-next { inset-inline-end: .35rem; }
+.vd-chips-arrow.is-prev svg { transform: scaleX(-1); }
+[dir="rtl"] .vd-chips-arrow.is-prev svg { transform: none; }
+[dir="rtl"] .vd-chips-arrow.is-next svg { transform: scaleX(-1); }
 .vd-chip {
-  display: inline-flex; flex: none; align-items: center; gap: .45rem;
-  padding: .36rem .8rem .36rem .4rem; border-radius: 999px;
+  display: inline-flex; flex: none; align-items: center; gap: .45rem; min-height: 38px;
+  padding-block: .3rem; padding-inline: .4rem .85rem; border-radius: 999px;
   border: 1px solid var(--line); background: var(--surface2, var(--surface));
-  color: var(--text); font: inherit; font-size: .87rem; font-weight: 600; white-space: nowrap; cursor: pointer;
-  transition: border-color .15s ease, transform .15s ease;
+  color: var(--text); font: inherit; font-size: .87rem; font-weight: 600; line-height: 1.2; white-space: nowrap; cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
 }
-[dir="rtl"] .vd-chip { padding: .36rem .4rem .36rem .8rem; }
 .vd-chip:hover, .vd-chip.is-picked { border-color: color-mix(in oklab, var(--c1, var(--a)) 80%, var(--line)); }
+.vd-chip.is-picked { background: color-mix(in oklab, var(--c1, var(--a)) 12%, var(--surface)); }
 .vd-chip:active { transform: scale(.97); }
-.vd-chip-icon { justify-content: center; width: 36px; padding: 0 !important; color: var(--muted); }
+.vd-chip-icon { justify-content: center; width: 38px; padding: 0; color: var(--muted); }
 .vd-dot {
-  width: 20px; height: 20px; border-radius: 50%; flex: none;
+  width: 22px; height: 22px; border-radius: 50%; flex: none;
   background: radial-gradient(circle at 32% 28%, var(--c2, #fff) 0 12%, var(--c1, var(--a)) 48%, var(--c0, #222) 100%);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12);
 }
 
-.vd-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-@media (max-width: 560px) { .vd-row { grid-template-columns: minmax(0, 1fr); } }
-.vd-seg { display: flex; padding: 4px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); }
-.vd-seg label { flex: 1; position: relative; }
-.vd-seg input { position: absolute; opacity: 0; pointer-events: none; }
-.vd-seg span {
-  display: block; padding: .5rem .6rem; border-radius: 999px; text-align: center;
-  font-size: .9rem; font-weight: 600; color: var(--muted); cursor: pointer; transition: background .15s ease, color .15s ease;
+/* A description that names a child: the service refuses those, so it is said before a design. */
+.vd-hint {
+  display: flex; align-items: flex-start; gap: .55rem; margin: 0; padding: .65rem .85rem; border-radius: 12px;
+  font-size: .86rem; line-height: 1.6; color: var(--text);
+  border: 1px solid color-mix(in oklab, #f5a524 45%, var(--line)); background: color-mix(in oklab, #f5a524 10%, transparent);
 }
-.vd-seg input:checked + span { background: var(--a); color: #fff; }
+.vd-hint svg { margin-top: 2px; color: #d98a00; }
+
+/* Language and voice: two segmented controls of the same height. */
+.vd-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.vd-seg {
+  display: flex; gap: 2px; min-height: var(--vd-control); padding: 4px;
+  border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+}
+.vd-seg label { display: flex; flex: 1 1 0; min-width: 0; position: relative; }
+.vd-seg input { position: absolute; opacity: 0; pointer-events: none; margin: 0; }
+.vd-seg span {
+  display: flex; flex: 1; align-items: center; justify-content: center; min-height: 34px; padding: 0 .7rem;
+  border-radius: 999px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: .9rem; font-weight: 600; line-height: 1.2; color: var(--muted); cursor: pointer;
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.vd-seg label:hover span { color: var(--text); }
+.vd-seg input:checked + span { background: var(--a); color: #fff; box-shadow: 0 4px 12px -6px color-mix(in oklab, var(--a) 70%, transparent); }
 .vd-seg input:focus-visible + span { outline: 2px solid var(--a); outline-offset: 2px; }
 
-.vd-switch { display: flex; align-items: flex-start; gap: .8rem; cursor: pointer; }
+/* "Write the line for me". */
+.vd-switch { display: flex; align-items: flex-start; gap: .85rem; cursor: pointer; }
 .vd-switch input { position: absolute; opacity: 0; pointer-events: none; }
 .vd-switch-track {
-  position: relative; flex: none; width: 44px; height: 26px; margin-top: 2px; border-radius: 999px;
+  position: relative; flex: none; width: 44px; height: 26px; margin-top: 1px; border-radius: 999px;
   background: var(--line-strong, var(--line)); transition: background .18s ease;
 }
 .vd-switch-track span {
@@ -132,69 +185,141 @@
 .vd-switch input:checked + .vd-switch-track { background: var(--a); }
 .vd-switch input:checked + .vd-switch-track span { inset-inline-start: 21px; }
 .vd-switch input:focus-visible + .vd-switch-track { outline: 2px solid var(--a); outline-offset: 2px; }
-.vd-switch-text { display: grid; gap: .15rem; }
-.vd-switch-text strong { font-size: .95rem; }
-.vd-switch-text small { color: var(--muted); font-size: .86rem; line-height: 1.55; }
-.vd-line-box { display: grid; gap: .45rem; margin-top: .3rem; }
-.vd-line-box textarea { min-height: 84px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: .8rem .95rem; }
-.vd-line-box textarea:focus { border-color: var(--a); }
+.vd-switch-text { display: grid; gap: .2rem; }
+.vd-switch-text strong { font-size: .92rem; line-height: 1.4; }
+.vd-switch-text small { color: var(--muted); font-size: .85rem; line-height: 1.55; }
+.vd-line-box { display: grid; gap: var(--vd-label-gap); margin-top: .9rem; }
+.vd .vd-line-box textarea {
+  display: block; width: 100%; min-height: 88px; margin: 0; resize: vertical;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: none;
+  padding: .8rem .95rem; color: var(--text); font: inherit; font-size: 1rem; line-height: 1.7;
+}
+.vd .vd-line-box textarea:focus { outline: 0; border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent); }
 .vd-line-box .vd-count { justify-self: end; }
 
-.vd-shape { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
-.vd-shape summary { display: flex; align-items: center; gap: .75rem; padding: .85rem 1rem; cursor: pointer; list-style: none; }
+/* Shape the voice: a panel that opens to three sliders. */
+.vd-shape { border: 1px solid var(--line); border-radius: var(--vd-panel-radius); background: var(--surface); }
+.vd-shape summary { display: flex; align-items: center; gap: .8rem; padding: .85rem 1.1rem; cursor: pointer; list-style: none; }
 .vd-shape summary::-webkit-details-marker { display: none; }
+/* A chevron drawn with physical borders, so it points down closed and up open in both directions. */
 .vd-shape summary::after {
-  content: ''; margin-inline-start: auto; width: 8px; height: 8px; flex: none;
-  border-inline-end: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .18s ease;
+  content: ''; flex: none; width: 9px; height: 9px; margin-inline-start: auto;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: translateY(-2px) rotate(45deg); transition: transform .2s ease;
 }
-.vd-shape[open] summary::after { transform: rotate(-135deg); }
-.vd-shape summary > span:not(.vd-shape-icon) { display: grid; gap: .1rem; }
-.vd-shape summary small { color: var(--muted); font-size: .84rem; }
-.vd-shape-icon { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 10px; background: color-mix(in oklab, var(--a) 14%, transparent); color: var(--a); }
+.vd-shape[open] summary::after { transform: translateY(2px) rotate(-135deg); }
+.vd-shape[open] summary { border-bottom: 1px solid var(--line); }
+.vd-shape summary > span:not(.vd-shape-icon) { display: grid; gap: .15rem; }
+.vd-shape summary strong { font-size: .92rem; line-height: 1.4; }
+.vd-shape summary small { color: var(--muted); font-size: .84rem; line-height: 1.5; }
+.vd-shape-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 11px; background: color-mix(in oklab, var(--a) 14%, transparent); color: var(--a); }
 .vd-shape-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
-.vd-sliders { display: grid; gap: 1.1rem; padding: .3rem 1rem 1.1rem; }
-.vd-slider { display: grid; gap: .35rem; }
-.vd-slider label { font-size: .9rem; font-weight: 600; }
-.vd-slider input[type="range"] { width: 100%; accent-color: var(--a); }
-.vd-slider-ends { display: flex; justify-content: space-between; font-size: .8rem; color: var(--muted); }
 
-.vd-actions { display: grid; gap: .55rem; }
-.vd-design-btn { display: inline-flex; align-items: center; justify-content: center; gap: .75rem; min-height: 54px; width: 100%; font-size: 1.02rem; }
+/* Each slider: its name, then the low end, the track and the high end on one line. The tracks
+   of all three line up, as they share one grid. */
+.vd-sliders {
+  display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: center;
+  column-gap: .9rem; row-gap: .5rem; padding: 1.05rem 1.1rem 1.2rem;
+}
+.vd-slider { display: contents; }
+.vd-slider-label { grid-column: 1 / -1; margin-top: .85rem !important; font-size: .9rem; font-weight: 700; line-height: 1.4; color: var(--text); }
+.vd-slider:first-child .vd-slider-label { margin-top: 0 !important; }
+.vd-slider-end { font-size: .8rem; line-height: 1.3; color: var(--muted); white-space: nowrap; }
+.vd-slider-end.is-low { text-align: end; }
+
+/* The studio's own slider: a thin track, a dot at the middle (where the description is left as
+   it is) and a round thumb. */
+.vd input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  display: block; width: 100%; height: 24px; min-height: 0; margin: 0; padding: 0;
+  border: 0; border-radius: 0; background: transparent; box-shadow: none; cursor: pointer;
+}
+.vd input[type="range"]:focus { outline: none; box-shadow: none; }
+.vd input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 50%, var(--muted) 0 2px, transparent 2.5px),
+    linear-gradient(90deg, color-mix(in oklab, var(--a) 35%, var(--line)), color-mix(in oklab, var(--b, var(--a)) 25%, var(--line)));
+}
+.vd input[type="range"]::-moz-range-track {
+  height: 6px; border: 0; border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 50%, var(--muted) 0 2px, transparent 2.5px),
+    linear-gradient(90deg, color-mix(in oklab, var(--a) 35%, var(--line)), color-mix(in oklab, var(--b, var(--a)) 25%, var(--line)));
+}
+.vd input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 20px; height: 20px; margin-top: -7px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--a), var(--b, var(--a))); border: 3px solid var(--surface);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--a) 30%, transparent), 0 2px 8px rgba(0, 0, 0, .25);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.vd input[type="range"]::-moz-range-thumb {
+  width: 20px; height: 20px; border-radius: 50%; box-sizing: border-box;
+  background: linear-gradient(135deg, var(--a), var(--b, var(--a))); border: 3px solid var(--surface);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--a) 30%, transparent), 0 2px 8px rgba(0, 0, 0, .25);
+}
+.vd input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.12); }
+.vd input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
+.vd input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px color-mix(in oklab, var(--a) 28%, transparent); }
+.vd input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px color-mix(in oklab, var(--a) 28%, transparent); }
+
+/* What a design costs and gives, then the button, then the rule. */
+.vd-actions { display: grid; gap: .9rem; }
+.vd-summary { padding: .2rem 1.1rem .8rem; border: 1px solid var(--line); border-radius: var(--vd-panel-radius); background: var(--surface); }
+.vd-summary dl { display: grid; margin: 0; }
+.vd-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid var(--line); }
+.vd-summary-row dt { display: flex; flex: none; align-items: center; gap: .6rem; color: var(--muted); font-size: .9rem; line-height: 1.4; white-space: nowrap; }
+.vd-summary-row dt .credit-icon { font-size: 1.1rem; }
+.vd-summary-row dt svg { width: 18px; height: 18px; color: var(--a); }
+.vd-summary-row dd { margin: 0; color: var(--text); font-size: .95rem; font-weight: 700; line-height: 1.4; text-align: end; font-variant-numeric: tabular-nums; }
+.vd-summary-note { margin: .7rem 0 0; color: var(--muted); font-size: .84rem; line-height: 1.55; }
+.vd-design-btn { display: inline-flex; align-items: center; justify-content: center; gap: .6rem; min-height: 54px; width: 100%; font-size: 1.02rem; }
+.vd-design-btn svg { width: 20px; height: 20px; }
 .vd-design-btn:disabled { opacity: .7; cursor: progress; }
-.vd-cost { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .6rem; border-radius: 999px; background: rgba(255, 255, 255, .17); font-size: .86rem; font-variant-numeric: tabular-nums; }
-.vd-cost-hint, .vd-note { margin: 0; color: var(--muted); font-size: .84rem; line-height: 1.6; }
-.vd-safety { display: flex; gap: .5rem; align-items: flex-start; margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.55; }
-.vd-safety svg { width: 16px; height: 16px; flex: none; margin-top: 2px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.vd-safety { display: flex; gap: .55rem; align-items: flex-start; margin: 0; color: var(--muted); font-size: .84rem; line-height: 1.55; }
+.vd-safety svg { width: 17px; height: 17px; flex: none; margin-top: 2px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+.vd-note { margin: 0; color: var(--muted); font-size: .84rem; line-height: 1.6; }
 
 /* ---------- The stage ---------- */
+/* Beside a long form the stage stays in view; with the takes it scrolls with the page. */
 .vd-stage {
-  display: grid; align-content: center; overflow: hidden; min-height: 480px;
+  position: sticky; top: var(--vd-sticky-top); scroll-margin-top: var(--vd-sticky-top);
+  display: grid; align-content: center; overflow: hidden;
+  min-height: min(600px, calc(100vh - var(--vd-sticky-top) - 1.5rem));
   background:
     radial-gradient(60% 55% at 50% 42%, color-mix(in oklab, var(--a) 16%, transparent), transparent 70%),
     var(--surface2, var(--surface));
 }
+.vd-stage[data-state="results"] { position: relative; top: auto; min-height: 0; align-content: start; }
+/* Stacked, the stage comes first: the voices are the first thing to meet, and a design's takes appear above the form. */
+@media (max-width: 1100px) { .vd-stage { order: -1; position: relative; top: auto; min-height: 0; padding-block: 1.25rem; } }
 .vd-stage-idle, .vd-stage-work { display: grid; justify-items: center; gap: 1rem; text-align: center; }
-.vd-stage-art { position: relative; width: 100%; height: clamp(300px, 30vw, 360px); display: grid; place-items: center; }
+.vd-stage-art { position: relative; width: 100%; height: clamp(320px, 30vw, 380px); display: grid; place-items: center; }
 .vd-cloud { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; pointer-events: none; }
 .vd-cloud-chip {
   position: absolute; padding: .5rem .95rem; border-radius: 999px;
   border: 1px solid var(--line); background: color-mix(in oklab, var(--surface) 88%, transparent);
-  color: var(--muted); font-size: .9rem; font-weight: 600; white-space: nowrap;
+  color: var(--muted); font-size: .88rem; font-weight: 600; line-height: 1.2; white-space: nowrap;
   filter: blur(1.2px); opacity: .7;
   animation: vd-float 7s ease-in-out infinite; animation-delay: calc(var(--i) * -.9s);
   transition: filter .35s ease, opacity .35s ease, color .35s ease, border-color .35s ease, box-shadow .35s ease;
 }
-.vd-cloud-chip:nth-child(1) { top: 7%; inset-inline-start: 6%; }
-.vd-cloud-chip:nth-child(2) { top: 4%; inset-inline-end: 8%; }
-.vd-cloud-chip:nth-child(3) { top: 30%; inset-inline-start: 0; }
-.vd-cloud-chip:nth-child(4) { top: 31%; inset-inline-end: 0; }
-.vd-cloud-chip:nth-child(5) { bottom: 30%; inset-inline-start: 2%; }
-.vd-cloud-chip:nth-child(6) { bottom: 28%; inset-inline-end: 1%; }
-.vd-cloud-chip:nth-child(7) { bottom: 6%; inset-inline-start: 10%; }
-.vd-cloud-chip:nth-child(8) { bottom: 4%; inset-inline-end: 9%; }
+/* Five rows of two around the orb. */
+.vd-cloud-chip:nth-child(1) { top: 3%; inset-inline-start: 9%; }
+.vd-cloud-chip:nth-child(2) { top: 5%; inset-inline-end: 8%; }
+.vd-cloud-chip:nth-child(3) { top: 24%; inset-inline-start: 1%; }
+.vd-cloud-chip:nth-child(4) { top: 25%; inset-inline-end: 0; }
+.vd-cloud-chip:nth-child(5) { top: 46%; inset-inline-start: 0; }
+.vd-cloud-chip:nth-child(6) { top: 47%; inset-inline-end: 1%; }
+.vd-cloud-chip:nth-child(7) { bottom: 24%; inset-inline-start: 2%; }
+.vd-cloud-chip:nth-child(8) { bottom: 23%; inset-inline-end: 0; }
+.vd-cloud-chip:nth-child(9) { bottom: 3%; inset-inline-start: 11%; }
+.vd-cloud-chip:nth-child(10) { bottom: 4%; inset-inline-end: 9%; }
 .vd-cloud-chip.is-speaking {
   filter: none; opacity: 1; color: var(--text); z-index: 3;
   border-color: color-mix(in oklab, var(--c1, var(--a)) 85%, var(--line));
+  background: var(--surface);
   box-shadow: 0 0 0 4px color-mix(in oklab, var(--c1, var(--a)) 18%, transparent), 0 12px 30px -14px var(--c1, var(--a));
 }
 @keyframes vd-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
@@ -208,19 +333,21 @@
 }
 .vd-orb-wrap.is-working .vd-orb { animation: vd-breathe 2.4s ease-in-out infinite; }
 @keyframes vd-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+/* The play button sits exactly on the orb's centre; the triangle is drawn optically centred. */
 .vd-orb-play {
-  position: absolute; display: grid; place-items: center; width: 58px; height: 58px; border: 0; border-radius: 50%;
-  background: #fff; color: #0B0B0F; cursor: pointer; box-shadow: 0 10px 28px -8px rgba(0, 0, 0, .6);
-  transition: transform .15s ease;
+  position: absolute; inset: 0; margin: auto; display: grid; place-items: center; width: 60px; height: 60px; padding: 0;
+  border: 0; border-radius: 50%; background: #fff; color: #0B0B0F; cursor: pointer;
+  box-shadow: 0 10px 28px -8px rgba(0, 0, 0, .6); transition: transform .15s ease;
 }
 .vd-orb-play:hover { transform: scale(1.06); }
 .vd-orb-play:focus-visible { outline: 3px solid var(--a); outline-offset: 3px; }
-.vd-play-icon svg { width: 24px; height: 24px; fill: currentColor; margin-left: 3px; }
-.vd-pause-icon { display: none; gap: 5px; }
+.vd-play-icon, .vd-pause-icon { display: grid; place-items: center; }
+.vd-play-icon svg { display: block; width: 24px; height: 24px; fill: currentColor; }
+.vd-pause-icon { display: none; grid-auto-flow: column; gap: 5px; }
 .vd-pause-icon i { display: block; width: 5px; height: 20px; border-radius: 2px; background: currentColor; }
 .is-playing > .vd-play-icon { display: none; }
-.is-playing > .vd-pause-icon { display: flex; }
-.vd-stage-hint { margin: 0; max-width: 34ch; color: var(--muted); font-size: .93rem; line-height: 1.6; min-height: 1.6em; }
+.is-playing > .vd-pause-icon { display: grid; }
+.vd-stage-hint { margin: 0; max-width: 36ch; color: var(--muted); font-size: .93rem; line-height: 1.6; min-height: 1.6em; }
 
 .vd-steps { display: grid; gap: .55rem; margin: .5rem 0 0; padding: 0; list-style: none; text-align: start; }
 .vd-steps li { display: flex; align-items: center; gap: .65rem; color: var(--muted); font-weight: 600; transition: color .25s ease; }
@@ -235,6 +362,21 @@
 @keyframes vd-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--a) 50%, transparent); } 50% { box-shadow: 0 0 0 6px transparent; } }
 .vd-progress { width: min(280px, 80%); height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
 .vd-progress i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--a), color-mix(in oklab, var(--a) 40%, #c084fc)); transition: width .6s ease; }
+
+/* ---------- Players: one round button, a bar and the length ---------- */
+.vd-play {
+  display: grid; place-items: center; width: 42px; height: 42px; flex: none; padding: 0; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface2, var(--surface)); color: var(--text); cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+.vd-play:hover { border-color: var(--a); color: var(--accent-text, var(--a)); }
+.vd-play.is-playing { background: var(--a); border-color: var(--a); color: #fff; }
+.vd-play .vd-play-icon svg { width: 16px; height: 16px; }
+.vd-play .vd-pause-icon { gap: 4px; }
+.vd-play .vd-pause-icon i { width: 4px; height: 14px; }
+.vd-take-bar { position: relative; height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.vd-take-bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--a); }
+.vd-time { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* ---------- The takes ---------- */
 .vd-results { display: grid; gap: 1rem; align-content: start; }
@@ -254,75 +396,77 @@
 }
 .vd-take.is-chosen { border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 20%, transparent); }
 @keyframes vd-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.vd-take .orb { --orb-size: 54px; }
-.vd-take-main { display: grid; gap: .4rem; min-width: 0; }
-.vd-take-title { display: flex; align-items: baseline; gap: .5rem; font-weight: 700; }
+.vd-take .orb { --orb-size: 52px; }
+.vd-take-main { display: grid; gap: .45rem; min-width: 0; }
+.vd-take-title { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; font-weight: 700; }
 .vd-take-title small { color: var(--muted); font-weight: 500; font-size: .8rem; }
-.vd-take-bar { height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
-.vd-take-bar i { display: block; height: 100%; width: 0; background: var(--a); }
 .vd-take-side { display: flex; align-items: center; gap: .5rem; }
-.vd-play {
-  display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 50%;
-  border: 1px solid var(--line); background: var(--surface2, var(--surface)); color: var(--text); cursor: pointer;
-  transition: border-color .15s ease, background .15s ease;
-}
-.vd-play:hover { border-color: var(--a); }
-.vd-play.is-playing { background: var(--a); border-color: var(--a); color: #fff; }
-.vd-play .vd-play-icon svg { width: 18px; height: 18px; }
-.vd-play .vd-pause-icon i { width: 4px; height: 15px; }
 .vd-take-keep { white-space: nowrap; padding: .55rem 1rem; font-size: .88rem; }
 @media (max-width: 520px) {
   .vd-take { grid-template-columns: auto minmax(0, 1fr); }
   .vd-take-side { grid-column: 1 / -1; justify-content: space-between; }
 }
 
-.vd-keep { display: grid; gap: .5rem; padding: 1rem; border-radius: 16px; border: 1px solid color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 6%, var(--surface)); }
+.vd-keep { display: grid; gap: var(--vd-label-gap); padding: 1rem; border-radius: var(--vd-panel-radius); border: 1px solid color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 6%, var(--surface)); }
 .vd-keep-row { display: flex; flex-wrap: wrap; gap: .5rem; }
-.vd-keep-row input {
-  flex: 1 1 200px; min-width: 0; padding: .7rem .9rem; border-radius: 12px; border: 1px solid var(--line);
-  background: var(--surface); color: var(--text); font: inherit;
+.vd .vd-keep-row input {
+  flex: 1 1 200px; min-width: 0; min-height: var(--vd-control); margin: 0; padding: .6rem .95rem; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--text); font: inherit; box-shadow: none;
 }
-.vd-keep-row input:focus { outline: 0; border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent); }
-.vd-upsell { display: grid; gap: .5rem; padding: 1.1rem; border-radius: 16px; text-align: center; border: 1px solid color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 7%, var(--surface)); }
+.vd .vd-keep-row input:focus { outline: 0; border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent); }
+.vd-keep-row .btn { min-height: var(--vd-control); white-space: nowrap; }
+.vd-upsell { display: grid; gap: .5rem; padding: 1.1rem; border-radius: var(--vd-panel-radius); text-align: center; border: 1px solid color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 7%, var(--surface)); }
 .vd-upsell p { margin: 0; color: var(--muted); font-size: .9rem; }
 .vd-upsell .btn { justify-self: center; }
 .vd-again { justify-self: start; }
 
-/* ---------- A plan without it ---------- */
-.vd-pitch { display: grid; gap: 1rem; align-content: center; justify-items: start; }
-.vd-pitch-mark { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, var(--a), color-mix(in oklab, var(--a) 45%, #c084fc)); }
-.vd-pitch-mark svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
-.vd-pitch h2 { margin: 0; font-size: clamp(1.3rem, 2.2vw, 1.65rem); }
-.vd-pitch > p { margin: 0; color: var(--muted); line-height: 1.7; max-width: 52ch; }
-.vd-pitch-points { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; }
-.vd-pitch-points li { display: flex; gap: .6rem; align-items: flex-start; line-height: 1.55; }
-.vd-pitch-points svg { width: 20px; height: 20px; flex: none; color: var(--a); }
-.vd-pitch-examples { display: grid; gap: .6rem; width: 100%; }
-.vd-pitch-examples figure { margin: 0; padding: .75rem .9rem; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
-.vd-pitch-examples figcaption { font-weight: 700; font-size: .88rem; margin-bottom: .2rem; }
-.vd-pitch-examples blockquote { margin: 0; color: var(--muted); font-size: .86rem; line-height: 1.6; }
-.vd-pitch-cta { margin-top: .25rem; }
+/* ---------- A plan without it: the form to try, and the way to a plan that designs ---------- */
+.vd-unlock {
+  display: grid; gap: .55rem; padding: 1rem 1.1rem 1.1rem;
+  border: 1px solid color-mix(in oklab, var(--a) 40%, var(--line)); border-radius: var(--vd-panel-radius);
+  background: color-mix(in oklab, var(--a) 7%, var(--surface));
+}
+/* The lock sits beside the title, so the text below has the panel's full width on a phone too. */
+.vd-unlock-head { display: flex; align-items: center; gap: .7rem; }
+.vd-unlock-head strong { font-size: .98rem; line-height: 1.4; }
+.vd-unlock-mark { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 11px; color: #fff; background: linear-gradient(135deg, var(--a), color-mix(in oklab, var(--a) 45%, #c084fc)); }
+.vd-unlock-mark svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.vd-unlock > p { margin: 0; color: var(--muted); font-size: .88rem; line-height: 1.6; }
+.vd-unlock-points { display: grid; gap: .4rem; margin: .1rem 0 0; padding: 0; list-style: none; }
+.vd-unlock-points li { display: flex; gap: .55rem; align-items: flex-start; font-size: .88rem; line-height: 1.55; }
+.vd-unlock-points svg { width: 19px; height: 19px; flex: none; margin-top: 1px; color: var(--a); }
+.vd-unlock.is-nudged { animation: vd-nudge .6s ease; }
+@keyframes vd-nudge { 0%, 100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+a.vd-design-btn { text-decoration: none; }
 
 /* ---------- The library ---------- */
 .vd-library { display: grid; gap: .9rem; }
 .vd-library-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .vd-library-head h2 { margin: 0; font-size: 1.15rem; }
-.vd-library-empty { margin: 0; padding: 1.4rem; border: 1px dashed var(--line); border-radius: 16px; color: var(--muted); text-align: center; }
-.vd-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: .9rem; }
-.vd-voice { display: grid; gap: .75rem; padding: 1rem; border: 1px solid var(--line); border-radius: 18px; background: var(--surface2, var(--surface)); }
+.vd-library-empty { margin: 0; padding: 1.4rem; border: 1px dashed var(--line); border-radius: var(--vd-panel-radius); color: var(--muted); text-align: center; }
+.vd-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: .9rem; }
+.vd-voice { display: grid; gap: .85rem; align-content: start; padding: 1rem; border: 1px solid var(--line); border-radius: 18px; background: var(--surface2, var(--surface)); }
 .vd-voice.is-new { animation: vd-in .35s ease both; border-color: color-mix(in oklab, var(--a) 55%, var(--line)); }
-.vd-voice-head { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+.vd-voice-head { display: flex; align-items: center; gap: .8rem; min-width: 0; }
 .vd-voice-head .orb { --orb-size: 46px; }
-.vd-voice-name { display: grid; gap: .1rem; min-width: 0; }
-.vd-voice-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vd-voice-name small { color: var(--muted); font-size: .8rem; }
+.vd-voice-name { display: grid; gap: .15rem; min-width: 0; }
+.vd-voice-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.35; }
+.vd-voice-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: .8rem; line-height: 1.4; }
 .vd-voice-desc {
-  margin: 0; color: var(--muted); font-size: .87rem; line-height: 1.6;
+  margin: 0; color: var(--muted); font-size: .87rem; line-height: 1.6; min-height: 3.2em;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
+/* Its sample: play, the bar and the length, in one rounded strip. */
+.vd-mini {
+  display: flex; align-items: center; gap: .75rem;
+  padding-block: .35rem; padding-inline: .35rem .9rem;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+}
+.vd-mini .vd-play { width: 36px; height: 36px; }
+.vd-mini .vd-take-bar { flex: 1; }
 .vd-voice-foot { display: flex; align-items: center; gap: .5rem; }
-.vd-voice-foot .btn { flex: 1; padding: .55rem .9rem; font-size: .88rem; }
-.vd-icon-btn { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.vd-voice-foot .btn { flex: 1; min-height: 42px; padding: .5rem 1rem; font-size: .9rem; white-space: nowrap; }
+.vd-icon-btn { display: grid; place-items: center; width: 42px; height: 42px; flex: none; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; transition: color .15s ease, border-color .15s ease; }
 .vd-icon-btn:hover { color: var(--danger, #ee4a77); border-color: currentColor; }
 .vd-icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -331,31 +475,46 @@
 .vd-tips summary:focus-visible, .vd-shape summary:focus-visible {
   outline: 2px solid var(--a); outline-offset: 2px;
 }
-.vd-shape summary:focus-visible { border-radius: 16px; }
+.vd-shape summary:focus-visible { border-radius: var(--vd-panel-radius); }
 @media (pointer: coarse) {
-  .vd-chip { min-height: 40px; }
-  .vd-chip-icon { width: 40px; }
-  .vd-ghost-btn { min-height: 40px; }
-  .vd-icon-btn { width: 44px; height: 44px; }
-  .vd-slider input[type="range"] { height: 28px; }
+  .vd-chips-arrow { display: none !important; }
+  .vd-chip, .vd-ghost-btn { min-height: 42px; }
+  .vd-chip-icon { width: 42px; }
+  .vd-icon-btn, .vd-play { width: 44px; height: 44px; }
+  .vd input[type="range"] { height: 32px; }
+  .vd input[type="range"]::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -9px; }
+  .vd input[type="range"]::-moz-range-thumb { width: 24px; height: 24px; }
 }
 
 /* ---------- Phones ---------- */
 @media (max-width: 560px) {
+  .vd { --vd-gap: 1.25rem; }
   .vd-card { padding: 1rem; }
+  .vd-row { grid-template-columns: minmax(0, 1fr); }
   .vd-stage { min-height: 0; padding-block: 1.25rem; }
-  .vd-stage-art { height: 250px; }
-  .vd-orb { --orb-size: 132px; }
-  .vd-orb-play { width: 52px; height: 52px; }
-  .vd-cloud-chip { padding: .34rem .62rem; font-size: .74rem; }
-  .vd-cloud-chip:nth-child(3) { top: 28%; }
-  .vd-cloud-chip:nth-child(4) { top: 29%; }
-  .vd-cloud-chip:nth-child(5) { bottom: 24%; }
-  .vd-cloud-chip:nth-child(6) { bottom: 22%; }
-  .vd-prompt textarea { min-height: 120px; }
+  /* A phone has room for two characters above the orb and two below it. */
+  .vd-stage-art { height: 270px; }
+  .vd-orb { --orb-size: 136px; }
+  .vd-orb-play { width: 54px; height: 54px; }
+  .vd-cloud-chip { padding: .34rem .66rem; font-size: .76rem; }
+  .vd-cloud-chip:nth-child(n+3):nth-child(-n+6), .vd-cloud-chip:nth-child(n+9) { display: none; }
+  .vd-cloud-chip:nth-child(1) { top: 2%; inset-inline-start: 4%; }
+  .vd-cloud-chip:nth-child(2) { top: 5%; inset-inline-end: 4%; }
+  .vd-cloud-chip:nth-child(7) { bottom: 4%; inset-inline-start: 6%; }
+  .vd-cloud-chip:nth-child(8) { bottom: 2%; inset-inline-end: 5%; }
+  .vd .vd-prompt textarea { min-height: 120px; }
   .vd-section-head h1 { font-size: clamp(1.7rem, 8vw, 2.1rem); }
+  /* On a phone each slider takes its own rows: the name, the track, then its two ends. */
+  .vd-sliders { grid-template-columns: minmax(0, 1fr); row-gap: 1.1rem; padding: .9rem 1rem 1.1rem; }
+  .vd-slider { display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "label label" "track track" "low high"; row-gap: .3rem; }
+  .vd-slider-label { grid-area: label; margin-top: 0 !important; }
+  .vd-slider input[type="range"] { grid-area: track; }
+  .vd-slider-end.is-low { grid-area: low; text-align: start; }
+  .vd-slider-end.is-high { grid-area: high; text-align: end; }
+  .vd-summary { padding-inline: .95rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .vd-cloud-chip, .vd-orb-wrap.is-working .vd-orb, .vd-take, .vd-voice, .vd-steps li.is-active::before { animation: none; }
+  .vd-cloud-chip, .vd-orb-wrap.is-working .vd-orb, .vd-take, .vd-voice, .vd-steps li.is-active::before, .vd-unlock.is-nudged { animation: none; }
+  .vd-chips { scroll-behavior: auto; }
 }

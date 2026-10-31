@@ -451,7 +451,7 @@ class PlanResource extends Resource
                     ->schema([
                         Forms\Components\Toggle::make('voice_design_enabled')
                             ->label('Include Voice Design')
-                            ->helperText('Off: members on this plan see what Voice Design does and the way to a plan that has it.')
+                            ->helperText('Off for every plan until you turn it on here and set its numbers. Until a plan has it, only the admin email sees Voice Design, whatever Voice Design → Settings says. Off on this plan, once another has it: its members try the tools and hear the voices, and the design button leads to the cheapest plan with it.')
                             ->default(false)
                             ->live()
                             ->columnSpan(2),
@@ -459,12 +459,11 @@ class PlanResource extends Resource
                             ->label('Designed voices a member keeps')
                             ->numeric()
                             ->integer()
-                            ->minValue(0)
+                            ->minValue(1)
                             ->maxValue(100)
-                            ->default(0)
                             ->required()
                             ->suffix('voices')
-                            ->helperText('At the same time. 0: the site-wide number (Voice Design → Settings). A member deletes one to keep another.')
+                            ->helperText('At the same time. A member deletes one to keep another.')
                             ->visible(fn (Forms\Get $get): bool => (bool) $get('voice_design_enabled')),
                         Forms\Components\TextInput::make('voice_design_monthly_voices')
                             ->label('New voices a month')
@@ -472,10 +471,9 @@ class PlanResource extends Resource
                             ->integer()
                             ->minValue(0)
                             ->maxValue(1000)
-                            ->default(0)
                             ->required()
                             ->suffix('voices')
-                            ->helperText('New voices a member may keep in a credit month; deleting one does not give it back. 0: no monthly count.')
+                            ->helperText('New voices a member may keep in a credit month; deleting one does not give it back. 0: no monthly count, only the voices kept.')
                             ->visible(fn (Forms\Get $get): bool => (bool) $get('voice_design_enabled')),
                         Forms\Components\Placeholder::make('voice_design_cost')
                             ->label('What a design costs')

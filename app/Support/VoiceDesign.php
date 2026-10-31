@@ -75,10 +75,20 @@ final class VoiceDesign
         }
 
         return match (self::audience()) {
-            self::AUDIENCE_EVERYONE => true,
+            // Everyone, once the owner has turned it on for a plan; until then the admin email alone.
+            self::AUDIENCE_EVERYONE => self::anyPlanIncludes() || VoiceCloningAccess::isPreviewAccount($user),
             self::AUDIENCE_OFF => false,
             default => VoiceCloningAccess::isPreviewAccount($user),
         };
+    }
+
+    /**
+     * Whether the owner has turned Voice Design on for any plan (each starts
+     * without it), on sale or not, so members kept on an old plan keep it.
+     */
+    public static function anyPlanIncludes(): bool
+    {
+        return (bool) rescue(fn () => Plan::query()->where('voice_design_enabled', true)->exists(), false, false);
     }
 
     public static function planIncludes(?Plan $plan): bool
@@ -100,10 +110,13 @@ final class VoiceDesign
         return self::planIncludes($plan) || VoiceCloningAccess::isPreviewAccount($user);
     }
 
-    /** The section with what Voice Design does and the way to a plan with it. */
+    /**
+     * The section to try, with the way to a plan that designs in place of
+     * its button: only while a plan with Voice Design is on sale.
+     */
     public static function showsUpgrade(?User $user, ?Plan $plan): bool
     {
-        return self::openTo($user) && ! self::allows($user, $plan);
+        return self::openTo($user) && ! self::allows($user, $plan) && self::cheapestPlan() !== null;
     }
 
     /** The cheapest plan on sale with Voice Design, for the upgrade button. */
@@ -121,7 +134,11 @@ final class VoiceDesign
         return $plan ? route('billing.page', ['plan' => $plan->slug]) : route('pricing');
     }
 
-    /** How many designed voices a member of this plan keeps (the plan's number, or the site's). */
+    /**
+     * How many designed voices a member of this plan keeps: the plan's number,
+     * which the owner sets on turning it on; the site's for the admin email
+     * trying it on a plan without it.
+     */
     public static function maxVoices(?Plan $plan): int
     {
         $own = (int) ($plan?->voice_design_max_voices ?? 0);
@@ -465,6 +482,8 @@ final class VoiceDesign
             ],
             // Credits one take costs speaking a written line, by language, before the line is known.
             'typical_credits' => ['ar' => $typical('ar'), 'en' => $typical('en')],
+            // Characters such a line takes from the demo's allowance.
+            'typical_chars' => ['ar' => UsageEstimator::estimate((string) trans('voice_design.fallback_line', [], 'ar'))['chars'], 'en' => UsageEstimator::estimate((string) trans('voice_design.fallback_line', [], 'en'))['chars']],
             'urls' => [
                 'design' => $demo ? route('demo.voice-design') : route('voice-design.design'),
                 'enhance' => route('voice-design.enhance'),

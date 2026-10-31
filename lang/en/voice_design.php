@@ -6,7 +6,6 @@ return [
     'nav_short' => 'Design',
     'title' => 'Voice Design',
     'subtitle' => 'Describe any voice, a person or a character, and hear it come to life. Compare the takes, keep the one you love and use it anywhere in the studio.',
-    'preview_badge' => 'Private preview: only you can see this',
 
     // The card with the orb.
     'stage_hint' => 'Press play to hear voices designed from a single sentence.',
@@ -23,11 +22,11 @@ return [
     'tips_link' => 'Writing tips',
     'tips_title' => 'What makes a great description',
     'tips' => [
-        'Say who they are: age, gender and character.',
+        'Say who they are: an adult\'s age, gender and character.',
         'Describe the sound: deep or bright, smooth or gravelly, breathy or crisp.',
         'Name the accent or dialect: Egyptian, Gulf, Levantine, Modern Standard Arabic, British, Southern American…',
         'Add the attitude and pace: calm, cheeky, menacing, quick, unhurried.',
-        'One or two sentences is plenty. Describe a character, never a real person.',
+        'One or two sentences is plenty. Describe an adult character, never a child or a real person.',
     ],
     'shuffle' => 'Surprise me',
     'examples_label' => 'Start from a character',
@@ -59,9 +58,18 @@ return [
     'design_again' => 'Design again',
     'designing' => 'Designing…',
     'cost' => ':credits credits',
-    'cost_hint' => ':takes, each speaking the line once. A take that does not arrive is not charged.',
     'takes_count' => ':count take|:count takes',
-    'safety_note' => 'Describe a character in your own words. Voices that imitate a real person are not allowed.',
+    'safety_note' => 'Describe an adult character in your own words. Voices of children and of real people can\'t be designed.',
+    'child_hint' => 'Voices of children can\'t be designed. Describe an adult, or just the sound: "a tiny, high, bright voice".',
+
+    // What a design costs, above its button.
+    'summary_cost' => 'From your credits',
+    'summary_cost_value' => ':credits credits',
+    'summary_demo_cost' => 'From your demo characters',
+    'summary_demo_cost_value' => ':count characters',
+    'summary_takes' => 'You get',
+    'summary_takes_value' => ':takes speaking the same line',
+    'summary_refund' => 'Only takes that arrive are charged.',
 
     // While it works.
     'step_reading' => 'Reading your description',
@@ -101,7 +109,9 @@ return [
     'badge' => 'Designed',
 
     // A plan without it.
-    'upgrade_title' => 'Design voices that do not exist yet',
+    'locked_title' => 'Designing voices comes with :plan',
+    'locked_title_any' => 'Designing voices comes with selected plans',
+    'locked_text' => 'Try everything here: write a description, pick a character and hear the voices on the stage. Upgrade to design your own.',
     'upgrade_text' => 'Voice Design comes with selected plans. Upgrade to describe any voice, keep the ones you love and use them in every project.',
     'upgrade_points' => [
         'Describe a voice in a sentence, in Arabic or English',
@@ -128,7 +138,7 @@ return [
     'errors' => [
         'busy' => 'Voice Design is busy right now. Nothing was charged; please try again in a minute.',
         'our_side' => 'We could not design this voice because of a problem on our side. Nothing was charged; please try again.',
-        'refused' => 'This description cannot be made into a voice. Describe a character in your own words, not a real person, and try again.',
+        'refused' => 'This voice can\'t be designed: voices of children and of real people aren\'t allowed. Describe an adult character, or just the sound ("a tiny, high, bright voice"), and try again. Nothing was charged.',
         'invalid' => 'This description could not be used. Try describing the voice a little differently.',
         'too_many' => 'You have designed a lot of voices in the last hour. Please try again in :minutes minutes.',
         'library_full' => 'You have kept :max designed voices, the most your plan holds. Delete one to keep another.',
