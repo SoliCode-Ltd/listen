@@ -1,9 +1,10 @@
 /*
- * The voice cloning stage's examples (dashboard.blade.php, #voiceCloningSection): a cloned
- * voice saying what it is, in Arabic and in English. The orb's button plays them one after
- * the other, each chip plays its own, and the orb ripples with the voice ([data-vs-cast],
- * __vpLevel, as js/listen-orbs.js follows). A recorder starting stops them at once, so an
- * example never ends up in a member's own recording.
+ * The voice cloning stage's example (dashboard.blade.php, #voiceCloningSection): a cloned
+ * voice saying what it is, in the page's language. The orb's button and the chip beside it
+ * play it (with more than one chip, the orb's button plays them in turn), and the orb
+ * ripples with the voice ([data-vs-cast], __vpLevel, as js/listen-orbs.js follows). A
+ * recorder starting stops it at once, so an example never ends up in a member's own
+ * recording.
  */
 (function () {
   'use strict';

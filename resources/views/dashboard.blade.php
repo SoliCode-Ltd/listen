@@ -2611,11 +2611,11 @@
               </div>
 
               @php
-                // A cloned voice saying what it is, in Arabic and in English (scripts/support/voice_cloning_examples.php):
-                // the page's own language first. Only the clips that exist.
-                $vcExamples = collect(app()->getLocale() === 'ar' ? ['ar', 'en'] : ['en', 'ar'])
+                // A cloned voice saying what it is, in the page's language (scripts/support/voice_cloning_examples.php),
+                // once its clip exists.
+                $vcExamples = collect([app()->getLocale() === 'ar' ? 'ar' : 'en'])
                     ->filter(fn (string $language): bool => is_file(public_path('audio/voice-cloning/examples/'.$language.'.mp3')))
-                    ->map(fn (string $language): array => ['language' => $language, 'name' => __('ui.voice_cloning.example_'.$language), 'url' => \App\Support\VersionedAsset::url('audio/voice-cloning/examples/'.$language.'.mp3')])
+                    ->map(fn (string $language): array => ['language' => $language, 'name' => __('ui.voice_cloning.example_name'), 'url' => \App\Support\VersionedAsset::url('audio/voice-cloning/examples/'.$language.'.mp3')])
                     ->values();
               @endphp
               <aside class="vc-stage" data-vc-stage data-vs-cast>
@@ -2642,7 +2642,7 @@
                   <div class="vc-examples" role="group" aria-label="{{ __('ui.voice_cloning.examples_title') }}">
                     @foreach($vcExamples as $example)
                       <button type="button" class="vc-example" data-vc-example="{{ $example['url'] }}" data-vc-example-name="{{ $example['name'] }}" aria-pressed="false">
-                        <span class="vc-example-mark" aria-hidden="true"><i></i><i></i><i></i></span>{{ $example['name'] }}
+                        <span class="vc-example-mark" aria-hidden="true"><i></i><i></i><i></i></span>{{ __('ui.voice_cloning.examples_title') }}
                       </button>
                     @endforeach
                   </div>

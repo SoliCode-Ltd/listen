@@ -1899,8 +1899,7 @@ return [
         'stage_consent' => 'Now read the consent sentence aloud, in the same room and with the same microphone.',
         // The stage's examples: the admin's own cloned voice saying what it is.
         'example_line' => 'This is a cloned voice. I recorded my voice just once, and now it reads anything I write, in English or in Arabic.',
-        'example_ar' => 'Arabic example',
-        'example_en' => 'English example',
+        'example_name' => 'a cloned voice',
         'examples_title' => 'Hear a cloned voice',
         'examples_play' => 'Play the cloned voice examples',
         'example_playing' => 'Now playing: :name',
