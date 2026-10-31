@@ -388,7 +388,7 @@ return [
             'label_developer_api' => 'Developer API',
             'label_voice_cloning' => 'Voice cloning',
             'label_video_dubbing' => 'Video dubbing',
-            'label_voice_design' => 'Design your own voices',
+            'label_voice_design' => 'Voice Design',
             'label_download_formats' => 'Download formats',
             'label_demo' => 'Premium voice to try',
             'label_card_needed' => 'Credit card',

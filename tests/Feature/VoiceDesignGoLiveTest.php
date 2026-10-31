@@ -48,13 +48,13 @@ class VoiceDesignGoLiveTest extends TestCase
 
         // Each plan's own lines: Voice Design right under voice cloning, once, in both languages.
         $this->assertSame(
-            ['Generations per day', 'Voice cloning', 'Design your own voices', 'Commercial use'],
+            ['Generations per day', 'Voice cloning', 'Voice Design', 'Commercial use'],
             array_column($creator->fresh()->features_en, 'label'),
         );
-        $this->assertSame(['label' => 'Design your own voices', 'value' => '10 voices', 'icon' => 'sliders'], $creator->fresh()->features_en[2]);
+        $this->assertSame(['label' => 'Voice Design', 'value' => '10 voices', 'icon' => 'sliders'], $creator->fresh()->features_en[2]);
         $this->assertSame(['label' => 'تصميم الأصوات', 'value' => '10 أصوات', 'icon' => 'sliders'], $creator->fresh()->features_ar[2]);
         $this->assertSame(
-            ['Generations per day', 'Voice cloning', 'Commercial use', 'Design your own voices'],
+            ['Generations per day', 'Voice cloning', 'Commercial use', 'Voice Design'],
             array_column($pro->fresh()->features_en, 'label'),
         );
         $this->assertSame('50 voices', $pro->fresh()->features_en[3]['value']);
@@ -63,7 +63,7 @@ class VoiceDesignGoLiveTest extends TestCase
         $this->assertSame('غير محدود', $max->fresh()->features_ar[2]['value']);
 
         // The pricing card shows the plan's own lines, the designed voices among them.
-        $this->assertContains('Design your own voices', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
+        $this->assertContains('Voice Design', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
         $this->assertContains('تصميم الأصوات', array_column(PlanPricingLines::forPlan($max->fresh(), 'ar'), 'label'));
     }
 
@@ -112,7 +112,7 @@ class VoiceDesignGoLiveTest extends TestCase
         $this->migrate();
         SiteSetting::set('voice_design_audience', VoiceDesign::AUDIENCE_PREVIEW, VoiceDesign::GROUP);
 
-        $this->assertNotContains('Design your own voices', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
+        $this->assertNotContains('Voice Design', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
         $this->assertNotContains('تصميم الأصوات', array_column(PlanPricingLines::forPlan($creator->fresh(), 'ar'), 'label'));
         $this->assertContains('Voice cloning', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
     }
