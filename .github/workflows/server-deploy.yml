@@ -129,6 +129,13 @@ name: Server deploy
 #            with the run (scripts/support/voice_design_test.php). It uses the
 #            speech quota staging shares with live (7 requests for 3 takes): only
 #            when the owner has said yes. Needs mode migrate first.
+#   voice-cloning-examples: staging only. The voice cloning stage's two examples,
+#            one Arabic and one English, each saying it is a cloned voice, spoken
+#            by the admin email's own ready cloned voice (nothing is made without
+#            one), kept with the run to commit to public/audio/voice-cloning/
+#            examples/ (scripts/support/voice_cloning_examples.php). Two short
+#            speech requests on the quota staging shares with live: only when the
+#            owner has said yes.
 #   voice-design-log: read-only. The last 30 "Voice design:" lines of the app's
 #            logs (what the speech service said when a design or a delete failed:
 #            the key's name, the reason and the service's own words; never a
@@ -147,7 +154,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test, voice-design-log]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test, voice-design-log, voice-cloning-examples]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -540,6 +547,16 @@ jobs:
             rm -f ~/.ssh/id_deploy
             exit "$failed"
           fi
+          if [ "$MODE" = voice-cloning-examples ]; then
+            [ "$TARGET" = staging ] || { echo "voice-cloning-examples runs on staging only"; exit 1; }
+            failed=0
+            tool voice_cloning_examples.php | $S "$FIND; php" || failed=1
+            mkdir -p voice-cloning-examples
+            for l in ar en; do $S "$FIND; cat storage/app/listen-deploy/voice-cloning-examples/$l.mp3 2>/dev/null" > voice-cloning-examples/$l.mp3 || true; [ -s voice-cloning-examples/$l.mp3 ] || rm -f voice-cloning-examples/$l.mp3; done
+            ls -l voice-cloning-examples
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
           if [ "$MODE" = voice-design-log ]; then
             $S "$FIND; grep -h 'Voice design:' \$(ls -t storage/logs/*.log 2>/dev/null | head -3) 2>/dev/null | tail -n 30 | cut -c1-700" || echo "No Voice Design lines in the logs."
             rm -f ~/.ssh/id_deploy
@@ -591,6 +608,14 @@ jobs:
         with:
           name: voice-design-test
           path: voice-design-test/
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Keep the cloning examples with the run
+        if: always() && inputs.mode == 'voice-cloning-examples'
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-cloning-examples
+          path: voice-cloning-examples/
           if-no-files-found: ignore
           retention-days: 3
       - name: Check the public footer

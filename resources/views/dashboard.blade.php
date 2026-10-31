@@ -2610,15 +2610,43 @@
                 </form>
               </div>
 
-              <aside class="vc-stage">
+              @php
+                // A cloned voice saying what it is, in Arabic and in English (scripts/support/voice_cloning_examples.php):
+                // the page's own language first. Only the clips that exist.
+                $vcExamples = collect(app()->getLocale() === 'ar' ? ['ar', 'en'] : ['en', 'ar'])
+                    ->filter(fn (string $language): bool => is_file(public_path('audio/voice-cloning/examples/'.$language.'.mp3')))
+                    ->map(fn (string $language): array => ['language' => $language, 'name' => __('ui.voice_cloning.example_'.$language), 'url' => \App\Support\VersionedAsset::url('audio/voice-cloning/examples/'.$language.'.mp3')])
+                    ->values();
+              @endphp
+              <aside class="vc-stage" data-vc-stage data-vs-cast>
                 <div class="vc-stage-art">
-                  <x-orb name="creator" class="vc-stage-orb is-live" />
+                  <div class="vc-stage-orb-wrap">
+                    <x-orb name="creator" class="vc-stage-orb is-live" />
+                    @if($vcExamples->isNotEmpty())
+                      <button type="button" class="vc-orb-play" data-vc-examples-play aria-label="{{ __('ui.voice_cloning.examples_play') }}">
+                        <span class="vc-play-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg></span>
+                        <span class="vc-pause-icon" aria-hidden="true"><i></i><i></i></span>
+                      </button>
+                    @endif
+                  </div>
                 </div>
                 <p class="vc-stage-state">
                   <span class="is-idle">{{ __('ui.voice_cloning.stage_idle', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</span>
                   <span class="is-consent">{{ __('ui.voice_cloning.stage_consent') }}</span>
                   <span class="is-recording">{{ __('ui.voice_cloning.stage_recording') }}</span>
+                  @if($vcExamples->isNotEmpty())
+                    <span class="is-playing" data-vc-example-now data-template="{{ __('ui.voice_cloning.example_playing', ['name' => ':name']) }}"></span>
+                  @endif
                 </p>
+                @if($vcExamples->isNotEmpty())
+                  <div class="vc-examples" role="group" aria-label="{{ __('ui.voice_cloning.examples_title') }}">
+                    @foreach($vcExamples as $example)
+                      <button type="button" class="vc-example" data-vc-example="{{ $example['url'] }}" data-vc-example-name="{{ $example['name'] }}" aria-pressed="false">
+                        <span class="vc-example-mark" aria-hidden="true"><i></i><i></i><i></i></span>{{ $example['name'] }}
+                      </button>
+                    @endforeach
+                  </div>
+                @endif
                 <div class="vc-guidelines" id="vcGuidelines">
                   <h4>{{ __('ui.voice_cloning.guidelines_title') }}</h4>
                   <ul>
@@ -6065,6 +6093,9 @@
   @endif
   @if(($voiceDesign ?? null) || ($voiceCloningVisible ?? false))
     @include('components.orb-script')
+  @endif
+  @if($voiceCloningVisible ?? false)
+    <script src="{{ asset('js/voice-cloning-stage.js') }}?v={{ filemtime(public_path('js/voice-cloning-stage.js')) }}" defer></script>
   @endif
   @if($voiceDesign ?? null)
     <script src="{{ asset('js/voice-design.js') }}?v={{ filemtime(public_path('js/voice-design.js')) }}" defer></script>
