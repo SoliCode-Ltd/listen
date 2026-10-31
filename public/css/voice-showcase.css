@@ -545,6 +545,22 @@ html:not([data-theme="light"]) .vs-speech::after {
   overflow: hidden;
 }
 .vs-card-text:lang(ar), .vs-turns:lang(ar) { font-size: 1.02rem; }
+/* A voice designed from words: its orb in place of a face, and the description it came from, as a quote. */
+.vs-designed .vs-designed-orb { --orb-size: 52px; flex: none; }
+.vs-designed-desc {
+  margin: 0;
+  padding: 10px 12px;
+  border-inline-start: 3px solid var(--brand-accent);
+  border-radius: 10px;
+  background: var(--vs-raised);
+  color: var(--text);
+  font-size: .875rem;
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .vs-card.is-playing .vs-card-text { color: var(--text); }
 .vs-card-foot {
   display: flex;

@@ -106,14 +106,16 @@ return [
     'library_title' => 'Your designed voices',
     'month_left' => ':left of :max new voice left this month|:left of :max new voices left this month',
     // When no more can be designed: instead of the design button.
-    'limit_month_title' => 'This month’s new voices are used',
-    'limit_month_text' => 'Deleting a voice doesn’t give one back. More come with your next credit month.',
+    'limit_month_title' => 'You’ve used this month’s designed voices',
+    'limit_month_text' => 'More come with your next credit month.',
     'limit_full_title' => 'Your library is full',
     'limit_full_text' => 'Delete a voice below to design a new one.',
     'library_empty' => 'The voices you keep appear here, ready in the studio’s voice list.',
     'use_in_studio' => 'Use in studio',
     'delete' => 'Delete',
     'delete_confirm' => 'Delete this voice? It cannot be brought back, but the audio you already made with it stays in your history.',
+    // Added to it on a plan with a monthly number of new voices.
+    'delete_month_note' => 'Deleting it doesn’t give back one of this month’s new voices.',
     'deleted' => 'The voice was deleted.',
     'created_on' => 'Created :date',
     'voice_meta' => ':speaks, made :date',
@@ -196,6 +198,15 @@ return [
             'orb' => 'studio_max',
             // What the example says on the Voice Design card (public/audio/voice-design/examples/fusha_narrator.mp3).
             'line' => 'في قلب الصحراء الشاسعة، حيث تشتدّ حرارة النهار وتبرد الليالي، تبدأ رحلة البقاء من جديد.',
+        ],
+        // The Evil Ogre's Arabic cousin: the ghoul of the old desert tales, as a dubbed cartoon would play him.
+        'desert_ghoul' => [
+            'name' => 'Desert Ghoul',
+            'description' => 'A deep, booming voice of a huge ghoul from old Arabian desert tales, in his middle years. Thick, gravelly and theatrical, like a villain in a dubbed cartoon: menacing and absurdly silly at once, with sudden bursts of wild laughter. He speaks Modern Standard Arabic.',
+            'language' => 'ar',
+            'orb' => 'teams',
+            // What the example says on the Voice Design card (public/audio/voice-design/examples/desert_ghoul.mp3).
+            'line' => 'مَن ذا الذي يجرؤ على عبور جسري؟ ها ها ها! سأطحن عظامك وآكلها على الفطور... مع قليلٍ من العسل!',
         ],
         'evil_ogre' => [
             'name' => 'Evil Ogre',

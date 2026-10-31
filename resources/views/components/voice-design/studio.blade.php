@@ -52,6 +52,7 @@
           'deleted' => __('voice_design.deleted'),
           'delete' => __('voice_design.delete'),
           'delete_confirm' => __('voice_design.delete_confirm'),
+          'delete_month_note' => __('voice_design.delete_month_note'),
           'use_in_studio' => __('voice_design.use_in_studio'),
           'month_left' => trans_choice('voice_design.month_left', $vd['monthly'], ['left' => ':left', 'max' => $vd['monthly']]),
           'limit_month_title' => __('voice_design.limit_month_title'),

@@ -86,6 +86,20 @@ final class VoiceDesign
      * Whether the owner has turned Voice Design on for any plan (each starts
      * without it), on sale or not, so members kept on an old plan keep it.
      */
+    /**
+     * Whether the public pages (the homepage's voice tour, the voice samples page) show the designed
+     * voices: once Voice Design is open to everyone and a plan includes it, so no visitor hears about
+     * what no plan sells; before that only the admin email does, to see them first.
+     */
+    public static function shownOnSite(?User $viewer): bool
+    {
+        if (! self::isPreviewOnly() && self::anyPlanIncludes()) {
+            return true;
+        }
+
+        return $viewer !== null && VoiceCloningAccess::isPreviewAccount($viewer);
+    }
+
     public static function anyPlanIncludes(): bool
     {
         return (bool) rescue(fn () => Plan::query()->where('voice_design_enabled', true)->exists(), false, false);

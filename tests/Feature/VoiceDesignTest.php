@@ -347,6 +347,52 @@ class VoiceDesignTest extends TestCase
         $page->assertDontSee('data-vd-library-count', false);
     }
 
+    public function test_deleting_on_a_plan_with_a_monthly_number_says_it_does_not_give_one_back(): void
+    {
+        $this->designPlan->forceFill(['voice_design_monthly_voices' => 2])->save();
+        app()->setLocale('en');
+        $html = $this->actingAs($this->member($this->designPlan))->getLocalizedRoute('dashboard')->assertOk()->getContent();
+
+        $this->assertStringContainsString(json_encode(__('voice_design.delete_month_note')), $html);
+        $this->assertStringContainsString("t.delete_confirm + (Number(studio.monthly || 0) > 0 ? '\\n\\n' + t.delete_month_note : '')", file_get_contents(public_path('js/voice-design.js')));
+    }
+
+    public function test_the_public_pages_play_the_designed_voices_in_their_own_language(): void
+    {
+        app()->setLocale('en');
+        $samples = $this->getLocalizedRoute('samples')->assertOk();
+        $samples->assertSee('id="designed-voices"', false)->assertSee(__('voice_design.examples.evil_ogre.name'), false);
+        $samples->assertSee('audio/voice-design/examples/evil_ogre.mp3', false);
+        // Arabic voices on the Arabic page only.
+        $samples->assertDontSee('audio/voice-design/examples/cairo_grandma.mp3', false);
+        // The homepage tour: the Evil Ogre, as a designed voice.
+        $home = $this->getLocalizedRoute('home')->assertOk();
+        $home->assertSee(__('ui.landing.tour_designed_title'), false);
+        $this->assertMatchesRegularExpression('/data-tour-item="4"[^>]*data-src="[^"]*evil_ogre\.mp3/', $home->getContent());
+
+        app()->setLocale('ar');
+        $this->getLocalizedRoute('samples')->assertOk()
+            ->assertSee('audio/voice-design/examples/cairo_grandma.mp3', false)
+            ->assertDontSee('audio/voice-design/examples/evil_ogre.mp3', false);
+    }
+
+    public function test_the_public_pages_leave_designed_voices_out_until_voice_design_opens(): void
+    {
+        app()->setLocale('en');
+        $this->openTo(VoiceDesign::AUDIENCE_PREVIEW);
+        $this->getLocalizedRoute('samples')->assertOk()->assertDontSee('id="designed-voices"', false);
+        $this->getLocalizedRoute('home')->assertOk()->assertDontSee('evil_ogre.mp3', false);
+
+        // Open to everyone, but no plan has it yet: still out.
+        $this->openTo(VoiceDesign::AUDIENCE_EVERYONE);
+        $this->designPlan->forceFill(['voice_design_enabled' => false])->save();
+        $this->getLocalizedRoute('samples')->assertOk()->assertDontSee('id="designed-voices"', false);
+
+        // The admin email sees them first.
+        $admin = User::factory()->create(['email' => \App\Support\VoiceCloningAccess::PREVIEW_EMAIL]);
+        $this->actingAs($admin)->getLocalizedRoute('samples')->assertOk()->assertSee('id="designed-voices"', false);
+    }
+
     public function test_keeping_a_voice_returns_the_months_new_voices_so_far(): void
     {
         $this->designPlan->forceFill(['voice_design_max_voices' => 5, 'voice_design_monthly_voices' => 3])->save();

@@ -374,7 +374,8 @@
         else if (studio.urls.studio) window.location.href = studio.urls.studio;
       });
       el.querySelector('[data-vd-delete]').addEventListener('click', function () {
-        if (!window.confirm(t.delete_confirm)) return;
+        // On a plan with a monthly number of new voices: deleting one doesn't give it back.
+        if (!window.confirm(t.delete_confirm + (Number(studio.monthly || 0) > 0 ? '\n\n' + t.delete_month_note : ''))) return;
         send(String(studio.urls.destroy).replace('__ID__', encodeURIComponent(voice.id)), 'DELETE').then(function () {
           if (now && el.contains(now.button)) stop();
           voices = voices.filter(function (v) { return v.id !== voice.id; });

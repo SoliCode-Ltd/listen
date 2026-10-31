@@ -21,7 +21,7 @@
               @endif
             >
               {{-- The picked orb keeps flowing. --}}
-              <x-orb :name="$item['key']" @class(['tour-orb', 'is-live' => $i === 0]) />
+              <x-orb :name="$item['orb'] ?? $item['key']" @class(['tour-orb', 'is-live' => $i === 0]) />
               @if($item['src'] !== '')
                 <span class="tour-play" aria-hidden="true">
                   <svg class="tour-icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
