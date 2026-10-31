@@ -46,7 +46,7 @@ final class AudioEffects
         // Clean-up: the voice itself, no place.
         'studio' => ['g-sliders', 'clean', 'Studio polish', 'لمسة استوديو', 'Even level, clean low end, broadcast loudness', 'مستوى متوازن ونقاء وصوت بمعايير البث',
             '[in]highpass=f=75,equalizer=f=250:t=q:w=1.2:g=-1.5,equalizer=f=4000:t=q:w=1.4:g=1.5,acompressor=threshold=0.1:ratio=2.5:attack=8:release=160:makeup=1.6,treble=g=1.5:f=11000[out]', 0.0],
-        'warm' => ['g-flame', 'clean', 'Warm presenter', 'دفء المذيع', 'Fuller low end and a close, intimate tone', 'قرار أعمق ونبرة قريبة دافئة',
+        'warm' => ['g-flame', 'clean', 'Warm presenter', 'دفء المذيع', 'Fuller low end and a close, intimate tone', 'قرار أعمق ونبرة قريبة من الأذن',
             '[in]highpass=f=60,bass=g=3.5:f=130:w=0.8,equalizer=f=3000:t=q:w=1.5:g=-1,treble=g=-1.5:f=8000,acompressor=threshold=0.12:ratio=2.5:attack=12:release=200:makeup=1.6[out]', 0.0],
         'bright' => ['g-bulb', 'clean', 'Crisp and clear', 'نقاء ووضوح', 'More presence and air, every word cuts through', 'حضور أوضح وكل كلمة مسموعة بجلاء',
             '[in]highpass=f=90,equalizer=f=300:t=q:w=1:g=-2,equalizer=f=3200:t=q:w=1.2:g=2.5,treble=g=3:f=10000,acompressor=threshold=0.12:ratio=2.5:attack=8:release=140:makeup=1.5[out]', 0.0],

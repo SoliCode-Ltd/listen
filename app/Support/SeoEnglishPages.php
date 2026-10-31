@@ -82,7 +82,7 @@ final class SeoEnglishPages
             'about_ar' => 'الإنجليزية الماليزية سريعة وودودة، وهي إنجليزية الحياة اليومية والأعمال في كوالالمبور.'],
         'ugandan' => ['country' => 'UG', 'en' => 'Ugandan', 'ar' => 'أوغندية',
             'about_en' => 'Ugandan English is clear and warm, the English of Kampala\'s media, schools and business.',
-            'about_ar' => 'الإنجليزية الأوغندية واضحة ودافئة، وهي إنجليزية الإعلام والتعليم والأعمال في كمبالا.'],
+            'about_ar' => 'الإنجليزية الأوغندية واضحة وودودة، وهي إنجليزية الإعلام والتعليم والأعمال في كمبالا.'],
         'zimbabwean' => ['country' => 'ZW', 'en' => 'Zimbabwean', 'ar' => 'زيمبابوية',
             'about_en' => 'Zimbabwean English is crisp and measured, widely understood across southern Africa.',
             'about_ar' => 'الإنجليزية الزيمبابوية واضحة ومتزنة ومفهومة على نطاق واسع في جنوب أفريقيا.'],
