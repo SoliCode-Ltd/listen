@@ -1647,16 +1647,19 @@
       flex: 1 1 auto;
       min-width: 0;
       width: auto;
-      height: 40px;
+      /* No fixed height: with one, Chrome cuts Arabic letters below the line and marks above it. */
+      height: auto;
       min-height: 40px;
       margin: 0;
-      padding: 0 .8rem;
+      padding: .15rem .8rem;
       border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
       border-radius: 10px;
       background: var(--surface);
       color: var(--text);
       font: inherit;
       font-size: .92rem;
+      /* Tall enough that Arabic letters below the line and marks above it are not clipped. */
+      line-height: 2;
       box-shadow: none;
     }
     #generateVoiceSection .vs-name-row input:focus { outline: none; border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent); }

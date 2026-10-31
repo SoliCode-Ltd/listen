@@ -411,8 +411,8 @@
 .vd-keep { display: grid; gap: var(--vd-label-gap); padding: 1rem; border-radius: var(--vd-panel-radius); border: 1px solid color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 6%, var(--surface)); }
 .vd-keep-row { display: flex; flex-wrap: wrap; gap: .5rem; }
 .vd .vd-keep-row input {
-  flex: 1 1 200px; min-width: 0; min-height: var(--vd-control); margin: 0; padding: .6rem .95rem; border-radius: 12px; border: 1px solid var(--line);
-  background: var(--surface); color: var(--text); font: inherit; box-shadow: none;
+  flex: 1 1 200px; min-width: 0; min-height: var(--vd-control); margin: 0; padding: .2rem .95rem; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--text); font: inherit; line-height: 2; box-shadow: none;
 }
 .vd .vd-keep-row input:focus { outline: 0; border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent); }
 .vd-keep-row .btn { min-height: var(--vd-control); white-space: nowrap; }
@@ -451,10 +451,12 @@ a.vd-design-btn { text-decoration: none; }
 .vd-voice-head { display: flex; align-items: center; gap: .8rem; min-width: 0; }
 .vd-voice-head .orb { --orb-size: 46px; }
 .vd-voice-name { display: grid; gap: .15rem; min-width: 0; }
-.vd-voice-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.35; }
-.vd-voice-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: .8rem; line-height: 1.4; }
+/* Cut to one line, with room in the box for Arabic letters below and marks above the line. */
+.vd-voice-name strong, .vd-voice-name small { margin-block: -.5em -.4em; padding-block: .5em .4em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vd-voice-name strong { line-height: 1.35; }
+.vd-voice-name small { color: var(--muted); font-size: .8rem; line-height: 1.4; }
 .vd-voice-desc {
-  margin: 0; color: var(--muted); font-size: .87rem; line-height: 1.6; min-height: 3.2em;
+  margin: -.25em 0 -.3em; padding-block: .25em .3em; color: var(--muted); font-size: .87rem; line-height: 1.6; min-height: 3.75em;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 /* Its sample: play, the bar and the length, in one rounded strip. */

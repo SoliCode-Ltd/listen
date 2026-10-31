@@ -130,9 +130,9 @@
 .vc-form-group > label, .vc-consent-block > label { display: block; font-size: .92rem; font-weight: 700; line-height: 1.4; color: var(--text); }
 .vc-form-group .hint { margin: 0; color: var(--muted); font-size: .84rem; line-height: 1.55; }
 .vc-shell .vc-form-group input[type="text"], .vc-shell .vc-language-value {
-  display: flex; align-items: center; width: 100%; min-height: var(--vc-control); margin: 0; padding: .55rem .95rem;
+  display: flex; align-items: center; width: 100%; min-height: var(--vc-control); margin: 0; padding: .15rem .95rem;
   border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--text); box-shadow: none;
-  font: inherit; font-size: .98rem; line-height: 1.45;
+  font: inherit; font-size: .98rem; line-height: 2.1;
 }
 .vc-shell .vc-form-group input[type="text"]:focus { outline: 0; border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent); }
 /* The sample's language follows the page: shown, not chosen. */
@@ -337,7 +337,8 @@
 .vc-card:nth-child(5n+5) > .vc-card-avatar { --c0: #17144A; --c1: #3A31B4; --c2: #7E62FF; }
 .vc-card > .vc-card-header { grid-column: 2; grid-row: 1; display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .vc-card > .vc-card-meta { grid-column: 2; grid-row: 2; display: flex; flex-wrap: wrap; gap: .1rem .75rem; color: var(--muted); font-size: .8rem; line-height: 1.45; }
-.vc-card-name { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; font-weight: 700; line-height: 1.35; }
+/* Cut to one line, with room in its box for Arabic letters below and marks above the line. */
+.vc-card-name { min-width: 0; margin: -.5em 0 -.4em; padding-block: .5em .4em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; font-weight: 700; line-height: 1.35; }
 .vc-status {
   display: inline-flex; flex: none; align-items: center; gap: .35rem; padding: .18rem .6rem; border-radius: 999px;
   border: 1px solid transparent; font-size: .75rem; font-weight: 700; white-space: nowrap;

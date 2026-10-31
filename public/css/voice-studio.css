@@ -1403,18 +1403,21 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
 }
 
 /* Arabic letters such as a final ي reach past their box (its dots sit below the
-   line in the site font): room on every side so they are never clipped, taken
-   back with negative margins so the layout does not move. */
+   line in the site font), and stacked marks such as ُّ rise above it: room on
+   every side so they are never clipped, taken back with negative margins so
+   the layout does not move. */
 .vs-select-label,
 .vs-pick-value,
 .vs-pick-desc,
 .vs-voice-name,
-.vs-voice-dialect { padding-block: .12em .3em; margin-block: -.12em -.3em; line-height: 1.45; }
+.vs-voice-dialect { padding-block: .35em .3em; margin-block: -.35em -.3em; line-height: 1.45; }
 .vs-select-label,
 .vs-pick-value,
 .vs-pick-desc { padding-inline-end: .3em; }
 .vs-voice-name,
 .vs-voice-dialect { padding-inline: .3em; }
+/* A name is set larger and bolder: a little more room above for its marks. */
+.vs-voice-name { padding-top: .5em; margin-top: -.5em; }
 
 /* ---------- Options outside the member's plan: dimmed, with an upgrade button ---------- */
 .vs-locked { position: relative; }
