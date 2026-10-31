@@ -664,7 +664,7 @@ class HomeController extends Controller
             // Voice Design, beside it too: one take from the demo's characters (App\Support\VoiceDesign).
             'voiceDesign' => VoiceDesign::openTo($member)
                 ? VoiceDesign::studio($member, $this->planAccessService->resolveAccessPlanForUserId((int) $member->id), true)
-                    + ['demo_used' => ! VoiceCloningAccess::isPreviewAccount($member) && $this->usedDemoDesign((int) $member->id, $request)]
+                    + ['demo_used' => ! VoiceCloningAccess::isPreviewAccount($member) && $this->usedDemoDesign($this->demoLinkedUserIds((int) $member->id, $request))]
                 : null,
         ]);
 
@@ -1096,14 +1096,17 @@ class HomeController extends Controller
             return $this->designDemoVoice($request, $designer);
         }
 
-        // One try for each member and the other accounts on this device, never more: a second
-        // request while the first is designing waits its turn and finds the try used.
-        $lock = Cache::lock('demo-voice-design:'.$user->id, 150);
+        // One try for each person, never more: counted over every account the text demo links to
+        // them (demoLinkedUserIds: the same browser or device, the same fingerprint through a VPN,
+        // accounts made in a row from one address), locked for that whole group so two of its
+        // accounts cannot try at the same moment.
+        $group = $this->demoLinkedUserIds((int) $user->id, $request);
+        $lock = Cache::lock('demo-voice-design:'.min($group), 150);
         if (! $lock->get()) {
             return response()->json(['ok' => false, 'message' => __('voice_design.errors.busy')], 429);
         }
         try {
-            if ($this->usedDemoDesign((int) $user->id, $request)) {
+            if ($this->usedDemoDesign($group)) {
                 return response()->json(['ok' => false, 'message' => __('voice_design.errors.demo_used'), 'demo_used' => true], 422);
             }
 
@@ -1114,13 +1117,15 @@ class HomeController extends Controller
     }
 
     /**
-     * Whether this member, or another account on this device (fingerprintLinkedUserIds),
-     * has had the demo's one Voice Design try: a design that came back.
+     * Whether any of these accounts (a member and those the demo links to them,
+     * demoLinkedUserIds) has had the demo's one Voice Design try: a design that came back.
+     *
+     * @param  list<int>  $userIds
      */
-    private function usedDemoDesign(int $userId, Request $request): bool
+    private function usedDemoDesign(array $userIds): bool
     {
         return DemoVoiceGeneration::query()
-            ->whereIn('user_id', $this->fingerprintLinkedUserIds($userId, $request))
+            ->whereIn('user_id', $userIds)
             ->whereNotNull('metadata->voice_design')
             ->exists();
     }

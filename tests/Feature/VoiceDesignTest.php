@@ -546,6 +546,13 @@ class VoiceDesignTest extends TestCase
             ->assertStatus(422)->assertJson(['ok' => false, 'demo_used' => true, 'message' => __('voice_design.errors.demo_used')]);
         $this->actingAs($this->member($this->freePlan))->withHeaders($device)->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
             ->assertStatus(422)->assertJson(['demo_used' => true]);
+        // Or a new account made from the same address, on another device (a VPN changes the address
+        // later, not the one it signed up from), as the text demo links them.
+        $member->forceFill(['registration_ip' => '203.0.113.7'])->save();
+        $again = $this->member($this->freePlan);
+        $again->forceFill(['registration_ip' => '203.0.113.7'])->save();
+        $this->actingAs($again)->withHeaders(['X-Client-FP' => str_repeat('f9e8d7c6', 4)])->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
+            ->assertStatus(422)->assertJson(['demo_used' => true]);
         $this->assertCount(1, $this->callsTo('POST', '/voices'));
 
         // The demo then says the try is used, with the way to a plan, in place of the design button.
