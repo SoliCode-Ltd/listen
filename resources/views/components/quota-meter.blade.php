@@ -1,13 +1,16 @@
 {{-- What is left of an allowance, as Voice Design and voice cloning show it at the top of their
      sections: a ring that empties as it is used, "2 of 3 left", and what it counts below.
-     $left, $max: the numbers. $value: the line with :left and :max in it. $caption: what it counts.
-     Pages update it with window.ListenQuota(element, left, max) as voices come and go. --}}
-@props(['left', 'max', 'value', 'caption'])
+     $left, $max: the numbers (no $max: no limit, the ring full). $value: the line with :left and
+     :max in it. $caption: what it counts. Pages update it with window.ListenQuota(element, left,
+     max) as voices come and go. --}}
+@props(['left' => null, 'max' => null, 'value', 'caption'])
 @php
+  $unlimited = $max === null;
   $left = max(0, (int) $left);
   $max = max(0, (int) $max);
+  $share = $unlimited ? 1 : ($max > 0 ? round(min(1, $left / $max), 4) : 0);
 @endphp
-<div {{ $attributes->merge(['class' => 'quota-meter'.($left === 0 ? ' is-empty' : '')]) }} data-quota data-quota-template="{{ $value }}" style="--quota: {{ $max > 0 ? round(min(1, $left / $max), 4) : 0 }};">
+<div {{ $attributes->merge(['class' => 'quota-meter'.(! $unlimited && $left === 0 ? ' is-empty' : '')]) }} data-quota data-quota-template="{{ $value }}" style="--quota: {{ $share }};">
   <span class="quota-ring" aria-hidden="true"></span>
   <span class="quota-text">
     <strong data-quota-value>{{ str_replace([':left', ':max'], [$left, $max], $value) }}</strong>

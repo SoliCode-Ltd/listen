@@ -410,6 +410,7 @@ return [
             'kept_days' => ':count day|:count days',
             'cloning_voices' => ':count voice|:count voices',
             'design_voices' => ':count designed voice|:count designed voices',
+            'design_voices_month' => ':count voice a month|:count voices a month',
             'dubbing_videos' => ':count video a month, up to :seconds s each|:count videos a month, up to :seconds s each',
             'dubbing_open' => 'Up to :seconds s a video, from your voice time',
             'topup_price' => ':price per 1M credits',

@@ -150,11 +150,14 @@ final class VoiceDesign
 
     /**
      * How many designed voices a member of this plan keeps: the plan's number,
-     * which the owner sets on turning it on; the site's for the admin email
-     * trying it on a plan without it.
+     * which the owner sets on turning it on (no cap on a plan without a count,
+     * isUnlimited); the site's for the admin email trying it on a plan without it.
      */
     public static function maxVoices(?Plan $plan): int
     {
+        if (self::isUnlimited($plan)) {
+            return PHP_INT_MAX;
+        }
         $own = (int) ($plan?->voice_design_max_voices ?? 0);
 
         return $own > 0 ? $own : max(1, (int) self::setting('voice_design_max_per_user', 10));
@@ -163,7 +166,13 @@ final class VoiceDesign
     /** New voices a member of this plan may keep in a credit month; 0 when only the library's size counts. */
     public static function monthlyLimit(?Plan $plan): int
     {
-        return max(0, (int) ($plan?->voice_design_monthly_voices ?? 0));
+        return self::isUnlimited($plan) ? 0 : max(0, (int) ($plan?->voice_design_monthly_voices ?? 0));
+    }
+
+    /** A plan with Voice Design and no count at all: no monthly number, no cap on the voices kept. */
+    public static function isUnlimited(?Plan $plan): bool
+    {
+        return self::planIncludes($plan) && (bool) ($plan?->voice_design_unlimited ?? false);
     }
 
     /**
@@ -502,6 +511,7 @@ final class VoiceDesign
             'upgrade_plan' => $cheapest ? ($arabic && filled($cheapest->name_ar) ? (string) $cheapest->name_ar : (string) $cheapest->name) : null,
             'takes' => $demo ? 1 : self::takes(),
             'max_voices' => self::maxVoices($plan),
+            'unlimited' => self::isUnlimited($plan),
             'monthly' => self::monthlyLimit($plan),
             'kept_month' => $allowed && ! $demo ? self::keptThisMonth((int) $user->id) : 0,
             'voices' => $voices->map(fn (DesignedVoice $voice): array => self::present($voice))->values()->all(),

@@ -107,6 +107,9 @@ return [
     // العدّاد أعلى القسم (components/quota-meter).
     'month_left' => 'تبقّى :left من :max',
     'month_left_caption' => 'أصوات مصمّمة هذا الشهر',
+    // في خطة بلا حدود.
+    'month_unlimited' => 'بلا حدود',
+    'month_unlimited_caption' => 'أصوات مصمّمة',
     // حين لا يمكن تصميم المزيد: بدل زر التصميم.
     'limit_month_title' => 'استخدمت أصواتك المصمّمة لهذا الشهر',
     'limit_month_text' => 'تتجدد أصواتك مع شهر رصيدك القادم.',
