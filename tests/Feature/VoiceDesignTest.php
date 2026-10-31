@@ -188,6 +188,23 @@ class VoiceDesignTest extends TestCase
         $this->assertSame(1, (int) UsageCounter::query()->where('user_id', $member->id)->value('total_requests'));
     }
 
+    public function test_each_take_says_how_it_was_made_from_the_description(): void
+    {
+        $member = $this->member($this->designPlan);
+        $this->fakeEngine();
+
+        $takes = $this->actingAs($member)->postJsonLocalizedRoute('voice-design.design', $this->designInput(['variety' => 50]))->assertOk()->json('takes');
+
+        // The first follows the description as written (the one the page recommends); the others lean a way of their own.
+        $this->assertSame(
+            [1 => 'Closest to your description', 2 => 'A warmer, deeper variation', 3 => 'A brighter, crisper variation'],
+            collect($takes)->pluck('note', 'take')->all(),
+        );
+        $this->assertSame(['closest', 'bolder', 'freer'], [VoiceDesign::takeLean(90, 1), VoiceDesign::takeLean(90, 2), VoiceDesign::takeLean(90, 3)]);
+        // Close to the words: the takes after the first are more takes of the same description.
+        $this->assertSame(['closest', 'same', 'same'], [VoiceDesign::takeLean(10, 1), VoiceDesign::takeLean(10, 2), VoiceDesign::takeLean(10, 3)]);
+    }
+
     public function test_a_take_that_never_comes_is_not_charged(): void
     {
         $member = $this->member($this->designPlan);

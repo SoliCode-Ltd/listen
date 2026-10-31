@@ -253,6 +253,25 @@ final class VoiceDesign
     }
 
     /**
+     * How a take was made from the description, as the member is told under it
+     * (voice_design.take_notes): the first follows it as written, and each one
+     * after leans the way takeTouch() sends it (or is another take of the same
+     * description, on a close setting).
+     */
+    public static function takeLean(int $variety, int $take): string
+    {
+        if ($take <= 1) {
+            return 'closest';
+        }
+        if (self::takeTouch($variety, $take) === null) {
+            return 'same';
+        }
+        $wide = $variety >= 67;
+
+        return $take === 2 ? ($wide ? 'bolder' : 'warmer') : ($wide ? 'freer' : 'brighter');
+    }
+
+    /**
      * Each take after the first, on a looser setting, leans a different way,
      * so three takes are three choices rather than one voice three times.
      */
@@ -417,6 +436,7 @@ final class VoiceDesign
             'tag' => __('ui.dashboard.library.speaks', ['language' => $language]),
             'key' => $voice->voiceKey(),
             'take' => $voice->take,
+            'note' => __('voice_design.take_notes.'.self::takeLean((int) data_get($voice->metadata, 'variety', 50), (int) $voice->take)),
             'name' => $voice->name,
             'status' => $voice->status,
             'description' => $voice->description,

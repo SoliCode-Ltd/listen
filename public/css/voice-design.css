@@ -224,7 +224,7 @@
 .vd-slider { display: contents; }
 .vd-slider-label { grid-column: 1 / -1; margin-top: .85rem !important; font-size: .9rem; font-weight: 700; line-height: 1.4; color: var(--text); }
 .vd-slider:first-child .vd-slider-label { margin-top: 0 !important; }
-.vd-slider-end { font-size: .8rem; line-height: 1.3; color: var(--muted); white-space: nowrap; }
+.vd-slider-end { font-size: .8rem; line-height: 1.6; color: var(--muted); white-space: nowrap; }
 .vd-slider-end.is-low { text-align: end; }
 
 /* The studio's own slider: a thin track, a dot at the middle (where the description is left as
@@ -388,24 +388,46 @@
   background: color-mix(in oklab, var(--a) 8%, transparent); color: var(--text); font-size: .95rem; line-height: 1.7;
 }
 .vd-line-quote:empty { display: none; }
-.vd-takes { display: grid; gap: .7rem; margin: 0; padding: 0; list-style: none; }
+.vd-takes { display: grid; gap: .85rem; margin: 0; padding: 0; list-style: none; }
 .vd-take {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .9rem;
-  padding: .75rem .9rem; border: 1px solid var(--line); border-radius: 18px; background: var(--surface);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1rem 1.1rem;
+  padding: 1.05rem 1.15rem; border: 1px solid var(--line); border-radius: 18px; background: var(--surface);
   animation: vd-in .4s ease both; animation-delay: calc(var(--n, 0) * 90ms);
   transition: border-color .2s ease, box-shadow .2s ease;
 }
+/* The one we recommend: the take that follows the description as written. */
+.vd-take.is-pick { border-color: color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 5%, var(--surface)); }
 .vd-take.is-chosen { border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 20%, transparent); }
 @keyframes vd-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.vd-take .orb { --orb-size: 52px; }
-.vd-take-main { display: grid; gap: .45rem; min-width: 0; }
-.vd-take-title { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; font-weight: 700; }
-.vd-take-title small { color: var(--muted); font-weight: 500; font-size: .8rem; }
-.vd-take-side { display: flex; align-items: center; gap: .5rem; }
-.vd-take-keep { white-space: nowrap; padding: .55rem 1rem; font-size: .88rem; }
+.vd-take .orb { --orb-size: 56px; align-self: start; }
+.vd-take-main { display: grid; gap: .35rem; min-width: 0; }
+.vd-take-head { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .6rem; }
+.vd-take-name { font-size: 1rem; line-height: 1.5; white-space: nowrap; }
+.vd-take-badge {
+  display: inline-flex; align-items: center; gap: .3rem; padding: .1rem .6rem; border-radius: 999px;
+  background: color-mix(in oklab, var(--a) 16%, transparent); color: var(--accent-text, var(--a));
+  font-size: .76rem; font-weight: 700; line-height: 1.8; white-space: nowrap;
+}
+.vd-take-badge svg { width: 12px; height: 12px; flex: none; fill: currentColor; }
+.vd-take-note { margin: 0; color: var(--muted); font-size: .86rem; line-height: 1.6; }
+.vd-take-note.is-sample { display: flex; align-items: flex-start; gap: .45rem; color: var(--text); }
+.vd-take-note.is-sample::before {
+  content: ''; width: 6px; height: 6px; flex: none; margin-top: calc(.5lh - 3px); border-radius: 50%; background: var(--warning, #f59e0b);
+}
+.vd-take-player { display: flex; align-items: center; gap: .7rem; margin-top: .3rem; }
+.vd-take-player .vd-play { width: 36px; height: 36px; }
+.vd-take-player .vd-take-bar { flex: 1; }
+/* Keep: quiet until a take is chosen, so the takes are heard before one is picked. */
+.vd-take-keep {
+  white-space: nowrap; min-height: 42px; padding: .5rem 1.05rem; font-size: .88rem;
+  border: 1px solid color-mix(in oklab, var(--a) 55%, var(--line)); background: transparent; color: var(--accent-text, var(--a));
+}
+.vd-take-keep:hover { background: color-mix(in oklab, var(--a) 10%, transparent); }
+.vd-take.is-chosen .vd-take-keep { background: var(--a); border-color: var(--a); color: #fff; }
 @media (max-width: 520px) {
-  .vd-take { grid-template-columns: auto minmax(0, 1fr); }
-  .vd-take-side { grid-column: 1 / -1; justify-content: space-between; }
+  .vd-take { grid-template-columns: auto minmax(0, 1fr); padding: 1rem; gap: .9rem; }
+  .vd-take .orb { --orb-size: 48px; }
+  .vd-take-keep { grid-column: 1 / -1; width: 100%; }
 }
 
 .vd-keep { display: grid; gap: var(--vd-label-gap); padding: 1rem; border-radius: var(--vd-panel-radius); border: 1px solid color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 6%, var(--surface)); }

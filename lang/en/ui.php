@@ -1894,14 +1894,13 @@ return [
         'consent_ready' => 'Consent ready',
 
         'guidelines_title' => 'For a close match',
-        'stage_idle' => 'Record or upload :min to :max seconds of your own voice.',
+        'stage_idle' => 'Record or upload :min to :max seconds of your voice.',
         'stage_recording' => 'Listening. Speak naturally, the way you want your voice to sound.',
         'stage_consent' => 'Now read the consent sentence aloud, in the same room and with the same microphone.',
         // The stage's examples: the admin's own cloned voice saying what it is.
         'example_line' => 'This is a cloned voice. I recorded my voice just once, and now it reads anything I write, in English or in Arabic.',
         'example_name' => 'a cloned voice',
-        'examples_title' => 'Hear a cloned voice',
-        'examples_play' => 'Play the cloned voice examples',
+        'examples_play' => 'Hear a cloned voice',
         'example_playing' => 'Now playing: :name',
         'guideline_1' => 'Speak for :min to :max seconds, in one take',
         'guideline_2' => 'Use a quiet room. No music, no other voices',

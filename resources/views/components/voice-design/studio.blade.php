@@ -27,6 +27,7 @@
       'i18n' => [
           'take' => __('voice_design.take_label', ['n' => ':n']),
           'take_sample' => __('voice_design.take_sample'),
+          'take_recommended' => __('voice_design.take_recommended'),
           'play' => __('voice_design.play'),
           'pause' => __('voice_design.pause'),
           'keep' => __('voice_design.keep'),

@@ -1,59 +1,55 @@
 /*
  * The voice cloning stage's example (dashboard.blade.php, #voiceCloningSection): a cloned
- * voice saying what it is, in the page's language. The orb's button and the chip beside it
- * play it (with more than one chip, the orb's button plays them in turn), and the orb
+ * voice saying what it is, in the page's language. The orb's button plays it, and the orb
  * ripples with the voice ([data-vs-cast], __vpLevel, as js/listen-orbs.js follows). A
- * recorder starting stops it at once, so an example never ends up in a member's own
+ * recorder starting stops it at once, so the example never ends up in a member's own
  * recording.
  */
 (function () {
   'use strict';
 
   function init(stage) {
-    var chips = Array.prototype.slice.call(stage.querySelectorAll('[data-vc-example]'));
-    if (!chips.length || stage.__vcExamples) return;
-    stage.__vcExamples = true;
-    var orbButton = stage.querySelector('[data-vc-examples-play]');
+    var button = stage.querySelector('[data-vc-example]');
+    if (!button || stage.__vcExample) return;
+    stage.__vcExample = true;
+    var url = button.getAttribute('data-vc-example');
     var nowLine = stage.querySelector('[data-vc-example-now]');
-    var template = nowLine ? nowLine.getAttribute('data-template') || ':name' : ':name';
+    if (nowLine) {
+      nowLine.textContent = (nowLine.getAttribute('data-template') || ':name').replace(':name', button.getAttribute('data-vc-example-name') || '');
+    }
     var audio = new Audio();
     audio.preload = 'none';
-    var now = null;
+    var playing = false;
     var frame = 0;
     var levels = null;
 
     function stop() {
       cancelAnimationFrame(frame);
       if (!audio.paused) audio.pause();
-      if (!now) return;
-      now = null;
+      if (!playing) return;
+      playing = false;
       stage.classList.remove('is-voicing', 'is-playing-example');
       stage.__vpLevel = 0;
-      chips.forEach(function (chip) { chip.classList.remove('is-playing'); chip.setAttribute('aria-pressed', 'false'); });
-      if (orbButton) orbButton.classList.remove('is-playing');
+      button.classList.remove('is-playing');
+      button.setAttribute('aria-pressed', 'false');
     }
 
-    function play(index, chain) {
+    function play() {
       stop();
-      var chip = chips[index];
-      if (!chip) return;
-      var url = chip.getAttribute('data-vc-example');
-      now = { index: index, chain: chain };
-      levels = null;
-      if (window.ListenVoiceAnalyse) {
-        Promise.resolve(window.ListenVoiceAnalyse(url)).then(function (info) { if (now && now.index === index) levels = info; }).catch(function () {});
+      playing = true;
+      if (window.ListenVoiceAnalyse && !levels) {
+        Promise.resolve(window.ListenVoiceAnalyse(url)).then(function (info) { levels = info; }).catch(function () {});
       }
-      audio.src = url;
+      if (audio.getAttribute('src') !== url) audio.src = url;
+      audio.currentTime = 0;
       var started = audio.play();
       if (started && started.catch) started.catch(function () { stop(); });
-      chip.classList.add('is-playing');
-      chip.setAttribute('aria-pressed', 'true');
-      if (orbButton && chain) orbButton.classList.add('is-playing');
+      button.classList.add('is-playing');
+      button.setAttribute('aria-pressed', 'true');
       stage.classList.add('is-voicing', 'is-playing-example');
-      if (nowLine) nowLine.textContent = template.replace(':name', chip.getAttribute('data-vc-example-name') || '');
       document.dispatchEvent(new CustomEvent('listen:audio-play', { detail: { source: 'voice-cloning-examples' } }));
       (function step() {
-        if (!now) return;
+        if (!playing) return;
         var target = 0;
         if (!audio.paused) {
           if (levels && levels.rms && levels.rms.length) {
@@ -68,27 +64,14 @@
       })();
     }
 
-    audio.addEventListener('ended', function () {
-      var was = now;
-      stop();
-      if (was && was.chain && was.index + 1 < chips.length) play(was.index + 1, true);
-    });
+    audio.addEventListener('ended', stop);
     audio.addEventListener('error', stop);
-
-    if (orbButton) {
-      orbButton.addEventListener('click', function () {
-        if (now) stop();
-        else play(0, true);
-      });
-    }
-    chips.forEach(function (chip, index) {
-      chip.addEventListener('click', function () {
-        if (now && now.index === index) stop();
-        else play(index, false);
-      });
+    button.addEventListener('click', function () {
+      if (playing) stop();
+      else play();
     });
 
-    // Another player on the page starting stops these.
+    // Another player on the page starting stops it.
     document.addEventListener('listen:audio-play', function (event) {
       if (event.detail && event.detail.source !== 'voice-cloning-examples') stop();
     });
@@ -104,7 +87,7 @@
         watch.observe(el, { attributes: true, attributeFilter: ['class'] });
       });
     }
-    // Leaving the section stops them too.
+    // Leaving the page stops it too.
     document.addEventListener('visibilitychange', function () { if (document.hidden) stop(); });
   }
 

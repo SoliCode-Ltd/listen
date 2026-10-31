@@ -2612,18 +2612,18 @@
 
               @php
                 // A cloned voice saying what it is, in the page's language (scripts/support/voice_cloning_examples.php),
-                // once its clip exists.
-                $vcExamples = collect([app()->getLocale() === 'ar' ? 'ar' : 'en'])
-                    ->filter(fn (string $language): bool => is_file(public_path('audio/voice-cloning/examples/'.$language.'.mp3')))
-                    ->map(fn (string $language): array => ['language' => $language, 'name' => __('ui.voice_cloning.example_name'), 'url' => \App\Support\VersionedAsset::url('audio/voice-cloning/examples/'.$language.'.mp3')])
-                    ->values();
+                // played by the orb's button once its clip exists.
+                $vcExampleLanguage = app()->getLocale() === 'ar' ? 'ar' : 'en';
+                $vcExample = is_file(public_path('audio/voice-cloning/examples/'.$vcExampleLanguage.'.mp3'))
+                    ? ['name' => __('ui.voice_cloning.example_name'), 'url' => \App\Support\VersionedAsset::url('audio/voice-cloning/examples/'.$vcExampleLanguage.'.mp3')]
+                    : null;
               @endphp
               <aside class="vc-stage" data-vc-stage data-vs-cast>
                 <div class="vc-stage-art">
                   <div class="vc-stage-orb-wrap">
                     <x-orb name="creator" class="vc-stage-orb is-live" />
-                    @if($vcExamples->isNotEmpty())
-                      <button type="button" class="vc-orb-play" data-vc-examples-play aria-label="{{ __('ui.voice_cloning.examples_play') }}">
+                    @if($vcExample)
+                      <button type="button" class="vc-orb-play" data-vc-example="{{ $vcExample['url'] }}" data-vc-example-name="{{ $vcExample['name'] }}" aria-pressed="false" aria-label="{{ __('ui.voice_cloning.examples_play') }}">
                         <span class="vc-play-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg></span>
                         <span class="vc-pause-icon" aria-hidden="true"><i></i><i></i></span>
                       </button>
@@ -2634,19 +2634,10 @@
                   <span class="is-idle">{{ __('ui.voice_cloning.stage_idle', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</span>
                   <span class="is-consent">{{ __('ui.voice_cloning.stage_consent') }}</span>
                   <span class="is-recording">{{ __('ui.voice_cloning.stage_recording') }}</span>
-                  @if($vcExamples->isNotEmpty())
+                  @if($vcExample)
                     <span class="is-playing" data-vc-example-now data-template="{{ __('ui.voice_cloning.example_playing', ['name' => ':name']) }}"></span>
                   @endif
                 </p>
-                @if($vcExamples->isNotEmpty())
-                  <div class="vc-examples" role="group" aria-label="{{ __('ui.voice_cloning.examples_title') }}">
-                    @foreach($vcExamples as $example)
-                      <button type="button" class="vc-example" data-vc-example="{{ $example['url'] }}" data-vc-example-name="{{ $example['name'] }}" aria-pressed="false">
-                        <span class="vc-example-mark" aria-hidden="true"><i></i><i></i><i></i></span>{{ __('ui.voice_cloning.examples_title') }}
-                      </button>
-                    @endforeach
-                  </div>
-                @endif
                 <div class="vc-guidelines" id="vcGuidelines">
                   <h4>{{ __('ui.voice_cloning.guidelines_title') }}</h4>
                   <ul>
@@ -4329,6 +4320,30 @@
     renderDialectOptions();
     applyStudioDefaults();
 
+    // After "Use in studio" or "Reuse": the studio, with the speaker's card (first in the voice
+    // library, js/voice-studio.js) on screen and focused, so it is plain who will speak. The
+    // studio's top when the card shows from there, otherwise the card in the middle of the screen.
+    function showPickedSpeaker() {
+      const section = document.getElementById('generateVoiceSection');
+      if (!section) return;
+      const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+      const card = section.querySelector('[data-vs-lib-grid] .vs-voice.is-selected');
+      if (!card) {
+        section.scrollIntoView({ behavior, block: 'start' });
+        return;
+      }
+      card.closest('[data-vs-lib-grid]').scrollTop = 0;
+      card.focus({ preventScroll: true });
+      const header = document.querySelector('.app-header')?.getBoundingClientRect().height || 0;
+      const sectionTop = section.getBoundingClientRect().top + window.scrollY - header - 12;
+      const box = card.getBoundingClientRect();
+      const cardBottom = box.bottom + window.scrollY;
+      const top = cardBottom - sectionTop <= window.innerHeight - header - 24
+        ? sectionTop
+        : box.top + window.scrollY - header - Math.max(12, (window.innerHeight - header - box.height) / 2);
+      window.scrollTo({ top: Math.max(0, top), behavior });
+    }
+
     function clonedVoiceLanguage(languageCode) {
       return String(languageCode || '').toLowerCase().startsWith('en') ? 'en' : 'ar';
     }
@@ -4352,6 +4367,7 @@
       renderVoiceOptions();
       if (!setSelectValueIfAvailable(voiceSelect, key)) return false;
       preferredVoiceKeyByLanguage[lang] = key;
+      voiceSelect.dispatchEvent(new Event('change', { bubbles: true }));
       voiceSelect.classList.add('vc-speaker-picked');
       setTimeout(() => voiceSelect.classList.remove('vc-speaker-picked'), 2200);
       setActiveDashboardSection('generateVoiceSection');
@@ -4362,8 +4378,7 @@
       if (`${window.location.pathname}${window.location.search}${window.location.hash}` !== nextUrl) {
         history.replaceState(null, '', nextUrl);
       }
-      document.getElementById('generateVoiceSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      voiceSelect.focus({ preventScroll: true });
+      showPickedSpeaker();
       return true;
     };
     updateTranslateHint();
@@ -4525,8 +4540,7 @@
       setActiveDashboardSection('generateVoiceSection');
       try { window.localStorage.setItem('dashboard_active_section', 'generateVoiceSection'); } catch (e) { /* no storage */ }
       history.replaceState(null, '', `${window.location.pathname}?designed_voice=${encodeURIComponent(id)}#generateVoiceSection`);
-      document.getElementById('generateVoiceSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      voiceSelect.focus({ preventScroll: true });
+      showPickedSpeaker();
       return true;
     };
 
@@ -4560,6 +4574,10 @@
       if (!match) return;
       window.openClonedVoiceInGenerator(match);
     })();
+    @if($reusePreset)
+      // "Reuse" on a past generation: its speaker's card shown too, once the library has drawn it.
+      window.addEventListener('load', function () { setTimeout(showPickedSpeaker, 60); });
+    @endif
   </script>
   @if(($voiceCloningVisible ?? false) && ($voiceCloningEnabledGlobally ?? false))
   <script>

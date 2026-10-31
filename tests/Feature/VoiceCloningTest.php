@@ -485,6 +485,23 @@ class VoiceCloningTest extends TestCase
         $response->assertJsonFragment(['error' => __('ui.voice_cloning.limit_reached', ['max' => 2])]);
     }
 
+    public function test_the_stage_orb_plays_one_example_in_the_pages_language(): void
+    {
+        $this->paidPlan->update(['voice_cloning_enabled' => true]);
+
+        foreach (['en', 'ar'] as $language) {
+            app()->setLocale($language);
+            $html = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard')->assertOk()->getContent();
+
+            // The orb's own button plays it; there is no separate chip for it.
+            $this->assertSame(1, substr_count($html, 'data-vc-example="'));
+            $this->assertStringContainsString('audio/voice-cloning/examples/'.$language.'.mp3', $html);
+            $this->assertStringNotContainsString('audio/voice-cloning/examples/'.($language === 'ar' ? 'en' : 'ar').'.mp3', $html);
+            $this->assertStringNotContainsString('class="vc-example"', $html);
+            $this->assertMatchesRegularExpression('/class="vc-orb-play" data-vc-example="[^"]+" data-vc-example-name="'.preg_quote(e(__('ui.voice_cloning.example_name')), '/').'"/', $html);
+        }
+    }
+
     public function test_plan_max_of_zero_uses_the_site_default_for_the_preview_account(): void
     {
         SiteSetting::set('voice_cloning_max_per_user', 5);

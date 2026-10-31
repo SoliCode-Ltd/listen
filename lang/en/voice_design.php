@@ -78,9 +78,19 @@ return [
 
     // The takes.
     'takes_title' => 'Pick your favourite take',
-    'takes_subtitle' => 'Each take is a voice of its own, speaking the same line.',
+    'takes_subtitle' => 'Each take is a voice of its own saying your line. Take 1 follows your description most closely.',
     'take_label' => 'Take :n',
-    'take_sample' => 'Its own sample',
+    'take_recommended' => 'Recommended',
+    // How each take was made from the description (App\Support\VoiceDesign::takeLean).
+    'take_notes' => [
+        'closest' => 'Closest to your description',
+        'same' => 'Another take on your description',
+        'warmer' => 'A warmer, deeper variation',
+        'brighter' => 'A brighter, crisper variation',
+        'bolder' => 'A bolder, richer variation',
+        'freer' => 'A lighter variation with a distinctive edge',
+    ],
+    'take_sample' => 'Says a sample of its own instead of your line',
     'play' => 'Play',
     'pause' => 'Pause',
     'keep' => 'Keep this voice',

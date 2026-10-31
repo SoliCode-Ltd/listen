@@ -20,6 +20,7 @@
   // As App\Support\VoiceDesign::VOICE_ORBS, for a voice the server sent without its orb.
   var LIBRARY_ORBS = ['arabic', 'emotions', 'english', 'dialogue', 'longform', 'creator', 'pro', 'places'];
   var ICON_PLAY = '<span class="vd-play-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg></span><span class="vd-pause-icon" aria-hidden="true"><i></i><i></i></span>';
+  var ICON_STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>';
   var ICON_TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l.8 12.2h9.4L17.5 7M10.2 10.5v5.5M13.8 10.5v5.5"/></svg>';
 
   function esc(value) {
@@ -157,12 +158,12 @@
       }, function () { throw new Error(t.network); });
     }
 
-    function showAlert(message, ok) {
+    function showAlert(message, ok, stay) {
       if (!alertBox) return;
       alertBox.textContent = message || '';
       alertBox.classList.toggle('is-ok', !!ok);
       alertBox.hidden = !message;
-      if (message) alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (message && !stay) alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     // ---------- The stage ----------
@@ -240,19 +241,24 @@
       var quote = q('[data-vd-line-quote]');
       if (quote) quote.textContent = line || '';
       var canKeep = !studio.demo || !!(response && response.can_keep);
+      var several = takes.length > 1;
       takes.forEach(function (take, n) {
         var orb = n === 0 && lastExample ? lastExample.orb : TAKE_ORBS[n % TAKE_ORBS.length];
+        // With more than one take, the first follows the description as written: it is the one we recommend.
+        var pick = several && (take.take || n + 1) === 1;
         var li = document.createElement('li');
-        li.className = 'vd-take';
+        li.className = 'vd-take' + (pick ? ' is-pick' : '');
         li.setAttribute('data-vs-cast', '');
         li.style.setProperty('--n', String(n));
         li.innerHTML = orbHtml(orb)
-          + '<div class="vd-take-main"><div class="vd-take-title">' + esc(fmt(t.take, { n: take.take || n + 1 }))
-          + (take.seconds ? ' <small dir="ltr">' + clock(take.seconds) + '</small>' : '')
-          + (take.line ? '' : ' <small>' + esc(t.take_sample) + '</small>')
-          + '</div><div class="vd-take-bar"><i></i></div></div>'
-          + '<div class="vd-take-side"><button type="button" class="vd-play" aria-label="' + esc(t.play) + '">' + ICON_PLAY + '</button>'
-          + (canKeep ? '<button type="button" class="btn btn-primary vd-take-keep">' + esc(t.keep) + '</button>' : '') + '</div>';
+          + '<div class="vd-take-main"><div class="vd-take-head"><strong class="vd-take-name">' + esc(fmt(t.take, { n: take.take || n + 1 })) + '</strong>'
+          + (pick ? '<span class="vd-take-badge">' + ICON_STAR + esc(t.take_recommended) + '</span>' : '') + '</div>'
+          + (several && take.note ? '<p class="vd-take-note">' + esc(take.note) + '</p>' : '')
+          + (take.line ? '' : '<p class="vd-take-note is-sample">' + esc(t.take_sample) + '</p>')
+          + '<div class="vd-take-player"><button type="button" class="vd-play" aria-label="' + esc(t.play) + '">' + ICON_PLAY + '</button>'
+          + '<div class="vd-take-bar"><i></i></div>'
+          + (take.seconds ? '<span class="vd-time" dir="ltr">' + clock(take.seconds) + '</span>' : '') + '</div></div>'
+          + (canKeep ? '<button type="button" class="btn vd-take-keep">' + esc(t.keep) + '</button>' : '');
         var playButton = li.querySelector('.vd-play');
         playButton.addEventListener('click', function () { play(take.url, { button: playButton, cast: li, bar: li.querySelector('.vd-take-bar i') }); });
         var keepButton = li.querySelector('.vd-take-keep');
@@ -290,8 +296,10 @@
           if (input) input.value = '';
           keepForm.hidden = true;
           setStage('idle');
-          if (res.voice) addToLibrary(res.voice, true);
-          showAlert(res.message || fmt(t.kept, { name: name }), true);
+          var kept = res.voice ? addToLibrary(res.voice, true) : null;
+          showAlert(res.message || fmt(t.kept, { name: name }), true, !!kept);
+          // Down to the voice just kept, in the library under the studio.
+          if (kept) kept.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }).catch(function (error) {
           showAlert(error.message);
         }).then(function () {
@@ -354,7 +362,7 @@
       return el;
     }
     function addToLibrary(voice, fresh) {
-      if (!libraryGrid) return;
+      if (!libraryGrid) return null;
       if (fresh) voices.unshift(voice);
       var el = card(voice, fresh);
       if (fresh) libraryGrid.insertBefore(el, libraryGrid.firstChild);
@@ -362,6 +370,7 @@
       drawOrbs(el);
       libraryCount();
       if (fresh) document.dispatchEvent(new CustomEvent('listen:designed-voice', { detail: voice }));
+      return el;
     }
     if (libraryGrid) voices.forEach(function (voice) { addToLibrary(voice, false); });
 
