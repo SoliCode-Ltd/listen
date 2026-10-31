@@ -14,15 +14,15 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Voice Design going live (database/migrations/2026_11_09_120000_open_voice_design_on_creator_pro_studio_max.php):
- * Creator 10 new voices a month, Pro 50, Studio Max no limit, open to everyone, and each plan's
- * own pricing-card lines saying so.
+ * Voice Design going live (database/migrations/2026_11_09_130000_open_voice_design_on_creator_pro_studio_max.php):
+ * Creator 10 designed voices in all, Pro 50, Studio Max no limit (deleted voices still count),
+ * open to everyone, and each plan's own pricing-card lines saying so.
  */
 class VoiceDesignGoLiveTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const MIGRATION = 'migrations/2026_11_09_120000_open_voice_design_on_creator_pro_studio_max.php';
+    private const MIGRATION = 'migrations/2026_11_09_130000_open_voice_design_on_creator_pro_studio_max.php';
 
     public function test_going_live_opens_it_on_the_three_plans_with_their_numbers_and_their_own_card_lines(): void
     {
@@ -32,12 +32,14 @@ class VoiceDesignGoLiveTest extends TestCase
         $creator = $this->plan('creator', 2200, withOwnLines: true);
         $pro = $this->plan('pro', 4900, withOwnLines: true);
         $max = $this->plan('studio_max', 9900, withOwnLines: true);
+        // Pro already had a Voice Design line in an earlier wording: it is replaced, not doubled.
+        $pro->forceFill(['features_en' => array_merge($pro->features_en, [['label' => 'Voice Design', 'value' => '50 voices a month', 'icon' => 'sliders']])])->save();
 
         $this->migrate();
         $this->migrate(); // A second run changes nothing.
 
-        $this->assertSame([true, 10, 10, false], $this->numbers($creator->fresh()));
-        $this->assertSame([true, 50, 50, false], $this->numbers($pro->fresh()));
+        $this->assertSame([true, 10, 0, false], $this->numbers($creator->fresh()));
+        $this->assertSame([true, 50, 0, false], $this->numbers($pro->fresh()));
         $this->assertTrue($max->fresh()->voice_design_enabled);
         $this->assertTrue(VoiceDesign::isUnlimited($max->fresh()));
         $this->assertFalse($starter->fresh()->voice_design_enabled);
@@ -46,38 +48,42 @@ class VoiceDesignGoLiveTest extends TestCase
 
         // Each plan's own lines: Voice Design right under voice cloning, once, in both languages.
         $this->assertSame(
-            ['Generations per day', 'Voice cloning', 'Voice Design', 'Commercial use'],
+            ['Generations per day', 'Voice cloning', 'Design your own voices', 'Commercial use'],
             array_column($creator->fresh()->features_en, 'label'),
         );
-        $this->assertSame(['label' => 'Voice Design', 'value' => '10 voices a month', 'icon' => 'sliders'], $creator->fresh()->features_en[2]);
-        $this->assertSame(['label' => 'تصميم الصوت', 'value' => '10 أصوات شهريًا', 'icon' => 'sliders'], $creator->fresh()->features_ar[2]);
-        $this->assertSame('50 voices a month', $pro->fresh()->features_en[2]['value']);
-        $this->assertSame('50 صوتًا شهريًا', $pro->fresh()->features_ar[2]['value']);
+        $this->assertSame(['label' => 'Design your own voices', 'value' => '10 voices', 'icon' => 'sliders'], $creator->fresh()->features_en[2]);
+        $this->assertSame(['label' => 'صمّم أصواتك بالوصف', 'value' => '10 أصوات', 'icon' => 'sliders'], $creator->fresh()->features_ar[2]);
+        $this->assertSame(
+            ['Generations per day', 'Voice cloning', 'Commercial use', 'Design your own voices'],
+            array_column($pro->fresh()->features_en, 'label'),
+        );
+        $this->assertSame('50 voices', $pro->fresh()->features_en[3]['value']);
+        $this->assertSame('50 صوتًا', $pro->fresh()->features_ar[2]['value']);
         $this->assertSame('Unlimited', $max->fresh()->features_en[2]['value']);
         $this->assertSame('غير محدود', $max->fresh()->features_ar[2]['value']);
 
-        // The pricing card shows the plan's own lines, Voice Design among them.
-        $this->assertContains('Voice Design', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
-        $this->assertContains('تصميم الصوت', array_column(PlanPricingLines::forPlan($max->fresh(), 'ar'), 'label'));
+        // The pricing card shows the plan's own lines, the designed voices among them.
+        $this->assertContains('Design your own voices', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
+        $this->assertContains('صمّم أصواتك بالوصف', array_column(PlanPricingLines::forPlan($max->fresh(), 'ar'), 'label'));
     }
 
-    public function test_each_plan_keeps_only_its_months_new_voices_and_deleting_one_gives_none_back(): void
+    public function test_each_plan_keeps_only_its_voices_in_all_and_deleting_one_gives_none_back(): void
     {
         $creator = $this->plan('creator', 2200);
         $pro = $this->plan('pro', 4900);
         $max = $this->plan('studio_max', 9900);
         $this->migrate();
 
-        foreach ([[$creator, 10], [$pro, 50], [$max, null]] as [$plan, $month]) {
+        foreach ([[$creator, 10], [$pro, 50], [$max, null]] as [$plan, $voices]) {
             $member = $this->member($plan->fresh());
-            // A month's voices less one, two of them deleted again: one more may still be kept.
-            $this->keptVoices($member, ($month ?? 120) - 1, deleted: 2);
+            // The plan's voices less one, two of them deleted again, all months ago: one more may still be kept.
+            $this->keptVoices($member, ($voices ?? 120) - 1, deleted: 2, keptAt: now()->subMonths(3));
             $this->assertNull(VoiceDesign::keepBlocker((int) $member->id, $plan->fresh()), $plan->slug);
             $this->keptVoices($member, 1, deleted: 0, from: 1000);
-            if ($month === null) {
+            if ($voices === null) {
                 $this->assertNull(VoiceDesign::keepBlocker((int) $member->id, $plan->fresh()), $plan->slug.' has no limit');
             } else {
-                $this->assertSame(trans_choice('voice_design.errors.month_used', $month, ['count' => $month]), VoiceDesign::keepBlocker((int) $member->id, $plan->fresh()), $plan->slug);
+                $this->assertSame(__('voice_design.errors.total_used', ['max' => $voices]), VoiceDesign::keepBlocker((int) $member->id, $plan->fresh()), $plan->slug);
             }
         }
 
@@ -86,7 +92,7 @@ class VoiceDesignGoLiveTest extends TestCase
         $this->keptVoices($member, 10, deleted: 3);
         $take = $this->keptVoices($member, 1, deleted: 0, from: 2000, draft: true);
         $this->actingAs($member)->postJsonLocalizedRoute('voice-design.keep', ['name' => 'One more'], ['id' => $take->id])
-            ->assertStatus(422)->assertJson(['message' => trans_choice('voice_design.errors.month_used', 10, ['count' => 10])]);
+            ->assertStatus(422)->assertJson(['message' => __('voice_design.errors.total_used', ['max' => 10])]);
         $this->assertSame(DesignedVoice::DRAFT, $take->fresh()->status);
     }
 
@@ -106,8 +112,8 @@ class VoiceDesignGoLiveTest extends TestCase
         $this->migrate();
         SiteSetting::set('voice_design_audience', VoiceDesign::AUDIENCE_PREVIEW, VoiceDesign::GROUP);
 
-        $this->assertNotContains('Voice Design', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
-        $this->assertNotContains('تصميم الصوت', array_column(PlanPricingLines::forPlan($creator->fresh(), 'ar'), 'label'));
+        $this->assertNotContains('Design your own voices', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
+        $this->assertNotContains('صمّم أصواتك بالوصف', array_column(PlanPricingLines::forPlan($creator->fresh(), 'ar'), 'label'));
         $this->assertContains('Voice cloning', array_column(PlanPricingLines::forPlan($creator->fresh(), 'en'), 'label'));
     }
 
@@ -136,8 +142,8 @@ class VoiceDesignGoLiveTest extends TestCase
         return $member;
     }
 
-    /** Voices the member kept this month ($deleted of them deleted again), or one take still to keep. */
-    private function keptVoices(User $member, int $count, int $deleted, int $from = 0, bool $draft = false): DesignedVoice
+    /** Voices the member kept ($deleted of them deleted again), or one take still to keep. */
+    private function keptVoices(User $member, int $count, int $deleted, int $from = 0, bool $draft = false, ?\DateTimeInterface $keptAt = null): DesignedVoice
     {
         $last = null;
         foreach (range(1, $count) as $n) {
@@ -145,7 +151,7 @@ class VoiceDesignGoLiveTest extends TestCase
             $last = DesignedVoice::query()->create([
                 'user_id' => $member->id, 'status' => $draft ? DesignedVoice::DRAFT : DesignedVoice::SAVED, 'batch' => 'b'.$member->id.'-'.$id,
                 'name' => $draft ? null : 'Voice '.$id, 'description' => 'A voice.', 'language' => 'en', 'provider_voice_key' => 'v'.$member->id.'-'.$id,
-                'key_name' => 'GEMINI_TTS_API_KEY', 'take' => 1, 'kept_at' => $draft ? null : now(),
+                'key_name' => 'GEMINI_TTS_API_KEY', 'take' => 1, 'kept_at' => $draft ? null : ($keptAt ?? now()),
                 'metadata' => ['site' => VoiceDesignService::siteTag()],
             ]);
             if ($n <= $deleted) {

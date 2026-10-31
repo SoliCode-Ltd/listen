@@ -17,8 +17,14 @@
         </div>
       @elseif($studio['allowed'] && $studio['monthly'] > 0)
         <div class="vd-section-meta">
-          <x-quota-meter data-vd-month-left :left="$studio['monthly'] - $studio['kept_month']" :max="$studio['monthly']"
+          <x-quota-meter data-vd-quota="month" :left="$studio['monthly'] - $studio['kept_month']" :max="$studio['monthly']"
             :value="__('voice_design.month_left')" :caption="__('voice_design.month_left_caption')" />
+        </div>
+      @elseif($studio['allowed'])
+        {{-- The plan's designed voices in all: deleting one does not give it back. --}}
+        <div class="vd-section-meta">
+          <x-quota-meter data-vd-quota="total" :left="$studio['max_voices'] - $studio['kept_total']" :max="$studio['max_voices']"
+            :value="__('voice_design.total_left')" :caption="__('voice_design.total_left_caption')" />
         </div>
       @endif
     </header>

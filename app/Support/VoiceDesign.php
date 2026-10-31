@@ -149,9 +149,11 @@ final class VoiceDesign
     }
 
     /**
-     * How many designed voices a member of this plan keeps: the plan's number,
-     * which the owner sets on turning it on (no cap on a plan without a count,
-     * isUnlimited); the site's for the admin email trying it on a plan without it.
+     * How many designed voices a member of this plan may keep in all, while the
+     * subscription lasts: every voice kept counts, deleted ones too (keptInTotal).
+     * The plan's number, which the owner sets on turning it on (no cap on a plan
+     * without a count, isUnlimited); the site's for the admin email trying it on a
+     * plan without it.
      */
     public static function maxVoices(?Plan $plan): int
     {
@@ -163,7 +165,7 @@ final class VoiceDesign
         return $own > 0 ? $own : max(1, (int) self::setting('voice_design_max_per_user', 10));
     }
 
-    /** New voices a member of this plan may keep in a credit month; 0 when only the library's size counts. */
+    /** New voices a member of this plan may keep in a credit month; 0 when only the plan's total counts. */
     public static function monthlyLimit(?Plan $plan): int
     {
         return self::isUnlimited($plan) ? 0 : max(0, (int) ($plan?->voice_design_monthly_voices ?? 0));
@@ -188,14 +190,23 @@ final class VoiceDesign
     }
 
     /**
-     * Why this member cannot keep another voice now (their library is full,
-     * or the month's new voices are used), or null when they can.
+     * Every voice the member has kept, deleted ones too: deleting a voice does not
+     * give back one of the plan's (maxVoices).
+     */
+    public static function keptInTotal(int $userId): int
+    {
+        return DesignedVoice::withTrashed()->where('user_id', $userId)->whereNotNull('kept_at')->count();
+    }
+
+    /**
+     * Why this member cannot keep another voice now (the plan's voices are all
+     * used, or the month's new ones), or null when they can.
      */
     public static function keepBlocker(int $userId, ?Plan $plan): ?string
     {
         $max = self::maxVoices($plan);
-        if (DesignedVoice::query()->ownedBy($userId)->saved()->count() >= $max) {
-            return __('voice_design.errors.library_full', ['max' => $max]);
+        if (self::keptInTotal($userId) >= $max) {
+            return __('voice_design.errors.total_used', ['max' => $max]);
         }
         $monthly = self::monthlyLimit($plan);
         if ($monthly > 0 && self::keptThisMonth($userId) >= $monthly) {
@@ -514,6 +525,7 @@ final class VoiceDesign
             'unlimited' => self::isUnlimited($plan),
             'monthly' => self::monthlyLimit($plan),
             'kept_month' => $allowed && ! $demo ? self::keptThisMonth((int) $user->id) : 0,
+            'kept_total' => $allowed && ! $demo ? self::keptInTotal((int) $user->id) : 0,
             'voices' => $voices->map(fn (DesignedVoice $voice): array => self::present($voice))->values()->all(),
             'examples' => self::examples(),
             'showcase' => self::showcase(),

@@ -16,7 +16,7 @@
       // The demo: its one try, once it is used (HomeController::designVoice).
       $vd['demo'] => ! empty($vd['demo_used']) ? 'demo' : null,
       ! $vd['allowed'] => null,
-      count($vd['voices']) >= $vd['max_voices'] => 'full',
+      ! $vd['unlimited'] && $vd['kept_total'] >= $vd['max_voices'] => 'total',
       $vd['monthly'] > 0 && $vd['kept_month'] >= $vd['monthly'] => 'month',
       default => null,
   };
@@ -56,11 +56,12 @@
           'delete' => __('voice_design.delete'),
           'delete_confirm' => __('voice_design.delete_confirm'),
           'delete_month_note' => __('voice_design.delete_month_note'),
+          'delete_total_note' => __('voice_design.delete_total_note'),
           'use_in_studio' => __('voice_design.use_in_studio'),
           'limit_month_title' => __('voice_design.limit_month_title'),
           'limit_month_text' => __('voice_design.limit_month_text'),
-          'limit_full_title' => __('voice_design.limit_full_title'),
-          'limit_full_text' => __('voice_design.limit_full_text'),
+          'limit_total_title' => __('voice_design.limit_total_title'),
+          'limit_total_text' => __('voice_design.limit_total_text'),
           'limit_demo_title' => __('voice_design.limit_demo_title'),
           'limit_demo_text' => __('voice_design.limit_demo_text'),
           'voice_meta' => __('voice_design.voice_meta', ['speaks' => ':speaks', 'date' => ':date']),
@@ -232,16 +233,14 @@
             </dl>
             <p class="vd-summary-note">{{ $vd['demo'] ? __('voice_design.demo_one_take') : __('voice_design.summary_refund') }}</p>
           </div>
-          {{-- No more now (the month's new voices used, the library full, or the demo's one try had):
+          {{-- No more now (the plan's designed voices used, the month's, or the demo's one try had):
                said here, in place of the design button, before anything is spent. --}}
           <div class="vd-limit" data-vd-limit role="status" @if($limit === null) hidden @endif>
             <span class="vd-limit-mark">{!! $icon['lock'] !!}</span>
             <div>
               <strong data-vd-limit-title>{{ $limit ? __('voice_design.limit_'.$limit.'_title') : '' }}</strong>
               <p data-vd-limit-text>{{ $limit ? __('voice_design.limit_'.$limit.'_text') : '' }}</p>
-              @if($vd['demo'])
-                <a class="vd-limit-link" href="{{ $vd['upgrade_url'] }}" data-vd-limit-link @if($limit !== 'demo') hidden @endif>{{ __('voice_design.limit_demo_cta') }}</a>
-              @endif
+              <a class="vd-limit-link" href="{{ $vd['demo'] ? $vd['upgrade_url'] : route('billing.page') }}" data-vd-limit-link @if(! in_array($limit, ['demo', 'total'], true)) hidden @endif>{{ __('voice_design.limit_cta') }}</a>
             </div>
           </div>
           <button type="submit" class="btn btn-primary vd-design-btn" data-vd-submit @if($limit !== null) hidden disabled @endif>

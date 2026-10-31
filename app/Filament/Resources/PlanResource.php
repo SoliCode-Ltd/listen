@@ -463,14 +463,14 @@ class PlanResource extends Resource
                             ->columnSpan(2)
                             ->visible(fn (Forms\Get $get): bool => (bool) $get('voice_design_enabled')),
                         Forms\Components\TextInput::make('voice_design_max_voices')
-                            ->label('Designed voices a member keeps')
+                            ->label('Designed voices in all')
                             ->numeric()
                             ->integer()
                             ->minValue(1)
                             ->maxValue(100)
                             ->required()
                             ->suffix('voices')
-                            ->helperText('At the same time. A member deletes one to keep another.')
+                            ->helperText('While the subscription lasts. Every voice a member keeps counts, deleted ones too: deleting one does not give it back.')
                             ->visible(fn (Forms\Get $get): bool => (bool) $get('voice_design_enabled') && ! $get('voice_design_unlimited')),
                         Forms\Components\TextInput::make('voice_design_monthly_voices')
                             ->label('New voices a month')
@@ -480,7 +480,7 @@ class PlanResource extends Resource
                             ->maxValue(1000)
                             ->required()
                             ->suffix('voices')
-                            ->helperText('New voices a member may keep in a credit month; deleting one does not give it back. 0: no monthly count, only the voices kept.')
+                            ->helperText('New voices a member may keep in a credit month, on top of the total; deleting one does not give it back. 0: no monthly count, only the total.')
                             ->visible(fn (Forms\Get $get): bool => (bool) $get('voice_design_enabled') && ! $get('voice_design_unlimited')),
                         Forms\Components\Placeholder::make('voice_design_cost')
                             ->label('What a design costs')
@@ -743,7 +743,7 @@ class PlanResource extends Resource
                         if ($record->voice_design_unlimited) {
                             return 'No limit';
                         }
-                        $kept = (int) $state > 0 ? $state.' voices' : 'Site default';
+                        $kept = (int) $state > 0 ? $state.' voices in all' : 'Site default';
 
                         return (int) $record->voice_design_monthly_voices > 0 ? $kept.', '.$record->voice_design_monthly_voices.' new a month' : $kept;
                     })

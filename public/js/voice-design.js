@@ -297,6 +297,7 @@
           keepForm.hidden = true;
           setStage('idle');
           keptMonth = res.kept_month !== undefined ? Number(res.kept_month) : keptMonth + 1;
+          keptTotal = res.kept_total !== undefined ? Number(res.kept_total) : keptTotal + 1;
           var kept = res.voice ? addToLibrary(res.voice, true) : null;
           showAlert(res.message || fmt(t.kept, { name: name }), true, !!kept);
           // Down to the voice just kept, in the library under the studio.
@@ -333,6 +334,7 @@
     // the server refuses a design then (App\Support\VoiceDesign::keepBlocker). Deleting a voice
     // makes room in the library, not in the month.
     var keptMonth = Number(studio.kept_month || 0);
+    var keptTotal = Number(studio.kept_total || 0);
     function refreshLimits() {
       var kind = '';
       if (studio.demo) {
@@ -341,14 +343,15 @@
       } else {
         if (!studio.allowed) return;
         var monthly = Number(studio.monthly || 0);
-        // A plan with no limit (studio.unlimited) has neither.
-        var full = !studio.unlimited && voices.length >= Number(studio.max_voices || 0);
-        kind = full ? 'full' : (monthly > 0 && keptMonth >= monthly ? 'month' : '');
-        if (monthly > 0) {
-          (root.closest('[data-dashboard-section]') || root).querySelectorAll('[data-vd-month-left]').forEach(function (meter) {
-            if (window.ListenQuota) window.ListenQuota(meter, monthly - keptMonth, monthly);
-          });
-        }
+        var max = Number(studio.max_voices || 0);
+        // The plan's voices in all (deleted ones too), then the month's; a plan with no limit has neither.
+        var used = !studio.unlimited && keptTotal >= max;
+        kind = used ? 'total' : (monthly > 0 && keptMonth >= monthly ? 'month' : '');
+        (root.closest('[data-dashboard-section]') || root).querySelectorAll('[data-vd-quota]').forEach(function (meter) {
+          if (!window.ListenQuota) return;
+          if (meter.getAttribute('data-vd-quota') === 'month') window.ListenQuota(meter, monthly - keptMonth, monthly);
+          else window.ListenQuota(meter, max - keptTotal, max);
+        });
       }
       var box = q('[data-vd-limit]');
       if (box) {
@@ -363,7 +366,7 @@
       var summary = q('[data-vd-summary]');
       if (summary) summary.hidden = !!kind;
       var link = q('[data-vd-limit-link]');
-      if (link) link.hidden = kind !== 'demo';
+      if (link) link.hidden = kind !== 'demo' && kind !== 'total';
     }
     function card(voice, fresh) {
       var el = document.createElement('article');
@@ -386,8 +389,9 @@
         else if (studio.urls.studio) window.location.href = studio.urls.studio;
       });
       el.querySelector('[data-vd-delete]').addEventListener('click', function () {
-        // On a plan with a monthly number of new voices: deleting one doesn't give it back.
-        if (!window.confirm(t.delete_confirm + (Number(studio.monthly || 0) > 0 ? '\n\n' + t.delete_month_note : ''))) return;
+        // Deleting one doesn't give it back: not the plan's voices in all, nor the month's.
+        var note = Number(studio.monthly || 0) > 0 ? t.delete_month_note : (studio.unlimited ? '' : t.delete_total_note);
+        if (!window.confirm(t.delete_confirm + (note ? '\n\n' + note : ''))) return;
         send(String(studio.urls.destroy).replace('__ID__', encodeURIComponent(voice.id)), 'DELETE').then(function () {
           if (now && el.contains(now.button)) stop();
           voices = voices.filter(function (v) { return v.id !== voice.id; });

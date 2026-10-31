@@ -175,8 +175,8 @@ final class PlanPricingLines
     /**
      * Lines the admin wrote by hand about a feature not open to everyone yet are left
      * out, as its automatic line is: video dubbing ("Video dubbing: 20 videos", "دبلجة
-     * الفيديو") until Video Dubbing → Settings opens it, Voice Design ("Voice Design: 10
-     * voices a month", "تصميم الصوت") until Voice Design → Settings does.
+     * الفيديو") until Video Dubbing → Settings opens it, Voice Design ("Design your own
+     * voices: 10 voices", "صمّم أصواتك بالوصف", "تصميم الصوت") until Voice Design → Settings does.
      *
      * @param  array<int, mixed>  $lines
      * @return array<int, mixed>
@@ -185,7 +185,7 @@ final class PlanPricingLines
     {
         $closed = array_filter([
             StudioFacts::dubbing() ? null : '\bdub|دبلج',
-            VoiceDesign::audience() === VoiceDesign::AUDIENCE_EVERYONE ? null : 'voice design|تصميم (ال)?(صوت|أصوات)',
+            VoiceDesign::audience() === VoiceDesign::AUDIENCE_EVERYONE ? null : 'voice design|design your own voices|تصميم (ال)?(صوت|أصوات)|صمّ?م أصواتك',
         ]);
         if ($closed === []) {
             return $lines;

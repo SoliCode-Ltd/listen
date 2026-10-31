@@ -11,21 +11,26 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Voice Design opens on the live site, as the owner chose: Creator gets 10
-     * new designed voices a month, Pro 50 and Studio Max no limit; each plan's
-     * library holds as many as its month gives. Voice Design opens to everyone
-     * (Voice Design → Settings), and each of these plans' own pricing-card lines
-     * (Admin → Plans → Features List) gets its Voice Design line in English and
-     * Arabic, under the voice cloning line. Every other plan has it switched
-     * off. A database with none of these plans (a new install) is left alone.
+     * Voice Design opens on the live site, as the owner chose: Creator members
+     * design 10 voices in all, Pro 50 and Studio Max with no limit. Every voice
+     * kept counts while the subscription lasts, deleted ones too; there is no
+     * monthly number. Voice Design opens to everyone (Voice Design → Settings),
+     * and each of these plans' own pricing-card lines (Admin → Plans → Features
+     * List) gets its line in English and Arabic ("Design your own voices: 10
+     * voices"), under the voice cloning line, in place of an earlier Voice
+     * Design line. Every other plan has it switched off. A database with none of
+     * these plans (a new install) is left alone.
      *
-     * @var array<string, array{monthly:int, unlimited:bool}>
+     * @var array<string, array{voices:int, unlimited:bool}>
      */
     private const PLANS = [
-        'creator' => ['monthly' => 10, 'unlimited' => false],
-        'pro' => ['monthly' => 50, 'unlimited' => false],
-        'studio_max' => ['monthly' => 0, 'unlimited' => true],
+        'creator' => ['voices' => 10, 'unlimited' => false],
+        'pro' => ['voices' => 50, 'unlimited' => false],
+        'studio_max' => ['voices' => 0, 'unlimited' => true],
     ];
+
+    /** Labels a plan's Voice Design line has had, in either language, besides today's. */
+    private const EARLIER_LABELS = ['Voice Design', 'تصميم الصوت', 'تصميم الأصوات'];
 
     public function up(): void
     {
@@ -48,8 +53,8 @@ return new class extends Migration
             $updates = [
                 'voice_design_enabled' => true,
                 'voice_design_unlimited' => $numbers['unlimited'],
-                'voice_design_max_voices' => $numbers['unlimited'] ? 0 : $numbers['monthly'],
-                'voice_design_monthly_voices' => $numbers['monthly'],
+                'voice_design_max_voices' => $numbers['voices'],
+                'voice_design_monthly_voices' => 0,
             ];
             foreach (PlanPricingLines::LOCALES as $locale) {
                 $column = 'features_'.$locale;
@@ -89,8 +94,7 @@ return new class extends Migration
                 $column = 'features_'.$locale;
                 $lines = Schema::hasColumn('plans', $column) ? json_decode((string) ($plan->{$column} ?? ''), true) : null;
                 if (is_array($lines) && $lines !== []) {
-                    $label = PlanPricingLines::labelKey((string) __('ui.pricing.lines.label_voice_design', [], $locale));
-                    $kept = array_values(array_filter($lines, fn ($line): bool => ! (is_array($line) && PlanPricingLines::labelKey((string) ($line['label'] ?? '')) === $label)));
+                    $kept = array_values(array_filter($lines, fn ($line): bool => ! $this->isDesignLine($line, $locale)));
                     $updates[$column] = json_encode($kept, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 }
             }
@@ -107,34 +111,44 @@ return new class extends Migration
     }
 
     /**
-     * The plan's own lines with its Voice Design line under the voice cloning
-     * line (or at the end), unless it already has one.
+     * The plan's own lines with its Voice Design line: in place of the one it has
+     * (an earlier wording too), or else under the voice cloning line (or at the end).
      *
      * @param  array<int, mixed>  $lines
-     * @param  array{monthly:int, unlimited:bool}  $numbers
+     * @param  array{voices:int, unlimited:bool}  $numbers
      * @return array<int, mixed>
      */
     private function withDesignLine(array $lines, string $locale, array $numbers): array
     {
-        $label = (string) __('ui.pricing.lines.label_voice_design', [], $locale);
+        $line = [
+            'label' => (string) __('ui.pricing.lines.label_voice_design', [], $locale),
+            'value' => PlanPricingLines::designValue($numbers['unlimited'], 0, $numbers['voices'], $locale),
+            'icon' => 'sliders',
+        ];
         $cloning = PlanPricingLines::labelKey((string) __('ui.pricing.lines.label_voice_cloning', [], $locale));
         $at = count($lines);
-        foreach ($lines as $i => $line) {
-            $key = PlanPricingLines::labelKey((string) (is_array($line) ? ($line['label'] ?? '') : ''));
-            if ($key === PlanPricingLines::labelKey($label)) {
-                return $lines;
+        foreach ($lines as $i => $existing) {
+            if ($this->isDesignLine($existing, $locale)) {
+                $lines[$i] = $line;
+
+                return array_values(array_filter($lines, fn ($other, $j): bool => $j === $i || ! $this->isDesignLine($other, $locale), ARRAY_FILTER_USE_BOTH));
             }
-            if ($key === $cloning) {
+            if (PlanPricingLines::labelKey((string) (is_array($existing) ? ($existing['label'] ?? '') : '')) === $cloning) {
                 $at = $i + 1;
             }
         }
-        $line = [
-            'label' => $label,
-            'value' => PlanPricingLines::designValue($numbers['unlimited'], $numbers['monthly'], $numbers['monthly'], $locale),
-            'icon' => 'sliders',
-        ];
         array_splice($lines, $at, 0, [$line]);
 
         return $lines;
+    }
+
+    private function isDesignLine(mixed $line, string $locale): bool
+    {
+        $labels = array_map(
+            fn (string $label): string => PlanPricingLines::labelKey($label),
+            [...self::EARLIER_LABELS, (string) __('ui.pricing.lines.label_voice_design', [], $locale)],
+        );
+
+        return is_array($line) && in_array(PlanPricingLines::labelKey((string) ($line['label'] ?? '')), $labels, true);
     }
 };

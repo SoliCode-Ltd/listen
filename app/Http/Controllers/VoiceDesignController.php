@@ -171,6 +171,7 @@ class VoiceDesignController extends Controller
             'message' => __('voice_design.kept', ['name' => $voice->name]),
             'voice' => VoiceDesign::present($voice),
             'kept_month' => VoiceDesign::keptThisMonth((int) $user->id),
+            'kept_total' => VoiceDesign::keptInTotal((int) $user->id),
         ]);
     }
 

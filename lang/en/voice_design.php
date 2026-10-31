@@ -110,14 +110,17 @@ return [
     // On a plan with no limit.
     'month_unlimited' => 'Unlimited',
     'month_unlimited_caption' => 'Designed voices',
+    // A plan's designed voices in all, while the subscription lasts.
+    'total_left' => ':left of :max left',
+    'total_left_caption' => 'Designed voices on your plan',
     // When no more can be designed: instead of the design button.
     'limit_month_title' => 'You’ve used this month’s designed voices',
     'limit_month_text' => 'More come with your next credit month.',
-    'limit_full_title' => 'Your library is full',
-    'limit_full_text' => 'Delete a voice below to design a new one.',
+    'limit_total_title' => 'You’ve used your plan’s designed voices',
+    'limit_total_text' => 'Every voice you keep counts, even after you delete it. Choose a bigger plan to design more.',
     'limit_demo_title' => 'You’ve had your free try',
     'limit_demo_text' => 'Choose a plan with Voice Design to design voices and keep them for the studio.',
-    'limit_demo_cta' => 'See the plans',
+    'limit_cta' => 'See the plans',
     // The demo: Listen writes the line the voice says.
     'demo_line_note' => 'Listen writes a line that suits your character, within the demo’s characters.',
     'library_empty' => 'The voices you keep appear here, ready in the studio’s voice list.',
@@ -126,6 +129,7 @@ return [
     'delete_confirm' => 'Delete this voice? It cannot be brought back, but the audio you already made with it stays in your history.',
     // Added to it on a plan with a monthly number of new voices.
     'delete_month_note' => 'Deleting it doesn’t give back one of this month’s new voices.',
+    'delete_total_note' => 'Deleting it doesn’t give back one of your plan’s designed voices.',
     'deleted' => 'The voice was deleted.',
     'created_on' => 'Created :date',
     'voice_meta' => ':speaks, made :date',
@@ -167,7 +171,7 @@ return [
         'refused' => 'This voice can\'t be designed: voices of children and of real people aren\'t allowed. Describe an adult character, or just the sound ("a tiny, high, bright voice"), and try again. Nothing was charged.',
         'invalid' => 'This description could not be used. Try describing the voice a little differently.',
         'too_many' => 'You have designed a lot of voices in the last hour. Please try again in :minutes minutes.',
-        'library_full' => 'You have kept :max designed voices, the most your plan holds. Delete one to keep another.',
+        'total_used' => 'You have kept all :max designed voices your plan includes; deleted ones count too. Choose a bigger plan to design more.',
         'month_used' => 'You have kept :count new designed voice this month, the most your plan allows. More come with your next credit month.|You have kept :count new designed voices this month, the most your plan allows. More come with your next credit month.',
         'line_needed' => 'Type the line the voice should say, or let Listen write it for you.',
         'line_too_long' => 'The line can be up to :max characters.',
