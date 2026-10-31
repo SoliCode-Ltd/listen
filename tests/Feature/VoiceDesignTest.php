@@ -332,14 +332,15 @@ class VoiceDesignTest extends TestCase
         app()->setLocale('en');
 
         $page = $this->actingAs($member)->getLocalizedRoute('dashboard')->assertOk();
-        $page->assertSee('1 of 2 new voices left this month', false);
+        $page->assertSee('1 of 2 left', false)->assertSee(__('voice_design.month_left_caption'), false);
         $this->assertMatchesRegularExpression('/data-vd-limit role="status"\s+hidden/', $page->getContent());
         $this->assertDoesNotMatchRegularExpression('/data-vd-submit\s+hidden disabled/', $page->getContent());
 
         // A second one kept, then deleted: room in the library, none in the month.
         $this->savedVoice($member, DesignedVoice::SAVED, 'voice_two')->delete();
         $page = $this->actingAs($member)->getLocalizedRoute('dashboard')->assertOk();
-        $page->assertSee('0 of 2 new voices left this month', false);
+        $page->assertSee('0 of 2 left', false);
+        $this->assertMatchesRegularExpression('/class="quota-meter is-empty"[^>]*data-vd-month-left/', $page->getContent());
         $page->assertSee(__('voice_design.limit_month_title'), false);
         $this->assertDoesNotMatchRegularExpression('/data-vd-limit role="status"\s+hidden/', $page->getContent());
         $this->assertMatchesRegularExpression('/data-vd-submit\s+hidden disabled/', $page->getContent());

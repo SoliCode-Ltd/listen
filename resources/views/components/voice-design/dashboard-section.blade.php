@@ -13,7 +13,8 @@
       </div>
       @if($studio['allowed'] && $studio['monthly'] > 0)
         <div class="vd-section-meta">
-          <span class="vd-pill" data-vd-month-left>{{ trans_choice('voice_design.month_left', $studio['monthly'], ['left' => max(0, $studio['monthly'] - $studio['kept_month']), 'max' => $studio['monthly']]) }}</span>
+          <x-quota-meter data-vd-month-left :left="$studio['monthly'] - $studio['kept_month']" :max="$studio['monthly']"
+            :value="__('voice_design.month_left')" :caption="__('voice_design.month_left_caption')" />
         </div>
       @endif
     </header>

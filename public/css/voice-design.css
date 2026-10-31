@@ -26,12 +26,6 @@
 .vd-section-head h1 { margin: 0 0 .45rem; }
 .vd-section-head p { margin: 0; max-width: 62ch; color: var(--muted); line-height: 1.7; }
 .vd-section-meta { display: flex; flex-wrap: wrap; gap: .5rem; }
-.vd-pill {
-  display: inline-flex; align-items: center; gap: .4rem;
-  padding: .38rem .8rem; border-radius: 999px;
-  border: 1px solid var(--line); background: var(--surface2, var(--surface));
-  color: var(--muted); font-size: .85rem; font-weight: 600; white-space: nowrap;
-}
 
 /* ---------- Layout ---------- */
 .vd-grid { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); gap: 1.25rem; align-items: start; }

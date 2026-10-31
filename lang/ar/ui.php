@@ -1935,7 +1935,9 @@ return [
         'rate_limited' => 'انتظر قليلاً قبل إنشاء صوت آخر.',
 
         'your_voices_title' => 'أصواتك',
-        'voices_left' => 'المتبقي: :left من :max',
+        // العدّاد أعلى القسم (components/quota-meter).
+        'voices_left' => 'تبقّى :left من :max',
+        'voices_left_caption' => 'أصوات مستنسخة في خطتك',
         'status_pending' => 'في الانتظار',
         'status_validating' => 'جارٍ الفحص',
         'status_processing' => 'جارٍ البناء',

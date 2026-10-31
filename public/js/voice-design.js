@@ -337,8 +337,8 @@
       if (studio.demo || !studio.allowed) return;
       var monthly = Number(studio.monthly || 0);
       var kind = voices.length >= Number(studio.max_voices || 0) ? 'full' : (monthly > 0 && keptMonth >= monthly ? 'month' : '');
-      (root.closest('[data-dashboard-section]') || root).querySelectorAll('[data-vd-month-left]').forEach(function (pill) {
-        pill.textContent = fmt(t.month_left, { left: Math.max(0, monthly - keptMonth) });
+      (root.closest('[data-dashboard-section]') || root).querySelectorAll('[data-vd-month-left]').forEach(function (meter) {
+        if (window.ListenQuota) window.ListenQuota(meter, monthly - keptMonth, monthly);
       });
       var box = q('[data-vd-limit]');
       if (box) {
