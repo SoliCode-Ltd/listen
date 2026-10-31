@@ -112,8 +112,7 @@ final class VoiceDesign
 
     /**
      * Whether this member may design and keep voices, and speak with them:
-     * their plan includes it. The admin email may always, to try it before
-     * any plan has it.
+     * their plan includes it. The admin email follows the same rule.
      */
     public static function allows(?User $user, ?Plan $plan): bool
     {
@@ -121,7 +120,7 @@ final class VoiceDesign
             return false;
         }
 
-        return self::planIncludes($plan) || VoiceCloningAccess::isPreviewAccount($user);
+        return self::planIncludes($plan);
     }
 
     /**
@@ -152,8 +151,8 @@ final class VoiceDesign
      * How many designed voices a member of this plan may keep in all, while the
      * subscription lasts: every voice kept counts, deleted ones too (keptInTotal).
      * The plan's number, which the owner sets on turning it on (no cap on a plan
-     * without a count, isUnlimited); the site's for the admin email trying it on a
-     * plan without it.
+     * without a count, isUnlimited); the site's (Voice Design → Settings) when the
+     * plan has none.
      */
     public static function maxVoices(?Plan $plan): int
     {
