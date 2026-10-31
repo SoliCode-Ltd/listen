@@ -556,11 +556,9 @@ html:not([data-theme="light"]) .vs-speech::after {
   color: var(--text);
   font-size: .875rem;
   line-height: 1.7;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
+/* The description and the line are shown whole: they are short, and the description is the point of the card. */
+.vs-designed .vs-card-text { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .vs-card.is-playing .vs-card-text { color: var(--text); }
 .vs-card-foot {
   display: flex;

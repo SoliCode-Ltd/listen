@@ -120,8 +120,9 @@
 .vc-step:focus-visible { outline: 2px solid var(--a); outline-offset: 4px; border-radius: 999px; }
 
 /* Fields: one label style and one control height. */
-.vc-field-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, .7fr); gap: 1rem; }
-.vc-form-group { display: grid; gap: var(--vc-label-gap); min-width: 0; margin: 0; }
+/* Side by side, the boxes line up at the bottom and keep one height, even if a label wraps. */
+.vc-field-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, .7fr); align-items: end; gap: 1rem; }
+.vc-form-group { display: grid; align-content: end; gap: var(--vc-label-gap); min-width: 0; margin: 0; }
 .vc-form-group > label, .vc-consent-block > label { display: block; font-size: .92rem; font-weight: 700; line-height: 1.4; color: var(--text); }
 .vc-form-group .hint { margin: 0; color: var(--muted); font-size: .84rem; line-height: 1.55; }
 .vc-shell .vc-form-group input[type="text"], .vc-shell .vc-language-value {
