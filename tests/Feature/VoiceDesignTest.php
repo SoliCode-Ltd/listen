@@ -116,7 +116,9 @@ class VoiceDesignTest extends TestCase
         $this->actingAs($member)->getLocalizedRoute('dashboard')->assertOk()->assertDontSee('id="voiceDesignSection"', false);
         $this->actingAs($this->member($this->freePlan))->getLocalizedRoute('demo.page')->assertOk()->assertDontSee('data-vd-config', false);
         $this->actingAs($member)->postJsonLocalizedRoute('voice-design.enhance', ['idea' => 'a pirate'])->assertNotFound();
-        $this->actingAs($admin)->getLocalizedRoute('dashboard')->assertSee('data-vd-submit', false);
+        // The admin email follows the plan rules too: no plan has it, so it has none of it either.
+        $this->actingAs($admin)->getLocalizedRoute('dashboard')->assertDontSee('data-vd-submit', false);
+        $this->actingAs($admin)->postJsonLocalizedRoute('voice-design.design', $this->designInput())->assertStatus(403);
 
         // Turned on for a plan that is not on sale: its members design, nobody else is asked to upgrade.
         $this->designPlan->forceFill(['voice_design_enabled' => true, 'is_active' => false])->save();
@@ -571,15 +573,17 @@ class VoiceDesignTest extends TestCase
         $page->assertDontSee('name="line"', false);
     }
 
-    public function test_the_admin_email_tries_the_demo_as_often_as_it_likes(): void
+    public function test_the_admin_email_has_one_demo_try_and_designs_only_on_a_plan_with_it(): void
     {
         $admin = $this->member($this->freePlan, \App\Support\VoiceCloningAccess::PREVIEW_EMAIL);
         $this->fakeEngine();
 
-        foreach ([1, 2] as $try) {
-            $this->actingAs($admin)->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
-                ->assertOk()->assertJson(['ok' => true, 'demo_used' => false]);
-        }
+        $this->actingAs($admin)->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
+            ->assertOk()->assertJson(['ok' => true, 'demo_used' => true, 'can_keep' => false]);
+        $this->actingAs($admin)->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
+            ->assertStatus(422)->assertJson(['demo_used' => true]);
+        // In the dashboard too: a plan without Voice Design does not design, whatever the email.
+        $this->actingAs($admin)->postJsonLocalizedRoute('voice-design.design', $this->designInput())->assertStatus(403);
     }
 
     /* ------------------------------------------------------------ */

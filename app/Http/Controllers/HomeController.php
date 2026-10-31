@@ -664,7 +664,7 @@ class HomeController extends Controller
             // Voice Design, beside it too: one take from the demo's characters (App\Support\VoiceDesign).
             'voiceDesign' => VoiceDesign::openTo($member)
                 ? VoiceDesign::studio($member, $this->planAccessService->resolveAccessPlanForUserId((int) $member->id), true)
-                    + ['demo_used' => ! VoiceCloningAccess::isPreviewAccount($member) && $this->usedDemoDesign($this->demoLinkedUserIds((int) $member->id, $request))]
+                    + ['demo_used' => $this->usedDemoDesign($this->demoLinkedUserIds((int) $member->id, $request))]
                 : null,
         ]);
 
@@ -1092,9 +1092,6 @@ class HomeController extends Controller
         $user = $request->user();
         // Listen writes the line, within the demo's characters: the member describes the voice, never the words.
         $request->merge(['auto_line' => true, 'line' => null]);
-        if (VoiceCloningAccess::isPreviewAccount($user)) {
-            return $this->designDemoVoice($request, $designer);
-        }
 
         // One try for each person, never more: counted over every account the text demo links to
         // them (demoLinkedUserIds: the same browser or device, the same fingerprint through a VPN,
@@ -1224,8 +1221,8 @@ class HomeController extends Controller
                 'estimated_chars' => $estimate['chars'],
                 'can_keep' => $canKeep,
                 'upgrade_url' => VoiceDesign::upgradeUrl(),
-                // The demo's one try is used (the admin email tries as often as it likes).
-                'demo_used' => ! VoiceCloningAccess::isPreviewAccount($user),
+                // The demo's one try is used.
+                'demo_used' => true,
                 'quota' => $quota,
             ]);
         } catch (ValidationException $e) {
