@@ -10,6 +10,13 @@
 @props(['studio'])
 @php
   $vd = $studio;
+  // Why no more can be designed now, as App\Support\VoiceDesign::keepBlocker() refuses one: the library
+  // full, or the month's new voices used (js/voice-design.js keeps it current as voices come and go).
+  $limit = ! $vd['allowed'] || $vd['demo'] ? null : match (true) {
+      count($vd['voices']) >= $vd['max_voices'] => 'full',
+      $vd['monthly'] > 0 && $vd['kept_month'] >= $vd['monthly'] => 'month',
+      default => null,
+  };
   $arabic = app()->getLocale() === 'ar';
   $examples = $vd['examples'];
   $showcase = $vd['showcase'];
@@ -46,7 +53,11 @@
           'delete' => __('voice_design.delete'),
           'delete_confirm' => __('voice_design.delete_confirm'),
           'use_in_studio' => __('voice_design.use_in_studio'),
-          'library_count' => __('voice_design.library_count', ['count' => ':count', 'max' => ':max']),
+          'month_left' => trans_choice('voice_design.month_left', $vd['monthly'], ['left' => ':left', 'max' => $vd['monthly']]),
+          'limit_month_title' => __('voice_design.limit_month_title'),
+          'limit_month_text' => __('voice_design.limit_month_text', ['date' => (string) ($vd['month_renews'] ?? '')]),
+          'limit_full_title' => __('voice_design.limit_full_title'),
+          'limit_full_text' => __('voice_design.limit_full_text'),
           'voice_meta' => __('voice_design.voice_meta', ['speaks' => ':speaks', 'date' => ':date']),
           'language_ar' => __('voice_design.language_ar'),
           'language_en' => __('voice_design.language_en'),
@@ -198,7 +209,7 @@
             {!! $icon['spark'] !!}<span>{{ $vd['upgrade_plan'] ? __('voice_design.upgrade_cta', ['plan' => $vd['upgrade_plan']]) : __('voice_design.upgrade_cta_any') }}</span>
           </a>
           @else
-          <div class="vd-summary">
+          <div class="vd-summary" data-vd-summary @if($limit !== null) hidden @endif>
             <dl>
               <div class="vd-summary-row">
                 <dt><x-credit-icon />{{ $vd['demo'] ? __('voice_design.summary_demo_cost') : __('voice_design.summary_cost') }}</dt>
@@ -211,7 +222,18 @@
             </dl>
             <p class="vd-summary-note">{{ $vd['demo'] ? __('voice_design.demo_one_take') : __('voice_design.summary_refund') }}</p>
           </div>
-          <button type="submit" class="btn btn-primary vd-design-btn" data-vd-submit>
+          @if(! $vd['demo'])
+            {{-- No more to keep (the month's new voices used, or the library full): said here, in place
+                 of the design button, before credits are spent on takes that could not be kept. --}}
+            <div class="vd-limit" data-vd-limit role="status" @if($limit === null) hidden @endif>
+              <span class="vd-limit-mark">{!! $icon['lock'] !!}</span>
+              <div>
+                <strong data-vd-limit-title>{{ $limit ? __('voice_design.limit_'.$limit.'_title') : '' }}</strong>
+                <p data-vd-limit-text>{{ $limit === 'month' ? __('voice_design.limit_month_text', ['date' => (string) $vd['month_renews']]) : ($limit === 'full' ? __('voice_design.limit_full_text') : '') }}</p>
+              </div>
+            </div>
+          @endif
+          <button type="submit" class="btn btn-primary vd-design-btn" data-vd-submit @if($limit !== null) hidden disabled @endif>
             {!! $icon['spark'] !!}<span data-vd-submit-label>{{ __('voice_design.design_button') }}</span>
           </button>
           @endif
@@ -289,7 +311,6 @@
     <section class="vd-library" aria-labelledby="vdLibraryTitle" data-vd-library>
       <header class="vd-library-head">
         <h2 id="vdLibraryTitle">{{ __('voice_design.library_title') }}</h2>
-        <span class="vd-pill" data-vd-library-count>{{ __('voice_design.library_count', ['count' => count($vd['voices']), 'max' => $vd['max_voices']]) }}</span>
       </header>
       <p class="vd-library-empty" data-vd-library-empty @if($vd['voices'] !== []) hidden @endif>{{ __('voice_design.library_empty') }}</p>
       <div class="vd-library-grid" data-vd-library-grid></div>

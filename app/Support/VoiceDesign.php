@@ -490,6 +490,10 @@ final class VoiceDesign
             'max_voices' => self::maxVoices($plan),
             'monthly' => self::monthlyLimit($plan),
             'kept_month' => $allowed && ! $demo ? self::keptThisMonth((int) $user->id) : 0,
+            // The day the month's new voices come back (the member's next credit month).
+            'month_renews' => $allowed && ! $demo && self::monthlyLimit($plan) > 0
+                ? CreditPeriod::current((int) $user->id)['ends_at']->copy()->locale($arabic ? 'ar' : 'en')->isoFormat('D MMMM')
+                : null,
             'voices' => $voices->map(fn (DesignedVoice $voice): array => self::present($voice))->values()->all(),
             'examples' => self::examples(),
             'showcase' => self::showcase(),

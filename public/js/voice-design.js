@@ -296,6 +296,7 @@
           if (input) input.value = '';
           keepForm.hidden = true;
           setStage('idle');
+          keptMonth = res.kept_month !== undefined ? Number(res.kept_month) : keptMonth + 1;
           var kept = res.voice ? addToLibrary(res.voice, true) : null;
           showAlert(res.message || fmt(t.kept, { name: name }), true, !!kept);
           // Down to the voice just kept, in the library under the studio.
@@ -323,10 +324,34 @@
 
     // ---------- The library ----------
     function libraryCount() {
-      var count = q('[data-vd-library-count]');
-      if (count) count.textContent = fmt(t.library_count, { count: voices.length, max: studio.max_voices });
       var empty = q('[data-vd-library-empty]');
       if (empty) empty.hidden = voices.length > 0;
+      refreshLimits();
+    }
+    // What is left: the month's new voices in the section's pill and, when no more can be kept now
+    // (the month's are used, or the library is full), a notice in place of the design button, as
+    // the server refuses a design then (App\Support\VoiceDesign::keepBlocker). Deleting a voice
+    // makes room in the library, not in the month.
+    var keptMonth = Number(studio.kept_month || 0);
+    function refreshLimits() {
+      if (studio.demo || !studio.allowed) return;
+      var monthly = Number(studio.monthly || 0);
+      var kind = voices.length >= Number(studio.max_voices || 0) ? 'full' : (monthly > 0 && keptMonth >= monthly ? 'month' : '');
+      (root.closest('[data-dashboard-section]') || root).querySelectorAll('[data-vd-month-left]').forEach(function (pill) {
+        pill.textContent = fmt(t.month_left, { left: Math.max(0, monthly - keptMonth) });
+      });
+      var box = q('[data-vd-limit]');
+      if (box) {
+        box.hidden = !kind;
+        if (kind) {
+          box.querySelector('[data-vd-limit-title]').textContent = t['limit_' + kind + '_title'];
+          box.querySelector('[data-vd-limit-text]').textContent = t['limit_' + kind + '_text'];
+        }
+      }
+      var button = q('[data-vd-submit]');
+      if (button) { button.hidden = !!kind; button.disabled = !!kind; }
+      var summary = q('[data-vd-summary]');
+      if (summary) summary.hidden = !!kind;
     }
     function card(voice, fresh) {
       var el = document.createElement('article');
@@ -373,6 +398,7 @@
       return el;
     }
     if (libraryGrid) voices.forEach(function (voice) { addToLibrary(voice, false); });
+    refreshLimits();
 
     // ---------- The form ----------
     if (!form) return;
@@ -555,6 +581,7 @@
         if (upgrade) upgrade.focus({ preventScroll: true });
         return;
       }
+      if (submit.disabled) return;
       showAlert('');
       var text = description.value.trim();
       if (text.length < Number(limits.description_min || 0)) { showAlert(t.description_short); description.focus(); return; }
@@ -594,6 +621,7 @@
       }).then(function () {
         submit.disabled = false;
         if (submitLabel) submitLabel.textContent = t.design;
+        refreshLimits();
       });
     });
 

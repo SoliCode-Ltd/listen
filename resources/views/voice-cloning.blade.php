@@ -161,7 +161,7 @@
     {{-- ========== MAIN FEATURE UI ========== --}}
     @else
       {{-- Voice count --}}
-      <div class="vc-count">{{ __('ui.voice_cloning.voice_count', ['count' => $voiceCount, 'max' => $maxVoices]) }}</div>
+      <div class="vc-count">{{ trans_choice('ui.voice_cloning.voices_left', $maxVoices, ['left' => max(0, $maxVoices - $voiceCount), 'max' => $maxVoices]) }}</div>
 
       {{-- Alert container for AJAX responses --}}
       <div id="vcAlerts"></div>

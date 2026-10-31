@@ -1930,7 +1930,7 @@ return [
         'rate_limited' => 'Please wait a little before creating another voice.',
 
         'your_voices_title' => 'Your voices',
-        'voice_count' => ':count of :max voices',
+        'voices_left' => ':left of :max voice left|:left of :max voices left',
         'status_pending' => 'Queued',
         'status_validating' => 'Checking',
         'status_processing' => 'Building',

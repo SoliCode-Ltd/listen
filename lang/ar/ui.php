@@ -1933,7 +1933,7 @@ return [
         'rate_limited' => 'انتظر قليلاً قبل إنشاء صوت آخر.',
 
         'your_voices_title' => 'أصواتك',
-        'voice_count' => ':count من :max أصوات',
+        'voices_left' => 'المتبقي: :left من :max',
         'status_pending' => 'في الانتظار',
         'status_validating' => 'جارٍ الفحص',
         'status_processing' => 'جارٍ البناء',

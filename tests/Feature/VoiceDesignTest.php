@@ -324,6 +324,40 @@ class VoiceDesignTest extends TestCase
             ->assertStatus(422)->assertJson(['message' => trans_choice('voice_design.errors.month_used', 1, ['count' => 1])]);
     }
 
+    public function test_the_page_says_what_is_left_this_month_and_stops_designing_once_it_is_used(): void
+    {
+        $this->designPlan->forceFill(['voice_design_max_voices' => 2, 'voice_design_monthly_voices' => 2])->save();
+        $member = $this->member($this->designPlan);
+        $this->savedVoice($member, DesignedVoice::SAVED, 'voice_one');
+        app()->setLocale('en');
+
+        $page = $this->actingAs($member)->getLocalizedRoute('dashboard')->assertOk();
+        $page->assertSee('1 of 2 new voices left this month', false);
+        $this->assertMatchesRegularExpression('/data-vd-limit role="status"\s+hidden/', $page->getContent());
+        $this->assertDoesNotMatchRegularExpression('/data-vd-submit\s+hidden disabled/', $page->getContent());
+
+        // A second one kept, then deleted: room in the library, none in the month.
+        $this->savedVoice($member, DesignedVoice::SAVED, 'voice_two')->delete();
+        $page = $this->actingAs($member)->getLocalizedRoute('dashboard')->assertOk();
+        $page->assertSee('0 of 2 new voices left this month', false);
+        $page->assertSee(__('voice_design.limit_month_title'), false);
+        $this->assertDoesNotMatchRegularExpression('/data-vd-limit role="status"\s+hidden/', $page->getContent());
+        $this->assertMatchesRegularExpression('/data-vd-submit\s+hidden disabled/', $page->getContent());
+        // The library's own count is gone: the pill above says what is left.
+        $page->assertDontSee('data-vd-library-count', false);
+    }
+
+    public function test_keeping_a_voice_returns_the_months_new_voices_so_far(): void
+    {
+        $this->designPlan->forceFill(['voice_design_max_voices' => 5, 'voice_design_monthly_voices' => 3])->save();
+        $member = $this->member($this->designPlan);
+        $this->savedVoice($member, DesignedVoice::SAVED, 'voice_one')->delete();
+        $take = $this->savedVoice($member, DesignedVoice::DRAFT, 'voice_take');
+
+        $this->actingAs($member)->postJsonLocalizedRoute('voice-design.keep', ['name' => 'Captain Two'], ['id' => $take->id])
+            ->assertOk()->assertJson(['kept_month' => 2]);
+    }
+
     public function test_a_member_cannot_keep_or_delete_someone_elses_voice(): void
     {
         $owner = $this->member($this->designPlan);

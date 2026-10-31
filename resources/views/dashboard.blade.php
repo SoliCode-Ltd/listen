@@ -2392,7 +2392,7 @@
           </div>
           @if($vcStudioOpen)
           <div class="vc-meta">
-            <div class="vc-count">{{ __('ui.voice_cloning.voice_count', ['count' => $voiceCloningCount, 'max' => $voiceCloningMaxVoices]) }}</div>
+            <div class="vc-count">{{ trans_choice('ui.voice_cloning.voices_left', $voiceCloningMaxVoices, ['left' => max(0, $voiceCloningMaxVoices - $voiceCloningCount), 'max' => $voiceCloningMaxVoices]) }}</div>
           </div>
           @endif
         </header>
@@ -4680,7 +4680,7 @@
         upload: @json(__('ui.voice_cloning.upload_tab')),
         recording: @json(__('ui.voice_cloning.record_tab')),
       };
-      const countTemplate = @json(__('ui.voice_cloning.voice_count', ['count' => '__COUNT__', 'max' => '__MAX__']));
+      const countTemplate = {{ \Illuminate\Support\Js::from(trans_choice('ui.voice_cloning.voices_left', (int) ($voiceCloningMaxVoices ?? 0), ['left' => '__LEFT__', 'max' => '__MAX__'])) }};
       const processingHintText = @json(__('ui.voice_cloning.processing_hint'));
       const failedHintText = @json(__('ui.voice_cloning.processing_failed_generic'));
       const useInGeneratorText = @json(__('ui.voice_cloning.use_in_generator'));
@@ -4753,9 +4753,10 @@
         return input.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
       }
 
+      // What is left to make on the plan (a deleted voice keeps its place for a while: vcDeletedNote).
       function formatCount() {
         return countTemplate
-          .replace('__COUNT__', String(currentVoiceCount))
+          .replace('__LEFT__', String(Math.max(0, MAX_VOICES - currentVoiceCount)))
           .replace('__MAX__', String(MAX_VOICES));
       }
 

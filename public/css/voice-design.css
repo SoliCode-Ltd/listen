@@ -461,6 +461,18 @@
 .vd-unlock.is-nudged { animation: vd-nudge .6s ease; }
 @keyframes vd-nudge { 0%, 100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 a.vd-design-btn { text-decoration: none; }
+/* No more to keep now (the month's new voices used, or the library full): in place of the design button. */
+.vd-limit {
+  display: flex; align-items: flex-start; gap: .75rem; padding: .95rem 1.05rem;
+  border: 1px solid color-mix(in oklab, var(--a) 35%, var(--line)); border-radius: var(--vd-panel-radius);
+  background: color-mix(in oklab, var(--a) 6%, var(--surface));
+}
+.vd-limit[hidden] { display: none; }
+.vd-limit-mark { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 11px; background: color-mix(in oklab, var(--a) 16%, transparent); color: var(--accent-text, var(--a)); }
+.vd-limit-mark svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.vd-limit strong { display: block; font-size: .96rem; line-height: 1.5; }
+.vd-limit p { margin: .15rem 0 0; color: var(--muted); font-size: .88rem; line-height: 1.6; }
+.vd-design-btn[hidden], .vd-summary[hidden] { display: none; }
 
 /* ---------- The library ---------- */
 .vd-library { display: grid; gap: .9rem; }

@@ -445,7 +445,7 @@ class VoiceCloningTest extends TestCase
             ->getLocalizedRoute('dashboard');
 
         $dashboard->assertOk();
-        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 2, 'max' => 2]), false);
+        $dashboard->assertSee(trans_choice('ui.voice_cloning.voices_left', 2, ['left' => 0, 'max' => 2]), false);
         $dashboard->assertSee(__('ui.voice_cloning.limit_reached', ['max' => 2]), false);
         $dashboard->assertDontSee('Delete one to create another', false);
         $dashboard->assertSee('class="vc-notice" id="vcLimitNotice"', false);
@@ -514,7 +514,7 @@ class VoiceCloningTest extends TestCase
             ->getLocalizedRoute('dashboard');
 
         $dashboard->assertOk();
-        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 0, 'max' => 5]), false);
+        $dashboard->assertSee(trans_choice('ui.voice_cloning.voices_left', 5, ['left' => 5, 'max' => 5]), false);
         $dashboard->assertSee(__('ui.voice_cloning.create_title'), false);
         $dashboard->assertDontSee(__('ui.voice_cloning.limit_reached', ['max' => 0]), false);
         $html = $dashboard->getContent();
@@ -809,7 +809,7 @@ class VoiceCloningTest extends TestCase
             ->getLocalizedRoute('dashboard');
 
         $dashboard->assertOk();
-        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 0, 'max' => 1]), false);
+        $dashboard->assertSee(trans_choice('ui.voice_cloning.voices_left', 1, ['left' => 1, 'max' => 1]), false);
         $dashboard->assertSee(__('ui.voice_cloning.create_title'), false);
         $html = $dashboard->getContent();
         $this->assertDoesNotMatchRegularExpression('/id="vcCreatePanel"\s+style="display:none"/', $html);
