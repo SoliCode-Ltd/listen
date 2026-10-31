@@ -269,10 +269,11 @@
 .vd-summary { padding: .2rem 1.1rem .8rem; border: 1px solid var(--line); border-radius: var(--vd-panel-radius); background: var(--surface); }
 .vd-summary dl { display: grid; margin: 0; }
 .vd-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid var(--line); }
-.vd-summary-row dt { display: flex; flex: none; align-items: center; gap: .6rem; color: var(--muted); font-size: .9rem; line-height: 1.4; white-space: nowrap; }
+/* The value stays on one line; on the narrowest phones its label wraps instead. */
+.vd-summary-row dt { display: flex; flex: 1 1 auto; align-items: center; gap: .6rem; color: var(--muted); font-size: .9rem; line-height: 1.4; overflow-wrap: normal; word-break: normal; }
 .vd-summary-row dt .credit-icon { font-size: 1.1rem; }
 .vd-summary-row dt svg { width: 18px; height: 18px; color: var(--a); }
-.vd-summary-row dd { margin: 0; color: var(--text); font-size: .95rem; font-weight: 700; line-height: 1.4; text-align: end; font-variant-numeric: tabular-nums; }
+.vd-summary-row dd { flex: none; margin: 0; color: var(--text); font-size: .95rem; font-weight: 700; line-height: 1.4; text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .vd-summary-note { margin: .7rem 0 0; color: var(--muted); font-size: .84rem; line-height: 1.55; }
 .vd-design-btn { display: inline-flex; align-items: center; justify-content: center; gap: .6rem; min-height: 54px; width: 100%; font-size: 1.02rem; }
 .vd-design-btn svg { width: 20px; height: 20px; }

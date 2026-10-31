@@ -205,7 +205,7 @@
               </div>
               <div class="vd-summary-row">
                 <dt>{!! $icon['layers'] !!}{{ __('voice_design.summary_takes') }}</dt>
-                <dd>{{ __('voice_design.summary_takes_value', ['takes' => trans_choice('voice_design.takes_count', $vd['takes'])]) }}</dd>
+                <dd>{{ $vd['takes'] > 1 ? __('voice_design.summary_takes_value', ['takes' => trans_choice('voice_design.takes_count', $vd['takes'])]) : trans_choice('voice_design.takes_count', 1) }}</dd>
               </div>
             </dl>
             <p class="vd-summary-note">{{ $vd['demo'] ? __('voice_design.demo_one_take') : __('voice_design.summary_refund') }}</p>

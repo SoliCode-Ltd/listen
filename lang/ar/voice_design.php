@@ -68,7 +68,7 @@ return [
     'summary_demo_cost' => 'يُخصم من أحرف التجربة',
     'summary_demo_cost_value' => ':count حرفاً',
     'summary_takes' => 'تحصل على',
-    'summary_takes_value' => ':takes تقول الجملة نفسها',
+    'summary_takes_value' => ':takes للمقارنة',
     'summary_refund' => 'لا يُخصم إلا مقابل النسخ التي تصل.',
 
     // أثناء العمل.

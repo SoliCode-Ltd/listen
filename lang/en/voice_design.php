@@ -68,7 +68,7 @@ return [
     'summary_demo_cost' => 'From your demo characters',
     'summary_demo_cost_value' => ':count characters',
     'summary_takes' => 'You get',
-    'summary_takes_value' => ':takes speaking the same line',
+    'summary_takes_value' => ':takes to compare',
     'summary_refund' => 'Only takes that arrive are charged.',
 
     // While it works.
