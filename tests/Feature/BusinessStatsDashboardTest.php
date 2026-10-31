@@ -67,6 +67,20 @@ class BusinessStatsDashboardTest extends TestCase
         return compact('admin');
     }
 
+    public function test_the_twelve_months_are_whole_calendar_months_on_the_last_days_of_a_month(): void
+    {
+        // From the 29th-31st, going back months before the month's start overflows into the next month.
+        foreach (['2026-10-31 12:00' => '2025-11', '2027-03-29 08:00' => '2026-04', '2026-12-31 23:30' => '2026-01'] as $now => $first) {
+            $this->travelTo($now);
+
+            $s = app(BusinessStatsService::class)->build(12);
+
+            $this->assertCount(12, $s['monthly'], $now);
+            $this->assertSame($first, array_values($s['monthly'])[0]['month'], $now);
+            $this->assertSame(substr($now, 0, 7), array_values($s['monthly'])[11]['month'], $now);
+        }
+    }
+
     public function test_snapshot_counts_members_and_excludes_admins(): void
     {
         $this->seedBusinessData();

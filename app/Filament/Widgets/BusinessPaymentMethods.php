@@ -41,7 +41,7 @@ class BusinessPaymentMethods extends BaseWidget
     protected function getStats(): array
     {
         $payments = rescue(fn () => Payment::query()
-            ->where('paid_at', '>=', now()->subMonths($this->months()))
+            ->where('paid_at', '>=', now()->subMonthsNoOverflow($this->months()))
             ->whereDoesntHave('user', fn ($user) => $user->where('is_admin', true))
             ->get(['method', 'amount_minor', 'refunded_minor', 'currency']), collect(), false);
 

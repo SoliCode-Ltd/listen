@@ -67,10 +67,10 @@ class MonthlyUsageAdminTest extends TestCase
     {
         $member = User::factory()->create();
         app(PlanAccessService::class)->assignPlan($member, $this->starter);
-        $old = UsageCounter::query()->create(['user_id' => $member->id, 'period_ym' => now()->subMonth()->format('Y-m'), 'total_chars' => 250000, 'total_requests' => 9]);
+        $old = UsageCounter::query()->create(['user_id' => $member->id, 'period_ym' => now()->subMonthNoOverflow()->format('Y-m'), 'total_chars' => 250000, 'total_requests' => 9]);
 
         Livewire::test(ListUsageCounters::class)
-            ->filterTable('period_ym', now()->subMonth()->format('Y-m'))
+            ->filterTable('period_ym', now()->subMonthNoOverflow()->format('Y-m'))
             ->assertCanSeeTableRecords([$old])
             ->assertSee('250,000 of 500,000 (50%)')
             ->assertSee('Ended');
@@ -84,12 +84,12 @@ class MonthlyUsageAdminTest extends TestCase
     {
         $member = User::factory()->create();
         $now = UsageCounter::query()->create(['user_id' => $member->id, 'period_ym' => now()->format('Y-m'), 'total_chars' => 10, 'total_requests' => 1]);
-        $old = UsageCounter::query()->create(['user_id' => $member->id, 'period_ym' => now()->subMonth()->format('Y-m'), 'total_chars' => 20, 'total_requests' => 2]);
+        $old = UsageCounter::query()->create(['user_id' => $member->id, 'period_ym' => now()->subMonthNoOverflow()->format('Y-m'), 'total_chars' => 20, 'total_requests' => 2]);
 
         Livewire::test(ListUsageCounters::class)
             ->assertCanSeeTableRecords([$now])
             ->assertCanNotSeeTableRecords([$old])
-            ->filterTable('period_ym', now()->subMonth()->format('Y-m'))
+            ->filterTable('period_ym', now()->subMonthNoOverflow()->format('Y-m'))
             ->assertCanSeeTableRecords([$old])
             ->assertCanNotSeeTableRecords([$now]);
     }
@@ -133,16 +133,16 @@ class MonthlyUsageAdminTest extends TestCase
     public function test_the_numbers_follow_the_month_picked_and_compare_with_the_month_before(): void
     {
         $member = User::factory()->create();
-        $last = now()->subMonth()->format('Y-m');
+        $last = now()->subMonthNoOverflow()->format('Y-m');
         foreach ([1000, 1000, 1000] as $chars) {
             $this->generation($member, ['billable_chars' => $chars]);
         }
-        $this->generation($member, ['billable_chars' => 700000, 'created_at' => now()->subMonth()->startOfMonth()->addDay()]);
-        $this->generation($member, ['billable_chars' => 77777, 'created_at' => now()->subMonth()->startOfMonth()->addDays(2)]);
+        $this->generation($member, ['billable_chars' => 700000, 'created_at' => now()->subMonthNoOverflow()->startOfMonth()->addDay()]);
+        $this->generation($member, ['billable_chars' => 77777, 'created_at' => now()->subMonthNoOverflow()->startOfMonth()->addDays(2)]);
 
         Livewire::test(MonthlyUsageStats::class)
             ->assertSee('3,000')
-            ->assertSee('+50% vs '.now()->subMonth()->format('F Y'));
+            ->assertSee('+50% vs '.now()->subMonthNoOverflow()->format('F Y'));
 
         Livewire::test(MonthlyUsageStats::class, ['tableFilters' => ['period_ym' => ['value' => $last]]])
             ->assertSee('777,777')
@@ -213,7 +213,7 @@ class MonthlyUsageAdminTest extends TestCase
         $row = UsageCounter::query()->create(['user_id' => $member->id, 'period_ym' => now()->format('Y-m'), 'total_chars' => 50, 'total_requests' => 2]);
         $this->generation($member, ['dialect' => 'ar-EG', 'duration_seconds' => 12]);
         $this->generation($member, ['duration_seconds' => 8]);
-        $this->generation($member, ['created_at' => now()->subMonths(2)]);
+        $this->generation($member, ['created_at' => now()->subMonthsNoOverflow(2)]);
 
         Livewire::test(ViewUsageCounter::class, ['record' => $row->getRouteKey()])
             ->assertSee('What they made')
