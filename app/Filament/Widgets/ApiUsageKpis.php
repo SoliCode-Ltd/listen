@@ -16,11 +16,29 @@ class ApiUsageKpis extends BaseWidget
 
     protected ?string $heading = 'API usage & cost (last 30 days)';
 
-    protected ?string $description = 'Every text-to-speech call: members, admins and the public demo. Cost uses the logged estimate, or config/analytics.php rates when none was logged.';
+    protected ?string $description = 'Every text-to-speech call: members, admins and the public demo. Each voice costs what the provider counted for it: every request, retries and the dialect rewrite included, at that day\'s price. Voices made before that was counted are estimated from its list prices.';
 
     protected function getColumns(): int
     {
         return 4;
+    }
+
+    /**
+     * How much of the cost is exact (the provider's counts), logged before that, or estimated.
+     *
+     * @param  array<string, mixed>  $t
+     */
+    private static function costSources(array $t): string
+    {
+        $exact = (float) ($t['exact_share'] ?? 0);
+        $estimated = (float) ($t['estimated_share'] ?? 0);
+        $parts = array_filter([
+            'exact' => $exact,
+            'logged' => ($t['cost'] ?? 0) > 0 ? max(0.0, 1 - $exact - $estimated) : 0.0,
+            'estimated' => $estimated,
+        ], fn (float $share): bool => $share >= 0.0005);
+
+        return $parts === [] ? '' : ' · '.implode(', ', array_map(fn (string $k, float $v): string => static::percent($v).' '.$k, array_keys($parts), $parts));
     }
 
     protected function getStats(): array
@@ -34,7 +52,7 @@ class ApiUsageKpis extends BaseWidget
 
         return [
             Stat::make('API cost', static::usd($t['cost'] ?? 0))
-                ->description(static::usd($all['cost'] ?? 0).' all time · '.static::percent($t['estimated_share'] ?? 0).' estimated from rates')
+                ->description(static::usd($all['cost'] ?? 0).' all time'.static::costSources($t))
                 ->descriptionIcon('heroicon-m-currency-dollar')
                 ->chart($monthly->pluck('cost_total')->all())
                 ->color('danger'),
@@ -47,8 +65,10 @@ class ApiUsageKpis extends BaseWidget
                 ->description('MRR '.static::usd($unit['mrr_usd'] ?? 0).' − API '.static::usd($unit['api_cost_30d'] ?? 0).' = '.static::usd($unit['gross_margin_usd'] ?? 0))
                 ->descriptionIcon('heroicon-m-scale')
                 ->color($margin === null ? 'gray' : ($margin >= 0.5 ? 'success' : 'danger')),
-            Stat::make('API calls', number_format($t['api_requests'] ?? 0))
-                ->description(number_format($t['cache_hits'] ?? 0).' served from cache ('.static::percent($t['cache_hit_rate'] ?? 0).') · '.number_format($t['failed'] ?? 0).' failed')
+            // A voice can take several requests (long texts go in pieces, retries, the dialect rewrite).
+            Stat::make('Voices sent to providers', number_format($t['api_requests'] ?? 0))
+                ->description(number_format($t['cache_hits'] ?? 0).' served from cache ('.static::percent($t['cache_hit_rate'] ?? 0).') · '.number_format($t['failed'] ?? 0).' failed'
+                    .(($t['api_calls'] ?? 0) > 0 ? ' · '.number_format($t['api_calls']).' provider requests counted' : ''))
                 ->descriptionIcon('heroicon-m-signal'),
             Stat::make('Cost per 1,000 characters', static::usd($t['cost_per_1k_chars'] ?? 0, 4))
                 ->description(static::usd($t['cost_per_audio_minute'] ?? 0, 4).' per audio minute')

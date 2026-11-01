@@ -111,17 +111,22 @@ class BusinessStatsDashboardTest extends TestCase
         $api = app(BusinessStatsService::class)->build(12)['api_usage'];
         $t = $api['totals_30d'];
 
-        // 4 Google member/admin generations logged at $0.01, Gemini estimated, demo WaveNet estimated.
-        $gemini = (60 * 32 * 10.0 + 400 / 4 * 0.5) / 1_000_000;
+        // 4 Google member/admin generations logged at $0.01, Gemini estimated at its model's list
+        // price (25 audio tokens a second at $10, 100 text tokens at $0.50), demo WaveNet estimated.
+        $gemini = (60 * 25 * 10.0 + 400 / 4 * 0.5) / 1_000_000;
         $demo = 1000 / 1_000_000 * 16;
         $this->assertSame(6, $t['requests']);
         $this->assertSame(400 + 1000 + 4 * 100, $t['chars']);
-        $this->assertEqualsWithDelta(0.04 + $gemini + $demo, $t['cost'], 0.006);
+        $this->assertSame(round(0.04 + $gemini + $demo, 2), $t['cost']);
+        // Delivered audio only: the failed generation's reserved minute is not audio.
+        $this->assertSame(round((3 * 60 + 60 + 30) / 60, 1), $t['audio_minutes']);
         $this->assertEqualsWithDelta(0.01, $t['admin_cost'], 0.0001);
         $this->assertEqualsWithDelta($demo, $t['demo_cost'], 0.006);
 
         $models = collect($api['by_model_30d'])->keyBy('model');
         $this->assertTrue($models->has('Gemini · gemini-2.5-flash-preview-tts'));
+        $this->assertSame(round($gemini, 2), $models['Gemini · gemini-2.5-flash-preview-tts']['cost_usd']);
+        $this->assertSame(round($gemini / 400 * 1000, 4), $models['Gemini · gemini-2.5-flash-preview-tts']['cost_per_1k_chars']);
         $this->assertSame('estimated', $models['Gemini · gemini-2.5-flash-preview-tts']['cost_basis']);
         $this->assertTrue($models->has('Google Cloud TTS · Wavenet'));
 

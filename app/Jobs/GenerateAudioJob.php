@@ -27,6 +27,7 @@ use App\Support\AudioEffects;
 use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\DialogueSpeakers;
+use App\Support\GeminiSpend;
 use App\Support\GenerationMessage;
 use App\Support\Pronunciations;
 use App\Support\SpeechText;
@@ -184,6 +185,10 @@ class GenerateAudioJob implements ShouldQueue
             return;
         }
 
+        // What Google bills for this try: the translation, the dialect rewrite and every
+        // speech request, retries and retakes included (App\Support\GeminiSpend).
+        $spend = GeminiSpend::start();
+        $spendSaved = false;
         try {
             $reserved = $this->reservedUsage($generation);
 
@@ -362,7 +367,8 @@ class GenerateAudioJob implements ShouldQueue
             // Done and charged together: a failure in between leaves neither, so a retry
             // never charges twice. A generation failed meanwhile (swept as stuck, its
             // credits already given back) is not delivered or charged.
-            $settled = DB::transaction(function () use ($generation, $audio, $actualSeconds, $measuredSeconds, $actualChars, $actualCredits, $reserved, $effect, $effectNotAdded, $spokenText, $textForSpeech): bool {
+            $spend->stop();
+            $settled = DB::transaction(function () use ($generation, $audio, $actualSeconds, $measuredSeconds, $actualChars, $actualCredits, $reserved, $effect, $effectNotAdded, $spokenText, $textForSpeech, $spend): bool {
                 $locked = AudioGeneration::query()->whereKey($generation->id)->lockForUpdate()->first();
                 if (! $locked || $locked->status !== 'processing') {
                     return false;
@@ -399,10 +405,12 @@ class GenerateAudioJob implements ShouldQueue
                     'tts_model' => $audio['model'] ?? null,
                     'tts_latency_ms' => $audio['latency_ms'] ?? null,
                     'tts_fallback_used' => $audio['fallback_used'] ?? false,
-                    'tts_cost_estimate_usd' => $audio['cost_estimate_usd'] ?? null,
+                    // Exact: what Google counted for this try and any before it, plus a
+                    // standard voice's per-character price.
+                    'tts_cost_estimate_usd' => round(GeminiSpend::spentBefore('audio_generations', $locked) + $spend->totalWith($audio), 6),
                     'billable_chars' => $actualChars,
                     'settings_snapshot' => $snapshot !== [] ? $snapshot : null,
-                ]);
+                ] + $spend->columnsFor('audio_generations', $locked));
 
                 $this->applyUsageDelta(
                     $locked,
@@ -413,7 +421,10 @@ class GenerateAudioJob implements ShouldQueue
 
                 return true;
             });
+            $spendSaved = true;
             if (! $settled) {
+                // Not delivered, but Google billed it all the same.
+                $this->keepSpend($generation, $spend);
                 Log::info('A generation finished after it was failed; its audio was not delivered.', ['generation_id' => $generation->id]);
 
                 return;
@@ -427,6 +438,11 @@ class GenerateAudioJob implements ShouldQueue
                 TextItem::whereKey($generation->text_item_id)->update(['status' => 'done']);
             }
         } catch (\Throwable $e) {
+            $spend->stop();
+            // A try that failed was still billed for the requests Google answered.
+            if (! $spendSaved) {
+                $this->keepSpend($generation, $spend);
+            }
             $sync = $this->connection === 'sync';
             // Its last try: made inline (the dashboard), called directly, or out of tries on the queue.
             $final = $sync || $this->job === null || $this->attempts() >= $this->tries;
@@ -467,6 +483,31 @@ class GenerateAudioJob implements ShouldQueue
             );
 
             throw $e;
+        } finally {
+            $spend->stop();
+        }
+    }
+
+    /**
+     * A failed try's spend, added to the row (what earlier tries spent stays).
+     */
+    private function keepSpend(AudioGeneration $generation, GeminiSpend $spend): void
+    {
+        if (! GeminiSpend::canStore('audio_generations')) {
+            return;
+        }
+
+        try {
+            DB::transaction(function () use ($generation, $spend): void {
+                $locked = AudioGeneration::query()->whereKey($generation->id)->lockForUpdate()->first();
+                if ($locked) {
+                    $locked->forceFill([
+                        'tts_cost_estimate_usd' => round(GeminiSpend::spentBefore('audio_generations', $locked) + $spend->cost(), 6),
+                    ] + $spend->columnsFor('audio_generations', $locked))->saveQuietly();
+                }
+            });
+        } catch (\Throwable $e) {
+            Log::warning('The spend of a failed generation was not saved.', ['generation_id' => $generation->id, 'error' => $e->getMessage()]);
         }
     }
 

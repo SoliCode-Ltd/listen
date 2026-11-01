@@ -2,6 +2,8 @@
 
 namespace App\Services\Analytics;
 
+use App\Support\GeminiSpend;
+use App\Support\GeminiTtsModel;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -11,9 +13,14 @@ use Illuminate\Support\Facades\Schema;
  * Text-to-speech API usage and cost across every source that calls a provider:
  * member generations, admin generations and the public demo.
  *
- * Cost per generation is the recorded estimate when the app logged one (> 0),
- * otherwise an estimate from config/analytics.php (per character for Google
- * Cloud voices, per token for Gemini). Cache hits cost nothing.
+ * A generation whose calls were metered (api_calls set, App\Support\GeminiSpend)
+ * costs exactly what it recorded: Google's token counts for every request it
+ * made, at the model's price on that day, plus a standard voice's price per
+ * character. Older ones use the cost the app logged (> 0), otherwise an
+ * estimate from config/analytics.php: per character for Google Cloud voices,
+ * and for Gemini the model's list price on that day for the text (about 4
+ * characters a token) and 25 audio tokens a second of delivered audio. Cache
+ * hits cost nothing unless metered (a translation can still be billed).
  */
 class ApiUsageStats
 {
@@ -50,6 +57,10 @@ class ApiUsageStats
     {
         $rows = collect();
         $chars = fn (string $table) => "coalesce({$table}.billable_chars, {$this->charLength($table.'.input_text')})";
+        // Metered rows (their exact cost recorded) are kept apart from older ones, which are estimated.
+        $metered = fn (string $table) => Schema::hasColumn($table, 'api_calls')
+            ? ["case when {$table}.api_calls is null then 0 else 1 end as metered", "coalesce(sum({$table}.api_calls), 0) as api_calls", "coalesce(sum({$table}.api_output_tokens), 0) as output_tokens"]
+            : ['0 as metered', '0 as api_calls', '0 as output_tokens'];
 
         $ag = 'audio_generations';
         $member = DB::table($ag)
@@ -66,12 +77,14 @@ class ApiUsageStats
                 "sum(case when {$ag}.status = 'failed' then 1 else 0 end) as failed",
                 "sum(case when {$ag}.translate then 1 else 0 end) as translated",
                 "coalesce(sum({$chars($ag)}), 0) as chars",
-                "coalesce(sum({$ag}.duration_seconds), 0) as seconds",
+                // Audio that was delivered: a failed or unfinished one only holds the seconds it reserved.
+                "coalesce(sum(case when {$ag}.status = 'done' then {$ag}.duration_seconds else 0 end), 0) as seconds",
                 "coalesce(sum({$ag}.tts_cost_estimate_usd), 0) as recorded_cost",
                 "coalesce(sum({$ag}.tts_latency_ms), 0) as latency_sum",
                 "sum(case when {$ag}.tts_latency_ms is null then 0 else 1 end) as latency_n",
+                ...$metered($ag),
             ]))
-            ->groupByRaw('1, 2, 3, 4, 5')
+            ->groupByRaw('1, 2, 3, 4, 5, 14')
             ->get();
         $rows = $rows->concat($member);
 
@@ -92,8 +105,9 @@ class ApiUsageStats
                     "coalesce(sum({$dg}.tts_cost_estimate_usd), 0) as recorded_cost",
                     "coalesce(sum({$dg}.tts_latency_ms), 0) as latency_sum",
                     "sum(case when {$dg}.tts_latency_ms is null then 0 else 1 end) as latency_n",
+                    ...$metered($dg),
                 ]))
-                ->groupByRaw('1, 2, 3, 4, 5')
+                ->groupByRaw('1, 2, 3, 4, 5, 14')
                 ->get();
             $rows = $rows->concat($demo);
         }
@@ -114,6 +128,9 @@ class ApiUsageStats
                 'recorded_cost' => (float) $r->recorded_cost,
                 'latency_sum' => (int) $r->latency_sum,
                 'latency_n' => (int) $r->latency_n,
+                'metered' => (int) $r->metered === 1,
+                'api_calls' => (int) $r->api_calls,
+                'output_tokens' => (int) $r->output_tokens,
             ];
             [$g['cost'], $g['cost_basis']] = $this->cost($g);
             $g['label'] = $this->modelLabel($g);
@@ -127,6 +144,9 @@ class ApiUsageStats
      */
     private function cost(array $g): array
     {
+        if ($g['metered']) {
+            return [$g['recorded_cost'], 'exact'];
+        }
         if ($g['provider'] === 'cache') {
             return [0.0, 'cache'];
         }
@@ -139,14 +159,12 @@ class ApiUsageStats
             if ($cfg['free_tier']) {
                 return [0.0, 'free tier'];
             }
-            $rates = str_contains(strtolower($g['model']), 'pro') ? $cfg['pro'] : $cfg['flash'];
-            $outputTokens = $g['seconds'] * $cfg['audio_tokens_per_second'];
-            $inputTokens = $g['chars'] / max(1, $cfg['chars_per_text_token']);
+            // The model's list price on that day (it doubles from 2027 for the 3.8 voices).
+            $outputTokens = (int) round($g['seconds'] * (float) $cfg['audio_tokens_per_second']);
+            $inputTokens = (int) round($g['chars'] / max(1, (float) $cfg['chars_per_text_token']));
+            $model = $g['model'] !== '' ? $g['model'] : GeminiTtsModel::LATEST;
 
-            return [
-                ($outputTokens * $rates['output_per_million_tokens'] + $inputTokens * $rates['input_per_million_tokens']) / 1_000_000,
-                'estimated',
-            ];
+            return [GeminiSpend::price($model, $inputTokens, $outputTokens, 0, Carbon::parse($g['day'].' 12:00:00')), 'estimated'];
         }
 
         if (str_starts_with($g['provider'], 'google')) {
@@ -207,6 +225,9 @@ class ApiUsageStats
             'cost' => round($groups->sum('cost'), 2),
             'recorded_cost' => round($groups->sum('recorded_cost'), 2),
             'estimated_share' => $this->ratio($groups->where('cost_basis', 'estimated')->sum('cost'), $groups->sum('cost')),
+            'exact_share' => $this->ratio($groups->where('cost_basis', 'exact')->sum('cost'), $groups->sum('cost')),
+            'metered_requests' => $groups->where('metered', true)->sum('requests'),
+            'api_calls' => $groups->sum('api_calls'),
             'member_cost' => round($bySource('members')->sum('cost'), 2),
             'admin_cost' => round($bySource('admin')->sum('cost'), 2),
             'demo_cost' => round($bySource('demo')->sum('cost'), 2),

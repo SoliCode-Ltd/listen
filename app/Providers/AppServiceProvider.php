@@ -89,6 +89,9 @@ class AppServiceProvider extends ServiceProvider
     {
         \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, \App\Services\Geo\UserCountryRecorder::class);
 
+        // Every Gemini reply's token counts, for what each voice really cost (App\Support\GeminiSpend).
+        \Illuminate\Support\Facades\Http::globalMiddleware(\App\Support\GeminiSpend::middleware());
+
         // "Sign in with Listen" for AI apps on the MCP server.
         \App\Mcp\SignInWithListen::configure();
 

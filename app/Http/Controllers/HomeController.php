@@ -34,6 +34,7 @@ use App\Support\DialogueSpeakers;
 use App\Support\DiscountTerms;
 use App\Support\EmailVerification;
 use App\Support\FreeAllowance;
+use App\Support\GeminiSpend;
 use App\Support\PlanPricingLines;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
@@ -872,6 +873,8 @@ class HomeController extends Controller
         $quotaReserved = false;
         $quota = [];
 
+        // What Google bills for this demo voice, the translation and rewrite included (GeminiSpend).
+        $spend = GeminiSpend::start();
         try {
             $quota = $this->enforceDemoPolicy($request, $estimate['chars'], true, true);
             $quotaReserved = true;
@@ -957,6 +960,9 @@ class HomeController extends Controller
             $baseCharge = (int) min($estimate['chars'], $baseAvailable);
             $rewardCharge = (int) max(0, $estimate['chars'] - $baseCharge);
 
+            $spend->stop();
+            $audio['cost_estimate_usd'] = $spend->totalWith($audio);
+            $audio['api_columns'] = $spend->columnsFor('demo_voice_generations');
             $generation = $this->storeDemoVoiceGeneration(
                 $request,
                 $validated,
@@ -1075,6 +1081,8 @@ class HomeController extends Controller
                 'message' => $e instanceof TranslationFailedException ? $e->getMessage() : __('ui.backend.demo_voice_generation_failed'),
                 'quota' => $quota ?: $this->demoQuotaForClient($request),
             ], 422);
+        } finally {
+            $spend->stop();
         }
     }
 
@@ -1136,6 +1144,7 @@ class HomeController extends Controller
         $quotaReserved = false;
         $estimate = ['chars' => 0];
 
+        $spend = GeminiSpend::start();
         try {
             $validated = VoiceDesignController::validateDesign($request, min(VoiceDesign::MAX_PREVIEW, $maxChars));
             $left = (int) $this->demoQuotaForClient($request)['total_remaining_chars'];
@@ -1180,7 +1189,9 @@ class HomeController extends Controller
                 null,
                 [],
                 ['audio_path' => $audioPath, 'provider' => 'gemini', 'model' => VoiceDesignService::MODEL,
-                    'duration_seconds' => AudioDuration::wholeSeconds(data_get($take->metadata, 'seconds'))],
+                    'duration_seconds' => AudioDuration::wholeSeconds(data_get($take->metadata, 'seconds')),
+                    'cost_estimate_usd' => $spend->stop()->cost(),
+                    'api_columns' => $spend->columnsFor('demo_voice_generations')],
                 $quota,
                 $baseCharge,
                 $estimate['chars'],
@@ -1251,6 +1262,8 @@ class HomeController extends Controller
                 'message' => __('voice_design.errors.our_side'),
                 'quota' => $quota ?: $this->demoQuotaForClient($request),
             ], 422);
+        } finally {
+            $spend->stop();
         }
     }
 
@@ -2150,7 +2163,7 @@ class HomeController extends Controller
                     // The speech cache's copy of this take (TtsService): deleted with the voice.
                     'cache_copy' => $audio['cache_path'] ?? null,
                 ],
-            ]);
+            ] + (array) ($audio['api_columns'] ?? []));
         } catch (\Throwable $e) {
             Log::warning('Failed to store demo voice generation.', [
                 'exception_class' => get_class($e),
