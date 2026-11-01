@@ -11,6 +11,7 @@ use App\Services\Tts\GeminiKeysOutException;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
+use App\Support\GeminiSpend;
 use App\Support\GeminiVocalTags;
 use App\Support\JoinPauses;
 use App\Support\PaceAndPitch;
@@ -442,11 +443,17 @@ class VoiceCloningService
             $texts[] = GeminiTtsProvider::pieceText($chunk['text'], 1.0, []) + ['part' => $partIndex];
         }
         // Written to a file piece by piece as they come, packaged from there and
-        // streamed to the disk: a long script is never held whole.
+        // streamed to the disk: a long script is never held whole. Every request
+        // Google answers is counted for what the voice cost (GeminiSpend).
         $checked = PieceCheck::emptyReport();
-        $joined = SpeechJoin::toFile(count($chunks) === 1
-            ? [$this->speakPiece($chunks[0], $voiceCloningKey, $styles[0])]
-            : $this->speakPieces($chunks, $voiceCloningKey, $styles, config('services.gemini_tts.check_pieces', true) ? $texts : [], $checked), $pauses, $groups, SpeechJoin::PAUSE, true);
+        $spend = GeminiSpend::start();
+        try {
+            $joined = SpeechJoin::toFile(count($chunks) === 1
+                ? [$this->speakPiece($chunks[0], $voiceCloningKey, $styles[0])]
+                : $this->speakPieces($chunks, $voiceCloningKey, $styles, config('services.gemini_tts.check_pieces', true) ? $texts : [], $checked), $pauses, $groups, SpeechJoin::PAUSE, true);
+        } finally {
+            $spend->stop();
+        }
         if ($checked['retaken'] > 0) {
             Log::info('Cloned voice: pieces of a long script were taken again.', $checked);
         }
@@ -468,7 +475,8 @@ class VoiceCloningService
             'provider' => 'gemini',
             'model' => self::MODEL,
             'latency_ms' => (int) ((microtime(true) - $startTime) * 1000),
-            'cost_estimate_usd' => $this->estimateCost(mb_strlen($text)),
+            'cost_estimate_usd' => $spend->cost(),
+            'api_usage' => $spend->summary(),
             'char_count' => mb_strlen($text),
             'duration_seconds' => null,
         ] + (count($chunks) > 1 ? ['pieces_check' => $checked] : []);
@@ -2063,12 +2071,5 @@ class VoiceCloningService
         return str_contains($message, 'not found')
             || str_contains($message, 'unknown')
             || str_contains($message, 'interaction');
-    }
-
-    private function estimateCost(int $charCount): float
-    {
-        $ratePerMillion = (float) config('services.gemini_tts.cost_per_million_chars', 0.0);
-
-        return round(($charCount / 1_000_000) * $ratePerMillion, 6);
     }
 }

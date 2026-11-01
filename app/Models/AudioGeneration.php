@@ -34,6 +34,10 @@ class AudioGeneration extends Model
         'tts_latency_ms',
         'tts_fallback_used',
         'tts_cost_estimate_usd',
+        // What Google counted for it (App\Support\GeminiSpend); null before metering
+        'api_calls',
+        'api_input_tokens',
+        'api_output_tokens',
         // Voice studio controls
         'dialect',
         'performance_style',
@@ -61,6 +65,9 @@ class AudioGeneration extends Model
         'tts_latency_ms' => 'integer',
         'tts_fallback_used' => 'boolean',
         'tts_cost_estimate_usd' => 'float',
+        'api_calls' => 'integer',
+        'api_input_tokens' => 'integer',
+        'api_output_tokens' => 'integer',
         'speed' => 'float',
         'pitch' => 'float',
         'is_dialogue' => 'boolean',

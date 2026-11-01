@@ -5,7 +5,7 @@
                 <x-slot name="heading">API usage by provider and model · {{ $title }}</x-slot>
                 <x-slot name="description">
                     Calls, characters, audio produced, speed, reliability and cost for every voice model, including the public demo.
-                    “Logged” means the app recorded the cost; “estimated” uses the rates in config/analytics.php.
+                    “Exact” is what the provider counted for every request a voice made (retries, retakes and the dialect rewrite included), at that day’s price; “logged” is a cost the app recorded before that; “estimated” uses the list prices in config/analytics.php with 25 audio tokens a second of delivered audio. Audio minutes count delivered voices only.
                     @if ($geminiFreeTier)
                         Gemini is set to the free tier, so it costs $0.
                     @endif
@@ -16,7 +16,7 @@
                         <thead>
                             <tr class="border-b border-gray-200 text-gray-500 dark:border-white/10 dark:text-gray-400">
                                 <th class="px-3 py-2 text-start font-medium">Provider · model</th>
-                                <th class="px-3 py-2 text-end font-medium">Calls</th>
+                                <th class="px-3 py-2 text-end font-medium">Voices</th>
                                 <th class="px-3 py-2 text-end font-medium">Members / demo</th>
                                 <th class="px-3 py-2 text-end font-medium">Characters</th>
                                 <th class="px-3 py-2 text-end font-medium">Audio min</th>

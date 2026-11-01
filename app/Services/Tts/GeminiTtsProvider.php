@@ -7,6 +7,7 @@ use App\Services\VoiceCloningService;
 use App\Support\ArabicDialects;
 use App\Support\SpeechLanguages;
 use App\Support\EnglishAccents;
+use App\Support\GeminiSpend;
 use App\Support\GeminiTtsModel;
 use App\Support\SpeakerVoices;
 use App\Support\GeminiVocalTags;
@@ -439,6 +440,36 @@ class GeminiTtsProvider implements TtsProviderInterface
         $this->currentKeyInfo = null;
         $keyInfo = $this->getAvailableKey();
 
+        // What Google bills for this voice: every call below, the dialect rewrite included.
+        $spend = GeminiSpend::start();
+        try {
+            $result = $this->synthesizeMetered($text, $targetLanguage, $voiceConfig, $model);
+        } finally {
+            $spend->stop();
+        }
+
+        // Record successful usage for current key
+        // Count it against the key that answered (it may have rotated).
+        $this->getKeyManager()->recordUsage(($this->currentKeyInfo ?? $keyInfo)['name'], $charCount);
+        $guardrail->record($this->name(), $charCount);
+
+        $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
+
+        return array_merge($result, [
+            'provider' => $this->name(),
+            'model' => $model,
+            'latency_ms' => $latencyMs,
+            'char_count' => $charCount,
+            'cost_estimate_usd' => $spend->cost(),
+            'api_usage' => $spend->summary(),
+        ]);
+    }
+
+    /**
+     * The voice itself, with the dialect rewrite first: synthesize() meters it.
+     */
+    private function synthesizeMetered(string $text, string $targetLanguage, array $voiceConfig, string $model): array
+    {
         $speakers = $voiceConfig['speakers'] ?? null;
         $isDialogue = is_array($speakers) && count($speakers) > 1;
         // The member's pronunciations in this text (App\Support\Pronunciations), as they wrote them.
@@ -468,26 +499,9 @@ class GeminiTtsProvider implements TtsProviderInterface
             throw new \RuntimeException('TTS text is empty.');
         }
 
-        if ($isDialogue) {
-            $result = $this->synthesizeDialogue($text, $targetLanguage, $speakers, $voiceConfig, $model);
-        } else {
-            $result = $this->synthesizeSingle($text, $targetLanguage, $voiceConfig, $model);
-        }
-
-        // Record successful usage for current key
-        // Count it against the key that answered (it may have rotated).
-        $this->getKeyManager()->recordUsage(($this->currentKeyInfo ?? $keyInfo)['name'], $charCount);
-        $guardrail->record($this->name(), $charCount);
-
-        $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
-
-        return array_merge($result, [
-            'provider' => $this->name(),
-            'model' => $model,
-            'latency_ms' => $latencyMs,
-            'char_count' => $charCount,
-            'cost_estimate_usd' => $this->estimateCost($charCount),
-        ]);
+        return $isDialogue
+            ? $this->synthesizeDialogue($text, $targetLanguage, $speakers, $voiceConfig, $model)
+            : $this->synthesizeSingle($text, $targetLanguage, $voiceConfig, $model);
     }
 
     /**
@@ -2060,15 +2074,6 @@ class GeminiTtsProvider implements TtsProviderInterface
         return max(3, (int) ceil($wordEstimate / 2.6));
     }
 
-    /**
-     * Estimate USD cost for Gemini TTS.
-     * Input text is charged per character.
-     */
-    private function estimateCost(int $charCount): float
-    {
-        $ratePerMillion = (float) config('services.gemini_tts.cost_per_million_chars', 0.0);
-        return round(($charCount / 1_000_000) * $ratePerMillion, 6);
-    }
 
     private function sendWithSslFallback(callable $sender, bool $verifySsl, string $context)
     {
