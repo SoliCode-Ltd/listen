@@ -3,9 +3,11 @@
 /*
  * Saudi campaign: one line, said by Listen's Saudi speakers in their own dialects.
  *
- * Each speaker is a Listen HD voice with the same name, voice and avatar as in the
- * product. The line is written once; Listen's dialect rewrite puts it into each
- * dialect, exactly as it does for members. Owner-approved (Saudi campaign, 2026-11-01).
+ * The line is written once and each voice reads it with a direction for its dialect
+ * (the generator does not rewrite the text). Note: sa-qatifi-abeer was made with
+ * Pulcherrima, not Abeer's product voice, so it is a spare and is never labelled Abeer.
+ * sa-cta-fatima is the bright campaign's closing line, in Fatima's own product voice
+ * (Achernar, سعودية نجدية). Owner-approved (Saudi campaign, 2026-11-01; CTA line 2026-11-01).
  *
  * Made by the "Launch ad voices" workflow (ad: saudi-ad):
  *   php artisan tts:showcase --set=ad --ad=saudi-ad --generate
@@ -29,5 +31,8 @@ return [
             'style' => $style('A Saudi man from Dammam, natural Eastern Province delivery,'), 'text' => $line],
         ['slug' => 'sa-qatifi-abeer', 'language' => 'ar', 'dialect' => 'ar-SA-QT', 'voice' => 'Pulcherrima', 'speaker' => 'Abeer',
             'style' => $style('A Saudi woman from Qatif, natural Qatifi delivery,'), 'text' => $line],
+        ['slug' => 'sa-cta-fatima', 'language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Achernar', 'speaker' => 'Fatima',
+            'style' => 'A Saudi woman from Riyadh, natural Najdi delivery, signing off a premium brand commercial: warm, confident and inviting, a small smile in the voice, unhurried, every word clear. Real breathing, no announcer exaggeration.',
+            'text' => 'خلّ محتواك يتكلم بالصوت الصح.'],
     ],
 ];
