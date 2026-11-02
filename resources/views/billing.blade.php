@@ -98,7 +98,11 @@
     }
     select {
       width: 100%;
-      padding: .75rem 2.25rem .75rem .75rem;
+      /* The box cuts its text at the font's line, and Alexandria's lowest Arabic letters reach far below
+         it (the dots of a final ي, 0.58em, against 0.25em): a taller line keeps the whole letter, and the
+         padding gives the height back, so the box stays 45px. */
+      line-height: 1.9;
+      padding: .44rem 2.25rem .44rem .75rem;
       border-radius: var(--radius);
       border: 1px solid var(--line);
       background: var(--surface);
@@ -114,7 +118,7 @@
       background-size: 1rem;
     }
     html[dir="rtl"] select {
-      padding: .75rem .75rem .75rem 2.25rem;
+      padding: .44rem .75rem .44rem 2.25rem;
       background-position: left .75rem center;
     }
     select:focus {
