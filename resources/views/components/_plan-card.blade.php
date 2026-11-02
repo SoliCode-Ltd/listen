@@ -78,7 +78,8 @@
     <div class="plan-offer">
       <span class="offer-label">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>
-        <span class="offer-label-text">{{ $terms['offer_monthly'] }}</span>
+        {{-- The percentage stands out ("50%"): the text is escaped first, then only the number is wrapped. --}}
+        <span class="offer-label-text">{!! preg_replace('/\d+(?:[.,]\d+)?\s*%/u', '<span class="offer-num">$0</span>', e($terms['offer_monthly']), 1) !!}</span>
         @if($offerUntil)
           <span class="offer-until">{{ __('ui.pricing.offer_until', ['date' => $offerUntil]) }}</span>
         @endif

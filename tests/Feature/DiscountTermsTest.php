@@ -115,7 +115,9 @@ class DiscountTermsTest extends TestCase
             ->assertOk()
             // The label above the price and the full price struck through beside it.
             ->assertSee('class="offer-label"', false)
-            ->assertSee('30% off your first month')
+            ->assertSeeText('30% off your first month')
+            // The percentage stands out in the label.
+            ->assertSee('<span class="offer-num">30%</span> off your first month', false)
             ->assertSee('<s class="price-original" dir="ltr">', false)
             // The button says what is off: the offer on monthly, the yearly saving on yearly.
             ->assertSee('data-monthly-label="Get 30% off"', false)
@@ -213,7 +215,8 @@ class DiscountTermsTest extends TestCase
             ->get($this->localizedRoute('pricing'))
             ->assertOk()
             ->assertSee('class="offer-label"', false)
-            ->assertSee('خصم 10% على أول شهرين')
+            ->assertSeeText('خصم 10% على أول شهرين')
+            ->assertSee('خصم <span class="offer-num">10%</span> على أول شهرين', false)
             // The button says what is off.
             ->assertSee('احصل على خصم 10%');
     }
