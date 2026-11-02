@@ -159,7 +159,7 @@ $predict = function (array $m, array $r, bool $withMoods = true): float {
 };
 
 /** Fits every number together on these voices. */
-$fitAll = function (array $list, bool $withMoods) use ($predict, $median, $solve, $families, $columnsAll): array {
+$fitAll = function (array $list, bool $withMoods, array $keep = []) use ($predict, $median, $solve, $families, $columnsAll): array {
     $m = ['beta' => [], 'factors' => ['style' => [], 'emotion' => [], 'dialect' => [], 'direction' => [], 'mood' => []], 'slower' => UsageEstimator::SLOWER_POWER, 'faster' => UsageEstimator::FASTER_POWER];
     foreach (['ar', 'en'] as $lang) {
         $m['beta'][$lang] = UsageEstimator::MODEL[VoiceTier::HD][$lang];
@@ -171,9 +171,12 @@ $fitAll = function (array $list, bool $withMoods) use ($predict, $median, $solve
             if (count($mine) < 30) {
                 continue;
             }
-            $cols = array_values(array_filter($columnsAll, fn ($c) => count(array_filter($mine, fn ($r) => $r['x'][$c] > 0)) >= 8));
+            $kept = $keep[$lang] ?? [];
+            $cols = array_values(array_filter($columnsAll, fn ($c) => ! in_array($c, $kept, true) && count(array_filter($mine, fn ($r) => $r['x'][$c] > 0)) >= 8));
             $cols[] = 'base';
             $dropped = [];
+            // The seconds the kept rates give each voice, taken off before the rest is fitted.
+            $keptPart = fn (array $r): float => array_sum(array_map(fn ($c) => ($m['beta'][$lang][$c] ?? 0.0) * $r['x'][$c], $kept));
             for ($attempt = 0; $attempt < count($cols); $attempt++) {
                 $k = count($cols);
                 $coef = null;
@@ -186,9 +189,10 @@ $fitAll = function (array $list, bool $withMoods) use ($predict, $median, $solve
                         $scale = $predict(['beta' => [$lang => ['base' => 1.0]]] + $m, ['x' => []] + $r, $withMoods);
                         $v = array_map(fn ($c) => $scale * ($c === 'base' ? 1.0 : (float) $r['x'][$c]), $cols);
                         $y = $r['y'];
+                        $target = $y - $scale * $keptPart($r);
                         $w = $coef === null ? 1 / ($y * $y) : 1 / ($y * max(abs($residual[$n]), 0.03 * $y));
                         for ($i = 0; $i < $k; $i++) {
-                            $atb[$i] += $w * $v[$i] * $y;
+                            $atb[$i] += $w * $v[$i] * $target;
                             for ($j = 0; $j < $k; $j++) {
                                 $ata[$i][$j] += $w * $v[$i] * $v[$j];
                             }
@@ -201,7 +205,7 @@ $fitAll = function (array $list, bool $withMoods) use ($predict, $median, $solve
                     if ($coef === null) {
                         break;
                     }
-                    $trial = ['beta' => [$lang => array_combine($cols, $coef)]] + $m;
+                    $trial = ['beta' => [$lang => array_merge(array_intersect_key($m['beta'][$lang], array_flip($kept)), array_combine($cols, $coef))]] + $m;
                     foreach ($mine as $n => $r) {
                         $residual[$n] = $predict($trial, $r, $withMoods) - $r['y'];
                     }
@@ -297,6 +301,10 @@ $test = array_values(array_filter($rows, fn ($r) => $r['id'] % 2 === 1));
 echo 'Fitted on '.count($train).' voices, judged on '.count($test)." others\n";
 $noMoods = $fitAll($train, false);
 $withMoods = $fitAll($train, true);
+// What too few voices hold to measure well keeps today's rate: sounds, pauses, digits,
+// letters of the other script, vowel marks, and the extra takes a mood starts.
+$cautious = ['ar' => ['latin', 'number', 'mark', 'sound', 'short_pause', 'long_pause', 'mood'], 'en' => ['arabic', 'number', 'mark', 'sound', 'short_pause', 'long_pause', 'mood']];
+$careful = $fitAll($train, false, $cautious);
 
 echo "\n== Judged on voices the fit did not see ==\n";
 $score("today's estimate", $test, fn ($r) => $r['today']);
@@ -305,6 +313,9 @@ foreach ([1.05, 1.10, 1.15] as $margin) {
 }
 foreach ([1.05, 1.10, 1.15] as $margin) {
     $score(sprintf('refit with mood factors, margin %.2f', $margin), $test, fn ($r) => $predict($withMoods, $r, true) * $margin);
+}
+foreach ([1.05, 1.10, 1.15] as $margin) {
+    $score(sprintf('cautious refit, margin %.2f', $margin), $test, fn ($r) => $predict($careful, $r, false) * $margin);
 }
 
 echo "\n== By setting, judged on the other half: today, then the refit with moods (margin 1.10) ==\n";
@@ -333,7 +344,7 @@ foreach (['style' => 10, 'emotion' => 8, 'dialect' => 8, 'mood' => 8, 'direction
 // ---------------------------------------------------------------- the numbers to ship, from every voice
 // Without mood factors: on voices the fit did not see they add about a point, and the
 // studio page would need its own copy of the parsing.
-$final = $fitAll($rows, false);
+$final = $fitAll($rows, false, $cautious);
 $counts = ['style' => [], 'emotion' => [], 'dialect' => [], 'direction' => []];
 foreach ($rows as $r) {
     foreach (array_keys($counts) as $family) {
@@ -362,7 +373,7 @@ $direction = round($final['factors']['direction']['written'] ?? 1.0, 2);
 $shipModel = ['beta' => $final['beta'], 'factors' => ['style' => $shipped['performance_style'], 'emotion' => $shipped['emotion'], 'dialect' => $shipped['dialect'],
     'direction' => $direction !== 1.0 ? ['written' => $direction] : [], 'mood' => []], 'slower' => $final['slower'], 'faster' => $final['faster']];
 
-echo "\n== To ship (fitted on all ".count($rows)." voices, no mood factors) ==\n";
+echo "\n== To ship (fitted on all ".count($rows)." voices, no mood factors, the rare rates as today) ==\n";
 foreach (['ar', 'en'] as $lang) {
     $b = $final['beta'][$lang];
     $order = ['arabic', 'latin', 'cjk', 'mark', 'number', 'sound', 'short_pause', 'long_pause', 'sentence', 'clause', 'line', 'mood', 'base'];
