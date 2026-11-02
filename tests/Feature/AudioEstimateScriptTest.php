@@ -52,6 +52,8 @@ Line two, after a blank line.
             ['performance_style' => 'cinematic', 'emotion' => 'spiritual', 'dialect' => 'ar-XA', 'style_prompt' => 'Slow and grand'],
             ['performance_style' => 'commercial', 'emotion' => 'warm', 'dialect' => 'ar-LB', 'style_prompt' => '  '],
             ['performance_style' => 'ad_style', 'emotion' => 'confident', 'dialect' => 'ar-EG'],
+            // Factors only Arabic has: each language reads its own.
+            ['performance_style' => 'horror', 'emotion' => 'serious', 'dialect' => 'ar-SA-QS'],
         ];
         $cases = [];
         foreach (self::TEXTS as $text) {

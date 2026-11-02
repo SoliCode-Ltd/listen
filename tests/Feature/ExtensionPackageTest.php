@@ -37,8 +37,8 @@ class ExtensionPackageTest extends TestCase
 
         $this->assertSame(ExtensionVersion::source(), $manifest['version'] ?? null);
         $this->assertTrue(version_compare(ExtensionVersion::source(), '1.1.0', '>='));
-        // Above the 1.2.1 going to the store before it: the store refuses a version it has had.
-        $this->assertTrue(version_compare(ExtensionVersion::source(), '1.2.1', '>'));
+        // Above the 1.2.2 the store has: it refuses a version it has had.
+        $this->assertTrue(version_compare(ExtensionVersion::source(), '1.2.2', '>'));
         $this->assertSame('__MSG_extName__', $manifest['name'] ?? null);
         $this->assertSame('__MSG_extDescription__', $manifest['description'] ?? null);
     }
