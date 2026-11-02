@@ -243,7 +243,9 @@ $fitAll = function (array $list, bool $withMoods) use ($predict, $median, $solve
             }
         }
 
-        // The pace: the power that leaves the smallest typical miss.
+        // The pace: the power that leaves the smallest miss on average (an average, not the
+        // median: most paced voices are only a little slower or faster, and the few at 0.5
+        // are the ones that show what the setting does).
         foreach (['slower' => fn ($r) => $r['speed'] < 0.999, 'faster' => fn ($r) => $r['speed'] > 1.001] as $which => $pick) {
             $paced = array_values(array_filter($list, $pick));
             if (count($paced) < 20) {
@@ -252,7 +254,8 @@ $fitAll = function (array $list, bool $withMoods) use ($predict, $median, $solve
             $best = null;
             for ($p = 0.0; $p <= 1.0001; $p += 0.05) {
                 $trial = array_merge($m, [$which => $p]);
-                $miss = $median(array_map(fn ($r) => abs(log($r['y'] / $predict($trial, $r, $withMoods))), $paced));
+                $misses = array_map(fn ($r) => abs(log($r['y'] / $predict($trial, $r, $withMoods))), $paced);
+                $miss = array_sum($misses) / count($misses);
                 if ($best === null || $miss < $best[1]) {
                     $best = [$p, $miss];
                 }
@@ -341,6 +344,17 @@ foreach ($final['factors'] as $family => $factors) {
     echo "  $family: ".implode(', ', array_map(fn ($v, $f) => $v.' '.number_format($f, 2).' ('.($counts[$v] ?? 0).')', array_keys($factors), $factors))."\n";
 }
 echo '  pace powers: slower '.$final['slower'].', faster '.$final['faster']."\n";
+
+echo "\n== The pace setting: real length against the shipped refit without its pace factor ==\n";
+$bucket = fn (float $speed): string => $speed < 0.55 ? '0.5' : ($speed < 0.95 ? '0.6-0.9' : ($speed <= 1.05 ? '1.0' : ($speed < 1.45 ? '1.1-1.4' : '1.5+')));
+$byPace = [];
+foreach ($rows as $r) {
+    $byPace[$bucket($r['speed'])][] = $r['y'] / $predict(array_merge($final, ['slower' => 0.0, 'faster' => 0.0]), $r, true);
+}
+ksort($byPace);
+foreach ($byPace as $b => $ratios) {
+    printf("  pace %-8s %4d voices: real / refit p25 %.2f median %.2f p75 %.2f\n", $b, count($ratios), $quantile($ratios, .25), $median($ratios), $quantile($ratios, .75));
+}
 echo "\n== All voices, today against the shipped refit (margin 1.10) ==\n";
 $score("today's estimate", $rows, fn ($r) => $r['today']);
 $score('refit with mood factors', $rows, fn ($r) => $predict($final, $r, true) * 1.10);
