@@ -7,8 +7,11 @@
  * Every number is fitted together, not one at a time: the rates for what a text holds,
  * and the factors for the studio's style, emotion, dialect and written direction, the
  * moods tagged in the text, and the pace. Fitted on half the voices (even ids) and judged
- * on the other half, against today's estimate on the same voices; the numbers to ship
- * are then fitted on all of them. Prints numbers only: never a text or a member's email.
+ * on the other half, against today's estimate on the same voices, for both languages
+ * together and for each on its own; the numbers to ship are then fitted on all of them,
+ * each language on its own voices and the pace on both. A language whose refit does no
+ * better than today's numbers on the voices it did not see keeps today's numbers.
+ * Prints numbers only: never a text or a member's email.
  *
  *   ssh user@host 'cd ~/public_html && php' < scripts/support/estimate_fit.php
  */
@@ -343,10 +346,14 @@ foreach (['style' => 10, 'emotion' => 8, 'dialect' => 8, 'mood' => 8, 'direction
 }
 
 // ---------------------------------------------------------------- by language: one set of factors for both, or each its own
-// Today's numbers as a fitted model, with another pace if given.
-$todayModel = fn (array $pace = []): array => ['beta' => UsageEstimator::MODEL[VoiceTier::HD],
-    'factors' => ['style' => UsageEstimator::STUDIO_FACTORS['performance_style'], 'emotion' => UsageEstimator::STUDIO_FACTORS['emotion'],
-        'dialect' => UsageEstimator::STUDIO_FACTORS['dialect'], 'direction' => ['written' => UsageEstimator::DIRECTION_FACTOR], 'mood' => []],
+// Today's studio factors and written-direction factor for a language: each language has its
+// own since November 2026, one set for both before.
+$factorsNow = fn (string $lang): array => isset(UsageEstimator::STUDIO_FACTORS[$lang]) ? UsageEstimator::STUDIO_FACTORS[$lang] : UsageEstimator::STUDIO_FACTORS;
+$directionNow = fn (string $lang): float => (float) (is_array(UsageEstimator::DIRECTION_FACTOR) ? UsageEstimator::DIRECTION_FACTOR[$lang] : UsageEstimator::DIRECTION_FACTOR);
+// Today's numbers for a language as a fitted model, with another pace if given.
+$todayModel = fn (string $lang, array $pace = []): array => ['beta' => UsageEstimator::MODEL[VoiceTier::HD],
+    'factors' => ['style' => $factorsNow($lang)['performance_style'] ?? [], 'emotion' => $factorsNow($lang)['emotion'] ?? [],
+        'dialect' => $factorsNow($lang)['dialect'] ?? [], 'direction' => ['written' => $directionNow($lang)], 'mood' => []],
     'slower' => $pace['slower'] ?? UsageEstimator::SLOWER_POWER, 'faster' => $pace['faster'] ?? UsageEstimator::FASTER_POWER];
 $refitPace = ['slower' => $careful['slower'], 'faster' => $careful['faster']];
 $own = [];
@@ -355,7 +362,7 @@ foreach (['ar', 'en'] as $lang) {
 }
 $variants = [
     "today's estimate" => fn ($r) => $r['today'],
-    "today's numbers, refit pace" => fn ($r) => $predict($todayModel($refitPace), $r, false) * 1.10,
+    "today's numbers, refit pace" => fn ($r) => $predict($todayModel($r['lang'], $refitPace), $r, false) * 1.10,
     'cautious refit, shared factors' => fn ($r) => $predict($careful, $r, false) * 1.10,
     'cautious refit, own factors' => fn ($r) => $predict($own[$r['lang']], $r, false) * 1.10,
 ];
@@ -366,7 +373,7 @@ foreach (['ar', 'en'] as $lang) {
         $score("$lang $label", $part, $estimate);
     }
 }
-$mixed = fn ($r) => $r['lang'] === 'en' ? $predict($todayModel($refitPace), $r, false) * 1.10 : $predict($own['ar'], $r, false) * 1.10;
+$mixed = fn ($r) => $r['lang'] === 'en' ? $predict($todayModel('en', $refitPace), $r, false) * 1.10 : $predict($own['ar'], $r, false) * 1.10;
 $score("ar own factors + en today's, refit pace", $test, $mixed);
 $score('cautious refit, shared factors (both)', $test, $variants['cautious refit, shared factors']);
 $score('cautious refit, own factors (both)', $test, $variants['cautious refit, own factors']);
@@ -393,94 +400,80 @@ foreach (['clips of 8 s or less' => $short, 'longer clips' => $long] as $what =>
 }
 
 // ---------------------------------------------------------------- the numbers to ship, from every voice
+// Each language its own rates and factors, fitted on its own voices; the pace on all of them.
 // Without mood factors: on voices the fit did not see they add about a point, and the
 // studio page would need its own copy of the parsing.
-$final = $fitAll($rows, false, $cautious);
-$counts = ['style' => [], 'emotion' => [], 'dialect' => [], 'direction' => []];
-foreach ($rows as $r) {
-    foreach (array_keys($counts) as $family) {
-        $counts[$family][$r[$family]] = ($counts[$family][$r[$family]] ?? 0) + 1;
-    }
-}
-// A setting seen on fewer than 5 of these voices keeps today's factor.
-$today = UsageEstimator::STUDIO_FACTORS;
+$joint = $fitAll($rows, false, $cautious);
+$pace = ['slower' => $joint['slower'], 'faster' => $joint['faster']];
 $names = ['style' => 'performance_style', 'emotion' => 'emotion', 'dialect' => 'dialect'];
-$shipped = [];
-foreach ($names as $family => $name) {
-    $merged = [];
-    foreach ($final['factors'][$family] as $value => $f) {
-        $merged[$value] = round($f, 2);
-    }
-    foreach ($today[$name] as $value => $f) {
-        if (($counts[$family][$value] ?? 0) < 5 && ! isset($merged[$value])) {
-            $merged[$value] = $f;
-        }
-    }
-    $merged = array_filter($merged, fn ($f) => abs($f - 1) >= 0.04);
-    arsort($merged);
-    $shipped[$name] = $merged;
-}
-$direction = round($final['factors']['direction']['written'] ?? 1.0, 2);
-$shipModel = ['beta' => $final['beta'], 'factors' => ['style' => $shipped['performance_style'], 'emotion' => $shipped['emotion'], 'dialect' => $shipped['dialect'],
-    'direction' => $direction !== 1.0 ? ['written' => $direction] : [], 'mood' => []], 'slower' => $final['slower'], 'faster' => $final['faster']];
-
-echo "\n== To ship (fitted on all ".count($rows)." voices, no mood factors, the rare rates as today) ==\n";
-foreach (['ar', 'en'] as $lang) {
-    $b = $final['beta'][$lang];
-    $order = ['arabic', 'latin', 'cjk', 'mark', 'number', 'sound', 'short_pause', 'long_pause', 'sentence', 'clause', 'line', 'mood', 'base'];
-    echo "  '$lang' => [".implode(', ', array_map(fn ($c) => "'$c' => ".rtrim(rtrim(number_format((float) ($b[$c] ?? 0.0), 3, '.', ''), '0'), '.'), $order))."],\n";
-}
-foreach ($shipped as $name => $factors) {
-    echo "  '$name' => [".implode(', ', array_map(fn ($v, $f) => "'$v' => $f", array_keys($factors), $factors))."],\n";
-    echo '      seen: '.implode(', ', array_map(fn ($v) => $v.' '.($counts[array_search($name, $names, true)][$v] ?? 0), array_keys($factors)))."\n";
-}
-echo "  DIRECTION_FACTOR = $direction (written directions seen: ".($counts['direction']['written'] ?? 0).")\n";
-echo '  SLOWER_POWER = '.$final['slower'].', FASTER_POWER = '.$final['faster']."\n";
-
-echo "\n== Each language its own factors, fitted on all its voices (pace as above, the rare rates as today) ==\n";
+$order = ['arabic', 'latin', 'cjk', 'mark', 'number', 'sound', 'short_pause', 'long_pause', 'sentence', 'clause', 'line', 'mood', 'base'];
+$ship = [];
+echo "\n== To ship: each language fitted on its own voices (no mood factors, the rare rates as today) ==\n";
 foreach (['ar', 'en'] as $lang) {
     $mine = array_values(array_filter($rows, fn ($r) => $r['lang'] === $lang));
-    $fit = $fitAll($mine, false, $cautious, ['slower' => $final['slower'], 'faster' => $final['faster']]);
-    $b = $fit['beta'][$lang];
-    $order = ['arabic', 'latin', 'cjk', 'mark', 'number', 'sound', 'short_pause', 'long_pause', 'sentence', 'clause', 'line', 'mood', 'base'];
-    echo "  '$lang' => [".implode(', ', array_map(fn ($c) => "'$c' => ".rtrim(rtrim(number_format((float) ($b[$c] ?? 0.0), 3, '.', ''), '0'), '.'), $order))."],\n";
-    $seen = ['style' => [], 'emotion' => [], 'dialect' => [], 'direction' => []];
+    $fit = $fitAll($mine, false, $cautious, $pace);
+    $counts = ['style' => [], 'emotion' => [], 'dialect' => [], 'direction' => []];
     foreach ($mine as $r) {
-        foreach (array_keys($seen) as $family) {
-            $seen[$family][$r[$family]] = ($seen[$family][$r[$family]] ?? 0) + 1;
+        foreach (array_keys($counts) as $family) {
+            $counts[$family][$r[$family]] = ($counts[$family][$r[$family]] ?? 0) + 1;
         }
     }
-    foreach (['style', 'emotion', 'dialect', 'direction'] as $family) {
-        $factors = $fit['factors'][$family];
-        arsort($factors);
-        echo "    $family: ".($factors === [] ? '-' : implode(', ', array_map(fn ($v, $f) => "'$v' => ".round($f, 2).' ('.($seen[$family][$v] ?? 0).')', array_keys($factors), $factors)))."\n";
+    // A setting seen on fewer than 5 of this language's voices keeps today's factor.
+    $factors = ['mood' => []];
+    foreach ($names as $family => $name) {
+        $merged = array_map(fn ($f) => round($f, 2), $fit['factors'][$family]);
+        foreach ($factorsNow($lang)[$name] ?? [] as $value => $f) {
+            if (($counts[$family][$value] ?? 0) < 5 && ! isset($merged[$value])) {
+                $merged[$value] = $f;
+            }
+        }
+        $merged = array_filter($merged, fn ($f) => abs($f - 1) >= 0.04);
+        arsort($merged);
+        $factors[$family] = $merged;
     }
+    $written = $counts['direction']['written'] ?? 0;
+    $direction = $written < 5 ? $directionNow($lang) : round($fit['factors']['direction']['written'] ?? 1.0, 2);
+    $factors['direction'] = $direction !== 1.0 ? ['written' => $direction] : [];
+    $ship[$lang] = ['beta' => $fit['beta'], 'factors' => $factors] + $pace;
+    $b = $fit['beta'][$lang];
+    echo "  '$lang' (".count($mine)." voices) => [".implode(', ', array_map(fn ($c) => "'$c' => ".rtrim(rtrim(number_format((float) ($b[$c] ?? 0.0), 3, '.', ''), '0'), '.'), $order))."],\n";
+    foreach ($names as $family => $name) {
+        echo "    '$name' => [".implode(', ', array_map(fn ($v, $f) => "'$v' => $f", array_keys($factors[$family]), $factors[$family]))."],\n";
+        echo '        seen: '.implode(', ', array_map(fn ($v) => $v.' '.($counts[$family][$v] ?? 0), array_keys($factors[$family])))."\n";
+    }
+    echo "    written direction $direction (seen on $written voices)\n";
 }
+echo '  SLOWER_POWER = '.$pace['slower'].', FASTER_POWER = '.$pace['faster']." (fitted on both languages)\n";
 
 echo "\n== The pace setting: real length against the shipped numbers without their pace factor ==\n";
 $bucket = fn (float $speed): string => $speed < 0.55 ? '0.5' : ($speed < 0.95 ? '0.6-0.9' : ($speed <= 1.05 ? '1.0' : ($speed < 1.45 ? '1.1-1.4' : '1.5+')));
 $byPace = [];
 foreach ($rows as $r) {
-    $byPace[$bucket($r['speed'])][] = $r['y'] / $predict(array_merge($shipModel, ['slower' => 0.0, 'faster' => 0.0]), $r, false);
+    $byPace[$bucket($r['speed'])][] = $r['y'] / $predict(array_merge($ship[$r['lang']], ['slower' => 0.0, 'faster' => 0.0]), $r, false);
 }
 ksort($byPace);
 foreach ($byPace as $b => $ratios) {
     printf("  pace %-8s %4d voices: real / estimate p25 %.2f median %.2f p75 %.2f\n", $b, count($ratios), $quantile($ratios, .25), $median($ratios), $quantile($ratios, .75));
 }
 
-echo "\n== All voices, today against the numbers to ship (margin 1.10) ==\n";
-$score("today's estimate", $rows, fn ($r) => $r['today']);
-$score('to ship', $rows, fn ($r) => $predict($shipModel, $r, false) * 1.10);
-$final = $shipModel;
-$withMoods = false;
+echo "\n== All voices, today against the numbers to ship (margin 1.10; in-sample) ==\n";
+foreach (['ar', 'en'] as $lang) {
+    $part = array_values(array_filter($rows, fn ($r) => $r['lang'] === $lang));
+    $score("$lang today's estimate", $part, fn ($r) => $r['today']);
+    $score("$lang today's numbers, refit pace", $part, fn ($r) => $predict($todayModel($lang, $pace), $r, false) * 1.10);
+    $score("$lang refit", $part, fn ($r) => $predict($ship[$lang], $r, false) * 1.10);
+}
+$score("both today's estimate", $rows, fn ($r) => $r['today']);
+$score('both refit', $rows, fn ($r) => $predict($ship[$r['lang']], $r, false) * 1.10);
+$score("ar refit + en today's numbers, refit pace", $rows, fn ($r) => $r['lang'] === 'en' ? $predict($todayModel('en', $pace), $r, false) * 1.10 : $predict($ship['ar'], $r, false) * 1.10);
 
 if ($member > 0) {
     $mine = array_values(array_filter($rows, fn ($r) => $r['user'] === $member));
     echo "\n== Member {$member}'s premium voices on this engine ==\n";
     printf("  voices %d, real %d s, today's estimate %d s, refit %d s\n", count($mine), array_sum(array_column($mine, 'y')),
-        array_sum(array_column($mine, 'today')), (int) array_sum(array_map(fn ($r) => round($predict($final, $r, false) * 1.10), $mine)));
+        array_sum(array_column($mine, 'today')), (int) array_sum(array_map(fn ($r) => round($predict($ship[$r['lang']], $r, false) * 1.10), $mine)));
     foreach ($mine as $r) {
         printf("  #%d %s pace %.2f style %s emotion %s dialect %s moods %s: real %d s, today %d s, refit %d s\n", $r['id'], $r['lang'], $r['speed'],
-            $r['style'] ?: '-', $r['emotion'] ?: '-', $r['dialect'] ?: '-', $r['moods'] ? implode('+', $r['moods']) : '-', $r['y'], $r['today'], round($predict($final, $r, false) * 1.10));
+            $r['style'] ?: '-', $r['emotion'] ?: '-', $r['dialect'] ?: '-', $r['moods'] ? implode('+', $r['moods']) : '-', $r['y'], $r['today'], round($predict($ship[$r['lang']], $r, false) * 1.10));
     }
 }
