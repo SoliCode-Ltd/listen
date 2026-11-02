@@ -90,9 +90,9 @@ final class PlanChanges
      *
      * @return list<string>
      */
-    public function plansWithoutOffer(User $user): array
+    public function plansWithoutOffer(User $user, ?Plan $current = null): array
     {
-        $current = $this->planAccess->resolveActivePlanForUserId((int) $user->id);
+        $current ??= $this->planAccess->resolveActivePlanForUserId((int) $user->id);
         if ($current === null || (int) $current->price_cents <= 0 || $current->isPack()) {
             return [];
         }
@@ -103,6 +103,54 @@ final class PlanChanges
             ->map(fn (Plan $plan): string => (string) $plan->slug)
             ->values()
             ->all();
+    }
+
+    /** A lower plan paid by InstaPay or Vodafone Cash that waits for its day: already paid for. */
+    public function paidChangeWaiting(User|int $user): ?PlanChange
+    {
+        $change = $this->scheduledFor($user);
+
+        return $change && $change->source === PlanChange::SOURCE_MANUAL ? $change : null;
+    }
+
+    /**
+     * The member's card changed: a booked lower plan is charged to the new card too. A
+     * schedule keeps the card it was given for the phases ahead (and, for a plan that
+     * starts later, for the subscription it creates then), so it is told.
+     */
+    public function followCard(User $user, string $paymentMethod): void
+    {
+        $change = $this->scheduledFor($user);
+        if ($change === null || trim($paymentMethod) === '') {
+            return;
+        }
+        $stripe = Cashier::stripe();
+
+        if ($change->source === PlanChange::SOURCE_CARD_START && $change->stripe_schedule_id) {
+            $stripe->subscriptionSchedules->update((string) $change->stripe_schedule_id, [
+                'default_settings' => ['default_payment_method' => $paymentMethod],
+            ]);
+
+            return;
+        }
+        if ($change->source !== PlanChange::SOURCE_CARD || ! $change->stripe_subscription_id) {
+            return;
+        }
+
+        $scheduleId = $this->scheduleIdOf($stripe->subscriptions->retrieve((string) $change->stripe_subscription_id, []));
+        if ($scheduleId === null) {
+            return;
+        }
+        $schedule = $stripe->subscriptionSchedules->retrieve($scheduleId, []);
+        $phases = [];
+        foreach ($schedule->phases ?? [] as $phase) {
+            if ((int) ($phase->end_date ?? 0) > now()->getTimestamp()) {
+                $phases[] = ['default_payment_method' => $paymentMethod] + $this->phaseParams($phase);
+            }
+        }
+        if ($phases !== []) {
+            $stripe->subscriptionSchedules->update($scheduleId, ['end_behavior' => 'release', 'phases' => $phases]);
+        }
     }
 
     public function scheduledFor(User|int $user): ?PlanChange
@@ -366,9 +414,24 @@ final class PlanChanges
             return;
         }
 
-        $sameSubscription = $stripeSubscription !== null && (string) ($stripeSubscription->id ?? '') === (string) $change->stripe_subscription_id;
-        $status = $sameSubscription ? (string) ($stripeSubscription->status ?? '') : '';
-        if (! $sameSubscription || in_array($status, ['canceled', 'incomplete_expired'], true)) {
+        $stripeId = (string) $change->stripe_subscription_id;
+        if ($stripeSubscription === null || (string) ($stripeSubscription->id ?? '') !== $stripeId) {
+            // The sync read another subscription, or none: the change is called off only
+            // when the one it is booked on has really ended (its schedule ends with it).
+            try {
+                $stripeSubscription = Cashier::stripe()->subscriptions->retrieve($stripeId, []);
+            } catch (\Stripe\Exception\InvalidRequestException $exception) {
+                if ((string) $exception->getStripeCode() === 'resource_missing') {
+                    $this->markCancelled($change, 'subscription_ended');
+                }
+
+                return;
+            } catch (\Throwable) {
+                // Not known now: a later sync settles it.
+                return;
+            }
+        }
+        if (in_array((string) ($stripeSubscription->status ?? ''), ['canceled', 'incomplete_expired'], true)) {
             $this->markCancelled($change, 'subscription_ended');
 
             return;

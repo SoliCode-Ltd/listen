@@ -41,6 +41,20 @@ class ManualPaymentController extends Controller
     }
 
     /**
+     * A lower plan paid by hand that waits for its day is already paid for: another plan
+     * paid now would call it off, so the team handles it. The member is told, or null.
+     */
+    private function paidChangeWaitingMessage(?User $user): ?string
+    {
+        $waiting = $user ? $this->planChanges->paidChangeWaiting($user) : null;
+
+        return $waiting ? __('ui.plan_change.paid_change_waiting', [
+            'plan' => $waiting->toPlan ? ($waiting->toPlan->getLocalizedName(app()->getLocale()) ?: (string) $waiting->toPlan->name) : '',
+            'date' => $this->planChanges->date($waiting->starts_at, app()->getLocale()),
+        ]) : null;
+    }
+
+    /**
      * @param  array<string, mixed>  $validated
      * @param  array<string, mixed>  $countryContext
      * @return array<string, mixed>|null
@@ -78,6 +92,9 @@ class ManualPaymentController extends Controller
         $plan = $this->payablePlan($validated);
         if ($plan->isPack() && ! $this->charPacks->canBuy($request->user(), $plan)) {
             return redirect()->route('billing.pack');
+        }
+        if (! $plan->isPack() && ($waiting = $this->paidChangeWaitingMessage($request->user())) !== null) {
+            return redirect()->route('billing.page')->withErrors(['manual_payment' => $waiting]);
         }
         if ($plan->isPack()) {
             $validated['billing_cycle'] = 'one_time';
@@ -124,6 +141,13 @@ class ManualPaymentController extends Controller
             }
 
             return redirect()->route('billing.pack')->withErrors(['manual_payment' => $message]);
+        }
+        if (! $plan->isPack() && ($waiting = $this->paidChangeWaitingMessage($request->user())) !== null) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => $waiting], 409);
+            }
+
+            return redirect()->route('billing.page')->withErrors(['manual_payment' => $waiting]);
         }
         if ($plan->isPack()) {
             $validated['billing_cycle'] = 'one_time';

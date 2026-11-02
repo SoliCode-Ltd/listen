@@ -390,10 +390,12 @@ class StripeWebhookEmailService
         }
 
         if ($changedItems) {
-            // The renewal that started a lower plan booked for it: the booking email, the
-            // reminder and the receipt have said it all.
+            // The renewal that started a lower plan booked for it (this very price): the
+            // booking email, the reminder and the receipt have said it all. Any other
+            // change to the subscription is told as usual.
             if (\App\Models\PlanChange::query()->where('stripe_subscription_id', (string) $subscriptionId)
                 ->where('status', \App\Models\PlanChange::STATUS_APPLIED)
+                ->where('stripe_price_id', (string) $this->extractPriceIdFromSubscription($subscription))
                 ->where('applied_at', '>=', now()->subHours(6))
                 ->exists()) {
                 return;

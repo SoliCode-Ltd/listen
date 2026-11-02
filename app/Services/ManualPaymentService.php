@@ -121,9 +121,19 @@ class ManualPaymentService
             $priceSnapshot = is_array($request->price_snapshot) ? $request->price_snapshot : [];
             $priceSnapshot['approval_context'] = $this->snapshotApprovalContext($currentSubscription);
 
+            // A lower plan paid by hand already waits for its day: it is paid for, and this
+            // payment would call it off. The team decides which stays (deleting the other).
+            $planChanges = app(PlanChanges::class);
+            $waiting = $planChanges->paidChangeWaiting($request->user);
+            if ($waiting && (int) $waiting->manual_payment_request_id !== (int) $request->id) {
+                throw new DomainException(__('ui.billing.manual_paid_change_waiting', [
+                    'plan' => (string) ($waiting->toPlan?->name ?? ''),
+                    'date' => $planChanges->date($waiting->starts_at, app()->getLocale()),
+                ]));
+            }
+
             // A lower plan paid while the current plan (paid by hand or given by the team)
             // still runs: it starts the day that plan ends, so no day of it is lost.
-            $planChanges = app(PlanChanges::class);
             $heldUntil = $planChanges->heldUntil($request->user);
             $cycle = strtolower((string) $request->billing_cycle) === 'yearly' ? 'yearly' : 'monthly';
             $fromPlan = $heldUntil !== null ? $currentSubscription?->plan : null;
@@ -135,7 +145,8 @@ class ManualPaymentService
                     'reviewed_at' => now(),
                     'reviewed_by' => $reviewer->id,
                     'reviewer_notes' => $reviewerNotes,
-                    'approved_subscription_id' => $currentSubscription?->id,
+                    // No plan yet: the one it pays for is made the day it starts (PlanChanges::applyDue).
+                    'approved_subscription_id' => null,
                 ])->save();
 
                 return $request->fresh(['user', 'plan', 'reviewer']);

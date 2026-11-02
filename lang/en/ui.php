@@ -619,6 +619,7 @@ return [
         'copy_failed' => 'Copy failed',
         'manual_request_received' => 'Your payment request has been received. Our team will review the payment and activate your plan within 24 hours.',
         'manual_pending_exists' => 'A pending manual payment request already exists for this plan and method.',
+        'manual_paid_change_waiting' => 'This member already paid for :plan, which starts on :date. Approving this payment would cancel it: delete that payment first if this one replaces it.',
         'manual_active_stripe_conflict' => 'This account already has an active Stripe subscription. Please manage or cancel the Stripe subscription before using a manual payment method.',
         // A renewal payment still overdue while its grace days keep the plan on: it is paid from Manage Subscription.
         'pay_overdue_first' => 'Your latest payment is still overdue. Update your card on Manage Subscription to pay it and keep your plan, which stays on until :date.',

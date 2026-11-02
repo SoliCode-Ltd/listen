@@ -75,10 +75,13 @@ $pages = [
     [null, 'developers', [200]],
     [null, 'browsers-extension', [200]],
     [$free, 'dashboard', [200]],
+    // A member's pricing page reads their plan, its cycle and any lower plan booked (no Stripe).
+    [$free, 'pricing', [200]],
     [$free, 'demo', [200]],
     [$free, 'dashboard/api-keys', [200, 302]],
     [$free, 'dashboard/voice-cloning', [200, 302]],
     [$paid, 'dashboard', [200]],
+    [$paid, 'pricing', [200]],
     // The keys page sends a member whose plan has no API to the studio.
     [$paid, 'dashboard/api-keys', [200, 302]],
     [$paid, 'dashboard/voice-cloning', [200, 302]],

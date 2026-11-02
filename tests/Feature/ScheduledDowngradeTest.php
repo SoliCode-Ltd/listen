@@ -550,7 +550,7 @@ class ScheduledDowngradeTest extends TestCase
         $this->assertSame($until->getTimestamp(), PlanChange::query()->sole()->starts_at->getTimestamp());
     }
 
-    public function test_a_higher_plan_paid_by_hand_starts_now_and_the_waiting_one_gives_way(): void
+    public function test_a_second_payment_by_hand_never_cancels_a_lower_plan_already_paid_for(): void
     {
         $until = Carbon::parse('2026-11-12 08:00:00', 'UTC');
         $user = $this->handPaidMember($this->creator, $until);
@@ -558,16 +558,27 @@ class ScheduledDowngradeTest extends TestCase
         $admin = User::factory()->create(['is_admin' => true]);
         $lower = $service->createRequest($user, $this->starter, 'monthly', 'instapay', ['amount_minor' => 45000, 'currency' => 'EGP', 'country_code' => 'EG'], ['country_code' => 'EG']);
         $service->approve($lower, $admin);
+        $this->assertNull($lower->fresh()->approved_subscription_id, 'A queued payment has no plan of its own until it starts.');
 
         $higher = $service->createRequest($user, $this->pro, 'monthly', 'instapay', ['amount_minor' => 245000, 'currency' => 'EGP', 'country_code' => 'EG'], ['country_code' => 'EG']);
-        $service->approve($higher, $admin);
+        try {
+            $service->approve($higher, $admin);
+            $this->fail('Approving it would cancel a plan already paid for.');
+        } catch (\DomainException $exception) {
+            $this->assertStringContainsString('already paid for Starter', $exception->getMessage());
+        }
+        $this->assertSame('creator', $this->planOf($user));
+        $this->assertSame(PlanChange::STATUS_SCHEDULED, PlanChange::query()->sole()->status, 'The paid lower plan still waits.');
 
+        // The team deletes the first payment: the second one is then approved and starts now.
+        $service->deleteRequest($lower);
+        $this->assertSame('creator', $this->planOf($user), 'Deleting a queued payment leaves the running plan alone.');
+        $service->approve($higher->fresh(), $admin);
         $this->assertSame('pro', $this->planOf($user));
-        $this->assertSame('replaced_by_payment', PlanChange::query()->sole()->cancel_reason);
 
         Carbon::setTestNow($until->copy()->addMinute());
         $this->artisan('listen:plan-changes')->assertSuccessful();
-        $this->assertSame('pro', $this->planOf($user), 'The waiting lower plan never comes back.');
+        $this->assertSame('pro', $this->planOf($user), 'The called-off lower plan never comes back.');
     }
 
     public function test_deleting_the_approved_payment_calls_off_the_waiting_plan(): void
@@ -919,6 +930,198 @@ class ScheduledDowngradeTest extends TestCase
 
     // ── The welcome email ────────────────────────────────────────────────────
 
+    // ── Checked before release ───────────────────────────────────────────────
+
+    /** The card update on Manage Subscription, with a card the bank approved. */
+    private function bindCardUpdate(string $paymentMethod): void
+    {
+        $this->app->instance(\App\Services\Billing\StripeCardUpdateGateway::class, new class($paymentMethod) implements \App\Services\Billing\StripeCardUpdateGateway
+        {
+            public function __construct(private string $paymentMethod) {}
+
+            public function ensureCustomer(User $user): string
+            {
+                return 'cus_dn';
+            }
+
+            public function createSetupIntent(string $customerId, int $userId): array
+            {
+                return ['id' => 'seti_1', 'client_secret' => 'seti_1_secret'];
+            }
+
+            public function retrieveSetupIntent(string $setupIntentId): array
+            {
+                return ['id' => 'seti_1', 'status' => 'succeeded', 'customer' => 'cus_dn', 'payment_method' => $this->paymentMethod, 'purpose' => 'card_update'];
+            }
+
+            public function useForRenewals(string $customerId, ?string $subscriptionId, string $paymentMethodId): void {}
+
+            public function payOpenInvoices(string $customerId, string $subscriptionId, string $paymentMethodId): array
+            {
+                return ['attempted' => 0, 'paid' => 0];
+            }
+        });
+    }
+
+    private function updateCard(User $user): \Illuminate\Testing\TestResponse
+    {
+        return $this->actingAs($user)->withoutMiddleware($this->without())
+            ->postJson($this->localizedRoute('billing.payment-method'), ['setup_intent' => 'seti_1']);
+    }
+
+    public function test_a_new_card_is_the_one_the_booked_switch_charges(): void
+    {
+        $user = $this->cardMember();
+        $this->subscribe($user, 'starter')->assertOk();
+        $this->bindCardUpdate('pm_new');
+
+        $this->updateCard($user)->assertOk()->assertJsonPath('ok', true);
+
+        $update = $this->stripe->last('post', '/v1/subscription_schedules/sub_sched_1');
+        $this->assertCount(2, $update['phases'], 'The switch stays booked.');
+        $this->assertSame('pm_new', $update['phases'][0]['default_payment_method']);
+        $this->assertSame('pm_new', $update['phases'][1]['default_payment_method'], 'The renewal is charged to the new card.');
+        $this->assertSame('price_starter_m', $update['phases'][1]['items'][0]['price']);
+        $this->assertSame($this->periodEnd, (int) $update['phases'][1]['start_date']);
+        $this->assertSame(PlanChange::STATUS_SCHEDULED, PlanChange::query()->sole()->status);
+    }
+
+    public function test_a_new_card_is_the_one_a_card_plan_starting_later_charges(): void
+    {
+        $user = $this->handPaidMember($this->creator, Carbon::parse('2026-11-12 08:00:00', 'UTC'));
+        $user->forceFill(['stripe_id' => 'cus_dn'])->save();
+        $this->subscribe($user, 'starter', 'monthly', ['payment_method' => 'pm_card'])->assertOk();
+        $this->bindCardUpdate('pm_new');
+
+        $this->updateCard($user)->assertOk();
+
+        $schedule = (string) PlanChange::query()->sole()->stripe_schedule_id;
+        $this->assertSame(['default_payment_method' => 'pm_new'], $this->stripe->last('post', '/v1/subscription_schedules/'.$schedule)['default_settings']);
+        $this->assertNotEmpty($this->stripe->schedules[$schedule]['phases'], 'The plan it starts is kept.');
+    }
+
+    public function test_a_lower_plan_paid_by_hand_holds_back_any_card_plan_until_the_team_sees_it(): void
+    {
+        $user = $this->handPaidMember($this->creator, Carbon::parse('2026-11-12 08:00:00', 'UTC'));
+        $user->forceFill(['stripe_id' => 'cus_dn'])->save();
+        $service = app(ManualPaymentService::class);
+        $service->approve($service->createRequest($user, $this->starter, 'monthly', 'instapay',
+            ['amount_minor' => 45000, 'currency' => 'EGP', 'country_code' => 'EG'], ['country_code' => 'EG']), User::factory()->create(['is_admin' => true]));
+        $calls = count($this->stripe->requests);
+
+        // A higher plan too: bought today, it would call the paid one off on its day.
+        $this->subscribe($user, 'pro', 'monthly', ['payment_method' => 'pm_card'])->assertStatus(409)
+            ->assertJsonPath('message', 'Starter is already paid for and starts on 12 Nov 2026. To change it, please contact us.');
+
+        $this->assertNull($this->stripe->lastSince($calls, 'post', '/v1/subscriptions'), 'Nothing was bought.');
+        $this->assertSame(PlanChange::STATUS_SCHEDULED, PlanChange::query()->sole()->status);
+    }
+
+    public function test_instapay_waits_for_the_team_while_a_lower_plan_paid_by_hand_waits(): void
+    {
+        SiteSetting::set('pricing_forced_country_code', 'EG', 'billing');
+        SiteSetting::set('manual_instapay_enabled', '1', 'billing');
+        SiteSetting::set('manual_instapay_number', '0123456789', 'billing');
+        $user = $this->handPaidMember($this->creator, Carbon::parse('2026-11-12 08:00:00', 'UTC'));
+        $service = app(ManualPaymentService::class);
+        $service->approve($service->createRequest($user, $this->starter, 'monthly', 'instapay',
+            ['amount_minor' => 45000, 'currency' => 'EGP', 'country_code' => 'EG'], ['country_code' => 'EG']), User::factory()->create(['is_admin' => true]));
+
+        $this->actingAs($user)->withoutMiddleware($this->without())
+            ->get($this->localizedRoute('billing.manual.instructions').'?plan=pro&billing_cycle=monthly&payment_method=instapay')
+            ->assertRedirect()->assertSessionHasErrors('manual_payment');
+        $this->actingAs($user)->withoutMiddleware($this->without())
+            ->postJson($this->localizedRoute('billing.manual.confirm'), ['plan' => 'pro', 'billing_cycle' => 'monthly', 'payment_method' => 'instapay'])
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Starter is already paid for and starts on 12 Nov 2026. To change it, please contact us.');
+
+        $this->assertSame(0, ManualPaymentRequest::query()->where('user_id', $user->id)->where('plan_id', $this->pro->id)->count());
+    }
+
+    public function test_a_queued_payment_for_monthly_billing_leaves_the_yearly_period_as_it_is(): void
+    {
+        $user = $this->handPaidMember($this->creator, Carbon::parse('2027-10-20 08:00:00', 'UTC'));
+        ManualPaymentRequest::query()->where('user_id', $user->id)->update(['billing_cycle' => 'yearly']);
+        $changes = app(PlanChanges::class);
+        $this->assertSame('yearly', $changes->currentCycle($user));
+
+        $service = app(ManualPaymentService::class);
+        $service->approve($service->createRequest($user, $this->creator, 'monthly', 'instapay',
+            ['amount_minor' => 123200, 'currency' => 'EGP', 'country_code' => 'EG'], ['country_code' => 'EG']), User::factory()->create(['is_admin' => true]));
+
+        $this->assertSame(PlanChange::SOURCE_MANUAL, PlanChange::query()->sole()->source, 'Monthly waits for the year to end.');
+        $this->assertSame('yearly', $changes->currentCycle($user), 'The year paid for is still the plan running.');
+    }
+
+    public function test_a_sync_that_reads_no_subscription_asks_stripe_before_calling_the_switch_off(): void
+    {
+        $user = $this->cardMember();
+        $this->subscribe($user, 'starter')->assertOk();
+
+        app(PlanChanges::class)->reconcile($user, null);
+        $this->assertSame(PlanChange::STATUS_SCHEDULED, PlanChange::query()->sole()->status, 'The subscription it is booked on still runs.');
+
+        $this->stripe->subscription['status'] = 'canceled';
+        app(PlanChanges::class)->reconcile($user, null);
+        $this->assertSame('subscription_ended', PlanChange::query()->sole()->cancel_reason);
+    }
+
+    public function test_a_cancellation_that_fails_books_the_lower_plan_again(): void
+    {
+        $user = $this->cardMember();
+        $this->subscribe($user, 'starter')->assertOk();
+        $this->stripe->failCancel = true;
+
+        $this->actingAs($user)->withoutMiddleware($this->without())->postJson($this->localizedRoute('billing.cancel'))
+            ->assertStatus(422)->assertJsonPath('ok', false);
+
+        $this->assertSame(['cancelled', 'scheduled'], PlanChange::query()->orderBy('id')->pluck('status')->all());
+        $this->assertSame($this->starter->id, (int) PlanChange::query()->scheduled()->sole()->to_plan_id);
+        $this->assertSame('price_starter_m', $this->stripe->last('post', '/v1/subscription_schedules/sub_sched_2')['phases'][1]['items'][0]['price']);
+        $this->assertFalse($this->stripe->subscription['cancel_at_period_end']);
+    }
+
+    public function test_a_trial_move_that_fails_keeps_the_trial_cancelled_as_the_member_asked(): void
+    {
+        $user = $this->cardMember('price_creator_m', 'trialing', Carbon::parse('2026-11-09 08:00:00', 'UTC')->getTimestamp(), true);
+        $this->stripe->subscription['cancel_at_period_end'] = true;
+        $this->stripe->failItemsUpdate = true;
+
+        $this->subscribe($user, 'starter')->assertStatus(422);
+
+        $this->assertTrue($this->stripe->subscription['cancel_at_period_end'], 'The cancellation the member asked for stays.');
+        $this->assertNotNull(BillingSubscription::query()->where('user_id', $user->id)->sole()->ends_at);
+    }
+
+    public function test_an_upgrade_after_the_switch_is_still_told(): void
+    {
+        $user = $this->cardMember();
+        $this->subscribe($user, 'starter')->assertOk();
+        Carbon::setTestNow(Carbon::createFromTimestamp($this->periodEnd)->addMinutes(3));
+        $this->stripe->renew();
+        app(BillingSyncService::class)->syncIfStale($user->fresh(), true);
+        \Illuminate\Support\Facades\Mail::shouldReceive('html')->once();
+
+        $event = \Stripe\Event::constructFrom([
+            'id' => 'evt_upgrade', 'type' => 'customer.subscription.updated',
+            'data' => [
+                'object' => ['id' => 'sub_dn', 'object' => 'subscription', 'customer' => 'cus_dn', 'status' => 'active',
+                    'cancel_at_period_end' => false, 'items' => ['object' => 'list', 'data' => [['id' => 'si_dn', 'price' => ['id' => 'price_pro_m']]]]],
+                'previous_attributes' => ['items' => ['object' => 'list', 'data' => [['id' => 'si_dn', 'price' => ['id' => 'price_starter_m']]]]],
+            ],
+        ]);
+        app(\App\Services\StripeWebhookEmailService::class)->sendForEvent($event);
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_the_preview_and_the_charge_read_an_unknown_price_alike(): void
+    {
+        $user = $this->cardMember('price_old_unknown');
+
+        $preview = $this->preview($user, 'starter')->assertOk();
+        $this->assertNotTrue($preview->json('scheduled'), 'A price no plan knows is charged as a change today, so the preview says so too.');
+    }
+
     public function test_a_move_down_sends_no_welcome_but_a_member_coming_back_gets_one(): void
     {
         $welcome = Mockery::mock(\App\Services\Newsletter\PaidWelcomeEmail::class);
@@ -959,6 +1162,12 @@ class DowngradeStripeFake implements ClientInterface
 
     public bool $failScheduleUpdate = false;
 
+    /** Turning the renewal off fails (cancel_at_period_end). */
+    public bool $failCancel = false;
+
+    /** Changing the subscription's price fails. */
+    public bool $failItemsUpdate = false;
+
     /** The renewal's invoice could not be paid. */
     public bool $failedRenewal = false;
 
@@ -975,6 +1184,10 @@ class DowngradeStripeFake implements ClientInterface
 
         if ($path === '/v1/subscriptions/sub_dn') {
             if ($method === 'post') {
+                if (($this->failCancel && in_array($params['cancel_at_period_end'] ?? null, [true, 'true', 1, '1'], true))
+                    || ($this->failItemsUpdate && isset($params['items']))) {
+                    return [json_encode(['error' => ['type' => 'api_error', 'message' => 'Try again later.']]), 500, []];
+                }
                 $this->updateSubscription($params);
             }
 
@@ -1170,9 +1383,27 @@ class DowngradeStripeFake implements ClientInterface
             if ($this->failScheduleUpdate) {
                 return [json_encode(['error' => ['type' => 'invalid_request_error', 'message' => 'Something about the phases.']]), 400, []];
             }
-            $phases = (array) ($params['phases'] ?? []);
-            $this->schedules[$id]['phases'] = $phases;
-            $this->schedules[$id]['end_behavior'] = (string) ($params['end_behavior'] ?? 'release');
+            if (array_key_exists('phases', $params)) {
+                // Stripe gives every phase its dates back, a phase sent with a duration too.
+                $phases = array_values((array) $params['phases']);
+                $end = null;
+                foreach ($phases as $i => $phase) {
+                    $start = isset($phase['start_date']) ? (int) $phase['start_date'] : ($end ?? $this->periodStart);
+                    if (! isset($phase['end_date'])) {
+                        $interval = (string) ($phase['duration']['interval'] ?? 'month');
+                        $count = (int) ($phase['duration']['interval_count'] ?? 1);
+                        $phase['end_date'] = Carbon::createFromTimestamp($start)->add($interval, $count)->getTimestamp();
+                    }
+                    $phase['start_date'] = $start;
+                    $end = (int) $phase['end_date'];
+                    $phases[$i] = $phase;
+                }
+                $this->schedules[$id]['phases'] = $phases;
+            }
+            if (array_key_exists('default_settings', $params)) {
+                $this->schedules[$id]['default_settings'] = (array) $params['default_settings'];
+            }
+            $this->schedules[$id]['end_behavior'] = (string) ($params['end_behavior'] ?? $this->schedules[$id]['end_behavior'] ?? 'release');
         }
 
         return $this->json($this->schedules[$id]);
@@ -1185,7 +1416,9 @@ class DowngradeStripeFake implements ClientInterface
 
         return [
             'id' => 'sub_dn', 'object' => 'subscription', 'customer' => 'cus_dn', 'status' => $status,
-            'cancel_at_period_end' => (bool) ($this->subscription['cancel_at_period_end'] ?? false), 'cancel_at' => null, 'ended_at' => null,
+            'cancel_at_period_end' => (bool) ($this->subscription['cancel_at_period_end'] ?? false),
+            // As in Stripe: a subscription set to end says when.
+            'cancel_at' => ($this->subscription['cancel_at_period_end'] ?? false) ? ($this->subscription['trial_end'] ?? $this->periodEnd) : null, 'ended_at' => null,
             'trial_end' => $this->subscription['trial_end'] ?? null, 'trial_start' => null,
             'schedule' => $this->subscription['schedule'] ?? null, 'default_payment_method' => 'pm_card',
             'created' => $this->periodStart - 86400, 'metadata' => [], 'discounts' => [], 'pending_update' => null,
