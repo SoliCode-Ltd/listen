@@ -215,7 +215,7 @@ $fitAll = function (array $list, bool $withMoods, array $keep = []) use ($predic
                 }
                 $fitted = array_combine($cols, $coef);
                 // A rate below nothing is not a rate: left out, and the rest fitted again.
-                $negative = array_keys(array_filter($fitted, fn ($v, $c) => $c !== 'base' && $v < 0, ARRAY_FILTER_USE_BOTH));
+                $negative = array_keys(array_filter($fitted, fn ($v) => $v < 0));
                 if ($negative === []) {
                     // What seldom occurs keeps today's rate; what the data puts below nothing is 0.
                     $m['beta'][$lang] = array_merge($m['beta'][$lang], array_fill_keys($dropped, 0.0), $fitted);
