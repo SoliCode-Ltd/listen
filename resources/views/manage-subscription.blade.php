@@ -36,6 +36,8 @@
       font-size: .7rem;
       margin-bottom: .35rem;
     }
+    .next-plan-diff { padding: .2rem .9rem .75rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    .next-plan-diff .plan-diff { margin-top: .6rem; }
     .status-item .status-next {
       display: block;
       margin-top: .2rem;
@@ -506,6 +508,12 @@
                 <small class="detail-sub">{{ $planChange['terms'] }}</small>
               </dd>
             </div>
+            @if(!empty($planChange['changes']))
+              <div class="next-plan-diff">
+                <x-plan-diff :title="__('ui.plan_change.changes_title', ['date' => $planChange['date']])"
+                  :from="$changeCurrent" :to="$planChange['plan']" :changes="$planChange['changes']" />
+              </div>
+            @endif
           @endif
           @if(!empty($billing['since']))
             <div class="detail-row">

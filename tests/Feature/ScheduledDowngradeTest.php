@@ -721,6 +721,166 @@ class ScheduledDowngradeTest extends TestCase
             ->assertSee('انتقل إلى الفوترة السنوية');
     }
 
+    // ── What changes, and the emails ─────────────────────────────────────────
+
+    public function test_the_order_details_list_what_changes_when_the_lower_plan_starts(): void
+    {
+        $user = $this->cardMember();
+
+        $preview = $this->preview($user, 'starter')->assertOk()
+            ->assertJsonPath('changes_title', 'What changes on 20 Nov 2026')
+            ->assertJsonPath('from_name', 'Creator')
+            ->assertJsonPath('to_name', 'Starter');
+        $rows = collect($preview->json('changes'))->keyBy('label');
+        $this->assertNotEmpty($rows);
+        $this->assertTrue($rows->every(fn ($row) => $row['from'] !== $row['to']), 'Only rows that differ.');
+        $this->assertSame('5,000 characters', $rows['Max text per generation']['to'] ?? null);
+        $this->assertSame('10,000 characters', $rows['Max text per generation']['from'] ?? null);
+    }
+
+    public function test_booking_a_lower_plan_sends_one_email_in_both_languages_with_what_changes(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $user = $this->cardMember();
+
+        $this->subscribe($user, 'starter')->assertOk();
+
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\PlanChangeMail::class, 1);
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\PlanChangeMail::class, function ($mail) use ($user) {
+            return $mail->hasTo($user->email)
+                && str_contains($mail->subjectLine, 'Your plan changes to Starter on 20 Nov 2026')
+                && str_contains($mail->subjectLine, 'تتغير خطتك إلى')
+                && str_contains($mail->htmlBody, 'You keep Creator and its credits until 20 Nov 2026')
+                && str_contains($mail->htmlBody, 'Nothing was charged today.')
+                && str_contains($mail->htmlBody, 'Max text per generation: 10,000 characters → 5,000 characters')
+                && str_contains($mail->htmlBody, '/en/manage-subscription')
+                && str_contains($mail->htmlBody, '/ar/manage-subscription');
+        });
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\PlanChangeMail::class, function ($mail) {
+            // The list's heading is the last paragraph, right above the list; no hidden marks.
+            $html = $mail->htmlBody;
+            $heading = strpos($html, 'What changes on 20 Nov 2026:');
+
+            return $heading !== false
+                && strpos($html, 'Changed your mind?') < $heading
+                && strpos($html, 'Max text per generation:') > $heading
+                && preg_match('/[\x{2066}-\x{2069}]/u', $html.$mail->textBody) === 0;
+        });
+        $this->assertSame('$9.00 a month', str_replace(["\u{2066}", "\u{2069}"], '', (string) (PlanChange::query()->sole()->terms['en']['terms'] ?? '')), 'The price as the page said it.');
+
+        // The same booking chosen again sends nothing more.
+        $this->subscribe($user, 'starter')->assertOk();
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\PlanChangeMail::class, 1);
+    }
+
+    public function test_an_approved_payment_by_hand_for_a_lower_plan_says_when_it_starts(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $user = $this->handPaidMember($this->creator, Carbon::parse('2026-11-12 08:00:00', 'UTC'));
+        $service = app(ManualPaymentService::class);
+        $service->approve($service->createRequest($user, $this->starter, 'monthly', 'instapay',
+            ['amount_minor' => 45000, 'currency' => 'EGP', 'country_code' => 'EG'], ['country_code' => 'EG']), User::factory()->create(['is_admin' => true]));
+        // The email goes once the admin's page has answered.
+        \Illuminate\Support\Facades\Mail::assertNotSent(\App\Mail\PlanChangeMail::class);
+        $this->app->terminate();
+
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\PlanChangeMail::class, function ($mail) {
+            return str_contains($mail->htmlBody, 'Your payment for Starter is approved.')
+                && str_contains($mail->htmlBody, 'Creator runs until 12 Nov 2026, then Starter starts. It is already paid.')
+                && ! str_contains($mail->htmlBody, 'Changed your mind?');
+        });
+    }
+
+    public function test_a_plan_paid_by_hand_with_a_switch_booked_gets_the_switch_reminder_not_the_end_one(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $until = Carbon::parse('2026-11-09 08:00:00', 'UTC');
+        $user = $this->handPaidMember($this->creator, $until);
+        $user->forceFill(['stripe_id' => 'cus_dn'])->save();
+        $this->subscribe($user, 'starter', 'monthly', ['payment_method' => 'pm_card'])->assertOk();
+        $this->partialMock(\App\Services\Billing\BillingLifecycleMail::class, fn ($mock) => $mock->shouldNotReceive('send'));
+
+        // Seven days before the end.
+        app(\App\Services\BillingLifecycleService::class)->sendPreRenewalReminders();
+
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\PlanChangeMail::class, function ($mail) {
+            return str_contains($mail->subjectLine, 'Your plan changes to Starter in 7 days')
+                && str_contains($mail->htmlBody, 'Then Starter starts, and your card is charged then:');
+        });
+        $this->assertNotNull(Subscription::query()->where('user_id', $user->id)->latest('id')->value('billing_reminder_7d_sent_at'));
+    }
+
+    public function test_a_card_member_gets_no_reminder_from_the_site_stripe_sends_its_own(): void
+    {
+        $user = $this->cardMember('price_creator_m');
+        $this->subscribe($user, 'starter')->assertOk();
+        \Illuminate\Support\Facades\Mail::fake();
+        Carbon::setTestNow(Carbon::createFromTimestamp($this->periodEnd)->subDays(7)->addHour());
+
+        app(\App\Services\BillingLifecycleService::class)->sendPreRenewalReminders();
+
+        \Illuminate\Support\Facades\Mail::assertNotSent(\App\Mail\PlanChangeMail::class);
+    }
+
+    public function test_the_renewal_that_starts_the_lower_plan_sends_no_subscription_updated_email(): void
+    {
+        $user = $this->cardMember();
+        $this->subscribe($user, 'starter')->assertOk();
+        Carbon::setTestNow(Carbon::createFromTimestamp($this->periodEnd)->addMinutes(3));
+        $this->stripe->renew();
+        app(BillingSyncService::class)->syncIfStale($user->fresh(), true);
+        \Illuminate\Support\Facades\Mail::shouldReceive('html')->never();
+
+        $event = \Stripe\Event::constructFrom([
+            'id' => 'evt_switch', 'type' => 'customer.subscription.updated',
+            'data' => [
+                'object' => ['id' => 'sub_dn', 'object' => 'subscription', 'customer' => 'cus_dn', 'status' => 'active',
+                    'cancel_at_period_end' => false, 'items' => ['object' => 'list', 'data' => [['id' => 'si_dn', 'price' => ['id' => 'price_starter_m']]]]],
+                'previous_attributes' => ['items' => ['object' => 'list', 'data' => [['id' => 'si_dn', 'price' => ['id' => 'price_creator_m']]]]],
+            ],
+        ]);
+        app(\App\Services\StripeWebhookEmailService::class)->sendForEvent($event);
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_a_failed_payment_at_the_switch_gives_the_grace_days_on_the_lower_plan(): void
+    {
+        $user = $this->cardMember();
+        $this->subscribe($user, 'starter')->assertOk();
+
+        Carbon::setTestNow(Carbon::createFromTimestamp($this->periodEnd)->addMinutes(3));
+        $this->stripe->renew();
+        $this->stripe->subscription['status'] = 'past_due';
+        $this->stripe->failedRenewal = true;
+        app(BillingSyncService::class)->syncIfStale($user->fresh(), true);
+
+        $row = Subscription::query()->where('user_id', $user->id)->latest('id')->first();
+        $this->assertSame('starter', $this->planOf($user), 'The grace days are on the plan being renewed.');
+        $this->assertSame($this->periodEnd, $row->current_period_end->getTimestamp(), 'With the dates of the period paid for: no fresh allowance.');
+        $this->assertSame(PlanChange::STATUS_APPLIED, PlanChange::query()->sole()->status);
+    }
+
+    public function test_the_billing_page_asks_stripe_for_its_prices_once_not_on_every_visit(): void
+    {
+        $user = $this->cardMember();
+        $this->actingAs($user)->getLocalizedRoute('billing.page')->assertOk();
+        $first = count(array_filter($this->stripe->requests, fn ($r) => str_starts_with($r['path'], '/v1/prices/')));
+        $this->assertGreaterThan(0, $first);
+
+        $this->actingAs($user)->getLocalizedRoute('billing.page')->assertOk();
+        $second = count(array_filter($this->stripe->requests, fn ($r) => str_starts_with($r['path'], '/v1/prices/')));
+        $this->assertSame($first, $second, 'The second visit asked Stripe for the prices again.');
+    }
+
+    public function test_the_wallet_keeps_its_place_where_it_showed_before(): void
+    {
+        $html = view('components.wallet-button', ['id' => 'wallet'])->render();
+
+        $this->assertStringContainsString('class="wallet-skeleton"', $html);
+        $this->assertStringContainsString("localStorage.getItem(memoryKey)", $html);
+        $this->assertStringContainsString("button.on('loaderror'", $html);
+    }
+
     // ── The welcome email ────────────────────────────────────────────────────
 
     public function test_a_move_down_sends_no_welcome_but_a_member_coming_back_gets_one(): void
@@ -762,6 +922,9 @@ class DowngradeStripeFake implements ClientInterface
     public array $schedules = [];
 
     public bool $failScheduleUpdate = false;
+
+    /** The renewal's invoice could not be paid. */
+    public bool $failedRenewal = false;
 
     private int $coupons = 0;
 
@@ -996,7 +1159,10 @@ class DowngradeStripeFake implements ClientInterface
                 'current_period_start' => $this->periodStart, 'current_period_end' => $this->periodEnd,
                 'price' => $this->priceObject($price),
             ]]],
-            'latest_invoice' => ['id' => 'in_dn', 'object' => 'invoice', 'amount_paid' => 2700, 'payments' => ['object' => 'list', 'data' => []]],
+            'latest_invoice' => $this->failedRenewal
+                ? ['id' => 'in_renewal', 'object' => 'invoice', 'status' => 'open', 'billing_reason' => 'subscription_cycle', 'amount_paid' => 0, 'amount_due' => 900,
+                    'attempt_count' => 1, 'next_payment_attempt' => $this->periodStart + 86400, 'created' => $this->periodStart, 'payments' => ['object' => 'list', 'data' => []]]
+                : ['id' => 'in_dn', 'object' => 'invoice', 'amount_paid' => 2700, 'payments' => ['object' => 'list', 'data' => []]],
         ];
     }
 

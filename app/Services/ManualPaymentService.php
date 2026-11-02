@@ -77,6 +77,12 @@ class ManualPaymentService
         app(AdsPurchases::class)->recordManualPayment($approved);
         // How it was paid, for Billing → Payments and the dashboard.
         app(PaymentLedger::class)->recordManualPayment($approved);
+        // A lower plan that waits for the current one to end: nobody else tells the member
+        // the payment is approved and when the plan starts.
+        $waiting = PlanChange::query()->scheduled()->where('manual_payment_request_id', $approved->id)->first();
+        if ($waiting) {
+            rescue(fn () => app(\App\Services\Billing\PlanChangeEmails::class)->queueBooked($waiting));
+        }
 
         return $approved;
     }

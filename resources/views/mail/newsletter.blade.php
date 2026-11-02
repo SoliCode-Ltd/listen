@@ -1,6 +1,7 @@
 @php
-    $font = \App\Services\Newsletter\NewsletterRenderer::FONT_EN;
-    $fontAr = \App\Services\Newsletter\NewsletterRenderer::FONT_AR;
+    $font = \App\Services\Newsletter\NewsletterRenderer::fontStack();
+    $adjustEn = \App\Services\Newsletter\NewsletterRenderer::sizeAdjust('en');
+    $adjustAr = \App\Services\Newsletter\NewsletterRenderer::sizeAdjust('ar');
     $wave = [4, 8, 14, 8, 5, 12, 20, 12, 6, 16, 26, 16, 7, 18, 11, 5, 13, 8, 4];
 @endphp
 <!DOCTYPE html>
@@ -11,12 +12,15 @@
     <meta name="color-scheme" content="light">
     <meta name="supported-color-schemes" content="light">
     <title>{{ $subject }}</title>
-    {{-- Emails keep their own fonts (NewsletterRenderer::FONT_*), not the website font setting. --}}
+    {{-- The website's font (Admin → Site Settings), as on the site (NewsletterRenderer::fontStack). --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="{{ \App\Services\Newsletter\NewsletterRenderer::fontStylesheetUrl() }}" rel="stylesheet">
+    <!--[if mso]>
+    <style>body, table, td, p, a, h1, span, div { font-family: Arial, sans-serif !important; }</style>
+    <![endif]-->
 </head>
-<body style="margin:0;padding:0;background:#ECEAF3;color:#16161D;font-family:{{ $font }};">
+<body style="margin:0;padding:0;background:#ECEAF3;color:#16161D;font-family:{{ $font }};font-size-adjust:{{ $adjustEn }};">
     <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;color:#ECEAF3;">
         {{ $preheader }}
         &#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;
@@ -46,7 +50,7 @@
                     </tr>
                     @foreach ($sections as $index => $section)
                         <tr>
-                            <td dir="{{ $section['dir'] }}" align="{{ $section['align'] }}" style="padding:{{ $index === 0 ? '36px' : '8px' }} 36px 8px 36px;text-align:{{ $section['align'] }};font-family:{{ $section['font'] }};background:#ffffff;">
+                            <td dir="{{ $section['dir'] }}" align="{{ $section['align'] }}" style="padding:{{ $index === 0 ? '36px' : '8px' }} 36px 8px 36px;text-align:{{ $section['align'] }};font-family:{{ $section['font'] }};font-size-adjust:{{ $section['adjust'] }};background:#ffffff;">
                                 @if ($index > 0)
                                     <div style="height:1px;background:#ECEAF3;margin:8px 0 32px 0;"></div>
                                 @endif
@@ -105,7 +109,7 @@
                                 <p style="margin:0;font-family:{{ $font }};font-size:12px;line-height:1.6;color:#C4B8FF;text-align:center;">
                                     <a href="{{ $unsubscribeUrlEn }}" style="color:#C4B8FF;text-decoration:underline;">Unsubscribe</a>
                                     <span style="color:#5C5C6A;"> · </span>
-                                    <a href="{{ $unsubscribeUrlAr }}" dir="rtl" style="color:#C4B8FF;text-decoration:underline;font-family:{{ $fontAr }};">إلغاء الاشتراك</a>
+                                    <a href="{{ $unsubscribeUrlAr }}" dir="rtl" style="color:#C4B8FF;text-decoration:underline;font-family:{{ $font }};font-size-adjust:{{ $adjustAr }};">إلغاء الاشتراك</a>
                                 </p>
                             @elseif ($preview)
                                 <p style="margin:0;font-family:{{ $font }};font-size:12px;line-height:1.6;color:#C4B8FF;text-align:center;">Unsubscribe · إلغاء الاشتراك</p>

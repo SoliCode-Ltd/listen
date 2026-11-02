@@ -12,6 +12,7 @@ use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Support\CreditPeriod;
 use App\Support\DiscountTerms;
+use App\Support\PlanPricingLines;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -542,7 +543,97 @@ final class PlanChanges
             'terms' => $terms,
             'can_keep' => $change->canBeKept(),
             'source' => (string) $change->source,
+            'changes' => $plan ? $this->differences($change->fromPlan, $plan, $locale) : [],
         ];
+    }
+
+    /**
+     * The price as the member sees it now, in English and Arabic, kept with the change so
+     * the emails that follow say exactly what the page said.
+     */
+    public function rememberTerms(PlanChange $change, array $countryContext): void
+    {
+        $change->loadMissing(['toPlan', 'fromPlan']);
+        $terms = [];
+        foreach (['en', 'ar'] as $locale) {
+            $line = $this->describe($change, $countryContext, $locale);
+            $terms[$locale] = ['terms' => $line['terms'], 'price' => $line['price'], 'first' => $line['first']];
+        }
+        $change->forceFill(['terms' => $terms])->save();
+    }
+
+    /**
+     * What changes when the lower plan starts: the plan comparison's rows whose values
+     * differ, in the reader's language ("Audio history: 90 days → 30 days").
+     *
+     * @return list<array{label:string, from:string, to:string}>
+     */
+    public function differences(?Plan $from, Plan $to, string $locale): array
+    {
+        if ($from === null || (int) $from->id === (int) $to->id) {
+            return [];
+        }
+
+        $rows = static function (Plan $plan) use ($locale): array {
+            $byKey = [];
+            foreach (PlanPricingLines::forComparison($plan, $locale) as $line) {
+                $label = trim((string) ($line['label'] ?? ''));
+                if ($label !== '') {
+                    $byKey[PlanPricingLines::labelKey($label)] = ['label' => $label, 'value' => trim((string) ($line['value'] ?? ''))];
+                }
+            }
+
+            return $byKey;
+        };
+        $before = $rows($from);
+        $after = $rows($to);
+        $none = __('ui.plan_change.not_included', [], $locale);
+
+        $changes = [];
+        foreach (array_unique(array_merge(array_keys($before), array_keys($after))) as $key) {
+            $was = $before[$key]['value'] ?? '';
+            $will = $after[$key]['value'] ?? '';
+            if ($was === $will) {
+                continue;
+            }
+            $changes[] = [
+                'label' => $before[$key]['label'] ?? $after[$key]['label'],
+                'from' => $was !== '' ? $was : $none,
+                'to' => $will !== '' ? $will : $none,
+            ];
+        }
+
+        return $changes;
+    }
+
+    /**
+     * A lower plan booked for this renewal whose first payment failed: the grace days are
+     * on the plan being renewed (the lower one), with the dates and credits of the period
+     * paid for, never a fresh allowance. BillingSyncService calls it when the grace keeps
+     * the plan. True when the plan was moved.
+     */
+    public function graceOnRenewedPlan(User $user, Plan $renewed, object $stripeSubscription): bool
+    {
+        $change = PlanChange::query()
+            ->where('user_id', $user->id)
+            ->where('source', PlanChange::SOURCE_CARD)
+            ->where('stripe_subscription_id', (string) ($stripeSubscription->id ?? ''))
+            ->where('to_plan_id', $renewed->id)
+            ->whereIn('status', [PlanChange::STATUS_SCHEDULED, PlanChange::STATUS_APPLIED])
+            ->where('starts_at', '<=', now()->addMinutes(5))
+            ->latest('id')
+            ->first();
+        $row = Subscription::query()->where('user_id', $user->id)->latest('id')->first();
+        if ($change === null || $row === null || (int) $row->plan_id === (int) $renewed->id) {
+            return false;
+        }
+
+        $this->planAccess->assignPlan($user, $renewed, (string) $row->status, $row->current_period_end, $row->current_period_start);
+        if ($change->isScheduled()) {
+            $change->forceFill(['status' => PlanChange::STATUS_APPLIED, 'applied_at' => now()])->save();
+        }
+
+        return true;
     }
 
     /**

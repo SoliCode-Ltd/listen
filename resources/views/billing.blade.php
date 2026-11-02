@@ -1337,6 +1337,7 @@
           <p class="amount" id="quoteAmount" dir="ltr">-</p>
           <p class="hint" id="quoteHint">{{ __('ui.billing.select_plan_for_preview') }}</p>
         </div>
+        <x-plan-diff id="planDiff" :hidden="true" />
 
         <section class="order-details" id="orderDetails" aria-labelledby="orderDetailsTitle" hidden>
           <h3 id="orderDetailsTitle">{{ __('ui.billing.order_details') }}</h3>
@@ -2143,6 +2144,7 @@
       const seq = ++planChange.seq;
       planChange.label = '';
       refreshPayLabel();
+      if (planDiff) planDiff.hidden = true;
       if (!planChangeApplies(selected)) {
         orderDetails.hidden = true;
         return;
@@ -2178,9 +2180,36 @@
       });
     }
 
+    // What changes when the lower plan starts (components/plan-diff), or nothing.
+    const planDiff = document.getElementById('planDiff');
+    function paintPlanDiff(data) {
+      if (!planDiff) return;
+      const rows = Array.isArray(data?.changes) ? data.changes : [];
+      planDiff.hidden = rows.length === 0;
+      if (!rows.length) return;
+      planDiff.querySelector('[data-plan-diff-title]').textContent = String(data.changes_title || '');
+      planDiff.querySelector('[data-plan-diff-from]').textContent = String(data.from_name || '');
+      planDiff.querySelector('[data-plan-diff-to]').textContent = String(data.to_name || '');
+      planDiff.querySelector('[data-plan-diff-rows]').replaceChildren(...rows.map(function(row) {
+        const tr = document.createElement('tr');
+        const label = document.createElement('th');
+        label.scope = 'row';
+        label.textContent = String(row.label || '');
+        const was = document.createElement('td');
+        was.className = 'was';
+        was.textContent = String(row.from || '');
+        const will = document.createElement('td');
+        will.className = 'will';
+        will.textContent = String(row.to || '');
+        tr.append(label, was, will);
+        return tr;
+      }));
+    }
+
     // A lower plan: nothing today; when it starts and what it costs then; the button says when.
     function paintScheduledChange(data) {
       orderDetails.hidden = true;
+      paintPlanDiff(data);
       quoteAmountLabel.textContent = i18n.due_today;
       quoteAmount.textContent = String(data.total || '-');
       quoteHint.textContent = String(data.note || '');
@@ -2291,6 +2320,37 @@
     } catch (_error) {
       stripe = null;
     }
+    // The wallet's sheet hands over a card; paying with it takes the same steps as the card boxes.
+    // Made first, right after Stripe, so its frames start loading before the card boxes'.
+    // It is made even when the page opens on a trial or on InstaPay, so it can show once the
+    // member picks paying by card.
+    const walletStartCents = Number(currentPlan()?.payment_methods?.stripe?.[String(cycleSelect?.value || 'monthly')]?.base_usd_cents || 0);
+    walletButton = stripe && walletStartCents > 0 && window.ListenWalletButton
+      ? window.ListenWalletButton(stripe, 'wallet', {
+          mode: 'subscription',
+          amount: walletStartCents,
+          billingDetails: { name: userName || undefined, email: userEmail || undefined },
+          onConfirm: async function(paymentMethod, walletError) {
+            if (walletError) {
+              showPaymentError(walletError.type === 'card_error'
+                ? stripeDeclineError(walletError)
+                : new Error(normalizeStripeMessage(walletError.message, i18n.payment_auth_failed)), i18n.payment_auth_failed);
+              return;
+            }
+            const charge = walletCharge();
+            if (paymentInFlight || !charge || !paymentMethod) return;
+            setMessage('', '');
+            let leaving = false;
+            try {
+              leaving = await subscribeByCard(charge.selected, paymentMethod, true);
+            } catch (error) {
+              showPaymentError(error, i18n.upgrade_failed);
+            } finally {
+              if (!leaving) setSubscribeButtonBusy(false);
+            }
+          },
+        })
+      : null;
     const cardFormMissing = Boolean(stripeKey) && !stripe;
     const cardUnavailableText = cardFormMissing ? i18n.card_form_unavailable : i18n.stripe_not_configured;
     const elements = stripe ? window.ListenCardElements(stripe) : null;
@@ -2617,36 +2677,6 @@
     renderMode();
     renderChargePreview();
 
-    // The wallet's sheet hands over a card; paying with it takes the same steps as the card boxes.
-    // It is made even when the page opens on a trial or on InstaPay, so it can show once the
-    // member picks paying by card.
-    const walletStartCents = Number(currentPlan()?.payment_methods?.stripe?.[String(cycleSelect?.value || 'monthly')]?.base_usd_cents || 0);
-    walletButton = stripe && walletStartCents > 0 && window.ListenWalletButton
-      ? window.ListenWalletButton(stripe, 'wallet', {
-          mode: 'subscription',
-          amount: walletStartCents,
-          billingDetails: { name: userName || undefined, email: userEmail || undefined },
-          onConfirm: async function(paymentMethod, walletError) {
-            if (walletError) {
-              showPaymentError(walletError.type === 'card_error'
-                ? stripeDeclineError(walletError)
-                : new Error(normalizeStripeMessage(walletError.message, i18n.payment_auth_failed)), i18n.payment_auth_failed);
-              return;
-            }
-            const charge = walletCharge();
-            if (paymentInFlight || !charge || !paymentMethod) return;
-            setMessage('', '');
-            let leaving = false;
-            try {
-              leaving = await subscribeByCard(charge.selected, paymentMethod, true);
-            } catch (error) {
-              showPaymentError(error, i18n.upgrade_failed);
-            } finally {
-              if (!leaving) setSubscribeButtonBusy(false);
-            }
-          },
-        })
-      : null;
     renderWallet();
 
     // Custom file upload area

@@ -37,6 +37,9 @@ return new class extends Migration
             $table->unsignedInteger('amount_cents')->default(0);
             $table->unsignedInteger('first_amount_cents')->nullable();
             $table->json('discount')->nullable();
+            // The price as the member was shown it when they chose the plan, in English and
+            // Arabic and in their money, for the emails that follow.
+            $table->json('terms')->nullable();
             $table->foreignId('manual_payment_request_id')->nullable()->constrained()->nullOnDelete();
             $table->string('cancel_reason', 40)->nullable();
             $table->timestamp('applied_at')->nullable();

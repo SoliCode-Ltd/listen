@@ -161,6 +161,10 @@ class BillingSyncService
                             // unpaid one), until the grace days run out; one who never did (a
                             // free trial's first charge) moves to Free now (RenewalGrace).
                             $keepPlanAsIs = $this->renewalGrace->forBillingSync($user, $stripeSubscription, $rowBeforeRead);
+                            // A lower plan booked for this renewal: its grace days are on that plan.
+                            if ($keepPlanAsIs && $mappedPlan) {
+                                rescue(fn () => $planChanges->graceOnRenewedPlan($user, $mappedPlan, $stripeSubscription));
+                            }
                         } elseif (in_array($selectedStatus, ['incomplete', 'incomplete_expired', 'canceled'], true)
                             && $this->keepsPlanGivenByHand($user, $currentPlan, $onlyDeclined)) {
                             // Nothing live in Stripe: a declined card never moves a plan paid by hand to Free.

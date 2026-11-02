@@ -390,6 +390,14 @@ class StripeWebhookEmailService
         }
 
         if ($changedItems) {
+            // The renewal that started a lower plan booked for it: the booking email, the
+            // reminder and the receipt have said it all.
+            if (\App\Models\PlanChange::query()->where('stripe_subscription_id', (string) $subscriptionId)
+                ->where('status', \App\Models\PlanChange::STATUS_APPLIED)
+                ->where('applied_at', '>=', now()->subHours(6))
+                ->exists()) {
+                return;
+            }
             if ($this->shouldSkipEmail("plan-updated:{$subscriptionId}:{$planLabel}:{$status}", 24 * 7)) {
                 return;
             }

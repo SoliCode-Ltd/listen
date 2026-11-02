@@ -1123,6 +1123,7 @@ class BillingController extends Controller
             throw $exception;
         }
 
+        $this->bookedEmail($change);
         $this->billingSyncService->syncIfStale($user, true);
         $locale = app()->getLocale();
 
@@ -1136,6 +1137,18 @@ class BillingController extends Controller
                 'current' => $fromPlan ? $this->planDisplayName($fromPlan) : __('ui.billing.plan'),
             ]),
         ]);
+    }
+
+    /**
+     * The booking email (Stripe sends none for a schedule), with the price as the member
+     * saw it on this page, after the page has answered.
+     */
+    private function bookedEmail(PlanChange $change): void
+    {
+        rescue(function () use ($change): void {
+            $this->planChanges->rememberTerms($change, $this->localizedPricingService->resolveCountryContext(request()));
+            app(\App\Services\Billing\PlanChangeEmails::class)->queueBooked($change);
+        });
     }
 
     /**
@@ -1205,7 +1218,7 @@ class BillingController extends Controller
             throw ValidationException::withMessages(['payment_method' => __('ui.backend.billing_add_payment_method')]);
         }
 
-        $this->planChanges->scheduleCardStart($user, $fromPlan, $plan, $cycle, $priceId, $startsAt, $paymentMethod);
+        $this->bookedEmail($this->planChanges->scheduleCardStart($user, $fromPlan, $plan, $cycle, $priceId, $startsAt, $paymentMethod));
         $locale = app()->getLocale();
 
         return response()->json([
@@ -1466,6 +1479,11 @@ class BillingController extends Controller
             'lines' => [],
             'note' => $note,
             'button' => $button,
+            // What changes when the lower plan starts, beside the member's plan.
+            'changes' => $this->planChanges->differences($fromPlan, $plan, $locale),
+            'changes_title' => __('ui.plan_change.changes_title', ['date' => $date]),
+            'from_name' => $current,
+            'to_name' => $name,
         ];
     }
 
@@ -1899,12 +1917,15 @@ class BillingController extends Controller
         return $couponId !== '' ? $couponId : null;
     }
 
+    /** @var array<string, ?array> This request's Stripe prices (fetchStripePrice). */
+    private array $priceMeta = [];
+
     /**
      * @return array{amount_cents:int,currency:string,interval:string,interval_count:int}|null
      */
     private function fetchStripePrice(string $priceId): ?array
     {
-        static $cache = [];
+        $cache = &$this->priceMeta;
 
         $priceId = trim($priceId);
         if ($priceId === '') {
@@ -1913,6 +1934,14 @@ class BillingController extends Controller
 
         if (array_key_exists($priceId, $cache)) {
             return $cache[$priceId];
+        }
+
+        // A Stripe price never changes its amount, currency or interval (a new price is
+        // made instead), so it is kept for hours: the billing page asked Stripe for every
+        // plan's monthly and yearly price, one after the other, on each visit.
+        $stored = Cache::get('stripe_price_meta:'.$priceId);
+        if (is_array($stored)) {
+            return $cache[$priceId] = $stored;
         }
 
         try {
@@ -1936,6 +1965,7 @@ class BillingController extends Controller
             'interval' => (string) ($price->recurring->interval ?? 'month'),
             'interval_count' => (int) ($price->recurring->interval_count ?? 1),
         ];
+        Cache::put('stripe_price_meta:'.$priceId, $cache[$priceId], now()->addHours(12));
 
         return $cache[$priceId];
     }
