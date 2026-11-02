@@ -325,6 +325,13 @@
     .plan-quota-coin { font-size: 1rem; flex: none; }
     .plan-minutes, .plan-quota-amount { flex-wrap: nowrap; }
     .plan-quota { container-type: inline-size; }
+    /* Wide cards (desktop): minutes and credits a little larger, still on one line. */
+    @container (min-width: 400px) {
+      .plan-minutes-number { font-size: 1.3rem; }
+      .plan-quota-number { font-size: 1.06rem; }
+      .plan-minutes-unit, .plan-quota-unit { font-size: .94rem; }
+      .plan-quota-coin { font-size: 1.1rem; }
+    }
     @container (max-width: 360px) {
       .plan-minutes-number { font-size: 1rem; }
       .plan-quota-number { font-size: .86rem; }
