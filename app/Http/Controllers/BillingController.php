@@ -76,6 +76,7 @@ class BillingController extends Controller
         $heldUntil = $this->planChanges->heldUntil($user);
         // A move down pays the lower plan's full price: those plans show no offer.
         $withoutOffer = $this->planChanges->plansWithoutOffer($user, $activePlan);
+        $overdueNotice = $this->overdueRenewalNotice($user);
 
         return view('billing', [
             'activePlan' => $activePlan,
@@ -104,11 +105,15 @@ class BillingController extends Controller
             // monthly, when they pay yearly, is told apart on the page.
             'lowerPlanSlugs' => array_values(array_diff($withoutOffer, [(string) ($activePlan?->slug ?? '')])),
             'planChange' => $scheduled ? $this->planChanges->describe($scheduled, $countryContext, $locale) : null,
-            // Apple Pay and Google Pay start a new plan only: changing, resuming or ending
-            // the trial of a running one stays with the card boxes, which can ask first.
-            // Nor for a plan that follows one paid by hand: the wallet's sheet would charge it today.
-            'walletPay' => $stripeReady && ! ($subscription && $subscription->valid()) && $heldUntil === null,
-            'paymentOverdueNotice' => $this->overdueRenewalNotice($user),
+            // Apple Pay and Google Pay pay whatever is due today by card (a new plan, a higher
+            // plan's difference) and hand over the card for a free trial; the page decides for
+            // each choice (a lower plan, a resumed one or a trial's end stays with the card
+            // boxes). Not while a renewal is overdue: that is paid from Manage Subscription.
+            'walletPay' => $stripeReady && $overdueNotice === null,
+            // A running free trial: another plan ends it only once the member agrees, which
+            // the card boxes ask; the wallet stays out of it.
+            'runningTrial' => (bool) ($subscription && $subscription->valid() && $subscription->onTrial()),
+            'paymentOverdueNotice' => $overdueNotice,
         ]);
     }
 
@@ -1460,6 +1465,8 @@ class BillingController extends Controller
             'lines' => $lines,
             'total' => $shown,
             'total_cents' => $due,
+            // The currency the difference is charged in (what the phone wallet's sheet shows).
+            'currency' => $currency,
             'credit_left' => $total < 0 ? $money($total) : null,
             'renews_on' => $renews > 0 ? $this->formatCarbonDate(Carbon::createFromTimestamp($renews)) : null,
         ]);

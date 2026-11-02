@@ -143,4 +143,23 @@ class CardUpdateTest extends TestCase
             ->assertSee('confirmCardSetup', false)
             ->assertSee(route('billing.payment-method.intent'), false);
     }
+
+    public function test_apple_pay_or_google_pay_can_hand_over_the_new_card(): void
+    {
+        config(['services.stripe.key' => 'pk_test_card', 'services.stripe.secret' => 'sk_test_card']);
+        $user = $this->member();
+
+        app()->setLocale('ar');
+        $this->actingAs($user)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            // Above the card boxes, in 'setup' mode: nothing is charged in its sheet.
+            ->assertSee('<div class="wallet-pay" id="card-wallet" hidden>', false)
+            ->assertSee(__('ui.billing.wallet_or_card_setup', [], 'ar'))
+            ->assertSee("window.ListenWalletButton(stripe, 'card-wallet', {\n          mode: 'setup',", false)
+            // Its card goes through the bank's check and the same update as a typed one.
+            ->assertSee('await replaceCard(paymentMethod);', false)
+            ->assertSee('payment_method: walletPaymentMethod || {', false)
+            ->assertSee("updateCardBtn?.addEventListener('click', () => replaceCard(null));", false);
+        $this->assertMatchesRegularExpression('/\p{Arabic}/u', __('ui.billing.wallet_or_card_setup', [], 'ar'));
+    }
 }

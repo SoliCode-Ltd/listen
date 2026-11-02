@@ -698,8 +698,9 @@ class RenewalGraceTest extends TestCase
 
         $this->travelTo(Carbon::parse('2026-10-16 09:00:00'));
         $notice = __('ui.billing.pay_overdue_first', ['date' => '21 Oct 2026']);
-        // The checkout page says so before any card is typed in.
-        $this->actingAs($this->member)->getLocalizedRoute('billing.page')->assertOk()->assertSee($notice);
+        // The checkout page says so before any card is typed in, and offers no phone wallet.
+        $this->actingAs($this->member)->getLocalizedRoute('billing.page')->assertOk()->assertSee($notice)
+            ->assertViewHas('walletPay', false);
 
         $response = $this->actingAs($this->member)->postJsonLocalizedRoute('billing.subscribe', [
             'plan' => 'starter', 'billing_cycle' => 'monthly', 'payment_method' => 'pm_new', 'save_card' => false,

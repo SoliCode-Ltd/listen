@@ -499,6 +499,7 @@ return [
         'card_expiry' => 'تاريخ الانتهاء',
         'card_cvc' => 'رمز الأمان (CVC)',
         'wallet_or_card' => 'أو ادفع بالبطاقة',
+        'wallet_or_card_setup' => 'أو استخدم بطاقة',
         'pay_title' => 'بيانات الدفع',
         'pay_secure' => 'دفع آمن ومشفّر',
         'using_saved_card' => 'سيتم استخدام بطاقتك المحفوظة.',

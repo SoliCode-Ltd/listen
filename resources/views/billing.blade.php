@@ -1529,6 +1529,8 @@
       // The pay button's words for a lower plan ("Switch on 30 Nov"), or none.
       label: '',
     };
+    // On a free trial another plan ends the trial only once the member agrees (the card boxes ask).
+    const runningTrial = @json((bool) ($runningTrial ?? false));
     const i18n = @json($billingI18n);
     const localeCode = String(document.documentElement.lang || '').toLowerCase();
     const isArabicLocale = localeCode.startsWith('ar');
@@ -1945,11 +1947,25 @@
       renderWallet();
     }
 
-    // A wallet pays for a new plan by card, never for a trial. It is shown the US
-    // dollar amount charged today, the same amount the card boxes charge.
+    // What the phone wallet does for this choice, or null when it stays out: it pays what
+    // is due today by card (a new plan's first payment, or a higher plan's difference from
+    // the order details), in the currency the card boxes charge in, or ('setup') hands over
+    // the card that starts a free trial. Not for a lower plan (nothing is paid today), a
+    // running trial's end (asked first) or while today's amount is still being worked out.
     function walletCharge() {
       const selected = selectedMeta();
-      if (!selected || selected.method !== 'stripe' || isTrialCheckout()) return null;
+      if (!selected || selected.method !== 'stripe' || isCurrentChoice()) return null;
+      if (isTrialCheckout()) return { selected: selected, setup: true };
+      if (runningTrial) return null;
+      if (planChangeApplies(selected)) {
+        const order = planChange.cache[planChangeKey(selected)];
+        if (!order) return null;
+        if (order.data.change) {
+          const due = Number(order.data.total_cents || 0);
+          if (order.data.scheduled || String(order.data.currency || '').toUpperCase() !== 'USD' || !(due > 0)) return null;
+          return { selected: selected, amount: due };
+        }
+      }
       const amount = Number(selected.meta?.base_usd_cents || 0);
       if (String(selected.meta?.charge_currency || '').toUpperCase() !== 'USD' || !(amount > 0)) return null;
       return { selected: selected, amount: amount };
@@ -1958,7 +1974,7 @@
     function renderWallet() {
       if (!walletButton) return;
       const charge = walletCharge();
-      if (charge) walletButton.setAmount(charge.amount);
+      if (charge) walletButton.setMode(charge.setup ? 'setup' : 'subscription', charge.amount);
       walletButton.show(Boolean(charge));
     }
 
@@ -2153,8 +2169,11 @@
         quoteHint.textContent = i18n.order_loading;
       }
 
+      renderWallet();
       loadPlanChange(selected).then(function(data) {
         if (seq !== planChange.seq) return;
+        // Today's amount is known: the wallet pays it (or stays out for a lower plan).
+        renderWallet();
         if (data && !data.change) {
           orderDetails.hidden = true;
           // Not a plan change after all (a new plan, or a higher one on a trial): the card's
@@ -2170,6 +2189,7 @@
         paintPlanChange(selected, data, discountHint);
       }).catch(function() {
         if (seq !== planChange.seq) return;
+        renderWallet();
         // No preview: the most it can be is the new plan's price, less the credit.
         orderDetails.hidden = true;
         quoteAmountLabel.textContent = '';
@@ -2311,6 +2331,11 @@
             const charge = walletCharge();
             if (paymentInFlight || !charge || !paymentMethod) return;
             setMessage('', '');
+            // A free trial starts with the wallet's card; anything else is paid with it today.
+            if (charge.setup) {
+              await startTrial(paymentMethod);
+              return;
+            }
             let leaving = false;
             try {
               leaving = await subscribeByCard(charge.selected, paymentMethod, true);
@@ -2477,13 +2502,17 @@
       return true;
     }
 
-    trialBtn?.addEventListener('click', async () => {
+    // Starts the free trial with the card in the card boxes, or with the phone wallet's
+    // card (walletPaymentMethod): the bank approves it now and nothing is charged today.
+    async function startTrial(walletPaymentMethod) {
       if (paymentInFlight) return;
       setMessage('', '');
       let leaving = false;
       try {
-        if (!stripe || !card) throw new Error(cardUnavailableText);
-        if (!cardComplete) throw new Error(i18n.enter_card_details);
+        if (!walletPaymentMethod) {
+          if (!stripe || !card) throw new Error(cardUnavailableText);
+          if (!cardComplete) throw new Error(i18n.enter_card_details);
+        }
 
         paymentInFlight = true;
         if (trialBtn) {
@@ -2501,7 +2530,7 @@
         }
 
         const confirmed = await stripe.confirmCardSetup(String(setupResponse.data.client_secret || ''), {
-          payment_method: {
+          payment_method: walletPaymentMethod || {
             card,
             billing_details: {
               name: userName || undefined,
@@ -2543,7 +2572,9 @@
           }
         }
       }
-    });
+    }
+
+    trialBtn?.addEventListener('click', () => startTrial(null));
 
     document.getElementById('billingForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();

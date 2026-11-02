@@ -498,6 +498,7 @@ return [
         'card_expiry' => 'Expiry date',
         'card_cvc' => 'Security code (CVC)',
         'wallet_or_card' => 'or Pay By Card',
+        'wallet_or_card_setup' => 'or Use a Card',
         'pay_title' => 'Payment details',
         'pay_secure' => 'Secure, encrypted',
         'using_saved_card' => 'Your saved card will be used.',

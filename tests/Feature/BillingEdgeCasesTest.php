@@ -399,6 +399,8 @@ class BillingEdgeCasesTest extends TestCase
             ->assertJsonPath('lines.1.kind', 'credit')
             ->assertJsonPath('lines.1.label', 'Credit for the unused time on Starter')
             ->assertJsonPath('total_cents', 1750)
+            // What the phone wallet's sheet is shown: the total, in the currency it is charged in.
+            ->assertJsonPath('currency', 'USD')
             ->assertJsonPath('credit_left', null)
             ->assertJsonPath('renews_on', '18 Nov 2026')
             ->assertJsonPath('lines.0.amount', '$22.00')
@@ -460,18 +462,47 @@ class BillingEdgeCasesTest extends TestCase
             ->assertSee(__('ui.billing.order_usage_note', [], 'ar'));
     }
 
-    public function test_a_running_plan_is_changed_with_the_card_boxes_only(): void
+    public function test_a_running_plan_pays_what_is_due_today_with_the_phone_wallet_too(): void
     {
-        // A plan change, a resumed plan or a trial's end can ask first: the phone wallet
-        // starts a new plan only.
+        // On a running plan the wallet pays a higher plan's difference: the order details'
+        // total, in dollars, once it is known. A lower plan (nothing due today), the plan
+        // already running and a total of nothing stay with the card boxes.
         $user = $this->userWithSubscription('active', 'price_starter_m');
         $this->actingAs($user)->getLocalizedRoute('billing.page')->assertOk()
-            ->assertViewHas('walletPay', false)
-            ->assertDontSee('id="wallet-button"', false);
+            ->assertViewHas('walletPay', true)
+            ->assertViewHas('runningTrial', false)
+            ->assertSee('<div class="wallet-pay" id="wallet" hidden>', false)
+            ->assertSee('const order = planChange.cache[planChangeKey(selected)];', false)
+            ->assertSee("if (order.data.scheduled || String(order.data.currency || '').toUpperCase() !== 'USD' || !(due > 0)) return null;", false)
+            ->assertSee('return { selected: selected, amount: due };', false)
+            ->assertSee("// Today's amount is known: the wallet pays it (or stays out for a lower plan).\n        renderWallet();", false);
 
+        // On a free trial another plan ends the trial only once the member agrees: the card boxes ask.
         BillingSubscription::query()->where('stripe_id', 'sub_edge')->update(['stripe_status' => 'trialing', 'trial_ends_at' => now()->addDays(7)]);
         $this->actingAs($user)->getLocalizedRoute('billing.page')->assertOk()
-            ->assertViewHas('walletPay', false);
+            ->assertViewHas('runningTrial', true)
+            ->assertSee('if (runningTrial) return null;', false);
+    }
+
+    public function test_a_phone_wallet_card_pays_a_higher_plans_difference_and_renews_the_plan(): void
+    {
+        $user = $this->userWithSubscription('active', 'price_starter_m');
+        $this->planFollowsStripe($user);
+        $this->stripe->wallet = 'apple_pay';
+        $this->stripe->requests = [];
+
+        $this->subscribe($user, ['plan' => 'creator', 'payment_method' => 'pm_edge', 'save_card' => true, 'proration_date' => time() - 60])
+            ->assertOk()
+            ->assertJsonPath('charged', true)
+            ->assertJsonPath('plan.slug', 'creator');
+
+        // A card: checked, made the card that renews the plan, and only then charged the difference.
+        $this->assertNotNull($this->stripe->last('get', '/v1/payment_methods/pm_edge'));
+        $updates = array_values(array_filter($this->stripe->requests, fn (array $request): bool => $request['method'] === 'post' && $request['path'] === '/v1/subscriptions/sub_edge'));
+        $this->assertSame('pm_edge', $updates[0]['params']['default_payment_method'] ?? null);
+        $change = end($updates);
+        $this->assertSame([['id' => 'si_edge', 'price' => 'price_creator_m']], $change['params']['items']);
+        $this->assertSame('always_invoice', $change['params']['proration_behavior']);
     }
 
     public function test_no_order_details_on_a_trial_or_the_same_plan(): void

@@ -84,7 +84,8 @@ class BillingPageClientTest extends TestCase
             ->assertSee("      paymentInFlight = Boolean(isBusy);\n", false)
             // A second submit or the trial button does nothing while one is on its way.
             ->assertSee("e.preventDefault();\n      if (paymentInFlight) return;", false)
-            ->assertSee("trialBtn?.addEventListener('click', async () => {\n      if (paymentInFlight) return;", false)
+            ->assertSee("async function startTrial(walletPaymentMethod) {\n      if (paymentInFlight) return;", false)
+            ->assertSee("trialBtn?.addEventListener('click', () => startTrial(null));", false)
             // After success the next page loads with Pay still off.
             ->assertSee('if (!leaving) setSubscribeButtonBusy(false);', false)
             // The server's 409 ("a payment is already in progress") is shown as it says.
@@ -170,11 +171,16 @@ class BillingPageClientTest extends TestCase
             ->assertSee("buttonType: { applePay: 'plain', googlePay: 'plain' },", false)
             // The buttons speak the page's language.
             ->assertSee("locale: String(document.documentElement.lang || '').toLowerCase().indexOf('ar') === 0 ? 'ar' : 'en',", false)
-            // It is shown the US dollar amount charged today, never on a trial.
-            ->assertSee("if (!selected || selected.method !== 'stripe' || isTrialCheckout()) return null;", false)
+            // It is shown the US dollar amount charged today; a free trial only takes its card.
+            ->assertSee("if (!selected || selected.method !== 'stripe' || isCurrentChoice()) return null;", false)
+            ->assertSee('if (isTrialCheckout()) return { selected: selected, setup: true };', false)
             ->assertSee("if (String(selected.meta?.charge_currency || '').toUpperCase() !== 'USD' || !(amount > 0)) return null;", false)
-            // Its card pays through the same steps as the card boxes, purchase conversion included.
+            ->assertSee("walletButton.setMode(charge.setup ? 'setup' : 'subscription', charge.amount);", false)
+            // Its card pays through the same steps as the card boxes, purchase conversion included;
+            // a trial's card goes through the trial's own steps.
             ->assertSee('leaving = await subscribeByCard(charge.selected, paymentMethod, true);', false)
+            ->assertSee("if (charge.setup) {\n              await startTrial(paymentMethod);", false)
+            ->assertSee('payment_method: walletPaymentMethod || {', false)
             ->assertSee('leaving = await subscribeByCard(selected, paymentMethod, saveCardCheckbox ? saveCardCheckbox.checked : true);', false)
             ->assertSee("if (paymentInFlight || !charge || !paymentMethod) return;", false)
             // Made even when the page opens on a trial or on InstaPay, so it can show once card is picked.

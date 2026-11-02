@@ -133,6 +133,20 @@ class CreatorTrialFlowTest extends TestCase
         ]);
     }
 
+    public function test_a_card_from_apple_pay_or_google_pay_starts_the_trial_too(): void
+    {
+        // The wallet's card has no security-code check (none is run for it), which is not a failed one.
+        $user = User::factory()->create(['subscription_status_checked_at' => now()]);
+
+        $this->startTrial($user, 'pm_wallet', '1881', 'fp_wallet', 'creator', 'monthly', ['cvc_check' => ''])
+            ->assertOk()
+            ->assertJsonPath('trial', true)
+            ->assertJsonPath('plan', 'creator');
+
+        $this->assertCount(1, $this->stripe->created);
+        $this->assertSame('fp_wallet', BillingTrial::query()->firstOrFail()->card_fingerprint);
+    }
+
     public function test_unverified_expired_and_failed_cards_do_not_start_a_trial(): void
     {
         $user = User::factory()->create(['subscription_status_checked_at' => now()]);
@@ -1142,7 +1156,7 @@ class CreatorTrialFlowTest extends TestCase
         ]);
     }
 
-    private function startTrial(User $user, string $paymentMethodId, string $last4, string $fingerprint, string $plan = 'creator', string $cycle = 'monthly'): \Illuminate\Testing\TestResponse
+    private function startTrial(User $user, string $paymentMethodId, string $last4, string $fingerprint, string $plan = 'creator', string $cycle = 'monthly', array $card = []): \Illuminate\Testing\TestResponse
     {
         $user->forceFill(['subscription_status_checked_at' => now()])->save();
         $this->actingAs($user);
@@ -1160,7 +1174,7 @@ class CreatorTrialFlowTest extends TestCase
             'last4' => $last4,
             'fingerprint' => $fingerprint,
             'brand' => 'visa',
-        ]);
+        ] + $card);
         $this->stripe->markSucceeded($intentId, $paymentMethodId);
         $user->forceFill(['subscription_status_checked_at' => now()])->save();
 
