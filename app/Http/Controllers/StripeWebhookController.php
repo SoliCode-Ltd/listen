@@ -86,6 +86,12 @@ class StripeWebhookController extends Controller
                         ? trim((string) ($event->data->object->id ?? ''))
                         : $customerId
                 ),
+                // A schedule that carried a lower plan ended in Stripe (let go, cancelled or done):
+                // the change is settled, and the sync reads the subscription it left.
+                'subscription_schedule.released',
+                'subscription_schedule.canceled',
+                'subscription_schedule.completed',
+                'subscription_schedule.aborted' => $this->scheduleEnded($event->data->object, $billingLifecycleService, $customerId),
                 // One-time character packs.
                 'payment_intent.succeeded' => app(CharPackCardPayment::class)->handlePaymentSucceeded($event->data->object),
                 'charge.refunded' => app(CharPackCardPayment::class)->handleChargeRefunded($event->data->object),
@@ -123,5 +129,13 @@ class StripeWebhookController extends Controller
         }
 
         return response('Webhook Handled', 200);
+    }
+
+    private function scheduleEnded(object $schedule, BillingLifecycleService $billingLifecycleService, string $customerId): void
+    {
+        app(\App\Services\Billing\PlanChanges::class)->scheduleEnded($schedule);
+        if ($customerId !== '') {
+            $billingLifecycleService->syncUserByStripeCustomerId($customerId);
+        }
     }
 }

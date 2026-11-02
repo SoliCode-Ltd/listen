@@ -409,6 +409,132 @@ class StripeTestModePurchaseTest extends TestCase
     }
 
     /**
+     * A lower plan waits for the renewal: nothing is charged when it is chosen, the
+     * member keeps Creator, and at the renewal (a test clock moved past it) Stripe
+     * charges Starter and the site moves the member to it.
+     */
+    public function test_a_lower_plan_is_charged_at_the_renewal_and_not_before(): void
+    {
+        [$user, $clock, $subscriptionId] = $this->creatorMemberOnAClock('downgrade-renewal');
+
+        $preview = $this->postJsonLocalizedRoute('billing.plan-change.preview', ['plan' => 'starter', 'billing_cycle' => 'monthly']);
+        $preview->assertOk();
+        $this->assertTrue($preview->json('scheduled') === true, (string) $preview->getContent());
+        $this->assertSame(0, (int) $preview->json('total_cents'));
+
+        $before = $this->invoiceIds($subscriptionId);
+        $response = $this->postJsonLocalizedRoute('billing.subscribe', ['plan' => 'starter', 'billing_cycle' => 'monthly']);
+        $this->assertTrue($response->json('scheduled') === true, (string) $response->getContent());
+        $this->assertTrue($response->json('charged') === false);
+
+        $live = Cashier::stripe()->subscriptions->retrieve($subscriptionId, []);
+        $this->assertSame(self::$stripePriceId, (string) $live->items->data[0]->price->id, 'The price changed before the renewal.');
+        $this->assertNotEmpty($live->schedule, 'No schedule carries the change.');
+        $this->assertSame($before, $this->invoiceIds($subscriptionId), 'Choosing the lower plan made an invoice.');
+        $this->assertSame('creator', app(PlanAccessService::class)->resolveActivePlanForUserId($user->id)?->slug);
+
+        // The renewal.
+        $periodEnd = (int) $live->items->data[0]->current_period_end;
+        $this->advanceClockTo((string) $clock->id, $periodEnd + 120, $subscriptionId);
+
+        $renewed = Cashier::stripe()->subscriptions->retrieve($subscriptionId, ['expand' => ['latest_invoice']]);
+        $this->assertSame(self::$starterPriceId, (string) $renewed->items->data[0]->price->id);
+        $this->assertSame('paid', (string) $renewed->latest_invoice->status);
+        $this->assertSame(self::STARTER_CENTS, (int) $renewed->latest_invoice->amount_paid);
+        $this->assertSame('subscription_cycle', (string) $renewed->latest_invoice->billing_reason, 'The renewal grace and reminders read this reason.');
+
+        app(\App\Services\BillingSyncService::class)->syncIfStale($user->fresh(), true);
+        $this->assertSame('starter', app(PlanAccessService::class)->resolveActivePlanForUserId($user->id)?->slug);
+        $this->assertSame(\App\Models\PlanChange::STATUS_APPLIED, \App\Models\PlanChange::query()->where('user_id', $user->id)->latest('id')->value('status'));
+        $this->assertEmpty(Cashier::stripe()->subscriptions->retrieve($subscriptionId, [])->schedule, 'The schedule was not let go after the switch.');
+
+        $this->recordResult('downgrade_at_renewal', [
+            'subscription' => $subscriptionId,
+            'renewal_invoice' => (string) $renewed->latest_invoice->id,
+            'amount_paid' => (int) $renewed->latest_invoice->amount_paid,
+            'billing_reason' => (string) $renewed->latest_invoice->billing_reason,
+        ]);
+    }
+
+    /** An offer running on the lower plan when it is chosen is charged at the renewal, after the offer ended. */
+    public function test_a_kept_offer_is_charged_at_the_renewal(): void
+    {
+        $coupon = Cashier::stripe()->coupons->create(['percent_off' => 50, 'duration' => 'once', 'redeem_by' => time() + 3600]);
+        Plan::query()->where('slug', 'starter')->update(['discount_percentage' => 50, 'discount_ends_at' => now()->addHour(), 'stripe_coupon_id' => $coupon->id]);
+        [$user, $clock, $subscriptionId] = $this->creatorMemberOnAClock('downgrade-offer');
+
+        $this->postJsonLocalizedRoute('billing.subscribe', ['plan' => 'starter', 'billing_cycle' => 'monthly'])->assertOk();
+        // The offer ends and its own coupon goes, long before the renewal.
+        Cashier::stripe()->coupons->delete($coupon->id, []);
+
+        $live = Cashier::stripe()->subscriptions->retrieve($subscriptionId, []);
+        $this->advanceClockTo((string) $clock->id, (int) $live->items->data[0]->current_period_end + 120, $subscriptionId);
+
+        $renewed = Cashier::stripe()->subscriptions->retrieve($subscriptionId, ['expand' => ['latest_invoice']]);
+        $this->assertSame((int) round(self::STARTER_CENTS / 2), (int) $renewed->latest_invoice->amount_paid, 'The kept offer was not applied.');
+    }
+
+    /** "Keep my plan" lets the schedule go, and an upgrade afterwards is charged the difference as usual. */
+    public function test_keeping_the_plan_then_upgrading_works_in_stripe(): void
+    {
+        $user = $this->makeUser('downgrade-keep');
+        $this->actingAs($user);
+        $subscriptionId = $this->payNowFor($user, 'creator');
+
+        $this->postJsonLocalizedRoute('billing.subscribe', ['plan' => 'starter', 'billing_cycle' => 'monthly'])->assertOk();
+        $this->postJsonLocalizedRoute('billing.plan-change.keep', [])->assertOk();
+        $this->assertEmpty(Cashier::stripe()->subscriptions->retrieve($subscriptionId, [])->schedule);
+
+        // Booked again, then cancelled: the schedule goes first and the renewal is turned off.
+        $this->postJsonLocalizedRoute('billing.subscribe', ['plan' => 'starter', 'billing_cycle' => 'monthly'])->assertOk();
+        $this->postJsonLocalizedRoute('billing.cancel', [])->assertOk();
+        $cancelled = Cashier::stripe()->subscriptions->retrieve($subscriptionId, []);
+        $this->assertEmpty($cancelled->schedule);
+        $this->assertTrue((bool) $cancelled->cancel_at_period_end);
+        $this->assertSame(self::$stripePriceId, (string) $cancelled->items->data[0]->price->id);
+    }
+
+    /**
+     * A member paying for Creator by card, with a test clock so the renewal can be reached.
+     *
+     * @return array{0: User, 1: object, 2: string}
+     */
+    private function creatorMemberOnAClock(string $label): array
+    {
+        $clock = Cashier::stripe()->testHelpers->testClocks->create(['frozen_time' => time(), 'name' => $label]);
+        $this->clockIds[] = (string) $clock->id;
+        $customer = Cashier::stripe()->customers->create(['email' => $label.'-'.uniqid('', true).'@example.test', 'test_clock' => $clock->id]);
+        $this->customerIds[] = (string) $customer->id;
+        $user = $this->makeUser($label, ['stripe_id' => $customer->id, 'email' => (string) $customer->email]);
+        $this->actingAs($user);
+
+        return [$user, $clock, $this->payNowFor($user, 'creator')];
+    }
+
+    /** @return list<string> */
+    private function invoiceIds(string $subscriptionId): array
+    {
+        $invoices = Cashier::stripe()->invoices->all(['subscription' => $subscriptionId, 'limit' => 20]);
+
+        return array_map(fn ($invoice) => (string) $invoice->id, $invoices->data);
+    }
+
+    /** Moves a test clock to a moment, then on past the renewal invoice's own finalisation. */
+    private function advanceClockTo(string $clockId, int $time, string $subscriptionId): void
+    {
+        Cashier::stripe()->testHelpers->testClocks->advance($clockId, ['frozen_time' => $time]);
+        $this->waitUntilReady($clockId);
+
+        $finalizeAt = 0;
+        foreach (Cashier::stripe()->invoices->all(['subscription' => $subscriptionId, 'limit' => 10])->data as $invoice) {
+            $finalizeAt = max($finalizeAt, (int) ($invoice->automatically_finalizes_at ?? 0));
+        }
+        $clock = Cashier::stripe()->testHelpers->testClocks->retrieve($clockId, []);
+        Cashier::stripe()->testHelpers->testClocks->advance($clockId, ['frozen_time' => max(((int) $clock->frozen_time) + 3600, $finalizeAt + 120)]);
+        $this->waitUntilReady($clockId);
+    }
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
     private function makeUser(string $label, array $attributes = []): User

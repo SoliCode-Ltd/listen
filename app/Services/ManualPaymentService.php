@@ -6,11 +6,13 @@ use App\Models\BillingSubscription;
 use App\Models\CharPackPurchase;
 use App\Models\ManualPaymentRequest;
 use App\Models\Plan;
+use App\Models\PlanChange;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\AdsPurchases;
 use App\Services\Billing\CharPackService;
 use App\Services\Billing\PaymentLedger;
+use App\Services\Billing\PlanChanges;
 use App\Support\CreditPeriod;
 use DomainException;
 use Illuminate\Http\UploadedFile;
@@ -113,6 +115,30 @@ class ManualPaymentService
             $priceSnapshot = is_array($request->price_snapshot) ? $request->price_snapshot : [];
             $priceSnapshot['approval_context'] = $this->snapshotApprovalContext($currentSubscription);
 
+            // A lower plan paid while the current plan (paid by hand or given by the team)
+            // still runs: it starts the day that plan ends, so no day of it is lost.
+            $planChanges = app(PlanChanges::class);
+            $heldUntil = $planChanges->heldUntil($request->user);
+            $cycle = strtolower((string) $request->billing_cycle) === 'yearly' ? 'yearly' : 'monthly';
+            $fromPlan = $heldUntil !== null ? $currentSubscription?->plan : null;
+            if ($heldUntil !== null && PlanChanges::direction($fromPlan, $planChanges->currentCycle($request->user), $request->plan, $cycle) === PlanChanges::DOWN) {
+                $planChanges->queueManual($request->user, $fromPlan, $request->plan, $cycle, $heldUntil, $request);
+                $request->forceFill([
+                    'status' => ManualPaymentRequest::STATUS_APPROVED,
+                    'price_snapshot' => $priceSnapshot,
+                    'reviewed_at' => now(),
+                    'reviewed_by' => $reviewer->id,
+                    'reviewer_notes' => $reviewerNotes,
+                    'approved_subscription_id' => $currentSubscription?->id,
+                ])->save();
+
+                return $request->fresh(['user', 'plan', 'reviewer']);
+            }
+
+            // Any other payment by hand is the newer decision: a lower plan waiting for
+            // its day (by card, or paid by hand) gives way.
+            $planChanges->supersede($request->user, 'replaced_by_payment');
+
             // Paid before the plan paid by hand has ended (the reminders ask members to
             // renew before then): the new period follows the one already paid for, so
             // no paid day is lost. Otherwise it starts now.
@@ -181,7 +207,14 @@ class ManualPaymentService
                     $rolledBack = true;
                 }
             } elseif ($request->status === ManualPaymentRequest::STATUS_APPROVED && $request->user) {
-                [$rolledBack, $usedFallbackPlan] = $this->rollbackApprovedRequestPlan($request);
+                // A lower plan still waiting for its day never changed the plan: it is only called off.
+                $waiting = PlanChange::query()->scheduled()->where('manual_payment_request_id', $request->id)->first();
+                if ($waiting) {
+                    $waiting->forceFill(['status' => PlanChange::STATUS_CANCELLED, 'cancelled_at' => now(), 'cancel_reason' => 'request_deleted'])->save();
+                    $rolledBack = true;
+                } else {
+                    [$rolledBack, $usedFallbackPlan] = $this->rollbackApprovedRequestPlan($request);
+                }
             }
 
             if (is_string($request->proof_path) && trim($request->proof_path) !== '') {

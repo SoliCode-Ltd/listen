@@ -353,6 +353,8 @@ Route::group([
         Route::post('/billing/payment-method', [BillingController::class, 'updatePaymentMethod'])->name('billing.payment-method');
         Route::post('/billing/cancel', [BillingController::class, 'cancel'])->name('billing.cancel');
         Route::post('/billing/resume', [BillingController::class, 'resume'])->name('billing.resume');
+        // "Keep my plan": the lower plan waiting for the renewal is called off.
+        Route::post('/billing/plan-change/keep', [BillingController::class, 'keepPlan'])->middleware('throttle:10,1')->name('billing.plan-change.keep');
         Route::post('/billing/sync', [BillingController::class, 'sync'])->name('billing.sync');
         Route::get('/billing/invoices/{invoiceId}/view', [BillingController::class, 'viewInvoice'])->name('billing.invoice.view');
         Route::get('/billing/invoices/{invoiceId}/download', [BillingController::class, 'downloadInvoice'])->name('billing.invoice.download');

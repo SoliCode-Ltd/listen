@@ -37,10 +37,58 @@
   @else
     <span class="{{ $disabledClass }}">{{ __('ui.pack.for_free_members') }}</span>
   @endif
+@elseif(auth()->check() && $state['is_current'] && !empty($state['current_cycle']))
+  {{-- The member's own plan: "Current plan" on the cycle they pay for, and the switch to the
+       other cycle when the page shows it (yearly is paid today, monthly starts at the renewal). --}}
+  @php
+    $ownMonthly = $state['current_cycle'] === 'monthly';
+    $toMonthly = route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => 'monthly']);
+    $toYearly = route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => 'yearly']);
+    $currentLabel = __('ui.pricing.current_plan');
+    $sizeClass = ($small ?? false) ? 'plan-btn-sm ' : '';
+    // The other cycle already booked for the renewal (yearly to monthly): it says when.
+    $otherBooked = !empty($state['scheduled_date']) && ($state['scheduled_cycle'] ?? null) === ($ownMonthly ? 'yearly' : 'monthly');
+    $otherLabel = $otherBooked
+      ? __('ui.pricing.starts_on', ['date' => $state['scheduled_date']])
+      : __($ownMonthly ? 'ui.pricing.switch_to_yearly' : 'ui.pricing.switch_to_monthly');
+    $monthlyOff = $ownMonthly || $otherBooked;
+    $yearlyOff = ! $ownMonthly || $otherBooked;
+  @endphp
+  <a
+    class="plan-btn {{ $sizeClass }}{{ $monthlyOff ? 'btn-disabled' : 'btn-outline' }}"
+    @if($monthlyOff) aria-disabled="true" @else href="{{ $toMonthly }}" @endif
+    data-upgrade-link="1"
+    data-monthly-href="{{ $toMonthly }}"
+    data-yearly-href="{{ $toYearly }}"
+    data-monthly-label="{{ $ownMonthly ? $currentLabel : $otherLabel }}"
+    data-yearly-label="{{ $ownMonthly ? $otherLabel : $currentLabel }}"
+    data-monthly-off="{{ $monthlyOff ? '1' : '0' }}"
+    data-yearly-off="{{ $yearlyOff ? '1' : '0' }}"
+  >{{ $ownMonthly ? $currentLabel : $otherLabel }}</a>
 @elseif(auth()->check() && $state['is_current'])
   <span class="{{ $disabledClass }}">{{ __('ui.pricing.current_plan') }}</span>
-@elseif(auth()->check() && ($state['is_lower'] || $plan['slug'] === 'free'))
-  <span class="{{ $disabledClass }}">{{ __('ui.pricing.downgrade') }}</span>
+@elseif(auth()->check() && !empty($state['scheduled_date']))
+  {{-- A lower plan already booked for the renewal. --}}
+  <span class="{{ $disabledClass }}">{{ __('ui.pricing.starts_on', ['date' => $state['scheduled_date']]) }}</span>
+@elseif(auth()->check() && $plan['slug'] === 'free')
+  {{-- A paid member goes to Free by not renewing: Manage Subscription does that. --}}
+  <a class="plan-btn {{ ($small ?? false) ? 'plan-btn-sm ' : '' }}btn-outline" href="{{ route('manage-subscription.page') }}">{{ __('ui.pricing.switch_to', ['plan' => $planDisplayName($plan)]) }}</a>
+@elseif(auth()->check() && $state['is_lower'])
+  {{-- A lower plan: nothing to pay today, it starts at the renewal (the billing page says when). --}}
+  @php
+    $switchLabel = __('ui.pricing.switch_to', ['plan' => $planDisplayName($plan)]);
+    $toMonthly = route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => 'monthly']);
+    $toYearly = route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => 'yearly']);
+  @endphp
+  <a
+    class="plan-btn {{ ($small ?? false) ? 'plan-btn-sm ' : '' }}btn-outline"
+    href="{{ $toMonthly }}"
+    data-upgrade-link="1"
+    data-monthly-href="{{ $toMonthly }}"
+    data-yearly-href="{{ $toYearly }}"
+    data-monthly-label="{{ $switchLabel }}"
+    data-yearly-label="{{ $switchLabel }}"
+  >{{ $switchLabel }}</a>
 @elseif($plan['slug'] === 'free')
   <a class="{{ $buttonClass }}" href="{{ route('register') }}">{{ __('ui.pricing.start_free') }}</a>
 @else

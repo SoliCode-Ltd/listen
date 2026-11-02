@@ -355,19 +355,7 @@ class BillingEdgeCasesTest extends TestCase
         $this->assertNull($this->stripe->last('post', '/v1/invoices/in_edge/void'));
     }
 
-    public function test_a_move_to_a_cheaper_plan_paid_by_its_credit_is_not_counted_as_a_charge(): void
-    {
-        $user = $this->userWithSubscription('active', 'price_creator_m');
-        $this->stripe->amountPaid = 0;
-        $starter = $this->starter;
-        $this->mock(BillingSyncService::class, fn ($mock) => $mock->shouldReceive('syncIfStale')->andReturnUsing(
-            fn () => app(PlanAccessService::class)->assignPlan($user, $starter, 'active', now()->addMonth())
-        ));
-
-        $this->subscribe($user, ['plan' => 'starter'])
-            ->assertOk()
-            ->assertJsonPath('charged', false);
-    }
+    // A move to a cheaper plan waits for the renewal: ScheduledDowngradeTest.
 
     public function test_only_a_recent_proration_date_inside_the_period_is_used(): void
     {
@@ -455,25 +443,6 @@ class BillingEdgeCasesTest extends TestCase
         // The total in the visitor's own money, and no dollar amount beside it.
         $response = $this->preview($user, 'creator')->assertOk()->assertJsonMissingPath('charged');
         $this->assertStringContainsString('EGP', $response->json('total'));
-    }
-
-    public function test_order_details_for_a_cheaper_plan_say_the_credit_pays_the_next_renewals(): void
-    {
-        \App\Models\SiteSetting::set('pricing_forced_country_code', 'US', 'billing');
-        $user = $this->userWithSubscription('active', 'price_creator_m');
-        $this->stripe->preview = [
-            'total' => -1300, 'amount_due' => 0,
-            'lines' => ['object' => 'list', 'data' => [
-                ['object' => 'line_item', 'amount' => -2200, 'period' => ['start' => time(), 'end' => time() + 86400 * 30]],
-                ['object' => 'line_item', 'amount' => 900, 'period' => ['start' => time(), 'end' => time() + 86400 * 30]],
-            ]],
-        ];
-
-        $this->preview($user, 'starter')->assertOk()
-            ->assertJsonPath('total_cents', 0)
-            ->assertJsonPath('total', '$0.00')
-            ->assertJsonPath('credit_left', '$13.00')
-            ->assertJsonPath('charged', null);
     }
 
     public function test_order_details_say_credits_used_this_month_count_on_the_new_plan(): void

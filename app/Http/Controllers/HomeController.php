@@ -478,9 +478,25 @@ class HomeController extends Controller
     public function pricingPage(Request $request)
     {
         $activePlanSlug = null;
+        $activeCycle = null;
+        $planChange = null;
         if ($request->user()) {
             $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $request->user()->id);
             $activePlanSlug = (string) ($activePlan?->slug ?? 'free');
+            // The member's own plan offers the cycle they don't have; a lower plan already
+            // booked for the renewal says when it starts (App\Services\Billing\PlanChanges).
+            $planChanges = app(\App\Services\Billing\PlanChanges::class);
+            if ($activePlan && (int) $activePlan->price_cents > 0 && ! $activePlan->isPack()) {
+                $activeCycle = $planChanges->currentCycle($request->user());
+            }
+            $scheduled = $planChanges->scheduledFor($request->user());
+            if ($scheduled && $scheduled->toPlan) {
+                $planChange = [
+                    'slug' => (string) $scheduled->toPlan->slug,
+                    'cycle' => (string) $scheduled->billing_cycle,
+                    'date' => $planChanges->date($scheduled->starts_at, app()->getLocale()),
+                ];
+            }
         }
 
         // Once per page: a visitor's country can take a few seconds to look up.
@@ -489,6 +505,8 @@ class HomeController extends Controller
         return view('pricing', [
             'pricingPlans' => $this->pricingPlans($countryContext),
             'activePlanSlug' => $activePlanSlug,
+            'activeCycle' => $activeCycle,
+            'planChange' => $planChange,
             'countryContext' => $countryContext,
             'yearlyDiscountPercent' => SiteSetting::yearlyDiscountPercent(),
             'trialPromo' => app(TrialEligibilityService::class)->promoFor($request->user()),

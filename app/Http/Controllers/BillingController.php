@@ -6,10 +6,12 @@ use App\Exceptions\SubscriptionStillLiveException;
 use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
 use App\Models\Plan;
+use App\Models\PlanChange;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\CardDecline;
+use App\Services\Billing\PlanChanges;
 use App\Services\Billing\RenewalGrace;
 use App\Services\Billing\SavedPaymentMethodRecorder;
 use App\Services\Billing\StripePricePlans;
@@ -45,6 +47,7 @@ class BillingController extends Controller
         private readonly SavedPaymentMethodRecorder $savedCards,
         private readonly TrialOutcomeService $trialOutcomes,
         private readonly StripePricePlans $stripePrices,
+        private readonly PlanChanges $planChanges,
     ) {}
 
     public function index(Request $request)
@@ -67,6 +70,10 @@ class BillingController extends Controller
             ->where('price_cents', '>', 0)
             ->pluck('slug')
             ->all();
+        $locale = app()->getLocale();
+        $scheduled = $this->planChanges->scheduledFor($user);
+        // A plan paid by hand or given by the team that still runs: a lower plan starts when it ends.
+        $heldUntil = $this->planChanges->heldUntil($user);
 
         return view('billing', [
             'activePlan' => $activePlan,
@@ -81,11 +88,24 @@ class BillingController extends Controller
             'countryContext' => $countryContext,
             'paymentBrandAssets' => $this->localizedPricingService->paymentBrandAssets(),
             'trialOffer' => $this->trialEligibility->offerFor($user),
-            // On a paid plan, another plan costs the difference today (the order details say how much).
-            'paidPlanChange' => $stripeReady && $subscription && $subscription->valid() && ! $subscription->onTrial(),
+            // On a paid plan, a higher plan costs the difference today and a lower one starts at
+            // the renewal; on a trial, a lower plan moves the trial (the order details say which).
+            'paidPlanChange' => $stripeReady && (($subscription && $subscription->valid()) || $heldUntil !== null),
+            'currentCycle' => $activePlan && (int) $activePlan->price_cents > 0 && ! $activePlan->isPack() ? $this->planChanges->currentCycle($user, $subscription) : null,
+            // Paid by hand (or given) and still running: a lower plan paid by InstaPay or Vodafone
+            // Cash starts the day it ends, and the payment panel says so.
+            'heldStart' => $heldUntil !== null && $activePlan ? [
+                'date' => $this->planChanges->date($heldUntil, $locale),
+                'current' => $activePlan->getLocalizedName($locale) ?: (string) $activePlan->name,
+            ] : null,
+            'lowerPlanSlugs' => $activePlan && (int) $activePlan->price_cents > 0
+                ? Plan::query()->subscriptionPlans()->where('price_cents', '>', 0)->where('price_cents', '<', (int) $activePlan->price_cents)->pluck('slug')->all()
+                : [],
+            'planChange' => $scheduled ? $this->planChanges->describe($scheduled, $countryContext, $locale) : null,
             // Apple Pay and Google Pay start a new plan only: changing, resuming or ending
             // the trial of a running one stays with the card boxes, which can ask first.
-            'walletPay' => $stripeReady && ! ($subscription && $subscription->valid()),
+            // Nor for a plan that follows one paid by hand: the wallet's sheet would charge it today.
+            'walletPay' => $stripeReady && ! ($subscription && $subscription->valid()) && $heldUntil === null,
             'paymentOverdueNotice' => $this->overdueRenewalNotice($user),
         ]);
     }
@@ -167,7 +187,8 @@ class BillingController extends Controller
             && trim((string) ($subscription?->stripe_id ?? '')) !== '';
 
         $stripeInvoices = $this->loadInvoices($user, $stripeReady, $countryContext, $locale);
-        $upcomingCharge = $stripeReady && $renews ? $this->resolveUpcomingCharge($subscription, $countryContext, $locale) : null;
+        $scheduled = $this->planChanges->scheduledFor($user);
+        $upcomingCharge = $stripeReady && $renews ? $this->resolveUpcomingCharge($subscription, $countryContext, $locale, $scheduled) : null;
         // In a failed renewal's grace days the member can cancel too: the plan then ends now.
         $cancelEndsNow = $this->cancelEndsNow($user, $subscription);
 
@@ -198,6 +219,47 @@ class BillingController extends Controller
                 'date' => $this->formatCarbonDate($local->billing_grace_ends_at),
             ]) : null,
             'manual' => $manual,
+            'planChange' => $scheduled ? $this->planChanges->describe($scheduled, $countryContext, $locale) : null,
+        ]);
+    }
+
+    /**
+     * "Keep my plan": the lower plan waiting for the renewal is called off, and the
+     * current plan renews as before. Nothing is charged.
+     */
+    public function keepPlan(Request $request)
+    {
+        $user = $request->user();
+        $scheduled = $this->planChanges->scheduledFor($user);
+        if (! $scheduled || ! $scheduled->canBeKept()) {
+            return response()->json(['ok' => false, 'message' => __('ui.plan_change.nothing_to_keep')], 422);
+        }
+
+        $lock = Cache::lock('billing-subscribe:'.$user->id, 60);
+        if (! $lock->get()) {
+            return response()->json(['ok' => false, 'message' => __('ui.backend.billing_payment_in_progress')], 409);
+        }
+
+        try {
+            $this->planChanges->cancel($user, 'kept');
+            $this->billingSyncService->syncIfStale($user, true);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to keep the current plan.', ['user_id' => $user->id, 'error' => $exception->getMessage()]);
+
+            return response()->json(['ok' => false, 'message' => __('ui.plan_change.keep_failed')], 422);
+        } finally {
+            $lock->release();
+        }
+
+        $locale = app()->getLocale();
+        $current = $scheduled->fromPlan;
+
+        return response()->json([
+            'ok' => true,
+            'message' => __('ui.plan_change.kept_message', [
+                'plan' => $current ? ($current->getLocalizedName($locale) ?: (string) $current->name) : __('ui.billing.plan'),
+                'date' => $this->planChanges->date($scheduled->starts_at, $locale),
+            ]),
         ]);
     }
 
@@ -492,6 +554,64 @@ class BillingController extends Controller
             // The same plan and cycle, at today's price or an older one the member kept.
             $samePlan = $subscription && $this->isOnPlan($subscription, $priceId, (string) $planRecord->slug, (string) $validated['billing_cycle']);
             $charged = true;
+            $cycle = (string) $validated['billing_cycle'];
+
+            // Upgrades now, downgrades at renewal (App\Services\Billing\PlanChanges).
+            $running = $subscription && $subscription->valid() ? $this->billingSubscriptionPlan($subscription) : null;
+            $heldUntil = $running === null ? $this->planChanges->heldUntil($user) : null;
+            $fromPlan = $running['plan'] ?? ($heldUntil !== null ? $this->planAccessService->resolveActivePlanForUserId((int) $user->id) : null);
+            $fromCycle = $running['cycle'] ?? ($heldUntil !== null ? $this->planChanges->currentCycle($user, $subscription) : null);
+            $direction = PlanChanges::direction($fromPlan, $fromCycle, $planRecord, $cycle);
+            $scheduled = $this->planChanges->scheduledFor($user);
+
+            // The lower plan already waits for this renewal: nothing more to do.
+            if ($scheduled && (int) $scheduled->to_plan_id === (int) $planRecord->id && $scheduled->billing_cycle === $cycle) {
+                return response()->json([
+                    'ok' => true,
+                    'charged' => false,
+                    'scheduled' => true,
+                    'message' => __('ui.plan_change.already_scheduled', [
+                        'plan' => $this->planDisplayName($planRecord),
+                        'date' => $this->planChanges->date($scheduled->starts_at, app()->getLocale()),
+                    ]),
+                ]);
+            }
+
+            // A lower plan paid by hand already waits for its day: it is paid for, so a
+            // different one needs the team.
+            if ($scheduled && $scheduled->source === PlanChange::SOURCE_MANUAL && $direction === PlanChanges::DOWN) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => __('ui.plan_change.paid_change_waiting', [
+                        'plan' => $scheduled->toPlan ? $this->planDisplayName($scheduled->toPlan) : '',
+                        'date' => $this->planChanges->date($scheduled->starts_at, app()->getLocale()),
+                    ]),
+                ], 409);
+            }
+
+            if ($subscription && $subscription->valid() && ! $samePlan && $direction === PlanChanges::DOWN) {
+                return $subscription->onTrial()
+                    ? $this->moveTrialDown($user, $subscription, $planRecord, $cycle, $priceId, $paymentMethod)
+                    : $this->scheduleDowngrade($user, $subscription, $fromPlan, $planRecord, $cycle, $priceId, $paymentMethod);
+            }
+
+            if ($heldUntil !== null && $direction === PlanChanges::DOWN) {
+                return $this->scheduleCardStart($user, $fromPlan, $planRecord, $cycle, $priceId, $heldUntil, $paymentMethod);
+            }
+
+            // Choosing the plan already running while a lower one waits: the member keeps it.
+            if ($samePlan && $scheduled && $scheduled->canBeKept() && $subscription->valid() && ! $subscription->onGracePeriod()) {
+                $this->planChanges->cancel($user, 'kept');
+
+                return response()->json([
+                    'ok' => true,
+                    'charged' => false,
+                    'message' => __('ui.plan_change.kept_message', [
+                        'plan' => $this->planDisplayName($planRecord),
+                        'date' => $this->planChanges->date($scheduled->starts_at, app()->getLocale()),
+                    ]),
+                ]);
+            }
 
             // Same plan while a cancellation is scheduled: undo the cancellation, charge nothing now.
             if ($subscription && $subscription->onGracePeriod() && $samePlan) {
@@ -542,6 +662,10 @@ class BillingController extends Controller
                     $this->retireStaleSubscription($subscription);
                 }
 
+                // A card plan booked to start later gives way to the plan bought now.
+                if ($scheduled && $scheduled->source === PlanChange::SOURCE_CARD_START) {
+                    $this->planChanges->cancel($user, 'replaced');
+                }
                 $this->createNewSubscription($user, $priceId, $paymentMethod, $couponId);
             }
         } catch (IncompletePayment $exception) {
@@ -754,6 +878,8 @@ class BillingController extends Controller
         }
 
         try {
+            // Cancelling ends the plan at the renewal: a lower plan waiting for it is moot.
+            $this->planChanges->releaseScheduleFor($subscription, 'cancelled');
             $subscription->cancel();
             $this->billingSyncService->syncIfStale($user, true);
             $subscription->refresh();
@@ -892,6 +1018,9 @@ class BillingController extends Controller
         $stripeId = (string) $subscription->stripe_id;
         $stripe = Cashier::stripe();
         $current = $stripe->subscriptions->retrieve($stripeId, []);
+        // A lower plan waiting for the renewal gives way to this one, and the schedule
+        // that carried it lets the subscription go before it is changed.
+        $this->planChanges->releaseScheduleOf($current, (int) $user->id, 'upgraded');
         $item = $current->items->data[0] ?? null;
         $oldPrice = (string) ($item->price->id ?? $subscription->stripe_price ?? '');
         $endTrial = $subscription->onTrial();
@@ -965,6 +1094,130 @@ class BillingController extends Controller
         return $this->declined($kind, __('ui.billing.decline_still_on_plan', [
             'plan' => $currentPlan ? $this->planDisplayName($currentPlan) : __('ui.billing.plan'),
         ]));
+    }
+
+    /**
+     * A lower plan (or yearly to monthly) on a running card plan: nothing is charged
+     * today and nothing is refunded. The member keeps their plan and its credits until
+     * the renewal, and the lower plan starts there (PlanChanges). A cancellation
+     * waiting for that day is undone: the plan now goes on, at the lower price.
+     */
+    private function scheduleDowngrade(User $user, BillingSubscription $subscription, ?Plan $fromPlan, Plan $plan, string $cycle, string $priceId, string $paymentMethod): \Illuminate\Http\JsonResponse
+    {
+        $resumed = false;
+        if ($subscription->onGracePeriod()) {
+            $subscription->resume();
+            $resumed = true;
+        }
+
+        try {
+            if ($paymentMethod !== '') {
+                $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
+            }
+            $change = $this->planChanges->scheduleOnSubscription($user, $subscription, $fromPlan, $plan, $cycle, $priceId, $paymentMethod);
+        } catch (\Throwable $exception) {
+            // Back as it was: a cancellation the member had asked for stays asked for.
+            if ($resumed) {
+                rescue(fn () => $subscription->cancel(), null, false);
+            }
+            throw $exception;
+        }
+
+        $this->billingSyncService->syncIfStale($user, true);
+        $locale = app()->getLocale();
+
+        return response()->json([
+            'ok' => true,
+            'charged' => false,
+            'scheduled' => true,
+            'message' => __('ui.plan_change.scheduled_message', [
+                'plan' => $this->planDisplayName($plan),
+                'date' => $this->planChanges->date($change->starts_at, $locale),
+                'current' => $fromPlan ? $this->planDisplayName($fromPlan) : __('ui.billing.plan'),
+            ]),
+        ]);
+    }
+
+    /**
+     * A lower plan on a free trial: the trial moves to it right away, nothing is
+     * charged and the trial ends on the same day; its first payment is the lower
+     * plan's (with that plan's offer when one runs, never the higher plan's).
+     */
+    private function moveTrialDown(User $user, BillingSubscription $subscription, Plan $plan, string $cycle, string $priceId, string $paymentMethod): \Illuminate\Http\JsonResponse
+    {
+        if ($subscription->onGracePeriod()) {
+            // A trial the member had cancelled goes on, on the lower plan.
+            $subscription->resume();
+        }
+        if ($paymentMethod !== '') {
+            $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
+        }
+
+        $stripe = Cashier::stripe();
+        $stripeId = (string) $subscription->stripe_id;
+        $current = $stripe->subscriptions->retrieve($stripeId, []);
+        $this->planChanges->releaseScheduleOf($current, (int) $user->id, 'trial_moved');
+        $item = $current->items->data[0] ?? null;
+        $oldPrice = (string) ($item->price->id ?? $subscription->stripe_price ?? '');
+        $couponId = $this->resolveCheckoutCouponId($plan, $cycle);
+
+        // Before the update, as for any plan change on a trial (the webhook can land first).
+        $this->trialOutcomes->followPrice($stripeId, $priceId);
+        try {
+            $stripe->subscriptions->update($stripeId, [
+                'items' => [array_filter(['id' => (string) ($item->id ?? ''), 'price' => $priceId])],
+                'proration_behavior' => 'none',
+                'discounts' => $couponId ? [['coupon' => $couponId]] : '',
+            ]);
+        } catch (\Throwable $exception) {
+            $this->trialOutcomes->followPrice($stripeId, $oldPrice);
+            throw $exception;
+        }
+
+        $this->billingSyncService->syncIfStale($user, true);
+
+        return response()->json([
+            'ok' => true,
+            'charged' => false,
+            'trial_moved' => true,
+            'message' => __('ui.plan_change.trial_moved_message', [
+                'plan' => $this->planDisplayName($plan),
+                'date' => $this->formatDateLabel($subscription->trial_ends_at?->toDateString()) ?? '',
+            ]),
+        ]);
+    }
+
+    /**
+     * A member on a plan paid by hand or given by the team chose a lower plan by card:
+     * it starts the day the current plan ends, and the card is charged then. The card
+     * is kept on the account for that day.
+     */
+    private function scheduleCardStart(User $user, ?Plan $fromPlan, Plan $plan, string $cycle, string $priceId, Carbon $startsAt, string $paymentMethod): \Illuminate\Http\JsonResponse
+    {
+        $this->ensureStripeCustomer($user);
+        if ($paymentMethod !== '') {
+            // Saved for the day it is charged, also when the member left "save card" off.
+            $user->addPaymentMethod($paymentMethod);
+        } else {
+            $paymentMethod = (string) ($user->defaultPaymentMethod()?->id ?? '');
+        }
+        if ($paymentMethod === '') {
+            throw ValidationException::withMessages(['payment_method' => __('ui.backend.billing_add_payment_method')]);
+        }
+
+        $this->planChanges->scheduleCardStart($user, $fromPlan, $plan, $cycle, $priceId, $startsAt, $paymentMethod);
+        $locale = app()->getLocale();
+
+        return response()->json([
+            'ok' => true,
+            'charged' => false,
+            'scheduled' => true,
+            'message' => __('ui.plan_change.card_start_message', [
+                'plan' => $this->planDisplayName($plan),
+                'date' => $this->planChanges->date($startsAt, $locale),
+                'current' => $fromPlan ? $this->planDisplayName($fromPlan) : __('ui.billing.plan'),
+            ]),
+        ]);
     }
 
     /**
@@ -1056,6 +1309,15 @@ class BillingController extends Controller
         $priceId = $plan ? $this->resolveStripePriceId((string) $plan->slug, $cycle) : '';
         $subscription = $this->currentDefaultSubscription($user);
 
+        // A lower plan costs nothing today: it starts at the renewal (or moves a trial, or
+        // follows a plan paid by hand), and the page says when and what it costs then.
+        if ($plan && $priceId !== '') {
+            $scheduledPreview = $this->scheduledChangePreview($request, $user, $subscription, $plan, $cycle);
+            if ($scheduledPreview !== null) {
+                return response()->json($scheduledPreview);
+            }
+        }
+
         // Only a paid plan changes with a credit; anything else pays the plan's price as shown.
         if ($priceId === '' || ! $subscription || ! $subscription->valid() || $subscription->onTrial()
             || trim((string) $user->stripe_id) === ''
@@ -1145,6 +1407,66 @@ class BillingController extends Controller
             'credit_left' => $total < 0 ? $money($total) : null,
             'renews_on' => $renews > 0 ? $this->formatCarbonDate(Carbon::createFromTimestamp($renews)) : null,
         ]);
+    }
+
+    /**
+     * The order details of a move to a lower plan, or null when the move is not one
+     * (an upgrade, a new plan, the same plan): nothing is due today, and the lower
+     * plan starts at the renewal, on a trial at once, or when a plan paid by hand ends.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function scheduledChangePreview(Request $request, User $user, ?BillingSubscription $subscription, Plan $plan, string $cycle): ?array
+    {
+        $running = $subscription && $subscription->valid() ? $this->billingSubscriptionPlan($subscription) : null;
+        $heldUntil = $running === null ? $this->planChanges->heldUntil($user) : null;
+        if ($running === null && $heldUntil === null) {
+            return null;
+        }
+
+        $fromPlan = $running['plan'] ?? $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+        $fromCycle = $running['cycle'] ?? $this->planChanges->currentCycle($user, $subscription);
+        if (PlanChanges::direction($fromPlan, $fromCycle, $plan, $cycle) !== PlanChanges::DOWN) {
+            return null;
+        }
+
+        $locale = app()->getLocale();
+        $countryContext = $this->localizedPricingService->resolveCountryContext($request);
+        $name = $this->planDisplayName($plan);
+        $current = $fromPlan ? $this->planDisplayName($fromPlan) : __('ui.billing.plan');
+        $terms = $this->planChanges->terms($plan, $cycle, $countryContext, $locale);
+
+        if ($running !== null && $subscription->onTrial()) {
+            $date = $this->formatDateLabel($subscription->trial_ends_at?->toDateString()) ?? '';
+            $kind = 'trial';
+            $note = __('ui.plan_change.preview_trial', ['plan' => $name, 'date' => $date, 'terms' => $terms]);
+            $button = __('ui.plan_change.button_trial', ['plan' => $name]);
+        } elseif ($running !== null) {
+            $live = Cashier::stripe()->subscriptions->retrieve((string) $subscription->stripe_id, []);
+            $endsAt = (int) ($live->items->data[0]->current_period_end ?? $live->current_period_end ?? 0);
+            $date = $endsAt > 0 ? $this->planChanges->date(Carbon::createFromTimestamp($endsAt), $locale) : '';
+            $kind = 'renewal';
+            $note = __('ui.plan_change.preview_renewal', ['current' => $current, 'plan' => $name, 'date' => $date, 'terms' => $terms]);
+            $button = __('ui.plan_change.button_switch', ['date' => $date]);
+        } else {
+            $date = $this->planChanges->date($heldUntil, $locale);
+            $kind = 'plan_end';
+            $note = __('ui.plan_change.preview_plan_end', ['current' => $current, 'plan' => $name, 'date' => $date, 'terms' => $terms]);
+            $button = __('ui.plan_change.button_switch', ['date' => $date]);
+        }
+
+        return [
+            'ok' => true,
+            'change' => true,
+            'scheduled' => true,
+            'kind' => $kind,
+            'starts_on' => $date,
+            'total' => $this->formatLocalizedInvoiceAmount(0, 'USD', $countryContext, $locale),
+            'total_cents' => 0,
+            'lines' => [],
+            'note' => $note,
+            'button' => $button,
+        ];
     }
 
     private function planDisplayName(Plan $plan): string
@@ -1706,19 +2028,28 @@ class BillingController extends Controller
     /**
      * @return array{total:string,currency:string,date:?string}|null
      */
-    private function resolveUpcomingCharge(?BillingSubscription $subscription, array $countryContext = [], string $locale = 'en'): ?array
+    private function resolveUpcomingCharge(?BillingSubscription $subscription, array $countryContext = [], string $locale = 'en', ?PlanChange $scheduled = null): ?array
     {
         if (! $subscription || ! $subscription->valid()) {
             return null;
         }
 
         try {
-            $upcoming = $subscription->upcomingInvoice();
-            if (! $upcoming) {
-                return null;
-            }
+            if ($scheduled && $scheduled->source === PlanChange::SOURCE_CARD && $scheduled->stripe_schedule_id
+                && trim((string) $subscription->user?->stripe_id) !== '') {
+                // The renewal the schedule will charge: the lower plan, with its kept offer.
+                $stripeInvoice = Cashier::stripe()->invoices->createPreview([
+                    'customer' => (string) $subscription->user->stripe_id,
+                    'schedule' => (string) $scheduled->stripe_schedule_id,
+                ]);
+            } else {
+                $upcoming = $subscription->upcomingInvoice();
+                if (! $upcoming) {
+                    return null;
+                }
 
-            $stripeInvoice = $upcoming->asStripeInvoice();
+                $stripeInvoice = $upcoming->asStripeInvoice();
+            }
             $periodEndTs = (int) ($stripeInvoice->period_end ?? 0);
             $currency = strtoupper((string) ($stripeInvoice->currency ?? 'USD'));
             $totalCents = (int) ($stripeInvoice->total ?? 0);

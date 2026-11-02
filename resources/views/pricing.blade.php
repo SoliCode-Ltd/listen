@@ -1115,7 +1115,9 @@
       $trialPromo = $trialPromo ?? [];
 
       // Where a plan stands for this visitor: shared by its card and the comparison table.
-      $planState = static function (array $plan, int $index) use ($activePlanSlug, $currentPlanIndex, $trialPromo): array {
+      $activeCycle = $activeCycle ?? null;
+      $planChange = $planChange ?? null;
+      $planState = static function (array $plan, int $index) use ($activePlanSlug, $currentPlanIndex, $trialPromo, $activeCycle, $planChange): array {
         $isPack = !empty($plan['is_pack']);
         $isCurrent = $activePlanSlug === $plan['slug'];
         $isFree = max(0, (int) ($plan['price_monthly_cents'] ?? 0)) <= 0;
@@ -1129,6 +1131,11 @@
           'is_current' => $isCurrent,
           'is_free' => $isFree,
           'is_lower' => $isLower,
+          // On the member's own paid plan: the cycle they pay for (the other one can be chosen).
+          'current_cycle' => $isCurrent && !$isFree && !$isPack ? $activeCycle : null,
+          // A lower plan already booked for the renewal: the day it starts.
+          'scheduled_date' => is_array($planChange) && ($planChange['slug'] ?? '') === $plan['slug'] ? ($planChange['date'] ?? null) : null,
+          'scheduled_cycle' => is_array($planChange) && ($planChange['slug'] ?? '') === $plan['slug'] ? ($planChange['cycle'] ?? null) : null,
           // The featured plan keeps its crown and strap for the member already on it too.
           'is_popular' => !empty($plan['is_popular']),
           'trial_monthly' => in_array('monthly', $trialCycles, true),
@@ -1607,8 +1614,21 @@
           var nextHref = isYearly
             ? String(link.getAttribute('data-yearly-href') || link.getAttribute('href') || '')
             : String(link.getAttribute('data-monthly-href') || link.getAttribute('href') || '');
+          // The member's own plan: "Current plan" (off) on their cycle, the switch on the other.
+          var toggles = link.hasAttribute('data-monthly-off');
+          var off = toggles && link.getAttribute(isYearly ? 'data-yearly-off' : 'data-monthly-off') === '1';
+          if (toggles) {
+            link.classList.toggle('btn-disabled', off);
+            link.classList.toggle('btn-outline', !off);
+            if (off) {
+              link.removeAttribute('href');
+              link.setAttribute('aria-disabled', 'true');
+            } else {
+              link.removeAttribute('aria-disabled');
+            }
+          }
 
-          if (nextHref !== '') {
+          if (nextHref !== '' && !off) {
             link.setAttribute('href', nextHref);
           }
 
