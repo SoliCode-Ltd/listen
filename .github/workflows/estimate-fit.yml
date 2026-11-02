@@ -1,0 +1,52 @@
+name: Estimate fit
+
+# Read-only: refits the premium voices' audio-length estimate (App\Support\UsageEstimator)
+# to the voices made on LIVE with today's engine: every rate and factor fitted together,
+# judged on voices the fit did not see against today's estimate, then fitted on all of
+# them for the numbers to ship. Pipes scripts/support/estimate_fit.php over SSH into the
+# app's own PHP (READ ONLY database session). Prints numbers only, never a text or an
+# email. A push of this file or the script runs it.
+
+on:
+  push:
+    branches: [claude/beautiful-sagan-df90b3]
+    paths:
+      - .github/workflows/estimate-fit.yml
+      - scripts/support/estimate_fit.php
+  workflow_dispatch:
+    inputs:
+      member:
+        description: A member id whose voices to list as well (optional)
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  fit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fit on live over SSH
+        env:
+          MEMBER_ID: ${{ inputs.member || '5369' }}
+          SSH_HOST: ${{ secrets.LIVE_SSH_HOST }}
+          SSH_USER: ${{ secrets.LIVE_SSH_USER }}
+          SSH_KEY: ${{ secrets.LIVE_SSH_KEY }}
+          APP_PATH: ${{ secrets.LIVE_APP_PATH }}
+        run: |
+          set -euo pipefail
+          [[ "$MEMBER_ID" =~ ^[0-9]{0,10}$ ]] || { echo "::error::member must be a member id"; exit 1; }
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_fit
+          chmod 600 ~/.ssh/id_fit
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; MEMBER_ID=$MEMBER_ID \$(command -v php8.4 || command -v php)"
+          ssh -i ~/.ssh/id_fit -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" < scripts/support/estimate_fit.php
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_fit
