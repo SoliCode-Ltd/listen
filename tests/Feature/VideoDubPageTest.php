@@ -184,7 +184,8 @@ class VideoDubPageTest extends TestCase
 
         $admin = User::factory()->create(['is_admin' => true]);
         $this->actingAs($admin)->get(\App\Filament\Resources\VideoDubResource::getUrl('index'))
-            ->assertOk()->assertSee('Dub my video')->assertSee('Dubs today')->assertSee($member->email)->assertSee('Saudi (Najdi)');
+            // The table cuts the email to 30 characters (VideoDubResource), so a long random one shows shortened.
+            ->assertOk()->assertSee('Dub my video')->assertSee('Dubs today')->assertSee(\Illuminate\Support\Str::limit($member->email, 30))->assertSee('Saudi (Najdi)');
         $this->actingAs($admin)->get(\App\Filament\Resources\VideoDubResource::getUrl('view', ['record' => $dub]))
             ->assertOk()->assertSee('Othman (Puck)')->assertSee('هلا والله.')->assertSee('Hello there.')
             ->assertSee('/admin-video/dubs/'.$dub->id.'/clean', false)->assertSee('90 credits', false);
