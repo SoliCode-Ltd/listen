@@ -139,7 +139,7 @@ $columnsAll = ['arabic', 'latin', 'mark', 'number', 'sound', 'short_pause', 'lon
 /** The seconds a fitted model gives a voice, before the margin. */
 $predict = function (array $m, array $r, bool $withMoods = true): float {
     $beta = $m['beta'][$r['lang']];
-    $s = $beta['base'];
+    $s = $beta['base'] ?? 0.0;
     foreach ($r['x'] as $name => $count) {
         $s += ($beta[$name] ?? 0.0) * $count;
     }
