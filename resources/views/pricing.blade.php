@@ -338,6 +338,15 @@
       .plan-minutes-unit, .plan-quota-unit { font-size: .76rem; }
       .plan-quota-coin { font-size: .9rem; }
     }
+    /* Desktop cards (about 340px wide): a little larger than the narrow size, still on one line. */
+    @media (min-width: 981px) {
+      @container (min-width: 320px) and (max-width: 399px) {
+        .plan-minutes-number { font-size: 1.07rem; }
+        .plan-quota-number { font-size: .9rem; }
+        .plan-minutes-unit, .plan-quota-unit { font-size: .8rem; }
+        .plan-quota-coin { font-size: .95rem; }
+      }
+    }
     @container (max-width: 300px) {
       .plan-quota { gap: .45rem; }
       .plan-minutes-number { font-size: .94rem; }
