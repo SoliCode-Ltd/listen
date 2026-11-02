@@ -171,14 +171,18 @@
   // UsageEstimator::rawSeconds().
   function rawSeconds(found, tier, speed, studio) {
     const level = levelOf(tier);
-    const model = config.model[level][found.arabic >= found.latin + found.cjk ? 'ar' : 'en'];
+    const language = found.arabic >= found.latin + found.cjk ? 'ar' : 'en';
+    const model = config.model[level][language];
     let seconds = model.base;
     Object.keys(found).forEach(function (name) {
       seconds += (model[name] || 0) * found[name];
     });
     if (level === 'hd') {
-      Object.keys(config.studio_factors).forEach(function (setting) {
-        const factor = config.studio_factors[setting][String(studio[setting] || '')];
+      // Each language has its own factors for the studio's settings (a site that sends
+      // only one table: that one for both).
+      const factors = (config.studio_factors_by_language || {})[language] || config.studio_factors || {};
+      Object.keys(factors).forEach(function (setting) {
+        const factor = factors[setting][String(studio[setting] || '')];
         seconds *= typeof factor === 'number' ? factor : 1;
       });
       if (trim(studio.style_prompt || '') !== '') seconds *= config.direction_factor;

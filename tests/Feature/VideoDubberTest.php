@@ -607,9 +607,10 @@ class VideoDubberTest extends TestCase
         $this->assertEqualsWithDelta(4.0, $r['lines'][0]['end'], 0.06);
         $this->assertEqualsWithDelta(5.0, $r['lines'][1]['start'], 0.06);
         $this->assertEqualsWithDelta(7.5, $r['lines'][1]['end'], 0.06);
-        // Each take far quicker than the speaker (2.2 s for 3.5 s, 1.65 s for 2.5 s): taken once more, slower, and that one kept.
+        // Each take far quicker than the speaker (2.4 s for 3.5 s, 1.8 s for 2.5 s): taken once more, slower, and that one kept.
         $this->assertSame(2, $r['voicing']['slowed']);
         $this->assertGreaterThan(2.5, $r['lines'][0]['voiced_seconds']);
+        $this->assertGreaterThan(1.9, $r['lines'][1]['voiced_seconds']);
     }
 
     /** Someone speaks from 0.5 to 2.5 s, pauses, speaks to 4 s, then from 5 to 7.5 s: three phrases. */
@@ -644,7 +645,7 @@ class VideoDubberTest extends TestCase
             $path = 'audio/take-'.bin2hex(random_bytes(3)).'.wav';
             @mkdir(dirname(Storage::disk('public')->path($path)), 0755, true);
             // As long as its words need (never taken again as too short), slower where asked to be.
-            $seconds = round(0.9 * VideoDubber::needs($text, $config), 2);
+            $seconds = round(0.9 * VideoDubber::needs($text, $config) / (float) ($config['speed'] ?? 1.0), 2);
             (new Process([$ffmpeg, '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=800:sample_rate=24000:duration='.$seconds, Storage::disk('public')->path($path)]))->mustRun();
 
             return ['audio_path' => $path, 'duration_seconds' => 2];

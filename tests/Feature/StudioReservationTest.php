@@ -31,6 +31,9 @@ class StudioReservationTest extends TestCase
 
     private const TEXT = 'Hello there';
 
+    /** Long enough for the pace to show once rounded to whole seconds. */
+    private const LONGER_TEXT = 'Hello there, my friend.';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -80,17 +83,17 @@ class StudioReservationTest extends TestCase
 
     public function test_a_slower_speed_reserves_for_the_longer_audio(): void
     {
-        // "Hello there" on a premium voice is about 2 seconds (30 credits); at half speed about 3 (45).
-        $user = $this->member(['monthly_chars' => 40, 'voice_tier' => 'hd']);
+        // "Hello there, my friend." on a premium voice is about 3 seconds (45 credits); at half speed about 4 (60).
+        $user = $this->member(['monthly_chars' => 50, 'voice_tier' => 'hd']);
         $this->fakeSpeech();
 
-        $this->generate($user, ['voice_tier' => 'hd', 'voice_key' => $this->premiumKey(), 'speed' => 0.5])
+        $this->generate($user, ['content' => self::LONGER_TEXT, 'voice_tier' => 'hd', 'voice_key' => $this->premiumKey(), 'speed' => 0.5])
             ->assertStatus(422)
-            ->assertJsonPath('errors.content.0', __('ui.backend.monthly_chars_not_enough', ['remaining' => '40', 'needed' => '45']));
+            ->assertJsonPath('errors.content.0', __('ui.backend.monthly_chars_not_enough', ['remaining' => '50', 'needed' => '60']));
         $this->assertSame(0, AudioGeneration::query()->count(), 'nothing is made or reserved');
         $this->assertSame(0, (int) CreditPeriod::counter((int) $user->id)->total_chars);
 
-        $this->generate($user, ['voice_tier' => 'hd', 'voice_key' => $this->premiumKey(), 'speed' => 1.0])->assertOk();
+        $this->generate($user, ['content' => self::LONGER_TEXT, 'voice_tier' => 'hd', 'voice_key' => $this->premiumKey(), 'speed' => 1.0])->assertOk();
     }
 
     public function test_a_failed_slow_generation_gives_back_all_it_reserved(): void
@@ -98,11 +101,11 @@ class StudioReservationTest extends TestCase
         $user = $this->member(['voice_tier' => 'hd']);
         $this->fakeSpeech(fails: true);
 
-        $this->generate($user, ['voice_tier' => 'hd', 'voice_key' => $this->premiumKey(), 'speed' => 0.5])->assertStatus(422);
+        $this->generate($user, ['content' => self::LONGER_TEXT, 'voice_tier' => 'hd', 'voice_key' => $this->premiumKey(), 'speed' => 0.5])->assertStatus(422);
 
         $reservation = AudioGeneration::query()->latest('id')->value('settings_snapshot')['reservation'] ?? null;
-        $this->assertSame(45, $reservation['credits'] ?? null, 'what was reserved is kept on the generation');
-        $this->assertSame(3, $reservation['seconds'] ?? null);
+        $this->assertSame(60, $reservation['credits'] ?? null, 'what was reserved is kept on the generation');
+        $this->assertSame(4, $reservation['seconds'] ?? null);
         $counter = CreditPeriod::counter((int) $user->id);
         $this->assertSame(0, (int) $counter->total_chars, 'all of it given back');
         $this->assertSame(0, (int) $counter->total_seconds);
@@ -111,19 +114,19 @@ class StudioReservationTest extends TestCase
 
     public function test_the_extension_reserves_for_the_speed_too(): void
     {
-        $user = $this->member(['monthly_chars' => 40, 'voice_tier' => 'hd']);
+        $user = $this->member(['monthly_chars' => 50, 'voice_tier' => 'hd']);
         $this->fakeSpeech();
         $key = 'lk_live_'.str_repeat('s', 32);
         $user->forceFill(['api_key_hash' => User::hashApiKey($key)])->save();
 
         $this->withHeaders(['X-Listen-Key' => $key])->postJson('/api/reader/queue', [
-            'content' => self::TEXT,
+            'content' => self::LONGER_TEXT,
             'target_language' => 'en',
             'voice_tier' => 'hd',
             'voice_key' => $this->premiumKey(),
             'speed' => 0.5,
             'prefer_sync' => true,
-        ])->assertStatus(422)->assertJsonPath('errors.content.0', __('ui.backend.monthly_chars_not_enough', ['remaining' => '40', 'needed' => '45']));
+        ])->assertStatus(422)->assertJsonPath('errors.content.0', __('ui.backend.monthly_chars_not_enough', ['remaining' => '50', 'needed' => '60']));
 
         $this->assertSame(0, AudioGeneration::query()->count());
     }

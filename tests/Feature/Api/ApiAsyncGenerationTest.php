@@ -150,15 +150,15 @@ class ApiAsyncGenerationTest extends TestCase
     }
 
     /**
-     * A slower speed makes longer audio, so more is reserved (twice as much at
-     * 0.5); the worker then charges the audio really made.
+     * A slower speed makes longer audio, so more is reserved (6 s instead of 5
+     * for this text at 0.5); the worker then charges the audio really made.
      */
     public function test_a_slower_speed_reserves_more_and_the_worker_charges_the_real_length(): void
     {
         $user = $this->apiMember();
         $plain = $this->issueKey($user)['plain'];
 
-        $this->speakAsync($plain, $this->premiumVoice(), ['voice_settings' => ['speed' => 0.5]])
+        $this->speakAsync($plain, $this->premiumVoice(), ['text' => 'Hello there, my friend. How are you today?', 'voice_settings' => ['speed' => 0.5]])
             ->assertStatus(202)
             // The answer shows what was reserved, not the estimate at normal speed.
             ->assertJsonPath('credits_used', 90);

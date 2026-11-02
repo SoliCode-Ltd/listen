@@ -1,0 +1,53 @@
+name: Credit use inspect
+
+# Read-only: how one member's credits for their current period were used, voice by
+# voice, on LIVE: each request's estimate (what was allowed against what was left),
+# what its real audio was charged, and the running total, so a total over the plan's
+# limit shows which voice took it there. Pipes scripts/support/credit_use_inspect.php
+# over SSH into the app's own PHP (READ ONLY database session). Prints member ids and
+# numbers only, never a text; the email is masked. Nothing is written.
+# A push of this file or the script runs it for the member named below.
+
+on:
+  push:
+    branches: [claude/beautiful-sagan-df90b3]
+    paths:
+      - .github/workflows/credit-use-inspect.yml
+      - scripts/support/credit_use_inspect.php
+  workflow_dispatch:
+    inputs:
+      member:
+        description: The member's id
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect live over SSH
+        env:
+          MEMBER_ID: ${{ inputs.member || '5369' }}
+          SSH_HOST: ${{ secrets.LIVE_SSH_HOST }}
+          SSH_USER: ${{ secrets.LIVE_SSH_USER }}
+          SSH_KEY: ${{ secrets.LIVE_SSH_KEY }}
+          APP_PATH: ${{ secrets.LIVE_APP_PATH }}
+        run: |
+          set -euo pipefail
+          [[ "$MEMBER_ID" =~ ^[0-9]{1,10}$ ]] || { echo "::error::member must be a member id"; exit 1; }
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_inspect
+          chmod 600 ~/.ssh/id_inspect
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; MEMBER_ID=$MEMBER_ID \$(command -v php8.4 || command -v php)"
+          ssh -i ~/.ssh/id_inspect -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" < scripts/support/credit_use_inspect.php
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_inspect
