@@ -158,9 +158,10 @@ $predict = function (array $m, array $r, bool $withMoods = true): float {
     return max(0.3, $s);
 };
 
-/** Fits every number together on these voices. */
-$fitAll = function (array $list, bool $withMoods, array $keep = []) use ($predict, $median, $solve, $families, $columnsAll): array {
-    $m = ['beta' => [], 'factors' => ['style' => [], 'emotion' => [], 'dialect' => [], 'direction' => [], 'mood' => []], 'slower' => UsageEstimator::SLOWER_POWER, 'faster' => UsageEstimator::FASTER_POWER];
+/** Fits every number together on these voices ($pace: the pace powers, kept as given). */
+$fitAll = function (array $list, bool $withMoods, array $keep = [], ?array $pace = null) use ($predict, $median, $solve, $families, $columnsAll): array {
+    $m = ['beta' => [], 'factors' => ['style' => [], 'emotion' => [], 'dialect' => [], 'direction' => [], 'mood' => []],
+        'slower' => $pace['slower'] ?? UsageEstimator::SLOWER_POWER, 'faster' => $pace['faster'] ?? UsageEstimator::FASTER_POWER];
     foreach (['ar', 'en'] as $lang) {
         $m['beta'][$lang] = UsageEstimator::MODEL[VoiceTier::HD][$lang];
     }
@@ -255,7 +256,7 @@ $fitAll = function (array $list, bool $withMoods, array $keep = []) use ($predic
         // are the ones that show what the setting does).
         foreach (['slower' => fn ($r) => $r['speed'] < 0.999, 'faster' => fn ($r) => $r['speed'] > 1.001] as $which => $pick) {
             $paced = array_values(array_filter($list, $pick));
-            if (count($paced) < 20) {
+            if ($pace !== null || count($paced) < 20) {
                 continue;
             }
             $best = null;
@@ -341,6 +342,56 @@ foreach (['style' => 10, 'emotion' => 8, 'dialect' => 8, 'mood' => 8, 'direction
     }
 }
 
+// ---------------------------------------------------------------- by language: one set of factors for both, or each its own
+// Today's numbers as a fitted model, with another pace if given.
+$todayModel = fn (array $pace = []): array => ['beta' => UsageEstimator::MODEL[VoiceTier::HD],
+    'factors' => ['style' => UsageEstimator::STUDIO_FACTORS['performance_style'], 'emotion' => UsageEstimator::STUDIO_FACTORS['emotion'],
+        'dialect' => UsageEstimator::STUDIO_FACTORS['dialect'], 'direction' => ['written' => UsageEstimator::DIRECTION_FACTOR], 'mood' => []],
+    'slower' => $pace['slower'] ?? UsageEstimator::SLOWER_POWER, 'faster' => $pace['faster'] ?? UsageEstimator::FASTER_POWER];
+$refitPace = ['slower' => $careful['slower'], 'faster' => $careful['faster']];
+$own = [];
+foreach (['ar', 'en'] as $lang) {
+    $own[$lang] = $fitAll(array_values(array_filter($train, fn ($r) => $r['lang'] === $lang)), false, $cautious, $refitPace);
+}
+$variants = [
+    "today's estimate" => fn ($r) => $r['today'],
+    "today's numbers, refit pace" => fn ($r) => $predict($todayModel($refitPace), $r, false) * 1.10,
+    'cautious refit, shared factors' => fn ($r) => $predict($careful, $r, false) * 1.10,
+    'cautious refit, own factors' => fn ($r) => $predict($own[$r['lang']], $r, false) * 1.10,
+];
+echo "\n== By language, judged on the other half (margin 1.10; pace powers ".$refitPace['slower'].'/'.$refitPace['faster']." where refit) ==\n";
+foreach (['ar', 'en'] as $lang) {
+    $part = array_values(array_filter($test, fn ($r) => $r['lang'] === $lang));
+    foreach ($variants as $label => $estimate) {
+        $score("$lang $label", $part, $estimate);
+    }
+}
+$mixed = fn ($r) => $r['lang'] === 'en' ? $predict($todayModel($refitPace), $r, false) * 1.10 : $predict($own['ar'], $r, false) * 1.10;
+$score("ar own factors + en today's, refit pace", $test, $mixed);
+$score('cautious refit, shared factors (both)', $test, $variants['cautious refit, shared factors']);
+$score('cautious refit, own factors (both)', $test, $variants['cautious refit, own factors']);
+
+echo "\n== English by setting, judged on the other half (margin 1.10) ==\n";
+$english = array_values(array_filter($test, fn ($r) => $r['lang'] === 'en'));
+foreach (['style' => 6, 'emotion' => 5, 'dialect' => 4, 'mood' => 2] as $key => $limit) {
+    foreach ($top($english, $key, $limit) as $value) {
+        $part = array_values(array_filter($english, fn ($r) => $key === 'mood' ? in_array($value, $r['moods'] ?: ['none'], true) : (($r[$key] !== '' ? $r[$key] : 'none') === $value)));
+        if (count($part) < 8) {
+            continue;
+        }
+        foreach ($variants as $label => $estimate) {
+            $score("$key $value: $label", $part, $estimate);
+        }
+    }
+}
+$short = array_values(array_filter($english, fn ($r) => $r['y'] <= 8));
+$long = array_values(array_filter($english, fn ($r) => $r['y'] > 8));
+foreach (['clips of 8 s or less' => $short, 'longer clips' => $long] as $what => $part) {
+    foreach ($variants as $label => $estimate) {
+        $score("en $what: $label", $part, $estimate);
+    }
+}
+
 // ---------------------------------------------------------------- the numbers to ship, from every voice
 // Without mood factors: on voices the fit did not see they add about a point, and the
 // studio page would need its own copy of the parsing.
@@ -385,6 +436,26 @@ foreach ($shipped as $name => $factors) {
 }
 echo "  DIRECTION_FACTOR = $direction (written directions seen: ".($counts['direction']['written'] ?? 0).")\n";
 echo '  SLOWER_POWER = '.$final['slower'].', FASTER_POWER = '.$final['faster']."\n";
+
+echo "\n== Each language its own factors, fitted on all its voices (pace as above, the rare rates as today) ==\n";
+foreach (['ar', 'en'] as $lang) {
+    $mine = array_values(array_filter($rows, fn ($r) => $r['lang'] === $lang));
+    $fit = $fitAll($mine, false, $cautious, ['slower' => $final['slower'], 'faster' => $final['faster']]);
+    $b = $fit['beta'][$lang];
+    $order = ['arabic', 'latin', 'cjk', 'mark', 'number', 'sound', 'short_pause', 'long_pause', 'sentence', 'clause', 'line', 'mood', 'base'];
+    echo "  '$lang' => [".implode(', ', array_map(fn ($c) => "'$c' => ".rtrim(rtrim(number_format((float) ($b[$c] ?? 0.0), 3, '.', ''), '0'), '.'), $order))."],\n";
+    $seen = ['style' => [], 'emotion' => [], 'dialect' => [], 'direction' => []];
+    foreach ($mine as $r) {
+        foreach (array_keys($seen) as $family) {
+            $seen[$family][$r[$family]] = ($seen[$family][$r[$family]] ?? 0) + 1;
+        }
+    }
+    foreach (['style', 'emotion', 'dialect', 'direction'] as $family) {
+        $factors = $fit['factors'][$family];
+        arsort($factors);
+        echo "    $family: ".($factors === [] ? '-' : implode(', ', array_map(fn ($v, $f) => "'$v' => ".round($f, 2).' ('.($seen[$family][$v] ?? 0).')', array_keys($factors), $factors)))."\n";
+    }
+}
 
 echo "\n== The pace setting: real length against the shipped numbers without their pace factor ==\n";
 $bucket = fn (float $speed): string => $speed < 0.55 ? '0.5' : ($speed < 0.95 ? '0.6-0.9' : ($speed <= 1.05 ? '1.0' : ($speed < 1.45 ? '1.1-1.4' : '1.5+')));
