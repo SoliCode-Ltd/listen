@@ -8,6 +8,8 @@
  * Pulcherrima, not Abeer's product voice, so it is a spare and is never labelled Abeer.
  * sa-cta-fatima is the bright campaign's closing line, in Fatima's own product voice
  * (Achernar, سعودية نجدية). Owner-approved (Saudi campaign, 2026-11-01; CTA line 2026-11-01).
+ * sa-guide-fatima is the studio scene's spoken guide in the same voice: the three steps in one read,
+ * cut at its pauses in the film (owner-approved 2026-11-02, in place of on-screen captions).
  *
  * Made by the "Launch ad voices" workflow (ad: saudi-ad):
  *   php artisan tts:showcase --set=ad --ad=saudi-ad --generate
@@ -34,5 +36,8 @@ return [
         ['slug' => 'sa-cta-fatima', 'language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Achernar', 'speaker' => 'Fatima',
             'style' => 'A Saudi woman from Riyadh, natural Najdi delivery, signing off a premium brand commercial: warm, confident and inviting, a small smile in the voice, unhurried, every word clear. Real breathing, no announcer exaggeration.',
             'text' => 'خلّ محتواك يتكلم بالصوت الصح.'],
+        ['slug' => 'sa-guide-fatima', 'language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Achernar', 'speaker' => 'Fatima',
+            'style' => 'A Saudi woman from Riyadh, natural Najdi delivery, guiding a viewer through an app, one step at a time, in a premium brand commercial: warm, friendly and clear, unhurried, a small smile in the voice, a short natural pause after each step. Real breathing, no announcer exaggeration.',
+            'text' => 'اكتب نصك. اختر الصوت واللهجة. واسمعه.'],
     ],
 ];
