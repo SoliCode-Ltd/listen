@@ -31,12 +31,8 @@ return new class extends Migration
             $table->string('stripe_subscription_id')->nullable();
             $table->string('stripe_schedule_id')->nullable()->index();
             $table->string('stripe_price_id')->nullable();
-            // The offer kept for this member (a coupon of their own, used once).
-            $table->string('stripe_coupon_id')->nullable();
-            // What the new plan costs, as promised when it was chosen (US cents).
+            // What the new plan costs: its full price, as a move down has no offer (US cents).
             $table->unsignedInteger('amount_cents')->default(0);
-            $table->unsignedInteger('first_amount_cents')->nullable();
-            $table->json('discount')->nullable();
             // The price as the member was shown it when they chose the plan, in English and
             // Arabic and in their money, for the emails that follow.
             $table->json('terms')->nullable();

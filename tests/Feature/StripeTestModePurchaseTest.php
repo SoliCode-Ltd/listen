@@ -456,22 +456,21 @@ class StripeTestModePurchaseTest extends TestCase
         ]);
     }
 
-    /** An offer running on the lower plan when it is chosen is charged at the renewal, after the offer ended. */
-    public function test_a_kept_offer_is_charged_at_the_renewal(): void
+    /** A move down is charged the lower plan's full price at the renewal, even while that plan has an offer. */
+    public function test_a_move_down_is_charged_the_full_price_while_the_lower_plan_has_an_offer(): void
     {
         $coupon = Cashier::stripe()->coupons->create(['percent_off' => 50, 'duration' => 'once', 'redeem_by' => time() + 3600]);
         Plan::query()->where('slug', 'starter')->update(['discount_percentage' => 50, 'discount_ends_at' => now()->addHour(), 'stripe_coupon_id' => $coupon->id]);
         [$user, $clock, $subscriptionId] = $this->creatorMemberOnAClock('downgrade-offer');
 
         $this->postJsonLocalizedRoute('billing.subscribe', ['plan' => 'starter', 'billing_cycle' => 'monthly'])->assertOk();
-        // The offer ends and its own coupon goes, long before the renewal.
-        Cashier::stripe()->coupons->delete($coupon->id, []);
 
         $live = Cashier::stripe()->subscriptions->retrieve($subscriptionId, []);
         $this->advanceClockTo((string) $clock->id, (int) $live->items->data[0]->current_period_end + 120, $subscriptionId);
 
         $renewed = Cashier::stripe()->subscriptions->retrieve($subscriptionId, ['expand' => ['latest_invoice']]);
-        $this->assertSame((int) round(self::STARTER_CENTS / 2), (int) $renewed->latest_invoice->amount_paid, 'The kept offer was not applied.');
+        $this->assertSame(self::STARTER_CENTS, (int) $renewed->latest_invoice->amount_paid, 'A move down has no offer.');
+        rescue(fn () => Cashier::stripe()->coupons->delete($coupon->id, []), null, false);
     }
 
     /** "Keep my plan" lets the schedule go, and an upgrade afterwards is charged the difference as usual. */

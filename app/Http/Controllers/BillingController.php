@@ -79,7 +79,8 @@ class BillingController extends Controller
             'activePlan' => $activePlan,
             'currentPlanSlug' => (string) ($activePlan?->slug ?? 'free'),
             'activeTierLabel' => VoiceTier::label((string) ($activePlan?->voice_tier ?: 'standard')),
-            'plans' => $this->resolveCheckoutPlans($stripeReady, $countryContext),
+            // A move down pays the lower plan's full price: those plans show no offer.
+            'plans' => $this->resolveCheckoutPlans($stripeReady, $countryContext, $this->planChanges->plansWithoutOffer($user)),
             'yearlyDiscountPercent' => SiteSetting::yearlyDiscountPercent(),
             'selectedPlan' => in_array($selectedPlan, $validPlanSlugs, true) ? $selectedPlan : '',
             'stripeReady' => $stripeReady,
@@ -1154,7 +1155,7 @@ class BillingController extends Controller
     /**
      * A lower plan on a free trial: the trial moves to it right away, nothing is
      * charged and the trial ends on the same day; its first payment is the lower
-     * plan's (with that plan's offer when one runs, never the higher plan's).
+     * plan's full price (a move down has no offer).
      */
     private function moveTrialDown(User $user, BillingSubscription $subscription, Plan $plan, string $cycle, string $priceId, string $paymentMethod): \Illuminate\Http\JsonResponse
     {
@@ -1172,7 +1173,6 @@ class BillingController extends Controller
         $this->planChanges->releaseScheduleOf($current, (int) $user->id, 'trial_moved');
         $item = $current->items->data[0] ?? null;
         $oldPrice = (string) ($item->price->id ?? $subscription->stripe_price ?? '');
-        $couponId = $this->resolveCheckoutCouponId($plan, $cycle);
 
         // Before the update, as for any plan change on a trial (the webhook can land first).
         $this->trialOutcomes->followPrice($stripeId, $priceId);
@@ -1180,7 +1180,9 @@ class BillingController extends Controller
             $stripe->subscriptions->update($stripeId, [
                 'items' => [array_filter(['id' => (string) ($item->id ?? ''), 'price' => $priceId])],
                 'proration_behavior' => 'none',
-                'discounts' => $couponId ? [['coupon' => $couponId]] : '',
+                // A move down pays the lower plan's full price: no offer, neither the
+                // higher plan's nor the lower one's.
+                'discounts' => '',
             ]);
         } catch (\Throwable $exception) {
             $this->trialOutcomes->followPrice($stripeId, $oldPrice);
@@ -1479,11 +1481,6 @@ class BillingController extends Controller
             'lines' => [],
             'note' => $note,
             'button' => $button,
-            // What changes when the lower plan starts, beside the member's plan.
-            'changes' => $this->planChanges->differences($fromPlan, $plan, $locale),
-            'changes_title' => __('ui.plan_change.changes_title', ['date' => $date]),
-            'from_name' => $current,
-            'to_name' => $name,
         ];
     }
 
@@ -1714,7 +1711,8 @@ class BillingController extends Controller
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function resolveCheckoutPlans(bool $stripeReady, array $countryContext): array
+    /** @param  list<string>  $withoutOffer  plans shown at their full price (PlanChanges::plansWithoutOffer) */
+    private function resolveCheckoutPlans(bool $stripeReady, array $countryContext, array $withoutOffer = []): array
     {
         $locale = app()->getLocale();
 
@@ -1730,7 +1728,10 @@ class BillingController extends Controller
                 $yearlyPriceId = $this->resolveStripePriceId($slug, 'yearly');
                 return $monthlyPriceId !== '' || $yearlyPriceId !== '';
             })
-            ->map(function (Plan $plan) use ($stripeReady, $countryContext, $locale) {
+            ->map(function (Plan $plan) use ($stripeReady, $countryContext, $locale, $withoutOffer) {
+                if (in_array((string) $plan->slug, $withoutOffer, true)) {
+                    $plan = $plan->withoutOffer();
+                }
                 $slug = (string) $plan->slug;
                 $yearlyDiscountPercent = SiteSetting::yearlyDiscountPercent();
 
@@ -2067,7 +2068,7 @@ class BillingController extends Controller
         try {
             if ($scheduled && $scheduled->source === PlanChange::SOURCE_CARD && $scheduled->stripe_schedule_id
                 && trim((string) $subscription->user?->stripe_id) !== '') {
-                // The renewal the schedule will charge: the lower plan, with its kept offer.
+                // The renewal the schedule will charge: the lower plan, at its full price.
                 $stripeInvoice = Cashier::stripe()->invoices->createPreview([
                     'customer' => (string) $subscription->user->stripe_id,
                     'schedule' => (string) $scheduled->stripe_schedule_id,

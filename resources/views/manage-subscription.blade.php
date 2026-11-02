@@ -556,7 +556,7 @@
             <div class="detail-row">
               <dt>{{ __('ui.manage_subscription.next_payment') }}</dt>
               <dd>
-                <bdi>{{ $planChange['first'] ?? $planChange['price'] }}</bdi>
+                <bdi>{{ $planChange['price'] }}</bdi>
                 {{ __('ui.manage_subscription.on_date', ['date' => $planChange['date']]) }}
                 <small class="detail-sub">{{ __('ui.plan_change.charged_by_card', ['plan' => $planChange['plan']]) }}</small>
               </dd>

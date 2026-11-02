@@ -1,18 +1,18 @@
-{{-- What changes when a lower plan starts: the plan comparison's rows that differ, the
-     member's plan beside the new one (App\Services\Billing\PlanChanges::differences). The
-     billing page fills it from the order details; Manage Subscription draws it as booked. --}}
-@props(['id' => null, 'title' => '', 'from' => '', 'to' => '', 'changes' => [], 'hidden' => false])
-<div class="plan-diff" @if($id) id="{{ $id }}" @endif @if($hidden) hidden @endif>
-  <p class="plan-diff-title" data-plan-diff-title>{{ $title }}</p>
+{{-- What changes when a booked lower plan starts, on Manage Subscription: the plan
+     comparison's rows that differ, the member's plan beside the new one
+     (App\Services\Billing\PlanChanges::differences). --}}
+@props(['title' => '', 'from' => '', 'to' => '', 'changes' => []])
+<div class="plan-diff">
+  <p class="plan-diff-title">{{ $title }}</p>
   <table class="plan-diff-table">
     <thead>
       <tr>
         <td></td>
-        <th scope="col" data-plan-diff-from>{{ $from }}</th>
-        <th scope="col" data-plan-diff-to>{{ $to }}</th>
+        <th scope="col">{{ $from }}</th>
+        <th scope="col">{{ $to }}</th>
       </tr>
     </thead>
-    <tbody data-plan-diff-rows>
+    <tbody>
       @foreach($changes as $row)
         <tr>
           <th scope="row">{{ $row['label'] }}</th>
@@ -26,7 +26,6 @@
 @once
   <style>
     .plan-diff { margin-top: 1rem; }
-    .plan-diff[hidden] { display: none; }
     .plan-diff-title { margin: 0 0 .45rem; font-size: .86rem; font-weight: 700; color: var(--text); }
     .plan-diff-table { width: 100%; border-collapse: collapse; font-size: .82rem; line-height: 1.45; }
     .plan-diff-table th, .plan-diff-table td {

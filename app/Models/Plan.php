@@ -290,6 +290,18 @@ class Plan extends Model
     /**
      * Check if this plan has an active (non-expired) discount.
      */
+    /**
+     * This plan as it is charged on a move down to it: the same plan with no offer
+     * (App\Services\Billing\PlanChanges). A copy to read prices from, never saved.
+     */
+    public function withoutOffer(): static
+    {
+        $plan = clone $this;
+        $plan->forceFill(['discount_percentage' => 0, 'discount_ends_at' => null]);
+
+        return $plan;
+    }
+
     public function hasActiveDiscount(): bool
     {
         if (empty($this->discount_percentage) || $this->discount_percentage <= 0) {

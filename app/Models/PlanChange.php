@@ -30,7 +30,7 @@ class PlanChange extends Model
     protected $fillable = [
         'user_id', 'from_plan_id', 'to_plan_id', 'billing_cycle', 'source', 'status',
         'starts_at', 'period_ends_at', 'stripe_subscription_id', 'stripe_schedule_id',
-        'stripe_price_id', 'stripe_coupon_id', 'amount_cents', 'first_amount_cents', 'discount', 'terms',
+        'stripe_price_id', 'amount_cents', 'terms',
         'manual_payment_request_id', 'cancel_reason', 'applied_at', 'cancelled_at',
     ];
 
@@ -39,10 +39,8 @@ class PlanChange extends Model
         'period_ends_at' => 'datetime',
         'applied_at' => 'datetime',
         'cancelled_at' => 'datetime',
-        'discount' => 'array',
         'terms' => 'array',
         'amount_cents' => 'integer',
-        'first_amount_cents' => 'integer',
     ];
 
     public function user(): BelongsTo

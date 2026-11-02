@@ -480,6 +480,7 @@ class HomeController extends Controller
         $activePlanSlug = null;
         $activeCycle = null;
         $planChange = null;
+        $withoutOffer = [];
         if ($request->user()) {
             $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $request->user()->id);
             $activePlanSlug = (string) ($activePlan?->slug ?? 'free');
@@ -489,6 +490,8 @@ class HomeController extends Controller
             if ($activePlan && (int) $activePlan->price_cents > 0 && ! $activePlan->isPack()) {
                 $activeCycle = $planChanges->currentCycle($request->user());
             }
+            // A move down pays the lower plan's full price: those cards show no offer.
+            $withoutOffer = $planChanges->plansWithoutOffer($request->user());
             $scheduled = $planChanges->scheduledFor($request->user());
             if ($scheduled && $scheduled->toPlan) {
                 $planChange = [
@@ -503,7 +506,7 @@ class HomeController extends Controller
         $countryContext = $this->localizedPricingService->resolveCountryContext($request);
 
         return view('pricing', [
-            'pricingPlans' => $this->pricingPlans($countryContext),
+            'pricingPlans' => $this->pricingPlans($countryContext, $withoutOffer),
             'activePlanSlug' => $activePlanSlug,
             'activeCycle' => $activeCycle,
             'planChange' => $planChange,
@@ -1574,7 +1577,8 @@ class HomeController extends Controller
      * @param  array<string, mixed>  $countryContext
      * @return array<int, array<string, mixed>>
      */
-    private function pricingPlans(array $countryContext): array
+    /** @param  list<string>  $withoutOffer  plans shown at their full price (PlanChanges::plansWithoutOffer) */
+    private function pricingPlans(array $countryContext, array $withoutOffer = []): array
     {
         $plans = Plan::query()
             ->where('is_active', true)
@@ -1590,7 +1594,10 @@ class HomeController extends Controller
         // New members only get the demo: the free card then shows the demo instead of a monthly allowance.
         $freeTryChars = FreeAllowance::freePlanGivesMonthlyChars() ? null : DemoAllowance::chars();
 
-        $mapped = $plans->map(function (Plan $plan) use ($locale, $countryContext, $viewerCanBuyPack, $viewerHasPack, $freeTryChars): array {
+        $mapped = $plans->map(function (Plan $plan) use ($locale, $countryContext, $viewerCanBuyPack, $viewerHasPack, $freeTryChars, $withoutOffer): array {
+            if (in_array((string) $plan->slug, $withoutOffer, true)) {
+                $plan = $plan->withoutOffer();
+            }
             $baseMonthlyCents = max(0, (int) $plan->price_cents);
             $yearlyDiscountPercent = SiteSetting::yearlyDiscountPercent();
             $monthlyCents = max(0, (int) $plan->getEffectivePriceCents());

@@ -11,13 +11,10 @@ use App\Models\User;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Support\CreditPeriod;
-use App\Support\DiscountTerms;
 use App\Support\PlanPricingLines;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Cashier;
-use Stripe\StripeClient;
 
 /**
  * Upgrades now, downgrades at renewal.
@@ -37,9 +34,10 @@ use Stripe\StripeClient;
  *   subscription then), one paid by InstaPay or Vodafone Cash too (source "manual",
  *   applied by applyDue()).
  *
- * An offer running on the lower plan when the member chose it is kept: a coupon of
- * their own (used once, with no end date), so the offer ending or its coupon being
- * deleted before the renewal changes nothing.
+ * A move down is charged the lower plan's full price: an offer is for joining or for
+ * moving up, never for moving down (the member's own offer on the plan they leave
+ * ends with it too). The billing and pricing pages show those plans without their
+ * offer (plansWithoutOffer()), and InstaPay asks the full price (movesDown()).
  */
 final class PlanChanges
 {
@@ -75,6 +73,36 @@ final class PlanChanges
         }
 
         return $toCycle === 'yearly' ? self::UP : self::DOWN;
+    }
+
+    /** Whether choosing this plan and cycle is a move down from the member's plan. */
+    public function movesDown(User $user, Plan $to, string $cycle): bool
+    {
+        $current = $this->planAccess->resolveActivePlanForUserId((int) $user->id);
+
+        return $current !== null
+            && self::direction($current, $this->currentCycle($user), $to, $cycle === 'yearly' ? 'yearly' : 'monthly') === self::DOWN;
+    }
+
+    /**
+     * The plans whose offer this member cannot have, as an offer is for monthly billing:
+     * every plan below theirs, and their own plan when they pay yearly.
+     *
+     * @return list<string>
+     */
+    public function plansWithoutOffer(User $user): array
+    {
+        $current = $this->planAccess->resolveActivePlanForUserId((int) $user->id);
+        if ($current === null || (int) $current->price_cents <= 0 || $current->isPack()) {
+            return [];
+        }
+        $cycle = $this->currentCycle($user);
+
+        return Plan::query()->subscriptionPlans()->where('price_cents', '>', 0)->get()
+            ->filter(fn (Plan $plan): bool => self::direction($current, $cycle, $plan, 'monthly') === self::DOWN)
+            ->map(fn (Plan $plan): string => (string) $plan->slug)
+            ->values()
+            ->all();
     }
 
     public function scheduledFor(User|int $user): ?PlanChange
@@ -158,22 +186,16 @@ final class PlanChanges
             throw new \RuntimeException('The subscription schedule has no current phase.');
         }
 
-        $offer = $this->offerFor($to, $cycle);
-        $couponId = null;
         // The renewal is charged to the card the subscription uses now (or the one just given).
         $card = $paymentMethod !== '' ? $paymentMethod : $this->idOf($live->default_payment_method ?? null);
         try {
-            $couponId = $offer !== null ? $this->keptOfferCoupon($stripe, $user, $to, $offer) : null;
             $stripe->subscriptionSchedules->update((string) $schedule->id, [
                 'end_behavior' => 'release',
-                'phases' => [$current, $this->phaseFor($to, $cycle, $priceId, $couponId, $card)],
+                'phases' => [$current, $this->phaseFor($to, $cycle, $priceId, $card)],
                 'metadata' => ['listen_user_id' => (string) $user->id, 'listen_change' => 'downgrade'],
             ]);
         } catch (\Throwable $exception) {
             // Nothing half done: the subscription goes on as it was.
-            if ($couponId !== null) {
-                rescue(fn () => $stripe->coupons->delete($couponId), null, false);
-            }
             if ($existing === null) {
                 rescue(fn () => $stripe->subscriptionSchedules->release((string) $schedule->id, []), null, false);
             }
@@ -189,8 +211,8 @@ final class PlanChanges
             'stripe_subscription_id' => $stripeId,
             'stripe_schedule_id' => (string) $schedule->id,
             'stripe_price_id' => $priceId,
-            'stripe_coupon_id' => $couponId,
-        ] + $this->amounts($to, $cycle, $offer));
+            'amount_cents' => $this->fullPrice($to, $cycle),
+        ]);
     }
 
     /**
@@ -200,30 +222,19 @@ final class PlanChanges
      */
     public function scheduleCardStart(User $user, ?Plan $from, Plan $to, string $cycle, string $priceId, Carbon $startsAt, string $paymentMethod): PlanChange
     {
-        $stripe = Cashier::stripe();
-        $offer = $this->offerFor($to, $cycle);
-        $couponId = $offer !== null ? $this->keptOfferCoupon($stripe, $user, $to, $offer) : null;
-
-        try {
-            $schedule = $stripe->subscriptionSchedules->create([
-                'customer' => (string) $user->stripe_id,
-                'start_date' => $startsAt->getTimestamp(),
-                'end_behavior' => 'release',
-                // The same billing as every subscription Cashier creates.
-                'billing_mode' => ['type' => 'classic'],
-                'default_settings' => [
-                    'default_payment_method' => $paymentMethod,
-                    'collection_method' => 'charge_automatically',
-                ],
-                'phases' => [$this->phaseFor($to, $cycle, $priceId, $couponId)],
-                'metadata' => ['listen_user_id' => (string) $user->id, 'listen_change' => 'downgrade'],
-            ]);
-        } catch (\Throwable $exception) {
-            if ($couponId !== null) {
-                rescue(fn () => $stripe->coupons->delete($couponId), null, false);
-            }
-            throw $exception;
-        }
+        $schedule = Cashier::stripe()->subscriptionSchedules->create([
+            'customer' => (string) $user->stripe_id,
+            'start_date' => $startsAt->getTimestamp(),
+            'end_behavior' => 'release',
+            // The same billing as every subscription Cashier creates.
+            'billing_mode' => ['type' => 'classic'],
+            'default_settings' => [
+                'default_payment_method' => $paymentMethod,
+                'collection_method' => 'charge_automatically',
+            ],
+            'phases' => [$this->phaseFor($to, $cycle, $priceId)],
+            'metadata' => ['listen_user_id' => (string) $user->id, 'listen_change' => 'downgrade'],
+        ]);
 
         return $this->record($user, [
             'from_plan_id' => $from?->id,
@@ -233,8 +244,8 @@ final class PlanChanges
             'starts_at' => $startsAt,
             'stripe_schedule_id' => (string) $schedule->id,
             'stripe_price_id' => $priceId,
-            'stripe_coupon_id' => $couponId,
-        ] + $this->amounts($to, $cycle, $offer));
+            'amount_cents' => $this->fullPrice($to, $cycle),
+        ]);
     }
 
     /**
@@ -252,7 +263,8 @@ final class PlanChanges
             'starts_at' => $startsAt,
             'period_ends_at' => $cycle === 'yearly' ? $startsAt->copy()->addYear() : $startsAt->copy()->addMonth(),
             'manual_payment_request_id' => $request->id,
-        ] + $this->amounts($to, $cycle, null));
+            'amount_cents' => $this->fullPrice($to, $cycle),
+        ]);
     }
 
     /**
@@ -515,20 +527,15 @@ final class PlanChanges
      * The scheduled change in the reader's words and money, for the billing, pricing
      * and Manage Subscription pages.
      *
-     * @return array{id:int, plan:string, plan_slug:string, cycle:string, date:string, starts_at:string, current:string, price:string, first:?string, terms:string, can_keep:bool, source:string}
+     * @return array{id:int, plan:string, plan_slug:string, cycle:string, date:string, starts_at:string, current:string, price:string, terms:string, can_keep:bool, source:string, changes:list<array{label:string, from:string, to:string}>}
      */
     public function describe(PlanChange $change, array $countryContext, string $locale): array
     {
         $plan = $change->toPlan;
         $price = $this->money((int) $change->amount_cents, $change->billing_cycle, $countryContext, $locale);
-        $first = $change->first_amount_cents !== null
-            ? $this->money((int) $change->first_amount_cents, $change->billing_cycle, $countryContext, $locale)
-            : null;
-        $per = __($change->billing_cycle === 'yearly' ? 'ui.plan_change.per_year' : 'ui.plan_change.per_month', ['price' => $this->isolate($price)], $locale);
-        $discount = is_array($change->discount) ? $change->discount : null;
         $terms = $change->source === PlanChange::SOURCE_MANUAL
             ? __('ui.plan_change.already_paid', [], $locale)
-            : ($plan ? $this->termsWith($plan, $change->billing_cycle, $price, $first !== null ? $discount : null, $locale) : $per);
+            : $this->perCycle($price, $change->billing_cycle, $locale);
 
         return [
             'id' => (int) $change->id,
@@ -539,7 +546,6 @@ final class PlanChanges
             'starts_at' => $change->starts_at->toIso8601String(),
             'current' => $change->fromPlan ? ($change->fromPlan->getLocalizedName($locale) ?: (string) $change->fromPlan->name) : '',
             'price' => $price,
-            'first' => $first,
             'terms' => $terms,
             'can_keep' => $change->canBeKept(),
             'source' => (string) $change->source,
@@ -557,7 +563,7 @@ final class PlanChanges
         $terms = [];
         foreach (['en', 'ar'] as $locale) {
             $line = $this->describe($change, $countryContext, $locale);
-            $terms[$locale] = ['terms' => $line['terms'], 'price' => $line['price'], 'first' => $line['first']];
+            $terms[$locale] = ['terms' => $line['terms'], 'price' => $line['price']];
         }
         $change->forceFill(['terms' => $terms])->save();
     }
@@ -637,37 +643,17 @@ final class PlanChanges
     }
 
     /**
-     * What a plan costs from its first payment, in the reader's money: "EGP 112 a
-     * month", or with an offer running now "50% off your first month, then EGP
-     * 112/month." (the plan cards' words).
+     * What a lower plan costs from its first payment, in the reader's money: "EGP 112 a
+     * month" (a move down pays the full price).
      */
     public function terms(Plan $plan, string $cycle, array $countryContext, string $locale): string
     {
-        $full = $this->amounts($plan, $cycle, null)['amount_cents'];
-
-        return $this->termsWith($plan, $cycle, $this->money($full, $cycle, $countryContext, $locale), $this->offerFor($plan, $cycle), $locale);
+        return $this->perCycle($this->money($this->fullPrice($plan, $cycle), $cycle, $countryContext, $locale), $cycle, $locale);
     }
 
-    /** @param  array{percent:int, duration:string, months:?int, plan_duration:string}|null  $offer */
-    private function termsWith(Plan $plan, string $cycle, string $price, ?array $offer, string $locale): string
+    private function perCycle(string $price, string $cycle, string $locale): string
     {
-        if ($offer === null) {
-            return __($cycle === 'yearly' ? 'ui.plan_change.per_year' : 'ui.plan_change.per_month', ['price' => $this->isolate($price)], $locale);
-        }
-
-        // The offer as it was when the member chose it, in the same words as the plan cards.
-        $kept = (clone $plan)->forceFill([
-            'discount_duration' => $offer['plan_duration'] ?? Plan::DISCOUNT_FIRST_PAYMENT,
-            'discount_duration_months' => $offer['months'] ?? null,
-        ]);
-        $previous = app()->getLocale();
-        app()->setLocale($locale);
-        try {
-            // DiscountTerms keeps the price in its own direction itself.
-            return DiscountTerms::line($kept, $cycle, (int) $offer['percent'], $price);
-        } finally {
-            app()->setLocale($previous);
-        }
+        return __($cycle === 'yearly' ? 'ui.plan_change.per_year' : 'ui.plan_change.per_month', ['price' => $this->isolate($price)], $locale);
     }
 
     /** "30 Nov 2026" in the reader's language. */
@@ -676,41 +662,10 @@ final class PlanChanges
         return Carbon::instance($date)->locale($locale)->translatedFormat('j M Y');
     }
 
-    /**
-     * The offer on a plan when the member chooses it, for monthly billing only (a
-     * yearly plan keeps its yearly saving instead), or null.
-     *
-     * @return array{percent:int, duration:string, months:?int, plan_duration:string}|null
-     */
-    public function offerFor(Plan $plan, string $cycle): ?array
+    /** The plan's own price for a cycle, in US cents: monthly, or a year less the yearly saving. */
+    private function fullPrice(Plan $plan, string $cycle): int
     {
-        if ($cycle === 'yearly' || ! $plan->hasActiveDiscount()) {
-            return null;
-        }
-
-        $stripe = $plan->stripeCouponDuration();
-
-        return [
-            'percent' => max(1, min(99, (int) $plan->discount_percentage)),
-            'duration' => (string) $stripe['duration'],
-            'months' => isset($stripe['duration_in_months']) ? (int) $stripe['duration_in_months'] : null,
-            'plan_duration' => $plan->discountDuration(),
-        ];
-    }
-
-    /**
-     * @param  array{percent:int, duration:string, months:?int, plan_duration:string}|null  $offer
-     * @return array{amount_cents:int, first_amount_cents:?int, discount:?array}
-     */
-    private function amounts(Plan $plan, string $cycle, ?array $offer): array
-    {
-        $full = $cycle === 'yearly' ? $plan->getEffectiveYearlyPriceCents() : (int) $plan->price_cents;
-
-        return [
-            'amount_cents' => max(0, $full),
-            'first_amount_cents' => $offer !== null ? (int) round($full * (100 - $offer['percent']) / 100) : null,
-            'discount' => $offer,
-        ];
+        return max(0, $cycle === 'yearly' ? $plan->getEffectiveYearlyPriceCents() : (int) $plan->price_cents);
     }
 
     private function money(int $usdCents, string $cycle, array $countryContext, string $locale): string
@@ -724,31 +679,12 @@ final class PlanChanges
     }
 
     /**
-     * The offer kept for this member: a coupon of their own, used once, with no end
-     * date. The plan's own coupon ends with the offer and is deleted then.
+     * The lower plan's phase, at its full price: a phase without discounts drops the
+     * offer of the plan before it (Stripe unsets what a phase leaves out).
      *
-     * @param  array{percent:int, duration:string, months:?int, plan_duration:string}  $offer
+     * @return array<string, mixed>
      */
-    private function keptOfferCoupon(StripeClient $stripe, User $user, Plan $plan, array $offer): string
-    {
-        $coupon = $stripe->coupons->create(array_filter([
-            'percent_off' => (float) $offer['percent'],
-            'duration' => $offer['duration'],
-            'duration_in_months' => $offer['duration'] === 'repeating' ? $offer['months'] : null,
-            'max_redemptions' => 1,
-            'name' => mb_substr($plan->name.' - '.$offer['percent'].'% Off', 0, 40),
-            'metadata' => [
-                'listen_plan_slug' => (string) $plan->slug,
-                'listen_plan_id' => (string) $plan->id,
-                'listen_kept_for_user' => (string) $user->id,
-            ],
-        ], fn ($value) => $value !== null));
-
-        return (string) $coupon->id;
-    }
-
-    /** @return array<string, mixed> */
-    private function phaseFor(Plan $plan, string $cycle, string $priceId, ?string $couponId, string $paymentMethod = ''): array
+    private function phaseFor(Plan $plan, string $cycle, string $priceId, string $paymentMethod = ''): array
     {
         return [
             'items' => [['price' => $priceId, 'quantity' => 1]],
@@ -756,8 +692,7 @@ final class PlanChanges
             'proration_behavior' => 'none',
             // Entering the phase writes these onto the subscription.
             'metadata' => ['listen_plan_slug' => (string) $plan->slug, 'listen_billing_cycle' => $cycle],
-        ] + ($couponId !== null ? ['discounts' => [['coupon' => $couponId]]] : [])
-            + ($paymentMethod !== '' ? ['default_payment_method' => $paymentMethod] : []);
+        ] + ($paymentMethod !== '' ? ['default_payment_method' => $paymentMethod] : []);
     }
 
     private function idOf(mixed $value): string
@@ -869,30 +804,20 @@ final class PlanChanges
                         && (string) $earlier->stripe_schedule_id !== (string) ($attributes['stripe_schedule_id'] ?? '')) {
                         $this->letGoInStripe($earlier);
                     }
-                    $this->markCancelled($earlier, 'replaced', $attributes['stripe_coupon_id'] ?? null);
+                    $this->markCancelled($earlier, 'replaced');
                 });
 
             return PlanChange::query()->create($attributes + ['user_id' => $user->id, 'status' => PlanChange::STATUS_SCHEDULED]);
         });
     }
 
-    private function markCancelled(PlanChange $change, string $reason, ?string $keepCoupon = null): PlanChange
+    private function markCancelled(PlanChange $change, string $reason): PlanChange
     {
         $change->forceFill([
             'status' => PlanChange::STATUS_CANCELLED,
             'cancelled_at' => now(),
             'cancel_reason' => mb_substr($reason, 0, 40),
         ])->save();
-
-        // Its kept offer was never used: no coupon is left behind.
-        $coupon = (string) $change->stripe_coupon_id;
-        if ($coupon !== '' && $coupon !== $keepCoupon) {
-            try {
-                Cashier::stripe()->coupons->delete($coupon);
-            } catch (\Throwable $exception) {
-                Log::info('A kept-offer coupon could not be deleted.', ['coupon' => $coupon, 'error' => $exception->getMessage()]);
-            }
-        }
 
         return $change;
     }

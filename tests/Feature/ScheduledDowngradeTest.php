@@ -239,7 +239,6 @@ class ScheduledDowngradeTest extends TestCase
         $this->assertSame($this->periodEnd, $change->starts_at->getTimestamp());
         $this->assertSame('sub_sched_1', $change->stripe_schedule_id);
         $this->assertSame(900, $change->amount_cents);
-        $this->assertNull($change->first_amount_cents);
     }
 
     public function test_yearly_to_monthly_on_the_same_plan_waits_for_the_end_of_the_year(): void
@@ -255,69 +254,46 @@ class ScheduledDowngradeTest extends TestCase
         $this->assertSame('monthly', PlanChange::query()->sole()->billing_cycle);
     }
 
-    public function test_a_running_offer_on_the_lower_plan_is_kept_in_a_coupon_of_its_own(): void
+    public function test_a_move_down_pays_the_full_price_even_while_the_lower_plan_has_an_offer(): void
     {
         $this->starter->forceFill(['discount_percentage' => 50, 'discount_ends_at' => now()->addDay(), 'stripe_coupon_id' => 'listen_starter_discount_50'])->save();
         $user = $this->cardMember();
 
         $this->preview($user, 'starter')->assertOk()
-            ->assertJsonPath('note', fn (string $note) => str_contains($note, '50% off your first month'));
+            ->assertJsonPath('note', fn (string $note) => str_contains($note, '$9.00') && ! str_contains($note, '50%'));
         $this->subscribe($user, 'starter')->assertOk();
 
-        $coupon = $this->stripe->last('post', '/v1/coupons');
-        $this->assertSame('50', (string) $coupon['percent_off']);
-        $this->assertSame('once', $coupon['duration']);
-        $this->assertSame('1', (string) $coupon['max_redemptions']);
-        $this->assertArrayNotHasKey('redeem_by', $coupon, 'The kept offer never runs out before the renewal.');
-        $update = $this->stripe->last('post', '/v1/subscription_schedules/sub_sched_1');
-        $this->assertSame([['coupon' => 'coupon_kept_1']], $update['phases'][1]['discounts']);
-
+        // An offer is for joining or moving up: the lower plan's phase carries none.
+        $this->assertNull($this->stripe->last('post', '/v1/coupons'), 'No coupon is made for a move down.');
+        $this->assertArrayNotHasKey('discounts', $this->stripe->last('post', '/v1/subscription_schedules/sub_sched_1')['phases'][1]);
         $change = PlanChange::query()->sole();
-        $this->assertSame('coupon_kept_1', $change->stripe_coupon_id);
-        $this->assertSame(450, $change->first_amount_cents);
-        $this->assertSame(50, $change->discount['percent']);
-
-        // Weeks later the offer is over and its coupon deleted: the member still gets it.
-        $this->starter->forceFill(['discount_percentage' => null, 'discount_ends_at' => null, 'stripe_coupon_id' => null])->save();
+        $this->assertSame(900, $change->amount_cents);
         $line = app(PlanChanges::class)->describe($change->fresh(['toPlan', 'fromPlan']), app(\App\Services\LocalizedPricingService::class)->resolveCountryContext(request()), 'en');
-        $this->assertStringContainsString('50% off your first month', $line['terms']);
+        $this->assertSame('$9.00 a month', str_replace(["\u{2066}", "\u{2069}"], '', $line['terms']));
         $this->assertSame('20 Nov 2026', $line['date']);
         $this->assertTrue($line['can_keep']);
     }
 
-    public function test_an_offer_for_several_months_is_kept_for_as_many_months(): void
+    public function test_the_members_own_offer_runs_to_the_renewal_and_does_not_follow_them_down(): void
     {
-        $this->starter->forceFill(['discount_percentage' => 30, 'discount_duration' => Plan::DISCOUNT_FIRST_MONTHS, 'discount_duration_months' => 3, 'stripe_coupon_id' => 'listen_starter_discount_30_m3'])->save();
         $user = $this->cardMember();
+        $this->stripe->subscription['discounts'] = [['coupon' => 'listen_creator_discount_20', 'discount' => 'di_creator']];
 
         $this->subscribe($user, 'starter')->assertOk();
 
-        $coupon = $this->stripe->last('post', '/v1/coupons');
-        $this->assertSame('repeating', $coupon['duration']);
-        $this->assertSame('3', (string) $coupon['duration_in_months']);
-    }
-
-    public function test_an_offer_is_for_monthly_billing_only(): void
-    {
-        $this->starter->forceFill(['discount_percentage' => 50, 'stripe_coupon_id' => 'listen_starter_discount_50'])->save();
-        $user = $this->cardMember();
-
-        $this->subscribe($user, 'starter', 'yearly')->assertOk()->assertJsonPath('scheduled', true);
-
-        $this->assertNull($this->stripe->last('post', '/v1/coupons'));
-        $this->assertArrayNotHasKey('discounts', $this->stripe->last('post', '/v1/subscription_schedules/sub_sched_1')['phases'][1]);
+        $update = $this->stripe->last('post', '/v1/subscription_schedules/sub_sched_1');
+        $this->assertSame([['discount' => 'di_creator']], $update['phases'][0]['discounts'], 'The month paid for keeps its offer.');
+        $this->assertArrayNotHasKey('discounts', $update['phases'][1], 'Starter starts at its full price.');
     }
 
     public function test_a_failed_schedule_update_leaves_the_subscription_as_it_was(): void
     {
-        $this->starter->forceFill(['discount_percentage' => 50, 'stripe_coupon_id' => 'listen_starter_discount_50'])->save();
         $user = $this->cardMember();
         $this->stripe->failScheduleUpdate = true;
 
         $this->subscribe($user, 'starter')->assertStatus(422)->assertJsonPath('ok', false);
 
         $this->assertNotNull($this->stripe->last('post', '/v1/subscription_schedules/sub_sched_1/release'), 'The new schedule was not let go.');
-        $this->assertNotNull($this->stripe->last('delete', '/v1/coupons/coupon_kept_1'), 'The kept coupon was left behind.');
         $this->assertSame(0, PlanChange::query()->count());
         $this->assertSame('creator', $this->planOf($user));
     }
@@ -352,7 +328,6 @@ class ScheduledDowngradeTest extends TestCase
 
     public function test_an_upgrade_lets_the_schedule_go_first_and_charges_the_difference(): void
     {
-        $this->starter->forceFill(['discount_percentage' => 50, 'stripe_coupon_id' => 'listen_starter_discount_50'])->save();
         $user = $this->cardMember();
         $this->subscribe($user, 'starter')->assertOk();
         $released = count($this->stripe->requests);
@@ -366,7 +341,6 @@ class ScheduledDowngradeTest extends TestCase
         $this->assertLessThan($change, $release, 'The schedule must go before the subscription changes.');
         $this->assertSame('price_pro_m', $this->stripe->subscription['price']);
         $this->assertSame('upgraded', PlanChange::query()->sole()->cancel_reason);
-        $this->assertNotNull($this->stripe->last('delete', '/v1/coupons/coupon_kept_1'), 'The unused kept offer was left behind.');
     }
 
     public function test_keep_my_plan_calls_off_the_switch(): void
@@ -493,6 +467,7 @@ class ScheduledDowngradeTest extends TestCase
         $trialEnds = Carbon::parse('2026-11-09 08:00:00', 'UTC')->getTimestamp();
         $user = $this->cardMember('price_creator_m', 'trialing', $trialEnds);
         $this->creator->forceFill(['discount_percentage' => 20, 'stripe_coupon_id' => 'listen_creator_discount_20'])->save();
+        $this->starter->forceFill(['discount_percentage' => 50, 'stripe_coupon_id' => 'listen_starter_discount_50'])->save();
         BillingTrial::query()->create([
             'user_id' => $user->id, 'plan_id' => $this->creator->id, 'quota_plan_id' => $this->starter->id,
             'billing_cycle' => 'monthly', 'status' => BillingTrial::STATUS_TRIALING, 'stripe_customer_id' => 'cus_dn',
@@ -503,7 +478,8 @@ class ScheduledDowngradeTest extends TestCase
         $this->preview($user, 'starter')->assertOk()
             ->assertJsonPath('kind', 'trial')
             ->assertJsonPath('button', 'Move my trial to Starter')
-            ->assertJsonPath('total', '$0.00');
+            ->assertJsonPath('total', '$0.00')
+            ->assertJsonPath('note', fn (string $note) => str_contains($note, '$9.00') && ! str_contains($note, '50%'));
 
         $this->subscribe($user, 'starter')->assertOk()
             ->assertJsonPath('trial_moved', true)
@@ -512,7 +488,7 @@ class ScheduledDowngradeTest extends TestCase
         $update = $this->stripe->lastWith('post', '/v1/subscriptions/sub_dn', 'items');
         $this->assertSame('price_starter_m', $update['items'][0]['price']);
         $this->assertSame('none', $update['proration_behavior']);
-        $this->assertSame('', $update['discounts'], "The higher plan's offer is not carried to the lower plan.");
+        $this->assertSame('', $update['discounts'], 'A move down has no offer: neither the higher plan\'s nor the lower one\'s.');
         $this->assertArrayNotHasKey('trial_end', $update, 'The trial ends on the same day.');
         $this->assertSame('starter', $this->stripe->planOfPrice($this->stripe->subscription['price']));
         $this->assertSame($this->starter->id, (int) BillingTrial::query()->sole()->plan_id);
@@ -723,19 +699,79 @@ class ScheduledDowngradeTest extends TestCase
 
     // ── What changes, and the emails ─────────────────────────────────────────
 
-    public function test_the_order_details_list_what_changes_when_the_lower_plan_starts(): void
+    public function test_what_changes_shows_on_manage_subscription_not_on_the_billing_page(): void
     {
         $user = $this->cardMember();
 
-        $preview = $this->preview($user, 'starter')->assertOk()
-            ->assertJsonPath('changes_title', 'What changes on 20 Nov 2026')
-            ->assertJsonPath('from_name', 'Creator')
-            ->assertJsonPath('to_name', 'Starter');
-        $rows = collect($preview->json('changes'))->keyBy('label');
+        $preview = $this->preview($user, 'starter')->assertOk();
+        $this->assertNull($preview->json('changes'), 'The billing page lists no changes.');
+        $this->actingAs($user)->withoutMiddleware($this->without())->get($this->localizedRoute('billing.page').'?plan=starter')
+            ->assertOk()->assertDontSee('class="plan-diff"', false);
+
+        $this->subscribe($user, 'starter')->assertOk();
+        $rows = collect(app(PlanChanges::class)->describe(PlanChange::query()->sole()->load(['toPlan', 'fromPlan']), [], 'en')['changes'])->keyBy('label');
         $this->assertNotEmpty($rows);
         $this->assertTrue($rows->every(fn ($row) => $row['from'] !== $row['to']), 'Only rows that differ.');
         $this->assertSame('5,000 characters', $rows['Max text per generation']['to'] ?? null);
         $this->assertSame('10,000 characters', $rows['Max text per generation']['from'] ?? null);
+        $this->actingAs($user)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            ->assertSee('class="plan-diff"', false)
+            ->assertSeeText('What changes on 20 Nov 2026')
+            ->assertSeeText('5,000 characters');
+    }
+
+    public function test_the_billing_and_pricing_pages_show_lower_plans_without_their_offer(): void
+    {
+        $this->starter->forceFill(['discount_percentage' => 50, 'stripe_coupon_id' => 'listen_starter_discount_50'])->save();
+        $this->pro->forceFill(['discount_percentage' => 30, 'stripe_coupon_id' => 'listen_pro_discount_30'])->save();
+        $user = $this->cardMember();
+
+        $plans = collect($this->actingAs($user)->getLocalizedRoute('billing.page')->assertOk()->viewData('plans'))->keyBy('slug');
+        $this->assertArrayNotHasKey('has_discount', $plans['starter'], 'A move down shows no offer.');
+        $this->assertSame(900, $plans['starter']['monthly']['amount_cents']);
+        $this->assertTrue($plans['pro']['has_discount'], 'A move up keeps its offer.');
+
+        $cards = collect($this->actingAs($user)->getLocalizedRoute('pricing')->assertOk()->viewData('pricingPlans'))->keyBy('slug');
+        $this->assertFalse($cards['starter']['has_discount']);
+        $this->assertSame(900, $cards['starter']['price_monthly_cents']);
+        $this->assertTrue($cards['pro']['has_discount']);
+
+        // A visitor, and a member on a lower plan, still see the offer.
+        \Illuminate\Support\Facades\Auth::logout();
+        $guest = collect($this->getLocalizedRoute('pricing')->assertOk()->viewData('pricingPlans'))->keyBy('slug');
+        $this->assertTrue($guest['starter']['has_discount']);
+    }
+
+    public function test_a_yearly_member_sees_their_own_plan_monthly_without_its_offer(): void
+    {
+        $changes = app(PlanChanges::class);
+
+        $user = $this->cardMember('price_creator_m');
+        $this->assertEqualsCanonicalizing(['basic', 'starter'], $changes->plansWithoutOffer($user), 'Monthly: only the plans below.');
+
+        BillingSubscription::query()->where('user_id', $user->id)->update(['stripe_price' => 'price_creator_y']);
+        $this->assertEqualsCanonicalizing(['basic', 'starter', 'creator'], $changes->plansWithoutOffer($user),
+            'Yearly: their own plan monthly is a move down too.');
+        $this->assertSame([], $changes->plansWithoutOffer(User::factory()->create()), 'A free member gets every offer.');
+    }
+
+    public function test_instapay_for_a_lower_plan_asks_its_full_price(): void
+    {
+        SiteSetting::set('pricing_forced_country_code', 'EG', 'billing');
+        SiteSetting::set('manual_instapay_enabled', '1', 'billing');
+        SiteSetting::set('manual_instapay_number', '0123456789', 'billing');
+        $this->starter->forceFill(['discount_percentage' => 50, 'stripe_coupon_id' => 'listen_starter_discount_50'])->save();
+        $member = $this->handPaidMember($this->creator, Carbon::parse('2026-11-12 08:00:00', 'UTC'));
+        $newcomer = User::factory()->create();
+
+        $quote = fn (User $user) => $this->actingAs($user)->withoutMiddleware($this->without())
+            ->get($this->localizedRoute('billing.manual.instructions').'?plan=starter&billing_cycle=monthly&payment_method=instapay')
+            ->assertOk()->viewData('quote');
+
+        $pricing = app(\App\Services\LocalizedPricingService::class);
+        $this->assertSame($pricing->convertUsdMinorToCurrency(900, 'EGP'), (int) $quote($member)['amount_minor'], 'A move down pays the full price.');
+        $this->assertSame($pricing->convertUsdMinorToCurrency(450, 'EGP'), (int) $quote($newcomer)['amount_minor'], 'A new member gets the offer.');
     }
 
     public function test_booking_a_lower_plan_sends_one_email_in_both_languages_with_what_changes(): void
@@ -1099,7 +1135,7 @@ class DowngradeStripeFake implements ClientInterface
                 'phases' => [[
                     'start_date' => $this->periodStart, 'end_date' => $this->periodEnd,
                     'items' => [['price' => (string) $this->subscription['price'], 'quantity' => 1]],
-                    'discounts' => [], 'metadata' => [], 'proration_behavior' => 'create_prorations',
+                    'discounts' => $this->subscription['discounts'] ?? [], 'metadata' => [], 'proration_behavior' => 'create_prorations',
                     'billing_cycle_anchor' => null, 'collection_method' => 'charge_automatically', 'currency' => 'usd',
                     'default_payment_method' => null, 'trial_end' => null,
                 ]],

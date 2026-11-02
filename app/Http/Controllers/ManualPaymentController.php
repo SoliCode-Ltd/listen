@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Middleware\CaptureAdClickId;
 use App\Models\Plan;
+use App\Models\User;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\PlanChanges;
 use App\Services\LocalizedPricingService;
 use App\Services\ManualPaymentService;
 use DomainException;
@@ -16,6 +18,7 @@ class ManualPaymentController extends Controller
         private readonly LocalizedPricingService $localizedPricingService,
         private readonly ManualPaymentService $manualPaymentService,
         private readonly CharPackService $charPacks,
+        private readonly PlanChanges $planChanges,
     ) {}
 
     /**
@@ -42,8 +45,13 @@ class ManualPaymentController extends Controller
      * @param  array<string, mixed>  $countryContext
      * @return array<string, mixed>|null
      */
-    private function quote(Plan $plan, array $validated, array $countryContext): ?array
+    private function quote(Plan $plan, array $validated, array $countryContext, ?User $user): ?array
     {
+        // A move down pays the lower plan's full price: no offer (PlanChanges).
+        if ($user && ! $plan->isPack() && $this->planChanges->movesDown($user, $plan, (string) $validated['billing_cycle'])) {
+            $plan = $plan->withoutOffer();
+        }
+
         $quote = $this->localizedPricingService->manualQuoteForPlan(
             $plan,
             $plan->isPack() ? 'monthly' : $validated['billing_cycle'],
@@ -76,7 +84,7 @@ class ManualPaymentController extends Controller
         }
 
         $countryContext = $this->localizedPricingService->resolveCountryContext($request);
-        $quote = $this->quote($plan, $validated, $countryContext);
+        $quote = $this->quote($plan, $validated, $countryContext, $request->user());
 
         abort_if($quote === null, 404);
 
@@ -122,7 +130,7 @@ class ManualPaymentController extends Controller
         }
 
         $countryContext = $this->localizedPricingService->resolveCountryContext($request);
-        $quote = $this->quote($plan, $validated, $countryContext);
+        $quote = $this->quote($plan, $validated, $countryContext, $request->user());
 
         if ($quote === null) {
             if ($request->expectsJson()) {
