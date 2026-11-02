@@ -183,9 +183,9 @@
     html[dir="rtl"] .plan-name { letter-spacing: 0; }
     .plan-desc { margin: .35rem auto 0; max-width: 30ch; color: var(--muted); font-size: .92rem; line-height: 1.55; text-wrap: balance; }
 
-    /* The offer: a label above the price on the monthly / yearly switch's grey ("30% off your
-       first month", then the day it ends on a deeper grey), the full price struck through beside
-       the price. */
+    /* The offer: a label above the price in a soft brand violet ("30% off your first month", the
+       percentage bolder, then the day it ends on a deeper violet), the full price struck through
+       beside the price. */
     .plan-offer { display: flex; justify-content: center; align-items: flex-end; padding-top: 1.05rem; }
     /* Side by side, a card without an offer keeps the row empty so its price lines up. */
     .plan-offer.is-empty { display: none; padding-top: 0; }
@@ -197,15 +197,17 @@
       max-width: 100%;
       padding: .34rem .8rem;
       border-radius: var(--radius-full);
-      background: color-mix(in oklab, var(--text) 5%, transparent);
-      color: var(--text);
+      background: color-mix(in oklab, var(--brand-accent) 9%, var(--surface));
+      box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--brand-accent) 26%, transparent);
+      color: color-mix(in oklab, var(--brand-accent) 55%, var(--text));
       font-size: .84rem;
       font-weight: 700;
       line-height: 1.4;
       text-align: center;
     }
+    .offer-num { font-size: 1.16em; font-weight: 800; color: color-mix(in oklab, var(--brand-accent) 78%, var(--text)); }
     .offer-label svg { flex: none; width: 15px; height: 15px; fill: none; stroke: var(--brand-accent); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-    /* The day the offer ends, as the label's last part on a deeper grey ("Until 30 Oct"). */
+    /* The day the offer ends, as the label's last part on a deeper violet ("Until 30 Oct"). */
     .offer-label:has(.offer-until) { align-items: stretch; padding-block: 0; padding-inline-end: 0; overflow: hidden; }
     .offer-label:has(.offer-until) svg { align-self: center; }
     .offer-label:has(.offer-until) .offer-label-text { padding-block: .34rem; }
@@ -214,7 +216,8 @@
       align-items: center;
       margin-inline-start: .35rem;
       padding: .34rem .75rem;
-      background: color-mix(in oklab, var(--text) 7%, transparent);
+      background: color-mix(in oklab, var(--brand-accent) 15%, transparent);
+      color: color-mix(in oklab, var(--brand-accent) 55%, var(--text));
       font-weight: 600;
       white-space: nowrap;
     }
