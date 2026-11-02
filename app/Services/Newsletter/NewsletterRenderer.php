@@ -3,14 +3,35 @@
 namespace App\Services\Newsletter;
 
 use App\Models\Newsletter;
+use App\Support\SiteFont;
 use Illuminate\Support\Facades\URL;
 
 class NewsletterRenderer
 {
-    /** Same stacks as resources/views/components/styles.blade.php. */
-    public const FONT_EN = "'IBM Plex Sans', sans-serif";
+    /**
+     * The emails' font: the website's own (Admin → Site Settings, App\Support\SiteFont), in
+     * both languages, so an email reads like the site. Arial where a mail app loads no web
+     * fonts: one by name, as Outlook does not take a family like sans-serif.
+     */
+    public static function fontStack(): string
+    {
+        return "'".SiteFont::current()."', Arial, sans-serif";
+    }
 
-    public const FONT_AR = "'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif";
+    /**
+     * How big the site draws the font's letters in that language (font-size-adjust): the
+     * same sizes as the site wherever a mail app draws the font. Mail apps that do not know
+     * the setting show the font sizes as written, as before.
+     */
+    public static function sizeAdjust(string $lang): float
+    {
+        return SiteFont::sizeAdjust($lang === 'ar' ? 'ar' : 'en');
+    }
+
+    public static function fontStylesheetUrl(): string
+    {
+        return SiteFont::stylesheetUrl();
+    }
 
     /**
      * @param  array{email?: string, name?: string, name_en?: string, name_ar?: string, preview?: bool, no_greeting?: bool}  $recipient
@@ -151,7 +172,8 @@ class NewsletterRenderer
             'lang' => $lang,
             'dir' => $arabic ? 'rtl' : 'ltr',
             'align' => $arabic ? 'right' : 'left',
-            'font' => $arabic ? self::FONT_AR : self::FONT_EN,
+            'font' => self::fontStack(),
+            'adjust' => self::sizeAdjust($lang),
             'preheader' => $this->personalize((string) ($arabic ? $newsletter->preheader_ar : $newsletter->preheader_en), $name),
             'eyebrow' => $this->personalize((string) ($arabic ? $newsletter->eyebrow_ar : $newsletter->eyebrow_en), $name),
             'headline' => $this->personalize((string) ($arabic ? $newsletter->headline_ar : $newsletter->headline_en), $name),

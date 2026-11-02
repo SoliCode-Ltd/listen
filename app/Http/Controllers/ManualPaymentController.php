@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Middleware\CaptureAdClickId;
 use App\Models\Plan;
+use App\Models\User;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\PlanChanges;
 use App\Services\LocalizedPricingService;
 use App\Services\ManualPaymentService;
 use DomainException;
@@ -16,6 +18,7 @@ class ManualPaymentController extends Controller
         private readonly LocalizedPricingService $localizedPricingService,
         private readonly ManualPaymentService $manualPaymentService,
         private readonly CharPackService $charPacks,
+        private readonly PlanChanges $planChanges,
     ) {}
 
     /**
@@ -38,12 +41,31 @@ class ManualPaymentController extends Controller
     }
 
     /**
+     * A lower plan paid by hand that waits for its day is already paid for: another plan
+     * paid now would call it off, so the team handles it. The member is told, or null.
+     */
+    private function paidChangeWaitingMessage(?User $user): ?string
+    {
+        $waiting = $user ? $this->planChanges->paidChangeWaiting($user) : null;
+
+        return $waiting ? __('ui.plan_change.paid_change_waiting', [
+            'plan' => $waiting->toPlan ? ($waiting->toPlan->getLocalizedName(app()->getLocale()) ?: (string) $waiting->toPlan->name) : '',
+            'date' => $this->planChanges->date($waiting->starts_at, app()->getLocale()),
+        ]) : null;
+    }
+
+    /**
      * @param  array<string, mixed>  $validated
      * @param  array<string, mixed>  $countryContext
      * @return array<string, mixed>|null
      */
-    private function quote(Plan $plan, array $validated, array $countryContext): ?array
+    private function quote(Plan $plan, array $validated, array $countryContext, ?User $user): ?array
     {
+        // A move down pays the lower plan's full price: no offer (PlanChanges).
+        if ($user && ! $plan->isPack() && $this->planChanges->movesDown($user, $plan, (string) $validated['billing_cycle'])) {
+            $plan = $plan->withoutOffer();
+        }
+
         $quote = $this->localizedPricingService->manualQuoteForPlan(
             $plan,
             $plan->isPack() ? 'monthly' : $validated['billing_cycle'],
@@ -71,12 +93,15 @@ class ManualPaymentController extends Controller
         if ($plan->isPack() && ! $this->charPacks->canBuy($request->user(), $plan)) {
             return redirect()->route('billing.pack');
         }
+        if (! $plan->isPack() && ($waiting = $this->paidChangeWaitingMessage($request->user())) !== null) {
+            return redirect()->route('billing.page')->withErrors(['manual_payment' => $waiting]);
+        }
         if ($plan->isPack()) {
             $validated['billing_cycle'] = 'one_time';
         }
 
         $countryContext = $this->localizedPricingService->resolveCountryContext($request);
-        $quote = $this->quote($plan, $validated, $countryContext);
+        $quote = $this->quote($plan, $validated, $countryContext, $request->user());
 
         abort_if($quote === null, 404);
 
@@ -117,12 +142,19 @@ class ManualPaymentController extends Controller
 
             return redirect()->route('billing.pack')->withErrors(['manual_payment' => $message]);
         }
+        if (! $plan->isPack() && ($waiting = $this->paidChangeWaitingMessage($request->user())) !== null) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => $waiting], 409);
+            }
+
+            return redirect()->route('billing.page')->withErrors(['manual_payment' => $waiting]);
+        }
         if ($plan->isPack()) {
             $validated['billing_cycle'] = 'one_time';
         }
 
         $countryContext = $this->localizedPricingService->resolveCountryContext($request);
-        $quote = $this->quote($plan, $validated, $countryContext);
+        $quote = $this->quote($plan, $validated, $countryContext, $request->user());
 
         if ($quote === null) {
             if ($request->expectsJson()) {

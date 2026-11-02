@@ -82,6 +82,14 @@ class BillingSyncService
             return;
         }
 
+        $planChanges = app(\App\Services\Billing\PlanChanges::class);
+        // Lower plans whose day has come take over first: one paid by hand, and a card plan
+        // booked to follow a plan paid by hand (Stripe started it: it is read below).
+        rescue(fn () => $planChanges->applyDue((int) $user->id));
+        if ($user->stripe_id) {
+            rescue(fn () => $planChanges->startDueCardPlans($user));
+        }
+
         // Admin can explicitly lock a user's plan by setting
         // billing_payment_state=manual_override on an active subscription.
         if ($this->hasManualPlanOverride($user)) {
@@ -153,6 +161,10 @@ class BillingSyncService
                             // unpaid one), until the grace days run out; one who never did (a
                             // free trial's first charge) moves to Free now (RenewalGrace).
                             $keepPlanAsIs = $this->renewalGrace->forBillingSync($user, $stripeSubscription, $rowBeforeRead);
+                            // A lower plan booked for this renewal: its grace days are on that plan.
+                            if ($keepPlanAsIs && $mappedPlan) {
+                                rescue(fn () => $planChanges->graceOnRenewedPlan($user, $mappedPlan, $stripeSubscription));
+                            }
                         } elseif (in_array($selectedStatus, ['incomplete', 'incomplete_expired', 'canceled'], true)
                             && $this->keepsPlanGivenByHand($user, $currentPlan, $onlyDeclined)) {
                             // Nothing live in Stripe: a declined card never moves a plan paid by hand to Free.
@@ -160,7 +172,10 @@ class BillingSyncService
                         }
 
                         $this->persistBillingSubscription($user, $stripeSubscription);
+                        // A lower plan booked for the renewal: done once Stripe switched, or called off.
+                        rescue(fn () => $planChanges->reconcile($user, $stripeSubscription));
                     } else {
+                        rescue(fn () => $planChanges->reconcile($user, null));
                         $targetPlan = $freePlan;
                         $keepPlanAsIs = $this->keepsPlanGivenByHand($user, $currentPlan, $onlyDeclined);
                         $billingSubscription = BillingSubscription::query()

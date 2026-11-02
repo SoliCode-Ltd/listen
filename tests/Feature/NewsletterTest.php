@@ -367,9 +367,12 @@ class NewsletterTest extends TestCase
         ]);
 
         $this->assertStringNotContainsString('Voice cloning', $html);
-        $this->assertStringContainsString('IBM+Plex+Sans:wght@400;500;600;700;800', $html);
-        $this->assertStringContainsString('IBM+Plex+Sans+Arabic:wght@400;500;600;700;800', $html);
-        $this->assertStringContainsString(e(NewsletterRenderer::FONT_EN), $html);
+        // The website's font, at the site's sizes; Arial where a mail app loads no web fonts.
+        $this->assertStringContainsString('family=Alexandria:', $html);
+        $this->assertStringNotContainsString('IBM+Plex', $html);
+        $this->assertStringContainsString(e("'Alexandria', Arial, sans-serif"), $html);
+        $this->assertStringContainsString('font-size-adjust:'.\App\Support\SiteFont::sizeAdjust('en'), $html);
+        $this->assertStringContainsString('<!--[if mso]>', $html);
         $this->assertStringNotContainsString('Segoe UI', $html);
         $this->assertStringNotContainsString('Tahoma', $html);
         $this->assertStringContainsString('Hello Sam,', $html);
@@ -389,7 +392,19 @@ class NewsletterTest extends TestCase
         ]);
         $this->assertStringContainsString('email-logo-ar.png', $arabicHtml);
         $this->assertStringNotContainsString('email-logo-en.png', $arabicHtml);
-        $this->assertStringContainsString(e(NewsletterRenderer::FONT_AR), $arabicHtml);
+        $this->assertStringContainsString(e(NewsletterRenderer::fontStack()), $arabicHtml);
+        $this->assertStringContainsString('font-size-adjust:'.\App\Support\SiteFont::sizeAdjust('ar'), $arabicHtml);
+    }
+
+    public function test_emails_follow_the_font_chosen_for_the_website(): void
+    {
+        \App\Models\SiteSetting::set('site_font', 'Cairo');
+        $html = app(NewsletterRenderer::class)->html(new Newsletter(Newsletter::defaultAttributes()), Newsletter::LANGUAGE_BOTH, ['name' => 'Sam']);
+
+        $this->assertStringContainsString('family=Cairo:', $html);
+        $this->assertStringContainsString(e("'Cairo', Arial, sans-serif"), $html);
+        $this->assertStringContainsString('font-size-adjust:'.\App\Support\SiteFont::sizeAdjust('ar', 'Cairo'), $html);
+        $this->assertStringNotContainsString('Alexandria', $html);
     }
 
     public function test_admin_can_open_newsletter_and_send_an_example_without_emailing_the_audience(): void

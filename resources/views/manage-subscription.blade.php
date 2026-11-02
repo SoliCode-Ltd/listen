@@ -36,6 +36,15 @@
       font-size: .7rem;
       margin-bottom: .35rem;
     }
+    .next-plan-diff { padding: .2rem .9rem .75rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    .next-plan-diff .plan-diff { margin-top: .6rem; }
+    .status-item .status-next {
+      display: block;
+      margin-top: .2rem;
+      font-size: .8rem;
+      font-weight: 500;
+      color: color-mix(in oklab, var(--brand-accent) 60%, var(--text));
+    }
     .status-item b {
       display: block;
       font-size: 1rem;
@@ -412,7 +421,13 @@
         {{ __('ui.manage_subscription.manual_pending_notice', ['plan' => $manual['pending_plan']]) }}
       </div>
     @endif
-    @if($manualNotice)
+    @php
+      $planChange = $planChange ?? null;
+      // A card plan booked to follow a plan paid by hand or given: the card is charged that day.
+      $bookedCard = $planChange && $planChange['source'] === 'card_start';
+    @endphp
+    {{-- With a switch booked, its own notice says what happens when this plan ends. --}}
+    @if($manualNotice && ! $planChange)
       <div class="message {{ $manual['expired'] ? 'error' : 'info' }}" style="margin-top:-.4rem;margin-bottom:1rem;">
         {{ $manualNotice }}
       </div>
@@ -422,11 +437,28 @@
         {{ __('ui.manage_subscription.billing_profile_removed') }}
       </div>
     @endif
+    @php
+      // A lower plan booked for the renewal (or for the day a plan paid by hand ends).
+      $changeCurrent = $planChange ? ($planChange['current'] ?: $activePlanName) : '';
+      $changeBody = $planChange ? match ($planChange['source']) {
+        'manual' => __('ui.plan_change.body_manual', ['plan' => $planChange['plan'], 'date' => $planChange['date'], 'current' => $changeCurrent]),
+        'card_start' => __('ui.plan_change.body_card_start', ['plan' => $planChange['plan'], 'date' => $planChange['date'], 'current' => $changeCurrent, 'terms' => $planChange['terms']]),
+        default => __('ui.plan_change.body', ['plan' => $planChange['plan'], 'date' => $planChange['date'], 'current' => $changeCurrent, 'terms' => $planChange['terms']]),
+      } : '';
+    @endphp
+    @if($planChange)
+      <div class="message info plan-change-notice" id="planChangeNotice" role="status" style="margin-top:-.4rem;margin-bottom:1rem;">
+        {{ $changeBody }}
+      </div>
+    @endif
 
     <div class="status-grid">
       <div class="status-item">
         <small>{{ __('ui.manage_subscription.current_plan') }}</small>
         <b>{{ $activePlanName }}</b>
+        @if($planChange)
+          <span class="status-next">{{ __('ui.plan_change.line', ['plan' => $planChange['plan'], 'date' => $planChange['date']]) }}</span>
+        @endif
       </div>
       <div class="status-item">
         <small>{{ __('ui.manage_subscription.status') }}</small>
@@ -468,6 +500,21 @@
             <dt>{{ __('ui.manage_subscription.current_plan') }}</dt>
             <dd>{{ $activePlanName }}{{ !empty($billing['cycle']) ? ' · '.$billing['cycle'] : '' }}</dd>
           </div>
+          @if($planChange)
+            <div class="detail-row" id="nextPlanRow">
+              <dt>{{ __('ui.plan_change.next_plan') }}</dt>
+              <dd>
+                {{ __('ui.plan_change.line', ['plan' => $planChange['plan'], 'date' => $planChange['date']]) }}
+                <small class="detail-sub">{{ $planChange['terms'] }}</small>
+              </dd>
+            </div>
+            @if(!empty($planChange['changes']))
+              <div class="next-plan-diff">
+                <x-plan-diff :title="__('ui.plan_change.changes_title', ['date' => $planChange['date']])"
+                  :from="$changeCurrent" :to="$planChange['plan']" :changes="$planChange['changes']" />
+              </div>
+            @endif
+          @endif
           @if(!empty($billing['since']))
             <div class="detail-row">
               <dt>{{ __('ui.manage_subscription.member_since') }}</dt>
@@ -490,7 +537,8 @@
               </div>
             @endif
           @endif
-          @if(!empty($billing['next']))
+          {{-- A plan paid by hand with a switch booked is not renewed by hand: the next plan follows it. --}}
+          @if(!empty($billing['next']) && ! ($planChange && $billing['next']['manual']))
             <div class="detail-row">
               <dt>{{ $billing['next']['manual'] ? __('ui.manage_subscription.renew_payment') : __('ui.manage_subscription.next_payment') }}</dt>
               <dd>
@@ -504,7 +552,17 @@
               </dd>
             </div>
           @endif
-          @if($noRenewal)
+          @if($bookedCard)
+            <div class="detail-row">
+              <dt>{{ __('ui.manage_subscription.next_payment') }}</dt>
+              <dd>
+                <bdi>{{ $planChange['price'] }}</bdi>
+                {{ __('ui.manage_subscription.on_date', ['date' => $planChange['date']]) }}
+                <small class="detail-sub">{{ __('ui.plan_change.charged_by_card', ['plan' => $planChange['plan']]) }}</small>
+              </dd>
+            </div>
+          @endif
+          @if($noRenewal && ! $bookedCard)
             @if($granted && empty($billing['next']))
               <div class="detail-row">
                 <dt>{{ __('ui.manage_subscription.next_payment') }}</dt>
@@ -540,12 +598,16 @@
         </div>
 
         <div class="actions">
-          @if(!empty($manual['plan_slug']))
+          @if(!empty($manual['plan_slug']) && ! $planChange)
             <a class="btn btn-primary" href="{{ route('billing.page', ['plan' => $manual['plan_slug']]) }}">{{ $granted && empty($manual['expired']) ? __('ui.manage_subscription.keep_plan') : __('ui.manage_subscription.renew_plan') }}</a>
           @endif
-          <a class="btn {{ empty($manual['plan_slug']) ? 'btn-primary' : '' }}" href="{{ route('billing.page') }}">{{ __('ui.manage_subscription.change_plan') }}</a>
+          <a class="btn {{ empty($manual['plan_slug']) || $planChange ? 'btn-primary' : '' }}" href="{{ route('billing.page') }}">{{ __('ui.manage_subscription.change_plan') }}</a>
           @if($isCancellationScheduled)
             <button class="btn btn-primary" id="resumeBtn" type="button">{{ __('ui.manage_subscription.resume_subscription') }}</button>
+          @endif
+          @if($planChange && $planChange['can_keep'])
+            <button class="btn" id="keepPlanBtn" type="button"
+              data-confirm="{{ __('ui.plan_change.keep_confirm', ['current' => $changeCurrent, 'plan' => $planChange['plan']]) }}">{{ __('ui.plan_change.keep_button', ['plan' => $changeCurrent]) }}</button>
           @endif
           @if($hasCancelableSubscription)
             <button class="btn btn-danger" id="cancelBtn" type="button"@if(!empty($cancelEndsNow)) data-confirm="{{ __('ui.manage_subscription.confirm_cancel_unpaid_prompt') }}"@endif>{{ __('ui.manage_subscription.cancel_subscription') }}</button>
@@ -558,7 +620,7 @@
             <span>{{ __('ui.manage_subscription.cancel_unpaid_note') }}</span>
           </p>
         @endif
-        @if($noRenewal && ! $hasCancelableSubscription)
+        @if($noRenewal && ! $hasCancelableSubscription && ! $planChange)
           <p class="no-cancel-note">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 11v5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="7.9" r="1.05" fill="currentColor"/></svg>
             <span>{{ !empty($manual['ends_at'])
@@ -681,6 +743,7 @@
   @include('components.scripts')
   @php
     $manageSubscriptionI18n = [
+      'keep_failed' => __('ui.plan_change.keep_failed'),
       'update_saved_card' => __('ui.manage_subscription.update_saved_card'),
       'cancel_subscription' => __('ui.manage_subscription.cancel_subscription'),
       'stripe_not_configured' => __('ui.billing.stripe_not_configured'),
@@ -920,6 +983,29 @@
         setMessage(subscriptionMessageBox, 'error', normalizeStripeMessage(error?.message, i18n.cancellation_failed));
       } finally {
         setButtonBusy(cancelBtn, false, '', cancelBtnDefaultText);
+      }
+    });
+
+    // "Keep my plan": the lower plan waiting for the renewal is called off.
+    const keepPlanBtn = document.getElementById('keepPlanBtn');
+    keepPlanBtn?.addEventListener('click', async () => {
+      const prompt = keepPlanBtn.getAttribute('data-confirm');
+      if (prompt && !window.confirm(prompt)) return;
+      const keepDefaultText = keepPlanBtn.textContent.trim();
+      setButtonBusy(keepPlanBtn, true, keepDefaultText, keepDefaultText);
+      setMessage(subscriptionMessageBox, '', '');
+
+      try {
+        const response = await post('{{ route('billing.plan-change.keep') }}');
+        if (!response.ok || response.data?.ok === false) {
+          throw new Error(response.data?.message || i18n.keep_failed);
+        }
+
+        setMessage(subscriptionMessageBox, 'ok', response.data?.message || '');
+        setTimeout(() => window.location.reload(), 1500);
+      } catch (error) {
+        setMessage(subscriptionMessageBox, 'error', error?.message || i18n.keep_failed);
+        setButtonBusy(keepPlanBtn, false, '', keepDefaultText);
       }
     });
 

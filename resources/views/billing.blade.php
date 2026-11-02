@@ -619,6 +619,32 @@
       background: color-mix(in oklab, var(--ok) 8%, var(--surface));
       color: color-mix(in oklab, var(--ok) 85%, var(--text));
     }
+    /* A plan change already booked: calm, in the brand's colour. */
+    .message.info {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: .35rem .75rem;
+      margin: 0 0 1rem;
+      border: 1px solid color-mix(in oklab, var(--brand-accent) 28%, var(--line));
+      background: color-mix(in oklab, var(--brand-accent) 7%, var(--surface));
+      color: color-mix(in oklab, var(--brand-accent) 45%, var(--text));
+      line-height: 1.6;
+    }
+    .message.info a {
+      color: color-mix(in oklab, var(--brand-accent) 80%, var(--text));
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      white-space: nowrap;
+    }
+    .status-item .status-next {
+      display: block;
+      margin-top: .2rem;
+      font-size: .8rem;
+      font-weight: 500;
+      color: color-mix(in oklab, var(--brand-accent) 60%, var(--text));
+    }
     .message.error {
       display: block;
       border: 1px solid color-mix(in oklab, var(--danger) 40%, var(--line));
@@ -978,15 +1004,23 @@
       $plan['localized_voice_tier'] = $normalizeTierLabel((string) ($plan['voice_tier'] ?? ''));
       return $plan;
     })->values()->all();
+    // Every other plan, and the member's own plan for its other cycle (monthly to yearly,
+    // or yearly to monthly at the renewal).
+    $currentCycle = $currentCycle ?? null;
     $upgradePlansForUi = collect($plansForUi)
-      ->reject(fn (array $plan): bool => (string) ($plan['slug'] ?? '') === (string) ($currentPlanSlug ?? ''))
+      ->reject(fn (array $plan): bool => (string) ($plan['slug'] ?? '') === (string) ($currentPlanSlug ?? '') && $currentCycle === null)
+      ->map(fn (array $plan): array => $plan + ['is_current' => (string) ($plan['slug'] ?? '') === (string) ($currentPlanSlug ?? '')])
       ->values()
       ->all();
     $upgradePlanSlugs = collect($upgradePlansForUi)->pluck('slug')->all();
     $showEgyptManualMethods = (bool) ($countryContext['is_egypt'] ?? false);
     $selectedPlanValue = old('plan', $selectedPlan);
     if (!in_array((string) $selectedPlanValue, $upgradePlanSlugs, true)) {
-      $selectedPlanValue = (string) ($upgradePlanSlugs[0] ?? '');
+      // The next plan up from the member's own (plans come cheapest first), else the first other one.
+      $currentIndex = array_search((string) ($currentPlanSlug ?? ''), $upgradePlanSlugs, true);
+      $others = array_values(array_filter($upgradePlanSlugs, fn ($slug) => $slug !== (string) ($currentPlanSlug ?? '')));
+      $above = $currentIndex === false ? [] : array_slice($upgradePlanSlugs, $currentIndex + 1);
+      $selectedPlanValue = (string) ($above[0] ?? $others[0] ?? $upgradePlanSlugs[0] ?? '');
     }
     $hasUpgradePlans = !empty($upgradePlansForUi);
     $selectedBillingCycle = old('billing_cycle', (string) request('billing_cycle', 'monthly'));
@@ -1017,6 +1051,9 @@
       <div class="status-item">
         <small>{{ __('ui.billing.current_plan') }}</small>
         <b>{{ $activePlanName }}</b>
+        @if(!empty($planChange))
+          <span class="status-next">{{ __('ui.plan_change.line', ['plan' => $planChange['plan'], 'date' => $planChange['date']]) }}</span>
+        @endif
       </div>
       <div class="status-item">
         <small>{{ __('ui.billing.voice_quality') }}</small>
@@ -1037,9 +1074,17 @@
     <div class="grid-layout">
       <div class="card">
         <div class="card-header">
-          <h2>{{ __('ui.billing.upgrade_plan') }}</h2>
+          <h2>{{ $currentCycle !== null ? __('ui.billing.change_plan') : __('ui.billing.upgrade_plan') }}</h2>
           <p>{{ __('ui.billing.upgrade_plan_hint') }}</p>
         </div>
+        @if(!empty($planChange))
+          <div class="message info plan-change-notice" id="planChangeNotice" role="status">
+            <span>{{ __('ui.plan_change.billing_notice', ['plan' => $planChange['plan'], 'date' => $planChange['date'], 'current' => $planChange['current'] ?: $activePlanName]) }}</span>
+            @if($planChange['can_keep'])
+              <a href="{{ route('manage-subscription.page') }}">{{ __('ui.plan_change.keep_button', ['plan' => $planChange['current'] ?: $activePlanName]) }}</a>
+            @endif
+          </div>
+        @endif
 
         <form id="billingForm" class="form-grid" method="POST" action="{{ url()->current() }}">
           @csrf
@@ -1053,7 +1098,7 @@
                 @if($hasUpgradePlans)
                   @foreach($upgradePlansForUi as $plan)
                     <option value="{{ $plan['slug'] }}" {{ $selectedPlanValue === $plan['slug'] ? 'selected' : '' }}>
-                      {{ $plan['localized_name'] }}
+                      {{ !empty($plan['is_current']) ? __('ui.plan_change.current_option', ['plan' => $plan['localized_name']]) : $plan['localized_name'] }}
                     </option>
                   @endforeach
                 @else
@@ -1387,6 +1432,8 @@
       'decline_other_card' => __('ui.billing.decline_other_card'),
       'decline_check_card' => __('ui.billing.decline_check_card'),
       'decline_try_again_button' => __('ui.billing.decline_try_again_button'),
+      'already_on_plan' => __('ui.plan_change.already_on_plan'),
+      'manual_starts_note' => __('ui.plan_change.manual_starts_note'),
     ];
   @endphp
   <script>
@@ -1397,6 +1444,16 @@
     const hasDefaultPaymentMethod = @json((bool) $defaultPaymentMethod);
     const yearlyDiscountPercent = Number(@json((int) ($yearlyDiscountPercent ?? 0)));
     const planCatalog = @json(collect($upgradePlansForUi)->keyBy('slug')->all());
+    // The cycle the member pays for now (null on the free plan): their own plan is offered for the other one.
+    const currentCycle = @json($currentCycle);
+    // A plan paid by hand that still runs: a lower plan starts the day it ends.
+    const heldStart = @json($heldStart ?? null);
+    const lowerPlanSlugs = @json($lowerPlanSlugs ?? []);
+    function isLowerChoice(selected) {
+      if (!selected) return false;
+      if (lowerPlanSlugs.indexOf(String(selected.plan.slug || '')) !== -1) return true;
+      return Boolean(selected.plan.is_current && currentCycle === 'yearly' && selected.cycle === 'monthly');
+    }
     const initialPaymentMethod = @json($selectedPaymentMethod);
     const gadsConversionSendTo = @json(\App\Support\SeoHelper::googleAdsConversionSendTo());
     const gadsTrialConversionSendTo = @json(\App\Support\SeoHelper::googleAdsTrialConversionSendTo());
@@ -1469,6 +1526,8 @@
       url: '{{ route('billing.plan-change.preview') }}',
       cache: {},
       seq: 0,
+      // The pay button's words for a lower plan ("Switch on 30 Nov"), or none.
+      label: '',
     };
     const i18n = @json($billingI18n);
     const localeCode = String(document.documentElement.lang || '').toLowerCase();
@@ -1712,6 +1771,18 @@
       return planCatalog[String(planSelect?.value || '')] || null;
     }
 
+    // The member's own plan and cycle: there is nothing to buy.
+    function isCurrentChoice() {
+      const plan = currentPlan();
+      return Boolean(plan && plan.is_current && currentCycle && String(cycleSelect?.value || 'monthly') === currentCycle);
+    }
+
+    // The pay button says what happens: "Switch on 30 Nov" for a lower plan.
+    function refreshPayLabel() {
+      if (!subscribeBtn || paymentInFlight || selectedMethod() !== 'stripe') return;
+      subscribeBtn.textContent = planChange.label || subscribeBtnDefaultText;
+    }
+
     function cycleOptionLabel(baseLabel, discountPercent) {
       const pct = Math.max(0, Math.min(99, Math.round(Number(discountPercent || 0))));
       if (pct <= 0) return String(baseLabel || '');
@@ -1834,9 +1905,9 @@
       manualPanel?.classList.toggle('show', !usingStripe);
 
       if (subscribeBtn && !paymentInFlight) {
-        subscribeBtn.textContent = usingStripe ? subscribeBtnDefaultText : i18n.manual_submit;
+        subscribeBtn.textContent = usingStripe ? (planChange.label || subscribeBtnDefaultText) : i18n.manual_submit;
         const hasPlan = Boolean(currentPlan());
-        subscribeBtn.disabled = !hasPlan || (usingStripe ? !stripe : false);
+        subscribeBtn.disabled = !hasPlan || isCurrentChoice() || (usingStripe ? !stripe : false);
       }
 
       const trial = trialState();
@@ -1951,6 +2022,11 @@
       const destination = selected.methodMeta?.destination || {};
       manualAmount.textContent = String(selected.meta.amount_formatted || '-');
       manualCycleHint.textContent = `${i18n.you_will_pay_manually} ${String(selected.meta.amount_formatted || '-')}.`;
+      if (heldStart && isLowerChoice(selected)) {
+        manualCycleHint.textContent += ' ' + String(i18n.manual_starts_note || '')
+          .replace(':date', String(heldStart.date || ''))
+          .replace(':current', String(heldStart.current || ''));
+      }
       manualIntroText.textContent = `${String(selected.methodMeta.label || '')} - ${String(selected.methodMeta.description || '')}`;
       const paymentLink = String(destination.payment_link || '').trim();
       const qrImageUrl = String(destination.qr_image_url || '').trim();
@@ -1986,6 +2062,19 @@
         quoteCycle.textContent = '-';
         quoteHint.textContent = currentPlan() ? i18n.payment_method_unavailable : i18n.no_upgrade_plans_available;
         renderManualPanel(null);
+        renderPlanChange(null, '');
+        return;
+      }
+
+      if (isCurrentChoice()) {
+        quoteAmount.textContent = '-';
+        quoteAmountLabel.textContent = '';
+        quotePlan.textContent = String(selected.plan.localized_name || selected.plan.name || selected.plan.slug || '-');
+        quoteMethod.textContent = String(selected.methodMeta.label || i18n.payment_method_label);
+        quoteCycle.textContent = cycleLabel(selected.meta);
+        quoteHint.textContent = i18n.already_on_plan;
+        renderManualPanel(selected);
+        syncManualFields();
         renderPlanChange(null, '');
         return;
       }
@@ -2052,6 +2141,8 @@
     function renderPlanChange(selected, discountHint) {
       if (!orderDetails) return;
       const seq = ++planChange.seq;
+      planChange.label = '';
+      refreshPayLabel();
       if (!planChangeApplies(selected)) {
         orderDetails.hidden = true;
         return;
@@ -2066,9 +2157,16 @@
         if (seq !== planChange.seq) return;
         if (data && !data.change) {
           orderDetails.hidden = true;
+          // Not a plan change after all (a new plan, or a higher one on a trial): the card's
+          // own amount and terms, in place of the "working out" shown while waiting.
+          renderChargeAmountOnly(selected, discountHint);
           return;
         }
         if (!data) throw new Error('preview');
+        if (data.scheduled) {
+          paintScheduledChange(data);
+          return;
+        }
         paintPlanChange(selected, data, discountHint);
       }).catch(function() {
         if (seq !== planChange.seq) return;
@@ -2078,6 +2176,24 @@
         quoteAmount.textContent = cardCharge(selected.meta).amount || '-';
         quoteHint.textContent = i18n.order_fallback_hint;
       });
+    }
+
+    // A lower plan: nothing today; when it starts and what it costs then; the button says when.
+    function paintScheduledChange(data) {
+      orderDetails.hidden = true;
+      quoteAmountLabel.textContent = i18n.due_today;
+      quoteAmount.textContent = String(data.total || '-');
+      quoteHint.textContent = String(data.note || '');
+      planChange.label = String(data.button || '');
+      refreshPayLabel();
+    }
+
+    // The card's amount and terms (renderChargePreview's own), after a wait that turned out to be for nothing.
+    function renderChargeAmountOnly(selected, discountHint) {
+      const amountText = cardCharge(selected.meta).amount || '-';
+      quoteAmount.textContent = amountText;
+      quoteAmountLabel.textContent = discountHint ? i18n.due_today : i18n.amount_to_be_charged;
+      quoteHint.textContent = discountHint || `${i18n.you_will_be_charged} \u2066${amountText}\u2069 (${cycleLabel(selected.meta)}).`;
     }
 
     function paintPlanChange(selected, data, discountHint) {
@@ -2114,9 +2230,9 @@
       paymentInFlight = Boolean(isBusy);
       if (!subscribeBtn) return;
       const usingStripe = selectedMethod() === 'stripe';
-      subscribeBtn.disabled = Boolean(isBusy) || (usingStripe && !stripe);
+      subscribeBtn.disabled = Boolean(isBusy) || isCurrentChoice() || (usingStripe && !stripe);
       subscribeBtn.classList.toggle('is-loading', Boolean(isBusy));
-      subscribeBtn.textContent = text || (usingStripe ? subscribeBtnDefaultText : i18n.manual_submit);
+      subscribeBtn.textContent = text || (usingStripe ? (planChange.label || subscribeBtnDefaultText) : i18n.manual_submit);
     }
 
     async function post(url, payload = {}) {
@@ -2175,6 +2291,37 @@
     } catch (_error) {
       stripe = null;
     }
+    // The wallet's sheet hands over a card; paying with it takes the same steps as the card boxes.
+    // Made first, right after Stripe, so its frames start loading before the card boxes'.
+    // It is made even when the page opens on a trial or on InstaPay, so it can show once the
+    // member picks paying by card.
+    const walletStartCents = Number(currentPlan()?.payment_methods?.stripe?.[String(cycleSelect?.value || 'monthly')]?.base_usd_cents || 0);
+    walletButton = stripe && walletStartCents > 0 && window.ListenWalletButton
+      ? window.ListenWalletButton(stripe, 'wallet', {
+          mode: 'subscription',
+          amount: walletStartCents,
+          billingDetails: { name: userName || undefined, email: userEmail || undefined },
+          onConfirm: async function(paymentMethod, walletError) {
+            if (walletError) {
+              showPaymentError(walletError.type === 'card_error'
+                ? stripeDeclineError(walletError)
+                : new Error(normalizeStripeMessage(walletError.message, i18n.payment_auth_failed)), i18n.payment_auth_failed);
+              return;
+            }
+            const charge = walletCharge();
+            if (paymentInFlight || !charge || !paymentMethod) return;
+            setMessage('', '');
+            let leaving = false;
+            try {
+              leaving = await subscribeByCard(charge.selected, paymentMethod, true);
+            } catch (error) {
+              showPaymentError(error, i18n.upgrade_failed);
+            } finally {
+              if (!leaving) setSubscribeButtonBusy(false);
+            }
+          },
+        })
+      : null;
     const cardFormMissing = Boolean(stripeKey) && !stripe;
     const cardUnavailableText = cardFormMissing ? i18n.card_form_unavailable : i18n.stripe_not_configured;
     const elements = stripe ? window.ListenCardElements(stripe) : null;
@@ -2466,6 +2613,11 @@
     });
 
     planSelect?.addEventListener('change', function() {
+      // The member's own plan: offered for the cycle they don't have yet.
+      const plan = currentPlan();
+      if (plan && plan.is_current && currentCycle && cycleSelect && cycleSelect.value === currentCycle) {
+        cycleSelect.value = currentCycle === 'yearly' ? 'monthly' : 'yearly';
+      }
       syncPaymentMethods();
       renderMode();
       renderChargePreview();
@@ -2496,36 +2648,6 @@
     renderMode();
     renderChargePreview();
 
-    // The wallet's sheet hands over a card; paying with it takes the same steps as the card boxes.
-    // It is made even when the page opens on a trial or on InstaPay, so it can show once the
-    // member picks paying by card.
-    const walletStartCents = Number(currentPlan()?.payment_methods?.stripe?.[String(cycleSelect?.value || 'monthly')]?.base_usd_cents || 0);
-    walletButton = stripe && walletStartCents > 0 && window.ListenWalletButton
-      ? window.ListenWalletButton(stripe, 'wallet', {
-          mode: 'subscription',
-          amount: walletStartCents,
-          billingDetails: { name: userName || undefined, email: userEmail || undefined },
-          onConfirm: async function(paymentMethod, walletError) {
-            if (walletError) {
-              showPaymentError(walletError.type === 'card_error'
-                ? stripeDeclineError(walletError)
-                : new Error(normalizeStripeMessage(walletError.message, i18n.payment_auth_failed)), i18n.payment_auth_failed);
-              return;
-            }
-            const charge = walletCharge();
-            if (paymentInFlight || !charge || !paymentMethod) return;
-            setMessage('', '');
-            let leaving = false;
-            try {
-              leaving = await subscribeByCard(charge.selected, paymentMethod, true);
-            } catch (error) {
-              showPaymentError(error, i18n.upgrade_failed);
-            } finally {
-              if (!leaving) setSubscribeButtonBusy(false);
-            }
-          },
-        })
-      : null;
     renderWallet();
 
     // Custom file upload area

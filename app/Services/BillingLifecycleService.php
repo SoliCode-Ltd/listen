@@ -77,6 +77,23 @@ class BillingLifecycleService
                         continue;
                     }
 
+                    // A lower plan booked to follow it (paid by hand, or by card from that
+                    // day): the reminder says the switch, never "ends and does not renew".
+                    $change = app(\App\Services\Billing\PlanChanges::class)->scheduledFor($user);
+                    if ($change && $change->source !== \App\Models\PlanChange::SOURCE_CARD
+                        && $subscription->current_period_end
+                        && abs($change->starts_at->diffInMinutes($subscription->current_period_end, false)) <= 24 * 60) {
+                        if (app(\App\Services\Billing\PlanChangeEmails::class)->sendReminder($change, $day)) {
+                            $subscription->forceFill([
+                                'billing_reminder_7d_sent_at' => $day === 7 ? now() : $subscription->billing_reminder_7d_sent_at,
+                                'billing_reminder_1d_sent_at' => $day === 1 ? now() : $subscription->billing_reminder_1d_sent_at,
+                            ])->save();
+                            $sent++;
+                        }
+
+                        continue;
+                    }
+
                     // So this plan does not renew by card (paid by InstaPay / Vodafone
                     // Cash, or given by the team): say when it ends, not that it renews.
                     $periodEnd = $subscription->current_period_end?->format('M j, Y') ?? 'soon';

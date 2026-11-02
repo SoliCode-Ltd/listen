@@ -123,6 +123,18 @@ class Subscription extends Model
                 if (app(\App\Services\PlanAccessService::class)->userHasUnpaidTrialWindow((int) $user->id)) {
                     return;
                 }
+                // A move down from a dearer paid plan (a downgrade at the renewal, for one)
+                // is no welcome: the member was already paid. ("saved" still has the old row.)
+                // One that ran out days ago and comes back on a cheaper plan is welcomed.
+                $endedBefore = $subscription->getOriginal('current_period_end');
+                if (! $subscription->wasRecentlyCreated && $subscription->wasChanged('plan_id')
+                    && (string) $subscription->getOriginal('status') === 'active'
+                    && ($endedBefore === null || \Illuminate\Support\Carbon::parse($endedBefore)->gte(now()->subDays(2)))) {
+                    $before = Plan::query()->find((int) $subscription->getOriginal('plan_id'));
+                    if ($before && (int) $before->price_cents > (int) $plan->price_cents) {
+                        return;
+                    }
+                }
                 app(\App\Services\Newsletter\PaidWelcomeEmail::class)->queueWelcome($user);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Paid welcome email check failed on subscription save.', [
