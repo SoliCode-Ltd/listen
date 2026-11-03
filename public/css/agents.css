@@ -177,6 +177,22 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-field > .ag-seg { display: flex; }
 .ag-field > .ag-seg label { flex: 1 1 0; }
 .ag-field > .ag-seg span { width: 100%; justify-content: center; }
+/* The setup's business form: each question with room around it, the choices with room between them. */
+.ag-setup .ag-fields { gap: 2rem; }
+.ag-setup .ag-field { gap: .6rem; }
+.ag-setup .ag-chips { gap: .7rem .6rem; margin-top: .2rem; }
+.ag-setup .ag-field > .ag-hint:first-of-type { margin-top: -.2rem; }
+/* The customers' language: a small switch beside the dialect card, its middle on the card's middle;
+   the note that any voice speaks the dialect runs under both. */
+.ag-speaks-block { display: grid; gap: .9rem; }
+.ag-row-speaks { grid-template-columns: auto minmax(0, 1fr); gap: 1rem 1.5rem; }
+.ag-field > .ag-seg.ag-seg-fit { display: inline-flex; width: max-content; align-self: start; margin-block: 6px; }
+.ag-seg.ag-seg-fit label { flex: none; }
+.ag-seg.ag-seg-fit span { width: auto; min-height: 36px; padding: .35rem 1.05rem; font-size: .9rem; }
+@media (max-width: 640px) {
+  .ag-row-speaks { grid-template-columns: minmax(0, 1fr); }
+  .ag-field > .ag-seg.ag-seg-fit { margin-block: 0; }
+}
 .ag-error { color: var(--ag-bad); font-size: .9rem; font-weight: 600; }
 .ag-note { display: flex; gap: .6rem; padding: .85rem 1rem; border-radius: 14px; background: var(--ag-soft); color: var(--text); font-size: .92rem; line-height: 1.55; }
 
@@ -190,12 +206,22 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-checks li.is-active { color: var(--text); border-color: color-mix(in srgb, var(--a) 40%, var(--line)); }
 .ag-checks li.is-active i { border-color: var(--a); border-top-color: transparent; animation: ag-spin .8s linear infinite; }
 .ag-checks li.is-done { color: var(--text); }
+.ag-writing h2 { transition: color .3s ease; }
+.ag-writing-slow { max-width: 40ch; margin: 0 auto; text-align: center; animation: ag-fade .4s var(--ag-ease); }
+/* Ready: every line ticked, the title says so, the orb settles, then the voice step slides in. */
+.ag-writing.is-ready h2 { color: var(--accent-text, var(--a)); animation: ag-fade .35s var(--ag-ease); }
+.ag-writing.is-ready .orb { animation: ag-ready .7s var(--ag-ease); }
+@keyframes ag-ready { 40% { transform: scale(1.06); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ag-writing.is-ready .orb, .ag-writing.is-ready h2, .ag-writing-slow { animation: none; } }
 .ag-checks li.is-done i { border-color: var(--a); background: var(--a) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.4l4 4L18 8.4'/%3E%3C/svg%3E") center / 14px 14px no-repeat; animation: none; }
 @keyframes ag-spin { to { transform: rotate(360deg); } }
 
 /* Decisions. */
 .ag-decisions { display: grid; gap: 1.1rem; }
 .ag-decision h3 { font-size: 1rem; font-weight: 700; margin-bottom: .6rem; line-height: 1.5; }
+.ag-decision { margin: 0; padding: 0; border: 0; min-width: 0; }
+.ag-decision legend { padding: 0; margin-bottom: .6rem; font-size: .95rem; font-weight: 700; line-height: 1.5; }
+.ag-decision + .ag-decision { margin-top: .4rem; }
 .ag-options { display: grid; gap: .5rem; }
 .ag-option { position: relative; display: flex; align-items: center; gap: .75rem; padding: .85rem 1rem; border: 1px solid var(--line); border-radius: 14px; cursor: pointer; background: var(--bg); transition: border-color .18s ease, background .18s ease; }
 .ag-option input { accent-color: var(--a); width: 18px; height: 18px; }
@@ -214,7 +240,9 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-avatar { position: relative; width: 84px; height: 84px; border-radius: 50%; }
 .ag-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: var(--ag-soft); }
 .ag-avatar svg.ag-ring { position: absolute; inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px); max-width: none; transform: rotate(-90deg); pointer-events: none; }
-.ag-avatar svg.ag-ring circle { fill: none; stroke: var(--a); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 289; stroke-dashoffset: 289; transition: stroke-dashoffset .12s linear; }
+/* Drawn every frame while the preview plays (no transition to lag behind it); it fades as it stops. */
+.ag-avatar svg.ag-ring circle { fill: none; stroke: var(--a); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 289; stroke-dashoffset: 289; opacity: 0; transition: opacity .3s ease; will-change: stroke-dashoffset; }
+.ag-voice.is-playing .ag-avatar svg.ag-ring circle { opacity: 1; transition: opacity .15s ease; }
 .ag-play { position: absolute; bottom: -2px; inset-inline-end: -2px; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--bg); background: var(--a); color: #fff; cursor: pointer; transition: transform .2s var(--ag-spring); }
 .ag-play:hover { transform: scale(1.08); }
 .ag-play svg { width: 13px; height: 13px; fill: currentColor; }

@@ -2,6 +2,8 @@
   {{-- The studio's dialect panel (the agent's dialect is picked as in the studio). --}}
   <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
   <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
+  {{-- From one step to a step that needs the page drawn again (publishing an agent made here): a cross-fade. --}}
+  <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>
 </head>
 <body>
   @include('components.header')
@@ -80,23 +82,29 @@
                   @endforeach
                 </div>
               </div>
-              <div class="ag-row">
-                <div class="ag-field">
-                  <span class="ag-label">{{ __('agents.language_label') }}</span>
-                  <div class="ag-seg">
-                    <label><input type="radio" name="language" value="ar" {{ $lang === 'ar' ? 'checked' : '' }}><span>{{ __('agents.language_ar') }}</span></label>
-                    <label><input type="radio" name="language" value="en" {{ $lang === 'en' ? 'checked' : '' }}><span>{{ __('agents.language_en') }}</span></label>
+              {{-- The customers' language as a small switch beside the dialect card; the note that any
+                   voice speaks it runs under both, the form's full width. --}}
+              <div class="ag-speaks-block">
+                <div class="ag-row ag-row-speaks">
+                  <div class="ag-field">
+                    <span class="ag-label" id="ag-language-label">{{ __('agents.language_label') }}</span>
+                    <div class="ag-seg ag-seg-fit" role="radiogroup" aria-labelledby="ag-language-label">
+                      <label><input type="radio" name="language" value="ar" {{ $lang === 'ar' ? 'checked' : '' }}><span>{{ __('agents.language_ar') }}</span></label>
+                      <label><input type="radio" name="language" value="en" {{ $lang === 'en' ? 'checked' : '' }}><span>{{ __('agents.language_en') }}</span></label>
+                    </div>
+                  </div>
+                  <div class="ag-field ag-speaks" data-ag-dialect-field @if($lang === 'en') hidden @endif>
+                    <span class="ag-label" id="ag-dialect-label">{{ __('agents.dialect_label') }}</span>
+                    @include('agents.partials.speaks-pick', ['id' => 'ag-dialect', 'name' => 'dialect', 'labelId' => 'ag-dialect-label', 'english' => false, 'value' => $dialect, 'note' => false])
+                  </div>
+                  {{-- English agents: any English accent, as Arabic agents speak any Arabic dialect. --}}
+                  <div class="ag-field ag-speaks" data-ag-accent-field @if($lang !== 'en') hidden @endif>
+                    <span class="ag-label" id="ag-accent-label">{{ __('agents.accent_label') }}</span>
+                    @include('agents.partials.speaks-pick', ['id' => 'ag-accent', 'name' => 'accent', 'labelId' => 'ag-accent-label', 'english' => true, 'value' => $agent->dialect ?? null, 'note' => false])
                   </div>
                 </div>
-                <div class="ag-field ag-speaks" data-ag-dialect-field @if($lang === 'en') hidden @endif>
-                  <span class="ag-label" id="ag-dialect-label">{{ __('agents.dialect_label') }}</span>
-                  @include('agents.partials.speaks-pick', ['id' => 'ag-dialect', 'name' => 'dialect', 'labelId' => 'ag-dialect-label', 'english' => false, 'value' => $dialect, 'faces' => collect($voicesAr)->pluck('avatar')->filter()->take(3)->all()])
-                </div>
-                {{-- English agents: any English accent, as Arabic agents speak any Arabic dialect. --}}
-                <div class="ag-field ag-speaks" data-ag-accent-field @if($lang !== 'en') hidden @endif>
-                  <span class="ag-label" id="ag-accent-label">{{ __('agents.accent_label') }}</span>
-                  @include('agents.partials.speaks-pick', ['id' => 'ag-accent', 'name' => 'accent', 'labelId' => 'ag-accent-label', 'english' => true, 'value' => $agent->dialect ?? null, 'faces' => collect($voicesEn)->pluck('avatar')->filter()->take(3)->all()])
-                </div>
+                <div data-ag-dialect-note @if($lang === 'en') hidden @endif>@include('agents.partials.speaks-note', ['english' => false, 'faces' => collect($voicesAr)->pluck('avatar')->filter()->take(3)->all()])</div>
+                <div data-ag-accent-note @if($lang !== 'en') hidden @endif>@include('agents.partials.speaks-note', ['english' => true, 'faces' => collect($voicesEn)->pluck('avatar')->filter()->take(3)->all()])</div>
               </div>
               <div class="ag-field">
                 <label for="ag-notes">{{ __('agents.notes_label') }}</label>
@@ -113,28 +121,17 @@
             </form>
           </div>
 
-          {{-- While the agent is written, then the two decisions. --}}
-          <div class="ag-writing" data-ag-writing hidden>
+          {{-- While the agent is set up: what is happening, a line at a time (the website line only when
+               there is a website), then a moment to say it is ready before its voice is chosen. --}}
+          <div class="ag-writing" data-ag-writing hidden aria-live="polite">
             <x-orb :name="$agent?->orbName() ?? 'listen'" class="is-live" />
-            <h2>{{ __('agents.writing_title') }}</h2>
+            <h2 data-ag-writing-title data-title="{{ __('agents.writing_title') }}" data-ready="{{ __('agents.writing_ready') }}">{{ __('agents.writing_title', ['name' => $agent->name ?? __('agents.agent_name_placeholder')]) }}</h2>
             <ul class="ag-checks" data-ag-checks>
               @foreach(['read', 'facts', 'first', 'rules', 'collect'] as $k)
                 <li data-ag-check="{{ $k }}"><i></i>{{ __('agents.writing_steps.'.$k) }}</li>
               @endforeach
             </ul>
-            <p class="ag-hint" data-ag-slow hidden>{{ __('agents.writing_slow') }}</p>
-          </div>
-          <div data-ag-decisions-wrap hidden>
-            <div class="ag-pane-head">
-              <h2>{{ __('agents.decisions_title') }}</h2>
-              <p>{{ __('agents.decisions_hint') }}</p>
-            </div>
-            <p class="ag-note" data-ag-site-note hidden>{{ __('agents.website_unreadable') }}</p>
-            <div class="ag-decisions" data-ag-decisions></div>
-            <div class="ag-actions">
-              <button type="button" class="ag-btn ag-btn-ghost" data-ag-rewrite>{{ __('agents.back') }}</button>
-              <button type="button" class="ag-btn ag-btn-primary ag-btn-lg" data-ag-decided>{{ __('agents.next') }}</button>
-            </div>
+            <p class="ag-hint ag-writing-slow" data-ag-slow data-site="{{ __('agents.writing_slow_site') }}" data-plain="{{ __('agents.writing_slow') }}" hidden></p>
           </div>
         </div>
 
@@ -144,6 +141,7 @@
             <h2>{{ __('agents.voice_heading') }}</h2>
             <p>{{ __('agents.voice_hint') }}</p>
           </div>
+          <p class="ag-note" data-ag-site-note hidden>{{ __('agents.website_unreadable') }}</p>
           <div class="ag-voice-tools">
             <div class="ag-seg" role="radiogroup">
               <label><input type="radio" name="ag-voice-scope" value="suggested" checked><span>{{ __('agents.voice_suggested') }}</span></label>

@@ -603,7 +603,7 @@ class PlanResource extends Resource
                             ->hidden(fn (Get $get): bool => (bool) $get('pricing_use_custom_text')),
                     ]),
                 Forms\Components\Section::make('Plan Features (English)')
-                    ->description('Your own lines for the English card, used while "Use my own text instead" is on. An empty list starts from the automatic lines.')
+                    ->description('Your own lines for the English card, used while "Use my own text instead" is on. An empty list starts from the automatic lines. Write {agents} as a value to show this plan\'s voice agents and call minutes, always as its settings are.')
                     ->visible(fn (Get $get): bool => (bool) $get('pricing_use_custom_text'))
                     ->schema([
                         Forms\Components\Repeater::make('features_en')
@@ -652,7 +652,7 @@ class PlanResource extends Resource
                             ->collapsible(),
                     ]),
                 Forms\Components\Section::make('خصائص الخطة (العربية)')
-                    ->description('سطورك الخاصة لبطاقة الأسعار العربية، وتُستخدم عند تفعيل "Use my own text instead". القائمة الفارغة تبدأ من السطور التلقائية.')
+                    ->description('سطورك الخاصة لبطاقة الأسعار العربية، وتُستخدم عند تفعيل "Use my own text instead". القائمة الفارغة تبدأ من السطور التلقائية. اكتب {agents} في القيمة ليظهر عدد الوكلاء ودقائق المكالمات كما في إعدادات الباقة دائمًا.')
                     ->visible(fn (Get $get): bool => (bool) $get('pricing_use_custom_text'))
                     ->schema([
                         Forms\Components\Repeater::make('features_ar')

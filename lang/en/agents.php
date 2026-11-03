@@ -121,21 +121,23 @@ return [
     'notes_label' => 'Anything it must know',
     'notes_placeholder' => "Prices, opening hours, branches, delivery, how to book…\nExample: Teeth whitening 1,500 EGP. Open every day 10 am to 10 pm except Friday.",
     'notes_hint' => 'What you write here wins over your website.',
-    'write_agent' => 'Write my agent',
+    'write_agent' => 'Create my agent',
 
-    // Writing the agent (animated checklist).
-    'writing_title' => 'Writing your agent',
+    // Setting the agent up (what is happening, a line at a time).
+    'writing_title' => 'Setting up :name',
+    'writing_ready' => ':name is ready',
     'writing_steps' => [
         'read' => 'Reading your website',
-        'facts' => 'Learning your prices and hours',
-        'first' => 'Writing how it answers',
+        'facts' => 'Learning about your business',
+        'first' => 'Preparing how it greets callers',
         'rules' => 'Setting what it must never do',
-        'collect' => 'Choosing what to collect from callers',
+        'collect' => 'Choosing what to ask callers for',
     ],
-    'writing_slow' => 'Still working. Reading a website can take a little longer.',
+    'writing_slow' => 'Almost ready. This takes a few more seconds.',
+    'writing_slow_site' => 'Still reading your website. A big website can take up to a minute.',
     'website_unreadable' => 'We could not read your website, so your agent learned from your notes. You can add your prices and hours any time.',
-    'decisions_title' => 'Two quick decisions',
-    'decisions_hint' => 'We picked what most businesses choose. Change it if you like.',
+    'decisions_title' => 'Tricky moments',
+    'decisions_hint' => 'What it does when a call needs your decision. We picked what most businesses choose.',
     'recommended' => 'Recommended',
 
     // Step 2: the voice.

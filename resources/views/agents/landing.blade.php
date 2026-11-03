@@ -45,7 +45,8 @@
           $limits = \App\Support\Agents\AgentAccess::limits($p);
           $minutes = intdiv(max(0, (int) $p->monthly_chars), $rate);
           if ($limits['minutes'] > 0) { $minutes = min($minutes, $limits['minutes']); }
-          return ['name' => $p->getLocalizedName(), 'agents' => $limits['agents'], 'minutes' => $minutes, 'slug' => $p->slug];
+          return ['name' => $p->getLocalizedName(), 'agents' => $limits['agents'], 'minutes' => $minutes, 'slug' => $p->slug,
+            'concurrent' => $limits['concurrent'], 'longest' => intdiv($limits['call_seconds'], 60), 'featured' => (bool) $p->is_featured];
       })->values()->all(), [], false);
     $factIcons = [
       '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
@@ -121,14 +122,13 @@
       </div>
     </section>
 
-    {{-- Every dialect (or accent) it speaks: one tile per region, and the full list, searchable, in a dialog. --}}
+    {{-- Every dialect (or accent) it speaks: one tile per region; a tile opens the full list, searchable, in a dialog. --}}
     <section class="agl-speaks" aria-labelledby="agl-speaks-title">
       <div class="agl-speaks-head">
         <div class="agl-speaks-copy">
           <h2 id="agl-speaks-title">{{ __('agents_landing.speaks_title') }}</h2>
           <p>{{ __('agents_landing.speaks_text', ['count' => $speechCount]) }}</p>
         </div>
-        <button type="button" class="agl-speaks-more" aria-haspopup="dialog" aria-controls="agl-all-speech" data-agl-more>{{ __('agents_landing.speaks_all') }} <span dir="ltr">{{ $speechCount }}</span><svg class="agl-fwd" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       </div>
       <ul class="agl-regions" style="--cols: {{ count($speechGroups) }}">
         @foreach($speechGroups as $group)
@@ -460,21 +460,40 @@
       </ul>
     </section>
 
-    {{-- What it costs: the rate in plain words and the plans that include agents. --}}
+    {{-- What it costs: the rate in plain words, then each plan that includes agents with what it gives.
+         Every number is read from the plans' own settings (Admin → Plans → Voice agents) and the call
+         rate, so the section changes with them. --}}
     <section class="agl-section agl-price" aria-labelledby="agl-price-title">
-      <div class="agl-price-copy">
-        <h2 id="agl-price-title">{{ __('agents_landing.plans_title') }}</h2>
-        <p>{{ __('agents_landing.plans_text', ['rate' => number_format($rate)]) }}</p>
-        <p class="agl-price-free">{{ __('agents_landing.plans_free', ['seconds' => number_format(\App\Support\Agents\AgentAccess::freeTestSeconds())]) }}</p>
+      <div class="agl-price-head">
+        <div class="agl-price-copy">
+          <h2 id="agl-price-title">{{ __('agents_landing.plans_title') }}</h2>
+          <p>{{ __('agents_landing.plans_text', ['rate' => number_format($rate)]) }}</p>
+        </div>
         <a class="ag-btn ag-btn-lg" href="{{ route('pricing') }}">{{ __('agents_landing.price_cta') }}</a>
       </div>
       @if($agentPlans !== [])
-        <ul class="agl-price-plans">
+        <ul class="agl-plans" style="--cols: {{ min(4, count($agentPlans)) }}">
           @foreach($agentPlans as $plan)
-            <li><b>{{ $plan['name'] }}</b><span>{{ trans_choice('agents_landing.plans_line', $plan['agents'], ['count' => $plan['agents'], 'minutes' => number_format($plan['minutes'])]) }}</span></li>
+            <li class="agl-plan {{ $plan['featured'] ? 'is-featured' : '' }}">
+              <div class="agl-plan-head">
+                <h3>{{ $plan['name'] }}</h3>
+                @if($plan['featured'])<span class="agl-plan-tag">{{ __('ui.pricing.most_popular') }}</span>@endif
+              </div>
+              <p class="agl-plan-minutes">
+                <small>{{ __('agents_landing.plans_up_to') }}</small>
+                <b dir="ltr">{{ number_format($plan['minutes']) }}</b>
+                <span>{{ __('agents_landing.plans_minutes') }}</span>
+              </p>
+              <ul class="agl-plan-facts">
+                <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>{{ trans_choice('agents_landing.plans_agents', $plan['agents'], ['count' => $plan['agents']]) }}</li>
+                <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>{{ trans_choice('agents_landing.plans_concurrent', $plan['concurrent'], ['count' => $plan['concurrent']]) }}</li>
+                <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>{{ trans_choice('agents_landing.plans_longest', $plan['longest'], ['count' => $plan['longest']]) }}</li>
+              </ul>
+            </li>
           @endforeach
         </ul>
       @endif
+      <p class="agl-price-free"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/></svg>{{ __('agents_landing.plans_free', ['seconds' => number_format(\App\Support\Agents\AgentAccess::freeTestSeconds())]) }}</p>
     </section>
 
     <section class="agl-final" aria-labelledby="agl-final-title">

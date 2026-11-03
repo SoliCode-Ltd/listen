@@ -149,12 +149,15 @@ class AgentDesignTest extends TestCase
         $call = substr($en, strpos($en, 'data-agl-real'), 6000);
         $this->assertDoesNotMatchRegularExpression('/\p{Arabic}/u', strip_tags($call), 'the English call shows Arabic');
         $this->assertStringContainsString(__('agents_landing.real_calls.gb.label'), $en);
-        // Every accent is one tap away, with how many there are.
-        $this->assertStringContainsString(__('agents_landing.speaks_all').' <span dir="ltr">'.count(\App\Support\EnglishAccents::ALL).'</span>', $en);
+        // Every accent is one tap away: each region's tile opens the full list (no separate button).
+        $this->assertStringContainsString('data-agl-region=', $en);
+        $this->assertStringNotContainsString('agl-speaks-more', $en);
+        $this->assertStringContainsString((string) count(\App\Support\EnglishAccents::ALL), strip_tags(substr($en, strpos($en, 'agl-speaks-title'), 1500)));
 
         app()->setLocale('ar');
         $ar = (string) $this->withoutLocale()->withSession(['locale' => 'ar'])->get($this->localizedRoute('agents-landing'))->assertOk()->getContent();
-        $this->assertStringContainsString(__('agents_landing.speaks_all').' <span dir="ltr">'.count(\App\Support\ArabicDialects::ALL).'</span>', $ar);
+        $this->assertStringContainsString('data-agl-region=', $ar);
+        $this->assertStringContainsString((string) count(\App\Support\ArabicDialects::ALL), strip_tags(substr($ar, strpos($ar, 'agl-speaks-title'), 1500)));
         // The page has one orb at most, in the call; the final call to action shows Listen's mark.
         $this->assertLessThanOrEqual(1, substr_count($ar, 'data-orb="'), 'more than one orb on the page');
     }

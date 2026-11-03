@@ -221,10 +221,19 @@ class AgentController extends Controller
             }
             $agent->script = $script;
         }
-        foreach (['name', 'business_name', 'first_message', 'knowledge', 'choices', 'max_call_seconds'] as $k) {
+        foreach (['name', 'business_name', 'first_message', 'knowledge', 'max_call_seconds'] as $k) {
             if (array_key_exists($k, $data)) {
                 $agent->{$k} = $data[$k];
             }
+        }
+        // The tricky moments: the owner picks an answer; each question keeps the options it was set up with.
+        if (array_key_exists('choices', $data)) {
+            $before = collect((array) ($agent->choices ?? []))->keyBy(fn ($c) => (string) ($c['question'] ?? ''));
+            $agent->choices = array_values(array_map(fn (array $c): array => [
+                'question' => (string) $c['question'],
+                'options' => array_values(array_filter((array) ($before->get((string) $c['question'])['options'] ?? []), 'is_string')),
+                'answer' => (string) $c['answer'],
+            ], (array) $data['choices']));
         }
         if (array_key_exists('daily_minutes', $data)) {
             $settings = (array) ($agent->settings ?? []);

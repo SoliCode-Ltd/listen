@@ -152,7 +152,7 @@
               <div class="ag-setting-control">
                 <div class="ag-list-editor {{ $listKey === 'steps' ? 'is-numbered' : '' }}" data-ag-list="{{ $listKey }}">
                   @foreach(array_values((array) ($script[$listKey] ?? [])) ?: [''] as $item)
-                    <div class="ag-list-item"><textarea class="ag-input ag-grow" rows="1" dir="auto">{{ $item }}</textarea><button type="button" class="ag-btn ag-btn-sm ag-btn-ghost ag-list-x" data-ag-list-remove aria-label="{{ __('agents.edit_remove') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+                    <div class="ag-list-item"><textarea class="ag-input ag-grow" rows="1" dir="auto" aria-label="{{ __('agents.'.$label) }}">{{ $item }}</textarea><button type="button" class="ag-btn ag-btn-sm ag-btn-ghost ag-list-x" data-ag-list-remove aria-label="{{ __('agents.edit_remove') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
                   @endforeach
                 </div>
                 <button type="button" class="ag-btn ag-btn-sm ag-list-add" data-ag-list-add="{{ $listKey }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>{{ __('agents.edit_add') }}</button>
@@ -163,6 +163,25 @@
             <div class="ag-setting-label"><label for="ag-handoff">{{ __('agents.edit_handoff') }}</label><p>{{ __('agents.edit_handoff_hint') }}</p></div>
             <textarea class="ag-textarea" id="ag-handoff" name="handoff" dir="auto" style="min-height:84px">{{ $script['handoff'] ?? '' }}</textarea>
           </div>
+          {{-- The moments a call needs the owner's decision (set up with what most businesses choose). --}}
+          @php $choices = array_values(array_filter((array) ($agent->choices ?? []), fn ($c) => is_array($c) && filled($c['question'] ?? null) && count((array) ($c['options'] ?? [])) > 1)); @endphp
+          @if($choices)
+            <div class="ag-setting">
+              <div class="ag-setting-label"><span class="ag-label">{{ __('agents.decisions_title') }}</span><p>{{ __('agents.decisions_hint') }}</p></div>
+              <div class="ag-setting-control ag-decisions">
+                @foreach($choices as $qi => $choice)
+                  <fieldset class="ag-decision" data-ag-choice data-question="{{ $choice['question'] }}">
+                    <legend dir="auto">{{ $choice['question'] }}</legend>
+                    <div class="ag-options">
+                      @foreach(array_values((array) $choice['options']) as $option)
+                        <label class="ag-option"><input type="radio" name="ag-choice-{{ $qi }}" value="{{ $option }}" @checked($option === ($choice['answer'] ?? null))><span dir="auto">{{ $option }}</span></label>
+                      @endforeach
+                    </div>
+                  </fieldset>
+                @endforeach
+              </div>
+            </div>
+          @endif
           <div class="ag-setting">
             <div class="ag-setting-label"><label for="ag-max">{{ __('agents.edit_max_call') }}</label><p>{{ __('agents.edit_max_call_hint') }}</p></div>
             <div class="ag-setting-control ag-range">

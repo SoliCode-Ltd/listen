@@ -138,7 +138,7 @@ final class PlanPricingLines
         if ($plan->pricing_use_custom_text) {
             $custom = $plan->getLocalizedFeatures($locale);
             if ($custom !== null) {
-                return self::withoutClosed(array_values($custom));
+                return self::withoutClosed(self::withLiveValues($plan, array_values($custom), $locale));
             }
         }
 
@@ -175,6 +175,32 @@ final class PlanPricingLines
     }
 
     /**
+     * A hand-written line can carry a value written from the plan's own settings: {agents} becomes
+     * "3 agents, up to 94 call minutes" (Plans → Voice agents and the call rate), so the card follows
+     * the settings. The line is left out where the plan has no agents or Agents are not open yet.
+     *
+     * @param  array<int, mixed>  $lines
+     * @return array<int, mixed>
+     */
+    private static function withLiveValues(Plan $plan, array $lines, string $locale): array
+    {
+        $out = [];
+        foreach ($lines as $line) {
+            if (is_array($line) && str_contains(((string) ($line['label'] ?? '')).((string) ($line['value'] ?? '')), '{agents}')) {
+                $agents = self::agentsValue($plan, $locale);
+                if ($agents === null) {
+                    continue;
+                }
+                $line['label'] = str_replace('{agents}', $agents, (string) ($line['label'] ?? ''));
+                $line['value'] = str_replace('{agents}', $agents, (string) ($line['value'] ?? ''));
+            }
+            $out[] = $line;
+        }
+
+        return $out;
+    }
+
+    /**
      * Lines the admin wrote by hand about a feature not open to everyone yet are left
      * out, as its automatic line is: video dubbing ("Video dubbing: 20 videos", "دبلجة
      * الفيديو") until Video Dubbing → Settings opens it, Voice Design ("Voice Design: 10
@@ -188,6 +214,7 @@ final class PlanPricingLines
         $closed = array_filter([
             StudioFacts::dubbing() ? null : '\bdub|دبلج',
             VoiceDesign::audience() === VoiceDesign::AUDIENCE_EVERYONE ? null : 'voice design|design your own voices|تصميم (ال)?(صوت|أصوات)|صمّ?م أصواتك',
+            \App\Support\Agents\AgentAccess::audience() === \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE ? null : 'voice agents?|الوكلاء الصوتي|وكلاء صوتي|وكيل صوتي',
         ]);
         if ($closed === []) {
             return $lines;

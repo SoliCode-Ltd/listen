@@ -279,7 +279,7 @@
     if (!data || !data.order || !data.order.length) return;
     var key = data.order[0];
     var lines = $('[data-agl-real-lines]', box), play = $('[data-agl-real-play]', box), label = $('[data-agl-real-label]', box);
-    var face = $('[data-agl-real-face]', box), name = $('[data-agl-real-name]', box);
+    var face = $('[data-agl-real-face]', box), name = $('[data-agl-real-name]', box), flag = $('[data-agl-real-flag]', box);
     var dialect = $('[data-agl-real-dialect]', box), biz = $('[data-agl-real-biz]', box), rTitle = $('[data-agl-real-result-title]', box);
     var rName = $('[data-agl-real-result-name]', box), rPhone = $('[data-agl-real-result-phone]', box), rNote = $('[data-agl-real-result-note]', box);
     var clips = {}, levels = {}, run = null, frame = 0, photo = $('[data-agl-real-photo]', box);
@@ -288,9 +288,11 @@
 
     function call() { return data.calls[key]; }
     function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+    // The button's words (read out, not shown) and its icon: play, pause, or play again.
     function setLabel(which) {
       label.textContent = play.getAttribute('data-label-' + which) || label.textContent;
       play.setAttribute('aria-pressed', which === 'pause' ? 'true' : 'false');
+      play.setAttribute('data-state', which);
     }
 
     // A line as the stage shows it: the words (each its own span for an agent line) and, on the
@@ -315,6 +317,7 @@
       call().turns.slice(0, data.rest || 2).forEach(function (t) { var li = lineEl(t, false); li.classList.add('is-shown'); lines.appendChild(li); });
       lines.scrollTop = 0; lines.classList.remove('is-full');
       face.src = call().avatar; name.textContent = call().agent; dialect.textContent = call().dialect;
+      if (flag) { if (call().flag) flag.src = call().flag; flag.hidden = !call().flag; }
       if (biz) biz.textContent = call().business || '';
       if (photo) photo.src = call().avatar;
       level(0);
@@ -386,11 +389,18 @@
       durations(turns).then(function (lengths) {
         play.disabled = false;
         run = { i: -1, lengths: lengths, audio: null, timer: 0, stopped: false, paused: false, started: 0 };
-        lines.textContent = ''; lines.classList.remove('is-full');
         box.classList.add('is-playing');
         box.classList.remove('is-done');
         setLabel('pause');
-        next();
+        // The lines shown before the call fade up and away; then the call starts from its first line.
+        var mine = run, hadLines = lines.children.length > 0;
+        lines.classList.add('is-clearing');
+        setTimeout(function () {
+          lines.classList.remove('is-clearing');
+          if (run !== mine || mine.stopped) return;
+          lines.textContent = ''; lines.classList.remove('is-full');
+          next();
+        }, hadLines && !reduce ? 260 : 0);
       });
     }
     function next() {
@@ -510,8 +520,13 @@
         var wasPlaying = run && !run.paused;
         halt(false);
         key = k;
-        preview();
-        if (wasPlaying) start();
+        // What changes (who answers, the lines, the saved contact) fades out and back in.
+        box.classList.add('is-swapping');
+        setTimeout(function () {
+          preview();
+          requestAnimationFrame(function () { box.classList.remove('is-swapping'); });
+          if (wasPlaying) start();
+        }, reduce ? 0 : 190);
       });
     });
     // Another player on the page started: this one stops (and it stops them, above).

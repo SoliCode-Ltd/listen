@@ -11,7 +11,7 @@
   --agl-soft-2: color-mix(in srgb, var(--a) 16%, transparent);
   --agl-ok: var(--ok, #32c58d);
   /* Green for small text: readable on white and on the dark surfaces. */
-  --agl-ok-text: #0f8a5f;
+  --agl-ok-text: #0c7a54; /* 4.5:1 and more on its pale green tints */
   --agl-ink: #17144A;
   --agl-ink-2: #231d63;
   --agl-on-ink: #F3F1FF;
@@ -56,7 +56,7 @@ html[dir="rtl"] .agl-head h2 { line-height: 1.4; }
 .agl-live-btn { border-color: color-mix(in srgb, var(--a) 45%, var(--line)); color: var(--accent-text, var(--a)); }
 .agl-live-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .agl-live-btn:hover { background: var(--agl-soft); }
-.agl-live-btn:focus-visible, .agl-speaks-more:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: 2px; }
+.agl-live-btn:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: 2px; }
 /* One icon style everywhere: a soft violet tile, line icons drawn the same way. */
 .agl-icon { flex: 0 0 auto; display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--agl-soft); color: var(--accent-text, var(--a)); }
 .agl-icon svg, .agl-honest svg, .agl-flow-icon svg, .agl-facts svg, .agl-app svg, .agl-dialects svg, .agl-fwd {
@@ -80,8 +80,8 @@ html[dir="rtl"] .agl-hero h1 { font-size: clamp(2.2rem, 4vw, 3.15rem); line-heig
 .agl-hero-call { min-width: 0; scroll-margin-top: 96px; }
 .agl-hero-call .agl-real { max-width: 560px; margin-inline-start: auto; gap: .85rem; }
 /* In the hero the stage keeps to one screen: a smaller orb and fewer lines in view. */
-.agl-real.is-hero .agl-real-orb { --orb-size: clamp(104px, 10vw, 128px); }
-.agl-real.is-hero .agl-real-lines { height: 14.5rem; }
+.agl-real.is-hero .agl-real-orb { --orb-size: clamp(116px, 11vw, 140px); }
+.agl-real.is-hero .agl-real-lines { height: 15.5rem; }
 /* The one moment of motion on arrival: the words, then the call, settle in once. */
 @media (prefers-reduced-motion: no-preference) {
   .agl-hero-text > * { animation: agl-arrive .8s var(--agl-ease) both; }
@@ -98,13 +98,6 @@ html[dir="rtl"] .agl-hero h1 { font-size: clamp(2.2rem, 4vw, 3.15rem); line-heig
 .agl-speaks-copy { min-width: 0; max-width: 640px; }
 .agl-speaks-copy h2 { font-size: clamp(1.25rem, 2vw, 1.5rem); font-weight: 700; line-height: 1.4; }
 .agl-speaks-copy p { margin-top: .3rem; color: var(--muted); font-size: .98rem; line-height: 1.65; }
-.agl-speaks-more {
-  flex: 0 0 auto; display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: .45rem 1.05rem; border-radius: 999px;
-  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font: inherit; font-size: .92rem; font-weight: 700; cursor: pointer;
-  transition: border-color .2s ease, background .2s ease;
-}
-.agl-speaks-more span { color: var(--accent-text); font-variant-numeric: tabular-nums; }
-.agl-speaks-more:hover { border-color: color-mix(in srgb, var(--a) 45%, var(--line-strong)); background: var(--agl-soft); }
 /* One frame, the regions divided by hairlines (each tile draws its own start and top line; the
    frame hides the outer ones, so a short last row leaves no grey gap). */
 .agl-regions {
@@ -511,18 +504,39 @@ html[dir="rtl"] .agl-flow-lines, html[dir="rtl"] .agl-flow-out { transform: scal
 .agl-safe-list li:nth-child(odd) { border-inline-end: 1px solid var(--line); }
 
 /* ---------- What it costs: the rate in words beside the plans that include agents. ---------- */
-.agl-price { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(1.2rem, 3vw, 2.6rem); align-items: center; }
-.agl-price-copy { display: grid; gap: .7rem; justify-items: start; }
+/* What it costs: the rate above, then one card per plan with agents, side by side, each led by its
+   call minutes (the plan that sells most marked, like the pricing page), and the free test calls. */
+.agl-price { display: grid; gap: 1.6rem; }
+.agl-price-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem 2rem; flex-wrap: wrap; }
+.agl-price-copy { display: grid; gap: .6rem; max-width: 640px; }
 .agl-price h2 { font-size: clamp(1.6rem, 2.8vw, 2.15rem); font-weight: 700; line-height: 1.25; }
 html[dir="rtl"] .agl-price h2 { line-height: 1.45; }
-.agl-price-copy p { color: var(--muted); line-height: 1.7; max-width: 52ch; }
-.agl-price .agl-price-free { font-size: .9rem; }
-.agl-price-copy .ag-btn { margin-top: .4rem; }
-.agl-price-plans { display: grid; border: 1px solid var(--line); border-radius: var(--agl-r); overflow: hidden; background: var(--surface); }
-.agl-price-plans li { display: flex; align-items: baseline; justify-content: space-between; gap: .3rem 1rem; flex-wrap: wrap; padding: .95rem 1.15rem; }
-.agl-price-plans li + li { border-top: 1px solid var(--line); }
-.agl-price-plans b { font-weight: 700; }
-.agl-price-plans span { color: var(--muted); font-size: .92rem; }
+.agl-price-copy p { color: var(--muted); line-height: 1.7; max-width: 58ch; }
+.agl-price-head .ag-btn { flex: none; }
+.agl-plans { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 1rem; }
+.agl-plan {
+  position: relative; display: grid; align-content: start; gap: 1.05rem; padding: 1.35rem 1.35rem 1.4rem;
+  border: 1px solid var(--line); border-radius: var(--agl-r); background: var(--surface);
+  transition: border-color .25s ease, transform .3s var(--agl-ease), box-shadow .3s ease;
+}
+.agl-plan:hover { border-color: color-mix(in srgb, var(--a) 35%, var(--line)); transform: translateY(-2px); box-shadow: 0 18px 40px -28px rgba(23, 20, 74, .45); }
+.agl-plan.is-featured { border-color: color-mix(in srgb, var(--a) 55%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--a) 35%, transparent), 0 22px 48px -30px color-mix(in srgb, var(--a) 70%, transparent); }
+.agl-plan-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; min-height: 28px; }
+.agl-plan-head h3 { margin: 0; font-size: 1.08rem; font-weight: 700; }
+.agl-plan-tag { padding: .16rem .6rem; border-radius: 999px; background: var(--agl-soft); color: var(--accent-text); font-size: .74rem; font-weight: 700; line-height: 1.6; white-space: nowrap; }
+.agl-plan-minutes { display: grid; gap: .1rem; margin: 0; padding-bottom: 1.05rem; border-bottom: 1px solid var(--line); }
+.agl-plan-minutes small { color: var(--muted); font-size: .8rem; font-weight: 600; }
+.agl-plan-minutes b { font-size: clamp(2rem, 3.2vw, 2.5rem); font-weight: 800; line-height: 1.1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; justify-self: start; }
+.agl-plan.is-featured .agl-plan-minutes b { color: var(--accent-text); }
+.agl-plan-minutes span { color: var(--muted); font-size: .88rem; }
+.agl-plan-facts { list-style: none; margin: 0; padding: 0; display: grid; gap: .65rem; }
+.agl-plan-facts li { display: flex; align-items: flex-start; gap: .55rem; font-size: .92rem; font-weight: 600; line-height: 1.5; }
+.agl-plan-facts svg { flex: none; width: 17px; height: 17px; margin-top: .15rem; fill: none; stroke: var(--accent-text); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.agl-price-free { display: inline-flex; align-items: center; justify-self: center; gap: .5rem; margin: 0; padding: .5rem 1rem; border-radius: 999px; background: var(--agl-soft); color: var(--text); font-size: .9rem; font-weight: 600; }
+.agl-price-free svg { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--accent-text); stroke-width: 1.9; stroke-linejoin: round; }
+@media (max-width: 1080px) { .agl-plans { grid-template-columns: repeat(min(2, var(--cols, 2)), minmax(0, 1fr)); } }
+@media (max-width: 560px) { .agl-plans { grid-template-columns: minmax(0, 1fr); } .agl-price-head .ag-btn { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .agl-plan { transition: none; } .agl-plan:hover { transform: none; } }
 
 /* ---------- The last word: one flat band, then the questions. ---------- */
 .agl-final { max-width: var(--agl-wide); margin: 0 auto; padding: clamp(3.2rem, 7vw, 6rem) clamp(1rem, 2.4vw, 1.6rem) 0; }
@@ -595,32 +609,51 @@ html:has(.agl) { scroll-behavior: smooth; }
 .agl-real-who { display: grid; gap: .15rem; min-width: 0; flex: 1 1 auto; line-height: 1.45; }
 .agl-real-who b { font-size: 1.02rem; font-weight: 700; color: #fff; }
 .agl-real-who span { font-size: .84rem; color: var(--agl-on-ink-muted); overflow-wrap: anywhere; }
-.agl-real-dialect { flex: 0 1 auto; padding: .3rem .7rem; border-radius: 999px; background: rgba(255, 255, 255, .08); color: var(--agl-on-ink); font-size: .78rem; font-weight: 600; line-height: 1.5; text-align: center; }
+.agl-real-dialect { flex: 0 1 auto; display: inline-flex; align-items: center; gap: .45rem; padding: .28rem .7rem .28rem .32rem; padding-inline: .32rem .75rem; border-radius: 999px; background: rgba(255, 255, 255, .08); color: var(--agl-on-ink); font-size: .78rem; font-weight: 600; line-height: 1.5; }
+/* The country's flag, round, at the start of the dialect. */
+.agl-real-dialect img { flex: none; width: 20px; height: 20px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .22); }
+.agl-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
-.agl-real-stage { position: relative; display: grid; justify-items: center; gap: .85rem; padding: .2rem 0; }
+.agl-real-stage { position: relative; display: grid; justify-items: center; padding: .3rem 0 .1rem; }
+.agl-real-voice { position: relative; display: grid; place-items: center; }
 .agl-real-orb { --orb-size: clamp(120px, 14vw, 160px); width: var(--orb-size); height: var(--orb-size); }
+/* The one control, on the voice itself: a white play button; while the call plays it turns into a quiet
+   glass pause that comes forward under the pointer (always there on touch); at the end, play again. */
 .agl-real-play {
-  display: inline-flex; align-items: center; gap: .65rem; min-height: 50px; padding: .4rem 1.2rem .4rem .45rem; padding-inline: .45rem 1.25rem;
-  border: 0; border-radius: 999px; background: #fff; color: var(--agl-ink); font: inherit; font-size: 1rem; font-weight: 700; cursor: pointer;
-  box-shadow: 0 10px 24px -12px rgba(0, 0, 0, .45); transition: transform .2s var(--agl-ease), box-shadow .2s ease;
+  --agl-btn: 58px;
+  position: absolute; inset: 0; z-index: 2; margin: auto; display: grid; place-items: center;
+  width: var(--agl-btn); height: var(--agl-btn); padding: 0; border: 0; border-radius: 50%;
+  background: #fff; color: var(--agl-ink); cursor: pointer;
+  box-shadow: 0 16px 34px -14px rgba(8, 6, 30, .6), 0 0 0 7px rgba(255, 255, 255, .12);
+  transition: transform .3s var(--agl-ease), background .3s ease, color .3s ease, box-shadow .3s ease, opacity .3s ease, width .3s var(--agl-ease), height .3s var(--agl-ease);
 }
-.agl-real-play:hover { transform: translateY(-1px); box-shadow: 0 14px 30px -12px rgba(0, 0, 0, .5); }
-.agl-real-play:active { transform: scale(.97); }
-.agl-real-play:focus-visible { outline: 3px solid color-mix(in srgb, #fff 55%, transparent); outline-offset: 3px; }
-.agl-real-play[disabled] { opacity: .7; cursor: progress; }
-.agl-real-play-icon { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--a); color: #fff; }
-.agl-real-play-icon svg { width: 16px; height: 16px; fill: currentColor; }
+.agl-real-play svg { grid-area: 1 / 1; width: 22px; height: 22px; fill: currentColor; transition: opacity .22s ease, transform .3s var(--agl-ease); }
 /* The play arrow points the same way in Arabic and English, a touch to the right to look centred. */
-.agl-real-play-icon .is-play { transform: translateX(1px); }
-.agl-real-play-icon .is-pause { display: none; }
-.agl-real-play[aria-pressed="true"] .is-play { display: none; }
-.agl-real-play[aria-pressed="true"] .is-pause { display: block; }
+.agl-real-play .is-play { transform: translateX(1.5px); }
+.agl-real-play .is-again { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+.agl-real-play .is-pause, .agl-real-play .is-again { opacity: 0; transform: scale(.55); }
+.agl-real-play[data-state="pause"] .is-play, .agl-real-play[data-state="again"] .is-play { opacity: 0; transform: translateX(1.5px) scale(.55); }
+.agl-real-play[data-state="pause"] .is-pause, .agl-real-play[data-state="again"] .is-again { opacity: 1; transform: none; }
+.agl-real-play:hover { transform: scale(1.07); }
+.agl-real-play:active { transform: scale(.95); }
+.agl-real-play:focus-visible { outline: 3px solid color-mix(in srgb, #fff 60%, transparent); outline-offset: 4px; }
+.agl-real-play[data-state="pause"] {
+  --agl-btn: 48px; background: rgba(255, 255, 255, .16); color: #fff; opacity: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .22); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.agl-real-voice:hover .agl-real-play[data-state="pause"], .agl-real-play[data-state="pause"]:focus-visible { opacity: 1; }
+@media (hover: none) { .agl-real-play[data-state="pause"] { opacity: .85; } }
+/* Getting the call ready: a thin ring turns round the button. */
+.agl-real-play[disabled] { cursor: progress; }
+.agl-real-play[disabled]::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .55); border-top-color: transparent; animation: agl-spin .8s linear infinite; }
+@keyframes agl-spin { to { transform: rotate(360deg); } }
 
-/* The call's lines, like a messenger: the agent on the start side, the caller on the end side.
-   A steady height; once it fills, the newest line stays in sight and older ones fade at the top. */
+/* The call's lines, like a messenger: the agent on the start side, the caller on the end side, with
+   room between them. A steady height; once it fills, the newest line stays in sight and older ones
+   fade at the top. */
 .agl-real-lines {
-  list-style: none; margin: 0; padding: .3rem .1rem 0; display: flex; flex-direction: column; gap: .5rem;
-  height: 17rem; overflow: hidden; scroll-behavior: smooth;
+  list-style: none; margin: 0; padding: .3rem .1rem 0; display: flex; flex-direction: column; gap: .85rem;
+  height: 17rem; overflow: hidden; scroll-behavior: smooth; transition: opacity .2s ease;
 }
 .agl-real:not(.is-playing):not(.is-done) .agl-real-lines {
   -webkit-mask-image: linear-gradient(to top, transparent 0, #000 3rem); mask-image: linear-gradient(to top, transparent 0, #000 3rem);
@@ -628,30 +661,47 @@ html:has(.agl) { scroll-behavior: smooth; }
 .agl-real.is-playing .agl-real-lines.is-full, .agl-real.is-done .agl-real-lines.is-full {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 2.2rem); mask-image: linear-gradient(to bottom, transparent 0, #000 2.2rem);
 }
-.agl-real-line { flex: 0 0 auto; max-width: 84%; padding: .62rem .9rem; border-radius: 18px; opacity: 0; transform: translateY(8px); transition: opacity .4s var(--agl-ease), transform .45s var(--agl-ease); }
+.agl-real-line { flex: 0 0 auto; max-width: 84%; padding: .66rem .95rem; border-radius: 18px; opacity: 0; transform: translateY(10px); transition: opacity .45s var(--agl-ease), transform .5s var(--agl-ease); }
 .agl-real-line.is-shown { opacity: 1; transform: none; }
+/* The lines before the call fade up and away as it starts. */
+.agl-real-lines.is-clearing .agl-real-line { opacity: 0; transform: translateY(-8px); transition-duration: .24s; }
 .agl-real-line p { margin: 0; font-size: .98rem; line-height: 1.75; text-wrap: pretty; }
 .agl-real-line.is-agent { align-self: flex-start; background: rgba(255, 255, 255, .09); border: 1px solid rgba(255, 255, 255, .1); border-start-start-radius: 6px; }
 .agl-real-line.is-caller { align-self: flex-end; background: #fff; color: var(--agl-ink); border-start-end-radius: 6px; }
 /* Each word lights when it is said. */
-.agl-real-w { transition: opacity .25s ease; }
+.agl-real-w { transition: opacity .28s ease; }
 .agl-real.is-playing .agl-real-line.is-agent .agl-real-w { opacity: .4; }
 .agl-real.is-playing .agl-real-line.is-agent .agl-real-w.is-said { opacity: 1; }
 
-/* What the business is left with: a saved contact, the number left to right. */
+/* What the business is left with: a new contact in its inbox. It waits during the call, rises at the
+   end, then its details one by one. */
 .agl-real-result {
-  display: flex; align-items: flex-start; gap: .75rem; padding: .85rem 1rem; border-radius: 18px;
-  background: color-mix(in srgb, var(--agl-ok) 12%, transparent); border: 1px solid color-mix(in srgb, var(--agl-ok) 30%, transparent);
-  transition: opacity .4s ease, transform .45s var(--agl-ease);
+  display: grid; gap: .75rem; padding: .95rem 1.05rem 1.05rem; border-radius: 18px;
+  background: rgba(255, 255, 255, .055); border: 1px solid rgba(255, 255, 255, .1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+  transition: opacity .45s var(--agl-ease), transform .5s var(--agl-ease);
 }
-.agl-real-result-icon { flex: 0 0 auto; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--agl-ok); color: #0c2a1d; margin-top: .1rem; }
+.agl-real-result-head { display: flex; align-items: center; gap: .6rem; min-width: 0; }
+.agl-real-result-icon { flex: 0 0 auto; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--agl-ok); color: #0c2a1d; }
 .agl-real-result-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-.agl-real-result-body { display: grid; gap: .2rem; min-width: 0; line-height: 1.5; }
-.agl-real-result-body b { color: #fff; font-size: .95rem; }
-.agl-real-contact { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .8rem; margin: 0; color: var(--agl-on-ink); font-size: .9rem; font-weight: 600; }
-.agl-real-contact bdi { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
-.agl-real-result-note { margin: 0; color: var(--agl-on-ink-muted); font-size: .86rem; }
-.agl-real.is-playing:not(.is-done) .agl-real-result { opacity: 0; transform: translateY(8px); }
+.agl-real-result-head b { flex: 1 1 auto; min-width: 0; color: #fff; font-size: .96rem; font-weight: 700; line-height: 1.45; }
+.agl-real-result-new { flex: none; padding: .14rem .6rem; border-radius: 999px; background: color-mix(in srgb, var(--agl-ok) 16%, transparent); color: color-mix(in srgb, var(--agl-ok) 70%, #fff); font-size: .74rem; font-weight: 700; line-height: 1.6; }
+.agl-real-result-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem .9rem; margin: 0; padding-top: .75rem; border-top: 1px solid rgba(255, 255, 255, .08); }
+.agl-real-result-row { display: flex; align-items: center; gap: .55rem; min-width: 0; transition: opacity .4s var(--agl-ease), transform .45s var(--agl-ease); }
+.agl-real-result-row.is-wide { grid-column: 1 / -1; }
+.agl-real-result-row dt { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: rgba(255, 255, 255, .07); color: var(--agl-on-ink-muted); }
+.agl-real-result-row dt svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.agl-real-result-row dd { margin: 0; min-width: 0; color: var(--agl-on-ink); font-size: .9rem; font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
+.agl-real-result-row bdi { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.agl-real.is-playing:not(.is-done) .agl-real-result { opacity: 0; transform: translateY(12px); }
+.agl-real.is-playing:not(.is-done) .agl-real-result-row { opacity: 0; transform: translateY(6px); }
+.agl-real.is-done .agl-real-result { transition-delay: .05s; }
+.agl-real.is-done .agl-real-result-row:nth-child(1) { transition-delay: .2s; }
+.agl-real.is-done .agl-real-result-row:nth-child(2) { transition-delay: .28s; }
+.agl-real.is-done .agl-real-result-row:nth-child(3) { transition-delay: .36s; }
+/* Another call picked: what changes fades out and back in, never jumps. */
+.agl-real-top { transition: opacity .2s ease; }
+.agl-real.is-swapping .agl-real-top, .agl-real.is-swapping .agl-real-lines, .agl-real.is-swapping .agl-real-result { opacity: 0; transition-duration: .18s; transition-delay: 0s; }
 .agl-real-note { margin: 0; font-size: .78rem; line-height: 1.6; color: var(--agl-on-ink-muted); text-align: center; }
 
 @media (max-width: 560px) {
@@ -661,7 +711,8 @@ html:has(.agl) { scroll-behavior: smooth; }
   .agl-real-lines { height: 19rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .agl-real-line, .agl-real-result, .agl-real-w, .agl-real-play { transition: none; }
+  .agl-real-line, .agl-real-result, .agl-real-result-row, .agl-real-w, .agl-real-play, .agl-real-play svg, .agl-real-top, .agl-real-lines { transition: none; }
+  .agl-real-play[disabled]::after { animation: none; }
 }
 
 /* ---------- The Agents page's real call: wide, the voice on one side and the words on the other. ---------- */
@@ -671,6 +722,8 @@ html:has(.agl) { scroll-behavior: smooth; }
   .agl-real.is-wide .agl-real-top { grid-column: 1 / -1; }
   .agl-real.is-wide .agl-real-stage { grid-column: 1; grid-row: 2 / span 3; align-content: center; padding: 1.2rem 0; border-inline-end: 1px solid rgba(255, 255, 255, .08); }
   .agl-real.is-wide .agl-real-orb { --orb-size: 200px; }
+  .agl-real.is-wide .agl-real-play { --agl-btn: 66px; }
+  .agl-real.is-wide .agl-real-play[data-state="pause"] { --agl-btn: 52px; }
   .agl-real.is-wide .agl-real-lines { grid-column: 2; height: 21rem; }
   .agl-real.is-wide .agl-real-result, .agl-real.is-wide .agl-real-note { grid-column: 2; }
   .agl-real.is-wide .agl-real-note { text-align: start; }
@@ -777,7 +830,7 @@ html[dir="rtl"] .agl-home-copy h2 { line-height: 1.4; }
   .agl-regions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 920px) {
-  .agl-hero, .agl-does-grid, .agl-price { grid-template-columns: minmax(0, 1fr); }
+  .agl-hero, .agl-does-grid { grid-template-columns: minmax(0, 1fr); }
   .agl-hero-call .agl-real { margin-inline: auto; }
   /* One column: the heading, the questions, then where to ask anything else. */
   .agl-faq-grid { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
@@ -805,7 +858,6 @@ html[dir="rtl"] .agl-home-copy h2 { line-height: 1.4; }
   .agl-flow-agent-text { justify-items: start; }
   .agl-cta-row .ag-btn { flex: 1 1 100%; }
   .agl-speaks-head { align-items: stretch; }
-  .agl-speaks-more { order: 2; justify-content: center; width: 100%; }
   .agl-regions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .agl-region { padding: .95rem .9rem 1rem; }
   .agl-region-n b { font-size: 1.55rem; }

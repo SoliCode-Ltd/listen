@@ -311,6 +311,10 @@ return [
     'real_again' => 'Hear it again',
     'real_switch' => 'Accent',
     'real_note' => 'The agent\'s voice is recorded live from calls with sample businesses, exactly as it spoke. The caller\'s lines are written.',
+    'real_new' => 'New',
+    'real_name_label' => 'Name',
+    'real_phone_label' => 'Phone',
+    'real_note_label' => 'Details',
     'real_caller' => 'Caller',
     'real_calls' => [
         'us' => [
@@ -367,6 +371,10 @@ return [
     // Pricing, from the plans (AgentAccess).
     'plans_title' => 'Calls come out of your plan',
     'plans_text' => 'One call minute uses :rate credits from your plan, the same credits as your voice-overs. You always see the minutes left.',
-    'plans_line' => '{1} 1 agent, up to :minutes call minutes a month|[2,*] :count agents, up to :minutes call minutes a month',
+    'plans_up_to' => 'Up to',
+    'plans_minutes' => 'call minutes a month',
+    'plans_agents' => '{1} 1 agent|[2,*] :count agents',
+    'plans_concurrent' => '{1} 1 call at a time|[2,*] :count calls at the same time',
+    'plans_longest' => '{1} Calls up to 1 minute long|[2,*] Calls up to :count minutes long',
     'plans_free' => 'Every account gets :seconds seconds of free test calls.',
 ];

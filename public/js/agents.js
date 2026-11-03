@@ -305,9 +305,33 @@
     btn.setAttribute('aria-label', fill(on ? (T.pause || T.play) : T.play, { name: name }));
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
+  // The ring round a speaker's face fills with the preview, frame by frame from the audio's own
+  // clock (the clock is read between its updates, so the ring never steps), and fades when it ends.
+  var ringFrame = 0;
   function stopPreview() {
+    cancelAnimationFrame(ringFrame);
     if (audio) { audio.pause(); audio = null; }
-    if (playingCard) { var ring = $('circle', playingCard); if (ring) ring.style.strokeDashoffset = 289; playState(playingCard, false); playingCard = null; }
+    if (playingCard) {
+      var card = playingCard, ring = $('circle', card);
+      playState(card, false);
+      playingCard = null;
+      if (ring) setTimeout(function () { if (playingCard !== card) ring.style.strokeDashoffset = 289; }, 320);
+    }
+  }
+  function runRing(card, clip) {
+    var ring = $('circle', card), at = 0, seen = -1, since = 0;
+    if (!ring) return;
+    ring.style.strokeDashoffset = 289;
+    (function frame(now) {
+      if (audio !== clip || playingCard !== card) return;
+      if (clip.duration && isFinite(clip.duration)) {
+        // currentTime moves in steps on some browsers: carry it on with the clock until the next step.
+        if (clip.currentTime !== seen) { seen = clip.currentTime; since = now; }
+        at = clip.paused ? seen : seen + (now - since) / 1000 * (clip.playbackRate || 1);
+        ring.style.strokeDashoffset = 289 * (1 - Math.min(1, Math.max(0, at / clip.duration)));
+      }
+      ringFrame = requestAnimationFrame(frame);
+    })(performance.now());
   }
   function voiceGallery(box, lang, onPick) {
     if (!box) return;
@@ -349,11 +373,10 @@
           stopPreview();
           playingCard = card;
           playState(card, true);
-          audio = new Audio(v.preview);
-          var ring = $('circle', card);
-          audio.ontimeupdate = function () { if (audio && audio.duration) ring.style.strokeDashoffset = 289 * (1 - audio.currentTime / audio.duration); };
-          audio.onended = stopPreview;
-          audio.play().catch(stopPreview);
+          var clip = audio = new Audio(v.preview);
+          clip.addEventListener('playing', function () { cancelAnimationFrame(ringFrame); runRing(card, clip); });
+          clip.onended = stopPreview;
+          clip.play().catch(stopPreview);
         });
         function pick() {
           chosen = v.id;
@@ -369,7 +392,11 @@
     }
     $$('input[name="ag-voice-scope"], input[name="ag-voice-gender"]').forEach(function (i) { i.addEventListener('change', render); });
     render();
-    return { render: render, setDialect: function (d) { dialect = d; render(); } };
+    return {
+      render: render,
+      setDialect: function (d) { dialect = d; render(); },
+      setLanguage: function (lg, d) { all = (C.voices && C.voices[lg]) || []; chosen = C.agent && C.agent.speaker_id; if (d) dialect = d; render(); },
+    };
   }
 
   /* ---------- Talking to the agent ---------- */
@@ -492,9 +519,12 @@
   function setup() {
     speaksPickers();
     var panes = $$('[data-ag-pane]'), links = $$('[data-ag-step-link]'), bar = $('[data-ag-bar]');
-    var current = -1, furthest = C.agent ? (C.agent.speaker_id ? 3 : 1) : 0;
+    var current = -1, furthest = C.agent ? (C.agent.speaker_id ? 3 : 1) : 0, gallery = null;
     function show(i) {
       i = Math.max(0, Math.min(3, i));
+      // An agent made on this page has no publishing parts yet (they are drawn by the server): load them.
+      var slot = $('[data-ag-golive-slot]');
+      if (i === 3 && slot && !slot.children.length && C.agent && C.agent.urls) { location.assign(C.agent.urls.edit + '?step=3'); return; }
       var back = i < current;
       stopPreview();
       panes.forEach(function (p, n) {
@@ -518,31 +548,47 @@
     var form = $('[data-ag-business-form]'), err = $('[data-ag-error]');
     var lang = function () { return ($('input[name="language"]:checked', form) || {}).value || 'ar'; };
     $$('input[name="language"]', form).forEach(function (r) { r.addEventListener('change', function () {
-      $('[data-ag-dialect-field]').hidden = lang() === 'en';
-      if ($('[data-ag-accent-field]')) $('[data-ag-accent-field]').hidden = lang() !== 'en';
+      var en = lang() === 'en';
+      ['[data-ag-dialect-field]', '[data-ag-dialect-note]'].forEach(function (q) { var n = $(q); if (n) n.hidden = en; });
+      ['[data-ag-accent-field]', '[data-ag-accent-note]'].forEach(function (q) { var n = $(q); if (n) n.hidden = !en; });
     }); });
-    var writing = $('[data-ag-writing]'), businessBox = $('[data-ag-business]'), decisionsWrap = $('[data-ag-decisions-wrap]');
+    var writing = $('[data-ag-writing]'), businessBox = $('[data-ag-business]'), wTitle = $('[data-ag-writing-title]');
     var allChecks = $$('[data-ag-check]'), checks = allChecks, slow = $('[data-ag-slow]');
-    var checkTimer = 0;
-    function animateChecks(hasSite) {
-      // No website given: there is nothing to read, so that line is not shown at all.
+    var checkTimer = 0, slowTimer = 0;
+    // What is being done, a line at a time. Reading a website comes first and only when there is one;
+    // the last line stays open until the agent is ready, and only a long wait adds a word on why.
+    function animateChecks(hasSite, name) {
       allChecks.forEach(function (c) { c.hidden = !hasSite && c.getAttribute('data-ag-check') === 'read'; });
       checks = allChecks.filter(function (c) { return !c.hidden; });
-      var i = 0;
       checks.forEach(function (c) { c.classList.remove('is-active', 'is-done'); });
+      writing.classList.remove('is-ready');
+      wTitle.textContent = fill(wTitle.getAttribute('data-title'), { name: name });
+      slow.textContent = slow.getAttribute(hasSite ? 'data-site' : 'data-plain');
+      slow.hidden = true;
+      var i = 0;
       function step() {
         if (i > 0) checks[i - 1].classList.replace('is-active', 'is-done');
-        if (i < checks.length - 1) { checks[i].classList.add('is-active'); i++; checkTimer = setTimeout(step, 1900 + Math.random() * 900); }
-        else { checks[i].classList.add('is-active'); slow.hidden = false; }
+        if (i < checks.length - 1) {
+          checks[i].classList.add('is-active');
+          // The website takes the longest: its line stays a little longer.
+          var wait = (checks[i].getAttribute('data-ag-check') === 'read' ? 3600 : 1700) + Math.random() * 700;
+          i++;
+          checkTimer = setTimeout(step, wait);
+        } else {
+          checks[i].classList.add('is-active');
+          slowTimer = setTimeout(function () { slow.hidden = false; }, 5000);
+        }
       }
       step();
     }
+    function stopChecks() { clearTimeout(checkTimer); clearTimeout(slowTimer); }
     function finishChecks(then) {
-      clearTimeout(checkTimer);
+      stopChecks();
+      slow.hidden = true;
       var k = 0;
       (function tick() {
-        if (k < checks.length) { checks[k].classList.remove('is-active'); checks[k].classList.add('is-done'); k++; setTimeout(tick, 140); }
-        else setTimeout(then, 420);
+        if (k < checks.length) { checks[k].classList.remove('is-active'); checks[k].classList.add('is-done'); k++; setTimeout(tick, 150); }
+        else setTimeout(then, 380);
       })();
     }
     form.addEventListener('submit', function (e) {
@@ -559,59 +605,43 @@
         notes: $('#ag-notes').value,
       };
       if (!data.business_name || !data.name) { err.textContent = T.error_name; err.hidden = false; return; }
-      businessBox.hidden = true; writing.hidden = false; slow.hidden = true;
-      animateChecks(!!data.website_url);
+      businessBox.hidden = true; writing.hidden = false;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      animateChecks(!!data.website_url, data.name);
       var req = C.agent ? api('POST', C.agent.urls.write, data) : api('POST', C.urls.store, data);
       req.then(function (res) {
-        finishChecks(function () { decisions(res); });
+        C.agent = Object.assign(C.agent || {}, res.agent || {});
+        finishChecks(function () { ready(res); });
       }).catch(function (e2) {
-        clearTimeout(checkTimer);
+        stopChecks();
         writing.hidden = true; businessBox.hidden = false;
         err.textContent = (e2.data && e2.data.message) || e2.message; err.hidden = false;
       });
     });
-    function decisions(res) {
-      writing.hidden = true;
-      var box = $('[data-ag-decisions]');
-      box.innerHTML = '';
-      C.agent = C.agent || {};
-      Object.assign(C.agent, res.agent);
-      $('[data-ag-site-note]').hidden = res.site_read !== false;
-      (res.questions || []).forEach(function (q, qi) {
-        var d = document.createElement('div');
-        d.className = 'ag-decision';
-        var h = document.createElement('h3'); h.textContent = q.question; d.appendChild(h);
-        var opts = document.createElement('div'); opts.className = 'ag-options';
-        q.options.forEach(function (o, oi) {
-          var l = document.createElement('label'); l.className = 'ag-option';
-          l.innerHTML = '<input type="radio" name="ag-q' + qi + '"><span></span>';
-          $('span', l).textContent = o;
-          $('input', l).value = o;
-          if (oi === q.recommended) { $('input', l).checked = true; var p = document.createElement('span'); p.className = 'ag-pill'; p.textContent = T.recommended; l.appendChild(p); }
-          opts.appendChild(l);
-        });
-        d.appendChild(opts);
-        d.__q = q.question;
-        box.appendChild(d);
-      });
-      decisionsWrap.hidden = false;
-      if (!(res.questions || []).length) $('[data-ag-decided]').click();
+    // Ready: a moment to say so, then its voice, on the same page (the address becomes the agent's).
+    // The answers the agent was set up with for tricky moments are on its page, under Setup.
+    function ready(res) {
+      wTitle.textContent = fill(wTitle.getAttribute('data-ready'), { name: C.agent.name || '' });
+      writing.classList.add('is-ready');
+      setTimeout(function () {
+        if (history.replaceState && C.agent.urls) history.replaceState(null, '', C.agent.urls.edit + '?step=1');
+        var openLink = $('[data-ag-open-agent]');
+        if (openLink && C.agent.urls) openLink.href = C.agent.urls.show;
+        var siteNote = $('[data-ag-site-note]');
+        if (siteNote) siteNote.hidden = res.site_read !== false;
+        var talkTitle = $('[data-ag-talk-title]');
+        if (talkTitle && T.talk_heading) talkTitle.textContent = fill(T.talk_heading, { name: C.agent.name || '' });
+        if (gallery) gallery.setLanguage(C.agent.language || lang(), C.agent.dialect);
+        writing.hidden = true; businessBox.hidden = false;
+        furthest = Math.max(furthest, 1);
+        show(1);
+      }, 900);
     }
-    $('[data-ag-rewrite]').addEventListener('click', function () { decisionsWrap.hidden = true; businessBox.hidden = false; });
-    $('[data-ag-decided]').addEventListener('click', function () {
-      var choices = $$('.ag-decision').map(function (d) {
-        var picked = $('input:checked', d);
-        return { question: d.__q, answer: picked ? picked.value : '' };
-      }).filter(function (c) { return c.answer; });
-      var go = function () { location.assign(C.agent.urls.edit + '?step=1'); };
-      if (choices.length) api('PATCH', C.agent.urls.update, { choices: choices }).then(go, go);
-      else go();
-    });
 
     // Step 2.
     var voiceNext = $('[data-ag-voice-next]');
     var talker = talk($('[data-ag-talk]'));
-    var gallery = voiceGallery($('[data-ag-voices]'), (C.agent && C.agent.language) || lang(), function (v) {
+    gallery = voiceGallery($('[data-ag-voices]'), (C.agent && C.agent.language) || lang(), function (v) {
       if (!C.agent || !C.agent.urls) return;
       api('PATCH', C.agent.urls.update, { speaker_id: v.id }).then(function () {
         C.agent.speaker_id = v.id;
@@ -761,6 +791,10 @@
         script: { identity: $('[name="identity"]', sf).value, handoff: $('[name="handoff"]', sf).value, never: list('never'), steps: list('steps') },
         max_call_seconds: parseInt(max.value, 10) * 60,
         daily_minutes: daily ? (dailySteps[parseInt(daily.value, 10)] || 0) : undefined,
+        choices: $$('[data-ag-choice]', sf).length ? $$('[data-ag-choice]', sf).map(function (f) {
+          var picked = $('input:checked', f);
+          return { question: f.getAttribute('data-question'), answer: picked ? picked.value : '' };
+        }).filter(function (c) { return c.answer; }) : undefined,
       }).then(function () { toast(T.saved); }).catch(function (err) { toast(err.message); });
     });
     knowledgeFiles($('[data-ag-files]'));
