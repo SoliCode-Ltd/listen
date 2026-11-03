@@ -136,6 +136,13 @@ name: Server deploy
 #            examples/ (scripts/support/voice_cloning_examples.php). Two short
 #            speech requests on the quota staging shares with live: only when the
 #            owner has said yes.
+#   member-generations: read-only (READ ONLY database session). For one member
+#            (input "member": a member id, an email, or a name, alternatives split
+#            by "|"): their latest voices and, for those as long as input "seconds"
+#            (the audio the owner has), what each was made with, what the studio's
+#            Reuse link (/ar/dashboard?reuse=N) brings back on their plan today and
+#            the link to send them (scripts/support/member_generations.php). Member
+#            ids and masked emails, never a text.
 #   voice-design-log: read-only. The last 30 "Voice design:" lines of the app's
 #            logs (what the speech service said when a design or a delete failed:
 #            the key's name, the reason and the service's own words; never a
@@ -154,14 +161,18 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test, voice-design-log, voice-cloning-examples]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, queue, settings, php-limits, data-checks, email-check, demo-links, member-generations, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test, voice-design-log, voice-cloning-examples]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
         type: string
         default: ""
       member:
-        description: "email-check, demo-links, join-check and speed-check: a member's email or member id"
+        description: "email-check, demo-links, join-check and speed-check: a member's email or member id (member-generations: also a name)"
+        type: string
+        default: ""
+      seconds:
+        description: "member-generations only: the voice's length in seconds, to find it"
         type: string
         default: ""
       dub:
@@ -207,6 +218,7 @@ jobs:
           MODE: ${{ inputs.mode }}
           CUSTOMER: ${{ inputs.customer }}
           MEMBER: ${{ inputs.member }}
+          VOICE_SECONDS: ${{ inputs.seconds }}
           DUB: ${{ inputs.dub }}
           DESIGN: ${{ inputs.design }}
           # What is deployed, as a variable: the script below must hold no ${{ }}
@@ -467,6 +479,14 @@ jobs:
           if [ "$MODE" = speed-check ]; then
             printf '%s' "$MEMBER" | grep -qE '^[A-Za-z0-9._%+@-]*$' || { echo "member must be an email or a member id"; exit 1; }
             tool speed_check.php | $S "$FIND; MEMBER='$MEMBER' nice php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = member-generations ]; then
+            # The name may hold any letters (Arabic too): it reaches the server as base64.
+            printf '%s' "$VOICE_SECONDS" | grep -qE '^[0-9]*([.][0-9]+)?$' || { echo "seconds must be a number"; exit 1; }
+            b64="$(printf '%s' "$MEMBER" | base64 -w0)"
+            tool member_generations.php | $S "$FIND; MEMBER_B64='$b64' DURATION='$VOICE_SECONDS' php"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
