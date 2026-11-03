@@ -69,7 +69,8 @@ class AgentCallController extends Controller
             'business' => $agent->business_name,
             'language' => $agent->language,
             'dir' => $ar ? 'rtl' : 'ltr',
-            // The owner's look; the agent's face is only for choosing its voice, never on the call.
+            // The agent's photo, shown small next to its name (unless the owner turned it off).
+            'avatar' => $look['photo'] ? ($voice['avatar'] ?? null) : null,
             'colors' => $look['colors'],
             'look' => $look,
             'text' => [

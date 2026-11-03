@@ -538,6 +538,7 @@
       look.title = $('[name="title"]', box).value.trim() || null;
       look.subtitle = $('[name="subtitle"]', box).value.trim() || null;
       look.captions = $('[name="captions"]', box).checked;
+      look.photo = $('[name="photo"]', box).checked;
       look.radius = val('radius') || look.radius;
       look.font = val('font') || look.font;
       look.theme = val('theme') || look.theme;
@@ -555,7 +556,7 @@
       status.textContent = (D.text || {}).saving || '';
       saveTimer = setTimeout(function () {
         var body = {};
-        ['position', 'style', 'theme', 'label', 'icon', 'size', 'shape', 'accent', 'palette', 'radius', 'captions', 'title', 'subtitle', 'font'].forEach(function (k) { body[k] = look[k] === null ? '' : look[k]; });
+        ['position', 'style', 'theme', 'label', 'icon', 'size', 'shape', 'accent', 'palette', 'radius', 'captions', 'photo', 'title', 'subtitle', 'font'].forEach(function (k) { body[k] = look[k] === null ? '' : look[k]; });
         if (look.palette === 'custom') body.orb_colors = look.orb_colors;
         api('PATCH', C.agent.urls.update, { appearance: body }).then(function () {
           status.textContent = (D.text || {}).saved || '';
@@ -595,6 +596,7 @@
       if (corner) corner.checked = true;
       ['label', 'title', 'subtitle'].forEach(function (k) { $('[name="' + k + '"]', box).value = ''; });
       $('[name="captions"]', box).checked = true;
+      $('[name="photo"]', box).checked = true;
       read();
       draw(true);
       styleBefore = look.style;

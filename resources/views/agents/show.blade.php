@@ -242,6 +242,7 @@
           'rtl' => $l === 'ar',
           'cfg' => [
             'name' => $agent->name, 'business' => $agent->business_name, 'language' => $agent->language, 'dir' => $l === 'ar' ? 'rtl' : 'ltr',
+            'avatar' => $voice['avatar'] ?? null,
             'text' => [
               'label' => trans('agents.widget_label', [], $l), 'title' => $agent->business_name,
               'subtitle' => trans($female ? 'agents.widget_subtitle_female' : 'agents.widget_subtitle', [], $l),

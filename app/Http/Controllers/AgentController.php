@@ -143,6 +143,7 @@ class AgentController extends Controller
             'appearance.orb_colors.*' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'appearance.radius' => ['nullable', 'in:square,soft,round'],
             'appearance.captions' => ['nullable', 'boolean'],
+            'appearance.photo' => ['nullable', 'boolean'],
             'appearance.title' => ['nullable', 'string', 'max:60'],
             'appearance.subtitle' => ['nullable', 'string', 'max:80'],
             'appearance.font' => ['nullable', 'in:system,rounded,site'],

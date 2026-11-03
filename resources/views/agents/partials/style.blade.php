@@ -132,6 +132,7 @@
           <input class="ag-input" id="ag-design-subtitle" name="subtitle" type="text" maxlength="80" dir="auto" value="{{ $look['subtitle'] }}" placeholder="{{ trans('agents.widget_subtitle', [], $rtl ? 'ar' : 'en') }}">
         </div>
       </div>
+      <label class="ag-design-check"><input type="checkbox" name="photo" value="1" @checked($look['photo'])><span>{{ __('agents.design.photo') }}</span></label>
       <label class="ag-design-check"><input type="checkbox" name="captions" value="1" @checked($look['captions'])><span>{{ __('agents.design.captions') }}</span></label>
       <div class="ag-design-pair">
         <div class="ag-design-field">

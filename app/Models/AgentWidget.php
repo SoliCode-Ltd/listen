@@ -58,6 +58,7 @@ class AgentWidget extends Model
         'orb_colors' => null,
         'radius' => 'round',
         'captions' => true,
+        'photo' => true,
         'title' => null,
         'subtitle' => null,
         'font' => 'system',
@@ -140,6 +141,8 @@ class AgentWidget extends Model
             'orb_colors' => null,
             'radius' => $pick('radius', ['square', 'soft', 'round']),
             'captions' => filter_var($a['captions'], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? true,
+            // The agent's photo next to its name on the call card (the orb stays alone in the middle).
+            'photo' => filter_var($a['photo'], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? true,
             'title' => $text('title', 60),
             'subtitle' => $text('subtitle', 80),
             'font' => $pick('font', ['system', 'rounded', 'site']),

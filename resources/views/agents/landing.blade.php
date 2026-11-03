@@ -41,8 +41,9 @@
 
       <div class="agl-call" id="agl-call" data-agl-call>
         <div class="agl-call-card">
-          {{-- Like the call button's card: the business, its assistant, and one orb that moves with the voice. --}}
+          {{-- Like the call button's card: the agent's photo next to its name, and one orb that moves with the voice. --}}
           <div class="agl-call-head">
+            <img class="agl-call-face" src="{{ $speaker($first['avatar']) }}" alt="" width="46" height="46" data-agl-face>
             <div class="agl-call-who">
               <strong data-agl-business dir="auto">{{ $first['business'] }}</strong>
               <span data-agl-agent data-pattern="{{ __('agents_landing.call_assistant') }}">{{ str_replace(':name', $first['agent'], __('agents_landing.call_assistant')) }}</span>

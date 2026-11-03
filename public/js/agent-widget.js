@@ -63,7 +63,10 @@
     '  transform-origin:bottom var(--side);opacity:0;transform:translateY(12px) scale(.94);pointer-events:none;visibility:hidden;transition:opacity .24s ease,transform .42s ' + EASE + ',visibility 0s linear .42s}',
     '.lva.is-right .lva-panel{right:0}.lva.is-left .lva-panel{left:0}',
     '.lva.is-open .lva-panel{opacity:1;transform:none;pointer-events:auto;visibility:visible;transition:opacity .24s ease,transform .42s ' + EASE + ',visibility 0s}',
-    '.lva-head{display:flex;align-items:flex-start;gap:10px}',
+    '.lva-head{display:flex;align-items:center;gap:10px}',
+    /* The agent's photo, small, next to its name. */
+    '.lva-face{width:42px;height:42px;border-radius:50%;flex:0 0 auto;background:var(--soft);box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--c2)}',
+    '.lva-face img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}',
     '.lva-who{flex:1;min-width:0;display:grid;gap:1px}',
     '.lva-who strong{font-size:16px;font-weight:800;line-height:1.3;overflow-wrap:anywhere}',
     '.lva-who small{color:var(--muted);font-size:12.5px}',
@@ -305,6 +308,9 @@
         close.setAttribute('aria-label', text.close || 'Close');
         close.innerHTML = ICONS.close;
         close.addEventListener('click', function () { setOpen(false); });
+        // The agent's photo next to its name (an https or Listen address only).
+        var photo = look.photo !== false && cfg.avatar && (/^https:\/\//.test(cfg.avatar) || (ctx.origin && cfg.avatar.indexOf(ctx.origin + '/') === 0)) ? cfg.avatar : null;
+        if (photo) { var face = el('span', 'lva-face'); var img = el('img'); img.alt = ''; img.src = photo; face.appendChild(img); head.appendChild(face); }
         head.appendChild(who); head.appendChild(pill); head.appendChild(close);
         var stage = el('div', 'lva-stage');
         parts.voice = voice(false);

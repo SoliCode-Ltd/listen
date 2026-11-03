@@ -57,6 +57,10 @@ class AgentDesignTest extends TestCase
         $this->assertSame('#10B981', $look['accent']);
         $this->assertSame('bar', $look['style']);
         $this->assertFalse($look['captions']);
+        // The photo next to the agent's name is on unless the owner turns it off.
+        $this->assertTrue($look['photo']);
+        $widget->appearance = ['photo' => false];
+        $this->assertFalse($widget->style()['photo']);
     }
 
     public function test_the_owner_saves_the_look_and_websites_get_it_without_new_code(): void
@@ -81,8 +85,9 @@ class AgentDesignTest extends TestCase
         // An emptied line goes back to the default words; the footer only names Listen.
         $this->assertSame('مساعد صوتي ذكي', $config['text']['subtitle']);
         $this->assertSame('مدعوم من إسمع', $config['text']['powered']);
-        // The speaker's face is for choosing the voice only, never on the call.
-        $this->assertArrayNotHasKey('avatar', $config);
+        // No voice picked yet, so no photo next to the name; the owner can also turn the photo off.
+        $this->assertNull($config['avatar']);
+        $this->assertTrue($config['look']['photo']);
         $this->assertArrayNotHasKey('note', $config['text']);
     }
 

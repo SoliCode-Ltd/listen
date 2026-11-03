@@ -337,6 +337,7 @@ return [
         'card_title' => 'Title',
         'card_subtitle' => 'Line under the title',
         'captions' => 'Show what is said during the call',
+        'photo' => 'Show the agent\'s photo next to its name',
         'radius' => 'Corners',
         'radii' => ['square' => 'Sharp', 'soft' => 'Soft', 'round' => 'Round'],
         'font' => 'Font',
