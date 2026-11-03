@@ -35,6 +35,7 @@
   $navLinks = [
     ['route' => 'home', 'label' => __('ui.nav.home'), 'guest' => false],
     ['route' => 'samples', 'label' => __('ui.nav.samples'), 'guest' => false],
+    ['route' => 'agents-landing', 'label' => __('agents.switch_agents'), 'guest' => false],
     ['route' => 'demo.page', 'label' => __('ui.nav.demo'), 'guest' => true],
     ['route' => 'pricing', 'label' => __('ui.nav.pricing'), 'guest' => false],
     ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension'), 'guest' => false],
@@ -51,6 +52,7 @@
     ['route' => 'home', 'label' => __('ui.nav.home'), 'guest' => false],
     ['route' => 'dashboard', 'label' => __('ui.nav.dashboard'), 'guest' => false],
     ['route' => 'samples', 'label' => __('ui.nav.samples'), 'guest' => false],
+    ['route' => 'agents-landing', 'label' => __('agents.switch_agents'), 'guest' => false],
     ['route' => 'pricing', 'label' => __('ui.nav.pricing'), 'guest' => false],
     ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension'), 'guest' => false],
     ['route' => 'contact', 'label' => __('ui.nav.contact'), 'guest' => false],
@@ -96,7 +98,7 @@
     <nav class="desktop-nav" aria-label="{{ __('ui.header.main_nav') }}">
       @auth
         @foreach($authNavLinks as $link)
-          @continue($productSide && $link['route'] === 'dashboard')
+          @continue($productSide && in_array($link['route'], ['dashboard', 'agents-landing'], true))
           <a href="{{ route($link['route']) }}" class="nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
         @endforeach
       @else

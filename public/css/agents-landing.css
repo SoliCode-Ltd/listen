@@ -1,0 +1,297 @@
+/*
+ * Listen Agents, for visitors (resources/views/agents/landing.blade.php) and the
+ * homepage's Agents section (components/home/agents). The call in the hero plays
+ * one dialect after another; the steps follow the scroll over the real setup;
+ * the bento and the channels play once in view. Built on the site's tokens and
+ * the agents' buttons (css/agents.css): flat surfaces, one violet, and one deep
+ * ink for the showcase panels.
+ */
+.agl {
+  --agl-ease: cubic-bezier(.22, 1, .36, 1);
+  --agl-soft: color-mix(in srgb, var(--a) 9%, transparent);
+  --agl-soft-2: color-mix(in srgb, var(--a) 16%, transparent);
+  --agl-ok: var(--ok, #32c58d);
+  --agl-ink: #17144A;
+  --agl-ink-2: #231d63;
+  --agl-on-ink: #F3F1FF;
+  --agl-on-ink-muted: #B9B2E6;
+  --agl-r: 26px;
+  overflow-x: clip;
+}
+html[data-theme="dark"] .agl { --agl-ink: #1c1747; --agl-ink-2: #29225e; }
+.agl *, .agl *::before, .agl *::after { box-sizing: border-box; }
+.agl [hidden] { display: none !important; }
+/* A light reset (one class of weight), so each part's own spacing below wins over it. */
+.agl :where(h1, h2, h3, p) { margin: 0; }
+.agl h1, .agl h2, .agl h3 { letter-spacing: -.02em; }
+html[dir="rtl"] .agl h1, html[dir="rtl"] .agl h2, html[dir="rtl"] .agl h3 { letter-spacing: 0; }
+
+/* ---------- The hero: the words, and the call they describe. ---------- */
+.agl-hero {
+  display: grid; grid-template-columns: minmax(0, 1.02fr) minmax(0, .98fr); gap: clamp(2rem, 5vw, 4.5rem); align-items: center;
+  max-width: 1180px; margin: 0 auto; padding: clamp(2.4rem, 6vw, 5rem) clamp(1rem, 2.4vw, 1.6rem) clamp(2.5rem, 6vw, 4.5rem);
+}
+.agl-hero h1 { font-size: clamp(2.35rem, 5.2vw, 4.1rem); font-weight: 800; line-height: 1.08; max-width: 13ch; }
+html[dir="rtl"] .agl-hero h1 { font-size: clamp(2.2rem, 4.6vw, 3.7rem); line-height: 1.35; max-width: 11ch; }
+.agl-lead { margin-top: 1.6rem; font-size: clamp(1.05rem, 1.5vw, 1.2rem); line-height: 1.7; color: var(--muted); max-width: 46ch; }
+.agl-cta-row { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.8rem; }
+.agl-cta-center { justify-content: center; margin-top: .4rem; }
+.agl .agl-note { margin-top: 1rem; color: var(--muted); font-size: .9rem; line-height: 1.6; }
+.agl .agl-note + .agl-note { margin-top: .15rem; }
+.agl-live-btn { border-color: color-mix(in srgb, var(--a) 45%, var(--line)); color: var(--accent-text, var(--a)); }
+.agl-live-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.agl-live-btn:hover { background: var(--agl-soft); }
+
+.agl-call { display: grid; gap: 1rem; justify-items: center; scroll-margin-top: 96px; }
+.agl-call-card {
+  width: min(460px, 100%); display: grid; gap: .9rem; padding: 1.1rem 1.1rem 1.25rem;
+  border: 1px solid var(--line); border-radius: var(--agl-r); background: var(--surface);
+  box-shadow: 0 40px 80px -48px color-mix(in srgb, var(--a) 70%, transparent), 0 2px 10px rgba(20, 16, 60, .05);
+}
+.agl-call-head { display: flex; align-items: center; gap: .75rem; }
+.agl-call-face { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; background: var(--agl-soft); flex: 0 0 auto; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px color-mix(in srgb, var(--a) 55%, transparent); }
+.agl-call-who { flex: 1; min-width: 0; display: grid; line-height: 1.3; }
+.agl-call-who strong { font-weight: 800; }
+.agl-call-who span { color: var(--muted); font-size: .86rem; overflow-wrap: anywhere; }
+.agl-call-live { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .65rem; border-radius: 999px; background: var(--agl-soft); font-size: .78rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+.agl-call-live i { width: 7px; height: 7px; border-radius: 50%; background: #ee4a77; animation: agl-blink 1.4s ease-in-out infinite; }
+.agl-call-live b { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--muted); }
+.agl-call-stage { display: flex; align-items: center; justify-content: center; gap: 14px; height: 150px; }
+.agl-call-stage .orb { --orb-size: 104px; width: 104px; height: 104px; flex: 0 0 auto; }
+/* The brand's voice waves, either side of the orb: they move while the agent talks. */
+.agl-wave { display: flex; align-items: center; gap: 5px; height: 84px; }
+.agl-wave i { display: block; width: 4px; height: 10px; border-radius: 4px; background: linear-gradient(180deg, #C9BEFF, var(--a)); transition: height .08s linear; }
+/* At rest the bars keep the brand mark's shape: short at the ends, tall in the middle. */
+.agl-wave i:nth-child(2), .agl-wave i:nth-child(6) { height: 14px; }
+.agl-wave i:nth-child(3), .agl-wave i:nth-child(5) { height: 18px; }
+.agl-wave i:nth-child(4) { height: 21px; }
+.agl-lines { display: grid; align-content: start; gap: .5rem; min-height: 232px; }
+.agl-line {
+  max-width: 88%; padding: .62rem .85rem; border-radius: 16px; font-size: .94rem; line-height: 1.55;
+  opacity: 0; transform: translateY(8px); transition: opacity .35s var(--agl-ease), transform .45s var(--agl-ease);
+}
+.agl-line.is-on { opacity: 1; transform: none; }
+.agl-line.is-agent { justify-self: start; background: var(--agl-soft); border-end-start-radius: 6px; }
+.agl-line.is-caller { justify-self: end; border: 1px solid var(--line); background: var(--bg); border-end-end-radius: 6px; }
+.agl-line span { display: block; min-height: 1.5em; }
+.agl-line small { display: block; margin-top: .2rem; color: var(--muted); font-size: .78rem; line-height: 1.45; }
+.agl-chip {
+  justify-self: center; display: inline-flex; align-items: center; gap: .5rem; padding: .45rem .9rem; border-radius: 999px;
+  background: color-mix(in srgb, var(--agl-ok) 13%, transparent); color: var(--agl-ok); font-weight: 700; font-size: .86rem;
+  opacity: 0; transform: scale(.92); transition: opacity .3s ease, transform .4s cubic-bezier(.34, 1.56, .64, 1);
+}
+.agl-chip.is-on { opacity: 1; transform: none; }
+.agl-chip i, .agl-bento-chip i { width: 16px; height: 16px; border-radius: 50%; flex: 0 0 auto; background: var(--agl-ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/10px no-repeat; }
+.agl-dialects { display: flex; flex-wrap: wrap; justify-content: center; gap: .35rem; max-width: 560px; }
+.agl-dialect {
+  min-height: 38px; padding: .4rem .78rem; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+  font: inherit; font-size: .86rem; font-weight: 700; cursor: pointer; transition: color .2s ease, background .25s ease, border-color .2s ease;
+}
+.agl-dialect:hover { color: var(--text); border-color: var(--line-strong, var(--line)); }
+.agl-dialect.is-on { background: var(--a); border-color: var(--a); color: #fff; }
+.agl-dialect:focus-visible, .agl-live-btn:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: 2px; }
+
+/* ---------- Sections. ---------- */
+.agl-section { max-width: 1180px; margin: 0 auto; padding: clamp(3rem, 7vw, 5.5rem) clamp(1rem, 2.4vw, 1.6rem); }
+.agl-head { max-width: 720px; margin-bottom: clamp(1.6rem, 3.5vw, 2.6rem); }
+.agl-head h2 { font-size: clamp(1.75rem, 3.4vw, 2.6rem); font-weight: 800; line-height: 1.15; }
+html[dir="rtl"] .agl-head h2 { line-height: 1.35; }
+.agl-head p { margin-top: .8rem; color: var(--muted); font-size: 1.05rem; line-height: 1.7; }
+.agl-head-split { max-width: none; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 1rem 3rem; align-items: end; }
+.agl-head-split p { margin-top: 0; }
+.agl-step-n { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--agl-soft-2); color: var(--accent-text, var(--a)); font-size: .84rem; font-weight: 800; flex: 0 0 auto; }
+
+/* ---------- How it works: the steps follow the scroll over the real setup. ---------- */
+.agl-how-grid { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: clamp(1.5rem, 4vw, 3.5rem); }
+.agl-how-steps { margin: 0; padding: 0; list-style: none; }
+.agl-how-step {
+  display: flex; gap: .9rem; min-height: 54vh; padding: 1.6rem 0 1.6rem 1.2rem; padding-inline: 1.2rem 0;
+  border-inline-start: 2px solid var(--line); opacity: .38; transition: opacity .4s ease, border-color .4s ease;
+}
+.agl-how-step:first-child { padding-top: .2rem; }
+.agl-how-step.is-on { opacity: 1; border-color: var(--a); }
+.agl-how-step.is-on .agl-step-n { background: var(--a); color: #fff; }
+.agl-how-copy h3 { font-size: clamp(1.25rem, 2vw, 1.6rem); font-weight: 800; line-height: 1.3; }
+.agl-how-copy p { margin-top: .5rem; color: var(--muted); font-size: 1.02rem; line-height: 1.7; max-width: 38ch; }
+.agl-how-inline { display: none; margin: 1rem 0 0; }
+.agl-how-inline img { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); }
+.agl-how-frame { position: sticky; top: 100px; align-self: start; padding: clamp(.8rem, 1.6vw, 1.1rem); border-radius: 28px; background: var(--agl-ink); box-shadow: 0 50px 90px -60px rgba(23, 20, 74, .9); }
+.agl-how-screen { position: relative; aspect-ratio: 1200 / 863; border-radius: 16px; overflow: hidden; background: #fff; }
+.agl-how-screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: top center; opacity: 0; transform: scale(1.02); transition: opacity .55s ease, transform .8s var(--agl-ease); }
+.agl-how-screen img.is-on { opacity: 1; transform: none; }
+.agl-how-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: .85rem; padding: 0 .3rem; color: var(--agl-on-ink-muted); font-size: .9rem; }
+.agl-how-dots { display: inline-flex; gap: 6px; }
+.agl-how-dots i { width: 22px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .22); transition: background .3s ease; }
+.agl-how-dots i.is-on { background: #fff; }
+
+/* ---------- The bento: a call that ends with something done, the month, three things. ---------- */
+.agl-bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1rem; }
+.agl-bento > article { border-radius: 24px; padding: clamp(1.2rem, 2.4vw, 1.6rem); border: 1px solid var(--line); background: var(--surface); }
+.agl-bento-call { grid-column: span 4; display: grid; gap: 1rem; align-content: space-between; min-height: 400px; background: var(--agl-ink) !important; border-color: transparent !important; color: var(--agl-on-ink); }
+.agl-bento-stats { grid-column: span 2; display: grid; gap: 1rem; align-content: space-between; }
+.agl-bento-small { grid-column: span 2; display: grid; gap: .55rem; align-content: start; }
+.agl-bento-live { justify-self: start; display: inline-flex; align-items: center; gap: .45rem; padding: .3rem .7rem; border-radius: 999px; background: rgba(255, 255, 255, .1); font-size: .8rem; font-weight: 700; }
+.agl-bento-live i { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; animation: agl-blink 1.4s ease-in-out infinite; }
+.agl-bento-live b { font-weight: 600; color: var(--agl-on-ink-muted); font-variant-numeric: tabular-nums; }
+.agl-bento-lines { display: grid; gap: .55rem; }
+.agl-bento-line { max-width: 78%; padding: .7rem .95rem; border-radius: 16px; font-size: .95rem; line-height: 1.55; opacity: 0; transform: translateY(10px); }
+.agl-bento-line.is-caller { justify-self: start; background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .16); border-end-start-radius: 6px; }
+.agl-bento-line.is-agent { justify-self: end; background: #fff; color: var(--agl-ink); border-end-end-radius: 6px; }
+.agl-bento-chip { justify-self: end; display: inline-flex; align-items: center; gap: .5rem; padding: .45rem .9rem; border-radius: 999px; background: #fff; color: var(--agl-ink); font-size: .85rem; font-weight: 700; opacity: 0; transform: scale(.9); }
+.agl-bento-caption { color: var(--muted); font-size: .93rem; line-height: 1.6; }
+.agl-bento-call .agl-bento-caption { color: var(--agl-on-ink-muted); }
+.agl-bento-stats h3, .agl-bento-small h3 { font-size: 1.08rem; font-weight: 800; }
+.agl-bento-nums { display: grid; gap: .55rem; }
+.agl-bento-nums div { display: flex; align-items: baseline; gap: .55rem; }
+.agl-bento-nums b { font-size: 1.9rem; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 2.6ch; }
+.agl-bento-nums span { color: var(--muted); font-size: .9rem; }
+.agl-bento-bars { display: flex; align-items: flex-end; gap: 5px; height: 72px; }
+.agl-bento-bars i { flex: 1; height: var(--h); border-radius: 5px 5px 2px 2px; background: color-mix(in srgb, var(--a) 70%, transparent); transform-origin: bottom; transform: scaleY(.08); }
+.agl-bento-bars i:last-child { background: var(--a); }
+.agl-bento-small p { color: var(--muted); font-size: .93rem; line-height: 1.6; }
+.agl-does-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--agl-soft); }
+.agl-does-icon svg, .agl-honest svg, .agl-flow-icon svg { width: 22px; height: 22px; fill: none; stroke: var(--a); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.agl-honest { display: flex; align-items: center; justify-content: center; gap: .6rem; margin-top: 1.3rem; color: var(--muted); font-size: .95rem; text-align: center; }
+/* In view: the call plays, the numbers count, the bars grow. */
+.is-in .agl-bento-line { animation: agl-rise .5s var(--agl-ease) forwards; animation-delay: calc(.3s + var(--d) * .9s); }
+.is-in .agl-bento-chip { animation: agl-pop-in .45s cubic-bezier(.34, 1.56, .64, 1) forwards; animation-delay: calc(.3s + var(--d) * .9s); }
+.is-in .agl-bento-bars i { animation: agl-grow .7s var(--agl-ease) forwards; animation-delay: calc(.2s + var(--d) * .05s); }
+
+/* ---------- One agent, every channel. ---------- */
+.agl-flow {
+  display: grid; grid-template-columns: minmax(0, 1fr) 120px auto 64px minmax(0, 1.15fr); align-items: center;
+  padding: clamp(1.4rem, 3vw, 2.6rem); border-radius: 28px; background: var(--agl-ink); color: var(--agl-on-ink);
+}
+.agl-flow-sources { height: 320px; display: flex; flex-direction: column; justify-content: space-between; margin: 0; padding: 0; list-style: none; }
+.agl-flow-sources li { display: flex; align-items: center; gap: .6rem; height: 52px; padding: 0 .9rem; border-radius: 14px; background: #fff; color: var(--agl-ink); font-size: .9rem; font-weight: 700; box-shadow: 0 10px 24px -16px rgba(0, 0, 0, .6); }
+.agl-flow-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: color-mix(in srgb, var(--a) 12%, #fff); flex: 0 0 auto; }
+.agl-flow-icon svg { width: 17px; height: 17px; }
+.agl-flow-lines, .agl-flow-out { width: 100%; height: 320px; overflow: visible; }
+.agl-flow-lines path, .agl-flow-out path { fill: none; stroke: rgba(201, 190, 255, .55); stroke-width: 1.6; stroke-dasharray: 5 7; animation: agl-dash 1.4s linear infinite; vector-effect: non-scaling-stroke; }
+html[dir="rtl"] .agl-flow-lines, html[dir="rtl"] .agl-flow-out { transform: scaleX(-1); }
+.agl-flow-agent { display: grid; justify-items: center; gap: .45rem; padding: 1.2rem 1.3rem; border-radius: 20px; background: var(--agl-ink-2); border: 1px solid rgba(255, 255, 255, .12); text-align: center; }
+.agl-flow-agent strong { font-size: 1rem; font-weight: 800; }
+.agl-flow-agent span { color: var(--agl-on-ink-muted); font-size: .8rem; }
+/* Listen's mark on a white tile, like its app icon; a soft ring shows it is on. */
+.agl-flow-logo { position: relative; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 20px; background: #fff; box-shadow: 0 14px 30px -14px rgba(118, 89, 250, .9); }
+.agl-flow-logo::after { content: ''; position: absolute; inset: -6px; border-radius: 25px; border: 1.5px solid rgba(201, 190, 255, .5); animation: agl-ring 2.6s ease-out infinite; }
+.agl-flow-logo svg { width: 40px; height: 40px; fill: var(--a); }
+.agl-flow-logo rect { transform-box: fill-box; transform-origin: center; }
+.agl-flow-logo rect:nth-child(n+2):nth-child(-n+6) { animation: agl-eq 1.5s ease-in-out infinite; }
+.agl-flow-logo rect:nth-child(3) { animation-delay: -.3s; }
+.agl-flow-logo rect:nth-child(4) { animation-delay: -.6s; }
+.agl-flow-logo rect:nth-child(5) { animation-delay: -.9s; }
+.agl-flow-logo rect:nth-child(6) { animation-delay: -1.2s; }
+.agl-flow-call { display: grid; gap: .6rem; padding: 1.1rem; border-radius: 20px; background: var(--agl-ink-2); border: 1px solid rgba(255, 255, 255, .12); }
+.agl-flow-call-head { display: flex; justify-content: space-between; align-items: center; font-size: .82rem; color: var(--agl-on-ink-muted); }
+.agl-flow-call-head span { display: inline-flex; align-items: center; gap: .4rem; font-weight: 700; color: var(--agl-on-ink); }
+.agl-flow-call-head i { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; animation: agl-blink 1.4s ease-in-out infinite; }
+.agl-flow-call-head b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.agl-flow-line { max-width: 92%; padding: .6rem .85rem; border-radius: 14px; font-size: .9rem; line-height: 1.55; opacity: 0; transform: translateY(8px); }
+.agl-flow-line.is-caller { justify-self: start; background: #fff; color: var(--agl-ink); border-end-start-radius: 5px; }
+.agl-flow-line.is-agent { justify-self: end; background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .16); border-end-end-radius: 5px; }
+.is-in .agl-flow-line { animation: agl-rise .5s var(--agl-ease) forwards; animation-delay: calc(.6s + var(--d) * 1.1s); }
+.agl-builders { margin-top: 1.2rem; text-align: center; color: var(--muted); font-size: .95rem; }
+
+/* ---------- Every call written down. ---------- */
+.agl-calls { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(1.5rem, 4vw, 3.5rem); align-items: center; }
+.agl-calls .agl-head { margin-bottom: 0; }
+.agl-inbox { display: grid; gap: .6rem; padding: .9rem; border: 1px solid var(--line); border-radius: var(--agl-r); background: var(--surface); }
+.agl-inbox-row { display: flex; align-items: center; gap: .75rem; padding: .8rem .9rem; border-radius: 14px; background: var(--bg); }
+.agl-inbox-row p { flex: 1; min-width: 0; font-size: .92rem; line-height: 1.5; }
+.agl-inbox-len { color: var(--muted); font-size: .8rem; white-space: nowrap; }
+.agl-inbox-customer { display: flex; align-items: center; gap: .75rem; margin-top: .2rem; padding: .8rem .9rem; border-radius: 14px; border: 1px dashed color-mix(in srgb, var(--a) 45%, var(--line)); }
+.agl-inbox-customer img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.agl-inbox-customer div { flex: 1; display: grid; line-height: 1.35; }
+.agl-inbox-customer div span { color: var(--muted); font-size: .86rem; }
+
+/* ---------- In every plan. ---------- */
+.agl-price { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; max-width: 1132px; margin: clamp(1rem, 3vw, 2rem) auto; padding: clamp(1.6rem, 4vw, 2.4rem); border-radius: var(--agl-r); background: var(--agl-soft); }
+.agl-price h2 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 800; }
+.agl-price p { margin-top: .45rem; color: var(--muted); max-width: 60ch; line-height: 1.65; }
+@media (max-width: 1200px) { .agl-price { margin-inline: clamp(1rem, 2.4vw, 1.6rem); } }
+
+/* ---------- Questions. ---------- */
+.agl-faq-list { max-width: 820px; border-top: 1px solid var(--line); }
+.agl-faq-list details { border-bottom: 1px solid var(--line); }
+.agl-faq-list summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.15rem .2rem; cursor: pointer; list-style: none; font-weight: 700; font-size: 1.04rem; }
+.agl-faq-list summary::-webkit-details-marker { display: none; }
+.agl-faq-list summary::after { content: '+'; font-size: 1.4rem; font-weight: 400; color: var(--muted); transition: transform .25s var(--agl-ease); }
+.agl-faq-list details[open] summary::after { transform: rotate(45deg); }
+.agl-faq-list summary:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: 2px; border-radius: 8px; }
+.agl-faq-list p { padding: 0 .2rem 1.2rem; color: var(--muted); line-height: 1.7; max-width: 70ch; }
+
+/* ---------- The last word. ---------- */
+.agl-final { display: grid; justify-items: center; gap: 1rem; padding: clamp(3rem, 8vw, 6rem) 1rem clamp(4rem, 9vw, 7rem); text-align: center; }
+.agl-final .orb { --orb-size: 110px; width: 110px; height: 110px; }
+.agl-final h2 { font-size: clamp(1.7rem, 3.6vw, 2.7rem); font-weight: 800; max-width: 22ch; line-height: 1.2; }
+html[dir="rtl"] .agl-final h2 { line-height: 1.4; }
+
+/* ---------- Motion while scrolling and clicking. ---------- */
+/* In-page links glide. */
+html:has(.agl) { scroll-behavior: smooth; }
+/* Parts rise into place as they come into view; only when the script runs, so nothing stays hidden without it. */
+.agl-js [data-agl-rise] { opacity: 0; transform: translateY(22px); transition: opacity .7s var(--agl-ease), transform .9s var(--agl-ease); transition-delay: var(--rise-d, 0s); }
+.agl-js [data-agl-rise].is-risen { opacity: 1; transform: none; }
+/* Switching the dialect: this call fades out, the next one comes in. */
+.agl-call-face, .agl-call-who, .agl-lines { transition: opacity .22s ease; }
+.agl-call.is-switching .agl-call-face, .agl-call.is-switching .agl-call-who, .agl-call.is-switching .agl-lines, .agl-call.is-switching .agl-chip { opacity: 0; }
+/* Answers open and close smoothly (the script animates their height). */
+.agl-faq-list details p { overflow: hidden; }
+.agl-faq-list details.is-closing summary::after { transform: none; }
+
+/* ---------- The homepage's Agents section. ---------- */
+.agl-home { max-width: 1180px; margin: 0 auto; }
+/* Centred like the homepage's other sections: the title, a line, then its two buttons. */
+.agl-home-head { display: grid; justify-items: center; text-align: center; gap: 1.3rem; margin-bottom: clamp(1.6rem, 3.4vw, 2.6rem); }
+.agl-home-head > div:first-child { max-width: 680px; }
+.agl-home-head .section-lead { margin: 0 auto; }
+.agl-home-head .agl-cta-row { margin-top: 0; justify-content: center; }
+
+@keyframes agl-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes agl-rise { to { opacity: 1; transform: none; } }
+@keyframes agl-pop-in { to { opacity: 1; transform: none; } }
+@keyframes agl-grow { to { transform: scaleY(1); } }
+@keyframes agl-dash { to { stroke-dashoffset: -24; } }
+@keyframes agl-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+@keyframes agl-eq { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.55); } }
+@keyframes agl-ring { 0% { opacity: .9; transform: scale(.96); } 100% { opacity: 0; transform: scale(1.14); } }
+
+@media (max-width: 1020px) {
+  .agl-bento-call, .agl-bento-stats { grid-column: span 6; }
+  .agl-bento-call { min-height: 0; }
+  .agl-flow { grid-template-columns: minmax(0, 1fr) 90px auto; row-gap: 1.2rem; }
+  .agl-flow-out { display: none; }
+  .agl-flow-call { grid-column: 1 / -1; }
+}
+@media (max-width: 920px) {
+  .agl-hero, .agl-calls, .agl-how-grid, .agl-head-split { grid-template-columns: minmax(0, 1fr); }
+  .agl-hero h1 { max-width: 16ch; }
+  .agl-how-frame { display: none; }
+  .agl-how-step { min-height: 0; opacity: 1; border-color: var(--line); padding-bottom: 2.2rem; }
+  .agl-how-inline { display: block; }
+}
+@media (max-width: 640px) {
+  .agl-bento-small { grid-column: span 6; }
+  .agl-flow { grid-template-columns: minmax(0, 1fr); }
+  .agl-flow-lines { display: none; }
+  .agl-flow-sources { height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+  .agl-flow-sources li { height: auto; min-height: 52px; padding: .6rem .7rem; font-size: .82rem; }
+  .agl-flow-agent { grid-auto-flow: column; justify-content: start; align-items: center; text-align: start; }
+  .agl-lines { min-height: 260px; }
+  .agl-call-stage { height: 130px; gap: 10px; }
+  .agl-call-stage .orb { --orb-size: 88px; width: 88px; height: 88px; }
+  .agl-wave { gap: 4px; }
+  .agl-cta-row .ag-btn { flex: 1 1 100%; }
+  .agl-dialects { gap: .45rem; }
+  .agl-dialect { min-height: 44px; padding: .5rem .95rem; }
+  .agl-price { flex-direction: column; align-items: flex-start; }
+}
+/* Without motion: everything shows as it ends. */
+@media (prefers-reduced-motion: reduce) {
+  .agl *, .agl *::before, .agl *::after { animation: none !important; transition: none !important; }
+  html:has(.agl) { scroll-behavior: auto; }
+  .agl-js [data-agl-rise] { opacity: 1; transform: none; }
+  .agl-bento-line, .agl-bento-chip, .agl-flow-line { opacity: 1; transform: none; }
+  .agl-bento-bars i { transform: none; }
+}

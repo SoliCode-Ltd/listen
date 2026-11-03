@@ -70,7 +70,11 @@ class AgentCalls
         $max = max(30, min((int) $agent->max_call_seconds, (int) config('listen.agents.max_call_seconds', 600)));
 
         $free = false;
-        if ($channel === 'test') {
+        // Listen's own agents (HouseAgent): their calls are on Listen, and short.
+        if ($agent->setting('house')) {
+            $free = true;
+            $max = min($max, \App\Support\Agents\HouseAgent::MAX_SECONDS);
+        } elseif ($channel === 'test') {
             $left = $this->freeTestSecondsLeft($userId);
             if ($left >= 20) {
                 $free = true;

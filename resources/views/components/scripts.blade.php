@@ -1005,5 +1005,14 @@
 {{-- Not on pages that belong to a member's own customers (an agent's link page). --}}
 @unless($noSupportChat ?? false)
   @include('components.whatsapp-widget')
+  @php
+    // Listen's own agent answers visitors on its public pages (php artisan agents:house).
+    $houseRoute = (string) (Route::currentRouteName() ?? '');
+    $houseAgent = (in_array($houseRoute, ['home', 'pricing', 'samples', 'agents-landing', 'contact'], true) || str_starts_with($houseRoute, 'seo.'))
+      ? \App\Support\Agents\HouseAgent::for(app()->getLocale()) : null;
+  @endphp
+  @if($houseAgent)
+    <script src="{{ asset('js/listen-agent.js') }}" data-agent="{{ $houseAgent['key'] }}" async></script>
+  @endif
 @endunless
 @endunless

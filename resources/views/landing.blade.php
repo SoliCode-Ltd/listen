@@ -934,6 +934,8 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
+  <link rel="stylesheet" href="{{ asset('css/agents-landing.css') }}?v={{ filemtime(public_path('css/agents-landing.css')) }}">
 </head>
 <body>
   <div class="bg-orb a"></div>
@@ -1038,6 +1040,9 @@
     {{-- Every kind of voice, one orb each --}}
     @include('components.home.voice-tour')
 
+    {{-- Listen Agents: a voice agent for a business, shown working. --}}
+    @include('components.home.agents')
+
     {{-- Voice gallery and dialogues --}}
     @include('components.home.voice-gallery')
     @include('components.home.dialogues')
@@ -1136,6 +1141,7 @@
   @include('components.motion')
   @include('components.voice-player-script')
   @include('components.orb-script')
+  <script src="{{ asset('js/agents-landing.js') }}?v={{ filemtime(public_path('js/agents-landing.js')) }}" defer></script>
   <script>
     // "Hear the voices" plays the hero conversation, and shows when it is playing.
     (function () {

@@ -26,8 +26,9 @@
     '.lva-launch:active{transform:scale(.97)}',
     '.lva-launch.is-round{padding:8px}',
     '.lva-mini{position:relative;width:36px;height:36px;flex:0 0 auto}',
-    '.lva-live-dot{position:absolute;top:-1px;inset-inline-end:-1px;width:11px;height:11px;border-radius:50%;background:#ee4a77;border:2px solid var(--bg);display:none}',
-    '.lva.is-live .lva-live-dot{display:block;animation:lva-blink 1.4s ease-in-out infinite}',
+    /* The status dot, on the photo's lower corner like a messenger's: green while the agent can take a call, pink and pulsing during one. */
+    '.lva-live-dot{position:absolute;bottom:-1px;inset-inline-end:-1px;z-index:2;width:13px;height:13px;border-radius:50%;background:#22c55e;border:2.5px solid var(--bg);transition:background .3s ease}',
+    '.lva.is-live .lva-live-dot{background:#ee4a77;animation:lva-blink 1.4s ease-in-out infinite}',
     /* The orb, drawn in CSS from the agent's colours (--c1 deep … --c4 light). */
     '.lva-orb{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 34% 28%,var(--c4) 0 7%,var(--c3) 24%,var(--c2) 55%,var(--c1) 100%);box-shadow:inset -8px -12px 24px rgba(0,0,0,.28),0 10px 28px -10px var(--c2);transform:scale(var(--s,1));transition:transform .09s linear;overflow:hidden;animation:lva-breathe 5s ease-in-out infinite}',
     '.lva-orb::before{content:"";position:absolute;inset:-12%;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 18%,var(--c3) 32%,transparent 48%,var(--c4) 66%,transparent 82%);opacity:.55;filter:blur(7px);mix-blend-mode:screen;animation:lva-spin 10s linear infinite}',
@@ -47,11 +48,24 @@
     '.lva-x{width:36px;height:36px;border-radius:50%;border:0;background:transparent;display:grid;place-items:center;color:var(--muted)}',
     '.lva-x:hover{background:var(--soft);color:var(--text)}',
     '.lva-x svg,.lva-call svg,.lva-mute svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
-    '.lva-stage{position:relative;width:132px;height:132px;margin:6px auto 0}',
-    '.lva-ring{position:absolute;inset:-9px;border-radius:50%;border:2px solid var(--c3);opacity:var(--mo,0);transform:scale(var(--ms,1));transition:opacity .12s linear,transform .12s linear}',
+    /* The voice: a small orb, and the brand's waves either side that move as it talks. */
+    '.lva-stage{display:flex;align-items:center;justify-content:center;gap:12px;height:104px;margin-top:4px}',
+    '.lva-stage-orb{position:relative;width:78px;height:78px;flex:0 0 auto}',
+    '.lva-ring{position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--c3);opacity:var(--mo,0);transform:scale(var(--ms,1));transition:opacity .12s linear,transform .12s linear}',
+    '.lva-wave{display:flex;align-items:center;gap:4px;height:64px}',
+    '.lva-wave i{display:block;width:4px;height:5px;border-radius:4px;background:linear-gradient(180deg,var(--c3),var(--c2));opacity:.9;transition:height .07s linear}',
+    '.lva:not(.is-live) .lva-wave i{animation:lva-idle 2.4s ease-in-out infinite}',
+    '.lva-wave i:nth-child(2n){animation-delay:-.6s}.lva-wave i:nth-child(3n){animation-delay:-1.2s}.lva-wave i:nth-child(5n){animation-delay:-1.8s}',
+    '@keyframes lva-idle{0%,100%{height:5px}50%{height:11px}}',
+    '.lva-face.is-photo{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--c2)}',
+    '.lva-mini img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}',
+    '.lva-mini.is-photo::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--c2)}',
+    '.lva.is-speaking .lva-mini.is-photo::after{animation:lva-pulse-ring 1s ease-in-out infinite}',
+    '@keyframes lva-pulse-ring{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.12);opacity:.5}}',
     '.lva-state{margin:0;text-align:center;font-weight:700;font-size:15px;min-height:22px}',
     '.lva-state.is-error{color:#d0335f}',
-    '.lva-lines{display:grid;gap:6px;max-height:150px;overflow:auto;scrollbar-width:thin}',
+    /* What was said: older lines fade out at the top as new ones come in. */
+    '.lva-lines{display:grid;gap:6px;max-height:160px;overflow:auto;scrollbar-width:thin;padding-top:12px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px);mask-image:linear-gradient(to bottom,transparent 0,#000 18px)}',
     '.lva-lines:empty{display:none}',
     '.lva-line{padding:8px 11px;border-radius:14px;background:var(--soft);font-size:13.5px;max-width:88%;justify-self:start;animation:lva-in .3s cubic-bezier(.22,1,.36,1)}',
     '.lva-line.is-caller{justify-self:end;background:transparent;border:1px solid var(--line)}',
@@ -141,7 +155,8 @@
     panel.setAttribute('aria-label', cfg.business || cfg.name || '');
     var head = el('div', 'lva-head');
     var face = el('span', 'lva-face');
-    if (cfg.avatar && /^https:\/\//.test(cfg.avatar)) { var img = el('img'); img.alt = ''; img.src = cfg.avatar; face.appendChild(img); }
+    var photo = cfg.avatar && (/^https:\/\//.test(cfg.avatar) || cfg.avatar.indexOf(ctx.origin + '/') === 0) ? cfg.avatar : null;
+    if (photo) { var img = el('img'); img.alt = ''; img.src = photo; face.appendChild(img); face.classList.add('is-photo'); }
     else { face.style.position = 'relative'; face.appendChild(orb()); }
     var who = el('div', 'lva-who');
     who.appendChild(el('strong', '', cfg.business || cfg.name));
@@ -153,10 +168,17 @@
     head.appendChild(face); head.appendChild(who); head.appendChild(close);
 
     var stage = el('div', 'lva-stage');
+    var waves = [el('span', 'lva-wave'), el('span', 'lva-wave')];
+    var bars = [];
+    waves.forEach(function (w) { for (var b = 0; b < 7; b++) { var bar = el('i'); w.appendChild(bar); bars.push(bar); } });
+    var orbBox = el('span', 'lva-stage-orb');
     var bigOrb = orb();
     var ring = el('i', 'lva-ring');
-    stage.appendChild(ring);
-    stage.appendChild(bigOrb);
+    orbBox.appendChild(ring);
+    orbBox.appendChild(bigOrb);
+    stage.appendChild(waves[0]);
+    stage.appendChild(orbBox);
+    stage.appendChild(waves[1]);
     var stateEl = el('p', 'lva-state', states.idle || '');
     stateEl.setAttribute('aria-live', 'polite');
     var lines = el('div', 'lva-lines');
@@ -191,7 +213,8 @@
     launch.setAttribute('aria-label', text.label || cfg.business || '');
     var mini = el('span', 'lva-mini');
     var miniOrb = orb();
-    mini.appendChild(miniOrb);
+    if (photo) { var mimg = el('img'); mimg.alt = ''; mimg.src = photo; mini.appendChild(mimg); mini.classList.add('is-photo'); }
+    else mini.appendChild(miniOrb);
     mini.appendChild(el('i', 'lva-live-dot'));
     launch.appendChild(mini);
     if (text.label) launch.appendChild(el('span', '', text.label));
@@ -249,12 +272,22 @@
         level(0, 0);
       }
     }
+    // The brand's waves: tallest in the middle of each group, each bar on its own beat.
+    var shape = [0.35, 0.6, 0.85, 1, 0.8, 0.55, 0.3];
     function level(a, c) {
-      var s = (1 + Math.min(1, a) * 0.16).toFixed(3);
+      a = Math.min(1, a || 0); c = Math.min(1, c || 0);
+      var s = (1 + a * 0.14).toFixed(3);
       bigOrb.style.setProperty('--s', s);
       miniOrb.style.setProperty('--s', s);
       ring.style.setProperty('--mo', Math.min(0.9, c * 2.2).toFixed(2));
-      ring.style.setProperty('--ms', (1 + Math.min(1, c) * 0.12).toFixed(3));
+      ring.style.setProperty('--ms', (1 + c * 0.12).toFixed(3));
+      if (!box.classList.contains('is-live')) { bars.forEach(function (b) { b.style.height = ''; }); return; }
+      var v = Math.max(a, c * 0.55), t = Date.now() / 95;
+      bars.forEach(function (b, i) {
+        var k = i % 7, side = i < 7 ? k : 6 - k;
+        var h = 5 + v * 54 * shape[side] * (0.55 + 0.45 * Math.abs(Math.sin(t + i * 1.7)));
+        b.style.height = h.toFixed(1) + 'px';
+      });
     }
     function line(t) {
       var n = el('div', 'lva-line is-' + t.role, t.text);
@@ -291,6 +324,13 @@
       muteBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
       muteBtn.setAttribute('aria-label', muted ? (text.unmute || 'Unmute') : (text.mute || 'Mute'));
     });
+
+    // The page can open it too ("Talk to our agent"), and start the call at once.
+    window.ListenAgentWidget.open = function (o) {
+      setOpen(true);
+      if (o && o.call && !call && !starting) callBtn.click();
+    };
+    try { document.dispatchEvent(new CustomEvent('listen-agent:ready')); } catch (e) {}
   }
 
   window.ListenAgentWidget = { mount: mount };

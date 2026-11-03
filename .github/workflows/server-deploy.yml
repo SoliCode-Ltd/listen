@@ -154,7 +154,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test, voice-design-log, voice-cloning-examples]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test, voice-design-log, voice-cloning-examples]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -259,6 +259,12 @@ jobs:
           if [ "$MODE" = migrate ]; then
             $S "$FIND; php artisan migrate:status --pending 2>/dev/null || php artisan migrate:status | grep -i pending || true"
             $S "$FIND; php artisan migrate --force"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = house-agent ] || [ "$MODE" = house-agent-off ]; then
+            # Listen's own agents on its public pages (php artisan agents:house), or off them.
+            $S "$FIND; php artisan agents:house $([ "$MODE" = house-agent-off ] && echo --off)"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi

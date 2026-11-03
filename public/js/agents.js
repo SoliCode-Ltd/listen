@@ -175,7 +175,10 @@
   function talk(root) {
     if (!root) return;
     var btn = $('[data-ag-call]', root), label = $('[data-ag-call-label]', root), stateEl = $('[data-ag-talk-state]', root);
-    var mute = $('[data-ag-mute]', root), stage = $('[data-ag-stage]', root), mic = $$('[data-ag-mic] i', root);
+    var mute = $('[data-ag-mute]', root), stage = $('[data-ag-stage]', root);
+    var bars = $$('.ag-wave i', root), face = $('[data-ag-talk-avatar]', root);
+    var halo = $('.ag-talk-halo', root), faceImg = $('[data-ag-talk-avatar-img]', root);
+    var shape = [0.35, 0.6, 0.85, 1, 0.8, 0.55, 0.3];
     var list = $('[data-ag-transcript]', root);
     var call = null, muted = false, lastAsked = '';
     var states = T.states || {};
@@ -188,7 +191,22 @@
       label.textContent = live ? T.end : T.start;
       if (mute) mute.hidden = !live;
       stage.classList.toggle('is-speaking', s === 'speaking');
-      if (!live) { stage.classList.remove('is-playing'); stage.__vpLevel = 0; call = null; }
+      stage.classList.toggle('is-live', live);
+      if (!live) { stage.classList.remove('is-playing'); stage.__vpLevel = 0; call = null; level(0, 0); }
+    }
+    // The waves follow the agent's voice (and the caller's, softer); the face and its halo breathe with it.
+    function level(a, c) {
+      a = Math.min(1, a || 0); c = Math.min(1, c || 0);
+      stage.__vpLevel = a;
+      stage.classList.toggle('is-playing', a > 0.01);
+      if (halo) { halo.style.setProperty('--hs', (1 + a * 0.22).toFixed(3)); halo.style.setProperty('--ho', (0.45 + a * 0.55).toFixed(2)); }
+      if (faceImg) faceImg.style.setProperty('--fs', (1 + a * 0.05).toFixed(3));
+      if (!stage.classList.contains('is-live')) { bars.forEach(function (b) { b.style.height = ''; }); return; }
+      var v = Math.max(a, c * 0.55), t = Date.now() / 95;
+      bars.forEach(function (b, i) {
+        var k = i % 7, side = i < 7 ? k : 6 - k;
+        b.style.height = (6 + v * 84 * shape[side] * (0.55 + 0.45 * Math.abs(Math.sin(t + i * 1.7)))).toFixed(1) + 'px';
+      });
     }
     function bubble(role, text, extra) {
       var b = document.createElement('div');
@@ -240,11 +258,7 @@
           if (t.role === 'caller') { lastAsked = t.text; bubble('caller', t.text); }
           else bubble('agent', t.text, correction(lastAsked));
         },
-        onLevel: function (a, c) {
-          stage.__vpLevel = a;
-          stage.classList.toggle('is-playing', a > 0.01);
-          mic.forEach(function (bar, i) { bar.style.height = Math.max(4, Math.min(18, 4 + c * 26 * (1 - Math.abs(i - 2) * 0.22))) + 'px'; });
-        },
+        onLevel: level,
         onTool: function (name, args) {
           if (name === 'save_contact' && C.mode !== 'link') bubble('event', fill(T.saved_contact, { details: [args.name, args.phone, args.email].filter(Boolean).join(' · ') }));
         },
@@ -258,8 +272,8 @@
       mute.textContent = muted ? T.unmute : T.mute;
     });
     return { setAvatar: function (url) {
-      var wrap = $('[data-ag-talk-avatar]', root), img = $('[data-ag-talk-avatar-img]', root);
-      if (wrap && img && url) { img.src = url; wrap.hidden = false; }
+      var orbBox = $('[data-ag-talk-orb]', root);
+      if (faceImg && url) { faceImg.src = url; faceImg.hidden = false; if (orbBox) orbBox.hidden = true; }
     } };
   }
 

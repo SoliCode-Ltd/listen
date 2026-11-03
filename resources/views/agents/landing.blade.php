@@ -1,0 +1,227 @@
+@include('components.page-head', ['pageTitle' => __('agents_landing.meta_title'), 'page' => 'agents_landing'])
+  <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
+  <link rel="stylesheet" href="{{ asset('css/agents-landing.css') }}?v={{ filemtime(public_path('css/agents-landing.css')) }}">
+</head>
+<body>
+  @include('components.header')
+  @php
+    $ar = app()->getLocale() === 'ar';
+    $hasAgents = auth()->check() && auth()->user()->agents()->exists();
+    $startUrl = $hasAgents ? route('voice-agents.index') : (auth()->check() ? route('voice-agents.create') : route('register', ['next' => 'agents']));
+    $scenes = __('agents_landing.scenes');
+    $order = __('agents_landing.scene_order');
+    $first = $scenes[$order[0]];
+    $steps = __('agents_landing.steps');
+    $speaker = fn (string $slug) => asset('images/speakers/'.$slug.'.webp').'?v=1';
+    $shot = fn (int $i) => asset('images/agents/landing/'.($ar ? 'ar' : 'en').'/step-'.($i + 1).'.webp').'?v=1';
+    $wave = '<span class="agl-wave" aria-hidden="true">'.str_repeat('<i></i>', 7).'</span>';
+    $micIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>';
+  @endphp
+
+  <main class="agl" id="agents-landing">
+    {{-- A call you can watch, in one dialect after another; and a real one with Listen's own agent. --}}
+    <section class="agl-hero">
+      <div class="agl-hero-text">
+        <h1>{{ __('agents_landing.hero_title') }}</h1>
+        <p class="agl-lead">{{ __('agents_landing.hero_text') }}</p>
+        <div class="agl-cta-row">
+          <a class="ag-btn ag-btn-primary ag-btn-lg" href="{{ $startUrl }}">{{ $hasAgents ? __('agents_landing.hero_cta_member') : __('agents_landing.hero_cta') }}</a>
+          <button type="button" class="ag-btn ag-btn-lg agl-live-btn" data-agl-live hidden>{!! $micIcon !!}{{ __('agents_landing.talk_live') }}</button>
+          <a class="ag-btn ag-btn-lg ag-btn-ghost" href="#agl-call" data-agl-watch>{{ __('agents_landing.hero_watch') }}</a>
+        </div>
+        <p class="agl-note" data-agl-live-note hidden>{{ __('agents_landing.talk_live_note') }}</p>
+        <p class="agl-note">{{ __('agents_landing.hero_note') }}</p>
+      </div>
+
+      <div class="agl-call" id="agl-call" data-agl-call>
+        <div class="agl-call-card">
+          <div class="agl-call-head">
+            <img class="agl-call-face" src="{{ $speaker($first['avatar']) }}" alt="" width="46" height="46" data-agl-face>
+            <div class="agl-call-who">
+              <strong data-agl-agent>{{ $first['agent'] }}</strong>
+              <span data-agl-business>{{ $first['business'] }}</span>
+            </div>
+            <span class="agl-call-live"><i aria-hidden="true"></i>{{ __('agents_landing.call_live') }} <b data-agl-clock dir="ltr">00:00</b></span>
+          </div>
+          <div class="agl-call-stage" data-vp-track data-agl-stage>
+            {!! $wave !!}
+            <x-orb name="listen" />
+            {!! $wave !!}
+          </div>
+          <div class="agl-lines" data-agl-lines aria-hidden="true">
+            @foreach($first['lines'] as [$role, $text])
+              <p class="agl-line is-{{ $role }} is-on" dir="auto"><span>{{ $text }}</span></p>
+            @endforeach
+          </div>
+          <p class="agl-chip is-on" data-agl-chip><i aria-hidden="true"></i><span>{{ $first['chip'] }}</span></p>
+        </div>
+        <div class="agl-dialects" role="group" aria-label="{{ __('agents_landing.dialects_label') }}">
+          @foreach($order as $i => $key)
+            <button type="button" class="agl-dialect {{ $i === 0 ? 'is-on' : '' }}" data-agl-scene="{{ $i }}" aria-pressed="{{ $i === 0 ? 'true' : 'false' }}">{{ $scenes[$key]['label'] }}</button>
+          @endforeach
+        </div>
+      </div>
+    </section>
+
+    {{-- How it works: the real setup, one step after another as the page scrolls. --}}
+    <section class="agl-section agl-how" data-agl-how>
+      <div class="agl-head" data-agl-rise>
+        <h2>{{ __('agents_landing.steps_title') }}</h2>
+        <p>{{ __('agents_landing.steps_text') }}</p>
+      </div>
+      <div class="agl-how-grid">
+        <ol class="agl-how-steps">
+          @foreach($steps as $i => [$title, $text])
+            <li class="agl-how-step {{ $i === 0 ? 'is-on' : '' }}" data-agl-how-step="{{ $i }}" data-label="{{ __('agents_landing.how_step_of', ['n' => $i + 1, 'total' => count($steps)]) }} · {{ $title }}">
+              <span class="agl-step-n">{{ $i + 1 }}</span>
+              <div class="agl-how-copy">
+                <h3>{{ $title }}</h3>
+                <p>{{ $text }}</p>
+                <figure class="agl-how-inline"><img src="{{ $shot($i) }}" alt="{{ $title }}" width="1200" height="863" loading="lazy"></figure>
+              </div>
+            </li>
+          @endforeach
+        </ol>
+        <div class="agl-how-frame" aria-hidden="true">
+          <div class="agl-how-screen">
+            @foreach($steps as $i => $step)
+              <img src="{{ $shot($i) }}" alt="" width="1200" height="863" loading="lazy" class="{{ $i === 0 ? 'is-on' : '' }}" data-agl-how-shot="{{ $i }}">
+            @endforeach
+          </div>
+          <p class="agl-how-foot">
+            <span data-agl-how-label>{{ __('agents_landing.how_step_of', ['n' => 1, 'total' => count($steps)]) }} · {{ $steps[0][0] }}</span>
+            <span class="agl-how-dots">@foreach($steps as $i => $step)<i class="{{ $i === 0 ? 'is-on' : '' }}"></i>@endforeach</span>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    {{-- What it does on every call, shown working. --}}
+    <section class="agl-section agl-bento-wrap" data-agl-reveal>
+      <div class="agl-head agl-head-split" data-agl-rise>
+        <h2>{{ __('agents_landing.bento_title') }}</h2>
+        <p>{{ __('agents_landing.bento_text') }}</p>
+      </div>
+      <x-agents.bento />
+      <p class="agl-honest" data-agl-rise><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>{{ __('agents_landing.honest') }}</p>
+    </section>
+
+    {{-- One agent, every channel: where callers come from, the agent, a live call. --}}
+    <section class="agl-section" data-agl-reveal>
+      <div class="agl-head agl-head-split" data-agl-rise>
+        <h2>{{ __('agents_landing.flow_title') }}</h2>
+        <p>{{ __('agents_landing.flow_text') }}</p>
+      </div>
+      <div class="agl-flow" aria-hidden="true" data-agl-rise style="--rise-d: .1s">
+        <ul class="agl-flow-sources">
+          @foreach(__('agents_landing.flow_sources') as $i => $label)
+            <li>
+              <span class="agl-flow-icon">
+                @switch($i)
+                  @case(0)<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 8h18M15 15h3"/></svg>@break
+                  @case(1)<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg>@break
+                  @case(2)<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3M21 14v.01M14 21h7v-4"/></svg>@break
+                  @default<svg viewBox="0 0 24 24"><path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+                @endswitch
+              </span>
+              {{ $label }}
+            </li>
+          @endforeach
+        </ul>
+        <svg class="agl-flow-lines" viewBox="0 0 120 320" preserveAspectRatio="none">
+          @foreach([26, 115, 205, 294] as $y)
+            <path d="M0 {{ $y }} C 62 {{ $y }}, 58 160, 120 160" />
+          @endforeach
+        </svg>
+        <div class="agl-flow-agent">
+          {{-- Listen's mark, its bars moving like a voice. --}}
+          <span class="agl-flow-logo" aria-hidden="true">
+            <svg viewBox="0 0 128 128"><rect x="5" y="59" width="10" height="10" rx="5"/><rect x="23" y="42" width="10" height="44" rx="5"/><rect x="41" y="28" width="10" height="72" rx="5"/><rect x="59" y="14" width="10" height="100" rx="5"/><rect x="77" y="28" width="10" height="72" rx="5"/><rect x="95" y="42" width="10" height="44" rx="5"/><rect x="113" y="59" width="10" height="10" rx="5"/></svg>
+          </span>
+          <strong>{{ __('agents_landing.flow_agent') }}</strong>
+          <span>{{ __('agents_landing.flow_agent_sub') }}</span>
+        </div>
+        <svg class="agl-flow-out" viewBox="0 0 64 320" preserveAspectRatio="none"><path d="M0 160 H 64" /></svg>
+        <div class="agl-flow-call">
+          <p class="agl-flow-call-head"><span><i></i>{{ __('agents_landing.call_live') }}</span><b dir="ltr">00:12</b></p>
+          @foreach(__('agents_landing.flow_lines') as $i => [$role, $text])
+            <p class="agl-flow-line is-{{ $role }}" style="--d: {{ $i }}" dir="auto">{{ $text }}</p>
+          @endforeach
+        </div>
+      </div>
+      <p class="agl-builders" data-agl-rise>{{ __('agents_landing.flow_builders') }}</p>
+    </section>
+
+    {{-- Every call written down. --}}
+    <section class="agl-section agl-calls" data-agl-reveal>
+      <div class="agl-head" data-agl-rise>
+        <h2>{{ __('agents_landing.calls_title') }}</h2>
+        <p>{{ __('agents_landing.calls_text') }}</p>
+      </div>
+      <div class="agl-inbox" aria-hidden="true" data-agl-rise style="--rise-d: .1s">
+        @foreach(__('agents_landing.calls_demo') as [$summary, $channel, $length])
+          <div class="agl-inbox-row">
+            <span class="ag-pill">{{ $channel }}</span>
+            <p dir="auto">{{ $summary }}</p>
+            <span class="agl-inbox-len">{{ $length }}</span>
+          </div>
+        @endforeach
+        <div class="agl-inbox-customer">
+          <img src="{{ $speaker('ar-ahmed') }}" alt="" width="40" height="40" loading="lazy" onerror="this.remove()">
+          <div><strong>{{ __('agents_landing.calls_customer') }}</strong><span dir="ltr">{{ __('agents_landing.calls_phone') }}</span></div>
+          <span class="ag-btn ag-btn-sm ag-btn-primary">{{ __('agents_landing.calls_call') }}</span>
+        </div>
+      </div>
+    </section>
+
+    {{-- In every plan. --}}
+    <section class="agl-price" data-agl-rise>
+      <div>
+        <h2>{{ __('agents_landing.price_title') }}</h2>
+        <p>{{ __('agents_landing.price_text') }}</p>
+      </div>
+      <a class="ag-btn ag-btn-lg" href="{{ route('pricing') }}">{{ __('agents_landing.price_cta') }}</a>
+    </section>
+
+    {{-- Questions. --}}
+    <section class="agl-section agl-faq">
+      <div class="agl-head" data-agl-rise><h2>{{ __('agents_landing.faq_title') }}</h2></div>
+      <div class="agl-faq-list" data-agl-rise style="--rise-d: .08s">
+        @foreach(__('agents_landing.faq') as $i => [$q, $a])
+          <details {{ $i === 0 ? 'open' : '' }}>
+            <summary>{{ $q }}</summary>
+            <p>{{ $a }}</p>
+          </details>
+        @endforeach
+      </div>
+    </section>
+
+    <section class="agl-final" data-orb-host>
+      <x-orb name="listen" />
+      <h2 data-agl-rise>{{ __('agents_landing.final_title') }}</h2>
+      <div class="agl-cta-row agl-cta-center" data-agl-rise style="--rise-d: .1s">
+        <a class="ag-btn ag-btn-primary ag-btn-lg" href="{{ $startUrl }}">{{ __('agents_landing.final_cta') }}</a>
+        <button type="button" class="ag-btn ag-btn-lg agl-live-btn" data-agl-live hidden>{!! $micIcon !!}{{ __('agents_landing.talk_live') }}</button>
+      </div>
+      <p class="agl-note">{{ __('agents_landing.hero_note') }}</p>
+    </section>
+  </main>
+
+  @include('components.footer')
+  @include('components.scripts')
+  @include('components.orb-script')
+  @php
+    $landing = [
+      'scenes' => array_map(fn ($key) => [
+        'agent' => $scenes[$key]['agent'],
+        'business' => $scenes[$key]['business'],
+        'face' => $speaker($scenes[$key]['avatar']),
+        'lines' => array_map(fn ($l) => ['role' => $l[0], 'text' => $l[1], 'note' => $l[2] ?? null], $scenes[$key]['lines']),
+        'chip' => $scenes[$key]['chip'],
+      ], $order),
+    ];
+  @endphp
+  <script>window.LISTEN_AGENTS_LANDING = {!! \Illuminate\Support\Js::from($landing) !!};</script>
+  <script src="{{ asset('js/agents-landing.js') }}?v={{ filemtime(public_path('js/agents-landing.js')) }}" defer></script>
+</body>
+</html>
