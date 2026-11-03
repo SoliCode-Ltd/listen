@@ -23,6 +23,11 @@ on:
 permissions:
   contents: read
 
+# The calls this run makes ("all", or case ids from the script): only the ones
+# being recorded again, so no audio is spent on calls already kept.
+env:
+  CALLS: ar-eg en-us
+
 concurrency:
   group: agent-live-agent-test
   cancel-in-progress: false
@@ -75,7 +80,7 @@ jobs:
           rm -f ~/.ssh/id_test
           if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
           echo "::add-mask::$KEY"
-          LIVE_KEY="$KEY" node scripts/agents/live_agent_test.mjs setups out
+          LIVE_KEY="$KEY" node scripts/agents/live_agent_test.mjs setups out $CALLS
 
       - name: Make the replies easy to play (MP3)
         if: always()

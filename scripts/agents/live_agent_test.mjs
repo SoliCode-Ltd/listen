@@ -8,14 +8,14 @@
 //   3. the agent speaks its dialect, reads the caller's number back and saves
 //      it with its save_contact tool, and Listen's answer to the tool reaches it.
 //
-// Usage: LIVE_KEY=... node scripts/agents/live_agent_test.mjs setups-dir out-dir
+// Usage: LIVE_KEY=... node scripts/agents/live_agent_test.mjs setups-dir out-dir [case ids...]
 // setups-dir holds one JSON per case from `php artisan agents:live-setup --sample=<id>`.
 
 import fs from 'node:fs';
 import path from 'node:path';
 
 const KEY = process.env.LIVE_KEY || '';
-const [SETUPS = 'setups', OUT = 'out'] = process.argv.slice(2);
+const [SETUPS = 'setups', OUT = 'out', ...PICK] = process.argv.slice(2);
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 const WS = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained';
 if (!KEY) { console.error('LIVE_KEY is not set'); process.exit(1); }
@@ -36,7 +36,7 @@ const CASES = [
   ] },
   { id: 'ar-eg', file: 'ar-eg.json', turns: [
     'السلام عليكم، هو انتو بتعملوا سحب عينات من البيت؟',
-    'طب تمام، عايزة حد ييجي بكرة الصبح، اسمي منى ورقمي صفر واحد صفر واحد اتنين تلاتة أربعة خمسة ستة سبعة تمانية',
+    'طب تمام، عايزة حد ييجي بكرة الساعة عشرة الصبح. اسمي منى ورقمي صفر واحد صفر واحد اتنين تلاتة أربعة خمسة ستة سبعة تمانية',
     'أيوه مظبوط، شكراً',
   ] },
   { id: 'ar-lb', file: 'ar-lb.json', turns: [
@@ -45,8 +45,8 @@ const CASES = [
     'تمام، يعطيك العافية',
   ] },
   { id: 'en-us', file: 'en-us.json', turns: [
-    'Hi, do you guys have time for an oil change today?',
-    'Three works. My name is Jake, and my number is five five five, two one zero, four eight seven six.',
+    'Hi, do you guys have time for an oil change today, maybe around three?',
+    'Perfect. My name is Jake, and my number is five five five, two one zero, four eight seven six.',
     "Yep, that's right. Thanks!",
   ] },
   { id: 'en-gb', file: 'en-gb.json', turns: [
@@ -118,7 +118,7 @@ function run(c, token) {
       if (m.toolCall) {
         for (const fc of m.toolCall.functionCalls || []) {
           out.tools.push({ name: fc.name, args: fc.args, at_turn: i + 1 });
-          if (cur) { clearTimeout(cur.done); cur.done = null; }
+          if (cur) { clearTimeout(cur.done); cur.done = fc.name === 'end_call' ? setTimeout(finish, 2500) : null; }
           ws.send(JSON.stringify({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: { result: fc.name === 'save_contact' ? 'saved' : 'ok' } }] } }));
         }
       }
@@ -138,7 +138,9 @@ function run(c, token) {
 }
 
 const results = { ran_at: new Date().toISOString(), cases: [] };
-for (const c of CASES) {
+// Only the calls named after the folders (all when none are named or "all").
+const picked = PICK.filter((x) => x && x !== 'all');
+for (const c of CASES.filter((x) => !picked.length || picked.includes(x.id))) {
   const setup = JSON.parse(fs.readFileSync(path.join(SETUPS, c.file), 'utf8'));
   const tried = [];
   let r = null;
