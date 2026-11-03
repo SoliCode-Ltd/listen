@@ -11,15 +11,18 @@ return [
     'start_title' => 'What do you want to do first?',
     'start_subtitle' => 'You can do both, any time. This only decides where you start.',
     'start_studio_title' => 'Make voice-overs',
-    'start_studio_text' => 'Ads, videos, stories and courses, in 147 Arabic voices and English accents.',
+    'start_studio_text' => 'Ads, videos, stories and courses, read by natural Arabic and English voices.',
     'start_agents_title' => 'Get a voice agent for my business',
     'start_agents_text' => 'It answers your customers on your website or a link, in their dialect, day and night.',
     'start_skip' => 'Just looking around',
     'start_hello' => 'Welcome, :name',
+    'start_continue_note' => 'You can switch between the Studio and Agents any time, from the top of every page.',
+    'start_label' => 'Where do you want to start?',
+    'start_shot_studio' => 'The Studio',
+    'start_shot_agents' => 'Your agent on your website',
     'start_studio_cta' => 'Open the Studio',
-    'start_studio_points' => ['147 Arabic dialects and 66 English accents', 'Emotions, styles and sound places', 'Download as MP3 or WAV in seconds'],
+    'start_studio_points' => [':dialects Arabic dialects and :accents English accents', 'Emotions, styles and sound places', 'Download as MP3 or WAV in seconds'],
     'start_agents_points' => ['Talks in your customers\' dialect', 'On your website, a link or a QR code', 'Ready in about two minutes'],
-    'start_art' => ['line' => 'Hear your script in any voice, in seconds.', 'chips' => ['Egyptian', 'Saudi', 'British'], 'business' => 'Bright Smile Dental', 'state' => 'Sara is speaking', 'caption' => 'Hi, how can I help you today?', 'button' => 'Talk to us'],
 
     // The list of agents.
     'title' => 'Agents',
@@ -168,7 +171,7 @@ return [
     'live_platforms_title' => 'Your website builder',
     'live_platforms_text' => 'Pick yours. WordPress has a plugin with your agent inside; the others take three short steps.',
     'soon' => 'Soon',
-    'live_send_dev' => 'Send to my web person',
+    'live_send_dev' => 'Send to my developer',
     'live_send_dev_text' => "Hi! Please add our voice agent to our website. Paste this line just before </body> on every page:\n\n:code\n\nThanks!",
     'live_allowed_label' => 'Websites allowed to show the button',
     'live_allowed_hint' => 'So nobody can copy your button onto another site and use your minutes. Leave empty to allow any site.',
@@ -182,44 +185,6 @@ return [
     'platform_kind' => [
         'plugin' => 'Plugin',
         'guide' => '3 steps',
-    ],
-    'guide_title' => 'Add your agent to :platform',
-    'guide_download' => 'Download the plugin',
-    'guide_meta' => '{1} One step, about two minutes|[2,*] :count steps, about two minutes',
-    'guide_code' => 'The line to paste',
-    'guides' => [
-        'wordpress' => [
-            'steps' => [
-                'Download your plugin below. Your agent is already inside it.',
-                'In your WordPress dashboard, open Plugins, then Add New Plugin, then Upload Plugin.',
-                'Choose the file you downloaded, click Install Now, then Activate.',
-            ],
-            'done' => 'The call button now shows on every page. To hide it, open Settings, then Listen Voice Agent.',
-        ],
-        'shopify' => [
-            'steps' => [
-                'In your Shopify admin, open Online Store, then Themes, and click Customize next to your current theme.',
-                'In the left panel, under Footer, click Add section and choose Custom Liquid. Paste this line in its box.',
-                'Click Save. If your theme has no Custom Liquid section, click ⋯ next to the theme, then Edit code, open `theme.liquid` under Layout, paste the line just before `</body>` and click Save.',
-            ],
-            'done' => 'The call button shows on every page of your store, except checkout.',
-        ],
-        'wix' => [
-            'steps' => [
-                'In your Wix dashboard, open Settings, then Custom code (under Advanced), and click `+ Add Custom Code`.',
-                'Paste this line and name it Listen call button. Choose All pages and Load code once, and under Place Code in choose `Body - end`.',
-                'Click Apply, then open your published site.',
-            ],
-            'done' => 'Custom code works on Wix sites with a Premium plan and a connected domain.',
-        ],
-        'laravel' => [
-            'steps' => [
-                'Add your agent key to `.env` as `LISTEN_AGENT_KEY=` followed by the `data-agent` value in the line below, and add `\'listen\' => [\'agent_key\' => env(\'LISTEN_AGENT_KEY\')],` to `config/services.php`.',
-                'Open the Blade file that closes `</body>` on all your pages (usually `resources/views/layouts/app.blade.php`, or `resources/views/app.blade.php` in Inertia apps). Paste the line below just before `</body>`, with `data-agent="{{ config(\'services.listen.agent_key\') }}"`.',
-                'If your app sends a Content-Security-Policy with `Vite::useCspNonce()`, add `nonce="{{ Vite::cspNonce() }}"` to the line and `\'strict-dynamic\'` to `script-src` (and Listen\'s address to `connect-src`, if you limit it). Deploy, then run `php artisan config:cache`.',
-            ],
-            'done' => 'The call button shows on every page that uses this layout.',
-        ],
     ],
     'live_seen' => 'Working on :site. Last seen :when.',
     'live_not_seen' => 'Not on a website yet. Once it is, open any page of your website and it shows here.',
@@ -306,6 +271,63 @@ return [
         'hello' => 'Hi, this is :name from :business. How can I help?',
         'ask' => 'What time do you open tomorrow?',
         'answer' => 'We open at 10 in the morning and close at 10 at night. Shall I book you in?',
+    ],
+    // The install panel (Go live): one place for every website builder, step by step.
+    'install' => [
+        'title' => 'Add your agent to your website',
+        'subtitle' => 'Pick where your website is built. It takes about two minutes, and you do it once.',
+        'open' => 'Step by step',
+        'tabs' => ['wordpress' => 'WordPress', 'shopify' => 'Shopify', 'wix' => 'Wix', 'laravel' => 'Laravel', 'html' => 'Any website'],
+        'level' => ['easy' => 'No coding needed', 'dev' => 'For developers'],
+        'time' => 'About 2 minutes',
+        'code' => 'The line to paste',
+        'download' => 'Download the plugin',
+        'download_note' => 'listen-voice-agent.zip, with your agent inside',
+        'check' => 'Check installation',
+        'checking' => 'Checking…',
+        'seen' => 'Working on :site, seen :when.',
+        'not_seen' => 'Not seen on a website yet. Open your website once after adding it, then check again.',
+        'send' => 'Send to my developer',
+        'send_text' => "Please add our Listen call button to every page of our website. Paste this line just before </body>:\n\n:code",
+        'close' => 'Close',
+        'steps' => [
+            'wordpress' => [
+                ['Download the plugin', 'Your agent is already inside it, so there is nothing to copy.'],
+                ['Upload it to WordPress', 'In your WordPress dashboard open `Plugins` > `Add New Plugin` > `Upload Plugin`, choose the file and click `Install Now`.'],
+                ['Turn it on', 'Click `Activate`. The call button shows on every page. To choose pages, open `Settings` > `Listen Voice Agent`.'],
+            ],
+            'shopify' => [
+                ['Open your theme editor', 'In your Shopify admin open `Online Store` > `Themes` and click `Customize` on your live theme.'],
+                ['Add a Custom Liquid section', 'In the left panel, under `Footer`, click `Add section` > `Custom Liquid` and paste the line below into its box.'],
+                ['Save', 'Click `Save`. No Custom Liquid in your theme? Open `⋯` > `Edit code`, then `theme.liquid`, and paste the line just before `</body>`.'],
+            ],
+            'wix' => [
+                ['Open Custom code', 'In your Wix dashboard open `Settings` > `Custom code` (under Advanced) and click `+ Add Custom Code`.'],
+                ['Paste the line', 'Paste the line below and name it Listen call button. Choose `All pages` and `Load code once`, and set `Place Code in` to `Body - end`.'],
+                ['Apply', 'Click `Apply`, then open your published website.'],
+            ],
+            'laravel' => [
+                ['Add your agent key', 'Put the data-agent value from the line below in `.env` as `LISTEN_AGENT_KEY`, then add this to the array in `config/services.php`: `\'listen\' => [\'agent_key\' => env(\'LISTEN_AGENT_KEY\')],`'],
+                ['Add the line to your layout', 'Paste the line below just before `</body>` in the Blade layout every page uses, usually: `resources/views/layouts/app.blade.php` In Inertia apps it is `resources/views/app.blade.php`. Then read the key from your config: `data-agent="{{ config(\'services.listen.agent_key\') }}"`'],
+                ['Using a security policy?', 'With `Vite::useCspNonce()`, add `nonce="{{ Vite::cspNonce() }}"` to the line and `\'strict-dynamic\'` to `script-src`. If you limit `connect-src`, add Listen\'s address too. Deploy, then run `php artisan config:cache`.'],
+            ],
+            'html' => [
+                ['Copy the line', 'It is the same for every website and every website builder.'],
+                ['Paste it before `</body>`', 'In your website\'s code, or its custom-code settings, paste it just before `</body>` so it is on every page.'],
+                ['Publish', 'Save and publish. The call button appears on its own, and any change you make in Listen reaches it.'],
+            ],
+        ],
+        // Shown before the steps, when a platform needs something first.
+        'before' => [
+            'wix' => 'Custom code needs a Wix Premium plan and a connected domain.',
+        ],
+        'done' => [
+            'wordpress' => 'Done. Open your website to see the call button.',
+            'shopify' => 'Done. The call button shows on every page of your store, except checkout.',
+            'wix' => 'Done. Open your published website to see the call button.',
+            'laravel' => 'Done. The call button shows on every page that uses this layout.',
+            'html' => 'Done. The call button shows on every page of your website.',
+        ],
     ],
     // The call button's look (the Design tab).
     'design' => [

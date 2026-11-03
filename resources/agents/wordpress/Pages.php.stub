@@ -1,0 +1,224 @@
+<?php
+/**
+ * The website's pages, as the settings page lists them for the call button.
+ *
+ * @package Listen\VoiceAgent
+ * @license GPL-2.0-or-later
+ */
+
+declare(strict_types=1);
+
+namespace Listen\VoiceAgent;
+
+use WP_Post;
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * The pages the call button can be limited to: the website's published pages, its latest
+ * posts and, on a shop, its latest products. Saving keeps only IDs that are one of these
+ * (or other published, public content), so nothing else ever reaches the settings.
+ */
+final class Pages
+{
+    /** The most pages the list shows. The ones already chosen are always in it. */
+    private const MOST_PAGES = 2000;
+
+    /** How many of the latest posts and products the list shows (the chosen ones are always in it). */
+    private const LATEST = ['post' => 50, 'product' => 100];
+
+    /**
+     * The IDs that are published content of the website: pages, posts, products and any other
+     * public kind of content, but not media files.
+     *
+     * @param list<int> $ids
+     * @return list<int> those IDs, in the same order
+     */
+    public static function published(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        $found = get_posts([
+            'post__in' => $ids,
+            'post_type' => self::types(),
+            'post_status' => 'publish',
+            'posts_per_page' => count($ids),
+            'fields' => 'ids',
+            'orderby' => 'post__in',
+            'ignore_sticky_posts' => true,
+            'no_found_rows' => true,
+        ]);
+        $found = array_flip(array_map('intval', $found));
+
+        return array_values(array_filter($ids, fn (int $id): bool => isset($found[$id])));
+    }
+
+    /**
+     * The list the settings page shows, in groups: the pages (the home page first, then each
+     * page followed by its subpages, in the website's own order), the latest posts, the latest
+     * products when the website sells some, then anything chosen earlier that none of these lists.
+     *
+     * @param list<int> $chosen the pages the button is limited to
+     * @return list<array{type: string, label: string, items: list<array{id: int, title: string, path: string, states: list<string>}>}>
+     */
+    public static function groups(array $chosen): array
+    {
+        $lists = [
+            'page' => self::in_site_order(get_posts(self::query('page', self::MOST_PAGES, ['menu_order' => 'ASC', 'title' => 'ASC']))),
+            'post' => get_posts(self::query('post', self::LATEST['post'], ['date' => 'DESC'])),
+        ];
+        if (post_type_exists('product')) {
+            $lists['product'] = get_posts(self::query('product', self::LATEST['product'], ['date' => 'DESC']));
+        }
+
+        // What was chosen earlier and the lists above leave out (an older post, another kind of content).
+        $listed = [];
+        foreach ($lists as $posts) {
+            foreach ($posts as $post) {
+                if ($post instanceof WP_Post) {
+                    $listed[(int) $post->ID] = true;
+                }
+            }
+        }
+        $missing = array_values(array_filter(self::published($chosen), fn (int $id): bool => !isset($listed[$id])));
+        if ($missing !== []) {
+            $query = self::query(self::types(), count($missing), 'post__in');
+
+            foreach (get_posts(['post__in' => $missing] + $query) as $post) {
+                if ($post instanceof WP_Post) {
+                    $lists[$post->post_type][] = $post;
+                }
+            }
+        }
+
+        $groups = [];
+        foreach ($lists as $type => $posts) {
+            $items = [];
+            foreach ($posts as $post) {
+                if ($post instanceof WP_Post) {
+                    $items[] = self::item($post);
+                }
+            }
+            if ($items !== []) {
+                $groups[] = ['type' => (string) $type, 'label' => self::label((string) $type), 'items' => $items];
+            }
+        }
+
+        return $groups;
+    }
+
+    /** @return list<string> the kinds of content the button can be limited to: every public one but media */
+    private static function types(): array
+    {
+        $types = get_post_types(['public' => true]);
+        unset($types['attachment']);
+
+        return array_values(array_map('strval', $types));
+    }
+
+    /**
+     * @param string|list<string>          $type
+     * @param string|array<string, string> $order
+     * @return array<string, mixed> the published content of that kind, in that order
+     */
+    private static function query(string|array $type, int $limit, string|array $order): array
+    {
+        return [
+            'post_type' => $type,
+            'post_status' => 'publish',
+            'posts_per_page' => $limit,
+            'orderby' => $order,
+            'ignore_sticky_posts' => true,
+            'no_found_rows' => true,
+            'update_post_meta_cache' => false,
+        ];
+    }
+
+    /**
+     * The pages as the website is built: the home page first, then each page followed by its
+     * subpages. A page whose parent is missing (or loops back to it) still shows, at the end.
+     *
+     * @param array<mixed> $pages in the website's order
+     * @return list<WP_Post>
+     */
+    private static function in_site_order(array $pages): array
+    {
+        $pages = array_values(array_filter($pages, fn ($page): bool => $page instanceof WP_Post));
+        $ids = [];
+        foreach ($pages as $page) {
+            $ids[(int) $page->ID] = true;
+        }
+        $children = [];
+        foreach ($pages as $page) {
+            $parent = (int) $page->post_parent;
+            $children[isset($ids[$parent]) && $parent !== (int) $page->ID ? $parent : 0][] = $page;
+        }
+
+        $sorted = [];
+        $seen = [];
+        $front = get_option('show_on_front') === 'page' ? (int) get_option('page_on_front') : 0;
+        $add = function (WP_Post $page) use (&$add, &$sorted, &$seen, $children): void {
+            if (isset($seen[(int) $page->ID])) {
+                return;
+            }
+            $seen[(int) $page->ID] = true;
+            $sorted[] = $page;
+            foreach ($children[(int) $page->ID] ?? [] as $child) {
+                $add($child);
+            }
+        };
+        foreach ($pages as $page) {
+            if ((int) $page->ID === $front) {
+                $add($page);
+            }
+        }
+        foreach (array_merge($children[0] ?? [], $pages) as $page) {
+            $add($page);
+        }
+
+        return $sorted;
+    }
+
+    /** @return array{id: int, title: string, path: string, states: list<string>} one line of the list */
+    private static function item(WP_Post $post): array
+    {
+        $title = trim(wp_strip_all_tags((string) $post->post_title));
+        $states = function_exists('get_post_states') ? get_post_states($post) : [];
+
+        return [
+            'id' => (int) $post->ID,
+            'title' => $title !== '' ? $title : __('(no title)', 'listen-voice-agent'),
+            'path' => self::path($post),
+            // What WordPress (or the shop) says of the page, in its own words: "Front Page", "Posts Page"…
+            'states' => array_values(array_filter(array_map(fn ($state): string => is_string($state) ? trim(wp_strip_all_tags($state)) : '', (array) $states))),
+        ];
+    }
+
+    /** Where the page is on the website, without the domain: "/contact", in letters people read. */
+    private static function path(WP_Post $post): string
+    {
+        $link = get_permalink($post);
+        if (!is_string($link) || $link === '') {
+            return '';
+        }
+        $path = wp_make_link_relative($link);
+        $readable = rawurldecode($path);
+        $path = preg_match('//u', $readable) === 1 ? $readable : $path;
+
+        return $path === '/' ? $path : untrailingslashit($path);
+    }
+
+    private static function label(string $type): string
+    {
+        if ($type === 'post') {
+            return __('Latest posts', 'listen-voice-agent');
+        }
+        $object = get_post_type_object($type);
+        $name = $object !== null ? ($object->labels->name ?? null) : null;
+
+        return is_string($name) && $name !== '' ? $name : $type;
+    }
+}

@@ -11,7 +11,7 @@
     'salla' => ['Salla', 'soon'],
     'zid' => ['Zid', 'soon'],
   ];
-  $seenHost = $widget->last_seen_origin ? parse_url($widget->last_seen_origin, PHP_URL_HOST) : null;
+  $seenHost = $widget->last_seen_origin && $widget->last_seen_at ? parse_url($widget->last_seen_origin, PHP_URL_HOST) : null;
 @endphp
 <div class="ag-live-grid" data-ag-golive data-link="{{ $link }}">
   <section class="ag-tile">
@@ -42,11 +42,11 @@
       @foreach($platforms as $key => [$label, $kind])
         @if($kind === 'soon')
           <span class="ag-platform" aria-disabled="true" style="opacity:.62">
-            <img src="{{ asset('images/platforms/'.$key.'.svg') }}" alt="" width="26" height="26">{{ $label }}<small>{{ __('agents.soon') }}</small>
+            <img src="{{ asset('images/platforms/'.$key.'.svg') }}" alt="" width="26" height="26"><span class="ag-platform-name"><b>{{ $label }}</b><small>{{ __('agents.soon') }}</small></span>
           </span>
         @else
-          <button type="button" class="ag-platform" data-ag-guide-open="ag-guide-{{ $key }}">
-            <img src="{{ asset('images/platforms/'.$key.'.svg') }}" alt="" width="26" height="26">{{ $label }}<small>{{ __('agents.platform_kind.'.$kind) }}</small>
+          <button type="button" class="ag-platform" data-ag-install-open="{{ $key }}">
+            <img src="{{ asset('images/platforms/'.$key.'.svg') }}" alt="" width="26" height="26"><span class="ag-platform-name"><b>{{ $label }}</b><small>{{ __('agents.platform_kind.'.$kind) }}</small></span>
           </button>
         @endif
       @endforeach
@@ -54,7 +54,7 @@
     <p class="ag-seen {{ $seenHost ? 'is-on' : '' }}" data-ag-seen>
       <i aria-hidden="true"></i>
       @if($seenHost)
-        {{ __('agents.live_seen', ['site' => $seenHost, 'when' => $widget->last_seen_at->diffForHumans()]) }}
+        {{ __('agents.live_seen', ['site' => $seenHost, 'when' => $widget->seenAgo()]) }}
       @else
         {{ __('agents.live_not_seen') }}
       @endif
@@ -69,6 +69,7 @@
       <button type="button" class="ag-btn ag-btn-sm" data-ag-copy="{{ $embed }}">{{ __('agents.live_copy') }}</button>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+      <button type="button" class="ag-btn ag-btn-sm ag-btn-primary" data-ag-install-open="html">{{ __('agents.install.open') }}</button>
       <button type="button" class="ag-btn ag-btn-sm ag-btn-ghost" data-ag-share data-text="{{ __('agents.live_send_dev_text', ['code' => $embed]) }}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/></svg>{{ __('agents.live_send_dev') }}
       </button>
@@ -80,38 +81,78 @@
     </div>
   </section>
 
-  {{-- The guides, one per website builder. --}}
-  @foreach($platforms as $key => [$label, $kind])
-    @continue($kind === 'soon')
-    @php $code = \App\Http\Controllers\AgentController::embedCode($widget, $key); @endphp
-    @php $guideSteps = __('agents.guides.'.$key.'.steps'); @endphp
-    <dialog class="ag-dialog ag-guide" id="ag-guide-{{ $key }}" aria-labelledby="ag-guide-{{ $key }}-title">
-      <div class="ag-guide-head">
-        <img src="{{ asset('images/platforms/'.$key.'.svg') }}" alt="" width="48" height="48">
-        <div>
-          <h3 id="ag-guide-{{ $key }}-title">{{ __('agents.guide_title', ['platform' => $label]) }}</h3>
-          <p>{{ trans_choice('agents.guide_meta', count($guideSteps), ['count' => count($guideSteps)]) }}</p>
-        </div>
-        <button type="button" class="ag-btn ag-btn-sm ag-btn-ghost ag-dialog-x" data-ag-guide-close aria-label="{{ __('agents.widget_close') }}">✕</button>
+  {{-- The install panel: every website builder step by step, the line to paste, and a live check that
+       the button is working on the owner's website. --}}
+  @php
+    $installTabs = ['wordpress' => 'plugin', 'shopify' => 'easy', 'wix' => 'easy', 'laravel' => 'dev', 'html' => 'easy'];
+    $pasteAfter = ['shopify' => 1, 'wix' => 1, 'laravel' => 1, 'html' => 0];
+  @endphp
+  <dialog class="ag-install" id="ag-install" aria-labelledby="ag-install-title" data-ag-install data-status-url="{{ route('voice-agents.install-status', $agent) }}">
+    <div class="ag-install-head">
+      <div>
+        <h3 id="ag-install-title">{{ __('agents.install.title') }}</h3>
+        <p>{{ __('agents.install.subtitle') }}</p>
       </div>
-      <ol class="ag-steps ag-guide-steps">
-        @foreach(__('agents.guides.'.$key.'.steps') as $step)
-          {{-- `code` in a step shows as code, always left to right inside Arabic sentences. --}}
-          <li>{!! preg_replace('/`([^`]+)`/', '<code dir="ltr">$1</code>', e($step)) !!}</li>
-        @endforeach
-      </ol>
-      @if($kind === 'plugin')
-        <a class="ag-btn ag-btn-primary ag-btn-lg ag-guide-download" href="{{ route('voice-agents.plugin', ['agent' => $agent, 'platform' => $key]) }}" download>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>{{ __('agents.guide_download') }}
-        </a>
-      @else
-        {{-- The line to paste, in full and readable, with Copy. --}}
-        <div class="ag-guide-code">
-          <div class="ag-guide-code-bar"><span>{{ __('agents.guide_code') }}</span><button type="button" class="ag-btn ag-btn-sm" data-ag-copy="{{ $code }}">{{ __('agents.live_copy') }}</button></div>
-          <pre dir="ltr"><code>{{ $code }}</code></pre>
-        </div>
-      @endif
-      <p class="ag-guide-done"><i aria-hidden="true"></i><span>{{ __('agents.guides.'.$key.'.done') }}</span></p>
-    </dialog>
-  @endforeach
+      <button type="button" class="ag-install-x" data-ag-install-close aria-label="{{ __('agents.install.close') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="ag-install-tabs" role="tablist" aria-label="{{ __('agents.install.title') }}">
+      @foreach($installTabs as $key => $kind)
+        <button type="button" role="tab" class="ag-install-tab" id="ag-install-tab-{{ $key }}" aria-controls="ag-install-panel-{{ $key }}" aria-selected="false" tabindex="-1" data-ag-install-tab="{{ $key }}">
+          @if($key === 'html')
+            <span class="ag-install-codeicon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg></span>
+          @else
+            <img src="{{ asset('images/platforms/'.$key.'.svg') }}" alt="" width="22" height="22">
+          @endif
+          <span>{{ __('agents.install.tabs.'.$key) }}</span>
+        </button>
+      @endforeach
+    </div>
+    <div class="ag-install-body">
+      @foreach($installTabs as $key => $kind)
+        @php $code = \App\Http\Controllers\AgentController::embedCode($widget, $key === 'html' ? null : $key); @endphp
+        <section class="ag-install-panel" role="tabpanel" id="ag-install-panel-{{ $key }}" aria-labelledby="ag-install-tab-{{ $key }}" data-ag-install-panel="{{ $key }}" hidden>
+          <div class="ag-install-meta">
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>{{ __('agents.install.level.'.($kind === 'dev' ? 'dev' : 'easy')) }}</span>
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>{{ __('agents.install.time') }}</span>
+          </div>
+          @if(\Illuminate\Support\Facades\Lang::has('agents.install.before.'.$key))
+            <p class="ag-install-before"><i aria-hidden="true"></i><span>{{ __('agents.install.before.'.$key) }}</span></p>
+          @endif
+          <ol class="ag-stepper">
+            @foreach(__('agents.install.steps.'.$key) as $i => [$title, $text])
+              <li>
+                <h4>{!! \App\Support\Agents\StepText::html($title) !!}</h4>
+                <p>{!! \App\Support\Agents\StepText::html($text) !!}</p>
+                @if($kind === 'plugin' && $i === 0)
+                  <div class="ag-install-dl">
+                    <a class="ag-btn ag-btn-primary" href="{{ route('voice-agents.plugin', ['agent' => $agent, 'platform' => $key]) }}" download>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>{{ __('agents.install.download') }}
+                    </a>
+                    <small>{!! str_replace(\App\Services\Agents\WordPressPlugin::SLUG.'.zip', '<bdi dir="ltr">'.\App\Services\Agents\WordPressPlugin::SLUG.'.zip</bdi>', e(__('agents.install.download_note'))) !!}</small>
+                  </div>
+                @endif
+                @if(($pasteAfter[$key] ?? -1) === $i)
+                  <div class="ag-guide-code">
+                    <div class="ag-guide-code-bar"><span>{{ __('agents.install.code') }}</span><button type="button" class="ag-btn ag-btn-sm" data-ag-copy="{{ $code }}">{{ __('agents.live_copy') }}</button></div>
+                    <pre dir="ltr"><code>{{ $code }}</code></pre>
+                  </div>
+                @endif
+              </li>
+            @endforeach
+          </ol>
+          <p class="ag-guide-done"><i aria-hidden="true"></i><span>{{ __('agents.install.done.'.$key) }}</span></p>
+        </section>
+      @endforeach
+    </div>
+    <div class="ag-install-foot">
+      <p class="ag-install-status {{ $seenHost ? 'is-on' : '' }}" data-ag-install-status aria-live="polite">
+        <i aria-hidden="true"></i>
+        <span>{{ $seenHost ? __('agents.install.seen', ['site' => $seenHost, 'when' => $widget->seenAgo()]) : __('agents.install.not_seen') }}</span>
+      </p>
+      <div class="ag-install-actions">
+        <button type="button" class="ag-btn ag-btn-sm" data-ag-share data-text="{{ __('agents.install.send_text', ['code' => $embed]) }}">{{ __('agents.install.send') }}</button>
+        <button type="button" class="ag-btn ag-btn-sm ag-btn-primary" data-ag-install-check data-checking="{{ __('agents.install.checking') }}" data-label="{{ __('agents.install.check') }}">{{ __('agents.install.check') }}</button>
+      </div>
+    </div>
+  </dialog>
 </div>

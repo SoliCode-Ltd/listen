@@ -2,6 +2,7 @@
 
 namespace App\Services\Agents;
 
+use App\Models\Agent;
 use App\Models\AgentWidget;
 use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
 use RuntimeException;
@@ -11,24 +12,29 @@ use ZipArchive;
  * The WordPress plugin for one agent: a zip the owner uploads in WordPress
  * (Plugins → Add New Plugin → Upload Plugin). It puts the agent's call button
  * on the website with the agent's key already in it; its settings page (under
- * Settings, in Arabic when WordPress is) turns the button off, shows it on some
- * pages only, or takes another agent's key.
+ * Settings, in Arabic when WordPress is) turns the button off, limits it to the
+ * pages ticked in a list of the website's pages, or takes another agent's key.
  *
  * The plugin lives in resources/agents/wordpress: templates whose {{…}} this
- * class fills in, and the Arabic it ships as WordPress translation files.
+ * class fills in, the settings page's style and script, and the Arabic it ships
+ * as WordPress translation files.
  */
 class WordPressPlugin
 {
     public const SLUG = 'listen-voice-agent';
 
-    public const VERSION = '1.1.0';
+    public const VERSION = '1.2.0';
 
     /** The plugin's files, by their path in its folder: the template each comes from. */
     private const FILES = [
         'listen-voice-agent.php' => 'listen-voice-agent.php.stub',
         'src/Plugin.php' => 'Plugin.php.stub',
         'src/Settings.php' => 'Settings.php.stub',
+        'src/SettingsPage.php' => 'SettingsPage.php.stub',
+        'src/Pages.php' => 'Pages.php.stub',
         'src/Placement.php' => 'Placement.php.stub',
+        'assets/settings.css' => 'settings.css',
+        'assets/settings.js' => 'settings.js',
         'uninstall.php' => 'uninstall.php.stub',
         'readme.txt' => 'readme.txt.stub',
     ];
@@ -83,7 +89,8 @@ class WordPressPlugin
             throw new RuntimeException('The WordPress plugin needs the agent\'s key.');
         }
         // Listen's pages without a language in the address, so each opens in its reader's language.
-        $page = fn (string $route): string => $this->address(LaravelLocalization::getNonLocalizedURL(route($route)));
+        $page = fn (string $route, array $parameters = []): string => $this->address(LaravelLocalization::getNonLocalizedURL(route($route, $parameters)));
+        $agent = $widget->agent;
 
         return [
             '{{VERSION}}' => self::VERSION,
@@ -95,6 +102,8 @@ class WordPressPlugin
             '{{KEY_PHP}}' => var_export($key, true),
             '{{SCRIPT_PHP}}' => var_export($this->address(asset('js/listen-agent.js')), true),
             '{{MANAGE_PHP}}' => var_export($page('voice-agents.index'), true),
+            // The agent's own page (its Design tab changes the button's look), or the list of agents without one.
+            '{{AGENT_PHP}}' => var_export($agent instanceof Agent && $agent->public_id ? $page('voice-agents.show', ['agent' => $agent]) : $page('voice-agents.index'), true),
         ];
     }
 
@@ -114,12 +123,27 @@ class WordPressPlugin
     /**
      * One language's WordPress translation file: the PHP format WordPress reads since 6.5
      * (….l10n.php), written with var_export so no word can become code.
+     *
+     * In the words file each English text maps to its translation, or, for a text with a
+     * number, to {"plural": the English plural, "forms": one translation per plural form}.
+     * WordPress finds those by "singular\0plural" and picks the form for the number.
      */
     private function translations(string $locale, string $words, string $plurals): string
     {
-        $messages = json_decode($this->template($words), true, 512, JSON_THROW_ON_ERROR);
-        if (! is_array($messages) || array_filter($messages, fn ($text, $english) => ! is_string($text) || ! is_string($english), ARRAY_FILTER_USE_BOTH) !== []) {
-            throw new RuntimeException('The WordPress plugin\'s words in '.$words.' are not all text.');
+        $entries = json_decode($this->template($words), true, 512, JSON_THROW_ON_ERROR);
+        $forms = preg_match('/\Anplurals=([1-9]);/', $plurals, $m) ? (int) $m[1] : 0;
+        $messages = [];
+        foreach (is_array($entries) ? $entries : [0 => null] as $english => $text) {
+            $plural = is_array($text) ? ($text['plural'] ?? null) : null;
+            $translations = is_array($text) ? ($text['forms'] ?? null) : null;
+            if (is_string($english) && is_string($text)) {
+                $messages[$english] = $text;
+            } elseif (is_string($english) && is_string($plural) && is_array($translations) && array_is_list($translations)
+                && count($translations) === $forms && array_filter($translations, 'is_string') === $translations && count($text) === 2) {
+                $messages[$english."\0".$plural] = implode("\0", $translations);
+            } else {
+                throw new RuntimeException('The WordPress plugin\'s words in '.$words.' are not all text, or a text with a number does not have all '.$forms.' forms.');
+            }
         }
         $file = [
             'project-id-version' => 'Listen Voice Agent '.self::VERSION,

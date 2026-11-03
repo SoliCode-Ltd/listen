@@ -58,13 +58,7 @@
     $$('[data-ag-golive]').forEach(function (box) {
       if (box.__agBound) return;
       box.__agBound = true;
-      $$('[data-ag-guide-open]', box).forEach(function (b) {
-        var dialog = document.getElementById(b.getAttribute('data-ag-guide-open'));
-        if (!dialog) return;
-        b.addEventListener('click', function () { if (dialog.showModal) dialog.showModal(); else dialog.setAttribute('open', ''); });
-        $$('[data-ag-guide-close]', dialog).forEach(function (c) { c.addEventListener('click', function () { dialog.close ? dialog.close() : dialog.removeAttribute('open'); }); });
-        dialog.addEventListener('click', function (e) { if (e.target === dialog && dialog.close) dialog.close(); });
-      });
+      install(box);
       var canvas = $('[data-ag-qr]', box);
       if (!canvas || !window.qrcode) return;
       var qr = window.qrcode(0, 'M');
@@ -81,6 +75,88 @@
       var origins = $('[data-ag-origins]', box);
       if (origins && C.agent) origins.addEventListener('change', function () {
         api('PATCH', C.agent.urls.update, { allowed_origins: origins.value }).then(function () { toast(T.saved); });
+      });
+    });
+  }
+
+  // The install panel: one side panel for every website builder, opened at the tile's tab, with
+  // "Check installation" asking whether the call button has been seen on a website yet.
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function install(box) {
+    var panel = $('[data-ag-install]', box);
+    if (!panel) return;
+    var tabs = $$('[data-ag-install-tab]', panel), body = $('.ag-install-body', panel), bar = $('.ag-install-tabs', panel), opener = null;
+    // On phones the tabs scroll sideways; the row fades at whichever edge has more tabs behind it.
+    function edges() {
+      if (!bar) return;
+      var max = bar.scrollWidth - bar.clientWidth, x = Math.abs(bar.scrollLeft);
+      bar.classList.toggle('is-scrolled', x > 2);
+      bar.classList.toggle('is-end', max <= 2 || x >= max - 2);
+    }
+    if (bar) bar.addEventListener('scroll', edges, { passive: true });
+    function pick(key, focus) {
+      tabs.forEach(function (t) {
+        var on = t.getAttribute('data-ag-install-tab') === key;
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        t.tabIndex = on ? 0 : -1;
+        if (!on) return;
+        if (focus) t.focus();
+        // Keep the chosen tab in view when the tabs scroll sideways, in either direction.
+        var br = bar.getBoundingClientRect(), tr = t.getBoundingClientRect();
+        if (tr.left < br.left + 24) bar.scrollLeft -= br.left + 24 - tr.left;
+        else if (tr.right > br.right - 24) bar.scrollLeft += tr.right - br.right + 24;
+      });
+      $$('[data-ag-install-panel]', panel).forEach(function (p) { p.hidden = p.getAttribute('data-ag-install-panel') !== key; });
+      if (body) body.scrollTop = 0;
+      edges();
+    }
+    tabs.forEach(function (t, i) {
+      t.addEventListener('click', function () { pick(t.getAttribute('data-ag-install-tab')); });
+      t.addEventListener('keydown', function (e) {
+        var step = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1, Home: -i, End: tabs.length - 1 - i }[e.key];
+        if (step === undefined) return;
+        e.preventDefault();
+        pick(tabs[(i + step + tabs.length) % tabs.length].getAttribute('data-ag-install-tab'), true);
+      });
+    });
+    function shut() {
+      if (!panel.open || panel.classList.contains('is-closing')) return;
+      var done = function () {
+        panel.classList.remove('is-closing');
+        if (panel.close) panel.close(); else panel.removeAttribute('open');
+        if (opener) opener.focus();
+      };
+      if (still) return done();
+      panel.classList.add('is-closing');
+      setTimeout(done, 200);
+    }
+    $$('[data-ag-install-open]', box).forEach(function (b) {
+      b.addEventListener('click', function () {
+        opener = b;
+        if (panel.showModal) { if (!panel.open) panel.showModal(); } else panel.setAttribute('open', '');
+        pick(b.getAttribute('data-ag-install-open') || 'wordpress', true);
+      });
+    });
+    $$('[data-ag-install-close]', panel).forEach(function (c) { c.addEventListener('click', shut); });
+    panel.addEventListener('cancel', function (e) { e.preventDefault(); shut(); });
+    panel.addEventListener('click', function (e) { if (e.target === panel) shut(); });
+
+    var check = $('[data-ag-install-check]', panel), status = $('[data-ag-install-status]', panel);
+    if (!check || !status) return;
+    check.addEventListener('click', function () {
+      check.disabled = true;
+      check.textContent = check.getAttribute('data-checking');
+      var wait = new Promise(function (ok) { setTimeout(ok, still ? 0 : 650); });
+      Promise.all([api('GET', panel.getAttribute('data-status-url')), wait]).then(function (r) {
+        var d = r[0] || {};
+        status.classList.toggle('is-on', !!d.seen);
+        status.classList.add('is-checked');
+        $('span', status).textContent = d.message || '';
+        var tile = $('[data-ag-seen]', box);
+        if (tile && d.tile) { tile.classList.toggle('is-on', !!d.seen); tile.lastChild.textContent = ' ' + d.tile; }
+      }).catch(function (err) { toast(err.message); }).then(function () {
+        check.disabled = false;
+        check.textContent = check.getAttribute('data-label');
       });
     });
   }

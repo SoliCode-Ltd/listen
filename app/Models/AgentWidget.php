@@ -191,6 +191,12 @@ class AgentWidget extends Model
         return $origin !== null && in_array($origin, $allowed, true);
     }
 
+    /** When the call button was last seen on a website, in words: "3 minutes ago", or "just now". */
+    public function seenAgo(): ?string
+    {
+        return $this->last_seen_at?->diffForHumans(['options' => \Carbon\CarbonInterface::JUST_NOW]);
+    }
+
     public static function normalizeOrigin(?string $value): ?string
     {
         $value = trim((string) $value);

@@ -45,10 +45,12 @@ if (defined(__NAMESPACE__ . '\VERSION')) {
 
 const VERSION = '{{VERSION}}';
 
-// This website's agent. Listen wrote these when the plugin was downloaded.
+// This website's agent. Listen wrote these when the plugin was downloaded: the agent's
+// key, the button's script, your agents in Listen, and this agent's own page there.
 const AGENT_KEY = {{KEY_PHP}};
 const SCRIPT_URL = {{SCRIPT_PHP}};
 const MANAGE_URL = {{MANAGE_PHP}};
+const AGENT_URL = {{AGENT_PHP}};
 
 const PLUGIN_FILE = __FILE__;
 
@@ -76,6 +78,8 @@ if (PHP_VERSION_ID < 80100) {
 
 require_once __DIR__ . '/src/Placement.php';
 require_once __DIR__ . '/src/Settings.php';
+require_once __DIR__ . '/src/Pages.php';
+require_once __DIR__ . '/src/SettingsPage.php';
 require_once __DIR__ . '/src/Plugin.php';
 
 Plugin::boot(PLUGIN_FILE);

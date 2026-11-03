@@ -17,9 +17,10 @@ number for a callback. Change what it says, its voice and what it knows in
 Listen ({{HOME}}); the button on your website follows on its own.
 
 * Your agent is already inside this copy of the plugin: activate it and the call button shows.
-* Show the button on every page, or only on the pages you choose.
+* Show the button on every page, or only on the pages you tick in a list of your website's pages, with a search to find them.
+* The settings page says at a glance whether the button is on and where it shows.
 * The button's script loads asynchronously at the end of the page, so it never holds your pages up.
-* In your dashboard the plugin adds only its settings page, under Settings.
+* In your dashboard the plugin adds only its settings page, under Settings, and its style and script load on that page only.
 * The settings page is in Arabic when your WordPress is in Arabic.
 
 == Installation ==
@@ -35,13 +36,13 @@ To hide the button, show it on some pages only, or use another agent, open Setti
 = The call button does not show. What do I check? =
 
 1. Your agent is live in Listen.
-2. In Settings, then Listen Voice Agent, "Show the call button on my website" is ticked. If you chose some pages only, the page is in the list.
+2. In Settings, then Listen Voice Agent, "Show the call button on my website" is on. If you chose some pages only, the page is ticked in the list.
 3. If you limited in Listen which websites may show your button, this website's address is in that list.
 4. If your website uses a caching plugin, clear its cache.
 
 = Can I show the button on some pages only? =
 
-Yes. In Settings, then Listen Voice Agent, choose "Only on these pages" and type the pages' IDs, separated by commas. A page's ID is the number after post= in its address while you edit it. The settings page names the pages it found, so you can check them.
+Yes. In Settings, then Listen Voice Agent, choose "Only on the pages I choose", then tick the pages in the list: it shows each page's title and address, your latest posts, and your products if you sell some. Type in the search box to find a page by its title or address; "Select all" and "Clear" tick or untick them in one click. Save, and the top of the page says how many pages show the button.
 
 = Where do I change what my agent says? =
 
@@ -76,6 +77,12 @@ Listen's privacy policy: {{PRIVACY_URL}}
 
 == Changelog ==
 
+= 1.2.0 =
+* Choose the pages that show the call button from a list of your website's pages, with a search, "Select all" and "Clear", instead of typing their IDs.
+* The list also has your latest posts, and your products if you sell some.
+* The settings page shows at a glance whether the button is on and where it shows, with links to your website and to the button's look in Listen.
+* The pages you chose before stay chosen.
+
 = 1.1.0 =
 * Show the call button on every page, or only on the pages you choose.
 * The button's script loads the way WordPress recommends: asynchronously, at the end of the page.
@@ -88,6 +95,9 @@ Listen's privacy policy: {{PRIVACY_URL}}
 * The call button on every page, with your agent already set.
 
 == Upgrade Notice ==
+
+= 1.2.0 =
+Choose the call button's pages from a list of your website's pages, with a search. The pages you chose before stay chosen.
 
 = 1.1.0 =
 Show the call button on chosen pages only, with stricter security. Needs WordPress 6.5 or newer and PHP 8.1 or newer.

@@ -20,6 +20,6 @@ enum Placement: string
     /** On every page of the website. */
     case Everywhere = 'all';
 
-    /** Only on the pages the site owner listed. */
+    /** Only on the pages the site owner ticked in the settings (Settings::PAGES). */
     case ChosenPages = 'pages';
 }

@@ -413,6 +413,7 @@ Route::group([
             Route::post('/{agent}/correct', [\App\Http\Controllers\AgentController::class, 'correct'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1')->name('voice-agents.correct');
             Route::post('/{agent}/test-call', [\App\Http\Controllers\AgentController::class, 'testCall'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:10,1,agent-test')->name('voice-agents.test-call');
             Route::delete('/{agent}', [\App\Http\Controllers\AgentController::class, 'destroy'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.destroy');
+            Route::get('/{agent}/install-status', [\App\Http\Controllers\AgentController::class, 'installStatus'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1')->name('voice-agents.install-status');
             Route::get('/{agent}/plugin/{platform}', [\App\Http\Controllers\AgentController::class, 'plugin'])->where(['agent' => 'agt_[a-z0-9]{24}', 'platform' => 'wordpress'])->middleware('throttle:20,1')->name('voice-agents.plugin');
         });
 

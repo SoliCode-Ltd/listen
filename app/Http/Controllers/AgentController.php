@@ -383,6 +383,23 @@ class AgentController extends Controller
         return '<script src="'.asset('js/listen-agent.js').'" data-agent="'.$widget->public_key.'"'.($via ? ' data-via="'.$via.'"' : '').' async></script>';
     }
 
+    /** "Check installation" in the install panel: has the call button been seen on a website yet? */
+    public function installStatus(Request $request, Agent $agent): JsonResponse
+    {
+        $this->own($request, $agent);
+        $widget = $agent->mainWidget();
+        $site = $widget->last_seen_origin ? parse_url($widget->last_seen_origin, PHP_URL_HOST) : null;
+        $when = $site ? $widget->seenAgo() : null;
+
+        return response()->json([
+            'seen' => (bool) $when,
+            'site' => $when ? $site : null,
+            'via' => $when ? $widget->installed_via : null,
+            'message' => $when ? __('agents.install.seen', ['site' => $site, 'when' => $when]) : __('agents.install.not_seen'),
+            'tile' => $when ? __('agents.live_seen', ['site' => $site, 'when' => $when]) : __('agents.live_not_seen'),
+        ])->header('Cache-Control', 'no-store');
+    }
+
     /** The WordPress plugin, with this agent already in it. */
     public function plugin(Request $request, Agent $agent, string $platform, WordPressPlugin $wordpress): BinaryFileResponse
     {

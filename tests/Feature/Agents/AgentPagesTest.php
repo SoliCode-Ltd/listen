@@ -165,7 +165,7 @@ class AgentPagesTest extends TestCase
         $this->assertSame('Sara', $agent->fresh()->name);
     }
 
-    public function test_the_agent_page_shows_its_link_qr_code_embed_line_and_builder_guides(): void
+    public function test_the_agent_page_shows_its_link_qr_code_embed_line_and_the_install_panel(): void
     {
         $owner = User::factory()->create();
         $agent = $this->agent($owner, ['status' => Agent::LIVE, 'live_voice' => 'Achernar']);
@@ -177,8 +177,31 @@ class AgentPagesTest extends TestCase
             ->assertSee('data-ag-qr', false)
             ->assertSee('data-agent=&quot;'.$widget->public_key.'&quot;', false)
             ->assertSee('data-via=&quot;shopify&quot;', false)
-            ->assertSee('id="ag-guide-wordpress"', false)
-            ->assertSee(route('voice-agents.plugin', ['agent' => $agent, 'platform' => 'wordpress']), false);
+            ->assertSee('id="ag-install"', false)
+            ->assertSee('data-ag-install-open="shopify"', false)
+            ->assertSee('data-ag-install-panel="html"', false)
+            ->assertSee(route('voice-agents.install-status', ['agent' => $agent]), false)
+            ->assertSee(route('voice-agents.plugin', ['agent' => $agent, 'platform' => 'wordpress']), false)
+            // A path through the platform's menus, never split, and the paste line in full.
+            ->assertSee('<code dir="ltr" class="is-path">Plugins</code>', false)
+            ->assertSee('<code dir="ltr">Install Now</code>', false);
+    }
+
+    public function test_check_installation_says_where_the_call_button_was_seen(): void
+    {
+        $owner = User::factory()->create();
+        $agent = $this->agent($owner, ['status' => Agent::LIVE, 'live_voice' => 'Achernar']);
+        app()->setLocale('en');
+
+        $this->actingAs($owner)->getLocalizedRoute('voice-agents.install-status', ['agent' => $agent])->assertOk()
+            ->assertJson(['seen' => false, 'site' => null, 'message' => __('agents.install.not_seen')]);
+
+        $agent->mainWidget()->forceFill(['last_seen_origin' => 'https://cairosmiles.example', 'last_seen_at' => now()->subMinutes(3), 'installed_via' => 'wordpress'])->save();
+        $this->actingAs($owner)->getLocalizedRoute('voice-agents.install-status', ['agent' => $agent])->assertOk()
+            ->assertJson(['seen' => true, 'site' => 'cairosmiles.example', 'via' => 'wordpress'])
+            ->assertJsonPath('message', fn ($m) => str_contains($m, 'cairosmiles.example'));
+
+        $this->actingAs(User::factory()->create())->getLocalizedRoute('voice-agents.install-status', ['agent' => $agent])->assertNotFound();
     }
 
     public function test_the_wordpress_plugin_comes_with_the_agent_inside(): void
@@ -224,7 +247,16 @@ class AgentPagesTest extends TestCase
         $this->actingAs($member)->getLocalizedRoute('onboarding.start')
             ->assertOk()
             ->assertSee(route('voice-agents.create'), false)
-            ->assertSee(__('agents.start_title'));
+            ->assertSee(__('agents.start_title'))
+            // The Studio's numbers come from the dialect and accent lists, and the pictures are the real screens.
+            ->assertSee(count(\App\Support\ArabicDialects::ALL).' ', false)
+            ->assertDontSee(':dialects', false)
+            ->assertSee('images/onboarding/', false);
+        foreach (['ar', 'en'] as $locale) {
+            foreach (['studio', 'agents'] as $shot) {
+                $this->assertFileExists(public_path("images/onboarding/{$locale}/{$shot}.webp"));
+            }
+        }
     }
 
     public function test_a_widget_key_is_never_shown_for_another_agent(): void

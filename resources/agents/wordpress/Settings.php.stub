@@ -32,7 +32,7 @@ final class Settings
     public const OPTIONS = [self::ENABLED, self::KEY, self::PLACEMENT, self::PAGES];
 
     /** The most pages the button can be limited to. */
-    public const MAX_PAGES = 100;
+    public const MAX_PAGES = 500;
 
     /** An agent's key, exactly: lw_ and 28 letters or digits, nothing before or after. */
     private const KEY_PATTERN = '/\Alw_[A-Za-z0-9]{28}\z/';
@@ -86,7 +86,31 @@ final class Settings
     }
 
     /**
-     * The page IDs in what the owner typed: "12, 45 78", with Arabic commas and digits too.
+     * The pages the settings form sent: the boxes ticked in its list of pages (anything in
+     * that list that is not an ID is left out), or IDs in a text, the way the form of
+     * version 1.1.0 sent them ("12, 45").
+     *
+     * @return list<int>|null the IDs (each once, in order), or null when the value is neither
+     */
+    public static function chosen_pages(mixed $value): ?array
+    {
+        if (!is_array($value)) {
+            return self::parse_pages($value);
+        }
+
+        $ids = [];
+        foreach ($value as $id) {
+            foreach (self::parse_pages([$id]) ?? [] as $page) {
+                $ids[$page] = $page;
+            }
+        }
+
+        return array_values($ids);
+    }
+
+    /**
+     * The page IDs in a saved setting: a list of IDs, or a text of IDs ("12, 45 78", with
+     * Arabic commas and digits too) as an owner typed them.
      *
      * @return list<int>|null the IDs (each once), or null when it holds anything but IDs
      */
