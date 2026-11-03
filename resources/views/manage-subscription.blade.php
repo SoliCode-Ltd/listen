@@ -637,6 +637,11 @@
           <p>{{ __('ui.manage_subscription.payment_method_hint') }}</p>
         </div>
 
+        @if($stripeReady)
+          {{-- Apple Pay or Google Pay hands over the new card instead of the card boxes. --}}
+          <x-wallet-button id="card-wallet" mode="setup" />
+        @endif
+
         <div class="stripe-container">
           <div class="stripe-label">
             <span class="card-icon" aria-hidden="true">
@@ -902,16 +907,17 @@
     }
 
     // The bank approves the new card first (3D Secure when it asks); only then
-    // does it replace the card that renews the subscription.
-    async function confirmCardWithBank() {
-      if (!stripe || !card) throw new Error(i18n.stripe_not_configured);
+    // does it replace the card that renews the subscription. The card is the one in the
+    // card boxes, or the phone wallet's (walletPaymentMethod).
+    async function confirmCardWithBank(walletPaymentMethod) {
+      if (!stripe || (!card && !walletPaymentMethod)) throw new Error(i18n.stripe_not_configured);
       const intent = await post('{{ route('billing.payment-method.intent') }}');
       if (!intent.ok || intent.data?.ok === false || !intent.data?.client_secret) {
         throw new Error(intent.data?.message || i18n.card_update_failed);
       }
 
       const result = await stripe.confirmCardSetup(String(intent.data.client_secret), {
-        payment_method: {
+        payment_method: walletPaymentMethod || {
           card,
           billing_details: {
             name: userName || undefined,
@@ -928,16 +934,18 @@
       return String(result.setupIntent?.id || '');
     }
 
-    updateCardBtn?.addEventListener('click', async () => {
+    // Replaces the card that renews the plan (and pays a renewal that is overdue) with the
+    // card in the card boxes, or with the phone wallet's (walletPaymentMethod).
+    async function replaceCard(walletPaymentMethod) {
       setButtonBusy(updateCardBtn, true, i18n.updating_card, updateCardBtnDefaultText);
       setMessage(paymentMessageBox, '', '');
 
       try {
-        if (!cardComplete) {
+        if (!walletPaymentMethod && !cardComplete) {
           throw new Error(i18n.enter_new_card_first);
         }
 
-        const setupIntent = await confirmCardWithBank();
+        const setupIntent = await confirmCardWithBank(walletPaymentMethod);
         const response = await post('{{ route('billing.payment-method') }}', { setup_intent: setupIntent });
 
         if (!response.ok || response.data?.ok === false) {
@@ -951,7 +959,27 @@
       } finally {
         setButtonBusy(updateCardBtn, false, '', updateCardBtnDefaultText);
       }
-    });
+    }
+
+    updateCardBtn?.addEventListener('click', () => replaceCard(null));
+
+    // Apple Pay or Google Pay: nothing is charged in its sheet; its card then goes through the
+    // same steps as a typed one.
+    const cardWallet = stripe && window.ListenWalletButton
+      ? window.ListenWalletButton(stripe, 'card-wallet', {
+          mode: 'setup',
+          billingDetails: { name: userName || undefined, email: userEmail || undefined },
+          onConfirm: async function(paymentMethod, walletError) {
+            if (walletError) {
+              setMessage(paymentMessageBox, 'error', normalizeStripeMessage(walletError.message, i18n.card_update_failed));
+              return;
+            }
+            if (!paymentMethod || updateCardBtn?.disabled) return;
+            await replaceCard(paymentMethod);
+          },
+        })
+      : null;
+    cardWallet?.show(true);
 
     cancelBtn?.addEventListener('click', async () => {
       // In a failed renewal's grace days the button has its own prompt: the plan ends now.

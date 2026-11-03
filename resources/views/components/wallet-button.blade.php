@@ -5,14 +5,17 @@
      the card boxes work as before. The wallet hands over a card, so a page pays with it the same
      way as with the card boxes. A page makes it with
      ListenWalletButton(stripe, id, { mode, amount, billingDetails, onConfirm }) and
-     shows it with .show(true) when paying by card is the choice. --}}
-@props(['id' => 'wallet'])
+     shows it with .show(true) when paying by card is the choice. In 'setup' mode it only
+     hands over a card for later (a free trial, the card that renews a plan), with no
+     amount; .setMode(mode, amount) moves it between paying today and that. --}}
+@props(['id' => 'wallet', 'mode' => 'subscription'])
 <div class="wallet-pay" id="{{ $id }}" hidden>
   {{-- Where the wallet showed before on this device, its place is kept while Stripe gets it
        ready, so it never pushes the card boxes down when it arrives. --}}
   <div class="wallet-skeleton" aria-hidden="true"></div>
   <div class="wallet-button" id="{{ $id }}-button"></div>
-  <div class="wallet-or"><span>{{ __('ui.billing.wallet_or_card') }}</span></div>
+  {{-- "or pay by card" when it pays today; "or use a card" when nothing is paid now. --}}
+  <div class="wallet-or"><span data-pay="{{ __('ui.billing.wallet_or_card') }}" data-setup="{{ __('ui.billing.wallet_or_card_setup') }}">{{ $mode === 'setup' ? __('ui.billing.wallet_or_card_setup') : __('ui.billing.wallet_or_card') }}</span></div>
 </div>
 @once
   <style>
@@ -43,12 +46,15 @@
   <script>
     window.ListenWalletButton = function (stripe, id, options) {
       var box = document.getElementById(id);
-      if (!stripe || !box || !(Number(options.amount) > 0)) return null;
+      var mode = String(options.mode || 'subscription');
+      // Paying today needs the amount; a card kept for later has none.
+      if (!stripe || !box || (mode !== 'setup' && !(Number(options.amount) > 0))) return null;
       var light = document.documentElement.getAttribute('data-theme') === 'light';
       // The wallet shows the amount charged, in the currency the card boxes charge in.
-      var elements = stripe.elements({
-        mode: options.mode,
+      var elements = stripe.elements(Object.assign(mode === 'setup' ? { mode: 'setup' } : {
+        mode: mode,
         amount: Math.round(Number(options.amount)),
+      }, {
         currency: 'usd',
         paymentMethodCreation: 'manual',
         // The buttons' words in the page's language, not the browser's: an Arabic page says
@@ -56,7 +62,8 @@
         locale: String(document.documentElement.lang || '').toLowerCase().indexOf('ar') === 0 ? 'ar' : 'en',
         // The site's corners (--radius); the wallets draw their own marks in their own colours.
         appearance: { variables: { borderRadius: '8px' } },
-      });
+      }));
+      var orText = box.querySelector('.wallet-or span');
       var narrow = Boolean(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
       // An iPhone or iPad (iPadOS reports itself as a Mac with a touch screen) pays with its own
       // wallet only: the other one is little used there and would ask to sign in first.
@@ -128,11 +135,21 @@
         }).catch(function (error) { return fail(error); });
       });
       button.mount('#' + id + '-button');
+      var shown = { mode: mode, amount: mode === 'setup' ? 0 : Math.round(Number(options.amount)) };
+      // Paying an amount today, or ('setup') only handing over a card for later.
+      var setMode = function (next, amount) {
+        next = String(next || 'subscription');
+        var cents = next === 'setup' ? 0 : Math.round(Number(amount));
+        if (next !== 'setup' && !(cents > 0)) return;
+        if (next === shown.mode && cents === shown.amount) return;
+        elements.update(next === 'setup' ? { mode: 'setup' } : { mode: next, amount: cents });
+        shown = { mode: next, amount: cents };
+        if (orText) orText.textContent = next === 'setup' ? orText.dataset.setup : orText.dataset.pay;
+      };
       return {
         show: function (on) { wanted = Boolean(on); paint(); },
-        setAmount: function (amount) {
-          if (Number(amount) > 0) elements.update({ amount: Math.round(Number(amount)) });
-        },
+        setAmount: function (amount) { setMode(shown.mode === 'setup' ? 'subscription' : shown.mode, amount); },
+        setMode: setMode,
       };
     };
   </script>
