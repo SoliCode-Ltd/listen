@@ -62,6 +62,9 @@ class AgentWidget extends Model
         'title' => null,
         'subtitle' => null,
         'font' => 'system',
+        // The line under the orb before a call ("Ready when you are"): the owner's words, or hidden.
+        'ready_text' => null,
+        'ready_show' => true,
     ];
 
     public const STYLES = ['orb', 'waves', 'bar'];
@@ -146,6 +149,8 @@ class AgentWidget extends Model
             'title' => $text('title', 60),
             'subtitle' => $text('subtitle', 80),
             'font' => $pick('font', ['system', 'rounded', 'site']),
+            'ready_text' => $text('ready_text', 60),
+            'ready_show' => filter_var($a['ready_show'], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? true,
         ];
         $custom = array_values(array_filter(array_map([self::class, 'hex'], (array) ($a['orb_colors'] ?? []))));
         if ($out['palette'] === 'custom' && count($custom) >= 2) {

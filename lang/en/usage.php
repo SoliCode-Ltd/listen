@@ -1,0 +1,43 @@
+<?php
+
+// The Usage page: what is left of the credits, and where the rest went.
+return [
+    'title' => 'Usage',
+    'period' => 'This period: :from to :to',
+    'period_pack' => 'Your pack, until :to',
+    'left' => 'credits left',
+    'of' => 'of :total this period',
+    'used' => ':count used',
+    'more' => 'Get more credits',
+    'plan' => 'Change plan',
+    'where' => 'Where your credits went',
+    'where_hint' => 'Every credit you used this period, by what used it.',
+    'kinds' => [
+        'studio' => 'Studio audio',
+        'api' => 'Developer API',
+        'dub' => 'Video dubbing',
+        'agent' => 'Agent calls',
+    ],
+    'kind_detail' => [
+        'studio' => '{0} No audio yet|{1} 1 audio, :minutes|[2,*] :count audios, :minutes',
+        'api' => '{0} No requests yet|{1} 1 request, :minutes|[2,*] :count requests, :minutes',
+        'dub' => '{0} No videos yet|{1} 1 video, :minutes|[2,*] :count videos, :minutes',
+        'agent' => '{0} No calls yet|{1} 1 call, :minutes|[2,*] :count calls, :minutes',
+    ],
+    'minutes' => '{0} under a minute|{1} 1 minute|[2,*] :count minutes',
+    'share' => ':percent% of what you used',
+    'by_agent' => 'By agent',
+    'rate' => 'A call minute uses :rate credits (studio audio: 900 a minute). An agent with a great deal to know can use more on a long call.',
+    'history' => 'Every item',
+    'history_hint' => 'Newest first, with the credits each one used.',
+    'col_when' => 'When',
+    'col_item' => 'Item',
+    'col_length' => 'Length',
+    'col_credits' => 'Credits',
+    'untitled' => 'Untitled audio',
+    'call_with' => 'Call with :name',
+    'api_item' => 'API request',
+    'dub_item' => 'Dubbed video',
+    'empty' => 'Nothing used yet this period. What you make in the studio and the calls your agents take show here, with their credits.',
+    'open_studio' => 'Open the studio',
+];

@@ -66,6 +66,53 @@ final class AgentCost
         return $cost / $minutes;
     }
 
+    /** The least a call may earn over what it costs: 40% of what the member pays for it. */
+    public const MARGIN = 0.40;
+
+    /**
+     * Credits a dollar of call cost must take, so that a call keeps MARGIN on the plan whose
+     * credits cost the least (a yearly price counts with its discount). Null: no paid plan.
+     */
+    public static function creditsPerDollar(): ?int
+    {
+        return once(function (): ?int {
+            $plans = rescue(fn () => Plan::query()->where('is_active', true)->where('price_cents', '>', 0)->where('monthly_chars', '>', 0)->get(), collect(), false);
+            $yearly = max(0, min(90, (int) AgentAccess::setting('billing_yearly_discount_percentage', 0)));
+            $cheapest = $plans->map(function (Plan $plan) use ($yearly): float {
+                $price = ((int) $plan->price_cents) / 100;
+                if (filled($plan->stripe_price_yearly ?? null) && $yearly > 0) {
+                    $price *= 1 - $yearly / 100;
+                }
+
+                return $price / max(1, (int) $plan->monthly_chars);
+            })->filter(fn (float $c) => $c > 0)->min();
+
+            return $cheapest ? (int) ceil(1 / ((1 - self::MARGIN) * $cheapest)) : null;
+        });
+    }
+
+    /** Tokens of an agent's instructions, as its calls are set up (cached for the request). */
+    public static function instructionTokens(\App\Models\Agent $agent): int
+    {
+        return once(fn (): int => self::tokensIn(AgentInstructions::build($agent)));
+    }
+
+    /**
+     * Credits a call minute of this agent uses for a call this long: the site's rate, or more for
+     * an agent with a great deal to know on a long call, so that no call earns less than MARGIN.
+     */
+    public static function rateFor(\App\Models\Agent $agent, int $seconds): int
+    {
+        $base = AgentAccess::creditsPerMinute();
+        $perDollar = self::creditsPerDollar();
+        if (! $perDollar || ! $agent->exists) {
+            return $base;
+        }
+        $cost = self::perMinute(max(1, (int) ceil($seconds / 60)), self::instructionTokens($agent));
+
+        return max($base, (int) ceil($cost * $perDollar / 10) * 10);
+    }
+
     public static function typical(): float
     {
         return self::perMinute(self::TYPICAL['minutes'], self::TYPICAL['instructions']);

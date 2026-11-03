@@ -95,7 +95,7 @@
           @endforeach
           <label class="ag-choice ag-swatch ag-swatch-custom" title="{{ __('agents.design.custom') }}">
             <input type="radio" name="accent" value="custom" @checked($customAccent !== null) aria-label="{{ __('agents.design.custom') }}">
-            <span style="background:{{ $customAccent ?? '#7659FA' }}"><input type="color" value="{{ $customAccent ?? '#7659FA' }}" data-ag-design-color="accent" aria-label="{{ __('agents.design.custom') }}"></span>
+            <span @if($customAccent) style="background:{{ $customAccent }}" @endif><input type="color" value="{{ $customAccent ?? '#7659FA' }}" data-ag-design-color="accent" aria-label="{{ __('agents.design.custom') }}"><svg class="ag-swatch-pick" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5l5 5M17 2.9a2.1 2.1 0 0 1 3 3l-1.6 1.6-3-3zM15.4 4.5L5.6 14.3 4.5 19.5l5.2-1.1 9.8-9.8"/></svg></span>
           </label>
         </div>
       </div>
@@ -110,9 +110,10 @@
           @endforeach
           <label class="ag-choice ag-swatch is-orb ag-swatch-two" title="{{ __('agents.design.palettes.custom') }}">
             <input type="radio" name="palette" value="custom" @checked($look['palette'] === 'custom') aria-label="{{ __('agents.design.palettes.custom') }}">
-            <span>
+            <span style="--c-a: {{ $orbCustom[0] }}; --c-b: {{ $orbCustom[1] }}">
               <input type="color" value="{{ $orbCustom[0] }}" data-ag-design-color="orb0" aria-label="{{ __('agents.design.palettes.custom') }} 1">
               <input type="color" value="{{ $orbCustom[1] }}" data-ag-design-color="orb1" aria-label="{{ __('agents.design.palettes.custom') }} 2">
+              <svg class="ag-swatch-pick" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5l5 5M17 2.9a2.1 2.1 0 0 1 3 3l-1.6 1.6-3-3zM15.4 4.5L5.6 14.3 4.5 19.5l5.2-1.1 9.8-9.8"/></svg>
             </span>
           </label>
         </div>
@@ -131,6 +132,11 @@
           <label class="ag-design-label" for="ag-design-subtitle">{{ __('agents.design.card_subtitle') }}</label>
           <input class="ag-input" id="ag-design-subtitle" name="subtitle" type="text" maxlength="80" dir="auto" value="{{ $look['subtitle'] }}" placeholder="{{ trans('agents.widget_subtitle', [], $rtl ? 'ar' : 'en') }}">
         </div>
+      </div>
+      <div class="ag-design-field">
+        <label class="ag-design-label" for="ag-design-ready">{{ __('agents.design.ready') }}</label>
+        <input class="ag-input" id="ag-design-ready" name="ready_text" type="text" maxlength="60" dir="auto" value="{{ $look['ready_text'] }}">
+        <label class="ag-design-check"><input type="checkbox" name="ready_show" value="1" @checked($look['ready_show'])><span>{{ __('agents.design.ready_show') }}</span></label>
       </div>
       <label class="ag-design-check"><input type="checkbox" name="photo" value="1" @checked($look['photo'])><span>{{ __('agents.design.photo') }}</span></label>
       <label class="ag-design-check"><input type="checkbox" name="captions" value="1" @checked($look['captions'])><span>{{ __('agents.design.captions') }}</span></label>

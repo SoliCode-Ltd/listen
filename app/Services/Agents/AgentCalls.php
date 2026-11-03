@@ -9,6 +9,7 @@ use App\Models\AgentWidget;
 use App\Services\Billing\MemberUsageMeter;
 use App\Services\PlanAccessService;
 use App\Support\Agents\AgentAccess;
+use App\Support\Agents\AgentCost;
 use App\Support\Credits;
 use App\Support\CreditPeriod;
 use App\Support\UsageSnapshot;
@@ -49,9 +50,12 @@ class AgentCalls
         return AgentAccess::creditsPerMinute();
     }
 
-    public static function creditsFor(int $seconds): int
+    /** Credits for $seconds of calls: the site's rate, or the agent's own when it costs more (AgentCost::rateFor). */
+    public static function creditsFor(int $seconds, ?Agent $agent = null): int
     {
-        return (int) ceil(max(0, $seconds) * self::creditsPerMinute() / 60);
+        $rate = $agent ? AgentCost::rateFor($agent, $seconds) : self::creditsPerMinute();
+
+        return (int) ceil(max(0, $seconds) * $rate / 60);
     }
 
     /** Free test seconds the owner has left (their own test calls, all agents). */
@@ -187,7 +191,7 @@ class AgentCalls
                 }
                 $max = min($max, $left);
             }
-            $affordable = $this->affordableSeconds($userId, $quotaPlan);
+            $affordable = $this->affordableSeconds($userId, $quotaPlan, $agent, $max);
             if ($affordable < 30) {
                 return $this->refused($agent, $channel, 'credits');
             }
@@ -219,7 +223,7 @@ class AgentCalls
                 ]);
             } else {
                 $estimate = ['chars' => $max * Credits::CHARS_PER_SECOND, 'words' => 0, 'seconds' => $max,
-                    'minutes' => (int) ceil($max / 60), 'credits' => self::creditsFor($max)];
+                    'minutes' => (int) ceil($max / 60), 'credits' => self::creditsFor($max, $agent)];
                 $conversation = $this->meter->reserveCredits($userId, $quotaPlan, $estimate,
                     fn (array $reservation) => AgentConversation::create($base + [
                         'reservation' => $reservation,
@@ -314,12 +318,13 @@ class AgentCalls
     }
 
     /** Seconds of call the owner's plan can still pay for, at the agents' rate. */
-    public function affordableSeconds(int $userId, $quotaPlan): int
+    public function affordableSeconds(int $userId, $quotaPlan, ?Agent $agent = null, int $longest = 600): int
     {
         $snapshot = UsageSnapshot::for($userId, $quotaPlan, CreditPeriod::counter($userId));
         $remaining = max(0, (int) ($snapshot['remaining_chars'] ?? 0));
+        $rate = $agent ? AgentCost::rateFor($agent, $longest) : self::creditsPerMinute();
 
-        return (int) floor($remaining * 60 / self::creditsPerMinute());
+        return (int) floor($remaining * 60 / max(1, $rate));
     }
 
     public function findByKey(string $publicId, string $callKey): ?AgentConversation
@@ -446,7 +451,7 @@ class AgentCalls
             }
             $reservation = $c->reservation ?? [];
             $seconds = max(0, min($seconds, (int) ($reservation['seconds'] ?? 0)));
-            $credits = $c->free ? 0 : min((int) ($reservation['credits'] ?? 0), self::creditsFor($seconds));
+            $credits = $c->free ? 0 : min((int) ($reservation['credits'] ?? 0), self::creditsFor($seconds, $c->agent));
             if (! $c->free && isset($reservation['period'])) {
                 try {
                     $this->meter->giveBackPart((int) $c->user_id, $reservation,

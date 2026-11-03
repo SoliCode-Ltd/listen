@@ -101,7 +101,8 @@
        the button is working on the owner's website. --}}
   @php
     $installTabs = ['wordpress' => 'plugin', 'shopify' => 'easy', 'wix' => 'easy', 'laravel' => 'dev', 'html' => 'easy'];
-    $pasteAfter = ['shopify' => 1, 'wix' => 1, 'laravel' => 1, 'html' => 0];
+    // Where "the line you paste" shows (Laravel's steps carry their own code blocks instead).
+    $pasteAfter = ['shopify' => 1, 'wix' => 1, 'html' => 0];
   @endphp
   <dialog class="ag-install" id="ag-install" aria-labelledby="ag-install-title" data-ag-install data-ui="ar" data-status-url="{{ route('voice-agents.install-status', $agent) }}">
     <div class="ag-install-head">
@@ -153,14 +154,30 @@
             <p class="ag-install-before"><i aria-hidden="true"></i><span>{{ __('agents.install.before.'.$key) }}</span></p>
           @endif
           <ol class="ag-stepper">
-            @foreach(__('agents.install.steps.'.$key) as $i => [$title, $text])
+            @php
+              // A step: its title, then one sentence, or one action a line; then its code, then a tip.
+              $stepBody = function ($text, ?string $tip): string {
+                  $lines = array_values(array_filter((array) $text, 'strlen'));
+                  $html = count($lines) > 1
+                      ? '<ul class="ag-step-do">'.implode('', array_map(fn ($t) => '<li>'.\App\Support\Agents\StepText::html($t).'</li>', $lines)).'</ul>'
+                      : '<p>'.\App\Support\Agents\StepText::html($lines[0] ?? '').'</p>';
+                  if ($tip) {
+                      $html .= '<p class="ag-step-tip"><i aria-hidden="true"></i><span>'.\App\Support\Agents\StepText::html($tip).'</span></p>';
+                  }
+
+                  return $html;
+              };
+            @endphp
+            @foreach(__('agents.install.steps.'.$key) as $i => $step)
+              @php [$title, $text] = $step; $tip = $step[3] ?? null; @endphp
               <li>
                 @if($arUi && isset($arUi[$i]))
                   <h4><span data-ui-text="ar">{!! \App\Support\Agents\StepText::html($arUi[$i][0]) !!}</span><span data-ui-text="en">{!! \App\Support\Agents\StepText::html($title) !!}</span></h4>
-                  <p><span data-ui-text="ar">{!! \App\Support\Agents\StepText::html($arUi[$i][1]) !!}</span><span data-ui-text="en">{!! \App\Support\Agents\StepText::html($text) !!}</span></p>
+                  <div class="ag-step-body" data-ui-text="ar">{!! $stepBody($arUi[$i][1], $arUi[$i][3] ?? null) !!}</div>
+                  <div class="ag-step-body" data-ui-text="en">{!! $stepBody($text, $tip) !!}</div>
                 @else
                   <h4>{!! \App\Support\Agents\StepText::html($title) !!}</h4>
-                  <p>{!! \App\Support\Agents\StepText::html($text) !!}</p>
+                  <div class="ag-step-body">{!! $stepBody($text, $tip) !!}</div>
                 @endif
                 @if($kind === 'plugin' && $i === 0)
                   <div class="ag-install-dl">
@@ -170,6 +187,19 @@
                     <small>{!! str_replace(\App\Services\Agents\WordPressPlugin::SLUG.'.zip', '<bdi dir="ltr">'.\App\Services\Agents\WordPressPlugin::SLUG.'.zip</bdi>', e(__('agents.install.download_note'))) !!}</small>
                   </div>
                 @endif
+                @foreach(($step[2] ?? []) as [$file, $snippet])
+                  @php
+                    // Laravel's line reads the key from the config, so the key lives in .env only.
+                    $snippet = strtr($snippet, [':key' => $widget->public_key, ':line' => str_replace('data-agent="'.$widget->public_key.'"', 'data-agent="{{ config(\'services.listen.agent_key\') }}"', $code)]);
+                  @endphp
+                  <div class="ag-guide-code ag-snippet">
+                    <div class="ag-guide-code-bar">
+                      <span class="ag-snippet-file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><bdi dir="ltr">{{ $file }}</bdi></span>
+                      <button type="button" class="ag-btn ag-btn-sm" data-ag-copy="{{ $snippet }}">{{ __('agents.live_copy') }}</button>
+                    </div>
+                    <pre dir="ltr"><code>{{ $snippet }}</code></pre>
+                  </div>
+                @endforeach
                 @if(($pasteAfter[$key] ?? -1) === $i)
                   <div class="ag-guide-code">
                     <div class="ag-guide-code-bar"><span>{{ __('agents.install.code') }}</span><button type="button" class="ag-btn ag-btn-sm" data-ag-copy="{{ $code }}">{{ __('agents.live_copy') }}</button></div>
@@ -179,7 +209,8 @@
               </li>
             @endforeach
           </ol>
-          <p class="ag-guide-done"><i aria-hidden="true"></i><span>{{ __('agents.install.done.'.$key) }}</span></p>
+          {{-- What happens once it is published, and how to confirm it: the check below is what says it works. --}}
+          <p class="ag-guide-next"><i aria-hidden="true"></i><span>{{ __('agents.install.done.'.$key) }} {{ __('agents.install.done_check') }}</span></p>
         </section>
       @endforeach
     </div>

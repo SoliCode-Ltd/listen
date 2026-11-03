@@ -1,5 +1,6 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.dashboard_title'), 'page' => 'dashboard'])
   <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
+  <link rel="stylesheet" href="{{ asset('css/usage.css') }}?v={{ filemtime(public_path('css/usage.css')) }}">
   @if(($voiceCloningVisible ?? false) || ($voiceCloningUpgrade ?? false))
     <link rel="stylesheet" href="{{ asset('css/voice-cloning.css') }}?v={{ filemtime(public_path('css/voice-cloning.css')) }}">
   @endif
@@ -1411,6 +1412,10 @@
       font-size: .88rem; color: var(--text);
     }
     .usage-chip svg { width: 14px; height: 14px; fill: none; stroke: var(--a, #6A45F2); stroke-width: 2; stroke-linecap: round; }
+    /* Where the credits went: the Usage page. */
+    .usage-chip-link { color: var(--accent-text, var(--a)); font-weight: 700; text-decoration: none; transition: border-color .18s ease, background .18s ease; }
+    .usage-chip-link:hover { border-color: color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 7%, var(--surface)); }
+    html[dir="rtl"] .usage-chip-link svg { transform: scaleX(-1); }
     .usage-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .9rem; margin-top: .9rem; }
     .usage-tile {
       display: flex; flex-direction: column; gap: .45rem;
@@ -1998,6 +2003,7 @@
               <small class="usage-hero-caption" id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
               <div class="usage-hero-chips">
                 <span class="usage-chip" title="{{ __('ui.pricing.credits_hint') }}"><x-credit-icon /><span><b id="usageCreditsLeft">{{ number_format($remainingChars) }}</b> {{ __('ui.dashboard.credits_left_suffix') }}</span></span>
+                <a class="usage-chip usage-chip-link" href="#usage-breakdown" data-usage-jump>{{ __('usage.where') }}<svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>
                 @if ($packMode && $packEndsOn)
                   <span class="usage-chip">{{ __('ui.pack.meter_ends', ['date' => $packEndsOn]) }}</span>
                 @endif
@@ -2063,6 +2069,8 @@
           </div>
 
         </article>
+        {{-- Where the credits went this period: studio audio, agent calls and the rest (the same credits). --}}
+        <x-usage.breakdown :usage="\App\Support\CreditUsage::for(auth()->user())" :agents-open="\App\Support\Agents\AgentAccess::openTo(auth()->user())" :per-minute="\App\Support\Agents\AgentAccess::creditsPerMinute()" />
       </div>
     </section>
 

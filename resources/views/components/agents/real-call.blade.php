@@ -1,6 +1,6 @@
-{{-- A call on its own stage: the caller's words, the agent's words lit as they are said, the orb
-     following the voice (js/listen-orbs.js reads the stage's loudness), and what the business is left
-     with at the end. Before it plays, the first lines show.
+{{-- A call on its own stage, read like a messenger: the caller on one side, the agent on the other,
+     the agent's words lit as they are said, the orb following the voice (js/listen-orbs.js reads the
+     stage's loudness), and what the business is left with at the end, as a saved contact.
 
      Real calls, recorded live with sample businesses (php artisan agents:live-setup --sample=...):
      the agent's own voice from the voice library, women and men. Each page has its own language's
@@ -17,6 +17,7 @@
   $show = fn (string $text) => \App\Support\Agents\SpokenNumbers::forDisplay($text, ! $english);
   foreach ($order as $key) {
     $c = $calls[$key];
+    [$title, $name, $phone, $note] = array_pad((array) $c['result'], 4, '');
     $data[$key] = [
       'label' => $c['label'],
       'agent' => $c['agent'],
@@ -27,10 +28,10 @@
       'turns' => array_map(fn ($t) => [
         'role' => $t[0],
         'text' => $show($t[1]),
-        'gloss' => '',
         'audio' => ! empty($t[3]) ? asset('audio/agents/calls/'.$t[3].'.mp3').'?v='.@filemtime(public_path('audio/agents/calls/'.$t[3].'.mp3')) : null,
       ], $c['turns']),
-      'result' => [$show($c['result'][0]), $show($c['result'][1])],
+      // What the business is left with: a saved contact (the phone always left to right).
+      'result' => ['title' => $title, 'name' => $name, 'phone' => $phone, 'note' => $show($note)],
     ];
   }
   $labels = ['play' => __('agents_landing.real_play'), 'again' => __('agents_landing.real_again'), 'note' => __('agents_landing.real_note')];
@@ -40,17 +41,20 @@
 @endphp
 {{-- visual "face": the agent's photo with rings that follow the voice, for a page that already has its one orb. --}}
 <div {{ $attributes->merge(['class' => 'agl-real is-'.$size.($visual === 'face' ? ' has-face' : '')]) }} data-agl-real data-vs-cast>
+  {{-- Which call: one tab each, a row of its own so every name has room. --}}
+  <div class="agl-real-switch" role="radiogroup" aria-label="{{ __('agents_landing.real_switch') }}">
+    @foreach($order as $key)
+      <button type="button" role="radio" aria-checked="{{ $loop->first ? 'true' : 'false' }}" data-agl-real-pick="{{ $key }}">{{ $data[$key]['label'] }}</button>
+    @endforeach
+  </div>
+
   <div class="agl-real-top">
-    <span class="agl-real-face" aria-hidden="true"><img src="{{ $first['avatar'] }}" alt="" width="46" height="46" data-agl-real-face></span>
+    <span class="agl-real-face" aria-hidden="true"><img src="{{ $first['avatar'] }}" alt="" width="48" height="48" data-agl-real-face></span>
     <div class="agl-real-who">
       <b data-agl-real-name>{{ $first['agent'] }}</b>
-      <small><span data-agl-real-biz>{{ $first['business'] }}</span><span data-agl-real-dialect>{{ $first['dialect'] }}</span></small>
+      <span data-agl-real-biz>{{ $first['business'] }}</span>
     </div>
-    <div class="agl-real-switch" role="radiogroup" aria-label="{{ __('agents_landing.real_switch') }}">
-      @foreach($order as $key)
-        <button type="button" role="radio" aria-checked="{{ $loop->first ? 'true' : 'false' }}" data-agl-real-pick="{{ $key }}">{{ $data[$key]['label'] }}</button>
-      @endforeach
-    </div>
+    <span class="agl-real-dialect" data-agl-real-dialect>{{ $first['dialect'] }}</span>
   </div>
 
   <div class="agl-real-stage">
@@ -70,6 +74,7 @@
     <span class="agl-real-progress" aria-hidden="true"><i data-agl-real-bar></i></span>
   </div>
 
+  {{-- The call, like a messenger: the agent's lines on the start side, the caller's on the other. --}}
   <ol class="agl-real-lines" data-agl-real-lines>
     @foreach(array_slice($first['turns'], 0, $rest) as $turn)
       <li class="agl-real-line is-{{ $turn['role'] }} is-shown">
@@ -78,11 +83,14 @@
     @endforeach
   </ol>
 
-  <p class="agl-real-result" data-agl-real-result aria-live="polite">
+  <div class="agl-real-result" data-agl-real-result aria-live="polite">
     <span class="agl-real-result-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
-    <b data-agl-real-result-title>{{ $first['result'][0] }}</b>
-    <span data-agl-real-result-text>{{ $first['result'][1] }}</span>
-  </p>
+    <div class="agl-real-result-body">
+      <b data-agl-real-result-title>{{ $first['result']['title'] }}</b>
+      <p class="agl-real-contact"><span data-agl-real-result-name>{{ $first['result']['name'] }}</span><bdi dir="ltr" data-agl-real-result-phone>{{ $first['result']['phone'] }}</bdi></p>
+      <p class="agl-real-result-note" data-agl-real-result-note>{{ $first['result']['note'] }}</p>
+    </div>
+  </div>
   <p class="agl-real-note">{{ $labels['note'] }}</p>
   <script type="application/json" data-agl-real-data>{!! json_encode(['order' => $order, 'calls' => $data, 'rest' => $rest], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) !!}</script>
 </div>

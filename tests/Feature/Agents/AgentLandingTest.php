@@ -33,15 +33,19 @@ class AgentLandingTest extends TestCase
             app()->setLocale($locale);
             $page = $this->page($locale)->assertOk();
             $page->assertSee(__('agents_landing.hero_title'));
-            foreach (__('agents_landing.scene_order') as $key) {
-                $page->assertSee(__('agents_landing.scenes.'.$key.'.label'));
+            // The real recorded calls, each under its own tab; the first is written into the page.
+            $order = __('agents_landing.real_order');
+            foreach ($order as $key) {
+                $page->assertSee(__('agents_landing.real_calls.'.$key.'.label'));
             }
-            // The first call is written into the page, for readers without scripts.
-            $page->assertSee(__('agents_landing.scenes.'.__('agents_landing.scene_order')[0].'.lines')[0][1]);
-            $page->assertSee('data-agl-call', false)
-                // The steps over the real setup, the bento and the channels.
-                ->assertSee('images/agents/landing/'.$locale.'/step-1.webp', false)
-                ->assertSee('data-agl-bento', false)
+            $first = collect(__('agents_landing.real_calls.'.$order[0].'.turns'))->firstWhere(0, 'agent');
+            $page->assertSee(\App\Support\Agents\SpokenNumbers::forDisplay($first[1], $locale === 'ar'))
+                ->assertSee('data-agl-real', false)
+                // How it works is drawn, not old screenshots; the call inbox and the channels follow.
+                ->assertSee(__('agents_landing.steps_title'))
+                ->assertDontSee('images/agents/landing/', false)
+                ->assertSee(__('agents_landing.calls_title'))
+                ->assertSee(__('agents_landing.speaks_title'))
                 ->assertSee(__('agents_landing.flow_sources')[0]);
         }
     }

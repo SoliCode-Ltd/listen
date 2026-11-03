@@ -213,15 +213,17 @@ return [
     | website, its link page or a QR code (App\Support\Agents).
     |
     | A call minute uses credits_per_minute from the member's plan, from the
-    | same credits as audio (900 = one audio minute; a call minute costs the
-    | site several times an audio minute, App\Support\Agents\AgentCost). The
+    | same credits as audio (900 = one audio minute; 8,100 = nine, so a call
+    | keeps 40% on the plan whose credits cost least, its yearly price too;
+    | an agent with a great deal to know uses more on a long call,
+    | App\Support\Agents\AgentCost::rateFor). The
     | owner's first test calls are free up to free_test_seconds. Calls end on
     | their own at max_call_seconds (a plan or the owner can set less). Admin →
     | Agents → Settings overrides the rate and the free seconds; which plans
     | include agents, and their limits, are set on each plan.
     */
     'agents' => [
-        'credits_per_minute' => (int) env('LISTEN_AGENT_CREDITS_PER_MINUTE', 1800),
+        'credits_per_minute' => (int) env('LISTEN_AGENT_CREDITS_PER_MINUTE', 8100),
         'free_test_seconds' => (int) env('LISTEN_AGENT_FREE_TEST_SECONDS', 120),
         'max_call_seconds' => (int) env('LISTEN_AGENT_MAX_CALL_SECONDS', 600),
         'max_agents' => (int) env('LISTEN_AGENT_MAX_AGENTS', 10),

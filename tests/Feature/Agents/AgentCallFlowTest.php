@@ -209,7 +209,8 @@ class AgentCallFlowTest extends TestCase
     public function test_calls_that_stop_reporting_still_count_toward_the_eight_at_once(): void
     {
         config(['listen.agents.calls_per_visitor_hour' => 10]);
-        $key = $this->liveAgent($this->owner())->mainWidget()->public_key;
+        // Credits enough to hold eight full-length calls at once: this test is about the eight, not the credits.
+        $key = $this->liveAgent($this->owner(8 * 20 * \App\Services\Agents\AgentCalls::creditsPerMinute()))->mainWidget()->public_key;
         for ($i = 1; $i <= 8; $i++) {
             $this->callApi('/calls', ['key' => $key, 'visitor' => 'silent-'.$i])->assertOk();
         }

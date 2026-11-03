@@ -86,8 +86,9 @@ class AgentSettings extends Page implements HasForms
                             ->suffix('credits')
                             ->required()
                             ->live(onBlur: true)
-                            ->helperText(fn (Forms\Get $get): string => sprintf('%s audio minutes for each call minute. Members see their call time in minutes. Recommended: 1,800.',
-                                rtrim(rtrim(number_format(max(1, (int) $get('agents_credits_per_minute')) / Credits::PER_MINUTE, 2), '0'), '.'))),
+                            ->helperText(fn (Forms\Get $get): string => sprintf('%s audio minutes for each call minute. Members see their call time in minutes. Recommended: %s, the least that keeps %d%% on every plan for a typical call (the plan whose credits cost least, with its yearly price). An agent with a great deal to know uses more on a long call, so no call earns less.',
+                                rtrim(rtrim(number_format(max(1, (int) $get('agents_credits_per_minute')) / Credits::PER_MINUTE, 2), '0'), '.'),
+                                number_format(self::recommendedRate()), (int) round(AgentCost::MARGIN * 100))),
                         Forms\Components\TextInput::make('agents_free_test_minutes')
                             ->label('Free test minutes for each member')
                             ->numeric()->minValue(0)->maxValue(30)->step(0.5)
@@ -149,6 +150,17 @@ class AgentSettings extends Page implements HasForms
     }
 
     /** What a call minute earns on each plan on sale, against what one costs. */
+    /** The rate that keeps the margin on a typical call on every plan, in whole audio minutes. */
+    public static function recommendedRate(): int
+    {
+        $perDollar = AgentCost::creditsPerDollar();
+        if (! $perDollar) {
+            return (int) config('listen.agents.credits_per_minute', 8100);
+        }
+
+        return (int) (ceil(AgentCost::typical() * $perDollar / Credits::PER_MINUTE) * Credits::PER_MINUTE);
+    }
+
     private static function plansTable(int $rate): HtmlString
     {
         $rows = AgentCost::plans($rate);
@@ -181,7 +193,7 @@ class AgentSettings extends Page implements HasForms
         $state = $this->form->getState();
         $audience = (string) ($state['agents_audience'] ?? AgentAccess::AUDIENCE_EVERYONE);
         SiteSetting::set('agents_audience', in_array($audience, [AgentAccess::AUDIENCE_PREVIEW, AgentAccess::AUDIENCE_OFF], true) ? $audience : AgentAccess::AUDIENCE_EVERYONE, self::GROUP);
-        SiteSetting::set('agents_credits_per_minute', (string) max(Credits::PER_MINUTE, min(Credits::PER_MINUTE * 10, (int) ($state['agents_credits_per_minute'] ?? 1800))), self::GROUP);
+        SiteSetting::set('agents_credits_per_minute', (string) max(Credits::PER_MINUTE, min(Credits::PER_MINUTE * 10, (int) ($state['agents_credits_per_minute'] ?? 8100))), self::GROUP);
         SiteSetting::set('agents_free_test_seconds', (string) max(0, min(1800, (int) round(((float) ($state['agents_free_test_minutes'] ?? 2)) * 60))), self::GROUP);
         SiteSetting::set('agents_calls_stopped', ! empty($state['agents_calls_stopped']) ? '1' : '0', self::GROUP);
         SiteSetting::set('agents_site_daily_minutes', (string) max(0, (int) ($state['agents_site_daily_minutes'] ?? 0)), self::GROUP);

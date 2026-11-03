@@ -1,4 +1,6 @@
 @include('components.page-head', ['pageTitle' => __('agents.setup_title'), 'page' => 'agents'])
+  {{-- The studio's dialect panel (the agent's dialect is picked as in the studio). --}}
+  <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
   <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
 </head>
 <body>
@@ -7,8 +9,6 @@
     $arabicUi = app()->getLocale() === 'ar';
     $lang = $agent->language ?? ($arabicUi ? 'ar' : 'en');
     $dialect = $agent->dialect ?? 'ar-EG';
-    $regions = ['nile' => $arabicUi ? 'مصر والسودان' : 'Egypt & Sudan', 'gulf' => $arabicUi ? 'الخليج' : 'Gulf', 'levant' => $arabicUi ? 'الشام' : 'Levant', 'iraq_yemen' => $arabicUi ? 'العراق واليمن' : 'Iraq & Yemen', 'maghreb' => $arabicUi ? 'المغرب العربي' : 'Maghreb', 'fusha' => $arabicUi ? 'الفصحى' : 'Fusha'];
-    $grouped = collect($dialects)->groupBy('region');
     $voiceAvatar = null;
     $voiceGender = null;
     if ($agent?->speaker_id) {
@@ -79,29 +79,14 @@
                     <label><input type="radio" name="language" value="en" {{ $lang === 'en' ? 'checked' : '' }}><span>{{ __('agents.language_en') }}</span></label>
                   </div>
                 </div>
-                <div class="ag-field" data-ag-dialect-field @if($lang === 'en') hidden @endif>
-                  <label for="ag-dialect">{{ __('agents.dialect_label') }}</label>
-                  <select class="ag-select" id="ag-dialect" name="dialect">
-                    @foreach($regions as $region => $regionLabel)
-                      @if($grouped->has($region))
-                        <optgroup label="{{ $regionLabel }}">
-                          @foreach($grouped[$region] as $d)
-                            <option value="{{ $d['code'] }}" {{ $dialect === $d['code'] ? 'selected' : '' }}>{{ $d['label'] }}</option>
-                          @endforeach
-                        </optgroup>
-                      @endif
-                    @endforeach
-                  </select>
+                <div class="ag-field ag-speaks" data-ag-dialect-field @if($lang === 'en') hidden @endif>
+                  <span class="ag-label" id="ag-dialect-label">{{ __('agents.dialect_label') }}</span>
+                  @include('agents.partials.speaks-pick', ['id' => 'ag-dialect', 'name' => 'dialect', 'labelId' => 'ag-dialect-label', 'english' => false, 'value' => $dialect, 'faces' => collect($voicesAr)->pluck('avatar')->filter()->take(3)->all()])
                 </div>
                 {{-- English agents: any English accent, as Arabic agents speak any Arabic dialect. --}}
-                <div class="ag-field" data-ag-accent-field @if($lang !== 'en') hidden @endif>
-                  <label for="ag-accent">{{ __('agents.accent_label') }}</label>
-                  @php $accent = isset(\App\Support\EnglishAccents::ALL[$agent->dialect ?? '']) ? $agent->dialect : 'en-US'; @endphp
-                  <select class="ag-select" id="ag-accent" name="accent">
-                    @foreach(\App\Support\EnglishAccents::ALL as $code => $a)
-                      <option value="{{ $code }}" {{ $accent === $code ? 'selected' : '' }}>{{ $arabicUi ? $a['ar'] : $a['en'] }}</option>
-                    @endforeach
-                  </select>
+                <div class="ag-field ag-speaks" data-ag-accent-field @if($lang !== 'en') hidden @endif>
+                  <span class="ag-label" id="ag-accent-label">{{ __('agents.accent_label') }}</span>
+                  @include('agents.partials.speaks-pick', ['id' => 'ag-accent', 'name' => 'accent', 'labelId' => 'ag-accent-label', 'english' => true, 'value' => $agent->dialect ?? null, 'faces' => collect($voicesEn)->pluck('avatar')->filter()->take(3)->all()])
                 </div>
               </div>
               <div class="ag-field">
@@ -247,7 +232,7 @@
         'correct' => __('agents.talk_correct'), 'correct_placeholder' => __('agents.talk_correct_placeholder'),
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
         'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'),
-        'play' => __('agents.voice_play'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
+        'play' => __('agents.voice_play'), 'pause' => __('agents.voice_pause'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
         'talk_heading' => __('agents.talk_heading'), 'error_name' => __('agents.error_name'),
         'balance' => ['upgrade' => __('agents.balance.upgrade')],
       ],
@@ -258,6 +243,9 @@
   </script>
   <script src="{{ asset('js/vendor/qrcode.js') }}?v={{ filemtime(public_path('js/vendor/qrcode.js')) }}" defer></script>
   <script src="{{ asset('js/agent-call.js') }}?v={{ filemtime(public_path('js/agent-call.js')) }}" defer></script>
+  @include('agents.partials.speaks-meta', ['english' => null])
+  <script src="{{ asset('js/voice-studio-icons.js') }}?v={{ filemtime(public_path('js/voice-studio-icons.js')) }}" defer></script>
+  <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
   <script src="{{ asset('js/agents.js') }}?v={{ filemtime(public_path('js/agents.js')) }}" defer></script>
 </body>
 </html>

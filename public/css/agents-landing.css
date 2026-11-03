@@ -1,10 +1,8 @@
 /*
- * Listen Agents, for visitors (resources/views/agents/landing.blade.php) and the
- * homepage's Agents section (components/home/agents). The call in the hero plays
- * one dialect after another; the steps follow the scroll over the real setup;
- * the bento and the channels play once in view. Built on the site's tokens and
- * the agents' buttons (css/agents.css): flat surfaces, one violet, and one deep
- * ink for the showcase panels.
+ * Listen Agents, for visitors (resources/views/agents/landing.blade.php) and the homepage's Agents
+ * section (components/home/agents). One bold element per page: the real call on its ink stage, with
+ * the page's one orb. Around it everything stays quiet: the site's own surfaces, fine lines, one
+ * violet, one type family (Alexandria) on one scale, and headlines that keep to two lines.
  */
 .agl {
   --agl-ease: cubic-bezier(.22, 1, .36, 1);
@@ -15,153 +13,151 @@
   --agl-ink-2: #231d63;
   --agl-on-ink: #F3F1FF;
   --agl-on-ink-muted: #B9B2E6;
-  --agl-r: 26px;
+  --agl-r: 24px;
+  --agl-wide: 1180px;
   overflow-x: clip;
 }
 html[data-theme="dark"] .agl { --agl-ink: #1c1747; --agl-ink-2: #29225e; }
 .agl *, .agl *::before, .agl *::after { box-sizing: border-box; }
 .agl [hidden] { display: none !important; }
 /* A light reset (one class of weight), so each part's own spacing below wins over it. */
-.agl :where(h1, h2, h3, p) { margin: 0; }
-.agl h1, .agl h2, .agl h3 { letter-spacing: -.02em; }
+.agl :where(h1, h2, h3, p, ul, ol) { margin: 0; }
+.agl :where(ul, ol) { padding: 0; list-style: none; }
+.agl h1, .agl h2, .agl h3 { letter-spacing: -.02em; text-wrap: balance; }
 html[dir="rtl"] .agl h1, html[dir="rtl"] .agl h2, html[dir="rtl"] .agl h3 { letter-spacing: 0; }
+.agl p { text-wrap: pretty; }
 
-/* ---------- The hero: the words, and the call they describe. ---------- */
-.agl-hero {
-  display: grid; grid-template-columns: minmax(0, 1.02fr) minmax(0, .98fr); gap: clamp(2rem, 5vw, 4.5rem); align-items: center;
-  max-width: 1180px; margin: 0 auto; padding: clamp(2.4rem, 6vw, 5rem) clamp(1rem, 2.4vw, 1.6rem) clamp(2.5rem, 6vw, 4.5rem);
-}
-.agl-hero h1 { font-size: clamp(2.35rem, 5.2vw, 4.1rem); font-weight: 800; line-height: 1.08; max-width: 13ch; }
-html[dir="rtl"] .agl-hero h1 { font-size: clamp(2.2rem, 4.6vw, 3.7rem); line-height: 1.35; max-width: 11ch; }
-.agl-lead { margin-top: 1.6rem; font-size: clamp(1.05rem, 1.5vw, 1.2rem); line-height: 1.7; color: var(--muted); max-width: 46ch; }
+/* ---------- One scale for every section. ---------- */
+.agl-section { max-width: var(--agl-wide); margin: 0 auto; padding: clamp(3.2rem, 7vw, 6rem) clamp(1rem, 2.4vw, 1.6rem) 0; }
+.agl-head { max-width: 640px; margin-bottom: clamp(1.6rem, 3.4vw, 2.6rem); }
+.agl-head h2 { font-size: clamp(1.7rem, 3.2vw, 2.45rem); font-weight: 700; line-height: 1.18; }
+html[dir="rtl"] .agl-head h2 { line-height: 1.4; }
+.agl-head p { margin-top: .75rem; color: var(--muted); font-size: 1.04rem; line-height: 1.75; }
 .agl-cta-row { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.8rem; }
 .agl-cta-center { justify-content: center; margin-top: .4rem; }
-.agl .agl-note { margin-top: 1rem; color: var(--muted); font-size: .9rem; line-height: 1.6; }
+.agl .agl-note { margin-top: .9rem; color: var(--muted); font-size: .9rem; line-height: 1.6; }
 .agl .agl-note + .agl-note { margin-top: .15rem; }
 .agl-live-btn { border-color: color-mix(in srgb, var(--a) 45%, var(--line)); color: var(--accent-text, var(--a)); }
 .agl-live-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .agl-live-btn:hover { background: var(--agl-soft); }
+.agl-live-btn:focus-visible, .agl-speaks-more:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: 2px; }
+/* One icon style everywhere: a soft violet tile. */
+.agl-icon { flex: 0 0 auto; display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--agl-soft); color: var(--accent-text, var(--a)); }
+.agl-icon svg, .agl-honest svg, .agl-flow-icon svg, .agl-facts svg, .agl-inbox-icon svg, .agl-ui-tile svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 
-.agl-call { display: grid; gap: 1rem; justify-items: center; scroll-margin-top: 96px; }
-.agl-call-card {
-  width: min(460px, 100%); display: grid; gap: .9rem; padding: 1.1rem 1.1rem 1.25rem;
-  border: 1px solid var(--line); border-radius: var(--agl-r); background: var(--surface);
-  box-shadow: 0 40px 80px -48px color-mix(in srgb, var(--a) 70%, transparent), 0 2px 10px rgba(20, 16, 60, .05);
+/* ---------- The hero: two lines, a short lead, the call beside them. ---------- */
+.agl-hero {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(2rem, 5vw, 4.5rem); align-items: center;
+  max-width: var(--agl-wide); margin: 0 auto; padding: clamp(2.2rem, 5.5vw, 4.5rem) clamp(1rem, 2.4vw, 1.6rem) clamp(1rem, 3vw, 2rem);
 }
-.agl-call-head { display: flex; align-items: center; gap: .75rem; }
-.agl-call-face { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; background: var(--agl-soft); flex: 0 0 auto; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px color-mix(in srgb, var(--a) 55%, transparent); }
-.agl-call-who { flex: 1; min-width: 0; display: grid; line-height: 1.3; }
-.agl-call-who strong { font-weight: 800; font-size: 1.02rem; overflow-wrap: anywhere; }
-.agl-call-who span { color: var(--muted); font-size: .86rem; overflow-wrap: anywhere; }
-.agl-call-live { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .65rem; border-radius: 999px; background: var(--agl-soft); font-size: .78rem; font-weight: 700; color: var(--text); white-space: nowrap; }
-.agl-call-live i { width: 7px; height: 7px; border-radius: 50%; background: #ee4a77; animation: agl-blink 1.4s ease-in-out infinite; }
-.agl-call-live b { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--muted); }
-.agl-call-stage { display: grid; place-items: center; height: 172px; }
-/* One orb, moving with the voice, with rings that ripple while it speaks (like the call button). */
-.agl-call-orb { position: relative; display: grid; place-items: center; width: 124px; height: 124px; }
-.agl-call-stage .orb { --orb-size: 116px; width: 116px; height: 116px; flex: 0 0 auto; position: relative; z-index: 1; }
-.agl-call-rings i { position: absolute; inset: 4px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--a) 45%, transparent); opacity: 0; }
-.agl-call-stage.is-speaking .agl-call-rings i { animation: agl-ripple 1.9s ease-out infinite; }
-.agl-call-stage.is-speaking .agl-call-rings i:nth-child(2) { animation-delay: .95s; }
-@keyframes agl-ripple { from { opacity: .6; transform: scale(.96); } to { opacity: 0; transform: scale(1.5); } }
-/* The brand's voice waves, either side of the orb: they move while the agent talks. */
-.agl-wave { display: flex; align-items: center; gap: 5px; height: 84px; }
-.agl-wave i { display: block; width: 4px; height: 10px; border-radius: 4px; background: linear-gradient(180deg, #C9BEFF, var(--a)); transition: height .08s linear; }
-/* At rest the bars keep the brand mark's shape: short at the ends, tall in the middle. */
-.agl-wave i:nth-child(2), .agl-wave i:nth-child(6) { height: 14px; }
-.agl-wave i:nth-child(3), .agl-wave i:nth-child(5) { height: 18px; }
-.agl-wave i:nth-child(4) { height: 21px; }
-.agl-lines { display: grid; align-content: start; gap: .5rem; min-height: 232px; }
-.agl-line {
-  max-width: 88%; padding: .62rem .85rem; border-radius: 16px; font-size: .94rem; line-height: 1.55;
-  opacity: 0; transform: translateY(8px); transition: opacity .35s var(--agl-ease), transform .45s var(--agl-ease);
+.agl-hero h1 { font-size: clamp(2.2rem, 3.5vw, 3rem); font-weight: 800; line-height: 1.12; max-width: 22ch; }
+html[dir="rtl"] .agl-hero h1 { font-size: clamp(2.2rem, 4vw, 3.15rem); line-height: 1.42; max-width: 14ch; }
+.agl-lead { margin-top: 1.25rem; font-size: clamp(1.04rem, 1.4vw, 1.15rem); line-height: 1.75; color: var(--muted); max-width: 46ch; }
+.agl-facts { display: grid; gap: .65rem; margin-top: 1.8rem; padding-top: 1.4rem; border-top: 1px solid var(--line); max-width: 46ch; }
+.agl-facts li { display: flex; align-items: flex-start; gap: .65rem; font-size: .98rem; line-height: 1.55; }
+.agl-facts svg { flex: 0 0 auto; margin-top: .12rem; color: var(--accent-text, var(--a)); width: 20px; height: 20px; }
+.agl-hero-call { min-width: 0; scroll-margin-top: 96px; }
+.agl-hero-call .agl-real { max-width: 560px; margin-inline-start: auto; gap: .85rem; }
+/* In the hero the stage keeps to one screen: a smaller orb and fewer lines in view. */
+.agl-real.is-hero .agl-real-orb { --orb-size: clamp(104px, 10vw, 128px); }
+.agl-real.is-hero .agl-real-lines { height: 14.5rem; }
+/* The one moment of motion on arrival: the words, then the call, settle in once. */
+@media (prefers-reduced-motion: no-preference) {
+  .agl-hero-text > * { animation: agl-arrive .8s var(--agl-ease) both; }
+  .agl-hero-text > :nth-child(2) { animation-delay: .06s; }
+  .agl-hero-text > :nth-child(3) { animation-delay: .12s; }
+  .agl-hero-text > :nth-child(n+4) { animation-delay: .18s; }
+  .agl-hero-call { animation: agl-arrive 1s var(--agl-ease) .12s both; }
 }
-.agl-line.is-on { opacity: 1; transform: none; }
-.agl-line.is-agent { justify-self: start; background: var(--agl-soft); border-end-start-radius: 6px; }
-.agl-line.is-caller { justify-self: end; border: 1px solid var(--line); background: var(--bg); border-end-end-radius: 6px; }
-.agl-line span { display: block; min-height: 1.5em; }
-.agl-line small { display: block; margin-top: .2rem; color: var(--muted); font-size: .78rem; line-height: 1.45; }
-.agl-chip {
-  justify-self: center; display: inline-flex; align-items: center; gap: .5rem; padding: .45rem .9rem; border-radius: 999px;
-  background: color-mix(in srgb, var(--agl-ok) 13%, transparent); color: var(--agl-ok); font-weight: 700; font-size: .86rem;
-  opacity: 0; transform: scale(.92); transition: opacity .3s ease, transform .4s cubic-bezier(.34, 1.56, .64, 1);
-}
-.agl-chip.is-on { opacity: 1; transform: none; }
-.agl-chip i, .agl-bento-chip i { width: 16px; height: 16px; border-radius: 50%; flex: 0 0 auto; background: var(--agl-ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/10px no-repeat; }
-.agl-dialects { display: flex; flex-wrap: wrap; justify-content: center; gap: .35rem; max-width: 560px; }
-.agl-dialect {
-  min-height: 38px; padding: .4rem .78rem; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted);
-  font: inherit; font-size: .86rem; font-weight: 700; cursor: pointer; transition: color .2s ease, background .25s ease, border-color .2s ease;
-}
-.agl-dialect:hover { color: var(--text); border-color: var(--line-strong, var(--line)); }
-.agl-dialect.is-on { background: var(--a); border-color: var(--a); color: #fff; }
-.agl-dialect:focus-visible, .agl-live-btn:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: 2px; }
+@keyframes agl-arrive { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
-/* ---------- Sections. ---------- */
-.agl-section { max-width: 1180px; margin: 0 auto; padding: clamp(3rem, 7vw, 5.5rem) clamp(1rem, 2.4vw, 1.6rem); }
-.agl-head { max-width: 720px; margin-bottom: clamp(1.6rem, 3.5vw, 2.6rem); }
-.agl-head h2 { font-size: clamp(1.75rem, 3.4vw, 2.6rem); font-weight: 800; line-height: 1.15; }
-html[dir="rtl"] .agl-head h2 { line-height: 1.35; }
-.agl-head p { margin-top: .8rem; color: var(--muted); font-size: 1.05rem; line-height: 1.7; }
-.agl-head-split { max-width: none; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 1rem 3rem; align-items: end; }
-.agl-head-split p { margin-top: 0; }
-.agl-step-n { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--agl-soft-2); color: var(--accent-text, var(--a)); font-size: .84rem; font-weight: 800; flex: 0 0 auto; }
-
-/* ---------- How it works: the steps follow the scroll over the real setup. ---------- */
-.agl-how-grid { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: clamp(1.5rem, 4vw, 3.5rem); }
-.agl-how-steps { margin: 0; padding: 0; list-style: none; }
-.agl-how-step {
-  display: flex; gap: .9rem; min-height: 54vh; padding: 1.6rem 0 1.6rem 1.2rem; padding-inline: 1.2rem 0;
-  border-inline-start: 2px solid var(--line); opacity: .38; transition: opacity .4s ease, border-color .4s ease;
+/* ---------- The dialects it speaks: one line, the regions, the full list on demand. ---------- */
+.agl-speaks {
+  max-width: var(--agl-wide); margin: clamp(1.5rem, 4vw, 3rem) auto 0; padding: 1.4rem clamp(1rem, 2.4vw, 1.6rem);
+  display: grid; grid-template-columns: minmax(14rem, .8fr) minmax(0, 1.6fr) auto; align-items: center; gap: 1rem 2rem;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
 }
-.agl-how-step:first-child { padding-top: .2rem; }
-.agl-how-step.is-on { opacity: 1; border-color: var(--a); }
-.agl-how-step.is-on .agl-step-n { background: var(--a); color: #fff; }
-.agl-how-copy h3 { font-size: clamp(1.25rem, 2vw, 1.6rem); font-weight: 800; line-height: 1.3; }
-.agl-how-copy p { margin-top: .5rem; color: var(--muted); font-size: 1.02rem; line-height: 1.7; max-width: 38ch; }
-.agl-how-inline { display: none; margin: 1rem 0 0; }
-.agl-how-inline img { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); }
-.agl-how-frame { position: sticky; top: 100px; align-self: start; padding: clamp(.8rem, 1.6vw, 1.1rem); border-radius: 28px; background: var(--agl-ink); box-shadow: 0 50px 90px -60px rgba(23, 20, 74, .9); }
-.agl-how-screen { position: relative; aspect-ratio: 1200 / 863; border-radius: 16px; overflow: hidden; background: #fff; }
-.agl-how-screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: top center; opacity: 0; transform: scale(1.02); transition: opacity .55s ease, transform .8s var(--agl-ease); }
-.agl-how-screen img.is-on { opacity: 1; transform: none; }
-.agl-how-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: .85rem; padding: 0 .3rem; color: var(--agl-on-ink-muted); font-size: .9rem; }
-.agl-how-dots { display: inline-flex; gap: 6px; }
-.agl-how-dots i { width: 22px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .22); transition: background .3s ease; }
-.agl-how-dots i.is-on { background: #fff; }
+.agl-speaks-copy h2 { font-size: 1.15rem; font-weight: 700; line-height: 1.45; }
+.agl-speaks-copy p { margin-top: .2rem; color: var(--muted); font-size: .94rem; line-height: 1.6; }
+.agl-speaks-regions { display: flex; flex-wrap: wrap; gap: .4rem; min-width: 0; }
+.agl-speaks-regions li { display: inline-flex; align-items: center; gap: .45rem; padding: .35rem .75rem; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: .86rem; line-height: 1.5; }
+.agl-speaks-regions b { font-weight: 600; }
+.agl-speaks-regions span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.agl-speaks-more {
+  display: inline-flex; align-items: center; gap: .4rem; min-height: 40px; padding: .4rem .9rem; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--a) 40%, var(--line));
+  background: transparent; color: var(--accent-text, var(--a)); font: inherit; font-size: .9rem; font-weight: 700; cursor: pointer;
+}
+.agl-speaks-more[aria-expanded="true"] { background: var(--agl-soft); }
+.agl-all { grid-column: 1 / -1; padding: 1rem 0 .2rem; text-align: start; }
+.agl-all-group + .agl-all-group { margin-top: .8rem; }
+.agl-all-region { display: block; margin-bottom: .4rem; color: var(--muted); font-size: .82rem; font-weight: 700; }
+.agl-all ul { display: flex; flex-wrap: wrap; gap: .3rem; max-height: 280px; overflow: auto; }
+.agl-all li { padding: .2rem .65rem; border-radius: 999px; background: var(--agl-soft); font-size: .82rem; font-weight: 600; line-height: 1.6; }
 
-/* ---------- The bento: a call that ends with something done, the month, three things. ---------- */
-.agl-bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1rem; }
-.agl-bento > article { border-radius: 24px; padding: clamp(1.2rem, 2.4vw, 1.6rem); border: 1px solid var(--line); background: var(--surface); }
-.agl-bento-call { grid-column: span 4; display: grid; gap: 1rem; align-content: space-between; min-height: 400px; background: var(--agl-ink) !important; border-color: transparent !important; color: var(--agl-on-ink); }
-.agl-bento-stats { grid-column: span 2; display: grid; gap: 1rem; align-content: space-between; }
-.agl-bento-small { grid-column: span 2; display: grid; gap: .55rem; align-content: start; }
-.agl-bento-live { justify-self: start; display: inline-flex; align-items: center; gap: .45rem; padding: .3rem .7rem; border-radius: 999px; background: rgba(255, 255, 255, .1); font-size: .8rem; font-weight: 700; }
-.agl-bento-live i { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; animation: agl-blink 1.4s ease-in-out infinite; }
-.agl-bento-live b { font-weight: 600; color: var(--agl-on-ink-muted); font-variant-numeric: tabular-nums; }
-.agl-bento-lines { display: grid; gap: .55rem; }
-.agl-bento-line { max-width: 78%; padding: .7rem .95rem; border-radius: 16px; font-size: .95rem; line-height: 1.55; opacity: 0; transform: translateY(10px); }
-.agl-bento-line.is-caller { justify-self: start; background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .16); border-end-start-radius: 6px; }
-.agl-bento-line.is-agent { justify-self: end; background: #fff; color: var(--agl-ink); border-end-end-radius: 6px; }
-.agl-bento-chip { justify-self: end; display: inline-flex; align-items: center; gap: .5rem; padding: .45rem .9rem; border-radius: 999px; background: #fff; color: var(--agl-ink); font-size: .85rem; font-weight: 700; opacity: 0; transform: scale(.9); }
-.agl-bento-caption { color: var(--muted); font-size: .93rem; line-height: 1.6; }
-.agl-bento-call .agl-bento-caption { color: var(--agl-on-ink-muted); }
-.agl-bento-stats h3, .agl-bento-small h3 { font-size: 1.08rem; font-weight: 800; }
-.agl-bento-nums { display: grid; gap: .55rem; }
-.agl-bento-nums div { display: flex; align-items: baseline; gap: .55rem; }
-.agl-bento-nums b { font-size: 1.9rem; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 2.6ch; }
-.agl-bento-nums span { color: var(--muted); font-size: .9rem; }
-.agl-bento-bars { display: flex; align-items: flex-end; gap: 5px; height: 72px; }
-.agl-bento-bars i { flex: 1; height: var(--h); border-radius: 5px 5px 2px 2px; background: color-mix(in srgb, var(--a) 70%, transparent); transform-origin: bottom; transform: scaleY(.08); }
-.agl-bento-bars i:last-child { background: var(--a); }
-.agl-bento-small p { color: var(--muted); font-size: .93rem; line-height: 1.6; }
-.agl-does-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--agl-soft); }
-.agl-does-icon svg, .agl-honest svg, .agl-flow-icon svg { width: 22px; height: 22px; fill: none; stroke: var(--a); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.agl-honest { display: flex; align-items: center; justify-content: center; gap: .6rem; margin-top: 1.3rem; color: var(--muted); font-size: .95rem; text-align: center; }
-/* In view: the call plays, the numbers count, the bars grow. */
-.is-in .agl-bento-line { animation: agl-rise .5s var(--agl-ease) forwards; animation-delay: calc(.3s + var(--d) * .9s); }
-.is-in .agl-bento-chip { animation: agl-pop-in .45s cubic-bezier(.34, 1.56, .64, 1) forwards; animation-delay: calc(.3s + var(--d) * .9s); }
-.is-in .agl-bento-bars i { animation: agl-grow .7s var(--agl-ease) forwards; animation-delay: calc(.2s + var(--d) * .05s); }
+/* ---------- How it works: one track, four steps, each with a drawing of its screen. ---------- */
+.agl-track {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; counter-reset: step;
+  border: 1px solid var(--line); border-radius: var(--agl-r); overflow: hidden; background: var(--line);
+}
+.agl-step { display: grid; align-content: start; gap: .55rem; padding: clamp(1rem, 1.8vw, 1.35rem); background: var(--surface); }
+.agl-step h3 { font-size: 1.06rem; font-weight: 700; line-height: 1.45; }
+.agl-step p { color: var(--muted); font-size: .93rem; line-height: 1.65; }
+.agl-step-n { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-top: .45rem; border-radius: 50%; background: var(--a); color: #fff; font-size: .84rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* The drawn screens: the product's own parts, in the page's language and theme. */
+.agl-ui {
+  position: relative; display: grid; align-content: center; gap: .6rem; height: 206px; padding: .9rem; overflow: hidden;
+  border-radius: 16px; background: var(--bg); border: 1px solid var(--line); font-size: .82rem; line-height: 1.5;
+}
+.agl-ui-site { display: flex; align-items: center; gap: .6rem; padding: .45rem .55rem; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+.agl-ui-dots { display: inline-flex; gap: 4px; }
+.agl-ui-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.agl-ui-addr { flex: 1; display: flex; align-items: center; gap: .35rem; height: 22px; padding: 0 .5rem; border-radius: 999px; background: var(--bg); }
+.agl-ui-addr svg { width: 12px; height: 12px; fill: none; stroke: var(--agl-ok); stroke-width: 2.2; }
+.agl-ui-addr i { flex: 0 1 60%; height: 6px; border-radius: 6px; background: var(--line); }
+.agl-ui-reading { display: flex; align-items: center; gap: .5rem; font-weight: 600; }
+.agl-ui-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--agl-soft-2); border-top-color: var(--a); animation: agl-spin 1s linear infinite; }
+.agl-ui-facts { display: flex; flex-wrap: wrap; gap: .35rem; }
+.agl-ui-facts li { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .55rem; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-weight: 600; }
+.agl-ui-facts svg { width: 12px; height: 12px; fill: none; stroke: var(--agl-ok); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.agl-ui-found { color: var(--muted); }
+.agl-ui-voices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem .4rem; }
+.agl-ui-voices li { display: grid; justify-items: center; gap: .25rem; font-weight: 600; }
+.agl-ui-voices img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--agl-soft); }
+.agl-ui-voices li.is-on img { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--a); }
+.agl-ui-voices li.is-on span { color: var(--accent-text, var(--a)); }
+.agl-ui-chat { display: flex; flex-direction: column; gap: .45rem; }
+.agl-ui-chat p { max-width: 88%; padding: .45rem .65rem; border-radius: 14px; }
+.agl-ui-chat .is-caller { align-self: flex-end; background: var(--surface); border: 1px solid var(--line); border-start-end-radius: 5px; }
+.agl-ui-chat .is-agent { align-self: flex-start; background: var(--agl-soft-2); border-start-start-radius: 5px; }
+.agl-ui-fix { align-self: flex-start; display: inline-flex; align-items: center; gap: .3rem; color: var(--accent-text, var(--a)); font-weight: 700; }
+.agl-ui-fix svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.agl-ui-live { display: grid; gap: .4rem; }
+.agl-ui-live li { display: flex; align-items: center; gap: .55rem; padding: .35rem .45rem; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); font-weight: 600; }
+.agl-ui-tile { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: var(--agl-soft); color: var(--accent-text, var(--a)); }
+.agl-ui-tile svg { width: 16px; height: 16px; }
+.agl-ui-on { display: inline-flex; align-items: center; gap: .4rem; color: var(--agl-ok); font-weight: 700; }
+.agl-ui-on i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px color-mix(in srgb, var(--agl-ok) 20%, transparent); }
+
+/* ---------- What it does: the month at a glance, and four things on every call. ---------- */
+.agl-does-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(1rem, 2.4vw, 1.6rem); align-items: stretch; }
+.agl-month { display: grid; gap: 1.1rem; align-content: space-between; padding: clamp(1.2rem, 2.4vw, 1.7rem); border-radius: var(--agl-r); border: 1px solid var(--line); background: var(--surface); }
+.agl-month h3 { font-size: 1.02rem; font-weight: 700; }
+.agl-month-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.agl-month-nums div { display: grid; gap: .1rem; }
+.agl-month-nums b { font-size: clamp(1.7rem, 3vw, 2.2rem); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; text-align: start; }
+.agl-month-nums span { color: var(--muted); font-size: .86rem; line-height: 1.45; }
+.agl-month-bars { display: flex; align-items: flex-end; gap: 5px; height: 84px; }
+.agl-month-bars i { flex: 1; height: var(--h); border-radius: 5px 5px 2px 2px; background: color-mix(in srgb, var(--a) 55%, transparent); transform-origin: bottom; transform: scaleY(.08); }
+.agl-month-bars i:last-child { background: var(--a); }
+.agl-month p { color: var(--muted); font-size: .92rem; line-height: 1.65; }
+.is-in .agl-month-bars i { animation: agl-grow .7s var(--agl-ease) forwards; animation-delay: calc(.15s + var(--d) * .04s); }
+.agl-does-list { display: grid; border: 1px solid var(--line); border-radius: var(--agl-r); background: var(--surface); }
+.agl-does-list li { display: flex; gap: .9rem; align-items: flex-start; padding: clamp(1rem, 2vw, 1.25rem) clamp(1rem, 2.2vw, 1.4rem); }
+.agl-does-list li + li { border-top: 1px solid var(--line); }
+.agl-does-list h3, .agl-safe-list h3 { font-size: 1rem; font-weight: 700; line-height: 1.5; }
+.agl-does-list p, .agl-safe-list p { margin-top: .2rem; color: var(--muted); font-size: .93rem; line-height: 1.65; }
+.agl-honest { display: flex; align-items: center; justify-content: center; gap: .6rem; margin-top: 1.4rem; color: var(--muted); font-size: .95rem; line-height: 1.6; text-align: center; }
+.agl-honest svg { flex: 0 0 auto; color: var(--accent-text, var(--a)); }
 
 /* ---------- One agent, every channel. ---------- */
 .agl-flow {
@@ -199,23 +195,51 @@ html[dir="rtl"] .agl-flow-lines, html[dir="rtl"] .agl-flow-out { transform: scal
 .is-in .agl-flow-line { animation: agl-rise .5s var(--agl-ease) forwards; animation-delay: calc(.6s + var(--d) * 1.1s); }
 .agl-builders { margin-top: 1.2rem; text-align: center; color: var(--muted); font-size: .95rem; }
 
-/* ---------- Every call written down. ---------- */
-.agl-calls { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(1.5rem, 4vw, 3.5rem); align-items: center; }
-.agl-calls .agl-head { margin-bottom: 0; }
-.agl-inbox { display: grid; gap: .6rem; padding: .9rem; border: 1px solid var(--line); border-radius: var(--agl-r); background: var(--surface); }
-.agl-inbox-row { display: flex; align-items: center; gap: .75rem; padding: .8rem .9rem; border-radius: 14px; background: var(--bg); }
-.agl-inbox-row p { flex: 1; min-width: 0; font-size: .92rem; line-height: 1.5; }
-.agl-inbox-len { color: var(--muted); font-size: .8rem; white-space: nowrap; }
-.agl-inbox-customer { display: flex; align-items: center; gap: .75rem; margin-top: .2rem; padding: .8rem .9rem; border-radius: 14px; border: 1px dashed color-mix(in srgb, var(--a) 45%, var(--line)); }
-.agl-inbox-customer img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
-.agl-inbox-customer div { flex: 1; display: grid; line-height: 1.35; }
-.agl-inbox-customer div span { color: var(--muted); font-size: .86rem; }
+/* ---------- Every call written down: the owner's call list and one call open. ---------- */
+.agl-inbox { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); border: 1px solid var(--line); border-radius: var(--agl-r); overflow: hidden; background: var(--surface); }
+.agl-inbox-list { display: grid; align-content: start; gap: .25rem; padding: .9rem; border-inline-end: 1px solid var(--line); background: var(--bg); }
+.agl .agl-inbox-title { padding: .2rem .5rem .55rem; color: var(--muted); font-size: .84rem; font-weight: 700; }
+.agl-inbox-row { display: flex; align-items: flex-start; gap: .7rem; padding: .75rem .65rem; border-radius: 14px; border: 1px solid transparent; }
+.agl-inbox-row.is-on { background: var(--surface); border-color: var(--line); box-shadow: 0 8px 24px -18px rgba(20, 16, 60, .35); }
+.agl-inbox-row > div { flex: 1; min-width: 0; display: grid; gap: .15rem; }
+.agl-inbox-row p { font-size: .93rem; line-height: 1.55; font-weight: 600; }
+.agl-inbox-row span { display: inline-flex; align-items: center; gap: .45rem; color: var(--muted); font-size: .8rem; }
+.agl-inbox-row span i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: .7; }
+.agl-inbox-row time { flex: 0 0 auto; color: var(--muted); font-size: .78rem; line-height: 1.6; white-space: nowrap; }
+.agl-inbox-icon { flex: 0 0 auto; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--agl-soft); color: var(--accent-text, var(--a)); }
+.agl-inbox-icon svg { width: 18px; height: 18px; }
+.agl-inbox-detail { display: grid; align-content: start; gap: .9rem; padding: clamp(1rem, 2.2vw, 1.4rem); }
+.agl-inbox-detail .agl-inbox-title { padding: 0; }
+.agl-inbox-summary { font-size: 1.02rem; font-weight: 600; line-height: 1.65; }
+.agl-inbox-contact { display: flex; align-items: center; gap: .75rem; padding: .75rem .85rem; border-radius: 16px; background: var(--bg); border: 1px solid var(--line); }
+.agl-inbox-contact img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
+.agl-inbox-contact > div { flex: 1; min-width: 0; display: grid; gap: .1rem; line-height: 1.45; }
+.agl-inbox-contact span:not(.ag-btn) { color: var(--muted); font-size: .86rem; }
+.agl-inbox-contact bdi { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; margin-inline-start: .2rem; }
+.agl-inbox-lines { display: flex; flex-direction: column; gap: .45rem; padding-top: .3rem; border-top: 1px dashed var(--line); }
+.agl-inbox-lines p { max-width: 86%; margin-top: .3rem; padding: .55rem .8rem; border-radius: 16px; font-size: .9rem; line-height: 1.6; }
+.agl-inbox-lines .is-caller { align-self: flex-end; background: var(--bg); border: 1px solid var(--line); border-start-end-radius: 5px; }
+.agl-inbox-lines .is-agent { align-self: flex-start; background: var(--agl-soft-2); border-start-start-radius: 5px; }
 
-/* ---------- In every plan. ---------- */
-.agl-price { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; max-width: 1132px; margin: clamp(1rem, 3vw, 2rem) auto; padding: clamp(1.6rem, 4vw, 2.4rem); border-radius: var(--agl-r); background: var(--agl-soft); }
-.agl-price h2 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 800; }
-.agl-price p { margin-top: .45rem; color: var(--muted); max-width: 60ch; line-height: 1.65; }
-@media (max-width: 1200px) { .agl-price { margin-inline: clamp(1rem, 2.4vw, 1.6rem); } }
+/* ---------- Safe by design: six promises, two columns divided by fine lines. ---------- */
+.agl-safe-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--agl-r); overflow: hidden; background: var(--surface); }
+.agl-safe-list li { display: flex; gap: .9rem; align-items: flex-start; padding: clamp(1.1rem, 2.2vw, 1.45rem); border-top: 1px solid var(--line); }
+.agl-safe-list li:nth-child(-n+2) { border-top: 0; }
+.agl-safe-list li:nth-child(odd) { border-inline-end: 1px solid var(--line); }
+
+/* ---------- What it costs: the rate in words beside the plans that include agents. ---------- */
+.agl-price { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(1.2rem, 3vw, 2.6rem); align-items: center; }
+.agl-price-copy { display: grid; gap: .7rem; justify-items: start; }
+.agl-price h2 { font-size: clamp(1.6rem, 2.8vw, 2.15rem); font-weight: 700; line-height: 1.25; }
+html[dir="rtl"] .agl-price h2 { line-height: 1.45; }
+.agl-price-copy p { color: var(--muted); line-height: 1.7; max-width: 52ch; }
+.agl-price .agl-price-free { font-size: .9rem; }
+.agl-price-copy .ag-btn { margin-top: .4rem; }
+.agl-price-plans { display: grid; border: 1px solid var(--line); border-radius: var(--agl-r); overflow: hidden; background: var(--surface); }
+.agl-price-plans li { display: flex; align-items: baseline; justify-content: space-between; gap: .3rem 1rem; flex-wrap: wrap; padding: .95rem 1.15rem; }
+.agl-price-plans li + li { border-top: 1px solid var(--line); }
+.agl-price-plans b { font-weight: 700; }
+.agl-price-plans span { color: var(--muted); font-size: .92rem; }
 
 /* ---------- Questions. ---------- */
 .agl-faq-list { max-width: 820px; border-top: 1px solid var(--line); }
@@ -228,39 +252,159 @@ html[dir="rtl"] .agl-flow-lines, html[dir="rtl"] .agl-flow-out { transform: scal
 .agl-faq-list p { padding: 0 .2rem 1.2rem; color: var(--muted); line-height: 1.7; max-width: 70ch; }
 
 /* ---------- The last word. ---------- */
-.agl-final { display: grid; justify-items: center; gap: 1rem; padding: clamp(3rem, 8vw, 6rem) 1rem clamp(4rem, 9vw, 7rem); text-align: center; }
-.agl-final .orb { --orb-size: 110px; width: 110px; height: 110px; }
-.agl-final h2 { font-size: clamp(1.7rem, 3.6vw, 2.7rem); font-weight: 800; max-width: 22ch; line-height: 1.2; }
-html[dir="rtl"] .agl-final h2 { line-height: 1.4; }
+.agl-final { display: grid; justify-items: center; gap: 1rem; padding: clamp(4rem, 9vw, 7rem) 1rem clamp(4rem, 9vw, 7rem); text-align: center; }
+.agl-final h2 { font-size: clamp(1.7rem, 3.4vw, 2.6rem); font-weight: 700; max-width: 22ch; line-height: 1.2; }
+html[dir="rtl"] .agl-final h2 { line-height: 1.45; }
+.agl-final-logo { width: 80px; height: 80px; border-radius: 24px; }
+.agl-final-logo::after { border-radius: 30px; }
+.agl-final-logo svg { width: 50px; height: 50px; }
 
-
-/* Every dialect or accent the agent speaks, opened from "+142 more". */
-.agl-dialect-more { border-style: dashed; color: var(--accent-text, var(--a)); }
-.agl-dialect-more.is-on { border-style: solid; }
-.agl-all { width: min(560px, 100%); overflow: hidden; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); text-align: start; }
-.agl .agl-all-title { margin-bottom: .7rem; font-weight: 800; }
-.agl-all-title b { color: var(--accent-text, var(--a)); }
-.agl-all-group + .agl-all-group { margin-top: .7rem; }
-.agl-all-region { display: block; margin-bottom: .35rem; color: var(--muted); font-size: .8rem; font-weight: 700; }
-.agl-all ul { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0; padding: 0; list-style: none; max-height: 260px; overflow: auto; }
-.agl-all li { padding: .2rem .6rem; border-radius: 999px; background: var(--agl-soft); font-size: .8rem; font-weight: 600; }
-/* The final call to action: Listen's mark. */
-.agl-final-logo { width: 84px; height: 84px; border-radius: 26px; }
-.agl-final-logo::after { border-radius: 32px; }
-.agl-final-logo svg { width: 52px; height: 52px; }
-
-/* ---------- Motion while scrolling and clicking. ---------- */
 /* In-page links glide. */
 html:has(.agl) { scroll-behavior: smooth; }
-/* Parts rise into place as they come into view; only when the script runs, so nothing stays hidden without it. */
+/* The homepage's section rises into place once (only when the script runs, so nothing stays hidden). */
 .agl-js [data-agl-rise] { opacity: 0; transform: translateY(22px); transition: opacity .7s var(--agl-ease), transform .9s var(--agl-ease); transition-delay: var(--rise-d, 0s); }
 .agl-js [data-agl-rise].is-risen { opacity: 1; transform: none; }
-/* Switching the dialect: this call fades out, the next one comes in. */
-.agl-call-face, .agl-call-who, .agl-lines { transition: opacity .22s ease; }
-.agl-call.is-switching .agl-call-face, .agl-call.is-switching .agl-call-who, .agl-call.is-switching .agl-lines, .agl-call.is-switching .agl-chip { opacity: 0; }
 /* Answers open and close smoothly (the script animates their height). */
 .agl-faq-list details p { overflow: hidden; }
 .agl-faq-list details.is-closing summary::after { transform: none; }
+
+/* ---------- A real call, recorded live (components/agents/real-call). ----------
+   An ink panel that reads like a messenger: the call's tabs on a row of their own, who answers,
+   the voice (orb or face) with its play button, then the lines, the agent's on the start side and
+   the caller's on the other, and the saved contact at the end. */
+.agl-real {
+  position: relative; display: grid; gap: 1rem; padding: clamp(1rem, 2.2vw, 1.5rem);
+  border-radius: 28px; background: var(--agl-ink); color: var(--agl-on-ink);
+  box-shadow: 0 40px 80px -40px rgba(23, 20, 74, .6); isolation: isolate; min-width: 0;
+}
+.agl-real-switch { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); padding: 4px; gap: 4px; border-radius: 16px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .08); }
+.agl-real-switch button {
+  min-height: 40px; padding: .35rem .5rem; border: 0; border-radius: 12px; background: transparent; color: var(--agl-on-ink-muted);
+  font: inherit; font-size: .88rem; font-weight: 700; line-height: 1.4; cursor: pointer; transition: background .2s ease, color .2s ease;
+}
+.agl-real-switch button:hover { color: #fff; }
+.agl-real-switch button[aria-checked="true"] { background: #fff; color: var(--agl-ink); box-shadow: 0 6px 16px -10px rgba(0, 0, 0, .6); }
+.agl-real-switch button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.agl-real-top { display: flex; align-items: center; gap: .8rem; min-width: 0; padding: 0 .2rem; }
+.agl-real-face { flex: 0 0 auto; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px rgba(255, 255, 255, .16); background: var(--agl-ink-2); }
+.agl-real-face img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* The name and the business each on their own line, never cut (Arabic letters need their room). */
+.agl-real-who { display: grid; gap: .15rem; min-width: 0; flex: 1 1 auto; line-height: 1.45; }
+.agl-real-who b { font-size: 1.02rem; font-weight: 700; color: #fff; }
+.agl-real-who span { font-size: .84rem; color: var(--agl-on-ink-muted); overflow-wrap: anywhere; }
+.agl-real-dialect { flex: 0 1 auto; padding: .3rem .7rem; border-radius: 999px; background: rgba(255, 255, 255, .08); color: var(--agl-on-ink); font-size: .78rem; font-weight: 600; line-height: 1.5; text-align: center; }
+
+.agl-real-stage { position: relative; display: grid; justify-items: center; gap: .85rem; padding: .2rem 0; }
+.agl-real-orb { --orb-size: clamp(120px, 14vw, 160px); width: var(--orb-size); height: var(--orb-size); }
+.agl-real-play {
+  display: inline-flex; align-items: center; gap: .65rem; min-height: 50px; padding: .4rem 1.2rem .4rem .45rem; padding-inline: .45rem 1.25rem;
+  border: 0; border-radius: 999px; background: #fff; color: var(--agl-ink); font: inherit; font-size: 1rem; font-weight: 700; cursor: pointer;
+  box-shadow: 0 10px 24px -12px rgba(0, 0, 0, .45); transition: transform .2s var(--agl-ease), box-shadow .2s ease;
+}
+.agl-real-play:hover { transform: translateY(-1px); box-shadow: 0 14px 30px -12px rgba(0, 0, 0, .5); }
+.agl-real-play:active { transform: scale(.97); }
+.agl-real-play:focus-visible { outline: 3px solid color-mix(in srgb, #fff 55%, transparent); outline-offset: 3px; }
+.agl-real-play[disabled] { opacity: .7; cursor: progress; }
+.agl-real-play-icon { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--a); color: #fff; }
+.agl-real-play-icon svg { width: 16px; height: 16px; fill: currentColor; }
+/* The play arrow points the same way in Arabic and English, a touch to the right to look centred. */
+.agl-real-play-icon .is-play { transform: translateX(1px); }
+.agl-real-play-icon .is-pause { display: none; }
+.agl-real-play[aria-pressed="true"] .is-play { display: none; }
+.agl-real-play[aria-pressed="true"] .is-pause { display: block; }
+.agl-real-progress { width: min(240px, 64%); height: 3px; border-radius: 999px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+.agl-real-progress i { display: block; height: 100%; width: 0; border-radius: inherit; background: #fff; }
+
+/* The call's lines, like a messenger: the agent on the start side, the caller on the end side.
+   A steady height; once it fills, the newest line stays in sight and older ones fade at the top. */
+.agl-real-lines {
+  list-style: none; margin: 0; padding: .3rem .1rem 0; display: flex; flex-direction: column; gap: .5rem;
+  height: 17rem; overflow: hidden; scroll-behavior: smooth;
+}
+.agl-real:not(.is-playing):not(.is-done) .agl-real-lines {
+  -webkit-mask-image: linear-gradient(to top, transparent 0, #000 3rem); mask-image: linear-gradient(to top, transparent 0, #000 3rem);
+}
+.agl-real.is-playing .agl-real-lines.is-full, .agl-real.is-done .agl-real-lines.is-full {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 2.2rem); mask-image: linear-gradient(to bottom, transparent 0, #000 2.2rem);
+}
+.agl-real-line { flex: 0 0 auto; max-width: 84%; padding: .62rem .9rem; border-radius: 18px; opacity: 0; transform: translateY(8px); transition: opacity .4s var(--agl-ease), transform .45s var(--agl-ease); }
+.agl-real-line.is-shown { opacity: 1; transform: none; }
+.agl-real-line p { margin: 0; font-size: .98rem; line-height: 1.75; text-wrap: pretty; }
+.agl-real-line.is-agent { align-self: flex-start; background: rgba(255, 255, 255, .09); border: 1px solid rgba(255, 255, 255, .1); border-start-start-radius: 6px; }
+.agl-real-line.is-caller { align-self: flex-end; background: #fff; color: var(--agl-ink); border-start-end-radius: 6px; }
+/* Each word lights when it is said. */
+.agl-real-w { transition: opacity .25s ease; }
+.agl-real.is-playing .agl-real-line.is-agent .agl-real-w { opacity: .4; }
+.agl-real.is-playing .agl-real-line.is-agent .agl-real-w.is-said { opacity: 1; }
+
+/* What the business is left with: a saved contact, the number left to right. */
+.agl-real-result {
+  display: flex; align-items: flex-start; gap: .75rem; padding: .85rem 1rem; border-radius: 18px;
+  background: color-mix(in srgb, var(--agl-ok) 12%, transparent); border: 1px solid color-mix(in srgb, var(--agl-ok) 30%, transparent);
+  transition: opacity .4s ease, transform .45s var(--agl-ease);
+}
+.agl-real-result-icon { flex: 0 0 auto; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--agl-ok); color: #0c2a1d; margin-top: .1rem; }
+.agl-real-result-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.agl-real-result-body { display: grid; gap: .2rem; min-width: 0; line-height: 1.5; }
+.agl-real-result-body b { color: #fff; font-size: .95rem; }
+.agl-real-contact { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .8rem; margin: 0; color: var(--agl-on-ink); font-size: .9rem; font-weight: 600; }
+.agl-real-contact bdi { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.agl-real-result-note { margin: 0; color: var(--agl-on-ink-muted); font-size: .86rem; }
+.agl-real.is-playing:not(.is-done) .agl-real-result { opacity: 0; transform: translateY(8px); }
+.agl-real-note { margin: 0; font-size: .78rem; line-height: 1.6; color: var(--agl-on-ink-muted); text-align: center; }
+
+@media (max-width: 560px) {
+  .agl-real-top { flex-wrap: wrap; }
+  .agl-real-dialect { order: 3; }
+  .agl-real-line { max-width: 90%; }
+  .agl-real-lines { height: 19rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agl-real-line, .agl-real-result, .agl-real-w, .agl-real-play { transition: none; }
+}
+
+/* ---------- The Agents page's real call: wide, the voice on one side and the words on the other. ---------- */
+.agl-real-wrap .agl-real { max-width: 1132px; margin: 0 auto; }
+@media (min-width: 900px) {
+  .agl-real.is-wide { grid-template-columns: minmax(0, 340px) minmax(0, 1fr); grid-template-rows: auto 1fr auto auto; column-gap: clamp(1.5rem, 3vw, 2.6rem); padding: clamp(1.4rem, 2.6vw, 2rem); }
+  .agl-real.is-wide .agl-real-top { grid-column: 1 / -1; }
+  .agl-real.is-wide .agl-real-stage { grid-column: 1; grid-row: 2 / span 3; align-content: center; padding: 1.2rem 0; border-inline-end: 1px solid rgba(255, 255, 255, .08); }
+  .agl-real.is-wide .agl-real-orb { --orb-size: 200px; }
+  .agl-real.is-wide .agl-real-lines { grid-column: 2; height: 21rem; }
+  .agl-real.is-wide .agl-real-result, .agl-real.is-wide .agl-real-note { grid-column: 2; }
+  .agl-real.is-wide .agl-real-note { text-align: start; }
+}
+
+/* The face visual (a page whose one orb is elsewhere): the agent's photo, with rings that follow her voice. */
+.agl-real.has-face .agl-real-face { display: none; }
+.agl-real-avatar { --agl-lvl: 0; position: relative; display: grid; place-items: center; width: 176px; height: 176px; }
+.agl-real-avatar img { position: relative; z-index: 1; width: 128px; height: 128px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px rgba(255, 255, 255, .16), 0 18px 40px -16px rgba(0, 0, 0, .55); }
+.agl-real-avatar i {
+  position: absolute; inset: 18px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--a) 62%, #fff);
+  opacity: calc(.18 + var(--agl-lvl) * .7); transform: scale(calc(1 + var(--agl-lvl) * .3));
+  transition: transform .09s linear, opacity .09s linear;
+}
+.agl-real-avatar i + i { inset: 2px; border-color: color-mix(in srgb, var(--a) 40%, transparent); opacity: calc(.1 + var(--agl-lvl) * .5); transform: scale(calc(1 + var(--agl-lvl) * .48)); }
+@media (min-width: 900px) {
+  .agl-real.is-wide .agl-real-avatar { width: 220px; height: 220px; }
+  .agl-real.is-wide .agl-real-avatar img { width: 156px; height: 156px; }
+}
+@media (prefers-reduced-motion: reduce) { .agl-real-avatar i { transition: none; transform: none; } }
+/* ---------- The homepage's section: the words beside the call. ---------- */
+.agl-home-grid { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: clamp(1.8rem, 4.5vw, 4rem); align-items: center; }
+.agl-home-copy { text-align: start; }
+.agl-home-copy h2 { font-size: clamp(2rem, 3.8vw, 3rem); font-weight: 800; line-height: 1.12; max-width: 15ch; text-wrap: balance; text-align: start; }
+html[dir="rtl"] .agl-home-copy h2 { line-height: 1.4; }
+.agl-home-copy .section-lead { margin: 1rem 0 0; max-width: 46ch; text-align: start; }
+.agl-home-facts span { text-wrap: pretty; }
+.agl-home-facts { list-style: none; margin: 1.5rem 0 0; padding: 0; display: grid; gap: .8rem; }
+.agl-home-facts li { display: flex; align-items: flex-start; gap: .7rem; font-size: 1rem; line-height: 1.55; color: var(--text); }
+.agl-home-facts svg { flex: 0 0 auto; width: 22px; height: 22px; margin-top: .1rem; padding: 3px; border-radius: 8px; background: var(--agl-soft-2); color: var(--accent-text); fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.agl-home-copy .agl-cta-row { margin-top: 1.8rem; }
+@media (max-width: 920px) {
+  .agl-home-grid { grid-template-columns: minmax(0, 1fr); }
+  .agl-home-copy h2 { max-width: 20ch; }
+}
 
 /* ---------- The homepage's Agents section. ---------- */
 .agl-home { max-width: 1180px; margin: 0 auto; }
@@ -279,200 +423,40 @@ html:has(.agl) { scroll-behavior: smooth; }
 @keyframes agl-eq { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.55); } }
 @keyframes agl-ring { 0% { opacity: .9; transform: scale(.96); } 100% { opacity: 0; transform: scale(1.14); } }
 
-@media (max-width: 1020px) {
-  .agl-bento-call, .agl-bento-stats { grid-column: span 6; }
-  .agl-bento-call { min-height: 0; }
+
+@keyframes agl-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 1080px) {
+  .agl-track { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .agl-flow { grid-template-columns: minmax(0, 1fr) 90px auto; row-gap: 1.2rem; }
   .agl-flow-out { display: none; }
   .agl-flow-call { grid-column: 1 / -1; }
 }
 @media (max-width: 920px) {
-  .agl-hero, .agl-calls, .agl-how-grid, .agl-head-split { grid-template-columns: minmax(0, 1fr); }
-  .agl-hero h1 { max-width: 16ch; }
-  .agl-how-frame { display: none; }
-  .agl-how-step { min-height: 0; opacity: 1; border-color: var(--line); padding-bottom: 2.2rem; }
-  .agl-how-inline { display: block; }
+  .agl-hero, .agl-does-grid, .agl-price, .agl-inbox { grid-template-columns: minmax(0, 1fr); }
+  .agl-hero-call .agl-real { margin-inline: auto; }
+  .agl-speaks { grid-template-columns: minmax(0, 1fr); }
+  .agl-inbox-list { border-inline-end: 0; border-bottom: 1px solid var(--line); }
 }
 @media (max-width: 640px) {
-  .agl-bento-small { grid-column: span 6; }
+  .agl-track, .agl-safe-list { grid-template-columns: minmax(0, 1fr); }
+  .agl-safe-list li:nth-child(-n+2) { border-top: 1px solid var(--line); }
+  .agl-safe-list li:first-child { border-top: 0; }
+  .agl-safe-list li:nth-child(odd) { border-inline-end: 0; }
+  .agl-month-nums { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
   .agl-flow { grid-template-columns: minmax(0, 1fr); }
   .agl-flow-lines { display: none; }
   .agl-flow-sources { height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
   .agl-flow-sources li { height: auto; min-height: 52px; padding: .6rem .7rem; font-size: .82rem; }
   .agl-flow-agent { grid-auto-flow: column; justify-content: start; align-items: center; text-align: start; }
-  .agl-lines { min-height: 260px; }
-  .agl-call-stage { height: 130px; gap: 10px; }
-  .agl-call-stage .orb { --orb-size: 88px; width: 88px; height: 88px; }
-  .agl-wave { gap: 4px; }
   .agl-cta-row .ag-btn { flex: 1 1 100%; }
-  .agl-dialects { gap: .45rem; }
-  .agl-dialect { min-height: 44px; padding: .5rem .95rem; }
-  .agl-price { flex-direction: column; align-items: flex-start; }
+  .agl-inbox-row time { display: none; }
 }
 /* Without motion: everything shows as it ends. */
 @media (prefers-reduced-motion: reduce) {
   .agl *, .agl *::before, .agl *::after { animation: none !important; transition: none !important; }
   html:has(.agl) { scroll-behavior: auto; }
   .agl-js [data-agl-rise] { opacity: 1; transform: none; }
-  .agl-bento-line, .agl-bento-chip, .agl-flow-line { opacity: 1; transform: none; }
-  .agl-bento-bars i { transform: none; }
+  .agl-flow-line { opacity: 1; transform: none; }
+  .agl-month-bars i { transform: none; }
 }
-
-/* ---------- A real call, recorded live (components/agents/real-call). ---------- */
-.agl-real {
-  position: relative; display: grid; gap: 1.1rem; padding: clamp(1.1rem, 2.4vw, 1.6rem);
-  border-radius: var(--agl-r); background: var(--agl-ink); color: var(--agl-on-ink);
-  box-shadow: 0 30px 70px -30px rgba(23, 20, 74, .55); isolation: isolate; min-width: 0;
-}
-.agl-real-top { display: flex; align-items: center; gap: .8rem; min-width: 0; }
-.agl-real-face { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px rgba(255, 255, 255, .14); background: var(--agl-ink-2); }
-.agl-real-face img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.agl-real-who { display: grid; gap: .1rem; min-width: 0; flex: 1 1 auto; }
-.agl-real-who b { font-size: 1rem; font-weight: 700; color: #fff; }
-.agl-real-who small { font-size: .8rem; color: var(--agl-on-ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.agl-real-who small span:not(:empty) + span:not(:empty)::before { content: "·"; margin-inline: .4em; opacity: .7; }
-.agl-real-switch { flex: 0 0 auto; display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .1); }
-.agl-real-switch button {
-  min-height: 34px; padding: .3rem .85rem; border: 0; border-radius: 999px; background: transparent; color: var(--agl-on-ink-muted);
-  font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .2s ease, color .2s ease;
-}
-.agl-real-switch button[aria-checked="true"] { background: #fff; color: var(--agl-ink); }
-.agl-real-switch button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-
-.agl-real-stage { position: relative; display: grid; justify-items: center; gap: .9rem; padding: .4rem 0 .2rem; }
-.agl-real-orb { --orb-size: clamp(120px, 15vw, 168px); width: var(--orb-size); height: var(--orb-size); }
-.agl-real-play {
-  display: inline-flex; align-items: center; gap: .6rem; min-height: 48px; padding: .55rem 1.25rem .55rem .65rem;
-  border: 0; border-radius: 999px; background: #fff; color: var(--agl-ink); font: inherit; font-size: .95rem; font-weight: 700;
-  cursor: pointer; box-shadow: 0 10px 26px -10px rgba(0, 0, 0, .45); transition: transform .2s var(--agl-ease), box-shadow .2s ease;
-}
-html[dir="rtl"] .agl-real-play { padding: .55rem .65rem .55rem 1.25rem; }
-.agl-real-play:hover { transform: translateY(-1px); box-shadow: 0 14px 30px -12px rgba(0, 0, 0, .5); }
-.agl-real-play:active { transform: scale(.97); }
-.agl-real-play:focus-visible { outline: 3px solid color-mix(in srgb, #fff 55%, transparent); outline-offset: 3px; }
-.agl-real-play[disabled] { opacity: .7; cursor: progress; }
-.agl-real-play-icon { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--a); color: #fff; }
-.agl-real-play-icon svg { width: 16px; height: 16px; fill: currentColor; }
-/* The play arrow points the same way in both languages, and sits optically centred. */
-.agl-real-play-icon .is-play { transform: translateX(1px); }
-html[dir="rtl"] .agl-real-play-icon .is-play { transform: translateX(1px); }
-.agl-real-play-icon .is-pause { display: none; }
-.agl-real-play[aria-pressed="true"] .is-play { display: none; }
-.agl-real-play[aria-pressed="true"] .is-pause { display: block; }
-.agl-real-progress { width: min(260px, 70%); height: 3px; border-radius: 999px; background: rgba(255, 255, 255, .14); overflow: hidden; }
-.agl-real-progress i { display: block; height: 100%; width: 0; border-radius: inherit; background: #fff; }
-
-/* A steady height. Lines read from the top, like a chat; once they fill it, the newest stays in
-   sight and older ones move up and fade under the top edge (.is-full). */
-.agl-real-lines {
-  list-style: none; margin: 0; padding: .4rem 0 0; display: flex; flex-direction: column; gap: .6rem;
-  height: 16.5rem; overflow: hidden; scroll-behavior: smooth;
-}
-.agl-real:not(.is-playing):not(.is-done) .agl-real-lines {
-  -webkit-mask-image: linear-gradient(to top, transparent 0, #000 3rem); mask-image: linear-gradient(to top, transparent 0, #000 3rem);
-}
-.agl-real.is-playing .agl-real-lines.is-full, .agl-real.is-done .agl-real-lines.is-full {
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 2.2rem); mask-image: linear-gradient(to bottom, transparent 0, #000 2.2rem);
-}
-.agl-real-line { display: grid; gap: .3rem; max-width: 88%; padding: .7rem .95rem; border-radius: 18px; opacity: 0; transform: translateY(8px); transition: opacity .45s var(--agl-ease), transform .45s var(--agl-ease); }
-.agl-real-line.is-shown { opacity: 1; transform: none; }
-.agl-real-line p { margin: 0; font-size: 1rem; line-height: 1.75; text-wrap: pretty; }
-.agl-real-line small { font-size: .82rem; line-height: 1.5; color: var(--agl-on-ink-muted); }
-/* The agent on the start side, the caller on the end side (whatever the page's direction). */
-.agl-real-line.is-agent { justify-self: start; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .1); border-start-start-radius: 6px; }
-.agl-real-line.is-caller { justify-self: end; background: #fff; color: var(--agl-ink); border-start-end-radius: 6px; }
-.agl-real-line.is-caller small { color: color-mix(in srgb, var(--agl-ink) 62%, transparent); }
-/* Each word lights as it is said. */
-.agl-real-w { transition: color .18s ease, opacity .18s ease; }
-.agl-real.is-playing .agl-real-line.is-agent .agl-real-w { opacity: .42; }
-.agl-real.is-playing .agl-real-line.is-agent .agl-real-w.is-said { opacity: 1; color: #fff; }
-
-.agl-real-result {
-  display: flex; align-items: center; flex-wrap: wrap; gap: .25rem .6rem; margin: 0; padding: .7rem .9rem; border-radius: 14px;
-  background: color-mix(in srgb, var(--agl-ok) 16%, transparent); border: 1px solid color-mix(in srgb, var(--agl-ok) 40%, transparent);
-  font-size: .9rem; line-height: 1.45; transition: opacity .5s var(--agl-ease), transform .5s var(--agl-ease);
-}
-.agl-real-result b { color: #fff; }
-.agl-real-result span:last-child { color: var(--agl-on-ink-muted); unicode-bidi: plaintext; }
-.agl-real-result-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--agl-ok); color: #0c2a1d; }
-.agl-real-result-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-/* While it plays, what the business is left with waits for the end. */
-.agl-real.is-playing:not(.is-done) .agl-real-result { opacity: 0; transform: translateY(8px); }
-.agl-real-note { margin: 0; font-size: .78rem; color: var(--agl-on-ink-muted); text-align: center; }
-
-@media (max-width: 560px) {
-  .agl-real-top { flex-wrap: wrap; }
-  .agl-real-switch { order: 3; width: 100%; justify-content: stretch; }
-  .agl-real-switch button { flex: 1 1 0; }
-  .agl-real-line { max-width: 94%; }
-  .agl-real-lines { height: 19rem; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .agl-real-line, .agl-real-result, .agl-real-w, .agl-real-play { transition: none; }
-}
-
-/* ---------- The homepage's section: the words beside the call. ---------- */
-.agl-home-grid { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: clamp(1.8rem, 4.5vw, 4rem); align-items: center; }
-.agl-home-copy { text-align: start; }
-.agl-home-copy h2 { font-size: clamp(2rem, 3.8vw, 3rem); font-weight: 800; line-height: 1.12; max-width: 15ch; text-wrap: balance; text-align: start; }
-html[dir="rtl"] .agl-home-copy h2 { line-height: 1.4; }
-.agl-home-copy .section-lead { margin: 1rem 0 0; max-width: 46ch; text-align: start; }
-.agl-home-facts span { text-wrap: pretty; }
-.agl-home-facts { list-style: none; margin: 1.5rem 0 0; padding: 0; display: grid; gap: .8rem; }
-.agl-home-facts li { display: flex; align-items: flex-start; gap: .7rem; font-size: 1rem; line-height: 1.55; color: var(--text); }
-.agl-home-facts svg { flex: 0 0 auto; width: 22px; height: 22px; margin-top: .1rem; padding: 3px; border-radius: 8px; background: var(--agl-soft-2); color: var(--accent-text); fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.agl-home-copy .agl-cta-row { margin-top: 1.8rem; }
-@media (max-width: 920px) {
-  .agl-home-grid { grid-template-columns: minmax(0, 1fr); }
-  .agl-home-copy h2 { max-width: 20ch; }
-}
-
-/* ---------- The Agents page's real call: wide, the voice on one side and the words on the other. ---------- */
-.agl-real-wrap .agl-real { max-width: 1132px; margin: 0 auto; }
-@media (min-width: 900px) {
-  .agl-real.is-wide { grid-template-columns: minmax(0, 340px) minmax(0, 1fr); grid-template-rows: auto 1fr auto auto; column-gap: clamp(1.5rem, 3vw, 2.6rem); padding: clamp(1.4rem, 2.6vw, 2rem); }
-  .agl-real.is-wide .agl-real-top { grid-column: 1 / -1; }
-  .agl-real.is-wide .agl-real-stage { grid-column: 1; grid-row: 2 / span 3; align-content: center; padding: 1.2rem 0; border-inline-end: 1px solid rgba(255, 255, 255, .08); }
-  .agl-real.is-wide .agl-real-orb { --orb-size: 200px; }
-  .agl-real.is-wide .agl-real-lines { grid-column: 2; height: 21rem; }
-  .agl-real.is-wide .agl-real-result, .agl-real.is-wide .agl-real-note { grid-column: 2; }
-  .agl-real.is-wide .agl-real-note { text-align: start; }
-}
-
-/* ---------- Safe by design: six promises in one panel, divided by fine lines. ---------- */
-.agl-safe-list {
-  list-style: none; margin: 0 auto; padding: 0; max-width: 1132px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px; border-radius: var(--agl-r); overflow: hidden; background: var(--line); border: 1px solid var(--line);
-}
-.agl-safe-list li { display: grid; align-content: start; gap: .55rem; padding: clamp(1.2rem, 2.4vw, 1.7rem); background: var(--surface); }
-.agl-safe-list h3 { font-size: 1.02rem; font-weight: 700; line-height: 1.35; }
-.agl-safe-list p { color: var(--muted); font-size: .93rem; line-height: 1.65; text-wrap: pretty; }
-.agl-safe-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--agl-soft); color: var(--accent-text); margin-bottom: .3rem; }
-.agl-safe-icon svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-@media (max-width: 900px) { .agl-safe-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .agl-safe-list { grid-template-columns: minmax(0, 1fr); } }
-
-/* ---------- What it costs: the rate in words and the plans that include agents. ---------- */
-.agl-price { align-items: center; }
-.agl-price-copy { flex: 1 1 22rem; min-width: 0; }
-.agl-price .agl-price-free { margin-top: .35rem; font-size: .88rem; }
-.agl-price-plans { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; flex: 1 1 20rem; min-width: 0; }
-.agl-price-plans li { display: flex; align-items: baseline; justify-content: space-between; gap: .4rem 1rem; flex-wrap: wrap; padding: .65rem .9rem; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
-.agl-price-plans b { font-weight: 700; }
-.agl-price-plans span { color: var(--muted); font-size: .9rem; }
-
-/* The face visual (a page whose one orb is elsewhere): the agent's photo, with rings that follow her voice. */
-.agl-real.has-face .agl-real-face { display: none; }
-.agl-real-avatar { --agl-lvl: 0; position: relative; display: grid; place-items: center; width: 176px; height: 176px; }
-.agl-real-avatar img { position: relative; z-index: 1; width: 128px; height: 128px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px rgba(255, 255, 255, .16), 0 18px 40px -16px rgba(0, 0, 0, .55); }
-.agl-real-avatar i {
-  position: absolute; inset: 18px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--a) 62%, #fff);
-  opacity: calc(.18 + var(--agl-lvl) * .7); transform: scale(calc(1 + var(--agl-lvl) * .3));
-  transition: transform .09s linear, opacity .09s linear;
-}
-.agl-real-avatar i + i { inset: 2px; border-color: color-mix(in srgb, var(--a) 40%, transparent); opacity: calc(.1 + var(--agl-lvl) * .5); transform: scale(calc(1 + var(--agl-lvl) * .48)); }
-@media (min-width: 900px) {
-  .agl-real.is-wide .agl-real-avatar { width: 220px; height: 220px; }
-  .agl-real.is-wide .agl-real-avatar img { width: 156px; height: 156px; }
-}
-@media (prefers-reduced-motion: reduce) { .agl-real-avatar i { transition: none; transform: none; } }

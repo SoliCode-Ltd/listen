@@ -140,6 +140,8 @@ class AgentController extends Controller
             'name' => ['sometimes', 'string', 'max:80'],
             'business_name' => ['sometimes', 'string', 'max:120'],
             'speaker_id' => ['sometimes', 'nullable', 'string', 'max:80'],
+            // The dialect (or English accent) the agent speaks, like the studio's: any speaker can speak it.
+            'dialect' => ['sometimes', 'string', 'max:20'],
             'first_message' => ['sometimes', 'nullable', 'string', 'max:400'],
             'knowledge' => ['sometimes', 'nullable', 'string', 'max:40000'],
             'script' => ['sometimes', 'array'],
@@ -175,8 +177,17 @@ class AgentController extends Controller
             'appearance.title' => ['nullable', 'string', 'max:60'],
             'appearance.subtitle' => ['nullable', 'string', 'max:80'],
             'appearance.font' => ['nullable', 'in:system,rounded,site'],
+            'appearance.ready_text' => ['nullable', 'string', 'max:60'],
+            'appearance.ready_show' => ['nullable', 'boolean'],
         ]);
 
+        if (array_key_exists('dialect', $data)) {
+            $known = $agent->language === 'en' ? \App\Support\EnglishAccents::ALL : ArabicDialects::ALL;
+            if (! isset($known[$data['dialect']])) {
+                return response()->json(['message' => __('agents.error_dialect')], 422);
+            }
+            $agent->dialect = $data['dialect'];
+        }
         if (array_key_exists('speaker_id', $data)) {
             $voice = $data['speaker_id'] ? AgentVoices::find($data['speaker_id'], $agent->language, false) : null;
             $agent->speaker_id = $voice['id'] ?? null;
@@ -220,7 +231,7 @@ class AgentController extends Controller
             }
             $agent->status = $data['status'];
         }
-        $setupChanged = $agent->isDirty(['name', 'business_name', 'first_message', 'knowledge', 'choices', 'script']);
+        $setupChanged = $agent->isDirty(['name', 'business_name', 'first_message', 'knowledge', 'choices', 'script', 'dialect']);
         $agent->save();
         // A live agent whose setup changed is checked again in the background (paused if it now
         // deceives or harms callers).
@@ -240,7 +251,7 @@ class AgentController extends Controller
         if (isset($data['appearance'])) {
             // Text fields may be emptied (back to the default words); the rest only change when sent.
             $look = array_merge($widget->appearance ?? [], array_filter($data['appearance'], fn ($v) => $v !== null));
-            foreach (['label', 'title', 'subtitle'] as $k) {
+            foreach (['label', 'title', 'subtitle', 'ready_text'] as $k) {
                 if (array_key_exists($k, $data['appearance']) && blank($data['appearance'][$k])) {
                     $look[$k] = null;
                 }

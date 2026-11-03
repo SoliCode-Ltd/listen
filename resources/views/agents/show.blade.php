@@ -1,4 +1,6 @@
 @include('components.page-head', ['pageTitle' => $agent->name.' · '.__('agents.title'), 'page' => 'agents'])
+  {{-- The studio's dialect panel (the agent's dialect is picked as in the studio). --}}
+  <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
   <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
 </head>
 <body>
@@ -19,9 +21,37 @@
     $dailyLabels = array_map(fn ($v) => $v === 0 ? __('agents.edit_daily_off') : trans_choice('agents.edit_daily_value', $v, ['count' => $v]), $dailySteps);
     $suspended = $agent->setting('suspended');
     $blocked = $agent->setting('review.verdict') === 'block' ? (string) $agent->setting('review.reason') : null;
+    // What the agent speaks, chosen like the studio's dialect: any voice speaks it.
+    $arabicUi = app()->getLocale() === 'ar';
+    $english = $agent->language === 'en';
+    $speaks = $english ? \App\Support\EnglishAccents::ALL : \App\Support\ArabicDialects::ALL;
+    $speaksCode = isset($speaks[$agent->dialect ?? '']) ? $agent->dialect : ($english ? 'en-US' : 'ar-XA-WH');
+    $speaksLabel = $speaks[$speaksCode][$arabicUi ? 'ar' : 'en'] ?? '';
   @endphp
 
-  <main class="ag" id="agents">
+  <main class="ag ag-agent" id="agents">
+   <div class="ag-layout">
+    {{-- The agent's sections, in a side menu like the studio's (a strip of tabs on phones). --}}
+    <aside class="ag-side">
+      <nav class="ag-tabs" role="tablist" aria-label="{{ $agent->name }}">
+        @php
+          $tabIcons = [
+            'overview' => '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>',
+            'setup' => '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+            'knowledge' => '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5"/>',
+            'design' => '<path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.8 1.6-1.6 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-4.1-4-7.4-9-7.4z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/>',
+            'live' => '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5z"/>',
+            'conversations' => '<path d="M20 12a7.5 7.5 0 0 1-11 6.6L4 20l1.4-4.4A7.5 7.5 0 1 1 20 12z"/>',
+            'customers' => '<circle cx="9" cy="8" r="3.5"/><path d="M2.8 20a6.4 6.4 0 0 1 12.4 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14a6.4 6.4 0 0 1 2.7 6"/>',
+          ];
+        @endphp
+        @foreach(['overview', 'setup', 'knowledge', 'design', 'live', 'conversations', 'customers'] as $tab)
+          @php $n = ['conversations' => $conversations->count(), 'customers' => $stats['contacts']][$tab] ?? 0; @endphp
+          <button type="button" role="tab" class="ag-tab" data-ag-tab="{{ $tab }}"><svg viewBox="0 0 24 24" aria-hidden="true">{!! $tabIcons[$tab] !!}</svg><span>{{ __('agents.tabs.'.$tab) }}</span>@if($n > 0)<small class="ag-tab-count">{{ $n > 99 ? '99+' : $n }}</small>@endif</button>
+        @endforeach
+      </nav>
+    </aside>
+    <div class="ag-main">
     {{-- What needs the owner now: Listen suspended it, the check paused it, or callers could not reach it today. --}}
     @if($suspended)
       <p class="ag-notice is-bad" role="alert">{{ __('agents.suspended_note', ['reason' => rtrim((string) ($suspended['reason'] ?? ''), '.').'.']) }}</p>
@@ -44,7 +74,7 @@
         <p class="ag-hero-meta">
           <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>{{ $agent->business_name }}</span>
           @if($voice)
-            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.voice_of', ['name' => $voice['name']]) }}@if($voice['dialect_label'] !== '')<small>{{ $voice['dialect_label'] }}</small>@endif</span>
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.voice_of', ['name' => $voice['name']]) }}@if($speaksLabel !== '')<small data-ag-speaks-label>{{ $speaksLabel }}</small>@endif</span>
           @endif
         </p>
       </div>
@@ -63,12 +93,6 @@
       </div>
     </section>
 
-    <nav class="ag-tabs" role="tablist" aria-label="{{ $agent->name }}">
-      @foreach(['overview', 'setup', 'knowledge', 'design', 'live', 'conversations', 'customers'] as $tab)
-        @php $n = ['conversations' => $conversations->count(), 'customers' => $stats['contacts']][$tab] ?? 0; @endphp
-        <button type="button" role="tab" class="ag-tab" data-ag-tab="{{ $tab }}">{{ __('agents.tabs.'.$tab) }}@if($n > 0)<small class="ag-tab-count">{{ $n > 99 ? '99+' : $n }}</small>@endif</button>
-      @endforeach
-    </nav>
 
     {{-- Overview: next steps, this month, and talking to it. --}}
     <section class="ag-panel" data-ag-panel="overview">
@@ -140,12 +164,18 @@
             </div>
           </div>
           <div class="ag-setting">
+            <div class="ag-setting-label"><span class="ag-label" id="ag-dialect-label">{{ $english ? __('agents.accent_label') : __('agents.dialect_label') }}</span><p>{{ $english ? __('agents.accent_page_hint') : __('agents.dialect_page_hint') }}</p></div>
+            <div class="ag-setting-control ag-speaks">
+              @include('agents.partials.speaks-pick', ['id' => 'ag-dialect', 'labelId' => 'ag-dialect-label', 'english' => $english, 'value' => $speaksCode, 'faces' => collect($voices)->pluck('avatar')->filter()->take(3)->all()])
+            </div>
+          </div>
+          <div class="ag-setting">
             <div class="ag-setting-label"><span class="ag-label">{{ __('agents.voice_heading') }}</span><p>{{ __('agents.voice_hint') }}</p></div>
             <details class="ag-voice-pick">
               <summary>
                 <span class="ag-voice-current">
                   @if($voice && $voice['avatar'])<img src="{{ $voice['avatar'] }}" alt="" width="40" height="40">@endif
-                  <span><b data-ag-voice-name>{{ $voice['name'] ?? '' }}</b><small data-ag-voice-dialect>{{ $voice['dialect_label'] ?? '' }}</small></span>
+                  <span><b data-ag-voice-name>{{ $voice['name'] ?? '' }}</b><small data-ag-speaks-label>{{ $speaksLabel }}</small></span>
                 </span>
                 <em class="ag-voice-change">{{ __('agents.voice_change') }}</em>
               </summary>
@@ -311,6 +341,8 @@
         </div>
       @endif
     </section>
+    </div>
+   </div>
     <div class="ag-toast" data-ag-toast role="status" aria-live="polite"></div>
   </main>
 
@@ -369,7 +401,7 @@
         'correct' => __('agents.talk_correct'), 'correct_placeholder' => __('agents.talk_correct_placeholder'),
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
         'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'),
-        'play' => __('agents.voice_play'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
+        'play' => __('agents.voice_play'), 'pause' => __('agents.voice_pause'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
         'status' => __('agents.status'),
         'files' => __('agents.files'),
         'balance' => ['upgrade' => __('agents.balance.upgrade')],
@@ -382,6 +414,9 @@
   <script src="{{ asset('js/vendor/qrcode.js') }}?v={{ filemtime(public_path('js/vendor/qrcode.js')) }}" defer></script>
   <script src="{{ asset('js/agent-call.js') }}?v={{ filemtime(public_path('js/agent-call.js')) }}" defer></script>
   <script src="{{ asset('js/agent-widget.js') }}?v={{ filemtime(public_path('js/agent-widget.js')) }}" defer></script>
+  @include('agents.partials.speaks-meta', ['english' => $english])
+  <script src="{{ asset('js/voice-studio-icons.js') }}?v={{ filemtime(public_path('js/voice-studio-icons.js')) }}" defer></script>
+  <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
   <script src="{{ asset('js/agents.js') }}?v={{ filemtime(public_path('js/agents.js')) }}" defer></script>
 </body>
 </html>

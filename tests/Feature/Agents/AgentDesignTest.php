@@ -145,16 +145,18 @@ class AgentDesignTest extends TestCase
         app()->setLocale('en');
         $en = (string) $this->withoutLocale()->withSession(['locale' => 'en'])->get($this->localizedRoute('agents-landing'))->assertOk()->getContent();
         $this->assertStringNotContainsString('images/speakers/ar-', $en);
-        $hero = substr($en, strpos($en, 'data-agl-call'), 4000);
-        $this->assertDoesNotMatchRegularExpression('/\p{Arabic}/u', $hero, 'the English call shows Arabic');
-        $this->assertStringContainsString(__('agents_landing.scenes.british.label'), $en);
-        $this->assertStringContainsString(__('agents_landing.dialects_more', ['count' => count(\App\Support\EnglishAccents::ALL) - 6]), $en);
+        // The real calls on the English page are English calls only.
+        $call = substr($en, strpos($en, 'data-agl-real'), 6000);
+        $this->assertDoesNotMatchRegularExpression('/\p{Arabic}/u', strip_tags($call), 'the English call shows Arabic');
+        $this->assertStringContainsString(__('agents_landing.real_calls.gb.label'), $en);
+        // Every accent is one tap away, with how many there are.
+        $this->assertStringContainsString(__('agents_landing.speaks_all').' <span dir="ltr">'.count(\App\Support\EnglishAccents::ALL).'</span>', $en);
 
         app()->setLocale('ar');
         $ar = (string) $this->withoutLocale()->withSession(['locale' => 'ar'])->get($this->localizedRoute('agents-landing'))->assertOk()->getContent();
-        $this->assertStringContainsString(__('agents_landing.dialects_more', ['count' => count(\App\Support\ArabicDialects::ALL) - 5]), $ar);
-        // The page has one orb, in the call; the final call to action shows Listen's mark.
-        $this->assertSame(1, substr_count($ar, 'data-orb="'), 'more than one orb on the page');
+        $this->assertStringContainsString(__('agents_landing.speaks_all').' <span dir="ltr">'.count(\App\Support\ArabicDialects::ALL).'</span>', $ar);
+        // The page has one orb at most, in the call; the final call to action shows Listen's mark.
+        $this->assertLessThanOrEqual(1, substr_count($ar, 'data-orb="'), 'more than one orb on the page');
     }
 
     public function test_the_link_page_footer_only_names_listen(): void

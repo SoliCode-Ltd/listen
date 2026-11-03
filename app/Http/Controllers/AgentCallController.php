@@ -81,7 +81,8 @@ class AgentCallController extends Controller
                 'subtitle' => $look['subtitle'] ?: trans(($voice['gender'] ?? null) === 'female' ? 'agents.widget_subtitle_female' : 'agents.widget_subtitle', [], $locale),
                 'start' => trans('agents.talk_start', [], $locale),
                 'end' => trans('agents.talk_end', [], $locale),
-                'states' => $this->states($agent, $voice, $locale),
+                // The line under the orb before a call: the owner's own words when set.
+                'states' => array_merge($this->states($agent, $voice, $locale), $look['ready_text'] ? ['idle' => $look['ready_text']] : []),
                 'mic' => trans('agents.talk_mic_blocked', [], $ar ? 'ar' : 'en'),
                 'paused' => trans('agents.error_paused', [], $ar ? 'ar' : 'en'),
                 'powered' => trans('agents.powered', [], $ar ? 'ar' : 'en'),

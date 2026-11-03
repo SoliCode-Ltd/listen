@@ -140,7 +140,7 @@ class AgentPlansTest extends TestCase
     public function test_owners_see_call_time_left_and_what_happens_when_it_runs_out(): void
     {
         $rate = AgentAccess::creditsPerMinute();
-        $this->assertSame(1800, $rate, 'a call minute uses two audio minutes of credits');
+        $this->assertSame(8100, $rate, 'a call minute uses nine audio minutes of credits (40% on every plan)');
 
         $owner = $this->owner([], 100 * $rate);
         $balance = AgentBalance::for($owner);
@@ -149,7 +149,8 @@ class AgentPlansTest extends TestCase
 
         $agent = $this->agent($owner);
         $this->actingAs($owner)->getLocalizedRoute('voice-agents.index')->assertOk()
-            ->assertSee(__('agents.balance.title'))->assertSee('data-ag-balance', false)->assertSee('<b dir="ltr">100</b>', false);
+            ->assertSee(__('agents.balance.title'))->assertSee('data-ag-balance', false)->assertSee('<b>100</b>', false)
+            ->assertSee('href="#usage-breakdown"', false);
         $this->actingAs($owner)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk()->assertSee('data-ag-balance', false);
 
         $low = $this->owner([], 8 * $rate);
@@ -160,9 +161,9 @@ class AgentPlansTest extends TestCase
         $this->actingAs($none)->getLocalizedRoute('voice-agents.index')->assertOk()->assertSee(__('agents.balance.state_out'));
 
         // The admin can change the rate.
-        SiteSetting::set('agents_credits_per_minute', '2700', 'agents');
-        $this->assertSame(2700, AgentAccess::creditsPerMinute());
-        $this->assertSame(intdiv(100 * $rate, 2700), AgentBalance::for($owner)['minutes_left']);
+        SiteSetting::set('agents_credits_per_minute', '9000', 'agents');
+        $this->assertSame(9000, AgentAccess::creditsPerMinute());
+        $this->assertSame(intdiv(100 * $rate, 9000), AgentBalance::for($owner)['minutes_left']);
     }
 
     public function test_the_owners_daily_limit_and_the_sites_ceilings_hold(): void
@@ -338,16 +339,47 @@ class AgentPlansTest extends TestCase
         $this->assertLessThan(0.08, AgentCost::typical());
         $this->assertLessThan(0.16, AgentCost::heavy());
 
-        $plan = Plan::factory()->create(['slug' => 'pro-x', 'name' => 'Pro', 'price_cents' => 4900, 'monthly_chars' => 450000, 'is_active' => true,
+        $plan = Plan::factory()->create(['slug' => 'pro-x', 'name' => 'Pro', 'price_cents' => 4900, 'monthly_chars' => 4500000, 'is_active' => true,
             'agents_enabled' => true, 'agents_max' => 5, 'agent_minutes_per_month' => 0]);
-        $this->assertSame('5 agents, up to 250 call minutes', PlanPricingLines::value($plan, 'voice_agents', 'en'));
+        $minutes = intdiv(4500000, \App\Support\Agents\AgentAccess::creditsPerMinute());
+        $this->assertSame('5 agents, up to '.number_format($minutes).' call minutes', PlanPricingLines::value($plan, 'voice_agents', 'en'));
         $plan->agent_minutes_per_month = 100;
         $this->assertSame('5 agents, up to 100 call minutes', PlanPricingLines::value($plan, 'voice_agents', 'en'));
         $plan->agents_enabled = false;
         $this->assertNull(PlanPricingLines::value($plan, 'voice_agents', 'en'));
 
         $row = collect(AgentCost::plans())->firstWhere('plan', 'Pro');
-        $this->assertSame(250, $row['minutes']);
-        $this->assertGreaterThan(50, $row['typical_margin']);
+        $this->assertSame($minutes, $row['minutes']);
+        $this->assertGreaterThanOrEqual(40, $row['typical_margin']);
+    }
+
+    public function test_no_call_earns_less_than_forty_percent_on_the_cheapest_plan(): void
+    {
+        // The plan whose credits cost the least sets what a dollar of call cost must take.
+        Plan::factory()->create(['slug' => 'pro-y', 'name' => 'Pro', 'price_cents' => 4900, 'monthly_chars' => 4000000, 'is_active' => true, 'agents_enabled' => true]);
+        Plan::factory()->create(['slug' => 'small-y', 'name' => 'Small', 'price_cents' => 900, 'monthly_chars' => 22000, 'is_active' => true, 'agents_enabled' => true]);
+        $perDollar = AgentCost::creditsPerDollar();
+        $this->assertSame((int) ceil(1 / (0.6 * 49 / 4000000)), $perDollar);
+
+        $owner = \App\Models\User::factory()->create();
+        $small = \App\Models\Agent::create(['user_id' => $owner->id, 'name' => 'Sara', 'business_name' => 'Cairo Smiles', 'business_type' => 'healthcare',
+            'jobs' => ['answer'], 'language' => 'ar', 'dialect' => 'ar-EG', 'status' => \App\Models\Agent::DRAFT]);
+        $base = \App\Support\Agents\AgentAccess::creditsPerMinute();
+        // A typical agent pays the site's rate; the rate itself keeps the margin on a typical call.
+        $this->assertSame($base, AgentCost::rateFor($small, 180));
+        $earns = $base * 49 / 4000000;
+        $this->assertGreaterThanOrEqual(0.4, ($earns - AgentCost::typical()) / $earns);
+
+        // An agent with a great deal to know, on a long call, pays more, and still keeps the margin.
+        $big = \App\Models\Agent::create(['user_id' => $owner->id, 'name' => 'Big', 'business_name' => 'Big Store', 'business_type' => 'retail',
+            'jobs' => ['answer'], 'language' => 'ar', 'dialect' => 'ar-EG', 'status' => \App\Models\Agent::DRAFT,
+            'knowledge' => str_repeat('أسعارنا ومواعيدنا وخدماتنا كلها مكتوبة هنا بالتفصيل. ', 1200)]);
+        $rate = AgentCost::rateFor($big, 600);
+        $this->assertGreaterThan($base, $rate);
+        $cost = AgentCost::perMinute(10, AgentCost::instructionTokens($big));
+        $earnsBig = $rate * 49 / 4000000;
+        $this->assertGreaterThanOrEqual(0.4, round(($earnsBig - $cost) / $earnsBig, 3));
+        // Charged at the end at that rate, never more than the hold.
+        $this->assertSame((int) ceil(600 * $rate / 60), \App\Services\Agents\AgentCalls::creditsFor(600, $big));
     }
 }

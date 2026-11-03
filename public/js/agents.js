@@ -69,9 +69,11 @@
     var copy = e.target.closest('[data-ag-copy]');
     if (copy) {
       var text = copy.getAttribute('data-ag-copy');
-      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { toast(T.copied); }, function () {
+      // The button says it worked for a moment, as well as the toast.
+      var done = function () { toast(T.copied); copy.classList.add('is-copied'); clearTimeout(copy.__agCopied); copy.__agCopied = setTimeout(function () { copy.classList.remove('is-copied'); }, 1600); };
+      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(done, function () {
         var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); toast(T.copied); } catch (err) {} ta.remove();
+        try { document.execCommand('copy'); done(); } catch (err) {} ta.remove();
       });
     }
     var share = e.target.closest('[data-ag-share]');
@@ -240,9 +242,22 @@
 
   /* ---------- Voices ---------- */
   var audio = null, playingCard = null;
+  var PLAY_ICON = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+  var PAUSE_ICON = '<svg viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>';
+  // The play button shows what a tap will do: pause while its voice plays, play again after.
+  function playState(card, on) {
+    var btn = card && $('.ag-play', card);
+    if (!btn) return;
+    btn.innerHTML = on ? PAUSE_ICON : PLAY_ICON;
+    btn.classList.toggle('is-playing', !!on);
+    card.classList.toggle('is-playing', !!on);
+    var name = btn.getAttribute('data-name') || '';
+    btn.setAttribute('aria-label', fill(on ? (T.pause || T.play) : T.play, { name: name }));
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
   function stopPreview() {
     if (audio) { audio.pause(); audio = null; }
-    if (playingCard) { var ring = $('circle', playingCard); if (ring) ring.style.strokeDashoffset = 289; playingCard = null; }
+    if (playingCard) { var ring = $('circle', playingCard); if (ring) ring.style.strokeDashoffset = 289; playState(playingCard, false); playingCard = null; }
   }
   function voiceGallery(box, lang, onPick) {
     if (!box) return;
@@ -272,16 +287,18 @@
         card.innerHTML =
           '<div class="ag-avatar">' + (v.avatar ? '<img loading="lazy" alt="" src="' + v.avatar + '">' : '<img alt="">') +
           '<svg class="ag-ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46"/></svg>' +
-          (v.preview ? '<button type="button" class="ag-play" aria-label="' + fill(T.play, { name: v.name }) + '"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>' : '') +
+          (v.preview ? '<button type="button" class="ag-play" aria-pressed="false" aria-label="' + fill(T.play, { name: v.name }) + '">' + PLAY_ICON + '</button>' : '') +
           '</div><div class="ag-voice-name"></div><div class="ag-voice-dialect">' + (v.flag ? '<img alt="" src="' + v.flag + '">' : '') + '<span></span></div>';
         $('.ag-voice-name', card).textContent = v.name;
         $('.ag-voice-dialect span', card).textContent = v.dialect_label || '';
         var play = $('.ag-play', card);
+        if (play) play.setAttribute('data-name', v.name);
         if (play) play.addEventListener('click', function (e) {
           e.stopPropagation();
           if (playingCard === card) { stopPreview(); return; }
           stopPreview();
           playingCard = card;
+          playState(card, true);
           audio = new Audio(v.preview);
           var ring = $('circle', card);
           audio.ontimeupdate = function () { if (audio && audio.duration) ring.style.strokeDashoffset = 289 * (1 - audio.currentTime / audio.duration); };
@@ -413,6 +430,7 @@
 
   /* ---------- The setup in four steps ---------- */
   function setup() {
+    speaksPickers();
     var panes = $$('[data-ag-pane]'), links = $$('[data-ag-step-link]'), bar = $('[data-ag-bar]');
     var current = -1, furthest = C.agent ? (C.agent.speaker_id ? 3 : 1) : 0;
     function show(i) {
@@ -551,6 +569,18 @@
     show(isNaN(q) ? (C.agent ? (C.agent.speaker_id ? 2 : 1) : 0) : Math.min(q, furthest));
   }
 
+  /* ---------- The dialect an agent speaks: the studio's own dialect panel ---------- */
+  function speaksPickers() {
+    var node = $('[data-ag-picker-meta]');
+    if (!node || !window.VoiceStudio || !window.VoiceStudio.picker) return;
+    var meta = {};
+    try { meta = JSON.parse(node.textContent || '{}') || {}; } catch (e) { return; }
+    $$('[data-ag-speaks-select]').forEach(function (select) {
+      var button = select.parentNode.querySelector('[data-vs-pick="dialect"]');
+      if (button && !button.hasAttribute('data-ag-ready')) { button.setAttribute('data-ag-ready', ''); window.VoiceStudio.picker(button, select, meta); }
+    });
+  }
+
   /* ---------- An agent's page ---------- */
   function agentPage() {
     var tabs = $$('[data-ag-tab]'), panels = $$('[data-ag-panel]');
@@ -578,7 +608,7 @@
     open((location.hash || '#overview').slice(1));
 
     var talker = talk($('[data-ag-talk]'));
-    voiceGallery($('[data-ag-voices]'), C.agent.language, function (v) {
+    var gallery = voiceGallery($('[data-ag-voices]'), C.agent.language, function (v) {
       api('PATCH', C.agent.urls.update, { speaker_id: v.id }).then(function () {
         C.agent.speaker_id = v.id;
         C.agent.gender = v.gender;
@@ -589,11 +619,27 @@
           var img = $('img', cur), name = $('[data-ag-voice-name]', cur), dialect = $('[data-ag-voice-dialect]', cur);
           if (img && v.avatar) img.src = v.avatar;
           if (name) name.textContent = v.name;
-          if (dialect) dialect.textContent = v.dialect_label || '';
         }
         var face = $('.ag-hero-face img');
         if (face && v.avatar) face.src = v.avatar;
       });
+    });
+    // The dialect (or accent) it speaks, picked in the studio's panel: saved at once; its voices come first.
+    speaksPickers();
+    var speaks = $('[data-ag-speaks-select]');
+    if (speaks) speaks.addEventListener('change', function () {
+      var code = speaks.value, was = C.agent.dialect;
+      var label = (speaks.options[speaks.selectedIndex] || {}).textContent || '';
+      speaks.disabled = true;
+      api('PATCH', C.agent.urls.update, { dialect: code }).then(function () {
+        C.agent.dialect = code;
+        $$('[data-ag-speaks-label]').forEach(function (el) { el.textContent = label; });
+        if (gallery) gallery.setDialect(code);
+        toast(T.saved);
+      }).catch(function (err) {
+        if (was) speaks.value = was;
+        toast(err.message);
+      }).then(function () { speaks.disabled = false; });
     });
 
     $$('[data-ag-status-set]').forEach(function (b) {
@@ -840,6 +886,7 @@
       if (look.label) c.text.label = look.label;
       if (look.title) c.text.title = look.title;
       if (look.subtitle) c.text.subtitle = look.subtitle;
+      if (look.ready_text) c.text.states = Object.assign({}, c.text.states, { idle: look.ready_text });
       return c;
     }
     function draw(rebuild) {
@@ -868,6 +915,8 @@
       look.title = $('[name="title"]', box).value.trim() || null;
       look.subtitle = $('[name="subtitle"]', box).value.trim() || null;
       look.captions = $('[name="captions"]', box).checked;
+      look.ready_text = $('[name="ready_text"]', box).value.trim() || null;
+      look.ready_show = $('[name="ready_show"]', box).checked;
       look.photo = $('[name="photo"]', box).checked;
       look.radius = val('radius') || look.radius;
       look.font = val('font') || look.font;
@@ -886,7 +935,7 @@
       status.textContent = (D.text || {}).saving || '';
       saveTimer = setTimeout(function () {
         var body = {};
-        ['position', 'style', 'theme', 'label', 'icon', 'size', 'shape', 'accent', 'palette', 'radius', 'captions', 'photo', 'title', 'subtitle', 'font'].forEach(function (k) { body[k] = look[k] === null ? '' : look[k]; });
+        ['position', 'style', 'theme', 'label', 'icon', 'size', 'shape', 'accent', 'palette', 'radius', 'captions', 'photo', 'title', 'subtitle', 'font', 'ready_text', 'ready_show'].forEach(function (k) { body[k] = look[k] === null ? '' : look[k]; });
         if (look.palette === 'custom') body.orb_colors = look.orb_colors;
         api('PATCH', C.agent.urls.update, { appearance: body }).then(function () {
           status.textContent = (D.text || {}).saved || '';
@@ -894,26 +943,36 @@
       }, 600);
     }
     var styleBefore = look.style;
+    function pickCustom(e) {
+      if (!e.target.matches('[data-ag-design-color]')) return;
+      // Picking a colour picks "your colour" too, while the picker is still open.
+      var which = e.target.getAttribute('data-ag-design-color');
+      var radio = $('input[name="' + (which === 'accent' ? 'accent' : 'palette') + '"][value="custom"]', box);
+      if (radio) radio.checked = true;
+    }
+    function changed() {
+      read();
+      var restyled = look.style !== styleBefore;
+      draw(restyled);
+      styleBefore = look.style;
+      // The slim bar only shows during a call: picking it plays a pretend call, so it is seen.
+      if (restyled && look.style === 'bar' && widget) { widget.demo(true); setPlaying(true); stopLater(); }
+      save();
+    }
+    var stopTimer = 0;
+    function stopLater() { clearTimeout(stopTimer); stopTimer = setTimeout(function () { if (playing) setPlaying(false); }, 14000); }
     box.addEventListener('input', function (e) {
       if (e.target.name === 'site') return;
-      read();
-      draw(look.style !== styleBefore);
-      styleBefore = look.style;
-      save();
+      pickCustom(e);
+      changed();
     });
     box.addEventListener('change', function (e) {
       if (e.target.name === 'site') { draw(true); return; }
-      if (e.target.matches('[data-ag-design-color]')) {
-        // Picking a colour picks "your colour" too.
-        var which = e.target.getAttribute('data-ag-design-color');
-        var radio = $('input[name="' + (which === 'accent' ? 'accent' : 'palette') + '"][value="custom"]', box);
-        if (radio) radio.checked = true;
-      }
-      read();
-      draw(look.style !== styleBefore);
-      styleBefore = look.style;
-      save();
+      pickCustom(e);
+      changed();
     });
+    var ready = $('[name="ready_text"]', box);
+    if (ready && !ready.placeholder) ready.placeholder = ((D.cfg && D.cfg.text && D.cfg.text.states) || {}).idle || '';
     $('[data-ag-design-reset]', box).addEventListener('click', function () {
       var d = D.defaults;
       ['style', 'icon', 'shape', 'size', 'radius', 'font', 'theme', 'palette'].forEach(function (k) {
@@ -924,8 +983,9 @@
       if (acc) acc.checked = true;
       var corner = $('input[name="corner"][value="' + ((d.position === 'start') === !!D.rtl ? 'right' : 'left') + '"]', box);
       if (corner) corner.checked = true;
-      ['label', 'title', 'subtitle'].forEach(function (k) { $('[name="' + k + '"]', box).value = ''; });
+      ['label', 'title', 'subtitle', 'ready_text'].forEach(function (k) { $('[name="' + k + '"]', box).value = ''; });
       $('[name="captions"]', box).checked = true;
+      $('[name="ready_show"]', box).checked = true;
       $('[name="photo"]', box).checked = true;
       read();
       draw(true);
@@ -936,7 +996,7 @@
       if (!widget) return;
       widget.demo(!playing);
       setPlaying(!playing);
-      if (playing) setTimeout(function () { if (playing) setPlaying(false); }, 14000);
+      if (playing) stopLater();
     });
     read();
     draw(true);

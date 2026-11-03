@@ -20,7 +20,8 @@
     '.lva{position:fixed;bottom:20px;z-index:2147483000;font-family:var(--font);font-size:15px;line-height:1.45;color:var(--text);-webkit-font-smoothing:antialiased;',
     '  --font:system-ui,-apple-system,"Segoe UI",Tahoma,"Noto Sans Arabic","Geeza Pro",Arial,sans-serif;',
     '  --bg:#ffffff;--text:#16132F;--muted:#615C80;--line:rgba(23,20,74,.12);--soft:rgba(23,20,74,.05);--shadow:0 26px 60px -20px rgba(23,20,74,.42),0 2px 8px rgba(23,20,74,.08);',
-    '  --r-card:26px;--r-btn:999px;--h:52px;--ico:38px;--fs:15px}',
+    '  --r-card:26px;--r-btn:999px;--h:52px;--ico:38px;--fs:15px;--room:calc(100vh - var(--h) - 60px)}',
+    '@supports (height:100dvh){.lva{--room:calc(100dvh - var(--h) - 60px)}}',
     '.lva[data-theme="dark"]{--bg:#17142E;--text:#F3F1FF;--muted:#B9B2DD;--line:rgba(255,255,255,.12);--soft:rgba(255,255,255,.06);--shadow:0 26px 60px -20px rgba(0,0,0,.75),0 2px 8px rgba(0,0,0,.35)}',
     '.lva[data-font="rounded"]{--font:ui-rounded,"SF Pro Rounded","Nunito","Varela Round","Tajawal","Noto Sans Arabic",system-ui,sans-serif}',
     '.lva[data-font="site"]{--font:var(--site-font)}',
@@ -39,7 +40,9 @@
     '.lva-launch{display:flex;align-items:center;gap:10px;height:var(--h);padding:0 18px 0 calc((var(--h) - var(--ico)) / 2);border:1px solid var(--line);border-radius:var(--r-btn);background:var(--bg);box-shadow:var(--shadow);font-weight:700;font-size:var(--fs);white-space:nowrap;',
     '  transition:transform .3s ' + EASE + ',box-shadow .3s ease,opacity .25s ease;animation:lva-enter .55s ' + EASE + ' both}',
     '.lva[dir="rtl"] .lva-launch{padding:0 calc((var(--h) - var(--ico)) / 2) 0 18px}',
-    '.lva-launch.is-round{width:var(--h);padding:0;justify-content:center}',
+    '.lva-launch.is-round,.lva[dir="rtl"] .lva-launch.is-round{width:var(--h);padding:0;justify-content:center;background:var(--a);border-color:transparent}',
+    '.lva-launch.is-round .lva-ico{width:100%;height:100%}',
+    '.lva-launch.is-round .lva-ico svg{width:40%;height:40%}',
     '.lva-launch:hover{transform:translateY(-2px);box-shadow:0 30px 64px -20px rgba(23,20,74,.5),0 2px 8px rgba(23,20,74,.1)}',
     '.lva-launch:active{transform:scale(.97)}',
     '.lva-ico{position:relative;display:grid;place-items:center;width:var(--ico);height:var(--ico);border-radius:var(--r-btn);background:var(--a);color:var(--a-ink);flex:0 0 auto;transition:background .3s ease}',
@@ -59,11 +62,11 @@
     '.lva-time{font-variant-numeric:tabular-nums;font-weight:800}',
 
     /* The card. */
-    '.lva-panel{position:absolute;bottom:calc(100% + 14px);width:344px;max-width:calc(100vw - 24px);padding:18px 18px 14px;border-radius:var(--r-card);background:var(--bg);border:1px solid var(--line);box-shadow:var(--shadow);display:grid;gap:12px;',
+    '.lva-panel{position:absolute;bottom:calc(100% + 14px);width:344px;max-width:calc(100vw - 24px);max-height:var(--room);padding:18px 18px 14px;border-radius:var(--r-card);background:var(--bg);border:1px solid var(--line);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;',
     '  transform-origin:bottom var(--side);opacity:0;transform:translateY(12px) scale(.94);pointer-events:none;visibility:hidden;transition:opacity .24s ease,transform .42s ' + EASE + ',visibility 0s linear .42s}',
     '.lva.is-right .lva-panel{right:0}.lva.is-left .lva-panel{left:0}',
     '.lva.is-open .lva-panel{opacity:1;transform:none;pointer-events:auto;visibility:visible;transition:opacity .24s ease,transform .42s ' + EASE + ',visibility 0s}',
-    '.lva-head{display:flex;align-items:center;gap:10px}',
+    '.lva-head{display:flex;align-items:center;gap:10px;flex:none}',
     /* The agent's photo, small, next to its name. */
     '.lva-face{width:42px;height:42px;border-radius:50%;flex:0 0 auto;background:var(--soft);box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--c2)}',
     '.lva-face img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}',
@@ -78,7 +81,7 @@
     '.lva-x svg,.lva-call svg,.lva-mute svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
 
     /* The orb: one, in the middle, moving with the voice. */
-    '.lva-stage{display:grid;place-items:center;height:164px}',
+    '.lva-stage{display:grid;place-items:center;flex:0 3 164px;min-height:118px}',
     '.lva-orbwrap{position:relative;width:112px;height:112px}',
     '.lva-orb{position:absolute;inset:0;border-radius:50%;overflow:hidden;isolation:isolate;',
     '  background:radial-gradient(120% 120% at 32% 24%,var(--c3) 0%,var(--c2) 46%,var(--c1) 100%);',
@@ -104,13 +107,13 @@
     '.lva-state{margin:0;text-align:center;font-weight:700;font-size:15px;min-height:22px;transition:opacity .2s ease}',
     '.lva-state.is-error{color:#D0335F}',
     /* What was said: the last lines, older ones fading at the top. */
-    '.lva-lines{display:grid;gap:6px;max-height:132px;overflow:auto;scrollbar-width:none;padding-top:10px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 16px);mask-image:linear-gradient(to bottom,transparent 0,#000 16px)}',
+    '.lva-lines{display:grid;align-content:start;gap:6px;flex:0 1 auto;min-height:0;max-height:132px;overflow:auto;scrollbar-width:none;padding-top:10px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 16px);mask-image:linear-gradient(to bottom,transparent 0,#000 16px)}',
     '.lva-lines::-webkit-scrollbar{display:none}',
     '.lva-lines:empty{display:none}',
     '.lva-line{padding:8px 12px;border-radius:16px;background:var(--soft);font-size:13.5px;max-width:88%;justify-self:start;animation:lva-in .35s ' + EASE + '}',
     '.lva[data-radius="square"] .lva-line{border-radius:8px}',
     '.lva-line.is-caller{justify-self:end;background:transparent;border:1px solid var(--line)}',
-    '.lva-buttons{display:flex;gap:8px;justify-content:center;align-items:center}',
+    '.lva-buttons{display:flex;gap:8px;justify-content:center;align-items:center;flex:none}',
     '.lva-call{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 24px;border:0;border-radius:var(--r-btn);background:var(--a);color:var(--a-ink) !important;font-weight:800;font-size:15.5px;box-shadow:0 0 0 1px var(--line),0 12px 26px -12px var(--a);transition:background .25s ease,transform .18s ease,box-shadow .25s ease}',
     '.lva-call:hover{background:var(--a-2)}',
     '.lva-call:active{transform:scale(.97)}',
@@ -118,7 +121,7 @@
     '.lva-mute{width:48px;height:48px;border-radius:var(--r-btn);border:1px solid var(--line);background:transparent;display:grid;place-items:center;transition:background .2s ease}',
     '.lva[data-radius="round"] .lva-mute{border-radius:50%}',
     '.lva-mute[aria-pressed="true"]{background:var(--soft);color:var(--a)}',
-    '.lva-powered{justify-self:center;display:inline-block;padding:4px 10px;color:var(--muted);font-size:11.5px;font-weight:700;text-decoration:none;border-radius:8px}',
+    '.lva-powered{align-self:center;display:inline-block;padding:4px 10px;color:var(--muted);font-size:11.5px;font-weight:700;text-decoration:none;border-radius:8px}',
     '.lva-powered:hover{color:var(--text)}',
 
     /* The slim bar: the button itself becomes the call, no card. */
@@ -257,6 +260,10 @@
       box.style.setProperty('--a-2', darker(accent));
       box.style.setProperty('--a-ink', inkOn(accent));
       box.style.setProperty('--site-font', opts.siteFont || getComputedStyle(document.body).fontFamily || 'inherit');
+      if (preview && opts.into) {
+        var btnH = { s: 44, m: 52, l: 60 }[look.size] || 52;
+        box.style.setProperty('--room', Math.max(300, (opts.into.clientHeight || 580) - btnH - 48) + 'px');
+      }
       ['--c1', '--c2', '--c3', '--c4'].forEach(function (v, i) { box.style.setProperty(v, colors[i] || colors[colors.length - 1]); });
       box.innerHTML = '';
       parts = {};
@@ -427,12 +434,15 @@
     function paintState(message) {
       var on = live();
       var msg = message || (stateNow === 'mic' ? text.mic : states[stateNow] || '');
+      // Before and after a call the owner may hide the line under the orb (look.ready_show).
+      var quiet = !on && stateNow !== 'error' && stateNow !== 'mic' && !message && look.ready_show === false;
       box.classList.toggle('is-live', on);
       box.classList.toggle('is-connecting', stateNow === 'connecting');
       box.classList.toggle('is-speaking', stateNow === 'speaking');
       box.classList.toggle('is-barlive', look.style === 'bar' && (on || stateNow === 'error' || stateNow === 'mic'));
       if (parts.state) {
-        parts.state.textContent = msg;
+        parts.state.hidden = quiet;
+        parts.state.textContent = quiet ? '' : msg;
         parts.state.classList.toggle('is-error', stateNow === 'error' || stateNow === 'mic');
       }
       if (parts.call) {

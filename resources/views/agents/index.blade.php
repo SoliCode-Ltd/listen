@@ -1,5 +1,6 @@
 @include('components.page-head', ['pageTitle' => __('agents.title'), 'page' => 'agents'])
   <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
+  <link rel="stylesheet" href="{{ asset('css/usage.css') }}?v={{ filemtime(public_path('css/usage.css')) }}">
 </head>
 <body>
   @include('components.header')
@@ -79,6 +80,9 @@
           </a>
         @endforeach
       </div>
+
+      {{-- Where the credits went: calls by agent, and the studio's audio (the same credits). --}}
+      <div class="ag-usage"><x-usage.breakdown :usage="\App\Support\CreditUsage::for(auth()->user())" :per-minute="\App\Support\Agents\AgentAccess::creditsPerMinute()" /></div>
     @endif
   </main>
 

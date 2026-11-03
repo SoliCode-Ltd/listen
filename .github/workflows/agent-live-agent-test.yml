@@ -27,11 +27,15 @@ permissions:
 # The calls this run makes ("all", or case ids from the script): only the ones
 # being recorded again, so no audio is spent on calls already kept.
 env:
-  CALLS: ar-ae ar-sa
+  CALLS: none
   # Takes of each call; the review below picks the cleanest.
-  TAKES: 2
-  # Voices from the studio's library tried live (two words each); Kore is a known live voice.
-  PROBE_VOICES: Kore ar-eg-csagent-3 en-us-csagent-7
+  TAKES: 1
+  # Voices from the studio's library tried live (one sentence each): Kore is a known live voice
+  # and NoSuchVoice-zz9 a made-up name, to see whether the live call refuses a voice it lacks.
+  PROBE_VOICES: Kore ar-eg-csagent-3 en-us-csagent-7 NoSuchVoice-zz9
+  # Each probe against the studio's sample of that voice (Abeer, Grace); Kore against a man's
+  # sample, which must come back "not the same".
+  SAME_VOICE: out/probe-ar-eg-csagent-3.wav=public/audio/voice-previews/ar-abeer.mp3 out/probe-en-us-csagent-7.wav=public/audio/voice-previews/en-grace.mp3 out/probe-Kore.wav=public/audio/voice-previews/ar-abdulaziz.mp3
 
 concurrency:
   group: agent-live-agent-test
@@ -106,5 +110,6 @@ jobs:
             out/*.mp3
             out/results.json
             out/review.json
+            out/same-voice.json
           if-no-files-found: ignore
           retention-days: 14

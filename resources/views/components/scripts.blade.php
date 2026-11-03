@@ -981,6 +981,50 @@
     }
   });
 
+  // Studio | Agents: as quick as the language switch. The page behind each side is fetched ahead
+  // (on hover or touch), the pill moves the moment it is tapped, and the page fades out while the
+  // other side loads (and fades in when it arrives).
+  function initProductSwitchTransition() {
+    var pending = false;
+    function prefetch(link) {
+      var href = link && link.getAttribute('href');
+      if (!href || link.__prefetched) return;
+      link.__prefetched = true;
+      var tag = document.createElement('link');
+      tag.rel = 'prefetch';
+      tag.href = href;
+      document.head.appendChild(tag);
+    }
+    ['pointerenter', 'touchstart', 'focusin'].forEach(function(type) {
+      document.addEventListener(type, function(e) {
+        var link = e.target && e.target.closest && e.target.closest('.product-switch a:not(.active)');
+        if (link) prefetch(link);
+      }, { passive: true, capture: true });
+    });
+    document.addEventListener('click', function(e) {
+      var link = e.target.closest('.product-switch a:not(.active)');
+      if (!link || pending || e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return;
+      var href = link.getAttribute('href');
+      if (!href) return;
+      e.preventDefault();
+      pending = true;
+      var nav = link.closest('.product-switch');
+      nav.classList.add('product-switch-prep');
+      Array.prototype.forEach.call(nav.querySelectorAll('a'), function(a) {
+        a.classList.toggle('active', a === link);
+        if (a === link) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+      });
+      try { sessionStorage.setItem('listen_locale_switch', '1'); } catch (_err) {}
+      var reduceMotion = false;
+      try { reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_err) {}
+      document.body.classList.add('locale-switching');
+      document.documentElement.classList.add('locale-switching');
+      if (reduceMotion) { window.location.assign(href); return; }
+      window.requestAnimationFrame(function() { window.setTimeout(function() { window.location.assign(href); }, 120); });
+    });
+    window.addEventListener('pageshow', function() { pending = false; });
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
       initThemeToggle();
@@ -988,6 +1032,7 @@
       initMobileMenu();
       initRevealAnimations();
       initLocaleSwitchTransition();
+      initProductSwitchTransition();
       window.initCustomAudioPlayers();
     });
   } else {
@@ -996,6 +1041,7 @@
     initMobileMenu();
     initRevealAnimations();
     initLocaleSwitchTransition();
+    initProductSwitchTransition();
     window.initCustomAudioPlayers();
   }
 })();

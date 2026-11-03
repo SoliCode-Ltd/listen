@@ -144,6 +144,29 @@ return [
     'home_talk' => 'Talk to our agent',
 
     // Every call written down.
+    // The page's drawn screens (how it works), the call inbox and the accent band.
+    'speaks_title' => 'It speaks the way your customers do',
+    'speaks_text' => ':count English accents, from American and British to Irish, Scottish and Indian.',
+    'speaks_all' => 'Every accent',
+    'steps_ui' => [
+        'reading' => 'Reading your website',
+        'facts' => ['Prices', 'Hours', 'Branches', 'Offers'],
+        'found' => 'Found 24 facts',
+        'talk_q' => 'How much is a cleaning?',
+        'talk_a' => 'A cleaning is $90 and takes about 45 minutes.',
+        'talk_fix' => 'Correct this answer',
+        'live' => ['Its link', 'QR code', 'A button on your site'],
+        'live_on' => 'Answering now',
+    ],
+    'calls_list' => 'Calls',
+    'calls_when' => ['5 min ago', '1 hour ago', '3 hours ago'],
+    'calls_summary' => 'Summary',
+    'calls_left' => 'Left their number',
+    'calls_lines' => [
+        ['caller', 'Do you have anything for whitening on Saturday?'],
+        ['agent', 'We do, Saturday at 4 pm. Shall I book it for you?'],
+    ],
+
     'calls_title' => 'Every call, written down',
     'calls_text' => 'Read a short summary of each call, open what was said, and call back the customers who left their number in one tap.',
     'calls_demo' => [
@@ -202,7 +225,7 @@ return [
                 ['caller', 'Yep, that\'s right. Thanks!'],
                 ['agent', 'You\'re very welcome! Have a great day. Goodbye.', '', 'en-us-3'],
             ],
-            'result' => ['Booking request saved', 'Jake · 555 210 4876 · Oil change, today at 3 pm'],
+            'result' => ['Booking request saved', 'Jake', '555 210 4876', 'Oil change, today at 3 pm'],
         ],
         'gb' => [
             'label' => 'British', 'agent' => 'Alice', 'avatar' => 'en-alice', 'business' => 'Bloom and Willow', 'dialect' => 'British (East Anglian)',
@@ -214,7 +237,7 @@ return [
                 ['caller', 'Lovely, thank you so much.'],
                 ['agent', 'You\'re very welcome, Sophie. I\'ve saved your order details, and the team will be in touch to confirm everything soon. Goodbye, and have a lovely day!', '', 'en-gb-3'],
             ],
-            'result' => ['Order saved', 'Sophie · 07700 900123 · A bright bouquet, about £40, tomorrow'],
+            'result' => ['Order saved', 'Sophie', '07700 900123', 'A bright bouquet, about £40, tomorrow'],
         ],
         'ie' => [
             'label' => 'Irish', 'agent' => 'Sienna', 'avatar' => 'en-sienna', 'business' => 'Harbour Lane Guesthouse', 'dialect' => 'Irish',
@@ -226,7 +249,7 @@ return [
                 ['caller', 'That\'s it, thanks a million.'],
                 ['agent', 'Perfect. I\'ve noted that down for you, and the team will be in touch soon to confirm your booking by text. You\'re very welcome. Enjoy your stay in Galway and have a lovely evening!', '', 'en-ie-3'],
             ],
-            'result' => ['Booking request saved', 'Ciara · 087 123 4567 · Double room, Friday night'],
+            'result' => ['Booking request saved', 'Ciara', '087 123 4567', 'Double room, Friday night'],
         ],
     ],
     'real_order' => ['us', 'gb', 'ie'],

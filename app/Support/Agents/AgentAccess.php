@@ -150,7 +150,7 @@ final class AgentAccess
     {
         $value = (int) self::setting('agents_credits_per_minute', 0);
 
-        return max(1, $value > 0 ? $value : (int) config('listen.agents.credits_per_minute', 1800));
+        return max(1, $value > 0 ? $value : (int) config('listen.agents.credits_per_minute', 8100));
     }
 
     public static function freeTestSeconds(): int

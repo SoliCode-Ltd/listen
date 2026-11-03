@@ -39,8 +39,9 @@ class AgentSettingsAdminTest extends TestCase
 
         Livewire::actingAs($this->admin)->test(AgentSettings::class)
             ->assertSee('Creator')->assertSee('Call minutes the credits pay for')->assertSee('Stop all calls now')
-            ->assertSet('data.agents_credits_per_minute', 1800)
-            ->set('data.agents_credits_per_minute', 2700)
+            ->assertSet('data.agents_credits_per_minute', 8100)
+            ->assertSee('keeps 40% on every plan')
+            ->set('data.agents_credits_per_minute', 9000)
             ->set('data.agents_free_test_minutes', 1)
             ->set('data.agents_calls_stopped', true)
             ->set('data.agents_site_daily_minutes', 500)
@@ -48,7 +49,7 @@ class AgentSettingsAdminTest extends TestCase
             ->call('save')
             ->assertHasNoErrors();
 
-        $this->assertSame(2700, AgentAccess::creditsPerMinute());
+        $this->assertSame(9000, AgentAccess::creditsPerMinute());
         $this->assertSame(60, AgentAccess::freeTestSeconds());
         $this->assertTrue(AgentAccess::callsStopped());
         $this->assertSame(500, AgentAccess::siteDailyMinutes());

@@ -286,6 +286,8 @@ html[data-theme="light"] .site-logo.logo-light {
 }
 
 .product-switch a:hover { color: var(--text); }
+/* The moment a side is tapped its pill is chosen, with no fade (the page follows). */
+.product-switch.product-switch-prep a { transition: none !important; }
 
 .product-switch a.active {
   color: #ffffff;

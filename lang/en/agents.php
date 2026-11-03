@@ -95,6 +95,12 @@ return [
     'language_en' => 'English',
     'dialect_label' => 'Their dialect',
     'accent_label' => 'Their accent',
+    'dialect_page_hint' => 'Voices from this dialect are listed first.',
+    'accent_page_hint' => 'Voices with this accent are listed first.',
+    'speaks_note_text_en' => 'Choose the accent here, then any voice you like: the agent speaks with this accent whatever the voice.',
+    'speaks_note_title_en' => 'Every voice speaks every accent',
+    'speaks_note_text' => 'Choose the dialect here, then any voice you like: the agent speaks this dialect whatever the voice.',
+    'speaks_note_title' => 'Every voice speaks every dialect',
     'notes_label' => 'Anything it must know',
     'notes_placeholder' => "Prices, opening hours, branches, delivery, how to book…\nExample: Teeth whitening 1,500 EGP. Open every day 10 am to 10 pm except Friday.",
     'notes_hint' => 'What you write here wins over your website.',
@@ -120,7 +126,9 @@ return [
     'voice_hint' => 'Hear each one. On calls, every voice speaks your customers\' dialect; voices from their region come first.',
     'voice_suggested' => 'Suggested for you',
     'voice_all' => 'All voices',
+    'error_dialect' => 'This dialect is not available.',
     'voice_play' => 'Play :name',
+    'voice_pause' => 'Pause :name',
     'voice_stop' => 'Stop',
     'voice_pick' => 'Choose :name',
     'voice_chosen' => 'Chosen',
@@ -316,7 +324,7 @@ return [
 
     // The link page and the call button.
     'talk_page_title' => 'Talk to :business',
-    'talk_page_mic' => 'Your browser asks to use the microphone for the call. No app needed.',
+    'talk_page_mic' => 'Just allow the microphone. No app needed.',
     'talk_page_subtitle' => ':name, the AI voice assistant, answers your questions in seconds.',
     'talk_page_subtitle_female' => ':name, the AI voice assistant, answers your questions in seconds.',
     'talk_page_note' => 'You are talking to an AI voice assistant. The conversation may be saved to help the business serve you.',
@@ -352,23 +360,32 @@ return [
         'steps' => [
             'wordpress' => [
                 ['Download the plugin', 'Your agent is already inside it, so there is nothing to copy.'],
-                ['Upload it to WordPress', 'In your WordPress dashboard open `Plugins` > `Add Plugin` > `Upload Plugin`, choose the file and click `Install Now`.'],
-                ['Turn it on', 'Click `Activate Plugin`. The call button shows on every page. To choose pages, open `Settings` > `Listen Voice Agent`.'],
+                ['Upload it to WordPress', ['In your WordPress dashboard, open `Plugins` > `Add Plugin` > `Upload Plugin`.', 'Choose the file, then click `Install Now`.']],
+                ['Turn it on', ['Click `Activate Plugin`. The call button shows on every page.'], [], 'To show it on some pages only, open `Settings` > `Listen Voice Agent`.'],
             ],
             'shopify' => [
-                ['Open your theme editor', 'In your Shopify admin open `Online Store` and click `Edit theme`. On some stores it is still `Themes` > `Customize`.'],
-                ['Add a Custom Liquid section', 'In the left panel, under `Footer`, click `Add section`, type Liquid in the search and choose `Custom Liquid`. Paste the line below into its box.'],
-                ['Save', 'Click `Save`. No Custom Liquid in your theme? Open `⋯` > `Edit code`, then `theme.liquid`, and paste the line just before `</body>`.'],
+                ['Open your theme editor', ['In your Shopify admin, open `Online Store`.', 'Click `Edit theme`.'], [], 'On some stores it is still `Themes` > `Customize`.'],
+                ['Add a Custom Liquid section', ['In the left panel, under `Footer`, click `Add section`.', 'Search for `Liquid` and choose `Custom Liquid`.', 'Paste the line below into its box.']],
+                ['Save', ['Click `Save`.'], [], 'No Custom Liquid in your theme? Open `⋯` > `Edit code`, then `theme.liquid`, and paste the line just before `</body>`.'],
             ],
             'wix' => [
-                ['Open Custom code', 'In your Wix dashboard open `Settings` > `Custom code` (under Advanced) and click `+ Add Custom Code`.'],
-                ['Paste the line', 'Paste the line below and name it Listen call button. Choose `All pages` and `Load code once`, and set `Place Code in` to `Body - end`.'],
-                ['Apply', 'Click `Apply`, then open your published website.'],
+                ['Open Custom code', ['In your Wix dashboard, open `Settings` > `Custom code` (under Advanced).', 'Click `+ Add Custom Code`.']],
+                ['Paste the line', ['Paste the line below and name it Listen call button.', 'Choose `All pages` and `Load code once`.', 'Set `Place Code in` to `Body - end`.']],
+                ['Apply', ['Click `Apply`, then open your published website.']],
             ],
+            // A third item: code blocks of their own, each under the file it goes in (:key is the agent's key, :line the line to paste).
             'laravel' => [
-                ['Add your agent key', 'Put the data-agent value from the line below in `.env` as `LISTEN_AGENT_KEY`, then add this to the array in `config/services.php`: `\'listen\' => [\'agent_key\' => env(\'LISTEN_AGENT_KEY\')],`'],
-                ['Add the line to your layout', 'Paste the line below just before `</body>` in the Blade layout every page uses, usually: `resources/views/layouts/app.blade.php` In Inertia apps it is `resources/views/app.blade.php`. Then read the key from your config: `data-agent="{{ config(\'services.listen.agent_key\') }}"`'],
-                ['Using a security policy?', 'With `Vite::useCspNonce()`, add `nonce="{{ Vite::cspNonce() }}"` to the line and `\'strict-dynamic\'` to `script-src`. If you limit `connect-src`, add Listen\'s address too. Deploy, then run `php artisan config:cache`.'],
+                ['Add your agent key', 'Put the key in your environment file, then read it in your services config.', [
+                    ['.env', 'LISTEN_AGENT_KEY=:key'],
+                    ['config/services.php', "'listen' => ['agent_key' => env('LISTEN_AGENT_KEY')],"],
+                ]],
+                ['Add the line to your layout', 'Paste it just before `</body>` in the Blade layout every page uses. In Inertia apps the layout is `resources/views/app.blade.php`.', [
+                    ['resources/views/layouts/app.blade.php', ':line'],
+                ]],
+                ['Using a security policy?', 'Only if your app sets one. With `Vite::useCspNonce()`, add the nonce to the line and `\'strict-dynamic\'` to `script-src`; if you limit `connect-src`, add Listen\'s address too. Then deploy and refresh the config cache.', [
+                    ['nonce', 'nonce="{{ Vite::cspNonce() }}"'],
+                    ['Terminal', 'php artisan config:cache'],
+                ]],
             ],
             'html' => [
                 ['Copy the line', 'It is the same for every website and every website builder.'],
@@ -380,13 +397,16 @@ return [
         'before' => [
             'wix' => 'Custom code needs a Wix Premium plan and a connected domain.',
         ],
+        // After the last step: what the owner will see once it is published (not a claim it is done),
+        // and how to confirm it. Only the check below says it is working.
         'done' => [
-            'wordpress' => 'Done. Open your website to see the call button.',
-            'shopify' => 'Done. The call button shows on every page of your store, except checkout.',
-            'wix' => 'Done. Open your published website to see the call button.',
-            'laravel' => 'Done. The call button shows on every page that uses this layout.',
-            'html' => 'Done. The call button shows on every page of your website.',
+            'wordpress' => 'Once the plugin is active, the call button shows on every page of your website.',
+            'shopify' => 'Once saved, the call button shows on every page of your store, except checkout.',
+            'wix' => 'Once applied, the call button shows on your published website.',
+            'laravel' => 'Once deployed, the call button shows on every page that uses this layout.',
+            'html' => 'Once published, the call button shows on every page of your website.',
         ],
+        'done_check' => 'Then press Check installation and we will confirm it works.',
     ],
     // The call button's look (the Design tab).
     'design' => [
@@ -428,6 +448,8 @@ return [
         'card_subtitle' => 'Line under the title',
         'captions' => 'Show what is said during the call',
         'photo' => 'Show the agent\'s photo next to its name',
+        'ready' => 'Line before the call',
+        'ready_show' => 'Show this line',
         'radius' => 'Corners',
         'radii' => ['square' => 'Sharp', 'soft' => 'Soft', 'round' => 'Round'],
         'font' => 'Font',
@@ -448,6 +470,14 @@ return [
     // Call time: what is left for calls (App\Support\Agents\AgentBalance).
     'balance' => [
         'title' => 'Call time',
+        // The card's figure and its three facts.
+        'unit' => '{1} minute left|[0,*] minutes left',
+        'of_month' => '{1} of 1 minute this month|[2,*] of :count minutes this month',
+        'stat_credits' => 'Credits left',
+        'stat_rate' => 'A call minute',
+        'stat_rate_value' => ':rate credits',
+        'stat_renews' => 'Renews on',
+        'stat_ends' => 'Ends on',
         'left' => '{0} No call time left|{1} 1 minute of calls left|[2,*] :count minutes of calls left',
         'of' => '{1} of 1 minute this month|[2,*] of :count minutes this month',
         'used' => '{0} No minutes used yet|{1} 1 minute used|[2,*] :count minutes used',

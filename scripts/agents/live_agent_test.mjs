@@ -142,7 +142,8 @@ function run(c, token, tag = c.id) {
 
 // Whether a voice can speak live (PROBE_VOICES="id id ..."): the studio's voice library has
 // many more voices than the 30 the live voice is known to take. One locked session per voice,
-// asked to say two words (a second or two of audio): kept as probe-<voice>.wav with the answer.
+// asked to say one short sentence (about four seconds): kept as probe-<voice>.wav with the answer.
+// The review then listens whether each sounds like that voice's studio sample (SAME_VOICE).
 async function probe(voice, base) {
   const setup = {
     model: base.model,
@@ -170,7 +171,7 @@ async function probe(voice, base) {
     ws.onmessage = async (ev) => {
       const raw = typeof ev.data === 'string' ? ev.data : Buffer.from(await ev.data.arrayBuffer()).toString('utf8');
       let m; try { m = JSON.parse(raw); } catch { return; }
-      if (m.setupComplete) { ws.send(JSON.stringify({ realtimeInput: { text: voice.startsWith('en') ? 'Hello there' : 'أهلاً وسهلاً' } })); return; }
+      if (m.setupComplete) { ws.send(JSON.stringify({ realtimeInput: { text: voice.startsWith('en') ? 'Hello, this is the customer care team. How can I help you today?' : 'أهلاً وسهلاً، معك فريق خدمة العملاء. كيف أقدر أساعدك اليوم؟' } })); return; }
       const sc = m.serverContent; if (!sc) return;
       for (const p of sc.modelTurn?.parts || []) if (p.inlineData?.data) chunks.push(Buffer.from(p.inlineData.data, 'base64'));
       if (sc.outputTranscription?.text) out.said += sc.outputTranscription.text;
