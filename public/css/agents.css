@@ -200,12 +200,22 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-writing { display: grid; justify-items: center; gap: 1.3rem; text-align: center; padding: 1.5rem 0 .5rem; }
 .ag-writing .orb { --orb-size: 150px; width: 150px; height: 150px; }
 .ag-writing h2 { font-size: 1.5rem; font-weight: 800; }
-.ag-checks { display: grid; gap: .55rem; list-style: none; padding: 0; margin: 0; min-width: min(360px, 100%); text-align: start; }
-.ag-checks li { display: flex; align-items: center; gap: .7rem; padding: .7rem .9rem; border-radius: 14px; border: 1px solid var(--line); color: var(--muted); font-weight: 600; transition: color .3s ease, border-color .3s ease, background .3s ease; }
-.ag-checks li i { position: relative; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line-strong); flex: 0 0 auto; transition: all .35s var(--ag-ease); }
-.ag-checks li.is-active { color: var(--text); border-color: color-mix(in srgb, var(--a) 40%, var(--line)); }
+/* What is being done, as a timeline: no boxes, a dot for each step and a line from each dot to the
+   next, the line filling with violet as a step is done; the step in hand turns, the next ones wait. */
+.ag-checks { display: grid; gap: 0; list-style: none; padding: 0; margin: 0; min-width: min(320px, 100%); text-align: start; }
+.ag-checks li { position: relative; display: flex; align-items: center; gap: .95rem; min-height: 54px; padding: 0; color: var(--muted); font-size: 1rem; font-weight: 600; transition: color .3s ease; }
+.ag-checks li::before, .ag-checks li::after {
+  content: ""; position: absolute; inset-inline-start: 12px; top: calc(50% + 17px); height: calc(100% - 34px);
+  width: 2px; border-radius: 2px; background: var(--line);
+}
+.ag-checks li::after { background: var(--a); transform: scaleY(0); transform-origin: top; transition: transform .5s var(--ag-ease); }
+.ag-checks li.is-done::after { transform: scaleY(1); }
+.ag-checks li:last-child::before, .ag-checks li:last-child::after { display: none; }
+.ag-checks li i { position: relative; z-index: 1; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--surface); flex: 0 0 auto; transition: border-color .3s ease, background-color .3s ease, transform .35s var(--ag-ease); }
+.ag-checks li.is-active { color: var(--text); font-weight: 700; }
 .ag-checks li.is-active i { border-color: var(--a); border-top-color: transparent; animation: ag-spin .8s linear infinite; }
 .ag-checks li.is-done { color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .ag-checks li::after { transition: none; } }
 .ag-writing h2 { transition: color .3s ease; }
 .ag-writing-slow { max-width: 40ch; margin: 0 auto; text-align: center; animation: ag-fade .4s var(--ag-ease); }
 /* Ready: every line ticked, the title says so, the orb settles, then the voice step slides in. */
