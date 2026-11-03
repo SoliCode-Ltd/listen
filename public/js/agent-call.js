@@ -111,6 +111,8 @@
     var playHead = 0, sources = new Set();
     var info = null, pending = [], agentText = '', callerText = '', usage = null;
     var pingTimer = 0, stopTimer = 0, raf = 0, endAfterSpeech = false;
+    // Set when the agent hangs up: its goodbye (already received) still plays, nothing after it.
+    var hungUp = false;
     var buf = new Float32Array(1024);
     // A caller who goes quiet: asked once if they are still there, then the agent says goodbye
     // (Listen pays for every second the line stays open).
@@ -146,6 +148,7 @@
     }
 
     function play(data) {
+      if (hungUp) return;
       var f = pcmFrom(data);
       if (!f.length) return;
       var b = ctx.createBuffer(1, f.length, 24000);
@@ -222,7 +225,7 @@
           if (agentText.trim()) { turn('agent', agentText); agentText = ''; }
           callerText += sc.inputTranscription.text;
         }
-        if (sc.outputTranscription && sc.outputTranscription.text) {
+        if (sc.outputTranscription && sc.outputTranscription.text && !hungUp) {
           if (callerText.trim()) { turn('caller', callerText); callerText = ''; }
           agentText += sc.outputTranscription.text;
         }
@@ -234,12 +237,17 @@
     }
 
     function runTool(fc) {
+      // end_call gets no answer: an answer makes the model speak again ("The call has ended.",
+      // sometimes in English on an Arabic call). Its goodbye came before the call, so it plays.
+      var hangUp = fc.name === 'end_call';
+      if (hangUp) hungUp = true;
       post(info.api + '/tool', { call_key: info.call_key, name: fc.name, args: fc.args || {} }).then(function (result) {
         opts.onTool && opts.onTool(fc.name, fc.args || {}, result);
-        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: result || { result: 'ok' } }] } }));
-        if (fc.name === 'end_call') {
+        if (hangUp) {
           if (sources.size) endAfterSpeech = true; else setTimeout(function () { finish('done'); }, 1200);
+          return;
         }
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: result || { result: 'ok' } }] } }));
       });
     }
 

@@ -120,12 +120,13 @@ function run(c, token, tag = c.id) {
       if (m.toolCall) {
         for (const fc of m.toolCall.functionCalls || []) {
           out.tools.push({ name: fc.name, args: fc.args, at_turn: i + 1 });
-          if (cur) { clearTimeout(cur.done); cur.done = fc.name === 'end_call' ? setTimeout(finish, 2500) : null; if (fc.name !== 'end_call') cur.tool = true; }
-          ws.send(JSON.stringify({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: { result: fc.name === 'save_contact' ? 'saved' : 'ok' } }] } }));
+          if (cur) { clearTimeout(cur.done); cur.done = fc.name === 'end_call' ? setTimeout(finish, 2500) : null; if (fc.name !== 'end_call') cur.tool = true; else cur.hungUp = true; }
+          // Like the site's call client: end_call gets no answer, and nothing after it is kept.
+          if (fc.name !== 'end_call') ws.send(JSON.stringify({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: { result: fc.name === 'save_contact' ? 'saved' : 'ok' } }] } }));
         }
       }
       if (m.usageMetadata && cur) cur.usage = m.usageMetadata;
-      const sc = m.serverContent; if (!sc || !cur) return;
+      const sc = m.serverContent; if (!sc || !cur || cur.hungUp) return;
       for (const p of sc.modelTurn?.parts || []) {
         if (p.inlineData?.data) { if (cur.first === null) cur.first = Math.round(performance.now() - cur.sent); cur.chunks.push(Buffer.from(p.inlineData.data, 'base64')); }
       }
@@ -139,7 +140,54 @@ function run(c, token, tag = c.id) {
   });
 }
 
-const results = { ran_at: new Date().toISOString(), cases: [] };
+// Whether a voice can speak live (PROBE_VOICES="id id ..."): the studio's voice library has
+// many more voices than the 30 the live voice is known to take. One locked session per voice,
+// asked to say two words (a second or two of audio): kept as probe-<voice>.wav with the answer.
+async function probe(voice, base) {
+  const setup = {
+    model: base.model,
+    generationConfig: { ...(base.generationConfig || {}), speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
+    systemInstruction: { parts: [{ text: 'Say exactly the words the user gives you, once, and nothing else.' }] },
+  };
+  const out = { voice, ok: false, audio_seconds: 0, said: '', error: null };
+  let token;
+  try { token = await mint(setup, 'bidiGenerateContentSetup'); } catch (e) { out.error = `key: ${String(e.message || e).slice(0, 300)}`; return out; }
+  return new Promise((resolve) => {
+    const ws = new WebSocket(`${WS}?access_token=${encodeURIComponent(token)}`);
+    const chunks = [];
+    let done = null;
+    const end = () => {
+      clearTimeout(timer); clearTimeout(done);
+      const pcm = Buffer.concat(chunks);
+      out.audio_seconds = +(pcm.length / 48000).toFixed(2);
+      out.ok = out.audio_seconds > 0;
+      if (pcm.length) fs.writeFileSync(path.join(OUT, `probe-${voice}.wav`), wav(pcm));
+      try { ws.close(); } catch {}
+      resolve(out);
+    };
+    const timer = setTimeout(() => { out.error = out.error || 'timed out'; end(); }, 30000);
+    ws.onopen = () => ws.send(JSON.stringify({ setup: PIRATE }));
+    ws.onmessage = async (ev) => {
+      const raw = typeof ev.data === 'string' ? ev.data : Buffer.from(await ev.data.arrayBuffer()).toString('utf8');
+      let m; try { m = JSON.parse(raw); } catch { return; }
+      if (m.setupComplete) { ws.send(JSON.stringify({ realtimeInput: { text: voice.startsWith('en') ? 'Hello there' : 'أهلاً وسهلاً' } })); return; }
+      const sc = m.serverContent; if (!sc) return;
+      for (const p of sc.modelTurn?.parts || []) if (p.inlineData?.data) chunks.push(Buffer.from(p.inlineData.data, 'base64'));
+      if (sc.outputTranscription?.text) out.said += sc.outputTranscription.text;
+      if (sc.turnComplete) { clearTimeout(done); done = setTimeout(end, 800); }
+    };
+    ws.onerror = (e) => { out.error = `socket error ${e?.message || ''}`; };
+    ws.onclose = (e) => { if (![1000, 1005].includes(e.code) && !out.error) out.error = `closed ${e.code} ${String(e.reason || '').slice(0, 300)}`; end(); };
+  });
+}
+
+const results = { ran_at: new Date().toISOString(), cases: [], probes: [] };
+for (const voice of (process.env.PROBE_VOICES || '').split(/\s+/).filter(Boolean).slice(0, 6)) {
+  const base = JSON.parse(fs.readFileSync(path.join(SETUPS, 'ar-eg.json'), 'utf8'));
+  const r = await probe(voice, base);
+  results.probes.push(r);
+  console.log(`probe ${voice}: ok=${r.ok} ${r.audio_seconds} s said=${JSON.stringify(r.said)} error=${r.error}`);
+}
 // Only the calls named after the folders (all when none are named or "all").
 const picked = PICK.filter((x) => x && x !== 'all');
 // How many takes of each call (TAKES, default 1): the review keeps the best.
@@ -165,4 +213,4 @@ for (const base of CASES.filter((x) => !picked.length || picked.includes(x.id)))
   for (const t of r?.turns || []) console.log(`  > ${t.asked}\n  < ${t.said} (${t.first_sound_ms} ms, ${t.audio_seconds} s)`);
 }
 fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2));
-process.exit(results.cases.some(c => c.turns?.length) ? 0 : 1);
+process.exit(results.cases.some(c => c.turns?.length) || results.probes.some(p => p.ok) ? 0 : 1);

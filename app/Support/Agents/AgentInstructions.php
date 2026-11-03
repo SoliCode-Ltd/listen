@@ -191,6 +191,8 @@ final class AgentInstructions
             $out .= " Its sounds and words: {$markers}";
         }
         $out .= ' Never use words from other Arabic dialects. '.self::avoid($code);
+        // The audio review heard these on real calls: stiff written Arabic, not how people talk.
+        $out .= ' Talk like someone from there on the phone, not like a system: call the caller by their name or the dialect\'s everyday polite word, never يا سيد or يا سيدة, and never say written phrases such as تم حفظ بياناتك بنجاح.';
         $out .= ' If the caller speaks English, answer in English.';
 
         return $out;

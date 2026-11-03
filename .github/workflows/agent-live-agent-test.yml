@@ -27,9 +27,11 @@ permissions:
 # The calls this run makes ("all", or case ids from the script): only the ones
 # being recorded again, so no audio is spent on calls already kept.
 env:
-  CALLS: ar-eg ar-lb
+  CALLS: ar-ae ar-sa
   # Takes of each call; the review below picks the cleanest.
   TAKES: 2
+  # Voices from the studio's library tried live (two words each); Kore is a known live voice.
+  PROBE_VOICES: Kore ar-eg-csagent-3 en-us-csagent-7
 
 concurrency:
   group: agent-live-agent-test
