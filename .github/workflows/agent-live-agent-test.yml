@@ -19,6 +19,7 @@ on:
     paths:
       - .github/workflows/agent-live-agent-test.yml
       - scripts/agents/live_agent_test.mjs
+      - scripts/agents/review_calls.mjs
 
 permissions:
   contents: read
@@ -26,7 +27,9 @@ permissions:
 # The calls this run makes ("all", or case ids from the script): only the ones
 # being recorded again, so no audio is spent on calls already kept.
 env:
-  CALLS: ar-eg
+  CALLS: ar-eg ar-lb
+  # Takes of each call; the review below picks the cleanest.
+  TAKES: 2
 
 concurrency:
   group: agent-live-agent-test
@@ -80,7 +83,10 @@ jobs:
           rm -f ~/.ssh/id_test
           if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
           echo "::add-mask::$KEY"
-          LIVE_KEY="$KEY" node scripts/agents/live_agent_test.mjs setups out $CALLS
+          LIVE_KEY="$KEY" node scripts/agents/live_agent_test.mjs setups out $CALLS || true
+          # A native-listener review of the new takes and of the calls on the site (listening only,
+          # no audio is made).
+          LIVE_KEY="$KEY" node scripts/agents/review_calls.mjs out out public/audio/agents/calls
 
       - name: Make the replies easy to play (MP3)
         if: always()
@@ -97,5 +103,6 @@ jobs:
           path: |
             out/*.mp3
             out/results.json
+            out/review.json
           if-no-files-found: ignore
           retention-days: 14

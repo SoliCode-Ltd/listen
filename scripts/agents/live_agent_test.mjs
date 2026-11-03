@@ -38,10 +38,12 @@ const CASES = [
     'السلام عليكم، هو انتو بتعملوا سحب عينات من البيت؟',
     'طب تمام، عايزة حد ييجي بكرة الساعة عشرة الصبح. اسمي منى ورقمي صفر واحد صفر واحد اتنين تلاتة أربعة خمسة ستة سبعة تمانية',
     'أيوه مظبوط. والنتيجة بتطلع إمتى؟',
+    'تمام، شكراً',
   ] },
   { id: 'ar-lb', file: 'ar-lb.json', turns: [
     'مرحبا، بدي إسأل إذا عندكن شقة للإيجار غرفتين نوم بصيدا',
-    'ميزانيتي تقريباً ستمية دولار. اسمي جاد ورقمي صفر تلاتة واحد اتنين تلاتة أربعة خمسة ستة',
+    'ميزانيتي تقريباً ستمية دولار. اسمي جاد ورقمي صفر تلاتة واحد تنين تلاتة أربعة خمسة ستة',
+    'إيه مظبوط',
     'تمام، يعطيك العافية',
   ] },
   { id: 'en-us', file: 'en-us.json', turns: [
@@ -92,16 +94,16 @@ async function mint(setup, way) {
 // Whether a message carries the agent's voice.
 const p0 = (sc) => (sc.modelTurn?.parts || []).some((p) => p.inlineData?.data);
 
-function run(c, token) {
+function run(c, token, tag = c.id) {
   return new Promise((resolve) => {
-    const out = { id: c.id, turns: [], tools: [], error: null };
+    const out = { id: tag, turns: [], tools: [], error: null };
     const ws = new WebSocket(`${WS}?access_token=${encodeURIComponent(token)}`);
     let i = -1; let cur = null;
     const timer = setTimeout(() => { out.error = out.error || 'timed out'; try { ws.close(); } catch {} }, 150000);
     const finish = () => {
       if (cur) {
         const pcm = Buffer.concat(cur.chunks);
-        const file = `${c.id}-${i + 1}.wav`;
+        const file = `${tag}-${i + 1}.wav`;
         fs.writeFileSync(path.join(OUT, file), wav(pcm));
         out.turns.push({ asked: cur.asked, said: cur.said.trim(), heard: cur.heard.trim(), first_sound_ms: cur.first, audio_seconds: +(pcm.length / 48000).toFixed(2), usage: cur.usage, file });
       }
@@ -140,14 +142,17 @@ function run(c, token) {
 const results = { ran_at: new Date().toISOString(), cases: [] };
 // Only the calls named after the folders (all when none are named or "all").
 const picked = PICK.filter((x) => x && x !== 'all');
-for (const c of CASES.filter((x) => !picked.length || picked.includes(x.id))) {
+// How many takes of each call (TAKES, default 1): the review keeps the best.
+const TAKES = Math.max(1, Math.min(3, parseInt(process.env.TAKES || '1', 10) || 1));
+for (const base of CASES.filter((x) => !picked.length || picked.includes(x.id))) for (let k = 1; k <= TAKES; k++) {
+  const c = { ...base, tag: TAKES > 1 ? `${base.id}-t${k}` : base.id };
   const setup = JSON.parse(fs.readFileSync(path.join(SETUPS, c.file), 'utf8'));
   const tried = [];
   let r = null;
   for (const way of ['bidiGenerateContentSetup', 'liveConnectConstraints']) {
     try {
       const token = await mint(setup, way);
-      r = await run(c, token);
+      r = await run(c, token, c.tag);
       r.lock = way;
       tried.push({ way, ok: !r.error, error: r.error });
       if (!r.error && r.turns.length) break;
@@ -155,8 +160,8 @@ for (const c of CASES.filter((x) => !picked.length || picked.includes(x.id))) {
       tried.push({ way, ok: false, error: String(e.message || e) });
     }
   }
-  results.cases.push({ ...(r || { id: c.id }), tried });
-  console.log(`${c.id}: lock=${r?.lock} tools=${JSON.stringify(r?.tools || [])} tried=${JSON.stringify(tried)}`);
+  results.cases.push({ ...(r || { id: c.tag }), tried });
+  console.log(`${c.tag}: lock=${r?.lock} tools=${JSON.stringify(r?.tools || [])} tried=${JSON.stringify(tried)}`);
   for (const t of r?.turns || []) console.log(`  > ${t.asked}\n  < ${t.said} (${t.first_sound_ms} ms, ${t.audio_seconds} s)`);
 }
 fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2));

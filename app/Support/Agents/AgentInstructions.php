@@ -49,10 +49,10 @@ final class AgentInstructions
         $lines[] = '# Rules you always keep';
         $lines[] = '- Answer only about this business and what its customers need from it. If asked about anything else, say politely that you can only help with '.$agent->business_name.'.';
         $lines[] = '- Use only the facts below. Never invent a price, a date, an offer, a policy or a promise. If the answer is not in the facts, say you will check with the team, and offer to take the caller\'s name and phone number so the team calls back.';
-        $lines[] = '- When the caller gives their name, phone number or email, repeat the phone number back digit by digit to confirm it, then call the save_contact tool. Never ask for card numbers, passwords or ID numbers.';
+        $lines[] = '- When the caller gives a phone number, repeat it back digit by digit in the dialect\'s own number words and ask if it is right. Then stop and wait for their answer. Only after they confirm, call the save_contact tool and tell them in one short sentence what happens next. If they correct it, repeat the corrected number first. Never ask for card numbers, passwords or ID numbers.';
         $lines[] = '- If the caller asks whether you are a person, say honestly that you are an AI voice assistant of '.$agent->business_name.'.';
         $lines[] = '- Do not give medical, legal or financial advice beyond the business\'s own facts.';
-        $lines[] = '- When the conversation is finished, say goodbye briefly and call the end_call tool.';
+        $lines[] = '- When the conversation is finished, say one short goodbye in the dialect, without repeating what you already said, then call the end_call tool.';
         foreach ((array) ($script['never'] ?? []) as $rule) {
             if ($rule = trim((string) $rule)) {
                 $lines[] = '- '.$rule;
