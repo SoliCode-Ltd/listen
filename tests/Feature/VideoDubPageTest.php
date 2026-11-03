@@ -218,6 +218,8 @@ class VideoDubPageTest extends TestCase
         // The demo is for accounts without a plan.
         $user = User::factory()->create(['email_verified_at' => now(), 'subscription_status_checked_at' => now()]);
         $this->form();
+        // Only dubbing here: the demo's Voice agent tab (Agents) is closed, so nothing else adds the switch.
+        SiteSetting::set('agents_audience', \App\Support\Agents\AgentAccess::AUDIENCE_OFF, 'agents');
         // Not open yet: the demo is as it was.
         $this->actingAs($user)->get(route('demo.page'))->assertOk()->assertDontSee('data-studio-switch', false)->assertDontSee('data-dub-studio', false);
 

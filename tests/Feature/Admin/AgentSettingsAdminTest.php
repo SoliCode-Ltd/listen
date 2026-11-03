@@ -39,8 +39,9 @@ class AgentSettingsAdminTest extends TestCase
 
         Livewire::actingAs($this->admin)->test(AgentSettings::class)
             ->assertSee('Creator')->assertSee('Call minutes the credits pay for')->assertSee('Stop all calls now')
-            ->assertSet('data.agents_credits_per_minute', 8100)
-            ->assertSee('keeps 40% on every plan')
+            // No rate saved: the field is empty and the rate follows the plans.
+            ->assertSet('data.agents_credits_per_minute', null)
+            ->assertSee('keep 40% on every plan')->assertSee('follows the plans')
             ->set('data.agents_credits_per_minute', 9000)
             ->set('data.agents_free_test_minutes', 1)
             ->set('data.agents_calls_stopped', true)
@@ -50,10 +51,20 @@ class AgentSettingsAdminTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertSame(9000, AgentAccess::creditsPerMinute());
+        $this->assertTrue(AgentAccess::rateIsSet());
         $this->assertSame(60, AgentAccess::freeTestSeconds());
         $this->assertTrue(AgentAccess::callsStopped());
         $this->assertSame(500, AgentAccess::siteDailyMinutes());
         $this->assertSame(AgentAccess::AUDIENCE_PREVIEW, AgentAccess::audience());
+
+        // Emptying the rate gives it back to the plans.
+        Livewire::actingAs($this->admin)->test(AgentSettings::class)
+            ->assertSet('data.agents_credits_per_minute', 9000)
+            ->set('data.agents_credits_per_minute', null)
+            ->call('save')
+            ->assertHasNoErrors();
+        $this->assertFalse(AgentAccess::rateIsSet());
+        $this->assertSame(\App\Support\Agents\AgentCost::recommendedRate(), AgentAccess::creditsPerMinute());
     }
 
     public function test_a_plan_includes_agents_with_its_own_numbers(): void

@@ -20,6 +20,12 @@ final class CreditUsage
     /** Items listed at most on the page. */
     public const ITEMS = 60;
 
+    /** Whether anything used credits this period (else there is nothing to show, nor a link to it). */
+    public static function hasUse(array $usage): bool
+    {
+        return ! empty($usage['items']) || (int) ($usage['used'] ?? 0) > 0;
+    }
+
     /**
      * @return array{period: array{starts_at: Carbon, ends_at: Carbon}, mode: string, total: int, left: int, used: int,
      *     parts: array<string, array{credits: int, seconds: int, count: int}>, agents: list<array{name: string, credits: int, seconds: int, count: int}>,

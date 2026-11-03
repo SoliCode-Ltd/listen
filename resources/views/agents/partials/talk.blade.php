@@ -9,7 +9,7 @@
       <span class="ag-talk-orb" data-ag-talk-orb><x-orb name="listen" :colors="$agent?->widgets()->oldest('id')->first()?->style()['colors']" /></span>
     </span>
   </div>
-  <p class="ag-talk-state" data-ag-talk-state aria-live="polite">{{ \App\Support\Agents\Gendered::line('agents.talk_states.idle', $female ?? false) }}</p>
+  {{-- The button right under the orb; what the call is doing shows under the button, only during and after a call. --}}
   <div class="ag-talk-buttons">
     <button type="button" class="ag-btn ag-btn-primary ag-btn-lg ag-call-btn" data-ag-call>
       <svg class="ag-i-mic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>
@@ -18,6 +18,7 @@
     </button>
     <button type="button" class="ag-btn" data-ag-mute hidden>{{ __('agents.talk_mute') }}</button>
   </div>
+  <p class="ag-talk-state" data-ag-talk-state aria-live="polite"></p>
   @if($showCost)
     <p class="ag-free" data-ag-free>
       @if($freeTestLeft > 0)

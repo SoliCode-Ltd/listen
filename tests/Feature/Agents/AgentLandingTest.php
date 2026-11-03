@@ -46,7 +46,20 @@ class AgentLandingTest extends TestCase
                 ->assertDontSee('images/agents/landing/', false)
                 ->assertSee(__('agents_landing.calls_title'))
                 ->assertSee(__('agents_landing.speaks_title'))
-                ->assertSee(__('agents_landing.flow_sources')[0]);
+                ->assertSee(__('agents_landing.flow_sources')[0])
+                // The call's play button has no progress line under it.
+                ->assertDontSee('agl-real-progress', false);
+            // Every dialect (or accent) is in the full list, by name.
+            $names = $locale === 'ar' ? array_column(\App\Support\ArabicDialects::ALL, 'ar') : array_column(\App\Support\EnglishAccents::ALL, 'en');
+            foreach ($names as $name) {
+                $page->assertSee($name);
+            }
+            // The questions are the page's last section, after the final call to action.
+            $html = (string) $page->getContent();
+            $main = substr($html, (int) strpos($html, '<main'), (int) strpos($html, '</main>') - (int) strpos($html, '<main'));
+            $faq = (int) strpos($main, 'id="agl-faq-title"');
+            $this->assertGreaterThan((int) strpos($main, 'class="agl-final"'), $faq, $locale.': the questions come before the final call to action');
+            $this->assertStringNotContainsString('<section', substr($main, $faq), $locale.': a section follows the questions');
         }
     }
 

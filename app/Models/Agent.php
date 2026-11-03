@@ -31,6 +31,9 @@ class Agent extends Model
 
     public const PAUSED = 'paused';
 
+    /** A member's practice agent for the demo page (App\Support\Agents\DemoAgent): never one of their agents. */
+    public const DEMO = 'demo';
+
     public const BUSINESS_TYPES = ['healthcare', 'real_estate', 'retail', 'restaurants', 'beauty', 'education', 'automotive', 'services', 'travel', 'other'];
 
     public const JOBS = ['answer', 'leads', 'booking', 'orders', 'support', 'reception'];

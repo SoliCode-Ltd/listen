@@ -2003,7 +2003,10 @@
               <small class="usage-hero-caption" id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
               <div class="usage-hero-chips">
                 <span class="usage-chip" title="{{ __('ui.pricing.credits_hint') }}"><x-credit-icon /><span><b id="usageCreditsLeft">{{ number_format($remainingChars) }}</b> {{ __('ui.dashboard.credits_left_suffix') }}</span></span>
+                @php $creditUse ??= \App\Support\CreditUsage::for(auth()->user()); @endphp
+                @if(\App\Support\CreditUsage::hasUse($creditUse))
                 <a class="usage-chip usage-chip-link" href="#usage-breakdown" data-usage-jump>{{ __('usage.where') }}<svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>
+                @endif
                 @if ($packMode && $packEndsOn)
                   <span class="usage-chip">{{ __('ui.pack.meter_ends', ['date' => $packEndsOn]) }}</span>
                 @endif
@@ -2070,7 +2073,7 @@
 
         </article>
         {{-- Where the credits went this period: studio audio, agent calls and the rest (the same credits). --}}
-        <x-usage.breakdown :usage="\App\Support\CreditUsage::for(auth()->user())" :agents-open="\App\Support\Agents\AgentAccess::openTo(auth()->user())" :per-minute="\App\Support\Agents\AgentAccess::creditsPerMinute()" />
+        <x-usage.breakdown :usage="$creditUse ?? \App\Support\CreditUsage::for(auth()->user())" :agents-open="\App\Support\Agents\AgentAccess::openTo(auth()->user())" :per-minute="\App\Support\Agents\AgentAccess::creditsPerMinute()" />
       </div>
     </section>
 

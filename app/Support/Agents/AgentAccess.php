@@ -145,12 +145,24 @@ final class AgentAccess
         return rescue(fn () => SiteSetting::get($key, $default), $default, false);
     }
 
-    /** Credits a call minute uses (Agents → Settings, else the config). */
+    /**
+     * Credits a call minute uses: the rate saved in Agents → Settings, else the one the plans call
+     * for (AgentCost::recommendedRate: the least that keeps 40% on every plan), else the config.
+     */
     public static function creditsPerMinute(): int
     {
         $value = (int) self::setting('agents_credits_per_minute', 0);
+        if ($value > 0) {
+            return $value;
+        }
 
-        return max(1, $value > 0 ? $value : (int) config('listen.agents.credits_per_minute', 8100));
+        return max(1, AgentCost::recommendedRate() ?? (int) config('listen.agents.credits_per_minute', 8100));
+    }
+
+    /** Whether the admin saved a rate of their own (otherwise it follows the plans). */
+    public static function rateIsSet(): bool
+    {
+        return (int) self::setting('agents_credits_per_minute', 0) > 0;
     }
 
     public static function freeTestSeconds(): int

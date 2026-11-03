@@ -123,3 +123,6 @@ html[dir="rtl"] .us-agents li i { background-position: 100% 0, 0 0; }
 @media (prefers-reduced-motion: reduce) { .us-bar i { animation: none; } .us-btn, .us-table tbody tr { transition: none; } }
 .us-legend + .us-parts { margin-top: 1.2rem; }
 .us-bar + .us-legend { margin-top: .8rem; }
+/* Opened from "Where your credits went": it unfolds into view. */
+.us.us-embed.is-opening { animation: us-open .38s cubic-bezier(.22, 1, .36, 1); }
+@media (prefers-reduced-motion: reduce) { .us.us-embed.is-opening { animation: none; } }

@@ -325,7 +325,7 @@
         ended = true;
         try { mic && mic.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
         try { ctx && ctx.close(); } catch (e) {}
-        opts.onError && opts.onError(err && err.message);
+        opts.onError && opts.onError(err && err.message, err);
         set('error');
       }
     });

@@ -1,10 +1,11 @@
 {{--
-  Text to speech, Voice Design or Dub a video, above the studio in the demo: whichever are open
-  ($design, $dub). It sets data-studio on the closest [data-studio-host]; what belongs to modes
-  carries data-studio-pane with their names (CSS in css/studio-modes.css, behaviour in
-  js/studio-modes.js). #voice-design or #dub in the address opens that side.
+  Text to speech, Voice Design, Dub a video or a Voice agent, above the studio in the demo:
+  whichever are open ($design, $dub, $agent). It sets data-studio on the closest
+  [data-studio-host]; what belongs to modes carries data-studio-pane with their names (CSS in
+  css/studio-modes.css, behaviour in js/studio-modes.js). #voice-design, #dub or #voice-agent in
+  the address opens that side.
 --}}
-@props(['design' => false, 'dub' => false])
+@props(['design' => false, 'dub' => false, 'agent' => false])
 <div class="studio-modes" role="tablist" aria-label="{{ __('ui.dub.modes_label') }}" data-studio-switch>
   <button type="button" role="tab" class="studio-mode" data-studio-tab="tts" aria-selected="true">
     <span class="studio-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><path d="M17 14v6M20 15.5v3M14 16v2"/></svg></span>
@@ -28,6 +29,15 @@
     <span class="studio-mode-text">
       <strong>{{ __('ui.dub.mode_dub') }}</strong>
       <small>{{ __('ui.dub.mode_dub_hint') }}</small>
+    </span>
+  </button>
+  @endif
+  @if($agent)
+  <button type="button" role="tab" class="studio-mode" data-studio-tab="agent" aria-selected="false">
+    <span class="studio-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 14v-1a8 8 0 0 1 16 0v1"/><rect x="3" y="13.5" width="4.5" height="6" rx="1.6"/><rect x="16.5" y="13.5" width="4.5" height="6" rx="1.6"/><path d="M19 19.5a3.5 3.5 0 0 1-3.5 2.5H13"/></svg></span>
+    <span class="studio-mode-text">
+      <strong>{{ __('agents.demo.tab') }}</strong>
+      <small>{{ __('agents.demo.tab_hint') }}</small>
     </span>
   </button>
   @endif

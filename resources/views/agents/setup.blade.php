@@ -18,22 +18,31 @@
 
   <main class="ag" id="agents">
     <div class="ag-setup" data-ag-setup>
-      <nav class="ag-card ag-rail" aria-label="{{ __('agents.setup_title') }}">
-        <div class="ag-rail-title">{{ __('agents.setup_title') }}</div>
-        @foreach(['business', 'voice', 'talk', 'live'] as $i => $step)
-          <button type="button" class="ag-step-link" data-ag-step-link="{{ $i }}" {{ $i > 0 && ! $agent ? 'disabled' : '' }}>
-            <b><span>{{ $i + 1 }}</span></b>{{ __('agents.steps.'.$step) }}
-          </button>
-        @endforeach
-        <div class="ag-bar"><i data-ag-bar></i></div>
-      </nav>
+      {{-- A wizard across the page: the way out, then the four steps on one line that fills as you go. --}}
+      <header class="ag-wizard-top">
+        <div class="ag-wizard-bar">
+          <a class="ag-wizard-exit" href="{{ route('voice-agents.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>{{ __('agents.title') }}</a>
+          <span class="ag-wizard-title">{{ __('agents.setup_title') }}</span>
+        </div>
+        <nav class="ag-wsteps" aria-label="{{ __('agents.setup_title') }}">
+          <span class="ag-bar" aria-hidden="true"><i data-ag-bar></i></span>
+          <ol>
+            @foreach(['business', 'voice', 'talk', 'live'] as $i => $step)
+              <li>
+                <button type="button" class="ag-step-link" data-ag-step-link="{{ $i }}" {{ $i > 0 && ! $agent ? 'disabled' : '' }}>
+                  <b><span>{{ $i + 1 }}</span></b>{{ __('agents.steps.'.$step) }}
+                </button>
+              </li>
+            @endforeach
+          </ol>
+        </nav>
+      </header>
 
       <section class="ag-card ag-stagecard">
         {{-- Step 1: the business. --}}
         <div class="ag-pane" data-ag-pane="0">
           <div data-ag-business>
             <div class="ag-pane-head">
-              <p class="ag-muted" style="font-weight:700;font-size:.86rem">{{ __('agents.step_of', ['n' => 1, 'total' => 4]) }}</p>
               <h2>{{ __('agents.business_heading') }}</h2>
               <p>{{ __('agents.business_hint') }}</p>
             </div>
@@ -132,7 +141,6 @@
         {{-- Step 2: the voice. --}}
         <div class="ag-pane" data-ag-pane="1">
           <div class="ag-pane-head">
-            <p class="ag-muted" style="font-weight:700;font-size:.86rem">{{ __('agents.step_of', ['n' => 2, 'total' => 4]) }}</p>
             <h2>{{ __('agents.voice_heading') }}</h2>
             <p>{{ __('agents.voice_hint') }}</p>
           </div>
@@ -157,7 +165,6 @@
         {{-- Step 3: talk to it. --}}
         <div class="ag-pane" data-ag-pane="2">
           <div class="ag-pane-head" style="text-align:center">
-            <p class="ag-muted" style="font-weight:700;font-size:.86rem">{{ __('agents.step_of', ['n' => 3, 'total' => 4]) }}</p>
             <h2 data-ag-talk-title>{{ __('agents.talk_heading', ['name' => $agent->name ?? __('agents.agent_name_placeholder')]) }}</h2>
             <p data-ag-talk-hint data-male="{{ __('agents.talk_hint') }}" data-female="{{ __('agents.talk_hint_female') }}">{{ \App\Support\Agents\Gendered::line('agents.talk_hint', ($voiceGender ?? null) === 'female') }}</p>
           </div>
@@ -171,7 +178,6 @@
         {{-- Step 4: go live. --}}
         <div class="ag-pane" data-ag-pane="3">
           <div class="ag-pane-head">
-            <p class="ag-muted" style="font-weight:700;font-size:.86rem">{{ __('agents.step_of', ['n' => 4, 'total' => 4]) }}</p>
             <h2>{{ __('agents.live_heading') }}</h2>
             <p>{{ __('agents.live_hint') }}</p>
           </div>
@@ -232,6 +238,7 @@
         'correct' => __('agents.talk_correct'), 'correct_placeholder' => __('agents.talk_correct_placeholder'),
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
         'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'),
+        'site_remove' => __('agents.live_site_remove'), 'site_remove_short' => __('agents.live_site_remove_short'), 'site_invalid' => __('agents.live_site_invalid'), 'site_exists' => __('agents.live_site_exists'), 'site_max' => __('agents.live_site_max'),
         'play' => __('agents.voice_play'), 'pause' => __('agents.voice_pause'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
         'talk_heading' => __('agents.talk_heading'), 'error_name' => __('agents.error_name'),
         'balance' => ['upgrade' => __('agents.balance.upgrade')],

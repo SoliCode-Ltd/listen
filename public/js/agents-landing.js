@@ -3,7 +3,9 @@
  * (components/agents/real-call) play with their words lit as they are said and the
  * orb following the voice; the month's numbers and the channels play once when they
  * come into view; "Talk to Sara now" opens a real call with Listen's own agent (its
- * call button, js/listen-agent.js). Without motion, everything shows as it ends.
+ * call button, js/listen-agent.js). Every dialect opens in a dialog with a search; how
+ * it works follows the page as it scrolls; a call picked in the inbox opens beside it.
+ * Without motion, everything shows as it ends.
  */
 (function () {
   'use strict';
@@ -51,24 +53,26 @@
     els.forEach(function (el) { io.observe(el); });
   }
 
-  /* Questions: the answer opens and closes smoothly instead of jumping. */
+  /* Questions: the answer opens and closes smoothly instead of jumping (and can turn back midway). */
   function faq() {
-    $$('.agl-faq-list details').forEach(function (d) {
-      var summary = $('summary', d), body = $('p', d);
+    $$('.agl-faq-item').forEach(function (d) {
+      var summary = $('summary', d), body = $('.agl-faq-a', d);
       if (!summary || !body || reduce || !body.animate) return;
       var ease = 'cubic-bezier(.22, 1, .36, 1)', busy = null;
       summary.addEventListener('click', function (ev) {
         ev.preventDefault();
-        if (busy) busy.cancel();
-        var pad = getComputedStyle(body).paddingBottom;
-        if (d.open) {
+        var from = body.getBoundingClientRect().height;
+        if (busy) { busy.onfinish = null; busy.cancel(); busy = null; }
+        if (d.open && !d.classList.contains('is-closing')) {
           d.classList.add('is-closing');
-          busy = body.animate([{ height: body.offsetHeight + 'px', paddingBottom: pad, opacity: 1 }, { height: '0px', paddingBottom: '0px', opacity: 0 }], { duration: 260, easing: ease });
+          busy = body.animate([{ height: from + 'px', opacity: 1 }, { height: '0px', opacity: 0 }], { duration: 260, easing: ease });
           busy.onfinish = function () { d.open = false; d.classList.remove('is-closing'); busy = null; };
-          busy.oncancel = function () { d.classList.remove('is-closing'); };
         } else {
+          var reopening = d.open;
+          d.classList.remove('is-closing');
           d.open = true;
-          busy = body.animate([{ height: '0px', paddingBottom: '0px', opacity: 0 }, { height: body.offsetHeight + 'px', paddingBottom: pad, opacity: 1 }], { duration: 340, easing: ease });
+          var to = body.scrollHeight;
+          busy = body.animate([{ height: (reopening ? from : 0) + 'px', opacity: reopening ? 1 : 0 }, { height: to + 'px', opacity: 1 }], { duration: 340, easing: ease });
           busy.onfinish = function () { busy = null; };
         }
       });
@@ -93,21 +97,172 @@
     });
   }
 
-  /* "Every dialect": the full list opens smoothly under the regions. */
-  function more() {
-    var btn = $('[data-agl-more]'), list = $('[data-agl-all]');
-    if (!btn || !list) return;
-    btn.addEventListener('click', function () {
-      var open = list.hidden;
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      btn.classList.toggle('is-on', open);
-      if (open) {
-        list.hidden = false;
-        if (!reduce && list.animate) list.animate([{ opacity: 0, transform: 'translateY(-6px)', maxHeight: '0px' }, { opacity: 1, transform: 'none', maxHeight: list.scrollHeight + 'px' }], { duration: 420, easing: 'cubic-bezier(.22, 1, .36, 1)' });
-      } else if (!reduce && list.animate) {
-        var a = list.animate([{ opacity: 1, maxHeight: list.scrollHeight + 'px' }, { opacity: 0, maxHeight: '0px' }], { duration: 260, easing: 'ease' });
-        a.onfinish = function () { list.hidden = true; };
-      } else list.hidden = true;
+  /*
+   * Every dialect (or accent): a dialog, opened by the button or by a region's tile (on that region).
+   * A search narrows the names (Arabic letters compared without their marks and letter variants),
+   * the regions filter them, and Escape, the close button or the dim backdrop close it.
+   */
+  function dialects() {
+    var dlg = $('[data-agl-all]');
+    if (!dlg) return;
+    var search = $('[data-agl-search]', dlg), none = $('[data-agl-none]', dlg), body = $('[data-agl-groups]', dlg);
+    var chips = $$('[data-agl-filter]', dlg), region = '', opener = null, closing = 0;
+    function norm(s) {
+      return String(s || '').toLowerCase()
+        .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+        .replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627')
+        .replace(/\u0649/g, '\u064A').replace(/\u0629/g, '\u0647').replace(/\u0624/g, '\u0648').replace(/\u0626/g, '\u064A')
+        .replace(/[()\[\]\u060C,.\-\u2013]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    var groups = $$('[data-agl-group]', dlg).map(function (g) {
+      return { el: g, key: g.getAttribute('data-agl-group'), items: $$('li', g).map(function (li) { return { el: li, text: norm(li.textContent) }; }) };
+    });
+    function apply() {
+      var q = norm(search ? search.value : ''), any = false;
+      groups.forEach(function (g) {
+        var shown = 0, inRegion = !region || g.key === region;
+        g.items.forEach(function (it) { var ok = inRegion && (!q || it.text.indexOf(q) !== -1); it.el.hidden = !ok; if (ok) shown++; });
+        g.el.hidden = !shown;
+        if (shown) any = true;
+      });
+      if (none) none.hidden = any;
+      chips.forEach(function (c) { c.setAttribute('aria-pressed', (c.getAttribute('data-agl-filter') || '') === region ? 'true' : 'false'); });
+    }
+    function open(r, from) {
+      region = r || ''; opener = from || null;
+      if (search) search.value = '';
+      apply();
+      clearTimeout(closing);
+      dlg.classList.remove('is-closing');
+      if (typeof dlg.showModal === 'function') { if (!dlg.open) dlg.showModal(); } else dlg.setAttribute('open', '');
+      if (body) body.scrollTop = 0;
+      // With a mouse, straight into the search; on a touch screen the keyboard would cover the list.
+      if (search && window.matchMedia && window.matchMedia('(pointer: fine)').matches) search.focus({ preventScroll: true });
+    }
+    function shut() {
+      clearTimeout(closing);
+      dlg.classList.remove('is-closing');
+      if (typeof dlg.close === 'function') dlg.close(); else { dlg.removeAttribute('open'); if (opener) opener.focus(); }
+    }
+    function close() {
+      if (!dlg.open || dlg.classList.contains('is-closing')) return;
+      if (reduce) { shut(); return; }
+      dlg.classList.add('is-closing');
+      closing = setTimeout(shut, 220);
+    }
+    $$('[data-agl-more]').forEach(function (b) {
+      b.addEventListener('click', function () { open(b.getAttribute('data-agl-region'), b); });
+    });
+    $$('[data-agl-close]', dlg).forEach(function (b) { b.addEventListener('click', close); });
+    // The box fills the dialog, so a click on the dialog itself is a click on the backdrop.
+    dlg.addEventListener('click', function (e) { if (e.target === dlg) close(); });
+    dlg.addEventListener('cancel', function (e) { e.preventDefault(); close(); });
+    chips.forEach(function (c) {
+      c.addEventListener('click', function () { region = c.getAttribute('data-agl-filter') || ''; apply(); if (body) body.scrollTop = 0; });
+    });
+    if (search) search.addEventListener('input', apply);
+  }
+
+  /*
+   * How it works, on wide screens: the step whose number is nearest the middle of the screen leads,
+   * the rail fills as the page scrolls, and the window beside the steps shows that step's screen
+   * (the one that was showing stays under it until it has faded in). On narrow screens, and without
+   * the script, every step simply shows its own screen.
+   */
+  function how() {
+    var root = $('[data-agl-how]');
+    if (!root) return;
+    var texts = $$('[data-agl-how-step]', root), wins = $$('[data-agl-how-win]', root), rail = $('[data-agl-how-rail]', root);
+    if (!texts.length || texts.length !== wins.length) return;
+    var nums = texts.map(function (t) { return $('.agl-how-n', t) || t; });
+    var wide = window.matchMedia ? window.matchMedia('(min-width: 1024px)') : { matches: false };
+    var on = 0, live = false, queued = false, later = 0;
+    function centre(el) { var r = el.getBoundingClientRect(); return r.top + r.height / 2; }
+    function lead(i) {
+      if (i === on) return;
+      var was = on;
+      on = i;
+      texts.forEach(function (t, k) { t.classList.toggle('is-on', k === i); t.classList.toggle('is-done', k < i); });
+      clearTimeout(later);
+      wins.forEach(function (w, k) { w.classList.remove('is-prev'); w.classList.toggle('is-on', k === i); });
+      if (wins[was] && !reduce) {
+        wins[was].classList.add('is-prev');
+        later = setTimeout(function () { wins[was].classList.remove('is-prev'); }, 480);
+      }
+    }
+    function place() {
+      if (!rail || !live) return;
+      var top = root.getBoundingClientRect().top, a = centre(nums[0]), b = centre(nums[nums.length - 1]);
+      rail.style.setProperty('--rail-top', (a - top) + 'px');
+      rail.style.setProperty('--rail-h', Math.max(0, b - a) + 'px');
+    }
+    function measure() {
+      queued = false;
+      if (!live) return;
+      var mid = window.innerHeight / 2, pick = 0, best = Infinity;
+      nums.forEach(function (n, k) { var d = Math.abs(centre(n) - mid); if (d < best) { best = d; pick = k; } });
+      lead(pick);
+      if (rail) {
+        var a = centre(nums[0]), b = centre(nums[nums.length - 1]);
+        rail.style.setProperty('--p', Math.max(0, Math.min(1, (mid - a) / Math.max(1, b - a))).toFixed(4));
+      }
+    }
+    function queue() { if (!queued) { queued = true; requestAnimationFrame(measure); } }
+    function mode() {
+      live = !!wide.matches;
+      root.classList.toggle('is-live', live);
+      if (live) { place(); measure(); }
+      else {
+        clearTimeout(later);
+        wins.forEach(function (w) { w.classList.remove('is-prev'); });
+      }
+    }
+    // A step not leading yet can be clicked: the page glides until it is in the middle.
+    texts.forEach(function (t, k) {
+      t.addEventListener('click', function (e) {
+        if (!live || k === on || (e.target.closest && e.target.closest('a, button'))) return;
+        window.scrollTo({ top: window.scrollY + centre(nums[k]) - window.innerHeight / 2, behavior: reduce ? 'auto' : 'smooth' });
+      });
+    });
+    window.addEventListener('scroll', queue, { passive: true });
+    window.addEventListener('resize', function () { place(); queue(); });
+    window.addEventListener('load', function () { place(); queue(); });
+    if (wide.addEventListener) wide.addEventListener('change', mode); else if (wide.addListener) wide.addListener(mode);
+    mode();
+  }
+
+  /* The call inbox: a call picked on the list opens on the other side; the arrow keys move along the list. */
+  function inbox() {
+    $$('[data-agl-inbox]').forEach(function (root) {
+      var tabs = $$('[role="tab"]', root);
+      var panels = tabs.map(function (t) { return document.getElementById(t.getAttribute('aria-controls')); });
+      function pick(i, focus) {
+        tabs.forEach(function (t, k) {
+          var sel = k === i;
+          t.setAttribute('aria-selected', sel ? 'true' : 'false');
+          t.tabIndex = sel ? 0 : -1;
+          if (panels[k]) panels[k].classList.toggle('is-on', sel);
+        });
+        if (focus) tabs[i].focus();
+      }
+      var narrow = window.matchMedia ? window.matchMedia('(max-width: 760px)') : { matches: false };
+      tabs.forEach(function (t, k) {
+        t.addEventListener('click', function () {
+          pick(k, false);
+          // On a phone the call opens under the list: bring it into view.
+          if (narrow.matches && panels[k] && panels[k].scrollIntoView) panels[k].scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+        });
+        t.addEventListener('keydown', function (e) {
+          var n = tabs.length, to = null;
+          if (e.key === 'ArrowDown') to = (k + 1) % n;
+          else if (e.key === 'ArrowUp') to = (k - 1 + n) % n;
+          else if (e.key === 'Home') to = 0;
+          else if (e.key === 'End') to = n - 1;
+          if (to === null) return;
+          e.preventDefault();
+          pick(to, true);
+        });
+      });
     });
   }
 
@@ -124,7 +279,7 @@
     if (!data || !data.order || !data.order.length) return;
     var key = data.order[0];
     var lines = $('[data-agl-real-lines]', box), play = $('[data-agl-real-play]', box), label = $('[data-agl-real-label]', box);
-    var bar = $('[data-agl-real-bar]', box), face = $('[data-agl-real-face]', box), name = $('[data-agl-real-name]', box);
+    var face = $('[data-agl-real-face]', box), name = $('[data-agl-real-name]', box);
     var dialect = $('[data-agl-real-dialect]', box), biz = $('[data-agl-real-biz]', box), rTitle = $('[data-agl-real-result-title]', box);
     var rName = $('[data-agl-real-result-name]', box), rPhone = $('[data-agl-real-result-phone]', box), rNote = $('[data-agl-real-result-note]', box);
     var clips = {}, levels = {}, run = null, frame = 0, photo = $('[data-agl-real-photo]', box);
@@ -165,7 +320,6 @@
       level(0);
       var r = call().result || {};
       rTitle.textContent = r.title || ''; rName.textContent = r.name || ''; rPhone.textContent = r.phone || ''; rNote.textContent = r.note || '';
-      bar.style.width = '0%';
       box.classList.remove('is-playing', 'is-done', 'is-voicing');
     }
 
@@ -231,8 +385,7 @@
       play.disabled = true;
       durations(turns).then(function (lengths) {
         play.disabled = false;
-        var total = lengths.reduce(function (s, v) { return s + v; }, 0) || 1;
-        run = { i: -1, lengths: lengths, total: total, before: 0, audio: null, timer: 0, stopped: false, paused: false, started: 0 };
+        run = { i: -1, lengths: lengths, audio: null, timer: 0, stopped: false, paused: false, started: 0 };
         lines.textContent = ''; lines.classList.remove('is-full');
         box.classList.add('is-playing');
         box.classList.remove('is-done');
@@ -242,7 +395,6 @@
     }
     function next() {
       if (!run || run.stopped) return;
-      if (run.i >= 0) run.before += run.lengths[run.i];
       run.i++;
       var turns = call().turns;
       if (run.i >= turns.length) { finish(); return; }
@@ -307,13 +459,11 @@
             level(Math.max(0, 0.32 + 0.22 * Math.sin(now * 7.3) * Math.sin(now * 2.1 + 1) + 0.08 * Math.sin(now * 19)));
           }
         }
-        bar.style.width = Math.min(100, (run.before + into) / run.total * 100).toFixed(2) + '%';
         if (!run.paused) frame = requestAnimationFrame(step);
       })();
     }
     function finish() {
       stopFrame();
-      bar.style.width = '100%';
       box.classList.remove('is-voicing');
       box.classList.add('is-done');
       level(0);
@@ -374,7 +524,9 @@
     $$('[data-agl-real]').forEach(realCall);
     rise();
     faq();
-    more();
+    dialects();
+    how();
+    inbox();
     reveals();
     live();
   }

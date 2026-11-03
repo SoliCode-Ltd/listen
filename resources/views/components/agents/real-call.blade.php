@@ -71,7 +71,6 @@
       </span>
       <span data-agl-real-label>{{ $labels['play'] }}</span>
     </button>
-    <span class="agl-real-progress" aria-hidden="true"><i data-agl-real-bar></i></span>
   </div>
 
   {{-- The call, like a messenger: the agent's lines on the start side, the caller's on the other. --}}

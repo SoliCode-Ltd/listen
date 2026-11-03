@@ -110,7 +110,7 @@ class AgentCalls
     }
 
     /**
-     * @param  array{origin?: ?string, page_url?: ?string, visitor?: ?string, country?: ?string, network?: ?string}  $context
+     * @param  array{origin?: ?string, page_url?: ?string, visitor?: ?string, country?: ?string, network?: ?string, free_only?: bool}  $context
      * @return array{ok: bool, error?: string, conversation?: AgentConversation, call_key?: string, token?: string, max_seconds?: int, free?: bool}
      */
     public function start(Agent $agent, string $channel, ?AgentWidget $widget = null, array $context = []): array
@@ -140,6 +140,10 @@ class AgentCalls
             $max = min($max, \App\Support\Agents\HouseAgent::MAX_SECONDS, $site);
         } elseif ($channel === 'test') {
             $left = $this->freeTestSecondsLeft($userId);
+            // The demo page's calls (DemoAgent) only ever use the free test seconds, never credits.
+            if (! empty($context['free_only']) && $left < 20) {
+                return ['ok' => false, 'error' => 'free_used'];
+            }
             if ($left >= 20) {
                 // Free test calls have a daily budget for the whole site, so accounts made only for
                 // the free minutes cannot run up the bill.

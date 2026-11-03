@@ -1,8 +1,8 @@
 /*
  * The switch above the demo's studio (components/dub/mode-switch.blade.php): Text to speech,
- * Voice Design and Dub a video, whichever are open. It sets data-studio on the closest
- * [data-studio-host]; what belongs to modes carries data-studio-pane with their names
- * ("tts", "design", "dub", or several, space separated). Behaviour: js/studio-modes.js.
+ * Voice Design, Dub a video and a Voice agent, whichever are open. It sets data-studio on the
+ * closest [data-studio-host]; what belongs to modes carries data-studio-pane with their names
+ * ("tts", "design", "dub", "agent", or several, space separated). Behaviour: js/studio-modes.js.
  */
 .studio-modes {
   display: grid;
@@ -57,7 +57,8 @@
 /* Only what belongs to the chosen mode shows. */
 [data-studio-host][data-studio="tts"] [data-studio-pane]:not([data-studio-pane~="tts"]),
 [data-studio-host][data-studio="design"] [data-studio-pane]:not([data-studio-pane~="design"]),
-[data-studio-host][data-studio="dub"] [data-studio-pane]:not([data-studio-pane~="dub"]) { display: none !important; }
+[data-studio-host][data-studio="dub"] [data-studio-pane]:not([data-studio-pane~="dub"]),
+[data-studio-host][data-studio="agent"] [data-studio-pane]:not([data-studio-pane~="agent"]) { display: none !important; }
 
 @media (max-width: 560px) {
   .studio-mode { padding: .6rem .65rem; gap: .55rem; flex-direction: column; text-align: center; }

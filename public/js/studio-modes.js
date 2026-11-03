@@ -1,15 +1,15 @@
 /*
  * The switch above the demo's studio (components/dub/mode-switch.blade.php): Text to speech,
- * Voice Design and Dub a video. It sets data-studio on the closest [data-studio-host]
- * (css/studio-modes.css shows only that mode's panes), remembers the choice in this browser,
- * and puts it in the address: #voice-design or #dub opens that side. Each change sends
- * listen:studio-mode ({mode}).
+ * Voice Design, Dub a video and a Voice agent. It sets data-studio on the closest
+ * [data-studio-host] (css/studio-modes.css shows only that mode's panes), remembers the choice in
+ * this browser, and puts it in the address: #voice-design, #dub or #voice-agent opens that side.
+ * Each change sends listen:studio-mode ({mode}).
  */
 (function () {
   'use strict';
 
   var MODE_KEY = 'listen.studio.mode';
-  var HASHES = { design: '#voice-design', dub: '#dub' };
+  var HASHES = { design: '#voice-design', dub: '#dub', agent: '#voice-agent' };
 
   function initSwitch(sw) {
     var host = sw.closest('[data-studio-host]');
@@ -40,6 +40,11 @@
       } catch (e) { /* no storage */ }
     }
     set(start, false);
+    // A link to #voice-design, #dub or #voice-agent on this same page opens that side too.
+    window.addEventListener('hashchange', function () {
+      var mode = Object.keys(HASHES).filter(function (m) { return HASHES[m] === window.location.hash; })[0];
+      if (mode && modes.indexOf(mode) >= 0) set(mode, false);
+    });
     requestAnimationFrame(function () { sw.classList.add('is-ready'); });
   }
 

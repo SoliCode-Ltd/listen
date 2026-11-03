@@ -10,7 +10,7 @@ return [
     'used' => ':count used',
     'more' => 'Get more credits',
     'plan' => 'Change plan',
-    'where' => 'Where your credits went',
+    'where' => 'Credit usage',
     'where_hint' => 'Every credit you used this period, by what used it.',
     'kinds' => [
         'studio' => 'Studio audio',

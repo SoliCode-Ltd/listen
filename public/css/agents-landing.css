@@ -3,29 +3,45 @@
  * section (components/home/agents). One bold element per page: the real call on its ink stage, with
  * the page's one orb. Around it everything stays quiet: the site's own surfaces, fine lines, one
  * violet, one type family (Alexandria) on one scale, and headlines that keep to two lines.
+ * The product's own screens (how it works, the call inbox) are drawn as flat windows on a flat stage.
  */
 .agl {
   --agl-ease: cubic-bezier(.22, 1, .36, 1);
   --agl-soft: color-mix(in srgb, var(--a) 9%, transparent);
   --agl-soft-2: color-mix(in srgb, var(--a) 16%, transparent);
   --agl-ok: var(--ok, #32c58d);
+  /* Green for small text: readable on white and on the dark surfaces. */
+  --agl-ok-text: #0f8a5f;
   --agl-ink: #17144A;
   --agl-ink-2: #231d63;
   --agl-on-ink: #F3F1FF;
   --agl-on-ink-muted: #B9B2E6;
   --agl-r: 24px;
   --agl-wide: 1180px;
+  /* The stage the drawn windows sit on, a pane inside a window, and the window's lift. */
+  --agl-stage: color-mix(in srgb, var(--a) 6%, var(--surface2));
+  --agl-stage-line: color-mix(in srgb, var(--a) 12%, var(--line));
+  --agl-pane: color-mix(in srgb, var(--surface2) 55%, var(--surface));
+  --agl-win-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 22px 44px -26px rgba(23, 20, 74, .32);
   overflow-x: clip;
 }
 html[data-theme="dark"] .agl { --agl-ink: #1c1747; --agl-ink-2: #29225e; }
+html:not([data-theme="light"]) .agl {
+  --agl-ok-text: #4fd8a2;
+  --agl-stage: color-mix(in srgb, var(--a) 7%, var(--bg));
+  --agl-stage-line: color-mix(in srgb, var(--a) 18%, var(--line));
+  --agl-pane: color-mix(in srgb, var(--surface2) 70%, var(--surface));
+  --agl-win-shadow: 0 24px 48px -24px rgba(0, 0, 0, .7);
+}
 .agl *, .agl *::before, .agl *::after { box-sizing: border-box; }
 .agl [hidden] { display: none !important; }
 /* A light reset (one class of weight), so each part's own spacing below wins over it. */
-.agl :where(h1, h2, h3, p, ul, ol) { margin: 0; }
+.agl :where(h1, h2, h3, h4, p, ul, ol) { margin: 0; }
 .agl :where(ul, ol) { padding: 0; list-style: none; }
 .agl h1, .agl h2, .agl h3 { letter-spacing: -.02em; text-wrap: balance; }
 html[dir="rtl"] .agl h1, html[dir="rtl"] .agl h2, html[dir="rtl"] .agl h3 { letter-spacing: 0; }
 .agl p { text-wrap: pretty; }
+.agl-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* ---------- One scale for every section. ---------- */
 .agl-section { max-width: var(--agl-wide); margin: 0 auto; padding: clamp(3.2rem, 7vw, 6rem) clamp(1rem, 2.4vw, 1.6rem) 0; }
@@ -41,9 +57,14 @@ html[dir="rtl"] .agl-head h2 { line-height: 1.4; }
 .agl-live-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .agl-live-btn:hover { background: var(--agl-soft); }
 .agl-live-btn:focus-visible, .agl-speaks-more:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: 2px; }
-/* One icon style everywhere: a soft violet tile. */
+/* One icon style everywhere: a soft violet tile, line icons drawn the same way. */
 .agl-icon { flex: 0 0 auto; display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--agl-soft); color: var(--accent-text, var(--a)); }
-.agl-icon svg, .agl-honest svg, .agl-flow-icon svg, .agl-facts svg, .agl-inbox-icon svg, .agl-ui-tile svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.agl-icon svg, .agl-honest svg, .agl-flow-icon svg, .agl-facts svg, .agl-app svg, .agl-dialects svg, .agl-fwd {
+  width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
+}
+/* An arrow that points forward in either direction. */
+.agl-fwd { width: 16px; height: 16px; stroke-width: 2.1; }
+html[dir="rtl"] .agl-fwd { transform: scaleX(-1); }
 
 /* ---------- The hero: two lines, a short lead, the call beside them. ---------- */
 .agl-hero {
@@ -71,72 +92,294 @@ html[dir="rtl"] .agl-hero h1 { font-size: clamp(2.2rem, 4vw, 3.15rem); line-heig
 }
 @keyframes agl-arrive { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
-/* ---------- The dialects it speaks: one line, the regions, the full list on demand. ---------- */
-.agl-speaks {
-  max-width: var(--agl-wide); margin: clamp(1.5rem, 4vw, 3rem) auto 0; padding: 1.4rem clamp(1rem, 2.4vw, 1.6rem);
-  display: grid; grid-template-columns: minmax(14rem, .8fr) minmax(0, 1.6fr) auto; align-items: center; gap: 1rem 2rem;
-  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
-}
-.agl-speaks-copy h2 { font-size: 1.15rem; font-weight: 700; line-height: 1.45; }
-.agl-speaks-copy p { margin-top: .2rem; color: var(--muted); font-size: .94rem; line-height: 1.6; }
-.agl-speaks-regions { display: flex; flex-wrap: wrap; gap: .4rem; min-width: 0; }
-.agl-speaks-regions li { display: inline-flex; align-items: center; gap: .45rem; padding: .35rem .75rem; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: .86rem; line-height: 1.5; }
-.agl-speaks-regions b { font-weight: 600; }
-.agl-speaks-regions span { color: var(--muted); font-variant-numeric: tabular-nums; }
+/* ---------- The dialects it speaks: a tile per region, every one of them in a dialog. ---------- */
+.agl-speaks { max-width: var(--agl-wide); margin: clamp(2rem, 5vw, 3.6rem) auto 0; padding: 0 clamp(1rem, 2.4vw, 1.6rem); }
+.agl-speaks-head { display: flex; align-items: flex-end; justify-content: space-between; gap: .9rem 2rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
+.agl-speaks-copy { min-width: 0; max-width: 640px; }
+.agl-speaks-copy h2 { font-size: clamp(1.25rem, 2vw, 1.5rem); font-weight: 700; line-height: 1.4; }
+.agl-speaks-copy p { margin-top: .3rem; color: var(--muted); font-size: .98rem; line-height: 1.65; }
 .agl-speaks-more {
-  display: inline-flex; align-items: center; gap: .4rem; min-height: 40px; padding: .4rem .9rem; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--a) 40%, var(--line));
-  background: transparent; color: var(--accent-text, var(--a)); font: inherit; font-size: .9rem; font-weight: 700; cursor: pointer;
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: .45rem 1.05rem; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font: inherit; font-size: .92rem; font-weight: 700; cursor: pointer;
+  transition: border-color .2s ease, background .2s ease;
 }
-.agl-speaks-more[aria-expanded="true"] { background: var(--agl-soft); }
-.agl-all { grid-column: 1 / -1; padding: 1rem 0 .2rem; text-align: start; }
-.agl-all-group + .agl-all-group { margin-top: .8rem; }
-.agl-all-region { display: block; margin-bottom: .4rem; color: var(--muted); font-size: .82rem; font-weight: 700; }
-.agl-all ul { display: flex; flex-wrap: wrap; gap: .3rem; max-height: 280px; overflow: auto; }
-.agl-all li { padding: .2rem .65rem; border-radius: 999px; background: var(--agl-soft); font-size: .82rem; font-weight: 600; line-height: 1.6; }
+.agl-speaks-more span { color: var(--accent-text); font-variant-numeric: tabular-nums; }
+.agl-speaks-more:hover { border-color: color-mix(in srgb, var(--a) 45%, var(--line-strong)); background: var(--agl-soft); }
+/* One frame, the regions divided by hairlines (each tile draws its own start and top line; the
+   frame hides the outer ones, so a short last row leaves no grey gap). */
+.agl-regions {
+  display: grid; grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr)); overflow: hidden;
+  border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: var(--card-shadow);
+}
+.agl-regions li { display: flex; min-width: 0; margin-block-start: -1px; margin-inline-start: -1px; border-block-start: 1px solid var(--line); border-inline-start: 1px solid var(--line); }
+.agl-region {
+  flex: 1; min-width: 0; display: grid; align-content: start; gap: .3rem; padding: 1.15rem 1.2rem 1.25rem; border: 0; border-radius: 0;
+  background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer; transition: background .2s ease;
+}
+.agl-region:hover { background: color-mix(in srgb, var(--a) 5%, var(--surface)); }
+.agl-region:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: -3px; }
+.agl-region-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .45rem; }
+.agl-region-n { display: inline-flex; align-items: baseline; gap: .35rem; min-width: 0; }
+.agl-region-n b { font-size: 1.9rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.agl-region-n small { color: var(--muted); font-size: .8rem; font-weight: 600; }
+/* A few of the region's flags, overlapping, the first country on top. */
+.agl-region-flags { display: inline-flex; flex: 0 0 auto; isolation: isolate; }
+.agl-region-flags img { position: relative; display: block; width: 24px; height: 24px; border-radius: 50%; object-fit: cover; background: var(--surface2); box-shadow: 0 0 0 2px var(--surface); }
+.agl-region-flags img + img { margin-inline-start: -8px; }
+.agl-region-flags img:nth-child(1) { z-index: 4; }
+.agl-region-flags img:nth-child(2) { z-index: 3; }
+.agl-region-flags img:nth-child(3) { z-index: 2; }
+.agl-region-flags img:nth-child(4) { z-index: 1; }
+.agl-region:hover .agl-region-flags img { box-shadow: 0 0 0 2px color-mix(in srgb, var(--a) 5%, var(--surface)); }
+.agl-region-badge { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--agl-soft-2); color: var(--accent-text); font-size: .82rem; font-weight: 800; line-height: 1; }
+.agl-region-name { font-size: 1rem; font-weight: 700; line-height: 1.45; }
+.agl-region-list { color: var(--muted); font-size: .84rem; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* ---------- How it works: one track, four steps, each with a drawing of its screen. ---------- */
-.agl-track {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; counter-reset: step;
-  border: 1px solid var(--line); border-radius: var(--agl-r); overflow: hidden; background: var(--line);
+/* Every dialect: a dialog with a search, the regions as filters, and the names in columns. */
+/* A steady height, so it does not jump while the search narrows the list. */
+.agl-dialects {
+  width: min(900px, calc(100vw - 2rem)); max-width: none; height: min(760px, calc(100dvh - 3rem)); max-height: none; padding: 0; margin: auto;
+  border: 1px solid var(--line); border-radius: 24px; background: var(--surface); color: var(--text); overflow: hidden;
+  box-shadow: 0 40px 90px -30px rgba(15, 12, 50, .5);
 }
-.agl-step { display: grid; align-content: start; gap: .55rem; padding: clamp(1rem, 1.8vw, 1.35rem); background: var(--surface); }
-.agl-step h3 { font-size: 1.06rem; font-weight: 700; line-height: 1.45; }
-.agl-step p { color: var(--muted); font-size: .93rem; line-height: 1.65; }
-.agl-step-n { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-top: .45rem; border-radius: 50%; background: var(--a); color: #fff; font-size: .84rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-/* The drawn screens: the product's own parts, in the page's language and theme. */
-.agl-ui {
-  position: relative; display: grid; align-content: center; gap: .6rem; height: 206px; padding: .9rem; overflow: hidden;
-  border-radius: 16px; background: var(--bg); border: 1px solid var(--line); font-size: .82rem; line-height: 1.5;
+.agl-dialects[open] { display: flex; }
+.agl-dialects::backdrop { background: rgba(14, 12, 34, .5); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.agl-dialects-box { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; }
+.agl-dialects-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.4rem 1.5rem 1rem; }
+.agl-dialects-head h3 { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem .6rem; font-size: 1.25rem; font-weight: 700; line-height: 1.45; }
+.agl-dialects-head p { margin-top: .2rem; color: var(--muted); font-size: .94rem; line-height: 1.6; }
+.agl-count { display: inline-grid; place-items: center; min-width: 2.3rem; height: 1.6rem; padding: 0 .55rem; border-radius: 999px; background: var(--agl-soft-2); color: var(--accent-text); font-size: .82rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.agl-dialects-close {
+  flex: 0 0 auto; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line-strong);
+  background: var(--surface); color: var(--text); cursor: pointer; transition: background .2s ease;
 }
-.agl-ui-site { display: flex; align-items: center; gap: .6rem; padding: .45rem .55rem; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
-.agl-ui-dots { display: inline-flex; gap: 4px; }
-.agl-ui-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
-.agl-ui-addr { flex: 1; display: flex; align-items: center; gap: .35rem; height: 22px; padding: 0 .5rem; border-radius: 999px; background: var(--bg); }
-.agl-ui-addr svg { width: 12px; height: 12px; fill: none; stroke: var(--agl-ok); stroke-width: 2.2; }
-.agl-ui-addr i { flex: 0 1 60%; height: 6px; border-radius: 6px; background: var(--line); }
-.agl-ui-reading { display: flex; align-items: center; gap: .5rem; font-weight: 600; }
-.agl-ui-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--agl-soft-2); border-top-color: var(--a); animation: agl-spin 1s linear infinite; }
-.agl-ui-facts { display: flex; flex-wrap: wrap; gap: .35rem; }
-.agl-ui-facts li { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .55rem; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-weight: 600; }
-.agl-ui-facts svg { width: 12px; height: 12px; fill: none; stroke: var(--agl-ok); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-.agl-ui-found { color: var(--muted); }
-.agl-ui-voices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem .4rem; }
-.agl-ui-voices li { display: grid; justify-items: center; gap: .25rem; font-weight: 600; }
-.agl-ui-voices img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--agl-soft); }
-.agl-ui-voices li.is-on img { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--a); }
-.agl-ui-voices li.is-on span { color: var(--accent-text, var(--a)); }
-.agl-ui-chat { display: flex; flex-direction: column; gap: .45rem; }
-.agl-ui-chat p { max-width: 88%; padding: .45rem .65rem; border-radius: 14px; }
-.agl-ui-chat .is-caller { align-self: flex-end; background: var(--surface); border: 1px solid var(--line); border-start-end-radius: 5px; }
-.agl-ui-chat .is-agent { align-self: flex-start; background: var(--agl-soft-2); border-start-start-radius: 5px; }
-.agl-ui-fix { align-self: flex-start; display: inline-flex; align-items: center; gap: .3rem; color: var(--accent-text, var(--a)); font-weight: 700; }
-.agl-ui-fix svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.agl-ui-live { display: grid; gap: .4rem; }
-.agl-ui-live li { display: flex; align-items: center; gap: .55rem; padding: .35rem .45rem; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); font-weight: 600; }
-.agl-ui-tile { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: var(--agl-soft); color: var(--accent-text, var(--a)); }
-.agl-ui-tile svg { width: 16px; height: 16px; }
-.agl-ui-on { display: inline-flex; align-items: center; gap: .4rem; color: var(--agl-ok); font-weight: 700; }
-.agl-ui-on i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px color-mix(in srgb, var(--agl-ok) 20%, transparent); }
+.agl-dialects-close:hover { background: var(--surface2); }
+.agl-dialects-close svg { width: 18px; height: 18px; stroke-width: 2.2; }
+.agl-dialects-close:focus-visible, .agl-dialects-filter button:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: 2px; }
+.agl-dialects-tools { display: grid; gap: .8rem; padding: 0 1.5rem 1.05rem; border-bottom: 1px solid var(--line); }
+.agl-dialects-search {
+  display: flex; align-items: center; gap: .6rem; height: 48px; padding: 0 .95rem; border-radius: 14px;
+  border: 1px solid var(--line-strong); background: var(--surface); transition: border-color .2s ease, box-shadow .2s ease;
+}
+.agl-dialects-search:focus-within { border-color: var(--a); box-shadow: 0 0 0 3px var(--agl-soft-2); }
+.agl-dialects-search svg { flex: 0 0 auto; width: 19px; height: 19px; color: var(--muted); }
+.agl-dialects-search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 1rem; }
+.agl-dialects-search input::placeholder { color: var(--muted); opacity: .85; }
+.agl-dialects-search input::-webkit-search-cancel-button { cursor: pointer; }
+.agl-dialects-filter { display: flex; flex-wrap: wrap; gap: .4rem; }
+.agl-dialects-filter button {
+  display: inline-flex; align-items: center; gap: .4rem; min-height: 36px; padding: .3rem .8rem; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font: inherit; font-size: .86rem; font-weight: 600; cursor: pointer;
+  transition: background .2s ease, border-color .2s ease, color .2s ease;
+}
+.agl-dialects-filter button span { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+.agl-dialects-filter button:hover { border-color: color-mix(in srgb, var(--a) 45%, var(--line-strong)); }
+.agl-dialects-filter button[aria-pressed="true"] { background: var(--a); border-color: var(--a); color: #fff; }
+.agl-dialects-filter button[aria-pressed="true"] span { color: rgba(255, 255, 255, .82); }
+.agl-dialects-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 1.15rem 1.5rem 1.4rem; }
+.agl-dialects-group + .agl-dialects-group { margin-top: 1.4rem; }
+.agl-dialects-group h4 { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; font-size: .92rem; font-weight: 700; }
+.agl-dialects-group h4 span { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.agl-dialects-group ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: .35rem; }
+.agl-dialects-group li { padding: .45rem .75rem; border-radius: 10px; background: var(--surface2); font-size: .9rem; line-height: 1.5; }
+.agl-dialects-none { padding: 2.2rem 0 1.4rem; color: var(--muted); text-align: center; }
+.agl-dialects-foot { padding: .85rem 1.5rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .86rem; line-height: 1.6; }
+/* The page stays put behind it (its scrollbar's room kept, so nothing shifts). */
+html:has(.agl-dialects[open]) { overflow: hidden; scrollbar-gutter: stable; }
+@media (prefers-reduced-motion: no-preference) {
+  .agl-dialects[open] { animation: agl-pop .34s var(--agl-ease); }
+  .agl-dialects[open]::backdrop { animation: agl-fade .3s ease; }
+  .agl-dialects.is-closing { animation: agl-pop-out .2s ease forwards; }
+  .agl-dialects.is-closing::backdrop { animation: agl-fade-out .2s ease forwards; }
+}
+@keyframes agl-pop { from { opacity: 0; transform: translateY(14px) scale(.985); } }
+@keyframes agl-pop-out { to { opacity: 0; transform: translateY(10px) scale(.99); } }
+@keyframes agl-fade { from { opacity: 0; } }
+@keyframes agl-fade-out { to { opacity: 0; } }
+
+/* ---------- The drawn studio windows (how it works, the call inbox). ---------- */
+.agl-app {
+  container-type: inline-size; display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; overflow: hidden;
+  border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--agl-win-shadow);
+  font-size: .84rem; line-height: 1.5; color: var(--text);
+}
+.agl-app svg { width: 16px; height: 16px; }
+.agl-app-bar { display: flex; align-items: center; gap: .6rem; min-height: 50px; padding: .5rem .95rem; border-bottom: 1px solid var(--line); }
+.agl-app-mark { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--a); }
+.agl-app .agl-app-mark svg { width: 16px; height: 16px; fill: #fff; stroke: none; }
+.agl-app-crumb { display: flex; align-items: center; gap: .45rem; min-width: 0; color: var(--muted); font-size: .84rem; white-space: nowrap; }
+.agl-app-crumb i { font-style: normal; opacity: .5; }
+.agl-app-crumb b { color: var(--text); font-weight: 700; }
+.agl-app-crumb em { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-style: normal; padding-inline-start: .45rem; border-inline-start: 1px solid var(--line); }
+.agl-app-state {
+  flex: 0 0 auto; margin-inline-start: auto; display: inline-flex; align-items: center; gap: .4rem; padding: .22rem .65rem;
+  border-radius: 999px; background: var(--surface2); color: var(--muted); font-size: .76rem; font-weight: 700; white-space: nowrap;
+}
+.agl-app-state i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .65; }
+.agl-app-state.is-live { background: color-mix(in srgb, var(--agl-ok) 14%, transparent); color: var(--agl-ok-text); }
+.agl-app-state.is-live i { background: var(--agl-ok); opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--agl-ok) 22%, transparent); }
+.agl-app-body { display: grid; grid-template-columns: 9.6rem minmax(0, 1fr); min-height: 0; }
+.agl-app-side { display: grid; align-content: start; gap: 2px; padding: .7rem .55rem; border-inline-end: 1px solid var(--line); background: var(--agl-pane); }
+.agl-app-side li { display: flex; align-items: center; gap: .55rem; min-height: 34px; padding: 0 .6rem; border-radius: 9px; color: var(--muted); font-size: .82rem; font-weight: 600; }
+.agl-app-side li svg { flex: 0 0 auto; display: block; }
+.agl-app-side li.is-on { background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(16, 24, 40, .06); }
+.agl-app-side li.is-on svg:first-child { color: var(--accent-text); }
+.agl-app-side li.is-after { position: relative; margin-top: .6rem; }
+.agl-app-side li.is-after::before { content: ''; position: absolute; top: calc(-.3rem - 1px); inset-inline: .6rem; height: 1px; background: var(--line); }
+.agl-app .agl-app-tick { width: 14px; height: 14px; margin-inline-start: auto; color: var(--agl-ok); stroke-width: 2.6; }
+.agl-app-main { display: grid; align-content: start; gap: .8rem; min-width: 0; padding: 1.05rem 1.15rem 1.15rem; }
+.agl-app-h { display: grid; gap: .05rem; }
+.agl-app-h b { font-size: 1rem; font-weight: 700; }
+.agl-app-h span { color: var(--muted); font-size: .8rem; }
+@container (max-width: 34rem) {
+  .agl-app-body { grid-template-columns: minmax(0, 1fr); }
+  .agl-app-side { display: none; }
+  .agl-app-crumb em { display: none; }
+}
+
+/* ---------- How it works: four steps on a rail, one window beside them. ---------- */
+.agl-how { position: relative; display: grid; }
+.agl-how-rail { display: none; }
+.agl-how-text { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); column-gap: .9rem; row-gap: .35rem; align-items: center; padding: 1.9rem 0 1rem; }
+.agl-how-text:first-of-type { padding-top: 0; }
+.agl-how-n {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%;
+  background: var(--a); color: #fff; font-size: .92rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  transition: background .35s ease, color .35s ease, box-shadow .35s ease;
+}
+.agl-how-n svg { display: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.agl-how-text h3 { font-size: clamp(1.15rem, 1.7vw, 1.38rem); font-weight: 700; line-height: 1.45; }
+.agl-how-text p { grid-column: 2; color: var(--muted); font-size: 1rem; line-height: 1.75; max-width: 42ch; }
+/* The stage: one flat panel, the window on it, and which step it is under it. */
+.agl-how-win { min-width: 0; padding: clamp(.55rem, 1.4vw, 1rem); border-radius: 26px; background: var(--agl-stage); border: 1px solid var(--agl-stage-line); }
+.agl-how-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem .4rem .2rem; color: var(--muted); font-size: .84rem; font-weight: 600; }
+.agl-how-foot > span:first-child { display: inline-flex; align-items: center; gap: .55rem; min-width: 0; }
+.agl-how-foot > span:first-child i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: .6; }
+.agl-how-dots { display: inline-flex; gap: 5px; flex: 0 0 auto; }
+.agl-how-dots i { width: 18px; height: 3px; border-radius: 3px; background: color-mix(in srgb, var(--text) 16%, transparent); }
+.agl-how-dots i.is-on { background: var(--a); }
+
+/* 1. Knowledge: the website read, what it found. */
+.agl-k-url { display: flex; align-items: center; gap: .6rem; height: 42px; padding-inline: .8rem .3rem; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface); }
+.agl-app .agl-k-url svg { flex: 0 0 auto; width: 15px; height: 15px; color: var(--agl-ok); stroke-width: 2.2; }
+.agl-k-url i { flex: 0 1 46%; height: 7px; border-radius: 7px; background: var(--line); }
+.agl-k-url b { margin-inline-start: auto; padding: .36rem .85rem; border-radius: 9px; background: var(--a); color: #fff; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.agl-k-done { display: grid; gap: .45rem; }
+.agl-k-done span { display: inline-flex; align-items: center; gap: .4rem; color: var(--agl-ok-text); font-size: .8rem; font-weight: 700; }
+.agl-app .agl-k-done svg { width: 15px; height: 15px; stroke-width: 2.6; }
+.agl-k-done i { display: block; height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.agl-k-done b { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--agl-ok); }
+.agl-k-facts { display: grid; border: 1px solid var(--line); border-radius: 13px; overflow: hidden; }
+.agl-k-facts li { display: grid; grid-template-columns: 28px 7.2rem minmax(0, 1fr); align-items: center; column-gap: .7rem; min-height: 46px; padding: .45rem .75rem; }
+.agl-k-facts li + li { border-top: 1px solid var(--line); }
+.agl-k-ic { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--agl-soft); color: var(--accent-text); }
+.agl-app .agl-k-ic svg { width: 15px; height: 15px; }
+.agl-k-label { color: var(--muted); font-size: .8rem; font-weight: 600; }
+.agl-k-value { min-width: 0; font-weight: 600; line-height: 1.5; }
+.agl-k-add { display: inline-flex; align-items: center; gap: .35rem; color: var(--accent-text); font-size: .8rem; font-weight: 700; }
+.agl-app .agl-k-add svg { width: 14px; height: 14px; stroke-width: 2.4; }
+@container (max-width: 26rem) {
+  .agl-k-facts li { grid-template-columns: 28px minmax(0, 1fr); row-gap: 0; padding-block: .55rem; }
+  .agl-k-ic { grid-row: 1 / span 2; }
+}
+
+/* 2. Voice: real voices, one picked, its sample. */
+.agl-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.agl-chips span { padding: .2rem .7rem; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); font-size: .78rem; font-weight: 600; }
+.agl-chips span.is-on { border-color: color-mix(in srgb, var(--a) 45%, var(--line)); background: var(--agl-soft); color: var(--accent-text); }
+.agl-v-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+.agl-v-grid li { display: flex; align-items: center; gap: .55rem; min-width: 0; padding: .5rem .55rem; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); }
+.agl-v-grid li.is-on { border-color: var(--a); background: color-mix(in srgb, var(--a) 6%, var(--surface)); box-shadow: 0 0 0 3px var(--agl-soft); }
+.agl-v-face { position: relative; flex: 0 0 auto; width: 36px; height: 36px; }
+.agl-v-face img { display: block; width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--agl-soft); }
+.agl-v-face i { position: absolute; inset-inline-end: -4px; bottom: -3px; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--a); color: #fff; box-shadow: 0 0 0 2px var(--surface); }
+.agl-app .agl-v-face i svg { width: 10px; height: 10px; stroke-width: 3.4; }
+.agl-v-who { display: grid; min-width: 0; line-height: 1.35; }
+.agl-v-who b { font-size: .84rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agl-v-who small { color: var(--muted); font-size: .74rem; }
+.agl-v-player {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "line line line" "play wave time"; align-items: center;
+  gap: .5rem .7rem; padding: .7rem .8rem; border-radius: 13px; border: 1px solid var(--line); background: var(--agl-pane);
+}
+.agl-v-player p { grid-area: line; font-size: .82rem; font-weight: 600; }
+.agl-v-play { grid-area: play; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--a); color: #fff; }
+.agl-app .agl-v-play svg { width: 13px; height: 13px; fill: currentColor; stroke: none; transform: translateX(1px); }
+.agl-v-wave { grid-area: wave; display: flex; align-items: center; gap: 2px; height: 28px; min-width: 0; overflow: hidden; }
+.agl-v-wave i { flex: 1 1 0; min-width: 2px; max-width: 4px; height: var(--h); border-radius: 2px; background: color-mix(in srgb, var(--text) 18%, transparent); }
+.agl-v-wave i.is-on { background: var(--a); }
+.agl-v-time { grid-area: time; color: var(--muted); font-size: .76rem; font-variant-numeric: tabular-nums; }
+@container (max-width: 26rem) { .agl-v-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* In the full window (with its side menu) the screens fill its height. */
+@container (min-width: 34rem) {
+  .agl-v-grid { gap: .6rem; }
+  .agl-v-grid li { padding: .65rem .7rem; }
+  .agl-v-face, .agl-v-face img { width: 42px; height: 42px; }
+  .agl-v-who b { font-size: .88rem; }
+  .agl-v-player { gap: .7rem .8rem; padding: .95rem 1rem; }
+  .agl-v-wave { height: 32px; }
+}
+
+/* 3. A test call, and one answer corrected. */
+.agl-t-bar { display: flex; align-items: center; gap: .6rem; padding: .5rem .6rem; border-radius: 13px; border: 1px solid var(--line); background: var(--agl-pane); }
+.agl-t-bar img { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+.agl-t-bar > span { display: grid; min-width: 0; line-height: 1.35; }
+.agl-t-bar b { font-size: .82rem; }
+.agl-t-bar small { display: inline-flex; align-items: center; gap: .35rem; color: var(--muted); font-size: .74rem; font-variant-numeric: tabular-nums; }
+.agl-t-bar small i { width: 6px; height: 6px; border-radius: 50%; background: var(--agl-ok); }
+.agl-t-bar em { flex: 0 0 auto; margin-inline-start: auto; padding: .24rem .75rem; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); font-size: .74rem; font-style: normal; font-weight: 700; }
+.agl-t-chat { display: flex; flex-direction: column; gap: .5rem; }
+.agl-t-chat > p { max-width: 86%; padding: .45rem .75rem .55rem; border-radius: 14px; font-size: .84rem; line-height: 1.6; }
+.agl-t-chat small { display: block; color: var(--muted); font-size: .7rem; font-weight: 700; }
+.agl-t-chat .is-agent { align-self: flex-start; background: var(--agl-soft-2); border-start-start-radius: 5px; }
+.agl-t-chat .is-caller { align-self: flex-end; background: var(--surface2); border-start-end-radius: 5px; }
+.agl-t-fix { align-self: flex-start; display: grid; gap: .3rem; width: min(100%, 22rem); padding: .6rem .8rem .65rem; border-radius: 13px; border: 1px dashed color-mix(in srgb, var(--a) 55%, var(--line)); background: var(--surface); }
+.agl-t-fix-head { display: inline-flex; align-items: center; gap: .35rem; color: var(--accent-text); font-size: .78rem; font-weight: 700; }
+.agl-app .agl-t-fix-head svg { width: 14px; height: 14px; }
+.agl-t-fix-text { font-weight: 600; }
+.agl-t-saved { display: inline-flex; align-items: center; gap: .35rem; color: var(--agl-ok-text); font-size: .76rem; font-weight: 700; }
+.agl-app .agl-t-saved svg { width: 14px; height: 14px; stroke-width: 2.6; }
+
+/* 4. Live: a button on the website, its link and its code. */
+.agl-l-grid { display: grid; grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr); gap: .7rem; align-items: stretch; }
+.agl-l-site { position: relative; display: grid; grid-template-rows: auto 1fr auto; min-height: 236px; overflow: hidden; border-radius: 13px; border: 1px solid var(--line); background: var(--agl-pane); }
+.agl-l-site-top { display: flex; align-items: center; gap: .4rem; height: 30px; padding: 0 .7rem; border-bottom: 1px solid var(--line); background: var(--surface); }
+.agl-l-site-top i { width: 22px; height: 6px; border-radius: 6px; background: var(--line); }
+.agl-l-site-top i:first-child { width: 36px; margin-inline-end: auto; background: color-mix(in srgb, var(--a) 35%, var(--line)); }
+.agl-l-site-page { position: relative; display: grid; align-content: start; gap: .45rem; padding: .85rem .75rem 3.4rem; }
+.agl-l-site-page i { height: 7px; border-radius: 7px; background: var(--line); }
+.agl-l-site-page i:nth-child(1) { width: 70%; height: 10px; }
+.agl-l-site-page i:nth-child(2) { width: 90%; }
+.agl-l-site-page i:nth-child(3) { width: 62%; }
+.agl-l-site-page i:nth-child(4) { width: 40%; height: 20px; margin-top: .3rem; border-radius: 7px; background: color-mix(in srgb, var(--a) 16%, var(--line)); }
+/* The website's own call button, floating in its corner (a flat ring, not an orb). */
+.agl-l-site-btn {
+  position: absolute; inset-inline-end: .6rem; bottom: .7rem; display: inline-flex; align-items: center; gap: .4rem; padding-block: .3rem; padding-inline: .32rem .8rem;
+  border-radius: 999px; background: var(--a); color: #fff; font-size: .76rem; font-weight: 700; white-space: nowrap; box-shadow: 0 8px 18px -8px rgba(76, 45, 235, .75);
+}
+.agl-l-site-btn b { width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 5px color-mix(in srgb, var(--a) 45%, #fff); }
+.agl-l-site-cap { display: grid; justify-items: start; gap: .1rem; padding: .55rem .75rem .6rem; border-top: 1px solid var(--line); background: var(--surface); line-height: 1.45; }
+.agl-l-site-cap b { font-size: .8rem; }
+.agl-l-site-cap small { display: inline-flex; align-items: center; gap: .3rem; color: var(--agl-ok-text); font-size: .72rem; font-weight: 700; }
+.agl-app .agl-l-site-cap svg { width: 13px; height: 13px; stroke-width: 2.6; }
+.agl-l-side { display: grid; gap: .7rem; align-content: start; }
+.agl-l-card { display: flex; align-items: center; gap: .65rem; min-width: 0; padding: .65rem .7rem; border-radius: 13px; border: 1px solid var(--line); background: var(--surface); }
+.agl-l-ic { flex: 0 0 auto; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--agl-soft); color: var(--accent-text); }
+.agl-l-what { flex: 1; display: grid; justify-items: start; gap: .45rem; min-width: 0; }
+.agl-l-what b { font-size: .8rem; }
+.agl-l-what > i { width: 88%; height: 6px; border-radius: 6px; background: var(--line); }
+.agl-l-btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: .3rem; padding: .24rem .55rem; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); font-size: .72rem; font-weight: 700; white-space: nowrap; }
+.agl-app .agl-l-btn svg { width: 12px; height: 12px; stroke-width: 2.2; }
+/* The code beside its name and button; if the card is too narrow, they go under the code. */
+.agl-l-card.is-qr { flex-wrap: wrap; row-gap: .55rem; }
+.agl-l-card.is-qr .agl-l-what { flex: 1 1 6.2rem; }
+.agl-l-qr { flex: 0 0 auto; width: 84px; height: 84px; padding: 5px; border-radius: 10px; background: #fff; border: 1px solid var(--line); }
+.agl-app .agl-l-qr svg { display: block; width: 100%; height: 100%; }
+.agl-l-qr path { fill: #17144A; stroke: none; }
+@container (min-width: 34rem) { .agl-l-site { min-height: 284px; } }
+@container (max-width: 26rem) {
+  .agl-l-grid { grid-template-columns: minmax(0, 1fr); }
+  .agl-l-site { min-height: 200px; }
+}
 
 /* ---------- What it does: the month at a glance, and four things on every call. ---------- */
 .agl-does-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(1rem, 2.4vw, 1.6rem); align-items: stretch; }
@@ -171,12 +414,14 @@ html[dir="rtl"] .agl-hero h1 { font-size: clamp(2.2rem, 4vw, 3.15rem); line-heig
 .agl-flow-lines, .agl-flow-out { width: 100%; height: 320px; overflow: visible; }
 .agl-flow-lines path, .agl-flow-out path { fill: none; stroke: rgba(201, 190, 255, .55); stroke-width: 1.6; stroke-dasharray: 5 7; animation: agl-dash 1.4s linear infinite; vector-effect: non-scaling-stroke; }
 html[dir="rtl"] .agl-flow-lines, html[dir="rtl"] .agl-flow-out { transform: scaleX(-1); }
-.agl-flow-agent { display: grid; justify-items: center; gap: .45rem; padding: 1.2rem 1.3rem; border-radius: 20px; background: var(--agl-ink-2); border: 1px solid rgba(255, 255, 255, .12); text-align: center; }
-.agl-flow-agent strong { font-size: 1rem; font-weight: 800; }
-.agl-flow-agent span { color: var(--agl-on-ink-muted); font-size: .8rem; }
+/* The agent: its mark with room all round for the ring that shows it is on, then its name. */
+.agl-flow-agent { display: grid; justify-items: center; gap: 1.35rem; padding: 1.75rem 1.5rem 1.4rem; border-radius: 22px; background: var(--agl-ink-2); border: 1px solid rgba(255, 255, 255, .12); text-align: center; }
+.agl-flow-agent-text { display: grid; justify-items: center; gap: .2rem; }
+.agl-flow-agent-text strong { color: var(--agl-on-ink); font-size: 1rem; font-weight: 800; line-height: 1.45; }
+.agl-flow-agent-text span { color: var(--agl-on-ink-muted); font-size: .8rem; line-height: 1.5; }
 /* Listen's mark on a white tile, like its app icon; a soft ring shows it is on. */
-.agl-flow-logo { position: relative; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 20px; background: #fff; box-shadow: 0 14px 30px -14px rgba(118, 89, 250, .9); }
-.agl-flow-logo::after { content: ''; position: absolute; inset: -6px; border-radius: 25px; border: 1.5px solid rgba(201, 190, 255, .5); animation: agl-ring 2.6s ease-out infinite; }
+.agl-flow-logo { position: relative; flex: 0 0 auto; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 20px; background: #fff; box-shadow: 0 10px 22px -12px rgba(118, 89, 250, .85); }
+.agl-flow-logo::after { content: ''; position: absolute; inset: -5px; border-radius: 24px; border: 1.5px solid rgba(201, 190, 255, .5); animation: agl-ring 2.6s ease-out infinite; pointer-events: none; }
 .agl-flow-logo svg { width: 40px; height: 40px; fill: var(--a); }
 .agl-flow-logo rect { transform-box: fill-box; transform-origin: center; }
 .agl-flow-logo rect:nth-child(n+2):nth-child(-n+6) { animation: agl-eq 1.5s ease-in-out infinite; }
@@ -195,31 +440,69 @@ html[dir="rtl"] .agl-flow-lines, html[dir="rtl"] .agl-flow-out { transform: scal
 .is-in .agl-flow-line { animation: agl-rise .5s var(--agl-ease) forwards; animation-delay: calc(.6s + var(--d) * 1.1s); }
 .agl-builders { margin-top: 1.2rem; text-align: center; color: var(--muted); font-size: .95rem; }
 
-/* ---------- Every call written down: the owner's call list and one call open. ---------- */
-.agl-inbox { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); border: 1px solid var(--line); border-radius: var(--agl-r); overflow: hidden; background: var(--surface); }
-.agl-inbox-list { display: grid; align-content: start; gap: .25rem; padding: .9rem; border-inline-end: 1px solid var(--line); background: var(--bg); }
-.agl .agl-inbox-title { padding: .2rem .5rem .55rem; color: var(--muted); font-size: .84rem; font-weight: 700; }
-.agl-inbox-row { display: flex; align-items: flex-start; gap: .7rem; padding: .75rem .65rem; border-radius: 14px; border: 1px solid transparent; }
-.agl-inbox-row.is-on { background: var(--surface); border-color: var(--line); box-shadow: 0 8px 24px -18px rgba(20, 16, 60, .35); }
-.agl-inbox-row > div { flex: 1; min-width: 0; display: grid; gap: .15rem; }
-.agl-inbox-row p { font-size: .93rem; line-height: 1.55; font-weight: 600; }
-.agl-inbox-row span { display: inline-flex; align-items: center; gap: .45rem; color: var(--muted); font-size: .8rem; }
-.agl-inbox-row span i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: .7; }
-.agl-inbox-row time { flex: 0 0 auto; color: var(--muted); font-size: .78rem; line-height: 1.6; white-space: nowrap; }
-.agl-inbox-icon { flex: 0 0 auto; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--agl-soft); color: var(--accent-text, var(--a)); }
-.agl-inbox-icon svg { width: 18px; height: 18px; }
-.agl-inbox-detail { display: grid; align-content: start; gap: .9rem; padding: clamp(1rem, 2.2vw, 1.4rem); }
-.agl-inbox-detail .agl-inbox-title { padding: 0; }
-.agl-inbox-summary { font-size: 1.02rem; font-weight: 600; line-height: 1.65; }
-.agl-inbox-contact { display: flex; align-items: center; gap: .75rem; padding: .75rem .85rem; border-radius: 16px; background: var(--bg); border: 1px solid var(--line); }
-.agl-inbox-contact img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
-.agl-inbox-contact > div { flex: 1; min-width: 0; display: grid; gap: .1rem; line-height: 1.45; }
-.agl-inbox-contact span:not(.ag-btn) { color: var(--muted); font-size: .86rem; }
-.agl-inbox-contact bdi { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; margin-inline-start: .2rem; }
-.agl-inbox-lines { display: flex; flex-direction: column; gap: .45rem; padding-top: .3rem; border-top: 1px dashed var(--line); }
-.agl-inbox-lines p { max-width: 86%; margin-top: .3rem; padding: .55rem .8rem; border-radius: 16px; font-size: .9rem; line-height: 1.6; }
-.agl-inbox-lines .is-caller { align-self: flex-end; background: var(--bg); border: 1px solid var(--line); border-start-end-radius: 5px; }
-.agl-inbox-lines .is-agent { align-self: flex-start; background: var(--agl-soft-2); border-start-start-radius: 5px; }
+/* ---------- Every call written down: the owner's inbox, one call open. ---------- */
+.agl-inbox { font-size: .9rem; }
+.agl-inbox .agl-app-bar { min-height: 56px; padding: .55rem 1.05rem; }
+.agl-inbox .agl-app-crumb { font-size: .9rem; }
+.agl-inbox-count { margin-inline-start: auto; display: inline-flex; align-items: center; gap: .55rem; min-width: 0; color: var(--muted); font-size: .84rem; white-space: nowrap; }
+.agl-inbox-count i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: .6; }
+.agl-inbox-count b { color: var(--accent-text); font-weight: 700; }
+.agl-inbox-body { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); }
+.agl-inbox-list { display: grid; align-content: start; gap: 4px; padding: .65rem; border-inline-end: 1px solid var(--line); background: var(--agl-pane); }
+.agl-in-row {
+  display: flex; align-items: center; gap: .85rem; width: 100%; min-width: 0; padding: .8rem .85rem; border-radius: 14px; border: 1px solid transparent;
+  background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer; transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.agl-in-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.agl-in-row[aria-selected="true"] { background: var(--surface); border-color: var(--line); box-shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 10px 22px -16px rgba(23, 20, 74, .35); }
+.agl-in-row:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: 1px; }
+/* The caller's initial, centred on the row and on itself. */
+.agl-in-av { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--agl-soft-2); color: var(--accent-text); font-size: 1rem; font-weight: 700; line-height: 1; }
+.agl-in-row[aria-selected="true"] .agl-in-av, .agl-in-av.is-lg { background: var(--a); color: #fff; }
+.agl-in-main { flex: 1; min-width: 0; display: grid; gap: .2rem; }
+.agl-in-top { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; min-width: 0; }
+.agl-in-top b { font-size: .95rem; font-weight: 700; }
+.agl-in-top time { flex: 0 0 auto; color: var(--muted); font-size: .76rem; }
+.agl-in-sum { font-size: .86rem; line-height: 1.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agl-in-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem .6rem; margin-top: .15rem; }
+.agl-in-ch { display: inline-flex; align-items: center; gap: .3rem; color: var(--muted); font-size: .76rem; line-height: 1.5; }
+.agl-app .agl-in-ch svg { display: block; width: 14px; height: 14px; }
+/* A call's kind: done (green), to act on (violet), or answered (grey). */
+.agl-tag { display: inline-flex; align-items: center; gap: .35rem; padding: .1rem .55rem; border-radius: 999px; background: var(--surface2); color: var(--muted); font-size: .72rem; font-weight: 700; line-height: 1.65; white-space: nowrap; }
+.agl-tag::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.agl-tag.is-ok { background: color-mix(in srgb, var(--agl-ok) 14%, transparent); color: var(--agl-ok-text); }
+.agl-tag.is-act { background: var(--agl-soft-2); color: var(--accent-text); }
+.agl-inbox-panels { display: grid; min-width: 0; }
+.agl-in-panel { grid-area: 1 / 1; display: grid; align-content: start; gap: 1rem; min-width: 0; padding: 1.2rem 1.35rem 1.35rem; }
+.agl-in-panel:not(.is-on) { visibility: hidden; }
+.agl-in-panel:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: -3px; }
+.agl-in-head { display: flex; align-items: center; gap: .8rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+.agl-in-av.is-lg { width: 48px; height: 48px; font-size: 1.15rem; }
+.agl-in-who { flex: 1; min-width: 0; display: grid; gap: .1rem; line-height: 1.45; }
+.agl-in-who b { font-size: 1.05rem; font-weight: 700; }
+.agl-in-who span { color: var(--muted); font-size: .84rem; }
+.agl-in-who bdi { margin-inline-start: .2rem; color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.agl-in-call { flex: 0 0 auto; display: inline-flex; align-items: center; gap: .4rem; min-height: 38px; padding: 0 1rem; border-radius: 999px; background: var(--a); color: #fff; font-size: .86rem; font-weight: 700; box-shadow: var(--lift); cursor: default; }
+.agl-app .agl-in-call svg { width: 15px; height: 15px; }
+.agl-in-facts { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem 1rem; color: var(--muted); font-size: .8rem; }
+.agl-in-facts li { display: inline-flex; align-items: center; gap: .35rem; }
+.agl-app .agl-in-facts svg { display: block; width: 15px; height: 15px; }
+.agl-in-block { display: grid; gap: .45rem; }
+.agl-in-label { color: var(--muted); font-size: .76rem; font-weight: 700; }
+.agl-in-summary { font-size: 1rem; font-weight: 600; line-height: 1.65; }
+.agl-in-outcome { display: flex; align-items: center; gap: .5rem; padding: .6rem .8rem; border-radius: 12px; background: var(--surface2); font-size: .86rem; font-weight: 600; }
+.agl-app .agl-in-outcome svg { flex: 0 0 auto; width: 17px; height: 17px; }
+.agl-in-outcome.is-ok { background: color-mix(in srgb, var(--agl-ok) 10%, transparent); color: var(--agl-ok-text); }
+.agl-in-outcome.is-act { background: var(--agl-soft); color: var(--accent-text); }
+.agl-in-lines { display: flex; flex-direction: column; gap: .45rem; }
+.agl-in-lines li { max-width: 88%; padding: .45rem .8rem .55rem; border-radius: 15px; font-size: .86rem; line-height: 1.6; }
+.agl-in-lines small { display: block; color: var(--muted); font-size: .7rem; font-weight: 700; }
+.agl-in-lines .is-agent { align-self: flex-start; background: var(--agl-soft-2); border-start-start-radius: 5px; }
+.agl-in-lines .is-caller { align-self: flex-end; background: var(--surface2); border-start-end-radius: 5px; }
+@media (prefers-reduced-motion: no-preference) {
+  .agl-in-panel.is-on { animation: agl-in-soft .32s var(--agl-ease); }
+}
+@keyframes agl-in-soft { from { opacity: 0; transform: translateY(4px); } }
 
 /* ---------- Safe by design: six promises, two columns divided by fine lines. ---------- */
 .agl-safe-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--agl-r); overflow: hidden; background: var(--surface); }
@@ -241,32 +524,52 @@ html[dir="rtl"] .agl-price h2 { line-height: 1.45; }
 .agl-price-plans b { font-weight: 700; }
 .agl-price-plans span { color: var(--muted); font-size: .92rem; }
 
-/* ---------- Questions. ---------- */
-.agl-faq-list { max-width: 820px; border-top: 1px solid var(--line); }
-.agl-faq-list details { border-bottom: 1px solid var(--line); }
-.agl-faq-list summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.15rem .2rem; cursor: pointer; list-style: none; font-weight: 700; font-size: 1.04rem; }
-.agl-faq-list summary::-webkit-details-marker { display: none; }
-.agl-faq-list summary::after { content: '+'; font-size: 1.4rem; font-weight: 400; color: var(--muted); transition: transform .25s var(--agl-ease); }
-.agl-faq-list details[open] summary::after { transform: rotate(45deg); }
-.agl-faq-list summary:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: 2px; border-radius: 8px; }
-.agl-faq-list p { padding: 0 .2rem 1.2rem; color: var(--muted); line-height: 1.7; max-width: 70ch; }
-
-/* ---------- The last word. ---------- */
-.agl-final { display: grid; justify-items: center; gap: 1rem; padding: clamp(4rem, 9vw, 7rem) 1rem clamp(4rem, 9vw, 7rem); text-align: center; }
+/* ---------- The last word: one flat band, then the questions. ---------- */
+.agl-final { max-width: var(--agl-wide); margin: 0 auto; padding: clamp(3.2rem, 7vw, 6rem) clamp(1rem, 2.4vw, 1.6rem) 0; }
+.agl-final-band { display: grid; justify-items: center; gap: 1rem; padding: clamp(2.8rem, 6vw, 4.6rem) 1.25rem; border-radius: 28px; background: var(--agl-stage); border: 1px solid var(--agl-stage-line); text-align: center; }
 .agl-final h2 { font-size: clamp(1.7rem, 3.4vw, 2.6rem); font-weight: 700; max-width: 22ch; line-height: 1.2; }
 html[dir="rtl"] .agl-final h2 { line-height: 1.45; }
-.agl-final-logo { width: 80px; height: 80px; border-radius: 24px; }
-.agl-final-logo::after { border-radius: 30px; }
+.agl-final-logo { width: 80px; height: 80px; border-radius: 24px; margin-bottom: .5rem; }
+.agl-final-logo::after { inset: -6px; border-radius: 30px; border-color: color-mix(in srgb, var(--a) 35%, transparent); }
 .agl-final-logo svg { width: 50px; height: 50px; }
+
+/* ---------- Questions, last: the heading and where to ask more beside the answers. ---------- */
+.agl-faq { padding-bottom: clamp(3.5rem, 8vw, 6rem); }
+.agl-faq-grid { display: grid; grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr); gap: clamp(1.6rem, 4.5vw, 4.5rem); align-items: start; }
+.agl-faq-aside { position: sticky; top: 104px; display: grid; gap: .75rem; }
+.agl-faq-aside h2 { font-size: clamp(1.7rem, 3.2vw, 2.45rem); font-weight: 700; line-height: 1.18; }
+html[dir="rtl"] .agl-faq-aside h2 { line-height: 1.4; }
+.agl-faq-aside > p { color: var(--muted); font-size: 1.02rem; line-height: 1.75; max-width: 36ch; }
+.agl-faq-ask { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .85rem; margin-top: 1rem; padding: 1.1rem 1.15rem 1.15rem; border-radius: 20px; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--card-shadow); }
+.agl-faq-ask-text { display: grid; gap: .1rem; line-height: 1.5; }
+.agl-faq-ask-text b { font-weight: 700; }
+.agl-faq-ask-text span { color: var(--muted); font-size: .9rem; line-height: 1.6; }
+.agl-faq-ask-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .5rem; }
+.agl-faq-live svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.agl-faq-list { display: grid; gap: .65rem; }
+.agl-faq-item { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--card-shadow); transition: border-color .25s ease, box-shadow .25s ease; }
+.agl-faq-item[open] { border-color: color-mix(in srgb, var(--a) 28%, var(--line)); box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 16px 34px -26px rgba(23, 20, 74, .4); }
+.agl-faq-item summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.25rem; border-radius: 18px; cursor: pointer; list-style: none; }
+.agl-faq-item summary::-webkit-details-marker { display: none; }
+.agl-faq-item summary:focus-visible { outline: 3px solid var(--agl-soft-2); outline-offset: 2px; }
+.agl-faq-q { font-size: 1.02rem; font-weight: 700; line-height: 1.55; }
+/* A plus that turns into a minus as the answer opens. */
+.agl-faq-toggle { position: relative; flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--surface); transition: background .25s ease, border-color .25s ease; }
+.agl-faq-toggle::before, .agl-faq-toggle::after { content: ''; position: absolute; top: 50%; left: 50%; width: 12px; height: 2px; margin: -1px 0 0 -6px; border-radius: 2px; background: var(--text); transition: transform .3s var(--agl-ease), background .25s ease; }
+.agl-faq-toggle::after { transform: rotate(90deg); }
+.agl-faq-item summary:hover .agl-faq-toggle { border-color: color-mix(in srgb, var(--a) 45%, var(--line-strong)); }
+.agl-faq-item[open]:not(.is-closing) .agl-faq-toggle { background: var(--a); border-color: var(--a); }
+.agl-faq-item[open]:not(.is-closing) .agl-faq-toggle::before, .agl-faq-item[open]:not(.is-closing) .agl-faq-toggle::after { background: #fff; }
+.agl-faq-item[open]:not(.is-closing) .agl-faq-toggle::after { transform: rotate(0deg); }
+/* Answers open and close smoothly (the script animates their height). */
+.agl-faq-a { overflow: hidden; }
+.agl-faq-a p { padding: 0 1.25rem 1.25rem; color: var(--muted); line-height: 1.8; max-width: 68ch; }
 
 /* In-page links glide. */
 html:has(.agl) { scroll-behavior: smooth; }
 /* The homepage's section rises into place once (only when the script runs, so nothing stays hidden). */
 .agl-js [data-agl-rise] { opacity: 0; transform: translateY(22px); transition: opacity .7s var(--agl-ease), transform .9s var(--agl-ease); transition-delay: var(--rise-d, 0s); }
 .agl-js [data-agl-rise].is-risen { opacity: 1; transform: none; }
-/* Answers open and close smoothly (the script animates their height). */
-.agl-faq-list details p { overflow: hidden; }
-.agl-faq-list details.is-closing summary::after { transform: none; }
 
 /* ---------- A real call, recorded live (components/agents/real-call). ----------
    An ink panel that reads like a messenger: the call's tabs on a row of their own, who answers,
@@ -312,8 +615,6 @@ html:has(.agl) { scroll-behavior: smooth; }
 .agl-real-play-icon .is-pause { display: none; }
 .agl-real-play[aria-pressed="true"] .is-play { display: none; }
 .agl-real-play[aria-pressed="true"] .is-pause { display: block; }
-.agl-real-progress { width: min(240px, 64%); height: 3px; border-radius: 999px; background: rgba(255, 255, 255, .14); overflow: hidden; }
-.agl-real-progress i { display: block; height: 100%; width: 0; border-radius: inherit; background: #fff; }
 
 /* The call's lines, like a messenger: the agent on the start side, the caller on the end side.
    A steady height; once it fills, the newest line stays in sight and older ones fade at the top. */
@@ -416,30 +717,82 @@ html[dir="rtl"] .agl-home-copy h2 { line-height: 1.4; }
 
 @keyframes agl-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 @keyframes agl-rise { to { opacity: 1; transform: none; } }
-@keyframes agl-pop-in { to { opacity: 1; transform: none; } }
 @keyframes agl-grow { to { transform: scaleY(1); } }
 @keyframes agl-dash { to { stroke-dashoffset: -24; } }
-@keyframes agl-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
 @keyframes agl-eq { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.55); } }
-@keyframes agl-ring { 0% { opacity: .9; transform: scale(.96); } 100% { opacity: 0; transform: scale(1.14); } }
+@keyframes agl-ring { 0% { opacity: .9; transform: scale(.97); } 100% { opacity: 0; transform: scale(1.12); } }
+@keyframes agl-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes agl-fill { from { width: 0; } }
+@keyframes agl-pick { from { border-color: var(--line); background: var(--surface); box-shadow: 0 0 0 0 transparent; } }
+@keyframes agl-pop-btn { from { opacity: 0; transform: translateY(8px) scale(.92); } }
 
-
-@keyframes agl-spin { to { transform: rotate(360deg); } }
+/* ---------- How it works, on wide screens with the script: the steps scroll, the window stays.
+   The step in the middle of the screen leads; the rail fills as you go; the window shows its screen. */
+@media (min-width: 1024px) {
+  .agl-how { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); column-gap: clamp(2.5rem, 5vw, 4.5rem); row-gap: 2.6rem; align-items: center; }
+  .agl-how-text { grid-column: 1; grid-row: var(--n); padding: 0; }
+  .agl-how-win { grid-column: 2; grid-row: var(--n); }
+  .agl-how.is-live { row-gap: 0; align-items: start; }
+  .agl-how.is-live .agl-how-text { min-height: clamp(420px, 58vh, 600px); align-content: center; row-gap: .55rem; opacity: .42; transition: opacity .45s var(--agl-ease); }
+  .agl-how.is-live .agl-how-text.is-on { opacity: 1; }
+  .agl-how.is-live .agl-how-text:not(.is-on) { cursor: pointer; }
+  .agl-how.is-live .agl-how-text:not(.is-on):hover { opacity: .7; }
+  .agl-how.is-live .agl-how-text h3 { font-size: clamp(1.4rem, 2.1vw, 1.75rem); line-height: 1.35; }
+  html[dir="rtl"] .agl-how.is-live .agl-how-text h3 { line-height: 1.5; }
+  .agl-how.is-live .agl-how-text p { font-size: 1.06rem; max-width: 38ch; }
+  .agl-how.is-live .agl-how-win {
+    grid-row: 1 / span 4; position: sticky; top: max(96px, calc(50vh - 262px + 36px)); align-self: start;
+    opacity: 0; visibility: hidden; transition: opacity .45s var(--agl-ease), visibility 0s linear .45s;
+  }
+  .agl-how.is-live .agl-how-win.is-on { z-index: 2; opacity: 1; visibility: visible; transition: opacity .45s var(--agl-ease), visibility 0s; }
+  .agl-how.is-live .agl-how-win.is-prev { z-index: 1; opacity: 1; visibility: visible; transition: none; }
+  .agl-how.is-live .agl-app { height: 452px; }
+  .agl-how.is-live .agl-how-rail { display: block; position: absolute; grid-column: 1; inset-inline-start: calc(1.125rem - 1px); top: var(--rail-top, 0); width: 2px; height: var(--rail-h, 0); border-radius: 2px; background: var(--line); }
+  .agl-how.is-live .agl-how-rail i { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--a); transform-origin: top; transform: scaleY(var(--p, 0)); }
+  .agl-how.is-live .agl-how-n { background: var(--surface); color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+  .agl-how.is-live .is-done .agl-how-n { background: color-mix(in srgb, var(--a) 12%, var(--surface)); color: var(--accent-text); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--a) 40%, transparent); }
+  .agl-how.is-live .is-done .agl-how-n b { display: none; }
+  .agl-how.is-live .is-done .agl-how-n svg { display: block; }
+  .agl-how.is-live .agl-how-text.is-on .agl-how-n { background: var(--a); color: #fff; box-shadow: 0 0 0 5px var(--agl-soft); }
+}
+/* Each screen settles in as its step takes the lead (only then; without motion it is simply there). */
+@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .agl-how.is-live .agl-how-win.is-on .agl-app-main > * { animation: agl-in .5s var(--agl-ease) both; }
+  .agl-how.is-live .agl-how-win.is-on .agl-app-main > :nth-child(2) { animation-delay: .05s; }
+  .agl-how.is-live .agl-how-win.is-on .agl-app-main > :nth-child(3) { animation-delay: .1s; }
+  .agl-how.is-live .agl-how-win.is-on .agl-app-main > :nth-child(n+4) { animation-delay: .15s; }
+  .agl-how.is-live .agl-how-win.is-on .agl-k-done b { animation: agl-fill 1.1s var(--agl-ease) .25s both; }
+  .agl-how.is-live .agl-how-win.is-on .agl-k-facts li { animation: agl-in .45s var(--agl-ease) both; animation-delay: calc(.5s + var(--d) * .09s); }
+  .agl-how.is-live .agl-how-win.is-on .agl-v-grid li.is-on { animation: agl-pick .7s var(--agl-ease) .35s both; }
+  .agl-how.is-live .agl-how-win.is-on .agl-t-chat > * { animation: agl-in .5s var(--agl-ease) both; animation-delay: calc(.25s + var(--d) * .4s); }
+  .agl-how.is-live .agl-how-win.is-on .agl-l-site-btn { animation: agl-pop-btn .6s var(--agl-ease) .4s both; }
+}
 
 @media (max-width: 1080px) {
-  .agl-track { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .agl-flow { grid-template-columns: minmax(0, 1fr) 90px auto; row-gap: 1.2rem; }
   .agl-flow-out { display: none; }
   .agl-flow-call { grid-column: 1 / -1; }
 }
+@media (max-width: 980px) {
+  .agl-regions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (max-width: 920px) {
-  .agl-hero, .agl-does-grid, .agl-price, .agl-inbox { grid-template-columns: minmax(0, 1fr); }
+  .agl-hero, .agl-does-grid, .agl-price { grid-template-columns: minmax(0, 1fr); }
   .agl-hero-call .agl-real { margin-inline: auto; }
-  .agl-speaks { grid-template-columns: minmax(0, 1fr); }
+  /* One column: the heading, the questions, then where to ask anything else. */
+  .agl-faq-grid { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+  .agl-faq-aside { display: contents; }
+  .agl-faq-aside > p { margin-top: .6rem; }
+  .agl-faq-list { order: 1; margin-top: clamp(1.3rem, 4vw, 1.8rem); }
+  .agl-faq-ask { order: 2; margin-top: 1.2rem; }
+}
+@media (max-width: 760px) {
+  .agl-inbox-body { grid-template-columns: minmax(0, 1fr); }
   .agl-inbox-list { border-inline-end: 0; border-bottom: 1px solid var(--line); }
+  .agl-inbox-count > span, .agl-inbox-count > i { display: none; }
 }
 @media (max-width: 640px) {
-  .agl-track, .agl-safe-list { grid-template-columns: minmax(0, 1fr); }
+  .agl-safe-list { grid-template-columns: minmax(0, 1fr); }
   .agl-safe-list li:nth-child(-n+2) { border-top: 1px solid var(--line); }
   .agl-safe-list li:first-child { border-top: 0; }
   .agl-safe-list li:nth-child(odd) { border-inline-end: 0; }
@@ -448,13 +801,49 @@ html[dir="rtl"] .agl-home-copy h2 { line-height: 1.4; }
   .agl-flow-lines { display: none; }
   .agl-flow-sources { height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
   .agl-flow-sources li { height: auto; min-height: 52px; padding: .6rem .7rem; font-size: .82rem; }
-  .agl-flow-agent { grid-auto-flow: column; justify-content: start; align-items: center; text-align: start; }
+  .agl-flow-agent { grid-auto-flow: column; justify-content: start; align-items: center; column-gap: 1.35rem; padding: 1.15rem 1.25rem; text-align: start; }
+  .agl-flow-agent-text { justify-items: start; }
   .agl-cta-row .ag-btn { flex: 1 1 100%; }
-  .agl-inbox-row time { display: none; }
+  .agl-speaks-head { align-items: stretch; }
+  .agl-speaks-more { order: 2; justify-content: center; width: 100%; }
+  .agl-regions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agl-region { padding: .95rem .9rem 1rem; }
+  .agl-region-n b { font-size: 1.55rem; }
+  .agl-region-flags img { width: 19px; height: 19px; }
+  .agl-region-flags img + img { margin-inline-start: -6px; }
+  .agl-region-list { font-size: .8rem; }
+  .agl-how-win { border-radius: 22px; }
+  .agl-how-foot { display: none; }
+  .agl-in-row { padding: .75rem .7rem; }
+  .agl-in-panel { padding: 1.05rem 1rem 1.15rem; }
+  .agl-in-head { flex-wrap: wrap; }
+  .agl-in-lines li { max-width: 94%; }
+  .agl-faq-item summary { padding: 1rem 1.05rem; }
+  .agl-faq-a p { padding: 0 1.05rem 1.1rem; }
+  .agl-final-band { border-radius: 24px; }
+  /* Every dialect: a sheet from the bottom of the screen. */
+  .agl-dialects { width: 100%; height: 90dvh; margin: auto 0 0; border-radius: 22px 22px 0 0; border-bottom: 0; }
+  .agl-dialects-head { padding: 1.15rem 1.1rem .85rem; }
+  .agl-dialects-head h3 { font-size: 1.12rem; }
+  .agl-dialects-head .agl-count { display: none; }
+  .agl-dialects-tools { padding: 0 1.1rem .9rem; }
+  .agl-dialects-filter { flex-wrap: nowrap; overflow-x: auto; margin-inline: -1.1rem; padding-inline: 1.1rem; scrollbar-width: none; }
+  .agl-dialects-filter::-webkit-scrollbar { display: none; }
+  .agl-dialects-filter button { flex: 0 0 auto; }
+  .agl-dialects-body { padding: 1rem 1.1rem 1.2rem; }
+  .agl-dialects-group ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agl-dialects-foot { padding: .75rem 1.1rem calc(.75rem + env(safe-area-inset-bottom, 0px)); }
 }
+@media (max-width: 640px) and (prefers-reduced-motion: no-preference) {
+  .agl-dialects[open] { animation: agl-sheet .38s var(--agl-ease); }
+  .agl-dialects.is-closing { animation: agl-sheet-out .22s ease forwards; }
+}
+@keyframes agl-sheet { from { transform: translateY(48px); opacity: 0; } }
+@keyframes agl-sheet-out { to { transform: translateY(48px); opacity: 0; } }
 /* Without motion: everything shows as it ends. */
 @media (prefers-reduced-motion: reduce) {
   .agl *, .agl *::before, .agl *::after { animation: none !important; transition: none !important; }
+  .agl-dialects::backdrop { animation: none !important; }
   html:has(.agl) { scroll-behavior: auto; }
   .agl-js [data-agl-rise] { opacity: 1; transform: none; }
   .agl-flow-line { opacity: 1; transform: none; }

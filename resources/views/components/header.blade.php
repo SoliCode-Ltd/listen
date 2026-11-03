@@ -32,8 +32,9 @@
       'active' => $currentLocaleCode === $localeCode,
     ];
   }
+  // The menu, by who is looking. The logo is the way home, so there is no Home link. Visitors: what
+  // Listen does and costs, the demo to try, and how to reach us.
   $navLinks = [
-    ['route' => 'home', 'label' => __('ui.nav.home'), 'guest' => false],
     ['route' => 'samples', 'label' => __('ui.nav.samples'), 'guest' => false],
     ['route' => 'agents-landing', 'label' => __('agents.switch_agents'), 'guest' => false],
     ['route' => 'demo.page', 'label' => __('ui.nav.demo'), 'guest' => true],
@@ -48,8 +49,10 @@
     $activePlan = app(\App\Services\PlanAccessService::class)->resolveActivePlanForUserId((int) auth()->id());
     $showDemoLinkForAuthenticated = strtolower(trim((string) ($activePlan?->slug ?? 'free'))) === 'free';
   }
+  // Members: the app (the Studio | Agents switch, or Dashboard where Agents are closed), the voices,
+  // the demo while on the free plan, plans, the extension and help. Billing and the rest are in the
+  // account menu.
   $authNavLinks = [
-    ['route' => 'home', 'label' => __('ui.nav.home'), 'guest' => false],
     ['route' => 'dashboard', 'label' => __('ui.nav.dashboard'), 'guest' => false],
     ['route' => 'samples', 'label' => __('ui.nav.samples'), 'guest' => false],
     ['route' => 'agents-landing', 'label' => __('agents.switch_agents'), 'guest' => false],
@@ -64,6 +67,9 @@
     $authNavLinks = array_values(array_filter($authNavLinks, fn ($l) => $l['route'] !== 'agents-landing'));
     $productSide = $productSide === 'studio' ? null : $productSide;
   }
+  // Every signed-in member with Agents (free ones too) has the Studio | Agents switch on every
+  // page, in place of the Dashboard and Agents links; outside the app neither side is lit.
+  $showSwitch = auth()->check() && ($agentsOpen || $productSide !== null);
   if ($showDemoLinkForAuthenticated) {
     array_splice($authNavLinks, 3, 0, [[
       'route' => 'demo.page',
@@ -89,8 +95,10 @@
       @endif
     </a>
 
+    {{-- The middle of the bar, as in the studio: the Studio | Agents switch and the links together. --}}
+    <div class="header-center">
     @auth
-      @if($productSide)
+      @if($showSwitch)
         <nav class="product-switch" aria-label="{{ __('agents.switch_label') }}">
           <a href="{{ route('dashboard') }}" class="{{ $productSide === 'studio' ? 'active' : '' }}" @if($productSide === 'studio') aria-current="page" @endif>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>{{ __('agents.switch_studio') }}
@@ -105,7 +113,7 @@
     <nav class="desktop-nav" aria-label="{{ __('ui.header.main_nav') }}">
       @auth
         @foreach($authNavLinks as $link)
-          @continue($productSide && in_array($link['route'], ['dashboard', 'agents-landing'], true))
+          @continue($showSwitch && in_array($link['route'], ['dashboard', 'agents-landing'], true))
           <a href="{{ route($link['route']) }}" class="nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
         @endforeach
       @else
@@ -116,6 +124,7 @@
         @endforeach
       @endauth
     </nav>
+    </div>
 
     <div class="header-actions">
       <div class="locale-switch {{ $isArabicUi ? 'ar-active' : '' }}" aria-label="{{ __('ui.locale.switch') }}">
@@ -145,7 +154,8 @@
                 {{ mb_strtoupper(mb_substr(preg_replace('/[^\p{L}]/u', '', auth()->user()->name ?? '') ?: 'U', 0, 1)) }}
               @endif
             </div>
-            <span class="user-name">{{ auth()->user()->name }}</span>
+            {{-- The first name only, so a long name never pushes the header off the screen (the full name is in the menu). --}}
+            <span class="user-name" title="{{ auth()->user()->name }}">{{ \Illuminate\Support\Str::of((string) auth()->user()->name)->squish()->explode(' ')->first() ?: auth()->user()->name }}</span>
             <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="user-dropdown" id="userDropdown">
@@ -257,7 +267,7 @@
       @endforeach
     </div>
     <div class="mobile-nav-divider"></div>
-    @auth
+    @if($showSwitch)
       <nav class="product-switch mobile-product-switch" aria-label="{{ __('agents.switch_label') }}">
         <a href="{{ route('dashboard') }}" class="{{ $productSide === 'studio' ? 'active' : '' }}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>{{ __('agents.switch_studio') }}
@@ -267,10 +277,11 @@
         </a>
       </nav>
       <div class="mobile-nav-divider"></div>
-    @endauth
+    @endif
 
     @auth
       @foreach($authNavLinks as $link)
+        @continue($showSwitch && in_array($link['route'], ['dashboard', 'agents-landing'], true))
         <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
       @endforeach
       @if(auth()->user()->is_admin)

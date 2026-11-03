@@ -305,6 +305,17 @@ html[data-theme="light"] .site-logo.logo-light {
   stroke-linejoin: round;
 }
 
+/* The middle of the bar, as in the studio: the switch and the links side by side as one group, so
+   the bar reads logo | menu | account with no stray gaps. */
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  min-width: 0;
+}
+
+.header-center .product-switch { margin-inline-start: 0; }
+
 .mobile-product-switch {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -551,7 +562,7 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   font-size: .85rem;
   font-weight: 600;
   line-height: 1.5;
-  max-width: 200px;
+  max-width: 9rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1204,6 +1215,9 @@ html[data-theme="light"] .app-footer {
     margin-inline-start: auto;
     gap: .45rem;
   }
+
+  /* Tablets: the links move into the menu; the switch stays by the logo. */
+  .header-center { margin-inline-start: .4rem; }
 
   .user-trigger {
     padding: .3rem;

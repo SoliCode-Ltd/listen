@@ -5,7 +5,7 @@
 <body>
   @include('components.header')
 
-  <main class="ag" id="agents">
+  <main class="ag {{ $agents->isEmpty() ? '' : 'ag-page ag-home' }}" id="agents">
     @if($agents->isEmpty())
       <section class="ag-card ag-empty">
         <x-orb name="listen" />
@@ -25,28 +25,46 @@
         <div style="margin-top:1rem">@include('agents.partials.balance', ['balance' => $balance])</div>
       @endif
     @else
-      <div class="ag-head">
-        <div>
-          <h1>{{ __('agents.title') }}</h1>
-          <p>{{ __('agents.subtitle') }}</p>
-        </div>
-        @if($agents->count() < $limits['agents'])
-          <a class="ag-btn ag-btn-primary" href="{{ route('voice-agents.create') }}">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>{{ __('agents.new_agent') }}
-          </a>
-        @else
-          <p class="ag-head-note">{{ trans_choice('agents.error_max_agents', $limits['agents'], ['count' => $limits['agents']]) }}</p>
-        @endif
-      </div>
+      @php
+        // Where the credits went: read once, shown only when asked for and only when something was used.
+        $creditUse = \App\Support\CreditUsage::for(auth()->user());
+        $hasUse = \App\Support\CreditUsage::hasUse($creditUse);
+      @endphp
+      {{-- One column the width of the header, so the page has no empty side strip: the title and the call
+           time in a panel, the agents, then the credit usage when there is any. --}}
+        <div class="ag-main">
+      <section class="ag-home-card" id="agents-overview">
+        <header class="ag-home-head">
+          <div>
+            <h1>{{ __('agents.title') }}</h1>
+            <p>{{ __('agents.subtitle') }}</p>
+          </div>
+          @if($agents->count() < $limits['agents'])
+            <a class="ag-btn ag-btn-primary" href="{{ route('voice-agents.create') }}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>{{ __('agents.new_agent') }}
+            </a>
+          @else
+            <span class="ag-home-plan"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>{{ trans_choice('agents.error_max_agents', $limits['agents'], ['count' => $limits['agents']]) }}</span>
+          @endif
+        </header>
+        {{-- The account's call time, once, here (each agent's page shows only its own numbers). --}}
+        @include('agents.partials.balance', ['balance' => $balance, 'hasUse' => $hasUse])
+      </section>
 
-      {{-- The account's call time, once, here (each agent's page shows only its own numbers). --}}
-      @include('agents.partials.balance', ['balance' => $balance])
-
-      <div class="ag-list-head">
+      <div class="ag-list-head" id="agents-list">
         <h2>{{ __('agents.list_count') }} <small>{{ $agents->count() }}</small></h2>
-        <span>{{ __('agents.list_month', ['date' => $since->copy()->locale(app()->getLocale())->translatedFormat('j F')]) }}</span>
+        {{-- The span the cards' numbers count, as a date range on a pill (the credit month so far). --}}
+        <span class="ag-period" title="{{ __('agents.list_period_hint') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>{{ __('agents.list_period', ['date' => $since->copy()->locale(app()->getLocale())->translatedFormat('j F')]) }}</span>
       </div>
-      <div class="ag-grid">
+      @php
+        // Every row full: the cards and the new-agent tile two or three to a row. One agent on a plan
+        // with no room for another stands beside the way to plans with more agents.
+        $room = $agents->count() < $limits['agents'];
+        $moreAgents = ! $room && $agents->count() === 1 && \App\Models\Plan::query()->subscriptionPlans()->where('is_active', true)->get()
+          ->contains(fn ($p) => \App\Support\Agents\AgentAccess::limits($p)['agents'] > $limits['agents']);
+        $tiles = $agents->count() + ($room || $moreAgents ? 1 : 0);
+      @endphp
+      <div class="ag-grid" style="--cols: {{ $tiles >= 3 ? 3 : max(1, $tiles) }}">
         @foreach($agents as $agent)
           @php
             $count = (int) ($calls[$agent->id]->n ?? 0);
@@ -65,15 +83,18 @@
                 @if($voice && $voice['avatar'])<img src="{{ $voice['avatar'] }}" alt="" width="52" height="52" loading="lazy">@else{{ mb_substr($agent->name, 0, 1) }}@endif
               </span>
               <div class="ag-agent-who">
-                <div class="ag-agent-name">{{ $agent->name }}</div>
-                <div class="ag-agent-biz">{{ $agent->business_name }}</div>
+                {{-- Each in its own direction, so a long Latin name ends in "…" at its end, not its start. --}}
+                <div class="ag-agent-name" dir="auto" title="{{ $agent->name }}">{{ $agent->name }}</div>
+                <div class="ag-agent-biz" dir="auto">{{ $agent->business_name }}</div>
               </div>
               <span class="ag-pill is-{{ $agent->status }}"><i></i>{{ __('agents.status.'.$agent->status) }}</span>
             </div>
             @if($voice)
+              {{-- The voice, then the dialect the agent speaks with that dialect's flag (the voice's own
+                   home dialect can differ: a voice from Cairo can speak Najdi). --}}
+              @php $speaksFlag = \App\Support\VoiceFlag::url($agent->dialect); @endphp
               <div class="ag-agent-voice">
-                @if($voice['flag'])<img src="{{ $voice['flag'] }}" alt="" width="18" height="13" loading="lazy">@endif
-                <span>{{ __('agents.voice_of', ['name' => $voice['name']]) }}</span>@if($speaks !== '')<small>{{ $speaks }}</small>@endif
+                <span>{{ __('agents.voice_of', ['name' => $voice['name']]) }}</span>@if($speaks !== '')<small>@if($speaksFlag)<img src="{{ $speaksFlag }}" alt="" width="16" height="12" loading="lazy">@endif{{ $speaks }}</small>@endif
               </div>
             @endif
             {{-- This agent's month: the same three numbers on every card, in the same place. --}}
@@ -99,11 +120,18 @@
             <b>{{ __('agents.new_agent') }}</b>
             <small>{{ trans_choice('agents.new_agent_left', $limits['agents'] - $agents->count(), ['count' => $limits['agents'] - $agents->count()]) }}</small>
           </a>
+        @elseif($moreAgents)
+          <a class="ag-agent-new" href="{{ route('pricing') }}">
+            <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></span>
+            <b>{{ __('agents.more_agents') }}</b>
+            <small>{{ __('agents.more_agents_text') }}</small>
+          </a>
         @endif
       </div>
 
       {{-- Where the credits went: calls by agent, and the studio's audio (the same credits). --}}
-      <div class="ag-usage"><x-usage.breakdown :usage="\App\Support\CreditUsage::for(auth()->user())" :per-minute="\App\Support\Agents\AgentAccess::creditsPerMinute()" /></div>
+      @if($hasUse)<div class="ag-usage"><x-usage.breakdown :usage="$creditUse" :per-minute="\App\Support\Agents\AgentAccess::creditsPerMinute()" /></div>@endif
+        </div>
     @endif
   </main>
 

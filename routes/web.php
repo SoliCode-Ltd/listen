@@ -299,6 +299,10 @@ Route::group([
             Route::post('/preview', [HomeController::class, 'preview'])->middleware('demo.verified')->name('demo.preview');
             // Voice Design's one take, beside the text studio (App\Support\VoiceDesign).
             Route::post('/demo/voice-design', [HomeController::class, 'designVoice'])->middleware(['demo.verified', 'throttle:6,1,demo-voice-design'])->name('demo.voice-design');
+            // The Voice agents tab: a live call with a sample business's agent, from the member's free
+            // test seconds, and the time left after it (App\Support\Agents\DemoAgent).
+            Route::post('/demo/agent-call', [\App\Http\Controllers\DemoAgentController::class, 'start'])->middleware(['demo.verified', 'throttle:6,1,demo-agent-call'])->name('demo.agent-call');
+            Route::get('/demo/agent-call', [\App\Http\Controllers\DemoAgentController::class, 'left'])->middleware('throttle:30,1,demo-agent-left')->name('demo.agent-left');
         });
     });
 

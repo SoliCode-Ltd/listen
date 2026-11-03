@@ -108,7 +108,7 @@
           <a href="{{ route('voice-agents.index') }}">{{ __('agents.balance.title') }}</a>
         </p>
       @endif
-      <div class="ag-stats" style="margin-bottom:1rem">
+      <div class="ag-stats">
         @foreach(['calls' => $stats['calls'], 'minutes' => $minutes, 'contacts' => $stats['contacts'], 'credits' => $stats['credits']] as $key => $value)
           <div class="ag-card ag-stat">
             <span class="ag-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24">{!! ['calls' => '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>', 'minutes' => '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', 'contacts' => '<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>', 'credits' => '<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>'][$key] !!}</svg></span>
@@ -412,6 +412,7 @@
         'correct' => __('agents.talk_correct'), 'correct_placeholder' => __('agents.talk_correct_placeholder'),
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
         'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'),
+        'site_remove' => __('agents.live_site_remove'), 'site_remove_short' => __('agents.live_site_remove_short'), 'site_invalid' => __('agents.live_site_invalid'), 'site_exists' => __('agents.live_site_exists'), 'site_max' => __('agents.live_site_max'),
         'play' => __('agents.voice_play'), 'pause' => __('agents.voice_pause'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
         'status' => __('agents.status'),
         'files' => __('agents.files'),

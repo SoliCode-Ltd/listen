@@ -36,6 +36,8 @@ class AgentCallFlowTest extends TestCase
         config(['services.gemini_tts.api_key' => 'test-key']);
         Http::fake(['*auth_tokens' => Http::response(['name' => 'auth_tokens/live-key'])]);
         Plan::factory()->free()->create(['monthly_chars' => 10000, 'voice_tier' => 'standard']);
+        // A fixed rate, so the plans these tests make do not move it.
+        \App\Models\SiteSetting::set('agents_credits_per_minute', '8100', 'agents');
     }
 
     /** An owner on a plan with agents (room for many calls at once unless a test says otherwise). */

@@ -688,6 +688,9 @@ class HomeController extends Controller
                 ? VoiceDesign::studio($member, $this->planAccessService->resolveAccessPlanForUserId((int) $member->id), true)
                     + ['demo_used' => $this->usedDemoDesign($this->demoLinkedUserIds((int) $member->id, $request))]
                 : null,
+            // A Voice agent: a live call with a sample business's agent, from the free test seconds
+            // (App\Support\Agents\DemoAgent).
+            'demoAgent' => \App\Support\Agents\DemoAgent::openTo($member) ? \App\Support\Agents\DemoAgent::studio($member, app()->getLocale()) : null,
         ]);
 
         return $this->attachDemoDeviceCookie($request, $response);

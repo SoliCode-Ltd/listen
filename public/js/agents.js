@@ -103,23 +103,73 @@
       if (dl) dl.onclick = function () {
         var a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = dl.getAttribute('data-name') || 'qr.png'; a.click();
       };
-      var origins = $('[data-ag-origins]', box);
-      if (origins && C.agent) origins.addEventListener('change', function () {
-        api('PATCH', C.agent.urls.update, { allowed_origins: origins.value }).then(function () { toast(T.saved); });
-      });
+      var origins = $('[data-ag-origins]', box), sites = $('[data-ag-sites]', box);
+      // The websites the button may show on: a row each; adding or removing one saves the list.
+      var siteList = sites && $('[data-ag-sites-list]', sites), siteForm = sites && $('[data-ag-sites-add]', sites);
+      var siteInput = sites && $('[data-ag-site-input]', sites), siteErr = sites && $('[data-ag-site-error]', sites);
+      var siteMax = sites ? (+sites.getAttribute('data-max') || 10) : 10;
+      function hostOf(v) { return String(v || '').trim().toLowerCase().replace(/^[a-z]+:\/\//, '').replace(/[\/?#].*$/, '').replace(/:\d+$/, '').replace(/^www\./, ''); }
+      function siteValues() { return siteList ? $$('li', siteList).map(function (li) { return li.getAttribute('data-site'); }) : []; }
+      function syncSites() {
+        if (!sites) return;
+        var n = siteValues().length, count = $('[data-ag-sites-count]', sites), full = $('[data-ag-sites-full]', sites);
+        $('[data-ag-sites-empty]', sites).hidden = n > 0;
+        if (siteForm) siteForm.hidden = n >= siteMax;
+        if (full) full.hidden = n < siteMax;
+        if (count) count.textContent = (count.getAttribute('data-pattern') || ':count / :max').replace(':count', n).replace(':max', siteMax);
+        origins.value = siteValues().join(', ');
+      }
+      function saveSites(then, undo) {
+        syncSites();
+        api('PATCH', C.agent.urls.update, { allowed_origins: origins.value }).then(function () { toast(T.saved); if (then) then(); })
+          .catch(function (err) { if (undo) undo(); syncSites(); toast(err.message); });
+      }
+      // A row like the page's own: the website's first letter, its address, and Remove.
+      function siteRow(site) {
+        var host = hostOf(site), li = document.createElement('li');
+        li.setAttribute('data-site', site);
+        li.innerHTML = '<span class="ag-site-mark" aria-hidden="true"></span><span class="ag-site-name"><bdi dir="ltr"></bdi></span>'
+          + '<button type="button" class="ag-sites-remove" data-ag-site-remove></button>';
+        $('.ag-site-mark', li).textContent = host.charAt(0).toUpperCase();
+        $('bdi', li).textContent = host;
+        var rm = $('button', li);
+        rm.textContent = T.site_remove_short || 'Remove';
+        rm.setAttribute('aria-label', (T.site_remove || ':site').replace(':site', host));
+        li.classList.add('is-new');
+        return li;
+      }
+      function addSite(raw, then) {
+        var host = hostOf(raw);
+        if (siteErr) siteErr.hidden = true;
+        if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host)) { if (siteErr) { siteErr.textContent = T.site_invalid; siteErr.hidden = false; } return false; }
+        if (siteValues().some(function (s) { return hostOf(s) === host; })) { if (siteErr) { siteErr.textContent = T.site_exists; siteErr.hidden = false; } return false; }
+        if (siteValues().length >= siteMax) { if (siteErr) { siteErr.textContent = T.site_max; siteErr.hidden = false; } return false; }
+        var li = siteRow('https://' + host);
+        siteList.appendChild(li);
+        saveSites(then, function () { li.remove(); });
+        return true;
+      }
+      if (sites && C.agent) {
+        siteForm.addEventListener('submit', function (e) {
+          e.preventDefault();
+          if (addSite(siteInput.value)) { siteInput.value = ''; siteInput.focus(); }
+        });
+        siteInput.addEventListener('input', function () { if (siteErr) siteErr.hidden = true; });
+        siteList.addEventListener('click', function (e) {
+          var b = e.target.closest('[data-ag-site-remove]');
+          if (!b) return;
+          var li = b.closest('li'), next = li.nextElementSibling;
+          li.remove();
+          saveSites(null, function () { siteList.insertBefore(li, next); });
+          (siteInput || document.body).focus();
+        });
+      }
       // "Allow it": the refused website joins the list.
       var allow = $('[data-ag-allow-origin]', box);
-      if (allow && origins && C.agent) allow.addEventListener('click', function () {
-        var site = allow.getAttribute('data-ag-allow-origin');
-        var list = origins.value.split(/[\s,]+/).filter(Boolean);
-        if (list.indexOf(site) < 0) list.push(site);
-        origins.value = list.join(', ');
+      if (allow && sites && C.agent) allow.addEventListener('click', function () {
         allow.disabled = true;
-        api('PATCH', C.agent.urls.update, { allowed_origins: origins.value }).then(function () {
-          toast(T.saved);
-          var row = allow.closest('[data-ag-refused]');
-          if (row) row.remove();
-        }).catch(function (err) { allow.disabled = false; toast(err.message); });
+        var done = function () { var row = allow.closest('[data-ag-refused]'); if (row) row.remove(); };
+        if (!addSite(allow.getAttribute('data-ag-allow-origin'), done)) { allow.disabled = false; done(); }
       });
     });
   }
@@ -330,8 +380,12 @@
       return id;
     } catch (e) { return ''; }
   }
-  function talk(root) {
+  // hooks (the demo page): onState(state) after each change; onError(message, error) returning
+  // false when it has dealt with a call that could not start.
+  function talk(root, hooks) {
     if (!root) return;
+    hooks = hooks || {};
+    var quietError = false;
     var btn = $('[data-ag-call]', root), label = $('[data-ag-call-label]', root), stateEl = $('[data-ag-talk-state]', root);
     var mute = $('[data-ag-mute]', root), stage = $('[data-ag-stage]', root);
     var bars = $$('.ag-wave i', root), face = $('[data-ag-talk-avatar]', root);
@@ -341,9 +395,11 @@
     var call = null, muted = false, lastAsked = '';
     var states = T.states || {};
     function setState(s) {
+      if (s === 'error' && quietError) { quietError = false; s = 'idle'; }
       // A woman's voice has its own words in Arabic ("سارة تتحدث"); the setup steps get both forms.
       var key = C.agent && C.agent.gender === 'female' && states[s + '_female'] ? s + '_female' : s;
-      stateEl.textContent = s === 'mic' ? (T.mic || '') : fill(states[key] || states.idle || '', { name: (C.agent && C.agent.name) || '' });
+      // Before a call nothing is said: the button under the orb is enough.
+      stateEl.textContent = s === 'idle' ? '' : (s === 'mic' ? (T.mic || '') : fill(states[key] || '', { name: (C.agent && C.agent.name) || '' }));
       stateEl.classList.toggle('is-error', s === 'error' || s === 'mic');
       var live = s === 'connecting' || s === 'listening' || s === 'speaking';
       btn.classList.toggle('is-live', live);
@@ -352,6 +408,7 @@
       stage.classList.toggle('is-speaking', s === 'speaking');
       stage.classList.toggle('is-live', live);
       if (!live) { stage.classList.remove('is-playing'); stage.__vpLevel = 0; call = null; level(0, 0); }
+      if (hooks.onState) hooks.onState(s);
     }
     // The waves follow the agent's voice (and the caller's, softer); the face and its halo breathe with it.
     function level(a, c) {
@@ -373,7 +430,7 @@
       list.scrollTop = list.scrollHeight;
     }
     function correction(question) {
-      if (!C.agent || !C.agent.urls || C.mode === 'link') return null;
+      if (!C.agent || !C.agent.urls || C.mode === 'link' || C.mode === 'demo') return null;
       var d = document.createElement('details');
       d.className = 'ag-correct';
       d.innerHTML = '<summary></summary><textarea class="ag-textarea" dir="auto"></textarea><button type="button" class="ag-btn ag-btn-sm ag-btn-primary"></button>';
@@ -397,7 +454,7 @@
           body: JSON.stringify({ slug: C.slug, page_url: location.href, visitor: visitorId() }) })
           .then(function (r) { return r.json(); });
       }
-      return api('POST', C.agent.urls.test);
+      return api('POST', C.agent.urls.test, typeof C.callBody === 'function' ? C.callBody() : undefined);
     }
     btn.addEventListener('click', function () {
       if (call) { call.end(); return; }
@@ -414,7 +471,10 @@
         onTool: function (name, args) {
           if (name === 'save_contact' && C.mode !== 'link') bubble('event', fill(T.saved_contact, { details: [args.name, args.phone, args.email].filter(Boolean).join(' · ') }));
         },
-        onError: function (msg) { if (msg) toast(msg); },
+        onError: function (msg, err) {
+          if (hooks.onError && hooks.onError(msg, err) === false) { quietError = true; return; }
+          if (msg) toast(msg);
+        },
       });
       if (window.ListenOrbs) window.ListenOrbs.wake();
     });
@@ -462,9 +522,12 @@
       if ($('[data-ag-accent-field]')) $('[data-ag-accent-field]').hidden = lang() !== 'en';
     }); });
     var writing = $('[data-ag-writing]'), businessBox = $('[data-ag-business]'), decisionsWrap = $('[data-ag-decisions-wrap]');
-    var checks = $$('[data-ag-check]'), slow = $('[data-ag-slow]');
+    var allChecks = $$('[data-ag-check]'), checks = allChecks, slow = $('[data-ag-slow]');
     var checkTimer = 0;
-    function animateChecks() {
+    function animateChecks(hasSite) {
+      // No website given: there is nothing to read, so that line is not shown at all.
+      allChecks.forEach(function (c) { c.hidden = !hasSite && c.getAttribute('data-ag-check') === 'read'; });
+      checks = allChecks.filter(function (c) { return !c.hidden; });
       var i = 0;
       checks.forEach(function (c) { c.classList.remove('is-active', 'is-done'); });
       function step() {
@@ -497,7 +560,7 @@
       };
       if (!data.business_name || !data.name) { err.textContent = T.error_name; err.hidden = false; return; }
       businessBox.hidden = true; writing.hidden = false; slow.hidden = true;
-      animateChecks();
+      animateChecks(!!data.website_url);
       var req = C.agent ? api('POST', C.agent.urls.write, data) : api('POST', C.urls.store, data);
       req.then(function (res) {
         finishChecks(function () { decisions(res); });
@@ -1002,10 +1065,71 @@
     draw(true);
   }
 
+  /* ---------- The demo page's Voice agent tab (App\Support\Agents\DemoAgent) ---------- */
+  // Three sample businesses: the one picked sets the agent's name, voice and lines; a call comes
+  // out of the member's free test seconds, and the time left is read again after each call.
+  function demo() {
+    var box = $('[data-demo-agent]');
+    if (!box) return;
+    var picks = $$('input[name="demo-agent-preset"]', box);
+    var biz = $('[data-demo-biz]', box), tryList = $('[data-demo-try]', box);
+    var left = $('[data-demo-left]', box), leftText = $('[data-demo-left-text]', box);
+    var used = $('[data-demo-used]', box), plans = $('[data-demo-plans]', box), callBtn = $('[data-ag-call]', box);
+    var live = false;
+    function chosen() { return picks.filter(function (i) { return i.checked; })[0] || picks[0]; }
+    function apply() {
+      var i = chosen();
+      if (!i) return;
+      C.agent.name = i.getAttribute('data-name');
+      C.agent.gender = i.getAttribute('data-gender');
+      if (biz) biz.textContent = i.getAttribute('data-business');
+      var lines = [];
+      try { lines = JSON.parse(i.getAttribute('data-try') || '[]'); } catch (e) { lines = []; }
+      if (tryList) {
+        tryList.innerHTML = '';
+        lines.forEach(function (t) { var li = document.createElement('li'); li.dir = 'auto'; li.textContent = t; tryList.appendChild(li); });
+      }
+    }
+    function usedUp() {
+      if (left) left.hidden = true;
+      if (used) used.hidden = false;
+      if (plans) plans.hidden = false;
+      if (callBtn) callBtn.disabled = true;
+    }
+    function refresh() {
+      fetch(C.agent.urls.left, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d) return;
+          if (!d.can_call) { usedUp(); return; }
+          if (leftText && left) leftText.textContent = fill(left.getAttribute('data-pattern'), { time: d.clock });
+        })
+        .catch(function () {});
+    }
+    C.callBody = function () { return { preset: (chosen() || {}).value }; };
+    picks.forEach(function (i) { i.addEventListener('change', apply); });
+    talk($('[data-ag-talk]', box), {
+      onState: function (s) {
+        var on = s === 'connecting' || s === 'listening' || s === 'speaking';
+        // While a call is on, the business stays the one being called.
+        picks.forEach(function (i) { i.disabled = on; });
+        if (live && !on) setTimeout(refresh, 1500);
+        live = on;
+      },
+      onError: function (msg, err) {
+        if (err && err.data && err.data.reason === 'free_used') { usedUp(); return false; }
+        return true;
+      },
+    });
+    if (used && !used.hidden) usedUp();
+    apply();
+  }
+
   function boot() {
     if (C.mode === 'setup') setup();
     else if (C.mode === 'agent') { agentPage(); design(); }
     else if (C.mode === 'link') talk($('[data-ag-talk]'));
+    else if (C.mode === 'demo') demo();
     drawQr();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

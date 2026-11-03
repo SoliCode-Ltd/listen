@@ -113,6 +113,22 @@ final class AgentCost
         return max($base, (int) ceil($cost * $perDollar / 10) * 10);
     }
 
+    /**
+     * The fewest credits a call minute can use and still keep MARGIN on a typical call on every
+     * plan on sale (the plan whose credits cost least sets it, its yearly price counted), rounded
+     * up to the next 100 and never under one audio minute. It follows the server's own plans, so
+     * the same code gives each server the rate its prices need. Null: no paid plan yet.
+     */
+    public static function recommendedRate(): ?int
+    {
+        $perDollar = self::creditsPerDollar();
+        if (! $perDollar) {
+            return null;
+        }
+
+        return max(\App\Support\Credits::PER_MINUTE, (int) (ceil(self::typical() * $perDollar / 100) * 100));
+    }
+
     public static function typical(): float
     {
         return self::perMinute(self::TYPICAL['minutes'], self::TYPICAL['instructions']);
@@ -165,14 +181,17 @@ final class AgentCost
         $typical = self::typical();
         $heavy = self::heavy();
         $plans = rescue(fn () => Plan::query()->where('is_active', true)->where('price_cents', '>', 0)->orderBy('price_cents')->get(), collect(), false);
+        $yearlyOff = max(0, min(90, (int) AgentAccess::setting('billing_yearly_discount_percentage', 0)));
 
-        return $plans->map(function (Plan $plan) use ($rate, $typical, $heavy): array {
+        return $plans->map(function (Plan $plan) use ($rate, $typical, $heavy, $yearlyOff): array {
             $credits = max(0, (int) $plan->monthly_chars);
             $price = ((int) $plan->price_cents) / 100;
             $minutes = intdiv($credits, $rate);
             $earns = $minutes > 0 ? $price / ($credits / $rate) : 0.0;
+            // The same minute on the yearly price (its discount), where the plan has one.
+            $yearly = filled($plan->stripe_price_yearly ?? null) && $yearlyOff > 0 && $earns > 0 ? $earns * (1 - $yearlyOff / 100) : null;
             $offer = $plan->hasActiveDiscount() ? ($plan->getDiscountedPriceCents() / 100) / max(1, $credits / $rate) : null;
-            $margin = fn (float $cost): ?int => $earns > 0 ? (int) round(($earns - $cost) / $earns * 100) : null;
+            $margin = fn (float $cost, ?float $on = null): ?int => ($on ??= $earns) > 0 ? (int) round(($on - $cost) / $on * 100) : null;
 
             return [
                 'plan' => (string) $plan->name,
@@ -180,8 +199,10 @@ final class AgentCost
                 'credits' => $credits,
                 'minutes' => $minutes,
                 'earns' => round($earns, 3),
+                'earns_yearly' => $yearly !== null ? round($yearly, 3) : null,
                 'earns_offer' => $offer !== null ? round($offer, 3) : null,
                 'typical_margin' => $margin($typical),
+                'typical_margin_yearly' => $yearly !== null ? $margin($typical, $yearly) : null,
                 'heavy_margin' => $margin($heavy),
                 'included' => AgentAccess::planIncludes($plan),
             ];

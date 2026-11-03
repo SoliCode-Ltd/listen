@@ -41,6 +41,9 @@ class AgentPlansTest extends TestCase
         config(['services.gemini_tts.api_key' => 'test-key']);
         Http::fake(['*auth_tokens' => Http::response(['name' => 'auth_tokens/live-key'])]);
         Plan::factory()->free()->create(['monthly_chars' => 10000, 'voice_tier' => 'standard']);
+        // A fixed rate, so the plans these tests make do not move it (the rate that follows the
+        // plans has its own test).
+        SiteSetting::set('agents_credits_per_minute', '8100', 'agents');
     }
 
     private function owner(array $plan = [], int $credits = 900000): User
@@ -140,7 +143,6 @@ class AgentPlansTest extends TestCase
     public function test_owners_see_call_time_left_and_what_happens_when_it_runs_out(): void
     {
         $rate = AgentAccess::creditsPerMinute();
-        $this->assertSame(8100, $rate, 'a call minute uses nine audio minutes of credits (40% on every plan)');
 
         $owner = $this->owner([], 100 * $rate);
         $balance = AgentBalance::for($owner);
@@ -149,8 +151,11 @@ class AgentPlansTest extends TestCase
 
         $agent = $this->agent($owner);
         $this->actingAs($owner)->getLocalizedRoute('voice-agents.index')->assertOk()
-            ->assertSee(__('agents.balance.title'))->assertSee('data-ag-balance', false)->assertSee('<b>100</b>', false)
-            ->assertSee('href="#usage-breakdown"', false);
+            ->assertSee(__('agents.balance.left_label'))->assertSee('data-ag-balance', false)->assertSee('<strong>100</strong>', false)
+            // More call time is the card's one solid button, in every state.
+            ->assertSee(__('agents.balance.more'))
+            // Nothing used yet: no "where your credits went".
+            ->assertDontSee('href="#usage-breakdown"', false);
         // The account's call time is on the agents list only; an agent's page shows a line when it needs the owner.
         $this->actingAs($owner)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk()
             ->assertDontSee('data-ag-balance', false)->assertDontSee('ag-balance-line', false);
@@ -220,8 +225,32 @@ class AgentPlansTest extends TestCase
         $this->withHeaders(['Origin' => 'https://copycat.example'])->getJson('/agent-api/widgets/'.$widget->public_key)->assertForbidden();
         $this->callAgent($agent, 'v-9', 'https://copycat.example')->assertForbidden();
         $this->assertSame('https://copycat.example', $widget->fresh()->lastRefused()['origin']);
-        $this->actingAs($agent->user)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk()
-            ->assertSee('data-ag-allow-origin="https://copycat.example"', false);
+        $page = $this->actingAs($agent->user)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk()
+            ->assertSee('data-ag-allow-origin="https://copycat.example"', false)
+            // The settings card: the allowed website, how many of ten, and the refused one in its own row.
+            ->assertSee('data-site="'.self::SITE.'"', false)
+            ->assertSee(__('agents.live_sites_count', ['count' => 1, 'max' => 10]))
+            ->assertSee(trim(explode(':when', __('agents.live_refused_line'))[0]));
+        $this->assertMatchesRegularExpression('/data-ag-sites-empty\s+hidden/', $page->getContent(), 'the empty row waits hidden');
+    }
+
+    public function test_the_allowed_websites_card_marks_where_the_button_was_seen(): void
+    {
+        $agent = $this->agent($this->owner());
+        $widget = $agent->mainWidget();
+        $widget->forceFill(['allowed_origins' => [self::SITE, 'https://shop.example'], 'last_seen_origin' => 'https://www.cairosmiles.com', 'last_seen_at' => now()->subHours(2)])->save();
+
+        $page = $this->actingAs($agent->user)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk()
+            ->assertSee(__('agents.live_sites_count', ['count' => 2, 'max' => 10]))
+            ->assertSee(__('agents.live_site_live', ['when' => $widget->fresh()->seenAgo()]));
+        // Seen once, on one website: the other row has no such line.
+        $this->assertSame(1, substr_count($page->getContent(), 'class="is-live"'));
+
+        $widget->forceFill(['allowed_origins' => []])->save();
+        $empty = $this->actingAs($agent->user)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk()
+            ->assertSee(__('agents.live_sites_empty_title'))
+            ->assertSee(__('agents.live_sites_count', ['count' => 0, 'max' => 10]));
+        $this->assertMatchesRegularExpression('/data-ag-sites-empty\s*>/', $empty->getContent(), 'the empty row shows');
     }
 
     public function test_a_caller_who_abuses_the_agent_or_leaves_calls_hanging_is_kept_off(): void
@@ -251,6 +280,10 @@ class AgentPlansTest extends TestCase
         $this->assertStringContainsString('# Safety rules that come before everything above', $text);
         $this->assertStringEndsWith(AgentInstructions::safety($agent), $text);
         $this->assertStringContainsString('Never ask for, or write down, card numbers', $text);
+        // Offensive talk is never answered: one calm line, then the call ends if it goes on.
+        $this->assertStringContainsString('never answer what they said', $text);
+        $this->assertStringContainsString('ما أقدر أرد على هذا النوع من الكلام', $text);
+        $this->assertStringContainsString('call end_call with the reason abusive', $text);
 
         $setup = \App\Services\Agents\LiveSession::setupFor($agent);
         $base = AgentCost::tokensIn($text);
@@ -357,8 +390,36 @@ class AgentPlansTest extends TestCase
         $this->assertGreaterThanOrEqual(40, $row['typical_margin']);
     }
 
+    public function test_with_no_saved_rate_a_call_minute_follows_the_plans(): void
+    {
+        SiteSetting::set('agents_credits_per_minute', '', 'agents');
+        SiteSetting::set('billing_yearly_discount_percentage', '20', 'billing');
+        // Live's plans: Studio Max's credits cost least, on its yearly price.
+        foreach ([['starter-l', 900, 90000], ['creator-l', 2200, 180000], ['pro-l', 4900, 450000], ['max-l', 9900, 1800000]] as [$slug, $cents, $credits]) {
+            Plan::factory()->create(['slug' => $slug, 'name' => $slug, 'price_cents' => $cents, 'monthly_chars' => $credits, 'stripe_price_yearly' => 'price_'.$slug, 'is_active' => true, 'agents_enabled' => true]);
+        }
+
+        $rate = AgentAccess::creditsPerMinute();
+        $this->assertFalse(AgentAccess::rateIsSet());
+        $this->assertSame(AgentCost::recommendedRate(), $rate);
+        $this->assertSame(0, $rate % 100);
+        // The fewest credits that keep 40% on a typical call on the cheapest credits (Studio Max, yearly) ...
+        $earns = fn (int $r): float => $r * (99 * 0.8) / 1800000;
+        $this->assertGreaterThanOrEqual(0.4, ($earns($rate) - AgentCost::typical()) / $earns($rate));
+        $this->assertLessThan(0.4, ($earns($rate - 100) - AgentCost::typical()) / $earns($rate - 100));
+        // ... far fewer than the 8,100 staging's test plans call for.
+        $this->assertLessThan(3000, $rate);
+
+        // A rate the admin saves wins, and clearing it goes back to the plans.
+        SiteSetting::set('agents_credits_per_minute', '2500', 'agents');
+        $this->assertSame(2500, AgentAccess::creditsPerMinute());
+        SiteSetting::set('agents_credits_per_minute', '', 'agents');
+        $this->assertSame($rate, AgentAccess::creditsPerMinute());
+    }
+
     public function test_no_call_earns_less_than_forty_percent_on_the_cheapest_plan(): void
     {
+        SiteSetting::set('agents_credits_per_minute', '', 'agents');
         // The plan whose credits cost the least sets what a dollar of call cost must take.
         Plan::factory()->create(['slug' => 'pro-y', 'name' => 'Pro', 'price_cents' => 4900, 'monthly_chars' => 4000000, 'is_active' => true, 'agents_enabled' => true]);
         Plan::factory()->create(['slug' => 'small-y', 'name' => 'Small', 'price_cents' => 900, 'monthly_chars' => 22000, 'is_active' => true, 'agents_enabled' => true]);

@@ -5,6 +5,8 @@
 @props(['usage', 'agentsOpen' => true, 'perMinute' => null])
 @php
   $u = $usage;
+  // Nothing used this period: nothing to show, and no link to it (CreditUsage::hasUse).
+  $hasUse = \App\Support\CreditUsage::hasUse($u);
   $locale = app()->getLocale();
   $minutes = fn (int $s) => trans_choice('usage.minutes', intdiv($s, 60), ['count' => number_format(intdiv($s, 60))]);
   $length = fn (int $s) => $s > 0 ? sprintf('%d:%02d', intdiv($s, 60), $s % 60) : '—';
@@ -18,7 +20,9 @@
     'dub' => '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M10 9.5v5l4.5-2.5z"/>',
   ];
 @endphp
-<section class="us us-embed" id="usage-breakdown" aria-labelledby="us-where">
+@if($hasUse)
+{{-- Closed until "Credit usage" is chosen (the chip by the credits, or the menu): then it opens and comes into view. --}}
+<section class="us us-embed" id="usage-breakdown" aria-labelledby="us-where" hidden data-usage-breakdown>
   <div class="us-card">
     <div class="us-card-head">
       <h2 id="us-where">{{ __('usage.where') }}</h2>
@@ -96,8 +100,25 @@
           </table>
         </div>
       </details>
-    @else
-      <p class="us-note">{{ __('usage.empty') }}</p>
     @endif
   </div>
 </section>
+<script>
+  (function () {
+    var box = document.getElementById('usage-breakdown');
+    if (!box) return;
+    function open(scroll) {
+      if (box.hidden) { box.hidden = false; box.classList.add('is-opening'); }
+      if (scroll) box.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    }
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[href="#usage-breakdown"]');
+      if (!a) return;
+      e.preventDefault();
+      open(true);
+      if (history.replaceState) history.replaceState(null, '', '#usage-breakdown');
+    });
+    if (location.hash === '#usage-breakdown') open(true);
+  })();
+</script>
+@endif

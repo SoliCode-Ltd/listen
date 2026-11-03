@@ -80,20 +80,66 @@
   <section class="ag-live-section">
     <div class="ag-live-head">
       <h3>{{ __('agents.live_security_title') }}</h3>
+      <p>{{ __('agents.live_security_text') }}</p>
     </div>
-    <div class="ag-card ag-tile">
-      <div class="ag-field">
-        <label for="ag-origins">{{ __('agents.live_allowed_label') }}</label>
-        <input class="ag-input ag-input-url" id="ag-origins" type="text" dir="ltr" placeholder="{{ __('agents.live_allowed_placeholder') }}" value="{{ implode(', ', $widget->allowed_origins ?? []) }}" data-ag-origins>
-        <span class="ag-hint">{{ __('agents.live_allowed_hint') }}</span>
+    {{-- The websites the button may show on, as a settings card: the title and how many, a row for
+         each website (removed with its own button), a website that was refused, and the field that
+         adds one at a time. --}}
+    @php
+      $sites = $widget->allowed_origins ?? [];
+      $siteMax = 10;
+      $bare = fn (?string $host) => preg_replace('#^www\.#', '', strtolower((string) $host));
+      $liveHost = $seenHost ? $bare($seenHost) : null;
+      $refused = $widget->lastRefused();
+    @endphp
+    <div class="ag-card ag-sites" data-ag-sites data-max="{{ $siteMax }}">
+      <div class="ag-sites-head">
+        <h4 id="ag-sites-label">{{ __('agents.live_allowed_label') }}</h4>
+        <span class="ag-sites-count" data-ag-sites-count data-pattern="{{ __('agents.live_sites_count') }}">{{ __('agents.live_sites_count', ['count' => count($sites), 'max' => $siteMax]) }}</span>
+      </div>
+      <ul class="ag-sites-list" aria-labelledby="ag-sites-label" data-ag-sites-list>
+        @foreach($sites as $site)
+          @php $host = preg_replace('#^https?://#', '', rtrim((string) $site, '/')); @endphp
+          <li data-site="{{ $site }}">
+            <span class="ag-site-mark" aria-hidden="true">{{ mb_strtoupper(mb_substr($bare($host), 0, 1)) }}</span>
+            <span class="ag-site-name">
+              <bdi dir="ltr">{{ $host }}</bdi>
+              @if($liveHost && $bare($host) === $liveHost)
+                <small class="is-live"><i aria-hidden="true"></i>{{ __('agents.live_site_live', ['when' => $widget->seenAgo()]) }}</small>
+              @endif
+            </span>
+            <button type="button" class="ag-sites-remove" data-ag-site-remove aria-label="{{ __('agents.live_site_remove', ['site' => $host]) }}">{{ __('agents.live_site_remove_short') }}</button>
+          </li>
+        @endforeach
+      </ul>
+      <div class="ag-sites-empty" data-ag-sites-empty @if($sites) hidden @endif>
+        <span class="ag-site-mark is-empty" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.9 5.2 3.9 8.5s-1.3 6.1-3.9 8.5c-2.6-2.4-3.9-5.2-3.9-8.5s1.3-6.1 3.9-8.5z"/></svg></span>
+        <p class="ag-site-name"><b>{{ __('agents.live_sites_empty_title') }}</b><small>{{ __('agents.live_sites_empty') }}</small></p>
       </div>
       {{-- A website that tried to show the button and was not on the list: allowed in one tap. --}}
-      @if($refused = $widget->lastRefused())
-        <div class="ag-refused" data-ag-refused>
-          <span>{!! str_replace(':site', '<bdi dir="ltr">'.e(parse_url($refused['origin'], PHP_URL_HOST)).'</bdi>', e(__('agents.live_refused', ['when' => $refused['at']->diffForHumans()]))) !!}</span>
-          <button type="button" class="ag-btn ag-btn-sm" data-ag-allow-origin="{{ $refused['origin'] }}">{{ __('agents.live_refused_allow') }}</button>
+      @if($refused)
+        @php $refusedHost = (string) parse_url($refused['origin'], PHP_URL_HOST); @endphp
+        <div class="ag-sites-refused" data-ag-refused>
+          <span class="ag-site-mark is-refused" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></svg></span>
+          <span class="ag-site-name">
+            <bdi dir="ltr">{{ $refusedHost }}</bdi>
+            <small>{{ __('agents.live_refused_line', ['when' => $refused['at']->diffForHumans()]) }}</small>
+          </span>
+          <button type="button" class="ag-btn ag-btn-sm" data-ag-allow-origin="{{ $refused['origin'] }}" aria-label="{{ __('agents.live_refused_allow_label', ['site' => $refusedHost]) }}">{{ __('agents.live_refused_allow') }}</button>
         </div>
       @endif
+      <div class="ag-sites-foot">
+        <form class="ag-sites-add" data-ag-sites-add novalidate @if(count($sites) >= $siteMax) hidden @endif>
+          <label class="ag-sites-field">
+            <span aria-hidden="true">https://</span>
+            <input id="ag-site-new" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr" placeholder="{{ __('agents.live_allowed_placeholder') }}" aria-label="{{ __('agents.live_site_add_label') }}" data-ag-site-input>
+          </label>
+          <button type="submit" class="ag-btn ag-btn-primary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>{{ __('agents.live_site_add') }}</button>
+        </form>
+        <p class="ag-sites-full" data-ag-sites-full @if(count($sites) < $siteMax) hidden @endif>{{ __('agents.live_site_max') }}</p>
+        <p class="ag-error" data-ag-site-error role="alert" hidden></p>
+      </div>
+      <input type="hidden" value="{{ implode(', ', $sites) }}" data-ag-origins>
     </div>
   </section>
 

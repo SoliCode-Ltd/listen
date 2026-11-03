@@ -62,9 +62,20 @@ class UsagePageTest extends TestCase
         $this->assertCount(2, $usage['items']);
     }
 
-    public function test_the_studio_meter_and_the_call_time_card_open_it(): void
+    public function test_it_opens_from_its_link_and_stays_out_of_the_way_until_then(): void
     {
+        // Nothing used yet: no section and no link to it.
         $user = User::factory()->create();
-        $this->actingAs($user)->getLocalizedRoute('dashboard')->assertOk()->assertSee('href="#usage-breakdown"', false);
+        $this->actingAs($user)->getLocalizedRoute('dashboard')->assertOk()
+            ->assertDontSee('href="#usage-breakdown"', false)->assertDontSee('id="usage-breakdown"', false);
+
+        // Once something was used: the link by the credits, and the section closed until it is chosen.
+        $text = new TextItem();
+        $text->forceFill(['user_id' => $user->id, 'source_type' => 'dashboard', 'title' => 'Hello', 'content' => 'Hello', 'status' => 'done', 'received_at' => now()])->save();
+        $audio = new AudioGeneration();
+        $audio->forceFill(['user_id' => $user->id, 'text_item_id' => $text->id, 'input_text' => 'Hello', 'target_language' => 'en', 'status' => 'done', 'billable_chars' => 900, 'duration_seconds' => 60])->save();
+        $this->actingAs($user)->getLocalizedRoute('dashboard')->assertOk()
+            ->assertSee('href="#usage-breakdown"', false)
+            ->assertSee('id="usage-breakdown" aria-labelledby="us-where" hidden data-usage-breakdown', false);
     }
 }
