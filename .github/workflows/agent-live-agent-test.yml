@@ -26,7 +26,7 @@ permissions:
 # The calls this run makes ("all", or case ids from the script): only the ones
 # being recorded again, so no audio is spent on calls already kept.
 env:
-  CALLS: ar-eg en-us
+  CALLS: ar-eg
 
 concurrency:
   group: agent-live-agent-test

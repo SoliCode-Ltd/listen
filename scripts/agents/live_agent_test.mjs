@@ -37,7 +37,7 @@ const CASES = [
   { id: 'ar-eg', file: 'ar-eg.json', turns: [
     'السلام عليكم، هو انتو بتعملوا سحب عينات من البيت؟',
     'طب تمام، عايزة حد ييجي بكرة الساعة عشرة الصبح. اسمي منى ورقمي صفر واحد صفر واحد اتنين تلاتة أربعة خمسة ستة سبعة تمانية',
-    'أيوه مظبوط، شكراً',
+    'أيوه مظبوط. والنتيجة بتطلع إمتى؟',
   ] },
   { id: 'ar-lb', file: 'ar-lb.json', turns: [
     'مرحبا، بدي إسأل إذا عندكن شقة للإيجار غرفتين نوم بصيدا',
@@ -118,7 +118,7 @@ function run(c, token) {
       if (m.toolCall) {
         for (const fc of m.toolCall.functionCalls || []) {
           out.tools.push({ name: fc.name, args: fc.args, at_turn: i + 1 });
-          if (cur) { clearTimeout(cur.done); cur.done = fc.name === 'end_call' ? setTimeout(finish, 2500) : null; }
+          if (cur) { clearTimeout(cur.done); cur.done = fc.name === 'end_call' ? setTimeout(finish, 2500) : null; if (fc.name !== 'end_call') cur.tool = true; }
           ws.send(JSON.stringify({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: { result: fc.name === 'save_contact' ? 'saved' : 'ok' } }] } }));
         }
       }
@@ -129,8 +129,8 @@ function run(c, token) {
       }
       if (sc.outputTranscription?.text) cur.said += sc.outputTranscription.text;
       if (sc.inputTranscription?.text) cur.heard += sc.inputTranscription.text;
-      if (p0(sc)) { clearTimeout(cur.done); cur.done = null; }
-      if (sc.turnComplete) { clearTimeout(cur.done); cur.done = setTimeout(finish, 1600); }
+      if (p0(sc)) { clearTimeout(cur.done); cur.done = null; cur.tool = false; }
+      if (sc.turnComplete) { clearTimeout(cur.done); cur.done = setTimeout(finish, cur.tool ? 6000 : 1600); }
     };
     ws.onerror = (e) => { out.error = `socket error ${e?.message || ''}`; };
     ws.onclose = (e) => { clearTimeout(timer); if (![1000, 1005].includes(e.code) && !out.error) out.error = `closed ${e.code} ${String(e.reason || '').slice(0, 300)}`; resolve(out); };
