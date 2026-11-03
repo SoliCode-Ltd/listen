@@ -78,6 +78,10 @@ $keys = [
     'extension_install_step_1', 'extension_install_step_2', 'extension_install_step_3', 'extension_install_step_4', 'extension_install_step_5',
     'extension_how_to_use_step_1', 'extension_how_to_use_step_2', 'extension_how_to_use_step_3', 'extension_how_to_use_step_4', 'extension_how_to_use_step_5',
     'extension_firefox_enabled', 'extension_safari_enabled',
+    // Agents: the credits a call minute uses (empty means the site's default), who has them, the
+    // free test minutes and the daily budgets.
+    'agents_credits_per_minute', 'agents_audience', 'agents_calls_stopped', 'agents_free_test_seconds', 'agents_free_daily_minutes',
+    'agents_site_daily_minutes', 'agents_house_daily_minutes', 'agents_review',
 ];
 $settings = DB::table('site_settings')->whereIn('key', $keys)->pluck('value', 'key');
 foreach ($keys as $key) {

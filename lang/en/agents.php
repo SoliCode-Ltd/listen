@@ -41,6 +41,15 @@ return [
     'card_last' => 'Last call :when',
     'card_open' => 'Open',
     'card_continue' => 'Continue setup',
+    'list_count' => 'Your agents',
+    'list_month' => 'This month, since :date',
+    'card_stat_calls' => 'Calls',
+    'card_stat_minutes' => 'Minutes',
+    'card_stat_customers' => 'New customers',
+    'card_missed' => '{1} 1 missed call today|[2,*] :count missed calls today',
+    'card_none' => 'No calls yet',
+    'card_setup' => 'Setup not finished',
+    'new_agent_left' => '{1} You can add 1 more agent|[2,*] You can add :count more agents',
 
     // Setup: the steps.
     'setup_title' => 'Create your agent',

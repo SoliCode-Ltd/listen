@@ -3,6 +3,8 @@
 namespace Tests\Feature\Agents;
 
 use App\Models\Agent;
+use App\Models\AgentContact;
+use App\Models\AgentConversation;
 use App\Models\Plan;
 use App\Models\AgentWidget;
 use App\Models\User;
@@ -69,6 +71,31 @@ class AgentPagesTest extends TestCase
             // The Studio | Agents switch is on the app's own pages.
             ->assertSee('class="product-switch"', false);
         $this->actingAs($owner)->getLocalizedRoute('voice-agents.create')->assertOk()->assertSee('data-ag-business-form', false);
+    }
+
+    public function test_each_card_shows_its_agents_own_month_and_the_agent_page_does_not_move(): void
+    {
+        // Mid-month, so "an hour ago" is in this month whenever the test runs.
+        $this->travelTo(now()->startOfMonth()->addDays(10)->setTime(12, 0));
+        $owner = User::factory()->create();
+        $agent = $this->agent($owner, ['name' => 'Huda', 'status' => Agent::LIVE]);
+        // Two callers' calls this month count; the owner's test call and a call two months ago do not.
+        foreach ([[now()->subHour(), 'widget', 125], [now()->subMinutes(10), 'link', 61], [now()->subHour(), 'test', 600], [now()->subMonths(2), 'widget', 900]] as [$at, $channel, $seconds]) {
+            AgentConversation::create(['agent_id' => $agent->id, 'user_id' => $owner->id, 'channel' => $channel, 'started_at' => $at, 'billed_seconds' => $seconds]);
+        }
+        AgentContact::create(['user_id' => $owner->id, 'agent_id' => $agent->id, 'name' => 'Omar', 'phone' => '+201000000000', 'last_contact_at' => now()]);
+        AgentContact::create(['user_id' => $owner->id, 'agent_id' => $agent->id, 'name' => 'Mona', 'phone' => '+201000000001'])
+            ->forceFill(['created_at' => now()->subMonths(2)])->save();
+
+        $this->actingAs($owner)->getLocalizedRoute('voice-agents.index')->assertOk()
+            // Calls, minutes (186 seconds) and new customers, in that order, on the card.
+            ->assertSeeInOrder(['class="ag-agent-nums"', '<dd>2</dd>', '<dd>3</dd>', '<dd>1</dd>'], false)
+            ->assertSee(__('agents.card_last', ['when' => now()->subMinutes(10)->diffForHumans()]));
+
+        // An agent's page is not a card: it never lifts or casts a shadow under the pointer.
+        $this->actingAs($owner)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk()
+            ->assertSee('<main class="ag ag-page" id="agents">', false)
+            ->assertDontSee('class="ag ag-agent"', false);
     }
 
     public function test_the_first_step_creates_the_agent_and_writes_it_in_the_owners_language(): void

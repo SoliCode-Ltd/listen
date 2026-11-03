@@ -151,10 +151,14 @@ class AgentPlansTest extends TestCase
         $this->actingAs($owner)->getLocalizedRoute('voice-agents.index')->assertOk()
             ->assertSee(__('agents.balance.title'))->assertSee('data-ag-balance', false)->assertSee('<b>100</b>', false)
             ->assertSee('href="#usage-breakdown"', false);
-        $this->actingAs($owner)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk()->assertSee('data-ag-balance', false);
+        // The account's call time is on the agents list only; an agent's page shows a line when it needs the owner.
+        $this->actingAs($owner)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk()
+            ->assertDontSee('data-ag-balance', false)->assertDontSee('ag-balance-line', false);
 
         $low = $this->owner([], 8 * $rate);
         $this->assertSame('low', AgentBalance::for($low)['state']);
+        $this->actingAs($low)->getLocalizedRoute('voice-agents.show', ['agent' => $this->agent($low)])->assertOk()
+            ->assertSee('ag-balance-line', false);
 
         $none = $this->owner([], 10);
         $this->assertSame('out', AgentBalance::for($none)['state']);

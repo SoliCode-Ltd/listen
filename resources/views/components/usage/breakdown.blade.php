@@ -48,19 +48,22 @@
             <b>{{ number_format($p['credits']) }}</b>
             @if($pct)<span>{{ __('usage.share', ['percent' => $pct]) }}</span>@endif
           </div>
+          {{-- The calls by agent, under the calls: each agent's credits and its share of them. --}}
+          @if($k === 'agent' && $u['agents'])
+            <ul class="us-agents" aria-label="{{ __('usage.by_agent') }}">
+              @foreach($u['agents'] as $a)
+                <li>
+                  <span><bdi>{{ $a['name'] }}</bdi></span>
+                  <small>{{ trans_choice('usage.kind_detail.agent', $a['count'], ['count' => number_format($a['count']), 'minutes' => $minutes($a['seconds'])]) }}</small>
+                  <b>{{ number_format($a['credits']) }}</b>
+                  <i style="--w: {{ round($a['credits'] / max(1, $p['credits']) * 100, 1) }}%" aria-hidden="true"></i>
+                </li>
+              @endforeach
+            </ul>
+          @endif
         </li>
       @endforeach
     </ul>
-    @if($u['agents'])
-      <div class="us-agents">
-        <h3>{{ __('usage.by_agent') }}</h3>
-        <ul>
-          @foreach($u['agents'] as $a)
-            <li><span>{{ $a['name'] }}</span><small>{{ trans_choice('usage.kind_detail.agent', $a['count'], ['count' => number_format($a['count']), 'minutes' => $minutes($a['seconds'])]) }}</small><b>{{ number_format($a['credits']) }}</b></li>
-          @endforeach
-        </ul>
-      </div>
-    @endif
     @if($agentsOpen && $perMinute)
       <p class="us-note">{{ __('usage.rate', ['rate' => number_format($perMinute)]) }}</p>
     @endif

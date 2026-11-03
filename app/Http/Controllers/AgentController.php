@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\ReviewAgent;
 use App\Models\Agent;
 use App\Models\AgentWidget;
+use App\Models\AgentContact;
 use App\Models\AgentConversation;
 use App\Models\AgentSource;
 use App\Services\Agents\AgentCalls;
@@ -16,6 +17,7 @@ use App\Services\Agents\SiteReader;
 use App\Services\Agents\WordPressPlugin;
 use App\Support\Agents\AgentVoices;
 use App\Support\ArabicDialects;
+use App\Support\CreditPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,9 +36,14 @@ class AgentController extends Controller
     public function index(Request $request): View|RedirectResponse
     {
         $agents = Agent::ownedBy($request->user())->with('widgets')->latest()->get();
-        $monthStart = now()->startOfMonth();
-        $calls = AgentConversation::query()->where('user_id', $request->user()->id)->where('started_at', '>=', $monthStart)
-            ->where('channel', '!=', 'test')->selectRaw('agent_id, count(*) as n, max(started_at) as last')->groupBy('agent_id')->get()->keyBy('agent_id');
+        // Each card's numbers are for the month the call time above counts (the credit month).
+        $since = CreditPeriod::current((int) $request->user()->id)['starts_at'];
+        $calls = AgentConversation::query()->where('user_id', $request->user()->id)->where('started_at', '>=', $since)
+            ->where('channel', '!=', 'test')->selectRaw('agent_id, count(*) as n, sum(billed_seconds) as s')->groupBy('agent_id')->get()->keyBy('agent_id');
+        $lastCalls = AgentConversation::query()->where('user_id', $request->user()->id)->where('channel', '!=', 'test')
+            ->selectRaw('agent_id, max(started_at) as last')->groupBy('agent_id')->pluck('last', 'agent_id');
+        $customers = AgentContact::query()->where('user_id', $request->user()->id)->where('created_at', '>=', $since)
+            ->selectRaw('agent_id, count(*) as n')->groupBy('agent_id')->pluck('n', 'agent_id');
 
         // Each agent's voice (its face and dialect on the card), one voice list per language.
         $arabicUi = app()->getLocale() === 'ar';
@@ -53,6 +60,9 @@ class AgentController extends Controller
         return view('agents.index', [
             'agents' => $agents,
             'calls' => $calls,
+            'lastCalls' => $lastCalls,
+            'customers' => $customers,
+            'since' => $since,
             'voices' => $voices,
             'balance' => AgentBalance::for($request->user()),
             'limits' => AgentAccess::limitsFor((int) $request->user()->id),
@@ -104,7 +114,8 @@ class AgentController extends Controller
     {
         $this->own($request, $agent);
         $widget = $agent->mainWidget();
-        $monthStart = now()->startOfMonth();
+        // The same month as the call time on the agents list (the credit month).
+        $monthStart = CreditPeriod::current((int) $request->user()->id)['starts_at'];
         $conversations = $agent->conversations()->latest('started_at')->limit(50)->get();
         $month = $agent->conversations()->where('started_at', '>=', $monthStart)->where('channel', '!=', 'test');
 

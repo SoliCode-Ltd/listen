@@ -29,7 +29,7 @@
     $speaksLabel = $speaks[$speaksCode][$arabicUi ? 'ar' : 'en'] ?? '';
   @endphp
 
-  <main class="ag ag-agent" id="agents">
+  <main class="ag ag-page" id="agents">
    <div class="ag-layout">
     {{-- The agent's sections, in a side menu like the studio's (a strip of tabs on phones). --}}
     <aside class="ag-side">
@@ -96,7 +96,18 @@
 
     {{-- Overview: next steps, this month, and talking to it. --}}
     <section class="ag-panel" data-ag-panel="overview">
-      @include('agents.partials.balance', ['balance' => $balance])
+      {{-- The account's call time lives on the agents list; here only a line when it needs the owner. --}}
+      @if(in_array($balance['state'], ['low', 'out', 'plan'], true))
+        @php $bDate = $balance['renews_at'] ? $balance['renews_at']->locale(app()->getLocale())->translatedFormat('j F') : null; @endphp
+        <p class="ag-balance-line {{ $balance['state'] === 'low' ? '' : 'is-out' }}" role="status">
+          <span>{{ match ($balance['state']) {
+            'low' => $bDate ? __('agents.balance.state_low', ['date' => $bDate]) : __('agents.balance.state_low_nodate'),
+            'out' => __('agents.balance.state_out'),
+            default => $balance['upgrade']['plan'] ? __('agents.balance.state_plan', ['plan' => $balance['upgrade']['plan']]) : __('agents.balance.state_plan_none'),
+          } }}</span>
+          <a href="{{ route('voice-agents.index') }}">{{ __('agents.balance.title') }}</a>
+        </p>
+      @endif
       <div class="ag-stats" style="margin-bottom:1rem">
         @foreach(['calls' => $stats['calls'], 'minutes' => $minutes, 'contacts' => $stats['contacts'], 'credits' => $stats['credits']] as $key => $value)
           <div class="ag-card ag-stat">
