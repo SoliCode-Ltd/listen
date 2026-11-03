@@ -133,8 +133,13 @@ return [
     ],
 
     // The homepage's section.
-    'home_title' => 'A voice agent for your business',
-    'home_text' => 'It answers your customers in their dialect, on your website, a link or a QR code, day and night. Ready in two minutes.',
+    'home_title' => 'Every call answered, in your customers\' dialect',
+    'home_text' => 'A voice agent for your business, on your website, a link or a QR code. It answers from your prices and hours, books visits and tells your team who to call back. Ready in two minutes.',
+    'home_facts' => [
+        'Answers in under a second, day and night',
+        'Reads every phone number back before saving it',
+        'Never asks for card numbers or passwords',
+    ],
     'home_cta' => 'Meet Agents',
     'home_talk' => 'Talk to our agent',
 
@@ -165,8 +170,66 @@ return [
         ['Will it make up answers?', 'It answers only from what you gave it. When it does not know, it takes the caller\'s number for your team.'],
         ['Can I stop it?', 'Any time. Pause it with one button and the call button stops showing on your website.'],
         ['Do I need a developer?', 'No. Share its link or QR code right away. For your website there is a ready plugin, or one line to paste once.'],
+        ['What does a call cost?', 'Calls use your plan\'s credits: one call minute uses :rate credits, the same credits as your voice-overs. Your agents\' page always shows the minutes left, and you can set the most minutes a day for each agent.'],
+        ['Is it safe for my customers?', 'Yes. Listen\'s own rules lead every call: it never asks for card numbers, passwords or money, never claims to be anyone else, and your call button works only on your own website.'],
     ],
 
     'final_title' => 'Your agent can answer its first customer today',
     'final_cta' => 'Create my agent',
+
+    // A real call with Listen's own agent, recorded live (components/agents/real-call): the caller's
+    // words, the agent's own voice with its words as it says them, and what the business gets.
+    'real_title' => 'Hear a real call',
+    'real_text' => 'Fatima answers in Saudi Arabic and Sumaya in Egyptian. The voice, the pauses and the number read back digit by digit, exactly as your callers hear them.',
+    'scene_play' => 'Watch a call',
+    'scene_again' => 'Watch it again',
+    'scene_note' => 'Every call ends with something done for your team.',
+    'scene_order_home' => ['american', 'british'],
+    'real_play' => 'Hear a real call',
+    'real_pause' => 'Pause',
+    'real_again' => 'Hear it again',
+    'real_switch' => 'Dialect',
+    'real_note' => 'Recorded live on a call with Listen\'s own agent. Nothing was edited.',
+    'real_caller' => 'Caller',
+    'real_calls' => [
+        'sa' => [
+            'label' => 'Saudi', 'agent' => 'Fatima', 'avatar' => 'ar-fatima', 'dialect' => 'Saudi Arabic, Najdi',
+            'turns' => [
+                ['caller', 'السلام عليكم', 'Hello.'],
+                ['agent', 'وعليكم السلام ورحمة الله وبركاته، هلا والله! معك فاطمة من Listen، وش تبي تستفسر عنه اليوم؟', 'Hello, and welcome! This is Fatima from Listen. What can I help you with today?', 'sa-1'],
+                ['caller', 'أبي أحد من الفريق يتصل فيني بخصوص باقة للشركة، اسمي محمد ورقمي 0501234567', 'I\'d like someone from the team to call me about a plan for my company. I\'m Mohammed, my number is 0501234567.'],
+                ['agent', 'أبشر يا محمد، الرقم صفر خمسة صفر واحد اثنين ثلاثة أربعة خمسة ستة سبعة. بيجيك اتصال من الفريق قريب إن شاء الله.', 'Of course, Mohammed. Your number is 0 5 0 1 2 3 4 5 6 7. Someone from the team will call you soon.', 'sa-2'],
+            ],
+            'result' => ['Callback saved', 'Mohammed · 050 123 4567 · a plan for his company'],
+        ],
+        'eg' => [
+            'label' => 'Egyptian', 'agent' => 'Sumaya', 'avatar' => 'ar-sumaya', 'dialect' => 'Egyptian Arabic, Cairene',
+            'turns' => [
+                ['caller', 'السلام عليكم', 'Hello.'],
+                ['agent', 'وعليكم السلام ورحمة الله وبركاته. أهلاً بيك في Listen! أقدر أساعدك إزاي النهاردة؟', 'Hello, and welcome to Listen! How can I help you today?', 'eg-1'],
+                ['caller', 'عايز حد من الفريق يكلمني بخصوص باقة للشركة، اسمي أحمد ورقمي 01012345678', 'I want someone from the team to call me about a plan for my company. I\'m Ahmed, my number is 01012345678.'],
+                ['agent', 'تمام يا أستاذ أحمد، خليني أتأكد من الرقم: صفر واحد صفر واحد اتنين تلاتة أربعة خمسة ستة سبعة تمانية، صح كده؟', 'Sure, Mr Ahmed. Let me check the number: 0 1 0 1 2 3 4 5 6 7 8. Is that right?', 'eg-2'],
+            ],
+            'result' => ['Callback saved', 'Ahmed · 0101 234 5678 · a plan for his company'],
+        ],
+    ],
+    'real_order' => ['sa', 'eg'],
+
+    // Safe by design.
+    'safe_title' => 'Safe for your customers, and for your bill',
+    'safe_text' => 'Listen\'s own rules lead every call, whatever your agent is told, and every minute stays in your hands.',
+    'safe' => [
+        ['Never asks for card numbers', 'Card numbers, passwords and codes are never asked for on a call, and it never asks anyone to send money.'],
+        ['Speaks only for you', 'It never claims to be anyone else, and it tells callers it is an AI assistant when they ask.'],
+        ['Works only on your website', 'Your call button is locked to your own website, so a copy on another site does not work.'],
+        ['Limits you choose', 'The longest call, the minutes a day, and calls at the same time. It hangs up kindly when a line goes quiet.'],
+        ['Checked before it goes live', 'Every agent is checked before it answers anyone, and callers can report one in a tap.'],
+        ['Every call written down', 'A summary of each call, what was said, and who to call back, kept for you.'],
+    ],
+
+    // Pricing, from the plans (AgentAccess).
+    'plans_title' => 'Calls come out of your plan',
+    'plans_text' => 'One call minute uses :rate credits from your plan, the same credits as your voice-overs. You always see the minutes left.',
+    'plans_line' => '{1} 1 agent, up to :minutes call minutes a month|[2,*] :count agents, up to :minutes call minutes a month',
+    'plans_free' => 'Every account gets :seconds seconds of free test calls.',
 ];

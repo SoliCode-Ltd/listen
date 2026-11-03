@@ -317,3 +317,162 @@ html:has(.agl) { scroll-behavior: smooth; }
   .agl-bento-line, .agl-bento-chip, .agl-flow-line { opacity: 1; transform: none; }
   .agl-bento-bars i { transform: none; }
 }
+
+/* ---------- A real call, recorded live (components/agents/real-call). ---------- */
+.agl-real {
+  position: relative; display: grid; gap: 1.1rem; padding: clamp(1.1rem, 2.4vw, 1.6rem);
+  border-radius: var(--agl-r); background: var(--agl-ink); color: var(--agl-on-ink);
+  box-shadow: 0 30px 70px -30px rgba(23, 20, 74, .55); isolation: isolate; min-width: 0;
+}
+.agl-real-top { display: flex; align-items: center; gap: .8rem; min-width: 0; }
+.agl-real-face { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px rgba(255, 255, 255, .14); background: var(--agl-ink-2); }
+.agl-real-face img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.agl-real-who { display: grid; gap: .1rem; min-width: 0; flex: 1 1 auto; }
+.agl-real-who b { font-size: 1rem; font-weight: 700; color: #fff; }
+.agl-real-who small { font-size: .8rem; color: var(--agl-on-ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agl-real-switch { flex: 0 0 auto; display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .1); }
+.agl-real-switch button {
+  min-height: 34px; padding: .3rem .85rem; border: 0; border-radius: 999px; background: transparent; color: var(--agl-on-ink-muted);
+  font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .2s ease, color .2s ease;
+}
+.agl-real-switch button[aria-checked="true"] { background: #fff; color: var(--agl-ink); }
+.agl-real-switch button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.agl-real-stage { position: relative; display: grid; justify-items: center; gap: .9rem; padding: .4rem 0 .2rem; }
+.agl-real-orb { --orb-size: clamp(120px, 15vw, 168px); width: var(--orb-size); height: var(--orb-size); }
+.agl-real-play {
+  display: inline-flex; align-items: center; gap: .6rem; min-height: 48px; padding: .55rem 1.25rem .55rem .65rem;
+  border: 0; border-radius: 999px; background: #fff; color: var(--agl-ink); font: inherit; font-size: .95rem; font-weight: 700;
+  cursor: pointer; box-shadow: 0 10px 26px -10px rgba(0, 0, 0, .45); transition: transform .2s var(--agl-ease), box-shadow .2s ease;
+}
+html[dir="rtl"] .agl-real-play { padding: .55rem .65rem .55rem 1.25rem; }
+.agl-real-play:hover { transform: translateY(-1px); box-shadow: 0 14px 30px -12px rgba(0, 0, 0, .5); }
+.agl-real-play:active { transform: scale(.97); }
+.agl-real-play:focus-visible { outline: 3px solid color-mix(in srgb, #fff 55%, transparent); outline-offset: 3px; }
+.agl-real-play[disabled] { opacity: .7; cursor: progress; }
+.agl-real-play-icon { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--a); color: #fff; }
+.agl-real-play-icon svg { width: 16px; height: 16px; fill: currentColor; }
+/* The play arrow points the same way in both languages, and sits optically centred. */
+.agl-real-play-icon .is-play { transform: translateX(1px); }
+html[dir="rtl"] .agl-real-play-icon .is-play { transform: translateX(1px); }
+.agl-real-play-icon .is-pause { display: none; }
+.agl-real-play[aria-pressed="true"] .is-play { display: none; }
+.agl-real-play[aria-pressed="true"] .is-pause { display: block; }
+.agl-real-progress { width: min(260px, 70%); height: 3px; border-radius: 999px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+.agl-real-progress i { display: block; height: 100%; width: 0; border-radius: inherit; background: #fff; }
+
+/* A steady height: as the call goes on, the newest line stays at the bottom and older ones move up
+   and fade under the top edge. At rest, the first lines read from the top. */
+.agl-real-lines {
+  list-style: none; margin: 0; padding: .4rem 0 0; display: flex; flex-direction: column; gap: .6rem;
+  height: 16.5rem; overflow: hidden; scroll-behavior: smooth;
+}
+.agl-real:not(.is-playing):not(.is-done) .agl-real-lines {
+  -webkit-mask-image: linear-gradient(to top, transparent 0, #000 3rem); mask-image: linear-gradient(to top, transparent 0, #000 3rem);
+}
+.agl-real.is-playing .agl-real-lines, .agl-real.is-done .agl-real-lines {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 2.2rem); mask-image: linear-gradient(to bottom, transparent 0, #000 2.2rem);
+}
+.agl-real.is-playing .agl-real-lines > :first-child, .agl-real.is-done .agl-real-lines > :first-child { margin-top: auto; }
+.agl-real-line { display: grid; gap: .3rem; max-width: 88%; padding: .7rem .95rem; border-radius: 18px; opacity: 0; transform: translateY(8px); transition: opacity .45s var(--agl-ease), transform .45s var(--agl-ease); }
+.agl-real-line.is-shown { opacity: 1; transform: none; }
+.agl-real-line p { margin: 0; font-size: 1rem; line-height: 1.75; text-wrap: pretty; }
+.agl-real-line small { font-size: .82rem; line-height: 1.5; color: var(--agl-on-ink-muted); }
+/* The agent on the start side, the caller on the end side (whatever the page's direction). */
+.agl-real-line.is-agent { justify-self: start; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .1); border-start-start-radius: 6px; }
+.agl-real-line.is-caller { justify-self: end; background: #fff; color: var(--agl-ink); border-start-end-radius: 6px; }
+.agl-real-line.is-caller small { color: color-mix(in srgb, var(--agl-ink) 62%, transparent); }
+/* Each word lights as it is said. */
+.agl-real-w { transition: color .18s ease, opacity .18s ease; }
+.agl-real.is-playing .agl-real-line.is-agent .agl-real-w { opacity: .42; }
+.agl-real.is-playing .agl-real-line.is-agent .agl-real-w.is-said { opacity: 1; color: #fff; }
+
+.agl-real-result {
+  display: flex; align-items: center; flex-wrap: wrap; gap: .25rem .6rem; margin: 0; padding: .7rem .9rem; border-radius: 14px;
+  background: color-mix(in srgb, var(--agl-ok) 16%, transparent); border: 1px solid color-mix(in srgb, var(--agl-ok) 40%, transparent);
+  font-size: .9rem; line-height: 1.45; transition: opacity .5s var(--agl-ease), transform .5s var(--agl-ease);
+}
+.agl-real-result b { color: #fff; }
+.agl-real-result span:last-child { color: var(--agl-on-ink-muted); unicode-bidi: plaintext; }
+.agl-real-result-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--agl-ok); color: #0c2a1d; }
+.agl-real-result-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+/* While it plays, what the business is left with waits for the end. */
+.agl-real.is-playing:not(.is-done) .agl-real-result { opacity: 0; transform: translateY(8px); }
+.agl-real-note { margin: 0; font-size: .78rem; color: var(--agl-on-ink-muted); text-align: center; }
+
+@media (max-width: 560px) {
+  .agl-real-top { flex-wrap: wrap; }
+  .agl-real-switch { order: 3; width: 100%; justify-content: stretch; }
+  .agl-real-switch button { flex: 1 1 0; }
+  .agl-real-line { max-width: 94%; }
+  .agl-real-lines { height: 19rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agl-real-line, .agl-real-result, .agl-real-w, .agl-real-play { transition: none; }
+}
+
+/* ---------- The homepage's section: the words beside the call. ---------- */
+.agl-home-grid { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: clamp(1.8rem, 4.5vw, 4rem); align-items: center; }
+.agl-home-copy { text-align: start; }
+.agl-home-copy h2 { font-size: clamp(2rem, 3.8vw, 3rem); font-weight: 800; line-height: 1.12; max-width: 15ch; text-wrap: balance; text-align: start; }
+html[dir="rtl"] .agl-home-copy h2 { line-height: 1.4; }
+.agl-home-copy .section-lead { margin: 1rem 0 0; max-width: 46ch; text-align: start; }
+.agl-home-facts span { text-wrap: pretty; }
+.agl-home-facts { list-style: none; margin: 1.5rem 0 0; padding: 0; display: grid; gap: .8rem; }
+.agl-home-facts li { display: flex; align-items: flex-start; gap: .7rem; font-size: 1rem; line-height: 1.55; color: var(--text); }
+.agl-home-facts svg { flex: 0 0 auto; width: 22px; height: 22px; margin-top: .1rem; padding: 3px; border-radius: 8px; background: var(--agl-soft-2); color: var(--accent-text); fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.agl-home-copy .agl-cta-row { margin-top: 1.8rem; }
+@media (max-width: 920px) {
+  .agl-home-grid { grid-template-columns: minmax(0, 1fr); }
+  .agl-home-copy h2 { max-width: 20ch; }
+}
+
+/* ---------- The Agents page's real call: wide, the voice on one side and the words on the other. ---------- */
+.agl-real-wrap .agl-real { max-width: 1132px; margin: 0 auto; }
+@media (min-width: 900px) {
+  .agl-real.is-wide { grid-template-columns: minmax(0, 340px) minmax(0, 1fr); grid-template-rows: auto 1fr auto auto; column-gap: clamp(1.5rem, 3vw, 2.6rem); padding: clamp(1.4rem, 2.6vw, 2rem); }
+  .agl-real.is-wide .agl-real-top { grid-column: 1 / -1; }
+  .agl-real.is-wide .agl-real-stage { grid-column: 1; grid-row: 2 / span 3; align-content: center; padding: 1.2rem 0; border-inline-end: 1px solid rgba(255, 255, 255, .08); }
+  .agl-real.is-wide .agl-real-orb { --orb-size: 200px; }
+  .agl-real.is-wide .agl-real-lines { grid-column: 2; height: 21rem; }
+  .agl-real.is-wide .agl-real-result, .agl-real.is-wide .agl-real-note { grid-column: 2; }
+  .agl-real.is-wide .agl-real-note { text-align: start; }
+}
+
+/* ---------- Safe by design: six promises in one panel, divided by fine lines. ---------- */
+.agl-safe-list {
+  list-style: none; margin: 0 auto; padding: 0; max-width: 1132px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px; border-radius: var(--agl-r); overflow: hidden; background: var(--line); border: 1px solid var(--line);
+}
+.agl-safe-list li { display: grid; align-content: start; gap: .55rem; padding: clamp(1.2rem, 2.4vw, 1.7rem); background: var(--surface); }
+.agl-safe-list h3 { font-size: 1.02rem; font-weight: 700; line-height: 1.35; }
+.agl-safe-list p { color: var(--muted); font-size: .93rem; line-height: 1.65; text-wrap: pretty; }
+.agl-safe-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--agl-soft); color: var(--accent-text); margin-bottom: .3rem; }
+.agl-safe-icon svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 900px) { .agl-safe-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .agl-safe-list { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- What it costs: the rate in words and the plans that include agents. ---------- */
+.agl-price { align-items: center; }
+.agl-price-copy { flex: 1 1 22rem; min-width: 0; }
+.agl-price .agl-price-free { margin-top: .35rem; font-size: .88rem; }
+.agl-price-plans { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; flex: 1 1 20rem; min-width: 0; }
+.agl-price-plans li { display: flex; align-items: baseline; justify-content: space-between; gap: .4rem 1rem; flex-wrap: wrap; padding: .65rem .9rem; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.agl-price-plans b { font-weight: 700; }
+.agl-price-plans span { color: var(--muted); font-size: .9rem; }
+
+/* The face visual (a page whose one orb is elsewhere): the agent's photo, with rings that follow her voice. */
+.agl-real.has-face .agl-real-face { display: none; }
+.agl-real-avatar { --agl-lvl: 0; position: relative; display: grid; place-items: center; width: 176px; height: 176px; }
+.agl-real-avatar img { position: relative; z-index: 1; width: 128px; height: 128px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px rgba(255, 255, 255, .16), 0 18px 40px -16px rgba(0, 0, 0, .55); }
+.agl-real-avatar i {
+  position: absolute; inset: 18px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--a) 62%, #fff);
+  opacity: calc(.18 + var(--agl-lvl) * .7); transform: scale(calc(1 + var(--agl-lvl) * .3));
+  transition: transform .09s linear, opacity .09s linear;
+}
+.agl-real-avatar i + i { inset: 2px; border-color: color-mix(in srgb, var(--a) 40%, transparent); opacity: calc(.1 + var(--agl-lvl) * .5); transform: scale(calc(1 + var(--agl-lvl) * .48)); }
+@media (min-width: 900px) {
+  .agl-real.is-wide .agl-real-avatar { width: 220px; height: 220px; }
+  .agl-real.is-wide .agl-real-avatar img { width: 156px; height: 156px; }
+}
+@media (prefers-reduced-motion: reduce) { .agl-real-avatar i { transition: none; transform: none; } }

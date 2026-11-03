@@ -419,7 +419,7 @@ return [
             'design_voices_month' => ':count voice a month|:count voices a month',
             'dubbing_videos' => ':count video a month, up to :seconds s each|:count videos a month, up to :seconds s each',
             'dubbing_open' => 'Up to :seconds s a video, from your voice time',
-            'agents_value' => '{1} 1 agent, about :minutes call minutes|[2,*] :count agents, about :minutes call minutes',
+            'agents_value' => '{1} 1 agent, up to :minutes call minutes|[2,*] :count agents, up to :minutes call minutes',
             'topup_price' => ':price per 1M credits',
         ],
     ],

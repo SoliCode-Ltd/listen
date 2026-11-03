@@ -105,8 +105,9 @@ class HouseAgentTest extends TestCase
             $this->page($locale, 'home')->assertOk()
                 ->assertSee(__('agents_landing.home_title'))
                 ->assertSee(route('agents-landing'), false)
-                ->assertSee('data-agl-bento', false)
-                ->assertSee(__('agents_landing.bento_chip'));
+                // A call on its own stage: a real recording in Arabic, an English call in words on the English page.
+                ->assertSee('data-agl-real', false)
+                ->assertSee($locale === 'ar' ? 'audio/agents/calls/sa-1.mp3' : __('agents_landing.scenes.american.lines')[0][1], false);
         }
     }
 }

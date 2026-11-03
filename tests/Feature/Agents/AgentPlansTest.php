@@ -340,9 +340,9 @@ class AgentPlansTest extends TestCase
 
         $plan = Plan::factory()->create(['slug' => 'pro-x', 'name' => 'Pro', 'price_cents' => 4900, 'monthly_chars' => 450000, 'is_active' => true,
             'agents_enabled' => true, 'agents_max' => 5, 'agent_minutes_per_month' => 0]);
-        $this->assertSame('5 agents, about 250 call minutes', PlanPricingLines::value($plan, 'voice_agents', 'en'));
+        $this->assertSame('5 agents, up to 250 call minutes', PlanPricingLines::value($plan, 'voice_agents', 'en'));
         $plan->agent_minutes_per_month = 100;
-        $this->assertSame('5 agents, about 100 call minutes', PlanPricingLines::value($plan, 'voice_agents', 'en'));
+        $this->assertSame('5 agents, up to 100 call minutes', PlanPricingLines::value($plan, 'voice_agents', 'en'));
         $plan->agents_enabled = false;
         $this->assertNull(PlanPricingLines::value($plan, 'voice_agents', 'en'));
 

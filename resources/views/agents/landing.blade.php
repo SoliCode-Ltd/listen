@@ -22,6 +22,24 @@
     $speechCount = collect($allSpeech)->sum(fn ($g) => count($g['names']));
     $moreCount = max(0, $speechCount - ($ar ? count($order) - 1 : count($order)));
     $micIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>';
+    // The plans that include agents, with what each gives (Plans → Voice agents), and the rate.
+    $rate = \App\Support\Agents\AgentAccess::creditsPerMinute();
+    $agentPlans = rescue(fn () => \App\Models\Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->orderBy('price_cents')->get()
+      ->filter(fn ($p) => \App\Support\Agents\AgentAccess::planColumns() && \App\Support\Agents\AgentAccess::planIncludes($p))
+      ->map(function ($p) use ($rate) {
+          $limits = \App\Support\Agents\AgentAccess::limits($p);
+          $minutes = intdiv(max(0, (int) $p->monthly_chars), $rate);
+          if ($limits['minutes'] > 0) { $minutes = min($minutes, $limits['minutes']); }
+          return ['name' => $p->getLocalizedName(), 'agents' => $limits['agents'], 'minutes' => $minutes, 'slug' => $p->slug];
+      })->values()->all(), [], false);
+    $safeIcons = [
+      '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h3"/><path d="M4 4l16 16"/>',
+      '<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M17 4l3 3-3 3"/>',
+      '<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 8h18"/><rect x="9" y="11" width="6" height="5" rx="1"/><path d="M10.5 11V9.8a1.5 1.5 0 0 1 3 0V11"/>',
+      '<circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.5M9.5 3h5"/>',
+      '<path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/>',
+      '<path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h4"/>',
+    ];
   @endphp
 
   <main class="agl" id="agents-landing">
@@ -33,7 +51,11 @@
         <div class="agl-cta-row">
           <a class="ag-btn ag-btn-primary ag-btn-lg" href="{{ $startUrl }}">{{ $hasAgents ? __('agents_landing.hero_cta_member') : __('agents_landing.hero_cta') }}</a>
           <button type="button" class="ag-btn ag-btn-lg agl-live-btn" data-agl-live hidden>{!! $micIcon !!}{{ __('agents_landing.talk_live') }}</button>
-          <a class="ag-btn ag-btn-lg ag-btn-ghost" href="#agl-call" data-agl-watch>{{ __('agents_landing.hero_watch') }}</a>
+          @if($ar)
+            <a class="ag-btn ag-btn-lg ag-btn-ghost" href="#agl-real" data-agl-watch>{{ __('agents_landing.real_play') }}</a>
+          @else
+            <a class="ag-btn ag-btn-lg ag-btn-ghost" href="#agl-call" data-agl-watch>{{ __('agents_landing.hero_watch') }}</a>
+          @endif
         </div>
         <p class="agl-note" data-agl-live-note hidden>{{ __('agents_landing.talk_live_note') }}</p>
         <p class="agl-note">{{ __('agents_landing.hero_note') }}</p>
@@ -83,6 +105,19 @@
         </div>
       </div>
     </section>
+
+    {{-- A real call, recorded live with Listen's own agent: hear it before reading about it. The
+         recordings are Arabic, so the English page keeps to the English call in its hero. --}}
+    @if($ar)
+      <section class="agl-section agl-real-wrap" id="agl-real">
+        <div class="agl-head agl-head-split" data-agl-rise>
+          <h2>{{ __('agents_landing.real_title') }}</h2>
+          <p>{{ __('agents_landing.real_text') }}</p>
+        </div>
+        {{-- The page's one orb is in the hero's call: here the agent's own face moves with her voice. --}}
+        <x-agents.real-call size="wide" visual="face" data-agl-rise style="--rise-d: .08s" />
+      </section>
+    @endif
 
     {{-- How it works: the real setup, one step after another as the page scrolls. --}}
     <section class="agl-section agl-how" data-agl-how>
@@ -195,12 +230,37 @@
       </div>
     </section>
 
-    {{-- In every plan. --}}
-    <section class="agl-price" data-agl-rise>
-      <div>
-        <h2>{{ __('agents_landing.price_title') }}</h2>
-        <p>{{ __('agents_landing.price_text') }}</p>
+    {{-- Safe by design: the rules every call keeps, and the limits the owner holds. --}}
+    <section class="agl-section agl-safe">
+      <div class="agl-head agl-head-split" data-agl-rise>
+        <h2>{{ __('agents_landing.safe_title') }}</h2>
+        <p>{{ __('agents_landing.safe_text') }}</p>
       </div>
+      <ul class="agl-safe-list" data-agl-rise style="--rise-d: .08s">
+        @foreach(__('agents_landing.safe') as $i => [$title, $text])
+          <li>
+            <span class="agl-safe-icon" aria-hidden="true"><svg viewBox="0 0 24 24">{!! $safeIcons[$i] ?? '' !!}</svg></span>
+            <h3>{{ $title }}</h3>
+            <p>{{ $text }}</p>
+          </li>
+        @endforeach
+      </ul>
+    </section>
+
+    {{-- What it costs: the plans that include agents, and the rate in plain minutes. --}}
+    <section class="agl-price" data-agl-rise>
+      <div class="agl-price-copy">
+        <h2>{{ __('agents_landing.plans_title') }}</h2>
+        <p>{{ __('agents_landing.plans_text', ['rate' => number_format($rate)]) }}</p>
+        <p class="agl-price-free">{{ __('agents_landing.plans_free', ['seconds' => number_format(\App\Support\Agents\AgentAccess::freeTestSeconds())]) }}</p>
+      </div>
+      @if($agentPlans !== [])
+        <ul class="agl-price-plans">
+          @foreach($agentPlans as $plan)
+            <li><b>{{ $plan['name'] }}</b><span>{{ trans_choice('agents_landing.plans_line', $plan['agents'], ['count' => $plan['agents'], 'minutes' => number_format($plan['minutes'])]) }}</span></li>
+          @endforeach
+        </ul>
+      @endif
       <a class="ag-btn ag-btn-lg" href="{{ route('pricing') }}">{{ __('agents_landing.price_cta') }}</a>
     </section>
 
@@ -211,7 +271,7 @@
         @foreach(__('agents_landing.faq') as $i => [$q, $a])
           <details {{ $i === 0 ? 'open' : '' }}>
             <summary>{{ $q }}</summary>
-            <p>{{ $a }}</p>
+            <p>{{ str_replace(':rate', number_format($rate), $a) }}</p>
           </details>
         @endforeach
       </div>

@@ -269,7 +269,261 @@
     });
   }
 
+  /*
+   * A real call, recorded live (components/agents/real-call): the caller's lines appear, the agent's
+   * own voice plays with its words lit as it says them, the orb follows its loudness (the stage holds
+   * it for js/listen-orbs.js), and what the business is left with rises at the end. One clip at a time
+   * on the page: another player starting stops it, and it stops them.
+   */
+  function realCall(box) {
+    var raw = $('[data-agl-real-data]', box);
+    var data = null;
+    try { data = JSON.parse(raw ? raw.textContent : 'null'); } catch (e) { data = null; }
+    if (!data || !data.order || !data.order.length) return;
+    var key = data.order[0];
+    var lines = $('[data-agl-real-lines]', box), play = $('[data-agl-real-play]', box), label = $('[data-agl-real-label]', box);
+    var bar = $('[data-agl-real-bar]', box), face = $('[data-agl-real-face]', box), name = $('[data-agl-real-name]', box);
+    var dialect = $('[data-agl-real-dialect]', box), rTitle = $('[data-agl-real-result-title]', box), rText = $('[data-agl-real-result-text]', box);
+    var clips = {}, levels = {}, run = null, frame = 0, photo = $('[data-agl-real-photo]', box);
+    // The voice's loudness, for the orb (it reads the stage) and for the face's rings (a CSS value).
+    function level(v) { box.__vpLevel = v; if (photo) box.style.setProperty('--agl-lvl', v.toFixed(3)); }
+
+    function call() { return data.calls[key]; }
+    function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+    function setLabel(which) {
+      label.textContent = play.getAttribute('data-label-' + which) || label.textContent;
+      play.setAttribute('aria-pressed', which === 'pause' ? 'true' : 'false');
+    }
+
+    // A line as the stage shows it: the words (each its own span for an agent line) and, on the
+    // English pages, what they mean.
+    function lineEl(turn, words) {
+      var li = el('li', 'agl-real-line is-' + turn.role);
+      var p = el('p');
+      p.setAttribute('dir', call().dir || 'rtl'); p.setAttribute('lang', call().lang || 'ar');
+      if (words) {
+        turn.text.split(/(\s+)/).forEach(function (part) {
+          if (!part) return;
+          if (/^\s+$/.test(part)) { p.appendChild(document.createTextNode(part)); return; }
+          p.appendChild(el('span', 'agl-real-w', part));
+        });
+      } else p.textContent = turn.text;
+      li.appendChild(p);
+      if (turn.gloss) li.appendChild(el('small', null, turn.gloss));
+      return li;
+    }
+    // Before it plays: the first exchange, as it was said.
+    function preview() {
+      lines.textContent = '';
+      call().turns.slice(0, data.rest || 2).forEach(function (t) { var li = lineEl(t, false); li.classList.add('is-shown'); lines.appendChild(li); });
+      lines.scrollTop = 0;
+      face.src = call().avatar; name.textContent = call().agent; dialect.textContent = call().dialect;
+      if (photo) photo.src = call().avatar;
+      level(0);
+      rTitle.textContent = call().result[0]; rText.textContent = call().result[1];
+      bar.style.width = '0%';
+      box.classList.remove('is-playing', 'is-done', 'is-voicing');
+    }
+
+    function clip(src) {
+      if (!clips[src]) { var a = new Audio(); a.preload = 'auto'; a.src = src; clips[src] = a; }
+      return clips[src];
+    }
+    // Each clip's loudness, decoded once, in 10 ms steps (what the orb follows).
+    function analyse(src) {
+      if (levels[src] || !window.fetch || !(window.AudioContext || window.webkitAudioContext)) return;
+      levels[src] = [];
+      fetch(src, { credentials: 'same-origin' }).then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+        var Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+        var ctx = Ctx ? new Ctx(1, 2, 24000) : new (window.AudioContext || window.webkitAudioContext)();
+        return new Promise(function (ok, bad) { ctx.decodeAudioData(buf, ok, bad); });
+      }).then(function (decoded) {
+        var d = decoded.getChannelData(0), hop = Math.max(1, Math.round(decoded.sampleRate * 0.01)), out = [];
+        for (var i = 0; i < d.length; i += hop) {
+          var sum = 0, n = Math.min(hop, d.length - i);
+          for (var j = 0; j < n; j++) sum += d[i + j] * d[i + j];
+          out.push(Math.min(1, Math.sqrt(sum / n) * 4.2));
+        }
+        levels[src] = out;
+      }).catch(function () {});
+    }
+    function durations(turns) {
+      return Promise.all(turns.map(function (t) {
+        if (t.role !== 'agent') return Promise.resolve(gap(t));
+        // A line shown in words only (the English pages): as long as it takes to say it.
+        if (!t.audio) return Promise.resolve(Math.max(2.4, Math.min(7, t.text.length * 0.058)));
+        var a = clip(t.audio);
+        analyse(t.audio);
+        if (a.readyState >= 1 && isFinite(a.duration)) return Promise.resolve(a.duration);
+        return new Promise(function (ok) {
+          var done = function () { ok(isFinite(a.duration) && a.duration > 0 ? a.duration : 6); };
+          a.addEventListener('loadedmetadata', done, { once: true });
+          a.addEventListener('error', function () { ok(6); }, { once: true });
+          setTimeout(function () { ok(isFinite(a.duration) && a.duration > 0 ? a.duration : 6); }, 4000);
+        });
+      }));
+    }
+    // A caller line stays as long as it takes to read.
+    function gap(t) { return Math.max(1.1, Math.min(2.6, t.text.length * 0.032)); }
+
+    function stopFrame() { cancelAnimationFrame(frame); frame = 0; }
+    function halt(reset) {
+      if (run) {
+        run.stopped = true;
+        clearTimeout(run.timer);
+        if (run.audio) { run.audio.pause(); run.audio.currentTime = 0; }
+      }
+      run = null;
+      stopFrame();
+      box.classList.remove('is-voicing');
+      level(0);
+      setLabel('play');
+      if (reset) preview();
+    }
+
+    function start() {
+      var turns = call().turns;
+      document.dispatchEvent(new CustomEvent('listen:audio-play', { detail: { source: box } }));
+      play.disabled = true;
+      durations(turns).then(function (lengths) {
+        play.disabled = false;
+        var total = lengths.reduce(function (s, v) { return s + v; }, 0) || 1;
+        run = { i: -1, lengths: lengths, total: total, before: 0, audio: null, timer: 0, stopped: false, paused: false, started: 0 };
+        lines.textContent = '';
+        box.classList.add('is-playing');
+        box.classList.remove('is-done');
+        setLabel('pause');
+        next();
+      });
+    }
+    function next() {
+      if (!run || run.stopped) return;
+      if (run.i >= 0) run.before += run.lengths[run.i];
+      run.i++;
+      var turns = call().turns;
+      if (run.i >= turns.length) { finish(); return; }
+      var t = turns[run.i];
+      var li = lineEl(t, t.role === 'agent');
+      lines.appendChild(li);
+      run.words = []; run.starts = []; run.audio = null;
+      requestAnimationFrame(function () { li.classList.add('is-shown'); });
+      // The newest line stays in sight; older ones move up under the fade.
+      requestAnimationFrame(function () { lines.scrollTop = lines.scrollHeight; });
+      var words = $$('.agl-real-w', li);
+      // Each word lights when it is said: the line's time shared out by the words' lengths.
+      var weights = words.map(function (w) { return w.textContent.length + (/[،,.؟?!]$/.test(w.textContent) ? 4 : 1); });
+      var sum = weights.reduce(function (s, v) { return s + v; }, 0) || 1, acc = 0;
+      run.words = words;
+      run.starts = weights.map(function (v) { var at = acc / sum; acc += v; return at; });
+      if (t.role !== 'agent' || !t.audio) {
+        // A caller's line, or an agent's line in words only: timed, with the orb moving as if it spoke.
+        run.started = performance.now();
+        run.wait = run.lengths[run.i] * 1000;
+        run.timer = setTimeout(function () {
+          if (t.role === 'agent') { words.forEach(function (w) { w.classList.add('is-said'); }); box.classList.remove('is-voicing'); level(0); }
+          next();
+        }, run.wait);
+        if (t.role === 'agent') { box.classList.add('is-voicing'); if (window.ListenOrbs && window.ListenOrbs.wake) window.ListenOrbs.wake(); }
+        tick();
+        return;
+      }
+      var a = clip(t.audio);
+      run.audio = a;
+      a.currentTime = 0;
+      a.onended = function () { box.classList.remove('is-voicing'); level(0); words.forEach(function (w) { w.classList.add('is-said'); }); next(); };
+      var p = a.play();
+      if (p && p.catch) p.catch(function () { halt(true); });
+      box.classList.add('is-voicing');
+      if (window.ListenOrbs && window.ListenOrbs.wake) window.ListenOrbs.wake();
+      tick();
+    }
+    function tick() {
+      stopFrame();
+      (function step() {
+        if (!run || run.stopped) return;
+        var t = call().turns[run.i], into = 0;
+        if (t && t.role === 'agent' && run.audio) {
+          var a = run.audio, d = run.lengths[run.i] || a.duration || 1;
+          into = Math.min(d, a.currentTime || 0);
+          var share = into / d;
+          (run.words || []).forEach(function (w, k) { if (run.starts[k] <= share * 1.04) w.classList.add('is-said'); });
+          var lv = levels[t.audio] || [];
+          level(lv.length ? (lv[Math.min(lv.length - 1, Math.floor(into * 100))] || 0) : 0.35);
+        } else if (run.wait) {
+          into = Math.min(run.lengths[run.i], (performance.now() - run.started) / 1000);
+          if (t && t.role === 'agent') {
+            var part = into / (run.lengths[run.i] || 1);
+            (run.words || []).forEach(function (w, k) { if (run.starts[k] <= part * 1.04) w.classList.add('is-said'); });
+            // A voice-like rise and fall for the orb while the words go by.
+            var now = performance.now() / 1000;
+            level(Math.max(0, 0.32 + 0.22 * Math.sin(now * 7.3) * Math.sin(now * 2.1 + 1) + 0.08 * Math.sin(now * 19)));
+          }
+        }
+        bar.style.width = Math.min(100, (run.before + into) / run.total * 100).toFixed(2) + '%';
+        if (!run.paused) frame = requestAnimationFrame(step);
+      })();
+    }
+    function finish() {
+      stopFrame();
+      bar.style.width = '100%';
+      box.classList.remove('is-voicing');
+      box.classList.add('is-done');
+      level(0);
+      run = null;
+      setLabel('again');
+    }
+    function pause() {
+      if (!run) return;
+      run.paused = true;
+      if (run.audio && !run.audio.paused) run.audio.pause();
+      if (run.timer) { clearTimeout(run.timer); run.left = Math.max(0, run.wait - (performance.now() - run.started)); run.timer = 0; }
+      box.classList.remove('is-voicing');
+      stopFrame();
+      setLabel('play');
+    }
+    function resume() {
+      if (!run) return;
+      run.paused = false;
+      document.dispatchEvent(new CustomEvent('listen:audio-play', { detail: { source: box } }));
+      setLabel('pause');
+      var t = call().turns[run.i];
+      if (t && t.role === 'agent' && run.audio) { run.audio.play(); box.classList.add('is-voicing'); }
+      else if (run.left != null) {
+        run.started = performance.now() - (run.wait - run.left);
+        run.timer = setTimeout(function () {
+          if (t && t.role === 'agent') { (run.words || []).forEach(function (w) { w.classList.add('is-said'); }); box.classList.remove('is-voicing'); level(0); }
+          next();
+        }, run.left);
+        run.left = null;
+        if (t && t.role === 'agent') box.classList.add('is-voicing');
+      }
+      tick();
+    }
+
+    play.addEventListener('click', function () {
+      if (!run) { start(); return; }
+      if (run.paused) resume(); else pause();
+    });
+    $$('[data-agl-real-pick]', box).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var k = b.getAttribute('data-agl-real-pick');
+        if (!data.calls[k]) return;
+        $$('[data-agl-real-pick]', box).forEach(function (o) { o.setAttribute('aria-checked', o === b ? 'true' : 'false'); });
+        var wasPlaying = run && !run.paused;
+        halt(false);
+        key = k;
+        preview();
+        if (wasPlaying) start();
+      });
+    });
+    // Another player on the page started: this one stops (and it stops them, above).
+    document.addEventListener('listen:audio-play', function (e) { if (e.detail && e.detail.source !== box && run && !run.paused) pause(); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden && run && !run.paused) pause(); });
+    preview();
+  }
+
   function boot() {
+    $$('[data-agl-real]').forEach(realCall);
     rise();
     faq();
     more();
