@@ -30,9 +30,19 @@
         $creditUse = \App\Support\CreditUsage::for(auth()->user());
         $hasUse = \App\Support\CreditUsage::hasUse($creditUse);
       @endphp
-      {{-- One column the width of the header, so the page has no empty side strip: the title and the call
-           time in a panel, the agents, then the credit usage when there is any. --}}
+      {{-- One column the width of the header (no side strip): the page's sections in one bar across the
+           top, as on an agent's page, then the title and the call time in a panel, the agents, and the
+           credit usage when there is any. --}}
         <div class="ag-main">
+      <nav class="ag-tabs" aria-label="{{ __('agents.title') }}" data-ag-home-menu>
+        <a class="ag-tab is-current" href="#agents-overview" aria-current="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg><span>{{ __('agents.menu_overview') }}</span></a>
+        <a class="ag-tab" href="#agents-list"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg><span>{{ __('agents.list_count') }}</span><small class="ag-tab-count">{{ $agents->count() }}</small></a>
+        @if($hasUse)
+          <a class="ag-tab" href="#usage-breakdown"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>{{ __('usage.where') }}</span></a>
+        @endif
+        <a class="ag-tab" href="{{ route('billing.page') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 10h18M7 14.5h4"/></svg><span>{{ __('agents.menu_plan') }}</span></a>
+        <a class="ag-tab" href="{{ route('agents-landing') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5"/></svg><span>{{ __('agents.menu_guide') }}</span></a>
+      </nav>
       <section class="ag-home-card" id="agents-overview">
         <header class="ag-home-head">
           <div>
@@ -137,5 +147,26 @@
 
   @include('components.scripts')
   @include('components.orb-script')
+  <script>
+    // The bar follows the page: the section in view is the lit one; a tap scrolls there.
+    (function () {
+      var menu = document.querySelector('[data-ag-home-menu]');
+      if (!menu || !('IntersectionObserver' in window)) return;
+      var links = [].slice.call(menu.querySelectorAll('a[href^="#"]'));
+      var light = function (id) {
+        links.forEach(function (a) {
+          var on = a.getAttribute('href') === '#' + id;
+          a.classList.toggle('is-current', on);
+          if (on) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+        });
+      };
+      var targets = links.map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); }).filter(Boolean);
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) light(e.target.id); });
+      }, { rootMargin: '-35% 0px -55% 0px' });
+      targets.forEach(function (t) { io.observe(t); });
+      links.forEach(function (a) { a.addEventListener('click', function () { light(a.getAttribute('href').slice(1)); }); });
+    })();
+  </script>
 </body>
 </html>

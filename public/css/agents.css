@@ -223,9 +223,9 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 /* Talk to it. */
 /* The button close under the orb, the word under the button right below it, nothing empty under
    them until the call has words to show: the same on every page (the demo, setup, an agent's page). */
-.ag-talk { display: grid; justify-items: center; gap: .85rem; text-align: center; }
+.ag-talk { display: grid; justify-items: center; gap: .7rem; text-align: center; }
 /* The agent's face, a halo that ripples while it speaks, and the brand's voice waves either side. */
-.ag-talk-stage { display: flex; align-items: center; justify-content: center; gap: clamp(12px, 3vw, 22px); height: 136px; }
+.ag-talk-stage { display: flex; align-items: center; justify-content: center; gap: clamp(12px, 3vw, 22px); height: 120px; }
 .ag-talk-face { position: relative; display: grid; place-items: center; width: 124px; height: 124px; flex: 0 0 auto; }
 .ag-talk-face img { position: relative; z-index: 1; width: 112px; height: 112px; border-radius: 50%; object-fit: cover; background: var(--ag-soft);
   box-shadow: 0 0 0 4px var(--surface), 0 0 0 6px color-mix(in srgb, var(--a) 60%, transparent), 0 22px 44px -22px color-mix(in srgb, var(--a) 90%, transparent);
@@ -245,7 +245,7 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 @keyframes ag-wave-idle { 0%, 100% { height: 6px; } 50% { height: 13px; } }
 @media (max-width: 420px) { .ag-wave i:nth-child(1), .ag-wave i:nth-child(7) { display: none; } }
 .ag-talk-state { margin: 0; font-weight: 700; font-size: 1rem; }
-.ag-talk-note { display: inline-flex; align-items: center; gap: .4rem; margin: -.4rem 0 0; color: var(--muted); font-size: .82rem; }
+.ag-talk .ag-talk-note { display: inline-flex; align-items: center; gap: .4rem; margin: -.45rem 0 0; color: var(--muted); font-size: .82rem; }
 .ag-talk-note svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .ag-talk-state:empty { display: none; }
 .ag-talk-state.is-error { color: var(--ag-bad); }
@@ -278,7 +278,9 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-correct summary::-webkit-details-marker { display: none; }
 .ag-correct textarea { margin-top: .4rem; min-height: 70px; }
 .ag-correct .ag-btn { margin-top: .4rem; }
-.ag-free { margin-top: -.4rem; font-size: .86rem; color: var(--muted); }
+.ag-free { font-size: .86rem; color: var(--muted); }
+/* Right under the button (the .ag p reset would put it back a full gap away). */
+.ag-talk .ag-free { margin-top: -.45rem; }
 .ag-transcript:empty { display: none; }
 
 /* Go live. */
@@ -996,7 +998,10 @@ html[dir="rtl"] .ag-home-head h1 { letter-spacing: 0; }
 .ag-home-head p { margin-top: .35rem; max-width: 60ch; color: var(--muted); font-size: 1rem; line-height: 1.6; }
 .ag-home-plan { display: inline-flex; align-items: center; gap: .45rem; padding: .45rem .9rem; border-radius: 999px; border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line)); background: color-mix(in oklab, var(--a) 6%, var(--surface)); color: var(--text); font-size: .88rem; font-weight: 700; white-space: nowrap; }
 .ag-home-plan svg { width: 16px; height: 16px; fill: none; stroke: var(--accent-text, var(--a)); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.ag-home [id] { scroll-margin-top: 90px; }
+/* Under the header and the sections bar. */
+.ag-home [id], .ag-home .us.us-embed { scroll-margin-top: 135px; }
+.ag-tabs a.ag-tab { text-decoration: none; }
+.ag-main > .ag-tabs:first-child { margin-top: 0; }
 /* The list is one column as wide as the header, edge to edge with the logo and the account menu,
    and its cards fill each row (two or three to a row, set by the page). */
 .ag-home .ag-grid { grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
