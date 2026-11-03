@@ -221,9 +221,11 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-voice-dialect img { width: 16px; height: 12px; border-radius: 2px; object-fit: cover; }
 
 /* Talk to it. */
-.ag-talk { display: grid; justify-items: center; gap: 1rem; text-align: center; }
+/* The button close under the orb, the word under the button right below it, nothing empty under
+   them until the call has words to show: the same on every page (the demo, setup, an agent's page). */
+.ag-talk { display: grid; justify-items: center; gap: .85rem; text-align: center; }
 /* The agent's face, a halo that ripples while it speaks, and the brand's voice waves either side. */
-.ag-talk-stage { display: flex; align-items: center; justify-content: center; gap: clamp(12px, 3vw, 22px); height: 170px; }
+.ag-talk-stage { display: flex; align-items: center; justify-content: center; gap: clamp(12px, 3vw, 22px); height: 136px; }
 .ag-talk-face { position: relative; display: grid; place-items: center; width: 124px; height: 124px; flex: 0 0 auto; }
 .ag-talk-face img { position: relative; z-index: 1; width: 112px; height: 112px; border-radius: 50%; object-fit: cover; background: var(--ag-soft);
   box-shadow: 0 0 0 4px var(--surface), 0 0 0 6px color-mix(in srgb, var(--a) 60%, transparent), 0 22px 44px -22px color-mix(in srgb, var(--a) 90%, transparent);
@@ -243,6 +245,8 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 @keyframes ag-wave-idle { 0%, 100% { height: 6px; } 50% { height: 13px; } }
 @media (max-width: 420px) { .ag-wave i:nth-child(1), .ag-wave i:nth-child(7) { display: none; } }
 .ag-talk-state { margin: 0; font-weight: 700; font-size: 1rem; }
+.ag-talk-note { display: inline-flex; align-items: center; gap: .4rem; margin: -.4rem 0 0; color: var(--muted); font-size: .82rem; }
+.ag-talk-note svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .ag-talk-state:empty { display: none; }
 .ag-talk-state.is-error { color: var(--ag-bad); }
 
@@ -274,7 +278,8 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-correct summary::-webkit-details-marker { display: none; }
 .ag-correct textarea { margin-top: .4rem; min-height: 70px; }
 .ag-correct .ag-btn { margin-top: .4rem; }
-.ag-free { font-size: .86rem; color: var(--muted); }
+.ag-free { margin-top: -.4rem; font-size: .86rem; color: var(--muted); }
+.ag-transcript:empty { display: none; }
 
 /* Go live. */
 /* Go live: where the button is, the website builders, sharing, and who may show the button. */
@@ -997,7 +1002,6 @@ html[dir="rtl"] .ag-home-head h1 { letter-spacing: 0; }
 .ag-home .ag-grid { grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
 @media (max-width: 1100px) { .ag-home .ag-grid { grid-template-columns: repeat(min(2, var(--cols, 2)), minmax(0, 1fr)); } }
 @media (max-width: 700px) { .ag-home .ag-grid { grid-template-columns: minmax(0, 1fr); } }
-.ag.ag-page.ag-home { max-width: 1400px; padding-inline: clamp(1rem, 2vw, 1.5rem); }
 
 /* What needs the owner now (suspended, paused by the check, missed calls, a go-live refusal). */
 .ag-notice { display: flex; align-items: center; justify-content: space-between; gap: .8rem 1rem; flex-wrap: wrap; margin-bottom: 1rem; padding: .85rem 1.1rem; border-radius: var(--ag-r-sm); border: 1px solid var(--line); background: var(--surface); font-size: .92rem; line-height: 1.55; font-weight: 600; text-wrap: pretty; }
@@ -1038,28 +1042,18 @@ html[dir="rtl"] .ag-home-head h1 { letter-spacing: 0; }
 /* The agents list: where the credits went, under the agents. */
 .ag-usage > .us { margin-top: 1.6rem; }
 
-/* An agent's page: its sections in a side menu, like the studio's (an icon each, a solid mark on the
-   open one, the divider running the page's height); a strip of tabs on phones and tablets. */
-.ag.ag-page { max-width: 1320px; }
-.ag-layout { display: grid; grid-template-columns: minmax(0, 1fr); }
+/* An agent's page: its name, then its sections in one bar across the page (the content runs the full
+   width, no side column), the bar staying in view as the section scrolls; a strip of tabs on phones. */
+/* As wide as the header, so the page lines up with the logo and the account menu. */
+.ag.ag-page { max-width: 1400px; padding-inline: clamp(1rem, 2vw, 1.5rem); }
 .ag-main { min-width: 0; }
 .ag-tab svg { display: none; }
+.ag-main > .ag-hero:first-child, .ag-main > .ag-notice:first-child { margin-top: 0; }
 @media (min-width: 1021px) {
-  .ag-layout { grid-template-columns: 216px minmax(0, 1fr); gap: 1.75rem; align-items: start; }
-  .ag-side { position: relative; align-self: stretch; padding-inline-end: 1rem; }
-  .ag-side::after { content: ""; position: absolute; top: -1.6rem; bottom: -4rem; inset-inline-end: 0; width: 1px; background: var(--line); }
-  .ag-side .ag-tabs { position: sticky; top: 5.5rem; display: grid; gap: 2px; margin: 0; padding: 0; overflow: visible; border: 0; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
-  .ag-side .ag-tab { display: flex; width: 100%; min-height: 42px; gap: .7rem; padding: .55rem .75rem; border-radius: 10px; font-size: .92rem; font-weight: 600; text-align: start; transition: background-color .15s ease, color .15s ease; }
-  .ag-side .ag-tab::after { display: none; }
-  .ag-side .ag-tab svg { display: block; flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .ag-side .ag-tab:hover { color: var(--text); background: var(--surface2, var(--ag-soft)); }
-  .ag-side .ag-tab.is-current { color: var(--accent-text, var(--a)); background: color-mix(in oklab, var(--a) 9%, var(--surface)); font-weight: 700; }
-  .ag-side .ag-tab.is-current::before { content: ""; position: absolute; inset-inline-start: -1px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--a); }
-  html[dir="rtl"] .ag-side .ag-tab.is-current::before { border-radius: 3px 0 0 3px; }
-  .ag-side .ag-tab-count { margin-inline-start: auto; }
-  .ag-main > .ag-hero:first-child, .ag-main > .ag-notice:first-child { margin-top: 0; }
-  /* Room between the agent's header and the section under it, so the section does not crowd it. */
-  .ag-main .ag-panel.is-current { padding-top: 1.6rem; }
+  .ag-main > .ag-tabs { gap: .35rem; margin: 1.5rem 0 1.75rem; }
+  .ag-main > .ag-tabs .ag-tab { gap: .55rem; min-height: 52px; padding: .55rem 1rem; font-size: .95rem; }
+  .ag-main > .ag-tabs .ag-tab svg { display: block; flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .ag-main > .ag-tabs .ag-tab.is-current { color: var(--accent-text, var(--a)); }
 }
 
 /* The agents list: one account summary at the top, the agents with this month's numbers, a card to add one. */
@@ -1160,4 +1154,7 @@ html[dir="rtl"] .ag-site-name bdi { text-align: right; }
 .ag-panel[data-ag-panel="overview"] > .ag-balance-line { margin: 0 0 1.5rem; }
 .ag-panel[data-ag-panel="overview"] > .ag-stats { margin: 0 0 1.5rem; }
 .ag-panel[data-ag-panel="overview"] > .ag-two { gap: 1.25rem; }
+/* The call card and the next steps side by side at one height, the call centred in its card. */
+.ag-panel[data-ag-panel="overview"] > .ag-two { align-items: stretch; }
+.ag-panel[data-ag-panel="overview"] > .ag-two > .ag-section:has(> .ag-talk) { display: grid; align-content: center; }
 @media (max-width: 1020px) { .ag-main .ag-panel.is-current { padding-top: .4rem; } }

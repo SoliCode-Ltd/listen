@@ -301,10 +301,7 @@
               </fieldset>
               <div class="demo-agent-call">
                 <p class="demo-agent-biz" data-demo-biz dir="auto">{{ $demoFirst['business'] }}</p>
-                @include('agents.partials.talk', ['agent' => null, 'showCost' => false, 'female' => $demoFirst['gender'] === 'female'])
-                <p class="demo-agent-mic">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.demo.mic') }}
-                </p>
+                @include('agents.partials.talk', ['agent' => null, 'showCost' => false, 'female' => $demoFirst['gender'] === 'female', 'note' => __('agents.demo.mic')])
               </div>
               <div class="demo-agent-try">
                 <p>{{ __('agents.demo.try') }}</p>

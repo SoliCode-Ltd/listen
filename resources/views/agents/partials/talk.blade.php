@@ -1,7 +1,7 @@
 {{-- Talk to the agent: one orb in the middle that moves with its voice, and a halo that ripples
      while it speaks (the speakers' faces are only for choosing the voice). What was said shows
      below; each answer can be corrected. --}}
-@props(['agent' => null, 'avatar' => null, 'freeTestLeft' => 0, 'perMinute' => 900, 'showCost' => true, 'female' => false])
+@props(['agent' => null, 'avatar' => null, 'freeTestLeft' => 0, 'perMinute' => 900, 'showCost' => true, 'female' => false, 'note' => null])
 <div class="ag-talk" data-ag-talk>
   <div class="ag-talk-stage" data-vp-track data-ag-stage>
     <span class="ag-talk-face" data-ag-talk-avatar>
@@ -18,6 +18,10 @@
     </button>
     <button type="button" class="ag-btn" data-ag-mute hidden>{{ __('agents.talk_mute') }}</button>
   </div>
+  {{-- A word right under the button (the demo: the call uses the microphone). --}}
+  @if($note)
+    <p class="ag-talk-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ $note }}</p>
+  @endif
   <p class="ag-talk-state" data-ag-talk-state aria-live="polite"></p>
   @if($showCost)
     <p class="ag-free" data-ag-free>

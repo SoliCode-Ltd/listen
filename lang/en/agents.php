@@ -51,6 +51,7 @@ return [
     'card_missed' => '{1} 1 missed call today|[2,*] :count missed calls today',
     'card_none' => 'No calls yet',
     'card_setup' => 'Setup not finished',
+    'all_agents' => 'All agents',
     'more_agents' => 'More agents',
     'more_agents_text' => 'Compare plans to add more agents for your business.',
     'new_agent_left' => '{1} You can add 1 more agent|[2,*] You can add :count more agents',

@@ -34,8 +34,6 @@
 .demo-agent-biz { margin: 0; font-size: 1.02rem; font-weight: 800; text-align: center; }
 .demo-agent-call .ag-talk { width: 100%; }
 .demo-agent-call .ag-transcript { max-height: 280px; }
-.demo-agent-mic { display: inline-flex; align-items: center; gap: .4rem; margin: .2rem 0 0; color: var(--muted); font-size: .82rem; }
-.demo-agent-mic svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* What to try saying: the caller's own words, as the transcript shows them. */
 .demo-agent-try { grid-area: try; padding: .95rem 1rem 1.05rem; border: 1px dashed var(--line); border-radius: 14px; }
