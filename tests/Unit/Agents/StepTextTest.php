@@ -25,6 +25,14 @@ class StepTextTest extends TestCase
         $this->assertStringNotContainsString('<b>', $html);
     }
 
+    public function test_an_arabic_menu_name_reads_right_to_left(): void
+    {
+        $this->assertSame(
+            'افتح <code dir="rtl" class="is-path">إضافات</code> <code dir="rtl">رفع إضافة</code> ثم <code dir="ltr">.zip</code>',
+            StepText::html('افتح `إضافات` > `رفع إضافة` ثم `.zip`')
+        );
+    }
+
     public function test_a_lone_greater_than_sign_stays_text(): void
     {
         $this->assertSame('5 &gt; 3 and <code dir="ltr">&lt;/body&gt;</code>', StepText::html('5 > 3 and `</body>`'));

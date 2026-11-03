@@ -33,6 +33,12 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { el.classList.remove('is-on'); }, 2200);
   }
+  // A one-line box that grows with its text (the setup's rules and steps).
+  function grow(el) {
+    if (!el || !el.offsetParent) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 2 + 'px';
+  }
   function fill(s, vars) { return String(s || '').replace(/:(\w+)/g, function (m, k) { return vars && vars[k] != null ? vars[k] : m; }); }
 
   /* ---------- Copy, share, QR, allowed websites, going live ---------- */
@@ -137,26 +143,44 @@
         pick(b.getAttribute('data-ag-install-open') || 'wordpress', true);
       });
     });
+    // Arabic pages: the owner's dashboard in Arabic or English decides the menu names in the steps (remembered here).
+    function ui(value) {
+      panel.setAttribute('data-ui', value);
+      $$('[data-ag-ui]', panel).forEach(function (r) { r.checked = r.value === value; });
+      try { localStorage.setItem('listen_dashboard_ui', value); } catch (e) {}
+    }
+    var savedUi = null;
+    try { savedUi = localStorage.getItem('listen_dashboard_ui'); } catch (e) {}
+    if (savedUi === 'en' || savedUi === 'ar') ui(savedUi);
+    $$('[data-ag-ui]', panel).forEach(function (r) { r.addEventListener('change', function () { if (r.checked) ui(r.value); }); });
     $$('[data-ag-install-close]', panel).forEach(function (c) { c.addEventListener('click', shut); });
     panel.addEventListener('cancel', function (e) { e.preventDefault(); shut(); });
     panel.addEventListener('click', function (e) { if (e.target === panel) shut(); });
 
-    var check = $('[data-ag-install-check]', panel), status = $('[data-ag-install-status]', panel);
-    if (!check || !status) return;
-    check.addEventListener('click', function () {
-      check.disabled = true;
-      check.textContent = check.getAttribute('data-checking');
-      var wait = new Promise(function (ok) { setTimeout(ok, still ? 0 : 650); });
-      Promise.all([api('GET', panel.getAttribute('data-status-url')), wait]).then(function (r) {
-        var d = r[0] || {};
-        status.classList.toggle('is-on', !!d.seen);
-        status.classList.add('is-checked');
-        $('span', status).textContent = d.message || '';
-        var tile = $('[data-ag-seen]', box);
-        if (tile && d.tile) { tile.classList.toggle('is-on', !!d.seen); tile.lastChild.textContent = ' ' + d.tile; }
-      }).catch(function (err) { toast(err.message); }).then(function () {
-        check.disabled = false;
-        check.textContent = check.getAttribute('data-label');
+    // Check installation (in the panel's footer and above the platforms): has the button been seen on a website?
+    var status = $('[data-ag-install-status]', panel);
+    $$('[data-ag-install-check]', box).forEach(function (check) {
+      check.addEventListener('click', function () {
+        check.disabled = true;
+        check.textContent = check.getAttribute('data-checking');
+        var wait = new Promise(function (ok) { setTimeout(ok, still ? 0 : 650); });
+        Promise.all([api('GET', panel.getAttribute('data-status-url')), wait]).then(function (r) {
+          var d = r[0] || {};
+          if (status) {
+            status.classList.toggle('is-on', !!d.seen);
+            status.classList.add('is-checked');
+            $('span', status).textContent = d.message || '';
+          }
+          var tile = $('[data-ag-seen]', box);
+          if (tile && d.tile) {
+            tile.classList.toggle('is-on', !!d.seen);
+            tile.classList.add('is-checked');
+            tile.lastChild.textContent = ' ' + d.tile;
+          }
+        }).catch(function (err) { toast(err.message); }).then(function () {
+          check.disabled = false;
+          check.textContent = check.getAttribute('data-label');
+        });
       });
     });
   }
@@ -259,7 +283,8 @@
     var call = null, muted = false, lastAsked = '';
     var states = T.states || {};
     function setState(s) {
-      var key = s === 'speaking' && C.agent && C.agent.gender === 'female' && states.speaking_female ? 'speaking_female' : s;
+      // A woman's voice has its own words in Arabic ("سارة تتحدث"); the setup steps get both forms.
+      var key = C.agent && C.agent.gender === 'female' && states[s + '_female'] ? s + '_female' : s;
       stateEl.textContent = s === 'mic' ? (T.mic || '') : fill(states[key] || states.idle || '', { name: (C.agent && C.agent.name) || '' });
       stateEl.classList.toggle('is-error', s === 'error' || s === 'mic');
       var live = s === 'connecting' || s === 'listening' || s === 'speaking';
@@ -340,8 +365,9 @@
       if (call) call.mute(muted);
       mute.textContent = muted ? T.unmute : T.mute;
     });
-    // The call shows the orb only; the speaker's face stays in the voice gallery.
-    return { setAvatar: function () {} };
+    // The call shows the orb only; the speaker's face stays in the voice gallery. A new voice
+    // can change the words ("جاهزة" for a woman's voice), so the waiting line is written again.
+    return { setAvatar: function () { if (!call) setState('idle'); } };
   }
 
   /* ---------- The setup in four steps ---------- */
@@ -470,6 +496,8 @@
         C.agent.gender = v.gender;
         voiceNext.disabled = false;
         if (talker) talker.setAvatar(v.avatar);
+        var hint = $('[data-ag-talk-hint]');
+        if (hint) hint.textContent = hint.getAttribute(v.gender === 'female' ? 'data-female' : 'data-male');
         furthest = Math.max(furthest, 2);
       });
     });
@@ -487,8 +515,21 @@
     var tabs = $$('[data-ag-tab]'), panels = $$('[data-ag-panel]');
     function open(name) {
       if (!$('[data-ag-panel="' + name + '"]')) name = 'overview';
-      tabs.forEach(function (t) { var on = t.getAttribute('data-ag-tab') === name; t.classList.toggle('is-current', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
-      panels.forEach(function (p) { p.classList.toggle('is-current', p.getAttribute('data-ag-panel') === name); });
+      tabs.forEach(function (t) {
+        var on = t.getAttribute('data-ag-tab') === name;
+        t.classList.toggle('is-current', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        if (!on) return;
+        // On phones the tabs scroll sideways: keep the open one in view, in either direction.
+        var bar = t.parentNode, br = bar.getBoundingClientRect(), tr = t.getBoundingClientRect();
+        if (tr.left < br.left + 8) bar.scrollLeft -= br.left + 8 - tr.left;
+        else if (tr.right > br.right - 8) bar.scrollLeft += tr.right - br.right + 8;
+      });
+      panels.forEach(function (p) {
+        var on = p.getAttribute('data-ag-panel') === name;
+        p.classList.toggle('is-current', on);
+        if (on) $$('.ag-grow', p).forEach(grow);
+      });
       if (history.replaceState) history.replaceState(null, '', '#' + name);
     }
     tabs.forEach(function (t) { t.addEventListener('click', function () { open(t.getAttribute('data-ag-tab')); }); });
@@ -504,10 +545,13 @@
         if (talker) talker.setAvatar(v.avatar);
         var cur = $('.ag-voice-current');
         if (cur) {
-          var img = $('img', cur), name = $('span', cur);
+          var img = $('img', cur), name = $('[data-ag-voice-name]', cur), dialect = $('[data-ag-voice-dialect]', cur);
           if (img && v.avatar) img.src = v.avatar;
           if (name) name.textContent = v.name;
+          if (dialect) dialect.textContent = v.dialect_label || '';
         }
+        var face = $('.ag-hero-face img');
+        if (face && v.avatar) face.src = v.avatar;
       });
     });
 
@@ -523,16 +567,19 @@
       b.addEventListener('click', function () {
         var box = $('[data-ag-list="' + b.getAttribute('data-ag-list-add') + '"]');
         var row = box.firstElementChild.cloneNode(true);
-        $('input', row).value = '';
+        var field = $('input, textarea', row);
+        field.value = '';
         box.appendChild(row);
-        $('input', row).focus();
+        grow(field);
+        field.focus();
       });
     });
+    document.addEventListener('input', function (e) { if (e.target.classList && e.target.classList.contains('ag-grow')) grow(e.target); });
     document.addEventListener('click', function (e) {
       var rm = e.target.closest('[data-ag-list-remove]');
       if (!rm) return;
       var box = rm.closest('[data-ag-list]');
-      if (box.children.length > 1) rm.parentElement.remove(); else $('input', rm.parentElement).value = '';
+      if (box.children.length > 1) rm.parentElement.remove(); else $('input, textarea', rm.parentElement).value = '';
     });
     var max = $('[data-ag-max]'), maxOut = $('[data-ag-max-out]');
     var maxLabels = {};
@@ -542,7 +589,7 @@
     var sf = $('[data-ag-script-form]');
     if (sf) sf.addEventListener('submit', function (e) {
       e.preventDefault();
-      var list = function (k) { return $$('[data-ag-list="' + k + '"] input', sf).map(function (i) { return i.value.trim(); }).filter(Boolean); };
+      var list = function (k) { return $$('[data-ag-list="' + k + '"] input, [data-ag-list="' + k + '"] textarea', sf).map(function (i) { return i.value.trim(); }).filter(Boolean); };
       api('PATCH', C.agent.urls.update, {
         first_message: $('[name="first_message"]', sf).value,
         script: { identity: $('[name="identity"]', sf).value, handoff: $('[name="handoff"]', sf).value, never: list('never'), steps: list('steps') },
@@ -550,6 +597,11 @@
       }).then(function () { toast(T.saved); }).catch(function (err) { toast(err.message); });
     });
     var kf = $('[data-ag-knowledge-form]');
+    var kbText = $('[data-ag-kb-text]'), kbCount = $('[data-ag-kb-count]');
+    if (kbText && kbCount) {
+      var nf = new Intl.NumberFormat('en'); // the site writes numbers in Latin digits in both languages
+      kbText.addEventListener('input', function () { kbCount.textContent = nf.format(kbText.value.length) + ' / ' + nf.format(40000); });
+    }
     if (kf) kf.addEventListener('submit', function (e) {
       e.preventDefault();
       api('PATCH', C.agent.urls.update, { knowledge: $('[name="knowledge"]', kf).value }).then(function () { toast(T.saved); }).catch(function (err) { toast(err.message); });

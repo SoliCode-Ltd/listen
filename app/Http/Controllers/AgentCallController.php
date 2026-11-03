@@ -93,13 +93,7 @@ class AgentCallController extends Controller
     /** @return array<string, string> the call's states, with the speaking line in the voice's gender */
     private function states(Agent $agent, ?array $voice, string $locale): array
     {
-        $states = (array) trans('agents.talk_states', ['name' => $agent->name], $locale);
-        if (($voice['gender'] ?? null) === 'female' && isset($states['speaking_female'])) {
-            $states['speaking'] = $states['speaking_female'];
-        }
-        unset($states['speaking_female']);
-
-        return $states;
+        return \App\Support\Agents\Gendered::lines((array) trans('agents.talk_states', ['name' => $agent->name], $locale), ($voice['gender'] ?? null) === 'female');
     }
 
     /**

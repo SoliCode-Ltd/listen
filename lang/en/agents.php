@@ -46,8 +46,8 @@ return [
     'setup_title' => 'Create your agent',
     'steps' => [
         'business' => 'Your business',
-        'voice' => 'Its voice',
-        'talk' => 'Talk to it',
+        'voice' => 'The voice',
+        'talk' => 'Test call',
         'live' => 'Go live',
     ],
     'step_of' => 'Step :n of :total',
@@ -131,6 +131,8 @@ return [
     // Step 3: talk to it.
     'talk_heading' => 'Talk to :name',
     'talk_hint' => 'Ask what your customers ask. If an answer is wrong, correct it and it will remember.',
+    'talk_hint_female' => 'Ask what your customers ask. If an answer is wrong, correct it and she will remember.',
+    'talk_to' => 'Talk to :name',
     'talk_start' => 'Start talking',
     'talk_end' => 'End',
     'talk_mute' => 'Mute',
@@ -169,6 +171,11 @@ return [
     'live_site_title' => 'On your website',
     'live_site_text' => 'One line of code adds a call button to every page. You never paste it again: changes apply on their own.',
     'live_platforms_title' => 'Your website builder',
+    'live_add_title' => 'Add it to your website',
+    'live_add_text' => 'Pick where your website is built. Each one opens the steps, one at a time.',
+    'live_share_title' => 'Share it anywhere',
+    'live_share_text' => 'Your agent\'s own page and a QR code, so customers can call without a website.',
+    'live_security_title' => 'Security',
     'live_platforms_text' => 'Pick yours. WordPress has a plugin with your agent inside; the others take three short steps.',
     'soon' => 'Soon',
     'live_send_dev' => 'Send to my developer',
@@ -185,6 +192,8 @@ return [
     'platform_kind' => [
         'plugin' => 'Plugin',
         'guide' => '3 steps',
+        'dev' => 'For developers',
+        'code' => 'One line of code',
     ],
     'live_seen' => 'Working on :site. Last seen :when.',
     'live_not_seen' => 'Not on a website yet. Once it is, open any page of your website and it shows here.',
@@ -215,6 +224,13 @@ return [
 
     // Setup tab (edit in plain words).
     'edit_first' => 'What it says first',
+    'edit_first_hint' => 'The first sentence every caller hears.',
+    'edit_identity_hint' => 'Its role and manner, in a sentence or two.',
+    'edit_never_hint' => 'What it always refuses, whatever the caller says.',
+    'edit_steps_hint' => 'What it does on a call, in order.',
+    'edit_handoff_hint' => 'When it takes the caller\'s details so your team can call back.',
+    'edit_max_call_hint' => 'Calls end politely after this, so one call never runs up your minutes.',
+    'voice_hint' => 'Every voice speaks in your customers\' dialect.',
     'edit_identity' => 'Who it is',
     'edit_never' => 'What it must never do',
     'edit_steps' => 'Its steps on a call',
@@ -232,11 +248,17 @@ return [
     // Knowledge tab.
     'knowledge_heading' => 'What your agent knows',
     'knowledge_hint' => 'Your agent answers only from this. Keep prices, hours and policies here up to date.',
+    'knowledge_tips_title' => 'What to write here',
+    'knowledge_tips' => ['Services and prices', 'Opening hours and holidays', 'Address, branches and how to get there', 'How to book, pay or order', 'Your policies: cancellations, refunds, delivery', 'The questions customers ask most'],
+    'knowledge_example_title' => 'For example',
+    'knowledge_example' => 'Teeth whitening: 1,500 EGP, about an hour. Open daily 10 am to 10 pm, closed on Fridays.',
     'knowledge_reread' => 'Read my website again',
     'knowledge_reading' => 'Reading…',
 
     // Conversations.
-    'conversations_empty' => 'No conversations yet. Talk to your agent or share its link, and every call will show here with a short summary.',
+    'conversations_empty_title' => 'No calls yet',
+    'conversations_empty' => 'Talk to your agent or share its link. Every call shows here with a short summary and what was said.',
+    'empty_share' => 'Share the link',
     'conversation_channel' => [
         'test' => 'Your test',
         'widget' => 'Website',
@@ -244,11 +266,12 @@ return [
     ],
     'conversation_duration' => ':m min :s s',
     'conversation_summary' => 'Summary',
-    'conversation_transcript' => 'Conversation',
+    'conversation_transcript' => 'What was said',
     'conversation_details' => 'Customer details',
     'conversation_credits' => ':count credits',
 
     // Customers.
+    'customers_empty_title' => 'No customers yet',
     'customers_empty' => 'When callers leave their name and phone number, they show here so you can call them back.',
     'customer_name' => 'Name',
     'customer_contact' => 'Phone or email',
@@ -258,6 +281,7 @@ return [
 
     // The link page and the call button.
     'talk_page_title' => 'Talk to :business',
+    'talk_page_mic' => 'Your browser asks to use the microphone for the call. No app needed.',
     'talk_page_subtitle' => ':name, the AI voice assistant, answers your questions in seconds.',
     'talk_page_subtitle_female' => ':name, the AI voice assistant, answers your questions in seconds.',
     'talk_page_note' => 'You are talking to an AI voice assistant. The conversation may be saved to help the business serve you.',
@@ -293,12 +317,12 @@ return [
         'steps' => [
             'wordpress' => [
                 ['Download the plugin', 'Your agent is already inside it, so there is nothing to copy.'],
-                ['Upload it to WordPress', 'In your WordPress dashboard open `Plugins` > `Add New Plugin` > `Upload Plugin`, choose the file and click `Install Now`.'],
-                ['Turn it on', 'Click `Activate`. The call button shows on every page. To choose pages, open `Settings` > `Listen Voice Agent`.'],
+                ['Upload it to WordPress', 'In your WordPress dashboard open `Plugins` > `Add Plugin` > `Upload Plugin`, choose the file and click `Install Now`.'],
+                ['Turn it on', 'Click `Activate Plugin`. The call button shows on every page. To choose pages, open `Settings` > `Listen Voice Agent`.'],
             ],
             'shopify' => [
-                ['Open your theme editor', 'In your Shopify admin open `Online Store` > `Themes` and click `Customize` on your live theme.'],
-                ['Add a Custom Liquid section', 'In the left panel, under `Footer`, click `Add section` > `Custom Liquid` and paste the line below into its box.'],
+                ['Open your theme editor', 'In your Shopify admin open `Online Store` and click `Edit theme`. On some stores it is still `Themes` > `Customize`.'],
+                ['Add a Custom Liquid section', 'In the left panel, under `Footer`, click `Add section`, type Liquid in the search and choose `Custom Liquid`. Paste the line below into its box.'],
                 ['Save', 'Click `Save`. No Custom Liquid in your theme? Open `⋯` > `Edit code`, then `theme.liquid`, and paste the line just before `</body>`.'],
             ],
             'wix' => [

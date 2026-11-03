@@ -174,9 +174,9 @@
           <div class="ag-pane-head" style="text-align:center">
             <p class="ag-muted" style="font-weight:700;font-size:.86rem">{{ __('agents.step_of', ['n' => 3, 'total' => 4]) }}</p>
             <h2 data-ag-talk-title>{{ __('agents.talk_heading', ['name' => $agent->name ?? __('agents.agent_name_placeholder')]) }}</h2>
-            <p>{{ __('agents.talk_hint') }}</p>
+            <p data-ag-talk-hint data-male="{{ __('agents.talk_hint') }}" data-female="{{ __('agents.talk_hint_female') }}">{{ \App\Support\Agents\Gendered::line('agents.talk_hint', ($voiceGender ?? null) === 'female') }}</p>
           </div>
-          @include('agents.partials.talk', ['agent' => $agent, 'avatar' => $voiceAvatar, 'freeTestLeft' => $freeTestLeft, 'perMinute' => $perMinute])
+          @include('agents.partials.talk', ['agent' => $agent, 'avatar' => $voiceAvatar, 'freeTestLeft' => $freeTestLeft, 'perMinute' => $perMinute, 'female' => ($voiceGender ?? null) === 'female'])
           <div class="ag-actions">
             <button type="button" class="ag-btn ag-btn-ghost" data-ag-go="1">{{ __('agents.back') }}</button>
             <button type="button" class="ag-btn ag-btn-primary ag-btn-lg" data-ag-go="3">{{ __('agents.next') }}</button>

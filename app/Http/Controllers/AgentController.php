@@ -34,9 +34,22 @@ class AgentController extends Controller
         $calls = AgentConversation::query()->where('user_id', $request->user()->id)->where('started_at', '>=', $monthStart)
             ->where('channel', '!=', 'test')->selectRaw('agent_id, count(*) as n, max(started_at) as last')->groupBy('agent_id')->get()->keyBy('agent_id');
 
+        // Each agent's voice (its face and dialect on the card), one voice list per language.
+        $arabicUi = app()->getLocale() === 'ar';
+        $lists = [];
+        $voices = $agents->mapWithKeys(function (Agent $agent) use (&$lists, $arabicUi) {
+            if (! $agent->speaker_id) {
+                return [$agent->id => null];
+            }
+            $lists[$agent->language] ??= collect(AgentVoices::all($agent->language, $arabicUi))->keyBy('id');
+
+            return [$agent->id => $lists[$agent->language]->get($agent->speaker_id)];
+        });
+
         return view('agents.index', [
             'agents' => $agents,
             'calls' => $calls,
+            'voices' => $voices,
         ]);
     }
 

@@ -14,18 +14,26 @@
   @endphp
 
   <main class="ag" id="agents">
-    <section class="ag-card ag-hero" data-orb-host>
-      <x-orb :name="$agent->orbName()" :class="$agent->isLive() ? 'is-live' : ''" />
+    {{-- The agent: its voice's face (the call card below has the page's one orb), name, status, business and voice. --}}
+    <section class="ag-hero">
+      <span class="ag-hero-face {{ $agent->isLive() ? 'is-live' : '' }}" style="--m: {{ $widget->look('accent') }}" aria-hidden="true">
+        @if($voice && $voice['avatar'])<img src="{{ $voice['avatar'] }}" alt="" width="72" height="72">@else<b>{{ mb_substr($agent->name, 0, 1) }}</b>@endif
+      </span>
       <div class="ag-hero-text">
-        <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+        <div class="ag-hero-title">
           <h1>{{ $agent->name }}</h1>
           <span class="ag-pill is-{{ $agent->status }}" data-ag-status><i></i>{{ __('agents.status.'.$agent->status) }}</span>
         </div>
-        <p>{{ $agent->business_name }}@if($voice) · {{ __('agents.voice_of', ['name' => $voice['name']]) }}@endif</p>
+        <p class="ag-hero-meta">
+          <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>{{ $agent->business_name }}</span>
+          @if($voice)
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.voice_of', ['name' => $voice['name']]) }}@if($voice['dialect_label'] !== '')<small>{{ $voice['dialect_label'] }}</small>@endif</span>
+          @endif
+        </p>
       </div>
       <div class="ag-hero-actions">
         <button type="button" class="ag-btn" data-ag-tab-go="overview" data-ag-talk-open>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.steps.talk') }}
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.talk_to', ['name' => $agent->name]) }}
         </button>
         @if($agent->isLive())
           <button type="button" class="ag-btn" data-ag-status-set="paused">{{ __('agents.live_pause') }}</button>
@@ -37,26 +45,29 @@
 
     <nav class="ag-tabs" role="tablist" aria-label="{{ $agent->name }}">
       @foreach(['overview', 'setup', 'knowledge', 'design', 'live', 'conversations', 'customers'] as $tab)
-        <button type="button" role="tab" class="ag-tab" data-ag-tab="{{ $tab }}">{{ __('agents.tabs.'.$tab) }}</button>
+        @php $n = ['conversations' => $conversations->count(), 'customers' => $stats['contacts']][$tab] ?? 0; @endphp
+        <button type="button" role="tab" class="ag-tab" data-ag-tab="{{ $tab }}">{{ __('agents.tabs.'.$tab) }}@if($n > 0)<small class="ag-tab-count">{{ $n > 99 ? '99+' : $n }}</small>@endif</button>
       @endforeach
     </nav>
 
     {{-- Overview: next steps, this month, and talking to it. --}}
     <section class="ag-panel" data-ag-panel="overview">
       <div class="ag-stats" style="margin-bottom:1rem">
-        <div class="ag-card ag-stat"><b>{{ number_format($stats['calls']) }}</b><span>{{ __('agents.overview_calls') }}</span></div>
-        <div class="ag-card ag-stat"><b>{{ number_format($minutes) }}</b><span>{{ __('agents.overview_minutes') }}</span></div>
-        <div class="ag-card ag-stat"><b>{{ number_format($stats['contacts']) }}</b><span>{{ __('agents.overview_contacts') }}</span></div>
-        <div class="ag-card ag-stat"><b>{{ number_format($stats['credits']) }}</b><span>{{ __('agents.overview_credits') }}</span></div>
+        @foreach(['calls' => $stats['calls'], 'minutes' => $minutes, 'contacts' => $stats['contacts'], 'credits' => $stats['credits']] as $key => $value)
+          <div class="ag-card ag-stat">
+            <span class="ag-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24">{!! ['calls' => '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>', 'minutes' => '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', 'contacts' => '<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>', 'credits' => '<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>'][$key] !!}</svg></span>
+            <b>{{ number_format($value) }}</b><span>{{ __('agents.overview_'.$key) }}</span>
+          </div>
+        @endforeach
       </div>
       <div class="ag-two">
         <div class="ag-card ag-section">
-          @include('agents.partials.talk', ['agent' => $agent, 'avatar' => $voice['avatar'] ?? null, 'freeTestLeft' => $freeTestLeft, 'perMinute' => $perMinute])
+          @include('agents.partials.talk', ['agent' => $agent, 'avatar' => $voice['avatar'] ?? null, 'freeTestLeft' => $freeTestLeft, 'perMinute' => $perMinute, 'female' => ($voice['gender'] ?? null) === 'female'])
         </div>
         <div class="ag-card ag-checklist">
           <h2>{{ __('agents.checklist_title') }} <span class="ag-progress" style="--p: {{ (int) round($done / $total * 100) }}; position:relative"><span>{{ $done }}/{{ $total }}</span></span></h2>
           @foreach($checklist as $key => $ok)
-            <button type="button" class="ag-check {{ $ok ? 'is-done' : '' }}" style="background:none;border:0;font:inherit;text-align:start;cursor:pointer" data-ag-tab-go="{{ ['created' => 'setup', 'voice' => 'setup', 'tested' => 'overview', 'facts' => 'knowledge', 'live' => 'live'][$key] }}"><i></i>{{ __('agents.checklist.'.$key) }}</button>
+            <button type="button" class="ag-check {{ $ok ? 'is-done' : '' }}" data-ag-tab-go="{{ ['created' => 'setup', 'voice' => 'setup', 'tested' => 'overview', 'facts' => 'knowledge', 'live' => 'live'][$key] }}" @if($key === 'tested') data-ag-talk-open @endif><i></i><span>{{ __('agents.checklist.'.$key) }}</span>@unless($ok)<svg class="ag-check-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>@endunless</button>
           @endforeach
           <p class="ag-hint" style="margin-top:.4rem">{{ __('agents.per_minute', ['credits' => number_format($perMinute)]) }}</p>
         </div>
@@ -65,75 +76,100 @@
 
     {{-- Setup, in plain words. --}}
     <section class="ag-panel" data-ag-panel="setup">
-      <form class="ag-card ag-section" data-ag-script-form>
-        <div class="ag-field">
-          <label for="ag-first">{{ __('agents.edit_first') }}</label>
-          <textarea class="ag-textarea" id="ag-first" name="first_message" rows="2" dir="auto" style="min-height:76px">{{ $agent->first_message }}</textarea>
-        </div>
-        <div class="ag-field">
-          <label for="ag-identity">{{ __('agents.edit_identity') }}</label>
-          <textarea class="ag-textarea" id="ag-identity" name="identity" dir="auto" style="min-height:90px">{{ $script['identity'] ?? '' }}</textarea>
-        </div>
-        @foreach(['never' => 'edit_never', 'steps' => 'edit_steps'] as $listKey => $label)
-          <div class="ag-field">
-            <span class="ag-label">{{ __('agents.'.$label) }}</span>
-            <div class="ag-list-editor" data-ag-list="{{ $listKey }}">
-              @foreach(array_values((array) ($script[$listKey] ?? [])) ?: [''] as $item)
-                <div class="ag-list-item"><input class="ag-input" type="text" value="{{ $item }}" dir="auto"><button type="button" class="ag-btn ag-btn-sm ag-btn-ghost" data-ag-list-remove aria-label="{{ __('agents.edit_remove') }}">✕</button></div>
-              @endforeach
-            </div>
-            <button type="button" class="ag-btn ag-btn-sm" style="justify-self:start" data-ag-list-add="{{ $listKey }}">+ {{ __('agents.edit_add') }}</button>
+      {{-- Each setting with what it is for beside it; saving stays at hand at the bottom. --}}
+      <form class="ag-settings" data-ag-script-form>
+        <div class="ag-card ag-settings-card">
+          <div class="ag-setting">
+            <div class="ag-setting-label"><label for="ag-first">{{ __('agents.edit_first') }}</label><p>{{ __('agents.edit_first_hint') }}</p></div>
+            <textarea class="ag-textarea" id="ag-first" name="first_message" rows="2" dir="auto" style="min-height:84px">{{ $agent->first_message }}</textarea>
           </div>
-        @endforeach
-        <div class="ag-field">
-          <label for="ag-handoff">{{ __('agents.edit_handoff') }}</label>
-          <textarea class="ag-textarea" id="ag-handoff" name="handoff" dir="auto" style="min-height:76px">{{ $script['handoff'] ?? '' }}</textarea>
-        </div>
-        <div class="ag-field">
-          <label for="ag-max">{{ __('agents.edit_max_call') }}: <output data-ag-max-out>{{ $minuteLabels[intdiv($agent->max_call_seconds, 60)] ?? '' }}</output></label>
-          <input id="ag-max" type="range" min="1" max="{{ $maxMinutes }}" step="1" value="{{ intdiv($agent->max_call_seconds, 60) }}" name="max_minutes" data-ag-max data-labels="{{ json_encode($minuteLabels, JSON_UNESCAPED_UNICODE) }}" style="accent-color:var(--a)">
-        </div>
-        <details class="ag-field ag-voice-pick">
-          <summary>
-            <span class="ag-label">{{ __('agents.voice_heading') }}</span>
-            <span class="ag-voice-current">
-              @if($voice && $voice['avatar'])<img src="{{ $voice['avatar'] }}" alt="" width="34" height="34">@endif
-              @if($voice)<span>{{ $voice['name'] }}</span>@endif
-              <b>{{ __('agents.voice_change') }}</b>
-            </span>
-          </summary>
-          <div class="ag-voice-tools" style="margin-top:.9rem">
-            <div class="ag-seg" role="radiogroup">
-              <label><input type="radio" name="ag-voice-scope" value="suggested" checked><span>{{ __('agents.voice_suggested') }}</span></label>
-              <label><input type="radio" name="ag-voice-scope" value="all"><span>{{ __('agents.voice_all') }}</span></label>
+          <div class="ag-setting">
+            <div class="ag-setting-label"><label for="ag-identity">{{ __('agents.edit_identity') }}</label><p>{{ __('agents.edit_identity_hint') }}</p></div>
+            <textarea class="ag-textarea" id="ag-identity" name="identity" dir="auto" style="min-height:104px">{{ $script['identity'] ?? '' }}</textarea>
+          </div>
+          @foreach(['never' => 'edit_never', 'steps' => 'edit_steps'] as $listKey => $label)
+            <div class="ag-setting">
+              <div class="ag-setting-label"><span class="ag-label">{{ __('agents.'.$label) }}</span><p>{{ __('agents.'.$label.'_hint') }}</p></div>
+              <div class="ag-setting-control">
+                <div class="ag-list-editor {{ $listKey === 'steps' ? 'is-numbered' : '' }}" data-ag-list="{{ $listKey }}">
+                  @foreach(array_values((array) ($script[$listKey] ?? [])) ?: [''] as $item)
+                    <div class="ag-list-item"><textarea class="ag-input ag-grow" rows="1" dir="auto">{{ $item }}</textarea><button type="button" class="ag-btn ag-btn-sm ag-btn-ghost ag-list-x" data-ag-list-remove aria-label="{{ __('agents.edit_remove') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+                  @endforeach
+                </div>
+                <button type="button" class="ag-btn ag-btn-sm ag-list-add" data-ag-list-add="{{ $listKey }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>{{ __('agents.edit_add') }}</button>
+              </div>
             </div>
-            <div class="ag-seg" role="radiogroup">
-              <label><input type="radio" name="ag-voice-gender" value="any" checked><span>{{ __('agents.filter_any') }}</span></label>
-              <label><input type="radio" name="ag-voice-gender" value="female"><span>{{ __('agents.filter_female') }}</span></label>
-              <label><input type="radio" name="ag-voice-gender" value="male"><span>{{ __('agents.filter_male') }}</span></label>
+          @endforeach
+          <div class="ag-setting">
+            <div class="ag-setting-label"><label for="ag-handoff">{{ __('agents.edit_handoff') }}</label><p>{{ __('agents.edit_handoff_hint') }}</p></div>
+            <textarea class="ag-textarea" id="ag-handoff" name="handoff" dir="auto" style="min-height:84px">{{ $script['handoff'] ?? '' }}</textarea>
+          </div>
+          <div class="ag-setting">
+            <div class="ag-setting-label"><label for="ag-max">{{ __('agents.edit_max_call') }}</label><p>{{ __('agents.edit_max_call_hint') }}</p></div>
+            <div class="ag-setting-control ag-range">
+              <input id="ag-max" type="range" min="1" max="{{ $maxMinutes }}" step="1" value="{{ intdiv($agent->max_call_seconds, 60) }}" name="max_minutes" data-ag-max data-labels="{{ json_encode($minuteLabels, JSON_UNESCAPED_UNICODE) }}">
+              <output data-ag-max-out>{{ $minuteLabels[intdiv($agent->max_call_seconds, 60)] ?? '' }}</output>
             </div>
           </div>
-          <div class="ag-voices" data-ag-voices></div>
-        </details>
-        <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
-          <button type="submit" class="ag-btn ag-btn-primary">{{ __('agents.edit_save') }}</button>
+          <div class="ag-setting">
+            <div class="ag-setting-label"><span class="ag-label">{{ __('agents.voice_heading') }}</span><p>{{ __('agents.voice_hint') }}</p></div>
+            <details class="ag-voice-pick">
+              <summary>
+                <span class="ag-voice-current">
+                  @if($voice && $voice['avatar'])<img src="{{ $voice['avatar'] }}" alt="" width="40" height="40">@endif
+                  <span><b data-ag-voice-name>{{ $voice['name'] ?? '' }}</b><small data-ag-voice-dialect>{{ $voice['dialect_label'] ?? '' }}</small></span>
+                </span>
+                <em class="ag-voice-change">{{ __('agents.voice_change') }}</em>
+              </summary>
+              <div class="ag-voice-tools" style="margin-top:.9rem">
+                <div class="ag-seg" role="radiogroup">
+                  <label><input type="radio" name="ag-voice-scope" value="suggested" checked><span>{{ __('agents.voice_suggested') }}</span></label>
+                  <label><input type="radio" name="ag-voice-scope" value="all"><span>{{ __('agents.voice_all') }}</span></label>
+                </div>
+                <div class="ag-seg" role="radiogroup">
+                  <label><input type="radio" name="ag-voice-gender" value="any" checked><span>{{ __('agents.filter_any') }}</span></label>
+                  <label><input type="radio" name="ag-voice-gender" value="female"><span>{{ __('agents.filter_female') }}</span></label>
+                  <label><input type="radio" name="ag-voice-gender" value="male"><span>{{ __('agents.filter_male') }}</span></label>
+                </div>
+              </div>
+              <div class="ag-voices" data-ag-voices></div>
+            </details>
+          </div>
+        </div>
+        <div class="ag-savebar">
           <a class="ag-btn ag-btn-ghost" href="{{ route('voice-agents.edit', $agent) }}">{{ __('agents.edit_wizard') }}</a>
+          <button type="submit" class="ag-btn ag-btn-primary">{{ __('agents.edit_save') }}</button>
         </div>
       </form>
     </section>
 
     {{-- What it knows. --}}
     <section class="ag-panel" data-ag-panel="knowledge">
-      <form class="ag-card ag-section" data-ag-knowledge-form>
-        <div>
-          <h2>{{ __('agents.knowledge_heading') }}</h2>
-          <p class="ag-hint" style="margin-top:.3rem">{{ __('agents.knowledge_hint') }}</p>
-        </div>
-        <textarea class="ag-textarea" name="knowledge" dir="auto" style="min-height:360px">{{ $agent->knowledge }}</textarea>
-        <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-          <button type="submit" class="ag-btn ag-btn-primary">{{ __('agents.edit_save') }}</button>
-        </div>
-      </form>
+      <div class="ag-kb">
+        <form class="ag-card ag-kb-editor" data-ag-knowledge-form>
+          <div class="ag-kb-head">
+            <h2>{{ __('agents.knowledge_heading') }}</h2>
+            <p class="ag-hint">{{ __('agents.knowledge_hint') }}</p>
+          </div>
+          <textarea class="ag-textarea" name="knowledge" dir="auto" maxlength="40000" data-ag-kb-text>{{ $agent->knowledge }}</textarea>
+          <div class="ag-kb-foot">
+            <span class="ag-hint ag-num" data-ag-kb-count>{{ number_format(mb_strlen((string) $agent->knowledge)) }} / {{ number_format(40000) }}</span>
+            <button type="submit" class="ag-btn ag-btn-primary">{{ __('agents.edit_save') }}</button>
+          </div>
+        </form>
+        <aside class="ag-card ag-kb-tips">
+          <h3>{{ __('agents.knowledge_tips_title') }}</h3>
+          <ul>
+            @foreach(__('agents.knowledge_tips') as $tip)
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>{{ $tip }}</li>
+            @endforeach
+          </ul>
+          <div class="ag-kb-example">
+            <b>{{ __('agents.knowledge_example_title') }}</b>
+            <p dir="auto">{{ __('agents.knowledge_example') }}</p>
+          </div>
+        </aside>
+      </div>
     </section>
 
     {{-- Design: how the call button looks. --}}
@@ -149,24 +185,39 @@
     {{-- Conversations. --}}
     <section class="ag-panel" data-ag-panel="conversations">
       @if($conversations->isEmpty())
-        <div class="ag-card ag-empty"><p>{{ __('agents.conversations_empty') }}</p></div>
+        <div class="ag-card ag-empty-state">
+          <span class="ag-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></span>
+          <h3>{{ __('agents.conversations_empty_title') }}</h3>
+          <p>{{ __('agents.conversations_empty') }}</p>
+          <div class="ag-empty-actions"><button type="button" class="ag-btn ag-btn-primary" data-ag-tab-go="overview" data-ag-talk-open>{{ __('agents.talk_to', ['name' => $agent->name]) }}</button><button type="button" class="ag-btn" data-ag-tab-go="live">{{ __('agents.empty_share') }}</button></div>
+        </div>
       @else
         <div class="ag-list">
           @foreach($conversations as $c)
             <article class="ag-card ag-convo">
-              <div class="ag-convo-top">
-                <span class="ag-pill">{{ __('agents.conversation_channel.'.$c->channel) }}</span>
-                <span class="ag-muted">{{ __('agents.conversation_duration', ['m' => intdiv($c->duration_seconds, 60), 's' => $c->duration_seconds % 60]) }}</span>
-                @if($c->credits > 0)<span class="ag-muted">· {{ __('agents.conversation_credits', ['count' => number_format($c->credits)]) }}</span>@endif
+              <header class="ag-convo-top">
+                <span class="ag-convo-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></span>
+                <div class="ag-convo-meta">
+                  <b>{{ __('agents.conversation_channel.'.$c->channel) }}</b>
+                  <span>{{ __('agents.conversation_duration', ['m' => intdiv($c->duration_seconds, 60), 's' => $c->duration_seconds % 60]) }}@if($c->credits > 0) · {{ __('agents.conversation_credits', ['count' => number_format($c->credits)]) }}@endif</span>
+                </div>
                 <time datetime="{{ $c->started_at->toIso8601String() }}">{{ $c->started_at->diffForHumans() }}</time>
-              </div>
-              @if($c->summary)<p>{{ $c->summary }}</p>@endif
+              </header>
+              @if($c->summary)<p class="ag-convo-summary" dir="auto">{{ $c->summary }}</p>@endif
               @if($c->lead)
-                <p class="ag-note" style="margin-top:.6rem"><strong>{{ __('agents.conversation_details') }}:</strong>&nbsp;{{ implode(' · ', array_filter([$c->lead['name'] ?? null, $c->lead['phone'] ?? null, $c->lead['email'] ?? null, $c->lead['note'] ?? null])) }}</p>
+                <div class="ag-convo-lead">
+                  <b>{{ __('agents.conversation_details') }}</b>
+                  <ul>
+                    @if(! empty($c->lead['name']))<li dir="auto">{{ $c->lead['name'] }}</li>@endif
+                    @if(! empty($c->lead['phone']))<li><a href="tel:{{ $c->lead['phone'] }}" dir="ltr">{{ $c->lead['phone'] }}</a></li>@endif
+                    @if(! empty($c->lead['email']))<li><a href="mailto:{{ $c->lead['email'] }}" dir="ltr">{{ $c->lead['email'] }}</a></li>@endif
+                    @if(! empty($c->lead['note']))<li dir="auto">{{ $c->lead['note'] }}</li>@endif
+                  </ul>
+                </div>
               @endif
               @if(! empty($c->transcript))
-                <details>
-                  <summary>{{ __('agents.conversation_transcript') }}</summary>
+                <details class="ag-convo-more">
+                  <summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>{{ __('agents.conversation_transcript') }}</summary>
                   <div class="ag-transcript" style="max-height:none">
                     @foreach($c->transcript as $t)
                       <div class="ag-bubble is-{{ $t['role'] }}" style="opacity:1;transform:none" dir="auto"><small>{{ $t['role'] === 'agent' ? $agent->name : __('agents.talk_you') }}</small>{{ $t['text'] }}</div>
@@ -183,7 +234,12 @@
     {{-- Customers. --}}
     <section class="ag-panel" data-ag-panel="customers">
       @if($contacts->isEmpty())
-        <div class="ag-card ag-empty"><p>{{ __('agents.customers_empty') }}</p></div>
+        <div class="ag-card ag-empty-state">
+          <span class="ag-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.2A6.5 6.5 0 0 1 21.5 20"/></svg></span>
+          <h3>{{ __('agents.customers_empty_title') }}</h3>
+          <p>{{ __('agents.customers_empty') }}</p>
+          <div class="ag-empty-actions"><button type="button" class="ag-btn ag-btn-primary" data-ag-tab-go="overview" data-ag-talk-open>{{ __('agents.talk_to', ['name' => $agent->name]) }}</button><button type="button" class="ag-btn" data-ag-tab-go="live">{{ __('agents.empty_share') }}</button></div>
+        </div>
       @else
         <div class="ag-card" style="overflow:hidden">
           <table class="ag-table">
@@ -192,7 +248,7 @@
               @foreach($contacts as $contact)
                 <tr>
                   <td dir="auto"><strong>{{ $contact->name ?: '—' }}</strong><div class="ag-hint">{{ $contact->last_contact_at?->diffForHumans() }}</div></td>
-                  <td class="ag-num">{{ $contact->phone ?: $contact->email }}</td>
+                  <td class="ag-num"><span dir="ltr">{{ $contact->phone ?: $contact->email }}</span></td>
                   <td dir="auto">{{ $contact->note }}</td>
                   <td style="white-space:nowrap">
                     @if($contact->phone)
@@ -232,9 +288,7 @@
       'design' => (function () use ($agent, $widget, $voice) {
         $l = $agent->language === 'en' ? 'en' : 'ar';
         $female = ($voice['gender'] ?? null) === 'female';
-        $states = (array) trans('agents.talk_states', ['name' => $agent->name], $l);
-        if ($female && isset($states['speaking_female'])) { $states['speaking'] = $states['speaking_female']; }
-        unset($states['speaking_female']);
+        $states = \App\Support\Agents\Gendered::lines((array) trans('agents.talk_states', ['name' => $agent->name], $l), $female);
         return [
           'look' => $widget->style(),
           'palettes' => \App\Models\AgentWidget::PALETTES,
@@ -260,7 +314,7 @@
         ];
       })(),
       'text' => [
-        'states' => __('agents.talk_states', ['name' => $agent->name]),
+        'states' => \App\Support\Agents\Gendered::lines((array) __('agents.talk_states', ['name' => $agent->name]), ($voice['gender'] ?? null) === 'female'),
         'start' => __('agents.talk_start'), 'end' => __('agents.talk_end'),
         'mute' => __('agents.talk_mute'), 'unmute' => __('agents.talk_unmute'),
         'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'),
