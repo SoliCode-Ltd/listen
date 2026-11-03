@@ -38,9 +38,11 @@ class AgentCallFlowTest extends TestCase
         Plan::factory()->free()->create(['monthly_chars' => 10000, 'voice_tier' => 'standard']);
     }
 
-    private function owner(int $credits = 500000): User
+    /** An owner on a plan with agents (room for many calls at once unless a test says otherwise). */
+    private function owner(int $credits = 500000, array $plan = []): User
     {
-        $plan = Plan::factory()->create(['slug' => 'pro-'.uniqid(), 'price_cents' => 4500, 'voice_tier' => 'hd', 'monthly_chars' => $credits, 'allow_overage' => false]);
+        $plan = Plan::factory()->create(array_merge(['slug' => 'pro-'.uniqid(), 'price_cents' => 4500, 'voice_tier' => 'hd', 'monthly_chars' => $credits, 'allow_overage' => false,
+            'agents_enabled' => true, 'agent_concurrent_calls' => 20], $plan));
         $user = User::factory()->create();
         Subscription::create(['user_id' => $user->id, 'plan_id' => $plan->id, 'status' => 'active']);
 

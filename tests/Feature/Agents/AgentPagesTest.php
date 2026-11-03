@@ -3,6 +3,7 @@
 namespace Tests\Feature\Agents;
 
 use App\Models\Agent;
+use App\Models\Plan;
 use App\Models\AgentWidget;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -27,6 +28,9 @@ class AgentPagesTest extends TestCase
     {
         parent::setUp();
         config(['services.gemini_tts.api_key' => 'test-key']);
+        // Members here are on the free plan, which includes agents in these tests (AgentPlansTest
+        // covers plans without them).
+        Plan::factory()->free()->create(['agents_enabled' => true]);
     }
 
     private function agent(User $owner, array $attributes = []): Agent

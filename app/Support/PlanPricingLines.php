@@ -39,6 +39,8 @@ final class PlanPricingLines
         'voice_design' => ['sliders', true],
         // Shown on every plan that includes dubbing, once Video Dubbing is open to everyone.
         'video_dubbing' => ['mic', true],
+        // Shown on every plan that includes voice agents (Plans → Voice agents), once Agents are open to everyone.
+        'voice_agents' => ['users', true],
         'download_formats' => ['download', true],
         // Shown on every plan that includes the developer API (Plans → Developer API).
         'developer_api' => ['globe', true],
@@ -306,6 +308,7 @@ final class PlanPricingLines
                     ? trans_choice('ui.pricing.lines.dubbing_videos', VideoDubbing::monthlyLimit($plan), ['seconds' => VideoDubbing::maxSeconds($plan, false)], $locale)
                     : self::t('dubbing_open', $locale, ['seconds' => VideoDubbing::maxSeconds($plan, false)]))
                 : null,
+            'voice_agents' => self::agentsValue($plan, $locale),
             'topup' => ! $plan->isPack() && self::topupCents($plan) > 0
                 ? self::t('topup_price', $locale, ['price' => '$'.number_format(self::topupCents($plan) / 100, 0)])
                 : null,
@@ -343,6 +346,9 @@ final class PlanPricingLines
             'video_dubbing' => VideoDubbing::planIncludes($plan)
                 ? 'Hidden: Video Dubbing is still for the admin only (Video Dubbing → Settings).'
                 : 'Hidden: this plan does not include video dubbing.',
+            'voice_agents' => \App\Support\Agents\AgentAccess::planColumns() && \App\Support\Agents\AgentAccess::planIncludes($plan)
+                ? 'Hidden: Agents are not open to everyone yet (Agents → Settings).'
+                : 'Hidden: this plan does not include voice agents.',
             'monthly_requests' => 'Hidden: a pack has no monthly count.',
             'daily_requests' => 'Hidden: no daily limit is set (Usage Limits → Generations per day).',
             default => 'Hidden for this plan.',
@@ -363,6 +369,26 @@ final class PlanPricingLines
         return $monthly > 0
             ? trans_choice('ui.pricing.lines.design_voices_month', $monthly, [], $locale)
             : trans_choice('ui.pricing.lines.design_voices', $kept, [], $locale);
+    }
+
+    /**
+     * "3 agents, about 100 call minutes": the agents a member keeps and the call minutes the plan's
+     * credits pay for (or its own call minutes a month, when fewer). Only on a plan with agents,
+     * once Agents are open to everyone.
+     */
+    private static function agentsValue(Plan $plan, string $locale): ?string
+    {
+        if (! \App\Support\Agents\AgentAccess::planColumns() || ! \App\Support\Agents\AgentAccess::planIncludes($plan)
+            || \App\Support\Agents\AgentAccess::audience() !== \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE) {
+            return null;
+        }
+        $limits = \App\Support\Agents\AgentAccess::limits($plan);
+        $minutes = intdiv(max(0, (int) $plan->monthly_chars), \App\Support\Agents\AgentAccess::creditsPerMinute());
+        if ($limits['minutes'] > 0) {
+            $minutes = min($minutes, $limits['minutes']);
+        }
+
+        return trans_choice('ui.pricing.lines.agents_value', $limits['agents'], ['count' => $limits['agents'], 'minutes' => number_format($minutes)], self::locale($locale));
     }
 
     private static function cloningOpen(Plan $plan): bool

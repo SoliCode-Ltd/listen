@@ -217,7 +217,7 @@ Route::group([
     Route::get('/pricing', [HomeController::class, 'pricingPage'])->name('pricing');
     Route::get('/voice-samples', [HomeController::class, 'samplesPage'])->name('samples');
     // Listen Agents, for visitors: what a voice agent does, shown working.
-    Route::view('/voice-agents', 'agents.landing')->name('agents-landing');
+    Route::view('/voice-agents', 'agents.landing')->middleware(\App\Http\Middleware\EnsureAgentsOpen::class)->name('agents-landing');
     Route::get('/free-trial', [HomeController::class, 'startFreeTrial'])->name('trial.start');
     Route::get('/premium-pack', [\App\Http\Controllers\CharPackController::class, 'start'])->name('pack.start');
     Route::get('/ai-text-to-speech', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_text_to_speech')->name('seo.ai-text-to-speech');
@@ -402,7 +402,7 @@ Route::group([
 
         // Listen Agents: the owner's side (App\Http\Controllers\AgentController). The names say
         // voice-agents because agents.* already names the AI-agent discovery files.
-        Route::prefix('agents')->group(function (): void {
+        Route::prefix('agents')->middleware(\App\Http\Middleware\EnsureAgentsOpen::class)->group(function (): void {
             Route::get('/', [\App\Http\Controllers\AgentController::class, 'index'])->name('voice-agents.index');
             Route::get('/new', [\App\Http\Controllers\AgentController::class, 'create'])->name('voice-agents.create');
             Route::post('/', [\App\Http\Controllers\AgentController::class, 'store'])->middleware('throttle:10,1,agent-write')->name('voice-agents.store');

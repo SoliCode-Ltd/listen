@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ReviewAgent;
 use App\Models\Agent;
 use App\Models\AgentWidget;
 use App\Models\AgentConversation;
 use App\Models\AgentSource;
 use App\Services\Agents\AgentCalls;
+use App\Services\Agents\AgentReview;
 use App\Services\Agents\AgentWriter;
+use App\Support\Agents\AgentAccess;
+use App\Support\Agents\AgentBalance;
 use App\Services\Agents\SiteReader;
 use App\Services\Agents\WordPressPlugin;
 use App\Support\Agents\AgentVoices;
@@ -50,12 +54,16 @@ class AgentController extends Controller
             'agents' => $agents,
             'calls' => $calls,
             'voices' => $voices,
+            'balance' => AgentBalance::for($request->user()),
+            'limits' => AgentAccess::limitsFor((int) $request->user()->id),
+            // Callers who could not reach an agent today, and why (no credits, its daily limit ...).
+            'missed' => $agents->mapWithKeys(fn (Agent $agent) => [$agent->id => AgentCalls::missedToday($agent)]),
         ]);
     }
 
     public function create(Request $request): View|RedirectResponse
     {
-        if (Agent::ownedBy($request->user())->count() >= (int) config('listen.agents.max_agents', 10)) {
+        if (Agent::ownedBy($request->user())->count() >= AgentAccess::limitsFor((int) $request->user()->id)['agents']) {
             return redirect()->route('voice-agents.index');
         }
 
@@ -73,8 +81,9 @@ class AgentController extends Controller
     public function store(Request $request, SiteReader $reader, AgentWriter $writer): JsonResponse
     {
         $data = $this->validateBusiness($request);
-        if (Agent::ownedBy($request->user())->count() >= (int) config('listen.agents.max_agents', 10)) {
-            return response()->json(['message' => __('agents.error_name')], 422);
+        $most = AgentAccess::limitsFor((int) $request->user()->id)['agents'];
+        if (Agent::ownedBy($request->user())->count() >= $most) {
+            return response()->json(['message' => trans_choice('agents.error_max_agents', $most, ['count' => $most])], 422);
         }
 
         $agent = Agent::create($data + ['user_id' => $request->user()->id, 'status' => Agent::DRAFT]);
@@ -116,6 +125,10 @@ class AgentController extends Controller
             'perMinute' => AgentCalls::creditsPerMinute(),
             'freeTestLeft' => $this->calls->freeTestSecondsLeft((int) $request->user()->id),
             'embed' => $this->embedCode($widget),
+            'balance' => AgentBalance::for($request->user()),
+            'limits' => AgentAccess::limitsFor((int) $request->user()->id),
+            'missed' => AgentCalls::missedToday($agent),
+            'refused' => $widget->lastRefused(),
         ]);
     }
 
@@ -139,7 +152,9 @@ class AgentController extends Controller
             'choices' => ['sometimes', 'array', 'max:6'],
             'choices.*.question' => ['required', 'string', 'max:300'],
             'choices.*.answer' => ['required', 'string', 'max:300'],
-            'max_call_seconds' => ['sometimes', 'integer', 'min:60', 'max:'.(int) config('listen.agents.max_call_seconds', 600)],
+            'max_call_seconds' => ['sometimes', 'integer', 'min:60', 'max:'.AgentAccess::limitsFor((int) $request->user()->id)['call_seconds']],
+            // The owner's own ceiling on callers' minutes a day for this agent (0: none).
+            'daily_minutes' => ['sometimes', 'integer', 'min:0', 'max:1440'],
             'status' => ['sometimes', 'in:ready,live,paused'],
             'allowed_origins' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'appearance' => ['sometimes', 'array'],
@@ -189,16 +204,30 @@ class AgentController extends Controller
                 $agent->{$k} = $data[$k];
             }
         }
+        if (array_key_exists('daily_minutes', $data)) {
+            $settings = (array) ($agent->settings ?? []);
+            $settings['daily_minutes'] = (int) $data['daily_minutes'];
+            $agent->settings = $settings;
+        }
         if (isset($data['status'])) {
-            if ($data['status'] === Agent::LIVE && ! $agent->live_voice) {
-                return response()->json(['message' => __('agents.voice_heading')], 422);
+            if ($data['status'] === Agent::LIVE) {
+                if ($refusal = $this->goLiveRefusal($request, $agent)) {
+                    return response()->json($refusal, 422);
+                }
+                if (! $agent->went_live_at) {
+                    $agent->went_live_at = now();
+                }
             }
             $agent->status = $data['status'];
-            if ($data['status'] === Agent::LIVE && ! $agent->went_live_at) {
-                $agent->went_live_at = now();
-            }
         }
+        $setupChanged = $agent->isDirty(['name', 'business_name', 'first_message', 'knowledge', 'choices', 'script']);
         $agent->save();
+        // A live agent whose setup changed is checked again in the background (paused if it now
+        // deceives or harms callers).
+        if ($setupChanged && $agent->isLive() && AgentAccess::reviewOn() && ! $agent->setting('house')
+            && ($agent->setting('review.hash') !== AgentReview::hash($agent))) {
+            ReviewAgent::dispatch($agent->id);
+        }
 
         $widget = $agent->mainWidget();
         if (array_key_exists('allowed_origins', $data)) {
@@ -221,6 +250,38 @@ class AgentController extends Controller
         $widget->save();
 
         return response()->json(['ok' => true, 'agent' => $this->payload($agent)]);
+    }
+
+    /**
+     * Why the agent cannot go live, or null: no voice yet, the team suspended it, the owner's plan
+     * has no agents (with the plan that does), or the check found it set up to deceive or harm.
+     *
+     * @return array{message: string, reason: string, upgrade?: array<string, mixed>}|null
+     */
+    private function goLiveRefusal(Request $request, Agent $agent): ?array
+    {
+        if (! $agent->live_voice) {
+            return ['message' => __('agents.voice_heading'), 'reason' => 'voice'];
+        }
+        if ($agent->setting('suspended')) {
+            return ['message' => __('agents.error_suspended'), 'reason' => 'suspended'];
+        }
+        $limits = AgentAccess::limitsFor((int) $request->user()->id);
+        if (! $limits['included']) {
+            $upgrade = AgentAccess::upgrade(app()->getLocale() === 'ar');
+
+            return [
+                'message' => $upgrade['plan'] ? __('agents.error_plan_live', ['plan' => $upgrade['plan']]) : __('agents.error_plan_none'),
+                'reason' => 'plan',
+                'upgrade' => $upgrade,
+            ];
+        }
+        $review = app(AgentReview::class)->check($agent);
+        if ($review['verdict'] === AgentReview::BLOCK) {
+            return ['message' => __('agents.error_review', ['reason' => $review['reason'] ?: __('agents.review_default')]), 'reason' => 'review'];
+        }
+
+        return null;
     }
 
     /** "Correct this answer" in the test call: the right answer joins what the agent knows. */
@@ -248,7 +309,18 @@ class AgentController extends Controller
         }
         $result = $this->calls->start($agent, 'test', null, ['origin' => $request->getSchemeAndHttpHost(), 'visitor' => 'owner-'.$request->user()->id]);
         if (! $result['ok']) {
-            return response()->json(['message' => __('agents.error_'.$result['error'])], 422);
+            // The owner hears exactly why (callers never do).
+            $error = $result['error'];
+            $message = match ($error) {
+                'plan' => __('agents.error_plan_test'),
+                'minutes' => __('agents.error_minutes'),
+                'suspended' => __('agents.error_suspended'),
+                'stopped' => __('agents.error_paused'),
+                'credits' => __('agents.error_credits'),
+                default => __('agents.error_busy'),
+            };
+
+            return response()->json(['message' => $message, 'reason' => $error], 422);
         }
         $agent->forceFill(['tested_at' => now()])->save();
 
@@ -281,6 +353,8 @@ class AgentController extends Controller
             'embed' => $agent ? $this->embedCode($agent->mainWidget()) : null,
             'freeTestLeft' => $this->calls->freeTestSecondsLeft((int) $request->user()->id),
             'perMinute' => AgentCalls::creditsPerMinute(),
+            'limits' => AgentAccess::limitsFor((int) $request->user()->id),
+            'upgrade' => AgentAccess::upgrade($arabic),
         ];
     }
 

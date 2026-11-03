@@ -57,6 +57,13 @@
     ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension'), 'guest' => false],
     ['route' => 'contact', 'label' => __('ui.nav.contact'), 'guest' => false],
   ];
+  // Agents only for whom Agents → Settings opens them (everyone, or the admin email before launch).
+  $agentsOpen = \App\Support\Agents\AgentAccess::openTo(auth()->user());
+  if (! $agentsOpen) {
+    $navLinks = array_values(array_filter($navLinks, fn ($l) => $l['route'] !== 'agents-landing'));
+    $authNavLinks = array_values(array_filter($authNavLinks, fn ($l) => $l['route'] !== 'agents-landing'));
+    $productSide = $productSide === 'studio' ? null : $productSide;
+  }
   if ($showDemoLinkForAuthenticated) {
     array_splice($authNavLinks, 3, 0, [[
       'route' => 'demo.page',

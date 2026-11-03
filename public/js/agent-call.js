@@ -73,6 +73,9 @@
     var info = null, pending = [], agentText = '', callerText = '', usage = null;
     var pingTimer = 0, stopTimer = 0, raf = 0, endAfterSpeech = false;
     var buf = new Float32Array(1024);
+    // A caller who goes quiet: asked once if they are still there, then the agent says goodbye
+    // (Listen pays for every second the line stays open).
+    var quietTimer = 0, heardAt = Date.now(), nudged = 0, quietEndAt = 0;
 
     function set(s) { if (state !== s) { state = s; opts.onState && opts.onState(s); } }
     function turn(role, text) {
@@ -115,8 +118,10 @@
       src.start(at);
       playHead = at + b.duration;
       sources.add(src);
+      heardAt = Date.now();
       src.onended = function () {
         sources.delete(src);
+        heardAt = Date.now();
         if (!sources.size) {
           if (state === 'speaking') set('listening');
           if (endAfterSpeech) finish('done');
@@ -136,7 +141,27 @@
       if (!outAnalyser) return;
       var a = sources.size ? rms(outAnalyser, buf) : 0;
       var c = micAnalyser && !muted ? rms(micAnalyser, buf) : 0;
+      if (c > 0.2) heardAt = Date.now();
       opts.onLevel && opts.onLevel(a, c);
+    }
+
+    // Every second, also in a background tab (where animation frames stop).
+    function checkQuiet() {
+      if (ended || !info || state === 'connecting') return;
+      if (sources.size) { heardAt = Date.now(); return; }
+      if (micAnalyser && !muted && rms(micAnalyser, buf) > 0.2) heardAt = Date.now();
+      var quiet = (Date.now() - heardAt) / 1000;
+      var limit = Math.max(8, info.silence_seconds || 20);
+      if (quietEndAt && Date.now() > quietEndAt) { finish('silence'); return; }
+      if (quiet < limit || !ws || ws.readyState !== 1) return;
+      heardAt = Date.now();
+      nudged++;
+      if (nudged === 1) {
+        ws.send(JSON.stringify({ realtimeInput: { text: '(The caller has been quiet for a while. Ask briefly, in the language of the call, whether they are still there.)' } }));
+      } else {
+        ws.send(JSON.stringify({ realtimeInput: { text: '(The caller is still quiet. Say a short, warm goodbye now and call end_call with the reason caller_left.)' } }));
+        quietEndAt = Date.now() + 12000;
+      }
     }
 
     function onMessage(ev) {
@@ -154,6 +179,7 @@
         if (!sc) return;
         if (sc.interrupted) hush();
         if (sc.inputTranscription && sc.inputTranscription.text) {
+          heardAt = Date.now(); nudged = 0; quietEndAt = 0;
           if (agentText.trim()) { turn('agent', agentText); agentText = ''; }
           callerText += sc.inputTranscription.text;
         }
@@ -190,7 +216,7 @@
       if (ended) return;
       ended = true;
       flushTurns();
-      clearInterval(pingTimer); clearTimeout(stopTimer); cancelAnimationFrame(raf);
+      clearInterval(pingTimer); clearInterval(quietTimer); clearTimeout(stopTimer); cancelAnimationFrame(raf);
       try { ws && ws.close(); } catch (e) {}
       try { mic && mic.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
       try { node && node.disconnect(); } catch (e) {}
@@ -241,6 +267,8 @@
         ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64(e.data), mimeType: 'audio/pcm;rate=16000' } } }));
       };
       pingTimer = setInterval(ping, 12000);
+      heardAt = Date.now();
+      quietTimer = setInterval(checkQuiet, 1000);
       stopTimer = setTimeout(function () { finish('limit'); }, Math.max(30, data.max_seconds || 600) * 1000);
       window.addEventListener('pagehide', onLeave);
       if (ctx.state === 'suspended') ctx.resume();

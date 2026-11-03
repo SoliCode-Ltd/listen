@@ -3,6 +3,7 @@
 namespace Tests\Feature\Agents;
 
 use App\Models\Agent;
+use App\Models\Plan;
 use App\Models\AgentWidget;
 use App\Models\User;
 use App\Support\Agents\AgentInstructions;
@@ -21,6 +22,13 @@ use Tests\TestCase;
 class AgentDesignTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Members here are on the free plan, which includes agents in these tests.
+        Plan::factory()->free()->create(['agents_enabled' => true]);
+    }
 
     private function agent(User $owner, array $attributes = []): Agent
     {

@@ -8,12 +8,29 @@
     $total = count($checklist);
     $script = $agent->script ?? [];
     $minutes = intdiv($stats['seconds'], 60);
-    $maxMinutes = max(1, intdiv((int) config('listen.agents.max_call_seconds', 600), 60));
+    $maxMinutes = max(1, intdiv((int) $limits['call_seconds'], 60));
     $minuteLabels = [];
     foreach (range(1, $maxMinutes) as $m) { $minuteLabels[$m] = trans_choice('agents.edit_minutes', $m, ['count' => $m]); }
+    // The owner's daily ceiling for callers, in steps (0: none).
+    $dailySteps = [0, 15, 30, 60, 120, 240, 480, 720];
+    $daily = (int) $agent->setting('daily_minutes', 0);
+    $dailyAt = array_search($daily, $dailySteps, true);
+    if ($dailyAt === false) { $dailySteps[] = $daily; sort($dailySteps); $dailyAt = array_search($daily, $dailySteps, true); }
+    $dailyLabels = array_map(fn ($v) => $v === 0 ? __('agents.edit_daily_off') : trans_choice('agents.edit_daily_value', $v, ['count' => $v]), $dailySteps);
+    $suspended = $agent->setting('suspended');
+    $blocked = $agent->setting('review.verdict') === 'block' ? (string) $agent->setting('review.reason') : null;
   @endphp
 
   <main class="ag" id="agents">
+    {{-- What needs the owner now: Listen suspended it, the check paused it, or callers could not reach it today. --}}
+    @if($suspended)
+      <p class="ag-notice is-bad" role="alert">{{ __('agents.suspended_note', ['reason' => rtrim((string) ($suspended['reason'] ?? ''), '.').'.']) }}</p>
+    @elseif($blocked !== null)
+      <p class="ag-notice is-bad" role="alert">{{ __('agents.review_paused_note', ['reason' => rtrim($blocked ?: __('agents.review_default'), '.').'.']) }}</p>
+    @elseif($missed)
+      <p class="ag-notice is-warn" role="status">{{ trans_choice('agents.missed', $missed['count'], ['count' => $missed['count'], 'name' => $agent->name, 'reason' => __('agents.missed_reasons.'.$missed['reason'])]) }}</p>
+    @endif
+
     {{-- The agent: its voice's face (the call card below has the page's one orb), name, status, business and voice. --}}
     <section class="ag-hero">
       <span class="ag-hero-face {{ $agent->isLive() ? 'is-live' : '' }}" style="--m: {{ $widget->look('accent') }}" aria-hidden="true">
@@ -37,7 +54,10 @@
         </button>
         @if($agent->isLive())
           <button type="button" class="ag-btn" data-ag-status-set="paused">{{ __('agents.live_pause') }}</button>
-        @else
+        @elseif(! $limits['included'] && ! $balance['upgrade']['none'])
+          {{-- A plan without agents: the way to one, instead of a button that cannot work. --}}
+          <a class="ag-btn ag-btn-primary" href="{{ $balance['upgrade']['url'] }}">{{ __('agents.balance.upgrade', ['plan' => $balance['upgrade']['plan']]) }}</a>
+        @elseif(! $suspended)
           <button type="button" class="ag-btn ag-btn-primary" data-ag-status-set="live">{{ $agent->status === 'paused' ? __('agents.live_resume') : __('agents.live_go') }}</button>
         @endif
       </div>
@@ -52,6 +72,7 @@
 
     {{-- Overview: next steps, this month, and talking to it. --}}
     <section class="ag-panel" data-ag-panel="overview">
+      @include('agents.partials.balance', ['balance' => $balance])
       <div class="ag-stats" style="margin-bottom:1rem">
         @foreach(['calls' => $stats['calls'], 'minutes' => $minutes, 'contacts' => $stats['contacts'], 'credits' => $stats['credits']] as $key => $value)
           <div class="ag-card ag-stat">
@@ -107,8 +128,15 @@
           <div class="ag-setting">
             <div class="ag-setting-label"><label for="ag-max">{{ __('agents.edit_max_call') }}</label><p>{{ __('agents.edit_max_call_hint') }}</p></div>
             <div class="ag-setting-control ag-range">
-              <input id="ag-max" type="range" min="1" max="{{ $maxMinutes }}" step="1" value="{{ intdiv($agent->max_call_seconds, 60) }}" name="max_minutes" data-ag-max data-labels="{{ json_encode($minuteLabels, JSON_UNESCAPED_UNICODE) }}">
-              <output data-ag-max-out>{{ $minuteLabels[intdiv($agent->max_call_seconds, 60)] ?? '' }}</output>
+              <input id="ag-max" type="range" min="1" max="{{ $maxMinutes }}" step="1" value="{{ min($maxMinutes, intdiv($agent->max_call_seconds, 60)) }}" name="max_minutes" data-ag-max data-labels="{{ json_encode($minuteLabels, JSON_UNESCAPED_UNICODE) }}">
+              <output data-ag-max-out>{{ $minuteLabels[min($maxMinutes, intdiv($agent->max_call_seconds, 60))] ?? '' }}</output>
+            </div>
+          </div>
+          <div class="ag-setting">
+            <div class="ag-setting-label"><label for="ag-daily">{{ __('agents.edit_daily') }}</label><p>{{ __('agents.edit_daily_hint') }}</p></div>
+            <div class="ag-setting-control ag-range">
+              <input id="ag-daily" type="range" min="0" max="{{ count($dailySteps) - 1 }}" step="1" value="{{ $dailyAt }}" data-ag-daily data-steps="{{ json_encode($dailySteps) }}" data-labels="{{ json_encode($dailyLabels, JSON_UNESCAPED_UNICODE) }}">
+              <output data-ag-daily-out>{{ $dailyLabels[$dailyAt] }}</output>
             </div>
           </div>
           <div class="ag-setting">
@@ -344,6 +372,7 @@
         'play' => __('agents.voice_play'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
         'status' => __('agents.status'),
         'files' => __('agents.files'),
+        'balance' => ['upgrade' => __('agents.balance.upgrade')],
       ],
     ];
   @endphp

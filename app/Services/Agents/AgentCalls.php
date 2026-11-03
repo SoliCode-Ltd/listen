@@ -8,11 +8,14 @@ use App\Models\AgentConversation;
 use App\Models\AgentWidget;
 use App\Services\Billing\MemberUsageMeter;
 use App\Services\PlanAccessService;
+use App\Support\Agents\AgentAccess;
 use App\Support\Credits;
 use App\Support\CreditPeriod;
 use App\Support\UsageSnapshot;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -38,9 +41,12 @@ class AgentCalls
         private PlanAccessService $plans,
     ) {}
 
+    /** Owner-side reasons a call could not start: the caller only hears that the agent is not available. */
+    public const OWNER_REASONS = ['credits', 'minutes', 'daily', 'plan', 'suspended'];
+
     public static function creditsPerMinute(): int
     {
-        return max(1, (int) config('listen.agents.credits_per_minute', 900));
+        return AgentAccess::creditsPerMinute();
     }
 
     public static function creditsFor(int $seconds): int
@@ -57,36 +63,133 @@ class AgentCalls
             ->get(['billed_seconds', 'reservation', 'settled_at'])
             ->sum(fn (AgentConversation $c) => $c->settled_at ? (int) $c->billed_seconds : (int) ($c->reservation['seconds'] ?? 0));
 
-        return max(0, (int) config('listen.agents.free_test_seconds', 120) - $used);
+        return max(0, AgentAccess::freeTestSeconds() - $used);
     }
 
     /**
-     * @param  array{origin?: ?string, page_url?: ?string, visitor?: ?string, country?: ?string}  $context
+     * Seconds of calls since $since: settled calls by what they were billed, live ones by their
+     * whole hold (they may still use it). Filtered by owner, agent, free or paid, and channel
+     * ('test' for the owners' own test calls, 'calls' for callers' calls).
+     */
+    public function secondsSince(\DateTimeInterface $since, ?int $userId = null, ?int $agentId = null, ?bool $free = null, ?string $channel = null): int
+    {
+        return (int) AgentConversation::query()
+            ->where('started_at', '>=', $since)
+            ->when($userId !== null, fn ($q) => $q->where('user_id', $userId))
+            ->when($agentId !== null, fn ($q) => $q->where('agent_id', $agentId))
+            ->when($free !== null, fn ($q) => $q->where('free', $free))
+            ->when($channel === 'test', fn ($q) => $q->where('channel', 'test'))
+            ->when($channel === 'calls', fn ($q) => $q->where('channel', '!=', 'test'))
+            ->get(['billed_seconds', 'reservation', 'settled_at'])
+            ->sum(fn (AgentConversation $c) => $c->settled_at ? (int) $c->billed_seconds : (int) ($c->reservation['seconds'] ?? 0));
+    }
+
+    /** Call seconds an owner has used in their credit period (free calls aside). */
+    public function periodSeconds(int $userId): int
+    {
+        $period = CreditPeriod::current($userId);
+
+        return (int) AgentConversation::query()->where('user_id', $userId)->where('free', false)
+            ->where(fn ($q) => $q->where('period_ym', $period['key'])
+                ->orWhere(fn ($q) => $q->whereNull('period_ym')->where('started_at', '>=', $period['starts_at'])))
+            ->get(['billed_seconds', 'reservation', 'settled_at'])
+            ->sum(fn (AgentConversation $c) => $c->settled_at ? (int) $c->billed_seconds : (int) ($c->reservation['seconds'] ?? 0));
+    }
+
+    /** Calls on now across all of an owner's agents (a call that stopped reporting counts until it could have ended). */
+    public function liveCalls(int $userId): int
+    {
+        $longest = AgentAccess::MAX_CALL_MINUTES * 60 + 30;
+
+        return AgentConversation::query()->where('user_id', $userId)->where('status', AgentConversation::LIVE)
+            ->where('channel', '!=', 'test')->where('started_at', '>', now()->subSeconds($longest))->count();
+    }
+
+    /**
+     * @param  array{origin?: ?string, page_url?: ?string, visitor?: ?string, country?: ?string, network?: ?string}  $context
      * @return array{ok: bool, error?: string, conversation?: AgentConversation, call_key?: string, token?: string, max_seconds?: int, free?: bool}
      */
     public function start(Agent $agent, string $channel, ?AgentWidget $widget = null, array $context = []): array
     {
         $userId = (int) $agent->user_id;
-        $max = max(30, min((int) $agent->max_call_seconds, (int) config('listen.agents.max_call_seconds', 600)));
+        $house = (bool) $agent->setting('house');
+        // "Stop all calls now" in Agents → Settings, and an agent the team suspended.
+        if (AgentAccess::callsStopped()) {
+            return ['ok' => false, 'error' => 'stopped'];
+        }
+        if (! $house && $agent->setting('suspended')) {
+            return $this->refused($agent, $channel, 'suspended');
+        }
+        $limits = $house ? AgentAccess::limits(null) : AgentAccess::limitsFor($userId);
+        $max = max(30, min((int) $agent->max_call_seconds, $limits['call_seconds']));
 
         $free = false;
-        // Listen's own agents (HouseAgent): their calls are on Listen, and short.
-        if ($agent->setting('house')) {
+        $today = now()->startOfDay();
+        // Listen's own agents (HouseAgent): their calls are on Listen, short, and within their own
+        // daily budget, so a flood on the public pages never stops the members' agents.
+        if ($house) {
             $free = true;
-            $max = min($max, \App\Support\Agents\HouseAgent::MAX_SECONDS);
+            $site = AgentAccess::houseDailyMinutes() * 60 - $this->secondsSince($today, free: true, channel: 'calls');
+            if ($site < 20) {
+                return ['ok' => false, 'error' => 'busy'];
+            }
+            $max = min($max, \App\Support\Agents\HouseAgent::MAX_SECONDS, $site);
         } elseif ($channel === 'test') {
             $left = $this->freeTestSecondsLeft($userId);
             if ($left >= 20) {
+                // Free test calls have a daily budget for the whole site, so accounts made only for
+                // the free minutes cannot run up the bill.
+                $site = AgentAccess::freeDailyMinutes() * 60 - $this->secondsSince($today, free: true, channel: 'test');
+                if ($site < 20) {
+                    return ['ok' => false, 'error' => 'busy'];
+                }
                 $free = true;
-                $max = min($max, $left);
+                $max = min($max, $left, $site);
+            } elseif (! $limits['included']) {
+                return ['ok' => false, 'error' => 'plan'];
+            }
+        } elseif (! $limits['included']) {
+            // A plan without agents: the agent can be built and tested, not called.
+            return $this->refused($agent, $channel, 'plan');
+        }
+
+        if (! $house) {
+            // The members' calls together, a day (Agents → Settings): a ceiling on what the site spends.
+            if (($siteMinutes = AgentAccess::siteDailyMinutes()) > 0) {
+                $site = $siteMinutes * 60 - $this->secondsSince($today, free: false);
+                if ($site < 30) {
+                    return ['ok' => false, 'error' => 'busy'];
+                }
+                $max = min($max, $site);
+            }
+            // Calls at the same time across all the owner's agents (their plan's number).
+            if ($channel !== 'test' && $this->liveCalls($userId) >= $limits['concurrent']) {
+                return ['ok' => false, 'error' => 'busy'];
             }
         }
 
         $quotaPlan = $free ? null : $this->plans->resolveQuotaPlanForUserId($userId);
         if (! $free) {
+            // The plan's call minutes a month (0: only the credits limit them).
+            if ($limits['minutes'] > 0) {
+                $left = $limits['minutes'] * 60 - $this->periodSeconds($userId);
+                if ($left < 30) {
+                    return $this->refused($agent, $channel, 'minutes');
+                }
+                $max = min($max, $left);
+            }
+            // The owner's own daily limit on this agent (its Setup tab), for callers.
+            $daily = (int) $agent->setting('daily_minutes', 0);
+            if ($daily > 0 && $channel !== 'test') {
+                $left = $daily * 60 - $this->secondsSince($today, agentId: $agent->id, free: false, channel: 'calls');
+                if ($left < 30) {
+                    return $this->refused($agent, $channel, 'daily');
+                }
+                $max = min($max, $left);
+            }
             $affordable = $this->affordableSeconds($userId, $quotaPlan);
             if ($affordable < 30) {
-                return ['ok' => false, 'error' => 'credits'];
+                return $this->refused($agent, $channel, 'credits');
             }
             $max = min($max, $affordable);
         }
@@ -133,12 +236,81 @@ class AgentCalls
 
             return ['ok' => false, 'error' => 'busy'];
         }
+        // The caller's network, kept with the call for a while: a caller who abuses the agent or
+        // keeps leaving calls hanging is stopped on the whole network, not just one browser id.
+        if (! empty($context['network'])) {
+            Cache::put('agent-call-net:'.$conversation->id, hash('sha256', (string) $context['network']), now()->addHours(2));
+        }
 
         if ($widget) {
             $widget->forceFill(['last_seen_at' => now(), 'last_seen_origin' => $base['origin']])->save();
         }
 
         return ['ok' => true, 'conversation' => $conversation, 'call_key' => $callKey, 'token' => $key['token'], 'max_seconds' => $max, 'free' => $free];
+    }
+
+    /**
+     * A call that could not start for a reason on the owner's side. The caller only hears that the
+     * agent is not available; the owner sees the missed calls, and why, on their agents' pages.
+     *
+     * @return array{ok: false, error: string}
+     */
+    protected function refused(Agent $agent, string $channel, string $reason): array
+    {
+        if ($channel !== 'test') {
+            $key = 'agent-missed:'.$agent->id;
+            $missed = (array) Cache::get($key, []);
+            $today = now()->toDateString();
+            $count = ($missed['day'] ?? null) === $today ? (int) ($missed['count'] ?? 0) : 0;
+            Cache::put($key, ['reason' => $reason, 'at' => now()->toIso8601String(), 'day' => $today, 'count' => $count + 1], now()->addDays(3));
+        }
+
+        return ['ok' => false, 'error' => $reason];
+    }
+
+    /**
+     * Callers who could not reach this agent today, and the last reason.
+     *
+     * @return array{count: int, reason: string, at: \Illuminate\Support\Carbon}|null
+     */
+    public static function missedToday(Agent $agent): ?array
+    {
+        $missed = (array) Cache::get('agent-missed:'.$agent->id, []);
+        if (($missed['day'] ?? null) !== now()->toDateString() || (int) ($missed['count'] ?? 0) < 1) {
+            return null;
+        }
+
+        return ['count' => (int) $missed['count'], 'reason' => (string) ($missed['reason'] ?? 'credits'), 'at' => \Illuminate\Support\Carbon::parse($missed['at'] ?? now())];
+    }
+
+    /** Whether this browser, or its network, is kept off this agent for a while (blockCaller()). */
+    public static function callerBlocked(int $agentId, string $visitor, string $network): bool
+    {
+        return Cache::has('agent-block:'.$agentId.':'.hash('sha256', $visitor))
+            || Cache::has('agent-block:'.$agentId.':'.hash('sha256', $network));
+    }
+
+    /**
+     * After a call ended as abusive (the agent warned the caller, then hung up), or the second call
+     * in an hour that stopped reporting while it went on: the caller's browser is kept off this agent
+     * for a while, and their network too once it happens again from there.
+     */
+    protected function blockCaller(AgentConversation $c, string $why): void
+    {
+        if ($c->channel === 'test' || ! $c->visitor_hash) {
+            return;
+        }
+        $hours = $why === 'abusive' ? 24 : 1;
+        $strikes = $why === 'abusive' ? 1 : 2;
+        $net = Cache::get('agent-call-net:'.$c->id);
+        foreach (array_filter([$c->visitor_hash, $net]) as $i => $hash) {
+            $key = 'agent-strike:'.$why.':'.$c->agent_id.':'.$hash;
+            RateLimiter::hit($key, $hours * 3600);
+            // The network (shared by more people) needs one strike more than the browser.
+            if (RateLimiter::attempts($key) >= $strikes + $i) {
+                Cache::put('agent-block:'.$c->agent_id.':'.$hash, $why, now()->addHours($hours));
+            }
+        }
     }
 
     /** Seconds of call the owner's plan can still pay for, at the agents' rate. */
@@ -229,8 +401,12 @@ class AgentCalls
             max(0, $conversation->started_at->diffInSeconds(now())),
             (int) ($conversation->reservation['seconds'] ?? 0),
         );
+        $settled = $this->settle($conversation, $conversation->end_reason ?: $reason, $seconds);
+        if ($settled->end_reason === 'abusive') {
+            $this->blockCaller($settled, 'abusive');
+        }
 
-        return $this->settle($conversation, $conversation->end_reason ?: $reason, $seconds);
+        return $settled;
     }
 
     /** Calls whose browser stopped saying they are on: charged up to the last time it did. */
@@ -246,6 +422,9 @@ class AgentCalls
                     (int) ($c->reservation['seconds'] ?? 0),
                 );
                 $this->settle($c, 'left', $seconds);
+                // A call whose browser went quiet while the call could go on: twice in an hour from
+                // one caller looks like someone keeping the line without paying for it.
+                $this->blockCaller($c, 'stale');
                 $count++;
             });
 

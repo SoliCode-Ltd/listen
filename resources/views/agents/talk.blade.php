@@ -21,8 +21,49 @@
       @endunless
       <p class="ag-talkpage-mic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.talk_page_mic') }}</p>
       <p class="ag-talkpage-foot"><a href="{{ url('/') }}" target="_blank" rel="noopener">{{ __('agents.powered') }}</a></p>
+      <button type="button" class="ag-talkpage-report" data-ag-report-open>{{ __('agents.report.link') }}</button>
     </section>
   </main>
+
+  {{-- "Report this agent": for a caller who was asked for card numbers or money, or treated badly. --}}
+  <dialog class="ag-report" data-ag-report aria-labelledby="ag-report-title">
+    <form method="dialog" class="ag-report-form" data-ag-report-form>
+      <h2 id="ag-report-title">{{ __('agents.report.title') }}</h2>
+      <p>{{ __('agents.report.text') }}</p>
+      <fieldset class="ag-report-reasons">
+        <legend class="sr-only">{{ __('agents.report.title') }}</legend>
+        @foreach(__('agents.report.reasons') as $key => $label)
+          <label class="ag-report-reason"><input type="radio" name="reason" value="{{ $key }}" @checked($loop->first)><span>{{ $label }}</span></label>
+        @endforeach
+      </fieldset>
+      <label class="ag-label" for="ag-report-note">{{ __('agents.report.note') }}</label>
+      <textarea class="ag-textarea" id="ag-report-note" name="note" rows="3" maxlength="500" dir="auto"></textarea>
+      <p class="ag-report-done" data-ag-report-done hidden role="status"></p>
+      <div class="ag-report-actions">
+        <button type="button" class="ag-btn ag-btn-ghost" data-ag-report-close>{{ __('agents.report.cancel') }}</button>
+        <button type="submit" class="ag-btn ag-btn-primary" data-ag-report-send>{{ __('agents.report.send') }}</button>
+      </div>
+    </form>
+  </dialog>
+  <script>
+    (function () {
+      var open = document.querySelector('[data-ag-report-open]'), box = document.querySelector('[data-ag-report]');
+      if (!open || !box || !box.showModal) { if (open) open.hidden = true; return; }
+      var form = box.querySelector('[data-ag-report-form]'), done = box.querySelector('[data-ag-report-done]'), send = box.querySelector('[data-ag-report-send]');
+      open.addEventListener('click', function () { box.showModal(); });
+      box.querySelector('[data-ag-report-close]').addEventListener('click', function () { box.close(); });
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        send.disabled = true;
+        var reason = (form.querySelector('input[name="reason"]:checked') || {}).value || 'other';
+        fetch(@json(route('agent-api.report')), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, credentials: 'omit',
+          body: JSON.stringify({ slug: @json($widget->slug), reason: reason, note: form.note.value }) })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { done.textContent = d.message || ''; done.hidden = false; form.querySelector('.ag-report-reasons').hidden = true; send.hidden = true; open.hidden = true; setTimeout(function () { box.close(); }, 2600); })
+          .catch(function () { send.disabled = false; });
+      });
+    })();
+  </script>
 
   @include('components.scripts', ['noSupportChat' => true])
   @include('components.orb-script')

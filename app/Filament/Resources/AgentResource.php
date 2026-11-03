@@ -71,6 +71,9 @@ class AgentResource extends Resource
     public const BADGES = self::STATUSES + [
         'house' => 'Listen\'s own',
         'deleted' => 'Deleted',
+        'suspended' => 'Suspended',
+        'flagged' => 'Marked for review',
+        'reported' => 'Reported',
     ];
 
     public const INSTALLED_VIA = [
@@ -222,6 +225,12 @@ class AgentResource extends Resource
                 Tables\Filters\SelectFilter::make('business_type')
                     ->label('Kind of business')
                     ->options(fn (): array => collect(Agent::BUSINESS_TYPES)->mapWithKeys(fn (string $type): array => [$type => self::businessTypeLabel($type)])->all()),
+                Tables\Filters\Filter::make('attention')
+                    ->label('Marked for review, reported or suspended')
+                    ->query(fn (Builder $query): Builder => $query->where(fn (Builder $q): Builder => $q
+                        ->whereIn('agents.settings->review->verdict', ['review', 'block'])
+                        ->orWhereNotNull('agents.settings->suspended')
+                        ->orWhereNotNull('agents.settings->reports'))),
                 Tables\Filters\TernaryFilter::make('deleted')
                     ->label('Deleted by the owner')
                     ->placeholder('Deleted or not')
@@ -359,6 +368,39 @@ class AgentResource extends Resource
                         ->view('filament.agents.choices'),
                 ]),
 
+            Infolists\Components\Section::make('Safety')
+                ->description('The check before it went live, what callers reported, and whether the team suspended it (Suspend, at the top of the page).')
+                ->columns(3)
+                ->schema([
+                    Infolists\Components\TextEntry::make('review_verdict')->label('Check before going live')
+                        ->state(fn (Agent $record): string => match ($record->setting('review.verdict')) {
+                            'allow' => 'Looks fine',
+                            'review' => 'Marked for review',
+                            'block' => 'Stopped from going live',
+                            default => 'Not checked yet',
+                        })
+                        ->badge()
+                        ->color(fn (Agent $record): string => match ($record->setting('review.verdict')) {
+                            'allow' => 'success', 'review' => 'warning', 'block' => 'danger', default => 'gray',
+                        }),
+                    Infolists\Components\TextEntry::make('review_reason')->label('What the check said')
+                        ->state(fn (Agent $record): string => (string) ($record->setting('review.reason') ?: '—'))
+                        ->columnSpan(2),
+                    Infolists\Components\TextEntry::make('suspended_reason')->label('Suspended by the team')
+                        ->state(fn (Agent $record): string => $record->setting('suspended')
+                            ? trim((string) $record->setting('suspended.reason')).' ('.Carbon::parse((string) $record->setting('suspended.at'))->toDayDateTimeString().')'
+                            : 'No')
+                        ->color(fn (Agent $record): ?string => $record->setting('suspended') ? 'danger' : null)
+                        ->columnSpan(3),
+                    Infolists\Components\TextEntry::make('reports_list')->label('Reported by callers')
+                        ->state(fn (Agent $record): array => collect((array) $record->setting('reports', []))->reverse()->take(10)
+                            ->map(fn ($r): string => Carbon::parse((string) ($r['at'] ?? now()))->toDayDateTimeString().' · '.(\App\Http\Controllers\AgentReportController::REASONS[$r['reason'] ?? 'other'] ?? 'Other')
+                                .(filled($r['note'] ?? null) ? ': '.Str::limit((string) $r['note'], 200) : ''))
+                            ->values()->all() ?: ['No reports'])
+                        ->listWithLineBreaks()
+                        ->columnSpan(3),
+                ]),
+
             Infolists\Components\Section::make('Settings')
                 ->description('Anything else saved with the agent.')
                 ->collapsible()
@@ -452,6 +494,9 @@ class AgentResource extends Resource
             (string) $agent->status,
             self::isHouse($agent) ? 'house' : null,
             $agent->trashed() ? 'deleted' : null,
+            $agent->setting('suspended') ? 'suspended' : null,
+            in_array($agent->setting('review.verdict'), ['review', 'block'], true) ? 'flagged' : null,
+            count((array) $agent->setting('reports', [])) > 0 ? 'reported' : null,
         ]));
     }
 
@@ -462,7 +507,8 @@ class AgentResource extends Resource
             Agent::READY => 'info',
             Agent::PAUSED => 'warning',
             'house' => 'primary',
-            'deleted' => 'danger',
+            'deleted', 'suspended' => 'danger',
+            'flagged', 'reported' => 'warning',
             default => 'gray',
         };
     }

@@ -50,6 +50,8 @@ class AgentCallController extends Controller
             return response()->json(['error' => 'not_found'], 404);
         }
         if (! $widget->allowsOrigin($request->headers->get('Origin'))) {
+            $widget->noteRefused($request->headers->get('Origin'));
+
             return response()->json(['error' => 'origin', 'message' => __('agents.error_origin')], 403);
         }
         $ar = $agent->language !== 'en';
@@ -110,11 +112,18 @@ class AgentCallController extends Controller
             return;
         }
         $via = (string) $request->query('via', '');
-        $widget->forceFill([
+        $fill = [
             'last_seen_origin' => $origin,
             'last_seen_at' => now(),
             'installed_via' => in_array($via, ['wordpress', 'shopify', 'wix', 'laravel'], true) ? $via : ($widget->installed_via ?: 'embed'),
-        ])->save();
+        ];
+        // The first website that loads the button becomes its website: copied onto another site,
+        // it does not work there, so nobody else's visitors spend the owner's credits. The owner
+        // adds more websites, or allows a refused one in one tap, in Go live → Security.
+        if ($widget->allowedOrigins() === [] && ! AgentWidget::isLocal($origin)) {
+            $fill['allowed_origins'] = [$origin];
+        }
+        $widget->forceFill($fill)->save();
     }
 
     /** A caller starts a call: from a website's call button (key) or the link page (slug). */
@@ -131,6 +140,8 @@ class AgentCallController extends Controller
         $channel = ! empty($in['key']) ? 'widget' : 'link';
         $origin = $request->headers->get('Origin');
         if ($channel === 'widget' && ! $widget->allowsOrigin($origin)) {
+            $widget->noteRefused($origin);
+
             return $this->error('origin', 403, __('agents.error_origin'));
         }
         if (! $agent->isLive()) {
@@ -140,25 +151,34 @@ class AgentCallController extends Controller
             return $this->error('paused', 409, __('agents.error_paused'));
         }
 
-        // A caller (browser) gets a few calls an hour on one agent, and one network a few more,
-        // so a new browser id never buys more calls. Mobile networks share addresses: hence the room.
-        $visitor = (string) $request->ip().'|'.substr((string) ($in['visitor'] ?? ''), 0, 64);
+        // A caller (browser) gets a few calls an hour and a day on one agent, and one network a few
+        // more, so a new browser id never buys more calls. Mobile networks share addresses: hence the room.
+        $network = (string) $request->ip();
+        $visitor = $network.'|'.substr((string) ($in['visitor'] ?? ''), 0, 64);
+        // Kept off this agent for a while: after abusing it, or leaving calls hanging (AgentCalls::blockCaller).
+        if (AgentCalls::callerBlocked($agent->id, $visitor, $network)) {
+            return $this->error('busy', 429, __('agents.error_busy'));
+        }
         $perVisitor = max(1, (int) config('listen.agents.calls_per_visitor_hour', 6));
+        $perDay = max($perVisitor, (int) config('listen.agents.calls_per_visitor_day', 15));
         $limits = [
-            'agent-call:'.$agent->id.':'.sha1($visitor) => $perVisitor,
-            'agent-call-ip:'.$agent->id.':'.sha1((string) $request->ip()) => $perVisitor * 5,
+            'agent-call:'.$agent->id.':'.sha1($visitor) => [$perVisitor, 3600],
+            'agent-call-ip:'.$agent->id.':'.sha1($network) => [$perVisitor * 5, 3600],
+            'agent-call-day:'.$agent->id.':'.sha1($visitor) => [$perDay, 86400],
+            'agent-call-ip-day:'.$agent->id.':'.sha1($network) => [$perDay * 4, 86400],
         ];
-        foreach ($limits as $limitKey => $max) {
+        foreach ($limits as $limitKey => [$max]) {
             if (RateLimiter::tooManyAttempts($limitKey, $max)) {
                 return $this->error('busy', 429, __('agents.error_busy'));
             }
         }
-        foreach (array_keys($limits) as $limitKey) {
-            RateLimiter::hit($limitKey, 3600);
+        foreach ($limits as $limitKey => [, $decay]) {
+            RateLimiter::hit($limitKey, $decay);
         }
-        // Never more than a handful of calls at once on one agent. A call that stopped reporting
-        // still counts until it could have ended on its own.
-        $longest = (int) config('listen.agents.max_call_seconds', 600) + 30;
+        // Never more than a handful of calls at once on one agent, whatever the plan allows across
+        // all of them (AgentCalls::start). A call that stopped reporting still counts until it could
+        // have ended on its own.
+        $longest = \App\Support\Agents\AgentAccess::MAX_CALL_MINUTES * 60 + 30;
         if ($agent->conversations()->where('status', 'live')->where('started_at', '>', now()->subSeconds($longest))->count() >= 8) {
             return $this->error('busy', 429, __('agents.error_busy'));
         }
@@ -167,11 +187,15 @@ class AgentCallController extends Controller
             'origin' => $origin,
             'page_url' => (string) ($in['page_url'] ?? ''),
             'visitor' => $visitor,
+            'network' => $network,
             'country' => strtoupper(substr((string) $request->headers->get('CF-IPCountry', ''), 0, 2)) ?: null,
         ]);
         if (! $result['ok']) {
-            // The caller is never told about the owner's credits: the agent is just not available.
-            return $this->error($result['error'] === 'credits' ? 'paused' : $result['error'], 409, __('agents.error_paused'));
+            // The caller is never told why on the owner's side (credits, plan, limits): the agent
+            // is just not available. Busy means try again in a moment.
+            return $result['error'] === 'busy'
+                ? $this->error('busy', 429, __('agents.error_busy'))
+                : $this->error('paused', 409, __('agents.error_paused'));
         }
 
         return response()->json(self::startPayload($agent, $result));
@@ -226,6 +250,8 @@ class AgentCallController extends Controller
             'model' => 'models/'.GeminiClient::LIVE_MODEL,
             'max_seconds' => $result['max_seconds'],
             'free' => $result['free'],
+            // A caller this quiet is asked if they are still there; as long again, the agent says goodbye.
+            'silence_seconds' => max(8, (int) config('listen.agents.silence_seconds', 20)),
             'speaks_first' => true,
             'api' => url('/agent-api/calls/'.$c->public_id),
             'agent' => ['name' => $agent->name, 'language' => $agent->language],

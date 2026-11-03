@@ -93,6 +93,13 @@
         <input class="ag-input" id="ag-origins" type="text" dir="ltr" placeholder="https://yourbusiness.com" value="{{ implode(', ', $widget->allowed_origins ?? []) }}" data-ag-origins>
         <span class="ag-hint">{{ __('agents.live_allowed_hint') }}</span>
       </div>
+      {{-- A website that tried to show the button and was not on the list: allowed in one tap. --}}
+      @if($refused = $widget->lastRefused())
+        <div class="ag-refused" data-ag-refused>
+          <span>{!! str_replace(':site', '<bdi dir="ltr">'.e(parse_url($refused['origin'], PHP_URL_HOST)).'</bdi>', e(__('agents.live_refused', ['when' => $refused['at']->diffForHumans()]))) !!}</span>
+          <button type="button" class="ag-btn ag-btn-sm" data-ag-allow-origin="{{ $refused['origin'] }}">{{ __('agents.live_refused_allow') }}</button>
+        </div>
+      @endif
     </div>
   </section>
 

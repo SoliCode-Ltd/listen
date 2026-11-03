@@ -262,10 +262,11 @@ class SeoHelper
                 'title_key' => 'agents_landing.meta_title',
                 'description' => 'A voice agent for your business: it answers calls on your website, a link or a QR code, in your customers\' dialect, day and night.',
                 'description_key' => 'agents_landing.meta_description',
-                'robots' => self::DEFAULT_META_ROBOTS,
+                // In search results while Agents are open to everyone (Agents → Settings).
+                'robots' => \App\Support\Agents\AgentAccess::audience() === \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE ? self::DEFAULT_META_ROBOTS : 'noindex,nofollow,noarchive,nosnippet',
                 'path' => '/voice-agents',
                 'localized' => true,
-                'indexable' => true,
+                'indexable' => \App\Support\Agents\AgentAccess::audience() === \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE,
                 'sitemap_priority' => 0.8,
                 'sitemap_change_frequency' => 'monthly',
             ],

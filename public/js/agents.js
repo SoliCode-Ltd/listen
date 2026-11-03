@@ -24,6 +24,29 @@
       });
     });
   }
+  // A message that stays at the top of the page until it is closed, with an optional way forward.
+  function notice(text, action) {
+    var main = $('main.ag');
+    if (!main) { toast(text); return; }
+    var old = $('[data-ag-js-notice]', main);
+    if (old) old.remove();
+    var box = document.createElement('div');
+    box.className = 'ag-notice is-bad';
+    box.setAttribute('role', 'alert');
+    box.setAttribute('data-ag-js-notice', '');
+    var p = document.createElement('span');
+    p.textContent = text;
+    box.appendChild(p);
+    if (action && action.url) {
+      var a = document.createElement('a');
+      a.className = 'ag-btn ag-btn-sm ag-btn-primary';
+      a.href = action.url;
+      a.textContent = action.plan ? ((T.balance && T.balance.upgrade) || '').replace(':plan', action.plan) : action.url;
+      box.appendChild(a);
+    }
+    main.insertBefore(box, main.firstChild);
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
   var toastTimer = 0;
   function toast(text) {
     var el = $('[data-ag-toast]');
@@ -81,6 +104,20 @@
       var origins = $('[data-ag-origins]', box);
       if (origins && C.agent) origins.addEventListener('change', function () {
         api('PATCH', C.agent.urls.update, { allowed_origins: origins.value }).then(function () { toast(T.saved); });
+      });
+      // "Allow it": the refused website joins the list.
+      var allow = $('[data-ag-allow-origin]', box);
+      if (allow && origins && C.agent) allow.addEventListener('click', function () {
+        var site = allow.getAttribute('data-ag-allow-origin');
+        var list = origins.value.split(/[\s,]+/).filter(Boolean);
+        if (list.indexOf(site) < 0) list.push(site);
+        origins.value = list.join(', ');
+        allow.disabled = true;
+        api('PATCH', C.agent.urls.update, { allowed_origins: origins.value }).then(function () {
+          toast(T.saved);
+          var row = allow.closest('[data-ag-refused]');
+          if (row) row.remove();
+        }).catch(function (err) { allow.disabled = false; toast(err.message); });
       });
     });
   }
@@ -193,7 +230,11 @@
         var ok = $('[data-ag-success]');
         if (ok) ok.classList.add('is-on');
         btn.hidden = true;
-      }).catch(function (err) { btn.disabled = false; toast(err.message); });
+      }).catch(function (err) {
+        btn.disabled = false;
+        var d = err.data || {};
+        if (d.reason && d.reason !== 'voice') notice(err.message, d.upgrade && !d.upgrade.none ? d.upgrade : null); else toast(err.message);
+      });
     });
   }
 
@@ -559,7 +600,12 @@
       b.addEventListener('click', function () {
         b.disabled = true;
         api('PATCH', C.agent.urls.update, { status: b.getAttribute('data-ag-status-set') }).then(function () { location.reload(); })
-          .catch(function (err) { b.disabled = false; toast(err.message); });
+          .catch(function (err) {
+            b.disabled = false;
+            // Why it cannot go live stays on screen (the plan, the check, a suspension), with the way forward.
+            var d = err.data || {};
+            if (d.reason && d.reason !== 'voice') notice(err.message, d.upgrade && !d.upgrade.none ? d.upgrade : null); else toast(err.message);
+          });
       });
     });
 
@@ -585,6 +631,12 @@
     var maxLabels = {};
     try { maxLabels = JSON.parse(max.getAttribute('data-labels') || '{}'); } catch (e) {}
     if (max) max.addEventListener('input', function () { maxOut.textContent = maxLabels[max.value] || max.value; });
+    // Calls a day: steps of minutes (0: no limit), shown in words.
+    var daily = $('[data-ag-daily]'), dailyOut = $('[data-ag-daily-out]'), dailySteps = [], dailyLabels = [];
+    if (daily) {
+      try { dailySteps = JSON.parse(daily.getAttribute('data-steps') || '[]'); dailyLabels = JSON.parse(daily.getAttribute('data-labels') || '[]'); } catch (e) {}
+      daily.addEventListener('input', function () { dailyOut.textContent = dailyLabels[daily.value] || ''; });
+    }
 
     var sf = $('[data-ag-script-form]');
     if (sf) sf.addEventListener('submit', function (e) {
@@ -594,6 +646,7 @@
         first_message: $('[name="first_message"]', sf).value,
         script: { identity: $('[name="identity"]', sf).value, handoff: $('[name="handoff"]', sf).value, never: list('never'), steps: list('steps') },
         max_call_seconds: parseInt(max.value, 10) * 60,
+        daily_minutes: daily ? (dailySteps[parseInt(daily.value, 10)] || 0) : undefined,
       }).then(function () { toast(T.saved); }).catch(function (err) { toast(err.message); });
     });
     knowledgeFiles($('[data-ag-files]'));

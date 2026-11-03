@@ -212,18 +212,29 @@ return [
     | Listen Agents: voice agents that answer a business's customers on its
     | website, its link page or a QR code (App\Support\Agents).
     |
-    | A call minute uses credits_per_minute from the member's plan, the same
-    | credits as audio (900 = one audio minute). The owner's first test calls
-    | are free up to free_test_seconds. Calls end on their own at
-    | max_call_seconds (the owner can set less per agent).
+    | A call minute uses credits_per_minute from the member's plan, from the
+    | same credits as audio (900 = one audio minute; a call minute costs the
+    | site several times an audio minute, App\Support\Agents\AgentCost). The
+    | owner's first test calls are free up to free_test_seconds. Calls end on
+    | their own at max_call_seconds (a plan or the owner can set less). Admin →
+    | Agents → Settings overrides the rate and the free seconds; which plans
+    | include agents, and their limits, are set on each plan.
     */
     'agents' => [
-        'credits_per_minute' => (int) env('LISTEN_AGENT_CREDITS_PER_MINUTE', 900),
+        'credits_per_minute' => (int) env('LISTEN_AGENT_CREDITS_PER_MINUTE', 1800),
         'free_test_seconds' => (int) env('LISTEN_AGENT_FREE_TEST_SECONDS', 120),
         'max_call_seconds' => (int) env('LISTEN_AGENT_MAX_CALL_SECONDS', 600),
         'max_agents' => (int) env('LISTEN_AGENT_MAX_AGENTS', 10),
-        // Calls a visitor (or a browser) may start an hour, on one agent.
+        // Calls at the same time across all of a member's agents, when their plan sets none.
+        'concurrent_calls' => (int) env('LISTEN_AGENT_CONCURRENT_CALLS', 3),
+        // Calls a visitor (or a browser) may start an hour, and a day, on one agent.
         'calls_per_visitor_hour' => (int) env('LISTEN_AGENT_CALLS_PER_VISITOR_HOUR', 6),
+        'calls_per_visitor_day' => (int) env('LISTEN_AGENT_CALLS_PER_VISITOR_DAY', 15),
+        // A caller who stays quiet this long is asked if they are still there; twice as long ends the call.
+        'silence_seconds' => (int) env('LISTEN_AGENT_SILENCE_SECONDS', 20),
+        // The conversation the live voice keeps in mind besides its instructions (older turns drop
+        // out): every turn is billed again for all of it, so this bounds what a long call costs.
+        'history_tokens' => (int) env('LISTEN_AGENT_HISTORY_TOKENS', 8000),
         // What Google charges for the real-time voice (per million tokens), to keep each call's cost.
         'price_per_million' => [
             'text_in' => (float) env('LISTEN_AGENT_PRICE_TEXT_IN', 0.75),

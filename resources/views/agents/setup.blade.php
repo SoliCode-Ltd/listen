@@ -200,7 +200,15 @@
               <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="29"/><path d="M20 33l8 8 16-17"/></svg>
               <strong>{{ __('agents.live_done') }}</strong>
             </div>
-            <button type="button" class="ag-btn ag-btn-primary ag-btn-lg" data-ag-golive-btn>{{ __('agents.live_go') }}</button>
+            @if($limits['included'])
+              <button type="button" class="ag-btn ag-btn-primary ag-btn-lg" data-ag-golive-btn>{{ __('agents.live_go') }}</button>
+            @else
+              {{-- A plan without agents: built and tested, and the way to put it live. --}}
+              <p class="ag-golive-plan">{{ $upgrade['plan'] ? __('agents.balance.state_plan', ['plan' => $upgrade['plan']]) : __('agents.balance.state_plan_none') }}</p>
+              @unless($upgrade['none'])
+                <a class="ag-btn ag-btn-primary ag-btn-lg" href="{{ $upgrade['url'] }}">{{ __('agents.balance.upgrade', ['plan' => $upgrade['plan']]) }}</a>
+              @endunless
+            @endif
           </div>
           <div class="ag-actions">
             <button type="button" class="ag-btn ag-btn-ghost" data-ag-go="2">{{ __('agents.back') }}</button>
@@ -241,6 +249,7 @@
         'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'),
         'play' => __('agents.voice_play'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
         'talk_heading' => __('agents.talk_heading'), 'error_name' => __('agents.error_name'),
+        'balance' => ['upgrade' => __('agents.balance.upgrade')],
       ],
     ];
   @endphp

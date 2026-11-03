@@ -20,18 +20,25 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>{{ __('agents.empty_cta') }}
         </a>
       </section>
+      @if(in_array($balance['state'], ['plan', 'out', 'low'], true))
+        <div style="margin-top:1rem">@include('agents.partials.balance', ['balance' => $balance])</div>
+      @endif
     @else
       <div class="ag-head">
         <div>
           <h1>{{ __('agents.title') }}</h1>
           <p>{{ __('agents.subtitle') }}</p>
         </div>
-        @if($agents->count() < (int) config('listen.agents.max_agents', 10))
+        @if($agents->count() < $limits['agents'])
           <a class="ag-btn ag-btn-primary" href="{{ route('voice-agents.create') }}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>{{ __('agents.new_agent') }}
           </a>
+        @else
+          <p class="ag-head-note">{{ trans_choice('agents.error_max_agents', $limits['agents'], ['count' => $limits['agents']]) }}</p>
         @endif
       </div>
+
+      @include('agents.partials.balance', ['balance' => $balance])
 
       <div class="ag-grid">
         @foreach($agents as $agent)
@@ -61,6 +68,9 @@
                 @if($voice['flag'])<img src="{{ $voice['flag'] }}" alt="" width="18" height="13" loading="lazy">@endif
                 <span>{{ __('agents.voice_of', ['name' => $voice['name']]) }}</span><small>{{ $voice['dialect_label'] }}</small>
               </div>
+            @endif
+            @if($m = $missed[$agent->id] ?? null)
+              <p class="ag-agent-missed" role="status"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.6 17.2A2 2 0 0 0 4.3 20h15.4a2 2 0 0 0 1.7-2.8L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>{{ trans_choice('agents.missed', $m['count'], ['count' => $m['count'], 'name' => $agent->name, 'reason' => __('agents.missed_reasons.'.$m['reason'])]) }}</p>
             @endif
             <div class="ag-agent-meta">
               <span>{{ trans_choice('agents.card_calls', $count, ['count' => $count]) }}</span>

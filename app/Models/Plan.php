@@ -104,6 +104,12 @@ class Plan extends Model
         'api_access_enabled',
         'api_requests_per_minute',
         'api_concurrency',
+        // Voice agents (App\Support\Agents\AgentAccess)
+        'agents_enabled',
+        'agents_max',
+        'agent_minutes_per_month',
+        'agent_concurrent_calls',
+        'agent_max_call_minutes',
     ];
 
     protected $casts = [
@@ -140,6 +146,11 @@ class Plan extends Model
         'api_access_enabled' => 'boolean',
         'api_requests_per_minute' => 'integer',
         'api_concurrency' => 'integer',
+        'agents_enabled' => 'boolean',
+        'agents_max' => 'integer',
+        'agent_minutes_per_month' => 'integer',
+        'agent_concurrent_calls' => 'integer',
+        'agent_max_call_minutes' => 'integer',
     ];
 
     public function subscriptions(): HasMany

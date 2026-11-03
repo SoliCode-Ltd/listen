@@ -1040,8 +1040,10 @@
     {{-- Every kind of voice, one orb each --}}
     @include('components.home.voice-tour')
 
-    {{-- Listen Agents: a voice agent for a business, shown working. --}}
-    @include('components.home.agents')
+    {{-- Listen Agents: a voice agent for a business, shown working (while Agents are open to this visitor). --}}
+    @if(\App\Support\Agents\AgentAccess::openTo(auth()->user()))
+      @include('components.home.agents')
+    @endif
 
     {{-- Voice gallery and dialogues --}}
     @include('components.home.voice-gallery')

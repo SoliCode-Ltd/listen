@@ -180,15 +180,76 @@ class AgentWidget extends Model
     }
 
     /** Whether a page from this origin may load the button (scheme://host[:port], lower case). */
+    /**
+     * Whether a website may load this call button. With no list yet, any website may, until the
+     * first one loads it (AgentCallController::seen() then keeps that website). A site's www and
+     * plain names are one website, and the owner's own computer (localhost) is always allowed:
+     * no visitor reaches the button there.
+     */
     public function allowsOrigin(?string $origin): bool
     {
-        $allowed = array_values(array_filter(array_map([self::class, 'normalizeOrigin'], $this->allowed_origins ?? [])));
+        $allowed = $this->allowedOrigins();
         if ($allowed === []) {
             return true;
         }
         $origin = self::normalizeOrigin($origin);
+        if ($origin === null) {
+            return false;
+        }
+        if (self::isLocal($origin)) {
+            return true;
+        }
 
-        return $origin !== null && in_array($origin, $allowed, true);
+        return in_array($origin, $allowed, true) || in_array(self::twin($origin), $allowed, true);
+    }
+
+    /** @return list<string> */
+    public function allowedOrigins(): array
+    {
+        return array_values(array_unique(array_filter(array_map([self::class, 'normalizeOrigin'], (array) ($this->allowed_origins ?? [])))));
+    }
+
+    public static function isLocal(string $origin): bool
+    {
+        return (bool) preg_match('#^https?://localhost(:\d+)?$#', $origin);
+    }
+
+    /** The same website with or without "www.". */
+    public static function twin(string $origin): string
+    {
+        return str_contains($origin, '://www.')
+            ? str_replace('://www.', '://', $origin)
+            : preg_replace('#^(https?://)#', '$1www.', $origin);
+    }
+
+    /**
+     * The last website that tried to load the call button and was not on the list, for the owner
+     * to allow in one tap (Go live → Security).
+     *
+     * @return array{origin: string, at: \Illuminate\Support\Carbon}|null
+     */
+    public function lastRefused(): ?array
+    {
+        $refused = \Illuminate\Support\Facades\Cache::get('agent-widget-refused:'.$this->id);
+        if (! is_array($refused) || empty($refused['origin']) || $this->allowsOrigin($refused['origin'])) {
+            return null;
+        }
+
+        return ['origin' => (string) $refused['origin'], 'at' => \Illuminate\Support\Carbon::parse($refused['at'] ?? now())];
+    }
+
+    public function noteRefused(?string $origin): void
+    {
+        $origin = self::normalizeOrigin($origin);
+        if ($origin === null) {
+            return;
+        }
+        $key = 'agent-widget-refused:'.$this->id;
+        $last = \Illuminate\Support\Facades\Cache::get($key);
+        if (is_array($last) && ($last['origin'] ?? null) === $origin && now()->diffInMinutes(\Illuminate\Support\Carbon::parse($last['at'] ?? now()), true) < 10) {
+            return;
+        }
+        \Illuminate\Support\Facades\Cache::put($key, ['origin' => $origin, 'at' => now()->toIso8601String()], now()->addDays(14));
     }
 
     /** When the call button was last seen on a website, in words: "3 minutes ago", or "just now". */

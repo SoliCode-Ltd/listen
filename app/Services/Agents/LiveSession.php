@@ -22,6 +22,13 @@ final class LiveSession
     /** @return array<string, mixed> the BidiGenerateContentSetup, model included */
     public static function setupFor(Agent $agent): array
     {
+        $instructions = AgentInstructions::build($agent);
+        // Every turn is billed again for all the call keeps in mind, so the conversation it keeps
+        // besides the instructions is bounded: past it, the oldest turns drop out (to half of it),
+        // and a long call costs about the same each minute (App\Support\Agents\AgentCost).
+        $keep = max(2000, (int) config('listen.agents.history_tokens', 8000));
+        $base = \App\Support\Agents\AgentCost::tokensIn($instructions);
+
         return [
             'model' => 'models/'.GeminiClient::LIVE_MODEL,
             'generationConfig' => [
@@ -30,12 +37,14 @@ final class LiveSession
                     'voiceConfig' => ['prebuiltVoiceConfig' => ['voiceName' => $agent->live_voice ?: self::DEFAULT_VOICE]],
                 ],
             ],
-            'systemInstruction' => ['parts' => [['text' => AgentInstructions::build($agent)]]],
+            'systemInstruction' => ['parts' => [['text' => $instructions]]],
             'tools' => [['functionDeclarations' => self::tools()]],
             'inputAudioTranscription' => (object) [],
             'outputAudioTranscription' => (object) [],
-            // Long calls stay light: the oldest turns drop out once the conversation grows.
-            'contextWindowCompression' => ['slidingWindow' => (object) []],
+            'contextWindowCompression' => [
+                'triggerTokens' => $base + $keep,
+                'slidingWindow' => ['targetTokens' => $base + intdiv($keep, 2)],
+            ],
         ];
     }
 
@@ -62,7 +71,7 @@ final class LiveSession
                 'parameters' => [
                     'type' => 'OBJECT',
                     'properties' => [
-                        'reason' => ['type' => 'STRING', 'description' => 'Why the call ends: done, caller_left, out_of_scope or handoff'],
+                        'reason' => ['type' => 'STRING', 'description' => 'Why the call ends: done, caller_left, out_of_scope, handoff, or abusive (the caller insulted you, harassed you, or kept pushing you to break your rules after one warning)'],
                     ],
                 ],
             ],
