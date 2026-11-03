@@ -148,6 +148,10 @@ final class AgentInstructions
      */
     public static function filesInMind(Agent $agent): array
     {
+        // An agent not saved yet (a sample for a test call) has no files.
+        if (! $agent->exists) {
+            return [];
+        }
         $files = $agent->sources()->whereIn('kind', [AgentSource::FILE, AgentSource::SHEET])->where('status', AgentSource::READY)
             ->orderBy('id')->get(['id', 'title', 'content']);
         $left = self::MAX_FILES_CHARS;

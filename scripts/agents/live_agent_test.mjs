@@ -9,7 +9,7 @@
 //      it with its save_contact tool, and Listen's answer to the tool reaches it.
 //
 // Usage: LIVE_KEY=... node scripts/agents/live_agent_test.mjs setups-dir out-dir
-// setups-dir holds sa.json and eg.json from `php artisan agents:live-setup`.
+// setups-dir holds one JSON per case from `php artisan agents:live-setup --sample=<id>`.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,16 +21,43 @@ const WS = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelangu
 if (!KEY) { console.error('LIVE_KEY is not set'); process.exit(1); }
 fs.mkdirSync(OUT, { recursive: true });
 
+// One call per sample business (php artisan agents:live-setup --sample=...): the caller's
+// lines are typed (text), the agent answers with its live voice, and those answers are kept.
 const CASES = [
-  { id: 'sa', file: 'sa.json', turns: [
-    'السلام عليكم',
-    'أبي أحد من الفريق يتصل فيني بخصوص باقة للشركة، اسمي محمد ورقمي صفر خمسة صفر واحد اثنين ثلاثة أربعة خمسة ستة سبعة',
-    'إيه صحيح، شكراً',
+  { id: 'ar-sa', file: 'ar-sa.json', turns: [
+    'السلام عليكم، أبي أحجز موعد تنظيف أسنان يوم الخميس العصر',
+    'الساعة أربعة تناسبني، اسمي محمد ورقمي صفر خمسة صفر واحد اثنين ثلاثة أربعة خمسة ستة سبعة',
+    'إيه صحيح، الله يعطيك العافية',
   ] },
-  { id: 'eg', file: 'eg.json', turns: [
-    'السلام عليكم',
-    'عايز حد من الفريق يكلمني بخصوص باقة للشركة، اسمي أحمد ورقمي صفر واحد صفر واحد اثنين تلاتة أربعة خمسة ستة سبعة تمانية',
+  { id: 'ar-ae', file: 'ar-ae.json', turns: [
+    'السلام عليكم، أبا أحجز طاولة حق أربعة أشخاص الليلة الساعة تسع',
+    'اسمي سعيد، ورقمي صفر خمسة صفر سبعة ستة خمسة أربعة ثلاثة اثنين واحد',
+    'زين، مشكور',
+  ] },
+  { id: 'ar-eg', file: 'ar-eg.json', turns: [
+    'السلام عليكم، هو انتو بتعملوا سحب عينات من البيت؟',
+    'طب تمام، عايزة حد ييجي بكرة الصبح، اسمي منى ورقمي صفر واحد صفر واحد اتنين تلاتة أربعة خمسة ستة سبعة تمانية',
     'أيوه مظبوط، شكراً',
+  ] },
+  { id: 'ar-lb', file: 'ar-lb.json', turns: [
+    'مرحبا، بدي إسأل إذا عندكن شقة للإيجار غرفتين نوم بصيدا',
+    'ميزانيتي تقريباً ستمية دولار. اسمي جاد ورقمي صفر تلاتة واحد اتنين تلاتة أربعة خمسة ستة',
+    'تمام، يعطيك العافية',
+  ] },
+  { id: 'en-us', file: 'en-us.json', turns: [
+    'Hi, do you guys have time for an oil change today?',
+    'Three works. My name is Jake, and my number is five five five, two one zero, four eight seven six.',
+    "Yep, that's right. Thanks!",
+  ] },
+  { id: 'en-gb', file: 'en-gb.json', turns: [
+    'Hello, could I order some flowers for delivery tomorrow?',
+    "Something bright, around forty pounds. I'm Sophie, and my number is oh seven seven double oh, nine double oh, one two three.",
+    'Lovely, thank you so much.',
+  ] },
+  { id: 'en-ie', file: 'en-ie.json', turns: [
+    'Hi there, have you a double room free this Friday night?',
+    "Brilliant. It's Ciara, and my number is oh eight seven, one two three, four five six seven.",
+    "That's it, thanks a million.",
   ] },
 ];
 
@@ -62,12 +89,15 @@ async function mint(setup, way) {
   return JSON.parse(text).name;
 }
 
+// Whether a message carries the agent's voice.
+const p0 = (sc) => (sc.modelTurn?.parts || []).some((p) => p.inlineData?.data);
+
 function run(c, token) {
   return new Promise((resolve) => {
     const out = { id: c.id, turns: [], tools: [], error: null };
     const ws = new WebSocket(`${WS}?access_token=${encodeURIComponent(token)}`);
     let i = -1; let cur = null;
-    const timer = setTimeout(() => { out.error = out.error || 'timed out'; try { ws.close(); } catch {} }, 120000);
+    const timer = setTimeout(() => { out.error = out.error || 'timed out'; try { ws.close(); } catch {} }, 150000);
     const finish = () => {
       if (cur) {
         const pcm = Buffer.concat(cur.chunks);
@@ -77,7 +107,7 @@ function run(c, token) {
       }
       i++;
       if (i >= c.turns.length) { clearTimeout(timer); ws.close(); return; }
-      cur = { asked: c.turns[i], chunks: [], said: '', heard: '', first: null, usage: null, sent: performance.now() };
+      cur = { asked: c.turns[i], chunks: [], said: '', heard: '', first: null, usage: null, sent: performance.now(), done: null };
       ws.send(JSON.stringify({ realtimeInput: { text: c.turns[i] } }));
     };
     ws.onopen = () => ws.send(JSON.stringify({ setup: PIRATE }));
@@ -88,6 +118,7 @@ function run(c, token) {
       if (m.toolCall) {
         for (const fc of m.toolCall.functionCalls || []) {
           out.tools.push({ name: fc.name, args: fc.args, at_turn: i + 1 });
+          if (cur) { clearTimeout(cur.done); cur.done = null; }
           ws.send(JSON.stringify({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: { result: fc.name === 'save_contact' ? 'saved' : 'ok' } }] } }));
         }
       }
@@ -98,7 +129,8 @@ function run(c, token) {
       }
       if (sc.outputTranscription?.text) cur.said += sc.outputTranscription.text;
       if (sc.inputTranscription?.text) cur.heard += sc.inputTranscription.text;
-      if (sc.turnComplete) setTimeout(finish, 700);
+      if (p0(sc)) { clearTimeout(cur.done); cur.done = null; }
+      if (sc.turnComplete) { clearTimeout(cur.done); cur.done = setTimeout(finish, 1600); }
     };
     ws.onerror = (e) => { out.error = `socket error ${e?.message || ''}`; };
     ws.onclose = (e) => { clearTimeout(timer); if (![1000, 1005].includes(e.code) && !out.error) out.error = `closed ${e.code} ${String(e.reason || '').slice(0, 300)}`; resolve(out); };

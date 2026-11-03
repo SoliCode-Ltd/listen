@@ -1,14 +1,17 @@
 name: Agent live call test
 
 # Checks a whole Listen agent call for real (scripts/agents/live_agent_test.mjs):
-# the agent's setup, as `php artisan agents:live-setup` builds it, locked
-# into a short-lived key; a different setup from the browser ignored; the
-# agent speaking its dialect, reading the caller's number back and saving it
-# with its tool. Keeps the replies (MP3) and what happened with the run.
+# each sample agent's setup, as `php artisan agents:live-setup --sample=...`
+# builds it, locked into a short-lived key; a different setup from the browser
+# ignored; the agent speaking its dialect or accent, reading the caller's number
+# back and saving it with its tool. Keeps the replies (MP3) and what happened.
+# The replies are the recorded calls on the homepage and the Agents page:
+# four Arabic (Saudi, Emirati, Egyptian, Lebanese) and three English (American,
+# British, Irish), women and men, each in its library speaker's own voice.
 #
 # Uses the first Gemini key from STAGING's .env, read over SSH, masked in the
-# log and never stored; about a minute of audio from the quota staging shares
-# with live, inside the 10 minutes the owner approved for testing agents.
+# log and never stored; about two minutes of audio from the quota staging
+# shares with live, inside the 10 minutes the owner approved for testing agents.
 
 on:
   push:
@@ -41,16 +44,17 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Build two agents' live setups (Saudi, Egyptian)
+      - name: Build the sample agents' live setups
         run: |
           set -euo pipefail
           composer install --no-interaction --no-progress --prefer-dist > /dev/null
           cp .env.example .env
           php artisan key:generate --no-interaction > /dev/null
           mkdir -p setups
-          php artisan agents:live-setup --dialect=ar-SA --voice=Achernar --name=Fatima > setups/sa.json
-          php artisan agents:live-setup --dialect=ar-EG --voice=Callirrhoe --name=Sumaya > setups/eg.json
-          python3 -c "import json; [json.load(open(f'setups/{n}.json')) for n in ('sa','eg')]; print('setups ok')"
+          for s in ar-sa ar-ae ar-eg ar-lb en-us en-gb en-ie; do
+            php artisan agents:live-setup --sample="$s" > "setups/$s.json"
+          done
+          python3 -c "import json,glob; [json.load(open(f)) for f in glob.glob('setups/*.json')]; print('setups ok')"
 
       - name: Call the agents with a staging key
         env:
