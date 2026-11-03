@@ -84,29 +84,34 @@
   @foreach($platforms as $key => [$label, $kind])
     @continue($kind === 'soon')
     @php $code = \App\Http\Controllers\AgentController::embedCode($widget, $key); @endphp
-    <dialog class="ag-dialog" id="ag-guide-{{ $key }}" aria-labelledby="ag-guide-{{ $key }}-title">
-      <div class="ag-dialog-head">
-        <img src="{{ asset('images/platforms/'.$key.'.svg') }}" alt="" width="34" height="34">
-        <h3 id="ag-guide-{{ $key }}-title">{{ __('agents.guide_title', ['platform' => $label]) }}</h3>
+    @php $guideSteps = __('agents.guides.'.$key.'.steps'); @endphp
+    <dialog class="ag-dialog ag-guide" id="ag-guide-{{ $key }}" aria-labelledby="ag-guide-{{ $key }}-title">
+      <div class="ag-guide-head">
+        <img src="{{ asset('images/platforms/'.$key.'.svg') }}" alt="" width="48" height="48">
+        <div>
+          <h3 id="ag-guide-{{ $key }}-title">{{ __('agents.guide_title', ['platform' => $label]) }}</h3>
+          <p>{{ trans_choice('agents.guide_meta', count($guideSteps), ['count' => count($guideSteps)]) }}</p>
+        </div>
         <button type="button" class="ag-btn ag-btn-sm ag-btn-ghost ag-dialog-x" data-ag-guide-close aria-label="{{ __('agents.widget_close') }}">✕</button>
       </div>
-      <ol class="ag-steps">
+      <ol class="ag-steps ag-guide-steps">
         @foreach(__('agents.guides.'.$key.'.steps') as $step)
           {{-- `code` in a step shows as code, always left to right inside Arabic sentences. --}}
           <li>{!! preg_replace('/`([^`]+)`/', '<code dir="ltr">$1</code>', e($step)) !!}</li>
         @endforeach
       </ol>
       @if($kind === 'plugin')
-        <a class="ag-btn ag-btn-primary" href="{{ route('voice-agents.plugin', ['agent' => $agent, 'platform' => $key]) }}" download>
+        <a class="ag-btn ag-btn-primary ag-btn-lg ag-guide-download" href="{{ route('voice-agents.plugin', ['agent' => $agent, 'platform' => $key]) }}" download>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>{{ __('agents.guide_download') }}
         </a>
       @else
-        <div class="ag-copy">
-          <code dir="ltr">{{ $code }}</code>
-          <button type="button" class="ag-btn ag-btn-sm" data-ag-copy="{{ $code }}">{{ __('agents.live_copy') }}</button>
+        {{-- The line to paste, in full and readable, with Copy. --}}
+        <div class="ag-guide-code">
+          <div class="ag-guide-code-bar"><span>{{ __('agents.guide_code') }}</span><button type="button" class="ag-btn ag-btn-sm" data-ag-copy="{{ $code }}">{{ __('agents.live_copy') }}</button></div>
+          <pre dir="ltr"><code>{{ $code }}</code></pre>
         </div>
       @endif
-      <p class="ag-hint">{{ __('agents.guides.'.$key.'.done') }}</p>
+      <p class="ag-guide-done"><i aria-hidden="true"></i><span>{{ __('agents.guides.'.$key.'.done') }}</span></p>
     </dialog>
   @endforeach
 </div>

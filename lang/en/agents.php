@@ -15,6 +15,11 @@ return [
     'start_agents_title' => 'Get a voice agent for my business',
     'start_agents_text' => 'It answers your customers on your website or a link, in their dialect, day and night.',
     'start_skip' => 'Just looking around',
+    'start_hello' => 'Welcome, :name',
+    'start_studio_cta' => 'Open the Studio',
+    'start_studio_points' => ['147 Arabic dialects and 66 English accents', 'Emotions, styles and sound places', 'Download as MP3 or WAV in seconds'],
+    'start_agents_points' => ['Talks in your customers\' dialect', 'On your website, a link or a QR code', 'Ready in about two minutes'],
+    'start_art' => ['line' => 'Hear your script in any voice, in seconds.', 'chips' => ['Egyptian', 'Saudi', 'British'], 'business' => 'Bright Smile Dental', 'state' => 'Sara is speaking', 'caption' => 'Hi, how can I help you today?', 'button' => 'Talk to us'],
 
     // The list of agents.
     'title' => 'Agents',
@@ -180,6 +185,8 @@ return [
     ],
     'guide_title' => 'Add your agent to :platform',
     'guide_download' => 'Download the plugin',
+    'guide_meta' => '{1} One step, about two minutes|[2,*] :count steps, about two minutes',
+    'guide_code' => 'The line to paste',
     'guides' => [
         'wordpress' => [
             'steps' => [

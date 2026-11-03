@@ -471,3 +471,98 @@ html[dir="rtl"] [data-ag-design-play] svg { transform: none; }
 /* The agents list: each agent's first letter in its call button's colour. */
 .ag-agent-mark { display: grid; place-items: center; width: 48px; height: 48px; flex: 0 0 auto; border-radius: 15px; background: color-mix(in srgb, var(--m, #7659FA) 14%, var(--bg)); color: var(--m, #7659FA); border: 1px solid color-mix(in srgb, var(--m, #7659FA) 30%, transparent); font-weight: 800; font-size: 1.25rem; transition: transform .3s cubic-bezier(.22, 1, .36, 1); }
 .ag-agent:hover .ag-agent-mark { transform: scale(1.06); }
+
+/* ---------- The welcome page: two paths, each with a small live picture of what it is. ---------- */
+.ag-welcome { max-width: 1080px; margin: 0 auto; padding: clamp(2.2rem, 6vw, 4.6rem) 1rem 3.4rem; display: grid; justify-items: center; gap: 1.3rem; }
+.ag-welcome-head { display: grid; gap: .6rem; max-width: 660px; text-align: center; }
+.ag-welcome-hi { margin: 0; color: var(--accent-text, var(--a)); font-weight: 800; font-size: 1rem; }
+.ag-welcome-head h1 { margin: 0; font-size: clamp(2rem, 4.6vw, 3.2rem); font-weight: 800; line-height: 1.15; letter-spacing: -.02em; }
+html[dir="rtl"] .ag-welcome-head h1 { letter-spacing: 0; line-height: 1.35; }
+.ag-welcome-head > p:last-child { margin: 0; color: var(--muted); font-size: 1.05rem; line-height: 1.7; }
+.ag-welcome-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.3rem; width: 100%; margin-top: 1rem; }
+.ag-welcome-card { display: grid; grid-template-rows: auto 1fr; border: 1px solid var(--line); border-radius: 28px; background: var(--surface, var(--bg)); overflow: hidden; color: inherit; text-decoration: none; box-shadow: 0 34px 80px -58px rgba(23, 20, 74, .75); opacity: 0; transform: translateY(18px); animation: ag-welcome-in .75s cubic-bezier(.22, 1, .36, 1) forwards; animation-delay: calc(.12s + var(--i, 0) * .14s); transition: transform .35s cubic-bezier(.22, 1, .36, 1), border-color .25s ease, box-shadow .35s ease; }
+.ag-welcome-card:hover { transform: translateY(-5px); border-color: color-mix(in srgb, var(--a) 55%, var(--line)); box-shadow: 0 44px 90px -54px color-mix(in srgb, var(--a) 75%, transparent); }
+.ag-welcome-card:focus-visible { outline: 3px solid color-mix(in srgb, var(--a) 45%, transparent); outline-offset: 4px; }
+@keyframes ag-welcome-in { to { opacity: 1; transform: none; } }
+.ag-welcome-body { display: grid; align-content: start; justify-items: start; gap: .7rem; padding: 1.5rem 1.6rem 1.7rem; }
+.ag-welcome-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: color-mix(in srgb, var(--a) 11%, var(--bg)); color: var(--a); border: 1px solid color-mix(in srgb, var(--a) 24%, transparent); }
+.ag-welcome-icon.is-accent { background: var(--a); color: #fff; border-color: transparent; box-shadow: 0 14px 28px -14px var(--a); }
+.ag-welcome-icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.ag-welcome-body h2 { margin: .2rem 0 0; font-size: 1.4rem; font-weight: 800; line-height: 1.3; }
+.ag-welcome-body > p { margin: 0; color: var(--muted); line-height: 1.7; }
+.ag-welcome-body ul { display: grid; gap: .45rem; margin: .2rem 0 .5rem; padding: 0; list-style: none; }
+.ag-welcome-body li { display: flex; align-items: center; gap: .55rem; font-weight: 600; font-size: .95rem; }
+.ag-welcome-body li svg { width: 20px; height: 20px; padding: 3px; border-radius: 50%; flex: 0 0 auto; background: color-mix(in srgb, var(--a) 12%, var(--bg)); fill: none; stroke: var(--a); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.ag-welcome-body .ag-btn { margin-top: auto; }
+.ag-welcome-skip { margin-top: .4rem; padding: .75rem 1rem; border-radius: 12px; color: var(--muted); font-weight: 700; text-decoration: none; }
+.ag-welcome-skip:hover { color: var(--text); background: var(--ag-soft, rgba(118, 89, 250, .08)); }
+/* The pictures. Flat surfaces, no gradients behind them. */
+.ag-welcome-art { position: relative; display: grid; place-items: center; height: 250px; padding: 1.3rem; overflow: hidden; border-bottom: 1px solid var(--line); }
+.ag-welcome-art.is-studio { background: #F2EFFF; }
+html[data-theme="dark"] .ag-welcome-art.is-studio { background: #1E1A45; }
+.ag-welcome-art.is-agents { background: #17144A; }
+.ag-wa-editor { width: min(360px, 100%); display: grid; gap: .8rem; padding: 1.1rem 1.15rem; border-radius: 18px; background: #fff; color: #16132F; box-shadow: 0 24px 50px -30px rgba(23, 20, 74, .55); transition: transform .45s cubic-bezier(.22, 1, .36, 1); }
+.ag-welcome-card:hover .ag-wa-editor { transform: translateY(-4px) rotate(-.6deg); }
+.ag-wa-line { margin: 0; font-weight: 700; font-size: .98rem; line-height: 1.5; }
+.ag-wa-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.ag-wa-chips i { font-style: normal; padding: .2rem .65rem; border-radius: 999px; border: 1px solid rgba(23, 20, 74, .14); font-size: .78rem; font-weight: 700; color: #5F5A7E; }
+.ag-wa-chips i.is-on { background: #7659FA; border-color: #7659FA; color: #fff; }
+.ag-wa-player { display: flex; align-items: center; gap: .65rem; }
+.ag-wa-play { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #7659FA; flex: 0 0 auto; }
+.ag-wa-play svg { width: 14px; height: 14px; fill: #fff; }
+html[dir="rtl"] .ag-wa-play svg { transform: none; }
+.ag-wa-wave { flex: 1; display: flex; align-items: center; gap: 3px; height: 34px; }
+.ag-wa-wave i { flex: 1; height: calc(var(--k) * 100%); border-radius: 3px; background: #C9BEFF; transform-origin: center; animation: ag-wa-eq 1.6s ease-in-out infinite; animation-delay: calc(var(--d) * -.07s); }
+.ag-wa-wave i:nth-child(-n+11) { background: #7659FA; }
+@keyframes ag-wa-eq { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.55); } }
+.ag-wa-player em { font-style: normal; font-size: .78rem; font-weight: 700; color: #5F5A7E; font-variant-numeric: tabular-nums; }
+/* The agent: a website's call card and its button. */
+.ag-wa-site { position: absolute; inset: 1.3rem 1.3rem auto; display: grid; gap: .5rem; opacity: .9; }
+.ag-wa-site b { display: block; height: 10px; width: 56%; border-radius: 6px; background: rgba(255, 255, 255, .1); }
+.ag-wa-site b.is-short { width: 34%; }
+.ag-wa-call { position: relative; z-index: 1; width: min(250px, 72%); display: grid; justify-items: center; gap: .35rem; margin-top: .4rem; padding: .85rem .9rem .9rem; border-radius: 18px; background: #fff; color: #16132F; box-shadow: 0 26px 50px -24px rgba(0, 0, 0, .6); transition: transform .45s cubic-bezier(.22, 1, .36, 1); }
+.ag-welcome-card:hover .ag-wa-call { transform: translateY(-4px); }
+.ag-wa-call-head { display: flex; align-items: center; justify-content: space-between; gap: .4rem; width: 100%; }
+.ag-wa-call-head strong { font-size: .8rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-wa-call-head span { display: inline-flex; align-items: center; gap: .25rem; padding: .1rem .45rem; border-radius: 999px; background: rgba(23, 20, 74, .06); font-size: .72rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ag-wa-call-head span i { width: 5px; height: 5px; border-radius: 50%; background: #E2445F; animation: ag-wa-blink 1.4s ease-in-out infinite; }
+.ag-wa-orb { position: relative; display: grid; place-items: center; width: 64px; height: 64px; margin: .25rem 0; }
+.ag-wa-orb b { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(120% 120% at 32% 24%, #C9BEFF 0%, #7659FA 46%, #2A1A8F 100%); box-shadow: inset 0 -8px 16px rgba(0, 0, 0, .25), 0 14px 26px -14px #7659FA; animation: ag-wa-talk 1.2s ease-in-out infinite; }
+.ag-wa-orb i { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid #C9BEFF; opacity: 0; animation: ag-wa-ring 1.9s ease-out infinite; }
+.ag-wa-orb i:nth-child(2) { animation-delay: .95s; }
+.ag-wa-state { margin: 0; font-size: .74rem; font-weight: 800; }
+.ag-wa-caption { margin: 0; padding: .3rem .55rem; border-radius: 10px; background: #F2EFFF; font-size: .72rem; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-wa-button { position: absolute; z-index: 1; bottom: 1rem; inset-inline-end: 1rem; display: inline-flex; align-items: center; gap: .45rem; padding: .3rem .8rem .3rem .3rem; border-radius: 999px; background: #fff; color: #16132F; font-size: .75rem; font-weight: 800; box-shadow: 0 14px 30px -14px rgba(0, 0, 0, .6); }
+html[dir="rtl"] .ag-wa-button { padding: .3rem .3rem .3rem .8rem; }
+.ag-wa-button i { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #7659FA; }
+.ag-wa-button svg { width: 13px; height: 13px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+@keyframes ag-wa-talk { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+@keyframes ag-wa-ring { 0% { opacity: .7; transform: scale(1); } 100% { opacity: 0; transform: scale(1.55); } }
+@keyframes ag-wa-blink { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+@media (max-width: 760px) {
+  .ag-welcome-cards { grid-template-columns: minmax(0, 1fr); }
+  .ag-welcome-art { height: 220px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ag-welcome-card { animation: none; opacity: 1; transform: none; }
+  .ag-wa-wave i, .ag-wa-orb b, .ag-wa-orb i, .ag-wa-call-head span i { animation: none; }
+}
+
+/* ---------- The platform guides: roomy steps, the line to paste in full, a clear finish. ---------- */
+.ag-dialog.ag-guide { width: min(660px, calc(100vw - 2rem)); padding: 1.6rem 1.6rem 1.5rem; gap: 1.15rem; }
+.ag-guide-head { display: flex; align-items: center; gap: .9rem; }
+.ag-guide-head img { width: 48px; height: 48px; border-radius: 13px; flex: 0 0 auto; }
+.ag-guide-head > div { flex: 1; min-width: 0; }
+.ag-guide-head h3 { margin: 0; font-size: 1.25rem; font-weight: 800; line-height: 1.3; }
+.ag-guide-head p { margin: .15rem 0 0; color: var(--muted); font-size: .88rem; }
+.ag-guide-steps { gap: .6rem; }
+.ag-guide-steps li { padding: .9rem 1rem; padding-inline-start: 3.4rem; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); line-height: 1.75; }
+.ag-guide-steps li::before { top: .9rem; inset-inline-start: .95rem; width: 1.85rem; height: 1.85rem; background: var(--a); color: #fff; }
+.ag-guide-code { border-radius: 16px; background: #17144A; color: #E9E5FF; overflow: hidden; }
+.ag-guide-code-bar { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding-block: .5rem; padding-inline: 1rem .55rem; border-bottom: 1px solid rgba(255, 255, 255, .1); color: #C9C3F2; font-size: .82rem; font-weight: 700; }
+.ag-guide-code-bar .ag-btn { border: 0; background: #fff; color: #17144A; }
+.ag-guide-code pre { margin: 0; padding: .95rem 1rem 1.05rem; direction: ltr; text-align: left; white-space: pre-wrap; word-break: break-all; font-family: var(--font-mono, ui-monospace, Menlo, monospace); font-size: .82rem; line-height: 1.65; }
+.ag-guide-done { display: flex; align-items: flex-start; gap: .6rem; margin: 0; padding: .8rem .95rem; border-radius: 14px; background: color-mix(in srgb, #10B981 11%, transparent); font-size: .92rem; line-height: 1.6; }
+.ag-guide-done i { width: 22px; height: 22px; flex: 0 0 auto; margin-top: .05rem; border-radius: 50%; background: #10B981 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 13px no-repeat; }
+.ag-guide-download { justify-self: start; }
+@media (max-width: 560px) { .ag-dialog.ag-guide { padding: 1.2rem 1.1rem 1.1rem; } .ag-guide-steps li { padding-inline-start: 3rem; } }
