@@ -51,6 +51,7 @@ return [
     'card_missed' => '{1} 1 missed call today|[2,*] :count missed calls today',
     'card_none' => 'No calls yet',
     'card_setup' => 'Setup not finished',
+    'all_agents' => 'All agents',
     'menu_overview' => 'Overview',
     'menu_plan' => 'Plan and billing',
     'menu_guide' => 'How agents work',

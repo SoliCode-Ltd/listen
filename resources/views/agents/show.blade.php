@@ -30,6 +30,31 @@
   @endphp
 
   <main class="ag ag-page" id="agents">
+    {{-- The studio's frame: the agent's sections in a menu down the side, then all the agents, help and
+         the legal pages at its foot. A strip of tabs across the top on tablets and phones. --}}
+    <div class="ag-layout">
+      <aside class="ag-side">
+        <div class="ag-side-inner">
+          <nav class="ag-tabs" role="tablist" aria-label="{{ $agent->name }}">
+            @php
+              $tabIcons = [
+                'overview' => '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>',
+                'setup' => '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+                'knowledge' => '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5"/>',
+                'design' => '<path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.8 1.6-1.6 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-4.1-4-7.4-9-7.4z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/>',
+                'live' => '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5z"/>',
+                'conversations' => '<path d="M20 12a7.5 7.5 0 0 1-11 6.6L4 20l1.4-4.4A7.5 7.5 0 1 1 20 12z"/>',
+                'customers' => '<circle cx="9" cy="8" r="3.5"/><path d="M2.8 20a6.4 6.4 0 0 1 12.4 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14a6.4 6.4 0 0 1 2.7 6"/>',
+              ];
+            @endphp
+            @foreach(['overview', 'setup', 'knowledge', 'design', 'live', 'conversations', 'customers'] as $tab)
+              @php $n = ['conversations' => $conversations->count(), 'customers' => $stats['contacts']][$tab] ?? 0; @endphp
+              <button type="button" role="tab" class="ag-tab" data-ag-tab="{{ $tab }}"><svg viewBox="0 0 24 24" aria-hidden="true">{!! $tabIcons[$tab] !!}</svg><span>{{ __('agents.tabs.'.$tab) }}</span>@if($n > 0)<small class="ag-tab-count">{{ $n > 99 ? '99+' : $n }}</small>@endif</button>
+            @endforeach
+          </nav>
+          @include('agents.partials.side-foot', ['back' => true])
+        </div>
+      </aside>
     <div class="ag-main">
     {{-- What needs the owner now: Listen suspended it, the check paused it, or callers could not reach it today. --}}
     @if($suspended)
@@ -71,27 +96,6 @@
         @endif
       </div>
     </section>
-
-    {{-- The agent's sections in one bar under its name (the content runs the page's full width, with no
-         side column); it stays in view while the section scrolls, as a strip of tabs on phones. --}}
-    <nav class="ag-tabs" role="tablist" aria-label="{{ $agent->name }}">
-        @php
-          $tabIcons = [
-            'overview' => '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>',
-            'setup' => '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
-            'knowledge' => '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5"/>',
-            'design' => '<path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.8 1.6-1.6 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-4.1-4-7.4-9-7.4z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/>',
-            'live' => '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5z"/>',
-            'conversations' => '<path d="M20 12a7.5 7.5 0 0 1-11 6.6L4 20l1.4-4.4A7.5 7.5 0 1 1 20 12z"/>',
-            'customers' => '<circle cx="9" cy="8" r="3.5"/><path d="M2.8 20a6.4 6.4 0 0 1 12.4 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14a6.4 6.4 0 0 1 2.7 6"/>',
-          ];
-        @endphp
-        @foreach(['overview', 'setup', 'knowledge', 'design', 'live', 'conversations', 'customers'] as $tab)
-          @php $n = ['conversations' => $conversations->count(), 'customers' => $stats['contacts']][$tab] ?? 0; @endphp
-          <button type="button" role="tab" class="ag-tab" data-ag-tab="{{ $tab }}"><svg viewBox="0 0 24 24" aria-hidden="true">{!! $tabIcons[$tab] !!}</svg><span>{{ __('agents.tabs.'.$tab) }}</span>@if($n > 0)<small class="ag-tab-count">{{ $n > 99 ? '99+' : $n }}</small>@endif</button>
-        @endforeach
-      </nav>
-
 
     {{-- Overview: next steps, this month, and talking to it. --}}
     <section class="ag-panel" data-ag-panel="overview">
@@ -351,6 +355,7 @@
         </div>
       @endif
     </section>
+    </div>
     </div>
     <div class="ag-toast" data-ag-toast role="status" aria-live="polite"></div>
   </main>

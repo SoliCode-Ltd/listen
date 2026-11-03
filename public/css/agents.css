@@ -57,6 +57,10 @@
 .ag-pill.is-live i { animation: ag-pulse 1.8s ease-in-out infinite; }
 .ag-pill.is-paused { background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--muted); }
 .ag-pill.is-draft { background: color-mix(in srgb, var(--ag-warn) 16%, transparent); color: var(--ag-warn); }
+/* Light: the status and warning words dark enough to read on their pale tints (4.5:1 and more). */
+html[data-theme="light"] .ag-pill.is-live { color: #1b6e4f; }
+html[data-theme="light"] .ag-pill.is-draft { color: #8a5a12; }
+html[data-theme="light"] .ag-agent-miss, html[data-theme="light"] .ag-notice.is-warn { color: #855a17; }
 @keyframes ag-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.8); } }
 
 /* Page head. */
@@ -998,14 +1002,13 @@ html[dir="rtl"] .ag-home-head h1 { letter-spacing: 0; }
 .ag-home-head p { margin-top: .35rem; max-width: 60ch; color: var(--muted); font-size: 1rem; line-height: 1.6; }
 .ag-home-plan { display: inline-flex; align-items: center; gap: .45rem; padding: .45rem .9rem; border-radius: 999px; border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line)); background: color-mix(in oklab, var(--a) 6%, var(--surface)); color: var(--text); font-size: .88rem; font-weight: 700; white-space: nowrap; }
 .ag-home-plan svg { width: 16px; height: 16px; fill: none; stroke: var(--accent-text, var(--a)); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-/* Under the header and the sections bar. */
+/* Under the header and the strip of tabs (tablets and phones). */
 .ag-home [id], .ag-home .us.us-embed { scroll-margin-top: 135px; }
 .ag-tabs a.ag-tab { text-decoration: none; }
-.ag-main > .ag-tabs:first-child { margin-top: 0; }
-/* The list is one column as wide as the header, edge to edge with the logo and the account menu,
-   and its cards fill each row (two or three to a row, set by the page). */
+/* The cards fill each row (two or three to a row, set by the page). */
 .ag-home .ag-grid { grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
-@media (max-width: 1100px) { .ag-home .ag-grid { grid-template-columns: repeat(min(2, var(--cols, 2)), minmax(0, 1fr)); } }
+/* Three to a row only where the content beside the menu is wide enough for three. */
+@media (max-width: 1280px) { .ag-home .ag-grid { grid-template-columns: repeat(min(2, var(--cols, 2)), minmax(0, 1fr)); } }
 @media (max-width: 700px) { .ag-home .ag-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* What needs the owner now (suspended, paused by the check, missed calls, a go-live refusal). */
@@ -1047,18 +1050,47 @@ html[dir="rtl"] .ag-home-head h1 { letter-spacing: 0; }
 /* The agents list: where the credits went, under the agents. */
 .ag-usage > .us { margin-top: 1.6rem; }
 
-/* An agent's page: its name, then its sections in one bar across the page (the content runs the full
-   width, no side column), the bar staying in view as the section scrolls; a strip of tabs on phones. */
-/* As wide as the header, so the page lines up with the logo and the account menu. */
+/* The Agents list and an agent's page in the studio's frame, measure for measure: the studio's width
+   (the menu at the window's edge, no empty band beside it), a 220px menu column whose divider runs
+   from the header to the bottom of the window, the menu staying in view as the page scrolls, an icon
+   per item and the open one tinted with a solid mark, help and the legal pages at its foot.
+   On tablets and phones the menu is a strip of tabs across the top that stays in view. */
 .ag.ag-page { max-width: 1400px; padding-inline: clamp(1rem, 2vw, 1.5rem); }
+.ag-layout { display: block; }
+.ag-side, .ag-side-inner { display: contents; }
+.ag-side-foot { display: none; }
 .ag-main { min-width: 0; }
 .ag-tab svg { display: none; }
 .ag-main > .ag-hero:first-child, .ag-main > .ag-notice:first-child { margin-top: 0; }
-@media (min-width: 1021px) {
-  .ag-main > .ag-tabs { gap: .35rem; margin: 1.5rem 0 1.75rem; }
-  .ag-main > .ag-tabs .ag-tab { gap: .55rem; min-height: 52px; padding: .55rem 1rem; font-size: .95rem; }
-  .ag-main > .ag-tabs .ag-tab svg { display: block; flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .ag-main > .ag-tabs .ag-tab.is-current { color: var(--accent-text, var(--a)); }
+@media (min-width: 1101px) {
+  /* The studio's shell: the menu and the content start 3.5rem under the header, as in the studio. */
+  .ag.ag-page { max-width: 1880px; padding: 3.5rem clamp(.75rem, 1.8vw, 1.75rem) 3rem; }
+  .ag-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 1.75rem; align-items: start; min-height: calc(100vh - 10.75rem); }
+  .ag-side { display: block; position: relative; align-self: stretch; padding-inline-end: 1rem; }
+  .ag-side::after { content: ""; position: absolute; top: -3.5rem; bottom: -3rem; inset-inline-end: 0; width: 1px; background: var(--line); }
+  .ag-side-inner { display: block; position: sticky; top: 5.5rem; }
+  .ag-side .ag-tabs { position: static; display: grid; gap: 2px; margin: 0; padding: 0; overflow: visible; border: 0; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .ag-side .ag-tab { display: flex; width: 100%; min-height: 42px; gap: .7rem; padding: .55rem .75rem; border-radius: 10px; color: var(--muted); font-size: .92rem; font-weight: 600; line-height: 1.3; text-align: start; transition: background-color .15s ease, color .15s ease; }
+  .ag-side .ag-tab::after { display: none; }
+  .ag-side .ag-tab svg { display: block; flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .ag-side .ag-tab:hover { color: var(--text); background: var(--surface2, var(--ag-soft)); }
+  .ag-side .ag-tab:focus-visible { outline: 2px solid var(--a); outline-offset: 1px; }
+  .ag-side .ag-tab.is-current { color: var(--accent-text, var(--a)); background: color-mix(in oklab, var(--a) 9%, var(--surface)); font-weight: 700; }
+  .ag-side .ag-tab.is-current::before { content: ""; position: absolute; inset-inline-start: -1px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--a); }
+  html[dir="rtl"] .ag-side .ag-tab.is-current::before { border-radius: 3px 0 0 3px; }
+  .ag-side .ag-tab-count { margin-inline-start: auto; }
+  .ag-side-foot { display: flex; flex-direction: column; gap: .35rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+  .ag-side-link { display: flex; align-items: center; gap: .7rem; min-height: 40px; padding: .45rem .75rem; border-radius: 10px; color: var(--muted); font-size: .9rem; font-weight: 600; text-decoration: none; transition: background-color .15s ease, color .15s ease; }
+  .ag-side-link:hover { color: var(--text); background: var(--surface2, var(--ag-soft)); }
+  .ag-side-link:focus-visible { outline: 2px solid var(--a); outline-offset: 1px; }
+  .ag-side-link svg { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .ag-side-legal { display: flex; flex-wrap: wrap; gap: .25rem 1rem; padding: .2rem .75rem; }
+  .ag-side-legal a { display: inline-flex; align-items: center; min-height: 24px; color: var(--muted); font-size: .8rem; text-decoration: none; }
+  .ag-side-legal a:hover { color: var(--text); text-decoration: underline; }
+  /* Only the header above a section the menu scrolls to. */
+  .ag-home [id], .ag-home .us.us-embed { scroll-margin-top: 5.5rem; }
+  /* Room between the agent's header and the section under it. */
+  .ag-main .ag-panel.is-current { padding-top: 1.6rem; }
 }
 
 /* The agents list: one account summary at the top, the agents with this month's numbers, a card to add one. */
@@ -1162,4 +1194,4 @@ html[dir="rtl"] .ag-site-name bdi { text-align: right; }
 /* The call card and the next steps side by side at one height, the call centred in its card. */
 .ag-panel[data-ag-panel="overview"] > .ag-two { align-items: stretch; }
 .ag-panel[data-ag-panel="overview"] > .ag-two > .ag-section:has(> .ag-talk) { display: grid; align-content: center; }
-@media (max-width: 1020px) { .ag-main .ag-panel.is-current { padding-top: .4rem; } }
+@media (max-width: 1100px) { .ag-main .ag-panel.is-current { padding-top: .4rem; } }

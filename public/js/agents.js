@@ -646,8 +646,8 @@
 
   /* ---------- An agent's page ---------- */
   function agentPage() {
-    var tabs = $$('[data-ag-tab]'), panels = $$('[data-ag-panel]');
-    function open(name) {
+    var tabs = $$('[data-ag-tab]'), panels = $$('[data-ag-panel]'), main = $('.ag-main');
+    function open(name, fromMenu) {
       if (!$('[data-ag-panel="' + name + '"]')) name = 'overview';
       tabs.forEach(function (t) {
         var on = t.getAttribute('data-ag-tab') === name;
@@ -665,8 +665,13 @@
         if (on) $$('.ag-grow', p).forEach(grow);
       });
       if (history.replaceState) history.replaceState(null, '', '#' + name);
+      // The menu stays in view as a long section scrolls: a section opened from far down starts at its top.
+      if (fromMenu && main) {
+        var top = main.getBoundingClientRect().top + window.pageYOffset - (window.innerWidth > 1020 ? 88 : 125);
+        if (window.pageYOffset > top + 40) window.scrollTo({ top: Math.max(0, top), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      }
     }
-    tabs.forEach(function (t) { t.addEventListener('click', function () { open(t.getAttribute('data-ag-tab')); }); });
+    tabs.forEach(function (t) { t.addEventListener('click', function () { open(t.getAttribute('data-ag-tab'), true); }); });
     $$('[data-ag-tab-go]').forEach(function (b) { b.addEventListener('click', function () { open(b.getAttribute('data-ag-tab-go')); }); });
     open((location.hash || '#overview').slice(1));
 
