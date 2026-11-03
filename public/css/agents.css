@@ -271,15 +271,17 @@ button.ag-platform { width: 100%; font-family: inherit; text-align: start; curso
 .ag-seen.is-on i { background: var(--ag-ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ag-ok) 20%, transparent); }
 /* A website builder's steps. */
 .ag-dialog { width: min(560px, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); padding: 1.4rem; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); color: var(--text); box-shadow: 0 30px 80px -24px rgba(10, 8, 40, .55); }
-.ag-dialog[open] { display: grid; gap: 1rem; animation: ag-dialog-in .32s var(--ag-ease); }
+/* One column that never grows past the window: long code scrolls in its own box, long paths wrap. */
+.ag-dialog[open] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; overflow-x: hidden; animation: ag-dialog-in .32s var(--ag-ease); }
 .ag-dialog::backdrop { background: rgba(12, 10, 34, .45); backdrop-filter: blur(3px); }
 .ag-dialog-head { display: flex; align-items: center; gap: .7rem; }
 .ag-dialog-head h3 { flex: 1; font-size: 1.15rem; font-weight: 800; }
 .ag-dialog-x { min-height: 36px; width: 36px; padding: 0; }
 .ag-steps { display: grid; gap: .75rem; margin: 0; padding: 0; list-style: none; counter-reset: ag-step; }
-.ag-steps li { position: relative; padding-inline-start: 2.4rem; line-height: 1.6; counter-increment: ag-step; }
+.ag-steps li { position: relative; padding-inline-start: 2.4rem; line-height: 1.6; counter-increment: ag-step; overflow-wrap: anywhere; }
 .ag-steps li::before { content: counter(ag-step); position: absolute; inset-inline-start: 0; top: 0; width: 1.7rem; height: 1.7rem; border-radius: 50%; display: grid; place-items: center; background: var(--ag-soft-2); color: var(--accent-text, var(--a)); font-weight: 800; font-size: .85rem; }
-.ag-dialog .ag-hint { color: var(--muted); font-size: .86rem; line-height: 1.55; }
+.ag-dialog .ag-hint { color: var(--muted); font-size: .86rem; line-height: 1.55; overflow-wrap: anywhere; }
+.ag-steps code { padding: .05rem .38rem; border-radius: 6px; background: var(--ag-soft, rgba(118, 89, 250, .08)); font-family: var(--font-mono, ui-monospace, Menlo, monospace); font-size: .82em; unicode-bidi: isolate; overflow-wrap: anywhere; }
 @keyframes ag-dialog-in { from { opacity: 0; transform: translateY(12px) scale(.98); } }
 .ag-golive { display: grid; justify-items: center; gap: .8rem; padding: 1.4rem; border-radius: 18px; background: var(--ag-soft); text-align: center; }
 .ag-success { display: none; justify-items: center; gap: .6rem; }
@@ -346,7 +348,10 @@ button.ag-platform { width: 100%; font-family: inherit; text-align: start; curso
 .ag-start-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; width: min(860px, 100%); margin-top: 1rem; }
 .ag-start-card { display: grid; justify-items: start; gap: .7rem; padding: 1.5rem; text-align: start; text-decoration: none; color: inherit; transition: transform .25s var(--ag-ease), border-color .2s ease, box-shadow .25s ease; }
 .ag-start-card:hover { transform: translateY(-4px); border-color: var(--a); box-shadow: 0 22px 50px -30px color-mix(in srgb, var(--a) 80%, transparent); }
-.ag-start-card .orb { --orb-size: 68px; width: 68px; height: 68px; }
+.ag-start-icon { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 18px; background: color-mix(in srgb, var(--a) 11%, var(--bg)); color: var(--a); border: 1px solid color-mix(in srgb, var(--a) 24%, transparent); transition: transform .3s var(--ag-ease), background .3s ease, color .3s ease; }
+.ag-start-icon svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.ag-start-card.is-agents .ag-start-icon { background: var(--a); color: #fff; border-color: transparent; box-shadow: 0 14px 28px -14px var(--a); }
+.ag-start-card:hover .ag-start-icon { transform: scale(1.06); }
 .ag-start-card h2 { font-size: 1.3rem; font-weight: 800; }
 .ag-start-card p { color: var(--muted); line-height: 1.6; }
 

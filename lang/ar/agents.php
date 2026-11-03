@@ -193,23 +193,23 @@ return [
             'steps' => [
                 'من لوحة تحكم متجرك في شوبيفاي افتح Online Store ثم Themes، واضغط Customize بجانب القالب الحالي.',
                 'في القائمة الجانبية، تحت Footer اضغط Add section واختر Custom Liquid، ثم الصق هذا السطر في خانته.',
-                'اضغط Save. إذا لم يكن في قالبك قسم Custom Liquid، فاضغط ⋯ بجانب القالب ثم Edit code، وافتح theme.liquid من قسم Layout، والصق السطر قبل </body> مباشرة، ثم اضغط Save.',
+                'اضغط Save. إذا لم يكن في قالبك قسم Custom Liquid، فاضغط ⋯ بجانب القالب ثم Edit code، وافتح `theme.liquid` من قسم Layout، والصق السطر قبل `</body>` مباشرة، ثم اضغط Save.',
             ],
             'done' => 'زر الاتصال يظهر في كل صفحات متجرك ما عدا صفحة الدفع.',
         ],
         'wix' => [
             'steps' => [
-                'من لوحة تحكم ويكس افتح Settings، ثم Custom code من قسم Advanced، واضغط + Add Custom Code.',
-                'الصق هذا السطر وسمّه «زر اتصال إسمع». اختر All pages ثم Load code once، ومن Place Code in اختر Body - end.',
+                'من لوحة تحكم ويكس افتح Settings، ثم Custom code من قسم Advanced، واضغط `+ Add Custom Code`.',
+                'الصق هذا السطر وسمّه «زر اتصال إسمع». اختر All pages ثم Load code once، ومن Place Code in اختر `Body - end`.',
                 'اضغط Apply، ثم افتح موقعك المنشور.',
             ],
             'done' => 'الأكواد المخصصة في ويكس تعمل مع الباقات المدفوعة (Premium) والنطاق الخاص.',
         ],
         'laravel' => [
             'steps' => [
-                'أضف مفتاح وكيلك إلى ملف .env هكذا: LISTEN_AGENT_KEY= ثم قيمة data-agent من السطر بالأسفل، وأضف \'listen\' => [\'agent_key\' => env(\'LISTEN_AGENT_KEY\')], إلى config/services.php.',
-                'افتح ملف Blade الذي يُغلق </body> في كل صفحاتك (غالبًا resources/views/layouts/app.blade.php، أو resources/views/app.blade.php في تطبيقات Inertia). الصق السطر بالأسفل قبل </body> مباشرة، واجعل data-agent="{{ config(\'services.listen.agent_key\') }}".',
-                'إذا كان تطبيقك يرسل Content-Security-Policy مع Vite::useCspNonce()، فأضف nonce="{{ Vite::cspNonce() }}" إلى السطر و\'strict-dynamic\' إلى script-src (وعنوان إسمع إلى connect-src إن كنت تقيّده). انشر التعديل، ثم شغّل php artisan config:cache.',
+                'أضف مفتاح وكيلك إلى ملف `.env` هكذا: `LISTEN_AGENT_KEY=` ثم قيمة `data-agent` من السطر بالأسفل، وأضف `\'listen\' => [\'agent_key\' => env(\'LISTEN_AGENT_KEY\')],` إلى `config/services.php`.',
+                'افتح ملف Blade الذي يُغلق `</body>` في كل صفحاتك (غالبًا `resources/views/layouts/app.blade.php`، أو `resources/views/app.blade.php` في تطبيقات Inertia). الصق السطر بالأسفل قبل `</body>` مباشرة، واجعل `data-agent="{{ config(\'services.listen.agent_key\') }}"`.',
+                'إذا كان تطبيقك يرسل Content-Security-Policy مع `Vite::useCspNonce()`، فأضف `nonce="{{ Vite::cspNonce() }}"` إلى السطر و`\'strict-dynamic\'` إلى `script-src` (وعنوان إسمع إلى `connect-src` إن كنت تقيّده). انشر التعديل، ثم شغّل `php artisan config:cache`.',
             ],
             'done' => 'زر الاتصال يظهر في كل صفحة تستخدم هذا التصميم.',
         ],

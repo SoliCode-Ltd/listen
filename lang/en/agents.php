@@ -193,23 +193,23 @@ return [
             'steps' => [
                 'In your Shopify admin, open Online Store, then Themes, and click Customize next to your current theme.',
                 'In the left panel, under Footer, click Add section and choose Custom Liquid. Paste this line in its box.',
-                'Click Save. If your theme has no Custom Liquid section, click ⋯ next to the theme, then Edit code, open theme.liquid under Layout, paste the line just before </body> and click Save.',
+                'Click Save. If your theme has no Custom Liquid section, click ⋯ next to the theme, then Edit code, open `theme.liquid` under Layout, paste the line just before `</body>` and click Save.',
             ],
             'done' => 'The call button shows on every page of your store, except checkout.',
         ],
         'wix' => [
             'steps' => [
-                'In your Wix dashboard, open Settings, then Custom code (under Advanced), and click + Add Custom Code.',
-                'Paste this line and name it Listen call button. Choose All pages and Load code once, and under Place Code in choose Body - end.',
+                'In your Wix dashboard, open Settings, then Custom code (under Advanced), and click `+ Add Custom Code`.',
+                'Paste this line and name it Listen call button. Choose All pages and Load code once, and under Place Code in choose `Body - end`.',
                 'Click Apply, then open your published site.',
             ],
             'done' => 'Custom code works on Wix sites with a Premium plan and a connected domain.',
         ],
         'laravel' => [
             'steps' => [
-                'Add your agent key to .env as LISTEN_AGENT_KEY= followed by the data-agent value in the line below, and add \'listen\' => [\'agent_key\' => env(\'LISTEN_AGENT_KEY\')], to config/services.php.',
-                'Open the Blade file that closes </body> on all your pages (usually resources/views/layouts/app.blade.php, or resources/views/app.blade.php in Inertia apps). Paste the line below just before </body>, with data-agent="{{ config(\'services.listen.agent_key\') }}".',
-                'If your app sends a Content-Security-Policy with Vite::useCspNonce(), add nonce="{{ Vite::cspNonce() }}" to the line and \'strict-dynamic\' to script-src (and Listen\'s address to connect-src, if you limit it). Deploy, then run php artisan config:cache.',
+                'Add your agent key to `.env` as `LISTEN_AGENT_KEY=` followed by the `data-agent` value in the line below, and add `\'listen\' => [\'agent_key\' => env(\'LISTEN_AGENT_KEY\')],` to `config/services.php`.',
+                'Open the Blade file that closes `</body>` on all your pages (usually `resources/views/layouts/app.blade.php`, or `resources/views/app.blade.php` in Inertia apps). Paste the line below just before `</body>`, with `data-agent="{{ config(\'services.listen.agent_key\') }}"`.',
+                'If your app sends a Content-Security-Policy with `Vite::useCspNonce()`, add `nonce="{{ Vite::cspNonce() }}"` to the line and `\'strict-dynamic\'` to `script-src` (and Listen\'s address to `connect-src`, if you limit it). Deploy, then run `php artisan config:cache`.',
             ],
             'done' => 'The call button shows on every page that uses this layout.',
         ],

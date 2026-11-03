@@ -92,7 +92,8 @@
       </div>
       <ol class="ag-steps">
         @foreach(__('agents.guides.'.$key.'.steps') as $step)
-          <li>{{ $step }}</li>
+          {{-- `code` in a step shows as code, always left to right inside Arabic sentences. --}}
+          <li>{!! preg_replace('/`([^`]+)`/', '<code dir="ltr">$1</code>', e($step)) !!}</li>
         @endforeach
       </ol>
       @if($kind === 'plugin')

@@ -9,14 +9,15 @@
       <h1>{{ __('agents.start_title') }}</h1>
       <p>{{ __('agents.start_subtitle') }}</p>
       <div class="ag-start-cards">
-        <a class="ag-card ag-start-card" href="{{ $studioUrl }}" data-orb-host>
-          <x-orb name="arabic" />
+        {{-- Clean icons, not orbs: the Studio's sound waves, the agent's call button. --}}
+        <a class="ag-card ag-start-card" href="{{ $studioUrl }}">
+          <span class="ag-start-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 10.5v3M7.5 7.5v9M12 4v16M16.5 7.5v9M20.5 10.5v3"/></svg></span>
           <h2>{{ __('agents.start_studio_title') }}</h2>
           <p>{{ __('agents.start_studio_text') }}</p>
           <span class="ag-btn ag-btn-sm">{{ __('agents.switch_studio') }}</span>
         </a>
-        <a class="ag-card ag-start-card" href="{{ $agentsUrl }}" data-orb-host>
-          <x-orb name="listen" />
+        <a class="ag-card ag-start-card is-agents" href="{{ $agentsUrl }}">
+          <span class="ag-start-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5.1 3.5h3.1l1.6 4.1-2 1.3a11.3 11.3 0 0 0 5.3 5.3l1.3-2 4.1 1.6v3.1a2 2 0 0 1-2.2 2A16.6 16.6 0 0 1 3.1 5.7a2 2 0 0 1 2-2.2z"/></svg></span>
           <h2>{{ __('agents.start_agents_title') }}</h2>
           <p>{{ __('agents.start_agents_text') }}</p>
           <span class="ag-btn ag-btn-sm ag-btn-primary">{{ __('agents.empty_cta') }}</span>
@@ -27,6 +28,5 @@
   </main>
 
   @include('components.scripts')
-  @include('components.orb-script')
 </body>
 </html>
