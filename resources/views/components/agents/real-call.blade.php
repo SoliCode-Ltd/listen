@@ -2,62 +2,49 @@
      following the voice (js/listen-orbs.js reads the stage's loudness), and what the business is left
      with at the end. Before it plays, the first lines show.
 
-     On the Arabic pages it is a real call with Listen's own agent, recorded live (Saudi and
-     Egyptian, the agent's own voice). The English pages show English voices only, so there it plays
-     an English call as it goes, in words (American and British): no recording is passed off as one. --}}
+     Real calls, recorded live with sample businesses (php artisan agents:live-setup --sample=...):
+     the agent's own voice from the voice library, women and men. Each page has its own language's
+     calls only: Saudi, Emirati, Egyptian and Lebanese on the Arabic pages; American, British and
+     Irish on the English pages. --}}
 @props(['size' => 'home', 'visual' => 'orb'])
 @php
   $english = app()->getLocale() === 'en';
+  $calls = (array) __('agents_landing.real_calls');
+  $order = array_values(array_filter((array) __('agents_landing.real_order'), fn ($k) => isset($calls[$k])));
   $data = [];
-  if (! $english) {
-    $calls = __('agents_landing.real_calls');
-    $order = array_values(array_filter((array) __('agents_landing.real_order'), fn ($k) => isset($calls[$k])));
-    foreach ($order as $key) {
-      $c = $calls[$key];
-      $data[$key] = [
-        'label' => $c['label'],
-        'agent' => $c['agent'],
-        'dialect' => $c['dialect'],
-        'avatar' => asset('images/speakers/'.$c['avatar'].'.webp'),
-        'dir' => 'rtl', 'lang' => 'ar',
-        'turns' => array_map(fn ($t) => [
-          'role' => $t[0],
-          'text' => $t[1],
-          'gloss' => '',
-          'audio' => ! empty($t[3]) ? asset('audio/agents/calls/'.$t[3].'.mp3').'?v='.@filemtime(public_path('audio/agents/calls/'.$t[3].'.mp3')) : null,
-        ], $c['turns']),
-        'result' => $c['result'],
-      ];
-    }
-    $labels = ['play' => __('agents_landing.real_play'), 'again' => __('agents_landing.real_again'), 'note' => __('agents_landing.real_note')];
-  } else {
-    $scenes = __('agents_landing.scenes');
-    $order = array_values(array_filter((array) __('agents_landing.scene_order_home'), fn ($k) => isset($scenes[$k])));
-    foreach ($order as $key) {
-      $c = $scenes[$key];
-      $data[$key] = [
-        'label' => $c['label'],
-        'agent' => $c['agent'],
-        'dialect' => $c['business'],
-        'avatar' => asset('images/speakers/'.$c['avatar'].'.webp').'?v=1',
-        'dir' => 'ltr', 'lang' => 'en',
-        'turns' => array_map(fn ($l) => ['role' => $l[0], 'text' => $l[1], 'gloss' => '', 'audio' => null], $c['lines']),
-        'result' => [$c['chip'], ''],
-      ];
-    }
-    $labels = ['play' => __('agents_landing.scene_play'), 'again' => __('agents_landing.scene_again'), 'note' => __('agents_landing.scene_note')];
+  // Each line as a page shows it: numbers read back digit by digit written as numbers, and on the
+  // Arabic page every spaced number kept in its own order (App\Support\Agents\SpokenNumbers).
+  $show = fn (string $text) => \App\Support\Agents\SpokenNumbers::forDisplay($text, ! $english);
+  foreach ($order as $key) {
+    $c = $calls[$key];
+    $data[$key] = [
+      'label' => $c['label'],
+      'agent' => $c['agent'],
+      'business' => $c['business'] ?? '',
+      'dialect' => $c['dialect'],
+      'avatar' => asset('images/speakers/'.$c['avatar'].'.webp').'?v=1',
+      'dir' => $english ? 'ltr' : 'rtl', 'lang' => $english ? 'en' : 'ar',
+      'turns' => array_map(fn ($t) => [
+        'role' => $t[0],
+        'text' => $show($t[1]),
+        'gloss' => '',
+        'audio' => ! empty($t[3]) ? asset('audio/agents/calls/'.$t[3].'.mp3').'?v='.@filemtime(public_path('audio/agents/calls/'.$t[3].'.mp3')) : null,
+      ], $c['turns']),
+      'result' => [$show($c['result'][0]), $show($c['result'][1])],
+    ];
   }
+  $labels = ['play' => __('agents_landing.real_play'), 'again' => __('agents_landing.real_again'), 'note' => __('agents_landing.real_note')];
   $first = $data[$order[0]];
   // At rest, the first three lines (the third fades out at the card's edge: the call goes on).
   $rest = 3;
 @endphp
 {{-- visual "face": the agent's photo with rings that follow the voice, for a page that already has its one orb. --}}
-<div {{ $attributes->merge(['class' => 'agl-real is-'.$size.($english ? ' is-scene' : '').($visual === 'face' ? ' has-face' : '')]) }} data-agl-real data-vs-cast>
+<div {{ $attributes->merge(['class' => 'agl-real is-'.$size.($visual === 'face' ? ' has-face' : '')]) }} data-agl-real data-vs-cast>
   <div class="agl-real-top">
     <span class="agl-real-face" aria-hidden="true"><img src="{{ $first['avatar'] }}" alt="" width="46" height="46" data-agl-real-face></span>
     <div class="agl-real-who">
       <b data-agl-real-name>{{ $first['agent'] }}</b>
-      <small data-agl-real-dialect>{{ $first['dialect'] }}</small>
+      <small><span data-agl-real-biz>{{ $first['business'] }}</span><span data-agl-real-dialect>{{ $first['dialect'] }}</span></small>
     </div>
     <div class="agl-real-switch" role="radiogroup" aria-label="{{ __('agents_landing.real_switch') }}">
       @foreach($order as $key)

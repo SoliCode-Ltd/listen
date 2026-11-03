@@ -9,7 +9,7 @@ return [
     'hero_text' => 'Your agent answers questions from your prices and hours, takes names and numbers, and books visits. On your website, a link or a QR code, day and night.',
     'hero_cta' => 'Create my agent',
     'hero_cta_member' => 'Open my agents',
-    'hero_note' => 'Your first two minutes of test calls are free.',
+    'hero_note' => '{1} Your first minute of test calls is free.|[2,*] Your first :count minutes of test calls are free.',
     'hero_watch' => 'Watch a call',
 
     // The call in the hero.
@@ -180,7 +180,7 @@ return [
     // A real call with Listen's own agent, recorded live (components/agents/real-call): the caller's
     // words, the agent's own voice with its words as it says them, and what the business gets.
     'real_title' => 'Hear a real call',
-    'real_text' => 'Fatima answers in Saudi Arabic and Sumaya in Egyptian. The voice, the pauses and the number read back digit by digit, exactly as your callers hear them.',
+    'real_text' => 'Three calls in three accents: Caleb in Phoenix, Alice in Norwich and Sienna in Galway. The voice, the pauses and the number read back digit by digit, exactly as your callers hear them.',
     'scene_play' => 'Watch a call',
     'scene_again' => 'Watch it again',
     'scene_note' => 'Every call ends with something done for your team.',
@@ -188,32 +188,48 @@ return [
     'real_play' => 'Hear a real call',
     'real_pause' => 'Pause',
     'real_again' => 'Hear it again',
-    'real_switch' => 'Dialect',
-    'real_note' => 'Recorded live on a call with Listen\'s own agent. Nothing was edited.',
+    'real_switch' => 'Accent',
+    'real_note' => 'The agent\'s voice is recorded live from calls with sample businesses, exactly as it spoke. The caller\'s lines are written.',
     'real_caller' => 'Caller',
     'real_calls' => [
-        'sa' => [
-            'label' => 'Saudi', 'agent' => 'Fatima', 'avatar' => 'ar-fatima', 'dialect' => 'Saudi Arabic, Najdi',
+        'us' => [
+            'label' => 'American', 'agent' => 'Caleb', 'avatar' => 'en-caleb', 'business' => 'Sunset Auto Care', 'dialect' => 'American (General)',
             'turns' => [
-                ['caller', 'السلام عليكم', 'Hello.'],
-                ['agent', 'وعليكم السلام ورحمة الله وبركاته، هلا والله! معك فاطمة من Listen، وش تبي تستفسر عنه اليوم؟', 'Hello, and welcome! This is Fatima from Listen. What can I help you with today?', 'sa-1'],
-                ['caller', 'أبي أحد من الفريق يتصل فيني بخصوص باقة للشركة، اسمي محمد ورقمي 0501234567', 'I\'d like someone from the team to call me about a plan for my company. I\'m Mohammed, my number is 0501234567.'],
-                ['agent', 'أبشر يا محمد، الرقم صفر خمسة صفر واحد اثنين ثلاثة أربعة خمسة ستة سبعة. بيجيك اتصال من الفريق قريب إن شاء الله.', 'Of course, Mohammed. Your number is 0 5 0 1 2 3 4 5 6 7. Someone from the team will call you soon.', 'sa-2'],
+                ['caller', 'Hi, do you guys have time for an oil change today, maybe around three?'],
+                ['agent', 'Yes, we do have an opening for an oil change today at three pm. To secure that time, may I have your name and phone number, please?', '', 'en-us-1'],
+                ['caller', 'Perfect. My name is Jake, and my number is 555 210 4876.'],
+                ['agent', 'Thank you, Jake. Let me confirm your number: five five five, two one zero, four eight seven six. Everything is set, Jake. We\'ll see you today at three pm.', '', 'en-us-2'],
+                ['caller', 'Yep, that\'s right. Thanks!'],
+                ['agent', 'You\'re very welcome! Have a great day. Goodbye.', '', 'en-us-3'],
             ],
-            'result' => ['Callback saved', 'Mohammed · 050 123 4567 · a plan for his company'],
+            'result' => ['Booking request saved', 'Jake · 555 210 4876 · Oil change, today at 3 pm'],
         ],
-        'eg' => [
-            'label' => 'Egyptian', 'agent' => 'Sumaya', 'avatar' => 'ar-sumaya', 'dialect' => 'Egyptian Arabic, Cairene',
+        'gb' => [
+            'label' => 'British', 'agent' => 'Alice', 'avatar' => 'en-alice', 'business' => 'Bloom and Willow', 'dialect' => 'British (East Anglian)',
             'turns' => [
-                ['caller', 'السلام عليكم', 'Hello.'],
-                ['agent', 'وعليكم السلام ورحمة الله وبركاته. أهلاً بيك في Listen! أقدر أساعدك إزاي النهاردة؟', 'Hello, and welcome to Listen! How can I help you today?', 'eg-1'],
-                ['caller', 'عايز حد من الفريق يكلمني بخصوص باقة للشركة، اسمي أحمد ورقمي 01012345678', 'I want someone from the team to call me about a plan for my company. I\'m Ahmed, my number is 01012345678.'],
-                ['agent', 'تمام يا أستاذ أحمد، خليني أتأكد من الرقم: صفر واحد صفر واحد اتنين تلاتة أربعة خمسة ستة سبعة تمانية، صح كده؟', 'Sure, Mr Ahmed. Let me check the number: 0 1 0 1 2 3 4 5 6 7 8. Is that right?', 'eg-2'],
+                ['caller', 'Hello, could I order some flowers for delivery tomorrow?'],
+                ['agent', 'Hello! Yes, we can certainly arrange a delivery for tomorrow. What flowers do you have in mind?', '', 'en-gb-1'],
+                ['caller', 'Something bright, around forty pounds. I\'m Sophie, and my number is 07700 900123.'],
+                ['agent', 'Thank you, Sophie. Just to confirm your number is oh seven seven double oh, nine double oh, one two three?', '', 'en-gb-2'],
+                ['caller', 'Lovely, thank you so much.'],
+                ['agent', 'You\'re very welcome, Sophie. I\'ve saved your order details, and the team will be in touch to confirm everything soon. Goodbye, and have a lovely day!', '', 'en-gb-3'],
             ],
-            'result' => ['Callback saved', 'Ahmed · 0101 234 5678 · a plan for his company'],
+            'result' => ['Order saved', 'Sophie · 07700 900123 · A bright bouquet, about £40, tomorrow'],
+        ],
+        'ie' => [
+            'label' => 'Irish', 'agent' => 'Sienna', 'avatar' => 'en-sienna', 'business' => 'Harbour Lane Guesthouse', 'dialect' => 'Irish',
+            'turns' => [
+                ['caller', 'Hi there, have you a double room free this Friday night?'],
+                ['agent', 'We do indeed! We have two double rooms free this Friday night, and they\'re one hundred and forty euro a night including breakfast.', '', 'en-ie-1'],
+                ['caller', 'Brilliant. It\'s Ciara, and my number is 087 123 4567.'],
+                ['agent', 'Thanks, Ciara. Just to confirm your number is zero eight seven, one two three, four five six seven?', '', 'en-ie-2'],
+                ['caller', 'That\'s it, thanks a million.'],
+                ['agent', 'Perfect. I\'ve noted that down for you, and the team will be in touch soon to confirm your booking by text. You\'re very welcome. Enjoy your stay in Galway and have a lovely evening!', '', 'en-ie-3'],
+            ],
+            'result' => ['Booking request saved', 'Ciara · 087 123 4567 · Double room, Friday night'],
         ],
     ],
-    'real_order' => ['sa', 'eg'],
+    'real_order' => ['us', 'gb', 'ie'],
 
     // Safe by design.
     'safe_title' => 'Safe for your customers, and for your bill',

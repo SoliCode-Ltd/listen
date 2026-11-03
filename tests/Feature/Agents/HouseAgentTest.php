@@ -105,9 +105,36 @@ class HouseAgentTest extends TestCase
             $this->page($locale, 'home')->assertOk()
                 ->assertSee(__('agents_landing.home_title'))
                 ->assertSee(route('agents-landing'), false)
-                // A call on its own stage: a real recording in Arabic, an English call in words on the English page.
+                // A real call on its own stage, recorded in the page's own language.
                 ->assertSee('data-agl-real', false)
-                ->assertSee($locale === 'ar' ? 'audio/agents/calls/sa-1.mp3' : __('agents_landing.scenes.american.lines')[0][1], false);
+                ->assertSee($locale === 'ar' ? 'audio/agents/calls/ar-sa-1.mp3' : 'audio/agents/calls/en-us-1.mp3', false);
         }
+    }
+
+    public function test_the_recorded_calls_are_in_the_pages_language_with_women_and_men(): void
+    {
+        // Each page's calls: its own language only, women and men, every clip on disk.
+        $speakers = ['ar' => ['ar-fatima', 'ar-hamed', 'ar-sumaya', 'ar-raed'], 'en' => ['en-caleb', 'en-alice', 'en-sienna']];
+        foreach ($speakers as $locale => $faces) {
+            app()->setLocale($locale);
+            $html = (string) $this->page($locale, 'home')->assertOk()->getContent();
+            $other = $locale === 'ar' ? 'en' : 'ar';
+            $this->assertStringNotContainsString('audio/agents/calls/'.$other.'-', $html, 'a call in the other language');
+            $this->assertStringNotContainsString('images/speakers/'.$other.'-', substr($html, (int) strpos($html, 'data-agl-real'), 60000));
+            foreach ($faces as $face) {
+                $this->assertStringContainsString('images/speakers/'.$face.'.webp', $html, $face.' is not on the '.$locale.' homepage');
+            }
+            foreach ((array) __('agents_landing.real_calls') as $key => $call) {
+                foreach ($call['turns'] as $turn) {
+                    $this->assertNotSame('', trim($turn[1]), $key.' has an empty line');
+                    if (! empty($turn[3])) {
+                        $this->assertFileExists(public_path('audio/agents/calls/'.$turn[3].'.mp3'));
+                    }
+                }
+            }
+        }
+        // No line names the brand in the other language: إسمع on the Arabic page.
+        app()->setLocale('ar');
+        $this->assertStringNotContainsString('Listen', json_encode(__('agents_landing.real_calls'), JSON_UNESCAPED_UNICODE));
     }
 }

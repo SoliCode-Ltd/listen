@@ -268,7 +268,7 @@
                   <summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>{{ __('agents.conversation_transcript') }}</summary>
                   <div class="ag-transcript" style="max-height:none">
                     @foreach($c->transcript as $t)
-                      <div class="ag-bubble is-{{ $t['role'] }}" style="opacity:1;transform:none" dir="auto"><small>{{ $t['role'] === 'agent' ? $agent->name : __('agents.talk_you') }}</small>{{ $t['text'] }}</div>
+                      <div class="ag-bubble is-{{ $t['role'] }}" style="opacity:1;transform:none" dir="auto"><small>{{ $t['role'] === 'agent' ? $agent->name : __('agents.talk_you') }}</small>{{ \App\Support\Agents\SpokenNumbers::forDisplay((string) $t['text'], $agent->language !== 'en') }}</div>
                     @endforeach
                   </div>
                 </details>

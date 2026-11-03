@@ -330,6 +330,7 @@ html:has(.agl) { scroll-behavior: smooth; }
 .agl-real-who { display: grid; gap: .1rem; min-width: 0; flex: 1 1 auto; }
 .agl-real-who b { font-size: 1rem; font-weight: 700; color: #fff; }
 .agl-real-who small { font-size: .8rem; color: var(--agl-on-ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agl-real-who small span:not(:empty) + span:not(:empty)::before { content: "·"; margin-inline: .4em; opacity: .7; }
 .agl-real-switch { flex: 0 0 auto; display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .1); }
 .agl-real-switch button {
   min-height: 34px; padding: .3rem .85rem; border: 0; border-radius: 999px; background: transparent; color: var(--agl-on-ink-muted);
@@ -361,8 +362,8 @@ html[dir="rtl"] .agl-real-play-icon .is-play { transform: translateX(1px); }
 .agl-real-progress { width: min(260px, 70%); height: 3px; border-radius: 999px; background: rgba(255, 255, 255, .14); overflow: hidden; }
 .agl-real-progress i { display: block; height: 100%; width: 0; border-radius: inherit; background: #fff; }
 
-/* A steady height: as the call goes on, the newest line stays at the bottom and older ones move up
-   and fade under the top edge. At rest, the first lines read from the top. */
+/* A steady height. Lines read from the top, like a chat; once they fill it, the newest stays in
+   sight and older ones move up and fade under the top edge (.is-full). */
 .agl-real-lines {
   list-style: none; margin: 0; padding: .4rem 0 0; display: flex; flex-direction: column; gap: .6rem;
   height: 16.5rem; overflow: hidden; scroll-behavior: smooth;
@@ -370,10 +371,9 @@ html[dir="rtl"] .agl-real-play-icon .is-play { transform: translateX(1px); }
 .agl-real:not(.is-playing):not(.is-done) .agl-real-lines {
   -webkit-mask-image: linear-gradient(to top, transparent 0, #000 3rem); mask-image: linear-gradient(to top, transparent 0, #000 3rem);
 }
-.agl-real.is-playing .agl-real-lines, .agl-real.is-done .agl-real-lines {
+.agl-real.is-playing .agl-real-lines.is-full, .agl-real.is-done .agl-real-lines.is-full {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 2.2rem); mask-image: linear-gradient(to bottom, transparent 0, #000 2.2rem);
 }
-.agl-real.is-playing .agl-real-lines > :first-child, .agl-real.is-done .agl-real-lines > :first-child { margin-top: auto; }
 .agl-real-line { display: grid; gap: .3rem; max-width: 88%; padding: .7rem .95rem; border-radius: 18px; opacity: 0; transform: translateY(8px); transition: opacity .45s var(--agl-ease), transform .45s var(--agl-ease); }
 .agl-real-line.is-shown { opacity: 1; transform: none; }
 .agl-real-line p { margin: 0; font-size: 1rem; line-height: 1.75; text-wrap: pretty; }

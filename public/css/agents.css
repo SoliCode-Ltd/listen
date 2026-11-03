@@ -919,7 +919,11 @@ html[dir="rtl"] .ag-stepper code.is-path::after { right: auto; left: -.95em; tra
 .ag-report-reasons { display: grid; gap: .45rem; border: 0; margin: 0; padding: 0; }
 .ag-report-reason { display: flex; align-items: flex-start; gap: .6rem; padding: .65rem .8rem; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; font-size: .9rem; line-height: 1.45; }
 .ag-report-reason:has(input:checked) { border-color: var(--a); background: color-mix(in srgb, var(--a) 8%, transparent); }
-.ag-report-reason input { margin-top: .2rem; accent-color: var(--a); }
+.ag-report-reason input { appearance: none; -webkit-appearance: none; flex: 0 0 auto; width: 18px; height: 18px; margin: .12rem 0 0; border: 1.5px solid color-mix(in srgb, var(--text, currentColor) 35%, transparent); border-radius: 50%; background: transparent; display: grid; place-items: center; cursor: pointer; transition: border-color .15s ease; }
+.ag-report-reason input::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--a); transform: scale(0); transition: transform .15s ease; }
+.ag-report-reason input:checked { border-color: var(--a); }
+.ag-report-reason input:checked::after { transform: scale(1); }
+.ag-report-reason input:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
 .ag-report-done { color: var(--ag-ok, #32c58d) !important; font-weight: 600; }
 .ag-report-actions { display: flex; justify-content: flex-end; gap: .5rem; }
 .ag-report-reasons legend { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

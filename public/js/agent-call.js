@@ -19,6 +19,45 @@
   'use strict';
   if (window.ListenAgentCall) return;
 
+  /*
+   * A line as people read it: the transcription's marks taken out (<no speech detected>, {pause})
+   * and a number read back digit by digit written as the number ("صفر خمسة صفر…" is 050…,
+   * "five five five, two one zero…" is 555 210…). Three spoken digits or more make a number, so
+   * "الساعة أربعة" stays. The same rules as App\Support\Agents\SpokenNumbers.
+   */
+  var AR_DIGITS = { 'صفر': 0, 'واحد': 1, 'اثنين': 2, 'إثنين': 2, 'اتنين': 2, 'اثنان': 2, 'إثنان': 2, 'اتنان': 2,
+    'ثلاثة': 3, 'ثلاثه': 3, 'تلاتة': 3, 'تلاته': 3, 'ثلاث': 3, 'تلات': 3, 'أربعة': 4, 'اربعة': 4, 'أربعه': 4, 'اربعه': 4, 'أربع': 4, 'اربع': 4,
+    'خمسة': 5, 'خمسه': 5, 'خمس': 5, 'ستة': 6, 'سته': 6, 'ست': 6, 'سبعة': 7, 'سبعه': 7, 'سبع': 7,
+    'ثمانية': 8, 'ثمانيه': 8, 'تمانية': 8, 'تمانيه': 8, 'ثماني': 8, 'تماني': 8, 'ثمان': 8, 'تمن': 8, 'تسعة': 9, 'تسعه': 9, 'تسع': 9 };
+  var EN_DIGITS = { zero: '0', oh: '0', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9' };
+  var spoken = (function () {
+    var arAlt = Object.keys(AR_DIGITS).sort(function (a, b) { return b.length - a.length; }).join('|');
+    var arSeq, arWord;
+    try {
+      arSeq = new RegExp('(^|[^\\p{L}\\p{M}])((?:' + arAlt + ')(?:[\\s،,\\-]+(?:' + arAlt + ')){2,})(?=$|[^\\p{L}\\p{M}])', 'gu');
+      arWord = new RegExp(arAlt, 'gu');
+    } catch (e) { arSeq = null; }
+    var enWord = '(?:(?:double|triple)\\s+)?(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)';
+    var enSeq = new RegExp('\\b' + enWord + '(?:(?:\\s*[,\\-]\\s*|\\s+)' + enWord + '){2,}\\b', 'gi');
+    return function (text) {
+      text = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]*>/g, '').replace(/\{[^}]*\}/g, '');
+      if (arSeq) text = text.replace(arSeq, function (m, pre, seq) { return pre + seq.match(arWord).map(function (w) { return AR_DIGITS[w]; }).join(''); });
+      text = text.replace(enSeq, function (seq) {
+        return seq.split(/\s*,\s*/).map(function (group) {
+          var out = '';
+          group.replace(/(?:(double|triple)\s+)?\b(zero|oh|one|two|three|four|five|six|seven|eight|nine)\b/gi, function (m, times, word) {
+            var d = EN_DIGITS[word.toLowerCase()];
+            out += times ? new Array((times.toLowerCase() === 'double' ? 2 : 3) + 1).join(d) : d;
+            return m;
+          });
+          return out;
+        }).filter(Boolean).join(' ');
+      });
+      text = text.replace(/(^|[^\d\-])(\d(?:-\d){2,})(?![\d\-])/g, function (m, pre, seq) { return pre + seq.replace(/-/g, ''); });
+      return text.replace(/\s+/g, ' ');
+    };
+  })();
+
   var WORKLET = [
     'class ListenPcm extends AudioWorkletProcessor {',
     '  constructor() { super(); this.step = sampleRate / 16000; this.pos = 0; this.prev = 0; this.out = new Int16Array(1600); this.n = 0; }',
@@ -79,7 +118,7 @@
 
     function set(s) { if (state !== s) { state = s; opts.onState && opts.onState(s); } }
     function turn(role, text) {
-      text = String(text || '').trim();
+      text = spoken(String(text || '')).trim();
       if (!text) return;
       var t = { role: role, text: text };
       pending.push(t);

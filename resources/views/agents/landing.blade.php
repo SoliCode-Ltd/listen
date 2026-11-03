@@ -24,6 +24,8 @@
     $micIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>';
     // The plans that include agents, with what each gives (Plans → Voice agents), and the rate.
     $rate = \App\Support\Agents\AgentAccess::creditsPerMinute();
+    // The free test minutes, as the admin set them (Agents → Settings).
+    $freeMinutes = intdiv(\App\Support\Agents\AgentAccess::freeTestSeconds(), 60);
     $agentPlans = rescue(fn () => \App\Models\Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->orderBy('price_cents')->get()
       ->filter(fn ($p) => \App\Support\Agents\AgentAccess::planColumns() && \App\Support\Agents\AgentAccess::planIncludes($p))
       ->map(function ($p) use ($rate) {
@@ -51,14 +53,10 @@
         <div class="agl-cta-row">
           <a class="ag-btn ag-btn-primary ag-btn-lg" href="{{ $startUrl }}">{{ $hasAgents ? __('agents_landing.hero_cta_member') : __('agents_landing.hero_cta') }}</a>
           <button type="button" class="ag-btn ag-btn-lg agl-live-btn" data-agl-live hidden>{!! $micIcon !!}{{ __('agents_landing.talk_live') }}</button>
-          @if($ar)
-            <a class="ag-btn ag-btn-lg ag-btn-ghost" href="#agl-real" data-agl-watch>{{ __('agents_landing.real_play') }}</a>
-          @else
-            <a class="ag-btn ag-btn-lg ag-btn-ghost" href="#agl-call" data-agl-watch>{{ __('agents_landing.hero_watch') }}</a>
-          @endif
+          <a class="ag-btn ag-btn-lg ag-btn-ghost" href="#agl-real" data-agl-watch>{{ __('agents_landing.real_play') }}</a>
         </div>
         <p class="agl-note" data-agl-live-note hidden>{{ __('agents_landing.talk_live_note') }}</p>
-        <p class="agl-note">{{ __('agents_landing.hero_note') }}</p>
+        @if($freeMinutes > 0)<p class="agl-note">{{ trans_choice('agents_landing.hero_note', $freeMinutes, ['count' => $freeMinutes]) }}</p>@endif
       </div>
 
       <div class="agl-call" id="agl-call" data-agl-call>
@@ -106,18 +104,15 @@
       </div>
     </section>
 
-    {{-- A real call, recorded live with Listen's own agent: hear it before reading about it. The
-         recordings are Arabic, so the English page keeps to the English call in its hero. --}}
-    @if($ar)
-      <section class="agl-section agl-real-wrap" id="agl-real">
-        <div class="agl-head agl-head-split" data-agl-rise>
-          <h2>{{ __('agents_landing.real_title') }}</h2>
-          <p>{{ __('agents_landing.real_text') }}</p>
-        </div>
-        {{-- The page's one orb is in the hero's call: here the agent's own face moves with her voice. --}}
-        <x-agents.real-call size="wide" visual="face" data-agl-rise style="--rise-d: .08s" />
-      </section>
-    @endif
+    {{-- Real calls, recorded live, in the page's own language: hear one before reading about it. --}}
+    <section class="agl-section agl-real-wrap" id="agl-real">
+      <div class="agl-head agl-head-split" data-agl-rise>
+        <h2>{{ __('agents_landing.real_title') }}</h2>
+        <p>{{ __('agents_landing.real_text') }}</p>
+      </div>
+      {{-- The page's one orb is in the hero's call: here the agent's own face moves with the voice. --}}
+      <x-agents.real-call size="wide" visual="face" data-agl-rise style="--rise-d: .08s" />
+    </section>
 
     {{-- How it works: the real setup, one step after another as the page scrolls. --}}
     <section class="agl-section agl-how" data-agl-how>
@@ -287,7 +282,7 @@
         <a class="ag-btn ag-btn-primary ag-btn-lg" href="{{ $startUrl }}">{{ __('agents_landing.final_cta') }}</a>
         <button type="button" class="ag-btn ag-btn-lg agl-live-btn" data-agl-live hidden>{!! $micIcon !!}{{ __('agents_landing.talk_live') }}</button>
       </div>
-      <p class="agl-note">{{ __('agents_landing.hero_note') }}</p>
+      @if($freeMinutes > 0)<p class="agl-note">{{ trans_choice('agents_landing.hero_note', $freeMinutes, ['count' => $freeMinutes]) }}</p>@endif
     </section>
   </main>
 

@@ -283,7 +283,7 @@
     var key = data.order[0];
     var lines = $('[data-agl-real-lines]', box), play = $('[data-agl-real-play]', box), label = $('[data-agl-real-label]', box);
     var bar = $('[data-agl-real-bar]', box), face = $('[data-agl-real-face]', box), name = $('[data-agl-real-name]', box);
-    var dialect = $('[data-agl-real-dialect]', box), rTitle = $('[data-agl-real-result-title]', box), rText = $('[data-agl-real-result-text]', box);
+    var dialect = $('[data-agl-real-dialect]', box), biz = $('[data-agl-real-biz]', box), rTitle = $('[data-agl-real-result-title]', box), rText = $('[data-agl-real-result-text]', box);
     var clips = {}, levels = {}, run = null, frame = 0, photo = $('[data-agl-real-photo]', box);
     // The voice's loudness, for the orb (it reads the stage) and for the face's rings (a CSS value).
     function level(v) { box.__vpLevel = v; if (photo) box.style.setProperty('--agl-lvl', v.toFixed(3)); }
@@ -316,8 +316,9 @@
     function preview() {
       lines.textContent = '';
       call().turns.slice(0, data.rest || 2).forEach(function (t) { var li = lineEl(t, false); li.classList.add('is-shown'); lines.appendChild(li); });
-      lines.scrollTop = 0;
+      lines.scrollTop = 0; lines.classList.remove('is-full');
       face.src = call().avatar; name.textContent = call().agent; dialect.textContent = call().dialect;
+      if (biz) biz.textContent = call().business || '';
       if (photo) photo.src = call().avatar;
       level(0);
       rTitle.textContent = call().result[0]; rText.textContent = call().result[1];
@@ -389,7 +390,7 @@
         play.disabled = false;
         var total = lengths.reduce(function (s, v) { return s + v; }, 0) || 1;
         run = { i: -1, lengths: lengths, total: total, before: 0, audio: null, timer: 0, stopped: false, paused: false, started: 0 };
-        lines.textContent = '';
+        lines.textContent = ''; lines.classList.remove('is-full');
         box.classList.add('is-playing');
         box.classList.remove('is-done');
         setLabel('pause');
@@ -408,10 +409,14 @@
       run.words = []; run.starts = []; run.audio = null;
       requestAnimationFrame(function () { li.classList.add('is-shown'); });
       // The newest line stays in sight; older ones move up under the fade.
-      requestAnimationFrame(function () { lines.scrollTop = lines.scrollHeight; });
+      requestAnimationFrame(function () { lines.scrollTop = lines.scrollHeight; lines.classList.toggle('is-full', lines.scrollHeight > lines.clientHeight + 4); });
       var words = $$('.agl-real-w', li);
       // Each word lights when it is said: the line's time shared out by the words' lengths.
-      var weights = words.map(function (w) { return w.textContent.length + (/[،,.؟?!]$/.test(w.textContent) ? 4 : 1); });
+      // A number is said digit by digit, so it takes as long as its digits' words.
+      var weights = words.map(function (w) {
+        var t = w.textContent, digits = (t.match(/\d/g) || []).length;
+        return (digits >= 3 ? digits * 4.6 : t.length) + (/[،,.؟?!]$/.test(t) ? 4 : 1);
+      });
       var sum = weights.reduce(function (s, v) { return s + v; }, 0) || 1, acc = 0;
       run.words = words;
       run.starts = weights.map(function (v) { var at = acc / sum; acc += v; return at; });
