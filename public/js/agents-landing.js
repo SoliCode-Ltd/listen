@@ -141,7 +141,7 @@
 
     function later(ms, fn) { timers.push(setTimeout(fn, ms)); }
     function clear() { timers.forEach(clearTimeout); timers = []; }
-    function speak(on) { speaking = on; if (on) stage.classList.add('is-playing'); }
+    function speak(on) { speaking = on; stage.classList.toggle('is-speaking', on); if (on) stage.classList.add('is-playing'); }
 
     function frame(t) {
       raf = requestAnimationFrame(frame);
@@ -200,8 +200,8 @@
       waiting = false;
       var sc = D.scenes[n];
       pills.forEach(function (p, i) { p.classList.toggle('is-on', i === n); p.setAttribute('aria-pressed', i === n ? 'true' : 'false'); });
-      face.src = sc.face;
-      agentEl.textContent = sc.agent;
+      if (face) face.src = sc.face;
+      agentEl.textContent = (agentEl.getAttribute('data-pattern') || ':name').replace(':name', sc.agent);
       bizEl.textContent = sc.business;
       $('span', chip).textContent = sc.chip;
       lines.innerHTML = '';
@@ -251,9 +251,28 @@
     show(0, true);
   }
 
+  /* "+142 more dialects": the full list opens smoothly under the calls. */
+  function more() {
+    var btn = $('[data-agl-more]'), list = $('[data-agl-all]');
+    if (!btn || !list) return;
+    btn.addEventListener('click', function () {
+      var open = list.hidden;
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      btn.classList.toggle('is-on', open);
+      if (open) {
+        list.hidden = false;
+        if (!reduce && list.animate) list.animate([{ opacity: 0, transform: 'translateY(-6px)', maxHeight: '0px' }, { opacity: 1, transform: 'none', maxHeight: list.scrollHeight + 'px' }], { duration: 420, easing: 'cubic-bezier(.22, 1, .36, 1)' });
+      } else if (!reduce && list.animate) {
+        var a = list.animate([{ opacity: 1, maxHeight: list.scrollHeight + 'px' }, { opacity: 0, maxHeight: '0px' }], { duration: 260, easing: 'ease' });
+        a.onfinish = function () { list.hidden = true; };
+      } else list.hidden = true;
+    });
+  }
+
   function boot() {
     rise();
     faq();
+    more();
     reveals();
     how();
     live();

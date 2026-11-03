@@ -36,7 +36,7 @@
     </section>
 
     <nav class="ag-tabs" role="tablist" aria-label="{{ $agent->name }}">
-      @foreach(['overview', 'setup', 'knowledge', 'live', 'conversations', 'customers'] as $tab)
+      @foreach(['overview', 'setup', 'knowledge', 'design', 'live', 'conversations', 'customers'] as $tab)
         <button type="button" role="tab" class="ag-tab" data-ag-tab="{{ $tab }}">{{ __('agents.tabs.'.$tab) }}</button>
       @endforeach
     </nav>
@@ -136,6 +136,11 @@
       </form>
     </section>
 
+    {{-- Design: how the call button looks. --}}
+    <section class="ag-panel" data-ag-panel="design">
+      @include('agents.partials.style', ['agent' => $agent, 'widget' => $widget])
+    </section>
+
     {{-- Go live. --}}
     <section class="ag-panel" data-ag-panel="live">
       @include('agents.partials.golive', ['agent' => $agent, 'widget' => $widget, 'embed' => $embed])
@@ -223,6 +228,36 @@
       ],
       'regions' => collect(\App\Support\ArabicDialects::ALL)->map(fn ($d) => $d['region'])->all(),
       'voices' => [$agent->language => $voices],
+      // The Design tab's preview: the button as the website gets it, in the agent's language.
+      'design' => (function () use ($agent, $widget, $voice) {
+        $l = $agent->language === 'en' ? 'en' : 'ar';
+        $female = ($voice['gender'] ?? null) === 'female';
+        $states = (array) trans('agents.talk_states', ['name' => $agent->name], $l);
+        if ($female && isset($states['speaking_female'])) { $states['speaking'] = $states['speaking_female']; }
+        unset($states['speaking_female']);
+        return [
+          'look' => $widget->style(),
+          'palettes' => \App\Models\AgentWidget::PALETTES,
+          'defaults' => \App\Models\AgentWidget::DEFAULT_APPEARANCE,
+          'rtl' => $l === 'ar',
+          'cfg' => [
+            'name' => $agent->name, 'business' => $agent->business_name, 'language' => $agent->language, 'dir' => $l === 'ar' ? 'rtl' : 'ltr',
+            'text' => [
+              'label' => trans('agents.widget_label', [], $l), 'title' => $agent->business_name,
+              'subtitle' => trans($female ? 'agents.widget_subtitle_female' : 'agents.widget_subtitle', [], $l),
+              'start' => trans('agents.talk_start', [], $l), 'end' => trans('agents.talk_end', [], $l), 'states' => $states,
+              'powered' => trans('agents.powered', [], $l), 'mute' => trans('agents.talk_mute', [], $l),
+              'unmute' => trans('agents.talk_unmute', [], $l), 'close' => trans('agents.widget_close', [], $l),
+              'sample' => [
+                ['role' => 'agent', 'text' => $agent->first_message ?: trans('agents.design_sample.hello', ['name' => $agent->name, 'business' => $agent->business_name], $l)],
+                ['role' => 'caller', 'text' => trans('agents.design_sample.ask', [], $l)],
+                ['role' => 'agent', 'text' => trans('agents.design_sample.answer', [], $l)],
+              ],
+            ],
+          ],
+          'text' => ['saving' => __('agents.design.saving'), 'saved' => __('agents.design.saved'), 'failed' => __('agents.design.failed')],
+        ];
+      })(),
       'text' => [
         'states' => __('agents.talk_states', ['name' => $agent->name]),
         'start' => __('agents.talk_start'), 'end' => __('agents.talk_end'),
@@ -241,6 +276,7 @@
   </script>
   <script src="{{ asset('js/vendor/qrcode.js') }}?v={{ filemtime(public_path('js/vendor/qrcode.js')) }}" defer></script>
   <script src="{{ asset('js/agent-call.js') }}?v={{ filemtime(public_path('js/agent-call.js')) }}" defer></script>
+  <script src="{{ asset('js/agent-widget.js') }}?v={{ filemtime(public_path('js/agent-widget.js')) }}" defer></script>
   <script src="{{ asset('js/agents.js') }}?v={{ filemtime(public_path('js/agents.js')) }}" defer></script>
 </body>
 </html>

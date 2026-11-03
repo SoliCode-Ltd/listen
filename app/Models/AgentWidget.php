@@ -38,12 +38,47 @@ class AgentWidget extends Model
         'last_seen_at' => 'datetime',
     ];
 
+    /**
+     * How the call button looks; the owner styles it with a live preview, and
+     * every website shows the new look on its next page load.
+     * style: what the call shows (an orb that moves with the voice, the
+     * brand's waves, or a slim bar), icon: the button's icon, accent: the
+     * button colour, palette: the orb's colours (or two custom ones).
+     */
     public const DEFAULT_APPEARANCE = [
         'position' => 'end',
         'style' => 'orb',
         'theme' => 'auto',
         'label' => null,
+        'icon' => 'phone',
+        'size' => 'm',
+        'shape' => 'pill',
+        'accent' => '#7659FA',
+        'palette' => 'listen',
+        'orb_colors' => null,
+        'radius' => 'round',
+        'captions' => true,
+        'title' => null,
+        'subtitle' => null,
+        'font' => 'system',
     ];
+
+    public const STYLES = ['orb', 'waves', 'bar'];
+
+    public const ICONS = ['phone', 'mic', 'headset', 'waves', 'orb'];
+
+    /** The orb's colours, deep to light. */
+    public const PALETTES = [
+        'listen' => ['#2A1A8F', '#7659FA', '#C9BEFF', '#F4F1FF'],
+        'ocean' => ['#0B3B6E', '#1E88E5', '#8FD3FF', '#EEF9FF'],
+        'emerald' => ['#064E3B', '#10B981', '#A7F3D0', '#F0FFF8'],
+        'sunset' => ['#7C2D12', '#F97316', '#FDBA74', '#FFF4EA'],
+        'rose' => ['#831843', '#EC4899', '#F9A8D4', '#FFF0F7'],
+        'gold' => ['#6B4A0E', '#D4A017', '#F7DC86', '#FFFBEA'],
+        'midnight' => ['#0F172A', '#475569', '#CBD5E1', '#F8FAFC'],
+    ];
+
+    public const ACCENTS = ['#7659FA', '#1E88E5', '#10B981', '#F97316', '#EC4899', '#D4A017', '#0F172A'];
 
     public static function createFor(Agent $agent): self
     {
@@ -77,7 +112,68 @@ class AgentWidget extends Model
 
     public function look(string $key, mixed $default = null): mixed
     {
-        return data_get(array_merge(self::DEFAULT_APPEARANCE, $this->appearance ?? []), $key, $default);
+        return data_get($this->style(), $key, $default);
+    }
+
+    /**
+     * The look, every value checked (anything unknown falls back to the
+     * default), plus the orb's four colours.
+     *
+     * @return array<string, mixed>
+     */
+    public function style(): array
+    {
+        $d = self::DEFAULT_APPEARANCE;
+        $a = array_merge($d, array_filter($this->appearance ?? [], fn ($v) => $v !== null));
+        $pick = fn (string $k, array $allowed) => in_array($a[$k], $allowed, true) ? $a[$k] : $d[$k];
+        $text = fn (string $k, int $max) => ($v = trim(strip_tags((string) ($a[$k] ?? '')))) !== '' ? mb_substr($v, 0, $max) : null;
+        $out = [
+            'position' => $pick('position', ['start', 'end']),
+            'style' => $pick('style', self::STYLES),
+            'theme' => $pick('theme', ['auto', 'light', 'dark']),
+            'label' => $text('label', 40),
+            'icon' => $pick('icon', self::ICONS),
+            'size' => $pick('size', ['s', 'm', 'l']),
+            'shape' => $pick('shape', ['pill', 'round']),
+            'accent' => self::hex($a['accent']) ?? $d['accent'],
+            'palette' => $a['palette'] === 'custom' || isset(self::PALETTES[$a['palette']]) ? $a['palette'] : $d['palette'],
+            'orb_colors' => null,
+            'radius' => $pick('radius', ['square', 'soft', 'round']),
+            'captions' => filter_var($a['captions'], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? true,
+            'title' => $text('title', 60),
+            'subtitle' => $text('subtitle', 80),
+            'font' => $pick('font', ['system', 'rounded', 'site']),
+        ];
+        $custom = array_values(array_filter(array_map([self::class, 'hex'], (array) ($a['orb_colors'] ?? []))));
+        if ($out['palette'] === 'custom' && count($custom) >= 2) {
+            $out['orb_colors'] = [$custom[0], $custom[1]];
+            $out['colors'] = [$custom[0], self::mix($custom[0], $custom[1], .5), $custom[1], self::mix($custom[1], '#FFFFFF', .75)];
+        } else {
+            if ($out['palette'] === 'custom') {
+                $out['palette'] = $d['palette'];
+            }
+            $out['colors'] = self::PALETTES[$out['palette']];
+        }
+
+        return $out;
+    }
+
+    /** "#7659fa" or "7659FA" as "#7659FA"; anything else is null. */
+    public static function hex(mixed $value): ?string
+    {
+        $v = ltrim(trim((string) $value), '#');
+
+        return preg_match('/^[0-9a-fA-F]{6}$/', $v) ? '#'.strtoupper($v) : null;
+    }
+
+    /** A colour part way from one to another (0 = the first, 1 = the second). */
+    public static function mix(string $from, string $to, float $t): string
+    {
+        $a = sscanf(ltrim($from, '#'), '%02x%02x%02x');
+        $b = sscanf(ltrim($to, '#'), '%02x%02x%02x');
+        $c = array_map(fn ($i) => (int) round($a[$i] + ($b[$i] - $a[$i]) * $t), [0, 1, 2]);
+
+        return sprintf('#%02X%02X%02X', ...$c);
     }
 
     /** Whether a page from this origin may load the button (scheme://host[:port], lower case). */

@@ -40,9 +40,11 @@
             $last = isset($calls[$agent->id]) ? \Illuminate\Support\Carbon::parse($calls[$agent->id]->last) : null;
             $setupDone = $agent->status !== \App\Models\Agent::DRAFT;
           @endphp
-          <a class="ag-card ag-agent" href="{{ $setupDone ? route('voice-agents.show', $agent) : route('voice-agents.edit', $agent) }}" data-orb-host>
+          @php $mark = $agent->widgets->sortBy('id')->first()?->look('accent') ?? '#7659FA'; @endphp
+          <a class="ag-card ag-agent" href="{{ $setupDone ? route('voice-agents.show', $agent) : route('voice-agents.edit', $agent) }}">
             <div class="ag-agent-top">
-              <x-orb :name="$agent->orbName()" />
+              {{-- The agent's first letter in its call button's colour: one orb per page is enough. --}}
+              <span class="ag-agent-mark" style="--m: {{ $mark }}" aria-hidden="true">{{ mb_substr($agent->name, 0, 1) }}</span>
               <div style="min-width:0">
                 <div class="ag-agent-name">{{ $agent->name }}</div>
                 <div class="ag-agent-biz">{{ $agent->business_name }}</div>

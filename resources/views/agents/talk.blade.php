@@ -12,7 +12,6 @@
       @unless($available)
         <p class="ag-note">{{ __('agents.error_paused') }}</p>
       @endunless
-      <p class="ag-hint">{{ __('agents.talk_page_note') }}</p>
       <p class="ag-talkpage-foot"><a href="{{ url('/') }}" target="_blank" rel="noopener">{{ __('agents.powered') }}</a></p>
     </section>
   </main>

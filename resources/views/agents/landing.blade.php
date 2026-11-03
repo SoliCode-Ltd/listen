@@ -14,7 +14,13 @@
     $steps = __('agents_landing.steps');
     $speaker = fn (string $slug) => asset('images/speakers/'.$slug.'.webp').'?v=1';
     $shot = fn (int $i) => asset('images/agents/landing/'.($ar ? 'ar' : 'en').'/step-'.($i + 1).'.webp').'?v=1';
-    $wave = '<span class="agl-wave" aria-hidden="true">'.str_repeat('<i></i>', 7).'</span>';
+    // Every dialect (Arabic page) or accent (English page) the agent speaks, beyond the calls shown.
+    $regionNames = ['nile' => $ar ? 'مصر والسودان' : 'Egypt & Sudan', 'gulf' => $ar ? 'الخليج' : 'Gulf', 'levant' => $ar ? 'الشام' : 'Levant', 'iraq_yemen' => $ar ? 'العراق واليمن' : 'Iraq & Yemen', 'maghreb' => $ar ? 'المغرب العربي' : 'Maghreb', 'fusha' => $ar ? 'الفصحى' : 'Fusha'];
+    $allSpeech = $ar
+      ? collect(\App\Support\ArabicDialects::ALL)->groupBy('region', true)->sortBy(fn ($g, $r) => array_search($r, array_keys($regionNames)))->map(fn ($g, $r) => ['title' => $regionNames[$r] ?? $r, 'names' => $g->pluck('ar')->all()])->values()->all()
+      : [['title' => null, 'names' => collect(\App\Support\EnglishAccents::ALL)->pluck('en')->all()]];
+    $speechCount = collect($allSpeech)->sum(fn ($g) => count($g['names']));
+    $moreCount = max(0, $speechCount - ($ar ? count($order) - 1 : count($order)));
     $micIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>';
   @endphp
 
@@ -35,18 +41,19 @@
 
       <div class="agl-call" id="agl-call" data-agl-call>
         <div class="agl-call-card">
+          {{-- Like the call button's card: the business, its assistant, and one orb that moves with the voice. --}}
           <div class="agl-call-head">
-            <img class="agl-call-face" src="{{ $speaker($first['avatar']) }}" alt="" width="46" height="46" data-agl-face>
             <div class="agl-call-who">
-              <strong data-agl-agent>{{ $first['agent'] }}</strong>
-              <span data-agl-business>{{ $first['business'] }}</span>
+              <strong data-agl-business dir="auto">{{ $first['business'] }}</strong>
+              <span data-agl-agent data-pattern="{{ __('agents_landing.call_assistant') }}">{{ str_replace(':name', $first['agent'], __('agents_landing.call_assistant')) }}</span>
             </div>
             <span class="agl-call-live"><i aria-hidden="true"></i>{{ __('agents_landing.call_live') }} <b data-agl-clock dir="ltr">00:00</b></span>
           </div>
           <div class="agl-call-stage" data-vp-track data-agl-stage>
-            {!! $wave !!}
-            <x-orb name="listen" />
-            {!! $wave !!}
+            <span class="agl-call-orb">
+              <span class="agl-call-rings" aria-hidden="true"><i></i><i></i></span>
+              <x-orb name="listen" />
+            </span>
           </div>
           <div class="agl-lines" data-agl-lines aria-hidden="true">
             @foreach($first['lines'] as [$role, $text])
@@ -58,6 +65,19 @@
         <div class="agl-dialects" role="group" aria-label="{{ __('agents_landing.dialects_label') }}">
           @foreach($order as $i => $key)
             <button type="button" class="agl-dialect {{ $i === 0 ? 'is-on' : '' }}" data-agl-scene="{{ $i }}" aria-pressed="{{ $i === 0 ? 'true' : 'false' }}">{{ $scenes[$key]['label'] }}</button>
+          @endforeach
+          @if($moreCount > 0)
+            <button type="button" class="agl-dialect agl-dialect-more" aria-expanded="false" aria-controls="agl-all-speech" data-agl-more>{{ __('agents_landing.dialects_more', ['count' => $moreCount]) }}</button>
+          @endif
+        </div>
+        {{-- All of them, by region: the agent speaks any of these. --}}
+        <div class="agl-all" id="agl-all-speech" data-agl-all hidden>
+          <p class="agl-all-title">{{ __('agents_landing.dialects_all') }} <b dir="ltr">{{ $speechCount }}</b></p>
+          @foreach($allSpeech as $group)
+            <div class="agl-all-group">
+              @if($group['title'])<span class="agl-all-region">{{ $group['title'] }}</span>@endif
+              <ul>@foreach($group['names'] as $name)<li>{{ $name }}</li>@endforeach</ul>
+            </div>
           @endforeach
         </div>
       </div>
@@ -167,7 +187,7 @@
           </div>
         @endforeach
         <div class="agl-inbox-customer">
-          <img src="{{ $speaker('ar-ahmed') }}" alt="" width="40" height="40" loading="lazy" onerror="this.remove()">
+          <img src="{{ $speaker(__('agents_landing.calls_avatar')) }}" alt="" width="40" height="40" loading="lazy" onerror="this.remove()">
           <div><strong>{{ __('agents_landing.calls_customer') }}</strong><span dir="ltr">{{ __('agents_landing.calls_phone') }}</span></div>
           <span class="ag-btn ag-btn-sm ag-btn-primary">{{ __('agents_landing.calls_call') }}</span>
         </div>
@@ -196,8 +216,11 @@
       </div>
     </section>
 
-    <section class="agl-final" data-orb-host>
-      <x-orb name="listen" />
+    <section class="agl-final">
+      {{-- Listen's mark, not a second orb: the page has one orb, in the call. --}}
+      <span class="agl-flow-logo agl-final-logo" aria-hidden="true">
+        <svg viewBox="0 0 128 128"><rect x="5" y="59" width="10" height="10" rx="5"/><rect x="23" y="42" width="10" height="44" rx="5"/><rect x="41" y="28" width="10" height="72" rx="5"/><rect x="59" y="14" width="10" height="100" rx="5"/><rect x="77" y="28" width="10" height="72" rx="5"/><rect x="95" y="42" width="10" height="44" rx="5"/><rect x="113" y="59" width="10" height="10" rx="5"/></svg>
+      </span>
       <h2 data-agl-rise>{{ __('agents_landing.final_title') }}</h2>
       <div class="agl-cta-row agl-cta-center" data-agl-rise style="--rise-d: .1s">
         <a class="ag-btn ag-btn-primary ag-btn-lg" href="{{ $startUrl }}">{{ __('agents_landing.final_cta') }}</a>

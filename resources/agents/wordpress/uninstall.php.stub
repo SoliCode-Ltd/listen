@@ -1,0 +1,47 @@
+<?php
+/**
+ * Deleting the plugin removes its settings, on every site of a network too.
+ *
+ * WordPress runs this file only when an administrator deletes the plugin
+ * (Plugins, then Delete). Deactivating keeps the settings.
+ *
+ * No type declarations here: this file must also run on a PHP older than the
+ * plugin needs, in case the server's PHP was changed after it was installed.
+ *
+ * @package Listen\VoiceAgent
+ * @license GPL-2.0-or-later
+ */
+
+declare(strict_types=1);
+
+namespace Listen\VoiceAgent;
+
+if (!defined('WP_UNINSTALL_PLUGIN')) {
+    exit;
+}
+
+/** Removes the plugin's settings from the current site (the same list as Settings::OPTIONS). */
+function remove_settings()
+{
+    foreach (['listen_voice_agent_enabled', 'listen_voice_agent_key', 'listen_voice_agent_placement', 'listen_voice_agent_pages'] as $option) {
+        delete_option($option);
+    }
+    delete_transient('listen_voice_agent_activated');
+}
+
+/** Removes them from this site, or from every site of a network. */
+function uninstall()
+{
+    if (!is_multisite()) {
+        remove_settings();
+
+        return;
+    }
+    foreach (get_sites(['fields' => 'ids', 'number' => 0]) as $site_id) {
+        switch_to_blog((int) $site_id);
+        remove_settings();
+        restore_current_blog();
+    }
+}
+
+uninstall();

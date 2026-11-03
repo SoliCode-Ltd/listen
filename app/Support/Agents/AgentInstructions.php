@@ -103,7 +103,7 @@ final class AgentInstructions
     public static function speech(Agent $agent): string
     {
         if ($agent->language === 'en') {
-            $accent = trim((string) $agent->setting('accent_prompt', ''));
+            $accent = trim((string) (\App\Support\EnglishAccents::ALL[$agent->dialect ?? '']['prompt'] ?? $agent->setting('accent_prompt', '')));
 
             return 'Speak natural, friendly English'.($accent !== '' ? " with this accent: {$accent}" : '').'. If the caller speaks Arabic, answer in Arabic.';
         }

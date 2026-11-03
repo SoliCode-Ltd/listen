@@ -61,12 +61,14 @@ final class AgentVoices
     /** Speakers of the same dialect first, then the same region, then the rest. */
     public static function suggested(array $voices, ?string $dialect, int $limit = 6): array
     {
-        $region = ArabicDialects::ALL[$dialect ?? '']['region'] ?? null;
-        $score = function (array $v) use ($dialect, $region): int {
+        // An Arabic dialect's region, or an English accent's country.
+        $groupOf = fn (?string $d) => ArabicDialects::ALL[$d ?? '']['region'] ?? (\App\Support\EnglishAccents::ALL[$d ?? '']['country'] ?? null);
+        $region = $groupOf($dialect);
+        $score = function (array $v) use ($dialect, $region, $groupOf): int {
             if ($dialect !== null && $v['dialect'] === $dialect) {
                 return 0;
             }
-            if ($region !== null && (ArabicDialects::ALL[$v['dialect']]['region'] ?? null) === $region) {
+            if ($region !== null && $groupOf($v['dialect']) === $region) {
                 return 1;
             }
 

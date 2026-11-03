@@ -93,6 +93,16 @@
                     @endforeach
                   </select>
                 </div>
+                {{-- English agents: any English accent, as Arabic agents speak any Arabic dialect. --}}
+                <div class="ag-field" data-ag-accent-field @if($lang !== 'en') hidden @endif>
+                  <label for="ag-accent">{{ __('agents.accent_label') }}</label>
+                  @php $accent = isset(\App\Support\EnglishAccents::ALL[$agent->dialect ?? '']) ? $agent->dialect : 'en-US'; @endphp
+                  <select class="ag-select" id="ag-accent" name="accent">
+                    @foreach(\App\Support\EnglishAccents::ALL as $code => $a)
+                      <option value="{{ $code }}" {{ $accent === $code ? 'selected' : '' }}>{{ $arabicUi ? $a['ar'] : $a['en'] }}</option>
+                    @endforeach
+                  </select>
+                </div>
               </div>
               <div class="ag-field">
                 <label for="ag-notes">{{ __('agents.notes_label') }}</label>

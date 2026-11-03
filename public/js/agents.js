@@ -200,13 +200,6 @@
       stage.__vpLevel = a;
       stage.classList.toggle('is-playing', a > 0.01);
       if (halo) { halo.style.setProperty('--hs', (1 + a * 0.22).toFixed(3)); halo.style.setProperty('--ho', (0.45 + a * 0.55).toFixed(2)); }
-      if (faceImg) faceImg.style.setProperty('--fs', (1 + a * 0.05).toFixed(3));
-      if (!stage.classList.contains('is-live')) { bars.forEach(function (b) { b.style.height = ''; }); return; }
-      var v = Math.max(a, c * 0.55), t = Date.now() / 95;
-      bars.forEach(function (b, i) {
-        var k = i % 7, side = i < 7 ? k : 6 - k;
-        b.style.height = (6 + v * 84 * shape[side] * (0.55 + 0.45 * Math.abs(Math.sin(t + i * 1.7)))).toFixed(1) + 'px';
-      });
     }
     function bubble(role, text, extra) {
       var b = document.createElement('div');
@@ -271,10 +264,8 @@
       if (call) call.mute(muted);
       mute.textContent = muted ? T.unmute : T.mute;
     });
-    return { setAvatar: function (url) {
-      var orbBox = $('[data-ag-talk-orb]', root);
-      if (faceImg && url) { faceImg.src = url; faceImg.hidden = false; if (orbBox) orbBox.hidden = true; }
-    } };
+    // The call shows the orb only; the speaker's face stays in the voice gallery.
+    return { setAvatar: function () {} };
   }
 
   /* ---------- The setup in four steps ---------- */
@@ -305,7 +296,10 @@
     // Step 1.
     var form = $('[data-ag-business-form]'), err = $('[data-ag-error]');
     var lang = function () { return ($('input[name="language"]:checked', form) || {}).value || 'ar'; };
-    $$('input[name="language"]', form).forEach(function (r) { r.addEventListener('change', function () { $('[data-ag-dialect-field]').hidden = lang() === 'en'; }); });
+    $$('input[name="language"]', form).forEach(function (r) { r.addEventListener('change', function () {
+      $('[data-ag-dialect-field]').hidden = lang() === 'en';
+      if ($('[data-ag-accent-field]')) $('[data-ag-accent-field]').hidden = lang() !== 'en';
+    }); });
     var writing = $('[data-ag-writing]'), businessBox = $('[data-ag-business]'), decisionsWrap = $('[data-ag-decisions-wrap]');
     var checks = $$('[data-ag-check]'), slow = $('[data-ag-slow]');
     var checkTimer = 0;
@@ -337,7 +331,7 @@
         business_type: ($('input[name="business_type"]:checked', form) || {}).value || 'other',
         jobs: $$('input[name="jobs[]"]:checked', form).map(function (i) { return i.value; }),
         language: lang(),
-        dialect: $('#ag-dialect').value,
+        dialect: lang() === 'en' && $('#ag-accent') ? $('#ag-accent').value : $('#ag-dialect').value,
         notes: $('#ag-notes').value,
       };
       if (!data.business_name || !data.name) { err.textContent = T.error_name; err.hidden = false; return; }
@@ -486,9 +480,139 @@
     });
   }
 
+  /*
+   * The Design tab: each choice redraws the preview at once (the real button,
+   * drawn on a pretend copy of the website) and is saved a moment later.
+   */
+  function design() {
+    var box = $('[data-ag-design]'), D = C.design;
+    if (!box || !D || !window.ListenAgentWidget || !window.ListenAgentWidget.preview) return;
+    var site = $('[data-ag-design-site]', box), status = $('[data-ag-design-status]', box), play = $('[data-ag-design-play]', box);
+    var look = JSON.parse(JSON.stringify(D.look)), widget = null, saveTimer = 0, playing = false;
+    var val = function (name) { var i = $('input[name="' + name + '"]:checked', box); return i ? i.value : null; };
+
+    function colors() {
+      if (look.palette === 'custom' && look.orb_colors) {
+        var a = look.orb_colors[0], b = look.orb_colors[1];
+        return [a, mix(a, b, 0.5), b, mix(b, '#ffffff', 0.75)];
+      }
+      return D.palettes[look.palette] || D.palettes.listen;
+    }
+    function mix(a, b, t) {
+      var p = function (h) { var n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+      var x = p(a), y = p(b);
+      return '#' + x.map(function (v, i) { return ('0' + Math.round(v + (y[i] - v) * t).toString(16)).slice(-2); }).join('');
+    }
+    function cfg() {
+      var c = JSON.parse(JSON.stringify(D.cfg));
+      c.look = look;
+      c.colors = colors();
+      if (look.label) c.text.label = look.label;
+      if (look.title) c.text.title = look.title;
+      if (look.subtitle) c.text.subtitle = look.subtitle;
+      return c;
+    }
+    function draw(rebuild) {
+      var dark = val('site') === 'dark';
+      site.classList.toggle('is-dark', dark);
+      if (widget && !rebuild) { widget.update(cfg()); return; }
+      if (widget) widget.destroy();
+      widget = window.ListenAgentWidget.preview(site, cfg(), { rtl: D.rtl, dark: dark, origin: location.origin, siteFont: getComputedStyle(document.body).fontFamily });
+      if (look.style !== 'bar') widget.open();
+      setPlaying(false);
+    }
+    function setPlaying(on) {
+      playing = on;
+      $('span', play).textContent = on ? play.getAttribute('data-stop') : play.getAttribute('data-play');
+    }
+    function read() {
+      look.style = val('style') || look.style;
+      look.icon = val('icon') || look.icon;
+      look.shape = val('shape') || look.shape;
+      look.size = val('size') || look.size;
+      var accent = val('accent');
+      look.accent = accent === 'custom' ? $('[data-ag-design-color="accent"]', box).value.toUpperCase() : (accent || look.accent);
+      look.palette = val('palette') || look.palette;
+      look.orb_colors = look.palette === 'custom' ? [$('[data-ag-design-color="orb0"]', box).value.toUpperCase(), $('[data-ag-design-color="orb1"]', box).value.toUpperCase()] : null;
+      look.label = $('[name="label"]', box).value.trim() || null;
+      look.title = $('[name="title"]', box).value.trim() || null;
+      look.subtitle = $('[name="subtitle"]', box).value.trim() || null;
+      look.captions = $('[name="captions"]', box).checked;
+      look.radius = val('radius') || look.radius;
+      look.font = val('font') || look.font;
+      look.theme = val('theme') || look.theme;
+      // The corner the owner sees: on a right-to-left website the start is the right.
+      var corner = val('corner');
+      if (corner) look.position = (corner === 'right') === !!D.rtl ? 'start' : 'end';
+      // The custom swatches show the chosen colours once picked, a rainbow before.
+      $('.ag-swatch-custom > span', box).style.background = accent === 'custom' ? look.accent : '';
+      var two = $('.ag-swatch-two > span', box);
+      two.style.setProperty('--c-a', $('[data-ag-design-color="orb0"]', box).value);
+      two.style.setProperty('--c-b', $('[data-ag-design-color="orb1"]', box).value);
+    }
+    function save() {
+      clearTimeout(saveTimer);
+      status.textContent = (D.text || {}).saving || '';
+      saveTimer = setTimeout(function () {
+        var body = {};
+        ['position', 'style', 'theme', 'label', 'icon', 'size', 'shape', 'accent', 'palette', 'radius', 'captions', 'title', 'subtitle', 'font'].forEach(function (k) { body[k] = look[k] === null ? '' : look[k]; });
+        if (look.palette === 'custom') body.orb_colors = look.orb_colors;
+        api('PATCH', C.agent.urls.update, { appearance: body }).then(function () {
+          status.textContent = (D.text || {}).saved || '';
+        }, function () { status.textContent = (D.text || {}).failed || ''; });
+      }, 600);
+    }
+    var styleBefore = look.style;
+    box.addEventListener('input', function (e) {
+      if (e.target.name === 'site') return;
+      read();
+      draw(look.style !== styleBefore);
+      styleBefore = look.style;
+      save();
+    });
+    box.addEventListener('change', function (e) {
+      if (e.target.name === 'site') { draw(true); return; }
+      if (e.target.matches('[data-ag-design-color]')) {
+        // Picking a colour picks "your colour" too.
+        var which = e.target.getAttribute('data-ag-design-color');
+        var radio = $('input[name="' + (which === 'accent' ? 'accent' : 'palette') + '"][value="custom"]', box);
+        if (radio) radio.checked = true;
+      }
+      read();
+      draw(look.style !== styleBefore);
+      styleBefore = look.style;
+      save();
+    });
+    $('[data-ag-design-reset]', box).addEventListener('click', function () {
+      var d = D.defaults;
+      ['style', 'icon', 'shape', 'size', 'radius', 'font', 'theme', 'palette'].forEach(function (k) {
+        var r = $('input[name="' + k + '"][value="' + d[k] + '"]', box);
+        if (r) r.checked = true;
+      });
+      var acc = $('input[name="accent"][value="' + d.accent + '"]', box);
+      if (acc) acc.checked = true;
+      var corner = $('input[name="corner"][value="' + ((d.position === 'start') === !!D.rtl ? 'right' : 'left') + '"]', box);
+      if (corner) corner.checked = true;
+      ['label', 'title', 'subtitle'].forEach(function (k) { $('[name="' + k + '"]', box).value = ''; });
+      $('[name="captions"]', box).checked = true;
+      read();
+      draw(true);
+      styleBefore = look.style;
+      save();
+    });
+    play.addEventListener('click', function () {
+      if (!widget) return;
+      widget.demo(!playing);
+      setPlaying(!playing);
+      if (playing) setTimeout(function () { if (playing) setPlaying(false); }, 14000);
+    });
+    read();
+    draw(true);
+  }
+
   function boot() {
     if (C.mode === 'setup') setup();
-    else if (C.mode === 'agent') agentPage();
+    else if (C.mode === 'agent') { agentPage(); design(); }
     else if (C.mode === 'link') talk($('[data-ag-talk]'));
     drawQr();
   }

@@ -7,7 +7,6 @@ use App\Models\AgentWidget;
 use App\Services\Agents\AgentCalls;
 use App\Services\Agents\GeminiClient;
 use App\Support\Agents\AgentVoices;
-use App\Support\Orbs;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -57,6 +56,7 @@ class AgentCallController extends Controller
         $voice = $agent->speaker_id ? AgentVoices::find($agent->speaker_id, $agent->language, $ar) : null;
         $this->seen($widget, $request);
         $locale = $ar ? 'ar' : 'en';
+        $look = $widget->style();
 
         return response()->json([
             'available' => $agent->isLive(),
@@ -69,14 +69,15 @@ class AgentCallController extends Controller
             'business' => $agent->business_name,
             'language' => $agent->language,
             'dir' => $ar ? 'rtl' : 'ltr',
-            'avatar' => $voice['avatar'] ?? null,
-            'colors' => Orbs::colors('listen'),
-            'look' => array_merge(AgentWidget::DEFAULT_APPEARANCE, $widget->appearance ?? []),
+            // The owner's look; the agent's face is only for choosing its voice, never on the call.
+            'colors' => $look['colors'],
+            'look' => $look,
             'text' => [
-                'label' => $widget->look('label') ?: trans('agents.widget_label', [], $ar ? 'ar' : 'en'),
-                'start' => trans('agents.talk_start', [], $ar ? 'ar' : 'en'),
-                'end' => trans('agents.talk_end', [], $ar ? 'ar' : 'en'),
-                'note' => trans('agents.talk_page_note', [], $ar ? 'ar' : 'en'),
+                'label' => $look['label'] ?: trans('agents.widget_label', [], $locale),
+                'title' => $look['title'] ?: $agent->business_name,
+                'subtitle' => $look['subtitle'] ?: trans(($voice['gender'] ?? null) === 'female' ? 'agents.widget_subtitle_female' : 'agents.widget_subtitle', [], $locale),
+                'start' => trans('agents.talk_start', [], $locale),
+                'end' => trans('agents.talk_end', [], $locale),
                 'states' => $this->states($agent, $voice, $locale),
                 'mic' => trans('agents.talk_mic_blocked', [], $ar ? 'ar' : 'en'),
                 'paused' => trans('agents.error_paused', [], $ar ? 'ar' : 'en'),

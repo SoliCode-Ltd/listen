@@ -195,8 +195,8 @@ class AgentPagesTest extends TestCase
         $this->assertTrue($zip->open($path) === true);
         $main = (string) $zip->getFromName('listen-voice-agent/listen-voice-agent.php');
         $this->assertStringContainsString('Plugin Name:       Listen Voice Agent', $main);
-        $this->assertStringContainsString("define('LISTEN_VOICE_AGENT_KEY', '".$key."');", $main);
-        $this->assertStringContainsString("define('LISTEN_VOICE_AGENT_SCRIPT', '".asset('js/listen-agent.js')."');", $main);
+        $this->assertStringContainsString("const AGENT_KEY = '".$key."';", $main);
+        $this->assertStringContainsString("const SCRIPT_URL = '".asset('js/listen-agent.js')."';", $main);
         $this->assertNotFalse($zip->getFromName('listen-voice-agent/readme.txt'));
         $this->assertStringContainsString('WP_UNINSTALL_PLUGIN', (string) $zip->getFromName('listen-voice-agent/uninstall.php'));
         $zip->close();

@@ -1,30 +1,93 @@
 === Listen Voice Agent ===
-Contributors: listen
 Tags: voice assistant, call button, customer service, arabic, ai receptionist
-Requires at least: 5.2
-Requires PHP: 7.2
+Requires at least: 6.5
+Tested up to: 7.1
+Requires PHP: 8.1
 Stable tag: {{VERSION}}
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Adds your Listen voice agent's call button to every page of your website.
+Adds your Listen voice agent's call button to your website, so visitors can talk to your business by voice.
 
 == Description ==
 
 Your agent answers your visitors by voice, in their own dialect, day and night:
 it answers questions from what you taught it and takes their name and phone
-number for a callback. Change what it says, its voice and its knowledge in
+number for a callback. Change what it says, its voice and what it knows in
 Listen ({{HOME}}); the button on your website follows on its own.
+
+* Your agent is already inside this copy of the plugin: activate it and the call button shows.
+* Show the button on every page, or only on the pages you choose.
+* The button's script loads asynchronously at the end of the page, so it never holds your pages up.
+* In your dashboard the plugin adds only its settings page, under Settings.
+* The settings page is in Arabic when your WordPress is in Arabic.
 
 == Installation ==
 
-1. In WordPress, open Plugins, then Add New Plugin, then Upload Plugin.
+1. In your WordPress dashboard, open Plugins, then Add New Plugin, then Upload Plugin.
 2. Choose this zip file, click Install Now, then Activate.
-3. That's it: open any page of your website to see the call button.
+3. Open any page of your website to see the call button.
 
-To hide the button, or to use another agent, open Settings, then Listen Voice Agent.
+To hide the button, show it on some pages only, or use another agent, open Settings, then Listen Voice Agent.
+
+== Frequently Asked Questions ==
+
+= The call button does not show. What do I check? =
+
+1. Your agent is live in Listen.
+2. In Settings, then Listen Voice Agent, "Show the call button on my website" is ticked. If you chose some pages only, the page is in the list.
+3. If you limited in Listen which websites may show your button, this website's address is in that list.
+4. If your website uses a caching plugin, clear its cache.
+
+= Can I show the button on some pages only? =
+
+Yes. In Settings, then Listen Voice Agent, choose "Only on these pages" and type the pages' IDs, separated by commas. A page's ID is the number after post= in its address while you edit it. The settings page names the pages it found, so you can check them.
+
+= Where do I change what my agent says? =
+
+In Listen ({{HOME}}). Your changes show on your website by themselves: you never need a new copy of the plugin for them.
+
+= Can I use another agent? =
+
+Yes: copy that agent's key in Listen and paste it in Settings, then Listen Voice Agent, under Agent key. Leave the key empty to use the agent this plugin came with.
+
+= How do I update the plugin? =
+
+Download it again from your agent's page in Listen, then upload it in Plugins, then Add New Plugin, then Upload Plugin, and choose "Replace current with uploaded". Your settings stay as they are. The plugin is never replaced by a plugin with the same name from anywhere else.
+
+= Can a developer decide where the button shows? =
+
+Yes. The filter listen_voice_agent_show_button receives whether the button shows on the page being viewed: return false to hide it, for example on a checkout page.
+
+= What happens when I delete the plugin? =
+
+Its settings are removed, on every site of a network too. Deactivating the plugin hides the button and keeps its settings.
+
+== External services ==
+
+The call button is a service of Listen ({{HOME}}). On every page that shows the button, the visitor's browser loads the button's script from Listen and asks Listen for your agent's button (whether it is live, its words, look and voice). Listen receives your agent's key, the address of the website, and what any web request carries, such as the visitor's IP address and browser.
+
+When a visitor starts a call, their voice and what they say during the call, such as their name and phone number for a callback, go to Listen so your agent can answer them.
+
+The plugin sends nothing from your server and stores no visitor data in WordPress: it keeps only its own settings.
+
+Listen's terms: {{TERMS_URL}}
+Listen's privacy policy: {{PRIVACY_URL}}
 
 == Changelog ==
 
-= {{VERSION}} =
+= 1.1.0 =
+* Show the call button on every page, or only on the pages you choose.
+* The button's script loads the way WordPress recommends: asynchronously, at the end of the page.
+* Every setting is checked strictly, and only administrators can change the settings.
+* Arabic comes with the plugin as WordPress translation files.
+* WordPress never replaces this plugin with another plugin of the same name.
+* Needs WordPress 6.5 or newer and PHP 8.1 or newer.
+
+= 1.0.0 =
 * The call button on every page, with your agent already set.
+
+== Upgrade Notice ==
+
+= 1.1.0 =
+Show the call button on chosen pages only, with stricter security. Needs WordPress 6.5 or newer and PHP 8.1 or newer.

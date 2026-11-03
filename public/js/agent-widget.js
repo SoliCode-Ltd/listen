@@ -1,99 +1,167 @@
 /*
- * Listen: the call button and its panel on a business's website, loaded by
+ * Listen: the call button and its call card on a business's website, loaded by
  * listen-agent.js with the agent's settings. Everything sits in a shadow root,
  * so the website's styles never reach it and it never reaches the website's.
  * The call itself is ListenAgentCall (agent-call.js), loaded on first use.
+ *
+ * The owner styles it (Design tab): what the call shows (an orb that moves
+ * with the voice, the brand's waves, or a slim bar), the button's icon, text,
+ * shape and size, its colours, the card's title, corners and font, the corner
+ * it sits in and light or dark. ListenAgentWidget.preview() draws the same
+ * button inside the Design tab, with a pretend call, so the owner sees it move.
  */
 (function () {
   'use strict';
   if (window.ListenAgentWidget) return;
 
+  var EASE = 'cubic-bezier(.22,1,.36,1)';
   var CSS = [
     ':host{all:initial}',
-    '.lva{position:fixed;bottom:20px;z-index:2147483000;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,"Noto Sans Arabic","Geeza Pro",Arial,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;',
-    '  --a:#7659FA;--a-2:#6446F2;--bg:#ffffff;--text:#16132F;--muted:#5F5A7E;--line:rgba(23,20,74,.12);--soft:rgba(118,89,250,.10);--shadow:0 24px 60px -18px rgba(23,20,74,.38),0 2px 6px rgba(23,20,74,.08)}',
-    '.lva[data-theme="dark"]{--bg:#17142E;--text:#F3F1FF;--muted:#B5AED9;--line:rgba(255,255,255,.12);--soft:rgba(160,140,255,.14);--shadow:0 24px 60px -18px rgba(0,0,0,.7),0 2px 6px rgba(0,0,0,.3)}',
-    '.lva{color:var(--text)}',
+    '.lva{position:fixed;bottom:20px;z-index:2147483000;font-family:var(--font);font-size:15px;line-height:1.45;color:var(--text);-webkit-font-smoothing:antialiased;',
+    '  --font:system-ui,-apple-system,"Segoe UI",Tahoma,"Noto Sans Arabic","Geeza Pro",Arial,sans-serif;',
+    '  --bg:#ffffff;--text:#16132F;--muted:#615C80;--line:rgba(23,20,74,.12);--soft:rgba(23,20,74,.05);--shadow:0 26px 60px -20px rgba(23,20,74,.42),0 2px 8px rgba(23,20,74,.08);',
+    '  --r-card:26px;--r-btn:999px;--h:52px;--ico:38px;--fs:15px}',
+    '.lva[data-theme="dark"]{--bg:#17142E;--text:#F3F1FF;--muted:#B9B2DD;--line:rgba(255,255,255,.12);--soft:rgba(255,255,255,.06);--shadow:0 26px 60px -20px rgba(0,0,0,.75),0 2px 8px rgba(0,0,0,.35)}',
+    '.lva[data-font="rounded"]{--font:ui-rounded,"SF Pro Rounded","Nunito","Varela Round","Tajawal","Noto Sans Arabic",system-ui,sans-serif}',
+    '.lva[data-font="site"]{--font:var(--site-font)}',
+    '.lva[data-radius="square"]{--r-card:10px;--r-btn:10px}.lva[data-radius="soft"]{--r-card:18px;--r-btn:14px}',
+    '.lva[data-size="s"]{--h:44px;--ico:32px;--fs:14px}.lva[data-size="l"]{--h:60px;--ico:44px;--fs:16.5px}',
+    '.lva.is-preview{position:absolute}',
     '.lva *,.lva *::before,.lva *::after{box-sizing:border-box}',
     '.lva [hidden]{display:none !important}',
-    '.lva button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}',
-    '.lva-mute{color:var(--text)}',
-    '.lva button:focus-visible,.lva a:focus-visible{outline:3px solid rgba(118,89,250,.45);outline-offset:2px}',
-    /* The launcher: a pill with a small living orb. */
-    '.lva-launch{display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 18px 8px 8px;border:0;border-radius:999px;background:var(--bg);color:var(--text);box-shadow:var(--shadow);font-weight:700;font-size:15px;transition:transform .25s cubic-bezier(.22,1,.36,1),box-shadow .25s ease}',
-    '.lva[dir="rtl"] .lva-launch{padding:8px 8px 8px 18px}',
-    '.lva-launch:hover{transform:translateY(-2px)}',
+    '.lva button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}',
+    '.lva button:focus-visible,.lva a:focus-visible{outline:3px solid color-mix(in srgb,var(--a) 45%,transparent);outline-offset:2px}',
+    '.lva.is-right{right:20px}.lva.is-left{left:20px}',
+    '.lva svg{display:block}',
+
+    /* The button: the accent circle with its icon, then the words. */
+    '.lva-dock{position:relative;display:flex;justify-content:flex-end}.lva.is-left .lva-dock{justify-content:flex-start}',
+    '.lva-launch{display:flex;align-items:center;gap:10px;height:var(--h);padding:0 18px 0 calc((var(--h) - var(--ico)) / 2);border:1px solid var(--line);border-radius:var(--r-btn);background:var(--bg);box-shadow:var(--shadow);font-weight:700;font-size:var(--fs);white-space:nowrap;',
+    '  transition:transform .3s ' + EASE + ',box-shadow .3s ease,opacity .25s ease;animation:lva-enter .55s ' + EASE + ' both}',
+    '.lva[dir="rtl"] .lva-launch{padding:0 calc((var(--h) - var(--ico)) / 2) 0 18px}',
+    '.lva-launch.is-round{width:var(--h);padding:0;justify-content:center}',
+    '.lva-launch:hover{transform:translateY(-2px);box-shadow:0 30px 64px -20px rgba(23,20,74,.5),0 2px 8px rgba(23,20,74,.1)}',
     '.lva-launch:active{transform:scale(.97)}',
-    '.lva-launch.is-round{padding:8px}',
-    '.lva-mini{position:relative;width:36px;height:36px;flex:0 0 auto}',
-    /* The status dot, on the photo's lower corner like a messenger's: green while the agent can take a call, pink and pulsing during one. */
-    '.lva-live-dot{position:absolute;bottom:-1px;inset-inline-end:-1px;z-index:2;width:13px;height:13px;border-radius:50%;background:#22c55e;border:2.5px solid var(--bg);transition:background .3s ease}',
-    '.lva.is-live .lva-live-dot{background:#ee4a77;animation:lva-blink 1.4s ease-in-out infinite}',
-    /* The orb, drawn in CSS from the agent's colours (--c1 deep … --c4 light). */
-    '.lva-orb{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 34% 28%,var(--c4) 0 7%,var(--c3) 24%,var(--c2) 55%,var(--c1) 100%);box-shadow:inset -8px -12px 24px rgba(0,0,0,.28),0 10px 28px -10px var(--c2);transform:scale(var(--s,1));transition:transform .09s linear;overflow:hidden;animation:lva-breathe 5s ease-in-out infinite}',
-    '.lva-orb::before{content:"";position:absolute;inset:-12%;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 18%,var(--c3) 32%,transparent 48%,var(--c4) 66%,transparent 82%);opacity:.55;filter:blur(7px);mix-blend-mode:screen;animation:lva-spin 10s linear infinite}',
-    '.lva-orb::after{content:"";position:absolute;inset:9% 20% 54% 22%;border-radius:50%;background:radial-gradient(ellipse at 50% 40%,rgba(255,255,255,.6),transparent 70%)}',
-    '.lva.is-speaking .lva-orb::before{animation-duration:3.2s;opacity:.8}',
-    '.lva.is-connecting .lva-orb{animation:lva-pulse 1.1s ease-in-out infinite}',
-    /* The panel. */
-    '.lva.is-right{right:20px}.lva.is-left{left:20px}.lva.is-right .lva-panel{right:0}.lva.is-left .lva-panel{left:0}',
-    '.lva-panel{position:absolute;bottom:calc(100% + 14px);width:344px;max-width:calc(100vw - 24px);padding:18px;border-radius:24px;background:var(--bg);color:var(--text);box-shadow:var(--shadow);border:1px solid var(--line);display:grid;gap:12px;transform-origin:bottom var(--side);opacity:0;transform:translateY(10px) scale(.96);pointer-events:none;visibility:hidden;transition:opacity .22s ease,transform .32s cubic-bezier(.22,1,.36,1),visibility 0s linear .32s}',
-    '.lva.is-open .lva-panel{opacity:1;transform:none;pointer-events:auto;visibility:visible;transition:opacity .22s ease,transform .32s cubic-bezier(.22,1,.36,1),visibility 0s}',
-    '.lva-head{display:flex;align-items:center;gap:10px}',
-    '.lva-face{width:42px;height:42px;border-radius:50%;overflow:hidden;flex:0 0 auto;background:var(--soft)}',
-    '.lva-face img{width:100%;height:100%;object-fit:cover;display:block}',
-    '.lva-who{flex:1;min-width:0;display:grid}',
-    '.lva-who strong{font-size:15.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.lva-ico{position:relative;display:grid;place-items:center;width:var(--ico);height:var(--ico);border-radius:var(--r-btn);background:var(--a);color:var(--a-ink);flex:0 0 auto;transition:background .3s ease}',
+    '.lva[data-radius="round"] .lva-ico{border-radius:50%}',
+    '.lva-ico svg{width:46%;height:46%;fill:none;stroke:currentColor;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}',
+    '.lva-ico svg.is-fill{fill:currentColor;stroke:none}',
+    '.lva-ico.is-orb{background:transparent;overflow:hidden}',
+    /* A soft ring once the button arrives, so it is noticed, then never again. */
+    '.lva-ico::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:0 0 0 0 color-mix(in srgb,var(--a) 55%,transparent);animation:lva-hello 1.6s ease-out .8s 2}',
+    /* On a call (card closed): moving bars instead of the icon, and the time instead of the words. */
+    '.lva-eq{display:none;align-items:center;gap:3px;height:42%}',
+    '.lva-eq i{width:3px;height:40%;border-radius:2px;background:currentColor;animation:lva-eq .9s ease-in-out infinite}',
+    '.lva-eq i:nth-child(2){animation-delay:-.3s}.lva-eq i:nth-child(3){animation-delay:-.6s}',
+    '.lva.is-live .lva-launch .lva-eq{display:flex}.lva.is-live .lva-launch .lva-ico > svg,.lva.is-live .lva-launch .lva-ico > .lva-mini{display:none}',
+    '.lva.is-live .lva-ico{background:#E2445F;color:#fff}',
+    '.lva.is-speaking .lva-eq i{animation-duration:.55s}',
+    '.lva-time{font-variant-numeric:tabular-nums;font-weight:800}',
+
+    /* The card. */
+    '.lva-panel{position:absolute;bottom:calc(100% + 14px);width:344px;max-width:calc(100vw - 24px);padding:18px 18px 14px;border-radius:var(--r-card);background:var(--bg);border:1px solid var(--line);box-shadow:var(--shadow);display:grid;gap:12px;',
+    '  transform-origin:bottom var(--side);opacity:0;transform:translateY(12px) scale(.94);pointer-events:none;visibility:hidden;transition:opacity .24s ease,transform .42s ' + EASE + ',visibility 0s linear .42s}',
+    '.lva.is-right .lva-panel{right:0}.lva.is-left .lva-panel{left:0}',
+    '.lva.is-open .lva-panel{opacity:1;transform:none;pointer-events:auto;visibility:visible;transition:opacity .24s ease,transform .42s ' + EASE + ',visibility 0s}',
+    '.lva-head{display:flex;align-items:flex-start;gap:10px}',
+    '.lva-who{flex:1;min-width:0;display:grid;gap:1px}',
+    '.lva-who strong{font-size:16px;font-weight:800;line-height:1.3;overflow-wrap:anywhere}',
     '.lva-who small{color:var(--muted);font-size:12.5px}',
-    '.lva-x{width:36px;height:36px;border-radius:50%;border:0;background:transparent;display:grid;place-items:center;color:var(--muted)}',
+    '.lva-pill{display:none;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;background:var(--soft);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}',
+    '.lva-pill i{width:7px;height:7px;border-radius:50%;background:#E2445F;animation:lva-blink 1.4s ease-in-out infinite}',
+    '.lva.is-live .lva-pill{display:inline-flex}',
+    '.lva-x{width:34px;height:34px;margin:-4px;border-radius:50%;border:0;background:transparent;display:grid;place-items:center;color:var(--muted);flex:0 0 auto}',
     '.lva-x:hover{background:var(--soft);color:var(--text)}',
     '.lva-x svg,.lva-call svg,.lva-mute svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
-    /* The voice: a small orb, and the brand's waves either side that move as it talks. */
-    '.lva-stage{display:flex;align-items:center;justify-content:center;gap:12px;height:104px;margin-top:4px}',
-    '.lva-stage-orb{position:relative;width:78px;height:78px;flex:0 0 auto}',
-    '.lva-ring{position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--c3);opacity:var(--mo,0);transform:scale(var(--ms,1));transition:opacity .12s linear,transform .12s linear}',
-    '.lva-wave{display:flex;align-items:center;gap:4px;height:64px}',
-    '.lva-wave i{display:block;width:4px;height:5px;border-radius:4px;background:linear-gradient(180deg,var(--c3),var(--c2));opacity:.9;transition:height .07s linear}',
-    '.lva:not(.is-live) .lva-wave i{animation:lva-idle 2.4s ease-in-out infinite}',
-    '.lva-wave i:nth-child(2n){animation-delay:-.6s}.lva-wave i:nth-child(3n){animation-delay:-1.2s}.lva-wave i:nth-child(5n){animation-delay:-1.8s}',
-    '@keyframes lva-idle{0%,100%{height:5px}50%{height:11px}}',
-    '.lva-face.is-photo{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--c2)}',
-    '.lva-mini img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}',
-    '.lva-mini.is-photo::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--c2)}',
-    '.lva.is-speaking .lva-mini.is-photo::after{animation:lva-pulse-ring 1s ease-in-out infinite}',
-    '@keyframes lva-pulse-ring{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.12);opacity:.5}}',
-    '.lva-state{margin:0;text-align:center;font-weight:700;font-size:15px;min-height:22px}',
-    '.lva-state.is-error{color:#d0335f}',
-    /* What was said: older lines fade out at the top as new ones come in. */
-    '.lva-lines{display:grid;gap:6px;max-height:160px;overflow:auto;scrollbar-width:thin;padding-top:12px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px);mask-image:linear-gradient(to bottom,transparent 0,#000 18px)}',
+
+    /* The orb: one, in the middle, moving with the voice. */
+    '.lva-stage{display:grid;place-items:center;height:164px}',
+    '.lva-orbwrap{position:relative;width:112px;height:112px}',
+    '.lva-orb{position:absolute;inset:0;border-radius:50%;overflow:hidden;isolation:isolate;',
+    '  background:radial-gradient(120% 120% at 32% 24%,var(--c3) 0%,var(--c2) 46%,var(--c1) 100%);',
+    '  box-shadow:inset 0 -12px 26px rgba(0,0,0,.28),inset 0 10px 20px rgba(255,255,255,.22),0 20px 44px -18px var(--c2);',
+    '  transform:scale(var(--s,1));transition:transform .12s linear}',
+    '.lva-orb::before{content:"";position:absolute;inset:-35%;background:conic-gradient(from 0deg,transparent 0 12%,var(--c3) 26%,transparent 42%,var(--c4) 62%,transparent 80%);filter:blur(14px);opacity:.55;mix-blend-mode:screen;animation:lva-spin 11s linear infinite}',
+    '.lva-orb::after{content:"";position:absolute;top:9%;left:19%;width:46%;height:30%;border-radius:50%;background:radial-gradient(ellipse at 50% 40%,rgba(255,255,255,.78),transparent 72%)}',
+    '.lva.is-speaking .lva-orb::before{animation-duration:3.4s;opacity:.85}',
+    '.lva.is-connecting .lva-orb{animation:lva-breathe 1.4s ease-in-out infinite}',
+    '.lva-rings i{position:absolute;inset:0;border-radius:50%;border:2px solid var(--c3);opacity:0}',
+    '.lva.is-speaking .lva-rings i{animation:lva-ring 1.9s ease-out infinite}.lva.is-speaking .lva-rings i:nth-child(2){animation-delay:.95s}',
+    '.lva-spin{position:absolute;inset:-10px;border-radius:50%;border:2px solid transparent;border-top-color:var(--c2);opacity:0;transition:opacity .3s ease}',
+    '.lva.is-connecting .lva-spin{opacity:1;animation:lva-spin .9s linear infinite}',
+    '.lva-mini{position:absolute;inset:0;border-radius:50%;overflow:hidden;background:radial-gradient(120% 120% at 32% 24%,var(--c3) 0%,var(--c2) 46%,var(--c1) 100%);box-shadow:inset 0 -5px 10px rgba(0,0,0,.25)}',
+    '.lva-mini::after{content:"";position:absolute;top:10%;left:20%;width:44%;height:30%;border-radius:50%;background:radial-gradient(ellipse at 50% 40%,rgba(255,255,255,.75),transparent 72%)}',
+
+    /* The waves: the brand mark, its bars moving with the voice. */
+    '.lva-wave{display:flex;align-items:center;justify-content:center;gap:7px;height:96px}',
+    '.lva-wave i{display:block;width:7px;height:var(--rest,12px);border-radius:7px;background:linear-gradient(180deg,var(--c3),var(--c2));transition:height .08s linear}',
+    '.lva:not(.is-live) .lva-wave i{animation:lva-idle 2.6s ease-in-out infinite}',
+    '.lva-wave i:nth-child(2n){animation-delay:-.7s}.lva-wave i:nth-child(3n){animation-delay:-1.4s}',
+
+    '.lva-state{margin:0;text-align:center;font-weight:700;font-size:15px;min-height:22px;transition:opacity .2s ease}',
+    '.lva-state.is-error{color:#D0335F}',
+    /* What was said: the last lines, older ones fading at the top. */
+    '.lva-lines{display:grid;gap:6px;max-height:132px;overflow:auto;scrollbar-width:none;padding-top:10px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 16px);mask-image:linear-gradient(to bottom,transparent 0,#000 16px)}',
+    '.lva-lines::-webkit-scrollbar{display:none}',
     '.lva-lines:empty{display:none}',
-    '.lva-line{padding:8px 11px;border-radius:14px;background:var(--soft);font-size:13.5px;max-width:88%;justify-self:start;animation:lva-in .3s cubic-bezier(.22,1,.36,1)}',
+    '.lva-line{padding:8px 12px;border-radius:16px;background:var(--soft);font-size:13.5px;max-width:88%;justify-self:start;animation:lva-in .35s ' + EASE + '}',
+    '.lva[data-radius="square"] .lva-line{border-radius:8px}',
     '.lva-line.is-caller{justify-self:end;background:transparent;border:1px solid var(--line)}',
-    '.lva-buttons{display:flex;gap:8px;justify-content:center}',
-    '.lva-call{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 22px;border:0;border-radius:999px;background:var(--a);color:#fff !important;font-weight:800;font-size:15.5px;box-shadow:0 10px 24px -10px var(--a);transition:background .2s ease,transform .18s ease}',
+    '.lva-buttons{display:flex;gap:8px;justify-content:center;align-items:center}',
+    '.lva-call{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 24px;border:0;border-radius:var(--r-btn);background:var(--a);color:var(--a-ink) !important;font-weight:800;font-size:15.5px;box-shadow:0 0 0 1px var(--line),0 12px 26px -12px var(--a);transition:background .25s ease,transform .18s ease,box-shadow .25s ease}',
     '.lva-call:hover{background:var(--a-2)}',
     '.lva-call:active{transform:scale(.97)}',
-    '.lva-call.is-live{background:#e2445f;box-shadow:0 10px 24px -10px #e2445f}',
-    '.lva-mute{width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:transparent;display:grid;place-items:center}',
+    '.lva-call.is-live{background:#E2445F;color:#fff !important;box-shadow:0 12px 26px -12px #E2445F}',
+    '.lva-mute{width:48px;height:48px;border-radius:var(--r-btn);border:1px solid var(--line);background:transparent;display:grid;place-items:center;transition:background .2s ease}',
+    '.lva[data-radius="round"] .lva-mute{border-radius:50%}',
     '.lva-mute[aria-pressed="true"]{background:var(--soft);color:var(--a)}',
-    '.lva-note{margin:0;color:var(--muted);font-size:12px;text-align:center}',
-    '.lva-powered{justify-self:center;color:var(--muted);font-size:11.5px;text-decoration:none;font-weight:600}',
-    '.lva-powered:hover{color:var(--a)}',
-    '@media (max-width:480px){.lva{bottom:14px}.lva.is-right{right:14px}.lva.is-left{left:14px}.lva .lva-panel{position:fixed;left:10px !important;right:10px !important;bottom:80px;width:auto;max-width:none}}',
+    '.lva-powered{justify-self:center;display:inline-block;padding:4px 10px;color:var(--muted);font-size:11.5px;font-weight:700;text-decoration:none;border-radius:8px}',
+    '.lva-powered:hover{color:var(--text)}',
+
+    /* The slim bar: the button itself becomes the call, no card. */
+    '.lva-bar{display:none;align-items:center;gap:10px;height:var(--h);padding:0 calc((var(--h) - var(--ico)) / 2);border:1px solid var(--line);border-radius:var(--r-btn);background:var(--bg);box-shadow:var(--shadow);animation:lva-pop .38s ' + EASE + ' both}',
+    '.lva.is-barlive .lva-bar{display:flex}.lva.is-barlive .lva-launch{display:none}',
+    '.lva-bar .lva-viz{position:relative;display:grid;place-items:center;width:var(--ico);height:var(--ico);flex:0 0 auto}',
+    '.lva-bar .lva-viz .lva-orbwrap{width:100%;height:100%}',
+    '.lva-bar .lva-viz .lva-orb{box-shadow:inset 0 -5px 10px rgba(0,0,0,.25)}',
+    '.lva-bar .lva-viz .lva-orb::before{filter:blur(6px)}',
+    '.lva-bar .lva-viz .lva-rings i{border-width:1.5px}',
+    '.lva-bar .lva-viz .lva-spin{inset:-5px}',
+    '.lva-bar .lva-wave{height:var(--ico);gap:3px}.lva-bar .lva-wave i{width:3.5px}',
+    '.lva-barinfo{display:grid;min-width:92px;line-height:1.25}',
+    '.lva-barinfo b{font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}',
+    '.lva-barinfo span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}',
+    '.lva-bar .lva-mute,.lva-bar .lva-end{width:var(--ico);height:var(--ico);min-height:0;padding:0;border-radius:50%}',
+    '.lva-end{display:grid;place-items:center;border:0;background:#E2445F;color:#fff !important}',
+    '.lva-end svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.lva-bartip{position:absolute;bottom:calc(100% + 10px);max-width:min(320px,calc(100vw - 40px));padding:9px 13px;border-radius:14px;background:var(--bg);border:1px solid var(--line);box-shadow:var(--shadow);font-size:13.5px;animation:lva-in .3s ' + EASE + '}',
+    '.lva.is-right .lva-bartip{right:0}.lva.is-left .lva-bartip{left:0}',
+    '.lva-bartip.is-error{color:#D0335F}',
+
+    '@media (max-width:480px){.lva{bottom:14px}.lva.is-right{right:14px}.lva.is-left{left:14px}.lva:not(.is-preview) .lva-panel{position:fixed;left:10px !important;right:10px !important;bottom:calc(var(--h) + 26px);width:auto;max-width:none}}',
+    '@keyframes lva-enter{from{opacity:0;transform:translateY(14px) scale(.96)}}',
+    '@keyframes lva-pop{from{opacity:0;transform:scale(.92)}}',
+    '@keyframes lva-hello{to{box-shadow:0 0 0 12px transparent}}',
     '@keyframes lva-spin{to{transform:rotate(360deg)}}',
-    '@keyframes lva-breathe{0%,100%{scale:1}50%{scale:1.035}}',
-    '@keyframes lva-pulse{0%,100%{opacity:1}50%{opacity:.65}}',
+    '@keyframes lva-breathe{0%,100%{transform:scale(.97)}50%{transform:scale(1.03)}}',
+    '@keyframes lva-ring{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.6);opacity:0}}',
+    '@keyframes lva-eq{0%,100%{height:30%}50%{height:100%}}',
+    '@keyframes lva-idle{0%,100%{height:var(--rest,12px)}50%{height:calc(var(--rest,12px) * 1.35)}}',
     '@keyframes lva-blink{0%,100%{opacity:1}50%{opacity:.35}}',
     '@keyframes lva-in{from{opacity:0;transform:translateY(6px)}}',
     '@media (prefers-reduced-motion:reduce){.lva *,.lva *::before,.lva *::after{animation:none !important;transition:none !important}}',
   ].join('\n');
 
   var ICONS = {
+    phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.1 3.5h3.1l1.6 4.1-2 1.3a11.3 11.3 0 0 0 5.3 5.3l1.3-2 4.1 1.6v3.1a2 2 0 0 1-2.2 2A16.6 16.6 0 0 1 3.1 5.7a2 2 0 0 1 2-2.2z"/></svg>',
     mic: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>',
+    headset: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="13" width="4.5" height="7" rx="2"/><rect x="16.5" y="13" width="4.5" height="7" rx="2"/><path d="M20 20c0 1-1.5 1.8-4 1.8h-2"/></svg>',
+    waves: '<svg viewBox="0 0 24 24" class="is-fill" aria-hidden="true"><rect x="2" y="10.5" width="2.4" height="3" rx="1.2"/><rect x="6.2" y="7.5" width="2.4" height="9" rx="1.2"/><rect x="10.8" y="3.5" width="2.4" height="17" rx="1.2"/><rect x="15.4" y="7.5" width="2.4" height="9" rx="1.2"/><rect x="19.6" y="10.5" width="2.4" height="3" rx="1.2"/></svg>',
     micOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V6a3 3 0 0 0-5.7-1.3"/><path d="M19 11a7 7 0 0 1-1.2 3.9M5 11a7 7 0 0 0 10.8 5.9M12 18v3"/></svg>',
     end: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15.2c5-4.6 13-4.6 18 0l-2.3 2.7-3.7-1.4v-2.8a12.4 12.4 0 0 0-6 0v2.8l-3.7 1.4z"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   };
+  var WAVE = [0.3, 0.5, 0.72, 0.9, 1, 0.9, 0.72, 0.5, 0.3];
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
@@ -101,10 +169,23 @@
     if (text != null) n.textContent = text;
     return n;
   }
-  function orb() {
-    var o = el('i', 'lva-orb');
-    o.setAttribute('aria-hidden', 'true');
-    return o;
+  function hexRgb(h) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(String(h || ''));
+    if (!m) return null;
+    var n = parseInt(m[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  // Text on the accent colour: white on a deep colour, ink on a light one.
+  function inkOn(h) {
+    var c = hexRgb(h);
+    if (!c) return '#fff';
+    var l = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * l(c[0]) + 0.7152 * l(c[1]) + 0.0722 * l(c[2]) > 0.42 ? '#16132F' : '#fff';
+  }
+  function darker(h) {
+    var c = hexRgb(h);
+    if (!c) return h;
+    return 'rgb(' + c.map(function (v) { return Math.round(v * 0.86); }).join(',') + ')';
   }
   function isDarkPage() {
     var pick = function (node) {
@@ -125,120 +206,304 @@
       return id;
     } catch (e) { return ''; }
   }
+  function clock(s) { return ('0' + Math.floor(s / 60)).slice(-2) + ':' + ('0' + (s % 60)).slice(-2); }
 
-  function mount(cfg, ctx) {
-    if (!document.body || document.querySelector('[data-listen-agent]')) return;
-    var text = cfg.text || {}, states = text.states || {}, look = cfg.look || {}, colors = cfg.colors || ['#24138A', '#7659FA', '#C9BEFF', '#FFE3D3'];
-    var pageRtl = getComputedStyle(document.documentElement).direction === 'rtl' || document.documentElement.dir === 'rtl';
-    var side = (look.position === 'start') !== pageRtl ? 'left' : 'right';
-    var theme = look.theme === 'dark' || (look.theme !== 'light' && isDarkPage()) ? 'dark' : 'light';
-
+  /*
+   * One button. opts.preview: drawn inside opts.into (the Design tab), with a
+   * pretend call instead of a real one.
+   */
+  function build(cfg, ctx, opts) {
+    opts = opts || {};
+    var preview = !!opts.preview;
     var host = el('div');
-    host.setAttribute('data-listen-agent', '');
+    host.setAttribute(preview ? 'data-listen-agent-preview' : 'data-listen-agent', '');
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
     var style = el('style');
     style.textContent = CSS;
     root.appendChild(style);
-
     var box = el('div', 'lva');
-    box.dir = cfg.dir === 'rtl' ? 'rtl' : 'ltr';
-    box.lang = cfg.language === 'en' ? 'en' : 'ar';
-    box.setAttribute('data-theme', theme);
-    box.classList.add('is-' + side);
-    box.style.setProperty('--side', side);
-    ['--c1', '--c2', '--c3', '--c4'].forEach(function (v, i) { box.style.setProperty(v, colors[i]); });
-
-    // The panel.
-    var panel = el('div', 'lva-panel');
-    panel.id = 'lva-panel';
-    panel.setAttribute('role', 'dialog');
-    panel.setAttribute('aria-label', cfg.business || cfg.name || '');
-    var head = el('div', 'lva-head');
-    var face = el('span', 'lva-face');
-    var photo = cfg.avatar && (/^https:\/\//.test(cfg.avatar) || cfg.avatar.indexOf(ctx.origin + '/') === 0) ? cfg.avatar : null;
-    if (photo) { var img = el('img'); img.alt = ''; img.src = photo; face.appendChild(img); face.classList.add('is-photo'); }
-    else { face.style.position = 'relative'; face.appendChild(orb()); }
-    var who = el('div', 'lva-who');
-    who.appendChild(el('strong', '', cfg.business || cfg.name));
-    who.appendChild(el('small', '', cfg.name));
-    var close = el('button', 'lva-x');
-    close.type = 'button';
-    close.setAttribute('aria-label', text.close || 'Close');
-    close.innerHTML = ICONS.close;
-    head.appendChild(face); head.appendChild(who); head.appendChild(close);
-
-    var stage = el('div', 'lva-stage');
-    var waves = [el('span', 'lva-wave'), el('span', 'lva-wave')];
-    var bars = [];
-    waves.forEach(function (w) { for (var b = 0; b < 7; b++) { var bar = el('i'); w.appendChild(bar); bars.push(bar); } });
-    var orbBox = el('span', 'lva-stage-orb');
-    var bigOrb = orb();
-    var ring = el('i', 'lva-ring');
-    orbBox.appendChild(ring);
-    orbBox.appendChild(bigOrb);
-    stage.appendChild(waves[0]);
-    stage.appendChild(orbBox);
-    stage.appendChild(waves[1]);
-    var stateEl = el('p', 'lva-state', states.idle || '');
-    stateEl.setAttribute('aria-live', 'polite');
-    var lines = el('div', 'lva-lines');
-    lines.setAttribute('aria-live', 'polite');
-    var buttons = el('div', 'lva-buttons');
-    var callBtn = el('button', 'lva-call');
-    callBtn.type = 'button';
-    var callIcon = el('span');
-    callIcon.style.display = 'contents';
-    callIcon.innerHTML = ICONS.mic;
-    var callLabel = el('span', '', text.start);
-    callBtn.appendChild(callIcon); callBtn.appendChild(callLabel);
-    var muteBtn = el('button', 'lva-mute');
-    muteBtn.type = 'button';
-    muteBtn.hidden = true;
-    muteBtn.setAttribute('aria-pressed', 'false');
-    muteBtn.setAttribute('aria-label', text.mute || 'Mute');
-    muteBtn.innerHTML = ICONS.micOff;
-    buttons.appendChild(callBtn); buttons.appendChild(muteBtn);
-    var note = el('p', 'lva-note', text.note);
-    var powered = el('a', 'lva-powered', text.powered);
-    powered.href = ctx.origin + '/';
-    powered.target = '_blank';
-    powered.rel = 'noopener';
-    [head, stage, stateEl, lines, buttons, note, powered].forEach(function (n) { panel.appendChild(n); });
-
-    // The launcher.
-    var launch = el('button', 'lva-launch' + (text.label ? '' : ' is-round'));
-    launch.type = 'button';
-    launch.setAttribute('aria-expanded', 'false');
-    launch.setAttribute('aria-controls', 'lva-panel');
-    launch.setAttribute('aria-label', text.label || cfg.business || '');
-    var mini = el('span', 'lva-mini');
-    var miniOrb = orb();
-    if (photo) { var mimg = el('img'); mimg.alt = ''; mimg.src = photo; mini.appendChild(mimg); mini.classList.add('is-photo'); }
-    else mini.appendChild(miniOrb);
-    mini.appendChild(el('i', 'lva-live-dot'));
-    launch.appendChild(mini);
-    if (text.label) launch.appendChild(el('span', '', text.label));
-
-    box.appendChild(panel);
-    box.appendChild(launch);
     root.appendChild(box);
-    document.body.appendChild(host);
+    (opts.into || document.body).appendChild(host);
 
-    // Open, close.
-    var open = false;
+    var text, look, states;
+    var stateNow = 'idle', call = null, starting = false, muted = false, pendingError = '', open = false;
+    var startedAt = 0, tick = 0, demo = null;
+    var parts = {};
+
+    function render(next) {
+      cfg = next || cfg;
+      text = cfg.text || {};
+      states = text.states || {};
+      look = cfg.look || {};
+      var colors = cfg.colors || ['#2A1A8F', '#7659FA', '#C9BEFF', '#F4F1FF'];
+      var pageRtl = opts.rtl != null ? !!opts.rtl : (getComputedStyle(document.documentElement).direction === 'rtl' || document.documentElement.dir === 'rtl');
+      var side = (look.position === 'start') !== pageRtl ? 'left' : 'right';
+      var theme = look.theme === 'dark' || (look.theme !== 'light' && (opts.dark != null ? opts.dark : isDarkPage())) ? 'dark' : 'light';
+      var accent = hexRgb(look.accent) ? look.accent : '#7659FA';
+
+      box.className = 'lva is-' + side + (preview ? ' is-preview' : '');
+      box.dir = cfg.dir === 'rtl' ? 'rtl' : 'ltr';
+      box.lang = cfg.language === 'en' ? 'en' : 'ar';
+      box.setAttribute('data-theme', theme);
+      box.setAttribute('data-style', look.style || 'orb');
+      box.setAttribute('data-size', look.size || 'm');
+      box.setAttribute('data-radius', look.radius || 'round');
+      box.setAttribute('data-font', look.font || 'system');
+      box.style.setProperty('--side', side);
+      box.style.setProperty('--a', accent);
+      box.style.setProperty('--a-2', darker(accent));
+      box.style.setProperty('--a-ink', inkOn(accent));
+      box.style.setProperty('--site-font', opts.siteFont || getComputedStyle(document.body).fontFamily || 'inherit');
+      ['--c1', '--c2', '--c3', '--c4'].forEach(function (v, i) { box.style.setProperty(v, colors[i] || colors[colors.length - 1]); });
+      box.innerHTML = '';
+      parts = {};
+      var bar = look.style === 'bar';
+
+      // The voice: one orb, or the waves.
+      function voice(small) {
+        if (look.style === 'waves') {
+          var w = el('span', 'lva-wave');
+          w.setAttribute('aria-hidden', 'true');
+          var n = small ? 5 : WAVE.length;
+          for (var b = 0; b < n; b++) {
+            var i = el('i');
+            var k = small ? [0.4, 0.75, 1, 0.75, 0.4][b] : WAVE[b];
+            i.style.setProperty('--rest', (small ? 5 + 12 * k : 8 + 22 * k).toFixed(1) + 'px');
+            i.__k = k;
+            w.appendChild(i);
+          }
+          return w;
+        }
+        var wrap = el('span', 'lva-orbwrap');
+        wrap.setAttribute('aria-hidden', 'true');
+        var rings = el('span', 'lva-rings');
+        rings.appendChild(el('i')); rings.appendChild(el('i'));
+        wrap.appendChild(rings);
+        wrap.appendChild(el('i', 'lva-spin'));
+        wrap.appendChild(el('i', 'lva-orb'));
+        return wrap;
+      }
+
+      // The card (orb and waves).
+      if (!bar) {
+        var panel = el('div', 'lva-panel');
+        panel.id = 'lva-panel';
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-label', text.title || cfg.business || '');
+        var head = el('div', 'lva-head');
+        var who = el('div', 'lva-who');
+        var title = el('strong', '', text.title || cfg.business || cfg.name);
+        title.dir = 'auto';
+        who.appendChild(title);
+        who.appendChild(el('small', '', text.subtitle || ''));
+        var pill = el('span', 'lva-pill');
+        pill.appendChild(el('i'));
+        parts.pillTime = el('span', '', '00:00');
+        pill.appendChild(parts.pillTime);
+        var close = el('button', 'lva-x');
+        close.type = 'button';
+        close.setAttribute('aria-label', text.close || 'Close');
+        close.innerHTML = ICONS.close;
+        close.addEventListener('click', function () { setOpen(false); });
+        head.appendChild(who); head.appendChild(pill); head.appendChild(close);
+        var stage = el('div', 'lva-stage');
+        parts.voice = voice(false);
+        stage.appendChild(parts.voice);
+        parts.state = el('p', 'lva-state', states.idle || '');
+        parts.state.setAttribute('aria-live', 'polite');
+        parts.lines = el('div', 'lva-lines');
+        parts.lines.setAttribute('aria-live', 'polite');
+        parts.lines.hidden = look.captions === false;
+        var buttons = el('div', 'lva-buttons');
+        parts.mute = muteButton();
+        parts.call = el('button', 'lva-call');
+        parts.call.type = 'button';
+        parts.callIcon = el('span');
+        parts.callIcon.style.display = 'contents';
+        parts.callLabel = el('span', '', text.start);
+        parts.call.appendChild(parts.callIcon); parts.call.appendChild(parts.callLabel);
+        parts.call.addEventListener('click', toggleCall);
+        buttons.appendChild(parts.mute); buttons.appendChild(parts.call);
+        [head, stage, parts.state, parts.lines, buttons, powered()].forEach(function (n) { panel.appendChild(n); });
+        box.appendChild(panel);
+      }
+
+      // The button.
+      var dock = el('div', 'lva-dock');
+      var round = look.shape === 'round' || !text.label;
+      var launch = el('button', 'lva-launch' + (round ? ' is-round' : ''));
+      launch.type = 'button';
+      launch.setAttribute('aria-label', text.label || text.title || cfg.business || '');
+      if (!bar) { launch.setAttribute('aria-expanded', open ? 'true' : 'false'); launch.setAttribute('aria-controls', 'lva-panel'); }
+      var ico = el('span', 'lva-ico');
+      if (look.icon === 'orb') { ico.classList.add('is-orb'); ico.appendChild(el('i', 'lva-mini')); }
+      else ico.innerHTML = ICONS[look.icon] || ICONS.phone;
+      var eq = el('span', 'lva-eq');
+      eq.appendChild(el('i')); eq.appendChild(el('i')); eq.appendChild(el('i'));
+      ico.appendChild(eq);
+      launch.appendChild(ico);
+      parts.launchLabel = el('span', '', text.label || '');
+      if (!round) launch.appendChild(parts.launchLabel);
+      launch.addEventListener('click', function () {
+        if (bar) toggleCall(); else setOpen(!open);
+      });
+      launch.addEventListener('pointerenter', function () { if (!preview) loadCall().catch(function () {}); }, { once: true });
+      dock.appendChild(launch);
+      parts.launch = launch;
+
+      // The slim bar: the button becomes the call.
+      if (bar) {
+        var b = el('div', 'lva-bar');
+        b.setAttribute('role', 'group');
+        b.setAttribute('aria-label', text.title || cfg.business || '');
+        var viz = el('span', 'lva-viz');
+        parts.voice = voice(true);
+        viz.appendChild(parts.voice);
+        var info = el('span', 'lva-barinfo');
+        parts.barTitle = el('b', '', text.title || cfg.business || '');
+        parts.barTitle.dir = 'auto';
+        parts.barState = el('span', '', states.connecting || '');
+        parts.barState.setAttribute('aria-live', 'polite');
+        info.appendChild(parts.barTitle); info.appendChild(parts.barState);
+        parts.mute = muteButton();
+        var end = el('button', 'lva-end');
+        end.type = 'button';
+        end.setAttribute('aria-label', text.end || 'End');
+        end.innerHTML = ICONS.end;
+        end.addEventListener('click', toggleCall);
+        b.appendChild(viz); b.appendChild(info); b.appendChild(parts.mute); b.appendChild(end);
+        dock.appendChild(b);
+        parts.tip = el('div', 'lva-bartip');
+        parts.tip.hidden = true;
+        parts.tip.setAttribute('aria-live', 'polite');
+        dock.appendChild(parts.tip);
+      }
+      box.appendChild(dock);
+      box.classList.toggle('is-open', open && !bar);
+      paintState();
+    }
+
+    function muteButton() {
+      var m = el('button', 'lva-mute');
+      m.type = 'button';
+      m.hidden = true;
+      m.setAttribute('aria-pressed', muted ? 'true' : 'false');
+      m.setAttribute('aria-label', muted ? (text.unmute || 'Unmute') : (text.mute || 'Mute'));
+      m.innerHTML = ICONS.micOff;
+      m.addEventListener('click', function () {
+        muted = !muted;
+        if (call && call.mute) call.mute(muted);
+        m.setAttribute('aria-pressed', muted ? 'true' : 'false');
+        m.setAttribute('aria-label', muted ? (text.unmute || 'Unmute') : (text.mute || 'Mute'));
+      });
+      return m;
+    }
+    function powered() {
+      var a = el('a', 'lva-powered', text.powered || 'Powered by Listen');
+      a.href = (ctx.origin || '') + '/';
+      a.target = '_blank';
+      a.rel = 'noopener';
+      return a;
+    }
+
     function setOpen(v) {
+      if (look.style === 'bar') return;
       open = v;
       box.classList.toggle('is-open', v);
-      launch.setAttribute('aria-expanded', v ? 'true' : 'false');
-      if (v) setTimeout(function () { callBtn.focus(); }, 60); else launch.focus();
+      parts.launch.setAttribute('aria-expanded', v ? 'true' : 'false');
+      if (v) setTimeout(function () { parts.call && parts.call.focus(); }, 60); else if (!preview) parts.launch.focus();
+      timer();
     }
-    launch.addEventListener('click', function () { setOpen(!open); });
-    launch.addEventListener('pointerenter', function () { loadCall().catch(function () {}); }, { once: true });
-    close.addEventListener('click', function () { setOpen(false); });
     root.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) setOpen(false); });
 
-    // The call.
-    var call = null, starting = false, muted = false, pendingError = '';
+    function live() { return stateNow === 'connecting' || stateNow === 'listening' || stateNow === 'speaking'; }
+
+    function paintState(message) {
+      var on = live();
+      var msg = message || (stateNow === 'mic' ? text.mic : states[stateNow] || '');
+      box.classList.toggle('is-live', on);
+      box.classList.toggle('is-connecting', stateNow === 'connecting');
+      box.classList.toggle('is-speaking', stateNow === 'speaking');
+      box.classList.toggle('is-barlive', look.style === 'bar' && (on || stateNow === 'error' || stateNow === 'mic'));
+      if (parts.state) {
+        parts.state.textContent = msg;
+        parts.state.classList.toggle('is-error', stateNow === 'error' || stateNow === 'mic');
+      }
+      if (parts.call) {
+        parts.call.classList.toggle('is-live', on);
+        parts.callLabel.textContent = on ? text.end : text.start;
+        parts.callIcon.innerHTML = on ? ICONS.end : ICONS.phone;
+      }
+      if (parts.mute) parts.mute.hidden = !on;
+      if (parts.barState) parts.barState.textContent = on && startedAt && stateNow !== 'connecting' ? clock(elapsed()) : msg;
+      if (parts.tip) {
+        var err = stateNow === 'error' || stateNow === 'mic';
+        parts.tip.hidden = !err;
+        parts.tip.classList.toggle('is-error', err);
+        if (err) parts.tip.textContent = msg;
+      }
+    }
+    function elapsed() { return startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0; }
+    function setState(s, message) {
+      if (s === 'error' && !message && pendingError) message = pendingError;
+      if (s !== 'error') pendingError = '';
+      var was = live();
+      stateNow = s;
+      if (live() && !was) {
+        startedAt = 0;
+        clearInterval(tick);
+        tick = setInterval(timer, 1000);
+      }
+      if ((s === 'listening' || s === 'speaking') && !startedAt) startedAt = Date.now();
+      if (!live()) {
+        clearInterval(tick);
+        startedAt = 0;
+        call = null;
+        muted = false;
+        level(0, 0);
+        if (look.style === 'bar' && (s === 'ended' || s === 'idle')) setTimeout(function () { if (!live()) { box.classList.remove('is-barlive'); } }, 900);
+      }
+      paintState(message);
+      timer();
+    }
+    function timer() {
+      var t = clock(elapsed());
+      if (parts.pillTime) parts.pillTime.textContent = t;
+      if (live() && startedAt) {
+        if (parts.launchLabel && !open) parts.launchLabel.textContent = t;
+        if (parts.barState && stateNow !== 'connecting') parts.barState.textContent = t;
+      } else if (parts.launchLabel) parts.launchLabel.textContent = text.label || '';
+    }
+
+    // The voice level (0..1) moves the orb or the waves; the caller's voice moves them gently.
+    function level(a, c) {
+      a = Math.min(1, a || 0); c = Math.min(1, c || 0);
+      var v = parts.voice;
+      if (!v) return;
+      if (look.style !== 'waves') {
+        var orbEl = v.querySelector('.lva-orb');
+        if (orbEl) orbEl.style.setProperty('--s', (1 + a * 0.12 + c * 0.04).toFixed(3));
+        return;
+      }
+      var bars = v.children, t = Date.now() / 95, small = look.style === 'bar';
+      var lvl = Math.max(a, c * 0.5);
+      for (var i = 0; i < bars.length; i++) {
+        var k = bars[i].__k || 0.5;
+        if (!live() || lvl < 0.01) { bars[i].style.height = ''; continue; }
+        var h = (small ? 5 + 12 * k : 8 + 22 * k) + lvl * (small ? 18 : 62) * k * (0.55 + 0.45 * Math.abs(Math.sin(t + i * 1.7)));
+        bars[i].style.height = h.toFixed(1) + 'px';
+      }
+    }
+    function line(t) {
+      if (!parts.lines || look.captions === false) return;
+      var n = el('div', 'lva-line is-' + t.role, t.text);
+      n.dir = 'auto';
+      parts.lines.appendChild(n);
+      while (parts.lines.children.length > 6) parts.lines.removeChild(parts.lines.firstChild);
+      parts.lines.scrollTop = parts.lines.scrollHeight;
+    }
+
+    // The real call.
     function loadCall() {
       if (window.ListenAgentCall) return Promise.resolve();
       if (loadCall.p) return loadCall.p;
@@ -252,55 +517,12 @@
       });
       return loadCall.p;
     }
-    function setState(s, message) {
-      var live = s === 'connecting' || s === 'listening' || s === 'speaking';
-      if (s === 'error' && !message && pendingError) { message = pendingError; }
-      if (s !== 'error') pendingError = '';
-      stateEl.textContent = message || (s === 'mic' ? text.mic : states[s] || '');
-      stateEl.classList.toggle('is-error', s === 'error' || s === 'mic');
-      box.classList.toggle('is-live', live);
-      box.classList.toggle('is-connecting', s === 'connecting');
-      box.classList.toggle('is-speaking', s === 'speaking');
-      callBtn.classList.toggle('is-live', live);
-      callLabel.textContent = live ? text.end : text.start;
-      callIcon.innerHTML = live ? ICONS.end : ICONS.mic;
-      muteBtn.hidden = !live;
-      if (!live) {
-        call = null;
-        muted = false;
-        muteBtn.setAttribute('aria-pressed', 'false');
-        level(0, 0);
-      }
-    }
-    // The brand's waves: tallest in the middle of each group, each bar on its own beat.
-    var shape = [0.35, 0.6, 0.85, 1, 0.8, 0.55, 0.3];
-    function level(a, c) {
-      a = Math.min(1, a || 0); c = Math.min(1, c || 0);
-      var s = (1 + a * 0.14).toFixed(3);
-      bigOrb.style.setProperty('--s', s);
-      miniOrb.style.setProperty('--s', s);
-      ring.style.setProperty('--mo', Math.min(0.9, c * 2.2).toFixed(2));
-      ring.style.setProperty('--ms', (1 + c * 0.12).toFixed(3));
-      if (!box.classList.contains('is-live')) { bars.forEach(function (b) { b.style.height = ''; }); return; }
-      var v = Math.max(a, c * 0.55), t = Date.now() / 95;
-      bars.forEach(function (b, i) {
-        var k = i % 7, side = i < 7 ? k : 6 - k;
-        var h = 5 + v * 54 * shape[side] * (0.55 + 0.45 * Math.abs(Math.sin(t + i * 1.7)));
-        b.style.height = h.toFixed(1) + 'px';
-      });
-    }
-    function line(t) {
-      var n = el('div', 'lva-line is-' + t.role, t.text);
-      n.dir = 'auto';
-      lines.appendChild(n);
-      while (lines.children.length > 6) lines.removeChild(lines.firstChild);
-      lines.scrollTop = lines.scrollHeight;
-    }
-    callBtn.addEventListener('click', function () {
+    function toggleCall() {
+      if (preview) { demo ? demo.stop() : runDemo(); return; }
       if (call) { call.end(); return; }
       if (starting) return;
       starting = true;
-      lines.innerHTML = '';
+      if (parts.lines) parts.lines.innerHTML = '';
       setState('connecting');
       loadCall().then(function () {
         starting = false;
@@ -317,21 +539,65 @@
           onError: function (msg) { pendingError = msg || ''; },
         });
       }, function () { starting = false; setState('error'); });
-    });
-    muteBtn.addEventListener('click', function () {
-      muted = !muted;
-      if (call) call.mute(muted);
-      muteBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
-      muteBtn.setAttribute('aria-label', muted ? (text.unmute || 'Unmute') : (text.mute || 'Mute'));
-    });
+    }
 
-    // The page can open it too ("Talk to our agent"), and start the call at once.
-    window.ListenAgentWidget.open = function (o) {
-      setOpen(true);
-      if (o && o.call && !call && !starting) callBtn.click();
+    // The pretend call in the Design tab: no sound, the button and the voice move as in a call.
+    function runDemo() {
+      var sample = (cfg.text && cfg.text.sample) || [];
+      var raf = 0, timers = [], speakingNow = false, alive = true;
+      var at = function (ms, fn) { timers.push(setTimeout(function () { if (alive) fn(); }, ms)); };
+      if (parts.lines) parts.lines.innerHTML = '';
+      setState('connecting');
+      var loop = function () {
+        if (!alive) return;
+        var t = Date.now();
+        level(speakingNow ? 0.32 + 0.3 * Math.abs(Math.sin(t / 150)) * (0.65 + 0.35 * Math.sin(t / 610)) : 0, speakingNow ? 0 : 0.12 + 0.1 * Math.abs(Math.sin(t / 240)));
+        raf = requestAnimationFrame(loop);
+      };
+      loop();
+      var t = 900;
+      sample.forEach(function (turn) {
+        var agent = turn.role === 'agent', lasts = Math.max(1600, String(turn.text || '').split(' ').length * 260);
+        at(t, function () { speakingNow = agent; setState(agent ? 'speaking' : 'listening'); line(turn); });
+        t += lasts;
+      });
+      at(t, function () { speakingNow = false; setState('listening'); });
+      demo = {
+        stop: function () {
+          alive = false; timers.forEach(clearTimeout); cancelAnimationFrame(raf); demo = null;
+          setState('ended');
+          setTimeout(function () { if (!demo) setState('idle'); }, 1200);
+        },
+      };
+      at(t + 2500, function () { if (demo) demo.stop(); });
+    }
+
+    render(cfg);
+    return {
+      update: function (next) { render(next); },
+      open: function (o) {
+        if (look.style !== 'bar') setOpen(true);
+        if (o && o.call && !call && !starting && !demo) toggleCall();
+      },
+      demo: function (on) { if (on && !demo) { if (look.style !== 'bar') setOpen(true); runDemo(); } else if (!on && demo) demo.stop(); },
+      destroy: function () { if (demo) demo.stop(); clearInterval(tick); host.remove(); },
     };
-    try { document.dispatchEvent(new CustomEvent('listen-agent:ready')); } catch (e) {}
   }
 
-  window.ListenAgentWidget = { mount: mount };
+  function mount(cfg, ctx) {
+    if (!document.body || document.querySelector('[data-listen-agent]')) return;
+    var w = build(cfg, ctx, {});
+    // The page can open it too ("Talk to our agent"), and start the call at once.
+    window.ListenAgentWidget.open = function (o) { w.open(o); };
+    try { document.dispatchEvent(new CustomEvent('listen-agent:ready')); } catch (e) {}
+    return w;
+  }
+
+  /* The Design tab's preview: the same button, drawn inside `into`. */
+  function preview(into, cfg, opts) {
+    opts = opts || {};
+    return build(cfg, { origin: opts.origin || '' }, { preview: true, into: into, rtl: opts.rtl, dark: opts.dark, siteFont: opts.siteFont });
+  }
+
+  window.ListenAgentWidget = { mount: mount, preview: preview };
 })();

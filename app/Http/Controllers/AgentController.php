@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Agent;
+use App\Models\AgentWidget;
 use App\Models\AgentConversation;
 use App\Models\AgentSource;
 use App\Services\Agents\AgentCalls;
@@ -28,7 +29,7 @@ class AgentController extends Controller
 
     public function index(Request $request): View|RedirectResponse
     {
-        $agents = Agent::ownedBy($request->user())->latest()->get();
+        $agents = Agent::ownedBy($request->user())->with('widgets')->latest()->get();
         $monthStart = now()->startOfMonth();
         $calls = AgentConversation::query()->where('user_id', $request->user()->id)->where('started_at', '>=', $monthStart)
             ->where('channel', '!=', 'test')->selectRaw('agent_id, count(*) as n, max(started_at) as last')->groupBy('agent_id')->get()->keyBy('agent_id');
@@ -132,6 +133,19 @@ class AgentController extends Controller
             'appearance.position' => ['nullable', 'in:start,end'],
             'appearance.theme' => ['nullable', 'in:auto,light,dark'],
             'appearance.label' => ['nullable', 'string', 'max:40'],
+            'appearance.style' => ['nullable', 'in:'.implode(',', AgentWidget::STYLES)],
+            'appearance.icon' => ['nullable', 'in:'.implode(',', AgentWidget::ICONS)],
+            'appearance.size' => ['nullable', 'in:s,m,l'],
+            'appearance.shape' => ['nullable', 'in:pill,round'],
+            'appearance.accent' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'appearance.palette' => ['nullable', 'in:custom,'.implode(',', array_keys(AgentWidget::PALETTES))],
+            'appearance.orb_colors' => ['nullable', 'array', 'size:2'],
+            'appearance.orb_colors.*' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'appearance.radius' => ['nullable', 'in:square,soft,round'],
+            'appearance.captions' => ['nullable', 'boolean'],
+            'appearance.title' => ['nullable', 'string', 'max:60'],
+            'appearance.subtitle' => ['nullable', 'string', 'max:80'],
+            'appearance.font' => ['nullable', 'in:system,rounded,site'],
         ]);
 
         if (array_key_exists('speaker_id', $data)) {
@@ -181,7 +195,14 @@ class AgentController extends Controller
             $widget->allowed_origins = array_slice($origins, 0, 10);
         }
         if (isset($data['appearance'])) {
-            $widget->appearance = array_merge($widget->appearance ?? [], array_filter($data['appearance'], fn ($v) => $v !== null));
+            // Text fields may be emptied (back to the default words); the rest only change when sent.
+            $look = array_merge($widget->appearance ?? [], array_filter($data['appearance'], fn ($v) => $v !== null));
+            foreach (['label', 'title', 'subtitle'] as $k) {
+                if (array_key_exists($k, $data['appearance']) && blank($data['appearance'][$k])) {
+                    $look[$k] = null;
+                }
+            }
+            $widget->appearance = $look;
         }
         $widget->save();
 
@@ -264,7 +285,10 @@ class AgentController extends Controller
             'notes' => ['nullable', 'string', 'max:8000'],
         ], ['business_name.required' => __('agents.error_name'), 'name.required' => __('agents.error_name')]);
 
-        $dialect = $data['language'] === 'ar' && isset(ArabicDialects::ALL[$data['dialect'] ?? '']) ? $data['dialect'] : ($data['language'] === 'ar' ? 'ar-XA-WH' : null);
+        // Any Arabic dialect for an Arabic agent, any English accent for an English one.
+        $dialect = $data['language'] === 'ar'
+            ? (isset(ArabicDialects::ALL[$data['dialect'] ?? '']) ? $data['dialect'] : 'ar-XA-WH')
+            : (isset(\App\Support\EnglishAccents::ALL[$data['dialect'] ?? '']) ? $data['dialect'] : 'en-US');
 
         return [
             'business_name' => trim($data['business_name']),
