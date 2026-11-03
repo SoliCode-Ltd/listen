@@ -127,6 +127,22 @@ foreach ($members as $m) {
         echo "\n  #", $g->displayNumber(), ' (id ', $g->id, '), made ', substr((string) $g->created_at, 0, 16), ' UTC, ', $g->status, ', ', (int) $g->duration_seconds, ' s, ',
             mb_strlen((string) $g->input_text), ' letters in ', count(preg_split('/\s+/u', trim((string) $g->input_text), -1, PREG_SPLIT_NO_EMPTY)), ' words', $g->audio_path ? '' : ', NO AUDIO KEPT', "\n";
         echo '    voice: ', $voiceLabel($g->voice_name), "\n";
+        // To tell apart voices of one length: the audio's exact length, level and where its
+        // pauses start (ffmpeg only reads the file; the owner runs the same on the audio they have).
+        $file = $g->audio_path ? Illuminate\Support\Facades\Storage::disk('public')->path((string) $g->audio_path) : '';
+        if ($file !== '' && is_file($file)) {
+            $ffmpeg = is_executable('storage/app/bin/ffmpeg') ? 'storage/app/bin/ffmpeg' : 'ffmpeg';
+            $run = Symfony\Component\Process\Process::fromShellCommandline($ffmpeg.' -hide_banner -nostats -i "$F" -af silencedetect=noise=-35dB:d=0.35,volumedetect -f null - 2>&1');
+            $run->setTimeout(60)->run(null, ['F' => $file]);
+            $out = $run->getOutput();
+            preg_match_all('/silence_start: ([\d.]+)/', $out, $starts);
+            preg_match('/Duration: (\d+):(\d+):([\d.]+)/', $out, $d);
+            preg_match('/mean_volume: (-?[\d.]+) dB/', $out, $mean);
+            echo '    audio: ', $d ? round($d[1] * 3600 + $d[2] * 60 + $d[3], 2).' s' : '?', ', mean level ', $mean[1] ?? '?', ' dB, pauses start at: ',
+                implode(' ', array_map(fn ($s) => number_format((float) $s, 2, '.', ''), $starts[1])), "\n";
+        } else {
+            echo "    audio: no file kept\n";
+        }
         if ($settings === null) {
             echo "    reuse: nothing to bring back (no voice saved with it)\n";
 
