@@ -63,7 +63,7 @@ class GeminiTtsProvider implements TtsProviderInterface
     }
 
     /** Gemini TTS supported voice names */
-    private const VOICES = [
+    public const VOICES = [
         'Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda',
         'Orus', 'Aoede', 'Callirrhoe', 'Autonoe', 'Enceladus',
         'Iapetus', 'Umbriel', 'Algieba', 'Despina', 'Erinome',

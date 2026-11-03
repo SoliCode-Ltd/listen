@@ -40,6 +40,8 @@
     ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension'), 'guest' => false],
     ['route' => 'contact', 'label' => __('ui.nav.contact'), 'guest' => false],
   ];
+  // Studio | Agents: the two sides of the app, on their own pages (the dashboard and Agents).
+  $productSide = str_starts_with($currentRoute, 'voice-agents.') ? 'agents' : ($currentRoute === 'dashboard' ? 'studio' : null);
   $showDemoLinkForAuthenticated = false;
   if (auth()->check()) {
     $activePlan = app(\App\Services\PlanAccessService::class)->resolveActivePlanForUserId((int) auth()->id());
@@ -78,9 +80,23 @@
       @endif
     </a>
 
+    @auth
+      @if($productSide)
+        <nav class="product-switch" aria-label="{{ __('agents.switch_label') }}">
+          <a href="{{ route('dashboard') }}" class="{{ $productSide === 'studio' ? 'active' : '' }}" @if($productSide === 'studio') aria-current="page" @endif>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>{{ __('agents.switch_studio') }}
+          </a>
+          <a href="{{ route('voice-agents.index') }}" class="{{ $productSide === 'agents' ? 'active' : '' }}" @if($productSide === 'agents') aria-current="page" @endif>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.switch_agents') }}
+          </a>
+        </nav>
+      @endif
+    @endauth
+
     <nav class="desktop-nav" aria-label="{{ __('ui.header.main_nav') }}">
       @auth
         @foreach($authNavLinks as $link)
+          @continue($productSide && $link['route'] === 'dashboard')
           <a href="{{ route($link['route']) }}" class="nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
         @endforeach
       @else
@@ -232,6 +248,17 @@
       @endforeach
     </div>
     <div class="mobile-nav-divider"></div>
+    @auth
+      <nav class="product-switch mobile-product-switch" aria-label="{{ __('agents.switch_label') }}">
+        <a href="{{ route('dashboard') }}" class="{{ $productSide === 'studio' ? 'active' : '' }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>{{ __('agents.switch_studio') }}
+        </a>
+        <a href="{{ route('voice-agents.index') }}" class="{{ $productSide === 'agents' ? 'active' : '' }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.switch_agents') }}
+        </a>
+      </nav>
+      <div class="mobile-nav-divider"></div>
+    @endauth
 
     @auth
       @foreach($authNavLinks as $link)

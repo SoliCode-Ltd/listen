@@ -1,0 +1,482 @@
+/*
+ * Listen Agents: the setup in four steps, an agent's page and its link page
+ * (window.LISTEN_AGENTS says which). Calls go through ListenAgentCall
+ * (agent-call.js); the orb follows the agent's voice ([data-vp-track]).
+ */
+(function () {
+  'use strict';
+  var C = window.LISTEN_AGENTS || {};
+  var T = C.text || {};
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var rtl = document.documentElement.dir === 'rtl';
+
+  function api(method, url, body) {
+    return fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': C.csrf || '', 'X-Requested-With': 'XMLHttpRequest' },
+      body: body ? JSON.stringify(body) : undefined,
+      credentials: 'same-origin',
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (!r.ok) { var e = new Error((data && data.message) || 'error'); e.data = data; throw e; }
+        return data;
+      });
+    });
+  }
+  var toastTimer = 0;
+  function toast(text) {
+    var el = $('[data-ag-toast]');
+    if (!el || !text) return;
+    el.textContent = text;
+    el.classList.add('is-on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('is-on'); }, 2200);
+  }
+  function fill(s, vars) { return String(s || '').replace(/:(\w+)/g, function (m, k) { return vars && vars[k] != null ? vars[k] : m; }); }
+
+  /* ---------- Copy, share, QR, allowed websites, going live ---------- */
+  document.addEventListener('click', function (e) {
+    var copy = e.target.closest('[data-ag-copy]');
+    if (copy) {
+      var text = copy.getAttribute('data-ag-copy');
+      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { toast(T.copied); }, function () {
+        var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); toast(T.copied); } catch (err) {} ta.remove();
+      });
+    }
+    var share = e.target.closest('[data-ag-share]');
+    if (share) {
+      var msg = share.getAttribute('data-text');
+      if (navigator.share) navigator.share({ text: msg }).catch(function () {});
+      else if (navigator.clipboard) navigator.clipboard.writeText(msg).then(function () { toast(T.copied); });
+    }
+  });
+
+  // The go-live tiles: drawn and wired once (the QR canvas draws fine while its tab is hidden).
+  function drawQr() {
+    $$('[data-ag-golive]').forEach(function (box) {
+      if (box.__agBound) return;
+      box.__agBound = true;
+      $$('[data-ag-guide-open]', box).forEach(function (b) {
+        var dialog = document.getElementById(b.getAttribute('data-ag-guide-open'));
+        if (!dialog) return;
+        b.addEventListener('click', function () { if (dialog.showModal) dialog.showModal(); else dialog.setAttribute('open', ''); });
+        $$('[data-ag-guide-close]', dialog).forEach(function (c) { c.addEventListener('click', function () { dialog.close ? dialog.close() : dialog.removeAttribute('open'); }); });
+        dialog.addEventListener('click', function (e) { if (e.target === dialog && dialog.close) dialog.close(); });
+      });
+      var canvas = $('[data-ag-qr]', box);
+      if (!canvas || !window.qrcode) return;
+      var qr = window.qrcode(0, 'M');
+      qr.addData(box.getAttribute('data-link'));
+      qr.make();
+      var n = qr.getModuleCount(), size = canvas.width, cell = size / (n + 4), ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = '#17144A';
+      for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr.isDark(r, c)) ctx.fillRect(Math.round((c + 2) * cell), Math.round((r + 2) * cell), Math.ceil(cell), Math.ceil(cell));
+      var dl = $('[data-ag-qr-download]', box);
+      if (dl) dl.onclick = function () {
+        var a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = dl.getAttribute('data-name') || 'qr.png'; a.click();
+      };
+      var origins = $('[data-ag-origins]', box);
+      if (origins && C.agent) origins.addEventListener('change', function () {
+        api('PATCH', C.agent.urls.update, { allowed_origins: origins.value }).then(function () { toast(T.saved); });
+      });
+    });
+  }
+
+  function goLive(btn) {
+    if (!btn || !C.agent) return;
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      api('PATCH', C.agent.urls.update, { status: 'live' }).then(function () {
+        var ok = $('[data-ag-success]');
+        if (ok) ok.classList.add('is-on');
+        btn.hidden = true;
+      }).catch(function (err) { btn.disabled = false; toast(err.message); });
+    });
+  }
+
+  /* ---------- Voices ---------- */
+  var audio = null, playingCard = null;
+  function stopPreview() {
+    if (audio) { audio.pause(); audio = null; }
+    if (playingCard) { var ring = $('circle', playingCard); if (ring) ring.style.strokeDashoffset = 289; playingCard = null; }
+  }
+  function voiceGallery(box, lang, onPick) {
+    if (!box) return;
+    var all = (C.voices && C.voices[lang]) || [];
+    var chosen = C.agent && C.agent.speaker_id;
+    var dialect = (C.agent && C.agent.dialect) || ($('#ag-dialect') && $('#ag-dialect').value) || null;
+    var regions = C.regions || {};
+    function score(v) {
+      if (dialect && v.dialect === dialect) return 0;
+      if (dialect && regions[v.dialect] && regions[v.dialect] === regions[dialect]) return 1;
+      return 2;
+    }
+    function render() {
+      var scope = ($('input[name="ag-voice-scope"]:checked') || {}).value || 'all';
+      var gender = ($('input[name="ag-voice-gender"]:checked') || {}).value || 'any';
+      var list = all.filter(function (v) { return gender === 'any' || v.gender === gender; });
+      list.sort(function (a, b) { return score(a) - score(b); });
+      if (scope === 'suggested') list = list.slice(0, 8);
+      box.innerHTML = '';
+      list.forEach(function (v) {
+        var card = document.createElement('div');
+        card.className = 'ag-voice' + (v.id === chosen ? ' is-chosen' : '');
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('aria-pressed', v.id === chosen ? 'true' : 'false');
+        card.setAttribute('aria-label', fill(T.pick, { name: v.name }));
+        card.innerHTML =
+          '<div class="ag-avatar">' + (v.avatar ? '<img loading="lazy" alt="" src="' + v.avatar + '">' : '<img alt="">') +
+          '<svg class="ag-ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46"/></svg>' +
+          (v.preview ? '<button type="button" class="ag-play" aria-label="' + fill(T.play, { name: v.name }) + '"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>' : '') +
+          '</div><div class="ag-voice-name"></div><div class="ag-voice-dialect">' + (v.flag ? '<img alt="" src="' + v.flag + '">' : '') + '<span></span></div>';
+        $('.ag-voice-name', card).textContent = v.name;
+        $('.ag-voice-dialect span', card).textContent = v.dialect_label || '';
+        var play = $('.ag-play', card);
+        if (play) play.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (playingCard === card) { stopPreview(); return; }
+          stopPreview();
+          playingCard = card;
+          audio = new Audio(v.preview);
+          var ring = $('circle', card);
+          audio.ontimeupdate = function () { if (audio && audio.duration) ring.style.strokeDashoffset = 289 * (1 - audio.currentTime / audio.duration); };
+          audio.onended = stopPreview;
+          audio.play().catch(stopPreview);
+        });
+        function pick() {
+          chosen = v.id;
+          $$('.ag-voice', box).forEach(function (c) { c.classList.remove('is-chosen'); c.setAttribute('aria-pressed', 'false'); });
+          card.classList.add('is-chosen');
+          card.setAttribute('aria-pressed', 'true');
+          onPick && onPick(v);
+        }
+        card.addEventListener('click', pick);
+        card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+        box.appendChild(card);
+      });
+    }
+    $$('input[name="ag-voice-scope"], input[name="ag-voice-gender"]').forEach(function (i) { i.addEventListener('change', render); });
+    render();
+    return { render: render, setDialect: function (d) { dialect = d; render(); } };
+  }
+
+  /* ---------- Talking to the agent ---------- */
+  function visitorId() {
+    try {
+      var id = localStorage.getItem('listen_agent_visitor');
+      if (!id) { id = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('listen_agent_visitor', id); }
+      return id;
+    } catch (e) { return ''; }
+  }
+  function talk(root) {
+    if (!root) return;
+    var btn = $('[data-ag-call]', root), label = $('[data-ag-call-label]', root), stateEl = $('[data-ag-talk-state]', root);
+    var mute = $('[data-ag-mute]', root), stage = $('[data-ag-stage]', root), mic = $$('[data-ag-mic] i', root);
+    var list = $('[data-ag-transcript]', root);
+    var call = null, muted = false, lastAsked = '';
+    var states = T.states || {};
+    function setState(s) {
+      var key = s === 'speaking' && C.agent && C.agent.gender === 'female' && states.speaking_female ? 'speaking_female' : s;
+      stateEl.textContent = s === 'mic' ? (T.mic || '') : fill(states[key] || states.idle || '', { name: (C.agent && C.agent.name) || '' });
+      stateEl.classList.toggle('is-error', s === 'error' || s === 'mic');
+      var live = s === 'connecting' || s === 'listening' || s === 'speaking';
+      btn.classList.toggle('is-live', live);
+      label.textContent = live ? T.end : T.start;
+      if (mute) mute.hidden = !live;
+      stage.classList.toggle('is-speaking', s === 'speaking');
+      if (!live) { stage.classList.remove('is-playing'); stage.__vpLevel = 0; call = null; }
+    }
+    function bubble(role, text, extra) {
+      var b = document.createElement('div');
+      b.className = 'ag-bubble is-' + role;
+      b.dir = 'auto';
+      var who = document.createElement('small');
+      who.textContent = role === 'agent' ? ((C.agent && C.agent.name) || '') : role === 'caller' ? T.you : '';
+      if (role !== 'event') b.appendChild(who);
+      b.appendChild(document.createTextNode(text));
+      if (extra) b.appendChild(extra);
+      list.appendChild(b);
+      list.scrollTop = list.scrollHeight;
+    }
+    function correction(question) {
+      if (!C.agent || !C.agent.urls || C.mode === 'link') return null;
+      var d = document.createElement('details');
+      d.className = 'ag-correct';
+      d.innerHTML = '<summary></summary><textarea class="ag-textarea" dir="auto"></textarea><button type="button" class="ag-btn ag-btn-sm ag-btn-primary"></button>';
+      $('summary', d).textContent = T.correct;
+      $('textarea', d).placeholder = T.correct_placeholder;
+      var save = $('button', d);
+      save.textContent = T.correct_save;
+      save.addEventListener('click', function () {
+        var answer = $('textarea', d).value.trim();
+        if (!answer) return;
+        save.disabled = true;
+        api('POST', C.agent.urls.correct, { question: question, answer: answer }).then(function () {
+          toast(T.correct_saved); d.open = false; d.querySelector('summary').textContent = '✓ ' + T.correct_saved;
+        }).catch(function (err) { save.disabled = false; toast(err.message); });
+      });
+      return d;
+    }
+    function begin() {
+      if (C.mode === 'link') {
+        return fetch(C.start, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, credentials: 'omit',
+          body: JSON.stringify({ slug: C.slug, page_url: location.href, visitor: visitorId() }) })
+          .then(function (r) { return r.json(); });
+      }
+      return api('POST', C.agent.urls.test);
+    }
+    btn.addEventListener('click', function () {
+      if (call) { call.end(); return; }
+      if (C.mode === 'link' && C.available === false) { stateEl.textContent = T.paused || ''; return; }
+      list.innerHTML = '';
+      call = window.ListenAgentCall.start({
+        begin: begin,
+        onState: setState,
+        onTurn: function (t) {
+          if (t.role === 'caller') { lastAsked = t.text; bubble('caller', t.text); }
+          else bubble('agent', t.text, correction(lastAsked));
+        },
+        onLevel: function (a, c) {
+          stage.__vpLevel = a;
+          stage.classList.toggle('is-playing', a > 0.01);
+          mic.forEach(function (bar, i) { bar.style.height = Math.max(4, Math.min(18, 4 + c * 26 * (1 - Math.abs(i - 2) * 0.22))) + 'px'; });
+        },
+        onTool: function (name, args) {
+          if (name === 'save_contact' && C.mode !== 'link') bubble('event', fill(T.saved_contact, { details: [args.name, args.phone, args.email].filter(Boolean).join(' · ') }));
+        },
+        onError: function (msg) { if (msg) toast(msg); },
+      });
+      if (window.ListenOrbs) window.ListenOrbs.wake();
+    });
+    if (mute) mute.addEventListener('click', function () {
+      muted = !muted;
+      if (call) call.mute(muted);
+      mute.textContent = muted ? T.unmute : T.mute;
+    });
+    return { setAvatar: function (url) {
+      var wrap = $('[data-ag-talk-avatar]', root), img = $('[data-ag-talk-avatar-img]', root);
+      if (wrap && img && url) { img.src = url; wrap.hidden = false; }
+    } };
+  }
+
+  /* ---------- The setup in four steps ---------- */
+  function setup() {
+    var panes = $$('[data-ag-pane]'), links = $$('[data-ag-step-link]'), bar = $('[data-ag-bar]');
+    var current = -1, furthest = C.agent ? (C.agent.speaker_id ? 3 : 1) : 0;
+    function show(i) {
+      i = Math.max(0, Math.min(3, i));
+      var back = i < current;
+      stopPreview();
+      panes.forEach(function (p, n) {
+        p.classList.toggle('is-current', n === i);
+        p.classList.toggle('is-back', n === i && back);
+      });
+      links.forEach(function (l, n) {
+        l.classList.toggle('is-current', n === i);
+        l.classList.toggle('is-done', n < furthest && n !== i);
+        l.disabled = n > furthest;
+      });
+      if (bar) bar.style.width = (i / 3 * 100) + '%';
+      current = i;
+      if (history.replaceState && C.agent) history.replaceState(null, '', location.pathname + '?step=' + i);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    links.forEach(function (l) { l.addEventListener('click', function () { show(+l.getAttribute('data-ag-step-link')); }); });
+    $$('[data-ag-go]').forEach(function (b) { b.addEventListener('click', function () { var n = +b.getAttribute('data-ag-go'); furthest = Math.max(furthest, n); show(n); }); });
+
+    // Step 1.
+    var form = $('[data-ag-business-form]'), err = $('[data-ag-error]');
+    var lang = function () { return ($('input[name="language"]:checked', form) || {}).value || 'ar'; };
+    $$('input[name="language"]', form).forEach(function (r) { r.addEventListener('change', function () { $('[data-ag-dialect-field]').hidden = lang() === 'en'; }); });
+    var writing = $('[data-ag-writing]'), businessBox = $('[data-ag-business]'), decisionsWrap = $('[data-ag-decisions-wrap]');
+    var checks = $$('[data-ag-check]'), slow = $('[data-ag-slow]');
+    var checkTimer = 0;
+    function animateChecks() {
+      var i = 0;
+      checks.forEach(function (c) { c.classList.remove('is-active', 'is-done'); });
+      function step() {
+        if (i > 0) checks[i - 1].classList.replace('is-active', 'is-done');
+        if (i < checks.length - 1) { checks[i].classList.add('is-active'); i++; checkTimer = setTimeout(step, 1900 + Math.random() * 900); }
+        else { checks[i].classList.add('is-active'); slow.hidden = false; }
+      }
+      step();
+    }
+    function finishChecks(then) {
+      clearTimeout(checkTimer);
+      var k = 0;
+      (function tick() {
+        if (k < checks.length) { checks[k].classList.remove('is-active'); checks[k].classList.add('is-done'); k++; setTimeout(tick, 140); }
+        else setTimeout(then, 420);
+      })();
+    }
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      err.hidden = true;
+      var data = {
+        website_url: $('#ag-website').value.trim(),
+        business_name: $('#ag-biz').value.trim(),
+        name: $('#ag-name').value.trim(),
+        business_type: ($('input[name="business_type"]:checked', form) || {}).value || 'other',
+        jobs: $$('input[name="jobs[]"]:checked', form).map(function (i) { return i.value; }),
+        language: lang(),
+        dialect: $('#ag-dialect').value,
+        notes: $('#ag-notes').value,
+      };
+      if (!data.business_name || !data.name) { err.textContent = T.error_name; err.hidden = false; return; }
+      businessBox.hidden = true; writing.hidden = false; slow.hidden = true;
+      animateChecks();
+      var req = C.agent ? api('POST', C.agent.urls.write, data) : api('POST', C.urls.store, data);
+      req.then(function (res) {
+        finishChecks(function () { decisions(res); });
+      }).catch(function (e2) {
+        clearTimeout(checkTimer);
+        writing.hidden = true; businessBox.hidden = false;
+        err.textContent = (e2.data && e2.data.message) || e2.message; err.hidden = false;
+      });
+    });
+    function decisions(res) {
+      writing.hidden = true;
+      var box = $('[data-ag-decisions]');
+      box.innerHTML = '';
+      C.agent = C.agent || {};
+      Object.assign(C.agent, res.agent);
+      $('[data-ag-site-note]').hidden = res.site_read !== false;
+      (res.questions || []).forEach(function (q, qi) {
+        var d = document.createElement('div');
+        d.className = 'ag-decision';
+        var h = document.createElement('h3'); h.textContent = q.question; d.appendChild(h);
+        var opts = document.createElement('div'); opts.className = 'ag-options';
+        q.options.forEach(function (o, oi) {
+          var l = document.createElement('label'); l.className = 'ag-option';
+          l.innerHTML = '<input type="radio" name="ag-q' + qi + '"><span></span>';
+          $('span', l).textContent = o;
+          $('input', l).value = o;
+          if (oi === q.recommended) { $('input', l).checked = true; var p = document.createElement('span'); p.className = 'ag-pill'; p.textContent = T.recommended; l.appendChild(p); }
+          opts.appendChild(l);
+        });
+        d.appendChild(opts);
+        d.__q = q.question;
+        box.appendChild(d);
+      });
+      decisionsWrap.hidden = false;
+      if (!(res.questions || []).length) $('[data-ag-decided]').click();
+    }
+    $('[data-ag-rewrite]').addEventListener('click', function () { decisionsWrap.hidden = true; businessBox.hidden = false; });
+    $('[data-ag-decided]').addEventListener('click', function () {
+      var choices = $$('.ag-decision').map(function (d) {
+        var picked = $('input:checked', d);
+        return { question: d.__q, answer: picked ? picked.value : '' };
+      }).filter(function (c) { return c.answer; });
+      var go = function () { location.assign(C.agent.urls.edit + '?step=1'); };
+      if (choices.length) api('PATCH', C.agent.urls.update, { choices: choices }).then(go, go);
+      else go();
+    });
+
+    // Step 2.
+    var voiceNext = $('[data-ag-voice-next]');
+    var talker = talk($('[data-ag-talk]'));
+    var gallery = voiceGallery($('[data-ag-voices]'), (C.agent && C.agent.language) || lang(), function (v) {
+      if (!C.agent || !C.agent.urls) return;
+      api('PATCH', C.agent.urls.update, { speaker_id: v.id }).then(function () {
+        C.agent.speaker_id = v.id;
+        C.agent.gender = v.gender;
+        voiceNext.disabled = false;
+        if (talker) talker.setAvatar(v.avatar);
+        furthest = Math.max(furthest, 2);
+      });
+    });
+    if (C.agent && C.agent.speaker_id) voiceNext.disabled = false;
+    voiceNext.addEventListener('click', function () { furthest = Math.max(furthest, 2); show(2); });
+    goLive($('[data-ag-golive-btn]'));
+    if (C.agent && C.agent.status === 'live') { var ok = $('[data-ag-success]'); if (ok) ok.classList.add('is-on'); var gb = $('[data-ag-golive-btn]'); if (gb) gb.hidden = true; }
+
+    var q = parseInt(new URLSearchParams(location.search).get('step') || '', 10);
+    show(isNaN(q) ? (C.agent ? (C.agent.speaker_id ? 2 : 1) : 0) : Math.min(q, furthest));
+  }
+
+  /* ---------- An agent's page ---------- */
+  function agentPage() {
+    var tabs = $$('[data-ag-tab]'), panels = $$('[data-ag-panel]');
+    function open(name) {
+      if (!$('[data-ag-panel="' + name + '"]')) name = 'overview';
+      tabs.forEach(function (t) { var on = t.getAttribute('data-ag-tab') === name; t.classList.toggle('is-current', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
+      panels.forEach(function (p) { p.classList.toggle('is-current', p.getAttribute('data-ag-panel') === name); });
+      if (history.replaceState) history.replaceState(null, '', '#' + name);
+    }
+    tabs.forEach(function (t) { t.addEventListener('click', function () { open(t.getAttribute('data-ag-tab')); }); });
+    $$('[data-ag-tab-go]').forEach(function (b) { b.addEventListener('click', function () { open(b.getAttribute('data-ag-tab-go')); }); });
+    open((location.hash || '#overview').slice(1));
+
+    var talker = talk($('[data-ag-talk]'));
+    voiceGallery($('[data-ag-voices]'), C.agent.language, function (v) {
+      api('PATCH', C.agent.urls.update, { speaker_id: v.id }).then(function () {
+        C.agent.speaker_id = v.id;
+        C.agent.gender = v.gender;
+        toast(T.saved);
+        if (talker) talker.setAvatar(v.avatar);
+        var cur = $('.ag-voice-current');
+        if (cur) {
+          var img = $('img', cur), name = $('span', cur);
+          if (img && v.avatar) img.src = v.avatar;
+          if (name) name.textContent = v.name;
+        }
+      });
+    });
+
+    $$('[data-ag-status-set]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        b.disabled = true;
+        api('PATCH', C.agent.urls.update, { status: b.getAttribute('data-ag-status-set') }).then(function () { location.reload(); })
+          .catch(function (err) { b.disabled = false; toast(err.message); });
+      });
+    });
+
+    $$('[data-ag-list-add]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var box = $('[data-ag-list="' + b.getAttribute('data-ag-list-add') + '"]');
+        var row = box.firstElementChild.cloneNode(true);
+        $('input', row).value = '';
+        box.appendChild(row);
+        $('input', row).focus();
+      });
+    });
+    document.addEventListener('click', function (e) {
+      var rm = e.target.closest('[data-ag-list-remove]');
+      if (!rm) return;
+      var box = rm.closest('[data-ag-list]');
+      if (box.children.length > 1) rm.parentElement.remove(); else $('input', rm.parentElement).value = '';
+    });
+    var max = $('[data-ag-max]'), maxOut = $('[data-ag-max-out]');
+    var maxLabels = {};
+    try { maxLabels = JSON.parse(max.getAttribute('data-labels') || '{}'); } catch (e) {}
+    if (max) max.addEventListener('input', function () { maxOut.textContent = maxLabels[max.value] || max.value; });
+
+    var sf = $('[data-ag-script-form]');
+    if (sf) sf.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var list = function (k) { return $$('[data-ag-list="' + k + '"] input', sf).map(function (i) { return i.value.trim(); }).filter(Boolean); };
+      api('PATCH', C.agent.urls.update, {
+        first_message: $('[name="first_message"]', sf).value,
+        script: { identity: $('[name="identity"]', sf).value, handoff: $('[name="handoff"]', sf).value, never: list('never'), steps: list('steps') },
+        max_call_seconds: parseInt(max.value, 10) * 60,
+      }).then(function () { toast(T.saved); }).catch(function (err) { toast(err.message); });
+    });
+    var kf = $('[data-ag-knowledge-form]');
+    if (kf) kf.addEventListener('submit', function (e) {
+      e.preventDefault();
+      api('PATCH', C.agent.urls.update, { knowledge: $('[name="knowledge"]', kf).value }).then(function () { toast(T.saved); }).catch(function (err) { toast(err.message); });
+    });
+  }
+
+  function boot() {
+    if (C.mode === 'setup') setup();
+    else if (C.mode === 'agent') agentPage();
+    else if (C.mode === 'link') talk($('[data-ag-talk]'));
+    drawQr();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();

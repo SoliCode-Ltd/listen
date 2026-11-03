@@ -1,0 +1,30 @@
+=== Listen Voice Agent ===
+Contributors: listen
+Tags: voice assistant, call button, customer service, arabic, ai receptionist
+Requires at least: 5.2
+Requires PHP: 7.2
+Stable tag: {{VERSION}}
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+
+Adds your Listen voice agent's call button to every page of your website.
+
+== Description ==
+
+Your agent answers your visitors by voice, in their own dialect, day and night:
+it answers questions from what you taught it and takes their name and phone
+number for a callback. Change what it says, its voice and its knowledge in
+Listen ({{HOME}}); the button on your website follows on its own.
+
+== Installation ==
+
+1. In WordPress, open Plugins, then Add New Plugin, then Upload Plugin.
+2. Choose this zip file, click Install Now, then Activate.
+3. That's it: open any page of your website to see the call button.
+
+To hide the button, or to use another agent, open Settings, then Listen Voice Agent.
+
+== Changelog ==
+
+= {{VERSION}} =
+* The call button on every page, with your agent already set.

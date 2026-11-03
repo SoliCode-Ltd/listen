@@ -27,6 +27,7 @@ class AgentConversation extends Model
         'user_id',
         'agent_widget_id',
         'public_id',
+        'call_key_hash',
         'channel',
         'visitor_hash',
         'origin',
@@ -46,7 +47,13 @@ class AgentConversation extends Model
         'outcome',
         'usage',
         'cost_usd',
+        'reservation',
+        'period_ym',
+        'free',
+        'settled_at',
     ];
+
+    protected $hidden = ['call_key_hash'];
 
     protected $casts = [
         'started_at' => 'datetime',
@@ -59,6 +66,9 @@ class AgentConversation extends Model
         'lead' => 'array',
         'usage' => 'array',
         'cost_usd' => 'decimal:5',
+        'reservation' => 'array',
+        'free' => 'boolean',
+        'settled_at' => 'datetime',
     ];
 
     protected static function booted(): void

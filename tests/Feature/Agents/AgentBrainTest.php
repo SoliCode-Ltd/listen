@@ -135,7 +135,8 @@ class AgentBrainTest extends TestCase
         Http::assertSent(function ($r) {
             return str_ends_with($r->url(), '/auth_tokens')
                 && $r['uses'] === 1
-                && $r['liveConnectConstraints']['model'] === 'models/gemini-3.8-live'
+                && $r['bidiGenerateContentSetup']['model'] === 'models/gemini-3.8-live'
+                && str_contains($r['bidiGenerateContentSetup']['systemInstruction']['parts'][0]['text'], 'Riyadh Dental')
                 && $r->header('x-goog-api-key')[0] === 'test-key';
         });
     }

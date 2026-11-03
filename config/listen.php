@@ -207,4 +207,29 @@ return [
             'voice_tokens_per_second' => (int) env('LISTEN_DUB_VOICE_TOKENS_PER_SECOND', 25),
         ],
     ],
+
+    /*
+    | Listen Agents: voice agents that answer a business's customers on its
+    | website, its link page or a QR code (App\Support\Agents).
+    |
+    | A call minute uses credits_per_minute from the member's plan, the same
+    | credits as audio (900 = one audio minute). The owner's first test calls
+    | are free up to free_test_seconds. Calls end on their own at
+    | max_call_seconds (the owner can set less per agent).
+    */
+    'agents' => [
+        'credits_per_minute' => (int) env('LISTEN_AGENT_CREDITS_PER_MINUTE', 900),
+        'free_test_seconds' => (int) env('LISTEN_AGENT_FREE_TEST_SECONDS', 120),
+        'max_call_seconds' => (int) env('LISTEN_AGENT_MAX_CALL_SECONDS', 600),
+        'max_agents' => (int) env('LISTEN_AGENT_MAX_AGENTS', 10),
+        // Calls a visitor (or a browser) may start an hour, on one agent.
+        'calls_per_visitor_hour' => (int) env('LISTEN_AGENT_CALLS_PER_VISITOR_HOUR', 6),
+        // What Google charges for the real-time voice (per million tokens), to keep each call's cost.
+        'price_per_million' => [
+            'text_in' => (float) env('LISTEN_AGENT_PRICE_TEXT_IN', 0.75),
+            'audio_in' => (float) env('LISTEN_AGENT_PRICE_AUDIO_IN', 3.0),
+            'text_out' => (float) env('LISTEN_AGENT_PRICE_TEXT_OUT', 4.5),
+            'audio_out' => (float) env('LISTEN_AGENT_PRICE_AUDIO_OUT', 12.0),
+        ],
+    ],
 ];

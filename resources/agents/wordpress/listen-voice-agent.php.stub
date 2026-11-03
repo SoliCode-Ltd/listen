@@ -1,0 +1,164 @@
+<?php
+/**
+ * Plugin Name:       Listen Voice Agent
+ * Plugin URI:        {{HOME}}
+ * Description:       Adds your Listen voice agent's call button to every page, so visitors can talk to your business in their own dialect.
+ * Version:           {{VERSION}}
+ * Requires at least: 5.2
+ * Requires PHP:      7.2
+ * Author:            Listen
+ * Author URI:        {{HOME}}
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       listen-voice-agent
+ */
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+define('LISTEN_VOICE_AGENT_KEY', {{KEY}});
+define('LISTEN_VOICE_AGENT_SCRIPT', {{SCRIPT}});
+define('LISTEN_VOICE_AGENT_HOME', {{HOME_PHP}});
+
+/** The agent's key: the one this plugin came with, unless another one was saved in its settings. */
+function listen_voice_agent_key()
+{
+    $key = trim((string) get_option('listen_voice_agent_key', ''));
+
+    return preg_match('/^lw_[A-Za-z0-9]{28}$/', $key) ? $key : LISTEN_VOICE_AGENT_KEY;
+}
+
+/** The plugin's words, in Arabic when WordPress is in Arabic. */
+function listen_voice_agent_text($id)
+{
+    $locale = function_exists('get_user_locale') ? get_user_locale() : get_locale();
+    $ar = strpos((string) $locale, 'ar') === 0;
+    $text = array(
+        'title' => array('Listen Voice Agent', 'وكيل إسمع الصوتي'),
+        'settings' => array('Settings', 'الإعدادات'),
+        'intro' => array('Your agent answers your visitors by voice, from a call button on every page.', 'وكيلك يرد على زوار موقعك بالصوت من زر اتصال في كل صفحة.'),
+        'show' => array('Call button', 'زر الاتصال'),
+        'show_label' => array('Show the call button on my website', 'أظهر زر الاتصال في موقعي'),
+        'key' => array('Agent key', 'مفتاح الوكيل'),
+        'key_hint' => array('Leave it empty to use the agent this plugin came with. To use another agent, paste its key from Listen.', 'اتركه فارغًا لاستخدام الوكيل الذي جاءت معه هذه الإضافة. لاستخدام وكيل آخر، الصق مفتاحه من إسمع.'),
+        'manage' => array('Change what your agent says, its voice and its hours in Listen.', 'غيّر ما يقوله وكيلك وصوته من إسمع.'),
+        'open' => array('Open Listen', 'افتح إسمع'),
+        'activated' => array('Your voice agent is on your website. Open any page to see its call button.', 'وكيلك الصوتي في موقعك الآن. افتح أي صفحة لترى زر الاتصال.'),
+    );
+
+    return isset($text[$id]) ? $text[$id][$ar ? 1 : 0] : $id;
+}
+
+// The call button, at the end of every page of the website (never in the admin).
+add_action('wp_footer', function () {
+    if (get_option('listen_voice_agent_enabled', '1') !== '1') {
+        return;
+    }
+    $attributes = array(
+        'src' => LISTEN_VOICE_AGENT_SCRIPT,
+        'data-agent' => listen_voice_agent_key(),
+        'data-via' => 'wordpress',
+        'async' => true,
+    );
+    if (function_exists('wp_print_script_tag')) {
+        wp_print_script_tag($attributes);
+
+        return;
+    }
+    printf(
+        '<script src="%s" data-agent="%s" data-via="wordpress" async></script>' . "\n",
+        esc_url(LISTEN_VOICE_AGENT_SCRIPT),
+        esc_attr(listen_voice_agent_key())
+    );
+}, 100);
+
+// Settings: Settings → Listen Voice Agent.
+add_action('admin_init', function () {
+    register_setting('listen_voice_agent', 'listen_voice_agent_enabled', array(
+        'type' => 'string',
+        'default' => '1',
+        'sanitize_callback' => function ($value) {
+            return $value === '1' ? '1' : '0';
+        },
+    ));
+    register_setting('listen_voice_agent', 'listen_voice_agent_key', array(
+        'type' => 'string',
+        'default' => '',
+        'sanitize_callback' => function ($value) {
+            $value = trim((string) $value);
+
+            return preg_match('/^lw_[A-Za-z0-9]{28}$/', $value) ? $value : '';
+        },
+    ));
+});
+
+add_action('admin_menu', function () {
+    add_options_page(
+        listen_voice_agent_text('title'),
+        listen_voice_agent_text('title'),
+        'manage_options',
+        'listen-voice-agent',
+        'listen_voice_agent_settings_page'
+    );
+});
+
+function listen_voice_agent_settings_page()
+{
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    $enabled = get_option('listen_voice_agent_enabled', '1') === '1';
+    ?>
+    <div class="wrap">
+        <h1><?php echo esc_html(listen_voice_agent_text('title')); ?></h1>
+        <p><?php echo esc_html(listen_voice_agent_text('intro')); ?></p>
+        <form method="post" action="options.php">
+            <?php settings_fields('listen_voice_agent'); ?>
+            <table class="form-table" role="presentation">
+                <tr>
+                    <th scope="row"><?php echo esc_html(listen_voice_agent_text('show')); ?></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="listen_voice_agent_enabled" value="1" <?php checked($enabled); ?>>
+                            <?php echo esc_html(listen_voice_agent_text('show_label')); ?>
+                        </label>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="listen_voice_agent_key"><?php echo esc_html(listen_voice_agent_text('key')); ?></label></th>
+                    <td>
+                        <input type="text" class="regular-text code" dir="ltr" id="listen_voice_agent_key" name="listen_voice_agent_key"
+                            value="<?php echo esc_attr(get_option('listen_voice_agent_key', '')); ?>"
+                            placeholder="<?php echo esc_attr(LISTEN_VOICE_AGENT_KEY); ?>">
+                        <p class="description"><?php echo esc_html(listen_voice_agent_text('key_hint')); ?></p>
+                    </td>
+                </tr>
+            </table>
+            <?php submit_button(); ?>
+        </form>
+        <p>
+            <?php echo esc_html(listen_voice_agent_text('manage')); ?>
+            <a href="<?php echo esc_url(LISTEN_VOICE_AGENT_HOME); ?>" target="_blank" rel="noopener"><?php echo esc_html(listen_voice_agent_text('open')); ?></a>
+        </p>
+    </div>
+    <?php
+}
+
+add_filter('plugin_action_links_' . plugin_basename(__FILE__), function ($links) {
+    array_unshift($links, '<a href="' . esc_url(admin_url('options-general.php?page=listen-voice-agent')) . '">' . esc_html(listen_voice_agent_text('settings')) . '</a>');
+
+    return $links;
+});
+
+register_activation_hook(__FILE__, function () {
+    set_transient('listen_voice_agent_activated', 1, 120);
+});
+
+add_action('admin_notices', function () {
+    if (!get_transient('listen_voice_agent_activated')) {
+        return;
+    }
+    delete_transient('listen_voice_agent_activated');
+    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html(listen_voice_agent_text('activated')) . '</p></div>';
+});

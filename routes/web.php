@@ -205,6 +205,10 @@ Route::get('/favicon.ico', function () {
 Route::get('/newsletter/unsubscribe', NewsletterUnsubscribeController::class)
     ->name('newsletter.unsubscribe');
 
+// Listen Agents: an agent's link page (and QR code), in the agent's language.
+Route::get('/talk/{slug}', [\App\Http\Controllers\AgentCallController::class, 'talk'])
+    ->where('slug', '[a-z0-9-]{3,90}')->name('agent-talk');
+
 Route::group([
     'prefix' => LaravelLocalization::setLocale(),
     'middleware' => ['localize', 'localeSessionRedirect', 'localizationRedirect'],
@@ -389,6 +393,25 @@ Route::group([
             Route::post('/', [VoiceDesignController::class, 'design'])->middleware('throttle:10,1,voice-design')->name('voice-design.design');
             Route::post('/{id}/keep', [VoiceDesignController::class, 'keep'])->whereNumber('id')->middleware('throttle:30,1')->name('voice-design.keep');
             Route::delete('/{id}', [VoiceDesignController::class, 'destroy'])->whereNumber('id')->middleware('throttle:30,1')->name('voice-design.destroy');
+        });
+
+        // A new member's first page: voice-overs or a voice agent (shown once, after sign-up).
+        Route::get('/start', \App\Http\Controllers\StartController::class)->name('onboarding.start');
+
+        // Listen Agents: the owner's side (App\Http\Controllers\AgentController). The names say
+        // voice-agents because agents.* already names the AI-agent discovery files.
+        Route::prefix('agents')->group(function (): void {
+            Route::get('/', [\App\Http\Controllers\AgentController::class, 'index'])->name('voice-agents.index');
+            Route::get('/new', [\App\Http\Controllers\AgentController::class, 'create'])->name('voice-agents.create');
+            Route::post('/', [\App\Http\Controllers\AgentController::class, 'store'])->middleware('throttle:10,1,agent-write')->name('voice-agents.store');
+            Route::get('/{agent}', [\App\Http\Controllers\AgentController::class, 'show'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.show');
+            Route::get('/{agent}/setup', [\App\Http\Controllers\AgentController::class, 'edit'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.edit');
+            Route::patch('/{agent}', [\App\Http\Controllers\AgentController::class, 'update'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:60,1')->name('voice-agents.update');
+            Route::post('/{agent}/write', [\App\Http\Controllers\AgentController::class, 'write'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:10,1,agent-write')->name('voice-agents.write');
+            Route::post('/{agent}/correct', [\App\Http\Controllers\AgentController::class, 'correct'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1')->name('voice-agents.correct');
+            Route::post('/{agent}/test-call', [\App\Http\Controllers\AgentController::class, 'testCall'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:10,1,agent-test')->name('voice-agents.test-call');
+            Route::delete('/{agent}', [\App\Http\Controllers\AgentController::class, 'destroy'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.destroy');
+            Route::get('/{agent}/plugin/{platform}', [\App\Http\Controllers\AgentController::class, 'plugin'])->where(['agent' => 'agt_[a-z0-9]{24}', 'platform' => 'wordpress'])->middleware('throttle:20,1')->name('voice-agents.plugin');
         });
 
         // Legacy user URL kept as redirect to dashboard voice-cloning section.

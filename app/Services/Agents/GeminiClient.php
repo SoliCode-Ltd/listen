@@ -64,7 +64,7 @@ class GeminiClient
     /**
      * A key for one live call. Returns ['token' => ..., 'expires_at' => ISO time] or null.
      *
-     * @param  array<string, mixed>  $setup  the session setup, without the model
+     * @param  array<string, mixed>  $setup  the session setup (LiveSession::setupFor)
      */
     public function liveToken(array $setup, int $seconds): ?array
     {
@@ -74,10 +74,9 @@ class GeminiClient
             'uses' => 1,
             'expireTime' => gmdate('Y-m-d\TH:i:s\Z', $expires),
             'newSessionExpireTime' => gmdate('Y-m-d\TH:i:s\Z', $now + 90),
-            'liveConnectConstraints' => [
-                'model' => 'models/'.self::LIVE_MODEL,
-                'config' => $setup,
-            ],
+            // The whole setup, locked: the setup the browser sends is ignored (checked live by the
+            // agent call test: a "pirate" setup from the browser did not change the agent).
+            'bidiGenerateContentSetup' => $setup + ['model' => 'models/'.self::LIVE_MODEL],
         ], self::LIVE_MODEL, 15);
         $name = $response?->successful() ? data_get($response->json(), 'name') : null;
         if (! is_string($name) || $name === '') {

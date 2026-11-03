@@ -1002,5 +1002,8 @@
 </script>
 {{-- In the dashboard, help sits in the sidebar instead of a button over the studio. --}}
 @unless(request()->routeIs('dashboard'))
-@include('components.whatsapp-widget')
+{{-- Not on pages that belong to a member's own customers (an agent's link page). --}}
+@unless($noSupportChat ?? false)
+  @include('components.whatsapp-widget')
+@endunless
 @endunless

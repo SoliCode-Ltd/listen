@@ -121,6 +121,14 @@ class Agent extends Model
         return $this->widgets()->oldest('id')->first() ?? AgentWidget::createFor($this);
     }
 
+    /** The agent's orb colours (components/orb), the same every time for one agent. */
+    public function orbName(): string
+    {
+        $names = ['listen', 'arabic', 'dialogue', 'places', 'emotions', 'english', 'creator', 'longform', 'pro'];
+
+        return $names[crc32((string) $this->public_id) % count($names)];
+    }
+
     public function setting(string $key, mixed $default = null): mixed
     {
         return data_get($this->settings ?? [], $key, $default);

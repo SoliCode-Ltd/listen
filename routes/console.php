@@ -49,3 +49,6 @@ Schedule::command('dubs:prune')->everyTenMinutes()->withoutOverlapping(30);
 // Voice Design: delete the takes nobody kept, so the speech projects keep room for voices
 // (App\Console\Commands\PruneDesignedVoicesCommand).
 Schedule::command('voice-design:prune')->everyThirtyMinutes()->withoutOverlapping(20);
+
+// Listen Agents: calls whose browser went quiet are charged up to their last sign of life.
+Schedule::command('agents:settle-calls')->everyMinute()->withoutOverlapping(5);

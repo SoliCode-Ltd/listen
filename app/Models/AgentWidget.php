@@ -107,6 +107,11 @@ class AgentWidget extends Model
         }
         $scheme = strtolower($parts['scheme'] ?? 'https');
         $host = strtolower($parts['host']);
+        // A website's name: dotted labels (or this computer), never a stray word.
+        if (! in_array($scheme, ['http', 'https'], true)
+            || ($host !== 'localhost' && ! preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$/', $host))) {
+            return null;
+        }
         $port = isset($parts['port']) ? ':'.$parts['port'] : '';
 
         return "{$scheme}://{$host}{$port}";

@@ -11,7 +11,9 @@ use Illuminate\Support\Str;
  * notes) and what its website says: the first sentence, who it is, what it
  * must never do, its steps, when it passes the customer to a person, the
  * business facts it answers from, and two questions the owner should decide
- * (each with a recommended answer), in the agent's language and dialect.
+ * (each with a recommended answer). What callers hear is in the agent's
+ * language and dialect; what the owner reads and edits (who it is, its rules,
+ * steps and the questions) is in the owner's own language.
  *
  * Without an answer from the text model it still returns a sound agent, made
  * from the owner's own words, so the setup never gets stuck.
@@ -24,12 +26,13 @@ class AgentWriter
      * @return array{first_message: string, identity: string, never: array<int, string>, steps: array<int, string>,
      *               handoff: string, knowledge: string, questions: array<int, array{question: string, options: array<int, string>, recommended: int}>, written_by: string}
      */
-    public function write(Agent $agent, string $siteText = '', string $notes = ''): array
+    public function write(Agent $agent, string $siteText = '', string $notes = '', ?string $ownerLocale = null): array
     {
-        $raw = $this->gemini->generate($this->prompt($agent, $siteText, $notes), self::schema(), 45, 0.4);
+        $ownerLocale = $ownerLocale ?? app()->getLocale();
+        $raw = $this->gemini->generate($this->prompt($agent, $siteText, $notes, $ownerLocale), self::schema(), 45, 0.4);
         $data = is_string($raw) ? json_decode($this->stripFence($raw), true) : null;
         if (! is_array($data) || trim((string) ($data['first_message'] ?? '')) === '') {
-            return $this->fallback($agent, $siteText, $notes);
+            return $this->fallback($agent, $siteText, $notes, $ownerLocale);
         }
 
         $clean = fn ($v, int $max) => Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $v) ?? ''), $max, '');
@@ -60,8 +63,10 @@ class AgentWriter
         ];
     }
 
-    public function prompt(Agent $agent, string $siteText, string $notes): string
+    public function prompt(Agent $agent, string $siteText, string $notes, ?string $ownerLocale = null): string
     {
+        // The owner reads and edits these parts, so they are in the owner's language.
+        $owner = ($ownerLocale ?? app()->getLocale()) === 'ar' ? 'simple Modern Standard Arabic' : 'English';
         $arabic = $agent->language !== 'en';
         $dialect = $arabic ? (ArabicDialects::prompt($agent->dialect ?: 'ar-XA-WH') ?? 'Arabic') : 'English';
         $jobs = implode(', ', (array) ($agent->jobs ?: ['answer']));
@@ -84,12 +89,12 @@ The business's website, as read (may be incomplete or include noise):
 
 Write, as JSON:
 - first_message: the first sentence the assistant says when the call starts, in {$dialect} as people really speak it: a warm greeting, its name, the business, and an offer to help. One sentence.
-- identity: who the assistant is and its tone, in English, 2 or 3 sentences.
-- never: up to 6 short rules, in English, of what it must never do for this kind of business (invent prices, promise discounts, give medical advice ...).
-- steps: up to 6 short steps, in English, for a typical call, following the owner's goals (for example find what the caller needs, answer from the facts, take name and phone for a callback or a booking).
-- handoff: in English, when it should pass the caller to a person.
+- identity: who the assistant is and its tone, in {$owner}, 2 or 3 sentences.
+- never: up to 6 short rules, in {$owner}, of what it must never do for this kind of business (invent prices, promise discounts, give medical advice ...).
+- steps: up to 6 short steps, in {$owner}, for a typical call, following the owner's goals (for example find what the caller needs, answer from the facts, take name and phone for a callback or a booking).
+- handoff: in {$owner}, when it should pass the caller to a person.
 - knowledge: the business facts the assistant may use, as short plain lines: services and products with prices, opening hours, branches and addresses, phone numbers, delivery, payment, booking and return policies. Only facts found in the notes or the website; never invent any. Keep the business's own words and currency.
-- questions: exactly 2 practical questions the owner should decide for this business (for example what to do when a customer asks for a discount or wants to speak to a manager), in English, each with 2 or 3 short options and the index of the option you recommend.
+- questions: exactly 2 practical questions the owner should decide for this business (for example what to do when a customer asks for a discount or wants to speak to a manager), in {$owner}, each with 2 or 3 short options and the index of the option you recommend.
 TXT);
     }
 
@@ -119,8 +124,9 @@ TXT);
     }
 
     /** A sound agent from the owner's own words, when the text model is not there. */
-    public function fallback(Agent $agent, string $siteText, string $notes): array
+    public function fallback(Agent $agent, string $siteText, string $notes, ?string $ownerLocale = null): array
     {
+        $ar = ($ownerLocale ?? app()->getLocale()) === 'ar';
         $first = match (true) {
             $agent->language === 'en' => "Hello, this is {$agent->name} from {$agent->business_name}. How can I help you today?",
             str_starts_with((string) $agent->dialect, 'ar-EG') => "أهلاً بيك، معاك {$agent->name} من {$agent->business_name}، أقدر أساعدك إزاي؟",
@@ -128,14 +134,29 @@ TXT);
             default => "أهلاً وسهلاً، معك {$agent->name} من {$agent->business_name}، كيف أقدر أساعدك؟",
         };
 
-        return [
-            'first_message' => $first,
+        $owner = $ar ? [
+            'identity' => "{$agent->name} هو المساعد الصوتي الودود لـ{$agent->business_name}. يجيب عن أسئلة العملاء بوضوح واختصار ويساعدهم على الخطوة التالية.",
+            'never' => ['لا يخترع أبدًا أسعارًا أو عروضًا أو سياسات.', 'لا يعد بأي خصم.', 'لا يطلب أبدًا أرقام البطاقات أو كلمات المرور.'],
+            'steps' => ['يرحب بالمتصل ويسأله كيف يساعده.', 'يجيب من المعلومات فقط.', 'إن لم يعرف الإجابة يأخذ الاسم ورقم الهاتف ليتصل به الفريق.', 'يودّع المتصل وينهي المكالمة.'],
+            'handoff' => 'عندما يطلب المتصل التحدث مع شخص، أو يكون منزعجًا، أو يحتاج شيئًا غير موجود في المعلومات.',
+            'questions' => [
+                ['question' => "إذا سُئل {$agent->name} عن شيء لا يعرفه، ماذا يفعل؟", 'options' => ['يأخذ الاسم والرقم ليتصل به فريقك', 'يطلب من المتصل التواصل مع النشاط مباشرة'], 'recommended' => 0],
+                ['question' => 'إذا طلب المتصل خصمًا؟', 'options' => ['يوضح أن الأسعار ثابتة ويعرض المساعدة', 'يأخذ رقمه ليرد عليه فريقك'], 'recommended' => 0],
+            ],
+        ] : [
             'identity' => "{$agent->name} is the friendly voice assistant of {$agent->business_name}. It answers customers' questions clearly and briefly and helps them take the next step.",
             'never' => ['Never invent prices, offers or policies.', 'Never promise a discount.', 'Never ask for card numbers or passwords.'],
             'steps' => ['Greet the caller and ask how you can help.', 'Answer from the facts only.', 'If you cannot answer, take their name and phone number for a callback.', 'Say goodbye and end the call.'],
             'handoff' => 'When the caller asks for a person, is upset, or needs something the facts do not cover.',
+            'questions' => [
+                ['question' => "If a caller asks {$agent->name} something it does not know, what should it do?", 'options' => ['Take their name and number for your team to call back', 'Ask them to contact the business directly'], 'recommended' => 0],
+                ['question' => 'If a caller asks for a discount?', 'options' => ['Explain prices are fixed and offer to help', 'Take their number so your team can reply'], 'recommended' => 0],
+            ],
+        ];
+
+        return $owner + [
+            'first_message' => $first,
             'knowledge' => trim($notes."\n\n".Str::limit($siteText, 8000, '')),
-            'questions' => [],
             'written_by' => 'fallback',
         ];
     }

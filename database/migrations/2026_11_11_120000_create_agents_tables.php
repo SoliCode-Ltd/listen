@@ -102,6 +102,8 @@ return new class extends Migration
                 $t->foreignId('user_id')->constrained()->cascadeOnDelete();
                 $t->foreignId('agent_widget_id')->nullable()->constrained()->nullOnDelete();
                 $t->string('public_id', 32)->unique();
+                // The key the caller's browser holds for this call (only its hash is kept).
+                $t->string('call_key_hash', 64)->nullable();
                 // test (the owner trying it), widget or link
                 $t->string('channel', 16);
                 $t->string('visitor_hash', 64)->nullable();
@@ -117,6 +119,12 @@ return new class extends Migration
                 $t->unsignedInteger('duration_seconds')->default(0);
                 $t->unsignedInteger('billed_seconds')->default(0);
                 $t->unsignedInteger('credits')->default(0);
+                // The plan credits held when the call started (MemberUsageMeter::reserveCredits), and
+                // their month; what the call did not use is given back when it ends. A free test call holds none.
+                $t->json('reservation')->nullable();
+                $t->string('period_ym', 20)->nullable();
+                $t->boolean('free')->default(false);
+                $t->timestamp('settled_at')->nullable();
                 $t->json('transcript')->nullable();
                 $t->text('summary')->nullable();
                 $t->json('lead')->nullable();

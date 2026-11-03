@@ -254,6 +254,79 @@ html[data-theme="light"] .site-logo.logo-light {
   gap: .65rem;
 }
 
+/* ===== STUDIO | AGENTS ===== */
+/* The two sides of the app. It sits by the logo on the app's pages, and in the phone menu. */
+.app-header .brand { flex-shrink: 0; }
+
+.product-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  margin-inline-start: .9rem;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  flex: none;
+}
+
+.product-switch a {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  min-height: 2rem;
+  padding: .3rem .85rem;
+  border-radius: var(--radius-full);
+  color: var(--muted);
+  font-size: .86rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color .2s ease, background-color .25s ease, box-shadow .25s ease;
+}
+
+.product-switch a:hover { color: var(--text); }
+
+.product-switch a.active {
+  color: #ffffff;
+  background: var(--brand-accent);
+  box-shadow: 0 4px 12px var(--brand-accent-glow);
+}
+
+.product-switch svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mobile-product-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-inline-start: 0;
+  min-width: 13rem;
+  align-self: flex-start;
+}
+
+.mobile-product-switch a {
+  justify-content: center;
+  min-height: 2.4rem;
+  font-size: .95rem;
+}
+
+/* Narrower desktops: the switch keeps its words and drops its icons. */
+@media (max-width: 1360px) {
+  .app-header .product-switch svg { display: none; }
+  .app-header .product-switch a { padding: .3rem .7rem; }
+}
+
+@media (max-width: 640px) {
+  .app-header .product-switch { display: none; }
+}
+
 /* ===== LANGUAGE SWITCHER ===== */
 .locale-switch,
 .mobile-locale-switch {
