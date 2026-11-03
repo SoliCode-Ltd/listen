@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
  * and the next one is tried, as the studio does.
  *
  * - generate(): the text model, for writing agents and summing up calls.
+ * - readFile(): the same model reading a file the owner uploaded (a PDF, a photo of a menu).
  * - liveToken(): a short-lived key for one live call, locked to the agent's
  *   setup (model, voice, instructions, tools), so the browser that holds it
  *   can only have that conversation, for that long.
@@ -49,6 +50,36 @@ class GeminiClient
             $response = $this->post("/models/{$model}:generateContent", [
                 'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
                 'generationConfig' => $config,
+            ], $model, $left);
+            if ($response?->successful()) {
+                $text = data_get($response->json(), 'candidates.0.content.parts.0.text');
+                if (is_string($text) && trim($text) !== '') {
+                    return $text;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * A file the owner uploaded (a PDF or a photo of a menu), read by the text model with the
+     * prompt beside it. Returns the reply text or null.
+     */
+    public function readFile(string $prompt, string $mime, string $bytes, int $timeout = 90): ?string
+    {
+        $deadline = microtime(true) + $timeout;
+        foreach (self::WRITER_MODELS as $model) {
+            $left = (int) floor($deadline - microtime(true));
+            if ($left < 8) {
+                break;
+            }
+            $response = $this->post("/models/{$model}:generateContent", [
+                'contents' => [['role' => 'user', 'parts' => [
+                    ['inline_data' => ['mime_type' => $mime, 'data' => base64_encode($bytes)]],
+                    ['text' => $prompt],
+                ]]],
+                'generationConfig' => ['temperature' => 0.1],
             ], $model, $left);
             if ($response?->successful()) {
                 $text = data_get($response->json(), 'candidates.0.content.parts.0.text');

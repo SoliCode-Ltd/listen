@@ -1,13 +1,19 @@
 {{-- What an agent was taught from (agent_sources): its website, the owner's notes and corrections, files. --}}
 @php
     $sources = $getRecord()->sources()->orderBy('id')->get();
-    $kinds = ['website' => 'Website', 'text' => 'Typed by the owner', 'file' => 'File', 'sheet' => 'Sheet'];
-    $statuses = ['ready' => 'Ready', 'pending' => 'Waiting', 'failed' => 'Failed'];
+    $kinds = ['website' => 'Website', 'text' => 'Typed by the owner', 'file' => 'File', 'sheet' => 'Spreadsheet'];
+    $statuses = ['ready' => 'Ready', 'pending' => 'Waiting', 'reading' => 'Reading', 'failed' => 'Failed'];
     $statusColor = fn (?string $status): string => match ($status) {
         'ready' => 'success',
         'failed' => 'danger',
-        'pending' => 'warning',
+        'pending', 'reading' => 'warning',
         default => 'gray',
+    };
+    // An uploaded file's reason, in words (agents.files.reasons), and a file only part of which fits.
+    $problem = fn ($source): ?string => match (true) {
+        $source->error === 'partial' => 'Only the first part fits',
+        in_array($source->error, \App\Services\Agents\FileReader::REASONS, true) => trans('agents.files.reasons.'.$source->error, [], 'en'),
+        default => $source->error,
     };
 @endphp
 
@@ -60,7 +66,7 @@
                             <x-filament::badge :color="$statusColor($source->status)">{{ $statuses[$source->status] ?? \Illuminate\Support\Str::headline((string) $source->status) }}</x-filament::badge>
                         </td>
                         <td class="lsa-nowrap">{{ $source->read_at?->format('j M Y, H:i') ?? '—' }}</td>
-                        <td @class(['lsa-error' => filled($source->error)])>{{ $source->error ?: '—' }}</td>
+                        <td @class(['lsa-error' => filled($source->error) && $source->error !== 'partial'])>{{ $problem($source) ?: '—' }}</td>
                     </tr>
                 @endforeach
             </tbody>

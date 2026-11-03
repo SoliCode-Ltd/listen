@@ -596,6 +596,7 @@
         max_call_seconds: parseInt(max.value, 10) * 60,
       }).then(function () { toast(T.saved); }).catch(function (err) { toast(err.message); });
     });
+    knowledgeFiles($('[data-ag-files]'));
     var kf = $('[data-ag-knowledge-form]');
     var kbText = $('[data-ag-kb-text]'), kbCount = $('[data-ag-kb-count]');
     if (kbText && kbCount) {
@@ -612,6 +613,141 @@
    * The Design tab: each choice redraws the preview at once (the real button,
    * drawn on a pretend copy of the website) and is saved a moment later.
    */
+  /*
+   * Knowledge files: drop or choose files, each uploads with its progress, is read in the
+   * background (the list checks back until it is done) and shows what the agent learned.
+   * Removing takes a second tap. Every name is written as text, never as HTML.
+   */
+  function knowledgeFiles(box) {
+    if (!box) return;
+    var F = T.files || {};
+    var list = $('[data-ag-files-list]', box), input = $('[data-ag-file-input]', box), drop = $('[data-ag-drop]', box), meter = $('[data-ag-files-used]', box);
+    var nf = new Intl.NumberFormat('en');
+    var state = { files: [], used: 0, budget: 0 }, uploads = [], open = {}, pollTimer = 0, polls = 0;
+    var TYPE = { pdf: ['PDF', 'is-pdf'], docx: ['DOC', 'is-doc'], xlsx: ['XLS', 'is-sheet'], csv: ['CSV', 'is-sheet'], txt: ['TXT', 'is-text'], md: ['TXT', 'is-text'], jpg: ['IMG', 'is-image'], jpeg: ['IMG', 'is-image'], png: ['IMG', 'is-image'], webp: ['IMG', 'is-image'] };
+    function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+    function url(id, tail) { return box.getAttribute('data-file-url').replace('__ID__', id) + (tail || ''); }
+    function size(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+    function ext(name) { var m = /\.([a-z0-9]+)$/i.exec(name || ''); return m ? m[1].toLowerCase() : ''; }
+    function button(cls, label, onClick) { var b = el('button', 'ag-btn ag-btn-sm ' + cls, label); b.type = 'button'; b.addEventListener('click', onClick); return b; }
+
+    function row(f) {
+      var li = el('li', 'ag-file is-' + f.status);
+      var type = TYPE[f.type] || ['FILE', 'is-text'];
+      li.appendChild(el('span', 'ag-file-type ' + type[1], type[0]));
+      var main = el('div', 'ag-file-main');
+      // The badge says the type, so the name shows without it (the full name on hover).
+      var name = el('b', 'ag-file-name', String(f.name || '').replace(/\.[a-z0-9]{2,5}$/i, '')); name.dir = 'auto'; name.title = f.name || ''; main.appendChild(name);
+      var meta = el('span', 'ag-file-meta');
+      if (f.size) meta.appendChild(el('span', null, size(f.size)));
+      var status;
+      if (f.status === 'uploading') status = el('span', 'ag-file-state is-busy', F.uploading);
+      else if (f.status === 'pending' || f.status === 'reading') status = el('span', 'ag-file-state is-busy', F.reading);
+      else if (f.status === 'ready') status = el('span', 'ag-file-state is-ok', (F.ready || '').replace(':count', nf.format(f.chars || 0)));
+      else status = el('span', 'ag-file-state is-bad', F.failed);
+      meta.appendChild(status);
+      main.appendChild(meta);
+      if (f.status === 'uploading') {
+        var bar = el('i', 'ag-file-progress'); var fill = el('b'); fill.style.width = Math.round((f.progress || 0) * 100) + '%'; bar.appendChild(fill); main.appendChild(bar);
+      }
+      if (f.partial) main.appendChild(el('p', 'ag-file-note is-warn', F.partial));
+      if (f.waiting) main.appendChild(el('p', 'ag-file-note is-warn', F.waiting));
+      if (f.status === 'failed' && f.reason) main.appendChild(el('p', 'ag-file-note is-bad', f.reason));
+      if (open[f.id] != null) {
+        var facts = el('pre', 'ag-file-facts', open[f.id]); facts.dir = 'auto'; main.appendChild(facts);
+      }
+      li.appendChild(main);
+      var actions = el('div', 'ag-file-actions');
+      if (f.status === 'ready') actions.appendChild(button('ag-btn-ghost', open[f.id] != null ? F.hide : F.view, function () { view(f); }));
+      if (f.status === 'failed' && f.id) actions.appendChild(button('', F.retry, function () { retry(f); }));
+      if (f.id || f.status === 'failed') {
+        var rm = button('ag-btn-ghost ag-file-remove', F.remove, function () { remove(f, rm); });
+        actions.appendChild(rm);
+      }
+      li.appendChild(actions);
+      return li;
+    }
+
+    function render() {
+      list.textContent = '';
+      uploads.forEach(function (u) { list.appendChild(row(u)); });
+      state.files.forEach(function (f) { list.appendChild(row(f)); });
+      if (meter) {
+        meter.hidden = !state.files.length;
+        $('span', meter).textContent = (F.used || '').replace(':used', nf.format(state.used)).replace(':budget', nf.format(state.budget));
+        $('i b', meter).style.width = Math.min(100, state.budget ? state.used / state.budget * 100 : 0) + '%';
+      }
+      var busy = state.files.some(function (f) { return f.status === 'pending' || f.status === 'reading'; });
+      clearTimeout(pollTimer);
+      // Reading takes a few seconds to a minute; the list checks back, slower as it goes.
+      if (busy && polls < 90) pollTimer = setTimeout(load, polls++ < 10 ? 2000 : 5000);
+      else if (!busy) polls = 0;
+    }
+    function take(d) { if (d && d.files) { state = d; render(); } }
+    function load() { api('GET', box.getAttribute('data-index-url')).then(take).catch(function () {}); }
+
+    function send(file) {
+      var u = { name: file.name, size: file.size, type: ext(file.name), status: 'uploading', progress: 0 };
+      uploads.push(u);
+      render();
+      return new Promise(function (done) {
+        var form = new FormData();
+        form.append('file', file);
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', box.getAttribute('data-store-url'));
+        xhr.setRequestHeader('Accept', 'application/json');
+        xhr.setRequestHeader('X-CSRF-TOKEN', C.csrf || '');
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.upload.onprogress = function (e) { if (e.lengthComputable) { u.progress = e.loaded / e.total; render(); } };
+        xhr.onload = function () {
+          var d = {};
+          try { d = JSON.parse(xhr.responseText || '{}'); } catch (e) {}
+          if (xhr.status === 201) {
+            uploads.splice(uploads.indexOf(u), 1);
+            take(d);
+          } else {
+            u.status = 'failed';
+            u.reason = (d.errors && d.errors.file && d.errors.file[0]) || d.message || F.failed;
+            render();
+          }
+          done();
+        };
+        xhr.onerror = function () { u.status = 'failed'; u.reason = F.failed; render(); done(); };
+        xhr.send(form);
+      });
+    }
+    function sendAll(files) {
+      var queue = Array.prototype.slice.call(files || []);
+      var next = function () { if (queue.length) send(queue.shift()).then(next); };
+      next();
+    }
+
+    function view(f) {
+      if (open[f.id] != null) { delete open[f.id]; render(); return; }
+      api('GET', url(f.id)).then(function (d) { open[f.id] = d.content || ''; render(); }).catch(function (err) { toast(err.message); });
+    }
+    function retry(f) { api('POST', url(f.id, '/retry')).then(take).catch(function (err) { toast(err.message); }); }
+    function remove(f, b) {
+      // A file that never uploaded just leaves the list.
+      if (!f.id) { uploads.splice(uploads.indexOf(f), 1); render(); return; }
+      if (!b.classList.contains('is-confirm')) {
+        b.classList.add('is-confirm');
+        b.textContent = F.remove_confirm;
+        setTimeout(function () { if (b.isConnected) { b.classList.remove('is-confirm'); b.textContent = F.remove; } }, 3500);
+        return;
+      }
+      api('DELETE', url(f.id)).then(function (d) { delete open[f.id]; take(d); toast(F.removed); }).catch(function (err) { toast(err.message); });
+    }
+
+    if (input) input.addEventListener('change', function () { sendAll(input.files); input.value = ''; });
+    if (drop) {
+      ['dragenter', 'dragover'].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('is-over'); }); });
+      ['dragleave', 'drop'].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove('is-over'); }); });
+      drop.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files) sendAll(e.dataTransfer.files); });
+    }
+    load();
+  }
+
   function design() {
     var box = $('[data-ag-design]'), D = C.design;
     if (!box || !D || !window.ListenAgentWidget || !window.ListenAgentWidget.preview) return;

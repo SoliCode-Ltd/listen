@@ -146,17 +146,37 @@
     {{-- What it knows. --}}
     <section class="ag-panel" data-ag-panel="knowledge">
       <div class="ag-kb">
+        <div class="ag-kb-main">
+          {{-- Files: the owner's menu, price list or brochure, read once and used on every call. --}}
+          <section class="ag-card ag-kb-files" data-ag-files
+            data-index-url="{{ route('voice-agents.files.index', $agent) }}"
+            data-store-url="{{ route('voice-agents.files.store', $agent) }}"
+            data-file-url="{{ route('voice-agents.files.show', ['agent' => $agent, 'source' => '__ID__']) }}">
+            <div class="ag-kb-head">
+              <h2>{{ __('agents.files.title') }}</h2>
+              <p class="ag-hint">{{ __('agents.files.hint') }}</p>
+            </div>
+            <label class="ag-drop" data-ag-drop>
+              <input type="file" multiple accept="{{ collect(array_keys(\App\Services\Agents\FileReader::TYPES))->map(fn ($e) => '.'.$e)->implode(',') }}" data-ag-file-input>
+              <span class="ag-drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span>
+              <b>{{ __('agents.files.drop') }}</b>
+              <small>{{ __('agents.files.types', ['mb' => intdiv(\App\Http\Controllers\AgentFileController::MAX_KB, 1024)]) }}</small>
+            </label>
+            <ul class="ag-files" data-ag-files-list aria-live="polite"></ul>
+            <div class="ag-files-used" data-ag-files-used hidden><span></span><i><b></b></i></div>
+          </section>
         <form class="ag-card ag-kb-editor" data-ag-knowledge-form>
           <div class="ag-kb-head">
-            <h2>{{ __('agents.knowledge_heading') }}</h2>
-            <p class="ag-hint">{{ __('agents.knowledge_hint') }}</p>
+            <h2>{{ __('agents.knowledge_notes_title') }}</h2>
+            <p class="ag-hint">{{ __('agents.knowledge_notes_hint') }}</p>
           </div>
           <textarea class="ag-textarea" name="knowledge" dir="auto" maxlength="40000" data-ag-kb-text>{{ $agent->knowledge }}</textarea>
           <div class="ag-kb-foot">
-            <span class="ag-hint ag-num" data-ag-kb-count>{{ number_format(mb_strlen((string) $agent->knowledge)) }} / {{ number_format(40000) }}</span>
+            <span class="ag-hint ag-num" dir="ltr" data-ag-kb-count>{{ number_format(mb_strlen((string) $agent->knowledge)) }} / {{ number_format(40000) }}</span>
             <button type="submit" class="ag-btn ag-btn-primary">{{ __('agents.edit_save') }}</button>
           </div>
         </form>
+        </div>
         <aside class="ag-card ag-kb-tips">
           <h3>{{ __('agents.knowledge_tips_title') }}</h3>
           <ul>
@@ -323,6 +343,7 @@
         'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'),
         'play' => __('agents.voice_play'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
         'status' => __('agents.status'),
+        'files' => __('agents.files'),
       ],
     ];
   @endphp

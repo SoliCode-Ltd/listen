@@ -413,6 +413,12 @@ Route::group([
             Route::post('/{agent}/correct', [\App\Http\Controllers\AgentController::class, 'correct'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1')->name('voice-agents.correct');
             Route::post('/{agent}/test-call', [\App\Http\Controllers\AgentController::class, 'testCall'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:10,1,agent-test')->name('voice-agents.test-call');
             Route::delete('/{agent}', [\App\Http\Controllers\AgentController::class, 'destroy'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.destroy');
+            // What the agent knows from files: upload, list, see what it learned, read again, remove.
+            Route::get('/{agent}/files', [\App\Http\Controllers\AgentFileController::class, 'index'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:120,1')->name('voice-agents.files.index');
+            Route::post('/{agent}/files', [\App\Http\Controllers\AgentFileController::class, 'store'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1,agent-files')->name('voice-agents.files.store');
+            Route::get('/{agent}/files/{source}', [\App\Http\Controllers\AgentFileController::class, 'show'])->where(['agent' => 'agt_[a-z0-9]{24}', 'source' => '[0-9]+'])->name('voice-agents.files.show');
+            Route::post('/{agent}/files/{source}/retry', [\App\Http\Controllers\AgentFileController::class, 'retry'])->where(['agent' => 'agt_[a-z0-9]{24}', 'source' => '[0-9]+'])->middleware('throttle:10,1')->name('voice-agents.files.retry');
+            Route::delete('/{agent}/files/{source}', [\App\Http\Controllers\AgentFileController::class, 'destroy'])->where(['agent' => 'agt_[a-z0-9]{24}', 'source' => '[0-9]+'])->name('voice-agents.files.destroy');
             Route::get('/{agent}/install-status', [\App\Http\Controllers\AgentController::class, 'installStatus'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1')->name('voice-agents.install-status');
             Route::get('/{agent}/plugin/{platform}', [\App\Http\Controllers\AgentController::class, 'plugin'])->where(['agent' => 'agt_[a-z0-9]{24}', 'platform' => 'wordpress'])->middleware('throttle:20,1')->name('voice-agents.plugin');
         });

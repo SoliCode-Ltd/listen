@@ -759,7 +759,7 @@ html[dir="rtl"] .ag-stepper code.is-path::after { right: auto; left: -.95em; tra
 .ag-kb-editor { display: grid; gap: 1rem; padding: 1.4rem; }
 .ag-kb-head h2 { font-size: 1.2rem; font-weight: 800; }
 .ag-kb-head p { margin-top: .3rem; }
-.ag-kb-editor .ag-textarea { min-height: 380px; line-height: 1.8; }
+.ag-kb-editor .ag-textarea { min-height: 220px; line-height: 1.8; }
 .ag-kb-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .ag-kb-tips { display: grid; gap: .9rem; padding: 1.3rem; position: sticky; top: 132px; }
 .ag-kb-tips h3 { font-size: 1rem; font-weight: 800; }
@@ -803,3 +803,57 @@ html[dir="rtl"] .ag-stepper code.is-path::after { right: auto; left: -.95em; tra
 .ag-stepper :is(h4, p) code[dir="rtl"] { font-family: inherit; font-size: .86em; font-weight: 700; letter-spacing: 0; font-variant-ligatures: normal; }
 .ag-ui-note { display: flex; align-items: flex-start; gap: .55rem; margin: 0; padding: .7rem .9rem; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--muted); font-size: .86rem; line-height: 1.6; }
 .ag-ui-note svg { width: 18px; height: 18px; flex: 0 0 auto; margin-top: .1rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- Knowledge files: a drop zone, then each file with its state and what the agent learned. ---------- */
+.ag-kb-main { display: grid; gap: 1rem; min-width: 0; }
+.ag-kb-files { display: grid; gap: 1rem; padding: 1.4rem; }
+.ag-drop { position: relative; display: grid; justify-items: center; gap: .35rem; padding: 1.6rem 1rem; border: 1.5px dashed color-mix(in srgb, var(--a) 40%, var(--line)); border-radius: 16px; background: color-mix(in srgb, var(--a) 4%, var(--bg)); text-align: center; cursor: pointer; transition: border-color .18s ease, background .18s ease, transform .2s var(--ag-ease); }
+.ag-drop:hover, .ag-drop.is-over { border-color: var(--a); background: color-mix(in srgb, var(--a) 9%, var(--bg)); }
+.ag-drop.is-over { transform: scale(1.01); }
+.ag-drop:focus-within { outline: 3px solid var(--ag-soft-2); outline-offset: 2px; }
+.ag-drop input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.ag-drop-icon { display: grid; place-items: center; width: 46px; height: 46px; margin-bottom: .25rem; border-radius: 14px; background: var(--surface); color: var(--accent-text, var(--a)); box-shadow: 0 0 0 1px var(--line); }
+.ag-drop-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ag-drop b { font-size: .98rem; font-weight: 800; }
+.ag-drop small { max-width: 52ch; color: var(--muted); font-size: .84rem; line-height: 1.55; }
+.ag-files { display: grid; gap: .55rem; margin: 0; padding: 0; list-style: none; }
+.ag-files:empty { display: none; }
+.ag-file { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: .85rem; padding: .85rem .95rem; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); animation: ag-fade .25s var(--ag-ease); }
+.ag-file.is-failed { border-color: color-mix(in srgb, var(--ag-bad) 35%, var(--line)); }
+.ag-file-type { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; font-size: .78rem; font-weight: 800; letter-spacing: .02em; color: #fff; }
+.ag-file-type.is-pdf { background: #E5484D; }
+.ag-file-type.is-doc { background: #2F6FED; }
+.ag-file-type.is-sheet { background: #1F9D55; }
+.ag-file-type.is-image { background: #8E4EC6; }
+.ag-file-type.is-text { background: #5F5A7E; }
+.ag-file-main { display: grid; gap: .25rem; min-width: 0; }
+.ag-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .95rem; }
+.ag-file-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .7rem; color: var(--muted); font-size: .82rem; }
+.ag-file-state { display: inline-flex; align-items: center; gap: .35rem; font-weight: 700; }
+.ag-file-state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.ag-file-state.is-ok { color: var(--ag-ok); }
+.ag-file-state.is-bad { color: var(--ag-bad); }
+.ag-file-state.is-busy { color: var(--accent-text, var(--a)); }
+.ag-file-state.is-busy::before { width: 11px; height: 11px; border: 2px solid currentColor; border-inline-end-color: transparent; background: none; animation: ag-spin .8s linear infinite; }
+@keyframes ag-spin { to { transform: rotate(360deg); } }
+.ag-file-progress { display: block; height: 4px; margin-top: .3rem; border-radius: 4px; background: var(--line); overflow: hidden; }
+.ag-file-progress b { display: block; height: 100%; border-radius: inherit; background: var(--a); transition: width .2s ease; }
+.ag-file-note { margin: .15rem 0 0; font-size: .82rem; line-height: 1.55; }
+.ag-file-note.is-warn { color: var(--ag-warn); }
+.ag-file-note.is-bad { color: var(--ag-bad); }
+.ag-file-facts { max-height: 260px; margin: .5rem 0 0; padding: .75rem .85rem; overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; font-size: .86rem; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ag-file-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; }
+.ag-file-remove { color: var(--muted); }
+.ag-file-remove:hover, .ag-file-remove.is-confirm { color: var(--ag-bad); }
+.ag-file-remove.is-confirm { background: color-mix(in srgb, var(--ag-bad) 10%, transparent); }
+.ag-files-used { display: grid; gap: .4rem; color: var(--muted); font-size: .82rem; }
+.ag-files-used i { display: block; height: 6px; border-radius: 6px; background: var(--line); overflow: hidden; }
+.ag-files-used b { display: block; height: 100%; border-radius: inherit; background: var(--a); transition: width .3s var(--ag-ease); }
+@media (max-width: 640px) {
+  .ag-kb-files { padding: 1.1rem; }
+  .ag-file { grid-template-columns: auto minmax(0, 1fr); }
+  .ag-file-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ag-file-state.is-busy::before { animation: none; }
+}

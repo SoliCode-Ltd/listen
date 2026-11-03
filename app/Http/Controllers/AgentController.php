@@ -385,7 +385,9 @@ class AgentController extends Controller
             'created' => true,
             'voice' => (bool) $agent->live_voice,
             'tested' => $agent->tested_at !== null,
-            'facts' => mb_strlen(trim((string) $agent->knowledge)) >= 80,
+            // Prices and hours: typed, or in a file the agent has read.
+            'facts' => mb_strlen(trim((string) $agent->knowledge)) >= 80
+                || $agent->sources()->whereIn('kind', [AgentSource::FILE, AgentSource::SHEET])->where('status', AgentSource::READY)->exists(),
             'live' => $agent->status === Agent::LIVE,
         ];
     }
