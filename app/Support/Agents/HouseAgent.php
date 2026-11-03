@@ -30,12 +30,24 @@ final class HouseAgent
         return is_array($row) && ! empty($row['key']) && ! empty($row['slug']) ? $row : null;
     }
 
+    /** A count in Arabic: one, two, a few (3 to 10) and many take different words. */
+    private static function arabicCount(int $n, string $one, string $two, string $few, string $many): string
+    {
+        return match (true) {
+            $n === 1 => $one,
+            $n === 2 => $two,
+            $n >= 3 && $n <= 10 => $n.' '.$few,
+            default => number_format($n).' '.$many,
+        };
+    }
+
     /** What the house agent knows, in its language. */
     public static function knowledge(string $language): string
     {
         $ar = $language === 'ar';
         $plans = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->orderBy('price_cents')->get();
-        $planLines = $plans->map(function (Plan $p) use ($ar) {
+        $rate = AgentAccess::creditsPerMinute();
+        $planLines = $plans->map(function (Plan $p) use ($ar, $rate) {
             $minutes = (int) floor((int) $p->monthly_chars / 900);
             $price = rtrim(rtrim(number_format($p->price_cents / 100, 2, '.', ''), '0'), '.');
 
@@ -43,10 +55,24 @@ final class HouseAgent
             $key = 'ui.pricing.plan_name_'.$p->slug;
             $arName = trans($key, [], 'ar') !== $key ? trans($key, [], 'ar') : $p->name;
 
+            // Whether the plan has agents (Admin → Plans → Voice agents), how many, and up to how many call minutes.
+            $limits = AgentAccess::limits($p);
+            $callMinutes = intdiv(max(0, (int) $p->monthly_chars), max(1, $rate));
+            if ($limits['minutes'] > 0) {
+                $callMinutes = min($callMinutes, $limits['minutes']);
+            }
+            $agents = $ar
+                ? ($limits['included'] ? '، وتشمل الوكلاء: '.self::arabicCount($limits['agents'], 'وكيل واحد', 'وكيلان', 'وكلاء', 'وكيلًا').' وحتى '.number_format($callMinutes).' دقيقة مكالمات في الشهر' : '، ولا تشمل الوكلاء')
+                : ($limits['included'] ? ", with agents: {$limits['agents']} ".($limits['agents'] === 1 ? 'agent' : 'agents').' and up to '.number_format($callMinutes).' call minutes a month' : ', without agents');
+
             return $ar
-                ? "- باقة {$arName}: {$price} دولار في الشهر، حوالي {$minutes} دقيقة صوت في الشهر (".number_format((int) $p->monthly_chars).' نقطة رصيد).'
-                : "- {$p->name} plan: \${$price} a month, about {$minutes} minutes of voice a month (".number_format((int) $p->monthly_chars).' credits).';
+                ? "- باقة {$arName}: {$price} دولار في الشهر، حوالي {$minutes} دقيقة صوت في الشهر (".number_format((int) $p->monthly_chars)." نقطة رصيد){$agents}."
+                : "- {$p->name} plan: \${$price} a month, about {$minutes} minutes of voice a month (".number_format((int) $p->monthly_chars)." credits){$agents}.";
         })->implode("\n");
+        $free = intdiv(AgentAccess::freeTestSeconds(), 60);
+        $freeAr = $free > 0 ? '، وأول '.self::arabicCount($free, 'دقيقة', 'دقيقتين', 'دقائق', 'دقيقة').' من مكالمات التجربة مجانًا' : '';
+        $freeEn = $free > 0 ? ", and the first {$free} ".($free === 1 ? 'minute' : 'minutes').' of test calls are free' : '';
+        $rateText = number_format($rate);
 
         $dialects = DialectCounts::arabic();
         $accents = DialectCounts::english();
@@ -69,11 +95,11 @@ final class HouseAgent
 - الملفات بصيغة MP3، وفي الباقات الأعلى WAV وM4A وOGG.
 
 # الوكلاء
-- وكيل صوتي للنشاط التجاري يرد على العملاء بلهجتهم في موقعه أو عبر رابط أو رمز QR، ليلًا ونهارًا.
+- وكيل صوتي للنشاط التجاري يرد على العملاء بلهجتهم في موقعه أو عبر رابط أو رمز استجابة سريعة، ليلًا ونهارًا.
 - يجيب من أسعار النشاط ومواعيده، ويأخذ الاسم ورقم الهاتف، ويساعد في الحجز.
-- يُنشأ في دقيقتين من صفحة الوكلاء، وأول دقيقتين من مكالمات التجربة مجانًا.
+- يُنشأ في دقيقتين من صفحة الوكلاء{$freeAr}.
 - إضافة جاهزة للمواقع، أو سطر واحد يُلصق في الموقع مرة واحدة.
-- المكالمات تستهلك رصيد الباقة نفسه.
+- المكالمات تستهلك رصيد الباقة نفسه: دقيقة المكالمة {$rateText} نقطة رصيد. الوكلاء في الباقات المذكورة أدناه فقط.
 
 # الباقات
 {$planLines}
@@ -98,9 +124,9 @@ Listen is an Arabic-first AI voice platform, in Arabic and English.
 # Agents
 - A voice agent for a business: it answers its customers in their dialect, on its website, a link or a QR code, day and night.
 - It answers from the business's prices and hours, takes names and phone numbers, and helps book visits.
-- It is set up in two minutes from the Agents page, and the first two minutes of test calls are free.
+- It is set up in two minutes from the Agents page{$freeEn}.
 - A ready plugin for websites, or one line pasted into the website once.
-- Calls use the plan's own credits.
+- Calls use the plan's own credits: a call minute is {$rateText} credits. Agents come with the plans listed below that include them.
 
 # Plans
 {$planLines}

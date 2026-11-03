@@ -4,15 +4,9 @@
   $link = route('agent-talk', ['slug' => $widget->slug]);
   // Website builders: WordPress has a plugin; the others take the one line in their own settings, step by step;
   // any other website takes the line itself.
-  $platforms = [
-    'wordpress' => ['WordPress', 'plugin'],
-    'shopify' => ['Shopify', 'guide'],
-    'wix' => ['Wix', 'guide'],
-    'laravel' => ['Laravel', 'dev'],
-    'html' => [__('agents.install.tabs.html'), 'code'],
-    'salla' => ['Salla', 'soon'],
-    'zid' => ['Zid', 'soon'],
-  ];
+  // Each name in the page's own language (ووردبريس, سلة and زد on the Arabic page).
+  $platforms = collect(['wordpress' => 'plugin', 'shopify' => 'guide', 'wix' => 'guide', 'laravel' => 'dev', 'html' => 'code', 'salla' => 'soon', 'zid' => 'soon'])
+    ->map(fn ($kind, $key) => [__('agents.install.tabs.'.$key), $kind])->all();
   $seenHost = $widget->last_seen_origin && $widget->last_seen_at ? parse_url($widget->last_seen_origin, PHP_URL_HOST) : null;
 @endphp
 <div class="ag-live" data-ag-golive data-link="{{ $link }}">
@@ -90,7 +84,7 @@
     <div class="ag-card ag-tile">
       <div class="ag-field">
         <label for="ag-origins">{{ __('agents.live_allowed_label') }}</label>
-        <input class="ag-input" id="ag-origins" type="text" dir="ltr" placeholder="https://yourbusiness.com" value="{{ implode(', ', $widget->allowed_origins ?? []) }}" data-ag-origins>
+        <input class="ag-input ag-input-url" id="ag-origins" type="text" dir="ltr" placeholder="{{ __('agents.live_allowed_placeholder') }}" value="{{ implode(', ', $widget->allowed_origins ?? []) }}" data-ag-origins>
         <span class="ag-hint">{{ __('agents.live_allowed_hint') }}</span>
       </div>
       {{-- A website that tried to show the button and was not on the list: allowed in one tap. --}}

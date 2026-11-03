@@ -131,10 +131,12 @@ html[dir="rtl"] .ag-head h1 { letter-spacing: 0; }
 }
 .ag-textarea { min-height: 120px; resize: vertical; line-height: 1.6; }
 .ag-input:focus, .ag-textarea:focus, .ag-select:focus { outline: none; border-color: var(--a); box-shadow: 0 0 0 4px var(--ag-soft); }
-.ag-input-prefix { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); overflow: hidden; transition: border-color .18s ease, box-shadow .18s ease; }
+.ag-input-prefix { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); overflow: hidden; transition: border-color .18s ease, box-shadow .18s ease; direction: ltr; } /* an address reads left to right, on Arabic pages too */
 .ag-input-prefix:focus-within { border-color: var(--a); box-shadow: 0 0 0 4px var(--ag-soft); }
 .ag-input-prefix span { display: grid; place-items: center; padding: 0 .8rem; color: var(--muted); font-size: .92rem; border-inline-end: 1px solid var(--line); direction: ltr; }
 .ag-input-prefix .ag-input { border: 0; box-shadow: none; border-radius: 0; direction: ltr; }
+/* An address field on an Arabic page: its hint reads right to left until an address is typed. */
+html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-chips { display: flex; flex-wrap: wrap; gap: .5rem; }
 .ag-chip { position: relative; }
 .ag-chip input { position: absolute; opacity: 0; pointer-events: none; }
@@ -820,7 +822,8 @@ html[dir="rtl"] .ag-stepper code.is-path::after { right: auto; left: -.95em; tra
 .ag-files:empty { display: none; }
 .ag-file { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: .85rem; padding: .85rem .95rem; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); animation: ag-fade .25s var(--ag-ease); }
 .ag-file.is-failed { border-color: color-mix(in srgb, var(--ag-bad) 35%, var(--line)); }
-.ag-file-type { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; font-size: .78rem; font-weight: 800; letter-spacing: .02em; color: #fff; }
+.ag-file-type { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: #fff; }
+.ag-file-type svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .ag-file-type.is-pdf { background: #E5484D; }
 .ag-file-type.is-doc { background: #2F6FED; }
 .ag-file-type.is-sheet { background: #1F9D55; }

@@ -91,7 +91,7 @@
         <span class="ag-design-label">{{ __('agents.design.accent') }}</span>
         <div class="ag-swatches">
           @foreach($accents as $hex)
-            <label class="ag-choice ag-swatch"><input type="radio" name="accent" value="{{ $hex }}" @checked($look['accent'] === $hex) aria-label="{{ $hex }}"><span style="background:{{ $hex }}"></span></label>
+            <label class="ag-choice ag-swatch"><input type="radio" name="accent" value="{{ $hex }}" @checked($look['accent'] === $hex) aria-label="{{ __('agents.design.colors.'.ltrim(strtolower($hex), '#')) }}" title="{{ __('agents.design.colors.'.ltrim(strtolower($hex), '#')) }}"><span style="background:{{ $hex }}"></span></label>
           @endforeach
           <label class="ag-choice ag-swatch ag-swatch-custom" title="{{ __('agents.design.custom') }}">
             <input type="radio" name="accent" value="custom" @checked($customAccent !== null) aria-label="{{ __('agents.design.custom') }}">
@@ -190,7 +190,7 @@
       </div>
     </div>
     <div class="ag-design-frame">
-      <div class="ag-design-bar" aria-hidden="true"><i></i><i></i><i></i><span dir="ltr">{{ __('agents.design.site') }}</span></div>
+      <div class="ag-design-bar" aria-hidden="true"><i></i><i></i><i></i><span dir="ltr">{{ ($agent->website_url ?? null) ? preg_replace('#^www\.#', '', (string) parse_url($agent->website_url, PHP_URL_HOST)) : __('agents.design.site') }}</span></div>
       <div class="ag-design-site" data-ag-design-site dir="{{ $rtl ? 'rtl' : 'ltr' }}" aria-label="{{ __('agents.design.preview') }}">
         <div class="ag-fake" aria-hidden="true">
           <b class="ag-fake-logo"></b>

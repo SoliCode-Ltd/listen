@@ -677,20 +677,33 @@
     var list = $('[data-ag-files-list]', box), input = $('[data-ag-file-input]', box), drop = $('[data-ag-drop]', box), meter = $('[data-ag-files-used]', box);
     var nf = new Intl.NumberFormat('en');
     var state = { files: [], used: 0, budget: 0 }, uploads = [], open = {}, pollTimer = 0, polls = 0;
-    var TYPE = { pdf: ['PDF', 'is-pdf'], docx: ['DOC', 'is-doc'], xlsx: ['XLS', 'is-sheet'], csv: ['CSV', 'is-sheet'], txt: ['TXT', 'is-text'], md: ['TXT', 'is-text'], jpg: ['IMG', 'is-image'], jpeg: ['IMG', 'is-image'], png: ['IMG', 'is-image'], webp: ['IMG', 'is-image'] };
+    // Each kind of file has its own drawing and colour, so the badge needs no letters in any language.
+    var TYPE = { pdf: 'pdf', docx: 'doc', xlsx: 'sheet', csv: 'sheet', txt: 'text', md: 'text', jpg: 'image', jpeg: 'image', png: 'image', webp: 'image' };
+    var ICON = {
+      pdf: '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><rect x="9.5" y="12.5" width="6" height="4.5" rx="1"/>',
+      doc: '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9.5 11.5h6M9.5 14.5h6M9.5 17.5h4"/>',
+      sheet: '<rect x="4.5" y="5" width="15" height="14" rx="2"/><path d="M4.5 10h15M4.5 14.5h15M10 5v14"/>',
+      text: '<path d="M5 6.5h14M5 10.5h14M5 14.5h10M5 18.5h7"/>',
+      image: '<rect x="4" y="5" width="16" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l4.5-4.5 3 3 2.5-2.5 4 4"/>'
+    };
     function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
     function url(id, tail) { return box.getAttribute('data-file-url').replace('__ID__', id) + (tail || ''); }
-    function size(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+    function size(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' ' + (F.mb || 'MB') : Math.max(1, Math.round(n / 1024)) + ' ' + (F.kb || 'KB'); }
+    function badge(kind) {
+      var b = el('span', 'ag-file-type is-' + kind);
+      b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[kind] + '</svg>';
+      b.appendChild(el('span', 'sr-only', (F.kinds || {})[kind] || ''));
+      return b;
+    }
     function ext(name) { var m = /\.([a-z0-9]+)$/i.exec(name || ''); return m ? m[1].toLowerCase() : ''; }
     function button(cls, label, onClick) { var b = el('button', 'ag-btn ag-btn-sm ' + cls, label); b.type = 'button'; b.addEventListener('click', onClick); return b; }
 
     function row(f) {
       var li = el('li', 'ag-file is-' + f.status);
-      var type = TYPE[f.type] || ['FILE', 'is-text'];
-      li.appendChild(el('span', 'ag-file-type ' + type[1], type[0]));
+      li.appendChild(badge(TYPE[f.type] || 'text'));
       var main = el('div', 'ag-file-main');
-      // The badge says the type, so the name shows without it (the full name on hover).
-      var name = el('b', 'ag-file-name', String(f.name || '').replace(/\.[a-z0-9]{2,5}$/i, '')); name.dir = 'auto'; name.title = f.name || ''; main.appendChild(name);
+      // The name as the owner gave it (the badge draws the kind; the full name on hover too).
+      var name = el('b', 'ag-file-name', String(f.name || '')); name.dir = 'auto'; name.title = f.name || ''; main.appendChild(name);
       var meta = el('span', 'ag-file-meta');
       if (f.size) meta.appendChild(el('span', null, size(f.size)));
       var status;

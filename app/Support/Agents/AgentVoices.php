@@ -42,7 +42,9 @@ final class AgentVoices
             $female = strtolower((string) $voice->gender) === 'female';
             $out[] = [
                 'id' => (string) $voice->internal_voice_id,
-                'name' => $arabicUi && $language === 'ar' ? VoiceCatalog::arabicName((string) $voice->display_name) : (string) $voice->display_name,
+                // On Arabic pages every speaker's name is written in Arabic, the English ones too
+                // (Alice is أليس there), as in the studio's voice library.
+                'name' => $arabicUi ? VoiceCatalog::arabicName((string) $voice->display_name) : (string) $voice->display_name,
                 'gender' => $female ? 'female' : 'male',
                 'age' => $age,
                 'language' => (string) $voice->language,
