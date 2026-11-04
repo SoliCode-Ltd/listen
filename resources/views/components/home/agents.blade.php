@@ -1,6 +1,6 @@
 {{-- The homepage's Agents section, set like the homepage's other sections: the title, a line and
-     what a voice agent does, centred, with its two buttons; under them a real call with Listen's own
-     agent, recorded live, the voice on one side and the words on the other. --}}
+     what a voice agent does, centred; a real call with Listen's own agent, recorded live, the voice on
+     one side and the words on the other; then its two buttons. --}}
 <section class="section agl agl-home" aria-labelledby="agentsHomeTitle">
   <div class="agl-home-head" data-agl-rise>
     <div>
@@ -19,14 +19,15 @@
         </li>
       @endforeach
     </ul>
-    <div class="agl-cta-row">
-      <a class="ag-btn ag-btn-primary ag-btn-lg" href="{{ route('agents-landing') }}">{{ __('agents_landing.home_cta') }}</a>
-      <button type="button" class="ag-btn ag-btn-lg agl-live-btn" data-agl-live hidden>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents_landing.home_talk') }}
-      </button>
-    </div>
   </div>
   <div class="agl-real-wrap">
     <x-agents.real-call size="wide" data-agl-rise style="--rise-d: .1s" />
+  </div>
+  {{-- After the example: where to learn more, and a real call with Listen's own agent when it is on the page. --}}
+  <div class="agl-cta-row agl-home-cta">
+    <a class="ag-btn ag-btn-primary ag-btn-lg" href="{{ route('agents-landing') }}">{{ __('agents_landing.home_cta') }}</a>
+    <button type="button" class="ag-btn ag-btn-lg agl-live-btn" data-agl-live hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents_landing.home_talk') }}
+    </button>
   </div>
 </section>

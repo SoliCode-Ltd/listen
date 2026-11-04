@@ -10,7 +10,7 @@ return [
     'hero_title_mark' => 'in their dialect',
     'hero_text' => 'Your agent answers questions from your prices and hours, takes names and numbers, and books visits. On your website, a link or a QR code, day and night.',
     'hero_cta' => 'Create my agent',
-    'hero_cta_member' => 'Open my agents',
+    'hero_cta_member' => 'View my agents',
     'hero_note' => '{1} Your first minute of test calls is free.|[2,*] Your first :count minutes of test calls are free.',
     'hero_watch' => 'Watch a call',
 
