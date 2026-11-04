@@ -328,6 +328,15 @@
                 </div>
                 <time datetime="{{ $c->started_at->toIso8601String() }}">{{ $c->started_at->diffForHumans() }}</time>
               </header>
+              {{-- Who called, when the website said who is signed in (CallerIdentity). --}}
+              @if(! empty($c->caller['email']))
+                <p class="ag-convo-caller">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20a7.2 7.2 0 0 1 14.4 0"/></svg>
+                  <span>{{ __('agents.conversation_caller') }}</span>
+                  @if(! empty($c->caller['name']))<b><bdi>{{ $c->caller['name'] }}</bdi></b>@endif
+                  <a href="mailto:{{ $c->caller['email'] }}" dir="ltr">{{ $c->caller['email'] }}</a>
+                </p>
+              @endif
               @if($c->summary)<p class="ag-convo-summary" dir="auto">{{ $c->summary }}</p>@endif
               @if($c->lead)
                 <div class="ag-convo-lead">

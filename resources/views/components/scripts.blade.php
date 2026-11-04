@@ -1100,7 +1100,12 @@
       ? \App\Support\Agents\HouseAgent::for(app()->getLocale()) : null;
   @endphp
   @if($houseAgent)
-    <script src="{{ asset('js/listen-agent.js') }}" data-agent="{{ $houseAgent['key'] }}" async></script>
+    @php
+      // A signed-in member who calls: the call is kept with their name and email, so the team
+      // knows who it was (signed for this button only, good for a few hours: CallerIdentity).
+      $houseCaller = auth()->check() ? \App\Support\Agents\CallerIdentity::attributes($houseAgent['key'], (string) auth()->user()->email, (string) auth()->user()->name) : [];
+    @endphp
+    <script src="{{ asset('js/listen-agent.js') }}" data-agent="{{ $houseAgent['key'] }}"@foreach($houseCaller as $attribute => $value) {{ $attribute }}="{{ $value }}"@endforeach async></script>
   @endif
 @endunless
 @endunless

@@ -802,6 +802,8 @@ return [
             's1_9' => 'A device cookie and a fingerprint of your device (made from details your browser shares, such as its graphics, fonts and time zone), so the free demo is used only once per device and our limits cannot be dodged with extra accounts',
             's1_10' => 'Developer API request logs, including the IP address each request came from, so we can help with your integration',
             's1_11' => 'If you arrive from one of our ads, the ad click ID from the link you clicked, kept for up to 90 days',
+            's1_12' => 'Your name and email with your call, if you call our assistant on our website while signed in, so our team knows who called',
+            's1_13' => 'When you call a business\'s voice agent made with Listen, the call is kept for that business, with your name and email if that business\'s website says you are signed in to it',
             's2_title' => '2. How We Use Your Information',
             's2_1' => 'To provide and maintain our service',
             's2_2' => 'To process your payments and manage your subscription',

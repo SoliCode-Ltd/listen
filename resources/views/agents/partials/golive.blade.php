@@ -235,8 +235,14 @@
                 @endif
                 @foreach(($step[2] ?? []) as [$file, $snippet])
                   @php
-                    // Laravel's line reads the key from the config, so the key lives in .env only.
-                    $snippet = strtr($snippet, [':key' => $widget->public_key, ':line' => str_replace('data-agent="'.$widget->public_key.'"', 'data-agent="{{ config(\'services.listen.agent_key\') }}"', $code)]);
+                    // Laravel's line reads the key from the config, so the key lives in .env only. The
+                    // caller secret signs who is calling (CallerIdentity): only the owner sees it here.
+                    $snippet = strtr($snippet, [
+                        ':key' => $widget->public_key,
+                        ':line' => str_replace('data-agent="'.$widget->public_key.'"', 'data-agent="{{ config(\'services.listen.agent_key\') }}"', $code),
+                        ':secret' => \App\Support\Agents\CallerIdentity::secret((string) $widget->public_key),
+                        ':src' => asset('js/listen-agent.js'),
+                    ]);
                   @endphp
                   <div class="ag-guide-code ag-snippet">
                     <div class="ag-guide-code-bar">

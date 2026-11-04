@@ -153,7 +153,7 @@ class AgentCalls
     }
 
     /**
-     * @param  array{origin?: ?string, page_url?: ?string, visitor?: ?string, country?: ?string, network?: ?string, free_only?: bool}  $context
+     * @param  array{origin?: ?string, page_url?: ?string, visitor?: ?string, country?: ?string, network?: ?string, free_only?: bool, caller?: ?array{email: string, name: ?string}}  $context
      * @return array{ok: bool, error?: string, conversation?: AgentConversation, call_key?: string, token?: string, max_seconds?: int, free?: bool}
      */
     public function start(Agent $agent, string $channel, ?AgentWidget $widget = null, array $context = []): array
@@ -275,6 +275,10 @@ class AgentCalls
                 'free' => $free,
                 'transcript' => [],
             ];
+            // Who is calling, when the website signed its signed-in visitor (CallerIdentity).
+            if (! empty($context['caller']) && AgentConversation::keepsCaller()) {
+                $base['caller'] = $context['caller'];
+            }
 
             try {
                 if ($free) {
@@ -681,6 +685,10 @@ class AgentCalls
     /** @param  array<string, string>  $lead */
     protected function rememberContact(AgentConversation $conversation, array $lead): void
     {
+        // A caller the website said is signed in: their email and name go with the details they gave.
+        $known = is_array($conversation->caller) ? $conversation->caller : [];
+        $lead += array_filter(['name' => $known['name'] ?? null, 'email' => $known['email'] ?? null],
+            fn ($v) => is_string($v) && $v !== '');
         $this->rememberCaller((int) $conversation->user_id, (int) $conversation->agent_id, $conversation->id, $lead);
     }
 

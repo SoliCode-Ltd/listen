@@ -510,6 +510,12 @@ html[dir="rtl"] .ag-check-go { transform: scaleX(-1); }
 .ag-convo-meta span { color: var(--muted); font-size: .84rem; }
 .ag-convo-top time { margin-inline-start: auto; color: var(--muted); font-size: .84rem; white-space: nowrap; }
 .ag-convo-summary { margin: 0; line-height: 1.7; }
+/* Who called, when they were signed in on the website. */
+.ag-convo-caller { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .55rem; margin: 0; color: var(--muted); font-size: .88rem; }
+.ag-convo-caller svg { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: var(--accent-text, var(--a)); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ag-convo-caller b { color: var(--text); font-weight: 700; }
+.ag-convo-caller a { display: inline-flex; align-items: center; min-height: 40px; margin-block: -.6rem; color: var(--accent-text, var(--a)); font-weight: 600; text-decoration: none; unicode-bidi: isolate; overflow-wrap: anywhere; }
+.ag-convo-caller a:hover { text-decoration: underline; }
 .ag-convo-lead { display: grid; gap: .4rem; padding: .8rem .95rem; border-radius: 12px; background: var(--ag-soft); }
 .ag-convo-lead b { font-size: .8rem; color: var(--muted); }
 .ag-convo-lead ul { display: flex; flex-wrap: wrap; gap: .35rem .5rem; margin: 0; padding: 0; list-style: none; }

@@ -352,6 +352,8 @@ return [
     'conversation_summary' => 'Summary',
     'conversation_transcript' => 'What was said',
     'conversation_details' => 'Customer details',
+    // Who called, when they were signed in on the website (CallerIdentity).
+    'conversation_caller' => 'Signed in on your website:',
     'conversation_credits' => ':count credits',
 
     // Customers.
@@ -403,6 +405,7 @@ return [
                 ['Download the plugin', 'Your agent is already inside it, so there is nothing to copy.'],
                 ['Upload it to WordPress', ['In your WordPress dashboard, open `Plugins` > `Add Plugin` > `Upload Plugin`.', 'Choose the file, then click `Install Now`.']],
                 ['Turn it on', ['Click `Activate Plugin`. The call button shows on every page.'], [], 'To show it on some pages only, open `Settings` > `Listen Voice Agent`.'],
+                ['See who is calling (optional)', 'In `Settings` > `Listen Voice Agent`, turn on `Show who is calling`. When someone signed in to your website calls, their name and email show with the call.'],
             ],
             'shopify' => [
                 ['Open your theme editor', ['In your Shopify admin, open `Online Store`.', 'Click `Edit theme`.'], [], 'On some stores it is still `Themes` > `Customize`.'],
@@ -427,6 +430,25 @@ return [
                     ['nonce', 'nonce="{{ Vite::cspNonce() }}"'],
                     ['Terminal', 'php artisan config:cache'],
                 ]],
+                ['Show who is calling (optional)', 'If your app has signed-in users, your server signs each one\'s email and name with your caller secret, and their calls show who it was. Keep the secret on your server: anyone who has it can say who is calling.', [
+                    ['.env', 'LISTEN_AGENT_CALLER_SECRET=:secret'],
+                    ['config/services.php', "'listen' => ['agent_key' => env('LISTEN_AGENT_KEY'), 'caller_secret' => env('LISTEN_AGENT_CALLER_SECRET')],"],
+                    ['resources/views/layouts/app.blade.php', <<<'BLADE'
+@auth
+    @php
+        $listenCaller = [auth()->user()->email, auth()->user()->name, now()->addHours(12)->timestamp];
+    @endphp
+@endauth
+<script src=":src" data-agent="{{ config('services.listen.agent_key') }}"
+    @isset($listenCaller)
+        data-caller-email="{{ $listenCaller[0] }}"
+        data-caller-name="{{ $listenCaller[1] }}"
+        data-caller-expires="{{ $listenCaller[2] }}"
+        data-caller-signature="{{ hash_hmac('sha256', implode("\n", $listenCaller), config('services.listen.caller_secret')) }}"
+    @endisset
+    async></script>
+BLADE],
+                ], 'Not on Laravel? Sign `email`, `name` and an expiry time (a Unix time), one per line, with HMAC-SHA256 and the secret, and put them in the four data-caller attributes.'],
             ],
             'html' => [
                 ['Copy the line', 'It is the same for every website and every website builder.'],

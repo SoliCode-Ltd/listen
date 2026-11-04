@@ -4,6 +4,7 @@ namespace App\Services\Agents;
 
 use App\Models\Agent;
 use App\Models\AgentWidget;
+use App\Support\Agents\CallerIdentity;
 use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
 use RuntimeException;
 use ZipArchive;
@@ -23,7 +24,7 @@ class WordPressPlugin
 {
     public const SLUG = 'listen-voice-agent';
 
-    public const VERSION = '1.2.0';
+    public const VERSION = '1.3.0';
 
     /** The plugin's files, by their path in its folder: the template each comes from. */
     private const FILES = [
@@ -100,6 +101,8 @@ class WordPressPlugin
             '{{PRIVACY_URL}}' => $page('legal.privacy'),
             // PHP strings in the plugin's code.
             '{{KEY_PHP}}' => var_export($key, true),
+            // Signs a signed-in user for this agent ("Show who is calling"); it stays on the website's server.
+            '{{CALLER_SECRET_PHP}}' => var_export(CallerIdentity::secret($key), true),
             '{{SCRIPT_PHP}}' => var_export($this->address(asset('js/listen-agent.js')), true),
             '{{MANAGE_PHP}}' => var_export($page('voice-agents.index'), true),
             // The agent's own page (its Design tab changes the button's look), or the list of agents without one.
