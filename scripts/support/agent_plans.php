@@ -42,6 +42,13 @@ foreach (Plan::query()->orderBy('kind')->orderBy('price_cents')->get() as $plan)
     printf("  price %s cents %s | credits a month %s | yearly price %s | discount %s%%\n",
         number_format((int) $plan->price_cents), (string) ($plan->currency ?? ''), number_format((int) $plan->monthly_chars),
         filled($plan->stripe_price_yearly ?? null) ? 'yes' : 'no', (int) ($plan->discount_percentage ?? 0));
+    if ((int) ($plan->discount_percentage ?? 0) > 0) {
+        // How long a buyer keeps the offer: the first payment, some months, or always.
+        printf("  discount lasts: %s%s | ends %s | active now: %s\n", (string) ($plan->discount_duration ?: 'once (first payment)'),
+            ($plan->discount_duration ?? '') === 'repeating' ? ' for '.(int) ($plan->discount_duration_months ?? 0).' months' : '',
+            $plan->discount_ends_at ? $plan->discount_ends_at->toDateTimeString() : 'never',
+            method_exists($plan, 'hasActiveDiscount') ? ($plan->hasActiveDiscount() ? 'yes' : 'no') : '?');
+    }
     if ($agentColumns !== []) {
         echo '  agents: ', implode(', ', array_map(fn ($c) => $c.'='.var_export($plan->{$c}, true), $agentColumns)), "\n";
     } else {
