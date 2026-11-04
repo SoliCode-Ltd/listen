@@ -193,7 +193,9 @@ class WordPressPluginTest extends TestCase
         $plugin = $this->files()['src/Plugin.php'];
         $this->assertStringContainsString("wp_enqueue_script(self::SLUG, SCRIPT_URL, [], VERSION, ['in_footer' => true, 'strategy' => 'async']);", $plugin);
         $this->assertStringContainsString("add_filter('wp_script_attributes', [\$this, 'add_button_attributes']);", $plugin);
-        $this->assertStringContainsString("\$attributes['data-agent'] = Settings::load(AGENT_KEY)->key;", $plugin);
+        $this->assertStringContainsString("\$settings = Settings::load(AGENT_KEY);\n        \$attributes['data-agent'] = \$settings->key;", $plugin);
+        // A signed-in user's name and email only when the owner turned on "Show who is calling".
+        $this->assertStringContainsString('if (!$settings->callers || $settings->key !== AGENT_KEY || !is_user_logged_in()) {', $plugin);
 
         foreach ($this->code() as $name => $php) {
             $this->assertStringNotContainsString('<script', $php, $name);
@@ -242,11 +244,11 @@ class WordPressPluginTest extends TestCase
         // The form goes through options.php with the Settings API's nonce, and each setting has its own check.
         $this->assertStringContainsString('<form action="options.php" method="post"', $page);
         $this->assertStringContainsString('settings_fields(Settings::GROUP);', $page);
-        $this->assertSame(4, substr_count($plugin, "'sanitize_callback' => [\$this, 'sanitize_"));
+        $this->assertSame(5, substr_count($plugin, "'sanitize_callback' => [\$this, 'sanitize_"));
         $this->assertStringContainsString("\$args + ['show_in_rest' => false]", $plugin);
         // Saving is refused in the dashboard to anyone who is not an administrator, whatever path the change takes.
         $this->assertStringContainsString("return !is_admin() || current_user_can('manage_options');", $plugin);
-        $this->assertSame(4, substr_count($plugin, '$this->may_change_settings()'));
+        $this->assertSame(5, substr_count($plugin, '$this->may_change_settings()'));
 
         // In the dashboard the plugin adds its page, its link and a one-time notice, nothing else.
         $admin = substr($plugin, strpos($plugin, 'if (is_admin()) {'));
@@ -341,9 +343,9 @@ class WordPressPluginTest extends TestCase
     public function test_uninstalling_removes_every_setting_the_plugin_keeps(): void
     {
         $files = $this->files();
-        preg_match_all("/public const (ENABLED|KEY|PLACEMENT|PAGES) = '([a-z_]+)';/", $files['src/Settings.php'], $options);
-        $this->assertCount(4, $options[2]);
-        $this->assertStringContainsString('public const OPTIONS = [self::ENABLED, self::KEY, self::PLACEMENT, self::PAGES];', $files['src/Settings.php']);
+        preg_match_all("/public const (ENABLED|KEY|PLACEMENT|PAGES|CALLERS) = '([a-z_]+)';/", $files['src/Settings.php'], $options);
+        $this->assertCount(5, $options[2]);
+        $this->assertStringContainsString('public const OPTIONS = [self::ENABLED, self::KEY, self::PLACEMENT, self::PAGES, self::CALLERS];', $files['src/Settings.php']);
         $this->assertStringContainsString("foreach (['".implode("', '", $options[2])."'] as \$option) {\n        delete_option(\$option);", $files['uninstall.php']);
         $this->assertStringContainsString("delete_transient('listen_voice_agent_activated');", $files['uninstall.php']);
         $this->assertStringContainsString("const ACTIVATED = 'listen_voice_agent_activated';", $files['src/Plugin.php']);

@@ -61,5 +61,9 @@
     "Sorry, you are not allowed to change these settings.": "عذرًا، لا يُسمح لك بتغيير هذه الإعدادات.",
     "You can choose up to %d pages, so the pages were not changed. To show the button on more, choose “On every page”.": "يمكنك اختيار %d صفحة على الأكثر، لذلك لم تتغير الصفحات. لإظهار الزر في صفحات أكثر، اختر «في كل الصفحات».",
     "That agent key is not right, so it was not saved. Copy it again from Listen: it starts with lw_ and is 31 characters long.": "مفتاح الوكيل هذا غير صحيح، لذلك لم يُحفظ. انسخه مرة أخرى من إسمع: يبدأ بـ lw_ وطوله 31 حرفًا.",
-    "Your call button is on your website. Open any page to see it; if it does not show, make sure your agent is live in Listen.": "زر الاتصال في موقعك الآن. افتح أي صفحة لتراه، وإذا لم يظهر فتأكد أن وكيلك منشور في إسمع."
+    "Your call button is on your website. Open any page to see it; if it does not show, make sure your agent is live in Listen.": "زر الاتصال في موقعك الآن. افتح أي صفحة لتراه، وإذا لم يظهر فتأكد أن وكيلك منشور في إسمع.",
+    "Who is calling": "من يتصل",
+    "When someone signed in to your website calls, Listen shows you their name and email with the call. Visitors who are not signed in stay anonymous.": "حين يتصل شخص مسجّل الدخول في موقعك، يعرض لك إسمع اسمه وبريده مع المكالمة. ويبقى الزوار غير المسجّلين مجهولين.",
+    "Show who is calling": "إظهار من يتصل",
+    "This works with the agent this plugin came with. For another agent, download its plugin from Listen.": "يعمل هذا مع الوكيل الذي جاءت معه الإضافة. لوكيل آخر نزّل إضافته من إسمع."
 }

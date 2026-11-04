@@ -3,6 +3,11 @@
  *
  *   <script src="https://listenai.studio/js/listen-agent.js" data-agent="lw_…" async></script>
  *
+ * A website that knows who is signed in can say so, signed on its server with the button's
+ * caller secret (Listen → the agent → Go live → Laravel), and the owner sees who called:
+ *   data-caller-email, data-caller-name, data-caller-expires (Unix time),
+ *   data-caller-signature = HMAC-SHA256("email\nname\nexpires", secret).
+ *
  * This file stays small and rarely changes. It asks Listen for the agent's
  * button (whether it shows, its words, look and voice) on every page load, then
  * loads the button itself, versioned, so owners never paste new code.
@@ -26,6 +31,16 @@
   var origin;
   try { origin = new URL(script.src, location.href).origin; } catch (e) { return; }
   var via = String(script.getAttribute('data-via') || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 20);
+  // Who is calling, as the website signed it (Listen checks the signature; nothing else is kept).
+  var caller = null;
+  if (script.getAttribute('data-caller-signature')) {
+    caller = {
+      email: String(script.getAttribute('data-caller-email') || ''),
+      name: String(script.getAttribute('data-caller-name') || ''),
+      expires: String(script.getAttribute('data-caller-expires') || ''),
+      signature: String(script.getAttribute('data-caller-signature') || '')
+    };
+  }
 
   function load(src) {
     return new Promise(function (resolve, reject) {
@@ -52,7 +67,7 @@
           return;
         }
         return load(cfg.assets.widget).then(function () {
-          if (window.ListenAgentWidget) window.ListenAgentWidget.mount(cfg, { key: key, origin: origin, callScript: cfg.assets.call });
+          if (window.ListenAgentWidget) window.ListenAgentWidget.mount(cfg, { key: key, origin: origin, callScript: cfg.assets.call, caller: caller });
         });
       })
       .catch(function () {});

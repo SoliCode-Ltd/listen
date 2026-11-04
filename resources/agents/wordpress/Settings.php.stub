@@ -27,9 +27,10 @@ final class Settings
     public const KEY = 'listen_voice_agent_key';
     public const PLACEMENT = 'listen_voice_agent_placement';
     public const PAGES = 'listen_voice_agent_pages';
+    public const CALLERS = 'listen_voice_agent_callers';
 
     /** Every option the plugin stores (uninstall.php removes the same list). */
-    public const OPTIONS = [self::ENABLED, self::KEY, self::PLACEMENT, self::PAGES];
+    public const OPTIONS = [self::ENABLED, self::KEY, self::PLACEMENT, self::PAGES, self::CALLERS];
 
     /** The most pages the button can be limited to. */
     public const MAX_PAGES = 500;
@@ -48,12 +49,14 @@ final class Settings
      * @param string    $key       the agent's key: the saved one, or the one the plugin came with
      * @param Placement $placement where the button shows
      * @param list<int> $pages     the pages it shows on, when limited to some pages
+     * @param bool      $callers   whether a signed-in user's name and email go with their calls
      */
     private function __construct(
         public readonly bool $enabled,
         public readonly string $key,
         public readonly Placement $placement,
         public readonly array $pages,
+        public readonly bool $callers,
     ) {
     }
 
@@ -63,12 +66,15 @@ final class Settings
         $enabled = get_option(self::ENABLED, '1');
         $placement = get_option(self::PLACEMENT, Placement::Everywhere->value);
         $pages = self::parse_pages(get_option(self::PAGES, [])) ?? [];
+        // Off until the site's owner turns it on.
+        $callers = get_option(self::CALLERS, '0');
 
         return new self(
             enabled: $enabled === '1' || $enabled === 1 || $enabled === true,
             key: self::stored_key() ?: $bundled_key,
             placement: (is_string($placement) ? Placement::tryFrom($placement) : null) ?? Placement::Everywhere,
             pages: array_slice($pages, 0, self::MAX_PAGES),
+            callers: $callers === '1' || $callers === 1 || $callers === true,
         );
     }
 

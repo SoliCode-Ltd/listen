@@ -51,6 +51,9 @@ const AGENT_KEY = {{KEY_PHP}};
 const SCRIPT_URL = {{SCRIPT_PHP}};
 const MANAGE_URL = {{MANAGE_PHP}};
 const AGENT_URL = {{AGENT_PHP}};
+// Signs a signed-in user's name and email for this agent when "Show who is calling" is on,
+// so Listen knows they came from this website. It stays in this file, on your server.
+const CALLER_SECRET = {{CALLER_SECRET_PHP}};
 
 const PLUGIN_FILE = __FILE__;
 

@@ -7,6 +7,7 @@ use App\Models\AgentWidget;
 use App\Services\Agents\AgentCalls;
 use App\Services\Agents\GeminiClient;
 use App\Support\Agents\AgentVoices;
+use App\Support\Agents\CallerIdentity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -235,6 +236,9 @@ class AgentCallController extends Controller
             'visitor' => $visitor,
             'network' => $network,
             'country' => strtoupper(substr((string) $request->headers->get('CF-IPCountry', ''), 0, 2)) ?: null,
+            // Who is calling, when the website the button is on signed its signed-in visitor (a
+            // call button only: a link page is on Listen, which never tells a business who you are).
+            'caller' => $channel === 'widget' ? CallerIdentity::verify($widget, $in['caller'] ?? null) : null,
         ]);
         if (! $result['ok'] && $result['error'] === 'lines') {
             // Every line is taken: the call button waits and tries again. Waiting is not a call, so

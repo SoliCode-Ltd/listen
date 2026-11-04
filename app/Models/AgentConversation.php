@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -11,7 +13,8 @@ use Illuminate\Support\Str;
  * button on a website (widget) or its link page (link).
  *
  * transcript is the conversation, turn by turn; lead the customer's details
- * the agent collected; summary what the call was about, written after it
+ * the agent collected; caller who called, when the website said who is signed
+ * in (CallerIdentity); summary what the call was about, written after it
  * ended. billed_seconds and credits are what it took from the owner's plan.
  */
 class AgentConversation extends Model
@@ -44,6 +47,7 @@ class AgentConversation extends Model
         'transcript',
         'summary',
         'lead',
+        'caller',
         'outcome',
         'usage',
         'cost_usd',
@@ -64,6 +68,7 @@ class AgentConversation extends Model
         'credits' => 'integer',
         'transcript' => 'array',
         'lead' => 'array',
+        'caller' => 'array',
         'usage' => 'array',
         'cost_usd' => 'decimal:5',
         'reservation' => 'array',
@@ -81,6 +86,27 @@ class AgentConversation extends Model
     public function getRouteKeyName(): string
     {
         return 'public_id';
+    }
+
+    /**
+     * Whether calls can keep who called yet: on a server the code reaches a minute before its
+     * migration (2026_11_23_120000), calls go on without it.
+     */
+    public static function keepsCaller(): bool
+    {
+        if (Cache::get('agents.conversations.caller') === true) {
+            return true;
+        }
+        try {
+            $has = Schema::hasColumn('agent_conversations', 'caller');
+        } catch (\Throwable) {
+            $has = false;
+        }
+        if ($has) {
+            Cache::put('agents.conversations.caller', true, now()->addMinutes(10));
+        }
+
+        return $has;
     }
 
     public function agent(): BelongsTo

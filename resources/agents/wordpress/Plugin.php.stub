@@ -106,10 +106,49 @@ final class Plugin
         if (!is_array($attributes) || ($attributes['id'] ?? null) !== self::SLUG . '-js') {
             return $attributes;
         }
-        $attributes['data-agent'] = Settings::load(AGENT_KEY)->key;
+        $settings = Settings::load(AGENT_KEY);
+        $attributes['data-agent'] = $settings->key;
         $attributes['data-via'] = 'wordpress';
 
-        return $attributes;
+        return $attributes + $this->caller_attributes($settings);
+    }
+
+    /**
+     * Who is calling, for a user signed in to this website, when "Show who is calling" is on:
+     * their email and name, signed for this agent with the secret this plugin came with (so
+     * nobody can pretend to be them), good for 12 hours. Only for the agent the plugin came
+     * with: another agent's key has its own secret.
+     *
+     * @return array<string, string>
+     */
+    private function caller_attributes(Settings $settings): array
+    {
+        if (!$settings->callers || $settings->key !== AGENT_KEY || !is_user_logged_in()) {
+            return [];
+        }
+        $user = wp_get_current_user();
+        $caller = ['email' => (string) $user->user_email, 'name' => (string) $user->display_name];
+
+        /**
+         * Filters what the call button says about the signed-in user who calls.
+         *
+         * @param array{email: string, name: string}|null $caller Their email and name; null keeps them anonymous.
+         * @param \WP_User                                 $user   The signed-in user.
+         */
+        $caller = apply_filters('listen_voice_agent_caller', $caller, $user);
+        if (!is_array($caller) || !is_email((string) ($caller['email'] ?? ''))) {
+            return [];
+        }
+        $email = (string) $caller['email'];
+        $name = mb_substr(trim((string) ($caller['name'] ?? '')), 0, 120);
+        $expires = time() + 12 * HOUR_IN_SECONDS;
+
+        return [
+            'data-caller-email' => $email,
+            'data-caller-name' => $name,
+            'data-caller-expires' => (string) $expires,
+            'data-caller-signature' => hash_hmac('sha256', $email . "\n" . $name . "\n" . $expires, CALLER_SECRET),
+        ];
     }
 
     private function shows_button(Settings $settings): bool
@@ -151,6 +190,7 @@ final class Plugin
             Settings::PLACEMENT => ['type' => 'string', 'default' => Placement::Everywhere->value, 'sanitize_callback' => [$this, 'sanitize_placement']],
             Settings::PAGES => ['type' => 'array', 'default' => [], 'sanitize_callback' => [$this, 'sanitize_pages']],
             Settings::KEY => ['type' => 'string', 'default' => '', 'sanitize_callback' => [$this, 'sanitize_key']],
+            Settings::CALLERS => ['type' => 'string', 'default' => '0', 'sanitize_callback' => [$this, 'sanitize_callers']],
         ];
         foreach ($settings as $option => $args) {
             register_setting(Settings::GROUP, $option, $args + ['show_in_rest' => false]);
@@ -167,6 +207,15 @@ final class Plugin
     {
         if (!$this->may_change_settings()) {
             return Settings::load(AGENT_KEY)->enabled ? '1' : '0';
+        }
+
+        return $value === '1' || $value === 1 || $value === true ? '1' : '0';
+    }
+
+    public function sanitize_callers(mixed $value): string
+    {
+        if (!$this->may_change_settings()) {
+            return Settings::load(AGENT_KEY)->callers ? '1' : '0';
         }
 
         return $value === '1' || $value === 1 || $value === true ? '1' : '0';

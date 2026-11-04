@@ -381,6 +381,12 @@ class AgentConversationResource extends Resource
                         ->helperText(fn (AgentConversation $record): ?string => self::callsFromCaller($record))
                         ->fontFamily('mono')
                         ->placeholder('—'),
+                    // Who called, when the website said who is signed in (CallerIdentity).
+                    Infolists\Components\TextEntry::make('caller_email')->label('Signed in as')
+                        ->state(fn (AgentConversation $record): ?string => is_array($record->caller) ? ($record->caller['email'] ?? null) : null)
+                        ->helperText(fn (AgentConversation $record): ?string => is_array($record->caller) ? ($record->caller['name'] ?? null) : null)
+                        ->copyable()
+                        ->placeholder('Not signed in, or the website did not say'),
                     Infolists\Components\TextEntry::make('widget.slug')->label('Call button / link page')
                         ->state(fn (AgentConversation $record): ?string => $record->widget?->slug)
                         ->helperText(fn (AgentConversation $record): ?string => $record->widget ? 'Key '.$record->widget->public_key : null)

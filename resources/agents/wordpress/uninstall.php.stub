@@ -23,7 +23,7 @@ if (!defined('WP_UNINSTALL_PLUGIN')) {
 /** Removes the plugin's settings from the current site (the same list as Settings::OPTIONS). */
 function remove_settings()
 {
-    foreach (['listen_voice_agent_enabled', 'listen_voice_agent_key', 'listen_voice_agent_placement', 'listen_voice_agent_pages'] as $option) {
+    foreach (['listen_voice_agent_enabled', 'listen_voice_agent_key', 'listen_voice_agent_placement', 'listen_voice_agent_pages', 'listen_voice_agent_callers'] as $option) {
         delete_option($option);
     }
     delete_transient('listen_voice_agent_activated');

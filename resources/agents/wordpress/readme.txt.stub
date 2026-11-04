@@ -70,12 +70,17 @@ The call button is a service of Listen ({{HOME}}). On every page that shows the 
 
 When a visitor starts a call, their voice and what they say during the call, such as their name and phone number for a callback, go to Listen so your agent can answer them.
 
+If you turn on "Show who is calling" (off until you do), the page of a user who is signed in to your website also carries their email and display name, signed so nobody can pretend to be them; when they start a call, these go to Listen with it, and you see who called in Listen. The filter listen_voice_agent_caller can change them, or return null to keep a user anonymous. If a cache plugin keeps pages for signed-in users (most only cache pages for visitors who are not signed in), leave it off: one user's cached page would carry their name to others.
+
 The plugin sends nothing from your server and stores no visitor data in WordPress: it keeps only its own settings.
 
 Listen's terms: {{TERMS_URL}}
 Listen's privacy policy: {{PRIVACY_URL}}
 
 == Changelog ==
+
+= 1.3.0 =
+* "Show who is calling": when someone signed in to your website calls, Listen shows you their name and email with the call. Off until you turn it on.
 
 = 1.2.0 =
 * Choose the pages that show the call button from a list of your website's pages, with a search, "Select all" and "Clear", instead of typing their IDs.
@@ -95,6 +100,9 @@ Listen's privacy policy: {{PRIVACY_URL}}
 * The call button on every page, with your agent already set.
 
 == Upgrade Notice ==
+
+= 1.3.0 =
+See who called: turn on "Show who is calling" to see the name and email of signed-in users with their calls.
 
 = 1.2.0 =
 Choose the call button's pages from a list of your website's pages, with a search. The pages you chose before stay chosen.

@@ -355,6 +355,8 @@ return [
     'conversation_summary' => 'الملخص',
     'conversation_transcript' => 'ما قيل في المكالمة',
     'conversation_details' => 'بيانات العميل',
+    // من اتصل، إن كان مسجّل الدخول في الموقع (CallerIdentity).
+    'conversation_caller' => 'مسجّل الدخول في موقعك:',
     'conversation_credits' => ':count نقطة رصيد',
 
     // العملاء.
@@ -406,6 +408,7 @@ return [
                 ['نزّل الإضافة', 'وكيلك موجود بداخلها، فلا شيء لتنسخه.'],
                 ['ارفعها إلى ووردبريس', ['من لوحة تحكم ووردبريس افتح `Plugins` > `Add Plugin` > `Upload Plugin`.', 'اختر الملف ثم اضغط `Install Now`.']],
                 ['فعّلها', ['اضغط `Activate Plugin`. يظهر زر الاتصال في كل الصفحات.'], [], 'لعرضه في صفحات بعينها فقط افتح `Settings` > `Listen Voice Agent`.'],
+                ['اعرف من يتصل (اختياري)', 'من `Settings` > `Listen Voice Agent` فعّل `Show who is calling`. حين يتصل شخص مسجّل الدخول في موقعك يظهر اسمه وبريده مع المكالمة.'],
             ],
             'shopify' => [
                 ['افتح محرر القالب', ['من لوحة تحكم متجرك في شوبيفاي افتح `Online Store`.', 'اضغط `Edit theme`.'], [], 'في بعض المتاجر ما زالت `Themes` > `Customize`.'],
@@ -430,6 +433,25 @@ return [
                     ['nonce', 'nonce="{{ Vite::cspNonce() }}"'],
                     ['الطرفية', 'php artisan config:cache'],
                 ]],
+                ['اعرف من يتصل (اختياري)', 'إن كان في تطبيقك مستخدمون يسجّلون الدخول، يوقّع خادمك بريد كل منهم واسمه بالمفتاح السري للمتصلين، فتظهر مع مكالماتهم هوية المتصل. أبقِ المفتاح السري على خادمك: من يملكه يستطيع أن يقول من المتصل.', [
+                    ['.env', 'LISTEN_AGENT_CALLER_SECRET=:secret'],
+                    ['config/services.php', "'listen' => ['agent_key' => env('LISTEN_AGENT_KEY'), 'caller_secret' => env('LISTEN_AGENT_CALLER_SECRET')],"],
+                    ['resources/views/layouts/app.blade.php', <<<'BLADE'
+@auth
+    @php
+        $listenCaller = [auth()->user()->email, auth()->user()->name, now()->addHours(12)->timestamp];
+    @endphp
+@endauth
+<script src=":src" data-agent="{{ config('services.listen.agent_key') }}"
+    @isset($listenCaller)
+        data-caller-email="{{ $listenCaller[0] }}"
+        data-caller-name="{{ $listenCaller[1] }}"
+        data-caller-expires="{{ $listenCaller[2] }}"
+        data-caller-signature="{{ hash_hmac('sha256', implode("\n", $listenCaller), config('services.listen.caller_secret')) }}"
+    @endisset
+    async></script>
+BLADE],
+                ], 'لا تستخدم لارافيل؟ وقّع `email` و`name` ووقت انتهاء (Unix time)، كل منها في سطر، بـ HMAC-SHA256 والمفتاح السري، وضعها في خصائص data-caller الأربع.'],
             ],
             'html' => [
                 ['انسخ السطر', 'هو نفسه لكل موقع ولكل منصة.'],
@@ -445,6 +467,7 @@ return [
                 ['نزّل الإضافة', 'وكيلك موجود بداخلها، فلا شيء لتنسخه.'],
                 ['ارفعها إلى ووردبريس', ['من لوحة تحكم ووردبريس افتح `إضافات` > `إضافة إضافة` > `رفع إضافة`.', 'اختر الملف ثم اضغط `التثبيت الآن`.']],
                 ['فعّلها', ['اضغط `تفعيل الإضافة`. يظهر زر الاتصال في كل الصفحات.'], [], 'لعرضه في صفحات بعينها فقط افتح `الإعدادات` > `وكيل إسمع الصوتي`.'],
+                ['اعرف من يتصل (اختياري)', 'من `الإعدادات` > `وكيل إسمع الصوتي` فعّل `إظهار من يتصل`. حين يتصل شخص مسجّل الدخول في موقعك يظهر اسمه وبريده مع المكالمة.'],
             ],
             'shopify' => [
                 ['افتح محرر القالب', ['من لوحة تحكم متجرك في شوبيفاي افتح `المتجر الإلكتروني`.', 'اضغط `تعديل القالب`.']],

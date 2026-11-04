@@ -729,7 +729,7 @@
           begin: function () {
             return fetch(ctx.origin + '/agent-api/calls', {
               method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-              body: JSON.stringify({ key: ctx.key, page_url: location.href, visitor: visitorId() }),
+              body: JSON.stringify({ key: ctx.key, page_url: location.href, visitor: visitorId(), caller: ctx.caller || undefined }),
             }).then(function (r) { return r.json().catch(function () { return {}; }); });
           },
           onState: function (s) { setState(s); },

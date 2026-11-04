@@ -318,6 +318,18 @@ class AgentsAdminTest extends TestCase
             ->assertSeeInOrder(['No credits', 'a free call of up to 3:00 (180 s)']);
     }
 
+    public function test_a_call_from_a_signed_in_member_says_who_it_was(): void
+    {
+        $this->houseCall->forceFill(['caller' => ['email' => 'mona@example.com', 'name' => 'Mona Adel']])->save();
+
+        $this->actingAs($this->admin)->get(AgentConversationResource::getUrl('view', ['record' => $this->houseCall]))
+            ->assertOk()
+            ->assertSeeInOrder(['Signed in as', 'mona@example.com', 'Mona Adel']);
+        $this->get(AgentConversationResource::getUrl('view', ['record' => $this->call]))
+            ->assertOk()
+            ->assertSee('Not signed in, or the website did not say');
+    }
+
     public function test_the_customers_list_shows_who_left_their_details_and_opens_their_call(): void
     {
         $this->actingAs($this->admin)->get(AgentContactResource::getUrl('index'))

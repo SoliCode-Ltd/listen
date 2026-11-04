@@ -19,7 +19,9 @@ class LegalPagesTest extends TestCase
     public function test_the_privacy_policy_says_what_is_kept_and_where_it_goes(): void
     {
         $this->page('en', 'legal.privacy')
-            ->assertSee('Effective date: October 28, 2026')
+            ->assertSee('Effective date: November 4, 2026')
+            ->assertSee('if you call our assistant on our website while signed in, so our team knows who called')
+            ->assertSee('with your name and email if that business&#039;s website says you are signed in to it', false)
             ->assertSee('The text you convert is kept with its audio in your history until you delete it.')
             ->assertSee('Your generated audio stays in your history until you delete it.')
             ->assertSee('The text you convert goes to our speech and translation processing providers, and the recordings you make for voice cloning (your voice sample and your consent recording) go to our speech provider, only to make your audio.')
@@ -33,7 +35,8 @@ class LegalPagesTest extends TestCase
             ->assertDontSee('through your dashboard');
 
         $this->page('ar', 'legal.privacy')
-            ->assertSee('تاريخ السريان: 28 أكتوبر 2026')
+            ->assertSee('تاريخ السريان: 4 نوفمبر 2026')
+            ->assertSee('إن اتصلت بمساعدنا على موقعنا وأنت مسجّل الدخول، ليعرف فريقنا من اتصل')
             ->assertSee('يُحفظ النص الذي تحوّله مع صوته في سجلك إلى أن تحذفه.')
             ->assertSee('يبقى الصوت الذي تنشئه في سجلك إلى أن تحذفه.')
             ->assertSee('يُرسَل النص الذي تحوّله إلى مزودي معالجة الكلام والترجمة لدينا')

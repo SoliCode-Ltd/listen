@@ -81,6 +81,7 @@ final class SettingsPage
                 <?php settings_fields(Settings::GROUP); ?>
                 <?php $this->render_button_card($settings); ?>
                 <?php $this->render_where_card($settings); ?>
+                <?php $this->render_callers_card($settings); ?>
                 <?php $this->render_agent_card(); ?>
                 <?php submit_button(); ?>
             </form>
@@ -139,6 +140,24 @@ final class SettingsPage
                 <input type="checkbox" role="switch" name="<?php echo esc_attr(Settings::ENABLED); ?>" value="1" <?php checked($settings->enabled); ?>>
                 <span><?php esc_html_e('Show the call button on my website', 'listen-voice-agent'); ?></span>
             </label>
+        </section>
+        <?php
+    }
+
+    /** Who is calling: a signed-in user's name and email with their calls, when the owner turns it on. */
+    private function render_callers_card(Settings $settings): void
+    {
+        ?>
+        <section class="lva-card" aria-labelledby="lva-callers-title">
+            <h2 class="lva-card-title" id="lva-callers-title"><?php esc_html_e('Who is calling', 'listen-voice-agent'); ?></h2>
+            <p class="lva-card-help"><?php esc_html_e('When someone signed in to your website calls, Listen shows you their name and email with the call. Visitors who are not signed in stay anonymous.', 'listen-voice-agent'); ?></p>
+            <label class="lva-toggle">
+                <input type="checkbox" role="switch" name="<?php echo esc_attr(Settings::CALLERS); ?>" value="1" <?php checked($settings->callers); ?>>
+                <span><?php esc_html_e('Show who is calling', 'listen-voice-agent'); ?></span>
+            </label>
+            <?php if ($settings->key !== AGENT_KEY) : ?>
+                <p class="lva-card-help"><?php esc_html_e('This works with the agent this plugin came with. For another agent, download its plugin from Listen.', 'listen-voice-agent'); ?></p>
+            <?php endif; ?>
         </section>
         <?php
     }
