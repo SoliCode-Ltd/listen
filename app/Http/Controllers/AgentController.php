@@ -13,6 +13,7 @@ use App\Services\Agents\AgentReview;
 use App\Services\Agents\AgentWriter;
 use App\Support\Agents\AgentAccess;
 use App\Support\Agents\AgentBalance;
+use App\Support\Agents\AgentPersona;
 use App\Services\Agents\SiteReader;
 use App\Services\Agents\WordPressPlugin;
 use App\Support\Agents\AgentVoices;
@@ -202,11 +203,18 @@ class AgentController extends Controller
             $agent->dialect = $data['dialect'];
         }
         if (array_key_exists('speaker_id', $data)) {
-            $voice = $data['speaker_id'] ? AgentVoices::find($data['speaker_id'], $agent->language, false) : null;
+            // Names as the agent says them: Arabic names for an Arabic agent.
+            $arabicNames = $agent->language !== 'en';
+            $old = $agent->speaker_id ? AgentVoices::find((string) $agent->speaker_id, $agent->language, $arabicNames) : null;
+            $voice = $data['speaker_id'] ? AgentVoices::find($data['speaker_id'], $agent->language, $arabicNames) : null;
             $agent->speaker_id = $voice['id'] ?? null;
             $agent->live_voice = $voice['voice'] ?? null;
             if ($voice && $agent->status === Agent::DRAFT) {
                 $agent->status = Agent::READY;
+            }
+            // Its name and words follow the voice (a speaker of the other gender brings their name), unless a name comes with it.
+            if ($voice && ! array_key_exists('name', $data)) {
+                AgentPersona::followVoice($agent, $old, $voice, app(AgentWriter::class));
             }
         }
         if (isset($data['script'])) {
@@ -445,6 +453,8 @@ class AgentController extends Controller
 
         $written = $writer->write($agent, $siteText, $notes);
         $agent->fill([
+            // The gender its words were written for: a voice of the other one rewrites them (AgentPersona).
+            'settings' => array_merge((array) ($agent->settings ?? []), array_filter(['texts_gender' => $written['gender'] ?? null])),
             'first_message' => $written['first_message'],
             'script' => ['identity' => $written['identity'], 'never' => $written['never'], 'steps' => $written['steps'], 'handoff' => $written['handoff']],
             'knowledge' => trim($written['knowledge']) !== '' ? $written['knowledge'] : trim($notes),

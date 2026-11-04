@@ -238,6 +238,7 @@
         'site_remove' => __('agents.live_site_remove'), 'site_remove_short' => __('agents.live_site_remove_short'), 'site_invalid' => __('agents.live_site_invalid'), 'site_exists' => __('agents.live_site_exists'), 'site_max' => __('agents.live_site_max'),
         'play' => __('agents.voice_play'), 'pause' => __('agents.voice_pause'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
         'talk_heading' => __('agents.talk_heading'), 'error_name' => __('agents.error_name'),
+        'voice_renamed' => __('agents.voice_renamed'), 'voice_renamed_female' => \App\Support\Agents\Gendered::line('agents.voice_renamed', true),
         'balance' => ['upgrade' => __('agents.balance.upgrade')],
       ],
     ];

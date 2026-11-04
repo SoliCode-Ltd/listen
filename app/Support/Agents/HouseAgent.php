@@ -2,6 +2,7 @@
 
 namespace App\Support\Agents;
 
+use App\Models\Agent;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Support\DialectCounts;
@@ -136,5 +137,97 @@ Listen is an Arabic-first AI voice platform, in Arabic and English.
 # Contact
 - Email: help@listenai.studio
 TXT).($support !== '' ? "\n- WhatsApp: {$support}" : '');
+    }
+
+    /**
+     * Its name and words for its voice: Sara with a woman's voice, the speaker's own name (and
+     * words for a man) with a man's.
+     *
+     * @param  array{name?: string, gender?: string}|null  $voice
+     * @return array{name: string, first_message: string, script: array<string, mixed>}
+     */
+    public static function texts(string $language, ?array $voice): array
+    {
+        $ar = $language !== 'en';
+        $female = ($voice['gender'] ?? 'female') === 'female';
+        $name = $female ? ($ar ? 'سارة' : 'Sara') : (trim((string) ($voice['name'] ?? '')) ?: ($ar ? 'وليد' : 'Sam'));
+
+        if ($ar) {
+            return [
+                'name' => $name,
+                'first_message' => "أهلًا بيك في إسمع، معاك {$name}. تحب تعرف إيه عن الأصوات أو الوكلاء أو الباقات؟",
+                'script' => [
+                    'identity' => $female
+                        ? "{$name} مساعدة إسمع الصوتية: ودودة وواضحة ومختصرة، وتتكلم مصري."
+                        : "{$name} مساعد إسمع الصوتي: ودود وواضح ومختصر، ويتكلم مصري.",
+                    'never' => [
+                        'لا تذكر أبدًا الشركات أو التقنيات التي يعمل بها إسمع، ولا أي شركة أخرى.',
+                        'لا تعد بخصم أو بميزة غير موجودة في المعلومات.',
+                        'لا تطلب أبدًا أرقام البطاقات أو كلمات المرور.',
+                        'لا تتحدث أبدًا عن تكاليف إسمع أو أرباحه أو مورّديه أو أي شأن داخلي، ولا تعرض أن يتواصل الفريق بشأنها: قل بلطف إنها ليست مما تشاركه، وارجع إلى ما يحتاجه المتصل.',
+                    ],
+                    'steps' => [
+                        'رحّب بالمتصل واسأله عما يحتاجه.',
+                        'أجب من المعلومات فقط، وباختصار.',
+                        'رشّح الباقة المناسبة لعدد الدقائق الذي يحتاجه.',
+                        'لمشاكل الحساب أو الدفع أو الاسترداد خذ الاسم ورقم الهاتف أو البريد ليتواصل الفريق.',
+                    ],
+                    'handoff' => 'عندما يحتاج المتصل مساعدة في حسابه أو دفعه، أو يطلب التحدث مع شخص.',
+                ],
+            ];
+        }
+
+        return [
+            'name' => $name,
+            'first_message' => "Hi, this is {$name} from Listen. Would you like to hear about our voices, our agents or our plans?",
+            'script' => [
+                'identity' => "{$name} is Listen's voice assistant: friendly, clear and brief.",
+                'never' => [
+                    'Never name the companies or the technology behind Listen, or any other company.',
+                    'Never promise a discount or a feature that is not in the facts.',
+                    'Never ask for card numbers or passwords.',
+                    "Never talk about Listen's costs, profits, suppliers or anything internal, and do not offer a call back about them: say kindly it is not something you share, and return to what the caller needs.",
+                ],
+                'steps' => [
+                    'Greet the caller and ask what they need.',
+                    'Answer from the facts only, briefly.',
+                    'Suggest the plan that fits the minutes they need.',
+                    'For account, payment or refund problems, take their name and a phone number or email for the team.',
+                ],
+                'handoff' => 'When the caller needs help with their account or a payment, or asks for a person.',
+            ],
+        ];
+    }
+
+    /** Its words as Listen last wrote them, unchanged by the owner (so they may follow its voice). */
+    public static function textsUntouched(Agent $agent): bool
+    {
+        $saved = $agent->setting('house_texts');
+        if (is_string($saved) && $saved !== '') {
+            return hash_equals($saved, self::textsHash($agent));
+        }
+        // Set up before the words were marked: untouched while they are still the first ones.
+        $first = self::texts($agent->language, null);
+
+        return (string) $agent->name === $first['name'] && (string) $agent->first_message === $first['first_message']
+            && ($agent->script ?? []) == $first['script'];
+    }
+
+    /** @param  array{name?: string, gender?: string}|null  $voice */
+    public static function applyTexts(Agent $agent, ?array $voice): void
+    {
+        $texts = self::texts($agent->language, $voice);
+        $agent->name = $texts['name'];
+        $agent->first_message = $texts['first_message'];
+        $agent->script = $texts['script'];
+        $agent->settings = array_merge((array) ($agent->settings ?? []), [
+            'house_texts' => self::textsHash($agent),
+            'texts_gender' => ($voice['gender'] ?? 'female') === 'female' ? 'female' : 'male',
+        ]);
+    }
+
+    private static function textsHash(Agent $agent): string
+    {
+        return hash('sha256', json_encode([(string) $agent->name, (string) $agent->first_message, $agent->script ?? []], JSON_UNESCAPED_UNICODE));
     }
 }

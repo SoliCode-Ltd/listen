@@ -11,8 +11,9 @@ use Illuminate\Console\Command;
 
 /**
  * Listen's own agents: one Arabic (Egyptian), one English. Running it again
- * updates them (what they know follows the plans), it never makes a second
- * pair. Their call buttons sit on Listen's public pages, opposite the
+ * updates what they know (it follows the plans) and keeps what the owner chose
+ * in the dashboard (the voice, dialect, a pause, the name and words), and it
+ * never makes a second pair. Their call buttons sit on Listen's public pages, opposite the
  * WhatsApp button, and their calls are on Listen (HouseAgent).
  */
 class HouseAgentCommand extends Command
@@ -50,57 +51,31 @@ class HouseAgentCommand extends Command
                 $agent->restore();
             }
 
-            $voice = $this->voice($language);
             $ar = $language === 'ar';
+            $existing = $agent->exists;
+            // The voice the owner picked stays; the first time (or when it is gone), a woman's voice.
+            $voice = $existing && $agent->speaker_id ? AgentVoices::find((string) $agent->speaker_id, $language, $ar) : null;
+            $voice = $voice ?: $this->voice($language);
+            // Its name and words are the owner's once changed; until then they are Listen's, for its voice.
+            $ownWords = $existing && ! HouseAgent::textsUntouched($agent);
             $agent->fill([
-                'name' => $ar ? 'سارة' : 'Sara',
                 'business_name' => $ar ? 'إسمع' : 'Listen',
                 'business_type' => 'services',
                 'jobs' => ['answer', 'leads', 'support'],
                 'website_url' => url('/'),
                 'language' => $language,
-                'dialect' => $ar ? 'ar-EG' : null,
+                'dialect' => $existing && $agent->dialect ? $agent->dialect : ($ar ? 'ar-EG' : null),
                 'speaker_id' => $voice['id'] ?? null,
                 'live_voice' => $voice['voice'] ?? 'Achernar',
-                'first_message' => $ar
-                    ? 'أهلًا بيك في إسمع، معاك سارة. تحب تعرف إيه عن الأصوات أو الوكلاء أو الباقات؟'
-                    : 'Hi, this is Sara from Listen. Would you like to hear about our voices, our agents or our plans?',
-                'script' => $ar ? [
-                    'identity' => 'سارة مساعدة إسمع الصوتية: ودودة وواضحة ومختصرة، وتتكلم مصري.',
-                    'never' => [
-                        'لا تذكر أبدًا الشركات أو التقنيات التي يعمل بها إسمع، ولا أي شركة أخرى.',
-                        'لا تعد بخصم أو بميزة غير موجودة في المعلومات.',
-                        'لا تطلب أبدًا أرقام البطاقات أو كلمات المرور.',
-                        'لا تتحدث أبدًا عن تكاليف إسمع أو أرباحه أو مورّديه أو أي شأن داخلي، ولا تعرض أن يتواصل الفريق بشأنها: قل بلطف إنها ليست مما تشاركه، وارجع إلى ما يحتاجه المتصل.',
-                    ],
-                    'steps' => [
-                        'رحّب بالمتصل واسأله عما يحتاجه.',
-                        'أجب من المعلومات فقط، وباختصار.',
-                        'رشّح الباقة المناسبة لعدد الدقائق الذي يحتاجه.',
-                        'لمشاكل الحساب أو الدفع أو الاسترداد خذ الاسم ورقم الهاتف أو البريد ليتواصل الفريق.',
-                    ],
-                    'handoff' => 'عندما يحتاج المتصل مساعدة في حسابه أو دفعه، أو يطلب التحدث مع شخص.',
-                ] : [
-                    'identity' => 'Sara is Listen\'s voice assistant: friendly, clear and brief.',
-                    'never' => [
-                        'Never name the companies or the technology behind Listen, or any other company.',
-                        'Never promise a discount or a feature that is not in the facts.',
-                        'Never ask for card numbers or passwords.',
-                        "Never talk about Listen's costs, profits, suppliers or anything internal, and do not offer a call back about them: say kindly it is not something you share, and return to what the caller needs.",
-                    ],
-                    'steps' => [
-                        'Greet the caller and ask what they need.',
-                        'Answer from the facts only, briefly.',
-                        'Suggest the plan that fits the minutes they need.',
-                        'For account, payment or refund problems, take their name and a phone number or email for the team.',
-                    ],
-                    'handoff' => 'When the caller needs help with their account or a payment, or asks for a person.',
-                ],
                 'knowledge' => HouseAgent::knowledge($language),
-                'status' => Agent::LIVE,
+                // Paused by the owner, it stays paused.
+                'status' => $existing && $agent->status === Agent::PAUSED ? Agent::PAUSED : Agent::LIVE,
                 'max_call_seconds' => HouseAgent::MAX_SECONDS,
                 'settings' => array_merge($agent->settings ?? [], ['house' => $language]),
             ]);
+            if (! $ownWords) {
+                HouseAgent::applyTexts($agent, $voice);
+            }
             if (! $agent->went_live_at) {
                 $agent->went_live_at = now();
             }

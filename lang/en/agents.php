@@ -6,7 +6,7 @@ return [
     'switch_studio' => 'Studio',
     'switch_agents' => 'Agents',
     'switch_label' => 'Switch between Studio and Agents',
-    'switch_studio_text' => 'Voices, dubbing and cloning',
+    'switch_studio_text' => 'Voices and cloning',
     'switch_agents_text' => 'Voice agents that answer your customers',
     'my_agents' => 'My agents',
 
@@ -269,6 +269,10 @@ return [
     'per_minute' => 'Calls use :credits credits a minute from your plan.',
 
     // Setup tab (edit in plain words).
+    'edit_name' => 'Name',
+    'edit_name_hint' => 'The name it gives callers. Pick a voice of the other gender and it takes that speaker\'s name, with its words to match.',
+    // After a voice of the other gender: the new name, and its words now fit the voice.
+    'voice_renamed' => 'Saved. It is now called :name, with its words to match the new voice.',
     'edit_first' => 'What it says first',
     'edit_first_hint' => 'The first sentence every caller hears.',
     'edit_identity_hint' => 'Its role and manner, in a sentence or two.',

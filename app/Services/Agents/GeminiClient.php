@@ -31,15 +31,19 @@ class GeminiClient
 
     /**
      * Text in, text out (JSON when $schema is given). Returns the reply text or null.
+     * $thinking ('low') makes a short task quicker: the model thinks less before it answers.
      *
      * @param  array<string, mixed>|null  $schema
      */
-    public function generate(string $prompt, ?array $schema = null, int $timeout = 40, float $temperature = 0.4): ?string
+    public function generate(string $prompt, ?array $schema = null, int $timeout = 40, float $temperature = 0.4, ?string $thinking = null): ?string
     {
         $config = ['temperature' => $temperature];
         if ($schema !== null) {
             $config['responseMimeType'] = 'application/json';
             $config['responseSchema'] = $schema;
+        }
+        if ($thinking !== null) {
+            $config['thinkingConfig'] = ['thinkingLevel' => $thinking];
         }
         $deadline = microtime(true) + $timeout;
         foreach (self::WRITER_MODELS as $model) {
@@ -47,10 +51,17 @@ class GeminiClient
             if ($left < 4) {
                 break;
             }
-            $response = $this->post("/models/{$model}:generateContent", [
+            $ask = fn (array $config, int $seconds) => $this->post("/models/{$model}:generateContent", [
                 'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
                 'generationConfig' => $config,
-            ], $model, $left);
+            ], $model, $seconds);
+            $response = $ask($config, $left);
+            // A model that does not take that thinking level is asked again with its own.
+            if ($response?->status() === 400 && isset($config['thinkingConfig']) && str_contains(strtolower((string) $response->body()), 'thinking')) {
+                unset($config['thinkingConfig']);
+                $left = (int) floor($deadline - microtime(true));
+                $response = $left >= 4 ? $ask($config, $left) : null;
+            }
             if ($response?->successful()) {
                 $text = data_get($response->json(), 'candidates.0.content.parts.0.text');
                 if (is_string($text) && trim($text) !== '') {

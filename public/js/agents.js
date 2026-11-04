@@ -380,10 +380,17 @@
         });
         function pick() {
           chosen = v.id;
-          $$('.ag-voice', box).forEach(function (c) { c.classList.remove('is-chosen'); c.setAttribute('aria-pressed', 'false'); });
+          $$('.ag-voice', box).forEach(function (c) { c.classList.remove('is-chosen', 'is-saving'); c.setAttribute('aria-pressed', 'false'); c.removeAttribute('aria-busy'); });
           card.classList.add('is-chosen');
           card.setAttribute('aria-pressed', 'true');
-          onPick && onPick(v);
+          // While it saves (a voice of the other gender also rewrites its words), its tick turns.
+          var saving = onPick && onPick(v);
+          if (saving && saving.then) {
+            card.classList.add('is-saving');
+            card.setAttribute('aria-busy', 'true');
+            var saved = function () { card.classList.remove('is-saving'); card.removeAttribute('aria-busy'); };
+            saving.then(saved, saved);
+          }
         }
         card.addEventListener('click', pick);
         card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
@@ -761,15 +768,25 @@
     var talker = talk($('[data-ag-talk]'));
     gallery = voiceGallery($('[data-ag-voices]'), (C.agent && C.agent.language) || lang(), function (v) {
       if (!C.agent || !C.agent.urls) return;
-      api('PATCH', C.agent.urls.update, { speaker_id: v.id }).then(function () {
+      return api('PATCH', C.agent.urls.update, { speaker_id: v.id }).then(function (res) {
+        var a = (res && res.agent) || {};
         C.agent.speaker_id = v.id;
         C.agent.gender = v.gender;
+        if (a.name && a.name !== C.agent.name) {
+          C.agent.name = a.name;
+          var talkTitle = $('[data-ag-talk-title]');
+          if (talkTitle && T.talk_heading) talkTitle.textContent = fill(T.talk_heading, { name: a.name });
+          // Step 1 shows the new name too, so going back and writing again keeps it.
+          var nameField = $('#ag-name');
+          if (nameField) nameField.value = a.name;
+          toast(fill(v.gender === 'female' ? T.voice_renamed_female : T.voice_renamed, { name: a.name }));
+        }
         voiceNext.disabled = false;
         if (talker) talker.setAvatar(v.avatar);
         var hint = $('[data-ag-talk-hint]');
         if (hint) hint.textContent = hint.getAttribute(v.gender === 'female' ? 'data-female' : 'data-male');
         furthest = Math.max(furthest, 2);
-      });
+      }).catch(function (err) { toast(err.message); });
     });
     if (C.agent && C.agent.speaker_id) voiceNext.disabled = false;
     voiceNext.addEventListener('click', function () { furthest = Math.max(furthest, 2); show(2); });
@@ -824,11 +841,33 @@
     open((location.hash || '#overview').slice(1));
 
     var talker = talk($('[data-ag-talk]'));
+    // A new name (from the Name field, or a voice of the other gender) shows wherever the page says it.
+    function showName(name) {
+      C.agent.name = name;
+      $$('[data-ag-hero-name]').forEach(function (el) { el.textContent = name; });
+      $$('[data-ag-talk-label]').forEach(function (el) { el.textContent = fill(T.talk_to, { name: name }); });
+      var input = $('[name="name"]', sf);
+      if (input && document.activeElement !== input) input.value = name;
+    }
+    // Its words, rewritten for a new voice, replace the ones on the page.
+    function showWords(a) {
+      if (!sf) return;
+      var script = a.script || {};
+      var set = function (field, value) { var el = $('[name="' + field + '"]', sf); if (el && value != null) el.value = value; };
+      set('first_message', a.first_message);
+      set('identity', script.identity);
+      set('handoff', script.handoff);
+      ['never', 'steps'].forEach(function (k) {
+        var boxes = $$('[data-ag-list="' + k + '"] textarea', sf), items = script[k] || [];
+        if (boxes.length === items.length) boxes.forEach(function (b, i) { b.value = items[i]; grow(b); });
+      });
+    }
+    var sf = $('[data-ag-script-form]');
     var gallery = voiceGallery($('[data-ag-voices]'), C.agent.language, function (v) {
-      api('PATCH', C.agent.urls.update, { speaker_id: v.id }).then(function () {
+      return api('PATCH', C.agent.urls.update, { speaker_id: v.id }).then(function (res) {
+        var a = (res && res.agent) || {};
         C.agent.speaker_id = v.id;
         C.agent.gender = v.gender;
-        toast(T.saved);
         if (talker) talker.setAvatar(v.avatar);
         var cur = $('.ag-voice-current');
         if (cur) {
@@ -838,7 +877,15 @@
         }
         var face = $('.ag-hero-face img');
         if (face && v.avatar) face.src = v.avatar;
-      });
+        $$('[data-ag-hero-voice]').forEach(function (el) { el.textContent = fill(T.voice_of, { name: v.name }); });
+        if (a.name && a.name !== C.agent.name) {
+          showName(a.name);
+          showWords(a);
+          toast(fill(v.gender === 'female' ? T.voice_renamed_female : T.voice_renamed, { name: a.name }));
+        } else {
+          toast(T.saved);
+        }
+      }).catch(function (err) { toast(err.message); });
     });
     // The dialect (or accent) it speaks, picked in the studio's panel: saved at once; its voices come first.
     speaksPickers();
@@ -900,11 +947,13 @@
       daily.addEventListener('input', function () { dailyOut.textContent = dailyLabels[daily.value] || ''; });
     }
 
-    var sf = $('[data-ag-script-form]');
     if (sf) sf.addEventListener('submit', function (e) {
       e.preventDefault();
       var list = function (k) { return $$('[data-ag-list="' + k + '"] input, [data-ag-list="' + k + '"] textarea', sf).map(function (i) { return i.value.trim(); }).filter(Boolean); };
+      var nameInput = $('[name="name"]', sf);
+      var newName = nameInput ? nameInput.value.trim() : '';
       api('PATCH', C.agent.urls.update, {
+        name: newName || undefined,
         first_message: $('[name="first_message"]', sf).value,
         script: { identity: $('[name="identity"]', sf).value, handoff: $('[name="handoff"]', sf).value, never: list('never'), steps: list('steps') },
         max_call_seconds: parseInt(max.value, 10) * 60,
@@ -913,7 +962,10 @@
           var picked = $('input:checked', f);
           return { question: f.getAttribute('data-question'), answer: picked ? picked.value : '' };
         }).filter(function (c) { return c.answer; }) : undefined,
-      }).then(function () { toast(T.saved); }).catch(function (err) { toast(err.message); });
+      }).then(function (res) {
+        if (res && res.agent && res.agent.name) showName(res.agent.name);
+        toast(T.saved);
+      }).catch(function (err) { toast(err.message); });
     });
     knowledgeFiles($('[data-ag-files]'));
     var kf = $('[data-ag-knowledge-form]');

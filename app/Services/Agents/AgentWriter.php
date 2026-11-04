@@ -3,6 +3,7 @@
 namespace App\Services\Agents;
 
 use App\Models\Agent;
+use App\Support\Agents\AgentPersona;
 use App\Support\ArabicDialects;
 use Illuminate\Support\Str;
 
@@ -59,6 +60,9 @@ class AgentWriter
             'handoff' => $clean($data['handoff'] ?? '', 400),
             'knowledge' => Str::limit(trim((string) ($data['knowledge'] ?? '')), 12000, ''),
             'questions' => $questions,
+            // The gender every word about the assistant was written in (the voice's, when it has one).
+            'gender' => in_array($said = strtolower(trim((string) ($data['assistant_gender'] ?? ''))), ['female', 'male'], true)
+                ? $said : AgentPersona::voiceGender($agent),
             'written_by' => 'model',
         ];
     }
@@ -71,6 +75,12 @@ class AgentWriter
         $dialect = $arabic ? (ArabicDialects::prompt($agent->dialect ?: 'ar-XA-WH') ?? 'Arabic') : 'English';
         $jobs = implode(', ', (array) ($agent->jobs ?: ['answer']));
         $type = str_replace('_', ' ', (string) $agent->business_type);
+        $gender = AgentPersona::voiceGender($agent);
+        $who = match ($gender) {
+            'female' => "a woman (its voice is a woman's)",
+            'male' => "a man (its voice is a man's)",
+            default => 'a man or a woman, as its name suggests',
+        };
 
         return trim(<<<TXT
 You write a voice assistant for a business. It will answer the business's customers on live voice calls from the business's website or link.
@@ -78,6 +88,7 @@ You write a voice assistant for a business. It will answer the business's custom
 Business name: {$agent->business_name}
 Business type: {$type}
 The assistant's name: {$agent->name}
+The assistant is: {$who}. Every word about the assistant itself uses that gender (in Arabic, the masculine or feminine forms).
 What the owner wants it to do: {$jobs}
 Language of the calls: {$dialect}
 
@@ -95,6 +106,7 @@ Write, as JSON:
 - handoff: in {$owner}, when it should pass the caller to a person.
 - knowledge: the business facts the assistant may use, as short plain lines: services and products with prices, opening hours, branches and addresses, phone numbers, delivery, payment, booking and return policies. Only facts found in the notes or the website; never invent any. Keep the business's own words and currency.
 - questions: exactly 2 practical questions the owner should decide for this business (for example what to do when a customer asks for a discount or wants to speak to a manager), in {$owner}, each with 2 or 3 short options and the index of the option you recommend.
+- assistant_gender: female or male, the gender every word about the assistant uses.
 TXT);
     }
 
@@ -118,8 +130,67 @@ TXT);
                     'properties' => ['question' => $str, 'options' => $list, 'recommended' => ['type' => 'INTEGER']],
                     'required' => ['question', 'options', 'recommended'],
                 ]],
+                'assistant_gender' => $str,
             ],
-            'required' => ['first_message', 'identity', 'never', 'steps', 'handoff', 'knowledge', 'questions'],
+            'required' => ['first_message', 'identity', 'never', 'steps', 'handoff', 'knowledge', 'questions', 'assistant_gender'],
+        ];
+    }
+
+    /**
+     * The agent's words for its new voice: the new name, and every word about the assistant in the
+     * voice's gender (a woman's voice: the feminine forms), nothing else changed, each part in its own
+     * language. Null when the text model gives no usable answer.
+     *
+     * @return array{first_message: string, identity: string, never: array<int, string>, steps: array<int, string>, handoff: string}|null
+     */
+    public function regender(Agent $agent, string $fromName, string $toName, string $gender): ?array
+    {
+        $script = (array) ($agent->script ?? []);
+        $before = [
+            'first_message' => (string) $agent->first_message,
+            'identity' => (string) ($script['identity'] ?? ''),
+            'never' => array_values(array_map('strval', (array) ($script['never'] ?? []))),
+            'steps' => array_values(array_map('strval', (array) ($script['steps'] ?? []))),
+            'handoff' => (string) ($script['handoff'] ?? ''),
+        ];
+        $as = $gender === 'female' ? 'a woman' : 'a man';
+        $json = json_encode($before, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        $prompt = trim(<<<TXT
+A business's voice assistant now speaks with {$as}'s voice, and its name is {$toName} (it was {$fromName}).
+Rewrite each field below so it fits: write the name {$toName} where it said {$fromName}, and put every word about the assistant itself in the form for {$as} (in Arabic, the masculine or feminine forms of its adjectives, verbs and pronouns).
+Change nothing else: keep each field's language and dialect, its meaning, facts, wording and length, and the same number of items in each list, in the same order. Words about the caller stay as they are.
+
+The fields, as JSON:
+{$json}
+TXT);
+        $str = ['type' => 'STRING'];
+        $list = ['type' => 'ARRAY', 'items' => $str];
+        $raw = $this->gemini->generate($prompt, [
+            'type' => 'OBJECT',
+            'properties' => ['first_message' => $str, 'identity' => $str, 'never' => $list, 'steps' => $list, 'handoff' => $str],
+            'required' => ['first_message', 'identity', 'never', 'steps', 'handoff'],
+            // Thinking less: about 3 seconds instead of 9 while the owner waits on the voice they picked.
+        ], 25, 0.1, 'low');
+        $data = is_string($raw) ? json_decode($this->stripFence($raw), true) : null;
+        if (! is_array($data) || ($before['first_message'] !== '' && trim((string) ($data['first_message'] ?? '')) === '')) {
+            return null;
+        }
+
+        $clean = fn ($v, int $max) => Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $v) ?? ''), $max, '');
+        // A list keeps its items: one answered with a different number of them stays as it was.
+        $list = function (string $key, int $max) use ($data, $before, $clean): array {
+            $items = array_values(array_map(fn ($x) => $clean($x, $max), (array) ($data[$key] ?? [])));
+
+            return count($items) === count($before[$key]) && ! in_array('', $items, true) ? $items : $before[$key];
+        };
+        $text = fn (string $key, int $max) => $before[$key] === '' ? '' : ($clean($data[$key] ?? '', $max) ?: $before[$key]);
+
+        return [
+            'first_message' => $text('first_message', 400),
+            'identity' => $text('identity', 1500),
+            'never' => $list('never', 300),
+            'steps' => $list('steps', 400),
+            'handoff' => $text('handoff', 800),
         ];
     }
 
@@ -157,6 +228,8 @@ TXT);
         return $owner + [
             'first_message' => $first,
             'knowledge' => trim($notes."\n\n".Str::limit($siteText, 8000, '')),
+            // Its Arabic words are a man's (the English ones fit both).
+            'gender' => 'male',
             'written_by' => 'fallback',
         ];
     }
