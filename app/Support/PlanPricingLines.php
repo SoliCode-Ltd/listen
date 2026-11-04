@@ -39,6 +39,8 @@ final class PlanPricingLines
         'voice_design' => ['sliders', true],
         // Shown on every plan that includes dubbing, once Video Dubbing is open to everyone.
         'video_dubbing' => ['mic', true],
+        // Shown on every plan that includes voice agents (Plans → Voice agents), once Agents are open to everyone.
+        'voice_agents' => ['users', true],
         'download_formats' => ['download', true],
         // Shown on every plan that includes the developer API (Plans → Developer API).
         'developer_api' => ['globe', true],
@@ -136,7 +138,7 @@ final class PlanPricingLines
         if ($plan->pricing_use_custom_text) {
             $custom = $plan->getLocalizedFeatures($locale);
             if ($custom !== null) {
-                return self::withoutClosed(array_values($custom));
+                return self::withoutClosed(self::withLiveValues($plan, array_values($custom), $locale));
             }
         }
 
@@ -173,6 +175,32 @@ final class PlanPricingLines
     }
 
     /**
+     * A hand-written line can carry a value written from the plan's own settings: {agents} becomes
+     * "3 agents, up to 94 call minutes" (Plans → Voice agents and the call rate), so the card follows
+     * the settings. The line is left out where the plan has no agents or Agents are not open yet.
+     *
+     * @param  array<int, mixed>  $lines
+     * @return array<int, mixed>
+     */
+    private static function withLiveValues(Plan $plan, array $lines, string $locale): array
+    {
+        $out = [];
+        foreach ($lines as $line) {
+            if (is_array($line) && str_contains(((string) ($line['label'] ?? '')).((string) ($line['value'] ?? '')), '{agents}')) {
+                $agents = self::agentsValue($plan, $locale);
+                if ($agents === null) {
+                    continue;
+                }
+                $line['label'] = str_replace('{agents}', $agents, (string) ($line['label'] ?? ''));
+                $line['value'] = str_replace('{agents}', $agents, (string) ($line['value'] ?? ''));
+            }
+            $out[] = $line;
+        }
+
+        return $out;
+    }
+
+    /**
      * Lines the admin wrote by hand about a feature not open to everyone yet are left
      * out, as its automatic line is: video dubbing ("Video dubbing: 20 videos", "دبلجة
      * الفيديو") until Video Dubbing → Settings opens it, Voice Design ("Voice Design: 10
@@ -186,6 +214,7 @@ final class PlanPricingLines
         $closed = array_filter([
             StudioFacts::dubbing() ? null : '\bdub|دبلج',
             VoiceDesign::audience() === VoiceDesign::AUDIENCE_EVERYONE ? null : 'voice design|design your own voices|تصميم (ال)?(صوت|أصوات)|صمّ?م أصواتك',
+            \App\Support\Agents\AgentAccess::audience() === \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE ? null : 'voice agents?|الوكلاء الصوتي|وكلاء صوتي|وكيل صوتي',
         ]);
         if ($closed === []) {
             return $lines;
@@ -306,6 +335,7 @@ final class PlanPricingLines
                     ? trans_choice('ui.pricing.lines.dubbing_videos', VideoDubbing::monthlyLimit($plan), ['seconds' => VideoDubbing::maxSeconds($plan, false)], $locale)
                     : self::t('dubbing_open', $locale, ['seconds' => VideoDubbing::maxSeconds($plan, false)]))
                 : null,
+            'voice_agents' => self::agentsValue($plan, $locale),
             'topup' => ! $plan->isPack() && self::topupCents($plan) > 0
                 ? self::t('topup_price', $locale, ['price' => '$'.number_format(self::topupCents($plan) / 100, 0)])
                 : null,
@@ -343,6 +373,9 @@ final class PlanPricingLines
             'video_dubbing' => VideoDubbing::planIncludes($plan)
                 ? 'Hidden: Video Dubbing is still for the admin only (Video Dubbing → Settings).'
                 : 'Hidden: this plan does not include video dubbing.',
+            'voice_agents' => \App\Support\Agents\AgentAccess::planColumns() && \App\Support\Agents\AgentAccess::planIncludes($plan)
+                ? 'Hidden: Agents are not open to everyone yet (Agents → Settings).'
+                : 'Hidden: this plan does not include voice agents.',
             'monthly_requests' => 'Hidden: a pack has no monthly count.',
             'daily_requests' => 'Hidden: no daily limit is set (Usage Limits → Generations per day).',
             default => 'Hidden for this plan.',
@@ -363,6 +396,59 @@ final class PlanPricingLines
         return $monthly > 0
             ? trans_choice('ui.pricing.lines.design_voices_month', $monthly, [], $locale)
             : trans_choice('ui.pricing.lines.design_voices', $kept, [], $locale);
+    }
+
+    /**
+     * "3 agents, about 100 call minutes": the agents a member keeps and the call minutes the plan's
+     * credits pay for (or its own call minutes a month, when fewer). Only on a plan with agents,
+     * once Agents are open to everyone.
+     */
+    private static function agentsValue(Plan $plan, string $locale): ?string
+    {
+        if (! \App\Support\Agents\AgentAccess::planColumns() || ! \App\Support\Agents\AgentAccess::planIncludes($plan)
+            || \App\Support\Agents\AgentAccess::audience() !== \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE) {
+            return null;
+        }
+        $limits = \App\Support\Agents\AgentAccess::limits($plan);
+        $minutes = intdiv(max(0, (int) $plan->monthly_chars), \App\Support\Agents\AgentAccess::creditsPerMinute());
+        if ($limits['minutes'] > 0) {
+            $minutes = min($minutes, $limits['minutes']);
+        }
+
+        return trans_choice('ui.pricing.lines.agents_value', $limits['agents'], ['count' => $limits['agents'], 'minutes' => number_format($minutes)], self::locale($locale));
+    }
+
+    /**
+     * The comparison table's Voice agents rows, from the plan's own settings (Plans → Voice agents)
+     * and the call rate, so the table follows any change there: the agents, the call minutes its
+     * credits pay for (or its own monthly call minutes, when fewer), the calls at once, the longest
+     * call and what a call minute costs. Null where the plan has no agents or Agents are not open
+     * to everyone yet.
+     *
+     * @return array{agents: string, minutes: string, concurrent: string, longest: string, rate: string}|null
+     */
+    public static function agentComparison(Plan $plan, string $locale): ?array
+    {
+        if (! \App\Support\Agents\AgentAccess::planColumns() || ! \App\Support\Agents\AgentAccess::planIncludes($plan)
+            || \App\Support\Agents\AgentAccess::audience() !== \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE) {
+            return null;
+        }
+        $locale = self::locale($locale);
+        $limits = \App\Support\Agents\AgentAccess::limits($plan);
+        $rate = \App\Support\Agents\AgentAccess::creditsPerMinute();
+        $minutes = intdiv(max(0, (int) $plan->monthly_chars), $rate);
+        if ($limits['minutes'] > 0) {
+            $minutes = min($minutes, $limits['minutes']);
+        }
+        $longest = max(1, intdiv($limits['call_seconds'], 60));
+
+        return [
+            'agents' => number_format($limits['agents']),
+            'minutes' => __('ui.pricing.compare_agents_minutes_value', ['count' => number_format($minutes)], $locale),
+            'concurrent' => number_format($limits['concurrent']),
+            'longest' => trans_choice('ui.pricing.compare_agents_longest_value', $longest, ['count' => number_format($longest)], $locale),
+            'rate' => __('ui.pricing.compare_agents_rate_value', ['credits' => number_format($rate)], $locale),
+        ];
     }
 
     private static function cloningOpen(Plan $plan): bool

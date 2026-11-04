@@ -29,6 +29,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Support\Facades\Route::middleware(['api', \App\Http\Middleware\ApiRequestContext::class])
                 ->prefix('v1')
                 ->group(base_path('routes/v1.php'));
+            // Listen Agents' calls, from the websites that carry a call button (see routes/agents.php).
+            \Illuminate\Support\Facades\Route::middleware(['api', \App\Http\Middleware\AgentCors::class])
+                ->prefix('agent-api')
+                ->group(base_path('routes/agents.php'));
         },
     )
     ->withCommands([

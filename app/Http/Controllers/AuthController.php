@@ -180,6 +180,12 @@ class AuthController extends Controller
      */
     private function rememberChosenPlan(Request $request): void
     {
+        // From the Agents pages: straight to creating an agent after signing up.
+        if ($request->query('next') === 'agents') {
+            $request->session()->put('url.intended', route('voice-agents.create'));
+
+            return;
+        }
         $slug = trim((string) $request->query('plan', ''));
         if ($slug === '') {
             return;

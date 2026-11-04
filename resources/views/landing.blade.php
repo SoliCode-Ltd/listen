@@ -21,9 +21,11 @@
       display: none;
     }
 
+    /* One rhythm between every homepage section: each keeps this much above and below its content,
+       so any two sections sit the same distance apart (about 118px on desktops, 78px on phones). */
     :root {
-      --landing-section-space: 4.5rem;
-      --landing-section-space-mobile: 2.5rem;
+      --landing-section-space: 3.5rem;
+      --landing-section-space-mobile: 2.25rem;
     }
 
     .hero {
@@ -456,9 +458,10 @@
       .hero-listen-bars i { animation: none; }
     }
 
-    /* What Listen has, in real numbers, each drawn above its figure. */
+    /* What Listen has, in real numbers, each drawn above its figure. With the voice-cloning line under
+       it, it is one pair: the section rhythm above the strip and below the line, a small step between. */
     .facts {
-      padding: .5rem 0 2rem;
+      padding: var(--landing-section-space) 0 1rem;
     }
     .facts-grid {
       display: grid;
@@ -507,13 +510,14 @@
       background: var(--surface2);
       overflow: hidden;
     }
+    /* Always two rows of two, so the longer Latin spellings on the English page fit like the Arabic. */
     .fact-art-dialects {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(2, max-content);
       align-content: center;
       justify-content: center;
       gap: .45rem .5rem;
-      padding: .5rem .75rem;
+      padding: .5rem .6rem;
     }
     .fa-bubble {
       padding: .26rem .7rem .32rem;
@@ -738,9 +742,18 @@
       }
     }
 
-    /* Voice cloning: one slim line under the hero. */
+    /* Voice cloning: one slim line under the facts strip. */
     .clone-announce {
-      padding: 0 0 .5rem;
+      padding: 1rem 0 var(--landing-section-space);
+    }
+    /* The closing panel keeps the same distance from the section above it as every other section. */
+    .closing-panel {
+      margin-top: var(--landing-section-space);
+    }
+    @media (max-width: 980px) {
+      .facts { padding-top: var(--landing-section-space-mobile); }
+      .clone-announce { padding-bottom: var(--landing-section-space-mobile); }
+      .closing-panel { margin-top: var(--landing-section-space-mobile); }
     }
     .clone-announce-card {
       display: flex;
@@ -914,6 +927,11 @@
       }
     }
 
+    /* Below 1200px the circle shows its caption card under it, as on phones (the speech bubbles need
+       a wide stage), so no empty room is kept below it for bubbles. */
+    @media (min-width: 641px) and (max-width: 1199.98px) {
+      .hero-art .vs-art { max-width: min(459px, 100%); }
+    }
     @media (max-width: 640px) {
       .hero-art {
         padding-inline: .5rem;
@@ -934,6 +952,8 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
+  <link rel="stylesheet" href="{{ asset('css/agents-landing.css') }}?v={{ filemtime(public_path('css/agents-landing.css')) }}">
 </head>
 <body>
   <div class="bg-orb a"></div>
@@ -980,6 +1000,12 @@
         </aside>
       </div>
     </section>
+
+    {{-- Listen Agents, right under the hero: a voice agent for a business, shown working (while Agents are open to this visitor). --}}
+    @php $agentsOpen = \App\Support\Agents\AgentAccess::openTo(auth()->user()); @endphp
+    @if($agentsOpen)
+      @include('components.home.agents')
+    @endif
 
     @php
       // Real counts, rounded down to the ten so each claim stays true as more are added.
@@ -1037,6 +1063,11 @@
 
     {{-- Every kind of voice, one orb each --}}
     @include('components.home.voice-tour')
+
+    {{-- Listen Agents, in the agents page's own words: one agent wherever customers find the business. --}}
+    @if($agentsOpen)
+      <x-agents.channels home />
+    @endif
 
     {{-- Voice gallery and dialogues --}}
     @include('components.home.voice-gallery')
@@ -1136,6 +1167,7 @@
   @include('components.motion')
   @include('components.voice-player-script')
   @include('components.orb-script')
+  <script src="{{ asset('js/agents-landing.js') }}?v={{ filemtime(public_path('js/agents-landing.js')) }}" defer></script>
   <script>
     // "Hear the voices" plays the hero conversation, and shows when it is playing.
     (function () {

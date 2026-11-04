@@ -1,0 +1,63 @@
+/*
+ * The demo's Voice agent tab (demo.blade.php, App\Support\Agents\DemoAgent): three sample
+ * businesses to pick from, the call (the agents' own orb, button and transcript from
+ * agents.css), what to try saying, and the free call time left. The site's tokens, light and
+ * dark, right to left.
+ */
+.ag.ag-embed { max-width: none; margin: 0; padding: 0; }
+.demo-agent-card { display: grid; gap: 1.4rem; padding: clamp(1.1rem, 2.6vw, 1.8rem); border: 1px solid var(--line); border-radius: 1.15rem; background: var(--surface); }
+.demo-agent-head h2 { margin: 0; font-size: clamp(1.3rem, 2.2vw, 1.6rem); font-weight: 800; line-height: 1.35; }
+.demo-agent-head p { margin-top: .4rem; max-width: 64ch; color: var(--muted); line-height: 1.75; }
+
+/* Desktop: the businesses and what to try on one side, the call beside them. Phones: business, call, then what to try. */
+.demo-agent-grid { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "picks call" "try call"; gap: 1rem 1.25rem; align-items: start; }
+.demo-agent-picks { grid-area: picks; display: grid; gap: .55rem; min-width: 0; margin: 0; padding: 0; border: 0; }
+.demo-agent-picks legend { margin-bottom: .55rem; padding: 0; color: var(--muted); font-size: .86rem; font-weight: 800; }
+.demo-agent-pick { position: relative; display: flex; align-items: center; gap: .8rem; min-height: 66px; padding: .7rem .9rem; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); cursor: pointer; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+.demo-agent-pick:hover { border-color: color-mix(in srgb, var(--a) 40%, var(--line)); }
+.demo-agent-pick input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.demo-agent-pick:has(input:checked) { border-color: var(--a); background: color-mix(in srgb, var(--a) 6%, var(--surface)); box-shadow: 0 0 0 3px var(--ag-soft); }
+.demo-agent-pick:has(input:focus-visible) { outline: 3px solid var(--ag-soft-2); outline-offset: 2px; }
+/* During a call the other businesses wait. */
+.demo-agent-pick:has(input:disabled) { cursor: default; }
+.demo-agent-pick:has(input:disabled:not(:checked)) { opacity: .5; }
+.demo-agent-pick-icon { display: grid; place-items: center; flex: 0 0 auto; width: 42px; height: 42px; border-radius: 12px; background: var(--ag-soft); color: var(--accent-text, var(--a)); }
+.demo-agent-pick-icon svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.demo-agent-pick-text { display: grid; gap: .12rem; flex: 1; min-width: 0; }
+.demo-agent-pick-text b { font-size: .98rem; font-weight: 800; }
+.demo-agent-pick-text small { color: var(--muted); font-size: .84rem; line-height: 1.5; }
+.demo-agent-pick-tick { flex: 0 0 auto; width: 22px; height: 22px; padding: 3px; border-radius: 50%; background: var(--a); fill: none; stroke: #fff; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transform: scale(.6); transition: opacity .18s ease, transform .22s var(--ag-ease); }
+.demo-agent-pick:has(input:checked) .demo-agent-pick-tick { opacity: 1; transform: none; }
+
+/* The call: the business's name over the orb, the button, the transcript, and a word on the microphone. */
+.demo-agent-call { grid-area: call; display: grid; justify-items: center; align-content: start; gap: .5rem; min-height: 100%; padding: 1.4rem 1rem 1.1rem; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); }
+.demo-agent-biz { margin: 0; font-size: 1.02rem; font-weight: 800; text-align: center; }
+.demo-agent-call .ag-talk { width: 100%; }
+.demo-agent-call .ag-transcript { max-height: 280px; }
+
+/* What to try saying: the caller's own words, as the transcript shows them. */
+.demo-agent-try { grid-area: try; padding: .95rem 1rem 1.05rem; border: 1px dashed var(--line); border-radius: 14px; }
+.demo-agent-try p { margin: 0; color: var(--muted); font-size: .84rem; font-weight: 800; }
+.demo-agent-try ul { display: flex; flex-wrap: wrap; gap: .45rem; margin: .6rem 0 0; padding: 0; list-style: none; }
+.demo-agent-try li { padding: .45rem .8rem; border: 1px solid var(--line); border-radius: 14px; border-end-end-radius: 5px; background: var(--bg); font-size: .9rem; font-weight: 600; line-height: 1.5; }
+
+/* The free call time left, or the way on once it is used. */
+.demo-agent-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .9rem 1.2rem; padding-top: 1.15rem; border-top: 1px solid var(--line); }
+.demo-agent-left { display: flex; align-items: center; gap: .7rem; margin: 0; }
+.demo-agent-left svg { flex: 0 0 auto; width: 24px; height: 24px; fill: none; stroke: var(--accent-text, var(--a)); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.demo-agent-left span { display: grid; gap: .12rem; }
+.demo-agent-left b { font-weight: 800; font-variant-numeric: tabular-nums; }
+.demo-agent-left small { color: var(--muted); font-size: .84rem; }
+.demo-agent-used { max-width: 56ch; margin: 0; font-weight: 700; line-height: 1.65; }
+.demo-agent-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+
+@media (max-width: 860px) {
+  .demo-agent-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; grid-template-areas: "picks" "call" "try"; }
+  .demo-agent-call { min-height: 0; }
+}
+@media (max-width: 560px) {
+  .demo-agent-card { gap: 1.1rem; }
+  .demo-agent-pick { min-height: 60px; padding: .6rem .75rem; }
+  .demo-agent-actions, .demo-agent-actions .ag-btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .demo-agent-pick, .demo-agent-pick-tick { transition: none; } }

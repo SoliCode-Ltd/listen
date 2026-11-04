@@ -32,34 +32,44 @@
       'active' => $currentLocaleCode === $localeCode,
     ];
   }
+  // The menu, by who is looking, Home first. Visitors: what Listen does and costs, the demo to try,
+  // and how to reach us.
   $navLinks = [
-    ['route' => 'home', 'label' => __('ui.nav.home'), 'guest' => false],
-    ['route' => 'samples', 'label' => __('ui.nav.samples'), 'guest' => false],
-    ['route' => 'demo.page', 'label' => __('ui.nav.demo'), 'guest' => true],
-    ['route' => 'pricing', 'label' => __('ui.nav.pricing'), 'guest' => false],
-    ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension'), 'guest' => false],
-    ['route' => 'contact', 'label' => __('ui.nav.contact'), 'guest' => false],
+    ['route' => 'home', 'label' => __('ui.nav.home')],
+    ['route' => 'samples', 'label' => __('ui.nav.samples')],
+    ['route' => 'agents-landing', 'label' => __('agents.switch_agents')],
+    ['route' => 'demo.page', 'label' => __('ui.nav.demo')],
+    ['route' => 'pricing', 'label' => __('ui.nav.pricing')],
+    ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension')],
+    ['route' => 'contact', 'label' => __('ui.nav.contact')],
   ];
-  $showDemoLinkForAuthenticated = false;
+  // Members: Home, the app (the Dashboard; Studio and Agents switch at the top of its side menu),
+  // the voices, Agents, the demo while on the free plan, plans, the extension and help. Billing and
+  // the rest are in the account menu.
+  $authNavLinks = [
+    ['route' => 'home', 'label' => __('ui.nav.home')],
+    ['route' => 'dashboard', 'label' => __('ui.nav.dashboard')],
+    ['route' => 'samples', 'label' => __('ui.nav.samples')],
+    ['route' => 'agents-landing', 'label' => __('agents.switch_agents')],
+    ['route' => 'pricing', 'label' => __('ui.nav.pricing')],
+    ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension')],
+    ['route' => 'contact', 'label' => __('ui.nav.contact')],
+  ];
   if (auth()->check()) {
     $activePlan = app(\App\Services\PlanAccessService::class)->resolveActivePlanForUserId((int) auth()->id());
-    $showDemoLinkForAuthenticated = strtolower(trim((string) ($activePlan?->slug ?? 'free'))) === 'free';
+    if (strtolower(trim((string) ($activePlan?->slug ?? 'free'))) === 'free') {
+      $at = array_search('pricing', array_column($authNavLinks, 'route'), true);
+      array_splice($authNavLinks, $at === false ? count($authNavLinks) : $at, 0, [['route' => 'demo.page', 'label' => __('ui.nav.demo')]]);
+    }
   }
-  $authNavLinks = [
-    ['route' => 'home', 'label' => __('ui.nav.home'), 'guest' => false],
-    ['route' => 'dashboard', 'label' => __('ui.nav.dashboard'), 'guest' => false],
-    ['route' => 'samples', 'label' => __('ui.nav.samples'), 'guest' => false],
-    ['route' => 'pricing', 'label' => __('ui.nav.pricing'), 'guest' => false],
-    ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension'), 'guest' => false],
-    ['route' => 'contact', 'label' => __('ui.nav.contact'), 'guest' => false],
-  ];
-  if ($showDemoLinkForAuthenticated) {
-    array_splice($authNavLinks, 3, 0, [[
-      'route' => 'demo.page',
-      'label' => __('ui.nav.demo'),
-      'guest' => false,
-    ]]);
+  // Agents only for whom Agents → Settings opens them (everyone, or the admin email before launch).
+  $agentsOpen = \App\Support\Agents\AgentAccess::openTo(auth()->user());
+  if (! $agentsOpen) {
+    $navLinks = array_values(array_filter($navLinks, fn ($l) => $l['route'] !== 'agents-landing'));
+    $authNavLinks = array_values(array_filter($authNavLinks, fn ($l) => $l['route'] !== 'agents-landing'));
   }
+  // The link that is lit: the page's own, and Dashboard anywhere in the app (Studio or Agents).
+  $navActive = fn (string $route) => $currentRoute === $route || ($route === 'dashboard' && str_starts_with($currentRoute, 'voice-agents.'));
 @endphp
 
 <header class="app-header">
@@ -78,19 +88,14 @@
       @endif
     </a>
 
+    {{-- The middle of the bar: the links. --}}
+    <div class="header-center">
     <nav class="desktop-nav" aria-label="{{ __('ui.header.main_nav') }}">
-      @auth
-        @foreach($authNavLinks as $link)
-          <a href="{{ route($link['route']) }}" class="nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
-        @endforeach
-      @else
-        @foreach($navLinks as $link)
-          @if(!$link['guest'] || !auth()->check())
-            <a href="{{ route($link['route']) }}" class="nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
-          @endif
-        @endforeach
-      @endauth
+      @foreach(auth()->check() ? $authNavLinks : $navLinks as $link)
+        <a href="{{ route($link['route']) }}" class="nav-link {{ $navActive($link['route']) ? 'active' : '' }}" @if($navActive($link['route'])) aria-current="page" @endif>{{ $link['label'] }}</a>
+      @endforeach
     </nav>
+    </div>
 
     <div class="header-actions">
       <div class="locale-switch {{ $isArabicUi ? 'ar-active' : '' }}" aria-label="{{ __('ui.locale.switch') }}">
@@ -120,7 +125,8 @@
                 {{ mb_strtoupper(mb_substr(preg_replace('/[^\p{L}]/u', '', auth()->user()->name ?? '') ?: 'U', 0, 1)) }}
               @endif
             </div>
-            <span class="user-name">{{ auth()->user()->name }}</span>
+            {{-- The first name only, so a long name never pushes the header off the screen (the full name is in the menu). --}}
+            <span class="user-name" title="{{ auth()->user()->name }}">{{ \Illuminate\Support\Str::of((string) auth()->user()->name)->squish()->explode(' ')->first() ?: auth()->user()->name }}</span>
             <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="user-dropdown" id="userDropdown">
@@ -142,6 +148,12 @@
               <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
               {{ __('ui.nav.dashboard') }}
             </a>
+            @if($agentsOpen)
+            <a href="{{ route('voice-agents.index') }}" class="dropdown-item">
+              <svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>
+              {{ __('agents.my_agents') }}
+            </a>
+            @endif
             <a href="{{ route('browsers-extension.page') }}" class="dropdown-item">
               <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
               {{ __('ui.nav.extension') }}
@@ -232,10 +244,9 @@
       @endforeach
     </div>
     <div class="mobile-nav-divider"></div>
-
     @auth
       @foreach($authNavLinks as $link)
-        <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
+        <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $navActive($link['route']) ? 'active' : '' }}">{{ $link['label'] }}</a>
       @endforeach
       @if(auth()->user()->is_admin)
       <a href="{{ url('/admin') }}" class="mobile-nav-link">{{ __('ui.nav.admin_dashboard') }}</a>
@@ -246,9 +257,7 @@
       </form>
     @else
       @foreach($navLinks as $link)
-        @if(!$link['guest'] || !auth()->check())
-          <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
-        @endif
+        <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $navActive($link['route']) ? 'active' : '' }}">{{ $link['label'] }}</a>
       @endforeach
       <div class="mobile-nav-divider"></div>
       <a href="{{ route('login') }}" class="mobile-nav-link">{{ __('ui.nav.sign_in') }}</a>

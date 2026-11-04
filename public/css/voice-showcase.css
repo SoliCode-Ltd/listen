@@ -1017,8 +1017,12 @@ html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-
   max-width: 62rem;
   margin: 1.75rem auto 0;
   text-align: center;
-  min-height: 8.5rem;
+  /* Every orb's caption in the same place: the area is as tall as the tallest of them at this width,
+     so picking another orb never moves the page, and nothing empty is left under the shown one. */
+  display: grid;
 }
+.tour-copy { grid-area: 1 / 1; }
+.tour-copy[hidden] { display: block !important; visibility: hidden; }
 /* On a wide screen each line of the caption stays on one line. */
 @media (min-width: 900px) {
   .tour-copy p { white-space: nowrap; }
@@ -1045,7 +1049,7 @@ html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-
   .tour-item { scroll-snap-align: center; }
   .tour-pick .tour-orb { --orb-size: 104px; }
   .tour-item.is-picked .tour-orb { --orb-size: 176px; }
-  .tour-caption { min-height: 10.5rem; padding: 0 4vw; }
+  .tour-caption { padding: 0 4vw; }
 }
 
 /* ───────────── Long reads: whole texts, with the time each took to make ───────────── */

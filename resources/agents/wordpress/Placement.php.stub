@@ -1,0 +1,25 @@
+<?php
+/**
+ * Where the call button shows.
+ *
+ * @package Listen\VoiceAgent
+ * @license GPL-2.0-or-later
+ */
+
+declare(strict_types=1);
+
+namespace Listen\VoiceAgent;
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/** Where the call button shows: the value is what the settings store. */
+enum Placement: string
+{
+    /** On every page of the website. */
+    case Everywhere = 'all';
+
+    /** Only on the pages the site owner ticked in the settings (Settings::PAGES). */
+    case ChosenPages = 'pages';
+}

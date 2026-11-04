@@ -1636,5 +1636,7 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
-  window.VoiceStudio = { init: boot, fold: fold };
+  // picker: the studio's choice card and its dialog on another page (the agents' dialect):
+  // a [data-vs-pick] button, the select it fills, and the picker data (dialects, countries, regions, i18n).
+  window.VoiceStudio = { init: boot, fold: fold, picker: initPickButton };
 })();

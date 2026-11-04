@@ -1,5 +1,6 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.dashboard_title'), 'page' => 'dashboard'])
   <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
+  <link rel="stylesheet" href="{{ asset('css/usage.css') }}?v={{ filemtime(public_path('css/usage.css')) }}">
   @if(($voiceCloningVisible ?? false) || ($voiceCloningUpgrade ?? false))
     <link rel="stylesheet" href="{{ asset('css/voice-cloning.css') }}?v={{ filemtime(public_path('css/voice-cloning.css')) }}">
   @endif
@@ -1411,6 +1412,10 @@
       font-size: .88rem; color: var(--text);
     }
     .usage-chip svg { width: 14px; height: 14px; fill: none; stroke: var(--a, #6A45F2); stroke-width: 2; stroke-linecap: round; }
+    /* Where the credits went: the Usage page. */
+    .usage-chip-link { color: var(--accent-text, var(--a)); font-weight: 700; text-decoration: none; transition: border-color .18s ease, background .18s ease; }
+    .usage-chip-link:hover { border-color: color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 7%, var(--surface)); }
+    html[dir="rtl"] .usage-chip-link svg { transform: scaleX(-1); }
     .usage-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .9rem; margin-top: .9rem; }
     .usage-tile {
       display: flex; flex-direction: column; gap: .45rem;
@@ -1495,7 +1500,13 @@
     .credit-live.is-short .credit-live-value { color: var(--danger, #ef4444); }
     /* ── App frame: the menu and its help links stay in view; no website footer. ── */
     .dashboard-shell { padding-bottom: 3rem !important; }
-    .dashboard-menu-inner { position: sticky; top: 5.5rem; }
+    .dashboard-menu-inner { position: sticky; top: 5.5rem; z-index: 1; }
+    .dashboard-layout > .app-switch.is-top { display: none; }
+    /* The menu over the content beside it, so the Studio | Agents panel opens on top. */
+    .dashboard-menu { z-index: 4; }
+    @media (max-width: 980px) {
+      .dashboard-menu .app-switch { max-width: 320px; }
+    }
     .dashboard-menu-inner .dashboard-menu-list { position: static; }
     .dm-short { display: none; }
     .dashboard-menu-foot {
@@ -1741,6 +1752,8 @@
       .dashboard-menu .dm-short { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
       .dashboard-menu-foot { display: none; }
       .dashboard-shell { padding-bottom: calc(5.25rem + env(safe-area-inset-bottom)) !important; }
+      .dashboard-menu .app-switch { display: none; }
+      .dashboard-layout > .app-switch.is-top { display: block; width: 100%; margin: 0; }
       /* Above the tab bar. */
       #generatedAudioWrap.output-dock { bottom: calc(4.6rem + env(safe-area-inset-bottom)); }
       /* One section at a time: it starts right under the header. */
@@ -1822,8 +1835,17 @@
           ? 'commandCenterSection'
           : 'generateVoiceSection';
       @endphp
+      @php $appSwitch = \App\Support\Agents\AgentAccess::openTo(auth()->user()); @endphp
+      {{-- Phones: Studio | Agents at the top of the page (the menu is the tab bar at the bottom). --}}
+      @if($appSwitch)
+        <x-app-switch current="studio" class="is-top" />
+      @endif
       <aside class="reveal dashboard-menu">
         <div class="dashboard-menu-inner">
+        {{-- Studio | Agents, at the top of the menu. --}}
+        @if($appSwitch)
+          <x-app-switch current="studio" class="is-side" />
+        @endif
         <nav class="dashboard-menu-list" aria-label="{{ __('ui.dashboard.menu_panel') }}">
           <a class="dashboard-menu-link {{ $dashboardStartSection === 'generateVoiceSection' ? 'active' : '' }}" href="#generateVoiceSection" data-dashboard-nav>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg>
@@ -1998,6 +2020,10 @@
               <small class="usage-hero-caption" id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
               <div class="usage-hero-chips">
                 <span class="usage-chip" title="{{ __('ui.pricing.credits_hint') }}"><x-credit-icon /><span><b id="usageCreditsLeft">{{ number_format($remainingChars) }}</b> {{ __('ui.dashboard.credits_left_suffix') }}</span></span>
+                @php $creditUse ??= \App\Support\CreditUsage::for(auth()->user()); @endphp
+                @if(\App\Support\CreditUsage::hasUse($creditUse))
+                <a class="usage-chip usage-chip-link" href="#usage-breakdown" data-usage-jump>{{ __('usage.where') }}<svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>
+                @endif
                 @if ($packMode && $packEndsOn)
                   <span class="usage-chip">{{ __('ui.pack.meter_ends', ['date' => $packEndsOn]) }}</span>
                 @endif
@@ -2063,6 +2089,8 @@
           </div>
 
         </article>
+        {{-- Where the credits went this period: studio audio, agent calls and the rest (the same credits). --}}
+        <x-usage.breakdown :usage="$creditUse ?? \App\Support\CreditUsage::for(auth()->user())" :agents-open="\App\Support\Agents\AgentAccess::openTo(auth()->user())" :per-minute="\App\Support\Agents\AgentAccess::creditsPerMinute()" />
       </div>
     </section>
 

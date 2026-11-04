@@ -1,0 +1,311 @@
+<?php
+/**
+ * The plugin: the call button on the website, and its settings page.
+ *
+ * @package Listen\VoiceAgent
+ * @license GPL-2.0-or-later
+ */
+
+declare(strict_types=1);
+
+namespace Listen\VoiceAgent;
+
+use WP_Post;
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * Adds the agent's call button to the website (Listen's script, loaded with the agent's
+ * key) and a page under Settings where an administrator turns the button off, picks the
+ * pages it shows on, or uses another agent (SettingsPage). In the dashboard it adds only
+ * that page and its link on the Plugins screen.
+ */
+final class Plugin
+{
+    /** The plugin's slug: its text domain, settings page and script handle. */
+    public const SLUG = 'listen-voice-agent';
+
+    /** Set when the plugin is activated, so the Plugins screen can say the button is on. */
+    private const ACTIVATED = 'listen_voice_agent_activated';
+
+    private static ?self $instance = null;
+
+    private function __construct(private readonly string $file)
+    {
+    }
+
+    /** Starts the plugin once. Other code can reach it with instance() to remove a hook. */
+    public static function boot(string $file): self
+    {
+        if (self::$instance === null) {
+            self::$instance = new self($file);
+            self::$instance->hook();
+        }
+
+        return self::$instance;
+    }
+
+    public static function instance(): ?self
+    {
+        return self::$instance;
+    }
+
+    public static function activate(): void
+    {
+        set_transient(self::ACTIVATED, '1', 2 * MINUTE_IN_SECONDS);
+    }
+
+    private function hook(): void
+    {
+        register_activation_hook($this->file, [self::class, 'activate']);
+
+        add_action('init', [$this, 'register_settings']);
+        add_action('wp_enqueue_scripts', [$this, 'enqueue_button']);
+
+        if (is_admin()) {
+            add_action('init', [$this, 'load_translations']);
+            add_action('admin_menu', [$this, 'add_settings_page']);
+            add_action('load-plugins.php', [$this, 'prepare_activation_notice']);
+            add_filter('plugin_action_links_' . plugin_basename($this->file), [$this, 'add_settings_link']);
+            add_filter('option_page_capability_' . Settings::GROUP, [$this, 'settings_capability']);
+        }
+    }
+
+    /**
+     * The plugin's words in the site's language: Arabic ships in its languages folder.
+     * WordPress 6.8 and newer find that folder on their own; 6.5 to 6.7 need this.
+     */
+    public function load_translations(): void
+    {
+        load_plugin_textdomain(self::SLUG, false, dirname(plugin_basename($this->file)) . '/languages');
+    }
+
+    // The website.
+
+    /** The call button: Listen's script at the end of the page, loaded without blocking it. */
+    public function enqueue_button(): void
+    {
+        if (!$this->shows_button(Settings::load(AGENT_KEY))) {
+            return;
+        }
+        wp_enqueue_script(self::SLUG, SCRIPT_URL, [], VERSION, ['in_footer' => true, 'strategy' => 'async']);
+        add_filter('wp_script_attributes', [$this, 'add_button_attributes']);
+    }
+
+    /**
+     * Gives the button's script tag the agent's key. WordPress escapes every attribute
+     * value when it prints the tag, and the key is checked against its exact format first.
+     *
+     * @param mixed $attributes the script tag's attributes, by name
+     * @return mixed
+     */
+    public function add_button_attributes(mixed $attributes): mixed
+    {
+        if (!is_array($attributes) || ($attributes['id'] ?? null) !== self::SLUG . '-js') {
+            return $attributes;
+        }
+        $attributes['data-agent'] = Settings::load(AGENT_KEY)->key;
+        $attributes['data-via'] = 'wordpress';
+
+        return $attributes;
+    }
+
+    private function shows_button(Settings $settings): bool
+    {
+        $shows = $settings->enabled && match ($settings->placement) {
+            Placement::Everywhere => true,
+            Placement::ChosenPages => in_array($this->current_page_id(), $settings->pages, true),
+        };
+
+        /**
+         * Filters whether the call button shows on the page being viewed.
+         *
+         * @param bool $shows Whether it shows, from the plugin's settings.
+         */
+        return (bool) apply_filters('listen_voice_agent_show_button', $shows);
+    }
+
+    /** The page being viewed (a page, a post, the blog page, a shop's page), or 0 on any other page. */
+    private function current_page_id(): int
+    {
+        $object = get_queried_object();
+        if ($object instanceof WP_Post) {
+            return (int) $object->ID;
+        }
+        // A shop's list of products is the archive of its products, shown at the address of the page chosen as its shop page.
+        if (function_exists('wc_get_page_id') && is_post_type_archive('product')) {
+            return max(0, (int) wc_get_page_id('shop'));
+        }
+
+        return 0;
+    }
+
+    // The settings.
+
+    public function register_settings(): void
+    {
+        $settings = [
+            Settings::ENABLED => ['type' => 'string', 'default' => '1', 'sanitize_callback' => [$this, 'sanitize_enabled']],
+            Settings::PLACEMENT => ['type' => 'string', 'default' => Placement::Everywhere->value, 'sanitize_callback' => [$this, 'sanitize_placement']],
+            Settings::PAGES => ['type' => 'array', 'default' => [], 'sanitize_callback' => [$this, 'sanitize_pages']],
+            Settings::KEY => ['type' => 'string', 'default' => '', 'sanitize_callback' => [$this, 'sanitize_key']],
+        ];
+        foreach ($settings as $option => $args) {
+            register_setting(Settings::GROUP, $option, $args + ['show_in_rest' => false]);
+        }
+    }
+
+    /** Only administrators save the settings form (WordPress checks this, and the form's nonce). */
+    public function settings_capability(): string
+    {
+        return 'manage_options';
+    }
+
+    public function sanitize_enabled(mixed $value): string
+    {
+        if (!$this->may_change_settings()) {
+            return Settings::load(AGENT_KEY)->enabled ? '1' : '0';
+        }
+
+        return $value === '1' || $value === 1 || $value === true ? '1' : '0';
+    }
+
+    public function sanitize_placement(mixed $value): string
+    {
+        $placement = is_string($value) ? Placement::tryFrom($value) : null;
+        if ($placement === null || !$this->may_change_settings()) {
+            return Settings::load(AGENT_KEY)->placement->value;
+        }
+
+        return $placement->value;
+    }
+
+    /**
+     * The pages ticked in the settings: only IDs of published pages, posts or products of
+     * this website are kept (anything else is left out), each once, in the order sent.
+     *
+     * @return list<int>
+     */
+    public function sanitize_pages(mixed $value): array
+    {
+        $stored = Settings::load(AGENT_KEY)->pages;
+        if (!$this->may_change_settings()) {
+            return $stored;
+        }
+        $pages = Settings::chosen_pages($value);
+        if ($pages === null) {
+            // Neither ticked boxes nor IDs: nothing the settings page sends, so nothing changes.
+            return $stored;
+        }
+        $pages = Pages::published($pages);
+        if (count($pages) > Settings::MAX_PAGES) {
+            $this->error('too_many_pages', sprintf(
+                /* translators: %d: the most pages the call button can be limited to. */
+                __('You can choose up to %d pages, so the pages were not changed. To show the button on more, choose “On every page”.', 'listen-voice-agent'),
+                Settings::MAX_PAGES
+            ));
+
+            return $stored;
+        }
+
+        return $pages;
+    }
+
+    public function sanitize_key(mixed $value): string
+    {
+        $stored = Settings::stored_key();
+        if (!$this->may_change_settings()) {
+            return $stored;
+        }
+        $key = is_string($value) ? trim($value) : ($value === null ? '' : null);
+        if ($key === '' || ($key !== null && Settings::is_key($key))) {
+            return $key;
+        }
+        $this->error('invalid_key', __('That agent key is not right, so it was not saved. Copy it again from Listen: it starts with lw_ and is 31 characters long.', 'listen-voice-agent'));
+
+        return $stored;
+    }
+
+    /** A change comes from an administrator, or from code outside the dashboard (the command line, scheduled tasks). */
+    private function may_change_settings(): bool
+    {
+        return !is_admin() || current_user_can('manage_options');
+    }
+
+    private function error(string $code, string $message): void
+    {
+        // The settings screen shows these; elsewhere (the command line) the value is simply kept.
+        if (!function_exists('add_settings_error')) {
+            return;
+        }
+        foreach (get_settings_errors(Settings::GROUP) as $error) {
+            if (($error['code'] ?? null) === $code) {
+                return;
+            }
+        }
+        add_settings_error(Settings::GROUP, $code, $message, 'error');
+    }
+
+    // The dashboard.
+
+    /** The settings page, under Settings. Its style and script load on that page only. */
+    public function add_settings_page(): void
+    {
+        $screen = new SettingsPage($this->file);
+        $page = add_options_page(
+            __('Listen Voice Agent', 'listen-voice-agent'),
+            __('Listen Voice Agent', 'listen-voice-agent'),
+            'manage_options',
+            self::SLUG,
+            [$screen, 'render']
+        );
+        if ($page !== false) {
+            add_action('load-' . $page, [$screen, 'load']);
+        }
+    }
+
+    /**
+     * The "Settings" link next to Deactivate on the Plugins screen.
+     *
+     * @param mixed $links the plugin's action links
+     * @return mixed
+     */
+    public function add_settings_link(mixed $links): mixed
+    {
+        if (!is_array($links) || !current_user_can('manage_options')) {
+            return $links;
+        }
+        array_unshift($links, sprintf(
+            '<a href="%s">%s</a>',
+            esc_url(admin_url('options-general.php?page=' . self::SLUG)),
+            esc_html__('Settings', 'listen-voice-agent')
+        ));
+
+        return $links;
+    }
+
+    /** Right after activation, the Plugins screen says the button is on (once). */
+    public function prepare_activation_notice(): void
+    {
+        if (!current_user_can('manage_options') || get_transient(self::ACTIVATED) === false) {
+            return;
+        }
+        delete_transient(self::ACTIVATED);
+        add_action('admin_notices', [$this, 'render_activation_notice']);
+    }
+
+    public function render_activation_notice(): void
+    {
+        wp_admin_notice(
+            sprintf(
+                '%s <a href="%s">%s</a>',
+                esc_html__('Your call button is on your website. Open any page to see it; if it does not show, make sure your agent is live in Listen.', 'listen-voice-agent'),
+                esc_url(admin_url('options-general.php?page=' . self::SLUG)),
+                esc_html__('Settings', 'listen-voice-agent')
+            ),
+            ['type' => 'success', 'dismissible' => true]
+        );
+    }
+}

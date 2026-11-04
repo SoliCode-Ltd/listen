@@ -1,0 +1,115 @@
+name: Agent live call test
+
+# Checks a whole Listen agent call for real (scripts/agents/live_agent_test.mjs):
+# each sample agent's setup, as `php artisan agents:live-setup --sample=...`
+# builds it, locked into a short-lived key; a different setup from the browser
+# ignored; the agent speaking its dialect or accent, reading the caller's number
+# back and saving it with its tool. Keeps the replies (MP3) and what happened.
+# The replies are the recorded calls on the homepage and the Agents page:
+# four Arabic (Saudi, Emirati, Egyptian, Lebanese) and three English (American,
+# British, Irish), women and men, each in its library speaker's own voice.
+#
+# Uses the first Gemini key from STAGING's .env, read over SSH, masked in the
+# log and never stored; about two minutes of audio from the quota staging
+# shares with live, inside the 10 minutes the owner approved for testing agents.
+
+on:
+  push:
+    branches: [claude/beautiful-sagan-df90b3]
+    paths:
+      - .github/workflows/agent-live-agent-test.yml
+      - scripts/agents/live_agent_test.mjs
+      - scripts/agents/review_calls.mjs
+
+permissions:
+  contents: read
+
+# The calls this run makes ("all", or case ids from the script): only the ones
+# being recorded again, so no audio is spent on calls already kept.
+env:
+  CALLS: none
+  # Takes of each call; the review below picks the cleanest.
+  TAKES: 1
+  # Voices from the studio's library tried live (one sentence each): Kore is a known live voice
+  # and NoSuchVoice-zz9 a made-up name, to see whether the live call refuses a voice it lacks.
+  PROBE_VOICES: Kore ar-eg-csagent-3 en-us-csagent-7 NoSuchVoice-zz9
+  # Each probe against the studio's sample of that voice (Abeer, Grace); Kore against a man's
+  # sample, which must come back "not the same".
+  SAME_VOICE: out/probe-ar-eg-csagent-3.wav=public/audio/voice-previews/ar-abeer.mp3 out/probe-en-us-csagent-7.wav=public/audio/voice-previews/en-grace.mp3 out/probe-Kore.wav=public/audio/voice-previews/ar-abdulaziz.mp3
+
+concurrency:
+  group: agent-live-agent-test
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: bcmath, intl, mbstring, pdo_sqlite, sqlite3, gd, zip
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build the sample agents' live setups
+        run: |
+          set -euo pipefail
+          composer install --no-interaction --no-progress --prefer-dist > /dev/null
+          cp .env.example .env
+          php artisan key:generate --no-interaction > /dev/null
+          mkdir -p setups
+          for s in ar-sa ar-ae ar-eg ar-lb en-us en-gb en-ie; do
+            php artisan agents:live-setup --sample="$s" > "setups/$s.json"
+          done
+          python3 -c "import json,glob; [json.load(open(f)) for f in glob.glob('setups/*.json')]; print('setups ok')"
+
+      - name: Call the agents with a staging key
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_test
+          chmod 600 ~/.ssh/id_test
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; grep -E '^GEMINI_TTS_API_KEY=' .env | head -1 | cut -d= -f2-"
+          KEY="$(ssh -i ~/.ssh/id_test -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" | tr -d "\"' \r\n")"
+          rm -f ~/.ssh/id_test
+          if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
+          echo "::add-mask::$KEY"
+          LIVE_KEY="$KEY" node scripts/agents/live_agent_test.mjs setups out $CALLS || true
+          # A native-listener review of the new takes and of the calls on the site (listening only,
+          # no audio is made).
+          LIVE_KEY="$KEY" node scripts/agents/review_calls.mjs out out public/audio/agents/calls
+
+      - name: Make the replies easy to play (MP3)
+        if: always()
+        run: |
+          set -uo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          for f in out/*.wav; do [ -f "$f" ] && ffmpeg -loglevel error -y -i "$f" -codec:a libmp3lame -q:a 3 "${f%.wav}.mp3"; done
+          cat out/results.json 2>/dev/null | head -c 20000 || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-live-agent-test
+          path: |
+            out/*.mp3
+            out/results.json
+            out/review.json
+            out/same-voice.json
+          if-no-files-found: ignore
+          retention-days: 14

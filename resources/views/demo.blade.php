@@ -1,7 +1,7 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.demo_title'), 'page' => 'demo'])
   <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
   <link rel="stylesheet" href="{{ asset('css/demo-studio.css') }}?v={{ filemtime(public_path('css/demo-studio.css')) }}">
-  @php $demoModes = ($dubStudio ?? null) || ($voiceDesign ?? null); @endphp
+  @php $demoModes = ($dubStudio ?? null) || ($voiceDesign ?? null) || ($demoAgent ?? null); @endphp
   @if($demoModes)
     <link rel="stylesheet" href="{{ asset('css/studio-modes.css') }}?v={{ filemtime(public_path('css/studio-modes.css')) }}">
   @endif
@@ -10,6 +10,10 @@
   @endif
   @if($voiceDesign ?? null)
     <link rel="stylesheet" href="{{ asset('css/voice-design.css') }}?v={{ filemtime(public_path('css/voice-design.css')) }}">
+  @endif
+  @if($demoAgent ?? null)
+    <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/demo-agent.css') }}?v={{ filemtime(public_path('css/demo-agent.css')) }}">
   @endif
   <script>
     (() => {
@@ -55,7 +59,7 @@
     <section class="studio-workspace" @if($demoModes) data-studio-host data-studio="tts" @endif>
       {{-- Text to speech, Voice Design or Dub a video: a script, a voice of your own words, or a video. --}}
       @if($demoModes)
-        <x-dub.mode-switch :design="(bool) ($voiceDesign ?? null)" :dub="(bool) ($dubStudio ?? null)" />
+        <x-dub.mode-switch :design="(bool) ($voiceDesign ?? null)" :dub="(bool) ($dubStudio ?? null)" :agent="(bool) ($demoAgent ?? null)" />
       @endif
       {{-- An email sign-up confirms its address first: what to do, with a button for a new link. --}}
       @include('components.verify-email-notice', ['verifyEmail' => $verifyEmail ?? null, 'verifyEmailTitle' => __('ui.verify_email.notice_title')])
@@ -259,6 +263,72 @@
       {{-- The free dub: the same studio around a video (components/dub/studio.blade.php). --}}
       @if($dubStudio ?? null)
         <x-dub.studio :dub="$dubStudio" :compact-meter="true" />
+      @endif
+
+      {{-- A Voice agent: a live call with a sample business's agent, from the member's free test
+           seconds (App\Support\Agents\DemoAgent); the call is agents.js and agent-call.js. --}}
+      @if($demoAgent ?? null)
+        @php
+          $demoFirst = $demoAgent['presets'][0];
+          $demoCanCall = $demoAgent['free_left'] >= $demoAgent['min_seconds'];
+          $demoIcons = [
+            'clinic' => '<path d="M8 3.6c-2.3 0-4.2 1.9-4.2 4.3 0 2.5.9 4 1.5 6.2.6 2.4.9 6.3 2.7 6.3 1.6 0 1.6-4.4 3.3-4.4h1.4c1.7 0 1.7 4.4 3.3 4.4 1.8 0 2.1-3.9 2.7-6.3.6-2.2 1.5-3.7 1.5-6.2 0-2.4-1.9-4.3-4.2-4.3-1.6 0-2.5.9-4 .9s-2.4-.9-4-.9z"/>',
+            'restaurant' => '<path d="M7 3v7.5M4.8 3v4.8a2.2 2.2 0 0 0 4.4 0V3M7 10.5V21M17.2 3c-1.8 1.3-2.7 3.6-2.7 6.8v3.4h2.7V21"/>',
+            'shop' => '<path d="M5.2 8.2h13.6l-1.1 11.6a1.3 1.3 0 0 1-1.3 1.2H7.6a1.3 1.3 0 0 1-1.3-1.2z"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/>',
+          ];
+        @endphp
+        <section class="ag ag-embed demo-agent" data-studio-pane="agent" data-demo-agent aria-labelledby="demo-agent-title">
+          <div class="demo-agent-card">
+            <header class="demo-agent-head">
+              <h2 id="demo-agent-title">{{ __('agents.demo.title') }}</h2>
+              <p>{{ __('agents.demo.text') }}</p>
+            </header>
+            <div class="demo-agent-grid">
+              <fieldset class="demo-agent-picks">
+                <legend>{{ __('agents.demo.pick') }}</legend>
+                @foreach($demoAgent['presets'] as $i => $p)
+                  <label class="demo-agent-pick">
+                    <input type="radio" name="demo-agent-preset" value="{{ $p['key'] }}" @checked($i === 0)
+                      data-name="{{ $p['agent'] }}" data-gender="{{ $p['gender'] }}" data-business="{{ $p['business'] }}" data-try="{{ json_encode($p['try'], JSON_UNESCAPED_UNICODE) }}">
+                    <span class="demo-agent-pick-icon" aria-hidden="true"><svg viewBox="0 0 24 24">{!! $demoIcons[$p['key']] !!}</svg></span>
+                    <span class="demo-agent-pick-text">
+                      <b>{{ $p['kind'] }}</b>
+                      <small>{{ __('agents.demo.speaks', ['name' => $p['agent'], 'dialect' => $p['dialect']]) }}</small>
+                    </span>
+                    <svg class="demo-agent-pick-tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg>
+                  </label>
+                @endforeach
+              </fieldset>
+              <div class="demo-agent-call">
+                <p class="demo-agent-biz" data-demo-biz dir="auto">{{ $demoFirst['business'] }}</p>
+                @include('agents.partials.talk', ['agent' => null, 'showCost' => false, 'female' => $demoFirst['gender'] === 'female', 'note' => __('agents.demo.mic')])
+              </div>
+              <div class="demo-agent-try">
+                <p>{{ __('agents.demo.try') }}</p>
+                <ul data-demo-try>
+                  @foreach($demoFirst['try'] as $line)
+                    <li dir="auto">{{ $line }}</li>
+                  @endforeach
+                </ul>
+              </div>
+            </div>
+            <footer class="demo-agent-foot">
+              <p class="demo-agent-left" data-demo-left data-pattern="{{ __('agents.demo.left') }}" @if(! $demoCanCall) hidden @endif>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+                <span>
+                  <b data-demo-left-text>{{ __('agents.demo.left', ['time' => \App\Support\Agents\DemoAgent::clock($demoAgent['free_left'])]) }}</b>
+                  <small>{{ __('agents.demo.left_note') }}</small>
+                </span>
+              </p>
+              <p class="demo-agent-used" data-demo-used role="status" @if($demoCanCall) hidden @endif>{{ __('agents.demo.used_up') }}</p>
+              <div class="demo-agent-actions">
+                <a class="ag-btn ag-btn-primary" href="{{ route('pricing') }}" data-demo-plans @if($demoCanCall) hidden @endif>{{ __('agents.demo.plans') }}</a>
+                <a class="ag-btn" href="{{ route('voice-agents.create') }}">{{ __('agents.demo.build') }}</a>
+              </div>
+            </footer>
+          </div>
+          <div class="ag-toast" data-ag-toast role="status" aria-live="polite"></div>
+        </section>
       @endif
     </section>
   </main>
@@ -1455,9 +1525,36 @@
   @if($dubStudio ?? null)
     <script src="{{ asset('js/dub-studio.js') }}?v={{ filemtime(public_path('js/dub-studio.js')) }}" defer></script>
   @endif
-  @if($voiceDesign ?? null)
+  @if(($voiceDesign ?? null) || ($demoAgent ?? null))
     @include('components.orb-script')
+  @endif
+  @if($voiceDesign ?? null)
     <script src="{{ asset('js/voice-design.js') }}?v={{ filemtime(public_path('js/voice-design.js')) }}" defer></script>
+  @endif
+  @if($demoAgent ?? null)
+    @php
+      // The call's words: the agent's name and voice change with the business picked, so the
+      // lines keep :name and their women's forms (agents.js picks and fills them).
+      $demoAgentPage = [
+        'mode' => 'demo',
+        'csrf' => csrf_token(),
+        'agent' => ['name' => $demoAgent['presets'][0]['agent'], 'gender' => $demoAgent['presets'][0]['gender'], 'language' => $demoAgent['presets'][0]['language'],
+          'urls' => ['test' => route('demo.agent-call'), 'left' => route('demo.agent-left')]],
+        'minSeconds' => $demoAgent['min_seconds'],
+        'text' => [
+          'states' => (array) trans('agents.talk_states'),
+          'start' => __('agents.talk_start'), 'end' => __('agents.talk_end'),
+          'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
+          'saved_contact' => __('agents.talk_saved_contact'),
+          'used_up' => __('agents.demo.used_up'),
+        ],
+      ];
+    @endphp
+    <script>
+      window.LISTEN_AGENTS = {!! \Illuminate\Support\Js::from($demoAgentPage) !!};
+    </script>
+    <script src="{{ asset('js/agent-call.js') }}?v={{ filemtime(public_path('js/agent-call.js')) }}" defer></script>
+    <script src="{{ asset('js/agents.js') }}?v={{ filemtime(public_path('js/agents.js')) }}" defer></script>
   @endif
   <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
 </body>

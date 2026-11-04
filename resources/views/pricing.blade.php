@@ -324,8 +324,10 @@
     .plan-quota-number { color: var(--text); font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
     .plan-minutes-unit,
     .plan-quota-unit { color: var(--muted); font-size: .86rem; font-weight: 500; }
-    .plan-quota-credits { display: inline-flex; align-items: center; gap: .3rem; cursor: help; }
-    .plan-quota-coin { font-size: 1rem; flex: none; }
+    /* The credits sit on the same baseline as the minutes: their text sets the line, and the coin
+       is centred on it (an image alone would set the line at its bottom edge and lift the text). */
+    .plan-quota-credits { display: inline-flex; align-items: baseline; gap: .3rem; cursor: help; }
+    .plan-quota-coin { font-size: 1rem; flex: none; align-self: center; }
     .plan-minutes, .plan-quota-amount { flex-wrap: nowrap; }
     .plan-quota { container-type: inline-size; }
     /* Wide cards (desktop): minutes and credits a little larger, still on one line. */
@@ -377,6 +379,13 @@
 
     /* On phones a long card shows its first four lines, and a button for the rest. */
     .plan-more { display: none; }
+    /* Under the plans, once and centred: the credits are one pool for voices and calls. */
+    .plans-shared-note { display: flex; align-items: center; justify-content: center; gap: .55rem; margin: 1.6rem auto 0; max-width: 46rem; color: var(--muted, #6b6785); font-size: .95rem; line-height: 1.6; text-align: center; text-wrap: balance; }
+    .plans-shared-coin { flex: none; width: 1.15rem; height: 1.15rem; }
+    /* The voice agents line keeps to one line where the card has the room. */
+    @media (min-width: 761px) {
+      .plan-features li.is-agents .feature-value { max-width: none; white-space: nowrap; }
+    }
     @media (max-width: 640px) {
       .can-fold .plan-card:not(.is-open) .plan-features.is-long li:nth-child(n+5) { display: none; }
       .can-fold .plan-card:not(.is-open) .plan-more { display: flex; }
@@ -1206,9 +1215,23 @@
       foreach (['max_chars_per_request', 'monthly_requests', 'daily_requests', 'processing_priority', 'audio_kept', 'topup'] as $usageKey) {
         $usageLabels[] = __('ui.pricing.lines.label_'.$usageKey);
       }
+      // Voice agents in a group of their own, every row from each plan's agent settings and the
+      // call rate (Plans → Voice agents), in place of the single line the cards carry.
+      $agentRows = [];
+      if (collect($comparePlans)->contains(fn ($p) => ! empty($p['agent_compare']))) {
+        foreach (['agents' => 'compare_agents_count', 'minutes' => 'compare_agents_minutes', 'concurrent' => 'compare_agents_concurrent', 'longest' => 'compare_agents_longest', 'rate' => 'compare_agents_rate'] as $agentKey => $agentLabel) {
+          foreach ($comparePlans as $comparePlan) {
+            $agentRows[__('ui.pricing.'.$agentLabel)][$comparePlan['slug']] = $comparePlan['agent_compare'][$agentKey] ?? null;
+          }
+        }
+        $agentsLineKey = \App\Support\PlanPricingLines::labelKey(__('ui.pricing.lines.label_voice_agents'));
+        $compareRows = array_filter($compareRows, fn ($values, $label) => \App\Support\PlanPricingLines::labelKey((string) $label) !== $agentsLineKey
+          && ! preg_match('/voice agents?|الوكلاء الصوتي|وكلاء صوتي/iu', (string) $label), ARRAY_FILTER_USE_BOTH);
+      }
       $compareGroups = array_filter([
         __('ui.pricing.compare_group_usage') => array_intersect_key($compareRows, array_flip($usageLabels)),
         __('ui.pricing.compare_group_features') => array_diff_key($compareRows, array_flip($usageLabels)),
+        __('ui.pricing.compare_group_agents') => $agentRows,
       ]);
       // A line every monthly plan has with the same value is left off the cards, which show
       // what sets each plan apart; the comparison table below lists every line.
@@ -1302,6 +1325,10 @@
           @include('components._plan-card', ['plan' => $plan, 'index' => $index])
         @endforeach
       </div>
+      {{-- One pool, said once under the plans: calls and voice generation use the same credits. --}}
+      @if(collect($mainPlans)->contains(fn ($p) => ! empty($p['agent_compare'])))
+        <p class="plans-shared-note"><x-credit-icon class="plans-shared-coin" />{{ __('ui.pricing.credits_shared') }}</p>
+      @endif
     </section>
 
     @if($trackPlans->count() >= 2)

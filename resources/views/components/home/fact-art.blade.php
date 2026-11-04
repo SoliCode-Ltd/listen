@@ -15,9 +15,11 @@
       </span>
       @break
     @case('dialects')
-      {{-- "How are you?" as the Gulf, Egypt, the Levant and the Maghreb say it. --}}
-      @foreach(['شلونك؟', 'إزيك؟', 'كيفك؟', 'لاباس؟'] as $i => $greeting)
-        <span class="fa-bubble" dir="rtl" lang="ar" style="--i: {{ $i }}">{{ $greeting }}</span>
+      {{-- "How are you?" as the Gulf, Egypt, the Levant and the Maghreb say it. The English page
+           writes them in Latin letters, as they sound: no Arabic script on an English page. --}}
+      @php $arPage = app()->getLocale() === 'ar'; @endphp
+      @foreach($arPage ? ['شلونك؟', 'إزيك؟', 'كيفك؟', 'لاباس؟'] : ['Shlonak?', 'Ezzayak?', 'Kifak?', 'Labas?'] as $i => $greeting)
+        <span class="fa-bubble" dir="{{ $arPage ? 'rtl' : 'ltr' }}" lang="{{ $arPage ? 'ar' : 'en' }}" style="--i: {{ $i }}">{{ $greeting }}</span>
       @endforeach
       @break
     @case('accents')

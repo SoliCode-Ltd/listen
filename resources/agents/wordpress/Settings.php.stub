@@ -1,0 +1,142 @@
+<?php
+/**
+ * The plugin's settings: what is stored, and how it is checked.
+ *
+ * @package Listen\VoiceAgent
+ * @license GPL-2.0-or-later
+ */
+
+declare(strict_types=1);
+
+namespace Listen\VoiceAgent;
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * The settings as the website uses them. Every value is checked again when it is read,
+ * so nothing written straight into the database can reach the page.
+ */
+final class Settings
+{
+    /** The settings group the form saves (WordPress checks its nonce and the capability). */
+    public const GROUP = 'listen_voice_agent';
+
+    public const ENABLED = 'listen_voice_agent_enabled';
+    public const KEY = 'listen_voice_agent_key';
+    public const PLACEMENT = 'listen_voice_agent_placement';
+    public const PAGES = 'listen_voice_agent_pages';
+
+    /** Every option the plugin stores (uninstall.php removes the same list). */
+    public const OPTIONS = [self::ENABLED, self::KEY, self::PLACEMENT, self::PAGES];
+
+    /** The most pages the button can be limited to. */
+    public const MAX_PAGES = 500;
+
+    /** An agent's key, exactly: lw_ and 28 letters or digits, nothing before or after. */
+    private const KEY_PATTERN = '/\Alw_[A-Za-z0-9]{28}\z/';
+
+    /** Arabic-Indic and Persian digits, so IDs typed on an Arabic keyboard work too. */
+    private const DIGITS = [
+        '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4', '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+    ];
+
+    /**
+     * @param bool      $enabled   whether the call button shows at all
+     * @param string    $key       the agent's key: the saved one, or the one the plugin came with
+     * @param Placement $placement where the button shows
+     * @param list<int> $pages     the pages it shows on, when limited to some pages
+     */
+    private function __construct(
+        public readonly bool $enabled,
+        public readonly string $key,
+        public readonly Placement $placement,
+        public readonly array $pages,
+    ) {
+    }
+
+    /** The current settings; $bundled_key is the key this plugin came with. */
+    public static function load(string $bundled_key): self
+    {
+        $enabled = get_option(self::ENABLED, '1');
+        $placement = get_option(self::PLACEMENT, Placement::Everywhere->value);
+        $pages = self::parse_pages(get_option(self::PAGES, [])) ?? [];
+
+        return new self(
+            enabled: $enabled === '1' || $enabled === 1 || $enabled === true,
+            key: self::stored_key() ?: $bundled_key,
+            placement: (is_string($placement) ? Placement::tryFrom($placement) : null) ?? Placement::Everywhere,
+            pages: array_slice($pages, 0, self::MAX_PAGES),
+        );
+    }
+
+    /** The key saved in the settings, or '' when none (or nothing valid) is saved. */
+    public static function stored_key(): string
+    {
+        $key = get_option(self::KEY, '');
+
+        return is_string($key) && self::is_key($key) ? $key : '';
+    }
+
+    public static function is_key(string $value): bool
+    {
+        return preg_match(self::KEY_PATTERN, $value) === 1;
+    }
+
+    /**
+     * The pages the settings form sent: the boxes ticked in its list of pages (anything in
+     * that list that is not an ID is left out), or IDs in a text, the way the form of
+     * version 1.1.0 sent them ("12, 45").
+     *
+     * @return list<int>|null the IDs (each once, in order), or null when the value is neither
+     */
+    public static function chosen_pages(mixed $value): ?array
+    {
+        if (!is_array($value)) {
+            return self::parse_pages($value);
+        }
+
+        $ids = [];
+        foreach ($value as $id) {
+            foreach (self::parse_pages([$id]) ?? [] as $page) {
+                $ids[$page] = $page;
+            }
+        }
+
+        return array_values($ids);
+    }
+
+    /**
+     * The page IDs in a saved setting: a list of IDs, or a text of IDs ("12, 45 78", with
+     * Arabic commas and digits too) as an owner typed them.
+     *
+     * @return list<int>|null the IDs (each once), or null when it holds anything but IDs
+     */
+    public static function parse_pages(mixed $value): ?array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+        if (is_string($value)) {
+            $value = preg_split('/[\s,;،؛]+/u', strtr($value, self::DIGITS), -1, PREG_SPLIT_NO_EMPTY);
+        }
+        if (!is_array($value)) {
+            return null;
+        }
+
+        $ids = [];
+        foreach ($value as $id) {
+            if (is_string($id) && preg_match('/\A[1-9][0-9]{0,17}\z/', $id) === 1) {
+                $id = (int) $id;
+            }
+            if (!is_int($id) || $id < 1) {
+                return null;
+            }
+            $ids[$id] = $id;
+        }
+
+        return array_values($ids);
+    }
+}

@@ -85,6 +85,12 @@ name: Server deploy
 #            length, the speaking rates by language and engine, and a fit of
 #            the seconds against what the texts hold. Totals only, never a
 #            text or a member (scripts/support/speech_rates.php).
+#   agent-plans: read-only (READ ONLY database session). Every plan as it is,
+#            to choose its voice agent settings: price, credits, the agent
+#            settings (when the site has them), how its pricing card is
+#            written (label and value of each line) and how many
+#            subscriptions it has (a count); then the call rate the site
+#            follows (scripts/support/agent_plans.php). No member data.
 #   plan-lines: read-only (READ ONLY database session). Which plans' own card
 #            lines still say "Priority Queue" / "Processing priority" /
 #            "أولوية المعالجة", with each plan's lines before as JSON.
@@ -140,6 +146,24 @@ name: Server deploy
 #            logs (what the speech service said when a design or a delete failed:
 #            the key's name, the reason and the service's own words; never a
 #            description or a member).
+#   agent-redteam: staging only. Real calls with test agents, held from the
+#            runner (scripts/support/agent_redteam.mjs): Listen's own agents
+#            and the demo's businesses (built for the call, never saved), asked
+#            for their instructions, keys, other callers, discounts, jokes and
+#            abuse, with a line in their facts that must never be obeyed; then
+#            one normal call through Listen's own call button, read back from
+#            the server (billed seconds and cost). Prints what each agent said,
+#            its tools, how fast it answered and the cost by the reported
+#            tokens (input "calls": some of the calls by id, all by default).
+#            About 15 minutes of calls on the speech account staging shares
+#            with live: only when the owner has said yes.
+#   plan-price: read-only. One plan's price as it is and what a new price
+#            would change (input "price": slug=dollars, such as
+#            studio_max=120), with its Stripe ids and subscriptions as counts
+#            (scripts/support/plan_price.php). plan-price-apply sets it the way
+#            Admin → Plans → Save does: the price, then new Stripe monthly and
+#            yearly prices (the old ones archived; members on them keep them).
+#            Live only, and only when the owner has said yes.
 # New migrations and composer.lock changes are reported, not run (see migrate and composer).
 # The "Run over SSH" script must stay under GitHub's 21,000-character limit for one
 # step (tests/Feature/ServerDeployWorkflowTest.php): longer remote work goes in
@@ -154,7 +178,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test, voice-design-log, voice-cloning-examples]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -172,6 +196,14 @@ on:
         description: "voice-design-test only: the example character to design (cairo_grandma, evil_ogre, gulf_commentator ...)"
         type: string
         default: ""
+      calls:
+        description: "agent-redteam only: the calls to make, by id (house-en-secrets,clinic-ar,real-house-en ...); all when empty"
+        type: string
+        default: ""
+      price:
+        description: "plan-price and plan-price-apply only: the plan and its monthly price in dollars (studio_max=120)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -185,7 +217,7 @@ jobs:
   run:
     runs-on: ubuntu-latest
     # A test dub takes the server several minutes (separation, hearing, a voice for each line).
-    timeout-minutes: ${{ inputs.mode == 'dub-test' && 45 || 15 }}
+    timeout-minutes: ${{ (inputs.mode == 'dub-test' || inputs.mode == 'agent-redteam') && 45 || 15 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -201,6 +233,11 @@ jobs:
           tar -czf bundle.tgz -T files.txt
           xargs -d '\n' md5sum < files.txt > manifest.md5
           echo "${{ inputs.target == 'live' && 'main' || github.ref_name }}: $(git log -1 --format='%h %s')"; wc -l < files.txt
+      - name: Node for the test calls
+        if: inputs.mode == 'agent-redteam'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Run over SSH
         env:
           TARGET: ${{ inputs.target }}
@@ -209,6 +246,8 @@ jobs:
           MEMBER: ${{ inputs.member }}
           DUB: ${{ inputs.dub }}
           DESIGN: ${{ inputs.design }}
+          RT_ONLY: ${{ inputs.calls }}
+          PLAN_PRICE: ${{ inputs.price }}
           # What is deployed, as a variable: the script below must hold no ${{ }}
           # of its own, or GitHub reads all of it as one expression (21,000 at most).
           DEPLOY_REF: ${{ inputs.target == 'live' && 'main' || github.ref_name }}
@@ -259,6 +298,12 @@ jobs:
           if [ "$MODE" = migrate ]; then
             $S "$FIND; php artisan migrate:status --pending 2>/dev/null || php artisan migrate:status | grep -i pending || true"
             $S "$FIND; php artisan migrate --force"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = house-agent ] || [ "$MODE" = house-agent-off ]; then
+            # Listen's own agents on its public pages (php artisan agents:house), or off them.
+            $S "$FIND; php artisan agents:house $([ "$MODE" = house-agent-off ] && echo --off)"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
@@ -459,6 +504,11 @@ jobs:
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
+          if [ "$MODE" = agent-plans ]; then
+            tool agent_plans.php | $S "$FIND; php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
           if [ "$MODE" = owner-todo ]; then
             tool owner_todo.php | $S "$FIND; php"
             rm -f ~/.ssh/id_deploy
@@ -561,6 +611,24 @@ jobs:
             $S "$FIND; grep -h 'Voice design:' \$(ls -t storage/logs/*.log 2>/dev/null | head -3) 2>/dev/null | tail -n 30 | cut -c1-700" || echo "No Voice Design lines in the logs."
             rm -f ~/.ssh/id_deploy
             exit 0
+          fi
+          if [ "$MODE" = agent-redteam ]; then
+            [ "$TARGET" = staging ] || { echo "agent-redteam runs on staging only"; exit 1; }
+            case "$RT_ONLY" in *[!a-z0-9,-]*) echo "calls: ids such as clinic-ar,real-house-en"; exit 1;; esac
+            tool agent_redteam.php > rt.php
+            failed=0
+            S="$S" FIND="$FIND" RT_PHP="$PWD/rt.php" RT_ONLY="$RT_ONLY" RT_BASE=https://phplaravel-1516130-6707450.cloudwaysapps.com node scripts/support/agent_redteam.mjs || failed=1
+            rm -f ~/.ssh/id_deploy rt.php
+            exit "$failed"
+          fi
+          if [ "$MODE" = plan-price ] || [ "$MODE" = plan-price-apply ]; then
+            case "$PLAN_PRICE" in [a-z]*=[0-9]*) ;; *) echo "price: the plan and its monthly price, such as studio_max=120"; exit 1;; esac
+            case "$PLAN_PRICE" in *[!a-z0-9_=.]*) echo "price: letters, digits, _ = and . only"; exit 1;; esac
+            if [ "$MODE" = plan-price-apply ] && [ "$TARGET" != live ]; then echo "plan-price-apply runs on live only (the site that makes Stripe prices)"; exit 1; fi
+            failed=0
+            tool plan_price.php | $S "$FIND; PLAN_PRICE='$PLAN_PRICE' APPLY=$([ "$MODE" = plan-price-apply ] && echo 1 || echo 0) php" || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
           fi
           if [ "$MODE" != deploy ]; then exit 0; fi
           $S "$FIND; cat > storage/app/listen-deploy/bundle.tgz" < bundle.tgz

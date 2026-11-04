@@ -160,7 +160,12 @@
 
   {{-- 5. What sets it apart: every line on wider screens; on phones the first four and a
        button for the rest, when at least two more would wait behind it. --}}
-  @php $foldLines = count($cardLines) > 5; @endphp
+  @php
+    $foldLines = count($cardLines) > 5;
+    $agentsKey = \App\Support\PlanPricingLines::labelKey(__('ui.pricing.lines.label_voice_agents'));
+    $isAgentsLine = fn (array $line): bool => \App\Support\PlanPricingLines::labelKey((string) ($line['label'] ?? '')) === $agentsKey
+      || (bool) preg_match('/voice agents?|الوكلاء الصوتي|وكلاء صوتي/iu', (string) ($line['label'] ?? ''));
+  @endphp
   <div class="plan-lines">
   <ul @class(['plan-features', 'is-long' => $foldLines]) id="plan-lines-{{ $plan['slug'] }}">
     @foreach($cardLines as $feature)
@@ -169,7 +174,7 @@
         $value = (string) ($feature['value'] ?? $includedMark);
         $isTick = $value === '' || $value === $includedMark;
       @endphp
-    <li class="{{ $isTick ? 'is-tick' : '' }}">
+    <li @class(['is-tick' => $isTick, 'is-agents' => $isAgentsLine($feature)])>
       <span class="feature-label">
         <svg viewBox="0 0 24 24" aria-hidden="true">{!! $isTick ? '<path d="M20 6 9 17l-5-5"/>' : $iconSvg !!}</svg>
         {{ $feature['label'] ?? '' }}

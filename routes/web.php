@@ -205,6 +205,10 @@ Route::get('/favicon.ico', function () {
 Route::get('/newsletter/unsubscribe', NewsletterUnsubscribeController::class)
     ->name('newsletter.unsubscribe');
 
+// Listen Agents: an agent's link page (and QR code), in the agent's language.
+Route::get('/talk/{slug}', [\App\Http\Controllers\AgentCallController::class, 'talk'])
+    ->where('slug', '[a-z0-9-]{3,90}')->name('agent-talk');
+
 Route::group([
     'prefix' => LaravelLocalization::setLocale(),
     'middleware' => ['localize', 'localeSessionRedirect', 'localizationRedirect'],
@@ -212,6 +216,8 @@ Route::group([
     Route::get('/', [HomeController::class, 'index'])->name('home');
     Route::get('/pricing', [HomeController::class, 'pricingPage'])->name('pricing');
     Route::get('/voice-samples', [HomeController::class, 'samplesPage'])->name('samples');
+    // Listen Agents, for visitors: what a voice agent does, shown working.
+    Route::view('/voice-agents', 'agents.landing')->middleware(\App\Http\Middleware\EnsureAgentsOpen::class)->name('agents-landing');
     Route::get('/free-trial', [HomeController::class, 'startFreeTrial'])->name('trial.start');
     Route::get('/premium-pack', [\App\Http\Controllers\CharPackController::class, 'start'])->name('pack.start');
     Route::get('/ai-text-to-speech', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_text_to_speech')->name('seo.ai-text-to-speech');
@@ -293,6 +299,10 @@ Route::group([
             Route::post('/preview', [HomeController::class, 'preview'])->middleware('demo.verified')->name('demo.preview');
             // Voice Design's one take, beside the text studio (App\Support\VoiceDesign).
             Route::post('/demo/voice-design', [HomeController::class, 'designVoice'])->middleware(['demo.verified', 'throttle:6,1,demo-voice-design'])->name('demo.voice-design');
+            // The Voice agents tab: a live call with a sample business's agent, from the member's free
+            // test seconds, and the time left after it (App\Support\Agents\DemoAgent).
+            Route::post('/demo/agent-call', [\App\Http\Controllers\DemoAgentController::class, 'start'])->middleware(['demo.verified', 'throttle:6,1,demo-agent-call'])->name('demo.agent-call');
+            Route::get('/demo/agent-call', [\App\Http\Controllers\DemoAgentController::class, 'left'])->middleware('throttle:30,1,demo-agent-left')->name('demo.agent-left');
         });
     });
 
@@ -389,6 +399,32 @@ Route::group([
             Route::post('/', [VoiceDesignController::class, 'design'])->middleware('throttle:10,1,voice-design')->name('voice-design.design');
             Route::post('/{id}/keep', [VoiceDesignController::class, 'keep'])->whereNumber('id')->middleware('throttle:30,1')->name('voice-design.keep');
             Route::delete('/{id}', [VoiceDesignController::class, 'destroy'])->whereNumber('id')->middleware('throttle:30,1')->name('voice-design.destroy');
+        });
+
+        // A new member's first page: voice-overs or a voice agent (shown once, after sign-up).
+        Route::get('/start', \App\Http\Controllers\StartController::class)->name('onboarding.start');
+
+        // Listen Agents: the owner's side (App\Http\Controllers\AgentController). The names say
+        // voice-agents because agents.* already names the AI-agent discovery files.
+        Route::prefix('agents')->middleware(\App\Http\Middleware\EnsureAgentsOpen::class)->group(function (): void {
+            Route::get('/', [\App\Http\Controllers\AgentController::class, 'index'])->name('voice-agents.index');
+            Route::get('/new', [\App\Http\Controllers\AgentController::class, 'create'])->name('voice-agents.create');
+            Route::post('/', [\App\Http\Controllers\AgentController::class, 'store'])->middleware('throttle:10,1,agent-write')->name('voice-agents.store');
+            Route::get('/{agent}', [\App\Http\Controllers\AgentController::class, 'show'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.show');
+            Route::get('/{agent}/setup', [\App\Http\Controllers\AgentController::class, 'edit'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.edit');
+            Route::patch('/{agent}', [\App\Http\Controllers\AgentController::class, 'update'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:60,1')->name('voice-agents.update');
+            Route::post('/{agent}/write', [\App\Http\Controllers\AgentController::class, 'write'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:10,1,agent-write')->name('voice-agents.write');
+            Route::post('/{agent}/correct', [\App\Http\Controllers\AgentController::class, 'correct'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1')->name('voice-agents.correct');
+            Route::post('/{agent}/test-call', [\App\Http\Controllers\AgentController::class, 'testCall'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:10,1,agent-test')->name('voice-agents.test-call');
+            Route::delete('/{agent}', [\App\Http\Controllers\AgentController::class, 'destroy'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.destroy');
+            // What the agent knows from files: upload, list, see what it learned, read again, remove.
+            Route::get('/{agent}/files', [\App\Http\Controllers\AgentFileController::class, 'index'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:120,1')->name('voice-agents.files.index');
+            Route::post('/{agent}/files', [\App\Http\Controllers\AgentFileController::class, 'store'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1,agent-files')->name('voice-agents.files.store');
+            Route::get('/{agent}/files/{source}', [\App\Http\Controllers\AgentFileController::class, 'show'])->where(['agent' => 'agt_[a-z0-9]{24}', 'source' => '[0-9]+'])->name('voice-agents.files.show');
+            Route::post('/{agent}/files/{source}/retry', [\App\Http\Controllers\AgentFileController::class, 'retry'])->where(['agent' => 'agt_[a-z0-9]{24}', 'source' => '[0-9]+'])->middleware('throttle:10,1')->name('voice-agents.files.retry');
+            Route::delete('/{agent}/files/{source}', [\App\Http\Controllers\AgentFileController::class, 'destroy'])->where(['agent' => 'agt_[a-z0-9]{24}', 'source' => '[0-9]+'])->name('voice-agents.files.destroy');
+            Route::get('/{agent}/install-status', [\App\Http\Controllers\AgentController::class, 'installStatus'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1')->name('voice-agents.install-status');
+            Route::get('/{agent}/plugin/{platform}', [\App\Http\Controllers\AgentController::class, 'plugin'])->where(['agent' => 'agt_[a-z0-9]{24}', 'platform' => 'wordpress'])->middleware('throttle:20,1')->name('voice-agents.plugin');
         });
 
         // Legacy user URL kept as redirect to dashboard voice-cloning section.

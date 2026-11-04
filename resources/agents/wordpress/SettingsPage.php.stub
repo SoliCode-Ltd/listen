@@ -1,0 +1,335 @@
+<?php
+/**
+ * The plugin's settings page: Settings, then Listen Voice Agent.
+ *
+ * @package Listen\VoiceAgent
+ * @license GPL-2.0-or-later
+ */
+
+declare(strict_types=1);
+
+namespace Listen\VoiceAgent;
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * The settings page: how the call button is doing, then its settings on three cards (the
+ * button, where it shows, and the agent). The form is the Settings API's: options.php
+ * checks its nonce and saves it, and every setting goes through its own check (Plugin).
+ * Its look and its page list come from the two files in assets/, which only this page loads.
+ */
+final class SettingsPage
+{
+    /** The handle of this page's style and script. */
+    private const ASSETS = 'listen-voice-agent-settings';
+
+    /**
+     * Numbers the page list says its count for, so the browser can pick the right words for
+     * any number in the dashboard's language (Arabic has six forms).
+     */
+    private const COUNT_SAMPLES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 21, 22, 100, 101, 102, 1000000];
+
+    public function __construct(private readonly string $file)
+    {
+    }
+
+    /** Runs as WordPress loads this page, and only this page, before anything is printed. */
+    public function load(): void
+    {
+        add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
+    }
+
+    public function enqueue_assets(): void
+    {
+        $assets = plugin_dir_url($this->file) . 'assets/';
+        wp_enqueue_style(self::ASSETS, $assets . 'settings.css', [], VERSION);
+        wp_enqueue_script(self::ASSETS, $assets . 'settings.js', [], VERSION, ['in_footer' => true, 'strategy' => 'defer']);
+    }
+
+    public function render(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('Sorry, you are not allowed to change these settings.', 'listen-voice-agent'), 403);
+        }
+        $settings = Settings::load(AGENT_KEY);
+        ?>
+        <div class="wrap lva">
+            <div class="lva-head">
+                <span class="lva-mark" aria-hidden="true">
+                    <svg viewBox="0 0 128 128" width="28" height="28" fill="#7659FA" focusable="false">
+                        <rect x="5" y="59" width="10" height="10" rx="5"/>
+                        <rect x="23" y="42" width="10" height="44" rx="5"/>
+                        <rect x="41" y="28" width="10" height="72" rx="5"/>
+                        <rect x="59" y="14" width="10" height="100" rx="5"/>
+                        <rect x="77" y="28" width="10" height="72" rx="5"/>
+                        <rect x="95" y="42" width="10" height="44" rx="5"/>
+                        <rect x="113" y="59" width="10" height="10" rx="5"/>
+                    </svg>
+                </span>
+                <div class="lva-head-text">
+                    <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+                    <p><?php esc_html_e('Your agent answers your visitors by voice, from a call button on your website.', 'listen-voice-agent'); ?></p>
+                </div>
+            </div>
+            <hr class="wp-header-end">
+
+            <?php $this->render_status($settings); ?>
+
+            <form action="options.php" method="post" class="lva-form">
+                <?php settings_fields(Settings::GROUP); ?>
+                <?php $this->render_button_card($settings); ?>
+                <?php $this->render_where_card($settings); ?>
+                <?php $this->render_agent_card(); ?>
+                <?php submit_button(); ?>
+            </form>
+        </div>
+        <?php
+    }
+
+    /** How the button is doing, in one sentence, with the website and Listen a click away. */
+    private function render_status(Settings $settings): void
+    {
+        $chosen = $settings->placement === Placement::ChosenPages ? Pages::published($settings->pages) : [];
+        if (!$settings->enabled) {
+            $state = 'off';
+            $icon = 'dashicons-hidden';
+            $title = __('Your call button is off', 'listen-voice-agent');
+            $note = __('Visitors don’t see it. Turn it on below whenever you’re ready.', 'listen-voice-agent');
+        } elseif ($settings->placement === Placement::ChosenPages && $chosen === []) {
+            $state = 'warning';
+            $icon = 'dashicons-warning';
+            $title = __('Your call button is on, but no page is chosen yet', 'listen-voice-agent');
+            $note = __('Choose pages below, or show it on every page.', 'listen-voice-agent');
+        } else {
+            $state = 'on';
+            $icon = 'dashicons-yes';
+            $title = $settings->placement === Placement::ChosenPages
+                ? sprintf(
+                    /* translators: %d: how many pages show the call button. */
+                    _n('Your call button is on and shows on %d page', 'Your call button is on and shows on %d pages', count($chosen), 'listen-voice-agent'),
+                    count($chosen)
+                )
+                : __('Your call button is on and shows on every page', 'listen-voice-agent');
+            $note = __('Not seeing it? Check that your agent is live in Listen.', 'listen-voice-agent');
+        }
+        ?>
+        <section class="lva-status is-<?php echo esc_attr($state); ?>" aria-labelledby="lva-status-title">
+            <span class="lva-status-icon" aria-hidden="true"><span class="dashicons <?php echo esc_attr($icon); ?>"></span></span>
+            <div class="lva-status-text">
+                <h2 class="lva-status-title" id="lva-status-title"><?php echo esc_html($title); ?></h2>
+                <p class="lva-status-note"><?php echo esc_html($note); ?></p>
+                <p class="lva-links">
+                    <?php $this->render_link($this->site_url($settings, $chosen), __('View your site', 'listen-voice-agent')); ?>
+                    <?php $this->render_link($this->listen_url('design'), __('Change the look in Listen', 'listen-voice-agent')); ?>
+                </p>
+            </div>
+        </section>
+        <?php
+    }
+
+    private function render_button_card(Settings $settings): void
+    {
+        ?>
+        <section class="lva-card" aria-labelledby="lva-button-title">
+            <h2 class="lva-card-title" id="lva-button-title"><?php esc_html_e('Call button', 'listen-voice-agent'); ?></h2>
+            <p class="lva-card-help"><?php esc_html_e('Turn it off to hide the button from your website without removing the plugin.', 'listen-voice-agent'); ?></p>
+            <label class="lva-toggle">
+                <input type="checkbox" role="switch" name="<?php echo esc_attr(Settings::ENABLED); ?>" value="1" <?php checked($settings->enabled); ?>>
+                <span><?php esc_html_e('Show the call button on my website', 'listen-voice-agent'); ?></span>
+            </label>
+        </section>
+        <?php
+    }
+
+    private function render_where_card(Settings $settings): void
+    {
+        $choices = [
+            [Placement::Everywhere, __('On every page', 'listen-voice-agent'), __('Visitors see it on every page of your website.', 'listen-voice-agent')],
+            [Placement::ChosenPages, __('Only on the pages I choose', 'listen-voice-agent'), __('Tick them in the list below.', 'listen-voice-agent')],
+        ];
+        ?>
+        <section class="lva-card lva-where" aria-labelledby="lva-where-title">
+            <h2 class="lva-card-title" id="lva-where-title"><?php esc_html_e('Where it shows', 'listen-voice-agent'); ?></h2>
+            <fieldset class="lva-choices">
+                <legend class="screen-reader-text"><?php esc_html_e('Where it shows', 'listen-voice-agent'); ?></legend>
+                <?php foreach ($choices as [$placement, $label, $help]) : ?>
+                    <label class="lva-choice">
+                        <input type="radio" name="<?php echo esc_attr(Settings::PLACEMENT); ?>" value="<?php echo esc_attr($placement->value); ?>"
+                            <?php checked($settings->placement === $placement); ?> data-lva-placement="<?php echo esc_attr($placement->name); ?>">
+                        <span class="lva-choice-text">
+                            <span class="lva-choice-title"><?php echo esc_html($label); ?></span>
+                            <span class="lva-choice-help"><?php echo esc_html($help); ?></span>
+                        </span>
+                    </label>
+                <?php endforeach; ?>
+            </fieldset>
+            <?php $this->render_picker($settings); ?>
+        </section>
+        <?php
+    }
+
+    /**
+     * The website's pages, to tick. Without JavaScript it is a plain list of checkboxes;
+     * the script adds the search, "Select all", "Clear" and the live count.
+     */
+    private function render_picker(Settings $settings): void
+    {
+        $groups = Pages::groups($settings->pages);
+        $chosen = array_flip($settings->pages);
+        $ticked = 0;
+        foreach ($groups as $group) {
+            foreach ($group['items'] as $item) {
+                $ticked += isset($chosen[$item['id']]) ? 1 : 0;
+            }
+        }
+        ?>
+        <div class="lva-picker" id="lva-picker" data-lva-picker data-lva-words="<?php echo esc_attr((string) wp_json_encode($this->picker_words(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); ?>">
+            <?php if ($groups === []) : ?>
+                <p class="lva-empty"><?php esc_html_e('Your website has no published pages yet.', 'listen-voice-agent'); ?></p>
+            <?php else : ?>
+                <div class="lva-picker-bar">
+                    <div class="lva-search">
+                        <label class="screen-reader-text" for="lva-search"><?php esc_html_e('Search by title or address', 'listen-voice-agent'); ?></label>
+                        <span class="dashicons dashicons-search" aria-hidden="true"></span>
+                        <input type="search" id="lva-search" autocomplete="off" spellcheck="false" data-lva-search
+                            placeholder="<?php esc_attr_e('Search by title or address', 'listen-voice-agent'); ?>">
+                    </div>
+                    <div class="lva-picker-tools">
+                        <span class="lva-count<?php echo esc_attr($ticked === 0 ? ' is-empty' : ''); ?>" data-lva-count aria-live="polite"><?php echo esc_html($this->count_text($ticked)); ?></span>
+                        <button type="button" class="button-link" data-lva-all><?php esc_html_e('Select all', 'listen-voice-agent'); ?></button>
+                        <button type="button" class="button-link" data-lva-clear><?php esc_html_e('Clear', 'listen-voice-agent'); ?></button>
+                    </div>
+                </div>
+                <div class="lva-list">
+                    <fieldset>
+                        <legend class="screen-reader-text"><?php esc_html_e('Pages that show the call button', 'listen-voice-agent'); ?></legend>
+                        <?php foreach ($groups as $group) : ?>
+                            <div class="lva-group" role="group" aria-labelledby="lva-group-<?php echo esc_attr($group['type']); ?>" data-lva-group>
+                                <h3 class="lva-group-title" id="lva-group-<?php echo esc_attr($group['type']); ?>"><?php echo esc_html($group['label']); ?></h3>
+                                <ul class="lva-rows">
+                                    <?php foreach ($group['items'] as $item) : ?>
+                                        <li class="lva-row" data-lva-row>
+                                            <label>
+                                                <input type="checkbox" name="<?php echo esc_attr(Settings::PAGES); ?>[]" value="<?php echo esc_attr((string) $item['id']); ?>" <?php checked(isset($chosen[$item['id']])); ?>>
+                                                <span class="lva-row-title" dir="auto"><?php echo esc_html($item['title']); ?></span>
+                                                <?php foreach ($item['states'] as $state) : ?>
+                                                    <span class="lva-row-state"><?php echo esc_html($state); ?></span>
+                                                <?php endforeach; ?>
+                                                <span class="lva-row-path"><bdi dir="ltr"><?php echo esc_html($item['path']); ?></bdi></span>
+                                            </label>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        <?php endforeach; ?>
+                        <p class="lva-empty" data-lva-empty hidden></p>
+                    </fieldset>
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    private function render_agent_card(): void
+    {
+        ?>
+        <section class="lva-card" aria-labelledby="lva-agent-title">
+            <h2 class="lva-card-title" id="lva-agent-title"><?php esc_html_e('Your agent', 'listen-voice-agent'); ?></h2>
+            <p class="lva-card-help">
+                <?php esc_html_e('Change what your agent says, its voice and what it knows in Listen.', 'listen-voice-agent'); ?>
+                <?php $this->render_link($this->listen_url(), __('Open Listen', 'listen-voice-agent')); ?>
+            </p>
+            <div class="lva-field">
+                <label class="lva-label" for="<?php echo esc_attr(Settings::KEY); ?>"><?php esc_html_e('Agent key', 'listen-voice-agent'); ?></label>
+                <input type="text" class="regular-text code" dir="ltr" id="<?php echo esc_attr(Settings::KEY); ?>" name="<?php echo esc_attr(Settings::KEY); ?>"
+                    value="<?php echo esc_attr(Settings::stored_key()); ?>" placeholder="<?php echo esc_attr(AGENT_KEY); ?>"
+                    autocomplete="off" spellcheck="false" aria-describedby="lva-key-help">
+                <p class="description" id="lva-key-help"><?php esc_html_e('Leave it empty to use the agent this plugin came with. To use another agent, paste its key from Listen.', 'listen-voice-agent'); ?></p>
+            </div>
+        </section>
+        <?php
+    }
+
+    /** A link that opens in a new tab, and says so to screen readers. */
+    private function render_link(string $url, string $text): void
+    {
+        ?>
+        <a class="lva-link" href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener"><span><?php echo esc_html($text); ?></span><span class="dashicons dashicons-external" aria-hidden="true"></span><span class="screen-reader-text"> <?php esc_html_e('(opens in a new tab)', 'listen-voice-agent'); ?></span></a>
+        <?php
+    }
+
+    /**
+     * Where to see the button: the home page, or the first chosen page when the button
+     * shows on some pages only and the home page is not one of them.
+     *
+     * @param list<int> $chosen the published pages the button is limited to
+     */
+    private function site_url(Settings $settings, array $chosen): string
+    {
+        $home = home_url('/');
+        $front = get_option('show_on_front') === 'page' ? (int) get_option('page_on_front') : 0;
+        if (!$settings->enabled || $chosen === [] || in_array($front, $chosen, true)) {
+            return $home;
+        }
+        $link = get_permalink($chosen[0]);
+
+        return is_string($link) && $link !== '' ? $link : $home;
+    }
+
+    /**
+     * This agent's page in Listen (opened on one of its tabs), or the list of agents when
+     * the settings use another agent: this copy of the plugin knows its own agent only.
+     */
+    private function listen_url(string $tab = ''): string
+    {
+        $key = Settings::stored_key();
+        if (($key !== '' && $key !== AGENT_KEY) || AGENT_URL === MANAGE_URL) {
+            return MANAGE_URL;
+        }
+
+        return $tab === '' ? AGENT_URL : AGENT_URL . '#' . $tab;
+    }
+
+    private function count_text(int $count): string
+    {
+        return $count === 0 ? __('No page selected yet', 'listen-voice-agent') : sprintf($this->count_words($count), $count);
+    }
+
+    /** The count's words for a number, with %d where the number goes. */
+    private function count_words(int $count): string
+    {
+        /* translators: %d: how many pages are ticked in the list. */
+        return _n('%d page selected', '%d pages selected', $count, 'listen-voice-agent');
+    }
+
+    /**
+     * What the page list's script says, in the dashboard's language: the count for each
+     * sample number (the script picks the one whose plural form matches), and its messages.
+     *
+     * @return array{lang: string, counts: object, none: string, noMatch: string}
+     */
+    private function picker_words(): array
+    {
+        $counts = [];
+        foreach (self::COUNT_SAMPLES as $count) {
+            $counts[(string) $count] = $this->count_words($count);
+        }
+        $locale = determine_locale();
+
+        return [
+            // The language whose plural rules the words follow: the plugin's Arabic is used for
+            // both of WordPress's Arabic languages, and English when the plugin has no words in the dashboard's language.
+            'lang' => match (true) {
+                in_array($locale, ['ar', 'ary'], true) => 'ar',
+                is_textdomain_loaded(Plugin::SLUG) => str_replace('_', '-', $locale),
+                default => 'en',
+            },
+            'counts' => (object) $counts,
+            'none' => __('No page selected yet', 'listen-voice-agent'),
+            /* translators: %s: what was typed in the search box. */
+            'noMatch' => __('No pages match “%s”.', 'listen-voice-agent'),
+        ];
+    }
+}

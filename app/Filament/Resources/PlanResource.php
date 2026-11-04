@@ -532,6 +532,47 @@ class PlanResource extends Resource
                             })
                             ->visible(fn (Forms\Get $get): bool => (bool) $get('video_dubbing_enabled')),
                     ]),
+                Forms\Components\Section::make('Voice agents')
+                    ->description('Members on this plan put voice agents live: agents that answer their customers on their website, a link and a QR code. Calls are paid from the plan\'s credits, at the rate in Agents → Settings. A member whose plan does not include agents can still build and test one agent with the free test minutes, and sees the cheapest plan that has them. Who sees Agents at all: Agents → Settings.')
+                    ->columns(2)
+                    ->visible(fn (): bool => \App\Support\Agents\AgentAccess::planColumns())
+                    ->schema([
+                        Forms\Components\Toggle::make('agents_enabled')
+                            ->label('Include voice agents')
+                            ->helperText('Off: this plan\'s members cannot put an agent live, and the agents of members who move to it stop taking calls (callers hear the agent is not available; nothing is deleted).')
+                            ->default(false)
+                            ->live()
+                            ->columnSpan(2),
+                        Forms\Components\TextInput::make('agents_max')
+                            ->label('Agents a member can have')
+                            ->numeric()->integer()->minValue(0)->maxValue(100)->default(0)->required()
+                            ->suffix('agents')
+                            ->helperText(fn (): string => '0 uses the site default ('.(int) config('listen.agents.max_agents', 10).').')
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('agents_enabled')),
+                        Forms\Components\TextInput::make('agent_minutes_per_month')
+                            ->label('Call minutes a month')
+                            ->numeric()->integer()->minValue(0)->maxValue(100000)->default(0)->required()
+                            ->suffix('minutes')
+                            ->helperText('0: only the plan\'s credits limit them. A number keeps calls below it even when credits are left (they stay for voice-overs). Members see the minutes left.')
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('agents_enabled')),
+                        Forms\Components\TextInput::make('agent_concurrent_calls')
+                            ->label('Calls at the same time')
+                            ->numeric()->integer()->minValue(0)->maxValue(50)->default(0)->required()
+                            ->suffix('calls')
+                            ->helperText(fn (): string => 'Across all of a member\'s agents (one agent can use them all). A caller who rings while they are all busy waits for the next free one, and can leave a number to be called back. 0 uses the site default ('.(int) config('listen.agents.concurrent_calls', 3).').')
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('agents_enabled')),
+                        Forms\Components\TextInput::make('agent_max_call_minutes')
+                            ->label('Longest call')
+                            ->numeric()->integer()->minValue(0)->maxValue(\App\Support\Agents\AgentAccess::MAX_CALL_MINUTES)->default(0)->required()
+                            ->suffix('minutes')
+                            ->helperText(fn (): string => 'Up to '.\App\Support\Agents\AgentAccess::MAX_CALL_MINUTES.' minutes; the agent says goodbye as the time runs out. Each owner can set less on an agent. 0 uses the site default ('.intdiv((int) config('listen.agents.max_call_seconds', 600), 60).').')
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('agents_enabled')),
+                        Forms\Components\Placeholder::make('agents_cost')
+                            ->label('What a member gets, and what it costs')
+                            ->content(fn (Forms\Get $get): HtmlString => self::agentEconomics($get))
+                            ->columnSpan(2)
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('agents_enabled')),
+                    ]),
                 Forms\Components\Section::make('Pricing page')
                     ->description('The lines under the price on this plan\'s card. They are written for you in English and Arabic from this plan\'s settings above, so changing a setting updates the card by itself. Tick the ones to show.')
                     ->schema([
@@ -562,7 +603,7 @@ class PlanResource extends Resource
                             ->hidden(fn (Get $get): bool => (bool) $get('pricing_use_custom_text')),
                     ]),
                 Forms\Components\Section::make('Plan Features (English)')
-                    ->description('Your own lines for the English card, used while "Use my own text instead" is on. An empty list starts from the automatic lines.')
+                    ->description('Your own lines for the English card, used while "Use my own text instead" is on. An empty list starts from the automatic lines. Write {agents} as a value to show this plan\'s voice agents and call minutes, always as its settings are.')
                     ->visible(fn (Get $get): bool => (bool) $get('pricing_use_custom_text'))
                     ->schema([
                         Forms\Components\Repeater::make('features_en')
@@ -611,7 +652,7 @@ class PlanResource extends Resource
                             ->collapsible(),
                     ]),
                 Forms\Components\Section::make('خصائص الخطة (العربية)')
-                    ->description('سطورك الخاصة لبطاقة الأسعار العربية، وتُستخدم عند تفعيل "Use my own text instead". القائمة الفارغة تبدأ من السطور التلقائية.')
+                    ->description('سطورك الخاصة لبطاقة الأسعار العربية، وتُستخدم عند تفعيل "Use my own text instead". القائمة الفارغة تبدأ من السطور التلقائية. اكتب {agents} في القيمة ليظهر عدد الوكلاء ودقائق المكالمات كما في إعدادات الباقة دائمًا.')
                     ->visible(fn (Get $get): bool => (bool) $get('pricing_use_custom_text'))
                     ->schema([
                         Forms\Components\Repeater::make('features_ar')
@@ -733,6 +774,19 @@ class PlanResource extends Resource
                 Tables\Columns\IconColumn::make('voice_cloning_enabled')
                     ->label('Voice Cloning')
                     ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: false),
+                Tables\Columns\TextColumn::make('agents_max')
+                    ->label('Voice agents')
+                    ->state(function (Plan $record): string {
+                        if (! \App\Support\Agents\AgentAccess::planIncludes($record)) {
+                            return 'Off';
+                        }
+                        $limits = \App\Support\Agents\AgentAccess::limits($record);
+
+                        return trans_choice(':count agent|:count agents', $limits['agents'], [], 'en')
+                            .($limits['minutes'] > 0 ? ' · '.number_format($limits['minutes']).' min' : '');
+                    })
+                    ->visible(fn (): bool => \App\Support\Agents\AgentAccess::planColumns())
                     ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('voice_design_max_voices')
                     ->label('Voice Design')
@@ -873,6 +927,39 @@ class PlanResource extends Resource
     }
 
     /**
+     * Voice agents on this plan, from the form as it is: the call minutes the credits pay for,
+     * what a call minute earns at this price, and what one costs on the live voice
+     * (App\Support\Agents\AgentCost), on a typical call and a heavy one.
+     */
+    private static function agentEconomics(Get $get): HtmlString
+    {
+        $rate = \App\Support\Agents\AgentAccess::creditsPerMinute();
+        $credits = max(0, (int) $get('monthly_chars'));
+        $price = max(0.0, (float) ($get('price_dollars') ?? 0));
+        $cap = max(0, (int) $get('agent_minutes_per_month'));
+        $byCredits = intdiv($credits, $rate);
+        $minutes = $cap > 0 ? min($cap, $byCredits) : $byCredits;
+        $typical = \App\Support\Agents\AgentCost::typical();
+        $heavy = \App\Support\Agents\AgentCost::heavy();
+        $earns = $byCredits > 0 ? $price / ($credits / $rate) : 0.0;
+        $money = fn (float $v): string => '$'.number_format($v, $v < 1 ? 3 : 2);
+        $margin = fn (float $cost): string => $earns > 0 ? (int) round(($earns - $cost) / $earns * 100).'%' : '—';
+
+        $lines = [
+            sprintf('Their %s credits pay for about <b>%s call minutes</b> a month at %s credits a minute%s (the same credits as their voice-overs: a call minute uses %s audio minutes).',
+                number_format($credits), number_format($byCredits), number_format($rate),
+                $cap > 0 && $cap < $byCredits ? ', and this plan stops calls at <b>'.number_format($cap).'</b>' : '',
+                rtrim(rtrim(number_format($rate / \App\Support\Credits::PER_MINUTE, 1), '0'), '.')),
+            sprintf('A call minute earns about <b>%s</b> at %s a month.', $money($earns), $money($price)),
+            sprintf('A call minute costs Listen about <b>%s</b> on a typical call (3 minutes, an agent with notes): <b>%s</b> margin; about <b>%s</b> on a heavy one (10 minutes, every note and file slot full): <b>%s</b> margin.',
+                $money($typical), $margin($typical), $money($heavy), $margin($heavy)),
+            sprintf('If every minute is used: about %s to %s a month for calls.', $money($minutes * $typical), $money($minutes * $heavy)),
+        ];
+
+        return new HtmlString('<div style="display:grid;gap:.35rem;font-size:.875rem;line-height:1.5">'.implode('', array_map(fn ($l) => '<p>'.$l.'</p>', $lines)).'</div>');
+    }
+
+    /**
      * The plan as the form currently has it, so the preview follows unsaved changes.
      */
     private static function planFromForm(Get $get, ?Plan $record): Plan
@@ -882,7 +969,7 @@ class PlanResource extends Resource
         foreach (['voice_tier', 'max_chars_per_request', 'monthly_chars', 'monthly_requests', 'processing_priority', 'commercial_use_allowed',
             'recent_voices_days', 'dialogue_enabled', 'custom_prompt_enabled', 'voice_cloning_enabled', 'voice_cloning_max_voices',
             'voice_design_enabled', 'voice_design_max_voices', 'voice_design_monthly_voices', 'voice_design_unlimited',
-            'download_formats', 'allow_overage'] as $field) {
+            'download_formats', 'allow_overage', 'agents_enabled', 'agents_max', 'agent_minutes_per_month'] as $field) {
             $plan->setAttribute($field, $get($field));
         }
 

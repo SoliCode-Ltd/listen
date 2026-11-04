@@ -688,6 +688,9 @@ class HomeController extends Controller
                 ? VoiceDesign::studio($member, $this->planAccessService->resolveAccessPlanForUserId((int) $member->id), true)
                     + ['demo_used' => $this->usedDemoDesign($this->demoLinkedUserIds((int) $member->id, $request))]
                 : null,
+            // A Voice agent: a live call with a sample business's agent, from the free test seconds
+            // (App\Support\Agents\DemoAgent).
+            'demoAgent' => \App\Support\Agents\DemoAgent::openTo($member) ? \App\Support\Agents\DemoAgent::studio($member, app()->getLocale()) : null,
         ]);
 
         return $this->attachDemoDeviceCookie($request, $response);
@@ -1722,6 +1725,8 @@ class HomeController extends Controller
                 'features' => $features,
                 // The comparison table's lines: from the plan's settings, never its card text.
                 'compare_lines' => PlanPricingLines::forComparison($plan, $locale),
+                // Its Voice agents rows in that table (null without agents).
+                'agent_compare' => PlanPricingLines::agentComparison($plan, $locale),
                 // Lines the admin wrote for this card in this language.
                 'own_lines' => (bool) $plan->pricing_use_custom_text && $plan->getLocalizedFeatures($locale) !== null,
                 'is_pack' => $plan->isPack(),
