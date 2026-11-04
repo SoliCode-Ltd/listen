@@ -15,12 +15,12 @@ class SiteReaderTest extends TestCase
 {
     private function reader(): SiteReader
     {
-        // The test pages live on a made-up public host.
+        // The test pages live on a made-up public host, at a documentation address.
         return new class extends SiteReader
         {
-            protected function hostAllowed(string $host): bool
+            protected function addressFor(string $host): ?string
             {
-                return $host === 'clinic.example';
+                return $host === 'clinic.example' ? '203.0.113.7' : null;
             }
         };
     }
@@ -70,6 +70,28 @@ class SiteReaderTest extends TestCase
         $result = (new SiteReader)->read('http://169.254.169.254/latest/meta-data');
         $this->assertFalse($result['ok']);
         Http::assertNothingSent();
+    }
+
+    public function test_the_connection_goes_to_the_address_that_was_checked(): void
+    {
+        // A name that answers a public address to the check and a private one to a second lookup
+        // (DNS rebinding) cannot send the request anywhere else: curl is told the checked address.
+        $this->assertSame([CURLOPT_RESOLVE => ['clinic.example:443:203.0.113.7']], SiteReader::options('https://clinic.example/menu', '203.0.113.7')['curl']);
+        $this->assertSame([CURLOPT_RESOLVE => ['clinic.example:8080:[2001:db8::7]']], SiteReader::options('http://clinic.example:8080/', '2001:db8::7')['curl']);
+        $this->assertSame([CURLOPT_RESOLVE => ['clinic.example:80:203.0.113.7']], SiteReader::options('http://Clinic.example/', '203.0.113.7')['curl']);
+        $this->assertFalse(SiteReader::options('https://clinic.example/', '203.0.113.7')['allow_redirects']);
+        // An address typed as the host needs no pin.
+        $this->assertArrayNotHasKey('curl', SiteReader::options('https://203.0.113.7/', '203.0.113.7'));
+    }
+
+    public function test_shared_and_reserved_ranges_are_not_public(): void
+    {
+        foreach (['100.64.0.1', '0.0.0.0', '::ffff:127.0.0.1', 'fe80::1', 'fd00::1', '192.0.0.8', '198.18.0.1'] as $ip) {
+            $this->assertFalse(SiteReader::isPublicIp($ip), $ip);
+            $this->assertNull(SiteReader::publicAddress($ip), $ip);
+        }
+        $this->assertTrue(SiteReader::isPublicIp('8.8.8.8'));
+        $this->assertSame('8.8.8.8', SiteReader::publicAddress('8.8.8.8'));
     }
 
     public function test_a_redirect_to_a_private_address_is_not_followed(): void

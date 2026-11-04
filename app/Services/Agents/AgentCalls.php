@@ -102,6 +102,18 @@ class AgentCalls
     }
 
     /** Calls on now across all of an owner's agents (a call that stopped reporting counts until it could have ended). */
+    /** The owner's start lock, held (null when the cache cannot lock, or another start keeps it too long). */
+    private function startLock(int $userId): ?\Illuminate\Contracts\Cache\Lock
+    {
+        try {
+            $lock = Cache::lock('agent-call-start:'.$userId, 10);
+
+            return $lock->block(5) ? $lock : null;
+        } catch (\BadMethodCallException|\Illuminate\Contracts\Cache\LockTimeoutException) {
+            return null;
+        }
+    }
+
     public function liveCalls(int $userId): int
     {
         $longest = AgentAccess::MAX_CALL_MINUTES * 60 + 30;
@@ -192,90 +204,97 @@ class AgentCalls
             return $this->refused($agent, $channel, 'plan');
         }
 
-        if (! $house) {
-            // The members' calls together, a day (Agents → Settings): a ceiling on what the site spends.
-            if (($siteMinutes = AgentAccess::siteDailyMinutes()) > 0) {
-                $site = $siteMinutes * 60 - $this->secondsSince($today, free: false);
-                if ($site < 30) {
-                    return ['ok' => false, 'error' => 'busy'];
-                }
-                $max = min($max, $site);
-            }
-            // Calls at the same time across all the owner's agents (their plan's number; one agent
-            // can use them all). A caller who finds them all taken waits in line, and the first to
-            // wait gets the next free one (WaitingLine).
-            if ($channel !== 'test') {
-                $waiter = WaitingLine::waiter($context['visitor'] ?? null);
-                $line = new WaitingLine($userId);
-                if ($this->liveCalls($userId) + $line->ahead($waiter) >= $limits['concurrent']) {
-                    return $this->linesBusy($agent, $channel, $line, $waiter);
-                }
-                if ($waiter !== null) {
-                    $line->leave($waiter);
-                }
-            }
-        }
-
-        $quotaPlan = $free ? null : $this->plans->resolveQuotaPlanForUserId($userId);
-        if (! $free) {
-            // The plan's call minutes a month (0: only the credits limit them).
-            if ($limits['minutes'] > 0) {
-                $left = $limits['minutes'] * 60 - $this->periodSeconds($userId);
-                if ($left < 30) {
-                    return $this->refused($agent, $channel, 'minutes');
-                }
-                $max = min($max, $left);
-            }
-            // The owner's own daily limit on this agent (its Setup tab), for callers.
-            $daily = (int) $agent->setting('daily_minutes', 0);
-            if ($daily > 0 && $channel !== 'test') {
-                $left = $daily * 60 - $this->secondsSince($today, agentId: $agent->id, free: false, channel: 'calls');
-                if ($left < 30) {
-                    return $this->refused($agent, $channel, 'daily');
-                }
-                $max = min($max, $left);
-            }
-            $affordable = $this->affordableSeconds($userId, $quotaPlan, $agent, $max);
-            if ($affordable < 30) {
-                return $this->refused($agent, $channel, 'credits');
-            }
-            $max = min($max, $affordable);
-        }
-
-        $callKey = Str::random(40);
-        $base = [
-            'agent_id' => $agent->id,
-            'user_id' => $userId,
-            'agent_widget_id' => $widget?->id,
-            'call_key_hash' => hash('sha256', $callKey),
-            'channel' => $channel,
-            'visitor_hash' => isset($context['visitor']) ? hash('sha256', (string) $context['visitor']) : null,
-            'origin' => Str::limit((string) ($context['origin'] ?? ''), 250, '') ?: null,
-            'page_url' => Str::limit((string) ($context['page_url'] ?? ''), 490, '') ?: null,
-            'country' => $context['country'] ?? null,
-            'status' => AgentConversation::LIVE,
-            'started_at' => now(),
-            'last_seen_at' => now(),
-            'free' => $free,
-            'transcript' => [],
-        ];
-
+        // One start at a time for an owner's callers, from the calls-at-once check until the call is
+        // kept, so callers arriving together never pass the plan's number between them.
+        $lock = $house || $channel === 'test' ? null : $this->startLock($userId);
         try {
-            if ($free) {
-                $conversation = AgentConversation::create($base + [
-                    'reservation' => ['seconds' => $max, 'credits' => 0, 'free' => true],
-                ]);
-            } else {
-                $estimate = ['chars' => $max * Credits::CHARS_PER_SECOND, 'words' => 0, 'seconds' => $max,
-                    'minutes' => (int) ceil($max / 60), 'credits' => self::creditsFor($max, $agent)];
-                $conversation = $this->meter->reserveCredits($userId, $quotaPlan, $estimate,
-                    fn (array $reservation) => AgentConversation::create($base + [
-                        'reservation' => $reservation,
-                        'period_ym' => $reservation['period'],
-                    ]));
+            if (! $house) {
+                // The members' calls together, a day (Agents → Settings): a ceiling on what the site spends.
+                if (($siteMinutes = AgentAccess::siteDailyMinutes()) > 0) {
+                    $site = $siteMinutes * 60 - $this->secondsSince($today, free: false);
+                    if ($site < 30) {
+                        return ['ok' => false, 'error' => 'busy'];
+                    }
+                    $max = min($max, $site);
+                }
+                // Calls at the same time across all the owner's agents (their plan's number; one agent
+                // can use them all). A caller who finds them all taken waits in line, and the first to
+                // wait gets the next free one (WaitingLine).
+                if ($channel !== 'test') {
+                    $waiter = WaitingLine::waiter($context['visitor'] ?? null);
+                    $line = new WaitingLine($userId);
+                    if ($this->liveCalls($userId) + $line->ahead($waiter) >= $limits['concurrent']) {
+                        return $this->linesBusy($agent, $channel, $line, $waiter);
+                    }
+                    if ($waiter !== null) {
+                        $line->leave($waiter);
+                    }
+                }
             }
-        } catch (ValidationException) {
-            return ['ok' => false, 'error' => 'credits'];
+
+            $quotaPlan = $free ? null : $this->plans->resolveQuotaPlanForUserId($userId);
+            if (! $free) {
+                // The plan's call minutes a month (0: only the credits limit them).
+                if ($limits['minutes'] > 0) {
+                    $left = $limits['minutes'] * 60 - $this->periodSeconds($userId);
+                    if ($left < 30) {
+                        return $this->refused($agent, $channel, 'minutes');
+                    }
+                    $max = min($max, $left);
+                }
+                // The owner's own daily limit on this agent (its Setup tab), for callers.
+                $daily = (int) $agent->setting('daily_minutes', 0);
+                if ($daily > 0 && $channel !== 'test') {
+                    $left = $daily * 60 - $this->secondsSince($today, agentId: $agent->id, free: false, channel: 'calls');
+                    if ($left < 30) {
+                        return $this->refused($agent, $channel, 'daily');
+                    }
+                    $max = min($max, $left);
+                }
+                $affordable = $this->affordableSeconds($userId, $quotaPlan, $agent, $max);
+                if ($affordable < 30) {
+                    return $this->refused($agent, $channel, 'credits');
+                }
+                $max = min($max, $affordable);
+            }
+
+            $callKey = Str::random(40);
+            $base = [
+                'agent_id' => $agent->id,
+                'user_id' => $userId,
+                'agent_widget_id' => $widget?->id,
+                'call_key_hash' => hash('sha256', $callKey),
+                'channel' => $channel,
+                'visitor_hash' => isset($context['visitor']) ? hash('sha256', (string) $context['visitor']) : null,
+                'origin' => Str::limit((string) ($context['origin'] ?? ''), 250, '') ?: null,
+                'page_url' => Str::limit((string) ($context['page_url'] ?? ''), 490, '') ?: null,
+                'country' => $context['country'] ?? null,
+                'status' => AgentConversation::LIVE,
+                'started_at' => now(),
+                'last_seen_at' => now(),
+                'free' => $free,
+                'transcript' => [],
+            ];
+
+            try {
+                if ($free) {
+                    $conversation = AgentConversation::create($base + [
+                        'reservation' => ['seconds' => $max, 'credits' => 0, 'free' => true],
+                    ]);
+                } else {
+                    $estimate = ['chars' => $max * Credits::CHARS_PER_SECOND, 'words' => 0, 'seconds' => $max,
+                        'minutes' => (int) ceil($max / 60), 'credits' => self::creditsFor($max, $agent)];
+                    $conversation = $this->meter->reserveCredits($userId, $quotaPlan, $estimate,
+                        fn (array $reservation) => AgentConversation::create($base + [
+                            'reservation' => $reservation,
+                            'period_ym' => $reservation['period'],
+                        ]));
+                }
+            } catch (ValidationException) {
+                return ['ok' => false, 'error' => 'credits'];
+            }
+        } finally {
+            $lock?->release();
         }
 
         $key = $this->gemini->liveToken(LiveSession::setupFor($agent), $max + 20);
@@ -513,7 +532,7 @@ class AgentCalls
     public function tool(AgentConversation $conversation, string $name, array $args): array
     {
         if ($name === 'save_contact') {
-            $clean = fn ($v, int $max) => Str::limit(trim(strip_tags((string) $v)), $max, '');
+            $clean = fn ($v, int $max) => \App\Support\Agents\CardNumbers::mask(Str::limit(trim(strip_tags((string) $v)), $max, ''));
             $lead = array_filter([
                 'name' => $clean($args['name'] ?? '', 120),
                 'phone' => $clean(preg_replace('/[^\d+]/', '', (string) ($args['phone'] ?? '')), 40),
@@ -523,11 +542,24 @@ class AgentCalls
             if (($lead['phone'] ?? '') === '' && ($lead['email'] ?? '') === '') {
                 return ['result' => 'missing', 'message' => 'Ask for a phone number or an email first.'];
             }
+            // A phone number is 7 to 15 digits (with its country code): anything else was misheard.
+            $digits = strlen(preg_replace('/\D/', '', (string) ($lead['phone'] ?? '')));
+            if (($lead['phone'] ?? '') !== '' && ($digits < 7 || $digits > 15)) {
+                return ['result' => 'invalid_phone', 'message' => 'That number does not look complete. Ask the caller kindly to say it again, then read it back.'];
+            }
+            // A few saves a call (a correction, an added address); more is someone playing with the tool.
+            $savesKey = 'agent-saves:'.$conversation->id;
+            Cache::add($savesKey, 0, now()->addHours(2));
+            if ((int) Cache::increment($savesKey) > 5) {
+                return ['result' => 'enough', 'message' => 'The details are already saved. Do not save again; tell the caller what happens next.'];
+            }
             $conversation->lead = array_merge($conversation->lead ?? [], $lead);
             $conversation->save();
             $this->rememberContact($conversation, $lead);
 
-            return ['result' => 'saved'];
+            // What the agent hears back: it tells the caller what happens next, never "it was saved"
+            // (a test call said "تم حفظ البيانات" and then asked a question it did not wait for).
+            return ['result' => 'saved', 'say' => 'Do not say it was saved. If you have not yet told the caller what happens next, tell them in one short sentence, then wait for them.'];
         }
         if ($name === 'end_call') {
             $conversation->end_reason = Str::limit((string) ($args['reason'] ?? 'done'), 30, '');
@@ -545,8 +577,14 @@ class AgentCalls
      */
     public function end(AgentConversation $conversation, array $turns = [], ?array $usage = null, string $reason = 'done'): AgentConversation
     {
+        // A finished call whose end was already kept stays as it is: its call key cannot rewrite
+        // its words or its cost afterwards. (A call settled while its browser was quiet still
+        // takes the browser's last words and token counts, once.)
+        if ($conversation->settled_at !== null && $conversation->usage !== null) {
+            return $conversation;
+        }
         $this->appendTurns($conversation, $turns);
-        if ($usage !== null) {
+        if ($usage !== null && $conversation->usage === null) {
             $conversation->usage = $usage;
             $conversation->cost_usd = self::costOf($usage);
         }
@@ -630,7 +668,7 @@ class AgentCalls
     {
         $transcript = $conversation->transcript ?? [];
         foreach (array_slice($turns, 0, 60) as $turn) {
-            $text = Str::limit(trim(strip_tags((string) ($turn['text'] ?? ''))), 2000, '');
+            $text = \App\Support\Agents\CardNumbers::mask(Str::limit(trim(strip_tags((string) ($turn['text'] ?? ''))), 2000, ''));
             $role = ($turn['role'] ?? '') === 'agent' ? 'agent' : 'caller';
             if ($text === '') {
                 continue;

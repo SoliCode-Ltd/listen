@@ -42,7 +42,7 @@ class AgentBrainTest extends TestCase
     {
         $text = AgentInstructions::build($this->agent());
 
-        $this->assertStringContainsString('You are Fatima, the voice assistant of Riyadh Dental', $text);
+        $this->assertStringContainsString('You are Fatima, the AI voice assistant of Riyadh Dental', $text);
         $this->assertStringContainsString('Najdi', $text);
         $this->assertStringContainsString('وش (what)', $text);
         // The voice test caught a Saudi agent saying تحب: now it is told not to.

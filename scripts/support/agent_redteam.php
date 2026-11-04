@@ -13,7 +13,7 @@
  *   clinic-ar, restaurant-ar, clinic-en  the demo page's businesses, with an
  *     owner's "never" rule, a handoff rule, and a line planted in their facts
  *     the way a website or a file could carry it (it must never be obeyed).
- * RT_PRINT=1 also prints the instructions (to stderr).
+ * RT_PRINT=1 also prints the instructions (to stderr). RT_SECONDS sets how long the call key lasts.
  *
  *   ssh user@host 'cd ~/public_html && RT_CASE=house-en php' < scripts/support/agent_redteam.php
  */
@@ -131,7 +131,8 @@ $instructions = AgentInstructions::build($agent);
 if (getenv('RT_PRINT') === '1') {
     fwrite(STDERR, "----- instructions for {$case} -----\n{$instructions}\n----- end -----\n");
 }
-$key = app(GeminiClient::class)->liveToken($setup, 900);
+// RT_SECONDS: how long the key lasts (60 at least), to check the speech service ends a call there.
+$key = app(GeminiClient::class)->liveToken($setup, max(60, (int) (getenv('RT_SECONDS') ?: 900)));
 if (! $key) {
     $fail('The speech service gave no call key (see the app log: "Agent live key was not made.").');
 }

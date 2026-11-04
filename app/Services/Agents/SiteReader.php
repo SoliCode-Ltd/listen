@@ -105,33 +105,72 @@ class SiteReader
     /** Whether a host may be read: a public name or address only. */
     public static function isPublicHost(string $host): bool
     {
+        return self::publicAddress($host) !== null;
+    }
+
+    /**
+     * The address a host is read from: when every address it resolves to is public, one of them
+     * (IPv4 first), else null. The reader connects to this very address (options()), so a name
+     * that answers a public address to this check and a private one to a second lookup (DNS
+     * rebinding) still never reaches this server's own network.
+     */
+    public static function publicAddress(string $host): ?string
+    {
         $host = strtolower(trim($host, '[]'));
         if ($host === '' || $host === 'localhost' || str_ends_with($host, '.localhost') || str_ends_with($host, '.local') || str_ends_with($host, '.internal')) {
-            return false;
+            return null;
         }
-        $ips = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : array_merge(
-            array_column(@dns_get_record($host, DNS_A) ?: [], 'ip'),
-            array_column(@dns_get_record($host, DNS_AAAA) ?: [], 'ipv6'),
-        );
-        if ($ips === []) {
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return self::isPublicIp($host) ? $host : null;
+        }
+        $v4 = array_column(@dns_get_record($host, DNS_A) ?: [], 'ip');
+        $v6 = array_column(@dns_get_record($host, DNS_AAAA) ?: [], 'ipv6');
+        if ($v4 === [] && $v6 === []) {
             $ip = gethostbyname($host);
-            $ips = $ip !== $host ? [$ip] : [];
+            $v4 = $ip !== $host ? [$ip] : [];
         }
+        $ips = array_merge($v4, $v6);
         if ($ips === []) {
-            return false;
+            return null;
         }
         foreach ($ips as $ip) {
-            if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-                return false;
+            if (! self::isPublicIp((string) $ip)) {
+                return null;
             }
         }
 
-        return true;
+        return (string) ($v4[0] ?? $ips[0]);
     }
 
-    protected function hostAllowed(string $host): bool
+    /** A public internet address: not private, reserved, shared (100.64/10), link-local or loopback. */
+    public static function isPublicIp(string $ip): bool
     {
-        return self::isPublicHost($host);
+        return (bool) filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE | FILTER_FLAG_GLOBAL_RANGE);
+    }
+
+    /** The address $host is read from, or null when it may not be read. */
+    protected function addressFor(string $host): ?string
+    {
+        return self::publicAddress($host);
+    }
+
+    /**
+     * The request's options: no redirects followed on their own (each hop is checked), and the
+     * connection pinned to the address that was checked.
+     *
+     * @return array<string, mixed>
+     */
+    public static function options(string $url, string $address): array
+    {
+        $options = ['allow_redirects' => false, 'stream' => false];
+        $host = strtolower(trim((string) parse_url($url, PHP_URL_HOST), '[]'));
+        if (filter_var($address, FILTER_VALIDATE_IP) && ! filter_var($host, FILTER_VALIDATE_IP) && defined('CURLOPT_RESOLVE')) {
+            $port = (int) (parse_url($url, PHP_URL_PORT) ?: (strtolower((string) parse_url($url, PHP_URL_SCHEME)) === 'http' ? 80 : 443));
+            $pinned = filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? "[{$address}]" : $address;
+            $options['curl'] = [CURLOPT_RESOLVE => ["{$host}:{$port}:{$pinned}"]];
+        }
+
+        return $options;
     }
 
     /** @return array{url: string, title: string, text: string, html: string}|null */
@@ -139,7 +178,8 @@ class SiteReader
     {
         for ($hop = 0; $hop < 4; $hop++) {
             $host = (string) parse_url($url, PHP_URL_HOST);
-            if (! $this->hostAllowed($host)) {
+            $address = $this->addressFor($host);
+            if ($address === null) {
                 return null;
             }
             try {
@@ -147,7 +187,7 @@ class SiteReader
                     'User-Agent' => 'ListenAgentReader/1.0 (+https://listenai.studio)',
                     'Accept' => 'text/html,application/xhtml+xml',
                     'Accept-Language' => 'ar,en;q=0.8',
-                ])->withOptions(['allow_redirects' => false, 'stream' => false])
+                ])->withOptions(self::options($url, $address))
                     ->timeout(12)->connectTimeout(6)->get($url);
             } catch (\Throwable) {
                 return null;

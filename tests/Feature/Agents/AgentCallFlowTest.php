@@ -155,9 +155,41 @@ class AgentCallFlowTest extends TestCase
         $this->assertEqualsWithDelta(0.00075 + 0.006 + 0.024, (float) $call->cost_usd, 0.00001); // text in, audio in, audio out
         $this->assertSame('+201012345678', AgentContact::where('agent_id', $agent->id)->sole()->phone);
 
-        // Ending twice never gives back twice.
-        $this->callApi('/calls/'.$id.'/end', ['call_key' => $callKey, 'turns' => []])->assertOk();
+        // Ending twice never gives back twice, and the call key cannot rewrite a finished call.
+        $this->callApi('/calls/'.$id.'/end', ['call_key' => $callKey, 'turns' => [['role' => 'agent', 'text' => 'كلام مضاف']], 'usage' => [
+            'promptTokenCount' => 9, 'promptTokensDetails' => [['modality' => 'TEXT', 'tokenCount' => 9]],
+        ]])->assertOk();
         $this->assertSame(AgentCalls::creditsFor(65), $this->creditsUsed($owner));
+        $call->refresh();
+        $this->assertCount(3, $call->transcript);
+        $this->assertEqualsWithDelta(0.00075 + 0.006 + 0.024, (float) $call->cost_usd, 0.00001);
+    }
+
+    public function test_saved_details_are_checked_and_card_numbers_never_kept(): void
+    {
+        $owner = $this->owner();
+        $agent = $this->liveAgent($owner);
+        $start = $this->callApi('/calls', ['key' => $agent->mainWidget()->public_key, 'visitor' => 'v-cards'])->assertOk();
+        $id = $start->json('conversation');
+        $callKey = $start->json('call_key');
+
+        // A misheard number is asked for again, not saved.
+        $this->callApi('/calls/'.$id.'/tool', ['call_key' => $callKey, 'name' => 'save_contact', 'args' => ['name' => 'Mona', 'phone' => '0100']])
+            ->assertOk()->assertJsonPath('result', 'invalid_phone');
+        $this->assertSame(0, AgentContact::where('agent_id', $agent->id)->count());
+
+        // A card number in the note or in the call's words is kept as its last four digits only.
+        $this->callApi('/calls/'.$id.'/tool', ['call_key' => $callKey, 'name' => 'save_contact', 'args' => ['name' => 'Mona', 'phone' => '+20 100 123 4567', 'note' => 'Card 4111 1111 1111 1111']])
+            ->assertOk()->assertJsonPath('result', 'saved');
+        $this->assertSame('Card •••• 1111', AgentContact::where('agent_id', $agent->id)->sole()->note);
+        $this->callApi('/calls/'.$id.'/ping', ['call_key' => $callKey, 'turns' => [['role' => 'caller', 'text' => 'رقم بطاقتي 5555 5555 5555 4444']]])->assertOk();
+        $this->assertSame('رقم بطاقتي •••• 4444', AgentConversation::where('public_id', $id)->sole()->transcript[0]['text']);
+
+        // A few saves a call; then the agent is told the details are already saved.
+        foreach (range(2, 5) as $i) {
+            $this->callApi('/calls/'.$id.'/tool', ['call_key' => $callKey, 'name' => 'save_contact', 'args' => ['phone' => '+20 100 123 456'.$i]])->assertJsonPath('result', 'saved');
+        }
+        $this->callApi('/calls/'.$id.'/tool', ['call_key' => $callKey, 'name' => 'save_contact', 'args' => ['phone' => '+20 100 123 4569']])->assertJsonPath('result', 'enough');
     }
 
     public function test_a_call_whose_browser_went_quiet_is_charged_up_to_its_last_ping(): void
