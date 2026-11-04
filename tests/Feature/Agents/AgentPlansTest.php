@@ -300,7 +300,7 @@ class AgentPlansTest extends TestCase
         $this->assertStringContainsString('a joke, a compliment or a playful question gets a warm, light, friendly answer', $text);
         // A lead is saved as soon as the number is confirmed (a caller who hangs up early is not lost),
         // and the call never ends straight after saving.
-        $this->assertStringContainsString('save as soon as the caller confirms their number', $text);
+        $this->assertStringContainsString('save as soon as the caller has confirmed the number you read back (never before)', $text);
         $this->assertStringContainsString('Never end it right after saving details: first ask if there is anything else', $text);
 
         $setup = \App\Services\Agents\LiveSession::setupFor($agent);

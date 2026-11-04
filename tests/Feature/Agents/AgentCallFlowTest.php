@@ -116,6 +116,8 @@ class AgentCallFlowTest extends TestCase
 
     public function test_a_call_holds_the_longest_call_and_charges_only_what_was_used(): void
     {
+        // The clock stands still between the steps, so a slow machine never adds a second.
+        $this->freezeTime();
         $owner = $this->owner();
         $agent = $this->liveAgent($owner);
         $key = $agent->mainWidget()->public_key;

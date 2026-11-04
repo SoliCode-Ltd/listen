@@ -60,6 +60,8 @@ class AgentBrainTest extends TestCase
         $egyptian = AgentInstructions::build($this->agent(['dialect' => 'ar-EG']));
         $this->assertStringContainsString('Cairene', $egyptian);
         $this->assertStringContainsString('Do not use Gulf or Levantine words', $egyptian);
+        // Arabic marks gender in "you": no guessing a caller is a man or a woman.
+        $this->assertStringContainsString('only once their voice or name makes it clear', $egyptian);
 
         $fusha = AgentInstructions::speech($this->agent(['dialect' => 'ar-XA']));
         $this->assertStringContainsString('Modern Standard Arabic', $fusha);
