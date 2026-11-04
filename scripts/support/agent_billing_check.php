@@ -21,6 +21,7 @@ use App\Models\Subscription;
 use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\Agents\AgentCalls;
+use App\Services\PlanAccessService;
 use App\Support\Agents\AgentAccess;
 use App\Support\Agents\HouseAgent;
 use Illuminate\Contracts\Console\Kernel;
@@ -125,29 +126,46 @@ try {
     $check(AgentConversation::query()->where('user_id', $user->id)->where('free', false)->sum('credits') == $used(),
         'the calls\' credits add up to the credits used');
 
-    // 4. Listen's own agent, owned by this member for the check: a visitor's call is paid by its
-    // owner like a member's agent (Agents → Settings, "use their owner's credits"), and only its
-    // seconds are taken. Rolled back with everything else.
+    // 4. Listen's own agent, lent to a member for one call: a visitor's call is paid by its owner
+    // when that account can pay for a whole call (Agents → Settings, "use their owner's credits"),
+    // and free when it cannot, so it never turns a visitor away. Rolled back with everything else.
     $house = ($id = HouseAgent::for('en')['agent'] ?? null) ? Agent::query()->where('public_id', $id)->first() : null;
     if (! $house || ! method_exists(AgentAccess::class, 'houseCharged')) {
         echo '  (Listen\'s own agent: not on this server, or this server\'s code does not charge it yet)'.PHP_EOL;
     } else {
-        $house->forceFill(['user_id' => $user->id])->save();
-        $house = $house->fresh();
-        $before = $used();
-        $hs = $calls->start($house, 'widget', $house->mainWidget(), ['origin' => rtrim((string) config('app.url'), '/'),
-            'visitor' => '203.0.113.9|billing-check-house', 'network' => '203.0.113.9']);
-        $check($hs['ok'] === true && $hs['free'] === false && $used() === $before + AgentCalls::creditsFor((int) $hs['max_seconds'], $house),
-            'Listen\'s own agent\'s call is paid by its owner: '.$n($used() - $before).' credits held for '.($hs['max_seconds'] ?? '?').' s'
-            .($hs['ok'] ? '' : ' ('.($hs['error'] ?? '?').')'));
-        if ($hs['ok']) {
-            Carbon::setTestNow(now()->addSeconds(50));
-            $ended = $calls->end($hs['conversation']->fresh(), [], null, 'done');
-            Carbon::setTestNow();
-            $expected = $ended->free ? 0 : AgentCalls::creditsFor((int) $ended->billed_seconds, $house);
-            $check(! $ended->free && (int) $ended->credits === $expected && $used() === $before + $expected,
-                'after 50 s it takes '.$n($ended->credits).' credits ('.$ended->billed_seconds.' s), the rest given back: used now '.$n($used()));
-        }
+        $houseCall = function (User $owner, string $who) use ($house, $calls, $check, $n): void {
+            $house->forceFill(['user_id' => $owner->id])->save();
+            $agent = $house->fresh();
+            $usedBy = fn (): int => (int) UsageCounter::query()->where('user_id', $owner->id)->sum('total_chars');
+            $quotaPlan = app(PlanAccessService::class)->resolveQuotaPlanForUserId($owner->id);
+            $pays = AgentAccess::limitsFor($owner->id)['included']
+                && $calls->affordableSeconds($owner->id, $quotaPlan, $agent, HouseAgent::MAX_SECONDS) >= HouseAgent::MAX_SECONDS;
+            $before = $usedBy();
+            $hs = $calls->start($agent, 'widget', $agent->mainWidget(), ['origin' => rtrim((string) config('app.url'), '/'),
+                'visitor' => '203.0.113.9|billing-check-house-'.$owner->id, 'network' => '203.0.113.9']);
+            $held = $usedBy() - $before;
+            $check($hs['ok'] === true && $hs['free'] === ! $pays && $held === ($pays ? AgentCalls::creditsFor((int) $hs['max_seconds'], $agent) : 0),
+                'Listen\'s own agent, owned by '.$who.': its call starts '
+                .($pays ? 'paid, holding '.$n($held).' credits for '.$hs['max_seconds'].' s' : 'free (a whole call costs more than the credits left)')
+                .($hs['ok'] ? '' : ' ('.($hs['error'] ?? '?').')'));
+            if ($hs['ok']) {
+                Carbon::setTestNow(now()->addSeconds(50));
+                $ended = $calls->end($hs['conversation']->fresh(), [], null, 'done');
+                Carbon::setTestNow();
+                $expected = $pays ? AgentCalls::creditsFor((int) $ended->billed_seconds, $agent) : 0;
+                $check((int) $ended->credits === $expected && $usedBy() === $before + $expected,
+                    '  after '.$ended->billed_seconds.' s it takes '.$n($expected).' credits from its owner, the rest given back');
+            }
+        };
+        // The member above, most of whose credits the calls above used.
+        $houseCall($user, 'the member above');
+        // A new member on the plan with agents that has the most credits.
+        $big = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->get()
+            ->filter(fn (Plan $p) => AgentAccess::limits($p)['included'])->sortByDesc('monthly_chars')->first();
+        $rich = User::query()->create(['name' => 'Billing check', 'email' => 'agent-billing-check-'.uniqid().'@example.test', 'password' => bcrypt(bin2hex(random_bytes(16)))]);
+        $rich->forceFill(['email_verified_at' => now()])->save();
+        Subscription::create(['user_id' => $rich->id, 'plan_id' => $big->id, 'status' => 'active']);
+        $houseCall($rich, 'a new member on '.$big->slug.' ('.$n($big->monthly_chars).' credits)');
     }
 } catch (Throwable $e) {
     $failures++;
