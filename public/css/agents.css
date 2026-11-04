@@ -202,7 +202,9 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-writing h2 { font-size: 1.5rem; font-weight: 800; }
 /* What is being done, as a timeline: no boxes, a dot for each step and a line from each dot to the
    next, the line filling with violet as a step is done; the step in hand turns, the next ones wait. */
-.ag-checks { display: grid; gap: 0; list-style: none; padding: 0; margin: 0; min-width: min(320px, 100%); text-align: start; }
+/* As wide as its longest step and no wider, so the whole timeline sits on the card's centre line
+   under the title (a wider box would leave the steps to one side of it). */
+.ag-checks { display: grid; gap: 0; list-style: none; padding: 0; margin: 0; width: max-content; max-width: 100%; justify-self: center; text-align: start; }
 .ag-checks li { position: relative; display: flex; align-items: center; gap: .95rem; min-height: 54px; padding: 0; color: var(--muted); font-size: 1rem; font-weight: 600; transition: color .3s ease; }
 .ag-checks li::before, .ag-checks li::after {
   content: ""; position: absolute; inset-inline-start: 12px; top: calc(50% + 17px); height: calc(100% - 34px);
