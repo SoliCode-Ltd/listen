@@ -86,9 +86,11 @@ try {
         Carbon::setTestNow(now()->addSeconds(65));
         $ended = $calls->end($c->fresh(), [], null, 'done');
         Carbon::setTestNow();
-        $expected = AgentCalls::creditsFor(65, $agent);
-        $check((int) $ended->billed_seconds === 65 && (int) $ended->credits === $expected,
-            'after 65 s it is charged '.$n($ended->credits).' credits (65 s at the rate: '.$n($expected).')');
+        // The start time is kept to the second, so a call can measure one second more.
+        $billed = (int) $ended->billed_seconds;
+        $expected = AgentCalls::creditsFor($billed, $agent);
+        $check(in_array($billed, [65, 66], true) && (int) $ended->credits === $expected,
+            'after 65 s it is charged '.$n($ended->credits).' credits ('.$billed.' s at the rate: '.$n($expected).')');
         $check($used() === $expected, 'the rest of the hold is given back: credits used now '.$n($used()));
     }
 
@@ -109,12 +111,15 @@ try {
         Carbon::setTestNow(now()->addSeconds(40));
         $ended = $calls->end($paidTest['conversation']->fresh(), [], null, 'done');
         Carbon::setTestNow();
-        $expected = AgentCalls::creditsFor(40, $agent);
-        $check((int) $ended->credits === $expected && $used() === $before + $expected, 'it is charged '.$n($ended->credits).' credits for 40 s (credits used now '.$n($used()).')');
+        $billed = (int) $ended->billed_seconds;
+        $expected = AgentCalls::creditsFor($billed, $agent);
+        $check(in_array($billed, [40, 41], true) && (int) $ended->credits === $expected && $used() === $before + $expected,
+            'after 40 s it is charged '.$n($ended->credits).' credits ('.$billed.' s at the rate: '.$n($expected).'; credits used now '.$n($used()).')');
     }
 
     // 3. What the member's Agents page shows: the paid seconds and credits of this period.
-    $check($calls->periodSeconds($user->id) === 65 + 40, 'the Agents page counts '.$calls->periodSeconds($user->id).' paid seconds this period');
+    $paid = (int) AgentConversation::query()->where('user_id', $user->id)->where('free', false)->sum('billed_seconds');
+    $check($calls->periodSeconds($user->id) === $paid, 'the Agents page counts '.$calls->periodSeconds($user->id).' paid seconds this period (the paid calls: '.$paid.' s)');
     $check(AgentConversation::query()->where('user_id', $user->id)->where('free', false)->sum('credits') == $used(),
         'the calls\' credits add up to the credits used');
 } catch (Throwable $e) {
