@@ -173,6 +173,9 @@ async function talk(spec, k, hooks = {}) {
   const total = newTotal();
   const tools = [];
   let agentText = '', turnAudio = 0, firstAudioAt = 0, sentAt = 0, waiter = null, hungUp = false, closed = false;
+  // After a tool answer the agent speaks again (as in a real call, where the caller hears that reply
+  // before they talk): the turn that carried the tool call is not the end of the agent's turn.
+  let toolWait = false, heardSinceTool = false;
   const latencies = [];
   const transcript = [];
 
@@ -195,6 +198,7 @@ async function talk(spec, k, hooks = {}) {
         tools.push(fc.name);
         say(`${at()}  [tool ${fc.name} ${JSON.stringify(fc.args || {})}]`);
         if (fc.name === 'end_call') { hungUp = true; setTimeout(() => finishTurn('end_call'), 1500); continue; }
+        toolWait = true; heardSinceTool = false;
         // As the server answers (AgentCalls::tool).
         const result = hooks.tool ? hooks.tool(fc) : { result: 'saved', say: 'Do not say it was saved. If the order or booking still needs details, ask for them now and save again once you have them; otherwise tell the caller in one short sentence what happens next and ask if there is anything else.' };
         Promise.resolve(result).then((r) => { if (ws.readyState === 1) ws.send(JSON.stringify({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: r || { result: 'ok' } }] } })); });
@@ -206,6 +210,7 @@ async function talk(spec, k, hooks = {}) {
     if (sc.outputTranscription && sc.outputTranscription.text && !hungUp) agentText += sc.outputTranscription.text;
     for (const p of (sc.modelTurn && sc.modelTurn.parts) || []) {
       if (p.inlineData && p.inlineData.data) {
+        if (toolWait) heardSinceTool = true;
         if (!firstAudioAt) { firstAudioAt = Date.now(); if (sentAt) latencies.push(firstAudioAt - sentAt); }
         turnAudio += Math.floor(p.inlineData.data.length * 3 / 4);
       }
@@ -213,6 +218,8 @@ async function talk(spec, k, hooks = {}) {
     if (sc.turnComplete) {
       if (agentText.trim()) { say(`${at()}  AGENT: ${agentText.trim()}`); transcript.push({ role: 'agent', text: agentText.trim() }); }
       agentText = '';
+      if (toolWait && !heardSinceTool) return;
+      toolWait = false;
       finishTurn('done');
     }
   };

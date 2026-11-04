@@ -302,6 +302,11 @@ class AgentPlansTest extends TestCase
         // and the call never ends straight after saving.
         $this->assertStringContainsString('save as soon as the caller has confirmed the number you read back (never before)', $text);
         $this->assertStringContainsString('Never end it right after saving details: first ask if there is anything else', $text);
+        // A goodbye ends the call even with a detail missing; prices are said as written; an emergency
+        // gets one sentence, no disclaimer (the fourth round of test calls).
+        $this->assertStringContainsString('Once the caller says goodbye, ask nothing more, even if a detail is still missing', $text);
+        $this->assertStringContainsString('exactly as the facts write them: never round, guess or change a number', $text);
+        $this->assertStringContainsString('emergency services straight away, with no disclaimer and no advice of your own', $text);
 
         $setup = \App\Services\Agents\LiveSession::setupFor($agent);
         $base = AgentCost::tokensIn($text);
