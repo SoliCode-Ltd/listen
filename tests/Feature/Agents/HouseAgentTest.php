@@ -80,6 +80,19 @@ class HouseAgentTest extends TestCase
         $this->page('en', 'dashboard')->assertOk()->assertDontSee('data-agent="'.$key.'"', false);
     }
 
+    public function test_the_agents_page_calls_it_by_the_name_it_has_now(): void
+    {
+        User::factory()->create(['is_admin' => true]);
+        $this->artisan('agents:house')->assertSuccessful();
+        $this->page('ar', 'agents-landing')->assertOk()->assertSee('تحدّث مع سارة الآن')->assertSee('اسأل سارة، وكيل إسمع نفسه');
+
+        // Given a man's voice, it takes his name (HouseAgent::texts), and the page says it.
+        Agent::where('public_id', HouseAgent::for('ar')['agent'])->update(['name' => 'وليد']);
+        $this->page('ar', 'agents-landing')->assertOk()->assertSee('تحدّث مع وليد الآن')->assertSee('اسأل وليد، وكيل إسمع نفسه')
+            ->assertDontSee('تحدّث مع سارة الآن');
+        $this->page('en', 'agents-landing')->assertOk()->assertSee('Talk to Sara now');
+    }
+
     public function test_its_call_button_loads_on_listens_own_pages(): void
     {
         User::factory()->create(['is_admin' => true]);

@@ -103,7 +103,7 @@ return [
     'honest' => 'Callers always know it is an AI assistant, and it never asks for card numbers or passwords.',
 
     'how_step_of' => 'Step :n of :total',
-    'talk_live' => 'Talk to Sara now',
+    'talk_live' => 'Talk to :name now',
     'talk_live_note' => 'A real call with Listen\'s own agent. Allow the microphone when asked.',
     'link_demo' => 'listenai.studio/talk/cairo-smiles',
 
@@ -284,7 +284,7 @@ return [
     'faq_text' => 'What business owners ask before their agent answers its first customer.',
     'faq_more_title' => 'Still have a question?',
     'faq_more_text' => 'Write to our team.',
-    'faq_more_live' => 'Ask Sara, Listen\'s own agent, out loud right now, or write to our team.',
+    'faq_more_live' => 'Ask :name, Listen\'s own agent, out loud right now, or write to our team.',
     'faq_contact' => 'Write to us',
     'faq' => [
         ['Does it sound like a robot?', 'No. It speaks naturally in your customers\' dialect, answers in under a second and lets callers interrupt it, like a person on the phone.'],
