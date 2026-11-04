@@ -93,10 +93,31 @@ final class SpokenNumbers
      */
     public static function forDisplay(string $text, bool $rtl = false): string
     {
-        $text = preg_replace(['/<!--.*?-->/su', '/<[^>]*>/u', '/\{[^}]*\}/u'], '', $text) ?? $text;
+        $text = self::withoutMarks($text);
         $text = trim(preg_replace('/\s+/u', ' ', self::digits($text)) ?? $text);
 
         return $rtl ? self::isolate($text) : $text;
+    }
+
+    /**
+     * What nobody said taken out of a line: the transcription's marks (<no speech detected>,
+     * {pause}) and a tool call the model wrote out instead of making it
+     * (<metadata>{"action": "end_call", …}</metadata>, seen once on a test call). Braces may nest.
+     * The same rules as public/js/agent-call.js.
+     */
+    public static function withoutMarks(string $text): string
+    {
+        $text = preg_replace([
+            '/<!--.*?-->/su',
+            '/<(metadata|tool_call|function_call)\b[^>]*>.*?<\/\1>/isu',
+            '/<(metadata|tool_call|function_call)\b[^>]*>.*$/isu',
+            '/<[^>]*>/u',
+        ], '', $text) ?? $text;
+        for ($i = 0; $i < 3 && preg_match('/\{[^{}]*\}/u', $text); $i++) {
+            $text = preg_replace('/\{[^{}]*\}/u', '', $text) ?? $text;
+        }
+
+        return str_replace(['{', '}'], '', $text);
     }
 
     /**

@@ -668,7 +668,7 @@ class AgentCalls
     {
         $transcript = $conversation->transcript ?? [];
         foreach (array_slice($turns, 0, 60) as $turn) {
-            $text = \App\Support\Agents\CardNumbers::mask(Str::limit(trim(strip_tags((string) ($turn['text'] ?? ''))), 2000, ''));
+            $text = \App\Support\Agents\CardNumbers::mask(Str::limit(trim(strip_tags(\App\Support\Agents\SpokenNumbers::withoutMarks((string) ($turn['text'] ?? '')))), 2000, ''));
             $role = ($turn['role'] ?? '') === 'agent' ? 'agent' : 'caller';
             if ($text === '') {
                 continue;

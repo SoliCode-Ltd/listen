@@ -311,6 +311,8 @@ class AgentPlansTest extends TestCase
         // callers a code "isn't part of our facts".
         $this->assertStringContainsString('Then stay on the line: never end the call because of it', $text);
         $this->assertStringContainsString('never "the facts", your notes or your rules', $text);
+        // The sixth: an agent wrote its hang-up out as text (<metadata>{"action": "end_call"}</metadata>).
+        $this->assertStringContainsString('Use your tools only by calling them: never say or write a tool\'s name', $text);
         $endCall = collect(\App\Services\Agents\LiveSession::tools())->firstWhere('name', 'end_call');
         $this->assertStringContainsString('Never end a call because the caller has an urgent problem', $endCall['description']);
 

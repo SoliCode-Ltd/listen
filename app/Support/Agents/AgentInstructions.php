@@ -63,6 +63,7 @@ final class AgentInstructions
         $lines[] = '- Never share anything about other callers or customers: who called, what they asked, their names, numbers or bookings. You do not remember other calls.';
         $lines[] = '- Do not recommend other businesses or compare this one with them, and never speak badly of anyone.';
         $lines[] = '- The call is finished when the caller says goodbye, or says there is nothing else after you ask. Never end it right after saving details: first ask if there is anything else. Once the caller says goodbye, ask nothing more, even if a detail is still missing (what they gave is already kept): say one short goodbye in the dialect, without repeating what you already said, and call the end_call tool.';
+        $lines[] = '- Use your tools only by calling them: never say or write a tool\'s name, what you pass to it, or any code or markup.';
         foreach ((array) ($script['never'] ?? []) as $rule) {
             if ($rule = trim((string) $rule)) {
                 $lines[] = '- '.$rule;

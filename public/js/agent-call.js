@@ -47,7 +47,12 @@
     var enWord = '(?:(?:double|triple)\\s+)?(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)';
     var enSeq = new RegExp('\\b' + enWord + '(?:(?:\\s*[,\\-]\\s*|\\s+)' + enWord + '){2,}\\b', 'gi');
     return function (text) {
-      text = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]*>/g, '').replace(/\{[^}]*\}/g, '');
+      // A tool call the model wrote out instead of making it (<metadata>{"action": "end_call", …}
+      // </metadata>, seen once on a test call) was never said either. Braces may nest.
+      text = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<(metadata|tool_call|function_call)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+        .replace(/<(metadata|tool_call|function_call)\b[^>]*>[\s\S]*$/gi, '').replace(/<[^>]*>/g, '');
+      for (var i = 0; i < 3 && /\{[^{}]*\}/.test(text); i++) text = text.replace(/\{[^{}]*\}/g, '');
+      text = text.replace(/[{}]/g, '');
       if (arSeq) text = text.replace(arSeq, function (m, pre, seq) { return pre + seq.match(arWord).map(function (w) { return AR_DIGITS[w]; }).join(''); });
       text = text.replace(enSeq, function (seq) {
         return seq.split(/\s*,\s*/).map(function (group) {
@@ -174,7 +179,14 @@
     }
     function flushTurns() {
       if (callerText.trim()) { turn('caller', callerText); callerText = ''; }
-      if (agentText.trim()) { turn('agent', agentText); agentText = ''; }
+      if (agentText.trim()) {
+        // A hang-up the model wrote out instead of calling end_call: its goodbye plays, then the
+        // call ends as if the tool had been called.
+        var endAsText = !ended && !hungUp && /["']?(?:action|name|tool)["']?\s*:\s*["']end_call["']/.test(agentText);
+        var why = (agentText.match(/["']?reason["']?\s*:\s*["']([a-z_]+)["']/) || [])[1];
+        turn('agent', agentText); agentText = '';
+        if (endAsText) runTool({ id: null, name: 'end_call', args: { reason: ['done', 'caller_left', 'out_of_scope', 'handoff', 'abusive'].indexOf(why) >= 0 ? why : 'done' } });
+      }
     }
     function addUsage(u) {
       if (!u) return;

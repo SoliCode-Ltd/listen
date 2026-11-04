@@ -50,6 +50,11 @@ class SpokenNumbersTest extends TestCase
     {
         $this->assertSame('مع السلامة.', SpokenNumbers::forDisplay('مع السلامة.<no speech detected>', true));
         $this->assertSame('Have a great day!', SpokenNumbers::forDisplay('Have a great day!<no speech>{pause}'));
+        // A hang-up the model wrote out instead of calling it (a test call on staging): nothing of it
+        // shows, not even a stray brace; cut off before its closing tag, it still goes.
+        $this->assertSame('مع السلامة.', SpokenNumbers::forDisplay("مع السلامة.\n<metadata>{\"action\": \"end_call\", \"arguments\": {\"reason\": \"done\"}}</metadata>", true));
+        $this->assertSame('Goodbye.', SpokenNumbers::forDisplay('Goodbye. <metadata>{"action": "end_call", "arguments": {"reason"'));
+        $this->assertSame('Thanks, bye.', SpokenNumbers::withoutMarks('Thanks, {"tool": {"name": "end_call"}}bye.'));
         $this->assertSame("محمد · \u{2066}050 123 4567\u{2069}", SpokenNumbers::forDisplay('محمد · 050 123 4567', true));
     }
 }

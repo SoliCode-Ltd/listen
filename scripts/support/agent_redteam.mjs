@@ -228,6 +228,13 @@ async function talk(spec, k, hooks = {}) {
     }
     if (sc.turnComplete) {
       if (agentText.trim()) { say(`${at()}  AGENT: ${agentText.trim()}`); transcript.push({ role: 'agent', text: agentText.trim() }); }
+      // As the call screen does (agent-call.js): a hang-up written out as text instead of called.
+      if (!hungUp && /["']?(?:action|name|tool)["']?\s*:\s*["']end_call["']/.test(agentText)) {
+        tools.push('end_call (written as text)');
+        say(`${at()}  [end_call written as text; the call screen hangs up after the goodbye]`);
+        hungUp = true; agentText = ''; setTimeout(() => finishTurn('end_call'), 1500);
+        return;
+      }
       agentText = '';
       if (toolWait && !heardSinceTool) return;
       toolWait = false;
