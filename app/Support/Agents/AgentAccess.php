@@ -210,6 +210,16 @@ final class AgentAccess
         return max(0, $value !== null && $value !== '' ? (int) $value : 180);
     }
 
+    /**
+     * Whether Listen's own agents' calls take credits from the account that owns them, like a
+     * member's agent (so the owner sees what they use). A call that account cannot pay for goes
+     * on free all the same: Listen's own button never turns a visitor away for it.
+     */
+    public static function houseCharged(): bool
+    {
+        return (bool) self::setting('agents_house_charged', true);
+    }
+
     /** Whether an agent is checked by the text model before it first goes live. */
     public static function reviewOn(): bool
     {

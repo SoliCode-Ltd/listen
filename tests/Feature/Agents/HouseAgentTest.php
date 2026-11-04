@@ -5,11 +5,17 @@ namespace Tests\Feature\Agents;
 use App\Models\Agent;
 use App\Models\AgentConversation;
 use App\Models\Plan;
+use App\Models\SiteSetting;
+use App\Models\Subscription;
+use App\Models\UsageCounter;
 use App\Models\User;
 use App\Models\Voice;
+use App\Services\Agents\AgentCalls;
 use App\Support\Agents\HouseAgent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
 use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath;
 use Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect;
@@ -34,7 +40,7 @@ class HouseAgentTest extends TestCase
             'internal_voice_id' => 'ar-Gemini-HD-Achernar', 'provider' => 'gemini', 'provider_voice_id' => 'Achernar', 'is_active' => true]);
     }
 
-    private function page(string $locale, string $route): \Illuminate\Testing\TestResponse
+    private function page(string $locale, string $route): TestResponse
     {
         app()->setLocale($locale);
 
@@ -107,8 +113,89 @@ class HouseAgentTest extends TestCase
         $this->getJson($url, ['Sec-Fetch-Site' => 'cross-site', 'Referer' => url('/en')])->assertForbidden();
     }
 
+    private function houseCall(string $locale = 'ar', string $visitor = 'v-house', string $ip = '203.0.113.7'): TestResponse
+    {
+        return $this->call('POST', '/agent-api/calls', [], [], [], ['CONTENT_TYPE' => 'text/plain', 'HTTP_ORIGIN' => rtrim(url('/'), '/'), 'REMOTE_ADDR' => $ip],
+            json_encode(['key' => HouseAgent::for($locale)['key'], 'visitor' => $visitor]))->assertOk();
+    }
+
+    /** The admin who owns Listen's own agents, on a plan with agents and $credits a month. */
+    private function ownerOnAgentsPlan(int $credits = 500000): User
+    {
+        $plan = Plan::factory()->create(['slug' => 'pro-'.uniqid(), 'price_cents' => 4500, 'voice_tier' => 'hd', 'monthly_chars' => $credits,
+            'allow_overage' => false, 'agents_enabled' => true, 'agent_concurrent_calls' => 20]);
+        $admin = User::factory()->create(['is_admin' => true]);
+        Subscription::create(['user_id' => $admin->id, 'plan_id' => $plan->id, 'status' => 'active']);
+
+        return $admin;
+    }
+
+    public function test_its_calls_are_paid_by_its_owner_like_a_members_agent(): void
+    {
+        $admin = $this->ownerOnAgentsPlan();
+        $this->artisan('agents:house')->assertSuccessful();
+        $agent = Agent::where('public_id', HouseAgent::for('ar')['agent'])->sole();
+
+        $call = $this->houseCall();
+        $this->assertFalse($call->json('free'));
+        $this->assertSame(HouseAgent::MAX_SECONDS, $call->json('max_seconds'));
+        $conversation = AgentConversation::where('public_id', $call->json('conversation'))->sole();
+        $held = AgentCalls::creditsFor(HouseAgent::MAX_SECONDS, $agent);
+        $this->assertSame($held, (int) $conversation->reservation['credits']);
+        $this->assertSame($held, (int) UsageCounter::where('user_id', $admin->id)->sum('total_chars'));
+
+        // It ends after 40 seconds: those seconds are charged, the rest of the hold comes back.
+        Carbon::setTestNow(now()->addSeconds(40));
+        $ended = app(AgentCalls::class)->end($conversation->fresh(), [], null, 'done');
+        Carbon::setTestNow();
+        $charged = AgentCalls::creditsFor((int) $ended->billed_seconds, $agent);
+        $this->assertContains((int) $ended->billed_seconds, [40, 41]);
+        $this->assertSame($charged, (int) $ended->credits);
+        $this->assertSame($charged, (int) UsageCounter::where('user_id', $admin->id)->sum('total_chars'));
+        // The owner's Agents page counts it with their call time.
+        $this->assertSame((int) $ended->billed_seconds, app(AgentCalls::class)->periodSeconds($admin->id));
+    }
+
+    public function test_it_still_answers_free_when_its_owner_cannot_pay_or_charging_is_off(): void
+    {
+        // Credits for less than one whole call: the visitor talks all the same, for free.
+        $admin = $this->ownerOnAgentsPlan(1000);
+        $this->artisan('agents:house')->assertSuccessful();
+        $call = $this->houseCall();
+        $this->assertTrue($call->json('free'));
+        $this->assertSame(HouseAgent::MAX_SECONDS, $call->json('max_seconds'));
+        $this->assertSame(0, (int) UsageCounter::where('user_id', $admin->id)->sum('total_chars'));
+
+        // Agents → Settings, "Listen's own agents use their owner's credits" off: free even for an owner who can pay.
+        $rich = $this->ownerOnAgentsPlan();
+        Agent::query()->update(['user_id' => $rich->id]);
+        SiteSetting::set('agents_house_charged', '0', 'agents');
+        $this->assertTrue($this->houseCall('ar', 'v-two', '203.0.113.8')->json('free'));
+        SiteSetting::set('agents_house_charged', '1', 'agents');
+        $this->assertFalse($this->houseCall('ar', 'v-three', '203.0.113.9')->json('free'));
+    }
+
+    public function test_its_test_calls_never_use_the_owners_free_test_minutes(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->artisan('agents:house')->assertSuccessful();
+        $agent = Agent::where('public_id', HouseAgent::for('en')['agent'])->sole();
+        $calls = app(AgentCalls::class);
+        $before = $calls->freeTestSecondsLeft($admin->id);
+
+        // No plan with agents: the test call is free, and the owner keeps their free test minutes.
+        $test = $calls->start($agent, 'test', $agent->mainWidget(), ['visitor' => '203.0.113.5|owner']);
+        $this->assertTrue($test['ok'] && $test['free']);
+        $this->assertNull($calls->testBlock($agent));
+        Carbon::setTestNow(now()->addSeconds(90));
+        $calls->end($test['conversation']->fresh(), [], null, 'done');
+        Carbon::setTestNow();
+        $this->assertSame($before, $calls->freeTestSecondsLeft($admin->id));
+    }
+
     public function test_its_calls_are_on_listen_and_short(): void
     {
+        // An owner without a plan that has agents cannot pay: Listen's own agent answers free.
         $admin = User::factory()->create(['is_admin' => true]);
         $this->artisan('agents:house')->assertSuccessful();
         $house = HouseAgent::for('ar');
@@ -119,7 +206,7 @@ class HouseAgentTest extends TestCase
         $this->assertTrue($call->json('free'));
         $this->assertSame(HouseAgent::MAX_SECONDS, $call->json('max_seconds'));
         $this->assertTrue(AgentConversation::where('public_id', $call->json('conversation'))->sole()->free);
-        $this->assertSame(0, (int) \App\Models\UsageCounter::where('user_id', $admin->id)->sum('total_chars'));
+        $this->assertSame(0, (int) UsageCounter::where('user_id', $admin->id)->sum('total_chars'));
         // Another website cannot carry Listen's own agent.
         $this->call('POST', '/agent-api/calls', [], [], [], ['CONTENT_TYPE' => 'text/plain', 'HTTP_ORIGIN' => 'https://copycat.example'],
             json_encode(['key' => $house['key']]))->assertForbidden();

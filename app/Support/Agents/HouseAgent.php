@@ -11,9 +11,10 @@ use App\Support\StudioFacts;
 /**
  * Listen's own agents (one Arabic, one English): they answer visitors on
  * Listen's public pages and are the live demo of Agents. They belong to an
- * admin, their calls are on Listen (no member's credits), and what they know
- * is built here from the plans and the studio's own counts, so it stays true.
- * Set up with `php artisan agents:house`.
+ * admin, whose credits pay for their calls when that account can (Agents →
+ * Settings; never a member's credits, and a call it cannot pay for is free),
+ * and what they know is built here from the plans and the studio's own counts,
+ * so it stays true. Set up with `php artisan agents:house`.
  */
 final class HouseAgent
 {
@@ -21,6 +22,24 @@ final class HouseAgent
 
     /** The longest call with a house agent. */
     public const MAX_SECONDS = 180;
+
+    /**
+     * The database ids of Listen's own agents, deleted ones too: set up as one, or listed in the
+     * setting.
+     *
+     * @return list<int>
+     */
+    public static function agentKeys(): array
+    {
+        $all = json_decode((string) SiteSetting::get(self::SETTING, ''), true);
+        $listed = is_array($all)
+            ? array_values(array_filter(array_map(fn ($row): string => is_array($row) ? (string) ($row['agent'] ?? '') : '', $all)))
+            : [];
+
+        return Agent::withTrashed()
+            ->where(fn ($q) => $q->whereNotNull('settings->house')->when($listed !== [], fn ($q) => $q->orWhereIn('public_id', $listed)))
+            ->pluck('id')->map(fn ($id): int => (int) $id)->all();
+    }
 
     /** @return array{key: string, slug: string, agent: string}|null */
     public static function for(string $locale): ?array

@@ -22,6 +22,7 @@ use App\Models\AgentConversation;
 use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\Agents\AgentCalls;
+use App\Services\PlanAccessService;
 use App\Support\Agents\AgentAccess;
 use App\Support\CreditPeriod;
 use Illuminate\Contracts\Console\Kernel;
@@ -69,15 +70,25 @@ $line('Free test seconds an owner gets', $n(AgentAccess::freeTestSeconds()));
 $line('Calls stopped for everyone', AgentAccess::callsStopped());
 echo PHP_EOL;
 
-echo '== Listen\'s own agents (their calls are on Listen: free)'.PHP_EOL;
+echo '== Listen\'s own agents (paid by the account that owns them when it can, else free)'.PHP_EOL;
 foreach ($agents->whereIn('id', $houseIds) as $agent) {
     $calls = AgentConversation::query()->where('agent_id', $agent->id)->where('started_at', '>=', $since)->get();
     $line('Agent '.$agent->id.' ('.$agent->language.', owner '.$agent->user_id.')', $calls->count().' calls in 30 days');
+    // Whether its owner pays for its calls now: a plan with agents, and credits for a whole call.
+    $owner = (int) $agent->user_id;
+    $limits = AgentAccess::limitsFor($owner);
+    $quotaPlan = app(PlanAccessService::class)->resolveQuotaPlanForUserId($owner);
+    $line('   owner\'s plan', ($quotaPlan?->slug ?? 'none').($limits['included'] ? ', with agents' : ', without agents'));
+    $line('   owner can pay for', $n(app(AgentCalls::class)->affordableSeconds($owner, $quotaPlan, $agent, 180)).' s of calls now');
+    $line('   charged to its owner (setting)', method_exists(AgentAccess::class, 'houseCharged') ? AgentAccess::houseCharged() : 'not on this server yet');
     foreach ($calls->groupBy('channel') as $channel => $group) {
         $line('   '.$channel, $group->count().' calls, '.$n($group->sum('billed_seconds')).' s, free '.$group->where('free', true)->count().', credits '.$n($group->sum('credits')));
     }
-    if ($calls->where('free', false)->isNotEmpty() || (int) $calls->sum('credits') > 0) {
-        $flag('agent '.$agent->id.' is Listen\'s own, but has calls that were not free.');
+    // A paid call takes what its seconds cost, like a member's call.
+    foreach ($calls->where('free', false)->whereNotNull('settled_at') as $call) {
+        if ((int) $call->credits !== AgentCalls::creditsFor((int) $call->billed_seconds, $agent)) {
+            $flag('call '.$call->id.' of Listen\'s own agent '.$agent->id.' took '.$n($call->credits).' credits for '.$call->billed_seconds.' s.');
+        }
     }
 }
 echo PHP_EOL;
