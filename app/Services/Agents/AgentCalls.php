@@ -10,6 +10,7 @@ use App\Services\Billing\MemberUsageMeter;
 use App\Services\PlanAccessService;
 use App\Support\Agents\AgentAccess;
 use App\Support\Agents\AgentCost;
+use App\Support\Agents\HouseAgent;
 use App\Support\Agents\WaitingLine;
 use App\Support\Credits;
 use App\Support\CreditPeriod;
@@ -59,12 +60,15 @@ class AgentCalls
         return (int) ceil(max(0, $seconds) * $rate / 60);
     }
 
-    /** Free test seconds the owner has left (their own test calls, all agents). */
+    /** Free test seconds the owner has left (their own test calls, all agents but Listen's own). */
     public function freeTestSecondsLeft(int $userId): int
     {
-        // A live free call counts its whole hold until it is settled.
+        // A live free call counts its whole hold until it is settled. Calls to Listen's own agents
+        // never use the free test minutes of the account that owns them.
+        $house = HouseAgent::agentKeys();
         $used = AgentConversation::query()
             ->where('user_id', $userId)->where('channel', 'test')->where('free', true)
+            ->when($house !== [], fn ($q) => $q->whereNotIn('agent_id', $house))
             ->get(['billed_seconds', 'reservation', 'settled_at'])
             ->sum(fn (AgentConversation $c) => $c->settled_at ? (int) $c->billed_seconds : (int) ($c->reservation['seconds'] ?? 0));
 
@@ -74,14 +78,21 @@ class AgentCalls
     /**
      * Seconds of calls since $since: settled calls by what they were billed, live ones by their
      * whole hold (they may still use it). Filtered by owner, agent, free or paid, and channel
-     * ('test' for the owners' own test calls, 'calls' for callers' calls).
+     * ('test' for the owners' own test calls, 'calls' for callers' calls), and to some agents
+     * ($agentIds) or all but some ($notAgentIds).
+     *
+     * @param  list<int>|null  $agentIds
+     * @param  list<int>|null  $notAgentIds
      */
-    public function secondsSince(\DateTimeInterface $since, ?int $userId = null, ?int $agentId = null, ?bool $free = null, ?string $channel = null): int
+    public function secondsSince(\DateTimeInterface $since, ?int $userId = null, ?int $agentId = null, ?bool $free = null, ?string $channel = null,
+        ?array $agentIds = null, ?array $notAgentIds = null): int
     {
         return (int) AgentConversation::query()
             ->where('started_at', '>=', $since)
             ->when($userId !== null, fn ($q) => $q->where('user_id', $userId))
             ->when($agentId !== null, fn ($q) => $q->where('agent_id', $agentId))
+            ->when($agentIds !== null, fn ($q) => $q->whereIn('agent_id', $agentIds))
+            ->when(! empty($notAgentIds), fn ($q) => $q->whereNotIn('agent_id', $notAgentIds))
             ->when($free !== null, fn ($q) => $q->where('free', $free))
             ->when($channel === 'test', fn ($q) => $q->where('channel', 'test'))
             ->when($channel === 'calls', fn ($q) => $q->where('channel', '!=', 'test'))
@@ -137,6 +148,10 @@ class AgentCalls
         if ($agent->setting('suspended')) {
             return 'suspended';
         }
+        // Listen's own agents always answer: paid by their owner when it can, free when it cannot.
+        if ($agent->setting('house')) {
+            return null;
+        }
         if ($this->freeTestSecondsLeft($userId) >= 20) {
             return null;
         }
@@ -172,15 +187,17 @@ class AgentCalls
 
         $free = false;
         $today = now()->startOfDay();
-        // Listen's own agents (HouseAgent): their calls are on Listen, short, and within their own
-        // daily budget, so a flood on the public pages never stops the members' agents.
+        // Listen's own agents (HouseAgent): short, and within their own daily budget (all their
+        // callers' calls, paid or free), so a flood on the public pages never stops the members'
+        // agents. They are paid by the account that owns them when it can pay for the whole call,
+        // so its owner sees what they use; when it cannot, the call is free: they always answer.
         if ($house) {
-            $free = true;
-            $site = AgentAccess::houseDailyMinutes() * 60 - $this->secondsSince($today, free: true, channel: 'calls');
+            $site = AgentAccess::houseDailyMinutes() * 60 - $this->secondsSince($today, channel: 'calls', agentIds: HouseAgent::agentKeys());
             if ($site < 20) {
                 return ['ok' => false, 'error' => 'busy'];
             }
-            $max = min($max, \App\Support\Agents\HouseAgent::MAX_SECONDS, $site);
+            $max = min($max, HouseAgent::MAX_SECONDS, $site);
+            $free = ! AgentAccess::houseCharged() || ! $this->ownerPaysWhole($agent, $max);
         } elseif ($channel === 'test') {
             $left = $this->freeTestSecondsLeft($userId);
             // The demo page's calls (DemoAgent) only ever use the free test seconds, never credits.
@@ -211,7 +228,7 @@ class AgentCalls
             if (! $house) {
                 // The members' calls together, a day (Agents → Settings): a ceiling on what the site spends.
                 if (($siteMinutes = AgentAccess::siteDailyMinutes()) > 0) {
-                    $site = $siteMinutes * 60 - $this->secondsSince($today, free: false);
+                    $site = $siteMinutes * 60 - $this->secondsSince($today, free: false, notAgentIds: HouseAgent::agentKeys());
                     if ($site < 30) {
                         return ['ok' => false, 'error' => 'busy'];
                     }
@@ -233,7 +250,8 @@ class AgentCalls
             }
 
             $quotaPlan = $free ? null : $this->plans->resolveQuotaPlanForUserId($userId);
-            if (! $free) {
+            // Listen's own agents were checked above (ownerPaysWhole): they are never turned away here.
+            if (! $free && ! $house) {
                 // The plan's call minutes a month (0: only the credits limit them).
                 if ($limits['minutes'] > 0) {
                     $left = $limits['minutes'] * 60 - $this->periodSeconds($userId);
@@ -280,11 +298,12 @@ class AgentCalls
                 $base['caller'] = $context['caller'];
             }
 
+            $freeCall = fn (): AgentConversation => AgentConversation::create(['free' => true] + $base + [
+                'reservation' => ['seconds' => $max, 'credits' => 0, 'free' => true],
+            ]);
             try {
                 if ($free) {
-                    $conversation = AgentConversation::create($base + [
-                        'reservation' => ['seconds' => $max, 'credits' => 0, 'free' => true],
-                    ]);
+                    $conversation = $freeCall();
                 } else {
                     $estimate = ['chars' => $max * Credits::CHARS_PER_SECOND, 'words' => 0, 'seconds' => $max,
                         'minutes' => (int) ceil($max / 60), 'credits' => self::creditsFor($max, $agent)];
@@ -295,7 +314,12 @@ class AgentCalls
                         ]));
                 }
             } catch (ValidationException) {
-                return ['ok' => false, 'error' => 'credits'];
+                if (! $house) {
+                    return ['ok' => false, 'error' => 'credits'];
+                }
+                // Listen's own agent: its owner's credits ran short just now; the caller still talks.
+                $free = true;
+                $conversation = $freeCall();
             }
         } finally {
             $lock?->release();
@@ -488,6 +512,24 @@ class AgentCalls
                 Cache::put('agent-block:'.$c->agent_id.':'.$hash, $why, now()->addHours($hours));
             }
         }
+    }
+
+    /**
+     * Whether the account that owns Listen's own agent can pay for a whole call of $seconds, as a
+     * member's call is checked: its plan has agents, and its call minutes and credits cover it.
+     */
+    private function ownerPaysWhole(Agent $agent, int $seconds): bool
+    {
+        $userId = (int) $agent->user_id;
+        $limits = AgentAccess::limitsFor($userId);
+        if (! $limits['included']) {
+            return false;
+        }
+        if ($limits['minutes'] > 0 && $seconds > $limits['minutes'] * 60 - $this->periodSeconds($userId)) {
+            return false;
+        }
+
+        return $this->affordableSeconds($userId, $this->plans->resolveQuotaPlanForUserId($userId), $agent, $seconds) >= $seconds;
     }
 
     /** Seconds of call the owner's plan can still pay for, at the agents' rate. */

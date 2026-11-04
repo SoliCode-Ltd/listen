@@ -53,6 +53,7 @@ class AgentSettings extends Page implements HasForms
             'agents_site_daily_minutes' => AgentAccess::siteDailyMinutes(),
             'agents_free_daily_minutes' => AgentAccess::freeDailyMinutes(),
             'agents_house_daily_minutes' => AgentAccess::houseDailyMinutes(),
+            'agents_house_charged' => AgentAccess::houseCharged(),
             'agents_review' => AgentAccess::reviewOn(),
         ]);
     }
@@ -98,6 +99,10 @@ class AgentSettings extends Page implements HasForms
                             ->suffix('minutes')
                             ->required()
                             ->helperText('Once per member, across all their agents: their own test calls, before they pay for calls.'),
+                        Forms\Components\Toggle::make('agents_house_charged')
+                            ->label('Listen\'s own agents use their owner\'s credits')
+                            ->helperText('Their calls (visitors\' and test calls) take credits from the account that owns them, like a member\'s agent, so you see what they use. A call that account cannot pay for in full (no plan with agents, or its minutes or credits used up) goes on free: visitors are never turned away. Off: all their calls are free.')
+                            ->columnSpan(2),
                         Forms\Components\Placeholder::make('agents_plans')
                             ->label('Each plan, at this rate')
                             ->content(fn (Forms\Get $get): HtmlString => self::plansTable(filled($get('agents_credits_per_minute')) ? max(1, (int) $get('agents_credits_per_minute')) : self::recommendedRate()))
@@ -202,6 +207,7 @@ class AgentSettings extends Page implements HasForms
         SiteSetting::set('agents_free_daily_minutes', (string) max(0, (int) ($state['agents_free_daily_minutes'] ?? 120)), self::GROUP);
         SiteSetting::set('agents_house_daily_minutes', (string) max(0, (int) ($state['agents_house_daily_minutes'] ?? 180)), self::GROUP);
         SiteSetting::set('agents_review', ! empty($state['agents_review']) ? '1' : '0', self::GROUP);
+        SiteSetting::set('agents_house_charged', ! empty($state['agents_house_charged']) ? '1' : '0', self::GROUP);
         SiteSetting::flushGroupCache(self::GROUP);
 
         Notification::make()->title('Agents settings saved.')->success()->send();
