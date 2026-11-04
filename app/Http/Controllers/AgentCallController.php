@@ -49,8 +49,9 @@ class AgentCallController extends Controller
         if (! $widget || ! $agent || ! $widget->enabled) {
             return response()->json(['error' => 'not_found'], 404);
         }
-        if (! $widget->allowsOrigin($request->headers->get('Origin'))) {
-            $widget->noteRefused($request->headers->get('Origin'));
+        $origin = self::askingOrigin($request);
+        if (! $widget->allowsOrigin($origin)) {
+            $widget->noteRefused($origin);
 
             return response()->json(['error' => 'origin', 'message' => __('agents.error_origin')], 403);
         }
@@ -118,6 +119,32 @@ class AgentCallController extends Controller
     }
 
     /**
+     * The website asking for the call button or a call: the request's Origin. A browser sends no
+     * Origin on a GET from the same website, so Listen's own pages (where Listen's own agent
+     * answers) were refused as "no website": there the page's address stands in. A request from
+     * another website always carries its real Origin (page scripts can neither drop it nor fake
+     * Sec-Fetch-Site), so a copy of the button elsewhere is still refused.
+     */
+    public static function askingOrigin(Request $request): ?string
+    {
+        $origin = trim((string) $request->headers->get('Origin', ''));
+        if ($origin !== '' && $origin !== 'null') {
+            return $origin;
+        }
+        // Without an Origin, only the same website (or a browser too old to say) is taken at its word.
+        $site = strtolower(trim((string) $request->headers->get('Sec-Fetch-Site', '')));
+        if ($site !== '' && $site !== 'same-origin') {
+            return null;
+        }
+        $referer = AgentWidget::normalizeOrigin($request->headers->get('Referer'));
+        if ($referer !== null) {
+            return $referer;
+        }
+
+        return $site === 'same-origin' ? AgentWidget::normalizeOrigin(url('/')) : null;
+    }
+
+    /**
      * Where the call button was last seen (and how it was added), so the owner
      * sees it working on their website. Written at most every ten minutes.
      */
@@ -157,7 +184,7 @@ class AgentCallController extends Controller
             return $this->error('not_found', 404);
         }
         $channel = ! empty($in['key']) ? 'widget' : 'link';
-        $origin = $request->headers->get('Origin');
+        $origin = self::askingOrigin($request);
         if ($channel === 'widget' && ! $widget->allowsOrigin($origin)) {
             $widget->noteRefused($origin);
 

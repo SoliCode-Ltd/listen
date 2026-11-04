@@ -80,6 +80,20 @@ class HouseAgentTest extends TestCase
         $this->page('en', 'dashboard')->assertOk()->assertDontSee('data-agent="'.$key.'"', false);
     }
 
+    public function test_its_call_button_loads_on_listens_own_pages(): void
+    {
+        User::factory()->create(['is_admin' => true]);
+        $this->artisan('agents:house')->assertSuccessful();
+        $url = '/agent-api/widgets/'.HouseAgent::for('en')['key'];
+
+        // The browser asks from Listen's own page, and a GET from the same website carries no Origin.
+        $this->getJson($url, ['Sec-Fetch-Site' => 'same-origin', 'Referer' => url('/en')])
+            ->assertOk()->assertJsonPath('available', true)->assertJsonPath('name', 'Sara');
+        // Another website still cannot load Listen's own agent.
+        $this->getJson($url, ['Origin' => 'https://copycat.example'])->assertForbidden();
+        $this->getJson($url, ['Sec-Fetch-Site' => 'cross-site', 'Referer' => url('/en')])->assertForbidden();
+    }
+
     public function test_its_calls_are_on_listen_and_short(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);

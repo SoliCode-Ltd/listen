@@ -114,6 +114,30 @@ class AgentCallFlowTest extends TestCase
         $this->assertSame('wordpress', $widget->installed_via);
     }
 
+    public function test_a_browser_asking_from_the_same_website_needs_no_origin_header(): void
+    {
+        $widget = $this->liveAgent($this->owner())->mainWidget();
+        $widget->forceFill(['allowed_origins' => [self::SITE]])->save();
+        $url = '/agent-api/widgets/'.$widget->public_key;
+
+        // A GET from the same website has no Origin: the browser marks it same-origin and the page's address stands in.
+        $this->getJson($url, ['Sec-Fetch-Site' => 'same-origin', 'Referer' => self::SITE.'/en?ref=1'])->assertOk()->assertJsonPath('available', true);
+        // A browser too old to mark it: the page's address too, and only an allowed one.
+        $this->getJson($url, ['Referer' => self::SITE.'/prices'])->assertOk();
+        $this->getJson($url, ['Referer' => 'https://copycat.example/'])->assertForbidden();
+        // From another website a browser always sends its Origin: without one, a page address there is not taken at its word.
+        $this->getJson($url, ['Sec-Fetch-Site' => 'cross-site', 'Referer' => self::SITE.'/en'])->assertForbidden();
+        $this->getJson($url, ['Origin' => 'https://copycat.example', 'Referer' => self::SITE.'/en'])->assertForbidden();
+        $this->getJson($url)->assertForbidden();
+
+        // A call starts the same way, and keeps the website, not the page's address.
+        $start = $this->call('POST', '/agent-api/calls', [], [], [], ['CONTENT_TYPE' => 'text/plain;charset=UTF-8', 'REMOTE_ADDR' => '203.0.113.9',
+            'HTTP_SEC_FETCH_SITE' => 'same-origin', 'HTTP_REFERER' => self::SITE.'/en?ref=1'], json_encode(['key' => $widget->public_key, 'visitor' => 'v-same']))->assertOk();
+        $this->assertSame(self::SITE, AgentConversation::where('public_id', $start->json('conversation'))->sole()->origin);
+        $this->call('POST', '/agent-api/calls', [], [], [], ['CONTENT_TYPE' => 'text/plain;charset=UTF-8', 'REMOTE_ADDR' => '203.0.113.9',
+            'HTTP_SEC_FETCH_SITE' => 'cross-site', 'HTTP_REFERER' => self::SITE.'/en'], json_encode(['key' => $widget->public_key, 'visitor' => 'v-other']))->assertForbidden();
+    }
+
     public function test_a_call_holds_the_longest_call_and_charges_only_what_was_used(): void
     {
         // The clock stands still between the steps, so a slow machine never adds a second.
