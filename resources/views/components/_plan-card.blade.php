@@ -186,5 +186,14 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
     </button>
   @endif
+  {{-- One pool: a plan with voice agents says its calls and its voice generation use the same credits. --}}
+  @php
+    $agentsKey = \App\Support\PlanPricingLines::labelKey(__('ui.pricing.lines.label_voice_agents'));
+    $hasAgentsLine = collect($cardLines)->contains(fn ($line) => \App\Support\PlanPricingLines::labelKey((string) ($line['label'] ?? '')) === $agentsKey
+      || preg_match('/voice agents?|الوكلاء الصوتي|وكلاء صوتي/iu', (string) ($line['label'] ?? '')));
+  @endphp
+  @if($hasAgentsLine)
+    <p class="plan-shared-note">{{ __('ui.pricing.credits_shared') }}</p>
+  @endif
   </div>
 </div>

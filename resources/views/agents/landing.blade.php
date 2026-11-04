@@ -110,11 +110,14 @@
           <button type="button" class="ag-btn ag-btn-lg agl-live-btn" data-agl-live hidden>{!! $micIcon !!}{{ __('agents_landing.talk_live') }}</button>
         </div>
         <p class="agl-note" data-agl-live-note hidden>{{ __('agents_landing.talk_live_note') }}</p>
-        @if($freeMinutes > 0)<p class="agl-note">{{ trans_choice('agents_landing.hero_note', $freeMinutes, ['count' => $freeMinutes]) }}</p>@endif
         <ul class="agl-facts">
           @foreach(__('agents_landing.home_facts') as $i => $fact)
             <li><svg viewBox="0 0 24 24" aria-hidden="true">{!! $factIcons[$i] ?? '' !!}</svg><span>{{ $fact }}</span></li>
           @endforeach
+          {{-- The free test minutes, one of the list (the owner's choice), not a note under the button. --}}
+          @if($freeMinutes > 0)
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v8.5a.5.5 0 0 1-.5.5h-15a.5.5 0 0 1-.5-.5V12M2.5 7.5h19V12h-19zM12 21V7.5M12 7.5H8a2.5 2.5 0 1 1 0-5c3 0 4 5 4 5zm0 0h4a2.5 2.5 0 1 0 0-5c-3 0-4 5-4 5z"/></svg><span>{{ rtrim(trans_choice('agents_landing.hero_note', $freeMinutes, ['count' => $freeMinutes]), '.') }}</span></li>
+          @endif
         </ul>
       </div>
       <div class="agl-hero-call" id="agl-real">

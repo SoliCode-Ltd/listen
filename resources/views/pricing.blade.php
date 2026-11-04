@@ -377,6 +377,7 @@
 
     /* On phones a long card shows its first four lines, and a button for the rest. */
     .plan-more { display: none; }
+    .plan-shared-note { margin: .7rem 0 0; color: var(--muted, #6b6785); font-size: .8rem; line-height: 1.5; text-wrap: pretty; }
     @media (max-width: 640px) {
       .can-fold .plan-card:not(.is-open) .plan-features.is-long li:nth-child(n+5) { display: none; }
       .can-fold .plan-card:not(.is-open) .plan-more { display: flex; }

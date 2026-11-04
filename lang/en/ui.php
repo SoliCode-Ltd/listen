@@ -227,6 +227,7 @@ return [
         'minutes_live' => ':minutes minutes a month: :plan',
         'all_plans' => 'All plans',
         'show_all_lines' => 'Show all features',
+        'credits_shared' => 'Credits are shared between voice generation and agent calls.',
         'voices_proof' => ':count+ dialects and accents on every plan',
         'monthly' => 'Monthly',
         'yearly' => 'Yearly',

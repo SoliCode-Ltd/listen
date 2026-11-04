@@ -620,14 +620,14 @@ html:has(.agl) { scroll-behavior: smooth; }
 /* The one control, on the voice itself: a white play button; while the call plays it turns into a quiet
    glass pause that comes forward under the pointer (always there on touch); at the end, play again. */
 .agl-real-play {
-  --agl-btn: 58px;
+  --agl-btn: 46px;
   position: absolute; inset: 0; z-index: 2; margin: auto; display: grid; place-items: center;
   width: var(--agl-btn); height: var(--agl-btn); padding: 0; border: 0; border-radius: 50%;
   background: #fff; color: var(--agl-ink); cursor: pointer;
-  box-shadow: 0 16px 34px -14px rgba(8, 6, 30, .6), 0 0 0 7px rgba(255, 255, 255, .12);
+  box-shadow: 0 12px 26px -12px rgba(8, 6, 30, .6), 0 0 0 5px rgba(255, 255, 255, .12);
   transition: transform .3s var(--agl-ease), background .3s ease, color .3s ease, box-shadow .3s ease, opacity .3s ease, width .3s var(--agl-ease), height .3s var(--agl-ease);
 }
-.agl-real-play svg { grid-area: 1 / 1; width: 22px; height: 22px; fill: currentColor; transition: opacity .22s ease, transform .3s var(--agl-ease); }
+.agl-real-play svg { grid-area: 1 / 1; width: 18px; height: 18px; fill: currentColor; transition: opacity .22s ease, transform .3s var(--agl-ease); }
 /* The play arrow points the same way in Arabic and English, a touch to the right to look centred. */
 .agl-real-play .is-play { transform: translateX(1.5px); }
 .agl-real-play .is-again { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
@@ -638,7 +638,7 @@ html:has(.agl) { scroll-behavior: smooth; }
 .agl-real-play:active { transform: scale(.95); }
 .agl-real-play:focus-visible { outline: 3px solid color-mix(in srgb, #fff 60%, transparent); outline-offset: 4px; }
 .agl-real-play[data-state="pause"] {
-  --agl-btn: 48px; background: rgba(255, 255, 255, .16); color: #fff; opacity: 0;
+  --agl-btn: 40px; background: rgba(255, 255, 255, .16); color: #fff; opacity: 0;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, .22); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
 }
 .agl-real-voice:hover .agl-real-play[data-state="pause"], .agl-real-play[data-state="pause"]:focus-visible { opacity: 1; }
