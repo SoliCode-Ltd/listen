@@ -196,7 +196,7 @@ async function talk(spec, k, hooks = {}) {
         say(`${at()}  [tool ${fc.name} ${JSON.stringify(fc.args || {})}]`);
         if (fc.name === 'end_call') { hungUp = true; setTimeout(() => finishTurn('end_call'), 1500); continue; }
         // As the server answers (AgentCalls::tool).
-        const result = hooks.tool ? hooks.tool(fc) : { result: 'saved', say: 'Do not say it was saved. If you have not yet told the caller what happens next, tell them in one short sentence, then wait for them.' };
+        const result = hooks.tool ? hooks.tool(fc) : { result: 'saved', say: 'Do not say it was saved. If the order or booking still needs details, ask for them now and save again once you have them; otherwise tell the caller in one short sentence what happens next and ask if there is anything else.' };
         Promise.resolve(result).then((r) => { if (ws.readyState === 1) ws.send(JSON.stringify({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: r || { result: 'ok' } }] } })); });
       }
     }

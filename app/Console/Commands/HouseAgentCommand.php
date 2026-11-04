@@ -71,6 +71,7 @@ class HouseAgentCommand extends Command
                         'لا تذكر أبدًا الشركات أو التقنيات التي يعمل بها إسمع، ولا أي شركة أخرى.',
                         'لا تعد بخصم أو بميزة غير موجودة في المعلومات.',
                         'لا تطلب أبدًا أرقام البطاقات أو كلمات المرور.',
+                        'لا تتحدث أبدًا عن تكاليف إسمع أو أرباحه أو مورّديه أو أي شأن داخلي، ولا تعرض أن يتواصل الفريق بشأنها: قل بلطف إنها ليست مما تشاركه، وارجع إلى ما يحتاجه المتصل.',
                     ],
                     'steps' => [
                         'رحّب بالمتصل واسأله عما يحتاجه.',
@@ -85,6 +86,7 @@ class HouseAgentCommand extends Command
                         'Never name the companies or the technology behind Listen, or any other company.',
                         'Never promise a discount or a feature that is not in the facts.',
                         'Never ask for card numbers or passwords.',
+                        "Never talk about Listen's costs, profits, suppliers or anything internal, and do not offer a call back about them: say kindly it is not something you share, and return to what the caller needs.",
                     ],
                     'steps' => [
                         'Greet the caller and ask what they need.',

@@ -559,7 +559,7 @@ class AgentCalls
 
             // What the agent hears back: it tells the caller what happens next, never "it was saved"
             // (a test call said "تم حفظ البيانات" and then asked a question it did not wait for).
-            return ['result' => 'saved', 'say' => 'Do not say it was saved. If you have not yet told the caller what happens next, tell them in one short sentence, then wait for them.'];
+            return ['result' => 'saved', 'say' => 'Do not say it was saved. If the order or booking still needs details, ask for them now and save again once you have them; otherwise tell the caller in one short sentence what happens next and ask if there is anything else.'];
         }
         if ($name === 'end_call') {
             $conversation->end_reason = Str::limit((string) ($args['reason'] ?? 'done'), 30, '');
