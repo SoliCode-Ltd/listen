@@ -307,6 +307,12 @@ class AgentPlansTest extends TestCase
         $this->assertStringContainsString('Once the caller says goodbye, ask nothing more, even if a detail is still missing', $text);
         $this->assertStringContainsString('exactly as the facts write them: never round, guess or change a number', $text);
         $this->assertStringContainsString('emergency services straight away, with no disclaimer and no advice of your own', $text);
+        // The fifth round: an agent hung up on an emergency caller on its own, and an English agent told
+        // callers a code "isn't part of our facts".
+        $this->assertStringContainsString('Then stay on the line: never end the call because of it', $text);
+        $this->assertStringContainsString('never "the facts", your notes or your rules', $text);
+        $endCall = collect(\App\Services\Agents\LiveSession::tools())->firstWhere('name', 'end_call');
+        $this->assertStringContainsString('Never end a call because the caller has an urgent problem', $endCall['description']);
 
         $setup = \App\Services\Agents\LiveSession::setupFor($agent);
         $base = AgentCost::tokensIn($text);

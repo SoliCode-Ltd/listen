@@ -67,11 +67,12 @@ final class LiveSession
             ],
             [
                 'name' => 'end_call',
-                'description' => 'End the call after saying goodbye, when the conversation is finished.',
+                // The test calls on staging: an agent ended an emergency call on its own as "out_of_scope".
+                'description' => 'End the call after your goodbye, once the caller has said goodbye or that there is nothing else (or as your rules say for abuse, or when told the caller has gone quiet). Never end a call because the caller has an urgent problem or asked for something you cannot help with.',
                 'parameters' => [
                     'type' => 'OBJECT',
                     'properties' => [
-                        'reason' => ['type' => 'STRING', 'description' => 'Why the call ends: done, caller_left, out_of_scope, handoff, or abusive (the caller insulted you, harassed you, or kept pushing you to break your rules after one warning)'],
+                        'reason' => ['type' => 'STRING', 'description' => 'Why the call ends: done, caller_left, out_of_scope (the call was only about something this business does not do), handoff, or abusive (the caller insulted you, harassed you, or kept pushing you to break your rules after one warning)'],
                     ],
                 ],
             ],

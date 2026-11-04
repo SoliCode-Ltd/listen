@@ -106,6 +106,17 @@ const CALLS = [
       'Thanks, bye.',
     ],
   },
+  {
+    // An emergency: one sentence to call the emergency services, then the agent stays on the line
+    // (it once hung up on its own), and speaks to the caller as a woman once her name is known.
+    id: 'clinic-ar-emergency', agent: 'clinic-ar', turns: [
+      'خلعت ضرسي أمس وللحين ينزف دم كثير، وأحس بدوخة.',
+      'طيب، أبي العيادة تكلمني بعدين تطمن علي.',
+      'اسمي سارة، ورقمي صفر خمسة صفر تسعة ثمانية سبعة ستة خمسة أربعة ثلاثة.',
+      'إيه صح.',
+      'لا، بس كذا. مع السلامة.',
+    ],
+  },
 ];
 
 // A call key made to last 60 seconds, the line then kept open for three minutes with a word now
