@@ -282,6 +282,13 @@ async function realCall(spec) {
 
 (async () => {
   if (typeof WebSocket === 'undefined') { console.error('Node 22 or newer is needed (WebSocket).'); process.exit(1); }
+  if (!ONLY.length || ONLY.includes('reader')) {
+    try {
+      const { stdout } = await run('bash', ['-c', '$S "$FIND; RT_CASE=reader php" < "$RT_PHP"'], { maxBuffer: 4 << 20, timeout: 120000 });
+      log('\n===== The website reader on the server =====');
+      for (const r of (JSON.parse(stdout.trim().split('\n').pop() || '{}').reader || [])) log(`  ${r.url}: ${r.ok ? 'read' : 'not read'}, ${r.pages} pages, ${r.chars} characters, address ${r.address || 'none'}`);
+    } catch (e) { log('  reader check FAILED: ' + (e.stderr || e.message || e)); }
+  }
   const calls = CALLS.filter((c) => !ONLY.length || ONLY.includes(c.id));
   let failed = 0, usd = 0, secs = 0;
   // Three calls at a time: each is a separate line, like three callers.

@@ -602,7 +602,7 @@ jobs:
           fi
           if [ "$MODE" = agent-redteam ]; then
             [ "$TARGET" = staging ] || { echo "agent-redteam runs on staging only"; exit 1; }
-            printf '%s' "$RT_ONLY" | grep -qE '^[a-z0-9,-]*$' || { echo "calls: ids such as clinic-ar,real-house-en"; exit 1; }
+            case "$RT_ONLY" in *[!a-z0-9,-]*) echo "calls: ids such as clinic-ar,real-house-en"; exit 1;; esac
             tool agent_redteam.php > rt.php
             failed=0
             S="$S" FIND="$FIND" RT_PHP="$PWD/rt.php" RT_ONLY="$RT_ONLY" RT_BASE=https://phplaravel-1516130-6707450.cloudwaysapps.com node scripts/support/agent_redteam.mjs || failed=1

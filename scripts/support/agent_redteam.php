@@ -66,6 +66,19 @@ if ($case === 'stored') {
     ], JSON_UNESCAPED_UNICODE), "\n";
     exit(0);
 }
+// The website reader on this server (its connection pinned to the address it checked): a public
+// page reads; this server's own network never does.
+if ($case === 'reader') {
+    $reader = new \App\Services\Agents\SiteReader;
+    $out = [];
+    foreach (['https://example.com', 'https://phplaravel-1516130-6707450.cloudwaysapps.com/en/agents', 'http://169.254.169.254/latest/meta-data', 'http://127.0.0.1/'] as $url) {
+        $r = $reader->read($url);
+        $out[] = ['url' => $url, 'ok' => (bool) ($r['ok'] ?? false), 'pages' => count($r['pages'] ?? []), 'chars' => mb_strlen((string) ($r['text'] ?? '')),
+            'address' => \App\Services\Agents\SiteReader::publicAddress((string) parse_url($url, PHP_URL_HOST))];
+    }
+    echo json_encode(['reader' => $out]), "\n";
+    exit(0);
+}
 if (str_starts_with($case, 'house-')) {
     $locale = $case === 'house-ar' ? 'ar' : 'en';
     $row = HouseAgent::for($locale);
