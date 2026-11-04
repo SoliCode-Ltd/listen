@@ -423,6 +423,7 @@
     var states = T.states || {};
     // The link page: every line busy, the caller's place in line, then a number to be called back.
     var sub = $('[data-ag-talk-sub]', root), leave = $('[data-ag-talk-leave]', root);
+    var pos = $('[data-ag-talk-pos]', root), posText = $('[data-ag-talk-pos-text]', root);
     var form = $('[data-ag-callback]', root), done = $('[data-ag-callback-done]', root);
     var buttons = $('.ag-talk-buttons', root), L = T.lines || {}, B = T.callback || {};
     var waitPos = 0, sentTo = null;
@@ -440,14 +441,18 @@
       stateEl.textContent = s === 'idle' || away ? '' : (s === 'mic' ? (T.mic || '') : waiting ? (L.waiting || '') : fill(states[key] || '', { name: (C.agent && C.agent.name) || '' }));
       stateEl.classList.toggle('is-error', s === 'error' || s === 'mic');
       var live = s === 'connecting' || s === 'listening' || s === 'speaking';
-      // While waiting the button gives up the wait, like hanging up while on hold.
-      btn.classList.toggle('is-live', live || waiting);
+      // While waiting the button quietly gives up the wait; "leave my number" is the main way on.
+      btn.classList.toggle('is-live', live);
+      btn.classList.toggle('is-quiet', waiting);
+      btn.classList.toggle('ag-btn-primary', !waiting);
+      root.classList.toggle('is-waiting', waiting);
       label.textContent = waiting ? (L.cancel || T.end) : live ? T.end : T.start;
       if (mute) mute.hidden = !live;
       stage.classList.toggle('is-speaking', s === 'speaking');
       stage.classList.toggle('is-live', live);
       stage.classList.toggle('is-waiting', waiting);
-      if (sub) { sub.hidden = !waiting; sub.textContent = waiting ? waitText() : ''; }
+      if (sub) sub.hidden = !waiting;
+      if (pos) { pos.hidden = !waiting; posText.textContent = waiting ? waitText() : ''; }
       if (leave) leave.hidden = !waiting;
       if (form) showCallback(s);
       if (!live && !waiting) { stage.classList.remove('is-playing'); stage.__vpLevel = 0; call = null; level(0, 0); }
@@ -574,7 +579,7 @@
           if (msg) toast(msg);
         },
         // Every line busy (the link page): the caller's place, kept fresh while they wait.
-        onWait: function (w) { waitPos = (w && w.position) || 0; if (sub && !sub.hidden) sub.textContent = waitText(); },
+        onWait: function (w) { waitPos = (w && w.position) || 0; if (pos && !pos.hidden) posText.textContent = waitText(); },
         patience: 60,
       });
       if (window.ListenOrbs) window.ListenOrbs.wake();

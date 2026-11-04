@@ -293,14 +293,36 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-talk-note svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .ag-talk-state:empty { display: none; }
 .ag-talk-state.is-error { color: var(--ag-bad); }
-/* Every line busy (the link page): the caller's place in line under the state, a quiet way to leave
-   a number, then the number itself and the thanks in place of the call. */
-.ag-talk-stage.is-waiting .ag-talk-halo { animation: ag-wait 2.8s ease-in-out infinite; }
+/* Every line busy (the link page): the orb a little smaller with a ring filling over the minute the
+   page waits, the caller's place in a pill, one calm line, then "leave my number" and a quiet cancel. */
+.ag-talk-ring { position: absolute; inset: -6px; width: calc(100% + 12px); height: calc(100% + 12px); transform: rotate(-90deg); opacity: 0; transition: opacity .35s ease; pointer-events: none; z-index: 2; }
+.ag-talk-ring circle { fill: none; stroke-width: 2.4; }
+.ag-talk-ring .t { stroke: var(--line); }
+.ag-talk-ring .p { stroke: var(--a); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; }
+.ag-talk-stage .ag-talk-face { transition: transform .5s var(--ag-ease); }
+.ag-talk-stage.is-waiting .ag-talk-face { transform: scale(.86); }
+.ag-talk-stage.is-waiting .ag-talk-ring { opacity: 1; }
+.ag-talk-stage.is-waiting .ag-talk-ring .p { animation: ag-ring-fill 60s linear forwards; }
+@keyframes ag-ring-fill { to { stroke-dashoffset: 0; } }
+.ag-talk-stage.is-waiting .ag-talk-halo { animation: ag-wait 3s ease-in-out infinite; }
 @keyframes ag-wait { 0%, 100% { opacity: .35; transform: scale(.96); } 50% { opacity: .8; transform: scale(1.06); } }
-.ag-talk-sub { margin: -.3rem 0 0; max-width: 34ch; color: var(--muted); font-size: .92rem; line-height: 1.55; text-wrap: balance; }
-.ag-talk-leave { min-height: 40px; padding: .4rem .8rem; border: 0; border-radius: 10px; background: none; color: var(--text); font: inherit; font-size: .9rem; font-weight: 700;
-  text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 4px; cursor: pointer; transition: background .2s ease; }
-.ag-talk-leave:hover { background: var(--ag-soft); }
+.ag-talk-pos { display: inline-flex; align-items: center; gap: .45rem; height: 30px; padding: 0 .85rem; border-radius: 999px; background: color-mix(in srgb, var(--a) 13%, transparent); color: var(--text); font-size: .84rem; font-weight: 800; }
+.ag-talk-pos i { width: 7px; height: 7px; border-radius: 50%; background: var(--a); animation: ag-pos-blink 1.4s ease-in-out infinite; }
+@keyframes ag-pos-blink { 50% { opacity: .35; } }
+.ag-talk-sub { margin: -.35rem 0 0; max-width: 34ch; color: var(--muted); font-size: .92rem; line-height: 1.55; text-wrap: balance; }
+.ag-talk-leave { width: min(320px, 100%); gap: .55rem; }
+.ag-talk-leave svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* While waiting the order is: orb, place, title, line, leave my number, cancel. */
+.ag-talk.is-waiting > * { order: 10; }
+.ag-talk.is-waiting > .ag-talk-stage { order: 1; }
+.ag-talk.is-waiting > .ag-talk-pos { order: 2; }
+.ag-talk.is-waiting > .ag-talk-state { order: 3; }
+.ag-talk.is-waiting > .ag-talk-sub { order: 4; }
+.ag-talk.is-waiting > .ag-talk-leave { order: 5; margin-top: .3rem; }
+.ag-talk.is-waiting > .ag-talk-buttons { order: 6; margin-top: -.3rem; }
+.ag-call-btn.is-quiet { min-width: 0; background: transparent; border-color: transparent; color: var(--muted); box-shadow: none; }
+.ag-call-btn.is-quiet:hover { background: var(--ag-soft); color: var(--text); }
+.ag-call-btn.is-quiet svg { display: none; }
 .ag-callback { display: grid; gap: .75rem; width: min(360px, 100%); text-align: center; animation: ag-callback-in .4s var(--ag-ease, cubic-bezier(.22, 1, .36, 1)) both; }
 @keyframes ag-callback-in { from { opacity: 0; transform: translateY(8px); } }
 .ag-callback h2 { margin: 0; font-size: 1.15rem; line-height: 1.35; text-wrap: balance; }
@@ -315,7 +337,7 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-callback-done bdi { color: var(--text); font-weight: 700; }
 /* Leaving a number, or done: the microphone note no longer applies. */
 .ag-talkpage-card:has([data-ag-callback]:not([hidden]), [data-ag-callback-done]:not([hidden])) .ag-talkpage-mic { display: none; }
-@media (prefers-reduced-motion: reduce) { .ag-talk-stage.is-waiting .ag-talk-halo, .ag-callback { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ag-talk-stage.is-waiting .ag-talk-halo, .ag-talk-stage.is-waiting .ag-talk-ring .p, .ag-talk-pos i, .ag-callback { animation: none; } }
 
 .ag-talk-buttons { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; }
 .ag-call-btn { min-width: 190px; }

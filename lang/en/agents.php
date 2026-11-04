@@ -497,9 +497,11 @@ return [
     // Every line on the business's plan taken: the caller waits for the next free one (agent's language).
     'lines' => [
         'waiting' => 'All lines are busy',
-        'next' => "You're next. We'll connect you the moment a line is free.",
-        'ahead' => "{1} One caller is ahead of you. We'll connect you as soon as it's your turn.|[2,*] :count callers are ahead of you. We'll connect you as soon as it's your turn.",
-        'leave' => 'Leave my number instead',
+        // The caller's place, in the pill above the title.
+        'next' => "You're next",
+        'ahead' => '{1} 1 caller ahead of you|[2,*] :count callers ahead of you',
+        'hold' => "Stay on this page and we'll connect you the moment a line is free.",
+        'leave' => 'Leave my number',
         'cancel' => 'Cancel',
     ],
     // Still busy, or the caller chose not to wait: they leave a number and the business calls back.

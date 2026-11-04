@@ -126,12 +126,26 @@
 
     /* Every line busy: the orb breathes slowly while the caller waits, their place under it. */
     '.lva-callview{display:contents}',
-    '.lva.is-waiting .lva-orb{animation:lva-breathe 2.8s ease-in-out infinite}',
-    '.lva.is-waiting .lva-wave i{animation:lva-idle 2.8s ease-in-out infinite}',
+    /* Waiting: the orb a little smaller and breathing slowly, a ring round it filling over the minute
+       the call button waits, the caller's place in a pill, then the way out. */
+    '.lva-orbwrap{transition:transform .5s ' + EASE + '}',
+    '.lva.is-waiting .lva-orbwrap{transform:scale(.84)}',
+    '.lva.is-waiting .lva-orb{animation:lva-breathe 3s ease-in-out infinite}',
+    '.lva.is-waiting .lva-wave i{animation:lva-idle 3s ease-in-out infinite}',
+    '.lva-ring{position:absolute;inset:-11px;width:calc(100% + 22px);height:calc(100% + 22px);transform:rotate(-90deg);opacity:0;transition:opacity .35s ease;pointer-events:none}',
+    '.lva-ring circle{fill:none;stroke-width:2.6}',
+    '.lva-ring .t{stroke:var(--line)}',
+    '.lva-ring .p{stroke:var(--a);stroke-linecap:round;stroke-dasharray:100;stroke-dashoffset:100}',
+    '.lva.is-waiting .lva-ring{opacity:1}',
+    '.lva.is-waiting .lva-ring .p{animation:lva-fill 60s linear forwards}',
+    '.lva-pos{align-self:center;display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 12px;margin:2px 0 -4px;border-radius:999px;background:color-mix(in srgb,var(--a) 13%,transparent);color:var(--text);font-size:12.5px;font-weight:800;animation:lva-in .35s ' + EASE + '}',
+    '.lva-pos i{width:7px;height:7px;border-radius:50%;background:var(--a);animation:lva-blink 1.4s ease-in-out infinite}',
     '.lva-sub{margin:-6px 0 0;text-align:center;color:var(--muted);font-size:13.5px;line-height:1.5;text-wrap:balance}',
     '.lva-sub:empty{display:none}',
-    '.lva-link{align-self:center;border:0;background:transparent;padding:6px 10px;margin:-4px 0;border-radius:10px;color:var(--text);font-weight:700;font-size:13.5px;text-decoration:underline;text-decoration-color:color-mix(in srgb,currentColor 35%,transparent);text-underline-offset:4px;transition:color .2s ease,background .2s ease}',
-    '.lva-link:hover{background:var(--soft)}',
+    '.lva.is-waiting .lva-buttons{flex-direction:column;align-items:stretch;gap:4px;margin-top:2px}',
+    '.lva-leave{width:100%}',
+    '.lva-call.is-quiet{background:transparent;color:var(--muted) !important;box-shadow:none;min-height:42px;font-weight:700;font-size:14.5px}',
+    '.lva-call.is-quiet:hover{background:var(--soft);color:var(--text) !important}',
     /* Leave a number: in the card, or above the slim bar. */
     '.lva-slot{display:grid;gap:10px;animation:lva-in .35s ' + EASE + '}',
     '.lva-slot h3{margin:0;font-size:16.5px;font-weight:800;line-height:1.35;text-align:center;text-wrap:balance}',
@@ -181,6 +195,7 @@
     '@keyframes lva-idle{0%,100%{height:var(--rest,12px)}50%{height:calc(var(--rest,12px) * 1.35)}}',
     '@keyframes lva-blink{0%,100%{opacity:1}50%{opacity:.35}}',
     '@keyframes lva-in{from{opacity:0;transform:translateY(6px)}}',
+    '@keyframes lva-fill{to{stroke-dashoffset:0}}',
     '@media (prefers-reduced-motion:reduce){.lva *,.lva *::before,.lva *::after{animation:none !important;transition:none !important}}',
   ].join('\n');
 
@@ -193,6 +208,7 @@
     end: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15.2c5-4.6 13-4.6 18 0l-2.3 2.7-3.7-1.4v-2.8a12.4 12.4 0 0 0-6 0v2.8l-3.7 1.4z"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    callback: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.1 3.5h3.1l1.6 4.1-2 1.3a11.3 11.3 0 0 0 5.3 5.3l1.3-2 4.1 1.6v3.1a2 2 0 0 1-2.2 2A16.6 16.6 0 0 1 3.1 5.7a2 2 0 0 1 2-2.2zM15 3h6v6M21 3l-6.5 6.5"/></svg>',
   };
   var WAVE = [0.3, 0.5, 0.72, 0.9, 1, 0.9, 0.72, 0.5, 0.3];
 
@@ -320,6 +336,13 @@
         wrap.appendChild(rings);
         wrap.appendChild(el('i', 'lva-spin'));
         wrap.appendChild(el('i', 'lva-orb'));
+        if (!small) {
+          var ring = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          ring.setAttribute('class', 'lva-ring');
+          ring.setAttribute('viewBox', '0 0 120 120');
+          ring.innerHTML = '<circle class="t" cx="60" cy="60" r="58"/><circle class="p" cx="60" cy="60" r="58" pathLength="100"/>';
+          wrap.appendChild(ring);
+        }
         return wrap;
       }
 
@@ -367,12 +390,18 @@
         parts.call.addEventListener('click', toggleCall);
         buttons.appendChild(parts.mute); buttons.appendChild(parts.call);
         // Every line busy: the caller's place under the line, and a way to leave a number instead.
+        parts.pos = el('span', 'lva-pos');
+        parts.pos.hidden = true;
+        parts.pos.appendChild(el('i'));
+        parts.posText = el('span');
+        parts.pos.appendChild(parts.posText);
         parts.sub = el('p', 'lva-sub');
-        parts.leave = linkButton(lineText().leave, leaveNumber);
+        parts.leave = leaveButton();
         parts.leave.hidden = true;
+        buttons.insertBefore(parts.leave, buttons.firstChild);
         // The call (or the wait), or in its place the form to leave a number and the thanks.
         parts.callBox = el('div', 'lva-callview');
-        [stage, parts.state, parts.sub, parts.lines, buttons, parts.leave].forEach(function (n) { parts.callBox.appendChild(n); });
+        [stage, parts.pos, parts.state, parts.sub, parts.lines, buttons].forEach(function (n) { parts.callBox.appendChild(n); });
         parts.slot = el('div', 'lva-slot');
         parts.slot.hidden = true;
         [head, parts.callBox, parts.slot, powered()].forEach(function (n) { panel.appendChild(n); });
@@ -429,7 +458,7 @@
         parts.tip.hidden = true;
         parts.tipText = el('span');
         parts.tipText.setAttribute('aria-live', 'polite');
-        parts.leave = linkButton(lineText().leave, leaveNumber);
+        parts.leave = leaveButton();
         parts.leave.hidden = true;
         parts.slot = el('div', 'lva-slot');
         parts.slot.hidden = true;
@@ -457,9 +486,17 @@
       return m;
     }
     function linkButton(label, onClick) {
-      var b = el('button', 'lva-link', label || '');
+      var b = el('button', 'lva-call is-quiet', label || '');
       b.type = 'button';
       b.addEventListener('click', onClick);
+      return b;
+    }
+    function leaveButton() {
+      var b = el('button', 'lva-call lva-leave');
+      b.type = 'button';
+      b.innerHTML = ICONS.callback;
+      b.appendChild(el('span', '', lineText().leave || ''));
+      b.addEventListener('click', leaveNumber);
       return b;
     }
     function powered() {
@@ -497,15 +534,17 @@
         parts.state.textContent = quiet ? '' : msg;
         parts.state.classList.toggle('is-error', stateNow === 'error' || stateNow === 'mic');
       }
-      if (parts.sub) parts.sub.textContent = waiting ? waitText() : '';
+      if (parts.pos) { parts.pos.hidden = !waiting; parts.posText.textContent = waiting ? waitText() : ''; }
+      if (parts.sub) parts.sub.textContent = waiting ? (lineText().hold || '') : '';
       if (parts.leave) parts.leave.hidden = !waiting;
       if (parts.callBox) parts.callBox.hidden = form;
       if (parts.slot) parts.slot.hidden = !form;
       if (parts.call) {
-        // While waiting the button gives up the wait, like hanging up while on hold.
-        parts.call.classList.toggle('is-live', on || waiting);
+        // While waiting the button quietly gives up the wait; "leave my number" is the main way on.
+        parts.call.classList.toggle('is-live', on);
+        parts.call.classList.toggle('is-quiet', waiting);
         parts.callLabel.textContent = waiting ? (lineText().cancel || text.end) : on ? text.end : text.start;
-        parts.callIcon.innerHTML = on || waiting ? ICONS.end : ICONS.phone;
+        parts.callIcon.innerHTML = waiting ? '' : on ? ICONS.end : ICONS.phone;
       }
       if (parts.mute) parts.mute.hidden = !on;
       if (parts.barState) parts.barState.textContent = on && startedAt && stateNow !== 'connecting' ? clock(elapsed()) : (form ? '' : msg);

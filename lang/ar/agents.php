@@ -517,9 +517,11 @@ return [
     // Every line on the business's plan taken: the caller waits for the next free one (agent's language).
     'lines' => [
         'waiting' => 'كل الخطوط مشغولة الآن',
-        'next' => 'أنت التالي، وسنوصلك فور أن يفرغ خط.',
-        'ahead' => '{1} أمامك متصل واحد، وسنوصلك فور أن يحين دورك.|{2} أمامك متصلان، وسنوصلك فور أن يحين دورك.|[3,10] أمامك :count متصلين، وسنوصلك فور أن يحين دورك.|[11,*] أمامك :count متصلًا، وسنوصلك فور أن يحين دورك.',
-        'leave' => 'ترك رقمي بدلًا من الانتظار',
+        // The caller's place, in the pill above the title.
+        'next' => 'أنت التالي',
+        'ahead' => '{1} أمامك متصل واحد|{2} أمامك متصلان|[3,10] أمامك :count متصلين|[11,*] أمامك :count متصلًا',
+        'hold' => 'سنوصلك فور أن يفرغ خط، ما دامت هذه الصفحة مفتوحة.',
+        'leave' => 'ترك رقمي',
         'cancel' => 'إلغاء',
     ],
     // Still busy, or the caller chose not to wait: they leave a number and the business calls back.

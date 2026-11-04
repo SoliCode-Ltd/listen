@@ -6,6 +6,10 @@
   <div class="ag-talk-stage" data-vp-track data-ag-stage>
     <span class="ag-talk-face" data-ag-talk-avatar>
       <span class="ag-talk-halo" aria-hidden="true"></span>
+      @if($callback ?? false)
+        {{-- Waiting for a line: a ring round the orb fills over the minute the page waits. --}}
+        <svg class="ag-talk-ring" viewBox="0 0 120 120" aria-hidden="true"><circle class="t" cx="60" cy="60" r="58"/><circle class="p" cx="60" cy="60" r="58" pathLength="100"/></svg>
+      @endif
       <span class="ag-talk-orb" data-ag-talk-orb><x-orb name="listen" :colors="$agent?->widgets()->oldest('id')->first()?->style()['colors']" /></span>
     </span>
   </div>
@@ -26,8 +30,12 @@
   {{-- The link page ($callback): every line busy, the caller's place in line and a way to leave a
        number instead; still busy, the number itself, then the thanks (agents.js talk()). --}}
   @if($callback ?? false)
-    <p class="ag-talk-sub" data-ag-talk-sub aria-live="polite" hidden></p>
-    <button type="button" class="ag-talk-leave" data-ag-talk-leave hidden>{{ __('agents.lines.leave') }}</button>
+    <span class="ag-talk-pos" data-ag-talk-pos hidden><i aria-hidden="true"></i><span data-ag-talk-pos-text aria-live="polite"></span></span>
+    <p class="ag-talk-sub" data-ag-talk-sub hidden>{{ __('agents.lines.hold') }}</p>
+    <button type="button" class="ag-btn ag-btn-primary ag-btn-lg ag-talk-leave" data-ag-talk-leave hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.1 3.5h3.1l1.6 4.1-2 1.3a11.3 11.3 0 0 0 5.3 5.3l1.3-2 4.1 1.6v3.1a2 2 0 0 1-2.2 2A16.6 16.6 0 0 1 3.1 5.7a2 2 0 0 1 2-2.2zM15 3h6v6M21 3l-6.5 6.5"/></svg>
+      {{ __('agents.lines.leave') }}
+    </button>
     <form class="ag-callback" data-ag-callback hidden novalidate>
       <h2>{{ __('agents.callback.title') }}</h2>
       <p>{{ __('agents.callback.text', ['business' => $agent->business_name]) }}</p>
@@ -35,7 +43,7 @@
       <label class="ag-callback-field"><span class="ag-label">{{ __('agents.callback.phone') }}</span><input class="ag-input" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="24" dir="ltr" required></label>
       <p class="ag-callback-error" data-ag-callback-error role="alert" hidden></p>
       <button type="submit" class="ag-btn ag-btn-primary ag-btn-lg" data-ag-callback-send>{{ __('agents.callback.send') }}</button>
-      <button type="button" class="ag-talk-leave" data-ag-callback-again>{{ __('agents.callback.again') }}</button>
+      <button type="button" class="ag-btn ag-btn-ghost" data-ag-callback-again>{{ __('agents.callback.again') }}</button>
     </form>
     <div class="ag-callback ag-callback-done" data-ag-callback-done role="status" tabindex="-1" hidden>
       <span class="ag-callback-tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
