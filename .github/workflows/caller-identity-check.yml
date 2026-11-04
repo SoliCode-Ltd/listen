@@ -1,0 +1,48 @@
+name: Caller identity check
+
+# Staging only: "who is calling" end to end on the real server
+# (scripts/support/caller_identity_check.php): a member signed in on Listen's
+# homepage gets their name and email, signed, on Listen's own call button; the
+# signature checks out for that button only; a call started with it keeps who
+# called (once the caller column is migrated); the WordPress plugin carries the
+# same secret. Everything runs in one database transaction that is rolled back:
+# nothing stays. Listen's own agent's calls are free. A push of this file or
+# the script runs it.
+
+on:
+  push:
+    branches: [claude/beautiful-sagan-df90b3]
+    paths:
+      - .github/workflows/caller-identity-check.yml
+      - scripts/support/caller_identity_check.php
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check on staging over SSH
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_check
+          chmod 600 ~/.ssh/id_check
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; \$(command -v php8.4 || command -v php)"
+          ssh -i ~/.ssh/id_check -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" < scripts/support/caller_identity_check.php
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_check
