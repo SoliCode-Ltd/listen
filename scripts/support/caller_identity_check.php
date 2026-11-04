@@ -8,7 +8,7 @@
  * the WordPress plugin carries the same button's secret.
  *
  * Everything happens inside one database transaction that is rolled back at the end: the member
- * and the call never stay. Listen's own agent's calls are free, so no credits move. The only
+ * and the call never stay, and any credits the call held or took come back with it. The only
  * thing outside the database is one short-lived key the speech service makes for the call start
  * (never used for a call), and the homepage's session for the member (removed at the end).
  *
@@ -17,6 +17,7 @@
 
 use App\Models\AgentConversation;
 use App\Models\AgentWidget;
+use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\Agents\AgentCalls;
 use App\Services\Agents\WordPressPlugin;
@@ -24,6 +25,7 @@ use App\Support\Agents\CallerIdentity;
 use App\Support\Agents\HouseAgent;
 use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 ini_set('display_errors', 'stderr');
@@ -106,17 +108,25 @@ try {
         $check(CallerIdentity::verify($other, $caller) === null, 'another button refuses it');
     }
 
-    // 3. A call started with it keeps who called (free: Listen's own agent).
+    // 3. A call started with it keeps who called. Listen's own agent: paid by its owner when that
+    // account can pay (Agents → Settings), free when it cannot; it always answers.
     $calls = app(AgentCalls::class);
+    $owner = (int) $agent->user_id;
+    $usedBefore = (int) UsageCounter::query()->where('user_id', $owner)->sum('total_chars');
     $start = $calls->start($agent, 'widget', $widget, ['origin' => rtrim((string) config('app.url'), '/'), 'visitor' => '203.0.113.9|caller-check',
         'network' => '203.0.113.9', 'caller' => $verified]);
-    $check($start['ok'] === true && $start['free'] === true, 'the call starts, free'.($start['ok'] ? '' : ' ('.($start['error'] ?? '?').')'));
+    $check($start['ok'] === true, 'the call starts, '.($start['ok'] ? ($start['free'] ? 'free (its owner does not pay now)' : 'paid by its owner') : 'refused ('.($start['error'] ?? '?').')'));
     if ($start['ok']) {
         $kept = $start['conversation']->fresh()->caller;
         $check($verified !== null && ($migrated ? $kept === $verified : $kept === null),
             $migrated ? 'the call keeps who called: '.json_encode($kept) : 'before the migration the call goes on without keeping who called');
+        Carbon::setTestNow(now()->addSeconds(30));
         $ended = $calls->end($start['conversation']->fresh(), [], null, 'done');
-        $check((int) $ended->credits === 0, 'it ends, taking no credits');
+        Carbon::setTestNow();
+        $used = (int) UsageCounter::query()->where('user_id', $owner)->sum('total_chars') - $usedBefore;
+        $expected = $ended->free ? 0 : AgentCalls::creditsFor((int) $ended->billed_seconds, $agent);
+        $check((int) $ended->credits === $expected && $used === $expected,
+            'after '.$ended->billed_seconds.' s it takes '.number_format($expected).' credits from its owner (the rest of the hold given back)');
     }
 
     // 4. The WordPress plugin for this button signs with the same secret.
@@ -128,6 +138,7 @@ try {
     $failures++;
     echo '  FAIL '.get_class($e).': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().')'.PHP_EOL;
 } finally {
+    Carbon::setTestNow();
     DB::rollBack();
     if ($session) {
         try {
