@@ -2,10 +2,13 @@
 
 // Listen Agents: voice agents that answer a business's customers on its website, a link page or a QR code.
 return [
-    // The switch at the top of the app.
+    // The product switch at the top of the app's side menu.
     'switch_studio' => 'Studio',
     'switch_agents' => 'Agents',
     'switch_label' => 'Switch between Studio and Agents',
+    'switch_studio_text' => 'Voices, dubbing and cloning',
+    'switch_agents_text' => 'Voice agents that answer your customers',
+    'my_agents' => 'My agents',
 
     // First visit after sign-up.
     'start_title' => 'What do you want to do first?',

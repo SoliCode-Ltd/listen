@@ -1500,7 +1500,13 @@
     .credit-live.is-short .credit-live-value { color: var(--danger, #ef4444); }
     /* ── App frame: the menu and its help links stay in view; no website footer. ── */
     .dashboard-shell { padding-bottom: 3rem !important; }
-    .dashboard-menu-inner { position: sticky; top: 5.5rem; }
+    .dashboard-menu-inner { position: sticky; top: 5.5rem; z-index: 1; }
+    .dashboard-layout > .app-switch.is-top { display: none; }
+    /* The menu over the content beside it, so the Studio | Agents panel opens on top. */
+    .dashboard-menu { z-index: 4; }
+    @media (max-width: 980px) {
+      .dashboard-menu .app-switch { max-width: 320px; }
+    }
     .dashboard-menu-inner .dashboard-menu-list { position: static; }
     .dm-short { display: none; }
     .dashboard-menu-foot {
@@ -1746,6 +1752,8 @@
       .dashboard-menu .dm-short { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
       .dashboard-menu-foot { display: none; }
       .dashboard-shell { padding-bottom: calc(5.25rem + env(safe-area-inset-bottom)) !important; }
+      .dashboard-menu .app-switch { display: none; }
+      .dashboard-layout > .app-switch.is-top { display: block; width: 100%; margin: 0; }
       /* Above the tab bar. */
       #generatedAudioWrap.output-dock { bottom: calc(4.6rem + env(safe-area-inset-bottom)); }
       /* One section at a time: it starts right under the header. */
@@ -1827,8 +1835,17 @@
           ? 'commandCenterSection'
           : 'generateVoiceSection';
       @endphp
+      @php $appSwitch = \App\Support\Agents\AgentAccess::openTo(auth()->user()); @endphp
+      {{-- Phones: Studio | Agents at the top of the page (the menu is the tab bar at the bottom). --}}
+      @if($appSwitch)
+        <x-app-switch current="studio" class="is-top" />
+      @endif
       <aside class="reveal dashboard-menu">
         <div class="dashboard-menu-inner">
+        {{-- Studio | Agents, at the top of the menu. --}}
+        @if($appSwitch)
+          <x-app-switch current="studio" class="is-side" />
+        @endif
         <nav class="dashboard-menu-list" aria-label="{{ __('ui.dashboard.menu_panel') }}">
           <a class="dashboard-menu-link {{ $dashboardStartSection === 'generateVoiceSection' ? 'active' : '' }}" href="#generateVoiceSection" data-dashboard-nav>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg>

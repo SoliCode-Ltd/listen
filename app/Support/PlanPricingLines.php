@@ -418,6 +418,39 @@ final class PlanPricingLines
         return trans_choice('ui.pricing.lines.agents_value', $limits['agents'], ['count' => $limits['agents'], 'minutes' => number_format($minutes)], self::locale($locale));
     }
 
+    /**
+     * The comparison table's Voice agents rows, from the plan's own settings (Plans → Voice agents)
+     * and the call rate, so the table follows any change there: the agents, the call minutes its
+     * credits pay for (or its own monthly call minutes, when fewer), the calls at once, the longest
+     * call and what a call minute costs. Null where the plan has no agents or Agents are not open
+     * to everyone yet.
+     *
+     * @return array{agents: string, minutes: string, concurrent: string, longest: string, rate: string}|null
+     */
+    public static function agentComparison(Plan $plan, string $locale): ?array
+    {
+        if (! \App\Support\Agents\AgentAccess::planColumns() || ! \App\Support\Agents\AgentAccess::planIncludes($plan)
+            || \App\Support\Agents\AgentAccess::audience() !== \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE) {
+            return null;
+        }
+        $locale = self::locale($locale);
+        $limits = \App\Support\Agents\AgentAccess::limits($plan);
+        $rate = \App\Support\Agents\AgentAccess::creditsPerMinute();
+        $minutes = intdiv(max(0, (int) $plan->monthly_chars), $rate);
+        if ($limits['minutes'] > 0) {
+            $minutes = min($minutes, $limits['minutes']);
+        }
+        $longest = max(1, intdiv($limits['call_seconds'], 60));
+
+        return [
+            'agents' => number_format($limits['agents']),
+            'minutes' => __('ui.pricing.compare_agents_minutes_value', ['count' => number_format($minutes)], $locale),
+            'concurrent' => number_format($limits['concurrent']),
+            'longest' => trans_choice('ui.pricing.compare_agents_longest_value', $longest, ['count' => number_format($longest)], $locale),
+            'rate' => __('ui.pricing.compare_agents_rate_value', ['credits' => number_format($rate)], $locale),
+        ];
+    }
+
     private static function cloningOpen(Plan $plan): bool
     {
         return VoiceCloningService::planAllows($plan) && ! VoiceCloningAccess::isPreviewOnly();

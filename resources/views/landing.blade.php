@@ -507,13 +507,14 @@
       background: var(--surface2);
       overflow: hidden;
     }
+    /* Always two rows of two, so the longer Latin spellings on the English page fit like the Arabic. */
     .fact-art-dialects {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(2, max-content);
       align-content: center;
       justify-content: center;
       gap: .45rem .5rem;
-      padding: .5rem .75rem;
+      padding: .5rem .6rem;
     }
     .fa-bubble {
       padding: .26rem .7rem .32rem;
@@ -983,6 +984,12 @@
       </div>
     </section>
 
+    {{-- Listen Agents, right under the hero: a voice agent for a business, shown working (while Agents are open to this visitor). --}}
+    @php $agentsOpen = \App\Support\Agents\AgentAccess::openTo(auth()->user()); @endphp
+    @if($agentsOpen)
+      @include('components.home.agents')
+    @endif
+
     @php
       // Real counts, rounded down to the ten so each claim stays true as more are added.
       $factPlaces = (int) (floor(count(array_filter(\App\Support\AudioEffects::ALL, fn ($row) => $row[1] !== 'clean')) / 10) * 10);
@@ -1040,9 +1047,9 @@
     {{-- Every kind of voice, one orb each --}}
     @include('components.home.voice-tour')
 
-    {{-- Listen Agents: a voice agent for a business, shown working (while Agents are open to this visitor). --}}
-    @if(\App\Support\Agents\AgentAccess::openTo(auth()->user()))
-      @include('components.home.agents')
+    {{-- Listen Agents, in the agents page's own words: one agent wherever customers find the business. --}}
+    @if($agentsOpen)
+      <x-agents.channels home />
     @endif
 
     {{-- Voice gallery and dialogues --}}

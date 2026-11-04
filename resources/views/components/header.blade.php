@@ -32,51 +32,44 @@
       'active' => $currentLocaleCode === $localeCode,
     ];
   }
-  // The menu, by who is looking. The logo is the way home, so there is no Home link. Visitors: what
-  // Listen does and costs, the demo to try, and how to reach us.
+  // The menu, by who is looking, Home first. Visitors: what Listen does and costs, the demo to try,
+  // and how to reach us.
   $navLinks = [
-    ['route' => 'samples', 'label' => __('ui.nav.samples'), 'guest' => false],
-    ['route' => 'agents-landing', 'label' => __('agents.switch_agents'), 'guest' => false],
-    ['route' => 'demo.page', 'label' => __('ui.nav.demo'), 'guest' => true],
-    ['route' => 'pricing', 'label' => __('ui.nav.pricing'), 'guest' => false],
-    ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension'), 'guest' => false],
-    ['route' => 'contact', 'label' => __('ui.nav.contact'), 'guest' => false],
+    ['route' => 'home', 'label' => __('ui.nav.home')],
+    ['route' => 'samples', 'label' => __('ui.nav.samples')],
+    ['route' => 'agents-landing', 'label' => __('agents.switch_agents')],
+    ['route' => 'demo.page', 'label' => __('ui.nav.demo')],
+    ['route' => 'pricing', 'label' => __('ui.nav.pricing')],
+    ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension')],
+    ['route' => 'contact', 'label' => __('ui.nav.contact')],
   ];
-  // Studio | Agents: the two sides of the app, on their own pages (the dashboard and Agents).
-  $productSide = str_starts_with($currentRoute, 'voice-agents.') ? 'agents' : ($currentRoute === 'dashboard' ? 'studio' : null);
-  $showDemoLinkForAuthenticated = false;
+  // Members: Home, the app (the Dashboard; Studio and Agents switch at the top of its side menu),
+  // the voices, Agents, the demo while on the free plan, plans, the extension and help. Billing and
+  // the rest are in the account menu.
+  $authNavLinks = [
+    ['route' => 'home', 'label' => __('ui.nav.home')],
+    ['route' => 'dashboard', 'label' => __('ui.nav.dashboard')],
+    ['route' => 'samples', 'label' => __('ui.nav.samples')],
+    ['route' => 'agents-landing', 'label' => __('agents.switch_agents')],
+    ['route' => 'pricing', 'label' => __('ui.nav.pricing')],
+    ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension')],
+    ['route' => 'contact', 'label' => __('ui.nav.contact')],
+  ];
   if (auth()->check()) {
     $activePlan = app(\App\Services\PlanAccessService::class)->resolveActivePlanForUserId((int) auth()->id());
-    $showDemoLinkForAuthenticated = strtolower(trim((string) ($activePlan?->slug ?? 'free'))) === 'free';
+    if (strtolower(trim((string) ($activePlan?->slug ?? 'free'))) === 'free') {
+      $at = array_search('pricing', array_column($authNavLinks, 'route'), true);
+      array_splice($authNavLinks, $at === false ? count($authNavLinks) : $at, 0, [['route' => 'demo.page', 'label' => __('ui.nav.demo')]]);
+    }
   }
-  // Members: the app (the Studio | Agents switch, or Dashboard where Agents are closed), the voices,
-  // the demo while on the free plan, plans, the extension and help. Billing and the rest are in the
-  // account menu.
-  $authNavLinks = [
-    ['route' => 'dashboard', 'label' => __('ui.nav.dashboard'), 'guest' => false],
-    ['route' => 'samples', 'label' => __('ui.nav.samples'), 'guest' => false],
-    ['route' => 'agents-landing', 'label' => __('agents.switch_agents'), 'guest' => false],
-    ['route' => 'pricing', 'label' => __('ui.nav.pricing'), 'guest' => false],
-    ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension'), 'guest' => false],
-    ['route' => 'contact', 'label' => __('ui.nav.contact'), 'guest' => false],
-  ];
   // Agents only for whom Agents → Settings opens them (everyone, or the admin email before launch).
   $agentsOpen = \App\Support\Agents\AgentAccess::openTo(auth()->user());
   if (! $agentsOpen) {
     $navLinks = array_values(array_filter($navLinks, fn ($l) => $l['route'] !== 'agents-landing'));
     $authNavLinks = array_values(array_filter($authNavLinks, fn ($l) => $l['route'] !== 'agents-landing'));
-    $productSide = $productSide === 'studio' ? null : $productSide;
   }
-  // Every signed-in member with Agents (free ones too) has the Studio | Agents switch on every
-  // page, in place of the Dashboard and Agents links; outside the app neither side is lit.
-  $showSwitch = auth()->check() && ($agentsOpen || $productSide !== null);
-  if ($showDemoLinkForAuthenticated) {
-    array_splice($authNavLinks, 3, 0, [[
-      'route' => 'demo.page',
-      'label' => __('ui.nav.demo'),
-      'guest' => false,
-    ]]);
-  }
+  // The link that is lit: the page's own, and Dashboard anywhere in the app (Studio or Agents).
+  $navActive = fn (string $route) => $currentRoute === $route || ($route === 'dashboard' && str_starts_with($currentRoute, 'voice-agents.'));
 @endphp
 
 <header class="app-header">
@@ -95,34 +88,12 @@
       @endif
     </a>
 
-    {{-- The middle of the bar, as in the studio: the Studio | Agents switch and the links together. --}}
+    {{-- The middle of the bar: the links. --}}
     <div class="header-center">
-    @auth
-      @if($showSwitch)
-        <nav class="product-switch" aria-label="{{ __('agents.switch_label') }}">
-          <a href="{{ route('dashboard') }}" class="{{ $productSide === 'studio' ? 'active' : '' }}" @if($productSide === 'studio') aria-current="page" @endif>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>{{ __('agents.switch_studio') }}
-          </a>
-          <a href="{{ route('voice-agents.index') }}" class="{{ $productSide === 'agents' ? 'active' : '' }}" @if($productSide === 'agents') aria-current="page" @endif>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.switch_agents') }}
-          </a>
-        </nav>
-      @endif
-    @endauth
-
     <nav class="desktop-nav" aria-label="{{ __('ui.header.main_nav') }}">
-      @auth
-        @foreach($authNavLinks as $link)
-          @continue($showSwitch && in_array($link['route'], ['dashboard', 'agents-landing'], true))
-          <a href="{{ route($link['route']) }}" class="nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
-        @endforeach
-      @else
-        @foreach($navLinks as $link)
-          @if(!$link['guest'] || !auth()->check())
-            <a href="{{ route($link['route']) }}" class="nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
-          @endif
-        @endforeach
-      @endauth
+      @foreach(auth()->check() ? $authNavLinks : $navLinks as $link)
+        <a href="{{ route($link['route']) }}" class="nav-link {{ $navActive($link['route']) ? 'active' : '' }}" @if($navActive($link['route'])) aria-current="page" @endif>{{ $link['label'] }}</a>
+      @endforeach
     </nav>
     </div>
 
@@ -177,6 +148,12 @@
               <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
               {{ __('ui.nav.dashboard') }}
             </a>
+            @if($agentsOpen)
+            <a href="{{ route('voice-agents.index') }}" class="dropdown-item">
+              <svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>
+              {{ __('agents.my_agents') }}
+            </a>
+            @endif
             <a href="{{ route('browsers-extension.page') }}" class="dropdown-item">
               <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
               {{ __('ui.nav.extension') }}
@@ -267,22 +244,9 @@
       @endforeach
     </div>
     <div class="mobile-nav-divider"></div>
-    @if($showSwitch)
-      <nav class="product-switch mobile-product-switch" aria-label="{{ __('agents.switch_label') }}">
-        <a href="{{ route('dashboard') }}" class="{{ $productSide === 'studio' ? 'active' : '' }}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>{{ __('agents.switch_studio') }}
-        </a>
-        <a href="{{ route('voice-agents.index') }}" class="{{ $productSide === 'agents' ? 'active' : '' }}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.switch_agents') }}
-        </a>
-      </nav>
-      <div class="mobile-nav-divider"></div>
-    @endif
-
     @auth
       @foreach($authNavLinks as $link)
-        @continue($showSwitch && in_array($link['route'], ['dashboard', 'agents-landing'], true))
-        <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
+        <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $navActive($link['route']) ? 'active' : '' }}">{{ $link['label'] }}</a>
       @endforeach
       @if(auth()->user()->is_admin)
       <a href="{{ url('/admin') }}" class="mobile-nav-link">{{ __('ui.nav.admin_dashboard') }}</a>
@@ -293,9 +257,7 @@
       </form>
     @else
       @foreach($navLinks as $link)
-        @if(!$link['guest'] || !auth()->check())
-          <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
-        @endif
+        <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $navActive($link['route']) ? 'active' : '' }}">{{ $link['label'] }}</a>
       @endforeach
       <div class="mobile-nav-divider"></div>
       <a href="{{ route('login') }}" class="mobile-nav-link">{{ __('ui.nav.sign_in') }}</a>

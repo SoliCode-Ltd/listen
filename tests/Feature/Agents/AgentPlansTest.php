@@ -392,6 +392,37 @@ class AgentPlansTest extends TestCase
         $this->assertGreaterThanOrEqual(40, $row['typical_margin']);
     }
 
+    public function test_the_pricing_table_lists_every_agent_setting_and_the_shared_credits_once(): void
+    {
+        Plan::factory()->create(['slug' => 'creator-t', 'name' => 'Creator', 'price_cents' => 2200, 'monthly_chars' => 810000, 'is_active' => true,
+            'agents_enabled' => true, 'agents_max' => 3, 'agent_minutes_per_month' => 0, 'agent_concurrent_calls' => 5, 'agent_max_call_minutes' => 8]);
+        Plan::factory()->create(['slug' => 'pro-t', 'name' => 'Pro', 'price_cents' => 4900, 'monthly_chars' => 8100000, 'is_active' => true,
+            'agents_enabled' => true, 'agents_max' => 5, 'agent_minutes_per_month' => 600, 'agent_concurrent_calls' => 10, 'agent_max_call_minutes' => 10]);
+
+        $page = $this->getLocalizedRoute('pricing')->assertOk();
+        // A group of its own, read from each plan's settings and the call rate (8,100 credits).
+        $page->assertSee(__('ui.pricing.compare_group_agents'))
+            ->assertSeeInOrder([__('ui.pricing.compare_agents_count'), '3', '5'])
+            // Creator: 810,000 credits / 8,100 = 100 minutes; Pro: its own 600 a month, fewer than its credits pay for.
+            ->assertSeeInOrder([__('ui.pricing.compare_agents_minutes'), 'up to 100', 'up to 600'])
+            ->assertSeeInOrder([__('ui.pricing.compare_agents_concurrent'), '5', '10'])
+            ->assertSeeInOrder([__('ui.pricing.compare_agents_longest'), '8 minutes', '10 minutes'])
+            ->assertSeeInOrder([__('ui.pricing.compare_agents_rate'), '8,100 credits']);
+        // The shared credits are said once, under the plans, not on every card.
+        $this->assertSame(1, substr_count($page->getContent(), __('ui.pricing.credits_shared')));
+        $page->assertSee('class="plans-shared-note"', false)->assertDontSee('plan-shared-note"', false);
+
+        // A change in Plans → Voice agents shows at once.
+        Plan::where('slug', 'pro-t')->update(['agent_concurrent_calls' => 12]);
+        $this->getLocalizedRoute('pricing')->assertSeeInOrder([__('ui.pricing.compare_agents_concurrent'), '5', '12']);
+
+        // Without agents on any plan, neither the group nor the note.
+        Plan::query()->update(['agents_enabled' => false]);
+        $this->getLocalizedRoute('pricing')->assertOk()
+            ->assertDontSee(__('ui.pricing.compare_agents_concurrent'))
+            ->assertDontSee(__('ui.pricing.credits_shared'));
+    }
+
     public function test_with_no_saved_rate_a_call_minute_follows_the_plans(): void
     {
         SiteSetting::set('agents_credits_per_minute', '', 'agents');

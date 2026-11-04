@@ -584,6 +584,7 @@ html[dir="rtl"] .ag-convo-more summary svg { transform: scaleX(-1); }
 /* The settings a little wider than the preview on desktop (the owner's call); the preview keeps room for the card. */
 .ag-design { display: grid; grid-template-columns: minmax(0, 1.22fr) minmax(400px, 1fr); gap: 1.6rem; align-items: start; }
 .ag-design-controls { display: grid; gap: .9rem; min-width: 0; }
+.ag-design-intro { grid-column: 1 / -1; }
 .ag-design-intro h2 { margin: 0 0 .3rem; font-size: 1.35rem; font-weight: 800; }
 .ag-design-intro p { margin: 0; }
 .ag-design-group { margin: 0; padding: 1rem 1.1rem 1.1rem; border: 1px solid var(--line); border-radius: 18px; background: var(--surface, var(--bg)); display: grid; gap: .85rem; min-width: 0; }
@@ -635,14 +636,14 @@ html[dir="rtl"] .ag-convo-more summary svg { transform: scaleX(-1); }
 .ag-design-check input { width: 20px; height: 20px; accent-color: var(--a); }
 /* The preview. */
 .ag-design-preview { position: sticky; top: 92px; display: grid; gap: .7rem; min-width: 0; }
-.ag-design-tools { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
-.ag-design-tools > strong { font-size: 1rem; }
-.ag-design-status { color: var(--muted); font-size: .84rem; font-weight: 600; margin-inline-end: auto; }
-.ag-design-sitetheme .ag-choice > span { min-height: 34px; padding: .25rem .65rem; font-size: .8rem; }
+.ag-design-status { color: var(--muted); font-size: .8rem; font-weight: 600; margin-inline-start: auto; white-space: nowrap; }
+.ag-design-sitetheme { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); }
+.ag-design-sitetheme .ag-choice > span { min-height: 28px; padding: .15rem .7rem; border: 0; border-radius: 999px; font-size: .78rem; }
 .ag-design-frame { border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--bg); box-shadow: 0 30px 70px -50px rgba(23, 20, 74, .7); }
-.ag-design-bar { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 .9rem; border-bottom: 1px solid var(--line); background: var(--surface, var(--bg)); }
+.ag-design-bar { display: flex; align-items: center; gap: 6px; height: 48px; padding: 0 .55rem 0 .9rem; border-bottom: 1px solid var(--line); background: var(--surface, var(--bg)); }
+.ag-design-bar .ag-design-status:empty + .ag-design-sitetheme, .ag-design-bar .ag-design-status:empty { margin-inline-start: auto; }
 .ag-design-bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
-.ag-design-bar span { margin-inline-start: .6rem; padding: .2rem .8rem; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); font-size: .76rem; font-weight: 600; }
+.ag-design-bar .ag-design-url { margin-inline-start: .6rem; padding: .2rem .8rem; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); font-size: .76rem; font-weight: 600; }
 .ag-design-site { position: relative; height: 580px; overflow: hidden; background: #F6F6FB; transition: background .3s ease; }
 .ag-design-site.is-dark { background: #0F1720; }
 .ag-fake { display: grid; gap: .7rem; padding: 1.6rem 1.6rem 0; max-width: 360px; }
@@ -658,6 +659,7 @@ html[dir="rtl"] .ag-convo-more summary svg { transform: scaleX(-1); }
 html[dir="rtl"] [data-ag-design-play] svg { transform: none; }
 @media (max-width: 1020px) {
   .ag-design { grid-template-columns: minmax(0, 1fr); }
+  .ag-design-intro { order: -2; }
   .ag-design-preview { position: static; order: -1; }
   .ag-design-site { height: 540px; }
 }
@@ -1146,6 +1148,10 @@ html[dir="rtl"] .ag-home-head h1 { letter-spacing: 0; }
 .ag-layout { display: block; }
 .ag-side, .ag-side-inner { display: contents; }
 .ag-side-foot { display: none; }
+/* Studio | Agents: at the top of the side menu; above the strip of tabs on tablets and phones. */
+.ag-side .app-switch { position: relative; z-index: 6; width: min(100%, 300px); margin: 1rem 0 0; }
+.ag .app-switch.is-solo { width: min(100%, 300px); margin: 0 auto 1rem; }
+@media (max-width: 640px) { .ag-side .app-switch, .ag .app-switch.is-solo { width: 100%; } }
 .ag-main { min-width: 0; }
 .ag-tab svg { display: none; }
 .ag-main > .ag-hero:first-child, .ag-main > .ag-notice:first-child { margin-top: 0; }
@@ -1153,9 +1159,10 @@ html[dir="rtl"] .ag-home-head h1 { letter-spacing: 0; }
   /* The studio's shell: the menu and the content start 3.5rem under the header, as in the studio. */
   .ag.ag-page { max-width: 1880px; padding: 3.5rem clamp(.75rem, 1.8vw, 1.75rem) 3rem; }
   .ag-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 1.75rem; align-items: start; min-height: calc(100vh - 10.75rem); }
-  .ag-side { display: block; position: relative; align-self: stretch; padding-inline-end: 1rem; }
+  .ag-side { display: block; position: relative; z-index: 4; align-self: stretch; padding-inline-end: 1rem; }
   .ag-side::after { content: ""; position: absolute; top: -3.5rem; bottom: -3rem; inset-inline-end: 0; width: 1px; background: var(--line); }
-  .ag-side-inner { display: block; position: sticky; top: 5.5rem; }
+  .ag-side-inner { display: block; position: sticky; z-index: 1; top: 5.5rem; }
+  .ag-side .app-switch { width: 100%; margin: 0 0 .85rem; }
   .ag-side .ag-tabs { position: static; display: grid; gap: 2px; margin: 0; padding: 0; overflow: visible; border: 0; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .ag-side .ag-tab { display: flex; width: 100%; min-height: 42px; gap: .7rem; padding: .55rem .75rem; border-radius: 10px; color: var(--muted); font-size: .92rem; font-weight: 600; line-height: 1.3; text-align: start; transition: background-color .15s ease, color .15s ease; }
   .ag-side .ag-tab::after { display: none; }

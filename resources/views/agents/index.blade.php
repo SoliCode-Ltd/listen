@@ -7,6 +7,8 @@
 
   <main class="ag {{ $agents->isEmpty() ? '' : 'ag-page ag-home' }}" id="agents">
     @if($agents->isEmpty())
+      {{-- No agents yet, so no side menu: Studio | Agents above the first step. --}}
+      <x-app-switch current="agents" class="is-solo" />
       <section class="ag-card ag-empty">
         <x-orb name="listen" />
         <h1 class="sr-only">{{ __('agents.title') }}</h1>
@@ -36,6 +38,7 @@
       <div class="ag-layout">
         <aside class="ag-side">
           <div class="ag-side-inner">
+            <x-app-switch current="agents" />
             <nav class="ag-tabs" aria-label="{{ __('agents.title') }}" data-ag-home-menu>
               <a class="ag-tab is-current" href="#agents-overview" aria-current="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg><span>{{ __('agents.menu_overview') }}</span></a>
               <a class="ag-tab" href="#agents-list"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg><span>{{ __('agents.list_count') }}</span><small class="ag-tab-count">{{ $agents->count() }}</small></a>

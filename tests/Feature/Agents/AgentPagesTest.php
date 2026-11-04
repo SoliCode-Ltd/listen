@@ -68,8 +68,10 @@ class AgentPagesTest extends TestCase
 
         $this->actingAs($owner)->getLocalizedRoute('voice-agents.index')
             ->assertOk()->assertSee('Huda')->assertDontSee('Someone Else')
-            // The Studio | Agents switch is on the app's own pages.
-            ->assertSee('class="product-switch"', false);
+            // Studio | Agents is at the top of the side menu, Agents ticked; the main menu has no switch.
+            ->assertSee('data-app-switch', false)
+            ->assertSee('class="app-switch-option is-current" href="'.route('voice-agents.index').'"', false)
+            ->assertDontSee('class="product-switch"', false);
         $this->actingAs($owner)->getLocalizedRoute('voice-agents.create')->assertOk()->assertSee('data-ag-business-form', false);
     }
 

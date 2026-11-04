@@ -35,6 +35,7 @@
     <div class="ag-layout">
       <aside class="ag-side">
         <div class="ag-side-inner">
+          <x-app-switch current="agents" />
           <nav class="ag-tabs" role="tablist" aria-label="{{ $agent->name }}">
             @php
               $tabIcons = [

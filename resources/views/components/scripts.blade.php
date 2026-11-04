@@ -159,8 +159,8 @@
     });
 
     window.addEventListener('resize', function() {
-      // Same width as the header's menu-button breakpoint (styles: max-width 1180px).
-      if (window.innerWidth > 1180 && mobileNav.classList.contains('open')) {
+      // Same width as the header's menu-button breakpoint (styles: max-width 1300px).
+      if (window.innerWidth > 1300 && mobileNav.classList.contains('open')) {
         closeMobileMenu(false);
       }
     });
@@ -981,10 +981,11 @@
     }
   });
 
-  // Studio | Agents: as quick as the language switch. The page behind each side is fetched ahead
-  // (on hover or touch), the pill moves the moment it is tapped, and the page fades out while the
-  // other side loads (and fades in when it arrives).
-  function initProductSwitchTransition() {
+  // Studio | Agents, at the top of each product's side menu (components/app-switch): the button opens
+  // the two products and closes on a click outside, on Escape (back to the button) or when focus
+  // leaves. Picking the other is as quick as the language switch: its page is fetched ahead (on hover
+  // or touch), and this page fades out while it loads (and the new one fades in when it arrives).
+  function initAppSwitch() {
     var pending = false;
     function prefetch(link) {
       var href = link && link.getAttribute('href');
@@ -995,25 +996,53 @@
       tag.href = href;
       document.head.appendChild(tag);
     }
+    function close(box, focusButton) {
+      if (!box || !box.classList.contains('is-open')) return;
+      box.classList.remove('is-open');
+      var btn = box.querySelector('.app-switch-btn');
+      if (btn) {
+        btn.setAttribute('aria-expanded', 'false');
+        if (focusButton) btn.focus();
+      }
+    }
+    function closeAll(except) {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-app-switch].is-open'), function(box) {
+        if (box !== except) close(box, false);
+      });
+    }
     ['pointerenter', 'touchstart', 'focusin'].forEach(function(type) {
       document.addEventListener(type, function(e) {
-        var link = e.target && e.target.closest && e.target.closest('.product-switch a:not(.active)');
+        var link = e.target && e.target.closest && e.target.closest('.app-switch-option:not(.is-current)');
         if (link) prefetch(link);
       }, { passive: true, capture: true });
     });
     document.addEventListener('click', function(e) {
-      var link = e.target.closest('.product-switch a:not(.active)');
-      if (!link || pending || e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return;
+      var btn = e.target.closest && e.target.closest('.app-switch-btn');
+      if (btn) {
+        var box = btn.closest('[data-app-switch]');
+        var open = !box.classList.contains('is-open');
+        closeAll(box);
+        box.classList.toggle('is-open', open);
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) {
+          var other = box.querySelector('.app-switch-option:not(.is-current)');
+          if (other) prefetch(other);
+        }
+        return;
+      }
+      if (!(e.target.closest && e.target.closest('.app-switch-menu'))) closeAll(null);
+      var link = e.target.closest && e.target.closest('.app-switch-option');
+      if (!link) return;
+      if (link.classList.contains('is-current')) {
+        e.preventDefault();
+        close(link.closest('[data-app-switch]'), true);
+        return;
+      }
+      if (pending || e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return;
       var href = link.getAttribute('href');
       if (!href) return;
       e.preventDefault();
       pending = true;
-      var nav = link.closest('.product-switch');
-      nav.classList.add('product-switch-prep');
-      Array.prototype.forEach.call(nav.querySelectorAll('a'), function(a) {
-        a.classList.toggle('active', a === link);
-        if (a === link) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-      });
       try { sessionStorage.setItem('listen_locale_switch', '1'); } catch (_err) {}
       var reduceMotion = false;
       try { reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_err) {}
@@ -1022,7 +1051,20 @@
       if (reduceMotion) { window.location.assign(href); return; }
       window.requestAnimationFrame(function() { window.setTimeout(function() { window.location.assign(href); }, 120); });
     });
-    window.addEventListener('pageshow', function() { pending = false; });
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      var box = document.querySelector('[data-app-switch].is-open');
+      if (box) { e.preventDefault(); close(box, true); }
+    });
+    document.addEventListener('focusin', function(e) {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-app-switch].is-open'), function(box) {
+        if (!box.contains(e.target)) close(box, false);
+      });
+    });
+    window.addEventListener('pageshow', function() {
+      pending = false;
+      closeAll(null);
+    });
   }
 
   if (document.readyState === 'loading') {
@@ -1032,7 +1074,7 @@
       initMobileMenu();
       initRevealAnimations();
       initLocaleSwitchTransition();
-      initProductSwitchTransition();
+      initAppSwitch();
       window.initCustomAudioPlayers();
     });
   } else {
@@ -1041,7 +1083,7 @@
     initMobileMenu();
     initRevealAnimations();
     initLocaleSwitchTransition();
-    initProductSwitchTransition();
+    initAppSwitch();
     window.initCustomAudioPlayers();
   }
 })();

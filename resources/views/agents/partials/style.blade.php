@@ -20,11 +20,12 @@
   ];
 @endphp
 <div class="ag-design" data-ag-design>
+  {{-- Across both columns, so the settings and the preview start on the same line. --}}
+  <div class="ag-design-intro">
+    <h2>{{ __('agents.design.title') }}</h2>
+    <p class="ag-muted">{{ __('agents.design.text') }}</p>
+  </div>
   <div class="ag-design-controls">
-    <div class="ag-design-intro">
-      <h2>{{ __('agents.design.title') }}</h2>
-      <p class="ag-muted">{{ __('agents.design.text') }}</p>
-    </div>
 
     {{-- What the call shows. --}}
     <fieldset class="ag-design-group">
@@ -187,16 +188,17 @@
 
   {{-- The preview: a pretend copy of the owner's website with the real button on it. --}}
   <div class="ag-design-preview">
-    <div class="ag-design-tools">
-      <strong>{{ __('agents.design.preview') }}</strong>
-      <span class="ag-design-status" data-ag-design-status aria-live="polite"></span>
-      <div class="ag-choice-row ag-design-sitetheme">
-        <label class="ag-choice"><input type="radio" name="site" value="light" checked><span>{{ __('agents.design.themes.light') }}</span></label>
-        <label class="ag-choice"><input type="radio" name="site" value="dark"><span>{{ __('agents.design.themes.dark') }}</span></label>
-      </div>
-    </div>
     <div class="ag-design-frame">
-      <div class="ag-design-bar" aria-hidden="true"><i></i><i></i><i></i><span dir="ltr">{{ ($agent->website_url ?? null) ? preg_replace('#^www\.#', '', (string) parse_url($agent->website_url, PHP_URL_HOST)) : __('agents.design.site') }}</span></div>
+      {{-- The preview's own browser bar: the website, then whether it is shown light or dark. --}}
+      <div class="ag-design-bar">
+        <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
+        <span class="ag-design-url" dir="ltr" aria-hidden="true">{{ ($agent->website_url ?? null) ? preg_replace('#^www\.#', '', (string) parse_url($agent->website_url, PHP_URL_HOST)) : __('agents.design.site') }}</span>
+        <span class="ag-design-status" data-ag-design-status aria-live="polite"></span>
+        <div class="ag-design-sitetheme" role="radiogroup" aria-label="{{ __('agents.design.preview') }}">
+          <label class="ag-choice"><input type="radio" name="site" value="light" checked><span>{{ __('agents.design.themes.light') }}</span></label>
+          <label class="ag-choice"><input type="radio" name="site" value="dark"><span>{{ __('agents.design.themes.dark') }}</span></label>
+        </div>
+      </div>
       <div class="ag-design-site" data-ag-design-site dir="{{ $rtl ? 'rtl' : 'ltr' }}" aria-label="{{ __('agents.design.preview') }}">
         <div class="ag-fake" aria-hidden="true">
           <b class="ag-fake-logo"></b>

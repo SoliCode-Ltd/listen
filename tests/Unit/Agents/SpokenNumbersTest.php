@@ -18,6 +18,9 @@ class SpokenNumbersTest extends TestCase
         // Egyptian spellings and groups read with commas.
         $this->assertSame('الرقم الأول: 01012345678. صح كده؟', SpokenNumbers::digits('الرقم الأول: صفر واحد صفر، واحد اتنين تلاتة، أربعة خمسة ستة، سبعة ثمانية. صح كده؟'));
         $this->assertSame('رقمك هو 03123456، ورح', SpokenNumbers::digits('رقمك هو صفر تلاتة واحد اتنين تلاتة أربعة خمسة ستة، ورح'));
+        // Levantine and Gulf: تنين / ثنين (two), تمنية (eight).
+        $this->assertSame('ورقمك هو 03123456، صح؟', SpokenNumbers::digits('ورقمك هو صفر تلاتة واحد تنين تلاتة أربعة خمسة ستة، صح؟'));
+        $this->assertSame('رقمي 0528', SpokenNumbers::digits('رقمي صفر خمسة ثنين تمنية'));
         $this->assertSame('0507654321', SpokenNumbers::digits('صفر خمسة صفر سبعة ستة خمسة أربعة ثلاثة اثنين واحد'));
     }
 

@@ -254,59 +254,10 @@ html[data-theme="light"] .site-logo.logo-light {
   gap: .65rem;
 }
 
-/* ===== STUDIO | AGENTS ===== */
-/* The two sides of the app. It sits by the logo on the app's pages, and in the phone menu. */
 .app-header .brand { flex-shrink: 0; }
 
-.product-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  margin-inline-start: .9rem;
-  border-radius: var(--radius-full);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  flex: none;
-}
-
-.product-switch a {
-  display: inline-flex;
-  align-items: center;
-  gap: .4rem;
-  min-height: 2rem;
-  padding: .3rem .85rem;
-  border-radius: var(--radius-full);
-  color: var(--muted);
-  font-size: .86rem;
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: color .2s ease, background-color .25s ease, box-shadow .25s ease;
-}
-
-.product-switch a:hover { color: var(--text); }
-/* The moment a side is tapped its pill is chosen, with no fade (the page follows). */
-.product-switch.product-switch-prep a { transition: none !important; }
-
-.product-switch a.active {
-  color: #ffffff;
-  background: var(--brand-accent);
-  box-shadow: 0 4px 12px var(--brand-accent-glow);
-}
-
-.product-switch svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* The middle of the bar, as in the studio: the switch and the links side by side as one group, so
-   the bar reads logo | menu | account with no stray gaps. */
+/* The middle of the bar: the links as one group, so the bar reads logo | menu | account with no
+   stray gaps. */
 .header-center {
   display: flex;
   align-items: center;
@@ -314,30 +265,118 @@ html[data-theme="light"] .site-logo.logo-light {
   min-width: 0;
 }
 
-.header-center .product-switch { margin-inline-start: 0; }
-
-.mobile-product-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  margin-inline-start: 0;
-  min-width: 13rem;
-  align-self: flex-start;
+/* ===== STUDIO | AGENTS ===== */
+/* The two products, chosen at the top of each one's side menu (components/app-switch): the product
+   in use on a button, the two in a small panel under it, each with a line on what it is. */
+.app-switch {
+  position: relative;
+  margin-bottom: .85rem;
 }
 
-.mobile-product-switch a {
-  justify-content: center;
-  min-height: 2.4rem;
+.app-switch-btn {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  width: 100%;
+  min-height: 48px;
+  padding: .4rem .55rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
   font-size: .95rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .2s ease, background-color .15s ease;
 }
 
-/* Narrower desktops: the switch keeps its words and drops its icons. */
-@media (max-width: 1360px) {
-  .app-header .product-switch svg { display: none; }
-  .app-header .product-switch a { padding: .3rem .7rem; }
+.app-switch-btn:hover { border-color: var(--line-strong, color-mix(in oklab, var(--text) 22%, transparent)); }
+.app-switch-btn:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
+.app-switch.is-open .app-switch-btn {
+  border-color: color-mix(in oklab, var(--a) 45%, var(--line));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 13%, transparent);
 }
 
-@media (max-width: 640px) {
-  .app-header .product-switch { display: none; }
+.app-switch-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--brand-accent, var(--a));
+  color: #ffffff;
+}
+
+.app-switch-mark svg,
+.app-switch-chev,
+.app-switch-tick {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-switch-mark svg { width: 17px; height: 17px; stroke-width: 2; }
+.app-switch-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-switch-chev { flex: none; width: 16px; height: 16px; stroke-width: 2; color: var(--muted); }
+
+.app-switch-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  inset-inline-start: 0;
+  z-index: 80;
+  display: grid;
+  gap: 2px;
+  width: max(100%, 290px);
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 22px 44px -20px rgba(16, 24, 40, .38);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px) scale(.985);
+  transform-origin: top;
+  transition: opacity .16s ease, transform .2s cubic-bezier(.22, 1, .36, 1), visibility 0s linear .2s;
+}
+
+html[data-theme="dark"] .app-switch-menu { box-shadow: 0 24px 48px -18px rgba(0, 0, 0, .75); }
+
+.app-switch.is-open .app-switch-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity .16s ease, transform .2s cubic-bezier(.22, 1, .36, 1), visibility 0s;
+}
+
+.app-switch-option {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding: .55rem .6rem;
+  border-radius: 10px;
+  color: var(--text);
+  text-decoration: none;
+  transition: background-color .15s ease;
+}
+
+.app-switch-option:hover,
+.app-switch-option:focus-visible { background: var(--surface2); outline: none; }
+.app-switch-option:focus-visible { box-shadow: inset 0 0 0 2px var(--a); }
+.app-switch-option .app-switch-mark { background: color-mix(in oklab, var(--a) 12%, var(--surface)); color: var(--accent-text, var(--a)); }
+.app-switch-option.is-current .app-switch-mark { background: var(--brand-accent, var(--a)); color: #ffffff; }
+.app-switch-copy { display: grid; gap: .1rem; flex: 1 1 auto; min-width: 0; }
+.app-switch-copy strong { font-size: .92rem; font-weight: 700; line-height: 1.35; }
+.app-switch-copy span { color: var(--muted); font-size: .8rem; line-height: 1.45; }
+.app-switch-tick { flex: none; width: 18px; height: 18px; stroke-width: 2.4; color: var(--accent-text, var(--a)); visibility: hidden; }
+.app-switch-option.is-current .app-switch-tick { visibility: visible; }
+
+@media (prefers-reduced-motion: reduce) {
+  .app-switch-menu, .app-switch.is-open .app-switch-menu { transition: none; transform: none; }
 }
 
 /* ===== LANGUAGE SWITCHER ===== */
@@ -1194,12 +1233,15 @@ html[data-theme="light"] .app-footer {
 }
 
 /* Narrower desktops: the links close up a little. */
-@media (max-width: 1360px) {
-  .nav-link { padding: .5rem .6rem; font-size: .92rem; }
+@media (max-width: 1460px) {
+  .nav-link { padding: .5rem .5rem; font-size: .9rem; }
+  .desktop-nav { gap: 0; }
+  .header-inner { gap: .75rem; }
+  .header-actions .auth-buttons .btn { white-space: nowrap; }
 }
 
-/* The menu button takes over before the links would wrap or crowd (six links, two languages). */
-@media (max-width: 1180px) {
+/* The menu button takes over before the links would wrap or crowd (seven links, two languages). */
+@media (max-width: 1300px) {
   .desktop-nav,
   .header-actions .auth-buttons,
   .locale-switch {
@@ -1216,7 +1258,7 @@ html[data-theme="light"] .app-footer {
     gap: .45rem;
   }
 
-  /* Tablets: the links move into the menu; the switch stays by the logo. */
+  /* Tablets: the links move into the menu. */
   .header-center { margin-inline-start: .4rem; }
 
   .user-trigger {

@@ -339,39 +339,7 @@
     </section>
 
     {{-- One agent, every channel: where callers come from, the agent, a live call. --}}
-    <section class="agl-section" data-agl-reveal aria-labelledby="agl-flow-title">
-      <div class="agl-head">
-        <h2 id="agl-flow-title">{{ __('agents_landing.flow_title') }}</h2>
-        <p>{{ __('agents_landing.flow_text') }}</p>
-      </div>
-      <div class="agl-flow" aria-hidden="true">
-        <ul class="agl-flow-sources">
-          @foreach(__('agents_landing.flow_sources') as $i => $label)
-            <li><span class="agl-flow-icon"><svg viewBox="0 0 24 24">{!! $channelIcons[$i] ?? '' !!}</svg></span>{{ $label }}</li>
-          @endforeach
-        </ul>
-        <svg class="agl-flow-lines" viewBox="0 0 120 320" preserveAspectRatio="none">
-          @foreach([26, 115, 205, 294] as $y)
-            <path d="M0 {{ $y }} C 62 {{ $y }}, 58 160, 120 160" />
-          @endforeach
-        </svg>
-        <div class="agl-flow-agent">
-          <span class="agl-flow-logo">{!! $logo !!}</span>
-          <span class="agl-flow-agent-text">
-            <strong>{{ __('agents_landing.flow_agent') }}</strong>
-            <span>{{ __('agents_landing.flow_agent_sub') }}</span>
-          </span>
-        </div>
-        <svg class="agl-flow-out" viewBox="0 0 64 320" preserveAspectRatio="none"><path d="M0 160 H 64" /></svg>
-        <div class="agl-flow-call">
-          <p class="agl-flow-call-head"><span><i></i>{{ __('agents_landing.call_live') }}</span><b dir="ltr">00:12</b></p>
-          @foreach(__('agents_landing.flow_lines') as $i => [$role, $text])
-            <p class="agl-flow-line is-{{ $role }}" style="--d: {{ $i }}">{{ $text }}</p>
-          @endforeach
-        </div>
-      </div>
-      <p class="agl-builders">{{ __('agents_landing.flow_builders') }}</p>
-    </section>
+    <x-agents.channels />
 
     {{-- Every call written down: the owner's inbox. Pick a call on the list to read it on the other side. --}}
     <section class="agl-section agl-calls" aria-labelledby="agl-calls-title">

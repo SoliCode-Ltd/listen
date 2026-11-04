@@ -432,6 +432,11 @@ html[dir="rtl"] .agl-flow-lines, html[dir="rtl"] .agl-flow-out { transform: scal
 .agl-flow-line.is-agent { justify-self: end; background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .16); border-end-end-radius: 5px; }
 .is-in .agl-flow-line { animation: agl-rise .5s var(--agl-ease) forwards; animation-delay: calc(.6s + var(--d) * 1.1s); }
 .agl-builders { margin-top: 1.2rem; text-align: center; color: var(--muted); font-size: .95rem; }
+/* On the homepage: centred like the homepage's other sections, on the homepage's own width. */
+.agl-channels-home.agl-section { max-width: none; padding-inline: 0; }
+.agl-channels-home .agl-head { margin-inline: auto; text-align: center; }
+.agl-channels-home .agl-head h2 { margin: 0; font-size: clamp(1.6rem, 3.2vw, 2.3rem); text-align: center; }
+.agl-channels-home .agl-head p { margin-inline: auto; max-width: 56ch; }
 
 /* ---------- Every call written down: the owner's inbox, one call open. ---------- */
 .agl-inbox { font-size: .9rem; }
@@ -692,7 +697,7 @@ html:has(.agl) { scroll-behavior: smooth; }
 .agl-real-result-row dt { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: rgba(255, 255, 255, .07); color: var(--agl-on-ink-muted); }
 .agl-real-result-row dt svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .agl-real-result-row dd { margin: 0; min-width: 0; color: var(--agl-on-ink); font-size: .9rem; font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
-.agl-real-result-row bdi { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.agl-real-result-row bdi { font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
 .agl-real.is-playing:not(.is-done) .agl-real-result { opacity: 0; transform: translateY(12px); }
 .agl-real.is-playing:not(.is-done) .agl-real-result-row { opacity: 0; transform: translateY(6px); }
 .agl-real.is-done .agl-real-result { transition-delay: .05s; }
@@ -745,7 +750,19 @@ html:has(.agl) { scroll-behavior: smooth; }
 }
 @media (prefers-reduced-motion: reduce) { .agl-real-avatar i { transition: none; transform: none; } }
 /* ---------- The homepage's section: the words beside the call. ---------- */
-.agl-home-grid { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: clamp(1.8rem, 4.5vw, 4rem); align-items: center; }
+/* Right under the hero, the second product on its own stage: the words, then the real call. */
+.agl-home.section { padding: 0 0 clamp(2rem, 4.5vw, 3.2rem); }
+/* The hero's art already leaves room under it, so the hero adds none of its own. */
+@media (min-width: 981px) { .hero:has(+ .agl-home) { padding-bottom: 0; } }
+@media (max-width: 640px) {
+  /* On a phone the stage is a quiet frame round the call, so the call keeps its width. */
+  .agl-home-grid { padding: 1.4rem .6rem .6rem; border-radius: 26px; gap: 1.6rem; }
+  .agl-home-copy { padding-inline: .5rem; }
+}
+.agl-home-grid {
+  display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: clamp(1.8rem, 4.5vw, 4rem); align-items: center;
+  padding: clamp(1.25rem, 4vw, 3.4rem); border-radius: 32px; background: var(--agl-stage); border: 1px solid var(--agl-stage-line);
+}
 .agl-home-copy { text-align: start; }
 .agl-home-copy h2 { font-size: clamp(2rem, 3.8vw, 3rem); font-weight: 800; line-height: 1.12; max-width: 15ch; text-wrap: balance; text-align: start; }
 html[dir="rtl"] .agl-home-copy h2 { line-height: 1.4; }
@@ -761,7 +778,8 @@ html[dir="rtl"] .agl-home-copy h2 { line-height: 1.4; }
 }
 
 /* ---------- The homepage's Agents section. ---------- */
-.agl-home { max-width: 1180px; margin: 0 auto; }
+/* As wide as the homepage's other bands (the facts strip under it), edge to edge in its container. */
+.agl-home { max-width: none; margin: 0; }
 /* Centred like the homepage's other sections: the title, a line, then its two buttons. */
 .agl-home-head { display: grid; justify-items: center; text-align: center; gap: 1.3rem; margin-bottom: clamp(1.6rem, 3.4vw, 2.6rem); }
 .agl-home-head > div:first-child { max-width: 680px; }
