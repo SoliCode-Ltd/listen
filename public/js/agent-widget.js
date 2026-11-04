@@ -78,7 +78,7 @@
     '.lva.is-live .lva-pill{display:inline-flex}',
     '.lva-x{width:34px;height:34px;margin:-4px;border-radius:50%;border:0;background:transparent;display:grid;place-items:center;color:var(--muted);flex:0 0 auto}',
     '.lva-x:hover{background:var(--soft);color:var(--text)}',
-    '.lva-x svg,.lva-call svg,.lva-mute svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.lva-x svg,.lva-call svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
 
     /* The orb: one, in the middle, moving with the voice. */
     '.lva-stage{display:grid;place-items:center;flex:0 3 164px;min-height:118px}',
@@ -119,9 +119,6 @@
     '.lva-call:hover{background:var(--a-2)}',
     '.lva-call:active{transform:scale(.97)}',
     '.lva-call.is-live{background:#E2445F;color:#fff !important;box-shadow:0 12px 26px -12px #E2445F}',
-    '.lva-mute{width:48px;height:48px;border-radius:var(--r-btn);border:1px solid var(--line);background:transparent;display:grid;place-items:center;transition:background .2s ease}',
-    '.lva[data-radius="round"] .lva-mute{border-radius:50%}',
-    '.lva-mute[aria-pressed="true"]{background:var(--soft);color:var(--a)}',
     '.lva-powered{align-self:center;display:inline-block;padding:4px 10px;color:var(--muted);font-size:11.5px;font-weight:700;text-decoration:none;border-radius:8px}',
     '.lva-powered:hover{color:var(--text)}',
 
@@ -178,7 +175,7 @@
     '.lva-barinfo{display:grid;min-width:92px;line-height:1.25}',
     '.lva-barinfo b{font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}',
     '.lva-barinfo span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}',
-    '.lva-bar .lva-mute,.lva-bar .lva-end{width:var(--ico);height:var(--ico);min-height:0;padding:0;border-radius:50%}',
+    '.lva-bar .lva-end{width:var(--ico);height:var(--ico);min-height:0;padding:0;border-radius:50%}',
     '.lva-end{display:grid;place-items:center;border:0;background:#E2445F;color:#fff !important}',
     '.lva-end svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
     '.lva-bartip{position:absolute;bottom:calc(100% + 10px);max-width:min(320px,calc(100vw - 40px));padding:9px 13px;border-radius:14px;background:var(--bg);border:1px solid var(--line);box-shadow:var(--shadow);font-size:13.5px;animation:lva-in .3s ' + EASE + '}',
@@ -380,8 +377,8 @@
         parts.lines = el('div', 'lva-lines');
         parts.lines.setAttribute('aria-live', 'polite');
         parts.lines.hidden = look.captions === false;
+        // One button: start, then hang up (no mute: a caller who is done simply ends the call).
         var buttons = el('div', 'lva-buttons');
-        parts.mute = muteButton();
         parts.call = el('button', 'lva-call');
         parts.call.type = 'button';
         parts.callIcon = el('span');
@@ -389,7 +386,7 @@
         parts.callLabel = el('span', '', text.start);
         parts.call.appendChild(parts.callIcon); parts.call.appendChild(parts.callLabel);
         parts.call.addEventListener('click', toggleCall);
-        buttons.appendChild(parts.mute); buttons.appendChild(parts.call);
+        buttons.appendChild(parts.call);
         // Every line busy: the caller's place under the line, and a way to leave a number instead.
         parts.pos = el('span', 'lva-pos');
         parts.pos.hidden = true;
@@ -446,13 +443,12 @@
         parts.barState = el('span', '', states.connecting || '');
         parts.barState.setAttribute('aria-live', 'polite');
         info.appendChild(parts.barTitle); info.appendChild(parts.barState);
-        parts.mute = muteButton();
         var end = el('button', 'lva-end');
         end.type = 'button';
         end.setAttribute('aria-label', text.end || 'End');
         end.innerHTML = ICONS.end;
         end.addEventListener('click', toggleCall);
-        b.appendChild(viz); b.appendChild(info); b.appendChild(parts.mute); b.appendChild(end);
+        b.appendChild(viz); b.appendChild(info); b.appendChild(end);
         dock.appendChild(b);
         // Above the bar: a problem, the caller's place in line, or the form to leave a number.
         parts.tip = el('div', 'lva-bartip');
@@ -471,21 +467,6 @@
       paintState();
     }
 
-    function muteButton() {
-      var m = el('button', 'lva-mute');
-      m.type = 'button';
-      m.hidden = true;
-      m.setAttribute('aria-pressed', muted ? 'true' : 'false');
-      m.setAttribute('aria-label', muted ? (text.unmute || 'Unmute') : (text.mute || 'Mute'));
-      m.innerHTML = ICONS.micOff;
-      m.addEventListener('click', function () {
-        muted = !muted;
-        if (call && call.mute) call.mute(muted);
-        m.setAttribute('aria-pressed', muted ? 'true' : 'false');
-        m.setAttribute('aria-label', muted ? (text.unmute || 'Unmute') : (text.mute || 'Mute'));
-      });
-      return m;
-    }
     function linkButton(label, onClick) {
       var b = el('button', 'lva-call is-quiet', label || '');
       b.type = 'button';
@@ -547,7 +528,6 @@
         parts.callLabel.textContent = waiting ? (lineText().cancel || text.end) : on ? text.end : text.start;
         parts.callIcon.innerHTML = waiting ? '' : on ? ICONS.end : ICONS.phone;
       }
-      if (parts.mute) parts.mute.hidden = !on;
       if (parts.barState) parts.barState.textContent = on && startedAt && stateNow !== 'connecting' ? clock(elapsed()) : (form ? '' : msg);
       if (parts.tip) {
         var err = stateNow === 'error' || stateNow === 'mic';

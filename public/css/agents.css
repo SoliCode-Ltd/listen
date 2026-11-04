@@ -287,6 +287,9 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-talk-note svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .ag-talk-state:empty { display: none; }
 .ag-talk-state.is-error { color: var(--ag-bad); }
+.ag-talk-blocked { margin: -.2rem 0 0; max-width: 40ch; color: var(--muted); font-size: .88rem; line-height: 1.6; text-wrap: balance; }
+.ag-talk-blocked a { color: var(--accent-text, var(--a)); font-weight: 700; text-decoration: none; white-space: nowrap; }
+.ag-talk-blocked a:hover { text-decoration: underline; }
 /* The call is over: one small line under what was said ("Call ended after 01:24"). */
 .ag-talk-ended { margin: .2rem 0 0; color: var(--muted); font-size: .86rem; font-weight: 600; line-height: 1.5; animation: ag-ended-in .35s ease both; }
 .ag-talk-ended[hidden] { display: none; }

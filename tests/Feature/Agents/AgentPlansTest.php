@@ -392,6 +392,30 @@ class AgentPlansTest extends TestCase
         $this->assertGreaterThanOrEqual(40, $row['typical_margin']);
     }
 
+    public function test_the_test_call_button_is_greyed_out_with_the_reason_when_no_call_can_start(): void
+    {
+        // On the free plan (no agents) with the free test time used: no call can start.
+        SiteSetting::set('agents_free_test_seconds', '0', 'agents');
+        $owner = User::factory()->create();
+        $agent = $this->agent($owner);
+        $this->assertSame('plan', app(AgentCalls::class)->testBlock($agent));
+        $this->actingAs($owner)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk()
+            ->assertSee('data-ag-call  disabled aria-describedby="ag-talk-blocked"', false)
+            ->assertSee(__('agents.error_plan_test'))
+            ->assertSee(__('agents.talk_blocked_plans'));
+
+        // With free test time left, the button is ready.
+        SiteSetting::set('agents_free_test_seconds', '120', 'agents');
+        $this->assertNull(app(AgentCalls::class)->testBlock($agent));
+        $this->actingAs($owner)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk()
+            ->assertDontSee('ag-talk-blocked', false);
+
+        // On a plan with agents but no credits left, it says so.
+        SiteSetting::set('agents_free_test_seconds', '0', 'agents');
+        $broke = $this->owner([], 0);
+        $this->assertSame('credits', app(AgentCalls::class)->testBlock($this->agent($broke)));
+    }
+
     public function test_the_pricing_table_lists_every_agent_setting_and_the_shared_credits_once(): void
     {
         Plan::factory()->create(['slug' => 'creator-t', 'name' => 'Creator', 'price_cents' => 2200, 'monthly_chars' => 810000, 'is_active' => true,

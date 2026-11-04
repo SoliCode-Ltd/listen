@@ -111,6 +111,36 @@ class AgentCalls
     }
 
     /**
+     * Why the owner's own test call would be refused right now, before they press the button:
+     * 'stopped', 'suspended', 'plan' (free test seconds used and no agents on the plan),
+     * 'minutes' (the plan's call minutes for the month used) or 'credits'; null when it can start.
+     * The same checks start() makes for a test call, leaving out the site's passing limits.
+     */
+    public function testBlock(Agent $agent): ?string
+    {
+        $userId = (int) $agent->user_id;
+        if (AgentAccess::callsStopped()) {
+            return 'stopped';
+        }
+        if ($agent->setting('suspended')) {
+            return 'suspended';
+        }
+        if ($this->freeTestSecondsLeft($userId) >= 20) {
+            return null;
+        }
+        $limits = AgentAccess::limitsFor($userId);
+        if (! $limits['included']) {
+            return 'plan';
+        }
+        if ($limits['minutes'] > 0 && $limits['minutes'] * 60 - $this->periodSeconds($userId) < 30) {
+            return 'minutes';
+        }
+        $quotaPlan = $this->plans->resolveQuotaPlanForUserId($userId);
+
+        return $this->affordableSeconds($userId, $quotaPlan, $agent, 60) < 30 ? 'credits' : null;
+    }
+
+    /**
      * @param  array{origin?: ?string, page_url?: ?string, visitor?: ?string, country?: ?string, network?: ?string, free_only?: bool}  $context
      * @return array{ok: bool, error?: string, conversation?: AgentConversation, call_key?: string, token?: string, max_seconds?: int, free?: bool}
      */

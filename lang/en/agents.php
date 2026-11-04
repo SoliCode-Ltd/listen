@@ -177,6 +177,8 @@ return [
         'error' => 'The call could not start. Try again.',
     ],
     'talk_mic_blocked' => 'Allow the microphone in your browser to talk to your agent.',
+    // A test call the owner can't make now: the button is greyed out, this goes under it.
+    'talk_blocked_plans' => 'See plans',
     'talk_free_left' => '{0} Your free test minutes are used up; test calls now use your plan\'s credits.|[1,*] :count free test seconds left',
     'talk_transcript' => 'What was said',
     'talk_correct' => 'Correct this answer',

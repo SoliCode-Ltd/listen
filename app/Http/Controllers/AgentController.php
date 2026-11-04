@@ -135,6 +135,8 @@ class AgentController extends Controller
             'checklist' => $this->checklist($agent, $widget),
             'perMinute' => AgentCalls::creditsPerMinute(),
             'freeTestLeft' => $this->calls->freeTestSecondsLeft((int) $request->user()->id),
+            // A test call that would be refused: the button is greyed out and says why.
+            'testBlock' => $this->calls->testBlock($agent),
             'embed' => $this->embedCode($widget),
             'balance' => AgentBalance::for($request->user()),
             'limits' => AgentAccess::limitsFor((int) $request->user()->id),
@@ -383,6 +385,7 @@ class AgentController extends Controller
             'widget' => $agent?->mainWidget(),
             'embed' => $agent ? $this->embedCode($agent->mainWidget()) : null,
             'freeTestLeft' => $this->calls->freeTestSecondsLeft((int) $request->user()->id),
+            'testBlock' => $agent ? $this->calls->testBlock($agent) : null,
             'perMinute' => AgentCalls::creditsPerMinute(),
             'limits' => AgentAccess::limitsFor((int) $request->user()->id),
             'upgrade' => AgentAccess::upgrade($arabic),

@@ -166,7 +166,7 @@
             <h2 data-ag-talk-title>{{ __('agents.talk_heading', ['name' => $agent->name ?? __('agents.agent_name_placeholder')]) }}</h2>
             <p data-ag-talk-hint data-male="{{ __('agents.talk_hint') }}" data-female="{{ __('agents.talk_hint_female') }}">{{ \App\Support\Agents\Gendered::line('agents.talk_hint', ($voiceGender ?? null) === 'female') }}</p>
           </div>
-          @include('agents.partials.talk', ['agent' => $agent, 'avatar' => $voiceAvatar, 'freeTestLeft' => $freeTestLeft, 'perMinute' => $perMinute, 'female' => ($voiceGender ?? null) === 'female'])
+          @include('agents.partials.talk', ['agent' => $agent, 'avatar' => $voiceAvatar, 'freeTestLeft' => $freeTestLeft, 'perMinute' => $perMinute, 'female' => ($voiceGender ?? null) === 'female', 'testBlock' => $testBlock ?? null])
           <div class="ag-actions">
             <button type="button" class="ag-btn ag-btn-ghost" data-ag-go="1">{{ __('agents.back') }}</button>
             <button type="button" class="ag-btn ag-btn-primary ag-btn-lg" data-ag-go="3">{{ __('agents.next') }}</button>
@@ -231,7 +231,6 @@
       'text' => [
         'states' => __('agents.talk_states'),
         'start' => __('agents.talk_start'), 'end' => __('agents.talk_end'),
-        'mute' => __('agents.talk_mute'), 'unmute' => __('agents.talk_unmute'),
         'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
         'correct' => __('agents.talk_correct'), 'correct_placeholder' => __('agents.talk_correct_placeholder'),
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),

@@ -412,14 +412,14 @@
   function talk(root, hooks) {
     if (!root) return;
     hooks = hooks || {};
-    var quietError = false;
+    var quietError = false, lastError = '';
     var btn = $('[data-ag-call]', root), label = $('[data-ag-call-label]', root), stateEl = $('[data-ag-talk-state]', root);
-    var mute = $('[data-ag-mute]', root), stage = $('[data-ag-stage]', root);
+    var stage = $('[data-ag-stage]', root);
     var bars = $$('.ag-wave i', root), face = $('[data-ag-talk-avatar]', root);
     var faceImg = $('[data-ag-talk-avatar-img]', root);
     var shape = [0.35, 0.6, 0.85, 1, 0.8, 0.55, 0.3];
     var list = $('[data-ag-transcript]', root);
-    var call = null, muted = false, lastAsked = '';
+    var call = null, lastAsked = '';
     var states = T.states || {};
     // The link page: every line busy, the caller's place in line, then a number to be called back.
     var sub = $('[data-ag-talk-sub]', root), leave = $('[data-ag-talk-leave]', root);
@@ -464,9 +464,10 @@
       if (s !== 'listening' && s !== 'speaking') answeredAt = 0;
       // A woman's voice has its own words in Arabic ("سارة تتحدث"); the setup steps get both forms.
       var key = C.agent && C.agent.gender === 'female' && states[s + '_female'] ? s + '_female' : s;
+      if (s === 'connecting') lastError = '';
       var waiting = s === 'waiting', away = s === 'busy' || s === 'sent';
       // Before a call nothing is said: the button under the orb is enough.
-      stateEl.textContent = s === 'idle' || away || (lasted >= 1 && T.ended_after) ? '' : (s === 'mic' ? (T.mic || '') : waiting ? (L.waiting || '') : fill(states[key] || '', { name: (C.agent && C.agent.name) || '' }));
+      stateEl.textContent = s === 'idle' || away || (lasted >= 1 && T.ended_after) ? '' : (s === 'mic' ? (T.mic || '') : waiting ? (L.waiting || '') : s === 'error' && lastError ? lastError : fill(states[key] || '', { name: (C.agent && C.agent.name) || '' }));
       stateEl.classList.toggle('is-error', s === 'error' || s === 'mic');
       var live = s === 'connecting' || s === 'listening' || s === 'speaking';
       // While waiting the button quietly gives up the wait; "leave my number" is the main way on.
@@ -475,7 +476,6 @@
       btn.classList.toggle('ag-btn-primary', !waiting);
       root.classList.toggle('is-waiting', waiting);
       label.textContent = waiting ? (L.cancel || T.end) : live ? T.end : T.start;
-      if (mute) mute.hidden = !live;
       stage.classList.toggle('is-speaking', s === 'speaking');
       stage.classList.toggle('is-live', live);
       stage.classList.toggle('is-waiting', waiting);
@@ -606,18 +606,18 @@
         },
         onError: function (msg, err) {
           if (hooks.onError && hooks.onError(msg, err) === false) { quietError = true; return; }
-          if (msg) toast(msg);
+          // The server's own reason (no plan, minutes or credits left) in place of "could not start";
+          // when no call can start until the plan changes, the button stays greyed out.
+          lastError = msg || '';
+          var reason = err && err.data && err.data.reason;
+          if (reason === 'plan' || reason === 'minutes' || reason === 'credits') btn.disabled = true;
+          else if (msg) toast(msg);
         },
         // Every line busy (the link page): the caller's place, kept fresh while they wait.
         onWait: function (w) { waitPos = (w && w.position) || 0; if (pos && !pos.hidden) posText.textContent = waitText(); },
         patience: 60,
       });
       if (window.ListenOrbs) window.ListenOrbs.wake();
-    });
-    if (mute) mute.addEventListener('click', function () {
-      muted = !muted;
-      if (call) call.mute(muted);
-      mute.textContent = muted ? T.unmute : T.mute;
     });
     // The call shows the orb only; the speaker's face stays in the voice gallery. A new voice
     // can change the words ("جاهزة" for a woman's voice), so the waiting line is written again.

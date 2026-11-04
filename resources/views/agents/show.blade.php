@@ -131,7 +131,7 @@
       </div>
       <div class="ag-two">
         <div class="ag-card ag-section">
-          @include('agents.partials.talk', ['agent' => $agent, 'avatar' => $voice['avatar'] ?? null, 'freeTestLeft' => $freeTestLeft, 'perMinute' => $perMinute, 'female' => ($voice['gender'] ?? null) === 'female'])
+          @include('agents.partials.talk', ['agent' => $agent, 'avatar' => $voice['avatar'] ?? null, 'freeTestLeft' => $freeTestLeft, 'perMinute' => $perMinute, 'female' => ($voice['gender'] ?? null) === 'female', 'testBlock' => $testBlock ?? null])
         </div>
         <div class="ag-card ag-checklist">
           <h2>{{ __('agents.checklist_title') }} <span class="ag-progress" style="--p: {{ (int) round($done / $total * 100) }}; position:relative"><span>{{ $done }}/{{ $total }}</span></span></h2>
@@ -424,8 +424,7 @@
               'label' => trans('agents.widget_label', [], $l), 'title' => $agent->business_name,
               'subtitle' => trans($female ? 'agents.widget_subtitle_female' : 'agents.widget_subtitle', [], $l),
               'start' => trans('agents.talk_start', [], $l), 'end' => trans('agents.talk_end', [], $l), 'states' => $states,
-              'powered' => trans('agents.powered', [], $l), 'mute' => trans('agents.talk_mute', [], $l),
-              'unmute' => trans('agents.talk_unmute', [], $l), 'close' => trans('agents.widget_close', [], $l),
+              'powered' => trans('agents.powered', [], $l), 'close' => trans('agents.widget_close', [], $l),
               'ended_after' => trans('agents.talk_ended_after', [], $l),
               'sample' => [
                 ['role' => 'agent', 'text' => $agent->first_message ?: trans('agents.design_sample.hello', ['name' => $agent->name, 'business' => $agent->business_name], $l)],
@@ -440,7 +439,6 @@
       'text' => [
         'states' => \App\Support\Agents\Gendered::lines((array) __('agents.talk_states', ['name' => $agent->name]), ($voice['gender'] ?? null) === 'female'),
         'start' => __('agents.talk_start'), 'end' => __('agents.talk_end'),
-        'mute' => __('agents.talk_mute'), 'unmute' => __('agents.talk_unmute'),
         'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
         'correct' => __('agents.talk_correct'), 'correct_placeholder' => __('agents.talk_correct_placeholder'),
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
