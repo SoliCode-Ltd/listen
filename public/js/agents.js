@@ -416,7 +416,7 @@
     var btn = $('[data-ag-call]', root), label = $('[data-ag-call-label]', root), stateEl = $('[data-ag-talk-state]', root);
     var mute = $('[data-ag-mute]', root), stage = $('[data-ag-stage]', root);
     var bars = $$('.ag-wave i', root), face = $('[data-ag-talk-avatar]', root);
-    var halo = $('.ag-talk-halo', root), faceImg = $('[data-ag-talk-avatar-img]', root);
+    var faceImg = $('[data-ag-talk-avatar-img]', root);
     var shape = [0.35, 0.6, 0.85, 1, 0.8, 0.55, 0.3];
     var list = $('[data-ag-transcript]', root);
     var call = null, muted = false, lastAsked = '';
@@ -427,6 +427,29 @@
     var form = $('[data-ag-callback]', root), done = $('[data-ag-callback-done]', root);
     var buttons = $('.ag-talk-buttons', root), L = T.lines || {}, B = T.callback || {};
     var waitPos = 0, sentTo = null;
+    // The line that closes a call ("Call ended after 01:24"), counted from when it was answered.
+    var answeredAt = 0, summary = null;
+    // 01:24, as the call button counts a call.
+    function clock(sec) { sec = Math.max(0, Math.round(sec)); return ('0' + Math.floor(sec / 60)).slice(-2) + ':' + ('0' + (sec % 60)).slice(-2); }
+    function hideSummary() { if (summary) summary.hidden = true; }
+    // One small line under what was said, where the eye already is.
+    function showSummary(seconds) {
+      if (!T.ended_after) return;
+      if (!summary) {
+        summary = document.createElement('p');
+        summary.className = 'ag-talk-ended';
+        summary.setAttribute('role', 'status');
+        root.appendChild(summary);
+      }
+      var words = String(T.ended_after).split(':time');
+      summary.textContent = words[0] || '';
+      var t = document.createElement('bdi');
+      t.dir = 'ltr';
+      t.textContent = clock(seconds);
+      summary.appendChild(t);
+      summary.appendChild(document.createTextNode(words[1] || ''));
+      summary.hidden = false;
+    }
     function waitText() {
       var ahead = L.ahead || {}, k = Math.max(0, waitPos - 1);
       if (k < 1) return L.next || '';
@@ -434,11 +457,16 @@
     }
     function setState(s) {
       if (s === 'error' && quietError) { quietError = false; s = 'idle'; }
+      // The call's length counts from when it was answered; a call that never was has no summary.
+      if (s === 'connecting') { answeredAt = 0; hideSummary(); }
+      if ((s === 'listening' || s === 'speaking') && !answeredAt) answeredAt = Date.now();
+      var lasted = s === 'ended' && answeredAt ? (Date.now() - answeredAt) / 1000 : 0;
+      if (s !== 'listening' && s !== 'speaking') answeredAt = 0;
       // A woman's voice has its own words in Arabic ("سارة تتحدث"); the setup steps get both forms.
       var key = C.agent && C.agent.gender === 'female' && states[s + '_female'] ? s + '_female' : s;
       var waiting = s === 'waiting', away = s === 'busy' || s === 'sent';
       // Before a call nothing is said: the button under the orb is enough.
-      stateEl.textContent = s === 'idle' || away ? '' : (s === 'mic' ? (T.mic || '') : waiting ? (L.waiting || '') : fill(states[key] || '', { name: (C.agent && C.agent.name) || '' }));
+      stateEl.textContent = s === 'idle' || away || (lasted >= 1 && T.ended_after) ? '' : (s === 'mic' ? (T.mic || '') : waiting ? (L.waiting || '') : fill(states[key] || '', { name: (C.agent && C.agent.name) || '' }));
       stateEl.classList.toggle('is-error', s === 'error' || s === 'mic');
       var live = s === 'connecting' || s === 'listening' || s === 'speaking';
       // While waiting the button quietly gives up the wait; "leave my number" is the main way on.
@@ -456,6 +484,8 @@
       if (leave) leave.hidden = !waiting;
       if (form) showCallback(s);
       if (!live && !waiting) { stage.classList.remove('is-playing'); stage.__vpLevel = 0; call = null; level(0, 0); }
+      if (lasted >= 1) showSummary(lasted);
+      else if (s !== 'ended' && s !== 'idle') hideSummary();
       if (hooks.onState) hooks.onState(s);
     }
     // Still busy: the form in place of the call; once sent, the thanks with the number they left.
@@ -513,12 +543,11 @@
       });
       $('[data-ag-callback-again]', form).addEventListener('click', function () { setState('idle'); btn.click(); });
     }
-    // The waves follow the agent's voice (and the caller's, softer); the face and its halo breathe with it.
+    // The orb follows the agent's voice from inside the ball (js/listen-orbs.js reads the stage's level).
     function level(a, c) {
       a = Math.min(1, a || 0); c = Math.min(1, c || 0);
       stage.__vpLevel = a;
       stage.classList.toggle('is-playing', a > 0.01);
-      if (halo) { halo.style.setProperty('--hs', (1 + a * 0.22).toFixed(3)); halo.style.setProperty('--ho', (0.45 + a * 0.55).toFixed(2)); }
     }
     function bubble(role, text, extra) {
       var b = document.createElement('div');
@@ -563,6 +592,7 @@
       if (call) { call.end(); return; }
       if (C.mode === 'link' && C.available === false) { stateEl.textContent = T.paused || ''; return; }
       list.innerHTML = '';
+      hideSummary();
       call = window.ListenAgentCall.start({
         begin: begin,
         onState: setState,
@@ -591,7 +621,16 @@
     });
     // The call shows the orb only; the speaker's face stays in the voice gallery. A new voice
     // can change the words ("جاهزة" for a woman's voice), so the waiting line is written again.
-    return { setAvatar: function () { if (!call) setState('idle'); } };
+    return {
+      setAvatar: function () { if (!call) setState('idle'); },
+      // Another agent picked (the demo): its page starts clean, with nothing the last one said.
+      reset: function () {
+        if (call) return;
+        list.innerHTML = '';
+        hideSummary();
+        setState('idle');
+      },
+    };
   }
 
   /* ---------- The setup in four steps ---------- */
@@ -1193,11 +1232,13 @@
     var biz = $('[data-demo-biz]', box), tryList = $('[data-demo-try]', box);
     var left = $('[data-demo-left]', box), leftText = $('[data-demo-left-text]', box);
     var used = $('[data-demo-used]', box), plans = $('[data-demo-plans]', box), callBtn = $('[data-ag-call]', box);
-    var live = false;
+    var live = false, talker = null;
     function chosen() { return picks.filter(function (i) { return i.checked; })[0] || picks[0]; }
     function apply() {
       var i = chosen();
       if (!i) return;
+      // Another business: nothing the last agent said stays on the page.
+      if (talker) talker.reset();
       C.agent.name = i.getAttribute('data-name');
       C.agent.gender = i.getAttribute('data-gender');
       if (biz) biz.textContent = i.getAttribute('data-business');
@@ -1226,7 +1267,7 @@
     }
     C.callBody = function () { return { preset: (chosen() || {}).value }; };
     picks.forEach(function (i) { i.addEventListener('change', apply); });
-    talk($('[data-ag-talk]', box), {
+    talker = talk($('[data-ag-talk]', box), {
       onState: function (s) {
         var on = s === 'connecting' || s === 'listening' || s === 'speaking';
         // While a call is on, the business stays the one being called.

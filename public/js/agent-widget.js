@@ -92,7 +92,8 @@
     '.lva.is-speaking .lva-orb::before{animation-duration:3.4s;opacity:.85}',
     '.lva.is-connecting .lva-orb{animation:lva-breathe 1.4s ease-in-out infinite}',
     '.lva-rings i{position:absolute;inset:0;border-radius:50%;border:2px solid var(--c3);opacity:0}',
-    '.lva.is-speaking .lva-rings i{animation:lva-ring 1.9s ease-out infinite}.lva.is-speaking .lva-rings i:nth-child(2){animation-delay:.95s}',
+    // The orb moves with the voice inside the ball only, as every orb on the site does: no rings spread round it.
+    '.lva.is-speaking .lva-rings i{animation:none}',
     '.lva-spin{position:absolute;inset:-10px;border-radius:50%;border:2px solid transparent;border-top-color:var(--c2);opacity:0;transition:opacity .3s ease}',
     '.lva.is-connecting .lva-spin{opacity:1;animation:lva-spin .9s linear infinite}',
     '.lva-mini{position:absolute;inset:0;border-radius:50%;overflow:hidden;background:radial-gradient(120% 120% at 32% 24%,var(--c3) 0%,var(--c2) 46%,var(--c1) 100%);box-shadow:inset 0 -5px 10px rgba(0,0,0,.25)}',
@@ -521,7 +522,7 @@
 
     function paintState(message) {
       var on = live(), waiting = stateNow === 'waiting', form = stateNow === 'busy' || stateNow === 'sent';
-      var msg = message || (stateNow === 'mic' ? text.mic : waiting ? (lineText().waiting || '') : states[stateNow] || '');
+      var msg = message || (stateNow === 'mic' ? text.mic : waiting ? (lineText().waiting || '') : endedText() || states[stateNow] || '');
       // Before and after a call the owner may hide the line under the orb (look.ready_show).
       var quiet = !on && !waiting && stateNow !== 'error' && stateNow !== 'mic' && !message && look.ready_show === false;
       box.classList.toggle('is-live', on);
@@ -653,11 +654,16 @@
       [mark, h, p, done].forEach(function (n) { parts.slot.appendChild(n); });
       setTimeout(function () { done.focus(); }, 60);
     }
+    var endedFor = 0;
     function elapsed() { return startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0; }
+    // "Call ended after 01:24", in place of "Call ended", once a call that was answered is over.
+    function endedText() { return stateNow === 'ended' && endedFor >= 1 && text.ended_after ? String(text.ended_after).replace(':time', clock(endedFor)) : ''; }
     function setState(s, message) {
       if (s === 'error' && !message && pendingError) message = pendingError;
       if (s !== 'error') pendingError = '';
       var was = live(), before = stateNow;
+      // How long the call that just ended lasted, said with "Call ended" until the next one.
+      endedFor = s === 'ended' ? elapsed() : 0;
       stateNow = s;
       if (live() && !was) {
         startedAt = 0;

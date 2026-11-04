@@ -1,11 +1,10 @@
-{{-- Talk to the agent: one orb in the middle that moves with its voice, and a halo that ripples
-     while it speaks (the speakers' faces are only for choosing the voice). What was said shows
-     below; each answer can be corrected. --}}
+{{-- Talk to the agent: one orb in the middle that moves with its voice, inside the ball only, as
+     every orb on the site does (the speakers' faces are only for choosing the voice). What was said
+     shows below, each answer can be corrected, and a summary closes the call (js/agents.js talk()). --}}
 @props(['agent' => null, 'avatar' => null, 'freeTestLeft' => 0, 'perMinute' => 900, 'showCost' => true, 'female' => false, 'note' => null])
 <div class="ag-talk" data-ag-talk>
   <div class="ag-talk-stage" data-vp-track data-ag-stage>
     <span class="ag-talk-face" data-ag-talk-avatar>
-      <span class="ag-talk-halo" aria-hidden="true"></span>
       @if($callback ?? false)
         {{-- Waiting for a line: a ring round the orb fills over the minute the page waits. --}}
         <svg class="ag-talk-ring" viewBox="0 0 120 120" aria-hidden="true"><circle class="t" cx="60" cy="60" r="58"/><circle class="p" cx="60" cy="60" r="58" pathLength="100"/></svg>

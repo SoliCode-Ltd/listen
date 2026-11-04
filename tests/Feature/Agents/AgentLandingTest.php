@@ -32,7 +32,9 @@ class AgentLandingTest extends TestCase
         foreach (['en', 'ar'] as $locale) {
             app()->setLocale($locale);
             $page = $this->page($locale)->assertOk();
-            $page->assertSee(__('agents_landing.hero_title'));
+            // The title reads whole, its dialect words in the brand colour.
+            $page->assertSeeText(__('agents_landing.hero_title'))
+                ->assertSee('<span class="brand-text">'.e(__('agents_landing.hero_title_mark')).'</span>', false);
             // The real recorded calls, each under its own tab; the first is written into the page.
             $order = __('agents_landing.real_order');
             foreach ($order as $key) {

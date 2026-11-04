@@ -89,6 +89,8 @@ class AgentCallController extends Controller
                 'mute' => trans('agents.talk_mute', [], $locale),
                 'unmute' => trans('agents.talk_unmute', [], $locale),
                 'close' => trans('agents.widget_close', [], $locale),
+                // After a call, one line: "Call ended after 01:24".
+                'ended_after' => trans('agents.talk_ended_after', [], $locale),
             ] + self::lineText($agent, $locale),
         ])->header('Cache-Control', 'public, max-age=60');
     }

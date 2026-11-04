@@ -185,6 +185,8 @@ return [
     'talk_correct_placeholder' => 'الإجابة الصحيحة هي…',
     'talk_correct_save' => 'علّمه',
     'talk_correct_saved' => 'تعلّم. سيجيب هكذا من الآن.',
+    // السطر الصغير الذي يختم المكالمة: كم استمرت.
+    'talk_ended_after' => 'انتهت المكالمة بعد :time',
     'talk_you' => 'أنت',
     'talk_saved_contact' => 'حُفظت بيانات المتصل: :details',
     'talk_skip' => 'تخطَّ الآن',

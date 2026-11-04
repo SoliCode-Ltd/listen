@@ -80,7 +80,7 @@
         'states' => \App\Support\Agents\Gendered::lines((array) __('agents.talk_states', ['name' => $agent->name]), ($voice['gender'] ?? null) === 'female'),
         'start' => __('agents.talk_start'), 'end' => __('agents.talk_end'),
         'mute' => __('agents.talk_mute'), 'unmute' => __('agents.talk_unmute'),
-        'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'),
+        'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
         'paused' => __('agents.error_paused'),
       ] + \App\Http\Controllers\AgentCallController::lineText($agent, app()->getLocale()),
     ];

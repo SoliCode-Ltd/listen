@@ -103,7 +103,13 @@
     {{-- The hero: what it is in two lines, and a real call to hear right away. The page's one orb is in it. --}}
     <section class="agl-hero">
       <div class="agl-hero-text">
-        <h1>{{ __('agents_landing.hero_title') }}</h1>
+        @php
+          // The dialect words in the brand colour, as the homepage's hero sets its own.
+          $heroTitle = (string) __('agents_landing.hero_title');
+          $heroMark = (string) __('agents_landing.hero_title_mark');
+          $heroAt = $heroMark !== '' ? mb_strpos($heroTitle, $heroMark) : false;
+        @endphp
+        <h1>@if($heroAt !== false){{ mb_substr($heroTitle, 0, $heroAt) }}<span class="brand-text">{{ $heroMark }}</span>{{ mb_substr($heroTitle, $heroAt + mb_strlen($heroMark)) }}@else{{ $heroTitle }}@endif</h1>
         <p class="agl-lead">{{ __('agents_landing.hero_text') }}</p>
         <div class="agl-cta-row">
           <a class="ag-btn ag-btn-primary ag-btn-lg" href="{{ $startUrl }}">{{ $hasAgents ? __('agents_landing.hero_cta_member') : __('agents_landing.hero_cta') }}</a>

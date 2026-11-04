@@ -324,8 +324,10 @@
     .plan-quota-number { color: var(--text); font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
     .plan-minutes-unit,
     .plan-quota-unit { color: var(--muted); font-size: .86rem; font-weight: 500; }
-    .plan-quota-credits { display: inline-flex; align-items: center; gap: .3rem; cursor: help; }
-    .plan-quota-coin { font-size: 1rem; flex: none; }
+    /* The credits sit on the same baseline as the minutes: their text sets the line, and the coin
+       is centred on it (an image alone would set the line at its bottom edge and lift the text). */
+    .plan-quota-credits { display: inline-flex; align-items: baseline; gap: .3rem; cursor: help; }
+    .plan-quota-coin { font-size: 1rem; flex: none; align-self: center; }
     .plan-minutes, .plan-quota-amount { flex-wrap: nowrap; }
     .plan-quota { container-type: inline-size; }
     /* Wide cards (desktop): minutes and credits a little larger, still on one line. */

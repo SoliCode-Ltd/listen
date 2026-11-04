@@ -183,6 +183,8 @@ return [
     'talk_correct_placeholder' => 'The right answer is…',
     'talk_correct_save' => 'Teach it',
     'talk_correct_saved' => 'Learned. It will answer this way from now on.',
+    // The small line that closes a call: how long it lasted.
+    'talk_ended_after' => 'Call ended after :time',
     'talk_you' => 'You',
     'talk_saved_contact' => 'Saved the caller\'s details: :details',
     'talk_skip' => 'Skip for now',

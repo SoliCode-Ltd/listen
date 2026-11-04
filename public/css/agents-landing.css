@@ -723,14 +723,17 @@ html:has(.agl) { scroll-behavior: smooth; }
 /* ---------- The Agents page's real call: wide, the voice on one side and the words on the other. ---------- */
 .agl-real-wrap .agl-real { max-width: 1132px; margin: 0 auto; }
 @media (min-width: 900px) {
-  .agl-real.is-wide { grid-template-columns: minmax(0, 340px) minmax(0, 1fr); grid-template-rows: auto 1fr auto auto; column-gap: clamp(1.5rem, 3vw, 2.6rem); padding: clamp(1.4rem, 2.6vw, 2rem); }
-  .agl-real.is-wide .agl-real-top { grid-column: 1 / -1; }
-  .agl-real.is-wide .agl-real-stage { grid-column: 1; grid-row: 2 / span 3; align-content: center; padding: 1.2rem 0; border-inline-end: 1px solid rgba(255, 255, 255, .08); }
+  /* The dialects, then who is speaking, across the top; the voice on one side, the words, the
+     saved result and the note on the other. */
+  .agl-real.is-wide { grid-template-columns: minmax(0, 340px) minmax(0, 1fr); grid-template-rows: auto auto 1fr auto auto; column-gap: clamp(1.5rem, 3vw, 2.6rem); padding: clamp(1.4rem, 2.6vw, 2rem); }
+  .agl-real.is-wide .agl-real-switch, .agl-real.is-wide .agl-real-top { grid-column: 1 / -1; }
+  .agl-real.is-wide .agl-real-stage { grid-column: 1; grid-row: 3 / span 3; align-content: center; padding: 1.2rem 0; border-inline-end: 1px solid rgba(255, 255, 255, .08); }
   .agl-real.is-wide .agl-real-orb { --orb-size: 200px; }
   .agl-real.is-wide .agl-real-play { --agl-btn: 66px; }
   .agl-real.is-wide .agl-real-play[data-state="pause"] { --agl-btn: 52px; }
-  .agl-real.is-wide .agl-real-lines { grid-column: 2; height: 21rem; }
-  .agl-real.is-wide .agl-real-result, .agl-real.is-wide .agl-real-note { grid-column: 2; }
+  .agl-real.is-wide .agl-real-lines { grid-column: 2; grid-row: 3; height: 21rem; }
+  .agl-real.is-wide .agl-real-result { grid-column: 2; grid-row: 4; }
+  .agl-real.is-wide .agl-real-note { grid-column: 2; grid-row: 5; }
   .agl-real.is-wide .agl-real-note { text-align: start; }
 }
 
@@ -749,42 +752,24 @@ html:has(.agl) { scroll-behavior: smooth; }
   .agl-real.is-wide .agl-real-avatar img { width: 156px; height: 156px; }
 }
 @media (prefers-reduced-motion: reduce) { .agl-real-avatar i { transition: none; transform: none; } }
-/* ---------- The homepage's section: the words beside the call. ---------- */
-/* Right under the hero, the second product on its own stage: the words, then the real call. */
-.agl-home.section { padding: 0 0 clamp(2rem, 4.5vw, 3.2rem); }
-/* The hero's art already leaves room under it, so the hero adds none of its own. */
-@media (min-width: 981px) { .hero:has(+ .agl-home) { padding-bottom: 0; } }
-@media (max-width: 640px) {
-  /* On a phone the stage is a quiet frame round the call, so the call keeps its width. */
-  .agl-home-grid { padding: 1.4rem .6rem .6rem; border-radius: 26px; gap: 1.6rem; }
-  .agl-home-copy { padding-inline: .5rem; }
-}
-.agl-home-grid {
-  display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: clamp(1.8rem, 4.5vw, 4rem); align-items: center;
-  padding: clamp(1.25rem, 4vw, 3.4rem); border-radius: 32px; background: var(--agl-stage); border: 1px solid var(--agl-stage-line);
-}
-.agl-home-copy { text-align: start; }
-.agl-home-copy h2 { font-size: clamp(2rem, 3.8vw, 3rem); font-weight: 800; line-height: 1.12; max-width: 15ch; text-wrap: balance; text-align: start; }
-html[dir="rtl"] .agl-home-copy h2 { line-height: 1.4; }
-.agl-home-copy .section-lead { margin: 1rem 0 0; max-width: 46ch; text-align: start; }
-.agl-home-facts span { text-wrap: pretty; }
-.agl-home-facts { list-style: none; margin: 1.5rem 0 0; padding: 0; display: grid; gap: .8rem; }
-.agl-home-facts li { display: flex; align-items: flex-start; gap: .7rem; font-size: 1rem; line-height: 1.55; color: var(--text); }
-.agl-home-facts svg { flex: 0 0 auto; width: 22px; height: 22px; margin-top: .1rem; padding: 3px; border-radius: 8px; background: var(--agl-soft-2); color: var(--accent-text); fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.agl-home-copy .agl-cta-row { margin-top: 1.8rem; }
-@media (max-width: 920px) {
-  .agl-home-grid { grid-template-columns: minmax(0, 1fr); }
-  .agl-home-copy h2 { max-width: 20ch; }
-}
-
-/* ---------- The homepage's Agents section. ---------- */
-/* As wide as the homepage's other bands (the facts strip under it), edge to edge in its container. */
+/* ---------- The homepage's Agents section, set like the homepage's other sections: the title,
+   its line, what the agent does and the two buttons, centred; the wide real call under them. ---------- */
 .agl-home { max-width: none; margin: 0; }
-/* Centred like the homepage's other sections: the title, a line, then its two buttons. */
-.agl-home-head { display: grid; justify-items: center; text-align: center; gap: 1.3rem; margin-bottom: clamp(1.6rem, 3.4vw, 2.6rem); }
-.agl-home-head > div:first-child { max-width: 680px; }
+/* The hero's art already leaves room under it. */
+@media (min-width: 981px) { .hero + .agl-home.section { padding-top: .75rem; } }
+.agl-home-head { display: grid; justify-items: center; gap: 1.2rem; margin-bottom: clamp(1.8rem, 3.6vw, 2.6rem); text-align: center; }
+.agl-home-head > div:first-child { max-width: 720px; }
+.agl-home-head h2 { margin: 0 0 .65rem; }
 .agl-home-head .section-lead { margin: 0 auto; }
-.agl-home-head .agl-cta-row { margin-top: 0; justify-content: center; }
+.agl-home-facts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: .65rem 1.6rem; }
+.agl-home-facts li { display: inline-flex; align-items: center; gap: .55rem; font-size: .96rem; line-height: 1.5; color: var(--text); text-wrap: pretty; }
+.agl-home-facts svg { flex: 0 0 auto; width: 22px; height: 22px; padding: 3px; border-radius: 8px; background: var(--agl-soft-2); color: var(--accent-text); fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.agl-home-head .agl-cta-row { margin-top: .3rem; justify-content: center; }
+@media (max-width: 640px) {
+  .agl-home-facts { display: grid; justify-content: start; justify-items: start; text-align: start; max-width: 26rem; }
+  .agl-home-facts li { align-items: flex-start; }
+  .agl-home-facts svg { margin-top: .1rem; }
+}
 
 @keyframes agl-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 @keyframes agl-rise { to { opacity: 1; transform: none; } }

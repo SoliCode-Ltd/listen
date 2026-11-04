@@ -426,6 +426,7 @@
               'start' => trans('agents.talk_start', [], $l), 'end' => trans('agents.talk_end', [], $l), 'states' => $states,
               'powered' => trans('agents.powered', [], $l), 'mute' => trans('agents.talk_mute', [], $l),
               'unmute' => trans('agents.talk_unmute', [], $l), 'close' => trans('agents.widget_close', [], $l),
+              'ended_after' => trans('agents.talk_ended_after', [], $l),
               'sample' => [
                 ['role' => 'agent', 'text' => $agent->first_message ?: trans('agents.design_sample.hello', ['name' => $agent->name, 'business' => $agent->business_name], $l)],
                 ['role' => 'caller', 'text' => trans('agents.design_sample.ask', [], $l)],
@@ -440,7 +441,7 @@
         'states' => \App\Support\Agents\Gendered::lines((array) __('agents.talk_states', ['name' => $agent->name]), ($voice['gender'] ?? null) === 'female'),
         'start' => __('agents.talk_start'), 'end' => __('agents.talk_end'),
         'mute' => __('agents.talk_mute'), 'unmute' => __('agents.talk_unmute'),
-        'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'),
+        'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
         'correct' => __('agents.talk_correct'), 'correct_placeholder' => __('agents.talk_correct_placeholder'),
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
         'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'),

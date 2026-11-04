@@ -6,6 +6,8 @@ return [
     'meta_description' => 'A voice agent for your business: it answers calls on your website, a link or a QR code, in Egyptian, Saudi, Emirati, Levantine, Moroccan or English, day and night. Ready in two minutes.',
 
     'hero_title' => 'A voice that answers your customers, in their dialect',
+    // The words of the title set in the brand colour (they must appear in it as written).
+    'hero_title_mark' => 'in their dialect',
     'hero_text' => 'Your agent answers questions from your prices and hours, takes names and numbers, and books visits. On your website, a link or a QR code, day and night.',
     'hero_cta' => 'Create my agent',
     'hero_cta_member' => 'Open my agents',

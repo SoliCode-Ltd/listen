@@ -268,18 +268,12 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 /* The button close under the orb, the word under the button right below it, nothing empty under
    them until the call has words to show: the same on every page (the demo, setup, an agent's page). */
 .ag-talk { display: grid; justify-items: center; gap: .7rem; text-align: center; }
-/* The agent's face, a halo that ripples while it speaks, and the brand's voice waves either side. */
+/* The orb, which moves with the voice inside the ball only (no ripples round it), and the brand's voice waves either side. */
 .ag-talk-stage { display: flex; align-items: center; justify-content: center; gap: clamp(12px, 3vw, 22px); height: 120px; }
 .ag-talk-face { position: relative; display: grid; place-items: center; width: 124px; height: 124px; flex: 0 0 auto; }
 .ag-talk-face img { position: relative; z-index: 1; width: 112px; height: 112px; border-radius: 50%; object-fit: cover; background: var(--ag-soft);
   box-shadow: 0 0 0 4px var(--surface), 0 0 0 6px color-mix(in srgb, var(--a) 60%, transparent), 0 22px 44px -22px color-mix(in srgb, var(--a) 90%, transparent);
   transform: scale(var(--fs, 1)); transition: transform .12s linear; }
-.ag-talk-halo { position: absolute; inset: -10px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--a) 24%, transparent) 50%, transparent 71%);
-  opacity: var(--ho, .55); transform: scale(var(--hs, 1)); transition: opacity .12s linear, transform .12s linear; }
-.ag-talk-halo::before, .ag-talk-halo::after { content: ''; position: absolute; inset: 10px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--a) 50%, transparent); opacity: 0; }
-.ag-talk-stage.is-speaking .ag-talk-halo::before { animation: ag-ripple 1.6s ease-out infinite; }
-.ag-talk-stage.is-speaking .ag-talk-halo::after { animation: ag-ripple 1.6s ease-out .8s infinite; }
-@keyframes ag-ripple { from { opacity: .75; transform: scale(.92); } to { opacity: 0; transform: scale(1.42); } }
 .ag-talk-orb { display: grid; place-items: center; }
 .ag-talk-orb .orb { --orb-size: 104px; width: 104px; height: 104px; }
 .ag-wave { display: flex; align-items: center; gap: 5px; height: 100px; }
@@ -293,6 +287,12 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-talk-note svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .ag-talk-state:empty { display: none; }
 .ag-talk-state.is-error { color: var(--ag-bad); }
+/* The call is over: one small line under what was said ("Call ended after 01:24"). */
+.ag-talk-ended { margin: .2rem 0 0; color: var(--muted); font-size: .86rem; font-weight: 600; line-height: 1.5; animation: ag-ended-in .35s ease both; }
+.ag-talk-ended[hidden] { display: none; }
+.ag-talk-ended bdi { font-variant-numeric: tabular-nums; }
+@keyframes ag-ended-in { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .ag-talk-ended { animation: none; } }
 /* Every line busy (the link page): the orb a little smaller with a ring filling over the minute the
    page waits, the caller's place in a pill, one calm line, then "leave my number" and a quiet cancel. */
 .ag-talk-ring { position: absolute; inset: -6px; width: calc(100% + 12px); height: calc(100% + 12px); transform: rotate(-90deg); opacity: 0; transition: opacity .35s ease; pointer-events: none; z-index: 2; }
@@ -304,8 +304,6 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-talk-stage.is-waiting .ag-talk-ring { opacity: 1; }
 .ag-talk-stage.is-waiting .ag-talk-ring .p { animation: ag-ring-fill 60s linear forwards; }
 @keyframes ag-ring-fill { to { stroke-dashoffset: 0; } }
-.ag-talk-stage.is-waiting .ag-talk-halo { animation: ag-wait 3s ease-in-out infinite; }
-@keyframes ag-wait { 0%, 100% { opacity: .35; transform: scale(.96); } 50% { opacity: .8; transform: scale(1.06); } }
 .ag-talk-pos { display: inline-flex; align-items: center; gap: .45rem; height: 30px; padding: 0 .85rem; border-radius: 999px; background: color-mix(in srgb, var(--a) 13%, transparent); color: var(--text); font-size: .84rem; font-weight: 800; }
 .ag-talk-pos i { width: 7px; height: 7px; border-radius: 50%; background: var(--a); animation: ag-pos-blink 1.4s ease-in-out infinite; }
 @keyframes ag-pos-blink { 50% { opacity: .35; } }
@@ -337,7 +335,7 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-callback-done bdi { color: var(--text); font-weight: 700; }
 /* Leaving a number, or done: the microphone note no longer applies. */
 .ag-talkpage-card:has([data-ag-callback]:not([hidden]), [data-ag-callback-done]:not([hidden])) .ag-talkpage-mic { display: none; }
-@media (prefers-reduced-motion: reduce) { .ag-talk-stage.is-waiting .ag-talk-halo, .ag-talk-stage.is-waiting .ag-talk-ring .p, .ag-talk-pos i, .ag-callback { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ag-talk-stage.is-waiting .ag-talk-ring .p, .ag-talk-pos i, .ag-callback { animation: none; } }
 
 .ag-talk-buttons { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; }
 .ag-call-btn { min-width: 190px; }
