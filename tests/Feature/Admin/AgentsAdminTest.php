@@ -275,6 +275,8 @@ class AgentsAdminTest extends TestCase
             ->resetTableFilters()
             ->filterTable('started_at', ['from' => now()->subHour()->toDateString(), 'until' => now()->toDateString()])
             ->assertCanSeeTableRecords([$this->call])
+            // The tab on its own: Listen's own call was two hours ago, which is yesterday just after midnight.
+            ->resetTableFilters()
             ->set('activeTab', 'house')
             ->assertCanSeeTableRecords([$this->houseCall])
             ->assertCanNotSeeTableRecords([$this->call]);

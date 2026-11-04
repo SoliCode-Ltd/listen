@@ -421,21 +421,92 @@
     var list = $('[data-ag-transcript]', root);
     var call = null, muted = false, lastAsked = '';
     var states = T.states || {};
+    // The link page: every line busy, the caller's place in line, then a number to be called back.
+    var sub = $('[data-ag-talk-sub]', root), leave = $('[data-ag-talk-leave]', root);
+    var form = $('[data-ag-callback]', root), done = $('[data-ag-callback-done]', root);
+    var buttons = $('.ag-talk-buttons', root), L = T.lines || {}, B = T.callback || {};
+    var waitPos = 0, sentTo = null;
+    function waitText() {
+      var ahead = L.ahead || {}, k = Math.max(0, waitPos - 1);
+      if (k < 1) return L.next || '';
+      return ahead[k] || String(ahead.many || '').replace(':count', k);
+    }
     function setState(s) {
       if (s === 'error' && quietError) { quietError = false; s = 'idle'; }
       // A woman's voice has its own words in Arabic ("سارة تتحدث"); the setup steps get both forms.
       var key = C.agent && C.agent.gender === 'female' && states[s + '_female'] ? s + '_female' : s;
+      var waiting = s === 'waiting', away = s === 'busy' || s === 'sent';
       // Before a call nothing is said: the button under the orb is enough.
-      stateEl.textContent = s === 'idle' ? '' : (s === 'mic' ? (T.mic || '') : fill(states[key] || '', { name: (C.agent && C.agent.name) || '' }));
+      stateEl.textContent = s === 'idle' || away ? '' : (s === 'mic' ? (T.mic || '') : waiting ? (L.waiting || '') : fill(states[key] || '', { name: (C.agent && C.agent.name) || '' }));
       stateEl.classList.toggle('is-error', s === 'error' || s === 'mic');
       var live = s === 'connecting' || s === 'listening' || s === 'speaking';
-      btn.classList.toggle('is-live', live);
-      label.textContent = live ? T.end : T.start;
+      // While waiting the button gives up the wait, like hanging up while on hold.
+      btn.classList.toggle('is-live', live || waiting);
+      label.textContent = waiting ? (L.cancel || T.end) : live ? T.end : T.start;
       if (mute) mute.hidden = !live;
       stage.classList.toggle('is-speaking', s === 'speaking');
       stage.classList.toggle('is-live', live);
-      if (!live) { stage.classList.remove('is-playing'); stage.__vpLevel = 0; call = null; level(0, 0); }
+      stage.classList.toggle('is-waiting', waiting);
+      if (sub) { sub.hidden = !waiting; sub.textContent = waiting ? waitText() : ''; }
+      if (leave) leave.hidden = !waiting;
+      if (form) showCallback(s);
+      if (!live && !waiting) { stage.classList.remove('is-playing'); stage.__vpLevel = 0; call = null; level(0, 0); }
       if (hooks.onState) hooks.onState(s);
+    }
+    // Still busy: the form in place of the call; once sent, the thanks with the number they left.
+    function showCallback(s) {
+      var asking = s === 'busy', thanked = s === 'sent';
+      [stage, buttons, list].forEach(function (n) { if (n) n.hidden = asking || thanked; });
+      if (asking && form.hidden) {
+        form.reset();
+        $('[data-ag-callback-error]', form).hidden = true;
+        form.hidden = false;
+        setTimeout(function () { form.querySelector('[name="name"]').focus(); }, 60);
+      }
+      if (!asking) form.hidden = true;
+      done.hidden = !thanked;
+      if (!thanked) return;
+      $('[data-ag-callback-title]', done).textContent = sentTo && sentTo.name ? fill(B.sent_title_named, { name: sentTo.name }) : (B.sent_title || '');
+      var text = $('[data-ag-callback-text]', done), words = String(B.sent_text || '').split(':phone');
+      text.textContent = words[0] || '';
+      if (words.length > 1) {
+        var num = document.createElement('bdi');
+        num.dir = 'ltr';
+        num.textContent = sentTo ? sentTo.phone : '';
+        text.appendChild(num);
+        text.appendChild(document.createTextNode(words[1] || ''));
+      }
+      done.focus();
+    }
+    if (leave) leave.addEventListener('click', function () { if (call && call.giveUp) call.giveUp(); });
+    if (form) {
+      var send = $('[data-ag-callback-send]', form), errEl = $('[data-ag-callback-error]', form);
+      var nameIn = $('[name="name"]', form), phoneIn = $('[name="phone"]', form);
+      var bad = function (m, onPhone) {
+        errEl.textContent = m || '';
+        errEl.hidden = !m;
+        send.disabled = false;
+        send.textContent = B.send || '';
+        phoneIn.setAttribute('aria-invalid', onPhone ? 'true' : 'false');
+        if (onPhone) phoneIn.focus();
+      };
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var number = phoneIn.value.trim(), who = nameIn.value.trim();
+        if ((number.match(/[0-9٠-٩۰-۹]/g) || []).length < 6) { bad(B.invalid_phone, true); return; }
+        send.disabled = true;
+        send.textContent = B.sending || '';
+        errEl.hidden = true;
+        fetch(C.callback, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, credentials: 'omit',
+          body: JSON.stringify({ slug: C.slug, visitor: visitorId(), name: who, phone: number }) })
+          .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok && d.ok, d: d || {} }; }); })
+          .then(function (res) {
+            if (!res.ok) { bad(res.d.message || B.not_now, res.d.error === 'phone'); return; }
+            sentTo = { name: who, phone: res.d.phone || number };
+            setState('sent');
+          }, function () { bad(B.not_now); });
+      });
+      $('[data-ag-callback-again]', form).addEventListener('click', function () { setState('idle'); btn.click(); });
     }
     // The waves follow the agent's voice (and the caller's, softer); the face and its halo breathe with it.
     function level(a, c) {
@@ -479,7 +550,7 @@
       if (C.mode === 'link') {
         return fetch(C.start, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, credentials: 'omit',
           body: JSON.stringify({ slug: C.slug, page_url: location.href, visitor: visitorId() }) })
-          .then(function (r) { return r.json(); });
+          .then(function (r) { return r.json().catch(function () { return {}; }); });
       }
       return api('POST', C.agent.urls.test, typeof C.callBody === 'function' ? C.callBody() : undefined);
     }
@@ -502,6 +573,9 @@
           if (hooks.onError && hooks.onError(msg, err) === false) { quietError = true; return; }
           if (msg) toast(msg);
         },
+        // Every line busy (the link page): the caller's place, kept fresh while they wait.
+        onWait: function (w) { waitPos = (w && w.position) || 0; if (sub && !sub.hidden) sub.textContent = waitText(); },
+        patience: 60,
       });
       if (window.ListenOrbs) window.ListenOrbs.wake();
     });

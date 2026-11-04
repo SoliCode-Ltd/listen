@@ -126,7 +126,9 @@ class AgentPlansTest extends TestCase
         $first = $this->callAgent($agent, 'a')->assertOk();
         $this->assertSame(120, $first->json('max_seconds'));
         $second = $this->callAgent($agent, 'b')->assertOk();
-        $this->callAgent($agent, 'c')->assertStatus(429)->assertJsonPath('error', 'busy');
+        // A third caller waits for a line (first in line), and is a missed call until they get through.
+        $this->callAgent($agent, 'c')->assertStatus(202)->assertJsonPath('error', 'lines')->assertJsonPath('position', 1);
+        $this->assertSame('lines', AgentCalls::missedToday($agent)['reason']);
 
         // Three call minutes a month: the holds (2 + 2 minutes) leave none for a third call even after one ends early.
         $this->travel(30)->seconds();

@@ -15,7 +15,7 @@
           <p><b>{{ $agent->name }}</b> · {{ __($female ? 'agents.widget_subtitle_female' : 'agents.widget_subtitle') }}</p>
         </div>
       </header>
-      @include('agents.partials.talk', ['agent' => $agent, 'avatar' => $voice['avatar'] ?? null, 'showCost' => false, 'female' => ($voice['gender'] ?? null) === 'female'])
+      @include('agents.partials.talk', ['agent' => $agent, 'avatar' => $voice['avatar'] ?? null, 'showCost' => false, 'female' => ($voice['gender'] ?? null) === 'female', 'callback' => true])
       @unless($available)
         <p class="ag-note">{{ __('agents.error_paused') }}</p>
       @endunless
@@ -73,6 +73,8 @@
       'slug' => $widget->slug,
       'available' => $available,
       'start' => url('/agent-api/calls'),
+      // Every line busy: the caller leaves a number to be called back.
+      'callback' => url('/agent-api/callbacks'),
       'agent' => ['name' => $agent->name, 'language' => $agent->language, 'gender' => $voice['gender'] ?? null],
       'text' => [
         'states' => \App\Support\Agents\Gendered::lines((array) __('agents.talk_states', ['name' => $agent->name]), ($voice['gender'] ?? null) === 'female'),
@@ -80,7 +82,7 @@
         'mute' => __('agents.talk_mute'), 'unmute' => __('agents.talk_unmute'),
         'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'),
         'paused' => __('agents.error_paused'),
-      ],
+      ] + \App\Http\Controllers\AgentCallController::lineText($agent, app()->getLocale()),
     ];
   @endphp
   <script>

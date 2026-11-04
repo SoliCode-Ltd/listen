@@ -89,8 +89,26 @@ class AgentCallController extends Controller
                 'mute' => trans('agents.talk_mute', [], $locale),
                 'unmute' => trans('agents.talk_unmute', [], $locale),
                 'close' => trans('agents.widget_close', [], $locale),
-            ],
+            ] + self::lineText($agent, $locale),
         ])->header('Cache-Control', 'public, max-age=60');
+    }
+
+    /**
+     * The words for a caller who finds every line busy (waiting, then leaving a number), in the
+     * agent's language, for the call button and the link page. "N callers ahead of you" comes ready
+     * for 1 to 10 (Arabic has its own forms for each) and as a pattern beyond.
+     *
+     * @return array{lines: array<string, mixed>, callback: array<string, string>}
+     */
+    public static function lineText(Agent $agent, string $locale): array
+    {
+        $lines = (array) trans('agents.lines', [], $locale);
+        $lines['ahead'] = collect(range(1, 10))->mapWithKeys(fn (int $n): array => [$n => trans_choice('agents.lines.ahead', $n, ['count' => $n], $locale)])
+            ->put('many', trans_choice('agents.lines.ahead', 11, ['count' => ':count'], $locale))->all();
+        $callback = (array) trans('agents.callback', ['business' => $agent->business_name], $locale);
+        unset($callback['note']);
+
+        return ['lines' => $lines, 'callback' => $callback];
     }
 
     /** @return array<string, string> the call's states, with the speaking line in the voice's gender */
@@ -176,11 +194,11 @@ class AgentCallController extends Controller
         foreach ($limits as $limitKey => [, $decay]) {
             RateLimiter::hit($limitKey, $decay);
         }
-        // Never more than a handful of calls at once on one agent, whatever the plan allows across
-        // all of them (AgentCalls::start). A call that stopped reporting still counts until it could
-        // have ended on its own.
+        // Listen's own agent: never more than a handful of calls at once. A member's agents share
+        // their plan's calls at once (AgentCalls::start), so one busy agent can use them all. A call
+        // that stopped reporting still counts until it could have ended on its own.
         $longest = \App\Support\Agents\AgentAccess::MAX_CALL_MINUTES * 60 + 30;
-        if ($agent->conversations()->where('status', 'live')->where('started_at', '>', now()->subSeconds($longest))->count() >= 8) {
+        if ($agent->setting('house') && $agent->conversations()->where('status', 'live')->where('started_at', '>', now()->subSeconds($longest))->count() >= 8) {
             return $this->error('busy', 429, __('agents.error_busy'));
         }
 
@@ -191,6 +209,21 @@ class AgentCallController extends Controller
             'network' => $network,
             'country' => strtoupper(substr((string) $request->headers->get('CF-IPCountry', ''), 0, 2)) ?: null,
         ]);
+        if (! $result['ok'] && $result['error'] === 'lines') {
+            // Every line is taken: the call button waits and tries again. Waiting is not a call, so
+            // the caller's calls an hour stay as they were.
+            foreach ($limits as $limitKey => [, $decay]) {
+                RateLimiter::decrement($limitKey, $decay);
+            }
+
+            return response()->json([
+                'error' => 'lines',
+                'message' => trans('agents.lines.waiting', [], $agent->language === 'en' ? 'en' : 'ar'),
+                'position' => $result['position'],
+                'retry_after' => $result['retry_after'],
+            // 202: the caller is in line (not an error the business's website should log).
+            ], 202);
+        }
         if (! $result['ok']) {
             // The caller is never told why on the owner's side (credits, plan, limits): the agent
             // is just not available. Busy means try again in a moment.
@@ -200,6 +233,41 @@ class AgentCallController extends Controller
         }
 
         return response()->json(self::startPayload($agent, $result));
+    }
+
+    /**
+     * A caller who found every line busy leaves their name and number, so the business calls them
+     * back (AgentCalls::callBack): from the call button (key) or the link page (slug), like a call.
+     */
+    public function callback(Request $request): JsonResponse
+    {
+        $in = $this->body($request);
+        $widget = ! empty($in['key'])
+            ? AgentWidget::where('public_key', (string) $in['key'])->first()
+            : AgentWidget::where('slug', (string) ($in['slug'] ?? ''))->first();
+        $agent = $widget?->agent;
+        if (! $widget || ! $agent || ! $widget->enabled) {
+            return $this->error('not_found', 404);
+        }
+        $locale = $agent->language === 'en' ? 'en' : 'ar';
+        if (! empty($in['key']) && ! $widget->allowsOrigin($request->headers->get('Origin'))) {
+            return $this->error('origin', 403, trans('agents.error_origin', [], $locale));
+        }
+        $network = (string) $request->ip();
+        $visitor = $network.'|'.substr((string) ($in['visitor'] ?? ''), 0, 64);
+        if (AgentCalls::callerBlocked($agent->id, $visitor, $network)) {
+            return $this->error('busy', 429, trans('agents.callback.not_now', [], $locale));
+        }
+        $phone = AgentCalls::phoneFrom($in['phone'] ?? '');
+        if ($phone === null) {
+            return $this->error('phone', 422, trans('agents.callback.invalid_phone', [], $locale));
+        }
+        $result = $this->calls->callBack($agent, ['visitor' => $visitor, 'name' => (string) ($in['name'] ?? ''), 'phone' => $phone]);
+        if (! $result['ok']) {
+            return $this->error($result['error'], 429, trans('agents.callback.not_now', [], $locale));
+        }
+
+        return response()->json(['ok' => true, 'phone' => $phone]);
     }
 
     public function ping(Request $request, string $conversation): JsonResponse

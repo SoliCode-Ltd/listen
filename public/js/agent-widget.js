@@ -124,6 +124,32 @@
     '.lva-powered{align-self:center;display:inline-block;padding:4px 10px;color:var(--muted);font-size:11.5px;font-weight:700;text-decoration:none;border-radius:8px}',
     '.lva-powered:hover{color:var(--text)}',
 
+    /* Every line busy: the orb breathes slowly while the caller waits, their place under it. */
+    '.lva-callview{display:contents}',
+    '.lva.is-waiting .lva-orb{animation:lva-breathe 2.8s ease-in-out infinite}',
+    '.lva.is-waiting .lva-wave i{animation:lva-idle 2.8s ease-in-out infinite}',
+    '.lva-sub{margin:-6px 0 0;text-align:center;color:var(--muted);font-size:13.5px;line-height:1.5;text-wrap:balance}',
+    '.lva-sub:empty{display:none}',
+    '.lva-link{align-self:center;border:0;background:transparent;padding:6px 10px;margin:-4px 0;border-radius:10px;color:var(--text);font-weight:700;font-size:13.5px;text-decoration:underline;text-decoration-color:color-mix(in srgb,currentColor 35%,transparent);text-underline-offset:4px;transition:color .2s ease,background .2s ease}',
+    '.lva-link:hover{background:var(--soft)}',
+    /* Leave a number: in the card, or above the slim bar. */
+    '.lva-slot{display:grid;gap:10px;animation:lva-in .35s ' + EASE + '}',
+    '.lva-slot h3{margin:0;font-size:16.5px;font-weight:800;line-height:1.35;text-align:center;text-wrap:balance}',
+    '.lva-slot p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5;text-align:center;text-wrap:balance}',
+    '.lva-form{display:grid;gap:10px}',
+    '.lva-field{display:grid;gap:5px;font-size:12.5px;font-weight:700;color:var(--muted)}',
+    '.lva-field input{font:inherit;font-size:15.5px;font-weight:600;color:var(--text);width:100%;height:46px;padding:0 14px;border-radius:14px;border:1px solid var(--line);background:var(--bg);outline:none;transition:border-color .2s ease,box-shadow .2s ease}',
+    '.lva[data-radius="square"] .lva-field input{border-radius:8px}',
+    '.lva-field input:focus{border-color:var(--a);box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 24%,transparent)}',
+    '.lva-field input[aria-invalid="true"]{border-color:#D0335F}',
+    '.lva-slot .lva-err{color:#D0335F;font-weight:700}',
+    '.lva-slot .lva-call{width:100%;margin-top:2px}',
+    '.lva-slot .lva-call:disabled{opacity:.7;cursor:progress}',
+    '.lva-tick{justify-self:center;display:grid;place-items:center;width:56px;height:56px;border-radius:50%;background:color-mix(in srgb,var(--a) 14%,transparent);color:var(--a);animation:lva-pop .45s ' + EASE + ' both}',
+    '.lva-tick svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}',
+    '.lva-slot bdi{color:var(--text);font-weight:700}',
+    '.lva-bartip .lva-slot{min-width:260px}',
+
     /* The slim bar: the button itself becomes the call, no card. */
     '.lva-bar{display:none;align-items:center;gap:10px;height:var(--h);padding:0 calc((var(--h) - var(--ico)) / 2);border:1px solid var(--line);border-radius:var(--r-btn);background:var(--bg);box-shadow:var(--shadow);animation:lva-pop .38s ' + EASE + ' both}',
     '.lva.is-barlive .lva-bar{display:flex}.lva.is-barlive .lva-launch{display:none}',
@@ -166,6 +192,7 @@
     micOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V6a3 3 0 0 0-5.7-1.3"/><path d="M19 11a7 7 0 0 1-1.2 3.9M5 11a7 7 0 0 0 10.8 5.9M12 18v3"/></svg>',
     end: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15.2c5-4.6 13-4.6 18 0l-2.3 2.7-3.7-1.4v-2.8a12.4 12.4 0 0 0-6 0v2.8l-3.7 1.4z"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   };
   var WAVE = [0.3, 0.5, 0.72, 0.9, 1, 0.9, 0.72, 0.5, 0.3];
 
@@ -234,6 +261,8 @@
     var text, look, states;
     var stateNow = 'idle', call = null, starting = false, muted = false, pendingError = '', open = false;
     var startedAt = 0, tick = 0, demo = null;
+    // Every line busy: the caller's place in line, then the number they left (waiting, busy, sent).
+    var waitPos = 0, sentTo = null;
     var parts = {};
 
     function render(next) {
@@ -337,7 +366,16 @@
         parts.call.appendChild(parts.callIcon); parts.call.appendChild(parts.callLabel);
         parts.call.addEventListener('click', toggleCall);
         buttons.appendChild(parts.mute); buttons.appendChild(parts.call);
-        [head, stage, parts.state, parts.lines, buttons, powered()].forEach(function (n) { panel.appendChild(n); });
+        // Every line busy: the caller's place under the line, and a way to leave a number instead.
+        parts.sub = el('p', 'lva-sub');
+        parts.leave = linkButton(lineText().leave, leaveNumber);
+        parts.leave.hidden = true;
+        // The call (or the wait), or in its place the form to leave a number and the thanks.
+        parts.callBox = el('div', 'lva-callview');
+        [stage, parts.state, parts.sub, parts.lines, buttons, parts.leave].forEach(function (n) { parts.callBox.appendChild(n); });
+        parts.slot = el('div', 'lva-slot');
+        parts.slot.hidden = true;
+        [head, parts.callBox, parts.slot, powered()].forEach(function (n) { panel.appendChild(n); });
         box.appendChild(panel);
       }
 
@@ -386,9 +424,16 @@
         end.addEventListener('click', toggleCall);
         b.appendChild(viz); b.appendChild(info); b.appendChild(parts.mute); b.appendChild(end);
         dock.appendChild(b);
+        // Above the bar: a problem, the caller's place in line, or the form to leave a number.
         parts.tip = el('div', 'lva-bartip');
         parts.tip.hidden = true;
-        parts.tip.setAttribute('aria-live', 'polite');
+        parts.tipText = el('span');
+        parts.tipText.setAttribute('aria-live', 'polite');
+        parts.leave = linkButton(lineText().leave, leaveNumber);
+        parts.leave.hidden = true;
+        parts.slot = el('div', 'lva-slot');
+        parts.slot.hidden = true;
+        parts.tip.appendChild(parts.tipText); parts.tip.appendChild(parts.leave); parts.tip.appendChild(parts.slot);
         dock.appendChild(parts.tip);
       }
       box.appendChild(dock);
@@ -411,6 +456,12 @@
       });
       return m;
     }
+    function linkButton(label, onClick) {
+      var b = el('button', 'lva-link', label || '');
+      b.type = 'button';
+      b.addEventListener('click', onClick);
+      return b;
+    }
     function powered() {
       var a = el('a', 'lva-powered', text.powered || 'Powered by Listen');
       a.href = (ctx.origin || '') + '/';
@@ -432,38 +483,142 @@
     function live() { return stateNow === 'connecting' || stateNow === 'listening' || stateNow === 'speaking'; }
 
     function paintState(message) {
-      var on = live();
-      var msg = message || (stateNow === 'mic' ? text.mic : states[stateNow] || '');
+      var on = live(), waiting = stateNow === 'waiting', form = stateNow === 'busy' || stateNow === 'sent';
+      var msg = message || (stateNow === 'mic' ? text.mic : waiting ? (lineText().waiting || '') : states[stateNow] || '');
       // Before and after a call the owner may hide the line under the orb (look.ready_show).
-      var quiet = !on && stateNow !== 'error' && stateNow !== 'mic' && !message && look.ready_show === false;
+      var quiet = !on && !waiting && stateNow !== 'error' && stateNow !== 'mic' && !message && look.ready_show === false;
       box.classList.toggle('is-live', on);
+      box.classList.toggle('is-waiting', waiting);
       box.classList.toggle('is-connecting', stateNow === 'connecting');
       box.classList.toggle('is-speaking', stateNow === 'speaking');
-      box.classList.toggle('is-barlive', look.style === 'bar' && (on || stateNow === 'error' || stateNow === 'mic'));
+      box.classList.toggle('is-barlive', look.style === 'bar' && (on || waiting || form || stateNow === 'error' || stateNow === 'mic'));
       if (parts.state) {
         parts.state.hidden = quiet;
         parts.state.textContent = quiet ? '' : msg;
         parts.state.classList.toggle('is-error', stateNow === 'error' || stateNow === 'mic');
       }
+      if (parts.sub) parts.sub.textContent = waiting ? waitText() : '';
+      if (parts.leave) parts.leave.hidden = !waiting;
+      if (parts.callBox) parts.callBox.hidden = form;
+      if (parts.slot) parts.slot.hidden = !form;
       if (parts.call) {
-        parts.call.classList.toggle('is-live', on);
-        parts.callLabel.textContent = on ? text.end : text.start;
-        parts.callIcon.innerHTML = on ? ICONS.end : ICONS.phone;
+        // While waiting the button gives up the wait, like hanging up while on hold.
+        parts.call.classList.toggle('is-live', on || waiting);
+        parts.callLabel.textContent = waiting ? (lineText().cancel || text.end) : on ? text.end : text.start;
+        parts.callIcon.innerHTML = on || waiting ? ICONS.end : ICONS.phone;
       }
       if (parts.mute) parts.mute.hidden = !on;
-      if (parts.barState) parts.barState.textContent = on && startedAt && stateNow !== 'connecting' ? clock(elapsed()) : msg;
+      if (parts.barState) parts.barState.textContent = on && startedAt && stateNow !== 'connecting' ? clock(elapsed()) : (form ? '' : msg);
       if (parts.tip) {
         var err = stateNow === 'error' || stateNow === 'mic';
-        parts.tip.hidden = !err;
+        parts.tip.hidden = !(err || waiting || form);
         parts.tip.classList.toggle('is-error', err);
-        if (err) parts.tip.textContent = msg;
+        parts.tipText.hidden = form;
+        parts.tipText.textContent = err ? msg : waiting ? waitText() : '';
       }
+    }
+    function lineText() { return (text && text.lines) || {}; }
+    function backText() { return (text && text.callback) || {}; }
+    // "You're next", or how many callers are ahead (the words for 1 to 10 come ready, Arabic plurals too).
+    function waitText() {
+      var L = lineText(), ahead = L.ahead || {}, k = Math.max(0, waitPos - 1);
+      if (k < 1) return L.next || '';
+      return ahead[k] || String(ahead.many || '').replace(':count', k);
+    }
+    function leaveNumber() {
+      if (call && call.giveUp) call.giveUp(); else setState('busy');
+    }
+
+    // Still busy (or the caller would rather not wait): their name and number, so the business calls back.
+    function showForm() {
+      var B = backText();
+      parts.slot.innerHTML = '';
+      var f = el('form', 'lva-form');
+      f.noValidate = true;
+      var name = field(B.name, 'text', 'name', 80), phone = field(B.phone, 'tel', 'tel', 24);
+      phone.input.dir = 'ltr';
+      phone.input.inputMode = 'tel';
+      phone.input.required = true;
+      var err = el('p', 'lva-err');
+      err.hidden = true;
+      err.setAttribute('role', 'alert');
+      var send = el('button', 'lva-call', B.send || '');
+      send.type = 'submit';
+      var bad = function (m, onPhone) {
+        err.textContent = m || '';
+        err.hidden = !m;
+        send.disabled = false;
+        send.textContent = B.send || '';
+        phone.input.setAttribute('aria-invalid', onPhone ? 'true' : 'false');
+        if (onPhone) phone.input.focus();
+      };
+      f.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var number = phone.input.value.trim(), who = name.input.value.trim();
+        if ((number.match(/[0-9٠-٩۰-۹]/g) || []).length < 6) { bad(B.invalid_phone, true); return; }
+        send.disabled = true;
+        send.textContent = B.sending || '';
+        err.hidden = true;
+        fetch(ctx.origin + '/agent-api/callbacks', {
+          method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          body: JSON.stringify({ key: ctx.key, visitor: visitorId(), name: who, phone: number }),
+        }).then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok && d.ok, d: d || {} }; });
+        }).then(function (res) {
+          if (!res.ok) { bad(res.d.message || B.not_now, res.d.error === 'phone'); return; }
+          sentTo = { name: who, phone: res.d.phone || number };
+          setState('sent');
+        }, function () { bad(B.not_now); });
+      });
+      [name.label, phone.label, err, send].forEach(function (n) { f.appendChild(n); });
+      [el('h3', '', B.title || ''), el('p', '', B.text || ''), f, linkButton(B.again, function () { setState('idle'); toggleCall(); })]
+        .forEach(function (n) { parts.slot.appendChild(n); });
+      if (look.style !== 'bar' && !open) setOpen(true);
+      setTimeout(function () { name.input.focus(); }, 90);
+    }
+    function field(label, type, autocomplete, max) {
+      var l = el('label', 'lva-field');
+      var input = el('input');
+      input.type = type;
+      input.autocomplete = autocomplete;
+      input.maxLength = max;
+      if (type === 'text') input.dir = 'auto';
+      l.appendChild(el('span', '', label || ''));
+      l.appendChild(input);
+      return { label: l, input: input };
+    }
+    function showSent() {
+      var B = backText();
+      parts.slot.innerHTML = '';
+      var mark = el('span', 'lva-tick');
+      mark.innerHTML = ICONS.check;
+      var title = sentTo && sentTo.name ? String(B.sent_title_named || B.sent_title || '').replace(':name', sentTo.name) : (B.sent_title || '');
+      var h = el('h3', '', title);
+      h.dir = 'auto';
+      // ":business will call you back on :phone.", the number kept left to right.
+      var p = el('p'), words = String(B.sent_text || '').split(':phone');
+      p.appendChild(document.createTextNode(words[0] || ''));
+      if (words.length > 1) {
+        var num = el('bdi', '', sentTo ? sentTo.phone : '');
+        num.dir = 'ltr';
+        p.appendChild(num);
+        p.appendChild(document.createTextNode(words[1] || ''));
+      }
+      var done = el('button', 'lva-call', B.close || text.close || '');
+      done.type = 'button';
+      done.addEventListener('click', function () {
+        if (look.style === 'bar') { setState('idle'); return; }
+        setOpen(false);
+        setTimeout(function () { if (stateNow === 'sent') setState('idle'); }, 450);
+      });
+      [mark, h, p, done].forEach(function (n) { parts.slot.appendChild(n); });
+      setTimeout(function () { done.focus(); }, 60);
     }
     function elapsed() { return startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0; }
     function setState(s, message) {
       if (s === 'error' && !message && pendingError) message = pendingError;
       if (s !== 'error') pendingError = '';
-      var was = live();
+      var was = live(), before = stateNow;
       stateNow = s;
       if (live() && !was) {
         startedAt = 0;
@@ -471,7 +626,10 @@
         tick = setInterval(timer, 1000);
       }
       if ((s === 'listening' || s === 'speaking') && !startedAt) startedAt = Date.now();
-      if (!live()) {
+      if (s === 'busy' && before !== 'busy') showForm();
+      if (s === 'sent') showSent();
+      // Waiting for a line is part of the call (it can still be given up); after it, all is reset.
+      if (!live() && s !== 'waiting') {
         clearInterval(tick);
         startedAt = 0;
         call = null;
@@ -547,12 +705,15 @@
             return fetch(ctx.origin + '/agent-api/calls', {
               method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
               body: JSON.stringify({ key: ctx.key, page_url: location.href, visitor: visitorId() }),
-            }).then(function (r) { return r.json(); });
+            }).then(function (r) { return r.json().catch(function () { return {}; }); });
           },
           onState: function (s) { setState(s); },
           onTurn: line,
           onLevel: level,
           onError: function (msg) { pendingError = msg || ''; },
+          // Every line busy: the caller's place, kept fresh while they wait (a minute at most).
+          onWait: function (w) { waitPos = (w && w.position) || 0; if (stateNow === 'waiting') paintState(); },
+          patience: 60,
         });
       }, function () { starting = false; setState('error'); });
     }

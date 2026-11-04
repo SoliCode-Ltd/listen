@@ -10,6 +10,7 @@ use App\Services\Billing\MemberUsageMeter;
 use App\Services\PlanAccessService;
 use App\Support\Agents\AgentAccess;
 use App\Support\Agents\AgentCost;
+use App\Support\Agents\WaitingLine;
 use App\Support\Credits;
 use App\Support\CreditPeriod;
 use App\Support\UsageSnapshot;
@@ -170,9 +171,18 @@ class AgentCalls
                 }
                 $max = min($max, $site);
             }
-            // Calls at the same time across all the owner's agents (their plan's number).
-            if ($channel !== 'test' && $this->liveCalls($userId) >= $limits['concurrent']) {
-                return ['ok' => false, 'error' => 'busy'];
+            // Calls at the same time across all the owner's agents (their plan's number; one agent
+            // can use them all). A caller who finds them all taken waits in line, and the first to
+            // wait gets the next free one (WaitingLine).
+            if ($channel !== 'test') {
+                $waiter = WaitingLine::waiter($context['visitor'] ?? null);
+                $line = new WaitingLine($userId);
+                if ($this->liveCalls($userId) + $line->ahead($waiter) >= $limits['concurrent']) {
+                    return $this->linesBusy($agent, $channel, $line, $waiter);
+                }
+                if ($waiter !== null) {
+                    $line->leave($waiter);
+                }
             }
         }
 
@@ -253,8 +263,105 @@ class AgentCalls
         if ($widget) {
             $widget->forceFill(['last_seen_at' => now(), 'last_seen_origin' => $base['origin']])->save();
         }
+        // A caller who waited for a line (or tried a little earlier) got through: not a missed call.
+        if ($channel !== 'test' && ($waiter = WaitingLine::waiter($context['visitor'] ?? null)) !== null
+            && Cache::pull('agent-missed-by:'.$agent->id.':'.$waiter)) {
+            $this->unmissed($agent);
+        }
 
         return ['ok' => true, 'conversation' => $conversation, 'call_key' => $callKey, 'token' => $key['token'], 'max_seconds' => $max, 'free' => $free];
+    }
+
+    /**
+     * Every line on the owner's plan is taken: the caller waits in line (the call button tries
+     * again every few seconds) and may leave their number instead (callBack()). A caller counts
+     * once as a missed call, and no longer once they get through.
+     *
+     * @return array{ok: false, error: string, position: ?int, retry_after: int}
+     */
+    protected function linesBusy(Agent $agent, string $channel, WaitingLine $line, ?string $waiter): array
+    {
+        $position = null;
+        if ($waiter !== null) {
+            $position = $line->join($waiter, $agent->id)['position'];
+            if (Cache::add('agent-missed-by:'.$agent->id.':'.$waiter, true, now()->addMinutes(30))) {
+                $this->refused($agent, $channel, 'lines');
+            }
+            Cache::put('agent-callback-ok:'.$agent->id.':'.$waiter, true, now()->addMinutes(30));
+        }
+
+        return ['ok' => false, 'error' => 'lines', 'position' => $position, 'retry_after' => WaitingLine::RETRY_SECONDS];
+    }
+
+    /**
+     * A caller who found every line busy leaves their name and number, so the business calls them
+     * back: they are among the agent's customers (the Customers tab, newest first) with a note that
+     * they asked for it, and the agent's page says how many did today. Only a caller who was waiting
+     * for a line on this agent can, a few times an hour.
+     *
+     * @param  array{visitor?: ?string, name?: ?string, phone: string}  $caller
+     * @return array{ok: bool, error?: string}
+     */
+    public function callBack(Agent $agent, array $caller): array
+    {
+        $waiter = WaitingLine::waiter($caller['visitor'] ?? null);
+        if ($waiter === null || ! Cache::has('agent-callback-ok:'.$agent->id.':'.$waiter)) {
+            return ['ok' => false, 'error' => 'not_waiting'];
+        }
+        // A few an hour from one caller, and a ceiling for the agent, so a flood never fills its customers.
+        $limits = ['agent-callback:'.$agent->id.':'.$waiter => 3, 'agent-callbacks:'.$agent->id => 30];
+        foreach ($limits as $limit => $most) {
+            if (RateLimiter::tooManyAttempts($limit, $most)) {
+                return ['ok' => false, 'error' => 'too_many'];
+            }
+        }
+        foreach (array_keys($limits) as $limit) {
+            RateLimiter::hit($limit, 3600);
+        }
+        (new WaitingLine((int) $agent->user_id))->leave($waiter);
+
+        $name = Str::limit(trim(strip_tags((string) ($caller['name'] ?? ''))), 80, '');
+        $this->rememberCaller((int) $agent->user_id, $agent->id, null, array_filter([
+            'name' => $name !== '' ? $name : null,
+            'phone' => $caller['phone'],
+            'note' => trans('agents.callback.note', [], $agent->language === 'en' ? 'en' : 'ar'),
+        ]));
+        $key = 'agent-missed:'.$agent->id;
+        $missed = (array) Cache::get($key, []);
+        if (($missed['day'] ?? null) === now()->toDateString()) {
+            $missed['callbacks'] = (int) ($missed['callbacks'] ?? 0) + 1;
+            Cache::put($key, $missed, now()->addDays(3));
+        }
+
+        return ['ok' => true];
+    }
+
+    /** A phone number as a caller typed it, kept if it has 6 to 15 digits: digits, an optional + first. */
+    public static function phoneFrom(mixed $value): ?string
+    {
+        $raw = strtr(trim((string) $value), ['٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4', '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9']);
+        if ($raw === '' || preg_match('/[^\d\s\-+().]/', $raw)) {
+            return null;
+        }
+        $digits = preg_replace('/\D/', '', $raw);
+        if (strlen($digits) < 6 || strlen($digits) > 15) {
+            return null;
+        }
+
+        return (str_starts_with(ltrim($raw), '+') ? '+' : '').$digits;
+    }
+
+    /** A caller who waited and got through after all: one missed call fewer today. */
+    protected function unmissed(Agent $agent): void
+    {
+        $key = 'agent-missed:'.$agent->id;
+        $missed = (array) Cache::get($key, []);
+        if (($missed['day'] ?? null) !== now()->toDateString() || (int) ($missed['count'] ?? 0) < 1) {
+            return;
+        }
+        $missed['count'] = (int) $missed['count'] - 1;
+        Cache::put($key, $missed, now()->addDays(3));
     }
 
     /**
@@ -269,8 +376,13 @@ class AgentCalls
             $key = 'agent-missed:'.$agent->id;
             $missed = (array) Cache::get($key, []);
             $today = now()->toDateString();
-            $count = ($missed['day'] ?? null) === $today ? (int) ($missed['count'] ?? 0) : 0;
-            Cache::put($key, ['reason' => $reason, 'at' => now()->toIso8601String(), 'day' => $today, 'count' => $count + 1], now()->addDays(3));
+            $same = ($missed['day'] ?? null) === $today;
+            Cache::put($key, [
+                'reason' => $reason, 'at' => now()->toIso8601String(), 'day' => $today,
+                'count' => ($same ? (int) ($missed['count'] ?? 0) : 0) + 1,
+                // Of them, callers who left a number to be called back (callBack()).
+                'callbacks' => $same ? (int) ($missed['callbacks'] ?? 0) : 0,
+            ], now()->addDays(3));
         }
 
         return ['ok' => false, 'error' => $reason];
@@ -279,7 +391,7 @@ class AgentCalls
     /**
      * Callers who could not reach this agent today, and the last reason.
      *
-     * @return array{count: int, reason: string, at: \Illuminate\Support\Carbon}|null
+     * @return array{count: int, reason: string, at: \Illuminate\Support\Carbon, callbacks: int}|null
      */
     public static function missedToday(Agent $agent): ?array
     {
@@ -288,7 +400,11 @@ class AgentCalls
             return null;
         }
 
-        return ['count' => (int) $missed['count'], 'reason' => (string) ($missed['reason'] ?? 'credits'), 'at' => \Illuminate\Support\Carbon::parse($missed['at'] ?? now())];
+        return [
+            'count' => (int) $missed['count'], 'reason' => (string) ($missed['reason'] ?? 'credits'),
+            'at' => \Illuminate\Support\Carbon::parse($missed['at'] ?? now()),
+            'callbacks' => min((int) $missed['count'], (int) ($missed['callbacks'] ?? 0)),
+        ];
     }
 
     /** Whether this browser, or its network, is kept off this agent for a while (blockCaller()). */
@@ -497,16 +613,27 @@ class AgentCalls
     /** @param  array<string, string>  $lead */
     protected function rememberContact(AgentConversation $conversation, array $lead): void
     {
-        $match = AgentContact::query()->where('user_id', $conversation->user_id);
+        $this->rememberCaller((int) $conversation->user_id, (int) $conversation->agent_id, $conversation->id, $lead);
+    }
+
+    /**
+     * A customer's details, kept once per phone number (or email) per owner: a second call from the
+     * same number brings it to the top with what is new.
+     *
+     * @param  array<string, string>  $lead
+     */
+    protected function rememberCaller(int $userId, int $agentId, ?int $conversationId, array $lead): void
+    {
+        $match = AgentContact::query()->where('user_id', $userId);
         if (($lead['phone'] ?? '') !== '') {
             $match->where('phone', $lead['phone']);
         } else {
             $match->where('email', $lead['email']);
         }
-        $contact = $match->first() ?? new AgentContact(['user_id' => $conversation->user_id]);
+        $contact = $match->first() ?? new AgentContact(['user_id' => $userId]);
         $contact->fill(array_filter([
-            'agent_id' => $conversation->agent_id,
-            'agent_conversation_id' => $conversation->id,
+            'agent_id' => $agentId,
+            'agent_conversation_id' => $conversationId,
             'name' => $lead['name'] ?? $contact->name,
             'phone' => $lead['phone'] ?? $contact->phone,
             'email' => $lead['email'] ?? $contact->email,

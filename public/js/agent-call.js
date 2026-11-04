@@ -3,12 +3,19 @@
  *
  *   var call = ListenAgentCall.start({
  *     begin: () => fetch(...),        // asks Listen for the call: { token, ws, model, call_key, api, max_seconds, speaks_first }
- *     onState(state) {},              // connecting, listening, speaking, ended, error, mic
+ *     onState(state) {},              // connecting, waiting, listening, speaking, ended, busy, error, mic
  *     onTurn(turn) {},                // { role: 'agent' | 'caller', text }
  *     onLevel(agent, caller) {},      // loudness 0..1 of the agent and of the caller, every frame
  *     onTool(name, args, result) {},  // what the agent did (save_contact ...)
+ *     onWait({ position, waited }) {},// every line busy: the caller's place in line (1 is next)
+ *     patience: 60,                   // seconds to wait for a line before "busy"
  *   });
- *   call.mute(true); call.end();
+ *   call.mute(true); call.end(); call.giveUp();
+ *
+ * When every line on the business's plan is taken, begin() answers { error: 'lines' }: the call
+ * waits (state waiting) and asks again every few seconds, and the first caller to wait gets the
+ * next free line. After `patience` seconds, or giveUp(), it stops (state busy) and lets go of the
+ * microphone, so the page can offer to leave a number instead.
  *
  * The microphone is read at 16 kHz and sent as it comes; the agent's voice
  * (24 kHz) is played as it arrives and stops the moment the caller talks over
@@ -117,8 +124,47 @@
     // A caller who goes quiet: asked once if they are still there, then the agent says goodbye
     // (Listen pays for every second the line stays open).
     var quietTimer = 0, heardAt = Date.now(), nudged = 0, quietEndAt = 0;
+    var waitTimer = 0;
 
     function set(s) { if (state !== s) { state = s; opts.onState && opts.onState(s); } }
+
+    // Every line taken: ask again every few seconds, keeping the caller's place, until a line is
+    // free, the caller gives up, or `patience` runs out. A call that starts after the caller left
+    // is ended at once, so it never holds a line.
+    function inLine() {
+      var since = Date.now(), patience = Math.max(10, opts.patience || 60) * 1000;
+      return new Promise(function (resolve, reject) {
+        (function attempt() {
+          if (ended) { resolve(null); return; }
+          Promise.resolve(opts.begin()).then(function (data) {
+            if (ended) {
+              if (data && data.token && data.api) post(data.api + '/end', { call_key: data.call_key, turns: [], reason: 'caller_left' }, true);
+              resolve(null);
+              return;
+            }
+            if (!data || data.error !== 'lines') {
+              if (state === 'waiting') set('connecting');
+              resolve(data);
+              return;
+            }
+            if (Date.now() - since >= patience) { toBusy(); resolve(null); return; }
+            opts.onWait && opts.onWait({ position: data.position || 0, waited: Math.round((Date.now() - since) / 1000) });
+            set('waiting');
+            waitTimer = setTimeout(attempt, Math.max(3, Math.min(10, data.retry_after || 5)) * 1000);
+          }, reject);
+        })();
+      });
+    }
+    // Still no free line: let go of the microphone; the page offers to leave a number.
+    function toBusy() {
+      if (ended) return;
+      ended = true;
+      clearTimeout(waitTimer);
+      try { mic && mic.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+      try { node && node.disconnect(); } catch (e) {}
+      if (ctx) setTimeout(function () { try { ctx.close(); } catch (e) {} }, 300);
+      set('busy');
+    }
     function turn(role, text) {
       text = spoken(String(text || '')).trim();
       if (!text) return;
@@ -263,7 +309,7 @@
       if (ended) return;
       ended = true;
       flushTurns();
-      clearInterval(pingTimer); clearInterval(quietTimer); clearTimeout(stopTimer); cancelAnimationFrame(raf);
+      clearInterval(pingTimer); clearInterval(quietTimer); clearTimeout(stopTimer); clearTimeout(waitTimer); cancelAnimationFrame(raf);
       try { ws && ws.close(); } catch (e) {}
       try { mic && mic.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
       try { node && node.disconnect(); } catch (e) {}
@@ -294,7 +340,7 @@
       return ctx.audioWorklet.addModule(url).then(function () {
         node = new AudioWorkletNode(ctx, 'listen-pcm');
         micSource.connect(node);
-        return opts.begin();
+        return inLine();
       });
     }, function () {
       set('mic');
@@ -302,7 +348,7 @@
       return null;
     }).then(function (data) {
       if (!data || ended) return;
-      if (!data.token) throw new Error(data.message || 'no call');
+      if (!data.token) throw new Error(data.message || '');
       info = data;
       ws = new WebSocket(data.ws + '?access_token=' + encodeURIComponent(data.token));
       ws.onopen = function () { ws.send(JSON.stringify({ setup: { model: data.model } })); };
@@ -332,6 +378,8 @@
 
     return {
       end: function () { finish('done'); },
+      // While waiting for a line: stop waiting (the caller would rather leave a number).
+      giveUp: function () { if (state === 'waiting') toBusy(); },
       mute: function (on) { muted = !!on; },
       get state() { return state; },
     };

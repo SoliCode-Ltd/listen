@@ -559,7 +559,7 @@ class PlanResource extends Resource
                             ->label('Calls at the same time')
                             ->numeric()->integer()->minValue(0)->maxValue(50)->default(0)->required()
                             ->suffix('calls')
-                            ->helperText(fn (): string => 'Across all of a member\'s agents. A caller who rings while they are all busy hears the agent is busy. 0 uses the site default ('.(int) config('listen.agents.concurrent_calls', 3).').')
+                            ->helperText(fn (): string => 'Across all of a member\'s agents (one agent can use them all). A caller who rings while they are all busy waits for the next free one, and can leave a number to be called back. 0 uses the site default ('.(int) config('listen.agents.concurrent_calls', 3).').')
                             ->visible(fn (Forms\Get $get): bool => (bool) $get('agents_enabled')),
                         Forms\Components\TextInput::make('agent_max_call_minutes')
                             ->label('Longest call')

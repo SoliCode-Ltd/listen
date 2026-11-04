@@ -208,18 +208,19 @@ class AgentCallFlowTest extends TestCase
         $this->callApi('/calls', ['key' => $key, 'visitor' => 'browser-new'])->assertStatus(429);
     }
 
-    public function test_calls_that_stop_reporting_still_count_toward_the_eight_at_once(): void
+    public function test_calls_that_stop_reporting_still_hold_the_plans_lines(): void
     {
         config(['listen.agents.calls_per_visitor_hour' => 10]);
-        // Credits enough to hold eight full-length calls at once: this test is about the eight, not the credits.
-        $key = $this->liveAgent($this->owner(8 * 20 * \App\Services\Agents\AgentCalls::creditsPerMinute()))->mainWidget()->public_key;
+        // Credits enough to hold eight full-length calls at once: this test is about the lines, not the credits.
+        $key = $this->liveAgent($this->owner(8 * 20 * \App\Services\Agents\AgentCalls::creditsPerMinute(), ['agent_concurrent_calls' => 8]))->mainWidget()->public_key;
         for ($i = 1; $i <= 8; $i++) {
             $this->callApi('/calls', ['key' => $key, 'visitor' => 'silent-'.$i])->assertOk();
         }
 
         $this->travel(2)->minutes();
 
-        $this->callApi('/calls', ['key' => $key, 'visitor' => 'one-more'])->assertStatus(429)->assertJsonPath('error', 'busy');
+        // Every line still counts as taken: the next caller waits in line.
+        $this->callApi('/calls', ['key' => $key, 'visitor' => 'one-more'])->assertStatus(202)->assertJsonPath('error', 'lines');
     }
 
     public function test_an_owner_without_credits_is_never_named_to_the_caller(): void

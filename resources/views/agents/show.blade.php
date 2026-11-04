@@ -62,7 +62,16 @@
     @elseif($blocked !== null)
       <p class="ag-notice is-bad" role="alert">{{ __('agents.review_paused_note', ['reason' => rtrim($blocked ?: __('agents.review_default'), '.').'.']) }}</p>
     @elseif($missed)
-      <p class="ag-notice is-warn" role="status">{{ trans_choice('agents.missed', $missed['count'], ['count' => $missed['count'], 'name' => $agent->name, 'reason' => __('agents.missed_reasons.'.$missed['reason'])]) }}</p>
+      {{-- Every line busy: how many left a number (they are in Customers), and a plan with more lines. --}}
+      <div class="ag-notice is-warn" role="status">
+        <span>{{ trans_choice('agents.missed', $missed['count'], ['count' => $missed['count'], 'name' => $agent->name, 'reason' => __('agents.missed_reasons.'.$missed['reason'])]) }}@if(($missed['callbacks'] ?? 0) > 0) {{ trans_choice('agents.missed_callbacks', $missed['callbacks'], ['count' => $missed['callbacks']]) }}@endif</span>
+        @if(($missed['callbacks'] ?? 0) > 0 || $missed['reason'] === 'lines')
+          <span class="ag-notice-actions">
+            @if(($missed['callbacks'] ?? 0) > 0)<button type="button" class="ag-btn ag-btn-sm" data-ag-tab-go="customers">{{ __('agents.missed_see_customers') }}</button>@endif
+            @if($missed['reason'] === 'lines')<a class="ag-btn ag-btn-sm ag-btn-primary" href="{{ route('pricing') }}">{{ __('agents.missed_more_lines') }}</a>@endif
+          </span>
+        @endif
+      </div>
     @endif
 
     {{-- The agent: its voice's face (the call card below has the page's one orb), name, status, business and voice. --}}
