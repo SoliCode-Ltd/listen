@@ -6,7 +6,8 @@
  * and gives the rest back), with this server's own plans, rates and speech key.
  *
  * Everything happens inside one database transaction that is rolled back at the end: the
- * member, their plan, agent and calls never stay. Nothing goes to the payment provider.
+ * member, their plan, agent and calls never stay (nor Listen's own agent, lent to the member for
+ * one call). Nothing goes to the payment provider.
  * The only thing outside the database is one short-lived key the speech service makes for
  * each call start (never used for a call).
  *
@@ -21,6 +22,7 @@ use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\Agents\AgentCalls;
 use App\Support\Agents\AgentAccess;
+use App\Support\Agents\HouseAgent;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -122,6 +124,31 @@ try {
     $check($calls->periodSeconds($user->id) === $paid, 'the Agents page counts '.$calls->periodSeconds($user->id).' paid seconds this period (the paid calls: '.$paid.' s)');
     $check(AgentConversation::query()->where('user_id', $user->id)->where('free', false)->sum('credits') == $used(),
         'the calls\' credits add up to the credits used');
+
+    // 4. Listen's own agent, owned by this member for the check: a visitor's call is paid by its
+    // owner like a member's agent (Agents → Settings, "use their owner's credits"), and only its
+    // seconds are taken. Rolled back with everything else.
+    $house = ($id = HouseAgent::for('en')['agent'] ?? null) ? Agent::query()->where('public_id', $id)->first() : null;
+    if (! $house || ! method_exists(AgentAccess::class, 'houseCharged')) {
+        echo '  (Listen\'s own agent: not on this server, or this server\'s code does not charge it yet)'.PHP_EOL;
+    } else {
+        $house->forceFill(['user_id' => $user->id])->save();
+        $house = $house->fresh();
+        $before = $used();
+        $hs = $calls->start($house, 'widget', $house->mainWidget(), ['origin' => rtrim((string) config('app.url'), '/'),
+            'visitor' => '203.0.113.9|billing-check-house', 'network' => '203.0.113.9']);
+        $check($hs['ok'] === true && $hs['free'] === false && $used() === $before + AgentCalls::creditsFor((int) $hs['max_seconds'], $house),
+            'Listen\'s own agent\'s call is paid by its owner: '.$n($used() - $before).' credits held for '.($hs['max_seconds'] ?? '?').' s'
+            .($hs['ok'] ? '' : ' ('.($hs['error'] ?? '?').')'));
+        if ($hs['ok']) {
+            Carbon::setTestNow(now()->addSeconds(50));
+            $ended = $calls->end($hs['conversation']->fresh(), [], null, 'done');
+            Carbon::setTestNow();
+            $expected = $ended->free ? 0 : AgentCalls::creditsFor((int) $ended->billed_seconds, $house);
+            $check(! $ended->free && (int) $ended->credits === $expected && $used() === $before + $expected,
+                'after 50 s it takes '.$n($ended->credits).' credits ('.$ended->billed_seconds.' s), the rest given back: used now '.$n($used()));
+        }
+    }
 } catch (Throwable $e) {
     $failures++;
     echo '  FAIL '.get_class($e).': '.$e->getMessage().PHP_EOL;
