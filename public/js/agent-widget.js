@@ -786,8 +786,27 @@
     };
   }
 
+  /* Who is calling, as the website signed it on the button's script tag (CallerIdentity). The
+     loader reads it too, but a browser or the CDN can still serve an older loader that does not
+     (it is cached for a long time), and this file is always the current one. */
+  function signedCaller(key) {
+    var tags = document.querySelectorAll('script[data-agent][data-caller-signature]');
+    for (var i = 0; i < tags.length; i++) {
+      var s = tags[i];
+      if (String(s.getAttribute('data-agent') || '').trim() !== key) continue;
+      return {
+        email: String(s.getAttribute('data-caller-email') || ''),
+        name: String(s.getAttribute('data-caller-name') || ''),
+        expires: String(s.getAttribute('data-caller-expires') || ''),
+        signature: String(s.getAttribute('data-caller-signature') || '')
+      };
+    }
+    return null;
+  }
+
   function mount(cfg, ctx) {
     if (!document.body || document.querySelector('[data-listen-agent]')) return;
+    if (ctx && !ctx.caller) ctx.caller = signedCaller(ctx.key);
     var w = build(cfg, ctx, {});
     // The page can open it too ("Talk to our agent"), and start the call at once.
     window.ListenAgentWidget.open = function (o) { w.open(o); };
