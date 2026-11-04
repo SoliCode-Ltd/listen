@@ -48,11 +48,22 @@ final class AgentAccess
     /** Whether this visitor or member sees Agents (the pages, the menu, the homepage section). */
     public static function openTo(?User $user): bool
     {
+        // Between a deploy and its migration nobody sees Agents: their pages read tables not made yet.
+        if (! self::tablesReady()) {
+            return false;
+        }
+
         return match (self::audience()) {
             self::AUDIENCE_EVERYONE => true,
             self::AUDIENCE_OFF => false,
             default => VoiceCloningAccess::isPreviewAccount($user),
         };
+    }
+
+    /** Whether this server has the agents tables yet (the migration has run). */
+    public static function tablesReady(): bool
+    {
+        return once(fn (): bool => rescue(fn () => Schema::hasTable('agent_conversations'), false, false));
     }
 
     /** Whether the plans table has the agents columns yet. */

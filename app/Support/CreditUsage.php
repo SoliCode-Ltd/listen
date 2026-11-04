@@ -42,10 +42,11 @@ final class CreditUsage
             ->where('user_id', $id)->where('status', 'done')->where('created_at', '>=', $from)
             ->latest('id')->limit(500)
             ->get(['id', 'text_item_id', 'api_key_id', 'billable_chars', 'duration_seconds', 'created_at', 'is_dialogue']);
-        $calls = AgentConversation::query()->with('agent:id,name')
+        // No calls before the agents tables exist (a deploy just ahead of its migration).
+        $calls = \App\Support\Agents\AgentAccess::tablesReady() ? AgentConversation::query()->with('agent:id,name')
             ->where('user_id', $id)->where('free', false)->whereNotNull('settled_at')->where('started_at', '>=', $from)
             ->latest('id')->limit(500)
-            ->get(['id', 'agent_id', 'channel', 'credits', 'billed_seconds', 'started_at']);
+            ->get(['id', 'agent_id', 'channel', 'credits', 'billed_seconds', 'started_at']) : collect();
         $dubs = rescue(fn () => VideoDub::query()
             ->where('user_id', $id)->where('status', 'done')->where('is_free', false)->where('created_at', '>=', $from)
             ->latest('id')->limit(200)->get(['id', 'original_name', 'video_seconds', 'reservation', 'created_at']), collect(), false);

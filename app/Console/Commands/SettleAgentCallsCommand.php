@@ -18,6 +18,10 @@ class SettleAgentCallsCommand extends Command
 
     public function handle(AgentCalls $calls): int
     {
+        // Nothing to settle before the agents tables exist (a deploy just ahead of its migration).
+        if (! \App\Support\Agents\AgentAccess::tablesReady()) {
+            return self::SUCCESS;
+        }
         $settled = $calls->settleStale();
         if ($settled > 0) {
             $this->info("Settled {$settled} call(s).");
