@@ -82,19 +82,19 @@
       </span>
       <div class="ag-hero-text">
         <div class="ag-hero-title">
-          <h1>{{ $agent->name }}</h1>
+          <h1 data-ag-hero-name>{{ $agent->name }}</h1>
           <span class="ag-pill is-{{ $agent->status }}" data-ag-status><i></i>{{ __('agents.status.'.$agent->status) }}</span>
         </div>
         <p class="ag-hero-meta">
           <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>{{ $agent->business_name }}</span>
           @if($voice)
-            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.voice_of', ['name' => $voice['name']]) }}@if($speaksLabel !== '')<small data-ag-speaks-label>{{ $speaksLabel }}</small>@endif</span>
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg><bdi data-ag-hero-voice>{{ __('agents.voice_of', ['name' => $voice['name']]) }}</bdi>@if($speaksLabel !== '')<small data-ag-speaks-label>{{ $speaksLabel }}</small>@endif</span>
           @endif
         </p>
       </div>
       <div class="ag-hero-actions">
         <button type="button" class="ag-btn" data-ag-tab-go="overview" data-ag-talk-open>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.talk_to', ['name' => $agent->name]) }}
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg><bdi data-ag-talk-label>{{ __('agents.talk_to', ['name' => $agent->name]) }}</bdi>
         </button>
         @if($agent->isLive())
           <button type="button" class="ag-btn" data-ag-status-set="paused">{{ __('agents.live_pause') }}</button>
@@ -148,6 +148,10 @@
       {{-- Each setting with what it is for beside it; saving stays at hand at the bottom. --}}
       <form class="ag-settings" data-ag-script-form>
         <div class="ag-card ag-settings-card">
+          <div class="ag-setting">
+            <div class="ag-setting-label"><label for="ag-name-edit">{{ __('agents.edit_name') }}</label><p>{{ __('agents.edit_name_hint') }}</p></div>
+            <input class="ag-input" id="ag-name-edit" name="name" maxlength="80" dir="auto" required value="{{ $agent->name }}">
+          </div>
           <div class="ag-setting">
             <div class="ag-setting-label"><label for="ag-first">{{ __('agents.edit_first') }}</label><p>{{ __('agents.edit_first_hint') }}</p></div>
             <textarea class="ag-textarea" id="ag-first" name="first_message" rows="2" dir="auto" style="min-height:84px">{{ $agent->first_message }}</textarea>
@@ -310,7 +314,7 @@
           <span class="ag-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></span>
           <h3>{{ __('agents.conversations_empty_title') }}</h3>
           <p>{{ __('agents.conversations_empty') }}</p>
-          <div class="ag-empty-actions"><button type="button" class="ag-btn ag-btn-primary" data-ag-tab-go="overview" data-ag-talk-open>{{ __('agents.talk_to', ['name' => $agent->name]) }}</button><button type="button" class="ag-btn" data-ag-tab-go="live">{{ __('agents.empty_share') }}</button></div>
+          <div class="ag-empty-actions"><button type="button" class="ag-btn ag-btn-primary" data-ag-tab-go="overview" data-ag-talk-open><bdi data-ag-talk-label>{{ __('agents.talk_to', ['name' => $agent->name]) }}</bdi></button><button type="button" class="ag-btn" data-ag-tab-go="live">{{ __('agents.empty_share') }}</button></div>
         </div>
       @else
         <div class="ag-list">
@@ -359,7 +363,7 @@
           <span class="ag-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.2A6.5 6.5 0 0 1 21.5 20"/></svg></span>
           <h3>{{ __('agents.customers_empty_title') }}</h3>
           <p>{{ __('agents.customers_empty') }}</p>
-          <div class="ag-empty-actions"><button type="button" class="ag-btn ag-btn-primary" data-ag-tab-go="overview" data-ag-talk-open>{{ __('agents.talk_to', ['name' => $agent->name]) }}</button><button type="button" class="ag-btn" data-ag-tab-go="live">{{ __('agents.empty_share') }}</button></div>
+          <div class="ag-empty-actions"><button type="button" class="ag-btn ag-btn-primary" data-ag-tab-go="overview" data-ag-talk-open><bdi data-ag-talk-label>{{ __('agents.talk_to', ['name' => $agent->name]) }}</bdi></button><button type="button" class="ag-btn" data-ag-tab-go="live">{{ __('agents.empty_share') }}</button></div>
         </div>
       @else
         <div class="ag-card" style="overflow:hidden">
@@ -437,7 +441,10 @@
         ];
       })(),
       'text' => [
-        'states' => \App\Support\Agents\Gendered::lines((array) __('agents.talk_states', ['name' => $agent->name]), ($voice['gender'] ?? null) === 'female'),
+        // With :name and each line's woman's form: the page fills them for its voice, also after a new one.
+        'states' => (array) __('agents.talk_states'),
+        'voice_of' => __('agents.voice_of'), 'talk_to' => __('agents.talk_to'),
+        'voice_renamed' => __('agents.voice_renamed'), 'voice_renamed_female' => \App\Support\Agents\Gendered::line('agents.voice_renamed', true),
         'start' => __('agents.talk_start'), 'end' => __('agents.talk_end'),
         'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
         'correct' => __('agents.talk_correct'), 'correct_placeholder' => __('agents.talk_correct_placeholder'),

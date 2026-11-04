@@ -2,7 +2,7 @@
  * Listen Agents, for visitors (and the homepage's Agents section): the real calls
  * (components/agents/real-call) play with their words lit as they are said and the
  * orb following the voice; the month's numbers and the channels play once when they
- * come into view; "Talk to Sara now" opens a real call with Listen's own agent (its
+ * come into view; "Talk to … now" opens a real call with Listen's own agent (its
  * call button, js/listen-agent.js). Every dialect opens in a dialog with a search; how
  * it works follows the page as it scrolls; a call picked in the inbox opens beside it.
  * Without motion, everything shows as it ends.
@@ -79,7 +79,7 @@
     });
   }
 
-  /* "Talk to Sara now": shown once Listen's own agent is on the page; it opens its call. */
+  /* "Talk to … now" (Listen's own agent, by its name): shown once that agent is on the page; it opens its call. */
   function live() {
     var buttons = $$('[data-agl-live]');
     if (!buttons.length) return;

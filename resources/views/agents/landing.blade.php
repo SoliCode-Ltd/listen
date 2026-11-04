@@ -7,6 +7,10 @@
   @php
     $ar = app()->getLocale() === 'ar';
     $hasAgents = auth()->check() && auth()->user()->agents()->exists();
+    // Listen's own agent by the name it has now (a man's voice brings his name, HouseAgent::texts).
+    $house = \App\Support\Agents\HouseAgent::for(app()->getLocale());
+    $houseName = trim((string) ($house ? \App\Models\Agent::query()->where('public_id', $house['agent'] ?? '')->value('name') : ''));
+    $houseName = $houseName !== '' ? $houseName : ($ar ? 'سارة' : 'Sara');
     $startUrl = $hasAgents ? route('voice-agents.index') : (auth()->check() ? route('voice-agents.create') : route('register', ['next' => 'agents']));
     $steps = __('agents_landing.steps');
     $ui = __('agents_landing.steps_ui');
@@ -113,7 +117,7 @@
         <p class="agl-lead">{{ __('agents_landing.hero_text') }}</p>
         <div class="agl-cta-row">
           <a class="ag-btn ag-btn-primary ag-btn-lg" href="{{ $startUrl }}">{{ $hasAgents ? __('agents_landing.hero_cta_member') : __('agents_landing.hero_cta') }}</a>
-          <button type="button" class="ag-btn ag-btn-lg agl-live-btn" data-agl-live hidden>{!! $micIcon !!}{{ __('agents_landing.talk_live') }}</button>
+          <button type="button" class="ag-btn ag-btn-lg agl-live-btn" data-agl-live hidden>{!! $micIcon !!}{{ __('agents_landing.talk_live', ['name' => $houseName]) }}</button>
         </div>
         <p class="agl-note" data-agl-live-note hidden>{{ __('agents_landing.talk_live_note') }}</p>
         <ul class="agl-facts">
@@ -480,7 +484,7 @@
         <h2 id="agl-final-title">{{ __('agents_landing.final_title') }}</h2>
         <div class="agl-cta-row agl-cta-center">
           <a class="ag-btn ag-btn-primary ag-btn-lg" href="{{ $startUrl }}">{{ __('agents_landing.final_cta') }}</a>
-          <button type="button" class="ag-btn ag-btn-lg agl-live-btn" data-agl-live hidden>{!! $micIcon !!}{{ __('agents_landing.talk_live') }}</button>
+          <button type="button" class="ag-btn ag-btn-lg agl-live-btn" data-agl-live hidden>{!! $micIcon !!}{{ __('agents_landing.talk_live', ['name' => $houseName]) }}</button>
         </div>
         @if($freeMinutes > 0)<p class="agl-note">{{ trans_choice('agents_landing.hero_note', $freeMinutes, ['count' => $freeMinutes]) }}</p>@endif
       </div>
@@ -497,10 +501,10 @@
             <div class="agl-faq-ask-text">
               <b>{{ __('agents_landing.faq_more_title') }}</b>
               <span data-agl-watch>{{ __('agents_landing.faq_more_text') }}</span>
-              <span data-agl-live-note hidden>{{ __('agents_landing.faq_more_live') }}</span>
+              <span data-agl-live-note hidden>{{ __('agents_landing.faq_more_live', ['name' => $houseName]) }}</span>
             </div>
             <div class="agl-faq-ask-actions">
-              <button type="button" class="ag-btn ag-btn-sm ag-btn-primary agl-faq-live" data-agl-live hidden>{!! $micIcon !!}{{ __('agents_landing.talk_live') }}</button>
+              <button type="button" class="ag-btn ag-btn-sm ag-btn-primary agl-faq-live" data-agl-live hidden>{!! $micIcon !!}{{ __('agents_landing.talk_live', ['name' => $houseName]) }}</button>
               <a class="ag-btn ag-btn-sm" href="{{ route('contact') }}">{{ __('agents_landing.faq_contact') }}</a>
             </div>
           </div>

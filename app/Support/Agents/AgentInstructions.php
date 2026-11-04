@@ -35,6 +35,12 @@ final class AgentInstructions
         $lines = [];
 
         $lines[] = "You are {$agent->name}, the AI voice assistant of {$agent->business_name}. You talk with its customers on a live voice call.";
+        // Arabic marks the speaker's own gender: the agent speaks of itself as its voice is.
+        if ($arabic && ($gender = AgentPersona::voiceGender($agent))) {
+            $lines[] = $gender === 'female'
+                ? "You speak with a woman's voice: speak of yourself as a woman (أنا متأكدة، أنا جاهزة), also where a line below says otherwise."
+                : "You speak with a man's voice: speak of yourself as a man (أنا متأكد، أنا جاهز), also where a line below says otherwise.";
+        }
         if ($identity = trim((string) ($script['identity'] ?? ''))) {
             $lines[] = $identity;
         }
