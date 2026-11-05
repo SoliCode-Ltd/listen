@@ -65,9 +65,13 @@ class AgentWidget extends Model
         // The line under the orb before a call ("Ready when you are"): the owner's words, or hidden.
         'ready_text' => null,
         'ready_show' => true,
+        // What the caller hears behind the agent's voice: a quiet office, or nothing (CallBackground).
+        'background' => 'office',
     ];
 
     public const STYLES = ['orb', 'waves', 'bar'];
+
+    public const BACKGROUNDS = ['office', 'none'];
 
     public const ICONS = ['phone', 'mic', 'headset', 'waves', 'orb'];
 
@@ -151,6 +155,7 @@ class AgentWidget extends Model
             'font' => $pick('font', ['system', 'rounded', 'site']),
             'ready_text' => $text('ready_text', 60),
             'ready_show' => filter_var($a['ready_show'], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? true,
+            'background' => $pick('background', self::BACKGROUNDS),
         ];
         $custom = array_values(array_filter(array_map([self::class, 'hex'], (array) ($a['orb_colors'] ?? []))));
         if ($out['palette'] === 'custom' && count($custom) >= 2) {

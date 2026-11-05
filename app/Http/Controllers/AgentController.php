@@ -205,6 +205,7 @@ class AgentController extends Controller
             'appearance.font' => ['nullable', 'in:system,rounded,site'],
             'appearance.ready_text' => ['nullable', 'string', 'max:60'],
             'appearance.ready_show' => ['nullable', 'boolean'],
+            'appearance.background' => ['nullable', 'in:'.implode(',', AgentWidget::BACKGROUNDS)],
         ]);
 
         if (array_key_exists('dialect', $data)) {

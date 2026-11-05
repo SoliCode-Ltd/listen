@@ -161,6 +161,20 @@
       </div>
     </fieldset>
 
+    {{-- What the caller hears behind the agent's voice (App\Support\Agents\CallBackground). --}}
+    <fieldset class="ag-design-group">
+      <legend>{{ __('agents.design.group_sound') }}</legend>
+      <div class="ag-design-field">
+        <span class="ag-design-label" id="ag-design-background">{{ __('agents.design.background') }}</span>
+        <div class="ag-choice-row" role="radiogroup" aria-labelledby="ag-design-background">
+          @foreach(\App\Models\AgentWidget::BACKGROUNDS as $b)
+            <label class="ag-choice"><input type="radio" name="background" value="{{ $b }}" @checked($look['background'] === $b)><span>{{ __('agents.design.backgrounds.'.$b) }}</span></label>
+          @endforeach
+        </div>
+        <p class="ag-muted ag-design-hint">{{ __('agents.design.background_hint') }}</p>
+      </div>
+    </fieldset>
+
     {{-- Where it sits. --}}
     <fieldset class="ag-design-group">
       <legend>{{ __('agents.design.group_place') }}</legend>

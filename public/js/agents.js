@@ -1430,6 +1430,8 @@
       look.radius = val('radius') || look.radius;
       look.font = val('font') || look.font;
       look.theme = val('theme') || look.theme;
+      // What the caller hears behind the agent (no part of the preview: it has no sound).
+      look.background = val('background') || look.background || 'office';
       // The corner the owner sees: on a right-to-left website the start is the right.
       var corner = val('corner');
       if (corner) look.position = (corner === 'right') === !!D.rtl ? 'start' : 'end';
@@ -1444,7 +1446,7 @@
       status.textContent = (D.text || {}).saving || '';
       saveTimer = setTimeout(function () {
         var body = {};
-        ['position', 'style', 'theme', 'label', 'icon', 'size', 'shape', 'accent', 'palette', 'radius', 'captions', 'photo', 'title', 'subtitle', 'font', 'ready_text', 'ready_show'].forEach(function (k) { body[k] = look[k] === null ? '' : look[k]; });
+        ['position', 'style', 'theme', 'label', 'icon', 'size', 'shape', 'accent', 'palette', 'radius', 'captions', 'photo', 'title', 'subtitle', 'font', 'ready_text', 'ready_show', 'background'].forEach(function (k) { body[k] = look[k] === null ? '' : look[k]; });
         if (look.palette === 'custom') body.orb_colors = look.orb_colors;
         api('PATCH', C.agent.urls.update, { appearance: body }).then(function () {
           status.textContent = (D.text || {}).saved || '';
@@ -1484,7 +1486,7 @@
     if (ready && !ready.placeholder) ready.placeholder = ((D.cfg && D.cfg.text && D.cfg.text.states) || {}).idle || '';
     $('[data-ag-design-reset]', box).addEventListener('click', function () {
       var d = D.defaults;
-      ['style', 'icon', 'shape', 'size', 'radius', 'font', 'theme', 'palette'].forEach(function (k) {
+      ['style', 'icon', 'shape', 'size', 'radius', 'font', 'theme', 'palette', 'background'].forEach(function (k) {
         var r = $('input[name="' + k + '"][value="' + d[k] + '"]', box);
         if (r) r.checked = true;
       });

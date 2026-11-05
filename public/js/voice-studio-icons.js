@@ -181,6 +181,8 @@
     far: '<circle cx="6" cy="6" r="1.8"/><path d="M6 8.5v5.5M6 10.5l-2.4 2M6 10.5l2.4 2M6 14l-2 4.5M6 14l2 4.5"/><path d="M13 12h8M17.5 9l3.5 3-3.5 3" />',
     tape: '<rect x="2.5" y="5.5" width="19" height="13" rx="2"/><circle cx="8.5" cy="11" r="2"/><circle cx="15.5" cy="11" r="2"/><path d="M10.5 11h3M7 18.5l1.5-3h7l1.5 3"/>',
     room: '<rect x="3.5" y="4" width="17" height="16" rx="1.5"/><path d="M9.5 20v-6.5h5V20M6.8 7.5h3.4v3.4H6.8z"/>',
+    // A screen on a desk and a colleague at the next one.
+    office: '<rect x="2.5" y="4.5" width="10" height="7" rx="1.2"/><path d="M7.5 11.5V16M2 16h20M4 16v4.5M20 16v4.5"/><circle cx="17.5" cy="7.5" r="2.3"/><path d="M13.6 16c0-2.6 1.7-4.6 3.9-4.6s3.9 2 3.9 4.6"/>',
     bath: 'M3 12h18v2.5a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5zM5.5 12V5.5a2 2 0 0 1 3.8-.9M7 19.5 6 21M17 19.5l1 1.5',
     church: 'M12 2.5v4M10.3 4.2h3.4M5 21v-9l7-5.5 7 5.5v9M3.5 21h17M10 21v-4a2 2 0 0 1 4 0v4',
     stadium: '<ellipse cx="12" cy="8" rx="9" ry="3.5"/><path d="M3 8v8c0 1.9 4 3.5 9 3.5s9-1.6 9-3.5V8M7.5 11.2v7.6M16.5 11.2v7.6"/>',

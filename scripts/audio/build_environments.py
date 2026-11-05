@@ -13,11 +13,14 @@ Builds the sound environment assets in resources/audio/environments/:
                    brought to -20 LUFS. Crowds are made from Listen's own
                    showcase voices, layered until no word can be followed.
 
+and the office that agents' calls play behind the agent's voice (office()):
+resources/audio/agents/office.mp3, the same colleagues as bed/office.flac.
+
 Everything here is generated, so the files are Listen's own.
 
 Run once, then commit the files:
   pip install pyroomacoustics soundfile scipy numpy
-  python3 scripts/audio/build_environments.py
+  python3 scripts/audio/build_environments.py          (or: rooms, beds, office)
 """
 
 import os
@@ -27,7 +30,7 @@ import sys
 import numpy as np
 import pyroomacoustics as pra
 import soundfile as sf
-from scipy.signal import butter, fftconvolve, sosfilt
+from scipy.signal import butter, fftconvolve, firwin2, sosfilt, welch
 
 FS = 44100
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -356,9 +359,115 @@ def build_beds():
     write_bed('static', hiss * (1 + 0.5 * smooth_random(n, 2)) + bp(crackle, lo=800, hi=5000) + 0.05 * hum * np.abs(hiss).max())
 
 
+# ---------- the office ----------
+
+# How the background of a quiet office line spreads its energy, measured on a real call: the share
+# (%) of each band below. Most of it sits where far-off voices are (120-800 Hz) and almost none above
+# 3 kHz, so no word, key or tick ever stands out, while the agent's voice stays clear on top.
+OFFICE_BANDS = [(0, 120), (120, 300), (300, 800), (800, 1500), (1500, 3000), (3000, 6000), (6000, 22050)]
+OFFICE_PROFILE = [12.0, 44.55, 32.9, 6.95, 2.8, 0.6, 0.3]
+PREVIEWS = os.path.join(ROOT, 'public', 'audio', 'voice-previews')
+AGENTS = os.path.join(ROOT, 'resources', 'audio', 'agents')
+# The call background's loop sits between these two points of its file (seconds); the file holds a
+# little more on each side, so a player that keeps an MP3's first silent frames still loops cleanly.
+OFFICE_RATE, OFFICE_PAD = 24000, 0.5
+
+
+def shares(x):
+    f, p = welch(x, FS, nperseg=4096)
+    return [100 * p[(f >= lo) & (f < hi)].sum() / p.sum() for lo, hi in OFFICE_BANDS]
+
+
+def rms(x):
+    return float(np.sqrt(np.mean(np.square(x))) + 1e-12)
+
+
+def office():
+    """
+    Colleagues talking quietly at the far end of an office: six people (Listen's own voice
+    previews), each saying one thing after another with the short pauses people leave, far from
+    the microphone in the office room (ir/office), over the building's hum (bed/room_tone); then
+    shaped, a few passes of an even filter, to OFFICE_PROFILE.
+
+    Two files from the same people: bed/office.flac for the studio (stereo: each colleague in their
+    own place in the room) and resources/audio/agents/office.mp3 for agents' calls (mono, at the
+    call's 24 kHz, the loop padded with OFFICE_PAD on each side; App\\Support\\Agents\\CallBackground
+    knows its level and loop).
+    """
+    rng = np.random.default_rng(11)
+    talkers, pause, seconds = 6, (0.15, 0.8), 90
+    n = seconds * FS
+    clips = sorted(os.path.join(PREVIEWS, f) for f in os.listdir(PREVIEWS) if f.endswith('.mp3'))
+    rng.shuffle(clips)
+    ir, _ = sf.read(os.path.join(OUT, 'ir', 'office.flac'))
+    ir_mono = ir.mean(axis=1)
+    tone, _ = sf.read(os.path.join(OUT, 'bed', 'room_tone.flac'))
+    tone = np.tile(tone, (int(np.ceil(n / len(tone))), 1))[:n]
+    place = np.random.default_rng(12)
+    mono, wide, used = np.zeros(n), np.zeros((n, 2)), 0
+    for _ in range(talkers):
+        line = np.zeros(n)
+        at = int(rng.uniform(0, 3) * FS)
+        while at < n:
+            c = load_voice(clips[used % len(clips)])
+            used += 1
+            c = c / rms(c)
+            end = min(n, at + len(c))
+            line[at:end] += c[: end - at]
+            at = end + int(rng.uniform(*pause) * FS)
+        gain = 10 ** (rng.uniform(-10, 0) / 20)
+        wet = fftconvolve(line, ir_mono)[:n]
+        scale = rms(line) / rms(wet)
+        mono += (0.25 * line + wet * scale) * gain
+        # In stereo: the same person at their own spot, their room sound from both microphones.
+        pan = place.uniform(-0.7, 0.7)
+        dry = np.stack([line * np.sqrt(0.5 * (1 - pan)), line * np.sqrt(0.5 * (1 + pan))], axis=1)
+        wet2 = np.stack([fftconvolve(line, ir[:, ch])[:n] for ch in range(2)], axis=1)
+        wide += (0.25 * dry * np.sqrt(2) + wet2 * scale) * gain
+    mono = mono / rms(mono) + 0.35 * tone.mean(axis=1) / rms(tone.mean(axis=1))
+    wide = wide / rms(wide.mean(axis=1)) + 0.35 * tone / rms(tone.mean(axis=1))
+
+    centres = [60, 190, 490, 1100, 2100, 4200, 12000]
+    for _ in range(5):
+        g = [np.sqrt(max(a, 0.02) / max(b, 0.02)) for a, b in zip(OFFICE_PROFILE, shares(mono))]
+        h = firwin2(4095, np.array([0] + centres + [FS / 2]) / (FS / 2), [g[0]] + g + [g[-1]])
+        mono = fftconvolve(mono, h, mode='same')
+        wide = np.stack([fftconvolve(wide[:, ch], h, mode='same') for ch in range(2)], axis=1)
+    print('office bands', [round(v, 1) for v in shares(mono)], 'measured', OFFICE_PROFILE)
+
+    write_bed('office', wide)
+
+    # The call's loop: the end fades into the start (3 s), then 24 kHz, taken from the middle of
+    # three copies so the loop has no seam, at an RMS of 0.05.
+    fade = 3 * FS
+    mono[:fade] = mono[:fade] * np.linspace(0, 1, fade) + mono[-fade:] * np.linspace(1, 0, fade)
+    loop = mono[:-fade]
+    step = len(loop) * OFFICE_RATE // FS
+    tmp = os.path.join(AGENTS, '.tmp')
+    os.makedirs(AGENTS, exist_ok=True)
+    sf.write(tmp + '-in.wav', np.tile(loop, 3).astype(np.float32), FS, subtype='FLOAT')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', tmp + '-in.wav', '-af', f'aresample={OFFICE_RATE}:resampler=soxr:precision=28',
+                    '-c:a', 'pcm_f32le', tmp + '-out.wav'], check=True)
+    loop, _ = sf.read(tmp + '-out.wav')
+    loop = loop[step:2 * step]
+    loop = loop / rms(loop) * 0.05
+    pad = int(OFFICE_PAD * OFFICE_RATE)
+    sf.write(tmp + '-call.wav', np.concatenate([loop[-pad:], loop, loop[:pad]]).astype(np.float32), OFFICE_RATE, subtype='FLOAT')
+    target = os.path.join(AGENTS, 'office.mp3')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', tmp + '-call.wav', '-c:a', 'libmp3lame', '-b:a', '32k', '-ac', '1', target], check=True)
+    for f in ('-in.wav', '-out.wav', '-call.wav'):
+        os.remove(tmp + f)
+    # As a browser plays it: decoded, the loop's part only.
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', target, '-f', 'f32le', '-ac', '1', '-ar', str(OFFICE_RATE), '-'], capture_output=True, check=True).stdout
+    heard = np.frombuffer(raw, dtype=np.float32)[pad:pad + step]
+    print(f'call office.mp3  loop {OFFICE_PAD}s to {OFFICE_PAD + step / OFFICE_RATE:.3f}s  rms {rms(heard):.4f}  peak {np.abs(heard).max():.3f}  {os.path.getsize(target) // 1024} KB')
+
+
 if __name__ == '__main__':
     what = sys.argv[1] if len(sys.argv) > 1 else 'all'
     if what in ('all', 'rooms'):
         build_rooms()
     if what in ('all', 'beds'):
         build_beds()
+    if what in ('all', 'office'):
+        office()

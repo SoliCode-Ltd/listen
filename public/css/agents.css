@@ -612,6 +612,7 @@ html[dir="rtl"] .ag-convo-more summary svg { transform: scaleX(-1); }
 .ag-design-group legend + * { clear: both; }
 .ag-design-field { display: grid; gap: .45rem; min-width: 0; }
 .ag-design-label { font-size: .84rem; font-weight: 700; color: var(--muted); }
+.ag-design-hint { margin: 0; font-size: .84rem; line-height: 1.65; }
 .ag-design-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; align-items: start; }
 .ag-choice-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .4rem; }
 .ag-choice { position: relative; display: inline-flex; cursor: pointer; }

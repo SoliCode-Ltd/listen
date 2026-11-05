@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::options('/{any}', fn () => response('', 204))->where('any', '.*');
 Route::get('/widgets/{key}', [AgentCallController::class, 'widget'])->where('key', 'lw_[A-Za-z0-9]{28}')->middleware('throttle:120,1')->name('agent-api.widget');
+// The office a caller hears behind the agent (CallBackground): one file for every website. No
+// ".mp3" in the address: the server's front would look for it as a file on disk.
+Route::get('/sounds/{name}', [AgentCallController::class, 'sound'])->where('name', '[a-z]+')->name('agent-api.sound');
 // A caller waiting for a line tries again every few seconds (AgentCalls::start, WaitingLine).
 Route::post('/calls', [AgentCallController::class, 'start'])->middleware('throttle:40,1')->name('agent-api.start');
 // Every line busy: the caller leaves a number to be called back.
