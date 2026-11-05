@@ -156,9 +156,12 @@ class AgentLinksTest extends TestCase
         $agent = $this->agent($owner, ['settings' => ['links' => [['network' => 'x', 'url' => 'https://x.com/SOS_KSA']]]]);
         $this->actingAs($owner);
 
-        // A link to anywhere else is refused, and nothing changes.
-        $this->withoutLocale()->patchJson($this->localizedRoute('voice-agents.update', ['agent' => $agent]), ['links' => ['https://x.com/SOS_KSA', 'https://phish.example/login']])
-            ->assertStatus(422)->assertJsonPath('message', __('agents.links_invalid'));
+        // A single post, or an address that is not on the internet, is refused, and nothing changes
+        // (a page of another website is only read, never written in the chat: AgentLinkReadsTest).
+        foreach (['https://www.instagram.com/p/Cx1Ab2', 'https://phish.example/login'] as $bad) {
+            $this->withoutLocale()->patchJson($this->localizedRoute('voice-agents.update', ['agent' => $agent]), ['links' => ['https://x.com/SOS_KSA', $bad]])
+                ->assertStatus(422)->assertJsonPath('message', __('agents.links_invalid'));
+        }
         $this->assertCount(1, AgentLinks::of($agent->fresh()));
 
         $this->withoutLocale()->patchJson($this->localizedRoute('voice-agents.update', ['agent' => $agent]), ['links' => ['https://x.com/SOS_KSA', 'snapchat.com/add/sos.ksa', 'https://www.clinic.example/register']])

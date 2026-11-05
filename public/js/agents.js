@@ -1040,7 +1040,16 @@
     var list = $('[data-ag-links-list]', box), form = $('[data-ag-links-add]', box), input = $('[data-ag-link-input]', box);
     var err = $('[data-ag-links-error]', box), note = $('[data-ag-links-note]', box), find = $('[data-ag-links-find]', box);
     var max = +box.getAttribute('data-max') || 10;
+    var pollTimer = 0, polls = 0;
     function urls() { return $$('li', list).map(function (li) { return li.getAttribute('data-url'); }); }
+    // New links are read in the background: the list checks back until each says what the agent read.
+    function watch() {
+      clearTimeout(pollTimer);
+      if (!$('li[data-state="reading"]', list) || !C.agent.urls.link_reads || polls >= 40) { polls = 0; return; }
+      pollTimer = setTimeout(function () {
+        api('GET', C.agent.urls.link_reads).then(function (res) { if (res && res.links) draw(res.links); }).catch(function () {});
+      }, polls++ < 10 ? 2500 : 6000);
+    }
     function sync() {
       var n = urls().length, count = $('[data-ag-links-count]', box);
       $('[data-ag-links-empty]', box).hidden = n > 0;
@@ -1061,6 +1070,22 @@
         mine.textContent = T.links_your_site || '';
         $('.ag-site-name', li).appendChild(mine);
       }
+      // What the agent read from it; a page of another website is only read, never written in the chat.
+      li.setAttribute('data-state', l.read ? l.read.state : '');
+      if (l.read || l.shown === false) {
+        var read = document.createElement('small');
+        read.className = 'ag-link-read is-' + (l.read ? l.read.state : 'none');
+        read.setAttribute('data-ag-link-read', '');
+        if (l.shown === false) {
+          var tag = document.createElement('i');
+          tag.className = 'ag-link-tag';
+          tag.title = T.links_read_only_hint || '';
+          tag.textContent = T.links_read_only || '';
+          read.appendChild(tag);
+        }
+        read.appendChild(document.createTextNode(l.read ? l.read.text : ''));
+        $('.ag-site-name', li).appendChild(read);
+      }
       var rm = $('button', li);
       rm.textContent = T.site_remove_short || 'Remove';
       rm.setAttribute('aria-label', fill(T.links_remove, { link: l.label || l.url }));
@@ -1075,6 +1100,7 @@
         list.appendChild(li);
       });
       sync();
+      watch();
     }
     function save(next, undo) {
       err.hidden = true;
@@ -1118,6 +1144,7 @@
     }
     if (find) find.addEventListener('click', function () { search(false); });
     if (C.agent.links_looked === false && C.agent.has_website && C.agent.urls.links) search(true);
+    else watch();
   }
 
   /*

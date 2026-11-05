@@ -12,9 +12,11 @@ use Illuminate\Support\Str;
  * website, the icons in its header and footer too (SiteReader), or added by the owner (Knowledge →
  * Social media links), and kept on the agent (settings.links).
  *
- * Only an account's own page is kept, never a share button, a single post or a video: an article
- * links to those far more often than to the business's own account. Nothing else can be kept, so
- * the chat never carries a link to anywhere else.
+ * Only an account's own page is written in the chat, never a share button, a single post or a
+ * video: an article links to those far more often than to the business's own account. The owner
+ * may also add a page of another website where its news is (accept()): the agent reads it
+ * (AgentLinkReads) but never writes it in the chat, so the chat never carries a link to anywhere
+ * else.
  */
 final class AgentLinks
 {
@@ -96,6 +98,71 @@ final class AgentLinks
         }
 
         return self::websitePage($parts, $host, $segments, $query, $site);
+    }
+
+    /**
+     * A link the owner adds: an account or a page of their own website (written in the chat when a
+     * caller asks: shown), the account of a single X post (its newest posts are read with the
+     * account's), or a page of another website anyone can open (only read, never written in the
+     * chat). Null for anything else, a single post or video on another social media site too.
+     *
+     * @return array{network: string, url: string, shown: bool}|null
+     */
+    public static function accept(string $url, ?string $site = null): ?array
+    {
+        if (($link = self::clean($url, $site)) !== null) {
+            return $link + ['shown' => true];
+        }
+        if (preg_match('#^(?:https?://)?(?:www\.|mobile\.|m\.)?(?:x|twitter)\.com/([A-Za-z0-9_]{1,15})/status(?:es)?/\d{1,25}(?:[/?\#].*)?$#i', trim($url), $post)
+            && ($account = self::clean('https://x.com/'.$post[1])) !== null) {
+            return $account + ['shown' => true];
+        }
+        $page = self::page($url);
+
+        return $page !== null ? $page + ['shown' => false] : null;
+    }
+
+    /**
+     * A page of another website, written one way (no tracking, no fragment). Never a social media
+     * site (only its accounts are kept), an address with a port, a password or a bare IP, or a
+     * name that is not on the internet (localhost, .local). Whether it may be read is checked
+     * again on every read (SiteReader::download).
+     *
+     * @return array{network: string, url: string}|null
+     */
+    public static function page(string $url): ?array
+    {
+        $url = trim(html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        if ($url === '' || strlen($url) > 500 || preg_match('/[\s<>"\'\\\\`]/u', $url)) {
+            return null;
+        }
+        if (! preg_match('#^https?://#i', $url)) {
+            if (preg_match('#^[a-z][a-z0-9+.-]*:#i', $url) || ! preg_match('#^[\p{L}\p{N}][\p{L}\p{N}.-]*\.(?:[\p{L}]{2,}|xn--[a-z0-9-]+)(?:[/?]|$)#iu', $url)) {
+                return null;
+            }
+            $url = 'https://'.$url;
+        }
+        $parts = parse_url($url);
+        if (! is_array($parts) || empty($parts['host']) || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])) {
+            return null;
+        }
+        $host = mb_strtolower(rtrim($parts['host'], '.'));
+        if (filter_var(trim($host, '[]'), FILTER_VALIDATE_IP) || ! preg_match('/^[\p{L}\p{N}][\p{L}\p{N}.-]*\.(?:[\p{L}]{2,}|xn--[a-z0-9-]+)$/u', $host)
+            || preg_match('/(^|\.)(localhost|local|internal|lan|home|corp|test|invalid|example)$/', $host)) {
+            return null;
+        }
+        foreach (array_keys(self::DOMAINS) as $domain) {
+            if ($host === $domain || str_ends_with($host, '.'.$domain)) {
+                return null;
+            }
+        }
+        parse_str((string) ($parts['query'] ?? ''), $query);
+        $kept = array_filter($query, fn ($v, $k) => is_string($v) && ! preg_match('/^(utm_|fbclid$|gclid$|mc_|igshid$)/i', (string) $k), ARRAY_FILTER_USE_BOTH);
+        $segments = array_values(array_filter(explode('/', (string) ($parts['path'] ?? '')), fn ($s) => $s !== ''));
+        $path = implode('/', array_map(fn (string $s): string => rawurlencode(rawurldecode($s)), $segments));
+        $scheme = strtolower((string) ($parts['scheme'] ?? 'https')) === 'http' ? 'http' : 'https';
+
+        return ['network' => 'page', 'url' => $scheme.'://'.$host.($path !== '' ? '/'.$path : '').($kept !== [] ? '?'.http_build_query($kept) : '')];
     }
 
     /**
@@ -339,6 +406,26 @@ final class AgentLinks
             $clean = $url !== '' ? self::clean($url, $agent->website_url) : null;
             if ($clean !== null) {
                 $out[strtolower($clean['url'])] ??= $clean;
+            }
+        }
+
+        return array_slice(array_values($out), 0, self::MAX);
+    }
+
+    /**
+     * Every link the agent keeps, in the owner's order: those written in the chat (shown), and
+     * the pages of other websites it only reads.
+     *
+     * @return list<array{network: string, url: string, shown: bool}>
+     */
+    public static function all(Agent $agent): array
+    {
+        $out = [];
+        foreach ((array) $agent->setting('links', []) as $link) {
+            $url = is_array($link) ? (string) ($link['url'] ?? '') : (is_string($link) ? $link : '');
+            $kept = $url !== '' ? self::accept($url, $agent->website_url) : null;
+            if ($kept !== null) {
+                $out[strtolower($kept['url'])] ??= $kept;
             }
         }
 

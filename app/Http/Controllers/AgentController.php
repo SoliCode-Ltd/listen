@@ -13,6 +13,7 @@ use App\Services\Agents\AgentReview;
 use App\Services\Agents\AgentWriter;
 use App\Support\Agents\AgentAccess;
 use App\Support\Agents\AgentBalance;
+use App\Support\Agents\AgentLinkReads;
 use App\Support\Agents\AgentLinks;
 use App\Support\Agents\AgentPersona;
 use App\Services\Agents\SiteReader;
@@ -116,6 +117,8 @@ class AgentController extends Controller
     {
         $this->own($request, $agent);
         $widget = $agent->mainWidget();
+        // An agent made before its links were read gets them read now (the card shows them being read).
+        AgentLinkReads::refresh($agent);
         // The same month as the call time on the agents list (the credit month).
         $monthStart = CreditPeriod::current((int) $request->user()->id)['starts_at'];
         $conversations = $agent->conversations()->latest('started_at')->limit(50)->get();
@@ -269,14 +272,16 @@ class AgentController extends Controller
                 if (blank($url)) {
                     continue;
                 }
-                $link = AgentLinks::clean((string) $url, $agent->website_url);
+                // An account or a page of their website (written in the chat), or a page of another
+                // website with their news (only read by the agent).
+                $link = AgentLinks::accept((string) $url, $agent->website_url);
                 if ($link === null) {
                     return response()->json(['message' => __('agents.links_invalid'), 'invalid' => (string) $url], 422);
                 }
-                $links[strtolower($link['url'])] ??= $link;
+                $links[strtolower($link['url'])] ??= ['network' => $link['network'], 'url' => $link['url']];
             }
             $links = array_values($links);
-            $linksChanged = array_column($links, 'url') !== array_column(AgentLinks::of($agent), 'url');
+            $linksChanged = array_column($links, 'url') !== array_column(AgentLinks::all($agent), 'url');
             $agent->settings = array_merge((array) ($agent->settings ?? []), ['links' => $links, 'links_edited' => true]);
         }
         if (array_key_exists('daily_minutes', $data)) {
@@ -299,6 +304,10 @@ class AgentController extends Controller
         $agent->save();
         if ($setupChanged) {
             $this->reviewAgain($agent);
+        }
+        if ($linksChanged) {
+            // New links are read in the background; the card shows them being read.
+            AgentLinkReads::refresh($agent);
         }
 
         $widget = $agent->mainWidget();
@@ -497,6 +506,8 @@ class AgentController extends Controller
             'knowledge' => trim($written['knowledge']) !== '' ? $written['knowledge'] : trim($notes),
             'choices' => array_map(fn ($q) => ['question' => $q['question'], 'options' => $q['options'], 'answer' => $q['options'][$q['recommended']] ?? $q['options'][0]], $written['questions']),
         ])->save();
+        // The links found on the website: their newest posts are read in the background.
+        AgentLinkReads::refresh($agent);
 
         return [
             'ok' => true,
@@ -533,15 +544,26 @@ class AgentController extends Controller
             return response()->json(['message' => __('agents.links_unreachable')], 422);
         }
         $site = AgentLinks::clean($agent->website_url, $agent->website_url);
-        [$links, $added] = AgentLinks::merge(AgentLinks::of($agent), array_merge($read['links'] ?? [], $site !== null ? [$site] : []));
+        // The pages the owner added for the agent to read stay with the accounts found.
+        $kept = array_map(fn (array $l): array => ['network' => $l['network'], 'url' => $l['url']], AgentLinks::all($agent));
+        [$links, $added] = AgentLinks::merge($kept, array_merge($read['links'] ?? [], $site !== null ? [$site] : []));
         // The page's own first search (auto) is not the owner's choice: the list still follows a new website.
         $edited = $request->boolean('auto') ? (bool) $agent->setting('links_edited') : true;
         $agent->settings = array_merge((array) ($agent->settings ?? []), ['links' => $links, 'links_edited' => $edited, 'links_found_at' => now()->toIso8601String()]);
         $agent->save();
         $this->reviewAgain($agent);
+        AgentLinkReads::refresh($agent);
 
-        return response()->json(['links' => AgentLinks::shown($links), 'added' => $added,
+        return response()->json(['links' => AgentLinkReads::rows($agent), 'added' => $added,
             'message' => trans_choice('agents.links_found', $added, ['count' => $added])]);
+    }
+
+    /** Knowledge → Social media links, checked again while new links are being read. */
+    public function linkReads(Request $request, Agent $agent): JsonResponse
+    {
+        $this->own($request, $agent);
+
+        return response()->json(['links' => AgentLinkReads::rows($agent)]);
     }
 
     /** A live agent whose setup changed is checked again in the background (paused if it now deceives or harms callers). */
@@ -569,7 +591,8 @@ class AgentController extends Controller
             'updates' => (string) $agent->setting('updates', ''),
             'updates_at' => self::updatesAt($agent),
             // Knowledge → Social media links: as kept, and whether the website was ever looked at for them.
-            'links' => AgentLinks::shown(AgentLinks::of($agent)),
+            // Each with what the agent read from it (AgentLinkReads).
+            'links' => AgentLinkReads::rows($agent),
             'links_looked' => $agent->setting('links_found_at') !== null || (bool) $agent->setting('links_edited'),
             'has_website' => (bool) $agent->website_url,
             'choices' => $agent->choices ?? [],
@@ -577,6 +600,7 @@ class AgentController extends Controller
                 'show' => route('voice-agents.show', $agent),
                 'update' => route('voice-agents.update', $agent),
                 'links' => route('voice-agents.links', $agent),
+                'link_reads' => route('voice-agents.links.reads', $agent),
                 'test' => route('voice-agents.test-call', $agent),
                 'correct' => route('voice-agents.correct', $agent),
                 'write' => route('voice-agents.write', $agent),

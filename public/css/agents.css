@@ -948,6 +948,14 @@ html[dir="rtl"] .ag-stepper code.is-path::after { right: auto; left: -.95em; tra
 .ag-kb-links .ag-sites-empty .ag-site-name small { font-size: .9rem; }
 .ag-kb-links-find { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .ag-kb-links-find [data-ag-links-note]:empty { display: none; }
+/* What the agent read from each link (AgentLinkReads), under it; a page of another website is only read. */
+.ag-kb-links .ag-site-name .ag-link-read { display: block; white-space: normal; overflow-wrap: anywhere; }
+.ag-kb-links .ag-link-read:is(.is-reading, .is-failed)::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-inline-end: .45rem; border-radius: 50%; background: var(--accent-text, var(--a)); vertical-align: .08em; }
+.ag-kb-links .ag-link-read.is-reading::before { animation: ag-link-pulse 1.3s ease-in-out infinite; }
+.ag-kb-links .ag-link-read.is-failed::before { background: var(--ag-bad); }
+.ag-link-tag { display: inline-block; margin-inline-end: .5rem; padding: 0 .45rem; border: 1px solid var(--line); border-radius: 6px; color: var(--text); font-size: .76rem; font-style: normal; font-weight: 700; line-height: 1.6; vertical-align: .06em; cursor: help; }
+@keyframes ag-link-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ag-kb-links .ag-link-read.is-reading::before { animation: none; } }
 @media (max-width: 560px) { .ag-kb-links-head { padding-inline: 1rem; flex-direction: column; gap: .6rem; } }
 .ag-kb-tips { display: grid; gap: .9rem; padding: 1.3rem; position: sticky; top: 132px; }
 .ag-kb-tips h3 { font-size: 1rem; font-weight: 800; }

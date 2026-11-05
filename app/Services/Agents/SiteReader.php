@@ -192,6 +192,25 @@ class SiteReader
     /** @return array{url: string, title: string, text: string, html: string}|null */
     protected function fetch(string $url): ?array
     {
+        $page = $this->download($url);
+        if ($page === null) {
+            return null;
+        }
+        $html = $page['body'];
+
+        return ['url' => $page['url'], 'title' => self::title($html), 'text' => self::textOf($html), 'html' => $html];
+    }
+
+    /**
+     * A public page or feed (also for LinkReader): every hop checked and pinned to the address
+     * that was checked, at most $maxBytes of it. Null when it may not be read, does not answer,
+     * or is not one of $types (parts of its Content-Type: html, xml, json).
+     *
+     * @param  list<string>  $types
+     * @return array{url: string, type: string, body: string}|null
+     */
+    public function download(string $url, array $types = ['html'], string $accept = 'text/html,application/xhtml+xml', string $language = 'ar,en;q=0.8', int $maxBytes = self::MAX_BYTES): ?array
+    {
         for ($hop = 0; $hop < 4; $hop++) {
             $host = (string) parse_url($url, PHP_URL_HOST);
             $address = $this->addressFor($host);
@@ -201,8 +220,8 @@ class SiteReader
             try {
                 $response = Http::withHeaders([
                     'User-Agent' => 'ListenAgentReader/1.0 (+https://listenai.studio)',
-                    'Accept' => 'text/html,application/xhtml+xml',
-                    'Accept-Language' => 'ar,en;q=0.8',
+                    'Accept' => $accept,
+                    'Accept-Language' => $language,
                 ])->withOptions(self::options($url, $address))
                     ->timeout(12)->connectTimeout(6)->get($url);
             } catch (\Throwable) {
@@ -220,12 +239,12 @@ class SiteReader
 
                 continue;
             }
-            if (! $response->successful() || ! str_contains(strtolower($response->header('Content-Type')), 'html')) {
+            $type = strtolower($response->header('Content-Type'));
+            if (! $response->successful() || ! Str::contains($type, $types)) {
                 return null;
             }
-            $html = substr($response->body(), 0, self::MAX_BYTES);
 
-            return ['url' => $url, 'title' => self::title($html), 'text' => self::textOf($html), 'html' => $html];
+            return ['url' => $url, 'type' => $type, 'body' => substr($response->body(), 0, $maxBytes)];
         }
 
         return null;

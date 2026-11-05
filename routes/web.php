@@ -417,6 +417,7 @@ Route::group([
             Route::post('/{agent}/correct', [\App\Http\Controllers\AgentController::class, 'correct'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1')->name('voice-agents.correct');
             // Knowledge → Social media links: read the website again for its accounts.
             Route::post('/{agent}/links', [\App\Http\Controllers\AgentController::class, 'findLinks'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:6,1,agent-links')->name('voice-agents.links');
+            Route::get('/{agent}/links', [\App\Http\Controllers\AgentController::class, 'linkReads'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:120,1')->name('voice-agents.links.reads');
             Route::post('/{agent}/test-call', [\App\Http\Controllers\AgentController::class, 'testCall'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:10,1,agent-test')->name('voice-agents.test-call');
             Route::delete('/{agent}', [\App\Http\Controllers\AgentController::class, 'destroy'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.destroy');
             // What the agent knows from files: upload, list, see what it learned, read again, remove.

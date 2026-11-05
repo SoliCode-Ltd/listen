@@ -267,7 +267,7 @@
           </form>
           {{-- Social media links: the business's own accounts and website (found on its website or added
                here), which the agent writes in the call's chat when a caller asks (AgentLinks). --}}
-          @php $agentLinks = \App\Support\Agents\AgentLinks::shown(\App\Support\Agents\AgentLinks::of($agent)); $linksMax = \App\Support\Agents\AgentLinks::MAX; @endphp
+          @php $agentLinks = \App\Support\Agents\AgentLinkReads::rows($agent); $linksMax = \App\Support\Agents\AgentLinks::MAX; @endphp
           <section class="ag-card ag-sites ag-kb-links" data-ag-links data-max="{{ $linksMax }}" aria-labelledby="ag-links-title">
             <div class="ag-kb-links-head">
               <div class="ag-kb-head">
@@ -278,11 +278,15 @@
             </div>
             <ul class="ag-sites-list" aria-labelledby="ag-links-title" data-ag-links-list>
               @foreach($agentLinks as $link)
-                <li data-url="{{ $link['url'] }}">
+                <li data-url="{{ $link['url'] }}" data-state="{{ $link['read']['state'] ?? '' }}">
                   <span class="ag-site-mark" aria-hidden="true">{{ mb_strtoupper(mb_substr($link['label'], 0, 1)) }}</span>
                   <span class="ag-site-name">
                     <bdi dir="ltr"><a href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer nofollow">{{ $link['label'] }}</a></bdi>
                     @if($link['network'] === 'website')<small>{{ __('agents.links_your_site') }}</small>@endif
+                    {{-- What the agent read from it (AgentLinkReads); a page of another website is only read. --}}
+                    @if($link['read'] || ! $link['shown'])
+                      <small class="ag-link-read is-{{ $link['read']['state'] ?? 'none' }}" data-ag-link-read>@unless($link['shown'])<i class="ag-link-tag" title="{{ __('agents.links_read_only_hint') }}">{{ __('agents.links_read_only') }}</i>@endunless{{ $link['read']['text'] ?? '' }}</small>
+                    @endif
                   </span>
                   <button type="button" class="ag-sites-remove" data-ag-link-remove aria-label="{{ __('agents.links_remove', ['link' => $link['label']]) }}">{{ __('agents.live_site_remove_short') }}</button>
                 </li>
@@ -480,7 +484,7 @@
           'show' => route('voice-agents.show', $agent), 'update' => route('voice-agents.update', $agent),
           'test' => route('voice-agents.test-call', $agent), 'correct' => route('voice-agents.correct', $agent),
           'write' => route('voice-agents.write', $agent), 'edit' => route('voice-agents.edit', $agent),
-          'links' => route('voice-agents.links', $agent),
+          'links' => route('voice-agents.links', $agent), 'link_reads' => route('voice-agents.links.reads', $agent),
         ],
       ],
       'regions' => collect(\App\Support\ArabicDialects::ALL)->map(fn ($d) => $d['region'])->all(),
@@ -525,7 +529,7 @@
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
         'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'),
         'site_remove' => __('agents.live_site_remove'), 'site_remove_short' => __('agents.live_site_remove_short'), 'site_invalid' => __('agents.live_site_invalid'), 'site_exists' => __('agents.live_site_exists'), 'site_max' => __('agents.live_site_max'),
-        'links_remove' => __('agents.links_remove'), 'links_saved' => __('agents.links_saved'), 'links_finding' => __('agents.links_finding'), 'links_your_site' => __('agents.links_your_site'),
+        'links_remove' => __('agents.links_remove'), 'links_saved' => __('agents.links_saved'), 'links_finding' => __('agents.links_finding'), 'links_your_site' => __('agents.links_your_site'), 'links_read_only' => __('agents.links_read_only'), 'links_read_only_hint' => __('agents.links_read_only_hint'),
         'play' => __('agents.voice_play'), 'pause' => __('agents.voice_pause'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
         'status' => __('agents.status'),
         'files' => __('agents.files'),

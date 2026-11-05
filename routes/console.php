@@ -52,3 +52,6 @@ Schedule::command('voice-design:prune')->everyThirtyMinutes()->withoutOverlappin
 
 // Listen Agents: calls whose browser went quiet are charged up to their last sign of life.
 Schedule::command('agents:settle-calls')->everyMinute()->withoutOverlapping(5);
+
+// Listen Agents: the newest posts on agents' links read again every few hours (AgentLinkReads).
+Schedule::command('agents:read-links')->hourly()->withoutOverlapping(30);
