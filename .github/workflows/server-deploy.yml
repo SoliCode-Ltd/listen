@@ -204,6 +204,11 @@ on:
         description: "plan-price and plan-price-apply only: the plan and its monthly price in dollars (studio_max=120)"
         type: string
         default: ""
+      agent_voice:
+        description: "house-agent only: the voice Listen's agents speak with (studio: the studio voice, the live voice kept as the fallback)"
+        type: choice
+        options: [keep, studio, live]
+        default: keep
 
 permissions:
   contents: read
@@ -248,6 +253,7 @@ jobs:
           DESIGN: ${{ inputs.design }}
           RT_ONLY: ${{ inputs.calls }}
           PLAN_PRICE: ${{ inputs.price }}
+          AGENT_VOICE: ${{ inputs.agent_voice }}
           # What is deployed, as a variable: the script below must hold no ${{ }}
           # of its own, or GitHub reads all of it as one expression (21,000 at most).
           DEPLOY_REF: ${{ inputs.target == 'live' && 'main' || github.ref_name }}
@@ -303,7 +309,9 @@ jobs:
           fi
           if [ "$MODE" = house-agent ] || [ "$MODE" = house-agent-off ]; then
             # Listen's own agents on its public pages (php artisan agents:house), or off them.
-            $S "$FIND; php artisan agents:house $([ "$MODE" = house-agent-off ] && echo --off)"
+            VOICE_OPT=""
+            if [ "$MODE" = house-agent ] && { [ "$AGENT_VOICE" = studio ] || [ "$AGENT_VOICE" = live ]; }; then VOICE_OPT="--voice=$AGENT_VOICE"; fi
+            $S "$FIND; php artisan agents:house $([ "$MODE" = house-agent-off ] && echo --off) $VOICE_OPT"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi

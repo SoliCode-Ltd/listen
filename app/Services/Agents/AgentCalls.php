@@ -679,7 +679,9 @@ class AgentCalls
         $this->appendTurns($conversation, $turns);
         if ($usage !== null && $conversation->usage === null) {
             $conversation->usage = $usage;
-            $conversation->cost_usd = self::costOf($usage);
+            // With the studio voice, what it cost to speak the agent's words comes on top (AgentSpeech).
+            $spoken = \App\Support\Agents\AgentSpeech::spent($conversation);
+            $conversation->cost_usd = round(self::costOf($usage) + $spoken, 5);
         }
         // Kept before settling, which reads the call afresh under its lock.
         $conversation->save();

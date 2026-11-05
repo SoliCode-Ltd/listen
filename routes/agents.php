@@ -23,6 +23,8 @@ Route::post('/calls/{conversation}/tool', [AgentCallController::class, 'tool'])-
 // A caller's line written again from their own voice (agent-call.js, when the call offers it).
 Route::post('/calls/{conversation}/transcribe', [AgentCallController::class, 'transcribe'])->where('conversation', 'cnv_[a-z0-9]{24}')->middleware('throttle:90,1')->name('agent-api.transcribe');
 Route::post('/calls/{conversation}/agent-line', [AgentCallController::class, 'agentLine'])->where('conversation', 'cnv_[a-z0-9]{24}')->middleware('throttle:90,1,agent-line')->name('agent-api.agent-line');
+// The studio voice saying a phrase of the agent's answer, streamed (about 4 phrases a turn).
+Route::post('/calls/{conversation}/speak', [AgentCallController::class, 'speak'])->where('conversation', 'cnv_[a-z0-9]{24}')->middleware('throttle:150,1,agent-speak')->name('agent-api.speak');
 Route::post('/calls/{conversation}/end', [AgentCallController::class, 'end'])->where('conversation', 'cnv_[a-z0-9]{24}')->middleware('throttle:60,1')->name('agent-api.end');
 // "Report this agent" on a link page (one report per network a day, AgentReportController).
 Route::post('/reports', [AgentReportController::class, 'store'])->middleware('throttle:10,1')->name('agent-api.report');

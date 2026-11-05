@@ -18,7 +18,8 @@ use Illuminate\Console\Command;
  */
 class HouseAgentCommand extends Command
 {
-    protected $signature = 'agents:house {--owner= : the admin who owns them (email); the first admin otherwise} {--off : take them off the pages}';
+    protected $signature = 'agents:house {--owner= : the admin who owns them (email); the first admin otherwise} {--off : take them off the pages}
+        {--voice= : studio (the studio voice speaks their words, the live voice kept as the fallback) or live; unchanged when not given}';
 
     protected $description = 'Set up (or update) Listen\'s own voice agents for its public pages';
 
@@ -40,6 +41,12 @@ class HouseAgentCommand extends Command
             return self::FAILURE;
         }
 
+        $engine = $this->option('voice');
+        if ($engine !== null && ! in_array($engine, ['studio', 'live'], true)) {
+            $this->error('--voice is studio or live.');
+
+            return self::FAILURE;
+        }
         $saved = json_decode((string) SiteSetting::get(HouseAgent::SETTING, ''), true) ?: [];
         $out = [];
         foreach (['ar', 'en'] as $language) {
@@ -71,7 +78,7 @@ class HouseAgentCommand extends Command
                 // Paused by the owner, it stays paused.
                 'status' => $existing && $agent->status === Agent::PAUSED ? Agent::PAUSED : Agent::LIVE,
                 'max_call_seconds' => HouseAgent::MAX_SECONDS,
-                'settings' => array_merge($agent->settings ?? [], ['house' => $language]),
+                'settings' => array_merge($agent->settings ?? [], ['house' => $language], $engine !== null ? ['voice_engine' => $engine] : []),
             ]);
             if (! $ownWords) {
                 HouseAgent::applyTexts($agent, $voice);
@@ -91,7 +98,8 @@ class HouseAgentCommand extends Command
             ])->save();
 
             $out[$language] = ['agent' => $agent->public_id, 'key' => $widget->public_key, 'slug' => $widget->slug];
-            $this->line(sprintf('%s: %s (%s), voice %s, %d characters of knowledge', $language, $agent->public_id, $widget->slug, $voice['name'] ?? $agent->live_voice, mb_strlen((string) $agent->knowledge)));
+            $this->line(sprintf('%s: %s (%s), voice %s (%s), %d characters of knowledge', $language, $agent->public_id, $widget->slug, $voice['name'] ?? $agent->live_voice,
+                $agent->setting('voice_engine') === 'studio' ? 'studio voice' : 'live voice', mb_strlen((string) $agent->knowledge)));
         }
 
         SiteSetting::set(HouseAgent::SETTING, json_encode($out), 'agents');

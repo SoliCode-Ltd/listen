@@ -7,6 +7,7 @@ use App\Models\AgentWidget;
 use App\Services\Agents\AgentCalls;
 use App\Services\Agents\GeminiClient;
 use App\Support\Agents\AgentAccess;
+use App\Support\Agents\AgentSpeech;
 use App\Support\Agents\AgentVoices;
 use App\Support\Agents\CallBackground;
 use App\Support\Agents\CallerIdentity;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Listen Agents, the callers' side: the agent's link page (/talk/{slug}), the
@@ -377,6 +379,54 @@ class AgentCallController extends Controller
         return response()->json(['text' => $this->calls->writeAgentLine($c, (int) ($in['n'] ?? 0), Str::limit((string) ($in['text'] ?? ''), 600, ''), ! empty($in['wrong']))]);
     }
 
+    /**
+     * The studio voice saying one phrase of the agent's answer (AgentSpeech), for an agent that
+     * speaks with it: 16-bit mono PCM at 24 kHz, streamed as the speech model makes it. Only while
+     * the call is live, and only as much as the call may say. Anything else: an error, and the call
+     * plays the live voice instead.
+     */
+    public function speak(Request $request, string $conversation): JsonResponse|StreamedResponse
+    {
+        $in = $this->body($request);
+        $c = $this->calls->findByKey($conversation, (string) ($in['call_key'] ?? ''));
+        if (! $c || ! $c->isLive() || ! AgentSpeech::enabled($c->agent)) {
+            return $this->error('not_found', 404);
+        }
+        $text = AgentSpeech::clean((string) ($in['text'] ?? ''));
+        if ($text === '') {
+            return $this->error('empty', 422);
+        }
+        if (! AgentSpeech::reserve($c, $text)) {
+            return $this->error('limit', 429);
+        }
+        $body = AgentSpeech::open($c->agent, $text);
+        if ($body === null) {
+            return $this->error('voice_unavailable', 503);
+        }
+
+        // Each piece is sent the moment it comes (PHP's own buffer too; a test reads the whole answer).
+        $flush = app()->runningUnitTests() ? null : function (): void {
+            if (ob_get_level() > 0) {
+                @ob_flush();
+            }
+            flush();
+        };
+
+        return response()->stream(function () use ($body, $c, $flush) {
+            $usage = AgentSpeech::pump($body, function (string $pcm) use ($flush): void {
+                echo $pcm;
+                $flush && $flush();
+            });
+            AgentSpeech::record($c, $usage);
+        }, 200, [
+            'Content-Type' => 'application/octet-stream',
+            'Cache-Control' => 'no-store',
+            // Each piece goes straight on to the caller: no server in between holds it back.
+            'X-Accel-Buffering' => 'no',
+            'Content-Encoding' => 'identity',
+        ]);
+    }
+
     public function end(Request $request, string $conversation): JsonResponse
     {
         $in = $this->body($request);
@@ -419,6 +469,8 @@ class AgentCallController extends Controller
             // What the caller hears behind the agent's voice (Design → Call sound): a quiet office
             // by default, or nothing. A test call or a demo follows the agent's first call button.
             'background' => CallBackground::for($c->agent_widget_id ? $c->widget : $agent->widgets()->oldest('id')->first()),
+            // The studio voice speaks what the agent says (AgentSpeech), with the live voice kept as the fallback.
+            'voice' => AgentSpeech::enabled($agent) ? 'studio' : 'live',
         ];
     }
 
