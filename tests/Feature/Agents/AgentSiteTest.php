@@ -280,6 +280,10 @@ class AgentSiteTest extends TestCase
         $this->assertStringContainsString('data-ag-site data-state="reading"', $html);
         $this->assertStringContainsString(e(__('agents.site.reading')), $html);
         $this->assertLessThan(strpos($html, 'data-ag-links '), strpos($html, 'data-ag-site '));
+        // The page gives its script the address "Read the website again" calls: without it the
+        // button was never wired up and did nothing on live.
+        $script = substr($html, (int) strpos($html, 'window.LISTEN_AGENTS'));
+        $this->assertMatchesRegularExpression('#agents\\W+'.$agent->public_id.'\\W+site\\b#', $script);
 
         AgentSite::read($agent, new class extends SiteReader
         {
