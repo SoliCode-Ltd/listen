@@ -764,7 +764,8 @@ class AgentCalls
             return null;
         }
         $tenths = (int) ceil(strlen($pcm) / 2 / $rate * 10);
-        if ($tenths < 3 || $tenths > 310) {
+        // On faint noise the model made a word up (the staging check): no speech, nothing to write.
+        if ($tenths < 3 || $tenths > 310 || ! self::voiced($pcm, $rate)) {
             return null;
         }
         $usedKey = 'agent-heard-tenths:'.$conversation->id;
@@ -845,6 +846,33 @@ class AgentCalls
         }
 
         return $text;
+    }
+
+    /**
+     * Whether a recording (16-bit mono PCM) holds at least 0.3 s of speech-loud sound, counted the
+     * way agent-call.js counts it before sending a line (0.1 s pieces louder than 450 RMS).
+     */
+    public static function voiced(string $pcm, int $rate): bool
+    {
+        $piece = max(1, intdiv($rate, 10)) * 2;
+        $loud = 0;
+        for ($at = 0, $length = strlen($pcm); $at + $piece <= $length; $at += $piece) {
+            $sum = 0;
+            $count = 0;
+            foreach (unpack('v*', substr($pcm, $at, $piece)) ?: [] as $i => $value) {
+                if ($i % 4 !== 1) {
+                    continue;
+                }
+                $value = $value >= 32768 ? $value - 65536 : $value;
+                $sum += $value * $value;
+                $count++;
+            }
+            if ($count > 0 && sqrt($sum / $count) > 450 && ++$loud >= 3) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** 16-bit mono PCM as a WAV file. */

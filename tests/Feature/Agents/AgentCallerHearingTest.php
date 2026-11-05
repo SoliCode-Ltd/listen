@@ -153,6 +153,24 @@ class AgentCallerHearingTest extends TestCase
         Http::assertSentCount(2); // the live key and the one line written
     }
 
+    public function test_a_line_with_no_speech_in_it_is_never_sent_to_the_model(): void
+    {
+        [$id, $key] = $this->startCall($this->agent());
+        $this->travel(30)->seconds();
+        // Two seconds of faint noise: on such a line the model made a word up.
+        mt_srand(7);
+        $noise = '';
+        for ($i = 0; $i < 32000; $i++) {
+            $noise .= pack('v', mt_rand(-60, 60) & 0xFFFF);
+        }
+        $this->assertFalse(\App\Services\Agents\AgentCalls::voiced($noise, 16000));
+        $this->assertTrue(\App\Services\Agents\AgentCalls::voiced(base64_decode($this->voice(1)), 16000));
+
+        $this->callApi("/calls/{$id}/transcribe", ['call_key' => $key, 'n' => 1, 'audio' => base64_encode($noise), 'heard' => 'unbelievable'])
+            ->assertOk()->assertJsonPath('text', null);
+        Http::assertNotSent(fn (Request $r) => str_ends_with($r->url(), ':generateContent'));
+    }
+
     public function test_a_call_that_ended_minutes_ago_writes_nothing_more(): void
     {
         [$id, $key] = $this->startCall($this->agent());
