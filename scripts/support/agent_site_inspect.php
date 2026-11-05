@@ -42,7 +42,7 @@ $line = static function (string $label, $value): void {
     echo '  '.str_pad($label, 44).(is_bool($value) ? ($value ? 'yes' : 'no') : (string) $value).PHP_EOL;
 };
 // A visitor's address never leaves the server.
-$clean = static fn (string $s): string => (string) preg_replace(['/\b\d{1,3}(?:\.\d{1,3}){3}\b/', '/\b(?:[0-9a-f]{1,4}:){3,7}[0-9a-f]{1,4}\b/i', '/agt_[a-z0-9]{24}/'], ['[ip]', '[ip]', 'agt_…'], $s);
+$clean = static fn (string $s): string => (string) preg_replace(['/\b\d{1,3}(?:\.\d{1,3}){3}\b/', '/\b(?=[0-9a-f:]*(?:[a-f]|::))(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}\b/i', '/agt_[a-z0-9]{24}/'], ['[ip]', '[ip]', 'agt_…'], $s);
 
 echo "== Server\n";
 $line('now', now()->toIso8601String());
@@ -122,21 +122,43 @@ $line('matching lines', $found);
 echo "\n== Web server: the owner's website requests today\n";
 $dirs = array_filter([dirname($root).'/logs', $root.'/../logs', getenv('HOME').'/logs']);
 $seen = 0;
+$byFrom = $methods = [];
+$shown = [];
 foreach (array_unique(array_map('realpath', array_filter($dirs, 'is_dir'))) as $dir) {
     foreach (glob($dir.'/*access*.log') ?: [] as $log) {
         $tail = (string) shell_exec('tail -n 40000 '.escapeshellarg($log).' 2>/dev/null');
         foreach (explode("\n", $tail) as $row) {
-            if (! preg_match('#"(POST|GET) [^"]*/agents/agt_[a-z0-9]{24}/(links|site)\b[^"]*"\s+(\d{3})#', $row, $m)) {
+            // The owner's agent page and its requests: when, what, the answer, and from which address
+            // (a page opened on www. sends its requests to the main address, another site to the browser).
+            if (! preg_match('#\[(\d\d/\w{3}/\d{4}:\d\d:\d\d:\d\d)[^\]]*\]\s+"(\w+) ([^" ]*/agents/agt_[a-z0-9]{24}(?:/[a-z-]+)?)[^"]*"\s+(\d{3})(?:\s+\S+\s+"([^"]*)")?#', $row, $m)) {
                 continue;
             }
             $seen++;
-            if ($seen <= 30) {
-                echo '  '.basename($log).': '.$clean(mb_substr(trim($row), 0, 260))."\n";
+            $from = (string) (parse_url($m[5] ?? '', PHP_URL_HOST) ?: '-');
+            $byFrom[$from] = ($byFrom[$from] ?? 0) + 1;
+            $methods[$m[2]] = ($methods[$m[2]] ?? 0) + 1;
+            if ($seen <= 40 || ! in_array($m[2], ['GET'], true)) {
+                $shown[] = '  '.str_pad(basename($log, '.log'), 22).' '.$m[1].' '.str_pad($m[2], 7).' '.$clean($m[3]).' -> '.$m[4].'  from '.$from;
             }
         }
     }
 }
+foreach (array_slice($shown, -60) as $row) {
+    echo mb_substr($row, 0, 200)."\n";
+}
 $line('requests seen', $seen);
+$line('by method', json_encode($methods));
+$line('by the page they came from', json_encode($byFrom));
+echo "\n== The site's addresses\n";
+$line('APP_URL', (string) config('app.url'));
+$line('session cookie domain', (string) (config('session.domain') ?: '(this address only)'));
+$www = 0;
+foreach (array_unique(array_map('realpath', array_filter($dirs, 'is_dir'))) as $dir) {
+    foreach (glob($dir.'/*access*.log') ?: [] as $log) {
+        $www += (int) trim((string) shell_exec('tail -n 40000 '.escapeshellarg($log).' 2>/dev/null | grep -c "https://www\\." || true'));
+    }
+}
+$line('recent requests from a www. page', $www);
 
 echo "\n== The reader on this server, timed\n";
 $reader = app(SiteReader::class);
