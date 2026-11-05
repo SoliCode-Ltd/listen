@@ -93,14 +93,20 @@ foreach ($calls as $c) {
     $classes = [];
     $wrong = [];
     $callerLast = $own;
+    $callerSaid = null;
     foreach ($lines as $i => $e) {
         $said = (string) ($e['heard'] ?? $e['text'] ?? '');
         $k = $tongue($said);
         if (($e['role'] ?? '') === 'caller') {
+            // The caller's line: its language as the live transcription heard it, and (after a
+            // slash) as it was written again from their voice, when it was. Never their words.
+            $live = $tongue((string) ($e['heard'] ?? $e['text'] ?? ''));
+            $again = isset($e['heard']) ? $tongue((string) ($e['text'] ?? '')) : null;
             if (in_array($k, ['ar', 'en'], true)) {
                 $callerLast = $k;
             }
-            $classes[] = 'c';
+            $callerSaid = $live.($again !== null ? '/'.$again : '');
+            $classes[] = ['ar' => 'c', 'short' => 's', 'latin' => 'l', 'en' => 'e', 'other' => 'x'][$live];
 
             continue;
         }
@@ -109,7 +115,7 @@ foreach ($calls as $c) {
         $bad = $k === 'other' || ($k === 'en' && $own === 'ar' && $callerLast !== 'en') || ($k === 'ar' && $own === 'en' && $callerLast !== 'ar');
         if ($bad) {
             $at = $m > 1 ? (int) round($seconds * $i / ($m - 1)) : 0;
-            $wrong[] = sprintf('line %d of %d (~%ds in, %s): %s', $i + 1, $m, $at, $k, implode(' ', array_slice(preg_split('/\s+/u', trim($said)), 0, 6)));
+            $wrong[] = sprintf('line %d of %d (~%ds in, %s, after a caller line in %s): %s', $i + 1, $m, $at, $k, $callerSaid ?? '-', implode(' ', array_slice(preg_split('/\s+/u', trim($said)), 0, 6)));
             $byMinute[intdiv($at, 60)] = ($byMinute[intdiv($at, 60)] ?? 0) + 1;
             $total['wrong_lines']++;
         }
@@ -130,7 +136,7 @@ foreach ($calls as $c) {
     }
 }
 
-echo PHP_EOL.'  (A Arabic, a short, L Latin letters, E English, X another language, c caller)'.PHP_EOL;
+echo PHP_EOL.'  (agent: A Arabic, a short, L Latin letters, E English, X another language; caller as heard live: c Arabic, s short, l Latin letters, e English, x another language)'.PHP_EOL;
 printf("  calls %d, of them 3 minutes or longer %d\n", $total['calls'], $total['long']);
 printf("  calls with a line in a wrong language %d (3 minutes or longer: %d)\n", $total['wrong'], $total['wrong_long']);
 printf("  agent lines %d, in a wrong language %d\n", $total['lines'], $total['wrong_lines']);
