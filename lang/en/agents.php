@@ -331,6 +331,7 @@ return [
         'page' => 'The agent read this page.',
         'updated' => 'Updated :when.',
         'closed' => 'The agent can\'t read it: this site shows its posts only to people who sign in.',
+        'empty_page' => 'The agent found no words it can read on this page.',
         'failed' => 'Couldn\'t be read just now. The agent tries again every few hours.',
     ],
     'knowledge_notes_title' => 'Your notes',

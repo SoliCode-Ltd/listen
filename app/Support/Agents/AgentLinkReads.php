@@ -21,6 +21,12 @@ final class AgentLinkReads
 {
     public const EVERY_HOURS = 6;
 
+    /** A link not read the last time (a site that was busy, X's limit for each server) is tried again sooner. */
+    public const FAILED_AGAIN_MINUTES = 60;
+
+    /** Reasons that do not pass in an hour (a page with no words, a private channel): read on the usual turn. */
+    public const LASTING = ['empty', 'invalid', 'closed'];
+
     /** All the links' posts and pages in the agent's instructions, at most. */
     public const MAX_CHARS = 6_000;
 
@@ -79,8 +85,8 @@ final class AgentLinkReads
     }
 
     /**
-     * Reads the agent's links: all of them, or ($due) those waiting or not tried for EVERY_HOURS
-     * hours. Stops at $until and says so (true: some are left for another run).
+     * Reads the agent's links: all of them, or ($due) those that are due (isDue). Stops at $until
+     * and says so (true: some are left for another run).
      */
     public static function read(Agent $agent, LinkReader $reader, bool $due = false, ?Carbon $until = null): bool
     {
@@ -91,8 +97,7 @@ final class AgentLinkReads
             if ($link === null) {
                 continue;
             }
-            if ($due && $row->status !== AgentSource::PENDING && $row->updated_at !== null
-                && $row->updated_at->gt(now()->subHours(self::EVERY_HOURS)->addMinutes(10))) {
+            if ($due && ! self::isDue($row)) {
                 continue;
             }
             if ($until !== null && now()->gte($until)) {
@@ -113,6 +118,21 @@ final class AgentLinkReads
         }
 
         return false;
+    }
+
+    /**
+     * Whether a link should be read again: waiting, not read the last time and tried an hour ago,
+     * or tried EVERY_HOURS hours ago (a few minutes early, so the hourly run never just misses it).
+     */
+    public static function isDue(AgentSource $row): bool
+    {
+        if ($row->status === AgentSource::PENDING || $row->updated_at === null) {
+            return true;
+        }
+        $failed = ($row->status === AgentSource::FAILED || ($row->error !== null && $row->error !== ''))
+            && ! in_array($row->error, self::LASTING, true);
+
+        return $row->updated_at->lte($failed ? now()->subMinutes(self::FAILED_AGAIN_MINUTES - 10) : now()->subHours(self::EVERY_HOURS)->addMinutes(10));
     }
 
     /**
@@ -162,7 +182,8 @@ final class AgentLinkReads
             return ['state' => 'reading', 'text' => __('agents.links_read.reading')];
         }
         if ($row->status !== AgentSource::READY) {
-            return ['state' => 'failed', 'text' => __('agents.links_read.failed')];
+            // A page with no words to read (drawn by its scripts) stays so: no "tried again" promise.
+            return ['state' => 'failed', 'text' => __($row->error === 'empty' ? 'agents.links_read.empty_page' : 'agents.links_read.failed')];
         }
         $read = (array) json_decode((string) $row->content, true);
         $when = $row->read_at ? ' '.__('agents.links_read.updated', ['when' => $row->read_at->locale(app()->getLocale())->diffForHumans()]) : '';

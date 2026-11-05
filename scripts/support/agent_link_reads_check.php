@@ -80,14 +80,10 @@ foreach ($links as $link) {
 
 echo "\n".($failed === 0 ? 'Every readable link was read.' : "{$failed} readable link(s) could not be read.")."\n";
 
-// What X answers this server, as it is: the account timeline X shows on other websites.
+// What X answers this server: it allows each server a few reads every quarter of an hour (rate limit left).
 echo "\n== X, as it answers this server ==\n";
 foreach ([
     'reader' => ['https://syndication.twitter.com/srv/timeline-profile/screen-name/SaudiMOH', 'ListenAgentReader/1.0 (+https://listenai.studio)'],
-    'browser' => ['https://syndication.twitter.com/srv/timeline-profile/screen-name/SaudiMOH', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'],
-    'cdn' => ['https://cdn.syndication.twimg.com/timeline/profile?screen_name=SaudiMOH', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'],
-    // One post, as X shows it on other websites.
-    'post' => ['https://cdn.syndication.twimg.com/tweet-result?id=1718073217384878443&lang=en&token=45xhi421t8q', 'ListenAgentReader/1.0 (+https://listenai.studio)'],
 ] as $name => [$url, $agent]) {
     try {
         $r = \Illuminate\Support\Facades\Http::withHeaders(['User-Agent' => $agent, 'Accept' => 'text/html,application/json'])->withOptions(['allow_redirects' => false])

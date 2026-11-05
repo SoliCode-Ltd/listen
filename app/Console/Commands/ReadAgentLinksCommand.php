@@ -42,10 +42,13 @@ class ReadAgentLinksCommand extends Command
                 return $sent < $limit;
             });
 
-        // Links not tried for a while, or still waiting after a run that did not finish.
+        // Links not tried for a while, not read the last time (tried again after an hour), or still
+        // waiting after a run that did not finish.
         $due = AgentSource::query()->where('kind', AgentSource::LINK)
             ->where(fn ($q) => $q->where('updated_at', '<', now()->subHours(AgentLinkReads::EVERY_HOURS))
-                ->orWhere(fn ($q) => $q->where('status', AgentSource::PENDING)->where('updated_at', '<', now()->subMinutes(15))))
+                ->orWhere(fn ($q) => $q->where('status', AgentSource::PENDING)->where('updated_at', '<', now()->subMinutes(15)))
+                ->orWhere(fn ($q) => $q->whereNotNull('error')->whereNotIn('error', AgentLinkReads::LASTING)
+                    ->where('updated_at', '<', now()->subMinutes(AgentLinkReads::FAILED_AGAIN_MINUTES - 10))))
             ->whereHas('agent', fn ($q) => $q->where('status', Agent::LIVE)->orWhere('updated_at', '>', now()->subDays(7)))
             ->orderBy('updated_at')->limit(max(0, $limit - $sent) * 10)->pluck('agent_id')->unique()->take(max(0, $limit - $sent));
         foreach ($due as $agentId) {

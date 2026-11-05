@@ -266,11 +266,16 @@ class AgentLinkReadsTest extends TestCase
         $fresh = $this->agent($owner, ['status' => Agent::LIVE, 'settings' => ['links' => [['network' => 'x', 'url' => 'https://x.com/SOS_KSA']]]]);
         $stale = $this->agent($owner, ['status' => Agent::LIVE, 'settings' => ['links' => [['network' => 'x', 'url' => 'https://x.com/Other']]]]);
         $closed = $this->agent($owner, ['status' => Agent::LIVE, 'settings' => ['links' => [['network' => 'instagram', 'url' => 'https://www.instagram.com/sos_ksa']]]]);
-        foreach ([$fresh, $stale] as $agent) {
+        // Not read an hour ago (X's limit for each server): tried again. A page with no words waits its usual turn.
+        $busy = $this->agent($owner, ['status' => Agent::LIVE, 'settings' => ['links' => [['network' => 'x', 'url' => 'https://x.com/Busy']]]]);
+        $empty = $this->agent($owner, ['status' => Agent::LIVE, 'settings' => ['links' => [['network' => 'page', 'url' => 'https://news.sos-ksa.org/app']]]]);
+        foreach ([$fresh, $stale, $busy, $empty] as $agent) {
             AgentLinkReads::prepare($agent);
             AgentSource::where('agent_id', $agent->id)->update(['status' => AgentSource::READY, 'content' => '{"kind":"posts","items":[]}', 'read_at' => now()]);
         }
         AgentSource::where('agent_id', $stale->id)->update(['updated_at' => now()->subHours(AgentLinkReads::EVERY_HOURS + 1)]);
+        AgentSource::where('agent_id', $busy->id)->update(['status' => AgentSource::FAILED, 'error' => 'unreachable', 'updated_at' => now()->subMinutes(70)]);
+        AgentSource::where('agent_id', $empty->id)->update(['status' => AgentSource::FAILED, 'error' => 'empty', 'updated_at' => now()->subMinutes(70)]);
 
         $this->artisan('agents:read-links')->assertSuccessful();
 
@@ -280,7 +285,11 @@ class AgentLinkReadsTest extends TestCase
 
             return true;
         });
-        $this->assertSame([$old->id => false, $stale->id => true], $sent);
+        ksort($sent);
+        $this->assertSame([$old->id => false, $stale->id => true, $busy->id => true], $sent);
+        $this->assertTrue(AgentLinkReads::isDue(AgentSource::where('agent_id', $busy->id)->firstOrFail()));
+        $this->assertFalse(AgentLinkReads::isDue(AgentSource::where('agent_id', $empty->id)->firstOrFail()));
+        $this->assertFalse(AgentLinkReads::isDue(AgentSource::where('agent_id', $fresh->id)->firstOrFail()));
         $this->assertSame(AgentSource::PENDING, AgentSource::where('agent_id', $old->id)->value('status'));
         $this->assertFalse(AgentSource::where('agent_id', $closed->id)->exists());
     }
@@ -303,5 +312,8 @@ class AgentLinkReadsTest extends TestCase
         // Opening it again sends nothing new.
         $this->get($this->localizedRoute('voice-agents.show', ['agent' => $agent]))->assertOk();
         Queue::assertPushed(ReadAgentLinks::class, 1);
+        // A page with no words to read says so, and promises no other try.
+        AgentSource::where('agent_id', $agent->id)->where('url', 'https://news.sos-ksa.org/events')->update(['status' => AgentSource::FAILED, 'error' => 'empty']);
+        $this->assertSame(['state' => 'failed', 'text' => __('agents.links_read.empty_page')], collect(AgentLinkReads::rows($agent->fresh()))->firstWhere('url', 'https://news.sos-ksa.org/events')['read']);
     }
 }
