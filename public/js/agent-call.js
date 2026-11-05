@@ -159,9 +159,9 @@
   // How long a caller line waits for its better writing (ms), and how loud a 0.1 s piece of the
   // microphone must be to count as speech (16-bit RMS; a quiet room under noise suppression is ~100).
   var WAIT_FIX = 3500, VOICED = 450;
-  // The agent's voice on a call, before it has said a word (RMS of its spoken 0.05 s pieces):
-  // the background starts under this, then follows the voice as it is heard.
-  var VOICE_USUAL = 0.112;
+  // The agent's voice on a call, before it has said a word (RMS of its spoken 0.05 s pieces; a real
+  // call measured -15 dBFS): the background starts under this, then follows the voice as it is heard.
+  var VOICE_USUAL = 0.178;
 
   var WORKLET = [
     'class ListenPcm extends AudioWorkletProcessor {',
@@ -497,7 +497,7 @@
     }
     function backgroundLevel() {
       var voice = voiceN ? Math.sqrt(voicePow) : VOICE_USUAL;
-      voice = Math.max(VOICE_USUAL / 2, Math.min(VOICE_USUAL * 2, voice));
+      voice = Math.max(VOICE_USUAL / 2.5, Math.min(VOICE_USUAL * 2.5, voice));
       return voice * Math.pow(10, -(+bg.under || 49) / 20) / (+bg.rms || 0.05);
     }
     function startBackground() {
