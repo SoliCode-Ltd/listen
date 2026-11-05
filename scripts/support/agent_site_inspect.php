@@ -167,6 +167,19 @@ foreach (array_unique(array_map('realpath', array_filter($dirs, 'is_dir'))) as $
         }
     }
 }
+echo "\n== The front server's log since 15:00 (agent pages)\n";
+foreach (array_unique(array_map('realpath', array_filter($dirs, 'is_dir'))) as $dir) {
+    foreach (['nginx-app.status.log', 'static_'.'*access.log'] as $pattern) {
+        foreach (glob($dir.'/'.$pattern) ?: [] as $log) {
+            $sample = (string) shell_exec('tail -n 1 '.escapeshellarg($log).' 2>/dev/null');
+            echo '  '.basename($log).' (last line): '.$clean(mb_substr(trim($sample), 0, 240))."\n";
+            $rows = (string) shell_exec('tail -n 30000 '.escapeshellarg($log).' 2>/dev/null | grep -E "agents/agt_[a-z0-9]{24}" | grep -E "05/Nov/2026:1[5-9]|2026-11-05T1[5-9]|:15:[0-9][0-9]:" | tail -n 40');
+            foreach (array_filter(explode("\n", $rows)) as $row) {
+                echo '    '.$clean(mb_substr(trim($row), 0, 240))."\n";
+            }
+        }
+    }
+}
 echo "\n== Web server log files\n";
 foreach (array_unique(array_map('realpath', array_filter($dirs, 'is_dir'))) as $dir) {
     foreach (glob($dir.'/*') ?: [] as $f) {
