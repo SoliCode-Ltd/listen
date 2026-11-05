@@ -318,6 +318,9 @@
     function render(next) {
       cfg = next || cfg;
       text = cfg.text || {};
+      // Settings a cache kept from before this sentence existed still say it, in the card's
+      // language (the same words as agents.network_error).
+      if (!text.offline) text.offline = cfg.language === 'en' ? "Couldn't connect. Check your internet connection and try again." : 'تعذّر الاتصال. تحقّق من اتصالك بالإنترنت ثم حاول مرة أخرى.';
       states = text.states || {};
       look = cfg.look || {};
       if (inline && look.style === 'bar') { var asCard = {}; for (var lk in look) asCard[lk] = look[lk]; asCard.style = 'orb'; look = asCard; }
