@@ -584,8 +584,10 @@
       var words = document.createTextNode(text);
       b.appendChild(words);
       if (extra) b.appendChild(extra);
+      // The newest line in view, gently, unless the owner scrolled up to read.
+      var follow = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
       list.appendChild(b);
-      list.scrollTop = list.scrollHeight;
+      if (follow) list.scrollTop = list.scrollHeight;
       return words;
     }
     // The business's own links the agent wrote in the chat (show_links), each opening in a new tab.
@@ -654,9 +656,14 @@
           if (t.role === 'caller') { lastAsked = t.text; lastCaller = t; t.view = bubble('caller', t.text); }
           else t.view = bubble('agent', t.text, correction(lastAsked));
         },
-        // The caller's line written again from their voice, in the agent's dialect.
+        // The caller's line written again from their voice, in the agent's dialect; an agent line
+        // that came out in Latin letters, in Arabic ones.
         onFix: function (t) {
-          if (t.view) t.view.nodeValue = t.text;
+          if (t.view) {
+            t.view.nodeValue = t.text;
+            var b = t.view.parentNode;
+            if (b && b.classList) { b.classList.remove('is-fixed'); void b.offsetWidth; b.classList.add('is-fixed'); }
+          }
           if (t === lastCaller) lastAsked = t.text;
         },
         onLinks: function (t) { t.view = linksBubble(t.links); },

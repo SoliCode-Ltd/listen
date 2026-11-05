@@ -29,6 +29,10 @@
  * written again from the caller's own voice, in the agent's dialect (POST …/transcribe). The line
  * waits a moment for it, then shows what the live transcription heard; a better line that comes
  * later replaces it (onFix(turn), the same turn object onTurn gave).
+ *
+ * The agent's words: the live transcription of its own voice sometimes writes its Arabic in Latin
+ * letters ("tfaḍḍal, kammil su'alak"). Such a line of an Arabic agent (arabic_lines) is written in
+ * Arabic letters, word for word, before it shows (POST …/agent-line), the same way (onFix).
  */
 (function () {
   'use strict';
@@ -101,6 +105,14 @@
   })();
   function plain(text) { return String(text || '').replace(/[\u2066\u2069]/g, ''); }
 
+  // An Arabic agent's line that the live transcription wrote mostly in Latin letters ("tfaḍḍal,
+  // kammil su'alak"): it is written again in Arabic ones (agent-line) before it shows.
+  function latinArabic(text) {
+    var latin = (String(text).match(/[A-Za-z\u00C0-\u024F\u1E00-\u1EFF]/g) || []).length;
+    var arabic = (String(text).match(/[\u0600-\u06FF\u0750-\u077F]/g) || []).length;
+    return latin >= 6 && latin > arabic;
+  }
+
   // How long a caller line waits for its better writing (ms), and how loud a 0.1 s piece of the
   // microphone must be to count as speech (16-bit RMS; a quiet room under noise suppression is ~100).
   var WAIT_FIX = 3500, VOICED = 450;
@@ -168,7 +180,7 @@
     // The caller's own voice since their last line (Int16 pieces of 0.1 s, each marked voiced or
     // not), for writing that line again (transcribe). What the microphone hears while the agent
     // speaks waits apart (overlap): it is the caller only when they talk over the agent.
-    var heard = [], overlap = [], callerSeq = 0, queue = [], lastSaid = '';
+    var heard = [], overlap = [], callerSeq = 0, agentSeq = 0, queue = [], lastSaid = '';
 
     function set(s) { if (state !== s) { state = s; opts.onState && opts.onState(s); } }
 
@@ -216,7 +228,31 @@
       queue.push(t);
       if (role === 'agent') lastSaid = text;
       if (role === 'caller' && info && info.transcribe && info.api) hearAgain(t, text);
+      if (role === 'agent' && info && info.arabic_lines && info.api && latinArabic(text)) writeAgain(t, text);
       drain();
+    }
+    // The agent's line in Arabic letters, word for word. It waits WAIT_FIX at most, like a caller's
+    // line; a writing that comes later still replaces it on the page and in what Listen keeps.
+    function writeAgain(t, latin) {
+      t.a = ++agentSeq;
+      t.wait = true;
+      var done = false;
+      var letGo = function () { if (t.wait) { t.wait = false; drain(); } };
+      var timer = setTimeout(letGo, WAIT_FIX);
+      post(info.api + '/agent-line', { call_key: info.call_key, n: t.a, text: latin }).then(function (r) {
+        if (done) return;
+        done = true;
+        var fixed = r && typeof r.text === 'string' ? spoken(r.text).trim() : '';
+        if (fixed && !latinArabic(fixed)) {
+          t.text = isolate(fixed);
+          t.heard = latin;
+          lastSaid = fixed;
+          if (t.kept) { t.kept.text = fixed; t.kept.heard = latin; }
+          if (t.shown && opts.onFix) opts.onFix(t);
+        }
+        clearTimeout(timer);
+        letGo();
+      }, function () { clearTimeout(timer); letGo(); });
     }
     // The lines in their order: a caller line waiting for its better writing holds the ones after it.
     function drain() {
@@ -231,6 +267,7 @@
         }
         t.kept = { role: t.role, text: plain(t.text) };
         if (t.n) t.kept.n = t.n;
+        if (t.a) t.kept.a = t.a;
         if (t.heard) t.kept.heard = t.heard;
         pending.push(t.kept);
         opts.onTurn && opts.onTurn(t);

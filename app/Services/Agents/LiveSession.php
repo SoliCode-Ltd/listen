@@ -102,7 +102,7 @@ final class LiveSession
         if ($agent && \App\Support\Agents\AgentLookup::available($agent)) {
             $tools[] = [
                 'name' => 'look_up',
-                'description' => 'Search all the pages of the business\'s website for what the caller asked when your instructions do not answer it (a person\'s name or role, a fee, a date, an event, a service, a rule). Use it before saying you do not have the information.',
+                'description' => 'Search all the pages and PDF files of the business\'s website for what the caller asked when your instructions do not answer it (a person\'s name or role, a fee, a date, an event, a service, a rule). Use it before saying you do not have the information.',
                 'parameters' => [
                     'type' => 'OBJECT',
                     'properties' => [

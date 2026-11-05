@@ -30,10 +30,16 @@ class SiteReader
         'من-نحن', 'خدماتنا', 'الخدمات', 'الأسعار', 'اتصل-بنا', 'تواصل', 'المنيو', 'العروض', 'الفروع'];
 
     /** The pages of a website read for its agent to look things up in during a call (site()). */
-    public const SITE_PAGES = 40;
+    public const SITE_PAGES = 80;
+
+    /** The PDF files a website links to that are read with it (a brochure, a programme, a price list). */
+    public const SITE_FILES = 6;
 
     /** The most of one page's words kept for looking things up. */
     public const PAGE_CHARS = 8_000;
+
+    /** A page with fewer characters of words than this (a form, a "thank you"), and no picture, is not kept. */
+    private const MIN_WORDS = 30;
 
     /** The parts of a page a visitor does not read as its words. */
     private const HIDDEN = ['head', 'title', 'script', 'style', 'noscript', 'svg', 'template', 'iframe', 'form', 'nav', 'header', 'footer'];
@@ -118,7 +124,12 @@ class SiteReader
      * Each page keeps its words (at most PAGE_CHARS) and the pictures in its main part, for a
      * page whose words are in a picture (PictureReader). done: nothing was left to read.
      *
-     * @return array{pages: list<array{url: string, title: string, text: string, pictures: list<string>}>, links: list<array{network: string, url: string}>, done: bool}
+     * A WordPress website gives its pages and newest posts through its own content feed
+     * (/wp-json/wp/v2), a few requests for the whole site, in the agent's language first; the
+     * pages it leaves out are read one by one as above. The PDF files the pages link to come back
+     * as files, to be read with the pictures (AgentSite).
+     *
+     * @return array{pages: list<array{url: string, title: string, text: string, pictures: list<string>}>, files: list<string>, links: list<array{network: string, url: string}>, done: bool}
      */
     public function site(string $url, ?string $language = null, ?float $until = null, int $max = self::SITE_PAGES): array
     {
@@ -130,7 +141,7 @@ class SiteReader
         }
         $first = $start !== null ? $this->fetch($start) : null;
         if ($first === null) {
-            return ['pages' => [], 'links' => [], 'done' => true];
+            return ['pages' => [], 'files' => [], 'links' => [], 'done' => true];
         }
         $host = self::bareHost($first['url']);
         $seen = [self::pageKey($start) => true, self::pageKey($first['url']) => true];
@@ -154,7 +165,27 @@ class SiteReader
         $keep = fn (array $page): array => ['url' => $page['url'], 'title' => $page['title'], 'text' => Str::limit($page['text'], self::PAGE_CHARS, ''), 'pictures' => self::pictures($page['html'], $page['url'])];
         $found = AgentLinks::inHtml($first['html'], $first['url']);
         $pages = [$keep($first)];
+        $files = self::filesOn($first['html'], $first['url']);
         $add(self::linksOn($first['html'], $first['url']), 1);
+
+        // A WordPress website: its pages and newest posts at once, from its content feed.
+        if (self::isWordPress($first['html'])) {
+            foreach ($this->wordpress($first['url'], $language, $until) as $item) {
+                $key = self::pageKey($item['url']);
+                if (count($pages) >= $max || isset($seen[$key]) || self::bareHost($item['url']) !== $host || self::skippable($item['url'])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                unset($queue[$key]);
+                $text = Str::limit(trim(($item['date'] !== '' ? 'Published on '.$item['date'].".\n" : '').self::textOf($item['html'])), self::PAGE_CHARS, '');
+                $kept = ['url' => $item['url'], 'title' => $item['title'], 'text' => $text, 'pictures' => self::pictures($item['html'], $item['url'])];
+                if (mb_strlen(trim($text)) >= self::MIN_WORDS || $kept['pictures'] !== []) {
+                    $pages[] = $kept;
+                }
+                $files = array_merge($files, self::filesOn($item['html'], $item['url']));
+                $add(self::linksOn($item['html'], $item['url']), 2);
+            }
+        }
         $add(array_map(fn (string $u): array => ['url' => $u, 'score' => 0, 'sitemap' => true], $this->sitemap($first['url'], $until)), 2);
 
         while (count($pages) < $max && $queue !== [] && microtime(true) < $until) {
@@ -184,13 +215,99 @@ class SiteReader
                 $found[$k] = isset($found[$k]) ? ['seen' => $found[$k]['seen'] + $account['seen']] + $found[$k] : $account;
             }
             $kept = $keep($page);
-            if (trim($kept['text']) !== '' || $kept['pictures'] !== []) {
+            if (mb_strlen(trim($kept['text'])) >= self::MIN_WORDS || $kept['pictures'] !== []) {
                 $pages[] = $kept;
             }
+            $files = array_merge($files, self::filesOn($page['html'], $page['url']));
             $add(self::linksOn($page['html'], $page['url']), $next['depth'] + 1);
         }
+        $files = array_slice(array_values(array_unique(array_filter($files, fn (string $f): bool => self::bareHost($f) === $host))), 0, self::SITE_FILES);
 
-        return ['pages' => self::withoutRepeats($pages), 'links' => AgentLinks::pick($found), 'done' => $queue === [] || count($pages) >= $max];
+        return ['pages' => self::withoutRepeats($pages), 'files' => $files, 'links' => AgentLinks::pick($found), 'done' => $queue === []];
+    }
+
+    /** A page made with WordPress (its content feed is at /wp-json/). */
+    private static function isWordPress(string $html): bool
+    {
+        return str_contains($html, '/wp-content/') || str_contains($html, 'api.w.org') || str_contains($html, '/wp-json/');
+    }
+
+    /**
+     * A WordPress website's pages (up to 100) and newest posts (up to 30), from its content feed:
+     * in the agent's language first (?lang=, as WPML and Polylang take it), then its own language.
+     * Each with its address, title, HTML and (for a post) the day it was published.
+     *
+     * @return list<array{url: string, title: string, html: string, date: string}>
+     */
+    private function wordpress(string $base, ?string $language, float $until): array
+    {
+        $root = strtolower((string) parse_url($base, PHP_URL_SCHEME)).'://'.parse_url($base, PHP_URL_HOST);
+        $out = [];
+        $langs = array_values(array_unique(array_filter([$language, ''], fn ($l) => $l !== null)));
+        foreach (['pages' => 5, 'posts' => 1] as $type => $batches) {
+            foreach ($langs as $lang) {
+                for ($batch = 1; $batch <= $batches; $batch++) {
+                    if (microtime(true) > $until - 25) {
+                        return array_values($out);
+                    }
+                    $feed = $root.'/wp-json/wp/v2/'.$type.'?per_page='.($type === 'posts' ? 30 : 20).'&page='.$batch
+                        .'&_fields=link,title,content,date'.($type === 'posts' ? '&orderby=date&order=desc' : '').($lang !== '' ? '&lang='.rawurlencode($lang) : '');
+                    $got = $this->download($feed, ['json'], 'application/json', 'ar,en;q=0.8', 8_000_000);
+                    $items = $got !== null ? json_decode($got['body'], true) : null;
+                    if (! is_array($items) || $items === [] || ! array_is_list($items)) {
+                        break;
+                    }
+                    foreach ($items as $item) {
+                        $link = is_array($item) ? (string) ($item['link'] ?? '') : '';
+                        if ($link === '' || ! preg_match('#^https?://#i', $link) || isset($out[strtolower($link)])) {
+                            continue;
+                        }
+                        $out[strtolower($link)] = [
+                            'url' => $link,
+                            'title' => Str::limit(trim(html_entity_decode(strip_tags((string) data_get($item, 'title.rendered', '')), ENT_QUOTES | ENT_HTML5, 'UTF-8')), 120, ''),
+                            'html' => self::utf8((string) data_get($item, 'content.rendered', '')),
+                            'date' => $type === 'posts' ? substr((string) ($item['date'] ?? ''), 0, 10) : '',
+                        ];
+                    }
+                    if (count($items) < ($type === 'posts' ? 30 : 20)) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        return array_values($out);
+    }
+
+    /**
+     * The PDF files a page links to (a brochure, a programme, a price list), those whose name or
+     * link text says they hold prices or services first.
+     *
+     * @return list<string>
+     */
+    public static function filesOn(string $html, string $base): array
+    {
+        if (! preg_match_all('/<a\s[^>]*href\s*=\s*["\']([^"\'#]+\.pdf(?:\?[^"\'#]*)?)["\'][^>]*>(.*?)<\/a>/isu', self::lean($html), $m, PREG_SET_ORDER)) {
+            return [];
+        }
+        $scored = [];
+        foreach ($m as $i => $a) {
+            $abs = self::absolute(html_entity_decode($a[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), $base);
+            if ($abs === null || ! preg_match('#^https?://#i', $abs)) {
+                continue;
+            }
+            $hay = mb_strtolower(rawurldecode((string) parse_url($abs, PHP_URL_PATH)).' '.strip_tags($a[2]));
+            $score = 0;
+            foreach (self::LIKELY as $j => $word) {
+                if (str_contains($hay, $word)) {
+                    $score = max($score, 100 - $j);
+                }
+            }
+            $scored[$abs] = max($scored[$abs] ?? PHP_INT_MIN, $score * 100 - $i);
+        }
+        arsort($scored);
+
+        return array_keys($scored);
     }
 
     /**
@@ -421,6 +538,8 @@ class SiteReader
         return (bool) preg_match('/\.(pdf|jpe?g|png|gif|webp|svg|ico|zip|rar|mp4|mp3|wav|webm|mov|avi|docx?|xlsx?|pptx?|ics|xml|json|css|js|rss|txt|woff2?)$/', $path)
             || (bool) preg_match('#/(wp-admin|wp-login|wp-json|wp-content|wp-includes|xmlrpc|feed|cdn-cgi|cart|checkout|basket|my-account|account|login|log-in|signin|sign-in|signup|sign-up|register|logout|lost-password|reset-password|forgot-password|change-password|edit-profile|profile|dashboard|search)(/|$|\.)#', $path)
             || (bool) preg_match('#/(tag|tags|category|categories|author)/#', $path)
+            // The steps of a payment or a sign-up, with nothing a caller asks about.
+            || (bool) preg_match('#/(thank-?you|thanks|order-received|wishlist|membership-card|guest|transactions?(-[a-z-]+)?|cancel-payment|[a-z-]*payment-(status|failed|success|cancel(led)?))(/|$)#', $path)
             || (bool) preg_match('#/page/\d+#', $path)
             || (bool) preg_match('/(^|&)(s|q|search|replytocom|add-to-cart|orderby|share|print|lang|filter_[a-z_]+)=/', $query);
     }

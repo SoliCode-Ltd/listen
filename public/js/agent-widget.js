@@ -108,12 +108,22 @@
     '.lva-state{margin:0;text-align:center;font-weight:700;font-size:15px;min-height:22px;transition:opacity .2s ease}',
     '.lva-state.is-error{color:#D0335F}',
     /* What was said: the last lines, older ones fading at the top. */
-    '.lva-lines{display:grid;align-content:start;gap:6px;flex:0 1 auto;min-height:0;max-height:132px;overflow:auto;scrollbar-width:none;padding-top:10px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 16px);mask-image:linear-gradient(to bottom,transparent 0,#000 16px)}',
+    /* The chat grows smoothly as lines come (agent-widget.js smoothly) and scrolls gently to the newest. */
+    '.lva-lines{display:flex;flex-direction:column;gap:10px;flex:0 1 auto;min-height:0;max-height:150px;overflow:auto;overscroll-behavior:contain;scrollbar-width:none;padding:14px 2px 2px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 22px);mask-image:linear-gradient(to bottom,transparent 0,#000 22px)}',
     '.lva-lines::-webkit-scrollbar{display:none}',
     '.lva-lines:empty{display:none}',
-    '.lva-line{padding:8px 12px;border-radius:16px;background:var(--soft);font-size:13.5px;max-width:88%;justify-self:start;animation:lva-in .35s ' + EASE + '}',
+    '.lva-lines>:first-child{margin-top:auto}',
+    '.lva-line{padding:10px 14px;border-radius:18px;background:var(--soft);font-size:14px;line-height:1.65;max-width:86%;align-self:flex-start;overflow-wrap:anywhere;animation:lva-in .42s ' + EASE + ' both}',
     '.lva[data-radius="square"] .lva-line{border-radius:8px}',
-    '.lva-line.is-caller{justify-self:end;background:transparent;border:1px solid var(--line)}',
+    '.lva-line.is-caller{align-self:flex-end;background:transparent;border:1px solid var(--line)}',
+    /* A change of speaker gets more room than two lines of the same one. */
+    '.lva-line.is-agent+.lva-line.is-caller,.lva-line.is-caller+.lva-line.is-agent,.lva-line.is-caller+.lva-line.is-links,.lva-line.is-links+.lva-line.is-caller{margin-top:8px}',
+    /* While the agent speaks, three dots in its bubble, which then holds its words. */
+    '.lva-line.is-typing{display:inline-flex;align-items:center;gap:5px;min-height:42px;padding:0 16px}',
+    '.lva-line.is-typing i{width:6px;height:6px;border-radius:50%;background:var(--text);opacity:.28;animation:lva-dot 1.2s ease-in-out infinite}',
+    '.lva-line.is-typing i:nth-child(2){animation-delay:.16s}.lva-line.is-typing i:nth-child(3){animation-delay:.32s}',
+    /* A line written again (the caller's from their voice, the agent's in Arabic letters) settles in softly. */
+    '.lva-line.is-fixed{animation:lva-fix .5s ease}',
     /* The business's own links, written in the chat when the caller asks for them (show_links). */
     '.lva-line.is-links{display:grid;gap:4px;padding:6px;min-width:62%}',
     /* Room for every link at once, with the line that follows them. */
@@ -204,7 +214,9 @@
     '@keyframes lva-eq{0%,100%{height:30%}50%{height:100%}}',
     '@keyframes lva-idle{0%,100%{height:var(--rest,12px)}50%{height:calc(var(--rest,12px) * 1.35)}}',
     '@keyframes lva-blink{0%,100%{opacity:1}50%{opacity:.35}}',
-    '@keyframes lva-in{from{opacity:0;transform:translateY(6px)}}',
+    '@keyframes lva-in{from{opacity:0;transform:translateY(8px) scale(.985)}}',
+    '@keyframes lva-dot{0%,70%,100%{opacity:.22;transform:none}35%{opacity:.75;transform:translateY(-2px)}}',
+    '@keyframes lva-fix{from{opacity:.4}}',
     '@keyframes lva-fill{to{stroke-dashoffset:0}}',
     '@media (prefers-reduced-motion:reduce){.lva *,.lva *::before,.lva *::after{animation:none !important;transition:none !important}}',
     /* The link page: the same card, open in the page, with no button to open it and nothing to close. */
@@ -400,6 +412,12 @@
         parts.state = el('p', 'lva-state', states.idle || '');
         parts.state.setAttribute('aria-live', 'polite');
         parts.lines = el('div', 'lva-lines');
+        // The chat follows the newest line until the caller scrolls up to read (not while it scrolls itself).
+        parts.lines.addEventListener('scroll', function () {
+          var box = parts.lines;
+          if (!box || Date.now() - (box.__auto || 0) < 800) return;
+          box.__pinned = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+        }, { passive: true });
         parts.lines.setAttribute('aria-live', 'polite');
         parts.lines.hidden = look.captions === false;
         // One button: start, then hang up (no mute: a caller who is done simply ends the call).
@@ -685,6 +703,10 @@
       // How long the call that just ended lasted, said with "Call ended" until the next one.
       endedFor = s === 'ended' ? elapsed() : 0;
       stateNow = s;
+      // The agent's dots: while it speaks, and a moment after (its words can follow its voice).
+      if (s === 'speaking') showTyping();
+      else if (s === 'listening') hideTyping(4500);
+      else hideTyping(0);
       if (live() && !was) {
         startedAt = 0;
         clearInterval(tick);
@@ -733,14 +755,91 @@
         bars[i].style.height = h.toFixed(1) + 'px';
       }
     }
+    /*
+     * The chat changes without jumps: its height moves smoothly to the new one (to its most, then
+     * it scrolls), and it follows the newest line unless the caller scrolled up to read.
+     */
+    var typing = null, typingOff = 0;
+    function smoothly(change) {
+      var box = parts.lines;
+      if (!box) { change(); return; }
+      var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var follow = box.__pinned !== false;
+      // What shows now (also in the middle of the last change), then the height the change needs.
+      var before = box.offsetHeight;
+      clearTimeout(box.__grow);
+      box.style.transition = 'none';
+      box.style.height = '';
+      change();
+      var after = box.offsetHeight;
+      if (!reduce && after !== before) {
+        box.style.height = before + 'px';
+        void box.offsetHeight;
+        box.style.transition = 'height .32s ' + EASE;
+        box.style.height = after + 'px';
+        box.__grow = setTimeout(function () { box.style.height = ''; box.style.transition = ''; }, 360);
+      } else {
+        box.style.transition = '';
+      }
+      if (follow) {
+        box.__auto = Date.now();
+        box.__pinned = true;
+        if (reduce || !box.scrollTo) box.scrollTop = box.scrollHeight;
+        else box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+      }
+    }
+    // Three dots in the agent's bubble while it speaks; its words take their place.
+    function showTyping() {
+      clearTimeout(typingOff);
+      if (typing || !parts.lines || look.captions === false || parts.lines.hidden) return;
+      smoothly(function () {
+        typing = el('div', 'lva-line is-agent is-typing');
+        typing.setAttribute('aria-hidden', 'true');
+        typing.innerHTML = '<i></i><i></i><i></i>';
+        parts.lines.appendChild(typing);
+      });
+    }
+    function hideTyping(later) {
+      clearTimeout(typingOff);
+      if (!typing) return;
+      // The agent's line can come a moment after its voice ends (written again, or after the caller's).
+      if (later) { typingOff = setTimeout(function () { hideTyping(false); }, later); return; }
+      var dots = typing;
+      typing = null;
+      smoothly(function () { if (dots.parentNode) dots.parentNode.removeChild(dots); });
+    }
     function line(t) {
       if (!parts.lines || look.captions === false) return;
-      var n = el('div', 'lva-line is-' + t.role, t.text);
-      n.dir = 'auto';
-      // The caller's line written again from their voice replaces this one (onFix).
-      t.view = n;
-      parts.lines.appendChild(n);
-      trimLines();
+      smoothly(function () {
+        var n;
+        if (t.role === 'agent' && typing) {
+          // The dots become the agent's words, in the same bubble.
+          n = typing;
+          typing = null;
+          clearTimeout(typingOff);
+          n.className = 'lva-line is-agent is-fixed';
+          n.removeAttribute('aria-hidden');
+          n.textContent = t.text;
+        } else {
+          n = el('div', 'lva-line is-' + t.role, t.text);
+          // A caller line that waited for its better writing comes before the agent's dots.
+          if (typing && typing.parentNode === parts.lines) parts.lines.insertBefore(n, typing);
+          else parts.lines.appendChild(n);
+        }
+        n.dir = 'auto';
+        // The line written again (the caller's from their voice, the agent's in Arabic letters) replaces this one (onFix).
+        t.view = n;
+        trimLines();
+      });
+    }
+    function fixLine(t) {
+      if (!t.view) return;
+      smoothly(function () {
+        t.view.textContent = t.text;
+        t.view.classList.remove('is-fixed');
+        void t.view.offsetWidth;
+        t.view.classList.add('is-fixed');
+      });
     }
     // The business's own links the agent wrote in the chat (show_links): they show also when the
     // words of the call do not (captions off), and stay while newer lines come and go.
@@ -768,18 +867,21 @@
         return;
       }
       parts.lines.hidden = false;
-      parts.lines.classList.add('has-links');
-      parts.lines.appendChild(n);
-      trimLines();
+      smoothly(function () {
+        parts.lines.classList.add('has-links');
+        if (typing && typing.parentNode === parts.lines) parts.lines.insertBefore(n, typing);
+        else parts.lines.appendChild(n);
+        trimLines();
+      });
     }
+    // The whole call stays, scrolled to the newest; only a very long one lets its oldest lines go.
     function trimLines() {
       var lines = parts.lines;
-      while (lines.children.length > 6) {
+      while (lines.children.length > 80) {
         var old = null;
         for (var i = 0; i < lines.children.length && !old; i++) if (!lines.children[i].classList.contains('is-links')) old = lines.children[i];
         lines.removeChild(old || lines.firstChild);
       }
-      lines.scrollTop = lines.scrollHeight;
     }
 
     // The real call.
@@ -802,6 +904,9 @@
       if (call) { call.end(); return; }
       if (starting) return;
       starting = true;
+      typing = null;
+      clearTimeout(typingOff);
+      if (parts.lines) parts.lines.__pinned = true;
       if (parts.lines) { parts.lines.innerHTML = ''; parts.lines.hidden = look.captions === false; parts.lines.classList.remove('has-links'); }
       if (parts.barLinks) parts.barLinks.hidden = true;
       setState('connecting');
@@ -816,7 +921,7 @@
           },
           onState: function (s) { setState(s); },
           onTurn: line,
-          onFix: function (t) { if (t.view) t.view.textContent = t.text; },
+          onFix: fixLine,
           onLinks: linksLine,
           onLevel: level,
           onError: function (msg) { pendingError = msg || ''; },
@@ -832,6 +937,8 @@
       var sample = (cfg.text && cfg.text.sample) || [];
       var raf = 0, timers = [], speakingNow = false, alive = true;
       var at = function (ms, fn) { timers.push(setTimeout(function () { if (alive) fn(); }, ms)); };
+      typing = null;
+      clearTimeout(typingOff);
       if (parts.lines) parts.lines.innerHTML = '';
       setState('connecting');
       var loop = function () {

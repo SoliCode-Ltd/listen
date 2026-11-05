@@ -2,7 +2,8 @@
 
 /*
  * Staging only: every page of real public websites, read by the server itself as an agent's
- * website is read (SiteReader::site, AgentSite::withPictures), then looked up with callers'
+ * website is read (SiteReader::site, a WordPress site from its content feed; the words in its
+ * pictures, AgentSite::withPictures; its PDF files, PictureReader::pdf), then looked up with callers'
  * questions (AgentLookup::searchIn), so it is known what an agent will know: how many pages, how
  * long the read takes, what a page whose words are in a picture gives, and what a look-up finds.
  *
@@ -66,8 +67,9 @@ foreach ($sites as $site) {
         printf("   %5d chars  %s%s\n", mb_strlen($page['text']), rawurldecode($page['url']), $page['pictures'] !== [] ? '  ('.count($page['pictures']).' pictures)' : '');
     }
 
+    echo '   PDF files linked: '.count($read['files'] ?? []).($read['files'] ?? [] ? ': '.implode(' ', array_map('rawurldecode', $read['files'])) : '')."\n";
     $start = microtime(true);
-    $withWords = AgentSite::withPictures($pages, $pictures, $site['business'], microtime(true) + 120);
+    $withWords = AgentSite::withPictures($pages, $pictures, $site['business'], microtime(true) + 110);
     echo '   pictures read in '.round(microtime(true) - $start, 1)." s:\n";
     foreach ($withWords as $i => $page) {
         if ($page['text'] !== $pages[$i]['text']) {
@@ -77,6 +79,14 @@ foreach ($sites as $site) {
     }
 
     $docs = array_map(fn (array $p): array => ['page' => $p['title'], 'text' => $p['text']], $withWords);
+    foreach (array_slice($read['files'] ?? [], 0, 2) as $file) {
+        $start = microtime(true);
+        $words = $pictures->pdf($file, rawurldecode(basename((string) parse_url($file, PHP_URL_PATH))), $site['business'], microtime(true) + 70);
+        echo '   - PDF '.rawurldecode($file).' read in '.round(microtime(true) - $start, 1).' s: '.mb_strlen($words)." chars\n      ".str_replace("\n", "\n      ", mb_substr($words, 0, 400))."\n";
+        if ($words !== '') {
+            $docs[] = ['page' => basename((string) parse_url($file, PHP_URL_PATH)).' (PDF)', 'text' => $words];
+        }
+    }
     echo "   look-ups:\n";
     foreach ($site['questions'] as $question) {
         $found = AgentLookup::searchIn($docs, $question);

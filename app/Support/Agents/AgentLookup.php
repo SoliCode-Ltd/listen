@@ -16,9 +16,9 @@ use Illuminate\Support\Str;
 final class AgentLookup
 {
     /** Passages one look-up returns, and their words at most. */
-    public const MAX_PASSAGES = 3;
+    public const MAX_PASSAGES = 4;
 
-    public const MAX_CHARS = 2_400;
+    public const MAX_CHARS = 3_200;
 
     private const PASSAGE_CHARS = 700;
 
