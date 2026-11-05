@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\SiteSetting;
+use App\Support\Agents\AgentAccess;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -262,6 +263,9 @@ class SeoHelper
                 'title_key' => 'agents_landing.meta_title',
                 'description' => 'A voice agent for your business: it answers calls on your website, a link or a QR code, in your customers\' dialect, day and night.',
                 'description_key' => 'agents_landing.meta_description',
+                'keywords_key' => 'agents_landing.meta_keywords',
+                // Its own picture when the page is shared (1200x630, in the page's language).
+                'share_image' => 'images/og/listen-voice-agents-{locale}.png',
                 // In search results while Agents are open to everyone (Agents → Settings).
                 'robots' => \App\Support\Agents\AgentAccess::audience() === \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE ? self::DEFAULT_META_ROBOTS : 'noindex,nofollow,noarchive,nosnippet',
                 'path' => '/voice-agents',
@@ -855,6 +859,7 @@ class SeoHelper
                 . ($library !== '' ? 'Its library has ' . $library . '. ' : '')
                 . ($cloning !== null ? 'Members can clone their own voice and have it speak the dialect they choose. ' : '')
                 . (StudioFacts::dubbing() ? 'It also dubs videos into an Arabic dialect or English accent. ' : '')
+                . (self::voiceAgentsPublic() ? 'It also makes AI voice agents for businesses, which answer callers out loud in their Arabic dialect or English accent on a website, a link or a QR code. ' : '')
                 . 'It speaks '
                 . StudioFacts::arabicDialects() . ' spoken Arabic dialects from ' . StudioFacts::arabicCountries() . ' countries, Modern Standard Arabic in ' . StudioFacts::fushaStyles() . ' styles and '
                 . StudioFacts::englishAccents() . ' English accents: more than ' . StudioFacts::roundedDown(StudioFacts::dialectsAndAccents()) . ' dialects and accents, on every plan. '
@@ -875,7 +880,9 @@ class SeoHelper
             '- History: every voice is kept with its settings, to play again, reuse or download' . $downloads . '.',
             "- API for developers: the same voices, dialects, emotions and tags from your own app ({$base}/en/developers).",
             "- Chrome extension: reads selected text on any web page aloud ({$base}/en/browsers-extension).",
+            self::voiceAgentsPublic() ? "- Voice agents for businesses: an AI voice agent that answers callers in their dialect, day and night (see Voice agents below, {$base}/en/voice-agents)." : null,
             "- Plans are monthly; every plan has all the dialects and accents; new members can try the voices once in the demo ({$base}/en/pricing).",
+            ...self::voiceAgentLlmsLines($base),
             '',
             '## Official URLs',
             "- [Home (English)]({$base}/en): overview, voice samples",
@@ -889,6 +896,7 @@ class SeoHelper
             "- [Developers]({$base}/en/developers): the text to speech API and its documentation",
             "- [Chrome extension]({$base}/en/browsers-extension): reads selected text on any web page",
             StudioFacts::dubbing() ? "- [Dub my video]({$base}/en/dub-my-video): a video dubbed into the Arabic dialect or English accent you choose · [Arabic version]({$base}/ar/dub-my-video)" : null,
+            self::voiceAgentsPublic() ? "- [Voice agents]({$base}/en/voice-agents): AI voice agents that answer a business's callers in their dialect, on its website, a link or a QR code · [Arabic version]({$base}/ar/voice-agents)" : null,
             "- [Contact]({$base}/en/contact-us)",
             '',
             '## Arabic dialects',
@@ -920,6 +928,60 @@ class SeoHelper
             "- Everything agents can use here (ARD catalog): {$base}/.well-known/ai-catalog.json; how to get an API key: {$base}/auth.md",
             "- Sitemap: {$base}/sitemap.xml",
         ]));
+    }
+
+    /**
+     * The voice agents section of llms.txt, every number read from the plans and Agents → Settings;
+     * none while the agents are not open to everyone.
+     *
+     * @return list<string>
+     */
+    private static function voiceAgentLlmsLines(string $base): array
+    {
+        if (! self::voiceAgentsPublic()) {
+            return [];
+        }
+
+        $lines = [
+            '',
+            '## Voice agents',
+            "Listen voice agents ({$base}/en/voice-agents) answer a business's callers out loud, in the caller's Arabic dialect or English accent, "
+                . "on the business's website, its own link or a QR code, day and night. A business sets one up in about two minutes, without a developer: "
+                . 'it tells the agent about the business (pasting its website or writing its prices and hours), picks a voice, talks to the agent in a test call, and puts it live.',
+        ];
+        foreach (self::voiceAgentFeatures('en') as $feature) {
+            $lines[] = '- ' . $feature . '.';
+        }
+        $lines[] = '- Callers always know it is an AI assistant' . (AgentAccess::reviewOn() ? ', every agent is checked before it answers anyone,' : '') . ' and callers can report an agent in a tap.';
+        $lines[] = '- Price: calls use the plan\'s credits, the same credits as voice-overs: one call minute uses ' . number_format(AgentAccess::creditsPerMinute()) . ' credits. The owner always sees the minutes left, and can set the most minutes a day for each agent.';
+        $free = AgentAccess::freeTestSeconds();
+        if ($free > 0) {
+            $lines[] = '- Free test calls: every account gets ' . ($free % 60 === 0 ? ($free / 60) . ' minute' . ($free === 60 ? '' : 's') : $free . ' seconds') . ' of test calls free, to build and try one agent before choosing a plan.';
+        }
+        $plans = AgentAccess::plansOnSale('en');
+        if ($plans !== []) {
+            $lines[] = "- Plans with voice agents ({$base}/en/pricing):";
+            foreach ($plans as $plan) {
+                $lines[] = '  - ' . $plan['name'] . ', ' . self::monthlyPrice($plan['price_cents']) . ' a month: up to ' . number_format($plan['minutes']) . ' call minutes a month, '
+                    . $plan['agents'] . ($plan['agents'] === 1 ? ' agent, ' : ' agents, ')
+                    . $plan['concurrent'] . ($plan['concurrent'] === 1 ? ' call at a time, ' : ' calls at the same time, ')
+                    . 'calls up to ' . $plan['longest'] . ($plan['longest'] === 1 ? ' minute' : ' minutes') . ' long';
+            }
+        }
+        if (rescue(fn () => \App\Support\Agents\HouseAgent::for('en'), null, false) !== null) {
+            $lines[] = '- Try it: a live call with Listen\'s own agent is on the voice agents page (allow the microphone when asked).';
+        }
+
+        return $lines;
+    }
+
+    /** A plan's monthly price as people read it: "$12" or "$12.50" in dollars, "12.50 EUR" otherwise. */
+    private static function monthlyPrice(int $cents): string
+    {
+        $currency = strtoupper((string) config('cashier.currency', 'usd'));
+        $amount = $cents % 100 === 0 ? number_format(intdiv($cents, 100)) : number_format($cents / 100, 2);
+
+        return $currency === 'USD' ? '$' . $amount : $amount . ' ' . $currency;
     }
 
     /**
@@ -1090,6 +1152,11 @@ class SeoHelper
             if ($override !== '') {
                 return $override;
             }
+            // A page with words of its own (the voice agents page) keeps them over the site's.
+            $default = self::localizedDefault('keywords', $page, $locale);
+            if ($default !== '') {
+                return $default;
+            }
         }
 
         return self::localizedOverride('meta_keywords', $locale);
@@ -1204,7 +1271,7 @@ class SeoHelper
         $locale = self::currentLocale();
         $title = self::title($pageTitle, $page, $locale);
         $description = self::description($page, $locale);
-        $image = self::shareImageUrl($locale);
+        $image = self::shareImageUrl($locale, $page);
         $siteName = self::siteName($locale);
         $type = (string) SiteSetting::get('og_type', 'website');
         $tags = [
@@ -1227,7 +1294,7 @@ class SeoHelper
         if ($image !== '') {
             $tags[] = '<meta property="og:image" content="' . e($image) . '">';
             $tags[] = '<meta property="og:image:alt" content="' . e($title) . '">';
-            if (self::usesDefaultShareImage()) {
+            if (self::pageShareImage($page, $locale) !== '' || self::usesDefaultShareImage()) {
                 $tags[] = '<meta property="og:image:width" content="1200">';
                 $tags[] = '<meta property="og:image:height" content="630">';
             }
@@ -1247,7 +1314,7 @@ class SeoHelper
         $description = self::description($page, $locale);
         $handle = trim((string) SiteSetting::get('twitter_handle', ''));
         $creator = trim((string) SiteSetting::get('twitter_creator', ''));
-        $image = self::shareImageUrl($locale);
+        $image = self::shareImageUrl($locale, $page);
         $tags = [
             '<meta name="twitter:card" content="' . e($cardType) . '">',
             '<meta name="twitter:title" content="' . e($title) . '">',
@@ -1340,6 +1407,17 @@ class SeoHelper
         if ($isPublicProductPage) {
             $webPage['about'] = ['@id' => $appId];
             $graph[] = self::softwareApplicationNode($appId, $organizationId, $homeUrl, $locale);
+            // The voice agents page is about the agents, a product of the studio's own.
+            if ($page === 'agents_landing') {
+                $agentsId = $homeUrl . '#voice-agents';
+                $webPage['about'] = ['@id' => $agentsId];
+                $webPage['mainEntity'] = ['@id' => $agentsId];
+                $graph[] = self::voiceAgentNode($agentsId, $appId, $organizationId, $locale);
+            }
+            $image = self::shareImageUrl($locale, $page);
+            if ($image !== '') {
+                $webPage['primaryImageOfPage'] = ['@type' => 'ImageObject', 'url' => $image];
+            }
         }
         $graph[] = $webPage;
 
@@ -1459,6 +1537,118 @@ class SeoHelper
     }
 
     /**
+     * Listen's voice agents, for the structured data of their page: what they do, the plans
+     * that include them and their picture.
+     *
+     * @return array<string, mixed>
+     */
+    private static function voiceAgentNode(string $id, string $appId, string $organizationId, string $locale): array
+    {
+        $ar = $locale === 'ar';
+        $node = [
+            '@type' => 'SoftwareApplication',
+            '@id' => $id,
+            'name' => $ar ? 'وكلاء إسمع الصوتيون' : 'Listen voice agents',
+            'alternateName' => $ar ? ['وكيل صوتي بالذكاء الاصطناعي من إسمع', 'موظف استقبال ذكي من إسمع'] : ['Listen AI voice agent', 'Listen AI receptionist'],
+            'url' => self::pageUrl('agents_landing', $locale),
+            'applicationCategory' => 'BusinessApplication',
+            'applicationSubCategory' => 'AI voice agent',
+            'operatingSystem' => 'Web',
+            'description' => self::description('agents_landing', $locale),
+            'inLanguage' => ['ar', 'en'],
+            'featureList' => self::voiceAgentFeatures($locale),
+            'audience' => ['@type' => 'BusinessAudience', 'audienceType' => $ar ? 'الأنشطة التجارية والمتاجر والعيادات والمطاعم' : 'Businesses, shops, clinics and restaurants'],
+            'isPartOf' => ['@id' => $appId],
+            'publisher' => ['@id' => $organizationId],
+        ];
+
+        $prices = array_column(AgentAccess::plansOnSale($locale), 'price_cents');
+        if ($prices !== []) {
+            $node['offers'] = [
+                '@type' => 'AggregateOffer',
+                'priceCurrency' => strtoupper((string) config('cashier.currency', 'usd')),
+                'lowPrice' => number_format(min($prices) / 100, 2, '.', ''),
+                'highPrice' => number_format(max($prices) / 100, 2, '.', ''),
+                'offerCount' => count($prices),
+                'url' => self::pageUrl('pricing', $locale),
+            ];
+        }
+
+        $image = self::shareImageUrl($locale, 'agents_landing');
+        if ($image !== '') {
+            $node['image'] = $image;
+        }
+
+        return $node;
+    }
+
+    /**
+     * Whether the voice agents are open to every visitor (Agents → Settings), so search engines and
+     * AI agents hear of them: the same test as their page's place in the sitemap.
+     */
+    public static function voiceAgentsPublic(): bool
+    {
+        return AgentAccess::audience() === AgentAccess::AUDIENCE_EVERYONE;
+    }
+
+    /**
+     * What a voice agent does, in plain words: the structured data's feature list and llms.txt.
+     * Names no other company or product.
+     *
+     * @return list<string>
+     */
+    public static function voiceAgentFeatures(string $locale): array
+    {
+        $spoken = StudioFacts::arabicDialects();
+        $accents = StudioFacts::englishAccents();
+
+        return $locale === 'ar' ? [
+            'يرد على المتصلين بالصوت ليلًا ونهارًا في أقل من ثانية، ويسمح لهم بمقاطعته',
+            'يتحدث '.$spoken.' لهجة عربية والعربية الفصحى و'.$accents.' لكنة إنجليزية، وتختار أنت لهجته',
+            'يرد عبر زر اتصال في موقعك، ورابطه الخاص، ورمز استجابة سريعة تطبعه',
+            'يتعلم نشاطك من موقعك، ومن المعلومات التي تكتبها، ومن ملفاتك: المستندات والجداول والصور',
+            'يجيب فقط من معلوماتك، وعندما لا يعرف يأخذ رقم المتصل لفريقك',
+            'يأخذ الأسماء والأرقام، ويعيد كل رقم على المتصل قبل حفظه',
+            'يحجز المواعيد والطلبات، ويعطي فريقك ملاحظة واضحة',
+            'عندما تكون الخطوط كلها مشغولة، ينتظر المتصل خطًا متاحًا أو يترك رقمه لمعاودة الاتصال',
+            'ملخص كل مكالمة ونصها كاملًا، وقائمة بمن تعاود الاتصال بهم',
+            'عندما يسجّل موقعك دخول زواره، تعرف المكالمة من المتصل: اسمه وبريده',
+            'لا يطلب أبدًا أرقام البطاقات أو كلمات المرور أو المال، وزر الاتصال يعمل على موقعك أنت فقط',
+            'حدود تختارها أنت: أطول مكالمة، والدقائق في اليوم، وعدد المكالمات في الوقت نفسه',
+            'إضافة جاهزة لمنصات إنشاء المواقع، أو سطر واحد يُلصق مرة واحدة، دون مبرمج',
+        ] : [
+            'Answers callers out loud, day and night, in under a second, and lets them interrupt',
+            'Speaks '.$spoken.' spoken Arabic dialects, Modern Standard Arabic and '.$accents.' English accents; you choose its dialect',
+            'Answers on a call button on your website, its own link and a QR code you can print',
+            'Learns your business from your website, the facts you write and your files: documents, spreadsheets and images',
+            'Answers only from your facts; when it does not know, it takes the caller\'s number for your team',
+            'Takes names and numbers, and reads every number back before saving it',
+            'Books visits and orders, and hands your team a clear note',
+            'When all lines are busy, the caller waits for a free line or leaves a number for a call back',
+            'A summary and the full transcript of every call, and a list of who to call back',
+            'When your website signs its visitors in, the call shows who called: their name and email',
+            'Never asks for card numbers, passwords or money; the call button works only on your own website',
+            'Limits you choose: the longest call, the minutes a day and the calls at the same time',
+            'A ready plugin for website builders, or one line pasted once, without a developer',
+        ];
+    }
+
+    /**
+     * The voice agents page's questions and answers, with the call rate as the page shows it.
+     *
+     * @return list<array{question: string, answer: string}>
+     */
+    public static function voiceAgentFaq(?string $locale = null): array
+    {
+        $rate = number_format(AgentAccess::creditsPerMinute());
+
+        return array_values(array_map(static fn (array $qa): array => [
+            'question' => (string) $qa[0],
+            'answer' => str_replace(':rate', $rate, (string) $qa[1]),
+        ], array_filter((array) __('agents_landing.faq', [], $locale), static fn ($qa): bool => is_array($qa) && count($qa) >= 2)));
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private static function planOffers(): ?array
@@ -1522,6 +1712,9 @@ class SeoHelper
         if (StudioFacts::dubbing()) {
             $list[] = $ar ? 'دبلجة الفيديو إلى اللهجة العربية أو اللكنة الإنجليزية التي تختارها، مع بقاء الموسيقى والمؤثرات' : 'Video dubbing into the Arabic dialect or English accent you choose, keeping the music and sound effects';
         }
+        if (self::voiceAgentsPublic()) {
+            $list[] = $ar ? 'وكلاء صوتيون بالذكاء الاصطناعي يردون على عملاء نشاطك بلهجتهم، في موقعك أو عبر رابط أو رمز استجابة سريعة' : 'AI voice agents that answer a business\'s callers in their dialect, on its website, a link or a QR code';
+        }
 
         return array_merge($list, $ar ? [
             StudioFacts::environments().' بيئة صوتية، ولمسة استوديو للصوت',
@@ -1570,16 +1763,33 @@ class SeoHelper
      * The image shown when a page is shared: the one set in the dashboard, or
      * the bundled 1200x630 image in the page's language.
      */
-    public static function shareImageUrl(?string $locale = null): string
+    public static function shareImageUrl(?string $locale = null, string $page = ''): string
     {
+        $locale = self::normalizeLocale($locale);
+        // A page with a picture of its own (the voice agents page) shows it, whatever the site's is.
+        $own = self::pageShareImage($page, $locale);
+        if ($own !== '') {
+            return $own;
+        }
+
         $configured = self::normalizeMediaUrl((string) SiteSetting::get('og_image_url', ''));
         if ($configured !== '') {
             return $configured;
         }
 
-        $locale = self::normalizeLocale($locale);
-
         return self::versionedAssetUrl(self::publicAssetUrl("images/og/listen-og-{$locale}.png"));
+    }
+
+    /** The page's own bundled 1200x630 share image in this language, when it has one. */
+    private static function pageShareImage(string $page, string $locale): string
+    {
+        $pattern = $page !== '' ? (string) (self::pageDefinitions()[$page]['share_image'] ?? '') : '';
+        if ($pattern === '') {
+            return '';
+        }
+        $path = str_replace('{locale}', self::normalizeLocale($locale), $pattern);
+
+        return is_file(public_path($path)) ? self::versionedAssetUrl(self::publicAssetUrl($path)) : '';
     }
 
     private static function usesDefaultShareImage(): bool

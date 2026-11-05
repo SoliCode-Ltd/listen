@@ -1,4 +1,5 @@
-@include('components.page-head', ['pageTitle' => __('agents_landing.meta_title'), 'page' => 'agents_landing'])
+{{-- The questions at the foot of the page, for search engines and AI answers as well (FAQPage). --}}
+@include('components.page-head', ['pageTitle' => __('agents_landing.meta_title'), 'page' => 'agents_landing', 'faqItems' => \App\Support\SeoHelper::voiceAgentFaq()])
   <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
   <link rel="stylesheet" href="{{ asset('css/agents-landing.css') }}?v={{ filemtime(public_path('css/agents-landing.css')) }}">
 </head>
@@ -43,15 +44,7 @@
     $rate = \App\Support\Agents\AgentAccess::creditsPerMinute();
     // The free test minutes, as the admin set them (Agents → Settings).
     $freeMinutes = intdiv(\App\Support\Agents\AgentAccess::freeTestSeconds(), 60);
-    $agentPlans = rescue(fn () => \App\Models\Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->orderBy('price_cents')->get()
-      ->filter(fn ($p) => \App\Support\Agents\AgentAccess::planColumns() && \App\Support\Agents\AgentAccess::planIncludes($p))
-      ->map(function ($p) use ($rate) {
-          $limits = \App\Support\Agents\AgentAccess::limits($p);
-          $minutes = intdiv(max(0, (int) $p->monthly_chars), $rate);
-          if ($limits['minutes'] > 0) { $minutes = min($minutes, $limits['minutes']); }
-          return ['name' => $p->getLocalizedName(), 'agents' => $limits['agents'], 'minutes' => $minutes, 'slug' => $p->slug,
-            'concurrent' => $limits['concurrent'], 'longest' => intdiv($limits['call_seconds'], 60), 'featured' => (bool) $p->is_featured];
-      })->values()->all(), [], false);
+    $agentPlans = \App\Support\Agents\AgentAccess::plansOnSale();
     $factIcons = [
       '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
       '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>',

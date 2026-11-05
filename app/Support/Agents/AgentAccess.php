@@ -132,6 +132,35 @@ final class AgentAccess
     }
 
     /**
+     * The paid monthly plans on sale with agents, cheapest first, with what each gives: the
+     * Agents page, llms.txt and the structured data read the same numbers.
+     *
+     * @return list<array{plan: Plan, name: string, slug: string, price_cents: int, featured: bool, agents: int, minutes: int, concurrent: int, longest: int}>
+     */
+    public static function plansOnSale(?string $locale = null): array
+    {
+        if (! self::planColumns()) {
+            return [];
+        }
+        $rate = self::creditsPerMinute();
+
+        return rescue(fn () => Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)
+            ->orderBy('price_cents')->get()
+            ->filter(fn (Plan $plan): bool => self::planIncludes($plan))
+            ->map(function (Plan $plan) use ($rate, $locale): array {
+                $limits = self::limits($plan);
+                $minutes = intdiv(max(0, (int) $plan->monthly_chars), $rate);
+                if ($limits['minutes'] > 0) {
+                    $minutes = min($minutes, $limits['minutes']);
+                }
+
+                return ['plan' => $plan, 'name' => $plan->getLocalizedName($locale), 'slug' => (string) $plan->slug,
+                    'price_cents' => (int) $plan->price_cents, 'featured' => (bool) $plan->is_featured, 'agents' => $limits['agents'],
+                    'minutes' => $minutes, 'concurrent' => $limits['concurrent'], 'longest' => intdiv($limits['call_seconds'], 60)];
+            })->values()->all(), [], false);
+    }
+
+    /**
      * Where the upgrade button goes and the plan it names; none: no plan on sale has agents.
      *
      * @return array{url: string, plan: ?string, none: bool}
