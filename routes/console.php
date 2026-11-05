@@ -55,3 +55,5 @@ Schedule::command('agents:settle-calls')->everyMinute()->withoutOverlapping(5);
 
 // Listen Agents: the newest posts on agents' links read again every few hours (AgentLinkReads).
 Schedule::command('agents:read-links')->hourly()->withoutOverlapping(30);
+// Every page of live agents' websites, for what callers ask (AgentSite): never read, or not for a week.
+Schedule::command('agents:read-websites')->hourly()->withoutOverlapping(30);

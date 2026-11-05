@@ -268,7 +268,7 @@ class AgentLinkReadsTest extends TestCase
         $fresh = $this->agent($owner, ['status' => Agent::LIVE, 'settings' => ['links' => [['network' => 'x', 'url' => 'https://x.com/SOS_KSA']]]]);
         $stale = $this->agent($owner, ['status' => Agent::LIVE, 'settings' => ['links' => [['network' => 'x', 'url' => 'https://x.com/Other']]]]);
         $closed = $this->agent($owner, ['status' => Agent::LIVE, 'settings' => ['links' => [['network' => 'instagram', 'url' => 'https://www.instagram.com/sos_ksa']]]]);
-        // Not read an hour ago (X's limit for each server): tried again. A page with no words waits its usual turn.
+        // Not read an hour ago (X's limit for each server, or a page with no words): tried again.
         $busy = $this->agent($owner, ['status' => Agent::LIVE, 'settings' => ['links' => [['network' => 'x', 'url' => 'https://x.com/Busy']]]]);
         $empty = $this->agent($owner, ['status' => Agent::LIVE, 'settings' => ['links' => [['network' => 'page', 'url' => 'https://news.sos-ksa.org/app']]]]);
         foreach ([$fresh, $stale, $busy, $empty] as $agent) {
@@ -291,11 +291,11 @@ class AgentLinkReadsTest extends TestCase
         });
         // The due ones are spread out, half a minute apart.
         sort($delays);
-        $this->assertSame([0, 0, 30], $delays);
+        $this->assertSame([0, 0, 30, 60], $delays);
         ksort($sent);
-        $this->assertSame([$old->id => false, $stale->id => true, $busy->id => true], $sent);
+        $this->assertSame([$old->id => false, $stale->id => true, $busy->id => true, $empty->id => true], $sent);
         $this->assertTrue(AgentLinkReads::isDue(AgentSource::where('agent_id', $busy->id)->firstOrFail()));
-        $this->assertFalse(AgentLinkReads::isDue(AgentSource::where('agent_id', $empty->id)->firstOrFail()));
+        $this->assertTrue(AgentLinkReads::isDue(AgentSource::where('agent_id', $empty->id)->firstOrFail()));
         $this->assertFalse(AgentLinkReads::isDue(AgentSource::where('agent_id', $fresh->id)->firstOrFail()));
         $this->assertSame(AgentSource::PENDING, AgentSource::where('agent_id', $old->id)->value('status'));
         $this->assertFalse(AgentSource::where('agent_id', $closed->id)->exists());

@@ -11,6 +11,33 @@
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var rtl = document.documentElement.dir === 'rtl';
 
+  /*
+   * A row of tabs that scrolls sideways on a phone: the tab tapped slides to the middle, so the
+   * tab after it always shows (a caller of the page may not know the row scrolls), and the row
+   * fades at whichever edge has more tabs behind it.
+   */
+  function sideways(bar) {
+    if (!bar) return { centre: function () {}, edges: function () {} };
+    function edges() {
+      var max = bar.scrollWidth - bar.clientWidth, x = Math.abs(bar.scrollLeft);
+      bar.classList.toggle('is-scrolled', max > 2 && x > 2);
+      bar.classList.toggle('is-end', max <= 2 || x >= max - 2);
+    }
+    bar.addEventListener('scroll', edges, { passive: true });
+    window.addEventListener('resize', edges);
+    edges();
+    return {
+      edges: edges,
+      centre: function (t, smooth) {
+        if (!t || bar.scrollWidth <= bar.clientWidth + 2) { edges(); return; }
+        var br = bar.getBoundingClientRect(), tr = t.getBoundingClientRect();
+        var by = (tr.left + tr.width / 2) - (br.left + br.width / 2);
+        if (Math.abs(by) > 2) bar.scrollBy({ left: by, behavior: smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto' });
+        edges();
+      },
+    };
+  }
+
   function api(method, url, body) {
     return fetch(url, {
       method: method,
@@ -181,29 +208,20 @@
     var panel = $('[data-ag-install]', box);
     if (!panel) return;
     var tabs = $$('[data-ag-install-tab]', panel), body = $('.ag-install-body', panel), bar = $('.ag-install-tabs', panel), opener = null;
-    // On phones the tabs scroll sideways; the row fades at whichever edge has more tabs behind it.
-    function edges() {
-      if (!bar) return;
-      var max = bar.scrollWidth - bar.clientWidth, x = Math.abs(bar.scrollLeft);
-      bar.classList.toggle('is-scrolled', x > 2);
-      bar.classList.toggle('is-end', max <= 2 || x >= max - 2);
-    }
-    if (bar) bar.addEventListener('scroll', edges, { passive: true });
+    // On phones the tabs scroll sideways: the chosen one slides to the middle, and the row fades
+    // at whichever edge has more tabs behind it.
+    var row = sideways(bar);
     function pick(key, focus) {
       tabs.forEach(function (t) {
         var on = t.getAttribute('data-ag-install-tab') === key;
         t.setAttribute('aria-selected', on ? 'true' : 'false');
         t.tabIndex = on ? 0 : -1;
         if (!on) return;
-        if (focus) t.focus();
-        // Keep the chosen tab in view when the tabs scroll sideways, in either direction.
-        var br = bar.getBoundingClientRect(), tr = t.getBoundingClientRect();
-        if (tr.left < br.left + 24) bar.scrollLeft -= br.left + 24 - tr.left;
-        else if (tr.right > br.right - 24) bar.scrollLeft += tr.right - br.right + 24;
+        if (focus) t.focus({ preventScroll: true });
+        row.centre(t, true);
       });
       $$('[data-ag-install-panel]', panel).forEach(function (p) { p.hidden = p.getAttribute('data-ag-install-panel') !== key; });
       if (body) body.scrollTop = 0;
-      edges();
     }
     tabs.forEach(function (t, i) {
       t.addEventListener('click', function () { pick(t.getAttribute('data-ag-install-tab')); });
@@ -847,17 +865,15 @@
   /* ---------- An agent's page ---------- */
   function agentPage() {
     var tabs = $$('[data-ag-tab]'), panels = $$('[data-ag-panel]'), main = $('.ag-main');
+    var row = sideways(tabs[0] && tabs[0].parentNode);
     function open(name, fromMenu) {
       if (!$('[data-ag-panel="' + name + '"]')) name = 'overview';
       tabs.forEach(function (t) {
         var on = t.getAttribute('data-ag-tab') === name;
         t.classList.toggle('is-current', on);
         t.setAttribute('aria-selected', on ? 'true' : 'false');
-        if (!on) return;
-        // On phones the tabs scroll sideways: keep the open one in view, in either direction.
-        var bar = t.parentNode, br = bar.getBoundingClientRect(), tr = t.getBoundingClientRect();
-        if (tr.left < br.left + 8) bar.scrollLeft -= br.left + 8 - tr.left;
-        else if (tr.right > br.right - 8) bar.scrollLeft += tr.right - br.right + 8;
+        // On phones the tabs scroll sideways: the open one slides to the middle, so the next one shows.
+        if (on) row.centre(t, fromMenu);
       });
       panels.forEach(function (p) {
         var on = p.getAttribute('data-ag-panel') === name;
@@ -1019,6 +1035,7 @@
       }).catch(function (err) { toast(err.message); });
     });
     socialLinks($('[data-ag-links]'));
+    yourSite($('[data-ag-site]'));
     if (kf) kf.addEventListener('submit', function (e) {
       e.preventDefault();
       api('PATCH', C.agent.urls.update, { knowledge: $('[name="knowledge"]', kf).value }).then(function () { toast(T.saved); }).catch(function (err) { toast(err.message); });
@@ -1035,6 +1052,40 @@
    * "Find them on my website" reads the website again for them. An agent made before its links were
    * read has its website searched once, on its own.
    */
+  function yourSite(box) {
+    if (!box || !C.agent || !C.agent.urls || !C.agent.urls.site) return;
+    var text = $('[data-ag-site-text]', box), again = $('[data-ag-site-again]', box), timer = 0, polls = 0;
+    function draw(site) {
+      if (!site) return;
+      box.setAttribute('data-state', site.state);
+      text.className = 'ag-link-read is-' + site.state;
+      text.textContent = site.text || '';
+      again.disabled = site.state === 'reading';
+      watch();
+    }
+    // Read in the background: the card checks back until the pages are read.
+    function watch() {
+      clearTimeout(timer);
+      var state = box.getAttribute('data-state');
+      if ((state !== 'reading' && state !== 'none') || polls >= 60) return;
+      timer = setTimeout(function () {
+        api('GET', C.agent.urls.site).then(function (res) { draw(res && res.site); }).catch(function () {});
+      }, polls++ < 12 ? 5000 : 15000);
+    }
+    again.addEventListener('click', function () {
+      again.disabled = true;
+      polls = 0;
+      api('POST', C.agent.urls.site).then(function (res) {
+        draw(res && res.site);
+        toast(T.site_again_done || '');
+      }, function () {
+        again.disabled = false;
+        toast(T.site_again_error || '');
+      });
+    });
+    watch();
+  }
+
   function socialLinks(box) {
     if (!box || !C.agent || !C.agent.urls) return;
     var list = $('[data-ag-links-list]', box), form = $('[data-ag-links-add]', box), input = $('[data-ag-link-input]', box);

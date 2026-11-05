@@ -17,6 +17,8 @@ use App\Support\Agents\AgentLinks;
  *   end_call(reason)                        the conversation is over
  *   show_links(networks)                    the business's own links, written in the call's chat
  *                                           (only for an agent that has some: AgentLinks)
+ *   look_up(query)                          what the business's website says (AgentLookup; only
+ *                                           for an agent whose website was read)
  */
 final class LiveSession
 {
@@ -92,6 +94,21 @@ final class LiveSession
                     'properties' => [
                         'networks' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING', 'enum' => $networks], 'description' => 'Which links to write, as the caller asked; leave it empty to write all of them.'],
                     ],
+                ],
+            ];
+        }
+
+        // Every page of its website, for what the summary in its instructions does not say.
+        if ($agent && \App\Support\Agents\AgentLookup::available($agent)) {
+            $tools[] = [
+                'name' => 'look_up',
+                'description' => 'Search all the pages of the business\'s website for what the caller asked when your instructions do not answer it (a person\'s name or role, a fee, a date, an event, a service, a rule). Use it before saying you do not have the information.',
+                'parameters' => [
+                    'type' => 'OBJECT',
+                    'properties' => [
+                        'query' => ['type' => 'STRING', 'description' => 'The main words of what the caller asked, as the website would write them, in the website\'s language (Arabic in standard spelling, not dialect), with a word or two that mean the same: for example "رسوم العضوية اشتراك" or "رئيس مجلس الإدارة".'],
+                    ],
+                    'required' => ['query'],
                 ],
             ];
         }

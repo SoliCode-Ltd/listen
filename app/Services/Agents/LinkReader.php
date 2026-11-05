@@ -43,9 +43,12 @@ class LinkReader
     /** What one link gives the agent at most. */
     public const MAX_CHARS = 2_000;
 
+    /** A page with fewer words than this has its pictures read too (PictureReader). */
+    private const PICTURES_BELOW = 1_500;
+
     private const SIGN_IN = ['instagram', 'facebook', 'tiktok', 'linkedin', 'snapchat', 'threads'];
 
-    public function __construct(private SiteReader $site) {}
+    public function __construct(private SiteReader $site, private PictureReader $pictures) {}
 
     /**
      * How a link is read: POSTS, PAGE, SITE, CLOSED or NONE. $website is the agent's website:
@@ -238,7 +241,12 @@ class LinkReader
         if ($feedOnly) {
             return ['ok' => true, 'kind' => 'none', 'title' => $title, 'items' => [], 'text' => '', 'error' => null];
         }
-        $text = Str::limit(SiteReader::textOf($html), self::MAX_CHARS, '');
+        $text = SiteReader::textOf($html);
+        // A page whose words are in a picture (a board of directors, a poster of fees): the
+        // picture's words come first, then the page's own.
+        $pictures = mb_strlen($text) < self::PICTURES_BELOW ? SiteReader::pictures($html, $got['url']) : [];
+        $seen = $pictures !== [] ? $this->pictures->words($pictures, $title, null) : '';
+        $text = Str::limit(trim($seen."\n".$text), self::MAX_CHARS, '');
         if (mb_strlen($text) < 40) {
             return self::failed('empty');
         }

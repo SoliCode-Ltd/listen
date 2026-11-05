@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Storage;
  * What an agent was taught from: its business's website (read at setup and
  * again when asked), notes the owner typed, a file, or one of its links (the
  * newest posts of an account or a page, read again every few hours:
- * AgentLinkReads). content is the text the agent answers from (for a link,
+ * AgentLinkReads), or one page of its website (AgentSite: every page, looked
+ * up during calls). content is the text the agent answers from (for a link,
  * what was read, as JSON).
  */
 class AgentSource extends Model
@@ -24,6 +25,9 @@ class AgentSource extends Model
     public const SHEET = 'sheet';
 
     public const LINK = 'link';
+
+    /** One page of the business's website, read in the background for the agent to look up during calls (AgentSite). */
+    public const PAGE = 'page';
 
     /** A file waiting to be read, being read, read, or that could not be read. */
     public const PENDING = 'pending';

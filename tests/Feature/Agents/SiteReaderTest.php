@@ -114,4 +114,47 @@ class SiteReaderTest extends TestCase
         $this->assertNull(SiteReader::normalizeUrl('https://user:pass@clinic.example'));
         $this->assertNull(SiteReader::normalizeUrl('   '));
     }
+
+    public function test_a_page_with_a_megabyte_of_scripts_before_its_words_is_read(): void
+    {
+        // A page builder's page (a medical society's fees page): one style block of 1.4 MB, then the
+        // words. The old pattern gave up on a block that long and the page had no words.
+        $html = '<html><head><style>'.str_repeat('.e{color:red}', 110_000).'</style></head><body>'
+            .'<script>var data = "'.str_repeat('x', 20_000).'";</script>'
+            .'<nav><a href="/ar/">الرئيسية</a></nav><h2>رسوم العضوية</h2><ul><li>استشاري: 600 ريال سعودي</li><li>زميل / مقيم: 200 ريال سعودي</li></ul>'
+            .'<svg><text>icon</text></svg><!-- '.str_repeat('c', 50_000).' --><footer>© 2026</footer></body></html>';
+        $this->assertGreaterThan(1_500_000, strlen($html));
+
+        $text = SiteReader::textOf($html);
+
+        $this->assertStringContainsString('رسوم العضوية', $text);
+        $this->assertStringContainsString('- استشاري: 600 ريال سعودي', $text);
+        $this->assertStringContainsString('- زميل / مقيم: 200 ريال سعودي', $text);
+        foreach (['color:red', 'xxxx', 'icon', 'cccc', 'الرئيسية', '©'] as $gone) {
+            $this->assertStringNotContainsString($gone, $text);
+        }
+    }
+
+    public function test_a_page_cut_at_its_size_limit_is_never_cut_inside_a_letter(): void
+    {
+        // Cut in the middle of an Arabic letter, the rest of the page could not be read at all.
+        Http::fake(['https://clinic.example/*' => Http::response('<p>عربي</p>', 200, ['Content-Type' => 'text/html; charset=utf-8'])]);
+
+        // 6 bytes end in the middle of the second letter (each takes two).
+        $page = $this->reader()->download('https://clinic.example/fees', ['html'], 'text/html', 'ar', 6);
+
+        $this->assertTrue(mb_check_encoding($page['body'], 'UTF-8'));
+        $this->assertSame('<p>ع', $page['body']);
+        $this->assertSame('ع', SiteReader::textOf($page['body']));
+    }
+
+    public function test_a_page_in_an_older_arabic_character_set_is_read_as_arabic(): void
+    {
+        $cp1256 = iconv('UTF-8', 'WINDOWS-1256', '<p>مواعيد العيادة</p>');
+        Http::fake(['https://clinic.example/*' => Http::response($cp1256, 200, ['Content-Type' => 'text/html; charset=windows-1256'])]);
+
+        $page = $this->reader()->download('https://clinic.example/hours');
+
+        $this->assertSame('مواعيد العيادة', SiteReader::textOf($page['body']));
+    }
 }
