@@ -109,7 +109,7 @@ class GeminiClient
      * the prompt beside it: quick (little thinking) and exact (temperature 0). Returns the words,
      * '' when the model heard none, or null when no model answered in time.
      */
-    public function transcribe(string $prompt, string $wav, int $timeout = 12): ?string
+    public function transcribe(string $prompt, string $wav, int $timeout = 12, string $thinking = 'low'): ?string
     {
         $deadline = microtime(true) + $timeout;
         $body = fn (bool $think): array => [
@@ -117,7 +117,7 @@ class GeminiClient
                 ['inline_data' => ['mime_type' => 'audio/wav', 'data' => base64_encode($wav)]],
                 ['text' => $prompt],
             ]]],
-            'generationConfig' => ['temperature' => 0] + ($think ? ['thinkingConfig' => ['thinkingLevel' => 'low']] : []),
+            'generationConfig' => ['temperature' => 0] + ($think ? ['thinkingConfig' => ['thinkingLevel' => $thinking]] : []),
         ];
         foreach (self::WRITER_MODELS as $model) {
             $left = (int) floor($deadline - microtime(true));
