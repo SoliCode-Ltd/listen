@@ -43,7 +43,8 @@ class PictureReader
             $key = 'agent-picture:'.sha1($url);
             $words = Cache::get($key);
             if (! is_string($words)) {
-                $words = $this->read($url, $page, $business);
+                // Never past the time given: the pages read before it are kept only once all is done.
+                $words = $this->read($url, $page, $business, $until !== null ? (int) max(8, min(45, $until - microtime(true) - 5)) : 45);
                 // Kept only when the model answered: a busy model is asked again next time.
                 if ($words !== null) {
                     Cache::put($key, $words, now()->addDays(self::KEEP_DAYS));
@@ -58,7 +59,7 @@ class PictureReader
     }
 
     /** The picture's words ('' when it has none, or is too small to hold any), or null when no model answered. */
-    private function read(string $url, string $page, ?string $business): ?string
+    private function read(string $url, string $page, ?string $business, int $timeout): ?string
     {
         $got = $this->site->download($url, ['image/png', 'image/jpeg', 'image/webp'], 'image/webp,image/png,image/jpeg;q=0.9', 'ar,en;q=0.8', self::MAX_BYTES);
         if ($got === null || strlen($got['body']) < self::MIN_BYTES) {
@@ -69,7 +70,7 @@ class PictureReader
             return '';
         }
         $mime = str_contains($got['type'], 'png') ? 'image/png' : (str_contains($got['type'], 'webp') ? 'image/webp' : 'image/jpeg');
-        $reply = $this->gemini->readFile($this->prompt($page, $business), $mime, $got['body'], 45);
+        $reply = $this->gemini->readFile($this->prompt($page, $business), $mime, $got['body'], $timeout);
         if ($reply === null) {
             return null;
         }
