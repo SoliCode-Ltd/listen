@@ -102,11 +102,11 @@ final class LiveSession
         if ($agent && \App\Support\Agents\AgentLookup::available($agent)) {
             $tools[] = [
                 'name' => 'look_up',
-                'description' => 'Search all the pages of the business\'s website for what the caller asked when your instructions do not answer it (a person\'s name or role, a fee, a date, an event, a service, a rule). Use it before saying you do not have the information.',
+                'description' => 'Search all the pages and PDF files of the business\'s website for what the caller asked when your instructions do not answer it (a person\'s name or role, a fee, a date, an event, a service, a rule). Use it before saying you do not have the information.',
                 'parameters' => [
                     'type' => 'OBJECT',
                     'properties' => [
-                        'query' => ['type' => 'STRING', 'description' => 'The main words of what the caller asked, as the website would write them, in the website\'s language (Arabic in standard spelling, not dialect), with a word or two that mean the same: for example "رسوم العضوية اشتراك" or "رئيس مجلس الإدارة".'],
+                        'query' => ['type' => 'STRING', 'description' => 'The main words of what the caller asked, as the website would write them, in the website\'s language (Arabic in standard spelling, not dialect), with a word or two that mean the same: for example "رسوم العضوية اشتراك" or "نائب رئيس مجلس الإدارة". Leave out the business\'s own name: it is on every page.'],
                     ],
                     'required' => ['query'],
                 ],

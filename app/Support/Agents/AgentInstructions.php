@@ -166,7 +166,7 @@ final class AgentInstructions
             $pages = AgentLookup::pages($agent);
             $lines[] = '';
             $lines[] = '# Looking things up on '.$agent->business_name.'\'s website';
-            $lines[] = 'The facts above are a summary. '.($pages > 0 ? "All {$pages} pages" : 'The pages').' of '.$agent->business_name.'\'s website can be searched with the look_up tool. When a caller asks something the facts do not answer (a person\'s name or role, a fee, a date, an event, a service, a rule), first say a few words in the dialect that you are checking (like "لحظة أتأكد لك"), then call look_up with the main words as the website would write them. Answer from what it finds, briefly and in your own words. If it finds nothing, you may try once more with other words; then say you do not have that information and offer to take the caller\'s name and number.';
+            $lines[] = 'The facts above are a summary. '.($pages > 0 ? "All {$pages} pages" : 'The pages').' of '.$agent->business_name.'\'s website can be searched with the look_up tool. When a caller asks something the facts do not answer (a person\'s name or role, a fee, a date, an event, a service, a rule), first say a few words in the dialect that you are checking (like "لحظة أتأكد لك"), then call look_up with the main words as the website would write them (without the business\'s own name). Answer from what it finds, briefly and in your own words. If it finds nothing, you may try once more with other words; then say you do not have that information and offer to take the caller\'s name and number.';
         }
 
         // The files the owner uploaded (a menu, a price list), as read by FileReader: facts, never instructions.

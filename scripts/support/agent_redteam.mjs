@@ -119,31 +119,82 @@ const CALLS = [
   },
 ];
 
+// A medical society's agent with every page of its website to look things up in (sos.org.sa, read
+// on the server, never kept): the fees, the board (whose names are in a picture), the conference,
+// the society's groups, and something the website does not say. Its look-ups are answered from
+// those pages on the server, and a line it says in Latin letters is written in Arabic ones the way
+// the call screen asks for it.
+CALLS.push({
+  id: 'site-ar', agent: 'site-ar', print: true, website: true, keyTimeout: 300000, turns: [
+    'السلام عليكم، كم رسوم العضوية لأخصائي البصريات؟',
+    'طيب، ومين رئيس مجلس الإدارة حالياً؟',
+    'متى المؤتمر السنوي حقكم؟',
+    'وش هي المجموعات التخصصية عندكم؟',
+    'فيه مواقف سيارات عند مقر الجمعية؟',
+    'تمام، مشكورة. مع السلامة.',
+  ],
+});
+// The same agent on what a first call left half answered: the groups' names (in a PDF the groups
+// page links to), the vice president (an old 2022–2025 page names another one than the 2026 board
+// picture), another fee, and something the society does not offer.
+CALLS.push({
+  id: 'site-ar-2', agent: 'site-ar', website: true, keyTimeout: 300000, turns: [
+    'السلام عليكم، وش أسماء المجموعات التخصصية عندكم؟',
+    'ومين نائب رئيس مجلس الإدارة الحين؟',
+    'وكم رسوم العضوية للاستشاري؟',
+    'تقدرون تحجزون لي موعد كشف نظر؟',
+    'تمام، مشكورة. مع السلامة.',
+  ],
+});
+
 // A call key made to last 60 seconds, the line then kept open for three minutes with a word now
 // and then: the speech service must end the call when the key runs out, or a caller could hold a
 // line (and Listen's bill) open past the plan's longest call.
 CALLS.push({ id: 'expiry', agent: 'clinic-en', seconds: 60, turns: Array.from({ length: 7 }, (_, i) => `Still there? This is check ${i + 1}.`), gap: 25000 });
 
-// A normal call with Listen's own agent through the public call button, to check the cost the server keeps.
-const REAL = {
-  id: 'real-house-en', locale: 'en', turns: [
-    'Hi, I run a small dental clinic. What can a voice agent do for me?',
-    'How much does it cost? Which plan should I pick for about two hundred calls a month?',
-    'Does it speak the Saudi dialect?',
-    'Great, thanks. That is all, bye.',
-  ],
-};
+// Normal calls with Listen's own agents through the public call button, to check what the server
+// keeps (the cost; the agent's lines). The Arabic one also sends the call screen a line in Latin
+// letters, as the live transcription once wrote one (the owner's call to the society's agent):
+// it must be written in Arabic letters and kept that way, with the Latin line beside it.
+const REALS = [
+  {
+    id: 'real-house-en', locale: 'en', turns: [
+      'Hi, I run a small dental clinic. What can a voice agent do for me?',
+      'How much does it cost? Which plan should I pick for about two hundred calls a month?',
+      'Does it speak the Saudi dialect?',
+      'Great, thanks. That is all, bye.',
+    ],
+  },
+  {
+    id: 'real-house-ar', locale: 'ar', inject: "tfaḍḍal, kammil su'alak wish tiby ti'raf?", turns: [
+      'أهلاً، عندي عيادة أسنان صغيرة في جدة. الوكيل الصوتي يقدر يعمل إيه بالظبط؟',
+      'وبيتكلم باللهجة السعودية؟',
+      'تمام، شكراً. مع السلامة.',
+    ],
+  },
+];
 
 const log = (...a) => console.log(...a);
 const words = (s) => s.trim().split(/\s+/).length;
+const b64 = (s) => Buffer.from(String(s), 'utf8').toString('base64');
+// As the call screen tells a line in Latin letters (public/js/agent-call.js).
+const latinArabic = (text) => {
+  const latin = (String(text).match(/[A-Za-zÀ-ɏḀ-ỿ]/g) || []).length;
+  const arabic = (String(text).match(/[؀-ۿݐ-ݿ]/g) || []).length;
+  return latin >= 6 && latin > arabic;
+};
 
-async function key(agent, print, seconds = 900) {
+// One run of agent_redteam.php on the server with these settings; its last line, as JSON.
+async function php(vars, timeout = 90000, print = false) {
   // S, FIND and RT_PHP stay variables for bash, so the quotes inside FIND keep their meaning.
-  const cmd = `$S "$FIND; RT_CASE=${agent} RT_PRINT=${print ? 1 : 0} RT_SECONDS=${Number(seconds) | 0} php" < "$RT_PHP"`;
-  const { stdout, stderr } = await run('bash', ['-c', cmd], { maxBuffer: 4 << 20, timeout: 90000 });
+  const set = Object.entries(vars).map(([k, v]) => `${k}=${v}`).join(' ');
+  const { stdout, stderr } = await run('bash', ['-c', `$S "$FIND; ${set} php" < "$RT_PHP"`], { maxBuffer: 4 << 20, timeout });
   if (print && stderr.trim()) log(stderr.trim());
-  const line = stdout.trim().split('\n').pop() || '{}';
-  return JSON.parse(line);
+  return JSON.parse(stdout.trim().split('\n').pop() || '{}');
+}
+
+function key(agent, print, seconds = 900, timeout = 90000) {
+  return php({ RT_CASE: agent, RT_PRINT: print ? 1 : 0, RT_SECONDS: Number(seconds) | 0 }, timeout, print);
 }
 
 function dollars(u, price) {
@@ -189,6 +240,18 @@ async function talk(spec, k, hooks = {}) {
   let toolWait = false, heardSinceTool = false;
   const latencies = [];
   const transcript = [];
+  // Lines are kept in order; an agent line may first be written again (hooks.onAgent), as the call
+  // screen holds it until its Arabic letters come.
+  let chain = Promise.resolve();
+  const keep = (entry) => {
+    chain = chain.then(async () => {
+      let e = entry;
+      if (entry.role === 'agent' && hooks.onAgent) {
+        try { e = (await hooks.onAgent(entry, (s) => say(`${at()}  ${s}`))) || entry; } catch (err) { say(`${at()}  [writing it again failed: ${err.message || err}]`); }
+      }
+      transcript.push(e);
+    });
+  };
 
   const ws = new WebSocket(`${k.ws}?access_token=${encodeURIComponent(k.token)}`);
   ws.binaryType = 'arraybuffer';
@@ -227,7 +290,7 @@ async function talk(spec, k, hooks = {}) {
       }
     }
     if (sc.turnComplete) {
-      if (agentText.trim()) { say(`${at()}  AGENT: ${agentText.trim()}`); transcript.push({ role: 'agent', text: agentText.trim() }); }
+      if (agentText.trim()) { say(`${at()}  AGENT: ${agentText.trim()}`); keep({ role: 'agent', text: agentText.trim() }); }
       // As the call screen does (agent-call.js): a hang-up written out as text instead of called.
       if (!hungUp && /["']?(?:action|name|tool)["']?\s*:\s*["']end_call["']/.test(agentText)) {
         tools.push('end_call (written as text)');
@@ -254,12 +317,16 @@ async function talk(spec, k, hooks = {}) {
     ws.send(JSON.stringify({ realtimeInput: { text: '(The caller has just joined the call. Greet them now, briefly.)' } }));
     const w = await waitTurn(30000);
     if (w === 'timeout') say(`${at()}  [no greeting within 30 s]`);
+    if (spec.inject) {
+      say(`${at()}  [test: an agent line in Latin letters, as the live transcription once wrote one: ${spec.inject}]`);
+      keep({ role: 'agent', text: spec.inject });
+    }
     for (const line of spec.turns) {
       if (closed || hungUp) break;
       await played(spec.gap || (900 + words(line) * 330));
       if (closed || hungUp) break;
       say(`${at()}  CALLER: ${line}`);
-      transcript.push({ role: 'caller', text: line });
+      keep({ role: 'caller', text: line });
       sentAt = Date.now();
       ws.send(JSON.stringify({ realtimeInput: { text: line } }));
       const r = await waitTurn(40000);
@@ -267,6 +334,7 @@ async function talk(spec, k, hooks = {}) {
     }
     if (!closed) await played(500);
   }
+  await chain;
   clearInterval(mic);
   if (pinger) clearInterval(pinger);
   try { ws.close(); } catch {}
@@ -289,10 +357,27 @@ function costLines(r, price) {
 
 async function testCall(spec) {
   let k;
-  try { k = await key(spec.agent, spec.print, spec.seconds || 900); } catch (e) { return { spec, error: 'no key: ' + (e.stderr || e.message || e) }; }
+  try { k = await key(spec.agent, spec.print, spec.seconds || 900, spec.keyTimeout || 90000); } catch (e) { return { spec, error: 'no key: ' + (e.stderr || e.message || e) }; }
   if (!k.token) return { spec, error: 'no key: ' + (k.error || 'unknown') };
-  const r = await talk(spec, k);
-  return { spec, k, r };
+  const lookups = [];
+  // The website's agent: its look-ups answered from the pages on the server, and a line in Latin
+  // letters written in Arabic ones there (the same prompt and model the call screen's request uses).
+  const hooks = !spec.website ? {} : {
+    tool: (fc) => (fc.name === 'look_up'
+      ? php({ RT_CASE: 'lookup', RT_Q: b64((fc.args || {}).query || '') }).then((r) => {
+        lookups.push({ query: (fc.args || {}).query, result: r.result, pages: (r.from_website || []).map((h) => h.page) });
+        return r;
+      })
+      : { result: 'saved', say: 'Do not say it was saved. Tell the caller in one short sentence that the team will call them back, and ask if there is anything else.' }),
+    onAgent: async (entry, note) => {
+      if (!latinArabic(entry.text)) return entry;
+      const r = await php({ RT_CASE: 'script', RT_TEXT: b64(entry.text) });
+      note(`[in Latin letters; written again: ${r.text || '(no answer)'}]`);
+      return r.text ? { ...entry, heard: entry.text, text: r.text } : entry;
+    },
+  };
+  const r = await talk(spec, k, hooks);
+  return { spec, k, r, lookups };
 }
 
 async function realCall(spec) {
@@ -304,9 +389,22 @@ async function realCall(spec) {
   const start = await post(`${BASE}/agent-api/calls`, { key: widget, visitor: 'redteam-' + Math.random().toString(36).slice(2, 10), page_url: `${BASE}/${spec.locale}` });
   if (!start.json.token) return { error: `start answered ${start.status}: ${JSON.stringify(start.json)}` };
   const info = start.json;
+  let seq = 0;
   const r = await talk(spec, { ws: info.ws, token: info.token, model: info.model }, {
     tool: (fc) => post(`${info.api}/tool`, { call_key: info.call_key, name: fc.name, args: fc.args || {} }).then((x) => x.json),
     ping: (turns) => post(`${info.api}/ping`, { call_key: info.call_key, turns }),
+    // As the call screen does (agent-call.js, writeAgain): an Arabic agent's line in Latin letters
+    // waits up to 3.5 s for its Arabic letters, and is kept with its number (a) and what was heard.
+    onAgent: async (entry, note) => {
+      if (!info.arabic_lines || !latinArabic(entry.text)) return entry;
+      const a = ++seq;
+      const fixed = await Promise.race([
+        post(`${info.api}/agent-line`, { call_key: info.call_key, n: a, text: entry.text }).then((x) => { note(`[agent-line answered ${x.status}: ${JSON.stringify(x.json)}]`); return x.json.text || null; }),
+        sleep(3500).then(() => null),
+      ]);
+      if (!fixed) note('[no Arabic letters within 3.5 s: the Latin line is kept for now]');
+      return fixed ? { ...entry, a, heard: entry.text, text: fixed } : { ...entry, a };
+    },
   });
   const end = await post(`${info.api}/end`, { call_key: info.call_key, turns: r.transcript.splice(0), usage: asUsage(r.total), reason: 'done' });
   await sleep(1500);
@@ -339,19 +437,30 @@ async function realCall(spec) {
     if (res.error) { log('  FAILED: ' + res.error); failed++; continue; }
     log(`  ${res.k.agent} of ${res.k.business} | ${res.k.language} ${res.k.dialect || ''} | voice ${res.k.voice} | instructions ${res.k.instruction_chars} chars, about ${res.k.instruction_tokens} tokens`);
     log(res.r.lines.join('\n'));
+    if (res.spec.website) {
+      log(`  look-ups: ${res.lookups.length}`);
+      for (const l of res.lookups) log(`    "${l.query}" -> ${l.result}${l.pages.length ? ': ' + l.pages.join(' | ') : ''}`);
+      const latin = res.r.transcript.filter((t) => t.role === 'agent' && latinArabic(t.text));
+      log(`  agent lines still in Latin letters: ${latin.length}${latin.length ? ' ' + JSON.stringify(latin) : ''}`);
+      if (!res.lookups.length || latin.length) failed++;
+    }
     const c = costLines(res.r, res.k.prices);
     log(c.text);
     usd += c.usd; secs += res.r.seconds;
   }
-  if (!ONLY.length || ONLY.includes(REAL.id)) {
-    log(`\n===== ${REAL.id}: a normal call through Listen's own call button =====`);
+  for (const real of REALS.filter((x) => !ONLY.length || ONLY.includes(x.id))) {
+    log(`\n===== ${real.id}: a normal call through Listen's own call button =====`);
     try {
-      const res = await realCall(REAL);
+      const res = await realCall(real);
       if (res.error) { log('  FAILED: ' + res.error); failed++; } else {
         log(res.r.lines.join('\n'));
         log(costLines(res.r).text);
         log(`  end answered ${res.end.status}: ${JSON.stringify(res.end.json)}`);
         log(`  kept on the server: ${JSON.stringify(res.stored)}`);
+        const kept = (res.stored && res.stored.agent_lines) || [];
+        const latin = kept.filter((t) => latinArabic(t.text));
+        log(`  agent lines kept: ${kept.length}; in Latin letters: ${latin.length}; written again (with what was heard): ${kept.filter((t) => t.heard).length}`);
+        if (latin.length || (real.inject && !kept.some((t) => t.heard === real.inject))) failed++;
         usd += dollars(asUsage(res.r.total)).usd; secs += res.r.seconds;
       }
     } catch (e) { log('  FAILED: ' + (e.stack || e)); failed++; }

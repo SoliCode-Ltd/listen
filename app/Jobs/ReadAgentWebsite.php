@@ -27,11 +27,12 @@ class ReadAgentWebsite implements ShouldBeUniqueUntilProcessing, ShouldQueue
 
     public int $uniqueFor = 3600;
 
-    public function __construct(public int $agentId) {}
+    // pages: the website's pages; extras: the pictures and PDF files a run had no time for.
+    public function __construct(public int $agentId, public string $part = 'pages') {}
 
     public function uniqueId(): string
     {
-        return (string) $this->agentId;
+        return $this->agentId.($this->part === 'extras' ? ':extras' : '');
     }
 
     public function handle(SiteReader $reader, PictureReader $pictures): void
@@ -39,6 +40,11 @@ class ReadAgentWebsite implements ShouldBeUniqueUntilProcessing, ShouldQueue
         $agent = Agent::find($this->agentId);
         if ($agent === null) {
             Cache::forget('agent-site-reading:'.$this->agentId);
+
+            return;
+        }
+        if ($this->part === 'extras') {
+            AgentSite::readExtras($agent, $pictures, microtime(true) + 120);
 
             return;
         }

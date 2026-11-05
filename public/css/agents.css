@@ -357,13 +357,18 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-voice-current small { color: var(--muted); font-size: .8rem; }
 .ag-voice-change { color: var(--accent-text, var(--a)); font-style: normal; font-size: .88rem; font-weight: 700; }
 .ag-voice-pick[open] .ag-voice-change { opacity: .6; }
-.ag-transcript { display: grid; gap: .55rem; width: 100%; max-width: 640px; max-height: 340px; overflow-y: auto; padding: .4rem; text-align: start; scroll-behavior: smooth; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 28px); mask-image: linear-gradient(to bottom, transparent 0, #000 28px); }
+.ag-transcript { display: grid; gap: .7rem; width: 100%; max-width: 640px; max-height: 340px; overflow-y: auto; padding: .4rem; text-align: start; scroll-behavior: smooth; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 28px); mask-image: linear-gradient(to bottom, transparent 0, #000 28px); }
 .ag-convo .ag-transcript { -webkit-mask-image: none; mask-image: none; }
-.ag-bubble { max-width: 86%; padding: .65rem .9rem; border-radius: 16px; line-height: 1.55; font-size: .95rem; animation: ag-rise .3s var(--ag-ease) forwards; opacity: 0; transform: translateY(6px); }
+.ag-bubble { max-width: 86%; padding: .7rem .95rem; border-radius: 16px; line-height: 1.65; font-size: .95rem; animation: ag-rise .3s var(--ag-ease) forwards; opacity: 0; transform: translateY(6px); }
 .ag-bubble.is-agent { justify-self: start; background: var(--ag-soft); border-end-start-radius: 6px; }
 .ag-bubble.is-caller { justify-self: end; background: var(--bg); border: 1px solid var(--line); border-end-end-radius: 6px; }
 .ag-bubble.is-event { justify-self: center; background: color-mix(in srgb, var(--ag-ok) 12%, transparent); color: var(--ag-ok); font-size: .86rem; font-weight: 600; }
 .ag-bubble small { display: block; font-size: .76rem; color: var(--muted); font-weight: 700; margin-bottom: .15rem; }
+/* A change of speaker gets more room than two lines of the same one. */
+.ag-bubble.is-agent + .ag-bubble.is-caller, .ag-bubble.is-caller + .ag-bubble.is-agent { margin-top: .5rem; }
+/* A line written again (from the caller's voice, or the agent's in Arabic letters) settles in softly. */
+.ag-bubble.is-fixed { animation: ag-fixed .5s ease; opacity: 1; transform: none; }
+@keyframes ag-fixed { from { opacity: .45; } }
 /* The business's own links, written in the chat when the caller asks for them (show_links). */
 .ag-bubble.is-links { min-width: min(300px, 86%); }
 .ag-chat-links { display: grid; gap: .4rem; margin-top: .35rem; }

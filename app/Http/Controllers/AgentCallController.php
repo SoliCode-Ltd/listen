@@ -361,6 +361,18 @@ class AgentCallController extends Controller
             Str::limit((string) ($in['heard'] ?? ''), 600, ''), Str::limit((string) ($in['said'] ?? ''), 600, ''))]);
     }
 
+    /** An agent line of an Arabic call that came out in Latin letters, written in Arabic ones. Answers { text }. */
+    public function agentLine(Request $request, string $conversation): JsonResponse
+    {
+        $in = $this->body($request);
+        $c = $this->calls->findByKey($conversation, (string) ($in['call_key'] ?? ''));
+        if (! $c) {
+            return $this->error('not_found', 404);
+        }
+
+        return response()->json(['text' => $this->calls->writeAgentLine($c, (int) ($in['n'] ?? 0), Str::limit((string) ($in['text'] ?? ''), 600, ''))]);
+    }
+
     public function end(Request $request, string $conversation): JsonResponse
     {
         $in = $this->body($request);
@@ -393,6 +405,8 @@ class AgentCallController extends Controller
             'speaks_first' => true,
             // Each caller line written again from their voice, in the agent's dialect (transcribe).
             'transcribe' => AgentAccess::callerTranscribe(),
+            // An Arabic agent's line that comes out in Latin letters is written in Arabic ones (agent-line).
+            'arabic_lines' => $agent->language !== 'en',
             'api' => url('/agent-api/calls/'.$c->public_id),
             'agent' => ['name' => $agent->name, 'language' => $agent->language],
         ];

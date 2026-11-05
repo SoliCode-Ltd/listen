@@ -16,9 +16,9 @@ use Illuminate\Support\Str;
 final class AgentLookup
 {
     /** Passages one look-up returns, and their words at most. */
-    public const MAX_PASSAGES = 3;
+    public const MAX_PASSAGES = 4;
 
-    public const MAX_CHARS = 2_400;
+    public const MAX_CHARS = 3_200;
 
     private const PASSAGE_CHARS = 700;
 
@@ -53,16 +53,19 @@ final class AgentLookup
      */
     public static function search(Agent $agent, string $query, int $limit = self::MAX_PASSAGES): array
     {
-        return $agent->exists ? self::searchIn(self::pagesOf($agent), $query, $limit) : [];
+        return $agent->exists ? self::searchIn(self::pagesOf($agent), $query, $limit, (string) $agent->business_name) : [];
     }
 
     /**
      * The same, in pages given as they are (a check that reads a website without keeping it).
+     * The words of $business (the business's own name) that are common across its pages count
+     * only when the question has no other words: asked for "نائب رئيس مجلس إدارة الجمعية السعودية
+     * لطب العيون", the home page must not win on the society's name.
      *
      * @param  list<array{page: string, text: string}>  $pages
      * @return list<array{page: string, text: string}>
      */
-    public static function searchIn(array $pages, string $query, int $limit = self::MAX_PASSAGES): array
+    public static function searchIn(array $pages, string $query, int $limit = self::MAX_PASSAGES, string $business = ''): array
     {
         $terms = array_values(array_unique(array_filter(self::words($query), fn (string $w): bool => ! in_array($w, self::stops(), true))));
         if ($terms === []) {
@@ -76,7 +79,10 @@ final class AgentLookup
         // How rare each word is across the passages: a word on every page counts little.
         $df = array_fill_keys($terms, 0);
         foreach ($passages as &$passage) {
-            $passage['tokens'] = self::words($passage['page'].' '.$passage['text']);
+            // A home page's title ("الرئيسية", "Home") says nothing of what is on it, and
+            // "الرئيسية" (main) would match "رئيس" (president) on every one of its passages.
+            $title = in_array(implode(' ', self::words($passage['page'])), self::homeTitles(), true) ? '' : $passage['page'];
+            $passage['tokens'] = self::words($title.' '.$passage['text']);
             $passage['hits'] = [];
             foreach ($terms as $term) {
                 $tf = 0;
@@ -93,6 +99,16 @@ final class AgentLookup
         }
         unset($passage);
         $n = count($passages);
+        // The business's own name, common across its pages, counts only when nothing else was asked.
+        $own = self::words($business);
+        $common = array_values(array_filter($terms, fn (string $t): bool => in_array($t, $own, true) && $df[$t] >= max(2, 0.25 * $n)));
+        if ($common !== [] && count($common) < count($terms)) {
+            $terms = array_values(array_diff($terms, $common));
+            foreach ($passages as &$passage) {
+                $passage['hits'] = array_diff_key($passage['hits'], array_flip($common));
+            }
+            unset($passage);
+        }
         $scored = [];
         foreach ($passages as $i => $passage) {
             if ($passage['hits'] === []) {
@@ -112,10 +128,17 @@ final class AgentLookup
 
         $out = [];
         $chars = 0;
+        $fromPage = [];
         foreach ($scored as $i => $score) {
             if (count($out) >= $limit || $score < $floor) {
                 break;
             }
+            // Two passages of one page at most, so one long page cannot crowd out the others.
+            $page = $passages[$i]['page'];
+            if (($fromPage[$page] ?? 0) >= 2) {
+                continue;
+            }
+            $fromPage[$page] = ($fromPage[$page] ?? 0) + 1;
             $text = $passages[$i]['text'];
             if ($chars + mb_strlen($text) > self::MAX_CHARS) {
                 $text = Str::limit($text, max(0, self::MAX_CHARS - $chars), '');
@@ -228,6 +251,15 @@ final class AgentLookup
         $n = min(4, $la, $lb);
 
         return mb_substr($a, 0, $n) === mb_substr($b, 0, $n) && abs($la - $lb) <= 4;
+    }
+
+    /** @return list<string> the titles a home page goes by, written one way */
+    private static function homeTitles(): array
+    {
+        static $titles = null;
+
+        return $titles ??= array_map(fn (string $t): string => implode(' ', self::words($t)),
+            ['الرئيسية', 'الصفحة الرئيسية', 'الرئيسيه', 'home', 'home page', 'homepage', 'main page']);
     }
 
     /** @return list<string> */
