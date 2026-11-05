@@ -817,7 +817,9 @@ class AgentCalls
             // whole line that sounded like service talk (the staging check, an English clip).
             'Write the words of the main voice in the recording: that is the caller. Leave out only a faint voice in the background behind them'
                 .($said !== '' ? ', such as the assistant\'s own words coming back through a speaker (it had just said: "'.Str::limit($said, 300, '').'")' : '').'.',
-            $heard !== '' ? 'An automatic speech recogniser wrote: "'.Str::limit($heard, 400, '').'". It is often wrong, and may even be in another language: use it only as a hint.' : null,
+            // On a quiet line the model copied this hint back (the staging check): it may help with a
+            // word that is hard to hear, never stand in for words that are not there.
+            $heard !== '' ? 'An automatic speech recogniser wrote: "'.Str::limit($heard, 400, '').'". It is often wrong, and may even be in another language: use it only to help with a word that is hard to hear. Never write a word you do not hear in the recording, and never translate what the recogniser wrote.' : null,
             'If the recording has no clear words, answer with nothing.',
             'Answer with the caller\'s words only, on one line, with no quotes, names or notes.',
         ]));
@@ -834,6 +836,11 @@ class AgentCalls
             return null;
         }
         if (mb_strlen($text) > min(800, max(80, 6 * mb_strlen(trim($heard))))) {
+            return null;
+        }
+        // The heard line given back as it was: nothing new to write.
+        $bare = fn (string $s): string => mb_strtolower(preg_replace('/[^\p{L}\p{N}]+/u', '', $s) ?? $s);
+        if (trim($heard) !== '' && $bare($text) === $bare($heard)) {
             return null;
         }
 

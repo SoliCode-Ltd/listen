@@ -166,7 +166,8 @@ class AgentCallerHearingTest extends TestCase
     {
         [$id, $key] = $this->startCall($this->agent());
         $this->travel(60)->seconds();
-        foreach (['', '(no speech)', str_repeat('كلام كثير جدًا ', 40)] as $i => $answer) {
+        // Nothing, a note, far more than the line, or the heard line given back as it was.
+        foreach (['', '(no speech)', str_repeat('كلام كثير جدًا ', 40), 'أيوه.'] as $i => $answer) {
             $this->heard = $answer;
             $this->callApi("/calls/{$id}/transcribe", ['call_key' => $key, 'n' => $i + 1, 'audio' => $this->voice(1), 'heard' => 'أيوه'])->assertOk()->assertJsonPath('text', null);
         }
