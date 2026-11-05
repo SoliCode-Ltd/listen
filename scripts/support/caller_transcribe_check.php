@@ -88,8 +88,8 @@ $clips = [
     ['ar-lb-2', 'ar', 'ar-LB', 'Tamam ya ustaz Jad, w raqmak'],
     ['ar-ae-1', 'ar', 'ar-AE', 'unbelievable'],
     ['en-us-2', 'en', 'en-US', 'شكرا جيك'],
-    ['en-us-2', 'en', 'en-US', ''],
 ];
+// (A call always has a hint: a caller line only exists once the live transcription heard something.)
 // The thinking level hearCaller uses ("minimal" was slower and gave empty answers here).
 $levels = ['low'];
 
@@ -103,9 +103,11 @@ for ($i = 0; $i < 32000; $i++) {
     $noise .= pack('v', (mt_rand(-60, 60)) & 0xFFFF);
 }
 $agent = new Agent(['name' => 'Check', 'business_name' => 'Check', 'language' => 'ar', 'dialect' => 'ar-SA']);
-$quiet = $gemini->transcribe(AgentCalls::hearPrompt($agent, 'شكرا', ''), AgentCalls::wav($noise, 16000), 15);
-echo PHP_EOL.'== a quiet line (2 s of faint noise)'.PHP_EOL.'  answer: '.json_encode($quiet, JSON_UNESCAPED_UNICODE).PHP_EOL;
-$check(AgentCalls::cleanHeard($quiet, 'شكرا') === null, 'nothing is made up from a quiet line');
+foreach (['شكرا', 'unbelievable'] as $hint) {
+    $quiet = $gemini->transcribe(AgentCalls::hearPrompt($agent, $hint, ''), AgentCalls::wav($noise, 16000), 15);
+    echo PHP_EOL.'== a quiet line (2 s of faint noise), hint "'.$hint.'"'.PHP_EOL.'  answer: '.json_encode($quiet, JSON_UNESCAPED_UNICODE).PHP_EOL;
+    $check(AgentCalls::cleanHeard($quiet, $hint) === null, 'nothing is made up from a quiet line (an echo of the hint changes nothing)');
+}
 foreach ($clips as [$clip, $language, $dialect, $hint]) {
     $file = public_path("audio/agents/calls/{$clip}.mp3");
     $words = $said($clip, $language);
