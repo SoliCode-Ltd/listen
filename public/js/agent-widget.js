@@ -194,7 +194,7 @@
     '.lva.is-right .lva-bartip{right:0}.lva.is-left .lva-bartip{left:0}',
     '.lva-bartip.is-error{color:#D0335F}',
 
-    '@media (max-width:480px){.lva{bottom:14px}.lva.is-right{right:14px}.lva.is-left{left:14px}.lva:not(.is-preview) .lva-panel{position:fixed;left:10px !important;right:10px !important;bottom:calc(var(--h) + 26px);width:auto;max-width:none}}',
+    '@media (max-width:480px){.lva{bottom:14px}.lva.is-right{right:14px}.lva.is-left{left:14px}.lva:not(.is-preview):not(.is-inline) .lva-panel{position:fixed;left:10px !important;right:10px !important;bottom:calc(var(--h) + 26px);width:auto;max-width:none}}',
     '@keyframes lva-enter{from{opacity:0;transform:translateY(14px) scale(.96)}}',
     '@keyframes lva-pop{from{opacity:0;transform:scale(.92)}}',
     '@keyframes lva-hello{to{box-shadow:0 0 0 12px transparent}}',
@@ -207,6 +207,14 @@
     '@keyframes lva-in{from{opacity:0;transform:translateY(6px)}}',
     '@keyframes lva-fill{to{stroke-dashoffset:0}}',
     '@media (prefers-reduced-motion:reduce){.lva *,.lva *::before,.lva *::after{animation:none !important;transition:none !important}}',
+    /* The link page: the same card, open in the page, with no button to open it and nothing to close. */
+    '.lva.is-inline,.lva.is-inline.is-right,.lva.is-inline.is-left{position:relative;inset:auto;z-index:auto;display:flex;justify-content:center;width:100%}',
+    '.lva.is-inline .lva-dock{display:none}',
+    '.lva.is-inline .lva-panel{position:relative;inset:auto;width:min(400px,100%);max-width:none;max-height:none;opacity:1;transform:none;pointer-events:auto;visibility:visible;transition:none}',
+    '.lva.is-inline .lva-head .lva-x{display:none}',
+    '.lva.is-inline .lva-lines,.lva.is-inline .lva-lines.has-links{max-height:min(420px,46vh)}',
+    // The link page of an agent that is not taking calls: the button stays, dimmed, under the reason.
+    '.lva.is-inline .lva-call:disabled,.lva.is-inline .lva-call:disabled:hover{background:var(--a);opacity:.45;cursor:not-allowed;box-shadow:none;transform:none}',
   ].join('\n');
 
   var ICONS = {
@@ -287,6 +295,9 @@
 
     var text, look, states;
     var stateNow = 'idle', call = null, starting = false, muted = false, pendingError = '', open = false;
+    // The link page (ListenAgentWidget.page): the card open in the page, never closed.
+    var inline = !!opts.inline;
+    if (inline) open = true;
     var startedAt = 0, tick = 0, demo = null;
     // Every line busy: the caller's place in line, then the number they left (waiting, busy, sent).
     var waitPos = 0, sentTo = null;
@@ -297,13 +308,14 @@
       text = cfg.text || {};
       states = text.states || {};
       look = cfg.look || {};
+      if (inline && look.style === 'bar') { var asCard = {}; for (var lk in look) asCard[lk] = look[lk]; asCard.style = 'orb'; look = asCard; }
       var colors = cfg.colors || ['#2A1A8F', '#7659FA', '#C9BEFF', '#F4F1FF'];
       var pageRtl = opts.rtl != null ? !!opts.rtl : (getComputedStyle(document.documentElement).direction === 'rtl' || document.documentElement.dir === 'rtl');
       var side = (look.position === 'start') !== pageRtl ? 'left' : 'right';
       var theme = look.theme === 'dark' || (look.theme !== 'light' && (opts.dark != null ? opts.dark : isDarkPage())) ? 'dark' : 'light';
       var accent = hexRgb(look.accent) ? look.accent : '#7659FA';
 
-      box.className = 'lva is-' + side + (preview ? ' is-preview' : '');
+      box.className = 'lva is-' + side + (preview ? ' is-preview' : '') + (inline ? ' is-inline' : '');
       box.dir = cfg.dir === 'rtl' ? 'rtl' : 'ltr';
       box.lang = cfg.language === 'en' ? 'en' : 'ar';
       box.setAttribute('data-theme', theme);
@@ -489,6 +501,10 @@
       box.appendChild(dock);
       box.classList.toggle('is-open', open && !bar);
       paintState();
+      if (inline && cfg.available === false && parts.call) {
+        parts.call.disabled = true;
+        if (parts.state) { parts.state.hidden = false; parts.state.textContent = text.paused || ''; }
+      }
     }
 
     function linkButton(label, onClick) {
@@ -514,7 +530,7 @@
     }
 
     function setOpen(v) {
-      if (look.style === 'bar') return;
+      if (look.style === 'bar' || inline) return;
       open = v;
       box.classList.toggle('is-open', v);
       parts.launch.setAttribute('aria-expanded', v ? 'true' : 'false');
@@ -605,7 +621,7 @@
         err.hidden = true;
         fetch(ctx.origin + '/agent-api/callbacks', {
           method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-          body: JSON.stringify({ key: ctx.key, visitor: visitorId(), name: who, phone: number }),
+          body: JSON.stringify(ctx.slug ? { slug: ctx.slug, visitor: visitorId(), name: who, phone: number } : { key: ctx.key, visitor: visitorId(), name: who, phone: number }),
         }).then(function (r) {
           return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok && d.ok, d: d || {} }; });
         }).then(function (res) {
@@ -782,6 +798,7 @@
     }
     function toggleCall() {
       if (preview) { demo ? demo.stop() : runDemo(); return; }
+      if (inline && cfg.available === false) return;
       if (call) { call.end(); return; }
       if (starting) return;
       starting = true;
@@ -794,7 +811,7 @@
           begin: function () {
             return fetch(ctx.origin + '/agent-api/calls', {
               method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-              body: JSON.stringify({ key: ctx.key, page_url: location.href, visitor: visitorId(), caller: ctx.caller || undefined }),
+              body: JSON.stringify(ctx.slug ? { slug: ctx.slug, page_url: location.href, visitor: visitorId() } : { key: ctx.key, page_url: location.href, visitor: visitorId(), caller: ctx.caller || undefined }),
             }).then(function (r) { return r.json().catch(function () { return {}; }); });
           },
           onState: function (s) { setState(s); },
@@ -887,5 +904,11 @@
     return build(cfg, { origin: opts.origin || '' }, { preview: true, into: into, rtl: opts.rtl, dark: opts.dark, siteFont: opts.siteFont });
   }
 
-  window.ListenAgentWidget = { mount: mount, preview: preview };
+  /* The link page: the same card, open in `into`, its calls asked for by the link (o.slug). */
+  function page(into, cfg, o) {
+    o = o || {};
+    return build(cfg, { origin: o.origin || '', slug: o.slug || '', callScript: o.callScript || '' }, { inline: true, into: into, dark: o.dark });
+  }
+
+  window.ListenAgentWidget = { mount: mount, preview: preview, page: page };
 })();

@@ -339,8 +339,6 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-callback-tick { justify-self: center; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--ag-soft); color: var(--a); }
 .ag-callback-tick svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .ag-callback-done bdi { color: var(--text); font-weight: 700; }
-/* Leaving a number, or done: the microphone note no longer applies. */
-.ag-talkpage-card:has([data-ag-callback]:not([hidden]), [data-ag-callback-done]:not([hidden])) .ag-talkpage-mic { display: none; }
 @media (prefers-reduced-motion: reduce) { .ag-talk-stage.is-waiting .ag-talk-ring .p, .ag-talk-pos i, .ag-callback { animation: none; } }
 
 .ag-talk-buttons { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; }
@@ -562,22 +560,10 @@ html[dir="rtl"] .ag-convo-more summary svg { transform: scaleX(-1); }
 .ag-start-card h2 { font-size: 1.3rem; font-weight: 800; }
 .ag-start-card p { color: var(--muted); line-height: 1.6; }
 
-/* The link page. */
-.ag-talkpage { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 2rem 1rem; background: var(--bg); }
-.ag-talkpage-card { width: min(460px, 100%); display: grid; justify-items: center; gap: 1.1rem; padding: clamp(1.3rem, 5vw, 2rem); text-align: center; }
-.ag-talkpage-who { display: flex; align-items: center; gap: .8rem; width: 100%; padding-bottom: 1rem; border-bottom: 1px solid var(--line); text-align: start; }
-.ag-talkpage-face { position: relative; display: grid; place-items: center; width: 52px; height: 52px; flex: 0 0 auto; border-radius: 50%; background: var(--ag-soft); color: var(--accent-text, var(--a)); font-size: 1.3rem; font-weight: 800; box-shadow: 0 0 0 1px var(--line); }
-.ag-talkpage-face img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-.ag-talkpage-face.is-live::after { content: ""; position: absolute; bottom: 1px; inset-inline-end: 1px; width: 12px; height: 12px; border-radius: 50%; background: var(--ag-ok); box-shadow: 0 0 0 2.5px var(--surface); }
-.ag-talkpage-who h1 { font-size: 1.15rem; font-weight: 800; line-height: 1.35; }
-.ag-talkpage-who p { margin-top: .1rem; color: var(--muted); font-size: .86rem; }
-.ag-talkpage-intro { max-width: 36ch; margin: .2rem 0 0; color: var(--muted); font-size: .95rem; line-height: 1.65; }
-.ag-talkpage-mic { display: inline-flex; align-items: center; gap: .45rem; margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.55; white-space: nowrap; }
-.ag-talkpage-mic svg { width: 15px; height: 15px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.ag-talkpage-card .ag-hint { max-width: 40ch; }
-.ag-talkpage-foot { color: var(--muted); font-size: .8rem; }
-.ag-talkpage-foot a { display: inline-block; padding: .75rem .9rem; color: inherit; font-weight: 700; text-decoration: none; border-radius: 10px; }
-.ag-talkpage-foot a:hover { color: var(--a); }
+/* The link page: the website button's own call card, open in the middle of the page, and the report link under it. */
+.ag-talkpage { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; align-content: center; gap: .75rem; padding: 2rem 1rem; background: var(--bg); }
+.ag-talkpage-call { display: block; width: min(400px, 100%); min-height: 320px; }
+.ag-talkpage-call > [data-listen-agent] { display: block; width: 100%; }
 
 @media (max-width: 920px) {
   .ag-two, .ag-live-grid { grid-template-columns: minmax(0, 1fr); }

@@ -83,7 +83,9 @@ class AgentCallFlowTest extends TestCase
 
         $page = $this->get('/talk/'.$slug)->assertOk();
 
-        $page->assertSee('Cairo Smiles')->assertSee('data-ag-talk', false)
+        $page->assertSee('Cairo Smiles')->assertSee('data-ag-talk-card', false)
+            // The same call card as the website button, from the same script.
+            ->assertSee('js/agent-widget.js', false)->assertDontSee('js/agents.js', false)
             ->assertHeader('X-Robots-Tag', 'noindex, nofollow')
             // Listen's own support chat is not on a business's page, nor the owner's costs.
             ->assertDontSee('id="whatsappWidget"', false)

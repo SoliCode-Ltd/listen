@@ -160,8 +160,22 @@ class AgentBusyLinesTest extends TestCase
         $this->assertArrayNotHasKey('note', $text['callback']);
 
         $widget->forceFill(['link_enabled' => true])->save();
-        $this->get('/talk/'.$widget->slug)->assertOk()->assertSee('data-ag-callback', false)
-            ->assertSee(trans('agents.callback.send', [], 'ar'))->assertSee('\u0022callback\u0022', false);
+        // The link page opens the call button's own card, with the same words for a busy line.
+        $card = $this->talkCard((string) $this->get('/talk/'.$widget->slug)->assertOk()->getContent());
+        $this->assertSame($text, $card['text']);
+        $this->assertSame(trans('agents.callback.send', [], 'ar'), $card['text']['callback']['send']);
+    }
+
+    /**
+     * The call card the link page opens (window.LISTEN_TALK), decoded.
+     *
+     * @return array<string, mixed>
+     */
+    private function talkCard(string $html): array
+    {
+        $this->assertSame(1, preg_match("#window\.LISTEN_TALK = JSON\.parse\('(.*?)'\);#s", $html, $m), 'the link page has no call card');
+
+        return json_decode((string) json_decode('"'.$m[1].'"'), true)['card'];
     }
 
     public function test_more_calls_at_once_on_every_agent_plan_and_a_number_set_by_hand_stays(): void

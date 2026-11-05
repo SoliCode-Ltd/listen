@@ -26,7 +26,10 @@ class AgentCallController extends Controller
 {
     public function __construct(private AgentCalls $calls) {}
 
-    /** The link page: it also works as a QR code. */
+    /**
+     * The link page (it also works as a QR code): the very call card the website button opens, with
+     * the agent's own look, shown open in the middle of the page.
+     */
     public function talk(string $slug): View|Response
     {
         $widget = AgentWidget::where('slug', $slug)->first();
@@ -39,8 +42,7 @@ class AgentCallController extends Controller
         return response()->view('agents.talk', [
             'agent' => $agent,
             'widget' => $widget,
-            'voice' => $agent->speaker_id ? AgentVoices::find($agent->speaker_id, $agent->language, $agent->language !== 'en') : null,
-            'available' => $agent->isLive(),
+            'card' => $this->card($agent, $widget),
         ])->header('X-Robots-Tag', 'noindex, nofollow');
     }
 
@@ -58,13 +60,25 @@ class AgentCallController extends Controller
 
             return response()->json(['error' => 'origin', 'message' => __('agents.error_origin')], 403);
         }
+        $this->seen($widget, $request);
+
+        return response()->json($this->card($agent, $widget))->header('Cache-Control', 'public, max-age=60');
+    }
+
+    /**
+     * The call card's settings: its words, look, voice and photo, the same for the website button
+     * and the link page.
+     *
+     * @return array<string, mixed>
+     */
+    private function card(Agent $agent, AgentWidget $widget): array
+    {
         $ar = $agent->language !== 'en';
         $voice = $agent->speaker_id ? AgentVoices::find($agent->speaker_id, $agent->language, $ar) : null;
-        $this->seen($widget, $request);
         $locale = $ar ? 'ar' : 'en';
         $look = $widget->style();
 
-        return response()->json([
+        return [
             'available' => $agent->isLive(),
             // The button and the call, versioned: a new version reaches every website on its own.
             'assets' => [
@@ -94,7 +108,7 @@ class AgentCallController extends Controller
                 // After a call, one line: "Call ended after 01:24".
                 'ended_after' => trans('agents.talk_ended_after', [], $locale),
             ] + self::lineText($agent, $locale),
-        ])->header('Cache-Control', 'public, max-age=60');
+        ];
     }
 
     /**

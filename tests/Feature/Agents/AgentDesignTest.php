@@ -167,8 +167,15 @@ class AgentDesignTest extends TestCase
         $agent = $this->agent(User::factory()->create());
         app()->setLocale('ar');
         $html = (string) $this->get('/talk/'.$agent->mainWidget()->slug)->assertOk()->getContent();
-        // The footer: only "Powered by Listen" (the page's description for search engines may still say it is an AI assistant).
-        $this->assertMatchesRegularExpression('#<p class="ag-talkpage-foot"><a [^>]+>('.preg_quote(trans('agents.powered', [], 'ar'), '#').'|'.preg_quote(trans('agents.powered', [], 'en'), '#').')</a></p>#u', $html);
+        // The page opens the website button's own call card, whose footer only says "Powered by Listen"
+        // (the page's description for search engines may still say it is an AI assistant).
+        $this->assertSame(1, preg_match("#window\.LISTEN_TALK = JSON\.parse\('(.*?)'\);#s", $html, $m), 'the link page has no call card');
+        $card = json_decode((string) json_decode('"'.$m[1].'"'), true)['card'];
+        $this->assertContains($card['text']['powered'], [trans('agents.powered', [], 'ar'), trans('agents.powered', [], 'en')]);
         $this->assertStringNotContainsString('<p class="ag-hint">', $html);
+        // Nothing of the old page's own card is left beside it: no second orb, footer or microphone note.
+        foreach (['data-orb="', 'ag-talkpage-foot', 'ag-talkpage-mic', 'ag-talkpage-card'] as $old) {
+            $this->assertStringNotContainsString($old, $html);
+        }
     }
 }

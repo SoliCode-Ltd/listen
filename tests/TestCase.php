@@ -15,6 +15,10 @@ abstract class TestCase extends BaseTestCase
         // Tests must never reach real services (Google, Gemini, Stripe, geo-IP):
         // any HTTP call that is not faked fails the test instead of leaving the machine.
         \Illuminate\Support\Facades\Http::preventStrayRequests();
+
+        // A migration can ask about a column before a later one adds it, and once() keeps the
+        // answer: let it go, so the first test of a run sees the finished database like the rest.
+        \Illuminate\Support\Once::flush();
     }
 
     /**
