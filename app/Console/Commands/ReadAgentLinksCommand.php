@@ -51,8 +51,10 @@ class ReadAgentLinksCommand extends Command
                     ->where('updated_at', '<', now()->subMinutes(AgentLinkReads::FAILED_AGAIN_MINUTES - 10))))
             ->whereHas('agent', fn ($q) => $q->where('status', Agent::LIVE)->orWhere('updated_at', '>', now()->subDays(7)))
             ->orderBy('updated_at')->limit(max(0, $limit - $sent) * 10)->pluck('agent_id')->unique()->take(max(0, $limit - $sent));
-        foreach ($due as $agentId) {
-            ReadAgentLinks::dispatch((int) $agentId, true);
+        // Spread over the hour (half a minute apart, at most 50 minutes), so a site that allows each
+        // server only a few reads at a time (X) is not asked for many accounts at once.
+        foreach ($due->values() as $i => $agentId) {
+            ReadAgentLinks::dispatch((int) $agentId, true)->delay(now()->addSeconds(min(3000, $i * 30)));
             $sent++;
         }
         if ($sent > 0) {

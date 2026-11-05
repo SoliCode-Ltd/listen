@@ -260,6 +260,8 @@ class AgentLinkReadsTest extends TestCase
 
     public function test_links_are_read_again_every_few_hours_and_an_older_agent_gets_its_links_read(): void
     {
+        // A still clock: the runs' half-minute spacing is checked exactly.
+        $this->freezeTime();
         Queue::fake();
         $owner = User::factory()->create();
         $old = $this->agent($owner, ['status' => Agent::LIVE, 'settings' => ['links' => [['network' => 'telegram', 'url' => 'https://t.me/sos_channel']]]]);
@@ -280,11 +282,16 @@ class AgentLinkReadsTest extends TestCase
         $this->artisan('agents:read-links')->assertSuccessful();
 
         $sent = [];
-        Queue::assertPushed(ReadAgentLinks::class, function (ReadAgentLinks $job) use (&$sent) {
+        $delays = [];
+        Queue::assertPushed(ReadAgentLinks::class, function (ReadAgentLinks $job) use (&$sent, &$delays) {
             $sent[$job->agentId] = $job->due;
+            $delays[] = $job->delay ? (int) round(now()->diffInSeconds($job->delay)) : 0;
 
             return true;
         });
+        // The due ones are spread out, half a minute apart.
+        sort($delays);
+        $this->assertSame([0, 0, 30], $delays);
         ksort($sent);
         $this->assertSame([$old->id => false, $stale->id => true, $busy->id => true], $sent);
         $this->assertTrue(AgentLinkReads::isDue(AgentSource::where('agent_id', $busy->id)->firstOrFail()));

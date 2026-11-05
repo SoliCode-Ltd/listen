@@ -27,13 +27,16 @@ class ReadAgentLinks implements ShouldBeUniqueUntilProcessing, ShouldQueue
     // Under the workers' --timeout=150 (README); each link is a request or two of at most 12 s.
     public int $timeout = 140;
 
-    public int $uniqueFor = 900;
+    // One waiting run for an agent, also while the hourly runs are spread over the hour.
+    public int $uniqueFor = 3600;
 
     public function __construct(public int $agentId, public bool $due = false) {}
 
+    // The owner's new links are never held up by an hourly run waiting its turn (that one then
+    // skips what was just read).
     public function uniqueId(): string
     {
-        return (string) $this->agentId;
+        return $this->agentId.($this->due ? ':due' : '');
     }
 
     public function handle(LinkReader $reader): void
