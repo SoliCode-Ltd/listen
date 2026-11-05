@@ -305,6 +305,19 @@ return [
     'updates_at' => 'Last updated :date',
     'updates_badge' => 'Newest first',
     // Knowledge → Social media links (AgentLinks): written in the call's chat when a caller asks for them.
+    // Knowledge → Your website: every page, which the agent looks things up in during a call (AgentSite).
+    'site' => [
+        'title' => 'Your website',
+        'hint' => 'The agent reads every page of your website, including the words in pictures such as a list of names, and looks up what callers ask during the call.',
+        'ready' => '{1} The agent has read 1 page of :site.|[2,*] The agent has read :count pages of :site.',
+        'read_on' => 'Last read on :date.',
+        'reading' => 'The agent is reading your website now. This takes a minute or two.',
+        'failed' => 'The agent couldn\'t read :site. Check that it opens in a browser, then read it again.',
+        'none' => 'The agent will read every page of :site in the next few minutes.',
+        'again' => 'Read the website again',
+        'again_done' => 'Reading your website again…',
+        'again_error' => 'The website couldn\'t be read again just now. Try again in a few minutes.',
+    ],
     'links_title' => 'Social media links',
     'links_hint' => 'Your accounts, your website, and pages where your news is posted. The agent reads their newest posts, so it knows your latest news, and writes your accounts in the call\'s chat when a caller asks for them.',
     'links_empty' => 'No links yet. Paste a link to one of your accounts or a page with your news below.',
@@ -335,7 +348,7 @@ return [
         'failed' => 'Couldn\'t be read just now. The agent tries again every few hours.',
     ],
     'knowledge_notes_title' => 'Your notes',
-    'knowledge_notes_hint' => 'Prices, hours and policies in your own words. Your agent answers from your latest updates, your notes and your files, and from nothing else.',
+    'knowledge_notes_hint' => 'Prices, hours and policies in your own words. Your agent answers from your latest updates, your notes, your files and your website, and from nothing else.',
     // Files the owner uploads (a menu, a price list, a brochure): read once, used on every call.
     'files' => [
         'title' => 'Files',

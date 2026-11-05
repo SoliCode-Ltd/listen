@@ -265,6 +265,20 @@
               <button type="submit" class="ag-btn ag-btn-primary">{{ __('agents.edit_save') }}</button>
             </div>
           </form>
+          {{-- Your website: every page of it, which the agent looks things up in during a call (AgentSite). --}}
+          @if($agent->website_url)
+            @php $siteRead = \App\Support\Agents\AgentSite::state($agent); @endphp
+            <section class="ag-card ag-kb-site" data-ag-site data-state="{{ $siteRead['state'] }}" aria-labelledby="ag-site-title">
+              <div class="ag-kb-head">
+                <h2 id="ag-site-title">{{ __('agents.site.title') }}</h2>
+                <p class="ag-hint">{{ __('agents.site.hint') }}</p>
+              </div>
+              <div class="ag-kb-site-foot">
+                <p class="ag-link-read is-{{ $siteRead['state'] }}" data-ag-site-text role="status">{{ $siteRead['text'] }}</p>
+                <button type="button" class="ag-btn ag-btn-sm" data-ag-site-again @disabled($siteRead['state'] === 'reading')><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg>{{ __('agents.site.again') }}</button>
+              </div>
+            </section>
+          @endif
           {{-- Social media links: the business's own accounts and website (found on its website or added
                here), which the agent writes in the call's chat when a caller asks (AgentLinks). --}}
           @php $agentLinks = \App\Support\Agents\AgentLinkReads::rows($agent); $linksMax = \App\Support\Agents\AgentLinks::MAX; @endphp
@@ -529,7 +543,7 @@
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
         'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'),
         'site_remove' => __('agents.live_site_remove'), 'site_remove_short' => __('agents.live_site_remove_short'), 'site_invalid' => __('agents.live_site_invalid'), 'site_exists' => __('agents.live_site_exists'), 'site_max' => __('agents.live_site_max'),
-        'links_remove' => __('agents.links_remove'), 'links_saved' => __('agents.links_saved'), 'links_finding' => __('agents.links_finding'), 'links_your_site' => __('agents.links_your_site'), 'links_read_only' => __('agents.links_read_only'), 'links_read_only_hint' => __('agents.links_read_only_hint'),
+        'links_remove' => __('agents.links_remove'), 'links_saved' => __('agents.links_saved'), 'links_finding' => __('agents.links_finding'), 'links_your_site' => __('agents.links_your_site'), 'site_again_done' => __('agents.site.again_done'), 'site_again_error' => __('agents.site.again_error'), 'links_read_only' => __('agents.links_read_only'), 'links_read_only_hint' => __('agents.links_read_only_hint'),
         'play' => __('agents.voice_play'), 'pause' => __('agents.voice_pause'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
         'status' => __('agents.status'),
         'files' => __('agents.files'),

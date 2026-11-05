@@ -24,8 +24,12 @@ final class AgentLinkReads
     /** A link not read the last time (a site that was busy, X's limit for each server) is tried again sooner. */
     public const FAILED_AGAIN_MINUTES = 60;
 
-    /** Reasons that do not pass in an hour (a page with no words, a private channel): read on the usual turn. */
-    public const LASTING = ['empty', 'invalid', 'closed'];
+    /**
+     * Reasons that do not pass in an hour (a private channel, a link that is no account): read on
+     * the usual turn. A page with no words is tried again in an hour like any other: its words may
+     * have been in a picture, or a page an older reader could not read.
+     */
+    public const LASTING = ['invalid', 'closed'];
 
     /** All the links' posts and pages in the agent's instructions, at most. */
     public const MAX_CHARS = 6_000;
