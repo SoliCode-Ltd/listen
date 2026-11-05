@@ -138,10 +138,32 @@ class CallBackgroundTest extends TestCase
         $this->assertStringContainsString('bgSrc.loopStart = from;', $script);
         $this->assertStringContainsString('bgSrc.loopEnd = to;', $script);
         // Straight to the speaker: the orb and the level only follow the agent's own sound.
-        $this->assertStringContainsString('bgGain.connect(ctx.destination);', $script);
+        $this->assertStringContainsString('bgGain.connect(vctx.destination);', $script);
         // Starts when the call connects and stops with it.
         $this->assertMatchesRegularExpression('/m\.setupComplete\)\s*\{\s*set\(\'listening\'\);\s*startBackground\(\);/', $script);
         $this->assertMatchesRegularExpression('/cancelAnimationFrame\(raf\);\s*stopBackground\(\);/', $script);
+    }
+
+    public function test_the_agents_voice_plays_at_its_own_rate_and_its_goodbye_is_never_cut(): void
+    {
+        $script = (string) file_get_contents(public_path('js/agent-call.js'));
+
+        // The voice (24 kHz) in an audio engine of its own at 24 kHz, so no piece is converted on its own
+        // with the browser's rough converter (a metallic shimmer and a dull top); the microphone keeps an
+        // engine at the device's rate. Each piece goes to that engine, and both close at the end.
+        $this->assertStringContainsString('new AC({ sampleRate: 24000 })', $script);
+        $this->assertStringContainsString('vctx = voiceEngine() || ctx;', $script);
+        $this->assertStringContainsString('var b = vctx.createBuffer(1, f.length, 24000);', $script);
+        $this->assertStringContainsString('outAnalyser.connect(vctx.destination);', $script);
+        $this->assertStringContainsString('micSource = ctx.createMediaStreamSource(stream);', $script);
+        $this->assertStringNotContainsString('ctx.createBuffer(', str_replace('vctx.createBuffer(', '', $script));
+        $this->assertSame(2, substr_count($script, 'closeEngines(300);'), 'busy and the end close both engines');
+        $this->assertSame(1, substr_count($script, 'closeEngines(0);'), 'an error closes both engines');
+
+        // The agent hangs up while its goodbye is still on its way: it plays to the end of the turn.
+        $this->assertStringContainsString('if (hangUp) hangUpAfterGoodbye();', $script);
+        $this->assertMatchesRegularExpression('/sc\.turnComplete\) \{ flushTurns\(\); dropTurn = false; if \(closing\) closingDone = true; \}/', $script);
+        $this->assertStringNotContainsString('if (hangUp) hungUp = true;', $script);
     }
 
     public function test_the_studio_has_the_same_office_as_a_place(): void
