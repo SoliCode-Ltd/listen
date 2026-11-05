@@ -164,6 +164,25 @@ foreach (array_unique(array_map('realpath', array_filter($dirs, 'is_dir'))) as $
         }
     }
 }
+echo "\n== PHP: how long the owner's agent requests took, and slow ones\n";
+foreach (array_unique(array_map('realpath', array_filter($dirs, 'is_dir'))) as $dir) {
+    foreach (['php-app.access.log', 'php-app.access.log.1'] as $name) {
+        if (is_file($dir.'/'.$name)) {
+            $rows = (string) shell_exec('grep -E "agents/agt_[a-z0-9]{24}/(links|site)" '.escapeshellarg($dir.'/'.$name).' 2>/dev/null | tail -n 20');
+            foreach (array_filter(explode("\n", $rows)) as $row) {
+                echo '  '.$name.': '.$clean(mb_substr(trim($row), 0, 220))."\n";
+            }
+        }
+    }
+    foreach (['php-app.slow.log', 'php-app.slow.log.1'] as $name) {
+        if (is_file($dir.'/'.$name)) {
+            $rows = (string) shell_exec('grep -E -B2 -A12 "script_filename|request_uri" '.escapeshellarg($dir.'/'.$name).' 2>/dev/null | grep -E "^\\[|agents/agt_|SiteReader|AgentController|AgentLink|AgentSite" | tail -n 30');
+            foreach (array_filter(explode("\n", $rows)) as $row) {
+                echo '  '.$name.': '.$clean(mb_substr(trim($row), 0, 200))."\n";
+            }
+        }
+    }
+}
 echo "\n== The site's addresses\n";
 $line('APP_URL', (string) config('app.url'));
 $line('session cookie domain', (string) (config('session.domain') ?: '(this address only)'));
