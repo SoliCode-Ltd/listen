@@ -149,6 +149,24 @@ foreach (array_slice($shown, -60) as $row) {
 $line('requests seen', $seen);
 $line('by method', json_encode($methods));
 $line('by the page they came from', json_encode($byFrom));
+echo "\n== Since 13:00 today: every agent page request, with the device it came from\n";
+foreach (array_unique(array_map('realpath', array_filter($dirs, 'is_dir'))) as $dir) {
+    foreach (glob($dir.'/backend_*access.log') ?: [] as $log) {
+        $tail = (string) shell_exec('tail -n 20000 '.escapeshellarg($log).' 2>/dev/null');
+        foreach (explode("\n", $tail) as $row) {
+            if (! preg_match('#\[(\d\d)/(\w{3})/(\d{4}):(\d\d):(\d\d):(\d\d)[^\]]*\]\s+"(\w+) ([^" ]*/agents(?:/agt_[a-z0-9]{24}(?:/[a-z-]+)?)?)[^"]*"\s+(\d{3})\s+\S+\s+"([^"]*)"\s+"([^"]*)"#', $row, $m)) {
+                continue;
+            }
+            if ($m[1] !== now()->format('d') || (int) $m[4] < 13) {
+                continue;
+            }
+            $ua = $m[11];
+            $device = (preg_match('/Android/', $ua) ? 'Android' : (preg_match('/iPhone|iPad/', $ua) ? 'iPhone' : (preg_match('/Windows/', $ua) ? 'Windows' : (preg_match('/Mac OS X/', $ua) ? 'Mac' : (preg_match('/Linux/', $ua) ? 'Linux' : 'other')))))
+                .' '.(preg_match('/Edg\//', $ua) ? 'Edge' : (preg_match('/Chrome\//', $ua) ? 'Chrome' : (preg_match('/Firefox\//', $ua) ? 'Firefox' : (preg_match('/Safari\//', $ua) ? 'Safari' : 'other'))));
+            echo '  '.$m[4].':'.$m[5].':'.$m[6].' '.str_pad($m[7], 7).' '.str_pad($clean($m[8]), 34).' -> '.$m[9].'  from '.str_pad((string) (parse_url($m[10], PHP_URL_HOST) ?: '-'), 18).' '.$device."\n";
+        }
+    }
+}
 echo "\n== Web server log files\n";
 foreach (array_unique(array_map('realpath', array_filter($dirs, 'is_dir'))) as $dir) {
     foreach (glob($dir.'/*') ?: [] as $f) {
