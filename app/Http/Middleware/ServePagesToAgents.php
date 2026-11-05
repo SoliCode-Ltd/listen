@@ -20,6 +20,7 @@ class ServePagesToAgents
 {
     private const PAGES = [
         'home', 'pricing', 'samples', 'seo.*', 'legal.*', 'browsers-extension.page', 'developers', 'contact',
+        'agents-landing', 'dub.page',
     ];
 
     public function handle(Request $request, Closure $next): Response

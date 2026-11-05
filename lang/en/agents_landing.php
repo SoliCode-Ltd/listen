@@ -4,6 +4,8 @@
 return [
     'meta_title' => 'Voice agents that answer your customers in their dialect',
     'meta_description' => 'A voice agent for your business: it answers calls on your website, a link or a QR code, in Egyptian, Saudi, Emirati, Levantine, Moroccan or English, day and night. Ready in two minutes.',
+    // The words search engines read for this page (no other company's name).
+    'meta_keywords' => 'AI voice agent, voice agent for business, AI receptionist, AI phone answering, AI call answering, Arabic voice agent, Arabic AI receptionist, AI voice assistant for websites, website call button, Egyptian Arabic voice agent, Saudi Arabic voice agent, Gulf Arabic voice agent, English voice agent, AI appointment booking, AI customer service calls, QR code voice assistant',
 
     'hero_title' => 'A voice that answers your customers, in their dialect',
     // The words of the title set in the brand colour (they must appear in it as written).
