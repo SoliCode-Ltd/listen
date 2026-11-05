@@ -33,6 +33,11 @@
  * The agent's words: the live transcription of its own voice sometimes writes its Arabic in Latin
  * letters ("tfaḍḍal, kammil su'alak"). Such a line of an Arabic agent (arabic_lines) is written in
  * Arabic letters, word for word, before it shows (POST …/agent-line), the same way (onFix).
+ *
+ * The agent's language: a line it starts in a language it should not speak (a test call on live:
+ * an Arabic agent answered in Spanish after three minutes) is stopped as soon as its first words
+ * show it, never written in the chat, and the agent is asked to say it again in the call's
+ * language (speaks). tongue() sorts a line the same way as App\Support\Agents\Tongue.
  */
 (function () {
   'use strict';
@@ -113,6 +118,38 @@
     return latin >= 6 && latin > arabic;
   }
 
+  /*
+   * Which language a line is in (the same rules as App\Support\Agents\Tongue): ar, short (too
+   * few letters to tell), latin (Arabic in Latin letters, a name), en, or other (Spanish, French,
+   * Portuguese, Italian or German from their words, accents and ¿ ¡; or another alphabet).
+   * Words that are also Arabic in Latin letters (el, la, de, ya, nos…) are left out.
+   */
+  function wordSet(list) { var o = {}; list.split(' ').forEach(function (w) { o[w] = 1; }); return o; }
+  var EU_WORDS = wordSet('que qué los las por para una está están puedo puede usted gracias hola también pero cómo cuándo dónde muy más información ahora momento ayudar ayudarte je vous nous est sont les des une pour avec pas oui merci bonjour très votre você não obrigado obrigada uma sono della grazie ich und ist nicht bitte danke');
+  var EN_WORDS = wordSet("the and you your are is would can have with this that what please thank thanks hello our will for it's i'm don't help sure let check");
+  function tongue(text) {
+    text = String(text || '');
+    var arabic = (text.match(/[\u0600-\u06FF\u0750-\u077F]/g) || []).length;
+    var latin = (text.match(/[A-Za-z\u00C0-\u024F\u1E00-\u1EFF]/g) || []).length;
+    var script = (text.match(/[\u0370-\u03FF\u0400-\u04FF\u0590-\u05FF\u0900-\u097F\u0E00-\u0E7F\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/g) || []).length;
+    if (script >= 4 && script > arabic && script > latin) return 'other';
+    if (arabic >= latin) return 'ar';
+    if (latin < 8) return 'short';
+    var lower = text.toLowerCase(), eu = 0, en = 0, seen = {};
+    (lower.match(/[a-z\u00C0-\u024F\u1E00-\u1EFF']+/g) || []).forEach(function (w) {
+      if (seen[w]) return;
+      seen[w] = 1;
+      if (EU_WORDS[w] === 1) eu++;
+      if (EN_WORDS[w] === 1) en++;
+    });
+    if (/[¿¡ñçßãõœ]/.test(lower)) eu += 2;
+    if ((lower.match(/[áéíóúàèìòùâêîôûäëïöü]/g) || []).length >= 2) eu += 1;
+    if (eu >= 2 && eu > en) return 'other';
+    return en >= 2 ? 'en' : 'latin';
+  }
+  // How many lines a call stops for their language at most, and how far apart it asks again (ms).
+  var MAX_REDO = 4, REDO_GAP = 8000;
+
   // How long a caller line waits for its better writing (ms), and how loud a 0.1 s piece of the
   // microphone must be to count as speech (16-bit RMS; a quiet room under noise suppression is ~100).
   var WAIT_FIX = 3500, VOICED = 450;
@@ -181,6 +218,9 @@
     // not), for writing that line again (transcribe). What the microphone hears while the agent
     // speaks waits apart (overlap): it is the caller only when they talk over the agent.
     var heard = [], overlap = [], callerSeq = 0, agentSeq = 0, queue = [], lastSaid = '';
+    // The language guard: the caller's last language, whether the agent's answer now coming is
+    // being dropped for its language (until that turn ends), and how often it happened.
+    var callerTongue = '', dropTurn = false, redone = 0, redoneAt = 0;
 
     function set(s) { if (state !== s) { state = s; opts.onState && opts.onState(s); } }
 
@@ -207,7 +247,12 @@
             opts.onWait && opts.onWait({ position: data.position || 0, waited: Math.round((Date.now() - since) / 1000) });
             set('waiting');
             waitTimer = setTimeout(attempt, Math.max(3, Math.min(10, data.retry_after || 5)) * 1000);
-          }, reject);
+          }, function (e) {
+            // No answer at all (the internet dropped): the page says so in its own words, never
+            // the browser's "Failed to fetch".
+            if (e && (e.name === 'TypeError' || (typeof navigator !== 'undefined' && navigator.onLine === false))) e.offline = true;
+            reject(e);
+          });
         })();
       });
     }
@@ -227,6 +272,7 @@
       var t = { role: role, text: isolate(text) };
       queue.push(t);
       if (role === 'agent') lastSaid = text;
+      if (role === 'caller') { var k = tongue(text); if (k !== 'short') callerTongue = k; }
       if (role === 'caller' && info && info.transcribe && info.api) hearAgain(t, text);
       if (role === 'agent' && info && info.arabic_lines && info.api && latinArabic(text)) writeAgain(t, text);
       drain();
@@ -239,7 +285,7 @@
       var done = false;
       var letGo = function () { if (t.wait) { t.wait = false; drain(); } };
       var timer = setTimeout(letGo, WAIT_FIX);
-      post(info.api + '/agent-line', { call_key: info.call_key, n: t.a, text: latin }).then(function (r) {
+      post(info.api + '/agent-line', { call_key: info.call_key, n: t.a, text: latin, wrong: wrongTongue(latin) ? 1 : 0 }).then(function (r) {
         if (done) return;
         done = true;
         var fixed = r && typeof r.text === 'string' ? spoken(r.text).trim() : '';
@@ -362,7 +408,7 @@
     }
 
     function play(data) {
-      if (hungUp) return;
+      if (hungUp || dropTurn) return;
       var f = pcmFrom(data);
       if (!f.length) return;
       var b = ctx.createBuffer(1, f.length, 24000);
@@ -385,6 +431,37 @@
         }
       };
       set('speaking');
+    }
+    // Whether an agent line is in a language it should not speak: never another language; an
+    // Arabic agent speaks English only after the caller did, and an English agent Arabic.
+    function ownTongue() { return info && info.agent && info.agent.language === 'en' ? 'en' : 'ar'; }
+    function wrongTongue(text) {
+      if (!info) return false;
+      var own = ownTongue(), caller = callerTongue || own, k = tongue(spoken(String(text || '')));
+      if (k === 'other') return true;
+      if (k === 'en') return own !== 'en' && caller !== 'en' && caller !== 'latin';
+      if (k === 'ar') return own === 'en' && caller !== 'ar' && caller !== 'latin';
+      return false;
+    }
+    // The language the agent is asked to speak: the call's, or the caller's English (or Arabic).
+    function callTongue() {
+      var own = ownTongue();
+      if (own === 'en') return callerTongue === 'ar' ? 'Arabic' : 'English';
+      return callerTongue === 'en' ? 'English' : (info && info.speaks) || 'Arabic';
+    }
+    // An answer the agent starts in a wrong language: its sound stops at once, it is not written
+    // in the chat, and the agent is asked (once in a while) to say it again in the call's language.
+    // What it sends until that answer ends is dropped too (play, onMessage).
+    function stopWrong() {
+      dropTurn = true;
+      redone++;
+      agentText = '';
+      overlap = [];
+      hush();
+      if (Date.now() - redoneAt < REDO_GAP || !ws || ws.readyState !== 1) return;
+      redoneAt = Date.now();
+      var say = callTongue();
+      ws.send(JSON.stringify({ realtimeInput: { text: '(You started that answer in the wrong language, and the caller cannot follow it. Say the whole answer again now in ' + say + ', without mentioning this note, and keep to ' + say + '.)' } }));
     }
     function hush() {
       // The caller talked over the agent: what the microphone heard just before is their voice.
@@ -416,9 +493,9 @@
       heardAt = Date.now();
       nudged++;
       if (nudged === 1) {
-        ws.send(JSON.stringify({ realtimeInput: { text: '(The caller has been quiet for a while. Ask briefly, in the language of the call, whether they are still there.)' } }));
+        ws.send(JSON.stringify({ realtimeInput: { text: '(The caller has been quiet for a while. Ask briefly, in ' + callTongue() + ', whether they are still there.)' } }));
       } else {
-        ws.send(JSON.stringify({ realtimeInput: { text: '(The caller is still quiet. Say a short, warm goodbye now and call end_call with the reason caller_left.)' } }));
+        ws.send(JSON.stringify({ realtimeInput: { text: '(The caller is still quiet. Say a short, warm goodbye now in ' + callTongue() + ' and call end_call with the reason caller_left.)' } }));
         quietEndAt = Date.now() + 12000;
       }
     }
@@ -429,25 +506,30 @@
         try { m = JSON.parse(raw); } catch (e) { return; }
         if (m.setupComplete) {
           set('listening');
-          if (info.speaks_first) ws.send(JSON.stringify({ realtimeInput: { text: '(The caller has just joined the call. Greet them now, briefly.)' } }));
+          if (info.speaks_first) ws.send(JSON.stringify({ realtimeInput: { text: '(The caller has just joined the call. Greet them now, briefly, in ' + callTongue() + '.)' } }));
           return;
         }
         if (m.usageMetadata) addUsage(m.usageMetadata);
-        if (m.toolCall) (m.toolCall.functionCalls || []).forEach(runTool);
+        if (m.toolCall) {
+          // What the agent says after a tool's answer is a new piece, judged again for its language.
+          dropTurn = false;
+          (m.toolCall.functionCalls || []).forEach(runTool);
+        }
         var sc = m.serverContent;
         if (!sc) return;
-        if (sc.interrupted) hush();
+        if (sc.interrupted) { hush(); dropTurn = false; }
         if (sc.inputTranscription && sc.inputTranscription.text) {
           heardAt = Date.now(); nudged = 0; quietEndAt = 0;
           if (agentText.trim()) { turn('agent', agentText); agentText = ''; }
           callerText += sc.inputTranscription.text;
         }
-        if (sc.outputTranscription && sc.outputTranscription.text && !hungUp) {
+        if (sc.outputTranscription && sc.outputTranscription.text && !hungUp && !dropTurn) {
           if (callerText.trim()) { turn('caller', callerText); callerText = ''; }
           agentText += sc.outputTranscription.text;
+          if (redone < MAX_REDO && wrongTongue(agentText)) stopWrong();
         }
         (sc.modelTurn && sc.modelTurn.parts || []).forEach(function (p) { if (p.inlineData && p.inlineData.data) play(p.inlineData.data); });
-        if (sc.turnComplete) flushTurns();
+        if (sc.turnComplete) { flushTurns(); dropTurn = false; }
       };
       if (typeof ev.data === 'string') handle(ev.data);
       else if (ev.data && ev.data.text) ev.data.text().then(handle);
@@ -562,7 +644,7 @@
         ended = true;
         try { mic && mic.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
         try { ctx && ctx.close(); } catch (e) {}
-        opts.onError && opts.onError(err && err.message, err);
+        opts.onError && opts.onError(err && !err.offline ? err.message : '', err);
         set('error');
       }
     });

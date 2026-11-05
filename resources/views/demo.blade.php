@@ -1544,7 +1544,7 @@
         'text' => [
           'states' => (array) trans('agents.talk_states'),
           'start' => __('agents.talk_start'), 'end' => __('agents.talk_end'),
-          'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
+          'mic' => __('agents.talk_mic_blocked'), 'network' => __('agents.network_error'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
           'saved_contact' => __('agents.talk_saved_contact'),
           'used_up' => __('agents.demo.used_up'),
         ],

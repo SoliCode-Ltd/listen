@@ -102,6 +102,8 @@ class AgentCallController extends Controller
                 // The line under the orb before a call: the owner's own words when set.
                 'states' => array_merge($this->states($agent, $voice, $locale), $look['ready_text'] ? ['idle' => $look['ready_text']] : []),
                 'mic' => trans('agents.talk_mic_blocked', [], $ar ? 'ar' : 'en'),
+                // No internet: one sentence in the card's language, never the browser's "Failed to fetch".
+                'offline' => trans('agents.network_error', [], $ar ? 'ar' : 'en'),
                 'paused' => trans('agents.error_paused', [], $ar ? 'ar' : 'en'),
                 'powered' => trans('agents.powered', [], $ar ? 'ar' : 'en'),
                 'close' => trans('agents.widget_close', [], $locale),
@@ -370,7 +372,7 @@ class AgentCallController extends Controller
             return $this->error('not_found', 404);
         }
 
-        return response()->json(['text' => $this->calls->writeAgentLine($c, (int) ($in['n'] ?? 0), Str::limit((string) ($in['text'] ?? ''), 600, ''))]);
+        return response()->json(['text' => $this->calls->writeAgentLine($c, (int) ($in['n'] ?? 0), Str::limit((string) ($in['text'] ?? ''), 600, ''), ! empty($in['wrong']))]);
     }
 
     public function end(Request $request, string $conversation): JsonResponse
@@ -407,6 +409,9 @@ class AgentCallController extends Controller
             'transcribe' => AgentAccess::callerTranscribe(),
             // An Arabic agent's line that comes out in Latin letters is written in Arabic ones (agent-line).
             'arabic_lines' => $agent->language !== 'en',
+            // The language it speaks, as the model is told it: a line in another language is stopped
+            // as it starts and the agent is asked to say it again in this one (agent-call.js).
+            'speaks' => \App\Support\Agents\AgentInstructions::speaks($agent),
             'api' => url('/agent-api/calls/'.$c->public_id),
             'agent' => ['name' => $agent->name, 'language' => $agent->language],
         ];

@@ -541,7 +541,7 @@
         'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
         'correct' => __('agents.talk_correct'), 'correct_placeholder' => __('agents.talk_correct_placeholder'),
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
-        'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'),
+        'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'), 'network' => __('agents.network_error'),
         'site_remove' => __('agents.live_site_remove'), 'site_remove_short' => __('agents.live_site_remove_short'), 'site_invalid' => __('agents.live_site_invalid'), 'site_exists' => __('agents.live_site_exists'), 'site_max' => __('agents.live_site_max'),
         'links_remove' => __('agents.links_remove'), 'links_saved' => __('agents.links_saved'), 'links_finding' => __('agents.links_finding'), 'links_your_site' => __('agents.links_your_site'), 'site_again_done' => __('agents.site.again_done'), 'site_again_error' => __('agents.site.again_error'), 'links_read_only' => __('agents.links_read_only'), 'links_read_only_hint' => __('agents.links_read_only_hint'),
         'play' => __('agents.voice_play'), 'pause' => __('agents.voice_pause'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),

@@ -74,6 +74,7 @@ return [
     'back' => 'Back',
     'next' => 'Continue',
     'saved' => 'Saved',
+    'network_error' => "Couldn't connect. Check your internet connection and try again.",
     'saving' => 'Saving…',
 
     // Step 1: the business.

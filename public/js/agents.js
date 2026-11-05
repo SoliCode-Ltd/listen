@@ -38,13 +38,23 @@
     };
   }
 
-  function api(method, url, body) {
-    return fetch(url, {
-      method: method,
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': C.csrf || '', 'X-Requested-With': 'XMLHttpRequest' },
-      body: body ? JSON.stringify(body) : undefined,
-      credentials: 'same-origin',
-    }).then(function (r) {
+  // again: times to send it once more when no answer came at all. A page left open for hours can
+  // send on a connection the network already closed, and the browser sends a page's own reads
+  // again by itself, never a button's request; for a request that is safe to repeat, this does.
+  function api(method, url, body, again) {
+    var send = function (left) {
+      return fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': C.csrf || '', 'X-Requested-With': 'XMLHttpRequest' },
+        body: body ? JSON.stringify(body) : undefined,
+        credentials: 'same-origin',
+      }).catch(function () {
+        if (left > 0) return new Promise(function (r) { setTimeout(r, 1200); }).then(function () { return send(left - 1); });
+        // No answer at all (offline, or refused by the browser): a sentence, never "Failed to fetch".
+        throw new Error(T.network || 'error');
+      });
+    };
+    return send(again || 0).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {
         if (!r.ok) { var e = new Error((data && data.message) || 'error'); e.data = data; throw e; }
         return data;
@@ -672,6 +682,7 @@
           if (name === 'save_contact' && C.mode !== 'link') bubble('event', fill(T.saved_contact, { details: [args.name, args.phone, args.email].filter(Boolean).join(' · ') }));
         },
         onError: function (msg, err) {
+          if (err && err.offline) msg = T.network || msg;
           if (hooks.onError && hooks.onError(msg, err) === false) { quietError = true; return; }
           // The server's own reason (no plan, minutes or credits left) in place of "could not start";
           // when no call can start until the plan changes, the button stays greyed out.
@@ -1082,11 +1093,15 @@
     again.addEventListener('click', function () {
       again.disabled = true;
       polls = 0;
-      api('POST', C.agent.urls.site).then(function (res) {
+      // Safe to send twice: a reading already under way is not started again.
+      api('POST', C.agent.urls.site, null, 1).then(function (res) {
         draw(res && res.site);
         toast(T.site_again_done || '');
-      }, function () {
+      }, function (e) {
         again.disabled = false;
+        // Said on the card itself, not only in a toast that is gone in two seconds.
+        text.className = 'ag-link-read is-failed';
+        text.textContent = (e && e.message && e.message !== 'error' ? e.message : '') || T.site_again_error || '';
         toast(T.site_again_error || '');
       });
     });
@@ -1193,7 +1208,8 @@
     function search(quiet) {
       if (find) find.disabled = true;
       if (note) note.textContent = T.links_finding || '';
-      api('POST', C.agent.urls.links, { auto: !!quiet }).then(function (res) {
+      // Safe to send twice: the website is read again and the same accounts are found.
+      api('POST', C.agent.urls.links, { auto: !!quiet }, 1).then(function (res) {
         draw(res.links);
         if (note) note.textContent = quiet && !res.added ? '' : (res.message || '');
       }, function (e) {
