@@ -88,7 +88,10 @@ $clips = [
     ['ar-lb-2', 'ar', 'ar-LB', 'Tamam ya ustaz Jad, w raqmak'],
     ['ar-ae-1', 'ar', 'ar-AE', 'unbelievable'],
     ['en-us-2', 'en', 'en-US', 'شكرا جيك'],
+    ['en-us-2', 'en', 'en-US', ''],
 ];
+// How much the model thinks first: the quickest answer that is still right is the one to keep.
+$levels = ['low', 'minimal'];
 
 $gemini = app(GeminiClient::class);
 $times = [];
@@ -103,9 +106,18 @@ foreach ($clips as [$clip, $language, $dialect, $hint]) {
         continue;
     }
     $agent = new Agent(['name' => 'Check', 'business_name' => 'Check', 'language' => $language, 'dialect' => $dialect]);
-    $started = microtime(true);
-    $raw = $gemini->transcribe(AgentCalls::hearPrompt($agent, $hint, ''), AgentCalls::wav($audio, 16000), 15);
-    $times[] = $seconds = microtime(true) - $started;
+    $line = null;
+    foreach ($levels as $level) {
+        $started = microtime(true);
+        $answer = $gemini->transcribe(AgentCalls::hearPrompt($agent, $hint, ''), AgentCalls::wav($audio, 16000), 15, $level);
+        $took = microtime(true) - $started;
+        $times[$level][] = $took;
+        echo sprintf('  %-8s %.1f s: %s', $level, $took, $answer === null ? '(no answer)' : json_encode($answer, JSON_UNESCAPED_UNICODE)).PHP_EOL;
+        if ($level === 'low') {
+            $raw = $answer;
+            $seconds = $took;
+        }
+    }
     $line = AgentCalls::cleanHeard($raw, $words);
     $line = $line === null ? null : SpokenNumbers::digits($line);
     echo '  wrote:  '.($line ?? '(nothing)').PHP_EOL;
@@ -128,9 +140,9 @@ foreach ($clips as [$clip, $language, $dialect, $hint]) {
 }
 
 echo PHP_EOL.'== Summary'.PHP_EOL;
-if ($times !== []) {
-    sort($times);
-    echo sprintf('  Answer time: %.1f s at most, %.1f s in the middle (the call shows the live line after 3.5 s).', end($times), $times[intdiv(count($times), 2)]).PHP_EOL;
+foreach ($times as $level => $list) {
+    sort($list);
+    echo sprintf('  Answer time (%s thinking): %.1f s at most, %.1f s in the middle (the call shows the live line after 3.5 s).', $level, end($list), $list[intdiv(count($list), 2)]).PHP_EOL;
 }
 echo '  '.($failures === 0 ? 'Every check passed.' : $failures.' check(s) failed.').PHP_EOL;
 exit($failures === 0 ? 0 : 1);
