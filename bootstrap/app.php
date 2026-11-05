@@ -55,6 +55,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // can read the fingerprint components on GET requests (page loads).
         $middleware->encryptCookies(except: ['listen_demo_fp']);
 
+        // www. pages move to the main address first, so a page and its requests are one site.
+        $middleware->prepend(\App\Http\Middleware\CanonicalHost::class);
+
         $middleware->web(append: [
             \App\Http\Middleware\EnsureUserIsNotBlocked::class,
             \App\Http\Middleware\CaptureAdClickId::class,
