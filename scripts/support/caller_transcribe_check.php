@@ -103,11 +103,10 @@ for ($i = 0; $i < 32000; $i++) {
     $noise .= pack('v', (mt_rand(-60, 60)) & 0xFFFF);
 }
 $agent = new Agent(['name' => 'Check', 'business_name' => 'Check', 'language' => 'ar', 'dialect' => 'ar-SA']);
-foreach (['شكرا', 'unbelievable'] as $hint) {
-    $quiet = $gemini->transcribe(AgentCalls::hearPrompt($agent, $hint, ''), AgentCalls::wav($noise, 16000), 15);
-    echo PHP_EOL.'== a quiet line (2 s of faint noise), hint "'.$hint.'"'.PHP_EOL.'  answer: '.json_encode($quiet, JSON_UNESCAPED_UNICODE).PHP_EOL;
-    $check(AgentCalls::cleanHeard($quiet, $hint) === null, 'nothing is made up from a quiet line (an echo of the hint changes nothing)');
-}
+// (Given such a line with the hint "unbelievable", the model once made a word up: it is never sent.)
+echo PHP_EOL.'== a quiet line (2 s of faint noise)'.PHP_EOL;
+$check(method_exists(AgentCalls::class, 'voiced') && ! AgentCalls::voiced($noise, 16000), 'it is never sent to the model: no speech in it');
+$check(method_exists(AgentCalls::class, 'voiced') && AgentCalls::voiced($pcm(public_path('audio/agents/calls/ar-sa-1.mp3')), 16000), 'a recorded call line is speech');
 foreach ($clips as [$clip, $language, $dialect, $hint]) {
     $file = public_path("audio/agents/calls/{$clip}.mp3");
     $words = $said($clip, $language);
