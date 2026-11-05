@@ -127,9 +127,10 @@ class SiteReader
      * A WordPress website gives its pages and newest posts through its own content feed
      * (/wp-json/wp/v2), a few requests for the whole site, in the agent's language first; the
      * pages it leaves out are read one by one as above. The PDF files the pages link to come back
-     * as files, to be read with the pictures (AgentSite).
+     * as files, to be read with the pictures (AgentSite), each with the title of the page that
+     * links to it (file_pages).
      *
-     * @return array{pages: list<array{url: string, title: string, text: string, pictures: list<string>}>, files: list<string>, links: list<array{network: string, url: string}>, done: bool}
+     * @return array{pages: list<array{url: string, title: string, text: string, pictures: list<string>}>, files: list<string>, file_pages: array<string, string>, links: list<array{network: string, url: string}>, done: bool}
      */
     public function site(string $url, ?string $language = null, ?float $until = null, int $max = self::SITE_PAGES): array
     {
@@ -141,7 +142,7 @@ class SiteReader
         }
         $first = $start !== null ? $this->fetch($start) : null;
         if ($first === null) {
-            return ['pages' => [], 'files' => [], 'links' => [], 'done' => true];
+            return ['pages' => [], 'files' => [], 'file_pages' => [], 'links' => [], 'done' => true];
         }
         $host = self::bareHost($first['url']);
         $seen = [self::pageKey($start) => true, self::pageKey($first['url']) => true];
@@ -165,7 +166,17 @@ class SiteReader
         $keep = fn (array $page): array => ['url' => $page['url'], 'title' => $page['title'], 'text' => Str::limit($page['text'], self::PAGE_CHARS, ''), 'pictures' => self::pictures($page['html'], $page['url'])];
         $found = AgentLinks::inHtml($first['html'], $first['url']);
         $pages = [$keep($first)];
-        $files = self::filesOn($first['html'], $first['url']);
+        // Each PDF file with the title of the first page that links to it: the file is about that
+        // page's subject ("Subspecialty_Group-Info.pdf" on the subspecialty groups page).
+        $files = [];
+        $fileFrom = [];
+        $filesOf = function (string $html, string $url, string $title) use (&$files, &$fileFrom): void {
+            foreach (self::filesOn($html, $url) as $file) {
+                $files[] = $file;
+                $fileFrom[$file] ??= $title;
+            }
+        };
+        $filesOf($first['html'], $first['url'], $first['title']);
         $add(self::linksOn($first['html'], $first['url']), 1);
 
         // A WordPress website: its pages and newest posts at once, from its content feed.
@@ -182,7 +193,7 @@ class SiteReader
                 if (mb_strlen(trim($text)) >= self::MIN_WORDS || $kept['pictures'] !== []) {
                     $pages[] = $kept;
                 }
-                $files = array_merge($files, self::filesOn($item['html'], $item['url']));
+                $filesOf($item['html'], $item['url'], $item['title']);
                 $add(self::linksOn($item['html'], $item['url']), 2);
             }
         }
@@ -218,12 +229,13 @@ class SiteReader
             if (mb_strlen(trim($kept['text'])) >= self::MIN_WORDS || $kept['pictures'] !== []) {
                 $pages[] = $kept;
             }
-            $files = array_merge($files, self::filesOn($page['html'], $page['url']));
+            $filesOf($page['html'], $page['url'], $page['title']);
             $add(self::linksOn($page['html'], $page['url']), $next['depth'] + 1);
         }
         $files = array_slice(array_values(array_unique(array_filter($files, fn (string $f): bool => self::bareHost($f) === $host))), 0, self::SITE_FILES);
 
-        return ['pages' => self::withoutRepeats($pages), 'files' => $files, 'links' => AgentLinks::pick($found), 'done' => $queue === []];
+        return ['pages' => self::withoutRepeats($pages), 'files' => $files, 'file_pages' => array_intersect_key($fileFrom, array_flip($files)),
+            'links' => AgentLinks::pick($found), 'done' => $queue === []];
     }
 
     /** A page made with WordPress (its content feed is at /wp-json/). */

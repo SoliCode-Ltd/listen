@@ -81,10 +81,11 @@ foreach ($sites as $site) {
     $docs = array_map(fn (array $p): array => ['page' => $p['title'], 'text' => $p['text']], $withWords);
     foreach (array_slice($read['files'] ?? [], 0, 2) as $file) {
         $start = microtime(true);
-        $words = $pictures->pdf($file, rawurldecode(basename((string) parse_url($file, PHP_URL_PATH))), $site['business'], microtime(true) + 70);
+        $title = AgentSite::pdfTitle($file, $read['file_pages'][$file] ?? null);
+        $words = $pictures->pdf($file, $title, $site['business'], microtime(true) + 70);
         echo '   - PDF '.rawurldecode($file).' read in '.round(microtime(true) - $start, 1).' s: '.mb_strlen($words)." chars\n      ".str_replace("\n", "\n      ", mb_substr($words, 0, 400))."\n";
         if ($words !== '') {
-            $docs[] = ['page' => basename((string) parse_url($file, PHP_URL_PATH)).' (PDF)', 'text' => $words];
+            $docs[] = ['page' => $title.' (PDF)', 'text' => $words];
         }
     }
     echo "   look-ups:\n";

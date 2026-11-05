@@ -134,6 +134,18 @@ CALLS.push({
     'تمام، مشكورة. مع السلامة.',
   ],
 });
+// The same agent on what a first call left half answered: the groups' names (in a PDF the groups
+// page links to), the vice president (an old 2022–2025 page names another one than the 2026 board
+// picture), another fee, and something the society does not offer.
+CALLS.push({
+  id: 'site-ar-2', agent: 'site-ar', website: true, keyTimeout: 300000, turns: [
+    'السلام عليكم، وش أسماء المجموعات التخصصية عندكم؟',
+    'ومين نائب رئيس مجلس الإدارة الحين؟',
+    'وكم رسوم العضوية للاستشاري؟',
+    'تقدرون تحجزون لي موعد كشف نظر؟',
+    'تمام، مشكورة. مع السلامة.',
+  ],
+});
 
 // A call key made to last 60 seconds, the line then kept open for three minutes with a word now
 // and then: the speech service must end the call when the key runs out, or a caller could hold a

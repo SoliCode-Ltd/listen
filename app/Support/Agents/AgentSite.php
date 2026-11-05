@@ -91,7 +91,7 @@ final class AgentSite
 
                 return 0;
             }
-            $left = self::extras($agent, self::extrasFor($pages, $site['files'] ?? []), $pictures, $until);
+            $left = self::extras($agent, self::extrasFor($pages, $site['files'] ?? [], $site['file_pages'] ?? []), $pictures, $until);
             if ($left !== []) {
                 Cache::put(self::key('extras', $agent), ['tasks' => $left, 'round' => 1], now()->addHours(6));
                 ReadAgentWebsite::dispatch($agent->id, 'extras');
@@ -157,9 +157,10 @@ final class AgentSite
      *
      * @param  list<array{url: string, title: string, text: string, pictures: list<string>}>  $pages
      * @param  list<string>  $files
+     * @param  array<string, string>  $from  the title of the page that links to each file
      * @return list<array{kind: string, url: string, title: string, pictures?: list<string>}>
      */
-    private static function extrasFor(array $pages, array $files): array
+    private static function extrasFor(array $pages, array $files, array $from = []): array
     {
         $wanting = array_values(array_filter($pages, fn (array $p): bool => $p['pictures'] !== [] && mb_strlen($p['text']) < self::PICTURES_BELOW));
         usort($wanting, fn (array $a, array $b): int => mb_strlen($a['text']) <=> mb_strlen($b['text']));
@@ -173,9 +174,21 @@ final class AgentSite
             $left -= $take;
             $tasks[] = ['kind' => 'pictures', 'url' => $page['url'], 'title' => $page['title'], 'pictures' => array_slice($page['pictures'], 0, $take)];
         }
-        $pdfs = array_map(fn (string $f): array => ['kind' => 'pdf', 'url' => $f, 'title' => rawurldecode(basename((string) parse_url($f, PHP_URL_PATH)))], $files);
+        $pdfs = array_map(fn (string $f): array => ['kind' => 'pdf', 'url' => $f, 'title' => self::pdfTitle($f, $from[$f] ?? null)], $files);
 
         return array_merge(array_slice($tasks, 0, 4), $pdfs, array_slice($tasks, 4));
+    }
+
+    /**
+     * A PDF file's title: the page that links to it, then its own name ("المجموعات التخصصية —
+     * Subspecialty_Group-Info.pdf"), so a look-up in the page's words finds the file too.
+     */
+    public static function pdfTitle(string $url, ?string $page = null): string
+    {
+        $name = rawurldecode(basename((string) parse_url($url, PHP_URL_PATH)));
+        $page = trim((string) $page);
+
+        return $page !== '' && $page !== $name ? Str::limit($page, 120, '').' — '.$name : $name;
     }
 
     /**

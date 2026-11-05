@@ -52,11 +52,26 @@ class PictureReader
                 }
             }
             if (is_string($words) && $words !== '') {
-                $out[] = $words;
+                $out[] = self::dated($url, $words);
             }
         }
 
         return implode("\n", $out);
+    }
+
+    /**
+     * A picture's words with the month it was put on the website, when its address tells
+     * (WordPress keeps uploads under /uploads/2026/07/): a board of directors in a picture from
+     * 2026 is newer than a page about the 2022–2025 board, and the agent tells which to trust.
+     */
+    public static function dated(string $url, string $words): string
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        if (! preg_match('#/uploads/((?:19|20)\d\d)/(0[1-9]|1[0-2])/#', $path, $m)) {
+            return $words;
+        }
+
+        return "(A picture put on the website in {$m[1]}-{$m[2]}.)\n".$words;
     }
 
     /** The most of a PDF file kept, and its size read at most. */

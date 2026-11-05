@@ -93,7 +93,7 @@ if ($case === 'reader') {
 // pages an agent keeps. Read once and kept in the cache for two hours, for the call (site-ar) and
 // its look-ups (lookup).
 $societyPages = function (): array {
-    $pages = \Illuminate\Support\Facades\Cache::get('agent-redteam-site-pages');
+    $pages = \Illuminate\Support\Facades\Cache::get('agent-redteam-site-pages-2');
     if (is_array($pages) && $pages !== []) {
         return $pages;
     }
@@ -105,14 +105,14 @@ $societyPages = function (): array {
         $pages[] = ['page' => $p['title'] !== '' ? $p['title'] : $p['url'], 'url' => $p['url'], 'text' => \Illuminate\Support\Str::limit(trim($p['text']), 10_000, '')];
     }
     foreach ($read['files'] ?? [] as $file) {
-        $title = rawurldecode(basename((string) parse_url($file, PHP_URL_PATH)));
+        $title = \App\Support\Agents\AgentSite::pdfTitle($file, $read['file_pages'][$file] ?? null);
         $words = $pictures->pdf($file, $title, $business, microtime(true) + 50);
         if ($words !== '') {
             $pages[] = ['page' => $title.' (PDF)', 'url' => $file, 'text' => $words];
         }
     }
     if ($pages !== []) {
-        \Illuminate\Support\Facades\Cache::put('agent-redteam-site-pages', $pages, now()->addHours(2));
+        \Illuminate\Support\Facades\Cache::put('agent-redteam-site-pages-2', $pages, now()->addHours(2));
     }
 
     return $pages;
