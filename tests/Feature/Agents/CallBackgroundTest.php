@@ -160,6 +160,14 @@ class CallBackgroundTest extends TestCase
         $this->assertSame(2, substr_count($script, 'closeEngines(300);'), 'busy and the end close both engines');
         $this->assertSame(1, substr_count($script, 'closeEngines(0);'), 'an error closes both engines');
 
+        // A new line starts with 0.15 s of the voice in hand, so a short pause in the voice model's
+        // stream early in the line (a test call's greeting: 0.18 s of silence mid-word) does not break
+        // a word; within a line a late piece plays at once.
+        $this->assertStringContainsString('START_LEAD = 0.15', $script);
+        $this->assertStringContainsString('var fresh = !sources.size && Date.now() - voiceEndAt > 400;', $script);
+        $this->assertStringContainsString('var at = Math.max(vctx.currentTime + (fresh ? START_LEAD : 0.03), playHead);', $script);
+        $this->assertSame(2, substr_count($script, 'voiceEndAt = Date.now();'), 'the voice ending and the caller talking over it both mark the end of a line');
+
         // The agent hangs up while its goodbye is still on its way: it plays to the end of the turn.
         $this->assertStringContainsString('if (hangUp) hangUpAfterGoodbye();', $script);
         $this->assertMatchesRegularExpression('/sc\.turnComplete\) \{ flushTurns\(\); dropTurn = false; if \(closing\) closingDone = true; \}/', $script);

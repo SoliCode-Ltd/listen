@@ -213,7 +213,12 @@
     var state = 'idle', ended = false, muted = false;
     var ws = null, ctx = null, vctx = null, mic = null, node = null, micSource = null;
     var out = null, outAnalyser = null, micAnalyser = null;
-    var playHead = 0, sources = new Set();
+    // The agent's voice: each piece plays straight after the one before. A new line (its first piece,
+    // with nothing playing for a moment) starts with a little of the voice in hand, START_LEAD, so a
+    // short pause in the voice model's stream early in the line does not break a word: a test call's
+    // greeting stopped arriving for 0.8 s after its first 0.76 s, and 30 ms in hand left 0.18 s of
+    // silence mid-word. Within a line a late piece plays at once (any wait would only lengthen a gap).
+    var playHead = 0, sources = new Set(), voiceEndAt = 0, START_LEAD = 0.15;
     var info = null, pending = [], agentText = '', callerText = '', usage = null;
     var pingTimer = 0, stopTimer = 0, raf = 0;
     // The agent hangs up (end_call): what it is still saying plays to the end of its turn (closing; the
@@ -452,7 +457,8 @@
       var src = vctx.createBufferSource();
       src.buffer = b;
       src.connect(out);
-      var at = Math.max(vctx.currentTime + 0.03, playHead);
+      var fresh = !sources.size && Date.now() - voiceEndAt > 400;
+      var at = Math.max(vctx.currentTime + (fresh ? START_LEAD : 0.03), playHead);
       src.start(at);
       playHead = at + b.duration;
       sources.add(src);
@@ -461,6 +467,7 @@
         sources.delete(src);
         heardAt = Date.now();
         if (!sources.size) {
+          voiceEndAt = Date.now();
           overlap = [];
           if (state === 'speaking') set('listening');
         }
@@ -575,6 +582,7 @@
       if (overlap.length) { heard = heard.concat(overlap); overlap = []; }
       sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
       sources.clear();
+      voiceEndAt = Date.now();
       playHead = vctx ? vctx.currentTime : 0;
       if (state === 'speaking') set('listening');
     }
