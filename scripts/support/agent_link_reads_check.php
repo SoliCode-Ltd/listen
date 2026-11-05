@@ -80,6 +80,25 @@ foreach ($links as $link) {
 
 echo "\n".($failed === 0 ? 'Every readable link was read.' : "{$failed} readable link(s) could not be read.")."\n";
 
+// What X answers this server, as it is: the account timeline X shows on other websites.
+echo "\n== X, as it answers this server ==\n";
+foreach ([
+    'reader' => ['https://syndication.twitter.com/srv/timeline-profile/screen-name/SaudiMOH', 'ListenAgentReader/1.0 (+https://listenai.studio)'],
+    'browser' => ['https://syndication.twitter.com/srv/timeline-profile/screen-name/SaudiMOH', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'],
+    'cdn' => ['https://cdn.syndication.twimg.com/timeline/profile?screen_name=SaudiMOH', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'],
+] as $name => [$url, $agent]) {
+    try {
+        $r = \Illuminate\Support\Facades\Http::withHeaders(['User-Agent' => $agent, 'Accept' => 'text/html,application/json'])->withOptions(['allow_redirects' => false])
+            ->timeout(12)->get($url);
+        $body = (string) $r->body();
+        echo "   {$name}: HTTP ".$r->status().', '.($r->header('Content-Type') ?: 'no type').', '.strlen($body).' bytes'
+            .($r->header('Location') ? ', to '.$r->header('Location') : '').', rate limit left: '.($r->header('x-rate-limit-remaining') ?: '?')
+            .', next data: '.(str_contains($body, '__NEXT_DATA__') ? 'yes' : 'no').', starts: '.json_encode(mb_substr(preg_replace('/\s+/u', ' ', strip_tags($body)), 0, 80))."\n";
+    } catch (\Throwable $e) {
+        echo "   {$name}: ".$e->getMessage()."\n";
+    }
+}
+
 // A live agent's link page on this server, to look at its call card (the same as the website button's).
 $page = \App\Models\AgentWidget::query()->where('link_enabled', true)
     ->whereHas('agent', fn ($q) => $q->where('status', \App\Models\Agent::LIVE))->orderBy('id')->value('slug');
