@@ -231,7 +231,7 @@
       'text' => [
         'states' => __('agents.talk_states'),
         'start' => __('agents.talk_start'), 'end' => __('agents.talk_end'),
-        'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
+        'mic' => __('agents.talk_mic_blocked'), 'network' => __('agents.network_error'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
         'correct' => __('agents.talk_correct'), 'correct_placeholder' => __('agents.talk_correct_placeholder'),
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
         'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'),

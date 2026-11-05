@@ -74,7 +74,7 @@ return [
     'back' => 'Back',
     'next' => 'Continue',
     'saved' => 'Saved',
-    'network_error' => "Couldn't reach Listen. Check your connection, reload the page and try again.",
+    'network_error' => "Couldn't connect. Check your internet connection and try again.",
     'saving' => 'Saving…',
 
     // Step 1: the business.

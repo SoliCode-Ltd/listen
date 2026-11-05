@@ -207,7 +207,12 @@
             opts.onWait && opts.onWait({ position: data.position || 0, waited: Math.round((Date.now() - since) / 1000) });
             set('waiting');
             waitTimer = setTimeout(attempt, Math.max(3, Math.min(10, data.retry_after || 5)) * 1000);
-          }, reject);
+          }, function (e) {
+            // No answer at all (the internet dropped): the page says so in its own words, never
+            // the browser's "Failed to fetch".
+            if (e && (e.name === 'TypeError' || (typeof navigator !== 'undefined' && navigator.onLine === false))) e.offline = true;
+            reject(e);
+          });
         })();
       });
     }
@@ -562,7 +567,7 @@
         ended = true;
         try { mic && mic.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
         try { ctx && ctx.close(); } catch (e) {}
-        opts.onError && opts.onError(err && err.message, err);
+        opts.onError && opts.onError(err && !err.offline ? err.message : '', err);
         set('error');
       }
     });

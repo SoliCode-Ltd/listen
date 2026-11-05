@@ -102,6 +102,8 @@ class AgentCallController extends Controller
                 // The line under the orb before a call: the owner's own words when set.
                 'states' => array_merge($this->states($agent, $voice, $locale), $look['ready_text'] ? ['idle' => $look['ready_text']] : []),
                 'mic' => trans('agents.talk_mic_blocked', [], $ar ? 'ar' : 'en'),
+                // No internet: one sentence in the card's language, never the browser's "Failed to fetch".
+                'offline' => trans('agents.network_error', [], $ar ? 'ar' : 'en'),
                 'paused' => trans('agents.error_paused', [], $ar ? 'ar' : 'en'),
                 'powered' => trans('agents.powered', [], $ar ? 'ar' : 'en'),
                 'close' => trans('agents.widget_close', [], $locale),

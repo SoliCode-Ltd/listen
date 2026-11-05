@@ -682,6 +682,7 @@
           if (name === 'save_contact' && C.mode !== 'link') bubble('event', fill(T.saved_contact, { details: [args.name, args.phone, args.email].filter(Boolean).join(' · ') }));
         },
         onError: function (msg, err) {
+          if (err && err.offline) msg = T.network || msg;
           if (hooks.onError && hooks.onError(msg, err) === false) { quietError = true; return; }
           // The server's own reason (no plan, minutes or credits left) in place of "could not start";
           // when no call can start until the plan changes, the button stays greyed out.

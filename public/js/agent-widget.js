@@ -698,6 +698,8 @@
     function endedText() { return stateNow === 'ended' && endedFor >= 1 && text.ended_after ? String(text.ended_after).replace(':time', clock(endedFor)) : ''; }
     function setState(s, message) {
       if (s === 'error' && !message && pendingError) message = pendingError;
+      // The internet dropped during the call: said in the card's language, not "something went wrong".
+      if (s === 'error' && !message && typeof navigator !== 'undefined' && navigator.onLine === false) message = text.offline || '';
       if (s !== 'error') pendingError = '';
       var was = live(), before = stateNow;
       // How long the call that just ended lasted, said with "Call ended" until the next one.
@@ -924,7 +926,7 @@
           onFix: fixLine,
           onLinks: linksLine,
           onLevel: level,
-          onError: function (msg) { pendingError = msg || ''; },
+          onError: function (msg, err) { pendingError = (err && err.offline ? text.offline : msg) || ''; },
           // Every line busy: the caller's place, kept fresh while they wait (a minute at most).
           onWait: function (w) { waitPos = (w && w.position) || 0; if (stateNow === 'waiting') paintState(); },
           patience: 60,
