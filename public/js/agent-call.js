@@ -449,11 +449,8 @@
 
     function play(data) {
       if (hungUp || dropTurn) return;
-      playPcm(pcmFrom(data));
-    }
-    // A piece of the agent's voice, 24 kHz: the live voice's, or the studio voice's (studioPump).
-    function playPcm(f) {
-      if (!f.length || !vctx) return;
+      var f = pcmFrom(data);
+      if (!f.length) return;
       if (bg) hearVoice(f);
       var b = vctx.createBuffer(1, f.length, 24000);
       b.copyToChannel(f, 0);
@@ -587,157 +584,7 @@
       sources.clear();
       voiceEndAt = Date.now();
       playHead = vctx ? vctx.currentTime : 0;
-      studioDrop();
       if (state === 'speaking') set('listening');
-    }
-
-    /*
-     * The studio voice (info.voice === 'studio', App\Support\Agents\AgentSpeech). The live model still
-     * listens, answers and uses its tools; the words it says (outputTranscription) are spoken by the
-     * studio voice instead, a phrase at a time: the first as soon as it is a phrase (so the answer starts
-     * early), then a sentence at a time, each streamed as it is made (/speak) and played in order. The
-     * live voice's own sound is kept, unplayed, for the turn: it plays instead when the studio voice
-     * fails, or has not started STUDIO_WAIT ms after the live voice's first sound.
-     */
-    var studio = false, svOpen = false, svText = '', svSent = 0, svQueue = [], svNative = [], svStarted = false, svLive = false, svWait = 0;
-    var STUDIO_WAIT = 2500, FIRST_WORDS = 8, PHRASE_WORDS = 14;
-    function studioBegin() {
-      if (svOpen) return;
-      svOpen = true; svText = ''; svSent = 0; svNative = []; svStarted = false; svLive = false;
-      clearTimeout(svWait);
-    }
-    function studioDrop() {
-      svQueue.forEach(function (j) { try { j.ctl && j.ctl.abort(); } catch (e) {} });
-      svQueue = []; svNative = []; svOpen = false; svText = ''; svSent = 0; svStarted = false; svLive = false;
-      clearTimeout(svWait);
-    }
-    function studioBusy() { return studio && svQueue.length > 0; }
-    // The turn's words so far: each finished phrase goes to the studio voice.
-    function studioWords(t) {
-      studioBegin();
-      svText += t;
-      studioCut(false);
-    }
-    function studioCut(all) {
-      if (svLive) return;
-      for (;;) {
-        var rest = svText.slice(svSent), first = svSent === 0;
-        if (!rest.trim()) return;
-        var end = -1, m, re = first ? /[\u060C,.!?\u061F\u061B;\u2026:]+(\s|$)/g : /[.!?\u061F\u2026]+(\s|$)/g;
-        while ((m = re.exec(rest))) { if (m.index + m[0].length < rest.length || all || /\s$/.test(m[0])) { end = m.index + m[0].length; break; } }
-        if (end < 0) {
-          // No phrase end yet: a long run of words is cut at a word's end (a comma if there is one).
-          var words = rest.split(/\s+/).filter(Boolean);
-          if (!all && words.length >= (first ? FIRST_WORDS : PHRASE_WORDS) && /\s$/.test(rest)) {
-            var comma = rest.search(/[\u060C,]\s/);
-            end = comma > 0 ? comma + 2 : rest.length;
-          } else if (all) {
-            end = rest.length;
-          } else {
-            return;
-          }
-        }
-        svSent += end;
-        studioSay(rest.slice(0, end));
-        if (all && svSent >= svText.length) return;
-      }
-    }
-    function studioSay(text) {
-      text = text.trim();
-      if (!/[A-Za-z0-9\u0600-\u06FF]/.test(text)) return;
-      // An Arabic agent's words in Latin letters cannot be spoken well: the live voice says this turn.
-      if (info.agent && info.agent.language !== 'en' && /[A-Za-z]{3,}/.test(text) && !/[\u0600-\u06FF]/.test(text)) {
-        if (!svStarted) studioLive();
-        return;
-      }
-      var job = { text: text, pieces: [], done: false, failed: false, tries: 0, ctl: null, left: -1 };
-      svQueue.push(job);
-      studioFetch(job);
-    }
-    function studioFetch(job) {
-      job.tries++;
-      job.ctl = window.AbortController ? new AbortController() : null;
-      fetch(info.api + '/speak', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, credentials: 'omit',
-        body: JSON.stringify({ call_key: info.call_key, text: job.text }), signal: job.ctl ? job.ctl.signal : undefined })
-        .then(function (r) {
-          // Only the voice itself is played: anything else (an error page on the way) is a failure.
-          if (!r.ok || String(r.headers.get('Content-Type') || '').indexOf('application/octet-stream') < 0) throw new Error('voice');
-          if (!r.body || !r.body.getReader) return r.arrayBuffer().then(function (a) { studioBytes(job, new Uint8Array(a)); });
-          var reader = r.body.getReader();
-          return (function read() {
-            return reader.read().then(function (x) {
-              if (x.done) return;
-              studioBytes(job, x.value);
-              studioPump();
-              return read();
-            });
-          })();
-        })
-        .then(function () {
-          if (!job.pieces.length && !job.played) throw new Error('empty');
-          job.done = true;
-          studioPump();
-        })
-        .catch(function () {
-          if (ended || svQueue.indexOf(job) < 0) return;
-          if (job.tries < 2 && !job.played) { job.pieces = []; job.left = -1; studioFetch(job); return; }
-          job.done = true; job.failed = true;
-          studioPump();
-        });
-    }
-    // 16-bit little-endian PCM as it streams in (a piece can end in the middle of a sample).
-    function studioBytes(job, u8) {
-      if (!u8 || !u8.length) return;
-      var bytes = u8;
-      if (job.left >= 0) { bytes = new Uint8Array(u8.length + 1); bytes[0] = job.left; bytes.set(u8, 1); job.left = -1; }
-      var n = bytes.length >> 1;
-      if (bytes.length & 1) job.left = bytes[bytes.length - 1];
-      if (!n) return;
-      var f = new Float32Array(n), dv = new DataView(bytes.buffer, bytes.byteOffset, n * 2);
-      for (var i = 0; i < n; i++) f[i] = dv.getInt16(2 * i, true) / 32768;
-      job.pieces.push(f);
-    }
-    // Plays the phrases in order, each piece as it comes.
-    function studioPump() {
-      if (ended || svLive) return;
-      while (svQueue.length) {
-        var j = svQueue[0];
-        while (j.pieces.length) {
-          playPcm(j.pieces.shift());
-          j.played = true;
-          if (!svStarted) { svStarted = true; clearTimeout(svWait); }
-        }
-        if (!j.done) return;
-        svQueue.shift();
-        // A phrase the studio voice could not say: before it started, the live voice says the turn;
-        // later, the turn goes on without that phrase rather than in another voice.
-        if (j.failed && !svStarted) { studioLive(); return; }
-      }
-    }
-    // The live voice's sound for this turn, kept until the studio voice has started.
-    function studioNative(data) {
-      if (hungUp || dropTurn) return;
-      studioBegin();
-      if (svLive) { play(data); return; }
-      if (svStarted) return;
-      svNative.push(pcmFrom(data));
-      if (svNative.length === 1) svWait = setTimeout(function () { if (!svStarted) studioLive(); }, STUDIO_WAIT);
-    }
-    // The live voice says this turn after all: what it has said so far, then the rest as it comes.
-    function studioLive() {
-      if (svLive || svStarted) return;
-      svLive = true;
-      clearTimeout(svWait);
-      svQueue.forEach(function (j) { try { j.ctl && j.ctl.abort(); } catch (e) {} });
-      svQueue = [];
-      var kept = svNative; svNative = [];
-      kept.forEach(function (f) { playPcm(f); });
-    }
-    // The turn has ended (or stopped for a tool): what is left of it is spoken; the next words open a new one.
-    function studioEndTurn() {
-      if (!svOpen) return;
-      studioCut(true);
-      svOpen = false;
     }
 
     function loop() {
@@ -782,7 +629,6 @@
         if (m.toolCall) {
           // What the agent says after a tool's answer is a new piece, judged again for its language.
           dropTurn = false;
-          if (studio) studioEndTurn();
           (m.toolCall.functionCalls || []).forEach(runTool);
         }
         var sc = m.serverContent;
@@ -797,10 +643,9 @@
           if (callerText.trim()) { turn('caller', callerText); callerText = ''; }
           agentText += sc.outputTranscription.text;
           if (redone < MAX_REDO && wrongTongue(agentText)) stopWrong();
-          else if (studio) studioWords(sc.outputTranscription.text);
         }
-        (sc.modelTurn && sc.modelTurn.parts || []).forEach(function (p) { if (p.inlineData && p.inlineData.data) (studio ? studioNative : play)(p.inlineData.data); });
-        if (sc.turnComplete) { if (studio) studioEndTurn(); flushTurns(); dropTurn = false; if (closing) closingDone = true; }
+        (sc.modelTurn && sc.modelTurn.parts || []).forEach(function (p) { if (p.inlineData && p.inlineData.data) play(p.inlineData.data); });
+        if (sc.turnComplete) { flushTurns(); dropTurn = false; if (closing) closingDone = true; }
       };
       if (typeof ev.data === 'string') handle(ev.data);
       else if (ev.data && ev.data.text) ev.data.text().then(handle);
@@ -844,7 +689,7 @@
       var since = Date.now();
       (function check() {
         if (ended) return;
-        if ((closingDone && !studioBusy()) || Date.now() - since > (studio ? 9000 : 4000)) hungUp = true;
+        if (closingDone || Date.now() - since > 4000) hungUp = true;
         if (hungUp && !sources.size) { setTimeout(function () { finish('done'); }, 400); return; }
         setTimeout(check, 150);
       })();
@@ -861,7 +706,6 @@
     function finish(reason) {
       if (ended) return;
       ended = true;
-      studioDrop();
       flushTurns();
       release();
       clearInterval(pingTimer); clearInterval(quietTimer); clearTimeout(stopTimer); clearTimeout(waitTimer); cancelAnimationFrame(raf);
@@ -907,7 +751,6 @@
       if (!data || ended) return;
       if (!data.token) throw new Error(data.message || '');
       info = data;
-      studio = data.voice === 'studio' && !!window.fetch;
       loadBackground();
       ws = new WebSocket(data.ws + '?access_token=' + encodeURIComponent(data.token));
       ws.onopen = function () { ws.send(JSON.stringify({ setup: { model: data.model } })); };

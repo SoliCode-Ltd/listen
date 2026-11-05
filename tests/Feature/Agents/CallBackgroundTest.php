@@ -170,7 +170,7 @@ class CallBackgroundTest extends TestCase
 
         // The agent hangs up while its goodbye is still on its way: it plays to the end of the turn.
         $this->assertStringContainsString('if (hangUp) hangUpAfterGoodbye();', $script);
-        $this->assertMatchesRegularExpression('/sc\.turnComplete\) \{ (if \(studio\) studioEndTurn\(\); )?flushTurns\(\); dropTurn = false; if \(closing\) closingDone = true; \}/', $script);
+        $this->assertMatchesRegularExpression('/sc\.turnComplete\) \{ flushTurns\(\); dropTurn = false; if \(closing\) closingDone = true; \}/', $script);
         $this->assertStringNotContainsString('if (hangUp) hungUp = true;', $script);
     }
 
