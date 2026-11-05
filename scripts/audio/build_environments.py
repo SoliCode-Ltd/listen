@@ -389,22 +389,24 @@ def rms(x):
 
 def office():
     """
-    An open-plan office heard from one desk (where the agent's headset is): four other desks 6 to 13 m
+    An open-plan office heard from one desk (where the agent's headset is): five other desks 5 to 12 m
     away in a 16 x 11 x 3 m room (carpet, an acoustic ceiling, plasterboard and glass), each with people
     having a real conversation, pausing, going quiet for a while, then talking again; the building's hum
     and a soft low rumble underneath. Every voice is in the room at its own distance (its direct sound
     and its reflections, simulated with the room's materials and the air), and the tone is shaped only
     gently: no steep filters, which smear the start of every word and make voices sound watery.
 
-    Against the measured office line: the same spread of energy per band, the same rhythm of speech and
-    the same lulls (an earlier version, six people reading without a break, was a steady wall).
+    Against the measured office line: within about a point of its energy in every band, its loud moments
+    and nearly its quiet spells (an earlier version, six people reading without a break, was a steady wall).
 
     Two files: bed/office.flac for the studio (stereo, the desk's two microphones) and
     resources/audio/agents/office.mp3 for agents' calls (mono, 24 kHz, 64 kbps, a 120 s loop padded with
     OFFICE_PAD on each side; App\\Support\\Agents\\CallBackground knows its level and loop).
     """
     rng = np.random.default_rng(7)
-    seconds, lull, rumble = 123, 1.6, 0.3
+    # The settings that measured closest to the measured office line (OFFICE_PROFILE, its speech rhythm
+    # and its swings), found by trying 288 mixes of desks, distance, lulls, rumble and tone.
+    seconds, lull, rumble, top = 123, 1.45, 0.37, 4200
     n = seconds * FS
     pool = sorted(os.path.join(CONVERSATIONS[0], f) for f in os.listdir(CONVERSATIONS[0]) if f.startswith('dlg-') and f.endswith('.mp3') and not any(k in f for k in ('ghost', 'drama')))
     pool += sorted(os.path.join(CONVERSATIONS[1], f) for f in os.listdir(CONVERSATIONS[1]) if f.endswith('.mp3'))
@@ -422,8 +424,7 @@ def office():
     materials = {'east': mat('glass_window', 0.1), 'west': mat('plasterboard', 0.2), 'north': mat('plasterboard', 0.2),
                  'south': mat('glass_window', 0.1), 'floor': mat('carpet_tufted_9.5mm', 0.2), 'ceiling': mat('ceiling_fissured_tile', 0.2)}
     mic = np.array([2.2, 5.5, 1.2])
-    desks = [np.array(p) for p in ([6.5, 3.0, 1.2], [8.0, 8.4, 1.25], [10.5, 5.2, 1.2], [12.8, 2.6, 1.3])]
-    desks = [np.minimum(np.maximum(mic + (p - mic) * 1.2, [0.5, 0.5, 1.0]), [15.5, 10.5, 1.4]) for p in desks]
+    desks = [np.array(p) for p in ([6.5, 3.0, 1.2], [8.0, 8.4, 1.25], [10.5, 5.2, 1.2], [12.8, 2.6, 1.3], [13.5, 8.8, 1.2])]
 
     def heard_at_desk(src):
         room = pra.ShoeBox(dims, fs=FS, materials=materials, max_order=12, ray_tracing=True, air_absorption=True)
@@ -455,7 +456,7 @@ def office():
     tone, _ = sf.read(os.path.join(OUT, 'bed', 'room_tone.flac'))
     tone = np.tile(tone, (int(np.ceil(n / len(tone))), 1))[:n]
     mix = mix / rms(mix.mean(axis=1)) + 0.18 * tone / rms(tone.mean(axis=1))
-    mix = sosfilt(np.vstack([butter(2, 140, 'high', fs=FS, output='sos'), butter(2, 3200, 'low', fs=FS, output='sos')]), mix, axis=0)
+    mix = sosfilt(np.vstack([butter(2, 140, 'high', fs=FS, output='sos'), butter(2, top, 'low', fs=FS, output='sos')]), mix, axis=0)
     low = np.cumsum(rng.standard_normal((n, 2)), axis=0)
     low = sosfilt(np.vstack([butter(2, 30, 'high', fs=FS, output='sos'), butter(2, 110, 'low', fs=FS, output='sos')]), low, axis=0)
     mix = mix + rumble * low / rms(low.mean(axis=1)) * rms(mix.mean(axis=1))
