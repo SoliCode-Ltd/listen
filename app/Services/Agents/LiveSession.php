@@ -4,6 +4,7 @@ namespace App\Services\Agents;
 
 use App\Models\Agent;
 use App\Support\Agents\AgentInstructions;
+use App\Support\Agents\AgentLinks;
 
 /**
  * The live call setup of an agent, sent to Gemini inside its short-lived key
@@ -14,6 +15,8 @@ use App\Support\Agents\AgentInstructions;
  * Tools the agent may call during a call (the browser carries them to Listen):
  *   save_contact(name, phone, email, note)  the customer's details
  *   end_call(reason)                        the conversation is over
+ *   show_links(networks)                    the business's own links, written in the call's chat
+ *                                           (only for an agent that has some: AgentLinks)
  */
 final class LiveSession
 {
@@ -38,7 +41,7 @@ final class LiveSession
                 ],
             ],
             'systemInstruction' => ['parts' => [['text' => $instructions]]],
-            'tools' => [['functionDeclarations' => self::tools()]],
+            'tools' => [['functionDeclarations' => self::tools($agent)]],
             'inputAudioTranscription' => (object) [],
             'outputAudioTranscription' => (object) [],
             'contextWindowCompression' => [
@@ -49,9 +52,9 @@ final class LiveSession
     }
 
     /** @return array<int, array<string, mixed>> */
-    public static function tools(): array
+    public static function tools(?Agent $agent = null): array
     {
-        return [
+        $tools = [
             [
                 'name' => 'save_contact',
                 'description' => 'Save the customer\'s contact details once they have given them and you have read the phone number back to them.',
@@ -77,5 +80,22 @@ final class LiveSession
                 ],
             ],
         ];
+
+        // Its own accounts and website, for a caller who asks for them: written in the chat, never read out.
+        $networks = $agent ? array_values(array_unique(array_column(AgentLinks::of($agent), 'network'))) : [];
+        if ($networks !== []) {
+            $tools[] = [
+                'name' => 'show_links',
+                'description' => 'Write the business\'s own links (listed in your instructions) in the chat on the caller\'s screen, when the caller asks for its social media accounts, its website or its WhatsApp. Then tell them in one short sentence that the links are in the chat. Never read a link aloud.',
+                'parameters' => [
+                    'type' => 'OBJECT',
+                    'properties' => [
+                        'networks' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING', 'enum' => $networks], 'description' => 'Which links to write, as the caller asked; leave it empty to write all of them.'],
+                    ],
+                ],
+            ];
+        }
+
+        return $tools;
     }
 }

@@ -366,6 +366,15 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-bubble.is-caller { justify-self: end; background: var(--bg); border: 1px solid var(--line); border-end-end-radius: 6px; }
 .ag-bubble.is-event { justify-self: center; background: color-mix(in srgb, var(--ag-ok) 12%, transparent); color: var(--ag-ok); font-size: .86rem; font-weight: 600; }
 .ag-bubble small { display: block; font-size: .76rem; color: var(--muted); font-weight: 700; margin-bottom: .15rem; }
+/* The business's own links, written in the chat when the caller asks for them (show_links). */
+.ag-bubble.is-links { min-width: min(300px, 86%); }
+.ag-chat-links { display: grid; gap: .4rem; margin-top: .35rem; }
+.ag-chat-link { display: flex; align-items: center; gap: .55rem; min-height: 42px; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 12px; background: var(--surface, var(--bg)); color: var(--text); font-size: .9rem; font-weight: 700; text-decoration: none; direction: ltr; text-align: left; transition: border-color .18s ease, background .18s ease; }
+.ag-chat-link:hover { border-color: var(--a); background: var(--ag-soft); }
+.ag-chat-link:focus-visible { outline: 3px solid var(--ag-soft-2, var(--ag-soft)); outline-offset: 2px; }
+.ag-chat-link svg { flex: 0 0 auto; width: 17px; height: 17px; fill: none; stroke: var(--a); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ag-chat-link span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag-bubble.is-links > bdi { display: block; overflow-wrap: anywhere; font-weight: 600; }
 .ag-correct { margin-top: .4rem; }
 .ag-correct summary { cursor: pointer; color: var(--accent-text); font-size: .82rem; font-weight: 700; list-style: none; }
 .ag-correct summary::-webkit-details-marker { display: none; }
@@ -944,6 +953,16 @@ html[dir="rtl"] .ag-stepper code.is-path::after { right: auto; left: -.95em; tra
 .ag-kb-updates .ag-textarea { min-height: 120px; }
 .ag-kb-badge { display: inline-flex; align-items: center; margin-inline-start: .5rem; padding: .15rem .6rem; border-radius: 999px; background: color-mix(in srgb, var(--brand, #7659FA) 12%, transparent); color: var(--brand, #7659FA); font-size: .75rem; font-weight: 700; vertical-align: middle; }
 .ag-kb-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+/* Social media links: the allowed-websites rows, under the Knowledge tab's own heading. */
+.ag-kb-links-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.4rem 1.4rem 1.1rem; border-bottom: 1px solid var(--line); }
+.ag-kb-links-head .ag-sites-count { margin-top: .2rem; }
+.ag-kb-links .ag-site-name a { color: inherit; text-decoration: none; }
+.ag-kb-links .ag-site-name a:hover { color: var(--accent-text, var(--a)); text-decoration: underline; text-underline-offset: 3px; }
+.ag-kb-links .ag-sites-field input { padding: 0 1.1rem; }
+.ag-kb-links .ag-sites-empty .ag-site-name small { font-size: .9rem; }
+.ag-kb-links-find { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.ag-kb-links-find [data-ag-links-note]:empty { display: none; }
+@media (max-width: 560px) { .ag-kb-links-head { padding-inline: 1rem; flex-direction: column; gap: .6rem; } }
 .ag-kb-tips { display: grid; gap: .9rem; padding: 1.3rem; position: sticky; top: 132px; }
 .ag-kb-tips h3 { font-size: 1rem; font-weight: 800; }
 .ag-kb-tips ul { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; }

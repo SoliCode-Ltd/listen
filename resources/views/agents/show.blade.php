@@ -265,6 +265,49 @@
               <button type="submit" class="ag-btn ag-btn-primary">{{ __('agents.edit_save') }}</button>
             </div>
           </form>
+          {{-- Social media links: the business's own accounts and website (found on its website or added
+               here), which the agent writes in the call's chat when a caller asks (AgentLinks). --}}
+          @php $agentLinks = \App\Support\Agents\AgentLinks::shown(\App\Support\Agents\AgentLinks::of($agent)); $linksMax = \App\Support\Agents\AgentLinks::MAX; @endphp
+          <section class="ag-card ag-sites ag-kb-links" data-ag-links data-max="{{ $linksMax }}" aria-labelledby="ag-links-title">
+            <div class="ag-kb-links-head">
+              <div class="ag-kb-head">
+                <h2 id="ag-links-title">{{ __('agents.links_title') }}</h2>
+                <p class="ag-hint">{{ __('agents.links_hint') }}</p>
+              </div>
+              <span class="ag-sites-count" data-ag-links-count data-pattern="{{ __('agents.live_sites_count') }}">{{ __('agents.live_sites_count', ['count' => count($agentLinks), 'max' => $linksMax]) }}</span>
+            </div>
+            <ul class="ag-sites-list" aria-labelledby="ag-links-title" data-ag-links-list>
+              @foreach($agentLinks as $link)
+                <li data-url="{{ $link['url'] }}">
+                  <span class="ag-site-mark" aria-hidden="true">{{ mb_strtoupper(mb_substr($link['label'], 0, 1)) }}</span>
+                  <span class="ag-site-name">
+                    <bdi dir="ltr"><a href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer nofollow">{{ $link['label'] }}</a></bdi>
+                    @if($link['network'] === 'website')<small>{{ __('agents.links_your_site') }}</small>@endif
+                  </span>
+                  <button type="button" class="ag-sites-remove" data-ag-link-remove aria-label="{{ __('agents.links_remove', ['link' => $link['label']]) }}">{{ __('agents.live_site_remove_short') }}</button>
+                </li>
+              @endforeach
+            </ul>
+            <div class="ag-sites-empty" data-ag-links-empty @if($agentLinks !== []) hidden @endif>
+              <span class="ag-site-mark is-empty" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg></span>
+              <p class="ag-site-name"><small>{{ __('agents.links_empty') }}</small></p>
+            </div>
+            <div class="ag-sites-foot">
+              <form class="ag-sites-add" data-ag-links-add novalidate @if(count($agentLinks) >= $linksMax) hidden @endif>
+                <label class="ag-sites-field">
+                  <input type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr" maxlength="500" placeholder="{{ __('agents.links_placeholder') }}" aria-label="{{ __('agents.links_placeholder') }}" data-ag-link-input>
+                </label>
+                <button type="submit" class="ag-btn ag-btn-primary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>{{ __('agents.links_add') }}</button>
+              </form>
+              <p class="ag-error" data-ag-links-error role="alert" hidden></p>
+              @if($agent->website_url)
+                <div class="ag-kb-links-find">
+                  <button type="button" class="ag-btn ag-btn-sm" data-ag-links-find><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>{{ __('agents.links_find') }}</button>
+                  <span class="ag-hint" data-ag-links-note role="status"></span>
+                </div>
+              @endif
+            </div>
+          </section>
           {{-- Files: the owner's menu, price list or brochure, read once and used on every call. --}}
           <section class="ag-card ag-kb-files" data-ag-files
             data-index-url="{{ route('voice-agents.files.index', $agent) }}"
@@ -367,7 +410,12 @@
                   <summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>{{ __('agents.conversation_transcript') }}</summary>
                   <div class="ag-transcript" style="max-height:none">
                     @foreach($c->transcript as $t)
-                      <div class="ag-bubble is-{{ $t['role'] }}" style="opacity:1;transform:none" dir="auto"><small>{{ $t['role'] === 'agent' ? $agent->name : __('agents.talk_you') }}</small>{{ \App\Support\Agents\SpokenNumbers::forDisplay((string) $t['text'], $agent->language !== 'en') }}</div>
+                      @if(($t['kind'] ?? null) === 'links')
+                        {{-- The links the agent wrote in the chat when the caller asked for them. --}}
+                        <div class="ag-bubble is-agent is-links" style="opacity:1;transform:none"><small>{{ $agent->name }} · {{ __('agents.links_shown') }}</small><bdi dir="ltr">{{ (string) $t['text'] }}</bdi></div>
+                      @else
+                        <div class="ag-bubble is-{{ $t['role'] }}" style="opacity:1;transform:none" dir="auto"><small>{{ $t['role'] === 'agent' ? $agent->name : __('agents.talk_you') }}</small>{{ \App\Support\Agents\SpokenNumbers::forDisplay((string) $t['text'], $agent->language !== 'en') }}</div>
+                      @endif
                     @endforeach
                   </div>
                 </details>
@@ -425,10 +473,14 @@
       'agent' => [
         'id' => $agent->public_id, 'name' => $agent->name, 'status' => $agent->status, 'language' => $agent->language,
         'dialect' => $agent->dialect, 'speaker_id' => $agent->speaker_id, 'gender' => $voice['gender'] ?? null,
+        // Knowledge → Social media links: an agent made before links were read has its website searched once.
+        'links_looked' => $agent->setting('links_found_at') !== null || (bool) $agent->setting('links_edited'),
+        'has_website' => (bool) $agent->website_url,
         'urls' => [
           'show' => route('voice-agents.show', $agent), 'update' => route('voice-agents.update', $agent),
           'test' => route('voice-agents.test-call', $agent), 'correct' => route('voice-agents.correct', $agent),
           'write' => route('voice-agents.write', $agent), 'edit' => route('voice-agents.edit', $agent),
+          'links' => route('voice-agents.links', $agent),
         ],
       ],
       'regions' => collect(\App\Support\ArabicDialects::ALL)->map(fn ($d) => $d['region'])->all(),
@@ -473,6 +525,7 @@
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
         'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'),
         'site_remove' => __('agents.live_site_remove'), 'site_remove_short' => __('agents.live_site_remove_short'), 'site_invalid' => __('agents.live_site_invalid'), 'site_exists' => __('agents.live_site_exists'), 'site_max' => __('agents.live_site_max'),
+        'links_remove' => __('agents.links_remove'), 'links_saved' => __('agents.links_saved'), 'links_finding' => __('agents.links_finding'), 'links_your_site' => __('agents.links_your_site'),
         'play' => __('agents.voice_play'), 'pause' => __('agents.voice_pause'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),
         'status' => __('agents.status'),
         'files' => __('agents.files'),

@@ -114,6 +114,18 @@
     '.lva-line{padding:8px 12px;border-radius:16px;background:var(--soft);font-size:13.5px;max-width:88%;justify-self:start;animation:lva-in .35s ' + EASE + '}',
     '.lva[data-radius="square"] .lva-line{border-radius:8px}',
     '.lva-line.is-caller{justify-self:end;background:transparent;border:1px solid var(--line)}',
+    /* The business's own links, written in the chat when the caller asks for them (show_links). */
+    '.lva-line.is-links{display:grid;gap:4px;padding:6px;min-width:62%}',
+    /* Room for every link at once, with the line that follows them. */
+    '.lva-lines.has-links{max-height:min(290px,46vh)}',
+    '.lva-link{display:flex;align-items:center;gap:8px;min-height:36px;padding:6px 10px;border-radius:10px;background:var(--bg);border:1px solid var(--line);color:var(--text) !important;text-decoration:none !important;font-size:13px;font-weight:700;direction:ltr;text-align:left;overflow:hidden;transition:border-color .18s ease,background .18s ease}',
+    '.lva-link:hover{border-color:var(--a)}',
+    '.lva-link:focus-visible{outline:2px solid var(--a);outline-offset:2px}',
+    '.lva-link span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.lva-link svg{flex:none;width:15px;height:15px;fill:none;stroke:var(--a);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.lva-barlinks{display:flex;align-items:flex-start;gap:6px;padding:6px;width:min(300px,calc(100vw - 40px))}',
+    '.lva-barlinks>div{flex:1;min-width:0}.lva-barlinks .lva-line{max-width:none;min-width:0;background:none;padding:0;animation:none}',
+    '.lva-barlinks .lva-x{flex:none;width:30px;height:30px}',
     '.lva-buttons{display:flex;gap:8px;justify-content:center;align-items:center;flex:none}',
     '.lva-call{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 24px;border:0;border-radius:var(--r-btn);background:var(--a);color:var(--a-ink) !important;font-weight:800;font-size:15.5px;box-shadow:0 0 0 1px var(--line),0 12px 26px -12px var(--a);transition:background .25s ease,transform .18s ease,box-shadow .25s ease}',
     '.lva-call:hover{background:var(--a-2)}',
@@ -206,6 +218,7 @@
     end: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15.2c5-4.6 13-4.6 18 0l-2.3 2.7-3.7-1.4v-2.8a12.4 12.4 0 0 0-6 0v2.8l-3.7 1.4z"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    link: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>',
     callback: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.1 3.5h3.1l1.6 4.1-2 1.3a11.3 11.3 0 0 0 5.3 5.3l1.3-2 4.1 1.6v3.1a2 2 0 0 1-2.2 2A16.6 16.6 0 0 1 3.1 5.7a2 2 0 0 1 2-2.2zM15 3h6v6M21 3l-6.5 6.5"/></svg>',
   };
   var WAVE = [0.3, 0.5, 0.72, 0.9, 1, 0.9, 0.72, 0.5, 0.3];
@@ -461,6 +474,17 @@
         parts.slot.hidden = true;
         parts.tip.appendChild(parts.tipText); parts.tip.appendChild(parts.leave); parts.tip.appendChild(parts.slot);
         dock.appendChild(parts.tip);
+        // The business's own links, when the caller asks for them (the bar has no chat to write them in).
+        parts.barLinks = el('div', 'lva-bartip lva-barlinks');
+        parts.barLinks.hidden = true;
+        parts.barLinksBody = el('div');
+        var shut = el('button', 'lva-x');
+        shut.type = 'button';
+        shut.setAttribute('aria-label', text.close || 'Close');
+        shut.innerHTML = ICONS.close;
+        shut.addEventListener('click', function () { parts.barLinks.hidden = true; });
+        parts.barLinks.appendChild(parts.barLinksBody); parts.barLinks.appendChild(shut);
+        dock.appendChild(parts.barLinks);
       }
       box.appendChild(dock);
       box.classList.toggle('is-open', open && !bar);
@@ -700,8 +724,46 @@
       // The caller's line written again from their voice replaces this one (onFix).
       t.view = n;
       parts.lines.appendChild(n);
-      while (parts.lines.children.length > 6) parts.lines.removeChild(parts.lines.firstChild);
-      parts.lines.scrollTop = parts.lines.scrollHeight;
+      trimLines();
+    }
+    // The business's own links the agent wrote in the chat (show_links): they show also when the
+    // words of the call do not (captions off), and stay while newer lines come and go.
+    function linksLine(t) {
+      if (!parts.lines && !parts.barLinks) return;
+      var n = el('div', 'lva-line is-links');
+      (t.links || []).forEach(function (l) {
+        if (!/^https?:\/\//i.test(String(l.url || ''))) return;
+        var a = el('a', 'lva-link');
+        a.href = l.url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer nofollow';
+        a.dir = 'ltr';
+        a.innerHTML = ICONS.link;
+        a.appendChild(el('span', '', l.label || l.url));
+        n.appendChild(a);
+      });
+      if (!n.children.length) return;
+      t.view = n;
+      // The slim bar has no chat: the links wait above it, until closed or the next call.
+      if (!parts.lines) {
+        parts.barLinksBody.innerHTML = '';
+        parts.barLinksBody.appendChild(n);
+        parts.barLinks.hidden = false;
+        return;
+      }
+      parts.lines.hidden = false;
+      parts.lines.classList.add('has-links');
+      parts.lines.appendChild(n);
+      trimLines();
+    }
+    function trimLines() {
+      var lines = parts.lines;
+      while (lines.children.length > 6) {
+        var old = null;
+        for (var i = 0; i < lines.children.length && !old; i++) if (!lines.children[i].classList.contains('is-links')) old = lines.children[i];
+        lines.removeChild(old || lines.firstChild);
+      }
+      lines.scrollTop = lines.scrollHeight;
     }
 
     // The real call.
@@ -723,7 +785,8 @@
       if (call) { call.end(); return; }
       if (starting) return;
       starting = true;
-      if (parts.lines) parts.lines.innerHTML = '';
+      if (parts.lines) { parts.lines.innerHTML = ''; parts.lines.hidden = look.captions === false; parts.lines.classList.remove('has-links'); }
+      if (parts.barLinks) parts.barLinks.hidden = true;
       setState('connecting');
       loadCall().then(function () {
         starting = false;
@@ -737,6 +800,7 @@
           onState: function (s) { setState(s); },
           onTurn: line,
           onFix: function (t) { if (t.view) t.view.textContent = t.text; },
+          onLinks: linksLine,
           onLevel: level,
           onError: function (msg) { pendingError = msg || ''; },
           // Every line busy: the caller's place, kept fresh while they wait (a minute at most).

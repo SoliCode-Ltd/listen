@@ -7,6 +7,8 @@
  *     onTurn(turn) {},                // { role: 'agent' | 'caller', text }
  *     onLevel(agent, caller) {},      // loudness 0..1 of the agent and of the caller, every frame
  *     onTool(name, args, result) {},  // what the agent did (save_contact ...)
+ *     onLinks(item) {},               // { links: [{ url, label, network }] }: the business's own links,
+ *                                     // to write in the chat where they came in the call (show_links)
  *     onWait({ position, waited }) {},// every line busy: the caller's place in line (1 is next)
  *     patience: 60,                   // seconds to wait for a line before "busy"
  *   });
@@ -221,6 +223,12 @@
       while (queue.length && !queue[0].wait) {
         var t = queue.shift();
         t.shown = true;
+        if (t.role === 'links') {
+          // Kept with the call's words as the agent's line, marked as links.
+          pending.push({ role: 'agent', kind: 'links', text: t.links.map(function (l) { return l.label; }).join(' · ') });
+          opts.onLinks && opts.onLinks(t);
+          continue;
+        }
         t.kept = { role: t.role, text: plain(t.text) };
         if (t.n) t.kept.n = t.n;
         if (t.heard) t.kept.heard = t.heard;
@@ -408,18 +416,36 @@
       else if (ev.data && ev.data.text) ev.data.text().then(handle);
     }
 
+    // The business's own links (show_links), written in the chat after what was said before them.
+    function showLinks(list) {
+      var links = (list || []).filter(function (l) { return l && typeof l.url === 'string' && /^https?:\/\//i.test(l.url); })
+        .map(function (l) { return { url: l.url, label: String(l.label || l.url), network: String(l.network || '') }; });
+      if (!links.length) return;
+      if (callerText.trim()) { turn('caller', callerText); callerText = ''; }
+      if (agentText.trim()) { turn('agent', agentText); agentText = ''; }
+      queue.push({ role: 'links', links: links, text: '' });
+      drain();
+    }
+
     function runTool(fc) {
       // end_call gets no answer: an answer makes the model speak again ("The call has ended.",
       // sometimes in English on an Arabic call). Its goodbye came before the call, so it plays.
       var hangUp = fc.name === 'end_call';
       if (hangUp) hungUp = true;
       post(info.api + '/tool', { call_key: info.call_key, name: fc.name, args: fc.args || {} }).then(function (result) {
+        var heard = result || { result: 'ok' };
+        if (fc.name === 'show_links' && result && result.links) {
+          showLinks(result.links);
+          // The model hears that they were written, never the addresses (it would read them out).
+          heard = {};
+          for (var k in result) if (k !== 'links' && Object.prototype.hasOwnProperty.call(result, k)) heard[k] = result[k];
+        }
         opts.onTool && opts.onTool(fc.name, fc.args || {}, result);
         if (hangUp) {
           if (sources.size) endAfterSpeech = true; else setTimeout(function () { finish('done'); }, 1200);
           return;
         }
-        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: result || { result: 'ok' } }] } }));
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: heard } ] } }));
       });
     }
 

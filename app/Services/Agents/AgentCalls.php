@@ -607,6 +607,30 @@ class AgentCalls
             // (a test call said "تم حفظ البيانات" and then asked a question it did not wait for).
             return ['result' => 'saved', 'say' => 'Do not say it was saved. If the order or booking still needs details, ask for them now and save again once you have them; otherwise tell the caller in one short sentence what happens next and ask if there is anything else.'];
         }
+        if ($name === 'show_links') {
+            // Only the business's own links, as kept on the agent: the model names networks, never addresses.
+            $all = $conversation->agent ? \App\Support\Agents\AgentLinks::of($conversation->agent) : [];
+            $asked = array_values(array_filter(array_map(fn ($n) => strtolower(trim((string) $n)), (array) ($args['networks'] ?? [])), 'strlen'));
+            $links = $asked === [] ? $all : array_values(array_filter($all, fn (array $l): bool => in_array($l['network'], $asked, true)));
+            if ($links === []) {
+                return ['result' => 'none', 'say' => $all === []
+                    ? 'There are no links to write. Say kindly that you do not have them, and offer to help another way.'
+                    : 'None of those are among the links. Tell the caller which accounts there are, and offer to write them in the chat.'];
+            }
+            $shownKey = 'agent-links:'.$conversation->id;
+            Cache::add($shownKey, 0, now()->addHours(2));
+            if ((int) Cache::increment($shownKey) > 6) {
+                return ['result' => 'enough', 'say' => 'The links are already in the chat. Tell the caller so, without writing them again.'];
+            }
+
+            // The call client writes `links` in the chat and keeps them from the model, which hears the rest.
+            return [
+                'result' => 'shown',
+                'shown' => array_values(array_unique(array_map(fn (array $l): string => \App\Support\Agents\AgentLinks::NAMES[$l['network']] ?? $l['network'], $links))),
+                'say' => 'The links are now written in the chat on the caller\'s screen. Tell them so in one short sentence in the language of the call, without reading any link aloud, then ask if there is anything else.',
+                'links' => \App\Support\Agents\AgentLinks::shown($links),
+            ];
+        }
         if ($name === 'end_call') {
             $conversation->end_reason = Str::limit((string) ($args['reason'] ?? 'done'), 30, '');
             $conversation->save();
@@ -728,6 +752,10 @@ class AgentCalls
                 continue;
             }
             $entry = ['role' => $role, 'text' => $text, 'at' => (int) $conversation->started_at->diffInSeconds(now())];
+            // The links the agent wrote in the chat (show_links), kept where they came in the call.
+            if ($role === 'agent' && ($turn['kind'] ?? null) === 'links') {
+                $entry['kind'] = 'links';
+            }
             $n = (int) ($turn['n'] ?? 0);
             if ($role === 'caller' && $n > 0 && $n <= self::HEAR_MAX_LINES) {
                 $entry['n'] = $n;

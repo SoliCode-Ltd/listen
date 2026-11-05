@@ -2,6 +2,7 @@
 
 namespace App\Services\Agents;
 
+use App\Support\Agents\AgentLinks;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -27,27 +28,41 @@ class SiteReader
         'من-نحن', 'خدماتنا', 'الخدمات', 'الأسعار', 'اتصل-بنا', 'تواصل', 'المنيو', 'العروض', 'الفروع'];
 
     /**
-     * @return array{ok: bool, text: string, pages: array<int, array{url: string, title: string, chars: int}>, error: ?string}
+     * links: the business's own accounts on social media sites, from every page read (the icons in
+     * its header and footer too, which the text leaves out), one on each network (AgentLinks).
+     *
+     * @return array{ok: bool, text: string, pages: array<int, array{url: string, title: string, chars: int}>, links: list<array{network: string, url: string}>, error: ?string}
      */
     public function read(string $url): array
     {
         $start = self::normalizeUrl($url);
         if ($start === null) {
-            return ['ok' => false, 'text' => '', 'pages' => [], 'error' => 'invalid_url'];
+            return ['ok' => false, 'text' => '', 'pages' => [], 'links' => [], 'error' => 'invalid_url'];
         }
 
         $first = $this->fetch($start);
         if ($first === null) {
-            return ['ok' => false, 'text' => '', 'pages' => [], 'error' => 'unreachable'];
+            return ['ok' => false, 'text' => '', 'pages' => [], 'links' => [], 'error' => 'unreachable'];
         }
 
+        $found = AgentLinks::inHtml($first['html'], $first['url']);
         $pages = [['url' => $first['url'], 'title' => $first['title'], 'text' => $first['text']]];
         foreach ($this->likelyLinks($first['html'], $first['url']) as $link) {
             if (count($pages) >= self::MAX_PAGES) {
                 break;
             }
             $page = $this->fetch($link);
-            if ($page !== null && trim($page['text']) !== '') {
+            if ($page === null) {
+                continue;
+            }
+            foreach (AgentLinks::inHtml($page['html'], $page['url']) as $key => $account) {
+                if (isset($found[$key])) {
+                    $found[$key]['seen'] += $account['seen'];
+                } else {
+                    $found[$key] = $account;
+                }
+            }
+            if (trim($page['text']) !== '') {
                 $pages[] = ['url' => $page['url'], 'title' => $page['title'], 'text' => $page['text']];
             }
         }
@@ -75,6 +90,7 @@ class SiteReader
             'ok' => $text !== '',
             'text' => $text,
             'pages' => array_map(fn ($p) => ['url' => $p['url'], 'title' => $p['title'], 'chars' => mb_strlen($p['text'])], $pages),
+            'links' => AgentLinks::pick($found),
             'error' => $text === '' ? 'empty' : null,
         ];
     }
