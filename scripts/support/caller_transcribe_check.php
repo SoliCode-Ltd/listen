@@ -90,11 +90,22 @@ $clips = [
     ['en-us-2', 'en', 'en-US', 'شكرا جيك'],
     ['en-us-2', 'en', 'en-US', ''],
 ];
-// How much the model thinks first: the quickest answer that is still right is the one to keep.
-$levels = ['low', 'minimal'];
+// The thinking level hearCaller uses ("minimal" was slower and gave empty answers here).
+$levels = ['low'];
 
 $gemini = app(GeminiClient::class);
 $times = [];
+
+// Two seconds of a quiet line (faint noise, no words): nothing must be written.
+mt_srand(7);
+$noise = '';
+for ($i = 0; $i < 32000; $i++) {
+    $noise .= pack('v', (mt_rand(-60, 60)) & 0xFFFF);
+}
+$agent = new Agent(['name' => 'Check', 'business_name' => 'Check', 'language' => 'ar', 'dialect' => 'ar-SA']);
+$quiet = $gemini->transcribe(AgentCalls::hearPrompt($agent, 'شكرا', ''), AgentCalls::wav($noise, 16000), 15);
+echo PHP_EOL.'== a quiet line (2 s of faint noise)'.PHP_EOL.'  answer: '.json_encode($quiet, JSON_UNESCAPED_UNICODE).PHP_EOL;
+$check(AgentCalls::cleanHeard($quiet, 'شكرا') === null, 'nothing is made up from a quiet line');
 foreach ($clips as [$clip, $language, $dialect, $hint]) {
     $file = public_path("audio/agents/calls/{$clip}.mp3");
     $words = $said($clip, $language);
