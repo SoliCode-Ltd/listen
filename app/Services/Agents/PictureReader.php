@@ -75,7 +75,8 @@ class PictureReader
         if (is_string($words)) {
             return $words;
         }
-        if ($until !== null && microtime(true) > $until - 25) {
+        // A file the model could not finish reading is tried again a day later, not on every read.
+        if (($until !== null && microtime(true) > $until - 25) || Cache::has($key.':unread')) {
             return '';
         }
         $got = $this->site->download($url, ['pdf'], 'application/pdf', 'ar,en;q=0.8', self::PDF_BYTES);
@@ -88,7 +89,7 @@ class PictureReader
 
             return '';
         }
-        $timeout = $until !== null ? (int) max(10, min(60, $until - microtime(true) - 5)) : 60;
+        $timeout = $until !== null ? (int) max(10, min(90, $until - microtime(true) - 5)) : 90;
         $reply = $this->gemini->readFile(implode("\n", [
             'This PDF file, "'.$title.'", is linked on the website of '.($business ? '"'.$business.'"' : 'a business').'. Its phone assistant answers callers from it.',
             'Write down everything in it a caller could ask about: services, programmes and events with their dates and places, prices and fees, people\'s names with their roles, opening hours, addresses, phone numbers and rules.',
@@ -97,6 +98,8 @@ class PictureReader
             'If it has none of this, reply with exactly: NONE',
         ]), 'application/pdf', $got['body'], $timeout);
         if ($reply === null) {
+            Cache::put($key.':unread', true, now()->addDay());
+
             return '';
         }
         $reply = trim(preg_replace('/^```[a-z]*\s*|\s*```$/i', '', trim($reply)) ?? $reply);
