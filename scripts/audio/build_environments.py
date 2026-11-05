@@ -396,8 +396,9 @@ def office():
     and its reflections, simulated with the room's materials and the air), and the tone is shaped only
     gently: no steep filters, which smear the start of every word and make voices sound watery.
 
-    Against the measured office line: within about a point of its energy in every band, its loud moments
-    and nearly its quiet spells (an earlier version, six people reading without a break, was a steady wall).
+    Against the measured office line: within two points of its energy in every band (the same below 120 Hz),
+    its loud moments and quiet spells within 0.3 dB (an earlier version, six people reading without a break,
+    was a steady wall).
 
     Two files: bed/office.flac for the studio (stereo, the desk's two microphones) and
     resources/audio/agents/office.mp3 for agents' calls (mono, 24 kHz, 64 kbps, a 120 s loop padded with
@@ -406,7 +407,7 @@ def office():
     rng = np.random.default_rng(7)
     # The settings that measured closest to the measured office line (OFFICE_PROFILE, its speech rhythm
     # and its swings), found by trying 288 mixes of desks, distance, lulls, rumble and tone.
-    seconds, lull, rumble, top = 123, 1.45, 0.37, 4200
+    seconds, lull, rumble, top = 123, 1.75, 0.34, 4200
     n = seconds * FS
     pool = sorted(os.path.join(CONVERSATIONS[0], f) for f in os.listdir(CONVERSATIONS[0]) if f.startswith('dlg-') and f.endswith('.mp3') and not any(k in f for k in ('ghost', 'drama')))
     pool += sorted(os.path.join(CONVERSATIONS[1], f) for f in os.listdir(CONVERSATIONS[1]) if f.endswith('.mp3'))
