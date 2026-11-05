@@ -406,4 +406,65 @@ class AgentSiteTest extends TestCase
         $this->assertTrue(\App\Services\Agents\AgentCalls::latinArabic('Shukran khaseer'));
         $this->assertFalse(\App\Services\Agents\AgentCalls::latinArabic('موعدك يوم الأحد الساعة 5 PM'));
     }
+
+    public function test_a_line_said_in_another_language_is_told_apart_from_arabic_in_latin_letters(): void
+    {
+        // Lines an Arabic agent said on live (Spanish, Chinese, Korean), and ones it may say.
+        foreach ([
+            'Déjame revisar la información. Las próximas fechas aún no se han anunciado' => 'other',
+            'Déjame revisar la información.' => 'other',
+            '¿Sigues ahí?' => 'other',
+            'Disculpa, solo puedo ayudarte con información' => 'other',
+            '好的，没问题。祝您生活愉快，再见！' => 'other',
+            '안녕하세요! 반갑습니다. إسمع 관련해서 어떤' => 'other',
+            'Je peux vous aider avec votre rendez-vous' => 'other',
+            'We are an online AI voice platform, and you can try it' => 'en',
+            "tfaḍḍal, kammil su'alak wish tiby ti'raf?" => 'latin',
+            'ana mesh 3aref el nadwa de imta, la2 lessa' => 'latin',
+            'Cairo Smiles Clinic' => 'latin',
+            'OK' => 'short',
+            'أبشر، موعدك يوم الأحد الساعة 5 PM' => 'ar',
+        ] as $line => $tongue) {
+            $this->assertSame($tongue, \App\Support\Agents\Tongue::of($line), $line);
+        }
+        // English is right for an Arabic agent only after the caller spoke English, and Arabic for an English agent.
+        $this->assertTrue(\App\Support\Agents\Tongue::wrong('We are an online AI voice platform, and you can try it', 'ar', 'ar'));
+        $this->assertFalse(\App\Support\Agents\Tongue::wrong('We are an online AI voice platform, and you can try it', 'ar', 'en'));
+        $this->assertTrue(\App\Support\Agents\Tongue::wrong('¿Sigues ahí?', 'ar', 'en'));
+        $this->assertTrue(\App\Support\Agents\Tongue::wrong('أبشر، موعدك يوم الأحد', 'en', 'en'));
+        $this->assertFalse(\App\Support\Agents\Tongue::wrong('أبشر، موعدك يوم الأحد', 'en', 'ar'));
+        $this->assertFalse(\App\Support\Agents\Tongue::wrong('أبشر، موعدك يوم الأحد', 'en', 'latin'));
+        $this->assertFalse(\App\Support\Agents\Tongue::wrong("tfaḍḍal, kammil su'alak", 'ar', 'ar'));
+    }
+
+    public function test_an_agent_is_held_to_its_language_and_a_wrong_line_is_written_in_its_dialect(): void
+    {
+        $agent = $this->liveAgent();
+        $instructions = \App\Support\Agents\AgentInstructions::build($agent);
+        $lines = explode("\n", $instructions);
+        // The voice model's own form, near the top and again at the very end.
+        $this->assertStringStartsWith('RESPOND IN ARABIC. YOU MUST RESPOND UNMISTAKABLY IN ARABIC', $lines[1]);
+        $this->assertStringStartsWith('- RESPOND IN ARABIC.', end($lines));
+        $this->assertStringContainsString('Never say a word in any other language.', end($lines));
+        $this->assertStringContainsString('RESPOND IN ENGLISH. YOU MUST RESPOND UNMISTAKABLY IN ENGLISH',
+            \App\Support\Agents\AgentInstructions::build(tap($agent->replicate(), fn ($a) => $a->forceFill(['language' => 'en', 'dialect' => 'en-US']))));
+
+        Http::fake([
+            '*auth_tokens' => Http::response(['name' => 'auth_tokens/live-key']),
+            '*generateContent' => Http::response(['candidates' => [['content' => ['parts' => [['text' => 'خليني أراجع المعلومات. المواعيد الجاية لسه ما انعلنت']]]]]]),
+        ]);
+        $start = $this->callApi('/calls', ['key' => $agent->mainWidget()->public_key, 'visitor' => 'v-spanish'])->assertOk()
+            ->assertJsonPath('speaks', \App\Support\Agents\AgentInstructions::speaks($agent));
+        [$id, $key] = [$start->json('conversation'), $start->json('call_key')];
+        $spanish = 'Déjame revisar la información. Las próximas fechas aún no se han anunciado.';
+        $this->callApi("/calls/{$id}/ping", ['call_key' => $key, 'turns' => [['role' => 'caller', 'text' => 'امتى الندوة الجاية'], ['role' => 'agent', 'text' => $spanish, 'a' => 1]]])->assertOk();
+
+        $this->callApi("/calls/{$id}/agent-line", ['call_key' => $key, 'n' => 1, 'text' => $spanish, 'wrong' => 1])->assertOk()
+            ->assertJsonPath('text', 'خليني أراجع المعلومات. المواعيد الجاية لسه ما انعلنت');
+        Http::assertSent(fn (HttpRequest $r) => str_contains($r->url(), 'generateContent')
+            && str_contains((string) data_get($r->data(), 'contents.0.parts.0.text'), 'in another language by mistake')
+            && str_contains((string) data_get($r->data(), 'contents.0.parts.0.text'), $spanish));
+        $line = collect(\App\Models\AgentConversation::where('public_id', $id)->value('transcript'))->firstWhere('role', 'agent');
+        $this->assertSame($spanish, $line['heard']);
+    }
 }

@@ -372,7 +372,7 @@ class AgentCallController extends Controller
             return $this->error('not_found', 404);
         }
 
-        return response()->json(['text' => $this->calls->writeAgentLine($c, (int) ($in['n'] ?? 0), Str::limit((string) ($in['text'] ?? ''), 600, ''))]);
+        return response()->json(['text' => $this->calls->writeAgentLine($c, (int) ($in['n'] ?? 0), Str::limit((string) ($in['text'] ?? ''), 600, ''), ! empty($in['wrong']))]);
     }
 
     public function end(Request $request, string $conversation): JsonResponse
@@ -409,6 +409,9 @@ class AgentCallController extends Controller
             'transcribe' => AgentAccess::callerTranscribe(),
             // An Arabic agent's line that comes out in Latin letters is written in Arabic ones (agent-line).
             'arabic_lines' => $agent->language !== 'en',
+            // The language it speaks, as the model is told it: a line in another language is stopped
+            // as it starts and the agent is asked to say it again in this one (agent-call.js).
+            'speaks' => \App\Support\Agents\AgentInstructions::speaks($agent),
             'api' => url('/agent-api/calls/'.$c->public_id),
             'agent' => ['name' => $agent->name, 'language' => $agent->language],
         ];
