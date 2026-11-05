@@ -106,7 +106,7 @@ final class LiveSession
                 'parameters' => [
                     'type' => 'OBJECT',
                     'properties' => [
-                        'query' => ['type' => 'STRING', 'description' => 'The main words of what the caller asked, as the website would write them, in the website\'s language (Arabic in standard spelling, not dialect), with a word or two that mean the same: for example "رسوم العضوية اشتراك" or "رئيس مجلس الإدارة".'],
+                        'query' => ['type' => 'STRING', 'description' => 'The main words of what the caller asked, as the website would write them, in the website\'s language (Arabic in standard spelling, not dialect), with a word or two that mean the same: for example "رسوم العضوية اشتراك" or "نائب رئيس مجلس الإدارة". Leave out the business\'s own name: it is on every page.'],
                     ],
                     'required' => ['query'],
                 ],

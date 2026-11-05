@@ -90,7 +90,7 @@ foreach ($sites as $site) {
     }
     echo "   look-ups:\n";
     foreach ($site['questions'] as $question) {
-        $found = AgentLookup::searchIn($docs, $question);
+        $found = AgentLookup::searchIn($docs, $question, AgentLookup::MAX_PASSAGES, $site['business']);
         echo "   ? {$question}\n";
         if ($found === []) {
             echo "      (nothing: the agent says it does not have this)\n";

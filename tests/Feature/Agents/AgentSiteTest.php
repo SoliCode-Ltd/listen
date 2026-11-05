@@ -351,6 +351,26 @@ class AgentSiteTest extends TestCase
         $this->assertStringContainsString('أخصائي البصريات: 300', AgentLookup::search($agent, 'رسوم أخصائي البصريات')[0]['text']);
     }
 
+    public function test_a_look_up_is_not_won_by_the_business_name_or_a_home_page_title(): void
+    {
+        $business = 'الجمعية السعودية لطب العيون';
+        $pages = [
+            ['page' => 'الرئيسية', 'text' => "الجمعية السعودية لطب العيون ترحب بكم\nأخبار الجمعية السعودية لطب العيون"],
+            ['page' => 'من نحن', 'text' => 'الجمعية السعودية لطب العيون جمعية علمية'],
+            ['page' => 'مجلس الإدارة', 'text' => "(A picture put on the website in 2026-07.)\nد. تركي التركي - نائب الرئيس"],
+            ['page' => 'الأخبار', 'text' => 'الجمعية السعودية لطب العيون تعلن موعد المؤتمر'],
+        ];
+
+        // The agent adds the society's name; "الرئيسية" (home) is no "رئيس" (president).
+        $found = AgentLookup::searchIn($pages, 'نائب رئيس مجلس إدارة الجمعية السعودية لطب العيون', AgentLookup::MAX_PASSAGES, $business);
+        $this->assertSame(['مجلس الإدارة'], array_column($found, 'page'));
+        // Asked for the society's name alone, its pages still answer.
+        $this->assertNotSame([], AgentLookup::searchIn($pages, 'الجمعية السعودية لطب العيون', AgentLookup::MAX_PASSAGES, $business));
+        // A word of the name that is rare on the site still counts ("عيادة … لطب الأسنان", asked for الأسنان).
+        $clinic = [['page' => 'الأسعار', 'text' => 'تنظيف الأسنان 250 ريال'], ['page' => 'من نحن', 'text' => 'عيادة ابتسامة الرياض']];
+        $this->assertSame('الأسعار', AgentLookup::searchIn($clinic, 'الأسنان', AgentLookup::MAX_PASSAGES, 'عيادة ابتسامة الرياض لطب الأسنان')[0]['page']);
+    }
+
     public function test_a_picture_says_when_it_was_put_on_the_website(): void
     {
         // A board of directors in a picture from July 2026 is newer than a page about the 2022–2025 board.
