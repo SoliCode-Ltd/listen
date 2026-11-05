@@ -426,7 +426,7 @@
     var faceImg = $('[data-ag-talk-avatar-img]', root);
     var shape = [0.35, 0.6, 0.85, 1, 0.8, 0.55, 0.3];
     var list = $('[data-ag-transcript]', root);
-    var call = null, lastAsked = '';
+    var call = null, lastAsked = '', lastCaller = null;
     var states = T.states || {};
     // The link page: every line busy, the caller's place in line, then a number to be called back.
     var sub = $('[data-ag-talk-sub]', root), leave = $('[data-ag-talk-leave]', root);
@@ -563,10 +563,39 @@
       var who = document.createElement('small');
       who.textContent = role === 'agent' ? ((C.agent && C.agent.name) || '') : role === 'caller' ? T.you : '';
       if (role !== 'event') b.appendChild(who);
-      b.appendChild(document.createTextNode(text));
+      var words = document.createTextNode(text);
+      b.appendChild(words);
       if (extra) b.appendChild(extra);
       list.appendChild(b);
       list.scrollTop = list.scrollHeight;
+      return words;
+    }
+    // The business's own links the agent wrote in the chat (show_links), each opening in a new tab.
+    function linksBubble(links) {
+      var b = document.createElement('div');
+      b.className = 'ag-bubble is-agent is-links';
+      var who = document.createElement('small');
+      who.textContent = (C.agent && C.agent.name) || '';
+      b.appendChild(who);
+      var box = document.createElement('div');
+      box.className = 'ag-chat-links';
+      links.forEach(function (l) {
+        var a = document.createElement('a');
+        a.className = 'ag-chat-link';
+        a.href = l.url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer nofollow';
+        a.dir = 'ltr';
+        a.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>';
+        var label = document.createElement('span');
+        label.textContent = l.label;
+        a.appendChild(label);
+        box.appendChild(a);
+      });
+      b.appendChild(box);
+      list.appendChild(b);
+      list.scrollTop = list.scrollHeight;
+      return b;
     }
     function correction(question) {
       if (!C.agent || !C.agent.urls || C.mode === 'link' || C.mode === 'demo') return null;
@@ -604,9 +633,15 @@
         begin: begin,
         onState: setState,
         onTurn: function (t) {
-          if (t.role === 'caller') { lastAsked = t.text; bubble('caller', t.text); }
-          else bubble('agent', t.text, correction(lastAsked));
+          if (t.role === 'caller') { lastAsked = t.text; lastCaller = t; t.view = bubble('caller', t.text); }
+          else t.view = bubble('agent', t.text, correction(lastAsked));
         },
+        // The caller's line written again from their voice, in the agent's dialect.
+        onFix: function (t) {
+          if (t.view) t.view.nodeValue = t.text;
+          if (t === lastCaller) lastAsked = t.text;
+        },
+        onLinks: function (t) { t.view = linksBubble(t.links); },
         onLevel: level,
         onTool: function (name, args) {
           if (name === 'save_contact' && C.mode !== 'link') bubble('event', fill(T.saved_contact, { details: [args.name, args.phone, args.email].filter(Boolean).join(' · ') }));
@@ -974,6 +1009,16 @@
       var nf = new Intl.NumberFormat('en'); // the site writes numbers in Latin digits in both languages
       kbText.addEventListener('input', function () { kbCount.textContent = nf.format(kbText.value.length) + ' / ' + nf.format(40000); });
     }
+    var uf = $('[data-ag-updates-form]');
+    if (uf) uf.addEventListener('submit', function (e) {
+      e.preventDefault();
+      api('PATCH', C.agent.urls.update, { updates: $('[name="updates"]', uf).value }).then(function (res) {
+        var at = $('[data-ag-updates-at]', uf);
+        if (at && res && res.agent) at.textContent = res.agent.updates_at || '';
+        toast(T.saved);
+      }).catch(function (err) { toast(err.message); });
+    });
+    socialLinks($('[data-ag-links]'));
     if (kf) kf.addEventListener('submit', function (e) {
       e.preventDefault();
       api('PATCH', C.agent.urls.update, { knowledge: $('[name="knowledge"]', kf).value }).then(function () { toast(T.saved); }).catch(function (err) { toast(err.message); });
@@ -984,6 +1029,124 @@
    * The Design tab: each choice redraws the preview at once (the real button,
    * drawn on a pretend copy of the website) and is saved a moment later.
    */
+  /*
+   * Knowledge → Social media links: a row each, like the allowed websites. Adding or removing one
+   * saves the list (Listen keeps only accounts and the business's own pages, written one way), and
+   * "Find them on my website" reads the website again for them. An agent made before its links were
+   * read has its website searched once, on its own.
+   */
+  function socialLinks(box) {
+    if (!box || !C.agent || !C.agent.urls) return;
+    var list = $('[data-ag-links-list]', box), form = $('[data-ag-links-add]', box), input = $('[data-ag-link-input]', box);
+    var err = $('[data-ag-links-error]', box), note = $('[data-ag-links-note]', box), find = $('[data-ag-links-find]', box);
+    var max = +box.getAttribute('data-max') || 10;
+    var pollTimer = 0, polls = 0;
+    function urls() { return $$('li', list).map(function (li) { return li.getAttribute('data-url'); }); }
+    // New links are read in the background: the list checks back until each says what the agent read.
+    function watch() {
+      clearTimeout(pollTimer);
+      if (!$('li[data-state="reading"]', list) || !C.agent.urls.link_reads || polls >= 40) { polls = 0; return; }
+      pollTimer = setTimeout(function () {
+        api('GET', C.agent.urls.link_reads).then(function (res) { if (res && res.links) draw(res.links); }).catch(function () {});
+      }, polls++ < 10 ? 2500 : 6000);
+    }
+    function sync() {
+      var n = urls().length, count = $('[data-ag-links-count]', box);
+      $('[data-ag-links-empty]', box).hidden = n > 0;
+      form.hidden = n >= max;
+      if (count) count.textContent = (count.getAttribute('data-pattern') || ':count / :max').replace(':count', n).replace(':max', max);
+    }
+    function row(l) {
+      var li = document.createElement('li');
+      li.setAttribute('data-url', l.url);
+      li.innerHTML = '<span class="ag-site-mark" aria-hidden="true"></span><span class="ag-site-name"><bdi dir="ltr"><a target="_blank" rel="noopener noreferrer nofollow"></a></bdi></span>'
+        + '<button type="button" class="ag-sites-remove" data-ag-link-remove></button>';
+      $('.ag-site-mark', li).textContent = String(l.label || '').charAt(0).toUpperCase();
+      var a = $('a', li);
+      a.href = l.url;
+      a.textContent = l.label || l.url;
+      if (l.network === 'website') {
+        var mine = document.createElement('small');
+        mine.textContent = T.links_your_site || '';
+        $('.ag-site-name', li).appendChild(mine);
+      }
+      // What the agent read from it; a page of another website is only read, never written in the chat.
+      li.setAttribute('data-state', l.read ? l.read.state : '');
+      if (l.read || l.shown === false) {
+        var read = document.createElement('small');
+        read.className = 'ag-link-read is-' + (l.read ? l.read.state : 'none');
+        read.setAttribute('data-ag-link-read', '');
+        if (l.shown === false) {
+          var tag = document.createElement('i');
+          tag.className = 'ag-link-tag';
+          tag.title = T.links_read_only_hint || '';
+          tag.textContent = T.links_read_only || '';
+          read.appendChild(tag);
+        }
+        read.appendChild(document.createTextNode(l.read ? l.read.text : ''));
+        $('.ag-site-name', li).appendChild(read);
+      }
+      var rm = $('button', li);
+      rm.textContent = T.site_remove_short || 'Remove';
+      rm.setAttribute('aria-label', fill(T.links_remove, { link: l.label || l.url }));
+      return li;
+    }
+    function draw(links) {
+      var before = urls();
+      list.innerHTML = '';
+      (links || []).forEach(function (l) {
+        var li = row(l);
+        if (before.indexOf(l.url) < 0) li.classList.add('is-new');
+        list.appendChild(li);
+      });
+      sync();
+      watch();
+    }
+    function save(next, undo) {
+      err.hidden = true;
+      return api('PATCH', C.agent.urls.update, { links: next }).then(function (res) {
+        draw(res && res.agent ? res.agent.links : []);
+        toast(T.links_saved || T.saved);
+        return true;
+      }).catch(function (e) {
+        if (undo) undo();
+        err.textContent = e.message || '';
+        err.hidden = !e.message;
+        sync();
+        return false;
+      });
+    }
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var value = input.value.trim();
+      if (!value) { input.focus(); return; }
+      save(urls().concat([value])).then(function (ok) { if (ok) { input.value = ''; input.focus(); } });
+    });
+    input.addEventListener('input', function () { err.hidden = true; });
+    list.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-ag-link-remove]');
+      if (!b) return;
+      var li = b.closest('li'), next = li.nextElementSibling;
+      li.remove();
+      sync();
+      save(urls(), function () { list.insertBefore(li, next); });
+      input.focus();
+    });
+    function search(quiet) {
+      if (find) find.disabled = true;
+      if (note) note.textContent = T.links_finding || '';
+      api('POST', C.agent.urls.links, { auto: !!quiet }).then(function (res) {
+        draw(res.links);
+        if (note) note.textContent = quiet && !res.added ? '' : (res.message || '');
+      }, function (e) {
+        if (note) note.textContent = quiet ? '' : (e.message || '');
+      }).then(function () { if (find) find.disabled = false; });
+    }
+    if (find) find.addEventListener('click', function () { search(false); });
+    if (C.agent.links_looked === false && C.agent.has_website && C.agent.urls.links) search(true);
+    else watch();
+  }
+
   /*
    * Knowledge files: drop or choose files, each uploads with its progress, is read in the
    * background (the list checks back until it is done) and shows what the agent learned.

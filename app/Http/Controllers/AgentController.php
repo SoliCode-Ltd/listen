@@ -13,6 +13,8 @@ use App\Services\Agents\AgentReview;
 use App\Services\Agents\AgentWriter;
 use App\Support\Agents\AgentAccess;
 use App\Support\Agents\AgentBalance;
+use App\Support\Agents\AgentLinkReads;
+use App\Support\Agents\AgentLinks;
 use App\Support\Agents\AgentPersona;
 use App\Services\Agents\SiteReader;
 use App\Services\Agents\WordPressPlugin;
@@ -115,6 +117,8 @@ class AgentController extends Controller
     {
         $this->own($request, $agent);
         $widget = $agent->mainWidget();
+        // An agent made before its links were read gets them read now (the card shows them being read).
+        AgentLinkReads::refresh($agent);
         // The same month as the call time on the agents list (the credit month).
         $monthStart = CreditPeriod::current((int) $request->user()->id)['starts_at'];
         $conversations = $agent->conversations()->latest('started_at')->limit(50)->get();
@@ -158,6 +162,11 @@ class AgentController extends Controller
             'dialect' => ['sometimes', 'string', 'max:20'],
             'first_message' => ['sometimes', 'nullable', 'string', 'max:400'],
             'knowledge' => ['sometimes', 'nullable', 'string', 'max:40000'],
+            // Knowledge → Latest updates: the newest information, ahead of every other fact.
+            'updates' => ['sometimes', 'nullable', 'string', 'max:'.\App\Support\Agents\AgentInstructions::MAX_UPDATES_CHARS],
+            // Knowledge → Social media links: the business's own accounts and website pages (AgentLinks).
+            'links' => ['sometimes', 'nullable', 'array', 'max:'.AgentLinks::MAX],
+            'links.*' => ['nullable', 'string', 'max:500'],
             'script' => ['sometimes', 'array'],
             'script.identity' => ['nullable', 'string', 'max:1500'],
             'script.never' => ['nullable', 'array', 'max:12'],
@@ -245,6 +254,36 @@ class AgentController extends Controller
                 'answer' => (string) $c['answer'],
             ], (array) $data['choices']));
         }
+        $updatesChanged = false;
+        if (array_key_exists('updates', $data)) {
+            $settings = (array) ($agent->settings ?? []);
+            $text = trim((string) $data['updates']);
+            if ($text !== trim((string) ($settings['updates'] ?? ''))) {
+                $settings['updates'] = $text;
+                $settings['updates_at'] = $text !== '' ? now()->toIso8601String() : null;
+                $agent->settings = $settings;
+                $updatesChanged = true;
+            }
+        }
+        $linksChanged = false;
+        if (array_key_exists('links', $data)) {
+            $links = [];
+            foreach ((array) ($data['links'] ?? []) as $url) {
+                if (blank($url)) {
+                    continue;
+                }
+                // An account or a page of their website (written in the chat), or a page of another
+                // website with their news (only read by the agent).
+                $link = AgentLinks::accept((string) $url, $agent->website_url);
+                if ($link === null) {
+                    return response()->json(['message' => __('agents.links_invalid'), 'invalid' => (string) $url], 422);
+                }
+                $links[strtolower($link['url'])] ??= ['network' => $link['network'], 'url' => $link['url']];
+            }
+            $links = array_values($links);
+            $linksChanged = array_column($links, 'url') !== array_column(AgentLinks::all($agent), 'url');
+            $agent->settings = array_merge((array) ($agent->settings ?? []), ['links' => $links, 'links_edited' => true]);
+        }
         if (array_key_exists('daily_minutes', $data)) {
             $settings = (array) ($agent->settings ?? []);
             $settings['daily_minutes'] = (int) $data['daily_minutes'];
@@ -261,13 +300,14 @@ class AgentController extends Controller
             }
             $agent->status = $data['status'];
         }
-        $setupChanged = $agent->isDirty(['name', 'business_name', 'first_message', 'knowledge', 'choices', 'script', 'dialect']);
+        $setupChanged = $updatesChanged || $linksChanged || $agent->isDirty(['name', 'business_name', 'first_message', 'knowledge', 'choices', 'script', 'dialect']);
         $agent->save();
-        // A live agent whose setup changed is checked again in the background (paused if it now
-        // deceives or harms callers).
-        if ($setupChanged && $agent->isLive() && AgentAccess::reviewOn() && ! $agent->setting('house')
-            && ($agent->setting('review.hash') !== AgentReview::hash($agent))) {
-            ReviewAgent::dispatch($agent->id);
+        if ($setupChanged) {
+            $this->reviewAgain($agent);
+        }
+        if ($linksChanged) {
+            // New links are read in the background; the card shows them being read.
+            AgentLinkReads::refresh($agent);
         }
 
         $widget = $agent->mainWidget();
@@ -333,7 +373,9 @@ class AgentController extends Controller
             'question' => ['nullable', 'string', 'max:500'],
             'answer' => ['required', 'string', 'max:1500'],
         ]);
-        $line = trim(($data['question'] ? 'Q: '.trim($data['question'])."\nA: " : '').trim($data['answer']));
+        // The question is the caller's line as the page showed it: without its left-to-right marks.
+        $question = trim(str_replace(["\u{2066}", "\u{2069}"], '', (string) $data['question']));
+        $line = trim(($question !== '' ? 'Q: '.$question."\nA: " : '').trim($data['answer']));
         $agent->knowledge = trim(trim((string) $agent->knowledge)."\n\n# Corrected by the owner\n".$line);
         $agent->save();
         AgentSource::create(['agent_id' => $agent->id, 'kind' => AgentSource::TEXT, 'title' => 'Correction', 'content' => $line, 'chars' => mb_strlen($line), 'status' => 'ready', 'read_at' => now()]);
@@ -444,6 +486,10 @@ class AgentController extends Controller
                 'url' => $agent->website_url, 'title' => $read['pages'][0]['title'] ?? null, 'content' => $read['text'],
                 'chars' => mb_strlen($read['text']), 'status' => $read['ok'] ? 'ready' : 'failed', 'error' => $read['error'], 'read_at' => now(),
             ]);
+            // Its accounts on social media, for a caller who asks for them (saved with the agent below).
+            if ($read['ok'] || ($read['links'] ?? []) !== []) {
+                AgentLinks::keepFound($agent, $read['links'] ?? []);
+            }
         }
         if (trim($notes) !== '') {
             AgentSource::updateOrCreate(['agent_id' => $agent->id, 'kind' => AgentSource::TEXT, 'title' => 'Notes'], [
@@ -460,6 +506,8 @@ class AgentController extends Controller
             'knowledge' => trim($written['knowledge']) !== '' ? $written['knowledge'] : trim($notes),
             'choices' => array_map(fn ($q) => ['question' => $q['question'], 'options' => $q['options'], 'answer' => $q['options'][$q['recommended']] ?? $q['options'][0]], $written['questions']),
         ])->save();
+        // The links found on the website: their newest posts are read in the background.
+        AgentLinkReads::refresh($agent);
 
         return [
             'ok' => true,
@@ -468,6 +516,62 @@ class AgentController extends Controller
             'site_read' => $siteOk,
             'written_by' => $written['written_by'],
         ];
+    }
+
+    /** "Last updated 5 November 2026" for Knowledge → Latest updates, or '' before the first one. */
+    public static function updatesAt(Agent $agent): string
+    {
+        $at = $agent->setting('updates_at');
+        if (blank($at) || trim((string) $agent->setting('updates', '')) === '') {
+            return '';
+        }
+
+        return __('agents.updates_at', ['date' => \Illuminate\Support\Carbon::parse($at)->locale(app()->getLocale())->translatedFormat('j F Y')]);
+    }
+
+    /**
+     * Knowledge → Social media links → "Find them on my website": the website is read again for its
+     * accounts (its words are left as they were), and the new ones are added to the agent's links.
+     */
+    public function findLinks(Request $request, Agent $agent, SiteReader $reader): JsonResponse
+    {
+        $this->own($request, $agent);
+        if (! $agent->website_url) {
+            return response()->json(['message' => __('agents.links_no_site')], 422);
+        }
+        $read = $reader->read($agent->website_url);
+        if (! $read['ok'] && ($read['links'] ?? []) === []) {
+            return response()->json(['message' => __('agents.links_unreachable')], 422);
+        }
+        $site = AgentLinks::clean($agent->website_url, $agent->website_url);
+        // The pages the owner added for the agent to read stay with the accounts found.
+        $kept = array_map(fn (array $l): array => ['network' => $l['network'], 'url' => $l['url']], AgentLinks::all($agent));
+        [$links, $added] = AgentLinks::merge($kept, array_merge($read['links'] ?? [], $site !== null ? [$site] : []));
+        // The page's own first search (auto) is not the owner's choice: the list still follows a new website.
+        $edited = $request->boolean('auto') ? (bool) $agent->setting('links_edited') : true;
+        $agent->settings = array_merge((array) ($agent->settings ?? []), ['links' => $links, 'links_edited' => $edited, 'links_found_at' => now()->toIso8601String()]);
+        $agent->save();
+        $this->reviewAgain($agent);
+        AgentLinkReads::refresh($agent);
+
+        return response()->json(['links' => AgentLinkReads::rows($agent), 'added' => $added,
+            'message' => trans_choice('agents.links_found', $added, ['count' => $added])]);
+    }
+
+    /** Knowledge → Social media links, checked again while new links are being read. */
+    public function linkReads(Request $request, Agent $agent): JsonResponse
+    {
+        $this->own($request, $agent);
+
+        return response()->json(['links' => AgentLinkReads::rows($agent)]);
+    }
+
+    /** A live agent whose setup changed is checked again in the background (paused if it now deceives or harms callers). */
+    private function reviewAgain(Agent $agent): void
+    {
+        if ($agent->isLive() && AgentAccess::reviewOn() && ! $agent->setting('house') && ($agent->setting('review.hash') !== AgentReview::hash($agent))) {
+            ReviewAgent::dispatch($agent->id);
+        }
     }
 
     /** @return array<string, mixed> */
@@ -484,10 +588,19 @@ class AgentController extends Controller
             'first_message' => $agent->first_message,
             'script' => $agent->script ?? [],
             'knowledge' => $agent->knowledge,
+            'updates' => (string) $agent->setting('updates', ''),
+            'updates_at' => self::updatesAt($agent),
+            // Knowledge → Social media links: as kept, and whether the website was ever looked at for them.
+            // Each with what the agent read from it (AgentLinkReads).
+            'links' => AgentLinkReads::rows($agent),
+            'links_looked' => $agent->setting('links_found_at') !== null || (bool) $agent->setting('links_edited'),
+            'has_website' => (bool) $agent->website_url,
             'choices' => $agent->choices ?? [],
             'urls' => [
                 'show' => route('voice-agents.show', $agent),
                 'update' => route('voice-agents.update', $agent),
+                'links' => route('voice-agents.links', $agent),
+                'link_reads' => route('voice-agents.links.reads', $agent),
                 'test' => route('voice-agents.test-call', $agent),
                 'correct' => route('voice-agents.correct', $agent),
                 'write' => route('voice-agents.write', $agent),

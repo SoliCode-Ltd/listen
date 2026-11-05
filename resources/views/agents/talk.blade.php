@@ -2,27 +2,12 @@
   <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
 </head>
 <body>
+  {{-- The link page: the very call card the website button opens (js/agent-widget.js), with the
+       agent's own look, open in the middle of the page. Only the report link sits under it. --}}
   <main class="ag ag-talkpage" id="agents" style="max-width:none">
-    @php $female = ($voice['gender'] ?? null) === 'female'; @endphp
-    <section class="ag-card ag-talkpage-card" data-ag-standalone>
-      {{-- Who answers: the business, and its assistant's face next to its name (as on the website's call card). --}}
-      <header class="ag-talkpage-who">
-        <span class="ag-talkpage-face {{ $available ? 'is-live' : '' }}" aria-hidden="true">
-          @if(! empty($voice['avatar']))<img src="{{ $voice['avatar'] }}" alt="" width="56" height="56">@else<b>{{ mb_substr($agent->business_name, 0, 1) }}</b>@endif
-        </span>
-        <div>
-          <h1>{{ $agent->business_name }}</h1>
-          <p><b>{{ $agent->name }}</b> · {{ __($female ? 'agents.widget_subtitle_female' : 'agents.widget_subtitle') }}</p>
-        </div>
-      </header>
-      @include('agents.partials.talk', ['agent' => $agent, 'avatar' => $voice['avatar'] ?? null, 'showCost' => false, 'female' => ($voice['gender'] ?? null) === 'female', 'callback' => true])
-      @unless($available)
-        <p class="ag-note">{{ __('agents.error_paused') }}</p>
-      @endunless
-      <p class="ag-talkpage-mic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ __('agents.talk_page_mic') }}</p>
-      <p class="ag-talkpage-foot"><a href="{{ url('/') }}" target="_blank" rel="noopener">{{ __('agents.powered') }}</a></p>
-      <button type="button" class="ag-talkpage-report" data-ag-report-open>{{ __('agents.report.link') }}</button>
-    </section>
+    <h1 class="sr-only">{{ $agent->business_name }}</h1>
+    <div class="ag-talkpage-call" data-ag-talk-card></div>
+    <button type="button" class="ag-talkpage-report" data-ag-report-open>{{ __('agents.report.link') }}</button>
   </main>
 
   {{-- "Report this agent": for a caller who was asked for card numbers or money, or treated badly. --}}
@@ -66,28 +51,19 @@
   </script>
 
   @include('components.scripts', ['noSupportChat' => true])
-  @include('components.orb-script')
-  @php
-    $agentsPage = [
-      'mode' => 'link',
-      'slug' => $widget->slug,
-      'available' => $available,
-      'start' => url('/agent-api/calls'),
-      // Every line busy: the caller leaves a number to be called back.
-      'callback' => url('/agent-api/callbacks'),
-      'agent' => ['name' => $agent->name, 'language' => $agent->language, 'gender' => $voice['gender'] ?? null],
-      'text' => [
-        'states' => \App\Support\Agents\Gendered::lines((array) __('agents.talk_states', ['name' => $agent->name]), ($voice['gender'] ?? null) === 'female'),
-        'start' => __('agents.talk_start'), 'end' => __('agents.talk_end'),
-        'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
-        'paused' => __('agents.error_paused'),
-      ] + \App\Http\Controllers\AgentCallController::lineText($agent, app()->getLocale()),
-    ];
-  @endphp
   <script>
-    window.LISTEN_AGENTS = {!! \Illuminate\Support\Js::from($agentsPage) !!};
+    window.LISTEN_TALK = {!! \Illuminate\Support\Js::from(['card' => $card, 'slug' => $widget->slug, 'origin' => url('')]) !!};
   </script>
   <script src="{{ asset('js/agent-call.js') }}?v={{ filemtime(public_path('js/agent-call.js')) }}" defer></script>
-  <script src="{{ asset('js/agents.js') }}?v={{ filemtime(public_path('js/agents.js')) }}" defer></script>
+  <script src="{{ asset('js/agent-widget.js') }}?v={{ filemtime(public_path('js/agent-widget.js')) }}" defer></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var T = window.LISTEN_TALK, into = document.querySelector('[data-ag-talk-card]');
+      if (!T || !into || !window.ListenAgentWidget || !window.ListenAgentWidget.page) return;
+      var theme = document.documentElement.getAttribute('data-theme');
+      var dark = theme ? theme === 'dark' : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      window.ListenAgentWidget.page(into, T.card, { origin: T.origin, slug: T.slug, callScript: T.card.assets && T.card.assets.call, dark: dark });
+    });
+  </script>
 </body>
 </html>

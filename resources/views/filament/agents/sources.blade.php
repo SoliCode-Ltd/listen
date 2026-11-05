@@ -1,7 +1,7 @@
-{{-- What an agent was taught from (agent_sources): its website, the owner's notes and corrections, files. --}}
+{{-- What an agent was taught from (agent_sources): its website, the owner's notes and corrections, files, and its links' newest posts. --}}
 @php
     $sources = $getRecord()->sources()->orderBy('id')->get();
-    $kinds = ['website' => 'Website', 'text' => 'Typed by the owner', 'file' => 'File', 'sheet' => 'Spreadsheet'];
+    $kinds = ['website' => 'Website', 'text' => 'Typed by the owner', 'file' => 'File', 'sheet' => 'Spreadsheet', 'link' => 'Link (newest posts)'];
     $statuses = ['ready' => 'Ready', 'pending' => 'Waiting', 'reading' => 'Reading', 'failed' => 'Failed'];
     $statusColor = fn (?string $status): string => match ($status) {
         'ready' => 'success',

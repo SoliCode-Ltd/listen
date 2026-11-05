@@ -55,6 +55,7 @@ class AgentSettings extends Page implements HasForms
             'agents_house_daily_minutes' => AgentAccess::houseDailyMinutes(),
             'agents_house_charged' => AgentAccess::houseCharged(),
             'agents_review' => AgentAccess::reviewOn(),
+            'agents_caller_transcribe' => AgentAccess::callerTranscribe(),
         ]);
     }
 
@@ -138,6 +139,10 @@ class AgentSettings extends Page implements HasForms
                         Forms\Components\Toggle::make('agents_review')
                             ->label('Check each agent before it first goes live')
                             ->helperText('The text model reads what the agent is told and stops one set up to collect card numbers or passwords, pose as a bank, a government office or a real person, or anything harmful. Agents it is unsure of go live and are marked for you (Agents → filter "Marked for review").'),
+                        Forms\Components\Toggle::make('agents_caller_transcribe')
+                            ->label('Write each caller line again from the caller\'s voice')
+                            ->helperText('The live call\'s own transcription sometimes writes Arabic as English ("unbelievable") or in Latin letters, and spaces phone numbers out. On: each caller line is written again by the text model from that line\'s sound, in the agent\'s dialect, for the caller\'s screen and the call\'s transcript (about a second later, a fraction of a cent a line). The sound is never kept. Off: the live transcription as it is.')
+                            ->columnSpan(2),
                     ]),
                 Forms\Components\Section::make('Real calls so far')
                     ->schema([
@@ -208,6 +213,7 @@ class AgentSettings extends Page implements HasForms
         SiteSetting::set('agents_house_daily_minutes', (string) max(0, (int) ($state['agents_house_daily_minutes'] ?? 180)), self::GROUP);
         SiteSetting::set('agents_review', ! empty($state['agents_review']) ? '1' : '0', self::GROUP);
         SiteSetting::set('agents_house_charged', ! empty($state['agents_house_charged']) ? '1' : '0', self::GROUP);
+        SiteSetting::set('agents_caller_transcribe', ! empty($state['agents_caller_transcribe']) ? '1' : '0', self::GROUP);
         SiteSetting::flushGroupCache(self::GROUP);
 
         Notification::make()->title('Agents settings saved.')->success()->send();

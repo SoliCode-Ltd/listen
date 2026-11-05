@@ -8,8 +8,10 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * What an agent was taught from: its business's website (read at setup and
- * again when asked), notes the owner typed, or a file. content is the text
- * the agent answers from.
+ * again when asked), notes the owner typed, a file, or one of its links (the
+ * newest posts of an account or a page, read again every few hours:
+ * AgentLinkReads). content is the text the agent answers from (for a link,
+ * what was read, as JSON).
  */
 class AgentSource extends Model
 {
@@ -20,6 +22,8 @@ class AgentSource extends Model
     public const FILE = 'file';
 
     public const SHEET = 'sheet';
+
+    public const LINK = 'link';
 
     /** A file waiting to be read, being read, read, or that could not be read. */
     public const PENDING = 'pending';

@@ -17,9 +17,12 @@ namespace App\Support\Agents;
  */
 final class SpokenNumbers
 {
-    /** Arabic digit words, Modern Standard and dialect spellings. */
+    /**
+     * Arabic digit words, Modern Standard and dialect spellings. Egyptians read their mobile
+     * prefix as a number (010 is "زيرو عشرة", 011 "صفر حداشر"), so those words are digits too.
+     */
     private const AR = [
-        '0' => ['صفر'],
+        '0' => ['صفر', 'زيرو'],
         '1' => ['واحد'],
         // تنين / ثنين: Levantine and Gulf.
         '2' => ['اثنين', 'إثنين', 'اتنين', 'اثنان', 'إثنان', 'اتنان', 'تنين', 'ثنين', 'تنتين'],
@@ -30,6 +33,10 @@ final class SpokenNumbers
         '7' => ['سبعة', 'سبعه', 'سبع'],
         '8' => ['ثمانية', 'ثمانيه', 'تمانية', 'تمانيه', 'تمنية', 'تمنيه', 'ثماني', 'تماني', 'ثمان', 'تمن'],
         '9' => ['تسعة', 'تسعه', 'تسع'],
+        '10' => ['عشرة', 'عشره'],
+        '11' => ['حداشر', 'احداشر', 'إحداشر'],
+        '12' => ['اتناشر', 'إتناشر', 'اطناشر', 'اثناشر'],
+        '15' => ['خمستاشر', 'خمسطاشر'],
     ];
 
     /** English digit words ("oh" is zero inside a number). */
@@ -44,6 +51,9 @@ final class SpokenNumbers
         if ($text === '') {
             return $text;
         }
+        // Arabic-Indic digits (٠١٢, ۰۱۲) as the site writes every number: 012.
+        $text = strtr($text, ['٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4', '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9']);
 
         // Arabic: a run of digit words, separated by spaces, commas or dashes, becomes one number.
         $map = [];
@@ -83,7 +93,17 @@ final class SpokenNumbers
         }, $text) ?? $text;
 
         // Single digits joined by dashes (5-5-5-2-1-0): one number.
-        return preg_replace_callback('/(?<![\d\-])\d(?:-\d){2,}(?![\d\-])/', fn ($m) => str_replace('-', '', $m[0]), $text) ?? $text;
+        $text = preg_replace_callback('/(?<![\d\-])\d(?:-\d){2,}(?![\d\-])/', fn ($m) => str_replace('-', '', $m[0]), $text) ?? $text;
+
+        // A number the transcription spaced out digit by digit ("0 10 6 8 1 2 1 7 0 5"): one number.
+        // On an Arabic line each spaced digit is laid out right to left, so it read backwards
+        // (01068121705 showed as "5 0 7 1 2 1 8 6 10 0"). Groups the speaker made (087 123 4567)
+        // have three digits or more and stay as they are.
+        return preg_replace_callback('/(?<![\d+])\d{1,2}(?:[ \x{00A0}]+\d{1,2}){3,}(?!\d)/u', function (array $m) {
+            $digits = preg_replace('/\D/', '', $m[0]) ?? '';
+
+            return strlen($digits) >= 6 ? $digits : $m[0];
+        }, $text) ?? $text;
     }
 
     /**
@@ -126,6 +146,7 @@ final class SpokenNumbers
      */
     public static function isolate(string $text): string
     {
-        return preg_replace('/(?<![\p{L}\p{N}\x{2066}])\+?\d[\d\- ]*[\- ]\d[\d\- ]*\d(?![\p{L}\p{N}])/u', "\u{2066}$0\u{2069}", $text) ?? $text;
+        // An international number (+966501234567) too: its plus sign would otherwise move to the other end.
+        return preg_replace('/(?<![\p{L}\p{N}\x{2066}])(?:\+\d{6,15}|\+?\d[\d\- ]*[\- ]\d[\d\- ]*\d)(?![\p{L}\p{N}])/u', "\u{2066}$0\u{2069}", $text) ?? $text;
     }
 }

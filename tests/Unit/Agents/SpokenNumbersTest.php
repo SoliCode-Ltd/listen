@@ -57,4 +57,26 @@ class SpokenNumbersTest extends TestCase
         $this->assertSame('Thanks, bye.', SpokenNumbers::withoutMarks('Thanks, {"tool": {"name": "end_call"}}bye.'));
         $this->assertSame("محمد · \u{2066}050 123 4567\u{2069}", SpokenNumbers::forDisplay('محمد · 050 123 4567', true));
     }
+
+    public function test_a_number_the_transcription_spaced_out_digit_by_digit_is_one_number(): void
+    {
+        // A test call: 01068121705, said as "صفر عشرة ستة…", came as single digits with spaces and
+        // read backwards on the Arabic page ("5 0 7 1 2 1 8 6 10 0").
+        $this->assertSame('01068121705', SpokenNumbers::digits('0 10 6 8 1 2 1 7 0 5'));
+        $this->assertSame('رقمي 01068121705.', SpokenNumbers::digits('رقمي 0 1 0 6 8 1 2 1 7 0 5.'));
+        // Egyptian mobile prefixes read as numbers, and Arabic-Indic digits.
+        $this->assertSame('رقمي 01068121705', SpokenNumbers::digits('رقمي زيرو عشرة ستة تمانية واحد اتنين واحد سبعة صفر خمسة'));
+        $this->assertSame('رقمي 01112345678', SpokenNumbers::digits('رقمي صفر حداشر واحد اتنين تلاتة أربعة خمسة ستة سبعة تمانية'));
+        $this->assertSame('رقمي 01068121705', SpokenNumbers::digits('رقمي ٠١٠٦٨١٢١٧٠٥'));
+        // What is not a phone number stays: groups the speaker made, a few small numbers, a time, years.
+        foreach (['is 087 123 4567?', 'عندي 2 3 4 5 أسئلة', 'الساعة 10 30', 'من 2025 إلى 2026', 'الساعة عشرة'] as $text) {
+            $this->assertSame($text, SpokenNumbers::digits($text));
+        }
+    }
+
+    public function test_an_international_number_keeps_its_plus_sign_in_front_on_an_arabic_line(): void
+    {
+        $this->assertSame("رقمي \u{2066}+966501234567\u{2069}", SpokenNumbers::isolate('رقمي +966501234567'));
+        $this->assertSame("رقمي \u{2066}+966501234567\u{2069}", SpokenNumbers::isolate("رقمي \u{2066}+966501234567\u{2069}"));
+    }
 }
