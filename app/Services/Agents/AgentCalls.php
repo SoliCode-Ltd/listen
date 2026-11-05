@@ -813,7 +813,10 @@ class AgentCalls
             'Write down exactly what the caller says in this recording of a phone call to '.$agent->business_name.'.',
             $speech,
             'Write numbers as digits, and a phone number as one group of digits without spaces (for example 01068121705).',
-            'Write only the caller\'s words: leave out any other voice, such as someone in the background, or the assistant\'s own voice if it can be heard'.($said !== '' ? ' (it had just said: "'.Str::limit($said, 300, '').'")' : '').'.',
+            // The main voice is the caller's: "leave out the assistant's voice" made the model drop a
+            // whole line that sounded like service talk (the staging check, an English clip).
+            'Write the words of the main voice in the recording: that is the caller. Leave out only a faint voice in the background behind them'
+                .($said !== '' ? ', such as the assistant\'s own words coming back through a speaker (it had just said: "'.Str::limit($said, 300, '').'")' : '').'.',
             $heard !== '' ? 'An automatic speech recogniser wrote: "'.Str::limit($heard, 400, '').'". It is often wrong, and may even be in another language: use it only as a hint.' : null,
             'If the recording has no clear words, answer with nothing.',
             'Answer with the caller\'s words only, on one line, with no quotes, names or notes.',
