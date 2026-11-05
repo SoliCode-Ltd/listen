@@ -252,6 +252,19 @@
     <section class="ag-panel" data-ag-panel="knowledge">
       <div class="ag-kb">
         <div class="ag-kb-main">
+          {{-- Latest updates: what changed since the website was read (an upcoming event, a new date or
+               price). The agent reads it first and it wins over the website, the notes and the files. --}}
+          <form class="ag-card ag-kb-editor ag-kb-updates" data-ag-updates-form>
+            <div class="ag-kb-head">
+              <h2>{{ __('agents.updates_title') }} <span class="ag-kb-badge">{{ __('agents.updates_badge') }}</span></h2>
+              <p class="ag-hint">{{ __('agents.updates_hint') }}</p>
+            </div>
+            <textarea class="ag-textarea" name="updates" dir="auto" maxlength="{{ \App\Support\Agents\AgentInstructions::MAX_UPDATES_CHARS }}" placeholder="{{ __('agents.updates_placeholder') }}" data-ag-updates-text>{{ $agent->setting('updates') }}</textarea>
+            <div class="ag-kb-foot">
+              <span class="ag-hint" data-ag-updates-at>{{ \App\Http\Controllers\AgentController::updatesAt($agent) }}</span>
+              <button type="submit" class="ag-btn ag-btn-primary">{{ __('agents.edit_save') }}</button>
+            </div>
+          </form>
           {{-- Files: the owner's menu, price list or brochure, read once and used on every call. --}}
           <section class="ag-card ag-kb-files" data-ag-files
             data-index-url="{{ route('voice-agents.files.index', $agent) }}"

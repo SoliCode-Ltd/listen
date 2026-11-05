@@ -21,6 +21,12 @@
  * (24 kHz) is played as it arrives and stops the moment the caller talks over
  * it. Listen hears every few seconds that the call is on (ping), what the agent
  * asked for (tool) and how it ended (end), with what was said.
+ *
+ * The caller's words: the live transcription sometimes writes Arabic as English ("unbelievable")
+ * or in Latin letters ("Shukran khaseer"). When Listen offers it (transcribe), each caller line is
+ * written again from the caller's own voice, in the agent's dialect (POST …/transcribe). The line
+ * waits a moment for it, then shows what the live transcription heard; a better line that comes
+ * later replaces it (onFix(turn), the same turn object onTurn gave).
  */
 (function () {
   'use strict';
@@ -32,10 +38,13 @@
    * "five five five, two one zero…" is 555 210…). Three spoken digits or more make a number, so
    * "الساعة أربعة" stays. The same rules as App\Support\Agents\SpokenNumbers.
    */
-  var AR_DIGITS = { 'صفر': 0, 'واحد': 1, 'اثنين': 2, 'إثنين': 2, 'اتنين': 2, 'اثنان': 2, 'إثنان': 2, 'اتنان': 2, 'تنين': 2, 'ثنين': 2, 'تنتين': 2,
+  // Egyptians read their mobile prefix as a number (010 is "زيرو عشرة"), so those words are digits too.
+  var AR_DIGITS = { 'صفر': 0, 'زيرو': 0, 'واحد': 1, 'اثنين': 2, 'إثنين': 2, 'اتنين': 2, 'اثنان': 2, 'إثنان': 2, 'اتنان': 2, 'تنين': 2, 'ثنين': 2, 'تنتين': 2,
     'ثلاثة': 3, 'ثلاثه': 3, 'تلاتة': 3, 'تلاته': 3, 'ثلاث': 3, 'تلات': 3, 'أربعة': 4, 'اربعة': 4, 'أربعه': 4, 'اربعه': 4, 'أربع': 4, 'اربع': 4,
     'خمسة': 5, 'خمسه': 5, 'خمس': 5, 'ستة': 6, 'سته': 6, 'ست': 6, 'سبعة': 7, 'سبعه': 7, 'سبع': 7,
-    'ثمانية': 8, 'ثمانيه': 8, 'تمانية': 8, 'تمانيه': 8, 'تمنية': 8, 'تمنيه': 8, 'ثماني': 8, 'تماني': 8, 'ثمان': 8, 'تمن': 8, 'تسعة': 9, 'تسعه': 9, 'تسع': 9 };
+    'ثمانية': 8, 'ثمانيه': 8, 'تمانية': 8, 'تمانيه': 8, 'تمنية': 8, 'تمنيه': 8, 'ثماني': 8, 'تماني': 8, 'ثمان': 8, 'تمن': 8, 'تسعة': 9, 'تسعه': 9, 'تسع': 9,
+    'عشرة': '10', 'عشره': '10', 'حداشر': '11', 'احداشر': '11', 'إحداشر': '11', 'اتناشر': '12', 'إتناشر': '12', 'اطناشر': '12', 'اثناشر': '12', 'خمستاشر': '15', 'خمسطاشر': '15' };
+  var INDIC = { '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9', '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9' };
   var EN_DIGITS = { zero: '0', oh: '0', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9' };
   var spoken = (function () {
     var arAlt = Object.keys(AR_DIGITS).sort(function (a, b) { return b.length - a.length; }).join('|');
@@ -53,6 +62,8 @@
         .replace(/<(metadata|tool_call|function_call)\b[^>]*>[\s\S]*$/gi, '').replace(/<[^>]*>/g, '');
       for (var i = 0; i < 3 && /\{[^{}]*\}/.test(text); i++) text = text.replace(/\{[^{}]*\}/g, '');
       text = text.replace(/[{}]/g, '');
+      // Arabic-Indic digits as the site writes every number (٠١٠ is 010).
+      text = text.replace(/[\u0660-\u0669\u06F0-\u06F9]/g, function (d) { return INDIC[d]; });
       if (arSeq) text = text.replace(arSeq, function (m, pre, seq) { return pre + seq.match(arWord).map(function (w) { return AR_DIGITS[w]; }).join(''); });
       text = text.replace(enSeq, function (seq) {
         return seq.split(/\s*,\s*/).map(function (group) {
@@ -66,9 +77,31 @@
         }).filter(Boolean).join(' ');
       });
       text = text.replace(/(^|[^\d\-])(\d(?:-\d){2,})(?![\d\-])/g, function (m, pre, seq) { return pre + seq.replace(/-/g, ''); });
+      // A number the transcription spaced out digit by digit ("0 10 6 8 1 2 1 7 0 5"): one number.
+      // On an Arabic line each spaced digit is laid out right to left, so it read backwards.
+      // Groups the speaker made (087 123 4567) have three digits or more and stay.
+      text = text.replace(/(^|[^\d+])(\d{1,2}(?:[ \u00a0]+\d{1,2}){3,})(?!\d)/g, function (m, pre, run) {
+        var digits = run.replace(/\D/g, '');
+        return digits.length >= 6 ? pre + digits : m;
+      });
       return text.replace(/\s+/g, ' ');
     };
   })();
+  /*
+   * A line as the page shows it: a number with spaces or dashes inside (050 123 4567), or with
+   * a plus sign (+966…), kept in one left-to-right piece, so an Arabic line shows it in its own
+   * order. plain() takes those marks out again for what Listen keeps.
+   */
+  var isolate = (function () {
+    var re = null;
+    try { re = new RegExp('(^|[^\\p{L}\\p{N}\\u2066])(\\+\\d{6,15}|\\+?\\d[\\d\\- ]*[\\- ]\\d[\\d\\- ]*\\d)(?=$|[^\\p{L}\\p{N}])', 'gu'); } catch (e) { re = null; }
+    return function (text) { return re ? text.replace(re, '$1\u2066$2\u2069') : text; };
+  })();
+  function plain(text) { return String(text || '').replace(/[\u2066\u2069]/g, ''); }
+
+  // How long a caller line waits for its better writing (ms), and how loud a 0.1 s piece of the
+  // microphone must be to count as speech (16-bit RMS; a quiet room under noise suppression is ~100).
+  var WAIT_FIX = 3500, VOICED = 450;
 
   var WORKLET = [
     'class ListenPcm extends AudioWorkletProcessor {',
@@ -130,6 +163,10 @@
     // (Listen pays for every second the line stays open).
     var quietTimer = 0, heardAt = Date.now(), nudged = 0, quietEndAt = 0;
     var waitTimer = 0;
+    // The caller's own voice since their last line (Int16 pieces of 0.1 s, each marked voiced or
+    // not), for writing that line again (transcribe). What the microphone hears while the agent
+    // speaks waits apart (overlap): it is the caller only when they talk over the agent.
+    var heard = [], overlap = [], callerSeq = 0, queue = [], lastSaid = '';
 
     function set(s) { if (state !== s) { state = s; opts.onState && opts.onState(s); } }
 
@@ -173,9 +210,83 @@
     function turn(role, text) {
       text = spoken(String(text || '')).trim();
       if (!text) return;
-      var t = { role: role, text: text };
-      pending.push(t);
-      opts.onTurn && opts.onTurn(t);
+      var t = { role: role, text: isolate(text) };
+      queue.push(t);
+      if (role === 'agent') lastSaid = text;
+      if (role === 'caller' && info && info.transcribe && info.api) hearAgain(t, text);
+      drain();
+    }
+    // The lines in their order: a caller line waiting for its better writing holds the ones after it.
+    function drain() {
+      while (queue.length && !queue[0].wait) {
+        var t = queue.shift();
+        t.shown = true;
+        t.kept = { role: t.role, text: plain(t.text) };
+        if (t.n) t.kept.n = t.n;
+        if (t.heard) t.kept.heard = t.heard;
+        pending.push(t.kept);
+        opts.onTurn && opts.onTurn(t);
+      }
+    }
+    function release() {
+      queue.forEach(function (t) { t.wait = false; });
+      drain();
+    }
+    // The caller's line written again from their voice, in the agent's dialect. It waits WAIT_FIX
+    // at most; a better line that comes later still replaces it on the page and in what Listen keeps.
+    function hearAgain(t, heardText) {
+      t.n = ++callerSeq;
+      var audio = takeHeard();
+      if (!audio) return;
+      t.wait = true;
+      var done = false;
+      var letGo = function () { if (t.wait) { t.wait = false; drain(); } };
+      var timer = setTimeout(letGo, WAIT_FIX);
+      post(info.api + '/transcribe', { call_key: info.call_key, n: t.n, audio: audio.data, rate: audio.rate, heard: heardText, said: lastSaid }).then(function (r) {
+        if (done) return;
+        done = true;
+        var fixed = r && typeof r.text === 'string' ? spoken(r.text).trim() : '';
+        if (fixed && fixed !== heardText) {
+          t.text = isolate(fixed);
+          t.heard = heardText;
+          if (t.kept) { t.kept.text = fixed; t.kept.heard = heardText; }
+          if (t.shown && opts.onFix) opts.onFix(t);
+        }
+        clearTimeout(timer);
+        letGo();
+      }, function () { clearTimeout(timer); letGo(); });
+    }
+    function keepHeard(buffer) {
+      var a = new Int16Array(buffer), sum = 0, n = 0;
+      for (var i = 0; i < a.length; i += 4) { sum += a[i] * a[i]; n++; }
+      var piece = { b: buffer, v: n > 0 && Math.sqrt(sum / n) > VOICED };
+      if (sources.size) {
+        overlap.push(piece);
+        if (overlap.length > 10) overlap.shift();
+        return;
+      }
+      heard.push(piece);
+      if (heard.length > 400) heard.shift();
+    }
+    // The voiced stretch of what the caller said since their last line, as 16-bit PCM in base64:
+    // at 16 kHz up to 15 s, at 8 kHz up to 30 s; nothing when they hardly spoke or spoke longer.
+    function takeHeard() {
+      var all = heard, first = -1, last = -1, voiced = 0;
+      heard = [];
+      for (var i = 0; i < all.length; i++) if (all[i].v) { if (first < 0) first = i; last = i; voiced++; }
+      if (voiced < 3) return null;
+      var from = Math.max(0, first - 3), to = Math.min(all.length, last + 4);
+      // Longer than 30 s: written again it would lose its start, so the live line stays.
+      if (to - from > 300) return null;
+      var half = to - from > 150, size = 0;
+      for (var j = from; j < to; j++) size += all[j].b.byteLength;
+      var out = new Int16Array((half ? size / 4 : size / 2) | 0), at = 0;
+      for (var k = from; k < to; k++) {
+        var p = new Int16Array(all[k].b);
+        if (!half) { out.set(p, at); at += p.length; continue; }
+        for (var m = 0; m + 1 < p.length; m += 2) out[at++] = (p[m] + p[m + 1]) >> 1;
+      }
+      return { data: b64(out.buffer.slice(0, at * 2)), rate: half ? 8000 : 16000 };
     }
     function flushTurns() {
       if (callerText.trim()) { turn('caller', callerText); callerText = ''; }
@@ -223,6 +334,7 @@
         sources.delete(src);
         heardAt = Date.now();
         if (!sources.size) {
+          overlap = [];
           if (state === 'speaking') set('listening');
           if (endAfterSpeech) finish('done');
         }
@@ -230,6 +342,8 @@
       set('speaking');
     }
     function hush() {
+      // The caller talked over the agent: what the microphone heard just before is their voice.
+      if (overlap.length) { heard = heard.concat(overlap); overlap = []; }
       sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
       sources.clear();
       playHead = ctx ? ctx.currentTime : 0;
@@ -321,6 +435,7 @@
       if (ended) return;
       ended = true;
       flushTurns();
+      release();
       clearInterval(pingTimer); clearInterval(quietTimer); clearTimeout(stopTimer); clearTimeout(waitTimer); cancelAnimationFrame(raf);
       try { ws && ws.close(); } catch (e) {}
       try { mic && mic.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
@@ -370,6 +485,7 @@
       node.port.onmessage = function (e) {
         if (muted || !ws || ws.readyState !== 1 || state === 'connecting') return;
         ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64(e.data), mimeType: 'audio/pcm;rate=16000' } } }));
+        if (info.transcribe) keepHeard(e.data);
       };
       pingTimer = setInterval(ping, 12000);
       heardAt = Date.now();

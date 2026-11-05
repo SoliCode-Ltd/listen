@@ -697,6 +697,8 @@
       if (!parts.lines || look.captions === false) return;
       var n = el('div', 'lva-line is-' + t.role, t.text);
       n.dir = 'auto';
+      // The caller's line written again from their voice replaces this one (onFix).
+      t.view = n;
       parts.lines.appendChild(n);
       while (parts.lines.children.length > 6) parts.lines.removeChild(parts.lines.firstChild);
       parts.lines.scrollTop = parts.lines.scrollHeight;
@@ -734,6 +736,7 @@
           },
           onState: function (s) { setState(s); },
           onTurn: line,
+          onFix: function (t) { if (t.view) t.view.textContent = t.text; },
           onLevel: level,
           onError: function (msg) { pendingError = msg || ''; },
           // Every line busy: the caller's place, kept fresh while they wait (a minute at most).

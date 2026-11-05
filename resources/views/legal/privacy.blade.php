@@ -108,6 +108,7 @@
           <li>{{ __('ui.legal.privacy.s1_11') }}</li>
           <li>{{ __('ui.legal.privacy.s1_12') }}</li>
           <li>{{ __('ui.legal.privacy.s1_13') }}</li>
+          <li>{{ __('ui.legal.privacy.s1_14') }}</li>
         </ul>
       </section>
 

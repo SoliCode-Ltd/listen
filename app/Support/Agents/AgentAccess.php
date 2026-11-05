@@ -249,6 +249,16 @@ final class AgentAccess
         return (bool) self::setting('agents_house_charged', true);
     }
 
+    /**
+     * Whether each caller line is written again from the caller's own voice, in the agent's dialect
+     * (AgentCalls::hearCaller): the live transcription sometimes writes Arabic as English or in
+     * Latin letters. Agents → Settings.
+     */
+    public static function callerTranscribe(): bool
+    {
+        return (bool) self::setting('agents_caller_transcribe', true);
+    }
+
     /** Whether an agent is checked by the text model before it first goes live. */
     public static function reviewOn(): bool
     {

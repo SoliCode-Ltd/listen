@@ -51,6 +51,7 @@ class AgentReview
             'What it says first: '.trim((string) $agent->first_message),
             'Decided by the business: '.collect((array) ($agent->choices ?? []))->map(fn ($c) => ($c['question'] ?? '').' → '.($c['answer'] ?? ''))->implode(' | '),
             'Facts it answers from (start): '.Str::limit(trim((string) $agent->knowledge), 5000, ' …'),
+            trim((string) $agent->setting('updates', '')) !== '' ? 'Latest updates from the owner: '.Str::limit(trim((string) $agent->setting('updates')), 2000, ' …') : null,
             $files !== '' ? 'Files it learned from: '.$files : null,
         ])));
     }

@@ -709,19 +709,198 @@ class AgentCalls
         }, 3);
     }
 
-    /** @param  array<int, array{role?: string, text?: string}>  $turns */
+    /**
+     * The turns the call client sent, kept in the transcript. A caller turn carries its number in
+     * the call (n) and, once written again from the caller's voice, what the live transcription
+     * heard (heard); a turn whose better writing came after it was sent gets it here.
+     *
+     * @param  array<int, array{role?: string, text?: string, n?: int, heard?: string}>  $turns
+     */
     protected function appendTurns(AgentConversation $conversation, array $turns): void
     {
         $transcript = $conversation->transcript ?? [];
+        $clean = fn ($text): string => \App\Support\Agents\CardNumbers::mask(Str::limit(trim(strip_tags(str_replace(["\u{2066}", "\u{2069}"], '',
+            \App\Support\Agents\SpokenNumbers::withoutMarks((string) $text)))), 2000, ''));
         foreach (array_slice($turns, 0, 60) as $turn) {
-            $text = \App\Support\Agents\CardNumbers::mask(Str::limit(trim(strip_tags(\App\Support\Agents\SpokenNumbers::withoutMarks((string) ($turn['text'] ?? '')))), 2000, ''));
+            $text = $clean($turn['text'] ?? '');
             $role = ($turn['role'] ?? '') === 'agent' ? 'agent' : 'caller';
             if ($text === '') {
                 continue;
             }
-            $transcript[] = ['role' => $role, 'text' => $text, 'at' => (int) $conversation->started_at->diffInSeconds(now())];
+            $entry = ['role' => $role, 'text' => $text, 'at' => (int) $conversation->started_at->diffInSeconds(now())];
+            $n = (int) ($turn['n'] ?? 0);
+            if ($role === 'caller' && $n > 0 && $n <= self::HEAR_MAX_LINES) {
+                $entry['n'] = $n;
+                if (isset($turn['heard']) && is_string($turn['heard']) && ($heard = $clean($turn['heard'])) !== '') {
+                    $entry['heard'] = $heard;
+                }
+            }
+            $transcript[] = $entry;
         }
         $conversation->transcript = array_slice($transcript, -400);
+        $this->healHeard($conversation);
+    }
+
+    /** Caller lines a call may have written again from the caller's voice. */
+    public const HEAR_MAX_LINES = 300;
+
+    /**
+     * A caller's line written again from their own voice (16-bit mono PCM at 8 or 16 kHz), in the
+     * agent's dialect: the live transcription sometimes writes Arabic as English ("unbelievable")
+     * or in Latin letters ("Shukran khaseer"), and spaces a phone number out digit by digit.
+     * The better line takes the place of the heard one in the transcript (which keeps the heard one
+     * beside it), also when it comes after the call client sent the line. Returns the line, or null.
+     *
+     * Only for a call that is on (or just ended, for its last line), and never more voice than the
+     * call has lasted, so a call key cannot be used to write down other recordings.
+     */
+    public function hearCaller(AgentConversation $conversation, int $n, string $pcm, int $rate, string $heard = '', string $said = ''): ?string
+    {
+        if (! AgentAccess::callerTranscribe() || $n < 1 || $n > self::HEAR_MAX_LINES || ! in_array($rate, [8000, 16000], true)) {
+            return null;
+        }
+        $justEnded = $conversation->ended_at !== null && $conversation->ended_at->gt(now()->subMinutes(3));
+        if (! $conversation->isLive() && ! $justEnded) {
+            return null;
+        }
+        $tenths = (int) ceil(strlen($pcm) / 2 / $rate * 10);
+        if ($tenths < 3 || $tenths > 310) {
+            return null;
+        }
+        $usedKey = 'agent-heard-tenths:'.$conversation->id;
+        Cache::add($usedKey, 0, now()->addHours(3));
+        $allowed = ((int) $conversation->started_at->diffInSeconds(now()) + 30) * 10;
+        if ((int) Cache::increment($usedKey, $tenths) > $allowed) {
+            return null;
+        }
+        $agent = $conversation->agent;
+        if (! $agent) {
+            return null;
+        }
+
+        $text = self::cleanHeard($this->gemini->transcribe(self::hearPrompt($agent, $heard, $said), self::wav($pcm, $rate), 12), $heard);
+        if ($text === null) {
+            return null;
+        }
+        $text = \App\Support\Agents\CardNumbers::mask(\App\Support\Agents\SpokenNumbers::digits($text));
+        Cache::put('agent-heard:'.$conversation->id.':'.$n, $text, now()->addMinutes(30));
+        DB::transaction(function () use ($conversation, $n, $text): void {
+            $c = AgentConversation::query()->whereKey($conversation->id)->lockForUpdate()->first();
+            if ($c && self::applyHeard($c, [$n => $text])) {
+                $c->save();
+            }
+        });
+
+        return $text;
+    }
+
+    /** What the text model is asked, to write down the caller's words from their voice. */
+    public static function hearPrompt(Agent $agent, string $heard = '', string $said = ''): string
+    {
+        if ($agent->language === 'en') {
+            $accent = (string) (\App\Support\EnglishAccents::ALL[$agent->dialect ?? '']['en'] ?? '');
+            $speech = 'The caller most likely speaks English'.($accent !== '' ? " (the business's assistant speaks {$accent} English)" : '').'. '
+                .'Write every word in the language they said it in: English words in English; Arabic words in Arabic letters, as they said them in their own dialect (never translated, never in Latin letters).';
+        } else {
+            $dialect = (string) (\App\Support\ArabicDialects::ALL[$agent->dialect ?? '']['en'] ?? '');
+            $speech = 'The caller most likely speaks Arabic'.($dialect !== '' ? ", the {$dialect} dialect (they may speak another Arabic dialect)" : '').'. '
+                .'Write every word in the language and dialect they said it in: Arabic words in Arabic letters, exactly as they said them in their own dialect (never translated, never in Latin letters, and never changed into Modern Standard Arabic); a word they said in English stays in English.';
+        }
+        $heard = trim($heard);
+        $said = trim($said);
+
+        return implode("\n", array_filter([
+            'Write down exactly what the caller says in this recording of a phone call to '.$agent->business_name.'.',
+            $speech,
+            'Write numbers as digits, and a phone number as one group of digits without spaces (for example 01068121705).',
+            'Write only the caller\'s words: leave out any other voice, such as someone in the background, or the assistant\'s own voice if it can be heard'.($said !== '' ? ' (it had just said: "'.Str::limit($said, 300, '').'")' : '').'.',
+            $heard !== '' ? 'An automatic speech recogniser wrote: "'.Str::limit($heard, 400, '').'". It is often wrong, and may even be in another language: use it only as a hint.' : null,
+            'If the recording has no clear words, answer with nothing.',
+            'Answer with the caller\'s words only, on one line, with no quotes, names or notes.',
+        ]));
+    }
+
+    /** The model's answer as a caller line, or null when it is empty, a note, or far longer than what was heard. */
+    public static function cleanHeard(?string $text, string $heard = ''): ?string
+    {
+        $text = trim(\App\Support\Agents\SpokenNumbers::withoutMarks((string) $text));
+        $text = preg_replace('/^(?:caller|the caller|المتصل)\s*[:：]\s*/iu', '', $text) ?? $text;
+        $text = trim(preg_replace('/\s+/u', ' ', $text) ?? $text, " \t\n\r\"'«»“”");
+        if ($text === '' || ! preg_match('/[\p{L}\p{N}]/u', $text)
+            || preg_match('/^\(?\s*(?:no (?:clear )?(?:speech|words)|silence|inaudible|unintelligible)\b/iu', $text)) {
+            return null;
+        }
+        if (mb_strlen($text) > min(800, max(80, 6 * mb_strlen(trim($heard))))) {
+            return null;
+        }
+
+        return $text;
+    }
+
+    /** 16-bit mono PCM as a WAV file. */
+    public static function wav(string $pcm, int $rate): string
+    {
+        $size = strlen($pcm);
+
+        return 'RIFF'.pack('V', 36 + $size).'WAVEfmt '.pack('VvvVVvv', 16, 1, 1, $rate, $rate * 2, 2, 16).'data'.pack('V', $size).$pcm;
+    }
+
+    /**
+     * Better caller lines (by their number in the call) put in place of the heard ones in the
+     * transcript, which keeps the heard line beside each. Returns whether anything changed.
+     *
+     * @param  array<int, string>  $fixes
+     */
+    protected static function applyHeard(AgentConversation $conversation, array $fixes): bool
+    {
+        $transcript = (array) ($conversation->transcript ?? []);
+        $changed = false;
+        foreach ($transcript as $i => $entry) {
+            $n = (int) ($entry['n'] ?? 0);
+            if (($entry['role'] ?? '') !== 'caller' || ! isset($fixes[$n]) || ($entry['text'] ?? '') === $fixes[$n]) {
+                continue;
+            }
+            $transcript[$i]['heard'] = $entry['heard'] ?? (string) ($entry['text'] ?? '');
+            $transcript[$i]['text'] = $fixes[$n];
+            $changed = true;
+        }
+        if ($changed) {
+            $conversation->transcript = $transcript;
+        }
+
+        return $changed;
+    }
+
+    /** The last caller lines not written again yet take their better writing, if it came (hearCaller). */
+    protected function healHeard(AgentConversation $conversation): void
+    {
+        if (! AgentAccess::callerTranscribe()) {
+            return;
+        }
+        $keys = [];
+        $transcript = (array) ($conversation->transcript ?? []);
+        for ($i = count($transcript) - 1, $seen = 0; $i >= 0 && $seen < 12; $i--) {
+            $entry = $transcript[$i];
+            if (($entry['role'] ?? '') !== 'caller' || empty($entry['n'])) {
+                continue;
+            }
+            $seen++;
+            if (! array_key_exists('heard', $entry)) {
+                $keys['agent-heard:'.$conversation->id.':'.(int) $entry['n']] = (int) $entry['n'];
+            }
+        }
+        if ($keys === []) {
+            return;
+        }
+        $fixes = [];
+        foreach (Cache::many(array_keys($keys)) as $key => $text) {
+            if (is_string($text) && $text !== '' && isset($keys[$key])) {
+                $fixes[$keys[$key]] = $text;
+            }
+        }
+        if ($fixes !== []) {
+            self::applyHeard($conversation, $fixes);
+        }
     }
 
     /** @param  array<string, string>  $lead */

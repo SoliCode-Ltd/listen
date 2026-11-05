@@ -6,12 +6,14 @@ use App\Models\Agent;
 use App\Models\AgentWidget;
 use App\Services\Agents\AgentCalls;
 use App\Services\Agents\GeminiClient;
+use App\Support\Agents\AgentAccess;
 use App\Support\Agents\AgentVoices;
 use App\Support\Agents\CallerIdentity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -323,6 +325,28 @@ class AgentCallController extends Controller
         return response()->json($this->calls->tool($c, (string) ($in['name'] ?? ''), (array) ($in['args'] ?? [])));
     }
 
+    /**
+     * A caller's line written again from their own voice (16-bit mono PCM in base64, at 8 or 16 kHz),
+     * in the agent's dialect. Answers { text } (null when it could not be written).
+     */
+    public function transcribe(Request $request, string $conversation): JsonResponse
+    {
+        $in = $this->body($request);
+        $c = $this->calls->findByKey($conversation, (string) ($in['call_key'] ?? ''));
+        if (! $c) {
+            return $this->error('not_found', 404);
+        }
+        $audio = (string) ($in['audio'] ?? '');
+        // 30 s at 8 kHz or 15 s at 16 kHz is about 640 KB in base64; more is not from the call client.
+        $pcm = $audio !== '' && strlen($audio) <= 1_100_000 ? base64_decode($audio, true) : false;
+        if ($pcm === false || $pcm === '') {
+            return response()->json(['text' => null]);
+        }
+
+        return response()->json(['text' => $this->calls->hearCaller($c, (int) ($in['n'] ?? 0), $pcm, (int) ($in['rate'] ?? 16000),
+            Str::limit((string) ($in['heard'] ?? ''), 600, ''), Str::limit((string) ($in['said'] ?? ''), 600, ''))]);
+    }
+
     public function end(Request $request, string $conversation): JsonResponse
     {
         $in = $this->body($request);
@@ -353,6 +377,8 @@ class AgentCallController extends Controller
             // A caller this quiet is asked if they are still there; as long again, the agent says goodbye.
             'silence_seconds' => max(8, (int) config('listen.agents.silence_seconds', 20)),
             'speaks_first' => true,
+            // Each caller line written again from their voice, in the agent's dialect (transcribe).
+            'transcribe' => AgentAccess::callerTranscribe(),
             'api' => url('/agent-api/calls/'.$c->public_id),
             'agent' => ['name' => $agent->name, 'language' => $agent->language],
         ];

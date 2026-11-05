@@ -941,6 +941,8 @@ html[dir="rtl"] .ag-stepper code.is-path::after { right: auto; left: -.95em; tra
 .ag-kb-head h2 { font-size: 1.2rem; font-weight: 800; }
 .ag-kb-head p { margin-top: .3rem; }
 .ag-kb-editor .ag-textarea { min-height: 220px; line-height: 1.8; }
+.ag-kb-updates .ag-textarea { min-height: 120px; }
+.ag-kb-badge { display: inline-flex; align-items: center; margin-inline-start: .5rem; padding: .15rem .6rem; border-radius: 999px; background: color-mix(in srgb, var(--brand, #7659FA) 12%, transparent); color: var(--brand, #7659FA); font-size: .75rem; font-weight: 700; vertical-align: middle; }
 .ag-kb-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .ag-kb-tips { display: grid; gap: .9rem; padding: 1.3rem; position: sticky; top: 132px; }
 .ag-kb-tips h3 { font-size: 1rem; font-weight: 800; }

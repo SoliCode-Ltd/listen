@@ -298,8 +298,14 @@ return [
     // Knowledge tab.
     'knowledge_heading' => 'What your agent knows',
     'knowledge_hint' => 'Your agent answers only from this. Keep prices, hours and policies here up to date.',
+    // Knowledge → Latest updates: the newest information, ahead of the website, notes and files.
+    'updates_title' => 'Latest updates',
+    'updates_hint' => 'Anything new: an upcoming event, a changed date or price, a new announcement. Your agent treats this as the newest information, ahead of your website, notes and files where they differ.',
+    'updates_placeholder' => 'For example: Our next seminar is on 20 December 2026 in Riyadh. Registration is open until 15 December.',
+    'updates_at' => 'Last updated :date',
+    'updates_badge' => 'Newest first',
     'knowledge_notes_title' => 'Your notes',
-    'knowledge_notes_hint' => 'Prices, hours and policies in your own words. Your agent answers from your notes and your files, and from nothing else.',
+    'knowledge_notes_hint' => 'Prices, hours and policies in your own words. Your agent answers from your latest updates, your notes and your files, and from nothing else.',
     // Files the owner uploads (a menu, a price list, a brochure): read once, used on every call.
     'files' => [
         'title' => 'Files',

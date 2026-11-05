@@ -158,6 +158,8 @@ class AgentController extends Controller
             'dialect' => ['sometimes', 'string', 'max:20'],
             'first_message' => ['sometimes', 'nullable', 'string', 'max:400'],
             'knowledge' => ['sometimes', 'nullable', 'string', 'max:40000'],
+            // Knowledge → Latest updates: the newest information, ahead of every other fact.
+            'updates' => ['sometimes', 'nullable', 'string', 'max:'.\App\Support\Agents\AgentInstructions::MAX_UPDATES_CHARS],
             'script' => ['sometimes', 'array'],
             'script.identity' => ['nullable', 'string', 'max:1500'],
             'script.never' => ['nullable', 'array', 'max:12'],
@@ -245,6 +247,17 @@ class AgentController extends Controller
                 'answer' => (string) $c['answer'],
             ], (array) $data['choices']));
         }
+        $updatesChanged = false;
+        if (array_key_exists('updates', $data)) {
+            $settings = (array) ($agent->settings ?? []);
+            $text = trim((string) $data['updates']);
+            if ($text !== trim((string) ($settings['updates'] ?? ''))) {
+                $settings['updates'] = $text;
+                $settings['updates_at'] = $text !== '' ? now()->toIso8601String() : null;
+                $agent->settings = $settings;
+                $updatesChanged = true;
+            }
+        }
         if (array_key_exists('daily_minutes', $data)) {
             $settings = (array) ($agent->settings ?? []);
             $settings['daily_minutes'] = (int) $data['daily_minutes'];
@@ -261,7 +274,7 @@ class AgentController extends Controller
             }
             $agent->status = $data['status'];
         }
-        $setupChanged = $agent->isDirty(['name', 'business_name', 'first_message', 'knowledge', 'choices', 'script', 'dialect']);
+        $setupChanged = $updatesChanged || $agent->isDirty(['name', 'business_name', 'first_message', 'knowledge', 'choices', 'script', 'dialect']);
         $agent->save();
         // A live agent whose setup changed is checked again in the background (paused if it now
         // deceives or harms callers).
@@ -333,7 +346,9 @@ class AgentController extends Controller
             'question' => ['nullable', 'string', 'max:500'],
             'answer' => ['required', 'string', 'max:1500'],
         ]);
-        $line = trim(($data['question'] ? 'Q: '.trim($data['question'])."\nA: " : '').trim($data['answer']));
+        // The question is the caller's line as the page showed it: without its left-to-right marks.
+        $question = trim(str_replace(["\u{2066}", "\u{2069}"], '', (string) $data['question']));
+        $line = trim(($question !== '' ? 'Q: '.$question."\nA: " : '').trim($data['answer']));
         $agent->knowledge = trim(trim((string) $agent->knowledge)."\n\n# Corrected by the owner\n".$line);
         $agent->save();
         AgentSource::create(['agent_id' => $agent->id, 'kind' => AgentSource::TEXT, 'title' => 'Correction', 'content' => $line, 'chars' => mb_strlen($line), 'status' => 'ready', 'read_at' => now()]);
@@ -471,6 +486,17 @@ class AgentController extends Controller
     }
 
     /** @return array<string, mixed> */
+    /** "Last updated 5 November 2026" for Knowledge → Latest updates, or '' before the first one. */
+    public static function updatesAt(Agent $agent): string
+    {
+        $at = $agent->setting('updates_at');
+        if (blank($at) || trim((string) $agent->setting('updates', '')) === '') {
+            return '';
+        }
+
+        return __('agents.updates_at', ['date' => \Illuminate\Support\Carbon::parse($at)->locale(app()->getLocale())->translatedFormat('j F Y')]);
+    }
+
     private function payload(Agent $agent): array
     {
         return [
@@ -484,6 +510,8 @@ class AgentController extends Controller
             'first_message' => $agent->first_message,
             'script' => $agent->script ?? [],
             'knowledge' => $agent->knowledge,
+            'updates' => (string) $agent->setting('updates', ''),
+            'updates_at' => self::updatesAt($agent),
             'choices' => $agent->choices ?? [],
             'urls' => [
                 'show' => route('voice-agents.show', $agent),

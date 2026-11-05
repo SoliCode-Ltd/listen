@@ -426,7 +426,7 @@
     var faceImg = $('[data-ag-talk-avatar-img]', root);
     var shape = [0.35, 0.6, 0.85, 1, 0.8, 0.55, 0.3];
     var list = $('[data-ag-transcript]', root);
-    var call = null, lastAsked = '';
+    var call = null, lastAsked = '', lastCaller = null;
     var states = T.states || {};
     // The link page: every line busy, the caller's place in line, then a number to be called back.
     var sub = $('[data-ag-talk-sub]', root), leave = $('[data-ag-talk-leave]', root);
@@ -563,10 +563,12 @@
       var who = document.createElement('small');
       who.textContent = role === 'agent' ? ((C.agent && C.agent.name) || '') : role === 'caller' ? T.you : '';
       if (role !== 'event') b.appendChild(who);
-      b.appendChild(document.createTextNode(text));
+      var words = document.createTextNode(text);
+      b.appendChild(words);
       if (extra) b.appendChild(extra);
       list.appendChild(b);
       list.scrollTop = list.scrollHeight;
+      return words;
     }
     function correction(question) {
       if (!C.agent || !C.agent.urls || C.mode === 'link' || C.mode === 'demo') return null;
@@ -604,8 +606,13 @@
         begin: begin,
         onState: setState,
         onTurn: function (t) {
-          if (t.role === 'caller') { lastAsked = t.text; bubble('caller', t.text); }
-          else bubble('agent', t.text, correction(lastAsked));
+          if (t.role === 'caller') { lastAsked = t.text; lastCaller = t; t.view = bubble('caller', t.text); }
+          else t.view = bubble('agent', t.text, correction(lastAsked));
+        },
+        // The caller's line written again from their voice, in the agent's dialect.
+        onFix: function (t) {
+          if (t.view) t.view.nodeValue = t.text;
+          if (t === lastCaller) lastAsked = t.text;
         },
         onLevel: level,
         onTool: function (name, args) {
@@ -974,6 +981,15 @@
       var nf = new Intl.NumberFormat('en'); // the site writes numbers in Latin digits in both languages
       kbText.addEventListener('input', function () { kbCount.textContent = nf.format(kbText.value.length) + ' / ' + nf.format(40000); });
     }
+    var uf = $('[data-ag-updates-form]');
+    if (uf) uf.addEventListener('submit', function (e) {
+      e.preventDefault();
+      api('PATCH', C.agent.urls.update, { updates: $('[name="updates"]', uf).value }).then(function (res) {
+        var at = $('[data-ag-updates-at]', uf);
+        if (at && res && res.agent) at.textContent = res.agent.updates_at || '';
+        toast(T.saved);
+      }).catch(function (err) { toast(err.message); });
+    });
     if (kf) kf.addEventListener('submit', function (e) {
       e.preventDefault();
       api('PATCH', C.agent.urls.update, { knowledge: $('[name="knowledge"]', kf).value }).then(function () { toast(T.saved); }).catch(function (err) { toast(err.message); });

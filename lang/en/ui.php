@@ -804,6 +804,7 @@ return [
             's1_11' => 'If you arrive from one of our ads, the ad click ID from the link you clicked, kept for up to 90 days',
             's1_12' => 'Your name and email with your call, if you call our assistant on our website while signed in, so our team knows who called',
             's1_13' => 'When you call a business\'s voice agent made with Listen, the call is kept for that business, with your name and email if that business\'s website says you are signed in to it',
+            's1_14' => 'What you say on a call with a voice agent, written down from the sound of your words right after you speak, so the line on the screen and in the call\'s record reads as you said it. The sound is not kept',
             's2_title' => '2. How We Use Your Information',
             's2_1' => 'To provide and maintain our service',
             's2_2' => 'To process your payments and manage your subscription',

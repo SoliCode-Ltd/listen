@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
  *
  * - generate(): the text model, for writing agents and summing up calls.
  * - readFile(): the same model reading a file the owner uploaded (a PDF, a photo of a menu).
+ * - transcribe(): the same model writing down what a caller said, from their voice.
  * - liveToken(): a short-lived key for one live call, locked to the agent's
  *   setup (model, voice, instructions, tools), so the browser that holds it
  *   can only have that conversation, for that long.
@@ -97,6 +98,42 @@ class GeminiClient
                 if (is_string($text) && trim($text) !== '') {
                     return $text;
                 }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * What a caller said, written down from their voice (a WAV recording) by the text model, with
+     * the prompt beside it: quick (little thinking) and exact (temperature 0). Returns the words,
+     * '' when the model heard none, or null when no model answered in time.
+     */
+    public function transcribe(string $prompt, string $wav, int $timeout = 12): ?string
+    {
+        $deadline = microtime(true) + $timeout;
+        $body = fn (bool $think): array => [
+            'contents' => [['role' => 'user', 'parts' => [
+                ['inline_data' => ['mime_type' => 'audio/wav', 'data' => base64_encode($wav)]],
+                ['text' => $prompt],
+            ]]],
+            'generationConfig' => ['temperature' => 0] + ($think ? ['thinkingConfig' => ['thinkingLevel' => 'low']] : []),
+        ];
+        foreach (self::WRITER_MODELS as $model) {
+            $left = (int) floor($deadline - microtime(true));
+            if ($left < 3) {
+                break;
+            }
+            $response = $this->post("/models/{$model}:generateContent", $body(true), $model, $left);
+            // A model that does not take that thinking level is asked again with its own.
+            if ($response?->status() === 400 && str_contains(strtolower((string) $response->body()), 'thinking')) {
+                $left = (int) floor($deadline - microtime(true));
+                $response = $left >= 3 ? $this->post("/models/{$model}:generateContent", $body(false), $model, $left) : null;
+            }
+            if ($response?->successful()) {
+                $text = data_get($response->json(), 'candidates.0.content.parts.0.text');
+
+                return is_string($text) ? trim($text) : '';
             }
         }
 
