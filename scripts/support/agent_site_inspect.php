@@ -149,6 +149,21 @@ foreach (array_slice($shown, -60) as $row) {
 $line('requests seen', $seen);
 $line('by method', json_encode($methods));
 $line('by the page they came from', json_encode($byFrom));
+echo "\n== Web server log files\n";
+foreach (array_unique(array_map('realpath', array_filter($dirs, 'is_dir'))) as $dir) {
+    foreach (glob($dir.'/*') ?: [] as $f) {
+        if (is_file($f) && filemtime($f) > time() - 86400) {
+            echo '  '.str_pad(basename($f), 70).' '.number_format((int) filesize($f))." bytes\n";
+        }
+    }
+    // Requests the front server answered itself or the browser gave up on (499), or that failed (5xx), today.
+    foreach (glob($dir.'/*access*.log') ?: [] as $log) {
+        $odd = (string) shell_exec('tail -n 60000 '.escapeshellarg($log).' 2>/dev/null | grep -E "/agents/agt_[a-z0-9]{24}" | grep -E "\" (499|5[0-9][0-9]) " | tail -n 15');
+        foreach (array_filter(explode("\n", $odd)) as $row) {
+            echo '  odd '.basename($log).': '.$clean(mb_substr(trim($row), 0, 220))."\n";
+        }
+    }
+}
 echo "\n== The site's addresses\n";
 $line('APP_URL', (string) config('app.url'));
 $line('session cookie domain', (string) (config('session.domain') ?: '(this address only)'));
