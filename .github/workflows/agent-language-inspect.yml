@@ -1,0 +1,60 @@
+name: Agent language inspect
+
+# Read-only: in which calls on LIVE (or staging) did an agent speak a language it should not
+# (an Arabic agent in Spanish or English), and how far into the call? Pipes
+# scripts/support/agent_language_inspect.php over SSH into the app's own PHP (READ ONLY
+# database session). Prints the agent's own lines only when they are in a wrong language,
+# never what a caller said. Nothing is written. A push of this file or the script runs it on live.
+
+on:
+  push:
+    branches: [claude/beautiful-sagan-df90b3]
+    paths:
+      - .github/workflows/agent-language-inspect.yml
+      - scripts/support/agent_language_inspect.php
+  workflow_dispatch:
+    inputs:
+      target:
+        description: live or staging
+        required: true
+        default: live
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect over SSH
+        env:
+          TARGET: ${{ inputs.target || 'live' }}
+          LIVE_HOST: ${{ secrets.LIVE_SSH_HOST }}
+          LIVE_USER: ${{ secrets.LIVE_SSH_USER }}
+          LIVE_KEY: ${{ secrets.LIVE_SSH_KEY }}
+          LIVE_PATH: ${{ secrets.LIVE_APP_PATH }}
+          STAGING_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_USER: ${{ secrets.STAGING_SSH_USER }}
+          STAGING_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          STAGING_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          case "$TARGET" in
+            live) SSH_HOST="$LIVE_HOST"; SSH_USER="$LIVE_USER"; SSH_KEY="$LIVE_KEY"; APP_PATH="$LIVE_PATH" ;;
+            staging) SSH_HOST="$STAGING_HOST"; SSH_USER="$STAGING_USER"; SSH_KEY="$STAGING_KEY"; APP_PATH="$STAGING_PATH" ;;
+            *) echo "::error::target must be live or staging"; exit 1 ;;
+          esac
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_inspect
+          chmod 600 ~/.ssh/id_inspect
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; \$(command -v php8.4 || command -v php)"
+          ssh -i ~/.ssh/id_inspect -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" < scripts/support/agent_language_inspect.php
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_inspect
