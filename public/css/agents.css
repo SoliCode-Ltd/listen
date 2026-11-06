@@ -623,31 +623,6 @@ html[dir="rtl"] .ag-convo-more summary svg { transform: scaleX(-1); }
 .ag-design-field { display: grid; gap: .45rem; min-width: 0; }
 .ag-design-label { font-size: .84rem; font-weight: 700; color: var(--muted); }
 .ag-design-hint { margin: 0; font-size: .84rem; line-height: 1.65; }
-/* Call sound: each choice in one tile with its own play button at its end, to hear the agent's voice
-   with the office behind it or alone. The ring round the mark fills as it plays, as round a voice's
-   face in the voice picker. */
-.ag-sound-choice { position: relative; display: inline-flex; }
-.ag-sound-choice > .ag-choice > span { min-height: 46px; padding-inline: .9rem 50px; }
-.ag-sound-choices.is-silent .ag-sound-choice > .ag-choice > span { padding-inline-end: .9rem; }
-.ag-sound-play { position: absolute; top: 50%; inset-inline-end: 6px; display: grid; place-items: center; width: 36px; height: 36px; margin: -18px 0 0; padding: 0; border: 0; border-radius: 50%; background: none; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.ag-sound-play[hidden] { display: none; }
-.ag-sound-play:focus-visible { outline: 3px solid color-mix(in srgb, var(--a) 40%, transparent); outline-offset: 1px; }
-.ag-sound-play .ag-sound-icon::before { transition: transform .18s ease; }
-.ag-sound-play:hover .ag-sound-icon::before { transform: scale(1.07); }
-.ag-sound-icon { position: relative; display: grid; place-items: center; width: 30px; height: 30px; flex: none; }
-.ag-sound-icon::before { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--a); }
-.ag-sound-glyph { position: relative; width: 12px; height: 12px; fill: #fff; }
-html[dir="rtl"] .ag-sound-glyph { transform: none; }
-.ag-sound-s { display: none; }
-.ag-sound-play.is-playing .ag-sound-p, .ag-sound-play.is-loading .ag-sound-p { display: none; }
-.ag-sound-play.is-playing .ag-sound-s, .ag-sound-play.is-loading .ag-sound-s { display: inline; }
-.ag-sound-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); opacity: 0; transition: opacity .2s ease; pointer-events: none; }
-.ag-sound-ring circle { fill: none; stroke: var(--a); stroke-width: 2; stroke-dasharray: 100; stroke-dashoffset: 100; will-change: stroke-dashoffset; }
-.ag-sound-play.is-playing .ag-sound-ring, .ag-sound-play.is-loading .ag-sound-ring { opacity: 1; }
-/* Getting ready (the first press on a phone): a short arc goes round until it plays. */
-.ag-sound-play.is-loading .ag-sound-ring { animation: ag-sound-wait .9s linear infinite; }
-.ag-sound-play.is-loading .ag-sound-ring circle { stroke-dashoffset: 72 !important; }
-@keyframes ag-sound-wait { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
 .ag-design-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; align-items: start; }
 .ag-choice-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .4rem; }
 .ag-choice { position: relative; display: inline-flex; cursor: pointer; }

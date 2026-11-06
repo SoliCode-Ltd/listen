@@ -532,8 +532,6 @@
             ],
           ],
           'text' => ['saving' => __('agents.design.saving'), 'saved' => __('agents.design.saved'), 'failed' => __('agents.design.failed')],
-          // Design → Call sound → Hear the difference: the agent's voice with the office behind it, as in a call.
-          'sound' => \App\Support\Agents\CallBackground::sound('office'),
         ];
       })(),
       'text' => [
