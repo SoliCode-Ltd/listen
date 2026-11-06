@@ -664,8 +664,9 @@
       });
     }
     // The caller's line from the moment they start it (onHear): dots in their bubble while they speak
-    // and while it is written again from their voice (onHold), until its words come with its turn.
-    function hear(on) {
+    // and while it is written again from their voice (onHold), until its words come with its turn. A
+    // line said before the agent's answer that is coming now (its words came late: before) goes above it.
+    function hear(on, before) {
       if (!on) { var old = hearing; hearing = null; if (old && old.parentNode) old.parentNode.removeChild(old); return; }
       if (hearing) return;
       hearing = document.createElement('div');
@@ -674,7 +675,7 @@
       hearing.innerHTML = '<small></small>' + DOTS;
       hearing.firstChild.textContent = T.you || '';
       // They started speaking now: after everything said before (an answer they talk over included).
-      place(hearing);
+      place(hearing, before);
     }
     function hold(t) {
       if (t.role !== 'caller') return;

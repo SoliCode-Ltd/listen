@@ -853,9 +853,10 @@
     }
     // The caller's line from the moment they start it (onHear): dots in their bubble while they speak
     // and while it is written again from their voice (onHold), in its place, until its words come with
-    // its turn. A line that came to nothing takes its dots away.
+    // its turn. A line that came to nothing takes its dots away. A line said before the agent's answer
+    // that is coming now (its words came late: before) goes above that answer.
     var hearing = null;
-    function hear(on) {
+    function hear(on, before) {
       if (!parts.lines || look.captions === false) return;
       if (!on) {
         var old = hearing;
@@ -869,7 +870,8 @@
         var n = el('div', 'lva-line is-caller is-typing');
         n.setAttribute('aria-hidden', 'true');
         n.innerHTML = '<i></i><i></i><i></i>';
-        parts.lines.appendChild(n);
+        var next = before && ((liveView && liveView.el) || typing);
+        if (next && next.parentNode === parts.lines) parts.lines.insertBefore(n, next); else parts.lines.appendChild(n);
         hearing = n;
       });
     }
