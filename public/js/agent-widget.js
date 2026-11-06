@@ -122,6 +122,8 @@
     '.lva-line.is-typing{display:inline-flex;align-items:center;gap:5px;min-height:42px;padding:0 16px}',
     '.lva-line.is-typing i{width:6px;height:6px;border-radius:50%;background:var(--text);opacity:.28;animation:lva-dot 1.2s ease-in-out infinite}',
     '.lva-line.is-typing i:nth-child(2){animation-delay:.16s}.lva-line.is-typing i:nth-child(3){animation-delay:.32s}',
+    /* The agent's words as it says them, each fading in as it comes (onWords). */
+    '.lva-w{animation:lva-word .34s ease both}',
     /* A line written again (the caller's from their voice, the agent's in Arabic letters) settles in softly. */
     '.lva-line.is-fixed{animation:lva-fix .5s ease}',
     /* The business's own links, written in the chat when the caller asks for them (show_links). */
@@ -217,6 +219,7 @@
     '@keyframes lva-in{from{opacity:0;transform:translateY(8px) scale(.985)}}',
     '@keyframes lva-dot{0%,70%,100%{opacity:.22;transform:none}35%{opacity:.75;transform:translateY(-2px)}}',
     '@keyframes lva-fix{from{opacity:.4}}',
+    '@keyframes lva-word{from{opacity:0}}',
     '@keyframes lva-fill{to{stroke-dashoffset:0}}',
     '@media (prefers-reduced-motion:reduce){.lva *,.lva *::before,.lva *::after{animation:none !important;transition:none !important}}',
     /* The link page: the same card, open in the page, with no button to open it and nothing to close. */
@@ -796,7 +799,8 @@
     // Three dots in the agent's bubble while it speaks; its words take their place.
     function showTyping() {
       clearTimeout(typingOff);
-      if (typing || !parts.lines || look.captions === false || parts.lines.hidden) return;
+      // Not under words already coming (a short pause in the voice), only before a line starts.
+      if (typing || liveView || !parts.lines || look.captions === false || parts.lines.hidden) return;
       smoothly(function () {
         typing = el('div', 'lva-line is-agent is-typing');
         typing.setAttribute('aria-hidden', 'true');
@@ -813,22 +817,101 @@
       typing = null;
       smoothly(function () { if (dots.parentNode) dots.parentNode.removeChild(dots); });
     }
+    // The agent's words as it says them (onWords): the dots become its bubble, which grows a word at
+    // a time; its turn (onTurn, t.live) ends it in place. A dropped line (wrong language) goes away.
+    var liveView = null;
+    function addWords(node, from, to) {
+      if (to.indexOf(from) !== 0 || !from) { node.textContent = to; return; }
+      if (to.length > from.length) node.appendChild(el('span', 'lva-w', to.slice(from.length)));
+    }
+    function words(w) {
+      if (!parts.lines || look.captions === false) return;
+      if (w.gone) {
+        if (liveView && liveView.n === w.n) {
+          var old = liveView.el;
+          liveView = null;
+          smoothly(function () { if (old.parentNode) old.parentNode.removeChild(old); });
+        }
+        return;
+      }
+      smoothly(function () {
+        if (!liveView || liveView.n !== w.n) {
+          var n = typing;
+          typing = null;
+          clearTimeout(typingOff);
+          if (n) n.innerHTML = '';
+          else { n = el('div'); parts.lines.appendChild(n); }
+          n.className = 'lva-line is-agent';
+          n.dir = 'auto';
+          // Read out once it is whole (its turn), not word by word.
+          n.setAttribute('aria-hidden', 'true');
+          liveView = { n: w.n, el: n, text: '' };
+        }
+        addWords(liveView.el, liveView.text, w.text);
+        liveView.text = w.text;
+      });
+    }
+    // The caller's line from the moment they start it (onHear): dots in their bubble while they speak
+    // and while it is written again from their voice (onHold), in its place, until its words come with
+    // its turn. A line that came to nothing takes its dots away.
+    var hearing = null;
+    function hear(on) {
+      if (!parts.lines || look.captions === false) return;
+      if (!on) {
+        var old = hearing;
+        hearing = null;
+        if (old) smoothly(function () { if (old.parentNode) old.parentNode.removeChild(old); });
+        return;
+      }
+      if (hearing) return;
+      smoothly(function () {
+        var n = el('div', 'lva-line is-caller is-typing');
+        n.setAttribute('aria-hidden', 'true');
+        n.innerHTML = '<i></i><i></i><i></i>';
+        var after = (liveView && liveView.el) || typing;
+        if (after && after.parentNode === parts.lines) parts.lines.insertBefore(n, after);
+        else parts.lines.appendChild(n);
+        hearing = n;
+      });
+    }
+    function hold(t) {
+      if (t.role !== 'caller') return;
+      if (!hearing) hear(true);
+      t.view = hearing;
+      hearing = null;
+    }
     function line(t) {
       if (!parts.lines || look.captions === false) return;
       smoothly(function () {
         var n;
-        if (t.role === 'agent' && typing) {
+        if (t.role === 'caller' && !t.view && hearing) { t.view = hearing; hearing = null; }
+        if (t.view && t.view.parentNode === parts.lines) {
+          // Its place was kept (onHold): the dots give way to its words.
+          n = t.view;
+          n.className = 'lva-line is-' + t.role;
+          n.removeAttribute('aria-hidden');
+          n.textContent = '';
+          n.appendChild(el('span', 'lva-w', t.text));
+        } else if (t.role === 'agent' && t.live && liveView && liveView.n === t.live) {
+          // Shown as it was said: the line ends where it is, with any last words.
+          n = liveView.el;
+          addWords(n, liveView.text, t.text);
+          liveView = null;
+          n.removeAttribute('aria-hidden');
+        } else if (t.role === 'agent' && typing) {
           // The dots become the agent's words, in the same bubble.
           n = typing;
           typing = null;
           clearTimeout(typingOff);
-          n.className = 'lva-line is-agent is-fixed';
+          n.className = 'lva-line is-agent';
           n.removeAttribute('aria-hidden');
-          n.textContent = t.text;
+          n.textContent = '';
+          n.appendChild(el('span', 'lva-w', t.text));
         } else {
           n = el('div', 'lva-line is-' + t.role, t.text);
-          // A caller line that waited for its better writing comes before the agent's dots.
-          if (typing && typing.parentNode === parts.lines) parts.lines.insertBefore(n, typing);
+          // A caller line comes before the agent's answer that has started (its dots or its words).
+          var after = (liveView && liveView.el) || typing;
+          if (t.role !== 'agent' && after && after.parentNode === parts.lines) parts.lines.insertBefore(n, after);
           else parts.lines.appendChild(n);
         }
         n.dir = 'auto';
@@ -910,6 +993,8 @@
       if (starting) return;
       starting = true;
       typing = null;
+      liveView = null;
+      hearing = null;
       clearTimeout(typingOff);
       if (parts.lines) parts.lines.__pinned = true;
       if (parts.lines) { parts.lines.innerHTML = ''; parts.lines.hidden = look.captions === false; parts.lines.classList.remove('has-links'); }
@@ -926,6 +1011,9 @@
           },
           onState: function (s) { setState(s); },
           onTurn: line,
+          onWords: words,
+          onHold: hold,
+          onHear: hear,
           onFix: fixLine,
           onLinks: linksLine,
           onLevel: level,
@@ -943,6 +1031,7 @@
       var raf = 0, timers = [], speakingNow = false, alive = true;
       var at = function (ms, fn) { timers.push(setTimeout(function () { if (alive) fn(); }, ms)); };
       typing = null;
+      liveView = null;
       clearTimeout(typingOff);
       if (parts.lines) parts.lines.innerHTML = '';
       setState('connecting');
@@ -953,11 +1042,20 @@
         raf = requestAnimationFrame(loop);
       };
       loop();
-      var t = 900;
+      var t = 900, seq = 0;
       sample.forEach(function (turn) {
-        var agent = turn.role === 'agent', lasts = Math.max(1600, String(turn.text || '').split(' ').length * 260);
-        at(t, function () { speakingNow = agent; setState(agent ? 'speaking' : 'listening'); line(turn); });
-        t += lasts;
+        var text = String(turn.text || ''), said = text.split(' '), lasts = Math.max(1600, said.length * 260);
+        if (turn.role !== 'agent') {
+          at(t, function () { speakingNow = false; setState('listening'); line(turn); });
+          t += lasts;
+          return;
+        }
+        // The agent's words come as it says them, as in a call.
+        var n = 'demo-' + (++seq), first = 340;
+        at(t, function () { speakingNow = true; setState('speaking'); });
+        said.forEach(function (w, i) { at(t + first + i * 260, function () { words({ n: n, text: said.slice(0, i + 1).join(' ') }); }); });
+        at(t + first + said.length * 260, function () { line({ role: 'agent', text: text, live: n }); });
+        t += Math.max(lasts, first + said.length * 260 + 300);
       });
       at(t, function () { speakingNow = false; setState('listening'); });
       demo = {

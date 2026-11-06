@@ -368,6 +368,16 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-bubble.is-agent + .ag-bubble.is-caller, .ag-bubble.is-caller + .ag-bubble.is-agent { margin-top: .5rem; }
 /* A line written again (from the caller's voice, or the agent's in Arabic letters) settles in softly. */
 .ag-bubble.is-fixed { animation: ag-fixed .5s ease; opacity: 1; transform: none; }
+/* The agent's words as it says them, each fading in as it comes; three dots hold a line's place
+   while the agent starts to speak, or while the caller speaks and their line is written. */
+.ag-w { animation: ag-word .34s ease both; }
+@keyframes ag-word { from { opacity: 0; } }
+.ag-bubble.is-typing { min-width: 64px; }
+.ag-dots { display: inline-flex; align-items: center; gap: 5px; height: 1.65em; }
+.ag-dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .28; animation: ag-dot 1.2s ease-in-out infinite; }
+.ag-dots i:nth-child(2) { animation-delay: .16s; }
+.ag-dots i:nth-child(3) { animation-delay: .32s; }
+@keyframes ag-dot { 0%, 70%, 100% { opacity: .22; transform: none; } 35% { opacity: .75; transform: translateY(-2px); } }
 @keyframes ag-fixed { from { opacity: .45; } }
 /* The business's own links, written in the chat when the caller asks for them (show_links). */
 .ag-bubble.is-links { min-width: min(300px, 86%); }

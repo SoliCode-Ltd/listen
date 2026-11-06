@@ -515,6 +515,9 @@
       root.classList.toggle('is-waiting', waiting);
       label.textContent = waiting ? (L.cancel || T.end) : live ? T.end : T.start;
       stage.classList.toggle('is-speaking', s === 'speaking');
+      if (s === 'speaking') agentDots(true);
+      else if (s === 'listening') agentDots(false, 4500);
+      else agentDots(false);
       stage.classList.toggle('is-live', live);
       stage.classList.toggle('is-waiting', waiting);
       if (sub) sub.hidden = !waiting;
@@ -587,21 +590,118 @@
       stage.__vpLevel = a;
       stage.classList.toggle('is-playing', a > 0.01);
     }
-    function bubble(role, text, extra) {
+    function bubble(role, text, extra, before) {
       var b = document.createElement('div');
       b.className = 'ag-bubble is-' + role;
       b.dir = 'auto';
       var who = document.createElement('small');
       who.textContent = role === 'agent' ? ((C.agent && C.agent.name) || '') : role === 'caller' ? T.you : '';
       if (role !== 'event') b.appendChild(who);
-      var words = document.createTextNode(text);
+      var words = document.createElement('span');
+      words.className = 'ag-words';
+      words.textContent = text;
       b.appendChild(words);
       if (extra) b.appendChild(extra);
-      // The newest line in view, gently, unless the owner scrolled up to read.
-      var follow = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
-      list.appendChild(b);
-      if (follow) list.scrollTop = list.scrollHeight;
+      place(b, before);
       return words;
+    }
+    // The newest line in view, gently, unless the owner scrolled up to read; a line can take its place
+    // before the agent's answer that has started (its dots or its words).
+    function place(b, before) {
+      var follow = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+      var after = before && ((liveView && liveView.box) || dots);
+      if (after && after.parentNode === list) list.insertBefore(b, after); else list.appendChild(b);
+      if (follow) list.scrollTop = list.scrollHeight;
+    }
+    function follow(change) {
+      var stay = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+      change();
+      if (stay) list.scrollTop = list.scrollHeight;
+    }
+    var DOTS = '<span class="ag-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
+    // The agent's words as it says them (onWords): three dots while it starts to speak, then its
+    // bubble grows a word at a time, and its turn (onTurn, t.live) ends it in place.
+    var liveView = null, dots = null, dotsOff = 0, hearing = null;
+    function agentDots(on, later) {
+      clearTimeout(dotsOff);
+      if (on) {
+        if (dots || liveView) return;
+        dots = document.createElement('div');
+        dots.className = 'ag-bubble is-agent is-typing';
+        dots.setAttribute('aria-hidden', 'true');
+        dots.innerHTML = '<small></small>' + DOTS;
+        dots.firstChild.textContent = (C.agent && C.agent.name) || '';
+        place(dots);
+        return;
+      }
+      if (!dots) return;
+      if (later) { dotsOff = setTimeout(function () { agentDots(false); }, later); return; }
+      var d = dots;
+      dots = null;
+      if (d.parentNode) d.parentNode.removeChild(d);
+    }
+    function grow(node, from, to) {
+      if (!from || to.indexOf(from) !== 0) { node.textContent = to; return; }
+      if (to.length > from.length) { var w = document.createElement('span'); w.className = 'ag-w'; w.textContent = to.slice(from.length); node.appendChild(w); }
+    }
+    function words(w) {
+      if (w.gone) {
+        if (liveView && liveView.n === w.n) { var old = liveView.box; liveView = null; if (old.parentNode) old.parentNode.removeChild(old); }
+        return;
+      }
+      follow(function () {
+        if (!liveView || liveView.n !== w.n) {
+          clearTimeout(dotsOff);
+          var box = dots;
+          dots = null;
+          if (!box) { box = document.createElement('div'); place(box); }
+          box.className = 'ag-bubble is-agent';
+          box.dir = 'auto';
+          box.setAttribute('aria-hidden', 'true');
+          box.innerHTML = '<small></small><span class="ag-words"></span>';
+          box.firstChild.textContent = (C.agent && C.agent.name) || '';
+          liveView = { n: w.n, box: box, words: box.lastChild, text: '' };
+        }
+        grow(liveView.words, liveView.text, w.text);
+        liveView.text = w.text;
+      });
+    }
+    // The caller's line from the moment they start it (onHear): dots in their bubble while they speak
+    // and while it is written again from their voice (onHold), until its words come with its turn.
+    function hear(on) {
+      if (!on) { var old = hearing; hearing = null; if (old && old.parentNode) old.parentNode.removeChild(old); return; }
+      if (hearing) return;
+      hearing = document.createElement('div');
+      hearing.className = 'ag-bubble is-caller is-typing';
+      hearing.setAttribute('aria-hidden', 'true');
+      hearing.innerHTML = '<small></small>' + DOTS;
+      hearing.firstChild.textContent = T.you || '';
+      place(hearing, true);
+    }
+    function hold(t) {
+      if (t.role !== 'caller') return;
+      if (!hearing) hear(true);
+      t.box = hearing;
+      hearing = null;
+    }
+    // A caller line whose place was kept: the dots give way to its words.
+    function fillHeld(t) {
+      var box = t.box || hearing;
+      if (t.box) t.box = null; else hearing = null;
+      if (!box || !box.parentNode) return null;
+      var span = document.createElement('span');
+      span.className = 'ag-words';
+      var w = document.createElement('span');
+      w.className = 'ag-w';
+      w.textContent = t.text;
+      span.appendChild(w);
+      follow(function () {
+        box.className = 'ag-bubble is-caller';
+        box.removeAttribute('aria-hidden');
+        var d = box.querySelector('.ag-dots');
+        if (d) box.replaceChild(span, d); else box.appendChild(span);
+      });
+      return span;
     }
     // The business's own links the agent wrote in the chat (show_links), each opening in a new tab.
     function linksBubble(links) {
@@ -661,19 +761,54 @@
       if (call) { call.end(); return; }
       if (C.mode === 'link' && C.available === false) { stateEl.textContent = T.paused || ''; return; }
       list.innerHTML = '';
+      liveView = null; dots = null; hearing = null; clearTimeout(dotsOff);
       hideSummary();
       call = window.ListenAgentCall.start({
         begin: begin,
         onState: setState,
         onTurn: function (t) {
-          if (t.role === 'caller') { lastAsked = t.text; lastCaller = t; t.view = bubble('caller', t.text); }
-          else t.view = bubble('agent', t.text, correction(lastAsked));
+          if (t.role === 'caller') {
+            lastAsked = t.text; lastCaller = t;
+            t.view = fillHeld(t) || bubble('caller', t.text, null, true);
+            return;
+          }
+          var fix = correction(lastAsked);
+          if (t.live && liveView && liveView.n === t.live) {
+            // Shown as it was said: the line ends where it is, with any last words.
+            var v = liveView;
+            liveView = null;
+            follow(function () { grow(v.words, v.text, t.text); if (fix) v.box.appendChild(fix); v.box.removeAttribute('aria-hidden'); });
+            t.view = v.words;
+            return;
+          }
+          if (dots) {
+            // The dots become the agent's words, in the same bubble.
+            var box = dots;
+            dots = null;
+            clearTimeout(dotsOff);
+            follow(function () {
+              box.className = 'ag-bubble is-agent';
+              box.removeAttribute('aria-hidden');
+              var span = document.createElement('span');
+              span.className = 'ag-words';
+              span.innerHTML = '<span class="ag-w"></span>';
+              span.firstChild.textContent = t.text;
+              box.replaceChild(span, box.querySelector('.ag-dots'));
+              if (fix) box.appendChild(fix);
+              t.view = span;
+            });
+            return;
+          }
+          t.view = bubble('agent', t.text, fix);
         },
+        onWords: words,
+        onHold: hold,
+        onHear: hear,
         // The caller's line written again from their voice, in the agent's dialect; an agent line
         // that came out in Latin letters, in Arabic ones.
         onFix: function (t) {
           if (t.view) {
-            t.view.nodeValue = t.text;
+            t.view.textContent = t.text;
             var b = t.view.parentNode;
             if (b && b.classList) { b.classList.remove('is-fixed'); void b.offsetWidth; b.classList.add('is-fixed'); }
           }
@@ -708,6 +843,7 @@
       reset: function () {
         if (call) return;
         list.innerHTML = '';
+        liveView = null; dots = null; hearing = null; clearTimeout(dotsOff);
         hideSummary();
         setState('idle');
       },
