@@ -4,7 +4,14 @@
  *   var call = ListenAgentCall.start({
  *     begin: () => fetch(...),        // asks Listen for the call: { token, ws, model, call_key, api, max_seconds, speaks_first }
  *     onState(state) {},              // connecting, waiting, listening, speaking, ended, busy, error, mic
- *     onTurn(turn) {},                // { role: 'agent' | 'caller', text }
+ *     onTurn(turn) {},                // { role: 'agent' | 'caller', text }; an agent line that showed as it
+ *                                     // was said has `live`, the n of its onWords
+ *     onWords(words) {},              // { n, text }: the agent's line so far, while it says it; { n, gone }
+ *                                     // when that line is dropped (said in the wrong language)
+ *     onHold(turn) {},                // a line being written again (transcribe, agent-line): its place in the
+ *                                     // chat now, its words with onTurn
+ *     onHear(on) {},                  // the caller has started a line (true: its place in the chat while they
+ *                                     // speak, filled by its onHold/onTurn), or it came to nothing (false)
  *     onLevel(agent, caller) {},      // loudness 0..1 of the agent and of the caller, every frame
  *     onTool(name, args, result) {},  // what the agent did (save_contact ...)
  *     onLinks(item) {},               // { links: [{ url, label, network }] }: the business's own links,
@@ -33,6 +40,14 @@
  * The agent's words: the live transcription of its own voice sometimes writes its Arabic in Latin
  * letters ("tfaḍḍal, kammil su'alak"). Such a line of an Arabic agent (arabic_lines) is written in
  * Arabic letters, word for word, before it shows (POST …/agent-line), the same way (onFix).
+ *
+ * The agent's words show as it says them (onWords). Its transcription comes at speaking pace, in uneven
+ * pieces; only whole words show (a word cut between two pieces waits for its end), a number read out
+ * digit by digit shows once it is whole, and nothing shows until the line is plainly in the call's
+ * language. They come a word at a time, about as fast as they are said and faster when more are
+ * waiting, so the line grows with the voice instead of appearing whole when the agent has finished
+ * (a real call's answers waited up to 13.7 s, then showed 171 letters at once). An Arabic agent's
+ * line that turns to Latin letters stops growing there and shows again when written in Arabic ones.
  *
  * The agent's language: a line it starts in a language it should not speak (a test call on live:
  * an Arabic agent answered in Spanish after three minutes) is stopped as soon as its first words
@@ -65,6 +80,12 @@
     'عشرة': '10', 'عشره': '10', 'حداشر': '11', 'احداشر': '11', 'إحداشر': '11', 'اتناشر': '12', 'إتناشر': '12', 'اطناشر': '12', 'اثناشر': '12', 'خمستاشر': '15', 'خمسطاشر': '15' };
   var INDIC = { '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9', '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9' };
   var EN_DIGITS = { zero: '0', oh: '0', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9' };
+  // The words at the end of a line still being said that may yet join a number (digits, or the
+  // words for them): they wait for the next word, so a number never shows half written.
+  var DIGIT_TAIL = (function () {
+    var words = Object.keys(AR_DIGITS).concat(Object.keys(EN_DIGITS), ['double', 'triple']).sort(function (a, b) { return b.length - a.length; }).join('|');
+    try { return new RegExp('(?:(?:^|\\s)(?:' + words + '|[+\\d][\\d\\-]*)[\\s،,\\-]*)+$', 'iu'); } catch (e) { return /(?:(?:^|\s)[+\d][\d\-]*[\s,\-]*)+$/; }
+  })();
   var spoken = (function () {
     var arAlt = Object.keys(AR_DIGITS).sort(function (a, b) { return b.length - a.length; }).join('|');
     var arSeq, arWord;
@@ -244,6 +265,8 @@
     // silence mid-word. Within a line a late piece plays at once (any wait would only lengthen a gap).
     var playHead = 0, sources = new Set(), voiceEndAt = 0, START_LEAD = 0.15;
     var info = null, pending = [], agentText = '', callerText = '', usage = null;
+    // The agent's line on the page while it says it: its number, its whole words, how many show.
+    var live = null, liveSeq = 0;
     var pingTimer = 0, stopTimer = 0, raf = 0;
     // The agent hangs up (end_call): what it is still saying plays to the end of its turn (closing; the
     // goodbye's last words can come after the hang-up), then nothing more (hungUp).
@@ -332,14 +355,68 @@
     }
     function turn(role, text) {
       text = spoken(String(text || '')).trim();
-      if (!text) return;
+      if (!text) {
+        if (role === 'agent') endLive(null);
+        else if (role === 'caller' && opts.onHear) opts.onHear(false);
+        return;
+      }
       var t = { role: role, text: isolate(text) };
+      if (role === 'agent') endLive(t);
       queue.push(t);
       if (role === 'agent') lastSaid = text;
       if (role === 'caller') { var k = tongue(text); if (k !== 'short') callerTongue = k; }
       if (role === 'caller' && info && info.transcribe && info.api) hearAgain(t, text);
-      if (role === 'agent' && info && info.arabic_lines && info.api && latinArabic(text)) writeAgain(t, text);
+      // An Arabic agent's line in Latin letters is written in Arabic ones; plainly English words to a
+      // caller who speaks English are English, and stay as they are.
+      if (role === 'agent' && info && info.arabic_lines && info.api && latinArabic(text) && !english(text)) writeAgain(t, text);
+      // A line being written again has its place in the chat now, before what is said after it.
+      if (t.wait && opts.onHold) opts.onHold(t);
       drain();
+    }
+    // What of the agent's line so far may show: its whole words, once it is plainly in the call's
+    // language, without the end of a number still being read out (whole: the line is said).
+    function liveUnits(text, whole) {
+      text = String(text || '');
+      if (!whole && !/[\s.,!?؟،؛…]$/.test(text)) text = text.replace(/\S+$/, '');
+      var k = tongue(spoken(text));
+      if ((k !== 'ar' && k !== 'en') || wrongTongue(text)) return null;
+      if (info && info.arabic_lines && latinArabic(text) && k !== 'en') return null;
+      text = spoken(text);
+      if (!whole) text = text.replace(DIGIT_TAIL, '');
+      text = isolate(text.trim());
+      return text ? text.match(/\u2066[^\u2069]*\u2069\S*|\S+/g) || [] : [];
+    }
+    function showLive() {
+      if (!opts.onWords || dropTurn) return;
+      var units = liveUnits(agentText, false);
+      if (!units || !units.length) return;
+      if (!live) live = { n: ++liveSeq, units: [], shown: 0, timer: 0 };
+      // Words already shown that read differently now (three digits written as one number): the line
+      // shows as it reads now from there.
+      var same = 0;
+      while (same < live.shown && same < units.length && units[same] === live.units[same]) same++;
+      live.units = units;
+      if (same < live.shown) { live.shown = same; opts.onWords({ n: live.n, text: units.slice(0, same).join(' ') }); }
+      if (!live.timer) nextWord();
+    }
+    // One more word: one every 0.38 s while one waits (about as fast as people speak), faster when more do.
+    function nextWord() {
+      var l = live;
+      if (!l) return;
+      l.timer = 0;
+      if (l.shown >= l.units.length) return;
+      l.shown++;
+      opts.onWords({ n: l.n, text: l.units.slice(0, l.shown).join(' ') });
+      var left = l.units.length - l.shown;
+      if (left > 0) l.timer = setTimeout(nextWord, Math.max(60, Math.min(380, 380 / left)));
+    }
+    // The line is said: what showed of it goes with its turn (t.live), or goes away when it is dropped.
+    function endLive(t) {
+      if (!live) return;
+      clearTimeout(live.timer);
+      if (live.shown && t) t.live = live.n;
+      else if (live.shown && opts.onWords) opts.onWords({ n: live.n, text: '', gone: true });
+      live = null;
     }
     // The agent's line in Arabic letters, word for word. It waits WAIT_FIX at most, like a caller's
     // line; a writing that comes later still replaces it on the page and in what Listen keeps.
@@ -510,6 +587,8 @@
       return false;
     }
     // The language the agent is asked to speak: the call's, or the caller's English (or Arabic).
+    // A line plainly in English that the call may have (the caller speaks English).
+    function english(text) { return tongue(spoken(String(text || ''))) === 'en' && !wrongTongue(text); }
     function callTongue() {
       var own = ownTongue();
       if (own === 'en') return callerTongue === 'ar' ? 'Arabic' : 'English';
@@ -522,6 +601,7 @@
       dropTurn = true;
       redone++;
       agentText = '';
+      endLive(null);
       overlap = [];
       hush();
       if (Date.now() - redoneAt < REDO_GAP || !ws || ws.readyState !== 1) return;
@@ -659,12 +739,17 @@
         if (sc.inputTranscription && sc.inputTranscription.text) {
           heardAt = Date.now(); nudged = 0; quietEndAt = 0;
           if (agentText.trim()) { turn('agent', agentText); agentText = ''; }
+          // A new line from the caller (its first real words, not a noise mark): its place in the chat
+          // now, while they speak.
+          var saidBefore = spoken(callerText).trim();
           callerText += sc.inputTranscription.text;
+          if (!saidBefore && spoken(callerText).trim() && opts.onHear) opts.onHear(true);
         }
         if (sc.outputTranscription && sc.outputTranscription.text && !hungUp && !dropTurn) {
           if (callerText.trim()) { turn('caller', callerText); callerText = ''; }
           agentText += sc.outputTranscription.text;
           if (redone < MAX_REDO && wrongTongue(agentText)) stopWrong();
+          else showLive();
         }
         (sc.modelTurn && sc.modelTurn.parts || []).forEach(function (p) { if (p.inlineData && p.inlineData.data) play(p.inlineData.data); });
         if (sc.turnComplete) { flushTurns(); dropTurn = false; if (closing) closingDone = true; }

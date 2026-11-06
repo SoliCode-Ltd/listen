@@ -545,7 +545,6 @@ BLADE],
         'background' => 'Background',
         'backgrounds' => ['office' => 'Quiet office', 'none' => 'None'],
         'background_hint' => 'Callers hear colleagues talking quietly far off, like a real office line. Your agent\'s voice stays clear.',
-        'background_try' => 'Hear the difference',
         'background_listen' => ['office' => 'Quiet office: play your agent\'s voice with the office behind it', 'none' => 'None: play your agent\'s voice with nothing behind it'],
         'styles' => [
             'orb' => ['Orb', 'Moves with the voice'],

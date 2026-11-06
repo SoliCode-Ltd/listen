@@ -368,6 +368,16 @@ html[dir="rtl"] .ag-input-url:placeholder-shown { direction: rtl; }
 .ag-bubble.is-agent + .ag-bubble.is-caller, .ag-bubble.is-caller + .ag-bubble.is-agent { margin-top: .5rem; }
 /* A line written again (from the caller's voice, or the agent's in Arabic letters) settles in softly. */
 .ag-bubble.is-fixed { animation: ag-fixed .5s ease; opacity: 1; transform: none; }
+/* The agent's words as it says them, each fading in as it comes; three dots hold a line's place
+   while the agent starts to speak, or while the caller speaks and their line is written. */
+.ag-w { animation: ag-word .34s ease both; }
+@keyframes ag-word { from { opacity: 0; } }
+.ag-bubble.is-typing { min-width: 64px; }
+.ag-dots { display: inline-flex; align-items: center; gap: 5px; height: 1.65em; }
+.ag-dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .28; animation: ag-dot 1.2s ease-in-out infinite; }
+.ag-dots i:nth-child(2) { animation-delay: .16s; }
+.ag-dots i:nth-child(3) { animation-delay: .32s; }
+@keyframes ag-dot { 0%, 70%, 100% { opacity: .22; transform: none; } 35% { opacity: .75; transform: translateY(-2px); } }
 @keyframes ag-fixed { from { opacity: .45; } }
 /* The business's own links, written in the chat when the caller asks for them (show_links). */
 .ag-bubble.is-links { min-width: min(300px, 86%); }
@@ -613,16 +623,17 @@ html[dir="rtl"] .ag-convo-more summary svg { transform: scaleX(-1); }
 .ag-design-field { display: grid; gap: .45rem; min-width: 0; }
 .ag-design-label { font-size: .84rem; font-weight: 700; color: var(--muted); }
 .ag-design-hint { margin: 0; font-size: .84rem; line-height: 1.65; }
-/* Call sound → Hear the difference: the agent's voice with the office behind it, or alone. The ring
-   round the mark fills as it plays, as round a voice's face in the voice picker. */
-.ag-sound-try { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; margin-top: .2rem; }
-.ag-sound-try[hidden] { display: none; }
-.ag-sound-try-label { font-size: .84rem; font-weight: 700; color: var(--muted); }
-.ag-sound-try-row { display: flex; flex-wrap: wrap; gap: .45rem; }
-.ag-sound-play { display: inline-flex; align-items: center; gap: .45rem; min-height: 40px; margin: 0; padding-block: 4px; padding-inline: 4px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--text); font: inherit; font-size: .86rem; font-weight: 700; line-height: 1.2; cursor: pointer; transition: border-color .2s ease, background .2s ease, color .2s ease; -webkit-tap-highlight-color: transparent; }
-.ag-sound-play:hover { border-color: color-mix(in srgb, var(--a) 40%, var(--line)); }
-.ag-sound-play:focus-visible { outline: 3px solid color-mix(in srgb, var(--a) 40%, transparent); outline-offset: 2px; }
-.ag-sound-play.is-playing, .ag-sound-play.is-loading { border-color: var(--a); background: color-mix(in srgb, var(--a) 9%, var(--bg)); color: var(--accent-text, var(--a)); }
+/* Call sound: each choice in one tile with its own play button at its end, to hear the agent's voice
+   with the office behind it or alone. The ring round the mark fills as it plays, as round a voice's
+   face in the voice picker. */
+.ag-sound-choice { position: relative; display: inline-flex; }
+.ag-sound-choice > .ag-choice > span { min-height: 46px; padding-inline: .9rem 50px; }
+.ag-sound-choices.is-silent .ag-sound-choice > .ag-choice > span { padding-inline-end: .9rem; }
+.ag-sound-play { position: absolute; top: 50%; inset-inline-end: 6px; display: grid; place-items: center; width: 36px; height: 36px; margin: -18px 0 0; padding: 0; border: 0; border-radius: 50%; background: none; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ag-sound-play[hidden] { display: none; }
+.ag-sound-play:focus-visible { outline: 3px solid color-mix(in srgb, var(--a) 40%, transparent); outline-offset: 1px; }
+.ag-sound-play .ag-sound-icon::before { transition: transform .18s ease; }
+.ag-sound-play:hover .ag-sound-icon::before { transform: scale(1.07); }
 .ag-sound-icon { position: relative; display: grid; place-items: center; width: 30px; height: 30px; flex: none; }
 .ag-sound-icon::before { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--a); }
 .ag-sound-glyph { position: relative; width: 12px; height: 12px; fill: #fff; }
