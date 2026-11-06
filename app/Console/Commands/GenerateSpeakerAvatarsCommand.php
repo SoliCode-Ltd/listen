@@ -23,6 +23,7 @@ class GenerateSpeakerAvatarsCommand extends Command
     protected $signature = 'speakers:avatars
         {--key= : Gemini API key (default: GEMINI_TTS_API_KEY)}
         {--only=* : Only these speaker names}
+        {--speaker=* : Only these speakers, as language:Name:gender (ar:Maha:female), without the database}
         {--force : Replace avatars that already exist}
         {--dry-run : Print the character descriptions without generating}
         {--pause=2 : Seconds between requests}';
@@ -52,6 +53,15 @@ class GenerateSpeakerAvatarsCommand extends Command
         'ar:Sawsan' => ['look' => 'Lebanese woman in her 30s, no hijab, shoulder-length wavy dark-brown hair, small gold earrings, mustard cardigan, amazed delighted expression, mouth slightly open'],
         'ar:Nawaf' => ['look' => 'Emirati man in his late 20s, white ghutra worn loosely without agal, white kandura, trimmed goatee, confident relaxed grin'],
         'ar:Aisha' => ['look' => 'Moroccan woman in her mid 20s, emerald-green hijab, embroidered beige top, big cheerful smile'],
+        // Speakers whose picked look came out as another's twin in the voice picker (the same scarf,
+        // colours and clothes): each has a look of their own.
+        'ar:Maha' => ['look' => 'Omani woman in her late 20s, a black shayla with a gold embroidered border worn loosely over dark hair, a deep burgundy dress with gold embroidery at the neck, small gold earrings, warm friendly smile'],
+        'ar:Noura' => ['look' => 'Saudi woman in her 40s, a black hijab, a dusty-blue abaya with silver embroidery, thin-framed glasses, calm gentle smile'],
+        'ar:Hamed' => ['look' => 'Emirati man in his 40s, a white ghutra worn loosely without an agal, a sand-beige kandura, a full dark beard touched with grey, no glasses, calm warm smile'],
+        'ar:Youssef' => ['look' => 'Arab man in his late 20s, short curly black hair, light stubble, a mustard knit sweater over a white collar, no glasses, playful grin'],
+        'ar:Hana' => ['look' => 'Arab woman in her 40s, a soft grey hijab with a thin patterned edge, a navy blazer over a white blouse, small pearl earrings, kind gentle smile'],
+        'ar:Wahiba' => ['look' => 'Algerian woman in her 40s, a mustard-yellow hijab, a deep teal top with fine embroidery, warm confident smile'],
+        'en:Finn' => ['look' => 'Irish man in his 40s, light skin, short ginger hair and a trimmed ginger beard, a cream cable-knit sweater, no glasses, hearty laugh'],
         // English hero
         'en:Daisy' => ['look' => 'American woman in her late 20s, light skin, freckles, auburn hair in a messy bun, denim jacket, excited wide smile'],
         'en:Theodore' => ['look' => 'British man in his 50s, light skin, neatly combed grey hair, clean-shaven, tweed blazer over a navy turtleneck, calm charming smile'],
@@ -77,8 +87,15 @@ class GenerateSpeakerAvatarsCommand extends Command
             : null;
 
         @mkdir(public_path(SpeakerAvatar::DIR), 0775, true);
-        $speakers = Voice::query()->where('is_active', true)->orderBy('language')->orderBy('display_name')->get(['display_name', 'language', 'gender'])
-            ->unique(fn (Voice $v): string => SpeakerAvatar::slug((string) $v->display_name, (string) $v->language));
+        $named = array_filter((array) $this->option('speaker'));
+        $speakers = $named !== []
+            ? collect($named)->map(function (string $s): Voice {
+                [$language, $name, $gender] = array_pad(explode(':', $s, 3), 3, '');
+
+                return (new Voice)->forceFill(['display_name' => $name, 'language' => $language, 'gender' => $gender]);
+            })
+            : Voice::query()->where('is_active', true)->orderBy('language')->orderBy('display_name')->get(['display_name', 'language', 'gender']);
+        $speakers = $speakers->unique(fn (Voice $v): string => SpeakerAvatar::slug((string) $v->display_name, (string) $v->language));
 
         $failed = 0;
         foreach ($speakers as $voice) {

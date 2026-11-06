@@ -1,0 +1,10 @@
+# Speaker avatars to make again (.github/workflows/speaker-avatars-make.yml), as language:Name:gender.
+# Each looked like another speaker's twin in the voice picker; their own looks are in
+# app/Console/Commands/GenerateSpeakerAvatarsCommand.php (CAST).
+ar:Maha:female
+ar:Noura:female
+ar:Hamed:male
+ar:Youssef:male
+ar:Hana:female
+ar:Wahiba:female
+en:Finn:male

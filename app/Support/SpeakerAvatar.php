@@ -11,7 +11,7 @@ final class SpeakerAvatar
 {
     public const DIR = 'images/speakers';
 
-    /** @var array<string, true>|null */
+    /** @var array<string, int>|null */
     private static ?array $files = null;
 
     public static function slug(string $name, string $language): string
@@ -41,18 +41,19 @@ final class SpeakerAvatar
             return null;
         }
 
-        return asset(self::DIR.'/'.$slug.'.webp').'?v=1';
+        // Its version is the file's time, so an avatar made again shows at once, never the old one cached.
+        return asset(self::DIR.'/'.$slug.'.webp').'?v='.self::files()[$slug];
     }
 
     /**
-     * @return array<string, true>
+     * @return array<string, int>
      */
     private static function files(): array
     {
         if (self::$files === null) {
             self::$files = [];
             foreach (glob(public_path(self::DIR.'/*.webp')) ?: [] as $file) {
-                self::$files[basename($file, '.webp')] = true;
+                self::$files[basename($file, '.webp')] = (int) @filemtime($file);
             }
         }
 
