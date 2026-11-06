@@ -23,10 +23,24 @@ class CallTranscriptTest extends TestCase
     {
         $call = $this->js('agent-call.js');
 
-        // The line so far while it speaks, one word at a time, about as fast as people speak and
-        // faster when more words are waiting.
+        // The line so far while it speaks, one word at a time, as far as its voice has played: its
+        // words come seconds before they are said, so they never show ahead of the voice.
         $this->assertStringContainsString("opts.onWords({ n: l.n, text: l.units.slice(0, l.shown).join(' ') });", $call);
-        $this->assertStringContainsString('Math.max(60, Math.min(380, 380 / left))', $call);
+        $this->assertStringContainsString('var due = Math.min(l.units.length, Math.round(l.units.length * voiced(l.voice)));', $call);
+        $this->assertStringContainsString('return Math.max(0, Math.min(1, (vctx.currentTime * vctx.sampleRate - v.from) / (v.to - v.from)));', $call);
+        $this->assertStringNotContainsString('380 / left', $call);
+        // Its turn comes while its voice still plays: the line waits for the voice (and the lines after it).
+        $this->assertStringContainsString('if (t && l.shown && voicing(l.voice)) {', $call);
+        $this->assertStringContainsString('while (queue.length && !queue[0].wait && !queue[0].hold) {', $call);
+        $this->assertStringContainsString('if (!t.hold && !t.live && voicing(v)) holdFor(t, v);', $call);
+        // Cut short: the line keeps only the words its voice reached.
+        $this->assertStringContainsString("if (overlap.length) { heard = heard.concat(overlap); overlap = []; }\n      cutVoice();", $call);
+        $this->assertStringContainsString("if (role === 'agent' && live && live.cut) text = plain(live.units.join(' '));", $call);
+        // The caller's words show in their bubble as they say them (whole words, plainly Arabic or English).
+        $this->assertStringContainsString('opts.onHearWords(isolate(text));', $call);
+        foreach (['agent-widget.js', 'agents.js'] as $card) {
+            $this->assertStringContainsString('onHearWords: hearWords', $this->js($card), $card);
+        }
         $this->assertStringContainsString("else showLive();", $call);
         // Only whole words: the transcription's last piece may be the start of a word.
         $this->assertStringContainsString("if (!whole && !/[\\s.,!?؟،؛…]$/.test(text)) text = text.replace(/\\S+$/, '');", $call);
@@ -37,8 +51,8 @@ class CallTranscriptTest extends TestCase
         // A number being read out digit by digit waits until it is whole.
         $this->assertStringContainsString("if (!whole) text = text.replace(DIGIT_TAIL, '');", $call);
         // Its end goes with its turn, in the same bubble; a dropped line takes its words away.
-        $this->assertStringContainsString('if (live.shown && t) t.live = live.n;', $call);
-        $this->assertStringContainsString("opts.onWords({ n: live.n, text: '', gone: true });", $call);
+        $this->assertStringContainsString('if (l.shown && t) t.live = l.n;', $call);
+        $this->assertStringContainsString("opts.onWords({ n: l.n, text: '', gone: true });", $call);
         $this->assertMatchesRegularExpression("/function stopWrong\\(\\) \\{\\s*dropTurn = true;\\s*redone\\+\\+;\\s*agentText = '';\\s*endLive\\(null\\);/", $call);
         // A plainly English answer to a caller who speaks English is not written in Arabic letters.
         $this->assertStringContainsString('latinArabic(text) && !english(text)) writeAgain(t, text);', $call);

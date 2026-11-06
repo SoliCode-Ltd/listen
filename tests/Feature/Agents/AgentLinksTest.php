@@ -4,6 +4,7 @@ namespace Tests\Feature\Agents;
 
 use App\Models\Agent;
 use App\Models\AgentConversation;
+use App\Models\AgentSource;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
@@ -279,5 +280,37 @@ class AgentLinksTest extends TestCase
             $result = $this->callApi("/calls/{$start->json('conversation')}/tool", ['call_key' => $start->json('call_key'), 'name' => 'show_links', 'args' => []])->json('result');
         }
         $this->assertSame('enough', $result);
+    }
+
+    public function test_a_caller_who_asks_for_one_page_gets_that_page_not_the_home_page(): void
+    {
+        Http::fake(['*auth_tokens' => Http::response(['name' => 'auth_tokens/live-key'])]);
+        $agent = $this->liveAgent(['links' => [['network' => 'website', 'url' => self::SITE]]]);
+        $tool = collect(LiveSession::tools($agent))->firstWhere('name', 'show_links');
+        $this->assertArrayHasKey('page', $tool['parameters']['properties']);
+        $this->assertStringContainsString('for one page of the website, such as the prices or booking page, set its page', AgentInstructions::build($agent));
+
+        // The pages read from the website: the one asked for is found by its address or its title.
+        foreach ([[self::SITE.'/', 'Home'], [self::SITE.'/membership/fees', 'رسوم العضوية'], [self::SITE.'/membership/fees/students', 'Student fees'], [self::SITE.'/contact-us', 'Contact']] as [$url, $title]) {
+            AgentSource::create(['agent_id' => $agent->id, 'kind' => AgentSource::PAGE, 'url' => $url, 'title' => $title, 'status' => AgentSource::READY, 'content' => 'x']);
+        }
+        $this->assertSame(self::SITE.'/membership/fees', AgentLinks::askedPage($agent, 'pricing')['url']);
+        $this->assertSame(self::SITE.'/membership/fees', AgentLinks::askedPage($agent, 'صفحة الرسوم')['url']);
+        $this->assertSame(self::SITE.'/contact-us', AgentLinks::askedPage($agent, 'contact')['url']);
+        // Nothing fits: no guess.
+        $this->assertNull(AgentLinks::askedPage($agent, 'careers'));
+
+        $start = $this->callApi('/calls', ['key' => $agent->mainWidget()->public_key, 'visitor' => 'v-page'])->assertOk();
+        [$id, $key] = [$start->json('conversation'), $start->json('call_key')];
+        $this->callApi("/calls/{$id}/tool", ['call_key' => $key, 'name' => 'show_links', 'args' => ['networks' => ['website'], 'page' => 'pricing']])->assertOk()
+            ->assertJsonPath('result', 'shown')->assertJsonPath('links.0.url', self::SITE.'/membership/fees');
+        $this->callApi("/calls/{$id}/tool", ['call_key' => $key, 'name' => 'show_links', 'args' => ['page' => 'careers']])->assertOk()
+            ->assertJsonPath('result', 'none')->assertJsonMissingPath('links');
+
+        // Listen's own agent writes Listen's own page, in its language.
+        $house = $this->liveAgent(['links' => [['network' => 'website', 'url' => self::SITE]], 'house' => 'ar']);
+        $this->assertStringEndsWith('/ar/pricing', AgentLinks::askedPage($house, 'pricing page')['url']);
+        $this->assertStringEndsWith('/ar/contact-us', AgentLinks::askedPage($house, 'صفحة التواصل')['url']);
+        $this->assertNull(AgentLinks::askedPage($house, 'careers'));
     }
 }

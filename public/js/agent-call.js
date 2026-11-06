@@ -44,9 +44,11 @@
  * The agent's words show as it says them (onWords). Its transcription comes at speaking pace, in uneven
  * pieces; only whole words show (a word cut between two pieces waits for its end), a number read out
  * digit by digit shows once it is whole, and nothing shows until the line is plainly in the call's
- * language. They come a word at a time, about as fast as they are said and faster when more are
- * waiting, so the line grows with the voice instead of appearing whole when the agent has finished
- * (a real call's answers waited up to 13.7 s, then showed 171 letters at once). An Arabic agent's
+ * language. They come a word at a time, as far as the agent's voice has gone (its words come
+ * seconds before its voice says them, and its turn ends while that voice still plays): the line
+ * grows with the voice, never ahead of it, and never shows whole before it is said (a real call's
+ * answers waited up to 13.7 s, then showed 171 letters at once). A line cut short (the caller
+ * talked over it) ends with the words its voice reached, on the page and in what Listen keeps. An Arabic agent's
  * line that turns to Latin letters stops growing there and shows again when written in Arabic ones.
  *
  * The agent's language: a line it starts in a language it should not speak (a test call on live:
@@ -358,6 +360,9 @@
     var info = null, pending = [], agentText = '', callerText = '', usage = null;
     // The agent's line on the page while it says it: its number, its whole words, how many show.
     var live = null, liveSeq = 0;
+    // The sound of the agent's line that is coming now (voice): the engine frames it plays from and
+    // to; each live line keeps its own. Lines whose turn came while their voice still plays (holding).
+    var voice = null, holding = [];
     var pingTimer = 0, stopTimer = 0, raf = 0;
     // The agent hangs up (end_call): what it is still saying plays to the end of its turn (closing; the
     // goodbye's last words can come after the hang-up), then nothing more (hungUp).
@@ -430,13 +435,20 @@
     }
     function turn(role, text) {
       text = spoken(String(text || '')).trim();
+      // Cut short: only the words its voice reached.
+      if (role === 'agent' && live && live.cut) text = plain(live.units.join(' '));
       if (!text) {
         if (role === 'agent') endLive(null);
         else if (role === 'caller' && opts.onHear) opts.onHear(false);
         return;
       }
       var t = { role: role, text: isolate(text) };
-      if (role === 'agent') endLive(t);
+      if (role === 'agent') {
+        var v = (live && live.voice) || voice;
+        endLive(t);
+        if (!t.hold && !t.live && voicing(v)) holdFor(t, v);
+        if (voice === v) voice = null;
+      }
       queue.push(t);
       if (role === 'agent') lastSaid = text;
       if (role === 'caller') { var k = tongue(text); if (k !== 'short') callerTongue = k; }
@@ -462,36 +474,104 @@
       return text ? text.match(/\u2066[^\u2069]*\u2069\S*|\S+/g) || [] : [];
     }
     function showLive() {
-      if (!opts.onWords || dropTurn) return;
+      if (!opts.onWords || dropTurn || (live && live.cut)) return;
       var units = liveUnits(agentText, false);
       if (!units || !units.length) return;
-      if (!live) live = { n: ++liveSeq, units: [], shown: 0, timer: 0 };
+      if (!live) live = { n: ++liveSeq, units: [], shown: 0, timer: 0, voice: voice || (voice = { from: -1, to: -1 }) };
       // Words already shown that read differently now (three digits written as one number): the line
       // shows as it reads now from there.
       var same = 0;
       while (same < live.shown && same < units.length && units[same] === live.units[same]) same++;
       live.units = units;
       if (same < live.shown) { live.shown = same; opts.onWords({ n: live.n, text: units.slice(0, same).join(' ') }); }
-      if (!live.timer) nextWord();
+      if (!live.timer) pace(live);
     }
-    // One more word: one every 0.38 s while one waits (about as fast as people speak), faster when more do.
-    function nextWord() {
-      var l = live;
-      if (!l) return;
+    // How much of a line's sound has played (0 to 1), and whether some of it is still to play. Its
+    // words come faster than it says them (a whole answer's text, then its turn, while its voice
+    // plays on for seconds), so they show as far as its voice has gone, never ahead of it.
+    function voiced(v) {
+      if (!v || v.from < 0 || !vctx) return 0;
+      if (v.cut || v.to <= v.from) return 1;
+      return Math.max(0, Math.min(1, (vctx.currentTime * vctx.sampleRate - v.from) / (v.to - v.from)));
+    }
+    function voicing(v) { return !!(v && v.from >= 0 && !v.cut && vctx && vctx.currentTime * vctx.sampleRate < v.to); }
+    // The next word once the voice has reached it: the share of the words that the share of the
+    // sound played says (a word at a time, each with its fade). A line whose turn came (l.done) ends
+    // when its voice does.
+    function pace(l) {
+      clearTimeout(l.timer);
       l.timer = 0;
-      if (l.shown >= l.units.length) return;
-      l.shown++;
-      opts.onWords({ n: l.n, text: l.units.slice(0, l.shown).join(' ') });
-      var left = l.units.length - l.shown;
-      if (left > 0) l.timer = setTimeout(nextWord, Math.max(60, Math.min(380, 380 / left)));
+      var due = Math.min(l.units.length, Math.round(l.units.length * voiced(l.voice)));
+      if (due > l.shown) {
+        l.shown++;
+        opts.onWords({ n: l.n, text: l.units.slice(0, l.shown).join(' ') });
+      }
+      if (l.done && (l.shown >= l.units.length || !voicing(l.voice))) return said(l);
+      if (l.shown < l.units.length) l.timer = setTimeout(pace, l.shown < due ? 70 : 110, l);
     }
-    // The line is said: what showed of it goes with its turn (t.live), or goes away when it is dropped.
+    // The line is said: what showed of it goes with its turn (t.live), or goes away when it is
+    // dropped. A turn that came while its voice still plays waits for it (t.hold), and the lines after it.
     function endLive(t) {
       if (!live) return;
-      clearTimeout(live.timer);
-      if (live.shown && t) t.live = live.n;
-      else if (live.shown && opts.onWords) opts.onWords({ n: live.n, text: '', gone: true });
+      var l = live;
       live = null;
+      if (voice === l.voice) voice = null;
+      clearTimeout(l.timer);
+      l.timer = 0;
+      if (t && l.shown && voicing(l.voice)) {
+        var whole = liveUnits(plain(t.text), true);
+        if (whole && whole.length) l.units = whole;
+        l.done = t;
+        t.hold = true;
+        holding.push(l);
+        pace(l);
+        return;
+      }
+      if (l.shown && t) t.live = l.n;
+      else if (l.shown && opts.onWords) opts.onWords({ n: l.n, text: '', gone: true });
+    }
+    function said(l) {
+      clearTimeout(l.timer);
+      l.timer = 0;
+      var i = holding.indexOf(l);
+      if (i >= 0) holding.splice(i, 1);
+      var t = l.done;
+      if (!t || !t.hold) return;
+      t.hold = false;
+      if (l.shown) t.live = l.n;
+      drain();
+    }
+    // A turn with no live words whose voice still plays (a line being written in Arabic letters):
+    // it shows when its voice ends.
+    function holdFor(t, v) {
+      t.hold = true;
+      (function wait() {
+        if (!t.hold) return;
+        if (voicing(v)) { setTimeout(wait, 150); return; }
+        t.hold = false;
+        drain();
+      })();
+    }
+    // The agent was cut short (the caller talked over it): its line on the page and in what Listen
+    // keeps ends with the words its voice had reached, never the ones it did not say.
+    function cutVoice() {
+      var reached = function (l) {
+        var due = Math.min(l.units.length, Math.max(l.shown, Math.round(l.units.length * voiced(l.voice))));
+        l.voice.cut = true;
+        if (due > l.shown) { l.shown = due; opts.onWords({ n: l.n, text: l.units.slice(0, due).join(' ') }); }
+        l.units = l.units.slice(0, l.shown);
+        l.cut = true;
+        clearTimeout(l.timer);
+        l.timer = 0;
+      };
+      if (live && !live.cut) reached(live);
+      if (voice) voice.cut = true;
+      holding.slice().forEach(function (l) {
+        var t = l.done, all = l.units.length;
+        reached(l);
+        if (t && l.shown < all) { t.text = l.units.join(' '); lastSaid = plain(t.text); }
+        said(l);
+      });
     }
     // The agent's line in Arabic letters, word for word. It waits WAIT_FIX at most, like a caller's
     // line; a writing that comes later still replaces it on the page and in what Listen keeps.
@@ -518,7 +598,7 @@
     }
     // The lines in their order: a caller line waiting for its better writing holds the ones after it.
     function drain() {
-      while (queue.length && !queue[0].wait) {
+      while (queue.length && !queue[0].wait && !queue[0].hold) {
         var t = queue.shift();
         t.shown = true;
         if (t.role === 'links') {
@@ -536,7 +616,8 @@
       }
     }
     function release() {
-      queue.forEach(function (t) { t.wait = false; });
+      holding.slice().forEach(said);
+      queue.forEach(function (t) { t.wait = false; t.hold = false; });
       drain();
     }
     // The caller's line written again from their voice, in the agent's dialect. It waits WAIT_FIX
@@ -594,6 +675,21 @@
         for (var m = 0; m + 1 < p.length; m += 2) out[at++] = (p[m] + p[m + 1]) >> 1;
       }
       return { data: b64(out.buffer.slice(0, at * 2)), rate: half ? 8000 : 16000 };
+    }
+    // The caller's words in their bubble as they say them (onHearWords), whole words only, when they
+    // are plainly Arabic or English: their bubble no longer waits with dots while the agent's answer
+    // already shows. Their line written again from their voice (hearAgain) puts the better words in place.
+    // A line in Latin letters that is not plainly English (an Arabic dialect, or another language) waits
+    // for its writing again.
+    function heardWords() {
+      if (!opts.onHearWords) return;
+      var text = spoken(callerText);
+      if (!/[\s.,!?؟،؛…]$/.test(text)) text = text.replace(/\S+$/, '');
+      text = text.trim();
+      if (!text) return;
+      var k = tongue(text);
+      if (k === 'latin' || k === 'other' || (k === 'short' && !/[\u0600-\u06FF]/.test(text) && ownTongue() !== 'en')) return;
+      opts.onHearWords(isolate(text));
     }
     // A caller line whose words came late: it ends (endLate) after its last piece, before the agent's line.
     function endLate() {
@@ -656,6 +752,9 @@
       var at = Math.max(Math.ceil((vctx.currentTime + (fresh ? START_LEAD : 0.03)) * R), playFrame);
       src.start(at / R);
       playFrame = at + Math.round(b.duration * R);
+      // The line's sound: a new one when the voice starts again after a pause, else it grows.
+      if (!voice || (fresh && voice.from >= 0)) { voice = { from: at, to: playFrame }; if (live && !live.cut) live.voice = voice; }
+      else { if (voice.from < 0) voice.from = at; voice.to = playFrame; }
       sources.add(src);
       heardAt = Date.now();
       src.onended = function () {
@@ -781,6 +880,7 @@
     function hush() {
       // The caller talked over the agent: what the microphone heard just before is their voice.
       if (overlap.length) { heard = heard.concat(overlap); overlap = []; }
+      cutVoice();
       sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
       sources.clear();
       voiceEndAt = Date.now();
@@ -846,6 +946,7 @@
           var saidBefore = spoken(callerText).trim();
           callerText += sc.inputTranscription.text;
           if (!saidBefore && spoken(callerText).trim() && opts.onHear) opts.onHear(true, late);
+          heardWords();
           if (late) { lateCaller = true; clearTimeout(lateTimer); lateTimer = setTimeout(endLate, LATE_GAP); }
         }
         if (sc.outputTranscription && sc.outputTranscription.text && !hungUp && !dropTurn) {

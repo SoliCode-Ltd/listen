@@ -677,6 +677,25 @@
       // They started speaking now: after everything said before (an answer they talk over included).
       place(hearing, before);
     }
+    // Their words as they say them (onHearWords): the dots give way to them, a word at a time.
+    function hearWords(text) {
+      if (!hearing) hear(true);
+      var box = hearing;
+      follow(function () {
+        var w = box.querySelector('.ag-words');
+        if (!w) {
+          box.className = 'ag-bubble is-caller';
+          box.removeAttribute('aria-hidden');
+          var d = box.querySelector('.ag-dots');
+          w = document.createElement('span');
+          w.className = 'ag-words';
+          if (d) box.replaceChild(w, d); else box.appendChild(w);
+          box.__text = '';
+        }
+        grow(w, box.__text || '', text);
+        box.__text = text;
+      });
+    }
     function hold(t) {
       if (t.role !== 'caller') return;
       if (!hearing) hear(true);
@@ -688,6 +707,12 @@
       var box = t.box || hearing;
       if (t.box) t.box = null; else hearing = null;
       if (!box || !box.parentNode) return null;
+      // Words already there (as they were said): the line carries on from them, or is written anew.
+      var said = box.querySelector('.ag-words');
+      if (said) {
+        follow(function () { grow(said, box.__text || '', t.text); box.__text = ''; });
+        return said;
+      }
       var span = document.createElement('span');
       span.className = 'ag-words';
       var w = document.createElement('span');
@@ -803,6 +828,7 @@
         onWords: words,
         onHold: hold,
         onHear: hear,
+        onHearWords: hearWords,
         // The caller's line written again from their voice, in the agent's dialect; an agent line
         // that came out in Latin letters, in Arabic ones.
         onFix: function (t) {
