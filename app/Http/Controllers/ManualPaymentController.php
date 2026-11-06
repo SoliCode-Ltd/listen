@@ -6,6 +6,7 @@ use App\Http\Middleware\CaptureAdClickId;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\ManualUpgrade;
 use App\Services\Billing\PlanChanges;
 use App\Services\LocalizedPricingService;
 use App\Services\ManualPaymentService;
@@ -19,6 +20,7 @@ class ManualPaymentController extends Controller
         private readonly ManualPaymentService $manualPaymentService,
         private readonly CharPackService $charPacks,
         private readonly PlanChanges $planChanges,
+        private readonly ManualUpgrade $manualUpgrade,
     ) {}
 
     /**
@@ -78,7 +80,56 @@ class ManualPaymentController extends Controller
             $quote['interval'] = null;
         }
 
-        return $quote;
+        return $quote !== null && $user && ! $plan->isPack()
+            ? $this->withUpgradeCredit($quote, $user, $plan, (string) $validated['billing_cycle'])
+            : $quote;
+    }
+
+    /**
+     * Moving up from a plan paid by hand costs what a card upgrade costs: the new
+     * plan's price less what is left of the current one (ManualUpgrade). When what is
+     * left is worth as much as the new plan, the team moves the member up instead.
+     *
+     * @param  array<string, mixed>  $quote
+     * @return array<string, mixed>
+     */
+    private function withUpgradeCredit(array $quote, User $user, Plan $plan, string $cycle): array
+    {
+        $currency = (string) ($quote['currency'] ?? '');
+        $credit = $this->manualUpgrade->credit($user, $plan, $cycle, $currency);
+        if ($credit === null) {
+            return $quote;
+        }
+
+        $price = (int) ($quote['amount_minor'] ?? 0);
+        if ($credit['credit_minor'] >= $price) {
+            return $quote + ['upgrade_by_team' => true];
+        }
+
+        $from = Plan::query()->find($credit['from_plan_id']);
+        $locale = app()->getLocale();
+        $rebuilt = $this->localizedPricingService->buildQuote($price - $credit['credit_minor'], $currency, (string) ($quote['cycle'] ?? $cycle), (string) ($quote['method'] ?? ''), $locale);
+
+        return array_merge($quote, $rebuilt, [
+            // What the new plan's period is worth, for a later upgrade from it.
+            'period_value_minor' => $price,
+            'price_formatted' => (string) ($quote['amount_formatted'] ?? ''),
+            'upgrade' => $credit + [
+                'credit_formatted' => $this->localizedPricingService->formatAmount($credit['credit_minor'], $currency, $locale),
+                'from_plan_name' => $from ? ($from->getLocalizedName($locale) ?: (string) $from->name) : '',
+            ],
+        ]);
+    }
+
+    /** The member is told the team moves them up, when what is left of their plan covers the new one. */
+    private function upgradeByTeamResponse(Request $request)
+    {
+        $message = __('ui.billing.manual_upgrade_by_team');
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => false, 'message' => $message], 409);
+        }
+
+        return redirect()->route('billing.page')->withErrors(['manual_payment' => $message]);
     }
 
     public function instructions(Request $request)
@@ -104,6 +155,9 @@ class ManualPaymentController extends Controller
         $quote = $this->quote($plan, $validated, $countryContext, $request->user());
 
         abort_if($quote === null, 404);
+        if (! empty($quote['upgrade_by_team'])) {
+            return $this->upgradeByTeamResponse($request);
+        }
 
         $pendingRequest = $this->manualPaymentService->latestPendingRequest(
             $request->user(),
@@ -172,6 +226,9 @@ class ManualPaymentController extends Controller
                     'payment_method' => $validated['payment_method'],
                 ])
                 ->withErrors(['payment_method' => __('ui.billing.manual_payment_not_available')]);
+        }
+        if (! empty($quote['upgrade_by_team'])) {
+            return $this->upgradeByTeamResponse($request);
         }
 
         try {
