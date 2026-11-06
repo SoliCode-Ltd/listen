@@ -499,6 +499,8 @@
           'test' => route('voice-agents.test-call', $agent), 'correct' => route('voice-agents.correct', $agent),
           'write' => route('voice-agents.write', $agent), 'edit' => route('voice-agents.edit', $agent),
           'links' => route('voice-agents.links', $agent), 'link_reads' => route('voice-agents.links.reads', $agent),
+          // Knowledge → Your website: without it "Read the website again" is never wired up (agents.js yourSite).
+          'site' => route('voice-agents.site', $agent),
         ],
       ],
       'regions' => collect(\App\Support\ArabicDialects::ALL)->map(fn ($d) => $d['region'])->all(),
@@ -530,6 +532,8 @@
             ],
           ],
           'text' => ['saving' => __('agents.design.saving'), 'saved' => __('agents.design.saved'), 'failed' => __('agents.design.failed')],
+          // Design → Call sound → Hear the difference: the agent's voice with the office behind it, as in a call.
+          'sound' => \App\Support\Agents\CallBackground::sound('office'),
         ];
       })(),
       'text' => [

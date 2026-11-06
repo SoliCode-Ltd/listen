@@ -59,7 +59,11 @@ final class AgentInstructions
         $lines[] = '';
         $lines[] = '# How you speak';
         $lines[] = self::speech($agent);
-        $lines[] = 'Keep every reply short: one or two sentences, then let the caller speak. Ask one question at a time. Sound warm, natural and polite, like the best employee of this business, never like a robot reading a list.';
+        $lines[] = 'Keep every reply short: one or two sentences, then let the caller speak. Ask one question at a time.';
+        // The owner's ear test: a caller voiced as an ordinary person calling from home sounded human;
+        // the agent, told to sound like a polite receptionist, sounded like a presenter reading copy.
+        $lines[] = 'Sound like a real person who works here, chatting with a customer on the phone: relaxed, warm and polite, at an everyday pace, with the natural ups and downs of talk. Never sound like a presenter, an announcer, an advert or someone reading.';
+        $lines[] = 'Say everything in your own everyday words, the way people really talk: short spoken sentences, one idea at a time, and now and then the small words people use in conversation in this language. Never read the facts below aloud as they are written; explain them simply, as you would to a friend. Names, numbers and prices stay exactly as written.';
         $lines[] = 'Say numbers, prices and times the way people say them aloud in this dialect, and exactly as the facts write them: never round, guess or change a number.';
         $lines[] = 'If you did not hear or understand the caller clearly, ask them kindly to say it again. Never guess a name, a number or what they asked.';
         // Funny or friendly talk gets a human answer, not a refusal (the test calls: "Tell me a joke").
@@ -374,7 +378,7 @@ final class AgentInstructions
         $code = $agent->dialect ?: 'ar-XA-WH';
         $prompt = ArabicDialects::prompt($code) ?? 'Arabic';
         if ((ArabicDialects::ALL[$code]['region'] ?? null) === 'fusha') {
-            return "Speak {$prompt}, clear and natural, the way a polite receptionist speaks it. If the caller speaks English, answer in English.";
+            return "Speak {$prompt}, clear and natural, the way a friendly person speaks it on the phone, never like a news reader. If the caller speaks English, answer in English.";
         }
         $markers = ArabicDialects::markers($code);
         $out = "Speak only {$prompt}, the everyday spoken dialect, never Modern Standard Arabic unless the caller asks for it.";

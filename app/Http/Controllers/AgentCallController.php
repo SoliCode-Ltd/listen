@@ -8,6 +8,7 @@ use App\Services\Agents\AgentCalls;
 use App\Services\Agents\GeminiClient;
 use App\Support\Agents\AgentAccess;
 use App\Support\Agents\AgentVoices;
+use App\Support\Agents\CallBackground;
 use App\Support\Agents\CallerIdentity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Listen Agents, the callers' side: the agent's link page (/talk/{slug}), the
@@ -414,7 +416,28 @@ class AgentCallController extends Controller
             'speaks' => \App\Support\Agents\AgentInstructions::speaks($agent),
             'api' => url('/agent-api/calls/'.$c->public_id),
             'agent' => ['name' => $agent->name, 'language' => $agent->language],
+            // What the caller hears behind the agent's voice (Design → Call sound): a quiet office
+            // by default, or nothing. A test call or a demo follows the agent's first call button.
+            'background' => CallBackground::for($c->agent_widget_id ? $c->widget : $agent->widgets()->oldest('id')->first()),
         ];
+    }
+
+    /**
+     * A call's background sound (CallBackground), for the websites a call button is on: open to any
+     * website and the same for all of them, so browsers and caches keep it (the address carries
+     * the file's version).
+     */
+    public function sound(string $name): BinaryFileResponse
+    {
+        $path = CallBackground::path($name);
+        abort_unless($path !== null && is_file($path), 404);
+
+        return response()->file($path, [
+            'Content-Type' => 'audio/mpeg',
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+            'Access-Control-Allow-Origin' => '*',
+            'Cross-Origin-Resource-Policy' => 'cross-origin',
+        ]);
     }
 
     /**

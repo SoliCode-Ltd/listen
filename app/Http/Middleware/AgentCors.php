@@ -15,6 +15,11 @@ class AgentCors
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // A call's background sound is the same file for every website and says so itself
+        // (AgentCallController::sound): no Origin echoed, so caches keep one copy for all.
+        if ($request->is('agent-api/sounds/*')) {
+            return $next($request);
+        }
         $response = $request->isMethod('OPTIONS') ? response('', 204) : $next($request);
         $origin = $request->headers->get('Origin');
         if ($origin) {

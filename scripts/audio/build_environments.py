@@ -13,11 +13,14 @@ Builds the sound environment assets in resources/audio/environments/:
                    brought to -20 LUFS. Crowds are made from Listen's own
                    showcase voices, layered until no word can be followed.
 
+and the office that agents' calls play behind the agent's voice (office()):
+resources/audio/agents/office.mp3, the same colleagues as bed/office.flac.
+
 Everything here is generated, so the files are Listen's own.
 
 Run once, then commit the files:
   pip install pyroomacoustics soundfile scipy numpy
-  python3 scripts/audio/build_environments.py
+  python3 scripts/audio/build_environments.py          (or: rooms, beds, office)
 """
 
 import os
@@ -27,7 +30,7 @@ import sys
 import numpy as np
 import pyroomacoustics as pra
 import soundfile as sf
-from scipy.signal import butter, fftconvolve, sosfilt
+from scipy.signal import butter, fftconvolve, sosfilt, welch
 
 FS = 44100
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -287,8 +290,9 @@ def seamless(x, fade_s=2.0):
     return np.concatenate([body, tail * ramp[::-1] + head * ramp])
 
 
-def write_bed(name, x):
-    x = seamless(x)
+def write_bed(name, x, join=True):
+    if join:
+        x = seamless(x)
     x = x / (np.abs(x).max() + 1e-9) * 0.5
     gain = 10 ** ((-20 - loudness(x)) / 20)
     x = x * gain
@@ -356,9 +360,146 @@ def build_beds():
     write_bed('static', hiss * (1 + 0.5 * smooth_random(n, 2)) + bp(crackle, lo=800, hi=5000) + 0.05 * hum * np.abs(hiss).max())
 
 
+# ---------- the office ----------
+
+# How the background of a quiet office line spreads its energy, measured on a real call: the share
+# (%) of each band below. Most of it sits where far-off voices are (120-800 Hz) and almost none above
+# 3 kHz, so no word, key or tick ever stands out, while the agent's voice stays clear on top. Also
+# measured there: how far the level dips in its lulls (its quietest tenth sits about 9 dB under the
+# average), because only now and then are several people talking at once.
+OFFICE_BANDS = [(0, 120), (120, 300), (300, 800), (800, 1500), (1500, 3000), (3000, 6000), (6000, 22050)]
+OFFICE_PROFILE = [12.0, 44.55, 32.9, 6.95, 2.8, 0.6, 0.3]
+# The conversations people have at the other desks: the site's own two-voice scenes and real call
+# exchanges (not the theatre pieces).
+CONVERSATIONS = [os.path.join(ROOT, 'public', 'audio', 'showcase'), os.path.join(ROOT, 'public', 'audio', 'agents', 'calls')]
+AGENTS = os.path.join(ROOT, 'resources', 'audio', 'agents')
+# The call background's loop sits between these two points of its file (seconds); the file holds a
+# little more on each side, so a player that keeps an MP3's first silent frames still loops cleanly.
+OFFICE_RATE, OFFICE_PAD = 24000, 0.5
+
+
+def shares(x):
+    f, p = welch(x, FS, nperseg=4096)
+    return [100 * p[(f >= lo) & (f < hi)].sum() / p.sum() for lo, hi in OFFICE_BANDS]
+
+
+def rms(x):
+    return float(np.sqrt(np.mean(np.square(x))) + 1e-12)
+
+
+def office():
+    """
+    An open-plan office heard from one desk (where the agent's headset is): five other desks 5 to 12 m
+    away in a 16 x 11 x 3 m room (carpet, an acoustic ceiling, plasterboard and glass), each with people
+    having a real conversation, pausing, going quiet for a while, then talking again; the building's hum
+    and a soft low rumble underneath. Every voice is in the room at its own distance (its direct sound
+    and its reflections, simulated with the room's materials and the air), and the tone is shaped only
+    gently: no steep filters, which smear the start of every word and make voices sound watery.
+
+    Against the measured office line: within two points of its energy in every band (the same below 120 Hz),
+    its loud moments and quiet spells within 0.3 dB (an earlier version, six people reading without a break,
+    was a steady wall).
+
+    Two files: bed/office.flac for the studio (stereo, the desk's two microphones) and
+    resources/audio/agents/office.mp3 for agents' calls (mono, 24 kHz, 64 kbps, a 120 s loop padded with
+    OFFICE_PAD on each side; App\\Support\\Agents\\CallBackground knows its level and loop).
+    """
+    rng = np.random.default_rng(7)
+    # The settings that measured closest to the measured office line (OFFICE_PROFILE, its speech rhythm
+    # and its swings), found by trying 288 mixes of desks, distance, lulls, rumble and tone.
+    seconds, lull, rumble, top = 123, 1.75, 0.34, 4200
+    n = seconds * FS
+    pool = sorted(os.path.join(CONVERSATIONS[0], f) for f in os.listdir(CONVERSATIONS[0]) if f.startswith('dlg-') and f.endswith('.mp3') and not any(k in f for k in ('ghost', 'drama')))
+    pool += sorted(os.path.join(CONVERSATIONS[1], f) for f in os.listdir(CONVERSATIONS[1]) if f.endswith('.mp3'))
+    clips = []
+    for path in pool:
+        x = load_voice(path)
+        on = np.nonzero(np.abs(x) > 0.01)[0]
+        if len(on) < FS:
+            continue
+        x = x[max(0, on[0] - 2000): on[-1] + 2000]
+        clips.append(x / rms(x))
+    rng.shuffle(clips)
+
+    dims = [16.0, 11.0, 3.0]
+    materials = {'east': mat('glass_window', 0.1), 'west': mat('plasterboard', 0.2), 'north': mat('plasterboard', 0.2),
+                 'south': mat('glass_window', 0.1), 'floor': mat('carpet_tufted_9.5mm', 0.2), 'ceiling': mat('ceiling_fissured_tile', 0.2)}
+    mic = np.array([2.2, 5.5, 1.2])
+    desks = [np.array(p) for p in ([6.5, 3.0, 1.2], [8.0, 8.4, 1.25], [10.5, 5.2, 1.2], [12.8, 2.6, 1.3], [13.5, 8.8, 1.2])]
+
+    def heard_at_desk(src):
+        room = pra.ShoeBox(dims, fs=FS, materials=materials, max_order=12, ray_tracing=True, air_absorption=True)
+        room.set_ray_tracing(receiver_radius=0.5, n_rays=12000, energy_thres=1e-7)
+        room.add_source(src)
+        room.add_microphone_array(np.c_[mic - [0, 0.2, 0], mic + [0, 0.2, 0]])
+        room.compute_rir()
+        m = max(len(room.rir[0][0]), len(room.rir[1][0]))
+        return np.stack([np.pad(room.rir[c][0], (0, m - len(room.rir[c][0]))) for c in range(2)], axis=1)
+
+    mix, k = np.zeros((n, 2)), 0
+    for src in desks:
+        line = np.zeros(n)
+        at = int(rng.uniform(0, 8) * FS)
+        while at < n:
+            c = clips[k % len(clips)]
+            k += 1
+            # A piece of their conversation, 6 to 20 s, faded in and out over 50 ms.
+            ln = int(min(len(c), rng.uniform(6, 20) * FS))
+            s0 = int(rng.uniform(0, max(1, len(c) - ln)))
+            seg = c[s0:s0 + ln] * np.r_[np.linspace(0, 1, 2205), np.ones(max(0, ln - 4410)), np.linspace(1, 0, 2205)][:ln]
+            end = min(n, at + ln)
+            line[at:end] += seg[: end - at]
+            # A pause before they talk again; now and then the desk goes quiet for a while.
+            at = end + int((rng.uniform(2, 7) if rng.random() > 0.25 else rng.uniform(10, 25)) * lull * FS)
+        h = heard_at_desk(src)
+        mix += np.stack([fftconvolve(line, h[:, ch])[:n] for ch in range(2)], axis=1) * 10 ** (rng.uniform(-3, 2) / 20)
+
+    tone, _ = sf.read(os.path.join(OUT, 'bed', 'room_tone.flac'))
+    tone = np.tile(tone, (int(np.ceil(n / len(tone))), 1))[:n]
+    mix = mix / rms(mix.mean(axis=1)) + 0.18 * tone / rms(tone.mean(axis=1))
+    mix = sosfilt(np.vstack([butter(2, 140, 'high', fs=FS, output='sos'), butter(2, top, 'low', fs=FS, output='sos')]), mix, axis=0)
+    low = np.cumsum(rng.standard_normal((n, 2)), axis=0)
+    low = sosfilt(np.vstack([butter(2, 30, 'high', fs=FS, output='sos'), butter(2, 110, 'low', fs=FS, output='sos')]), low, axis=0)
+    mix = mix + rumble * low / rms(low.mean(axis=1)) * rms(mix.mean(axis=1))
+    # A loop that never jumps: the last 3 s fade into the first.
+    fade = 3 * FS
+    mix[:fade] = mix[:fade] * np.linspace(0, 1, fade)[:, None] + mix[-fade:] * np.linspace(1, 0, fade)[:, None]
+    mix = mix[:-fade]
+    mono = mix.mean(axis=1)
+    w = int(0.05 * FS)
+    e = 10 * np.log10((mono[: len(mono) // w * w].reshape(-1, w) ** 2).mean(axis=1) + 1e-20)
+    print('office bands', [round(v, 1) for v in shares(mono)], 'measured', OFFICE_PROFILE,
+          f' lulls {np.percentile(e, 10) - 10 * np.log10(np.mean(mono ** 2)):+.1f} dB (measured about -9)')
+
+    write_bed('office', mix, join=False)
+
+    # The call's file: 24 kHz, taken from the middle of three copies so the loop has no seam, at an
+    # RMS of 0.05, 64 kbps (32 kbps left a watery swirl on the voices).
+    step = len(mono) * OFFICE_RATE // FS
+    tmp = os.path.join(AGENTS, '.tmp')
+    os.makedirs(AGENTS, exist_ok=True)
+    sf.write(tmp + '-in.wav', np.tile(mono, 3).astype(np.float32), FS, subtype='FLOAT')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', tmp + '-in.wav', '-af', f'aresample={OFFICE_RATE}:resampler=soxr:precision=28',
+                    '-c:a', 'pcm_f32le', tmp + '-out.wav'], check=True)
+    loop, _ = sf.read(tmp + '-out.wav')
+    loop = loop[step:2 * step]
+    loop = loop / rms(loop) * 0.05
+    pad = int(OFFICE_PAD * OFFICE_RATE)
+    sf.write(tmp + '-call.wav', np.concatenate([loop[-pad:], loop, loop[:pad]]).astype(np.float32), OFFICE_RATE, subtype='FLOAT')
+    target = os.path.join(AGENTS, 'office.mp3')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', tmp + '-call.wav', '-c:a', 'libmp3lame', '-b:a', '64k', '-ac', '1', target], check=True)
+    for f in ('-in.wav', '-out.wav', '-call.wav'):
+        os.remove(tmp + f)
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', target, '-f', 'f32le', '-ac', '1', '-ar', str(OFFICE_RATE), '-'], capture_output=True, check=True).stdout
+    heard = np.frombuffer(raw, dtype=np.float32)[pad:pad + step]
+    print(f'call office.mp3  loop {OFFICE_PAD}s to {OFFICE_PAD + step / OFFICE_RATE:.3f}s  rms {rms(heard):.4f}  peak {np.abs(heard).max():.3f}  {os.path.getsize(target) // 1024} KB')
+
+
 if __name__ == '__main__':
     what = sys.argv[1] if len(sys.argv) > 1 else 'all'
     if what in ('all', 'rooms'):
         build_rooms()
     if what in ('all', 'beds'):
         build_beds()
+    if what in ('all', 'office'):
+        office()

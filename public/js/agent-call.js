@@ -38,6 +38,14 @@
  * an Arabic agent answered in Spanish after three minutes) is stopped as soon as its first words
  * show it, never written in the chat, and the agent is asked to say it again in the call's
  * language (speaks). tongue() sorts a line the same way as App\Support\Agents\Tongue.
+ *
+ * The office behind the agent (background, App\Support\Agents\CallBackground; Design → Call
+ * sound): colleagues talking quietly far off, as on a real office line. A seamless loop played
+ * straight to the speaker, apart from the agent's own sound (the orb and the level never move with
+ * it) and steady, never dipping while the agent speaks; it fades in as the call connects and out
+ * as it ends. It sits `under` dB below the agent's voice, as that voice is heard on this call
+ * (officeLevel); Design → Call sound → Hear the difference plays the agent's preview line with the
+ * office at the same depth, measured the same way (spokenPower).
  */
 (function () {
   'use strict';
@@ -153,6 +161,31 @@
   // How long a caller line waits for its better writing (ms), and how loud a 0.1 s piece of the
   // microphone must be to count as speech (16-bit RMS; a quiet room under noise suppression is ~100).
   var WAIT_FIX = 3500, VOICED = 450;
+  // The agent's voice on a call, before it has said a word (RMS of its spoken 0.05 s pieces; a real
+  // call measured -15 dBFS): the background starts under this, then follows the voice as it is heard.
+  var VOICE_USUAL = 0.178;
+  // A 0.05 s piece of the agent's voice counts as speech when louder than -40 dBFS (its mean power).
+  var SPOKEN = 1e-4;
+  // How loud the office plays under a voice whose spoken pieces have the mean power `pow` (0 before
+  // it has said a word): `under` dB below that voice. A call and the Design tab's sample both use it.
+  function officeLevel(pow, bg) {
+    var voice = pow > 0 ? Math.sqrt(pow) : VOICE_USUAL;
+    voice = Math.max(VOICE_USUAL / 2.5, Math.min(VOICE_USUAL * 2.5, voice));
+    return voice * Math.pow(10, -(+bg.under || 49) / 20) / (+bg.rms || 0.05);
+  }
+  // The mean power of a recording's spoken 0.05 s pieces, as a call measures its agent (hearVoice).
+  function spokenPower(f, rate) {
+    var size = Math.max(1, Math.round(rate * 0.05)), sum = 0, n = 0;
+    for (var i = 0; i + size <= f.length; i += size) {
+      var p = 0;
+      for (var j = i; j < i + size; j++) p += f[j] * f[j];
+      p /= size;
+      if (p < SPOKEN) continue;
+      sum += p;
+      n++;
+    }
+    return n ? sum / n : 0;
+  }
 
   var WORKLET = [
     'class ListenPcm extends AudioWorkletProcessor {',
@@ -202,13 +235,19 @@
 
   function start(opts) {
     var state = 'idle', ended = false, muted = false;
-    var ws = null, ctx = null, mic = null, node = null, micSource = null;
+    var ws = null, ctx = null, vctx = null, mic = null, node = null, micSource = null;
     var out = null, outAnalyser = null, micAnalyser = null;
-    var playHead = 0, sources = new Set();
+    // The agent's voice: each piece plays straight after the one before. A new line (its first piece,
+    // with nothing playing for a moment) starts with a little of the voice in hand, START_LEAD, so a
+    // short pause in the voice model's stream early in the line does not break a word: a test call's
+    // greeting stopped arriving for 0.8 s after its first 0.76 s, and 30 ms in hand left 0.18 s of
+    // silence mid-word. Within a line a late piece plays at once (any wait would only lengthen a gap).
+    var playHead = 0, sources = new Set(), voiceEndAt = 0, START_LEAD = 0.15;
     var info = null, pending = [], agentText = '', callerText = '', usage = null;
-    var pingTimer = 0, stopTimer = 0, raf = 0, endAfterSpeech = false;
-    // Set when the agent hangs up: its goodbye (already received) still plays, nothing after it.
-    var hungUp = false;
+    var pingTimer = 0, stopTimer = 0, raf = 0;
+    // The agent hangs up (end_call): what it is still saying plays to the end of its turn (closing; the
+    // goodbye's last words can come after the hang-up), then nothing more (hungUp).
+    var hungUp = false, closing = false, closingDone = false;
     var buf = new Float32Array(1024);
     // A caller who goes quiet: asked once if they are still there, then the agent says goodbye
     // (Listen pays for every second the line stays open).
@@ -221,8 +260,33 @@
     // The language guard: the caller's last language, whether the agent's answer now coming is
     // being dropped for its language (until that turn ends), and how often it happened.
     var callerTongue = '', dropTurn = false, redone = 0, redoneAt = 0;
+    // The office behind the agent: its sound once fetched, where it plays, whether the call is
+    // on, and the agent's voice it follows (the mean power of its spoken 0.05 s pieces).
+    var bg = null, bgBuffer = null, bgSrc = null, bgGain = null, bgOn = false, bgLevel = 0, voicePow = 0, voiceN = 0;
 
     function set(s) { if (state !== s) { state = s; opts.onState && opts.onState(s); } }
+
+    /*
+     * The agent's voice (and the office behind it) in an audio engine of its own, at the voice's own
+     * 24 kHz: each piece plays exactly as it came, and the browser brings the whole voice to the speaker's
+     * rate with its best converter. Played piece by piece in an engine at the speaker's rate, every piece
+     * would be converted on its own with a rough one: a metallic shimmer above the voice and a dull top. The
+     * microphone stays in an engine at the device's rate (some browsers take a microphone at no other).
+     */
+    function voiceEngine() {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      try {
+        var c = new AC({ sampleRate: 24000 });
+        if (c.sampleRate === 24000) return c;
+        c.close();
+      } catch (e) {}
+      return null;
+    }
+    function closeEngines(delay) {
+      var list = [ctx, vctx].filter(function (c, i, all) { return c && all.indexOf(c) === i; });
+      var close = function () { list.forEach(function (c) { try { c.close(); } catch (e) {} }); };
+      if (delay) setTimeout(close, delay); else close();
+    }
 
     // Every line taken: ask again every few seconds, keeping the caller's place, until a line is
     // free, the caller gives up, or `patience` runs out. A call that starts after the caller left
@@ -263,7 +327,7 @@
       clearTimeout(waitTimer);
       try { mic && mic.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
       try { node && node.disconnect(); } catch (e) {}
-      if (ctx) setTimeout(function () { try { ctx.close(); } catch (e) {} }, 300);
+      closeEngines(300);
       set('busy');
     }
     function turn(role, text) {
@@ -411,12 +475,14 @@
       if (hungUp || dropTurn) return;
       var f = pcmFrom(data);
       if (!f.length) return;
-      var b = ctx.createBuffer(1, f.length, 24000);
+      if (bg) hearVoice(f);
+      var b = vctx.createBuffer(1, f.length, 24000);
       b.copyToChannel(f, 0);
-      var src = ctx.createBufferSource();
+      var src = vctx.createBufferSource();
       src.buffer = b;
       src.connect(out);
-      var at = Math.max(ctx.currentTime + 0.03, playHead);
+      var fresh = !sources.size && Date.now() - voiceEndAt > 400;
+      var at = Math.max(vctx.currentTime + (fresh ? START_LEAD : 0.03), playHead);
       src.start(at);
       playHead = at + b.duration;
       sources.add(src);
@@ -425,9 +491,9 @@
         sources.delete(src);
         heardAt = Date.now();
         if (!sources.size) {
+          voiceEndAt = Date.now();
           overlap = [];
           if (state === 'speaking') set('listening');
-          if (endAfterSpeech) finish('done');
         }
       };
       set('speaking');
@@ -463,12 +529,83 @@
       var say = callTongue();
       ws.send(JSON.stringify({ realtimeInput: { text: '(You started that answer in the wrong language, and the caller cannot follow it. Say the whole answer again now in ' + say + ', without mentioning this note, and keep to ' + say + '.)' } }));
     }
+    // The office's sound, fetched as the call starts (from any website: it is open to all) and
+    // decoded once; it starts when the call connects (startBackground), or as soon as it is ready.
+    function loadBackground() {
+      bg = info && info.background && info.background.url ? info.background : null;
+      if (!bg || !vctx || !window.fetch) { bg = null; return; }
+      fetch(bg.url, { credentials: 'omit' }).then(function (r) {
+        if (!r.ok) throw new Error('sound');
+        return r.arrayBuffer();
+      }).then(function (data) {
+        // Older Safari decodes with callbacks only.
+        return new Promise(function (resolve, reject) {
+          var p = vctx.decodeAudioData(data, resolve, reject);
+          if (p && p.then) p.then(resolve, reject);
+        });
+      }).then(function (buffer) {
+        bgBuffer = buffer;
+        if (bgOn) startBackground();
+      }).catch(function () { bg = null; });
+    }
+    function backgroundLevel() {
+      return officeLevel(voiceN ? voicePow : 0, bg);
+    }
+    function startBackground() {
+      bgOn = true;
+      if (!bg || !bgBuffer || bgSrc || ended || !vctx) return;
+      try {
+        var loop = bg.loop || [0, bgBuffer.duration], from = +loop[0] || 0, to = Math.min(+loop[1] || bgBuffer.duration, bgBuffer.duration);
+        bgGain = vctx.createGain();
+        bgGain.gain.value = 0;
+        bgSrc = vctx.createBufferSource();
+        bgSrc.buffer = bgBuffer;
+        bgSrc.loop = true;
+        bgSrc.loopStart = from;
+        bgSrc.loopEnd = to;
+        bgSrc.connect(bgGain);
+        bgGain.connect(vctx.destination);
+        // From a different moment of the office on every call; it fades in over about two seconds.
+        var at = vctx.currentTime + 0.05;
+        bgSrc.start(at, from + Math.random() * (to - from));
+        bgLevel = backgroundLevel();
+        bgGain.gain.setTargetAtTime(bgLevel, at, 0.7);
+      } catch (e) { bgSrc = null; }
+    }
+    // The agent's voice as it arrives: its 0.05 s pieces louder than -40 dBFS, averaged over its
+    // first 20 s of speech and slowly after. The office follows it when it moves by more than 1 dB.
+    function hearVoice(f) {
+      for (var i = 0; i + 1200 <= f.length; i += 1200) {
+        var p = 0;
+        for (var j = i; j < i + 1200; j++) p += f[j] * f[j];
+        p /= 1200;
+        if (p < SPOKEN) continue;
+        voiceN++;
+        voicePow += (p - voicePow) / Math.min(voiceN, 400);
+      }
+      if (!bgGain || !voiceN) return;
+      var level = backgroundLevel();
+      if (Math.abs(level / bgLevel - 1) < 0.12) return;
+      bgLevel = level;
+      try { bgGain.gain.setTargetAtTime(level, vctx.currentTime, 2); } catch (e) {}
+    }
+    function stopBackground() {
+      bgOn = false;
+      if (!bgGain || !vctx) return;
+      try {
+        var now = vctx.currentTime;
+        bgGain.gain.cancelScheduledValues(now);
+        bgGain.gain.setTargetAtTime(0, now, 0.06);
+        bgSrc.stop(now + 0.4);
+      } catch (e) {}
+    }
     function hush() {
       // The caller talked over the agent: what the microphone heard just before is their voice.
       if (overlap.length) { heard = heard.concat(overlap); overlap = []; }
       sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
       sources.clear();
-      playHead = ctx ? ctx.currentTime : 0;
+      voiceEndAt = Date.now();
+      playHead = vctx ? vctx.currentTime : 0;
       if (state === 'speaking') set('listening');
     }
 
@@ -506,6 +643,7 @@
         try { m = JSON.parse(raw); } catch (e) { return; }
         if (m.setupComplete) {
           set('listening');
+          startBackground();
           if (info.speaks_first) ws.send(JSON.stringify({ realtimeInput: { text: '(The caller has just joined the call. Greet them now, briefly, in ' + callTongue() + '.)' } }));
           return;
         }
@@ -517,7 +655,7 @@
         }
         var sc = m.serverContent;
         if (!sc) return;
-        if (sc.interrupted) { hush(); dropTurn = false; }
+        if (sc.interrupted) { hush(); dropTurn = false; if (closing) closingDone = true; }
         if (sc.inputTranscription && sc.inputTranscription.text) {
           heardAt = Date.now(); nudged = 0; quietEndAt = 0;
           if (agentText.trim()) { turn('agent', agentText); agentText = ''; }
@@ -529,7 +667,7 @@
           if (redone < MAX_REDO && wrongTongue(agentText)) stopWrong();
         }
         (sc.modelTurn && sc.modelTurn.parts || []).forEach(function (p) { if (p.inlineData && p.inlineData.data) play(p.inlineData.data); });
-        if (sc.turnComplete) { flushTurns(); dropTurn = false; }
+        if (sc.turnComplete) { flushTurns(); dropTurn = false; if (closing) closingDone = true; }
       };
       if (typeof ev.data === 'string') handle(ev.data);
       else if (ev.data && ev.data.text) ev.data.text().then(handle);
@@ -550,7 +688,7 @@
       // end_call gets no answer: an answer makes the model speak again ("The call has ended.",
       // sometimes in English on an Arabic call). Its goodbye came before the call, so it plays.
       var hangUp = fc.name === 'end_call';
-      if (hangUp) hungUp = true;
+      if (hangUp) hangUpAfterGoodbye();
       post(info.api + '/tool', { call_key: info.call_key, name: fc.name, args: fc.args || {} }).then(function (result) {
         var heard = result || { result: 'ok' };
         if (fc.name === 'show_links' && result && result.links) {
@@ -560,12 +698,23 @@
           for (var k in result) if (k !== 'links' && Object.prototype.hasOwnProperty.call(result, k)) heard[k] = result[k];
         }
         opts.onTool && opts.onTool(fc.name, fc.args || {}, result);
-        if (hangUp) {
-          if (sources.size) endAfterSpeech = true; else setTimeout(function () { finish('done'); }, 1200);
-          return;
-        }
+        if (hangUp) return;
         if (ws && ws.readyState === 1) ws.send(JSON.stringify({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: heard } ] } }));
       });
+    }
+
+    // The goodbye plays to the end of the agent's turn (4 s at most after the hang-up), then the call ends
+    // once its sound has played out.
+    function hangUpAfterGoodbye() {
+      if (closing) return;
+      closing = true;
+      var since = Date.now();
+      (function check() {
+        if (ended) return;
+        if (closingDone || Date.now() - since > 4000) hungUp = true;
+        if (hungUp && !sources.size) { setTimeout(function () { finish('done'); }, 400); return; }
+        setTimeout(check, 150);
+      })();
     }
 
     function ping() {
@@ -582,10 +731,11 @@
       flushTurns();
       release();
       clearInterval(pingTimer); clearInterval(quietTimer); clearTimeout(stopTimer); clearTimeout(waitTimer); cancelAnimationFrame(raf);
+      stopBackground();
       try { ws && ws.close(); } catch (e) {}
       try { mic && mic.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
       try { node && node.disconnect(); } catch (e) {}
-      if (ctx) setTimeout(function () { try { ctx.close(); } catch (e) {} }, 300);
+      closeEngines(300);
       if (info) post(info.api + '/end', { call_key: info.call_key, turns: pending.splice(0), usage: usageOut(), reason: reason || 'done' }, true);
       opts.onLevel && opts.onLevel(0, 0);
       set(reason === 'error' ? 'error' : 'ended');
@@ -602,9 +752,10 @@
       mic = stream;
       if (ended) { stream.getTracks().forEach(function (t) { t.stop(); }); return null; }
       ctx = new (window.AudioContext || window.webkitAudioContext)();
-      out = ctx.createGain();
-      outAnalyser = ctx.createAnalyser(); outAnalyser.fftSize = 1024;
-      out.connect(outAnalyser); outAnalyser.connect(ctx.destination);
+      vctx = voiceEngine() || ctx;
+      out = vctx.createGain();
+      outAnalyser = vctx.createAnalyser(); outAnalyser.fftSize = 1024;
+      out.connect(outAnalyser); outAnalyser.connect(vctx.destination);
       micSource = ctx.createMediaStreamSource(stream);
       micAnalyser = ctx.createAnalyser(); micAnalyser.fftSize = 1024;
       micSource.connect(micAnalyser);
@@ -622,6 +773,7 @@
       if (!data || ended) return;
       if (!data.token) throw new Error(data.message || '');
       info = data;
+      loadBackground();
       ws = new WebSocket(data.ws + '?access_token=' + encodeURIComponent(data.token));
       ws.onopen = function () { ws.send(JSON.stringify({ setup: { model: data.model } })); };
       ws.onmessage = onMessage;
@@ -638,12 +790,13 @@
       stopTimer = setTimeout(function () { finish('limit'); }, Math.max(30, data.max_seconds || 600) * 1000);
       window.addEventListener('pagehide', onLeave);
       if (ctx.state === 'suspended') ctx.resume();
+      if (vctx !== ctx && vctx.state === 'suspended') vctx.resume();
       loop();
     }).catch(function (err) {
       if (!ended) {
         ended = true;
         try { mic && mic.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
-        try { ctx && ctx.close(); } catch (e) {}
+        closeEngines(0);
         opts.onError && opts.onError(err && !err.offline ? err.message : '', err);
         set('error');
       }
@@ -658,5 +811,5 @@
     };
   }
 
-  window.ListenAgentCall = { start: start };
+  window.ListenAgentCall = { start: start, officeLevel: officeLevel, spokenPower: spokenPower };
 })();

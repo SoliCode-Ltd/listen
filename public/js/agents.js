@@ -320,6 +320,8 @@
 
   /* ---------- Voices ---------- */
   var audio = null, playingCard = null;
+  // Stops Design → Call sound → Hear the difference (soundTry), so only one sound plays at a time.
+  var stopTry = function () {};
   var PLAY_ICON = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
   var PAUSE_ICON = '<svg viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>';
   // The play button shows what a tap will do: pause while its voice plays, play again after.
@@ -399,6 +401,7 @@
           e.stopPropagation();
           if (playingCard === card) { stopPreview(); return; }
           stopPreview();
+          stopTry();
           playingCard = card;
           playState(card, true);
           var clip = audio = new Audio(v.preview);
@@ -493,7 +496,7 @@
     function setState(s) {
       if (s === 'error' && quietError) { quietError = false; s = 'idle'; }
       // The call's length counts from when it was answered; a call that never was has no summary.
-      if (s === 'connecting') { answeredAt = 0; hideSummary(); }
+      if (s === 'connecting') { answeredAt = 0; hideSummary(); stopPreview(); stopTry(); }
       if ((s === 'listening' || s === 'speaking') && !answeredAt) answeredAt = Date.now();
       var lasted = s === 'ended' && answeredAt ? (Date.now() - answeredAt) / 1000 : 0;
       if (s !== 'listening' && s !== 'speaking') answeredAt = 0;
@@ -886,6 +889,8 @@
     var row = sideways(tabs[0] && tabs[0].parentNode);
     function open(name, fromMenu) {
       if (!$('[data-ag-panel="' + name + '"]')) name = 'overview';
+      stopPreview();
+      stopTry();
       tabs.forEach(function (t) {
         var on = t.getAttribute('data-ag-tab') === name;
         t.classList.toggle('is-current', on);
@@ -1430,6 +1435,8 @@
       look.radius = val('radius') || look.radius;
       look.font = val('font') || look.font;
       look.theme = val('theme') || look.theme;
+      // What the caller hears behind the agent (no part of the preview: it has no sound).
+      look.background = val('background') || look.background || 'office';
       // The corner the owner sees: on a right-to-left website the start is the right.
       var corner = val('corner');
       if (corner) look.position = (corner === 'right') === !!D.rtl ? 'start' : 'end';
@@ -1444,7 +1451,7 @@
       status.textContent = (D.text || {}).saving || '';
       saveTimer = setTimeout(function () {
         var body = {};
-        ['position', 'style', 'theme', 'label', 'icon', 'size', 'shape', 'accent', 'palette', 'radius', 'captions', 'photo', 'title', 'subtitle', 'font', 'ready_text', 'ready_show'].forEach(function (k) { body[k] = look[k] === null ? '' : look[k]; });
+        ['position', 'style', 'theme', 'label', 'icon', 'size', 'shape', 'accent', 'palette', 'radius', 'captions', 'photo', 'title', 'subtitle', 'font', 'ready_text', 'ready_show', 'background'].forEach(function (k) { body[k] = look[k] === null ? '' : look[k]; });
         if (look.palette === 'custom') body.orb_colors = look.orb_colors;
         api('PATCH', C.agent.urls.update, { appearance: body }).then(function () {
           status.textContent = (D.text || {}).saved || '';
@@ -1484,7 +1491,7 @@
     if (ready && !ready.placeholder) ready.placeholder = ((D.cfg && D.cfg.text && D.cfg.text.states) || {}).idle || '';
     $('[data-ag-design-reset]', box).addEventListener('click', function () {
       var d = D.defaults;
-      ['style', 'icon', 'shape', 'size', 'radius', 'font', 'theme', 'palette'].forEach(function (k) {
+      ['style', 'icon', 'shape', 'size', 'radius', 'font', 'theme', 'palette', 'background'].forEach(function (k) {
         var r = $('input[name="' + k + '"][value="' + d[k] + '"]', box);
         if (r) r.checked = true;
       });
@@ -1509,6 +1516,206 @@
     });
     read();
     draw(true);
+  }
+
+  /* ---------- Design → Call sound → Hear the difference ---------- */
+  // The agent's own preview line as a caller hears it: with the office behind it, as far under the
+  // voice as on a call (ListenAgentCall.officeLevel, the call's own measure, from a different moment
+  // of the office each time), or alone. Both takes are mixed here on one timeline and played as plain
+  // audio, as the voice previews are (so a phone on silent plays them too); pressing the other while
+  // one plays carries on at the same moment, so the difference is all that changes.
+  function soundTry() {
+    var box = $('[data-ag-sound-try]'), S = C.design && C.design.sound, AC = window.ListenAgentCall;
+    var Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!box) return;
+    if (!S || !S.url || !Offline || !window.fetch || !window.Blob || !window.URL || !AC || !AC.officeLevel || !AC.spokenPower || !clip()) { box.hidden = true; return; }
+    // The call's own rate (the voice and the office are both 24 kHz), the office alone before the
+    // voice starts, and after it ends.
+    var RATE = 24000, LEAD = 0.6, TAIL = 0.8;
+    var buttons = $$('[data-ag-sound]', box), els = null, takes = null, building = {}, decoded = {}, silent = null;
+    var cur = null, want = null, frame = 0;
+    // The agent's voice now (another may have been picked since the page opened).
+    function clip() {
+      var all = (C.voices && C.agent && C.voices[C.agent.language]) || [];
+      for (var i = 0; i < all.length; i++) if (all[i].id === C.agent.speaker_id) return all[i].preview || null;
+      return null;
+    }
+    function decode(url) {
+      if (!decoded[url]) decoded[url] = fetch(url, { credentials: 'omit' }).then(function (r) {
+        if (!r.ok) throw new Error('sound');
+        return r.arrayBuffer();
+      }).then(function (data) {
+        var ac = new Offline(1, 1, RATE);
+        // Older Safari decodes with callbacks only.
+        return new Promise(function (resolve, reject) {
+          var p = ac.decodeAudioData(data, resolve, reject);
+          if (p && p.then) p.then(resolve, reject);
+        });
+      }).then(function (b) {
+        var f = b.getChannelData(0);
+        if (b.numberOfChannels > 1) { var g = b.getChannelData(1); f = f.map(function (v, i) { return (v + g[i]) / 2; }); }
+        return f;
+      }).catch(function (e) { delete decoded[url]; throw e; });
+      return decoded[url];
+    }
+    // 16-bit PCM WAV, mono at the call's rate.
+    function wav(f) {
+      var b = new ArrayBuffer(44 + f.length * 2), d = new DataView(b);
+      var put = function (o, s) { for (var i = 0; i < s.length; i++) d.setUint8(o + i, s.charCodeAt(i)); };
+      put(0, 'RIFF'); d.setUint32(4, 36 + f.length * 2, true); put(8, 'WAVE');
+      put(12, 'fmt '); d.setUint32(16, 16, true); d.setUint16(20, 1, true); d.setUint16(22, 1, true);
+      d.setUint32(24, RATE, true); d.setUint32(28, RATE * 2, true); d.setUint16(32, 2, true); d.setUint16(34, 16, true);
+      put(36, 'data'); d.setUint32(40, f.length * 2, true);
+      for (var i = 0; i < f.length; i++) {
+        var v = Math.max(-1, Math.min(1, f[i]));
+        d.setInt16(44 + i * 2, Math.round(v < 0 ? v * 32768 : v * 32767), true);
+      }
+      return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+    }
+    // The two takes: the voice alone, and the voice with the office under it, which comes in before
+    // the voice and goes out after it, as at the start and end of a call.
+    function mix(voice, office) {
+      var lead = Math.round(LEAD * RATE), n = lead + voice.length + Math.round(TAIL * RATE);
+      var dry = new Float32Array(n), wet = new Float32Array(n);
+      dry.set(voice, lead);
+      var level = AC.officeLevel(AC.spokenPower(voice, RATE), S), loop = S.loop || [];
+      var from = Math.round((+loop[0] || 0) * RATE), to = Math.min(Math.round((+loop[1] || 0) * RATE) || office.length, office.length);
+      if (to - from < RATE) { from = 0; to = office.length; }
+      var span = to - from, at = Math.floor(Math.random() * span);
+      var rise = Math.round(0.5 * RATE), fall = Math.round(0.6 * RATE);
+      for (var i = 0; i < n; i++) {
+        var g = level;
+        if (i < rise) g *= 0.5 - 0.5 * Math.cos(Math.PI * i / rise);
+        if (n - i <= fall) g *= 0.5 - 0.5 * Math.cos(Math.PI * (n - i - 1) / fall);
+        wet[i] = dry[i] + office[from + (at + i) % span] * g;
+      }
+      return { none: wav(dry), office: wav(wet) };
+    }
+    function take(url) {
+      if (takes && takes.clip === url) return Promise.resolve(takes);
+      if (!building[url]) building[url] = Promise.all([decode(url), decode(S.url)]).then(function (got) {
+        delete building[url];
+        if (takes && takes.clip === url) return takes;
+        var t = mix(got[0], got[1]);
+        t.clip = url;
+        if (takes) { URL.revokeObjectURL(takes.none); URL.revokeObjectURL(takes.office); }
+        takes = t;
+        return t;
+      }, function (e) { delete building[url]; throw e; });
+      return building[url];
+    }
+    // One player per take, made during a tap: a phone then lets each play once its take is ready.
+    function players() {
+      if (els) return els;
+      els = {};
+      buttons.forEach(function (b) {
+        var k = b.getAttribute('data-ag-sound'), a = new Audio();
+        a.preload = 'auto';
+        a.addEventListener('ended', function () { if (cur === k) stop(); });
+        try { a.load(); } catch (e) {}
+        els[k] = a;
+      });
+      return els;
+    }
+    function bind(t) {
+      var e = players();
+      Object.keys(e).forEach(function (k) { if (t[k] && e[k].getAttribute('src') !== t[k]) e[k].src = t[k]; });
+    }
+    // The first tap on a phone comes before the takes are mixed: a moment of silence played from the
+    // tap itself lets the take play when it is ready.
+    function unlock(a) {
+      try {
+        if (a.getAttribute('src')) return;
+        if (!silent) silent = wav(new Float32Array(240));
+        a.src = silent;
+        var p = a.play();
+        if (p && p.catch) p.catch(function () {});
+      } catch (e) {}
+    }
+    function bar(b, p) { var c = $('circle', b); if (c) c.style.strokeDashoffset = String(100 * (1 - p)); }
+    function show() {
+      buttons.forEach(function (b) {
+        var k = b.getAttribute('data-ag-sound'), on = cur === k, wait = want === k;
+        b.classList.toggle('is-playing', on);
+        b.classList.toggle('is-loading', wait);
+        b.setAttribute('aria-pressed', on || wait ? 'true' : 'false');
+        if (wait) b.setAttribute('aria-busy', 'true'); else b.removeAttribute('aria-busy');
+        if (!on) bar(b, 0);
+      });
+    }
+    // The ring round the button's mark fills with the take, from the audio's own clock (read between
+    // its updates, so the ring never steps), as round a voice's face.
+    function ring() {
+      cancelAnimationFrame(frame);
+      var seen = -1, since = 0;
+      (function step(now) {
+        if (!cur || !els) return;
+        var a = els[cur], b = $('[data-ag-sound="' + cur + '"]', box);
+        if (a.duration && isFinite(a.duration)) {
+          if (a.currentTime !== seen) { seen = a.currentTime; since = now; }
+          var at = a.paused ? seen : seen + (now - since) / 1000;
+          bar(b, Math.min(1, Math.max(0, at / a.duration)));
+        }
+        frame = requestAnimationFrame(step);
+      })(performance.now());
+    }
+    function play(k) {
+      var e = players(), from = cur ? e[cur] : null, to = e[k];
+      // Switching while one plays carries on at the same moment; otherwise it starts at the top.
+      var at = from && from !== to && !from.paused && !from.ended ? from.currentTime : 0;
+      if (from && from !== to) from.pause();
+      cur = k;
+      want = null;
+      try { to.currentTime = at; } catch (x) {}
+      if (at && to.readyState < 1) {
+        to.addEventListener('loadedmetadata', function once() { to.removeEventListener('loadedmetadata', once); try { to.currentTime = at; } catch (x) {} });
+      }
+      var p = to.play();
+      if (p && p.catch) p.catch(function () { if (cur === k && to.paused) stop(); });
+      show();
+      ring();
+    }
+    function stop() {
+      want = null;
+      if (cur && els) els[cur].pause();
+      cur = null;
+      cancelAnimationFrame(frame);
+      show();
+    }
+    stopTry = stop;
+    function press(k) {
+      // Pressing the one that plays (or is getting ready) stops it.
+      if (cur === k || want === k) { stop(); return; }
+      stopPreview();
+      var url = clip();
+      if (!url) return;
+      var e = players();
+      if (takes && takes.clip === url) { bind(takes); play(k); return; }
+      if (cur) { e[cur].pause(); cur = null; cancelAnimationFrame(frame); }
+      want = k;
+      show();
+      unlock(e[k]);
+      take(url).then(function (t) {
+        if (want !== k) return;
+        bind(t);
+        play(k);
+      }, function () {
+        if (want !== k) return;
+        want = null;
+        show();
+        toast(T.network || '');
+      });
+    }
+    buttons.forEach(function (b) { b.addEventListener('click', function () { press(b.getAttribute('data-ag-sound')); }); });
+    // Mixed ahead when the owner reaches it (or points at it), so a press plays at once.
+    function early() { var url = clip(); if (url) take(url).catch(function () {}); }
+    ['pointerenter', 'focusin', 'touchstart'].forEach(function (t) { box.addEventListener(t, early, { passive: true }); });
+    if ('IntersectionObserver' in window) {
+      var near = new IntersectionObserver(function (list) {
+        if (list.some(function (x) { return x.isIntersecting; })) { near.disconnect(); early(); }
+      }, { rootMargin: '200px' });
+      near.observe(box);
+    }
   }
 
   /* ---------- The demo page's Voice agent tab (App\Support\Agents\DemoAgent) ---------- */
@@ -1575,7 +1782,7 @@
 
   function boot() {
     if (C.mode === 'setup') setup();
-    else if (C.mode === 'agent') { agentPage(); design(); }
+    else if (C.mode === 'agent') { agentPage(); design(); soundTry(); }
     else if (C.mode === 'link') talk($('[data-ag-talk]'));
     else if (C.mode === 'demo') demo();
     drawQr();

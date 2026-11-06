@@ -52,8 +52,13 @@ final class AudioEffects
             '[in]highpass=f=90,equalizer=f=300:t=q:w=1:g=-2,equalizer=f=3200:t=q:w=1.2:g=2.5,treble=g=3:f=10000,acompressor=threshold=0.12:ratio=2.5:attack=8:release=140:makeup=1.5[out]', 0.0],
 
         // Places: real rooms, from a car to a cathedral.
-        'room' => ['g-room', 'space', 'Small room', 'غرفة صغيرة', 'A short, natural room sound, like an office', 'صوت غرفة قصير وطبيعي كمكتب',
+        'room' => ['g-room', 'space', 'Small room', 'غرفة صغيرة', 'A short, natural sound of a small room', 'صوت قصير وطبيعي لغرفة صغيرة',
             '[in]highpass=f=70,ROOM(office,-10),BED(room_tone,-20)[out]', 0.5],
+        // The voice close to the microphone, as on a headset, and colleagues talking quietly far
+        // off: the same office as agents' calls (bed/office, about 49 dB under the voice in a
+        // pause, as on a real office line). No keys or ticks, so the voice stays clear.
+        'office' => ['g-office', 'space', 'Office', 'مكتب', 'Colleagues talking quietly far off, your voice close and clear', 'زملاء يتحدثون بهدوء من بعيد وصوتك قريب وواضح',
+            '[in]highpass=f=70,BED(office,-45)[out]', 0.6],
         'bathroom' => ['g-bath', 'space', 'Bathroom', 'حمّام', 'Hard tiles: bright, close reflections', 'بلاط صلب وانعكاسات قريبة لامعة',
             '[in]highpass=f=90,ROOM(bathroom,-15)[out]', 1.0],
         'hall' => ['g-hall', 'space', 'Concert hall', 'قاعة كبيرة', 'A large hall with a rich, smooth reverb', 'قاعة واسعة بصدى غني وناعم',

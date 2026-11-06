@@ -71,6 +71,19 @@ class AgentBrainTest extends TestCase
         $this->assertStringContainsString('English', $english);
     }
 
+    public function test_every_agent_talks_like_a_person_on_the_phone_not_a_presenter(): void
+    {
+        foreach ([['dialect' => 'ar-EG'], ['dialect' => 'ar-XA'], ['language' => 'en', 'dialect' => null]] as $attributes) {
+            $text = AgentInstructions::build($this->agent($attributes));
+            $this->assertStringContainsString('chatting with a customer on the phone: relaxed, warm and polite, at an everyday pace', $text);
+            $this->assertStringContainsString('Never sound like a presenter, an announcer, an advert or someone reading.', $text);
+            // The facts are explained in spoken words, never read out as written; numbers stay exact.
+            $this->assertStringContainsString('Never read the facts below aloud as they are written', $text);
+            $this->assertStringContainsString('Names, numbers and prices stay exactly as written.', $text);
+            $this->assertStringNotContainsString('receptionist', AgentInstructions::speech($this->agent($attributes)));
+        }
+    }
+
     public function test_the_live_setup_locks_the_voice_instructions_and_tools(): void
     {
         $setup = LiveSession::setupFor($this->agent());

@@ -136,6 +136,16 @@ foreach ($calls as $c) {
     }
 }
 
+// What this server's agents are told now: the language line at the top and at the end (the
+// instructions themselves are not printed).
+echo PHP_EOL.'== The language line in each agent\'s instructions, as this server builds them now'.PHP_EOL;
+foreach (Agent::query()->orderBy('id')->get() as $a) {
+    $lines = explode("\n", AgentInstructions::build($a));
+    $top = collect(array_slice($lines, 0, 4))->first(fn ($l) => str_starts_with($l, 'RESPOND IN'));
+    printf("  agent %d (%s): top %s, end %s\n", $a->id, $a->language, $top ? substr($top, 0, 19) : 'MISSING',
+        str_contains((string) end($lines), 'YOU MUST RESPOND UNMISTAKABLY') ? 'yes' : 'MISSING');
+}
+
 echo PHP_EOL.'  (agent: A Arabic, a short, L Latin letters, E English, X another language; caller as heard live: c Arabic, s short, l Latin letters, e English, x another language)'.PHP_EOL;
 printf("  calls %d, of them 3 minutes or longer %d\n", $total['calls'], $total['long']);
 printf("  calls with a line in a wrong language %d (3 minutes or longer: %d)\n", $total['wrong'], $total['wrong_long']);

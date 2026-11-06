@@ -161,6 +161,31 @@
       </div>
     </fieldset>
 
+    {{-- What the caller hears behind the agent's voice (App\Support\Agents\CallBackground). --}}
+    <fieldset class="ag-design-group">
+      <legend>{{ __('agents.design.group_sound') }}</legend>
+      <div class="ag-design-field">
+        <span class="ag-design-label" id="ag-design-background">{{ __('agents.design.background') }}</span>
+        <div class="ag-choice-row" role="radiogroup" aria-labelledby="ag-design-background">
+          @foreach(\App\Models\AgentWidget::BACKGROUNDS as $b)
+            <label class="ag-choice"><input type="radio" name="background" value="{{ $b }}" @checked($look['background'] === $b)><span>{{ __('agents.design.backgrounds.'.$b) }}</span></label>
+          @endforeach
+        </div>
+        <p class="ag-muted ag-design-hint">{{ __('agents.design.background_hint') }}</p>
+        {{-- Hear the difference: the agent's own voice, as a caller hears it, with the office or alone (agents.js). --}}
+        <div class="ag-sound-try" data-ag-sound-try>
+          <span class="ag-sound-try-label" id="ag-sound-try">{{ __('agents.design.background_try') }}</span>
+          <div class="ag-sound-try-row" role="group" aria-labelledby="ag-sound-try">
+            @foreach(\App\Models\AgentWidget::BACKGROUNDS as $b)
+              <button type="button" class="ag-sound-play" data-ag-sound="{{ $b }}" aria-pressed="false" aria-label="{{ __('agents.design.background_listen.'.$b) }}">
+                <span class="ag-sound-icon" aria-hidden="true"><svg class="ag-sound-ring" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" pathLength="100"/></svg><svg class="ag-sound-glyph" viewBox="0 0 24 24"><path class="ag-sound-p" d="M8.6 6.2v11.6L18 12z"/><rect class="ag-sound-s" x="7" y="7" width="10" height="10" rx="2"/></svg></span><span class="ag-sound-name">{{ __('agents.design.backgrounds.'.$b) }}</span>
+              </button>
+            @endforeach
+          </div>
+        </div>
+      </div>
+    </fieldset>
+
     {{-- Where it sits. --}}
     <fieldset class="ag-design-group">
       <legend>{{ __('agents.design.group_place') }}</legend>
