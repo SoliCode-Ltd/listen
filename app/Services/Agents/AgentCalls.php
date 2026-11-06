@@ -612,6 +612,15 @@ class AgentCalls
             $all = $conversation->agent ? \App\Support\Agents\AgentLinks::of($conversation->agent) : [];
             $asked = array_values(array_filter(array_map(fn ($n) => strtolower(trim((string) $n)), (array) ($args['networks'] ?? [])), 'strlen'));
             $links = $asked === [] ? $all : array_values(array_filter($all, fn (array $l): bool => in_array($l['network'], $asked, true)));
+            // One page of the website the caller asked for (the prices, the booking page), not its home page.
+            $page = trim((string) ($args['page'] ?? ''));
+            if ($page !== '' && $conversation->agent) {
+                $found = \App\Support\Agents\AgentLinks::askedPage($conversation->agent, $page);
+                if ($found === null) {
+                    return ['result' => 'none', 'say' => 'That page is not one you know on the website. Say so kindly, and offer to write the website\'s own link in the chat instead.'];
+                }
+                $links = [$found];
+            }
             if ($links === []) {
                 return ['result' => 'none', 'say' => $all === []
                     ? 'There are no links to write. Say kindly that you do not have them, and offer to help another way.'

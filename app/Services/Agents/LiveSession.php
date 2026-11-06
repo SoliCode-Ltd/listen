@@ -88,11 +88,12 @@ final class LiveSession
         if ($networks !== []) {
             $tools[] = [
                 'name' => 'show_links',
-                'description' => 'Write the business\'s own links (listed in your instructions) in the chat on the caller\'s screen, when the caller asks for its social media accounts, its website or its WhatsApp. Then tell them in one short sentence that the links are in the chat. Never read a link aloud.',
+                'description' => 'Write the business\'s own links (listed in your instructions) in the chat on the caller\'s screen, when the caller asks for its social media accounts, its website, a page of its website (its prices, booking, contact page...) or its WhatsApp. Then tell them in one short sentence that the links are in the chat. Never read a link aloud.',
                 'parameters' => [
                     'type' => 'OBJECT',
                     'properties' => [
                         'networks' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING', 'enum' => $networks], 'description' => 'Which links to write, as the caller asked; leave it empty to write all of them.'],
+                        'page' => ['type' => 'STRING', 'description' => 'Only when the caller asked for one page of the website: which, in one or two English words (pricing, booking, contact, register, a service\'s name). That page is written instead of the home page.'],
                     ],
                 ],
             ];

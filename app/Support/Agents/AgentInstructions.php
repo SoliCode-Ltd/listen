@@ -193,7 +193,7 @@ final class AgentInstructions
         if ($links !== []) {
             $lines[] = '';
             $lines[] = '# Links you can write in the chat';
-            $lines[] = 'The caller sees the call\'s chat on their screen. When they ask for '.$agent->business_name.'\'s accounts on social media, its website or its WhatsApp, or how to follow it, call the show_links tool with the ones they asked for (with none, it writes them all), then say in one short sentence that the links are now in the chat. Never read a link or a web address aloud, and never spell one out; you may say an account\'s name if they ask for it. These are all the links there are: asked for another site, say '.$agent->business_name.' has no account there that you know of, and offer the ones it has.';
+            $lines[] = 'The caller sees the call\'s chat on their screen. When they ask for '.$agent->business_name.'\'s accounts on social media, its website or its WhatsApp, or how to follow it, call the show_links tool with the ones they asked for (with none, it writes them all; for one page of the website, such as the prices or booking page, set its page), then say in one short sentence that the links are now in the chat. Never read a link or a web address aloud, and never spell one out; you may say an account\'s name if they ask for it. These are all the links there are: asked for another site, say '.$agent->business_name.' has no account there that you know of, and offer the ones it has.';
             foreach ($links as $link) {
                 $lines[] = '- '.AgentLinks::describe($link);
             }

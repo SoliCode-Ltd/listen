@@ -474,6 +474,87 @@ final class AgentLinks
     }
 
     /**
+     * What a caller may ask a page by, in a few words (show_links' page): the words of each kind of
+     * page in English and Arabic, so "the prices page", "صفحة الأسعار" and "pricing" find the same one.
+     */
+    private const PAGE_WORDS = [
+        'pricing' => ['pricing', 'price', 'prices', 'plan', 'plans', 'package', 'packages', 'cost', 'fees', 'سعر', 'أسعار', 'الأسعار', 'اسعار', 'باقة', 'باقات', 'الباقات', 'رسوم', 'تسعير'],
+        'contact' => ['contact', 'support', 'help', 'call', 'تواصل', 'اتصال', 'اتصل', 'الدعم', 'دعم'],
+        'register' => ['register', 'signup', 'sign', 'account', 'join', 'تسجيل', 'سجل', 'حساب', 'اشتراك', 'اشترك'],
+        'agents' => ['agent', 'agents', 'وكيل', 'وكلاء', 'الوكلاء'],
+        'samples' => ['sample', 'samples', 'voices', 'نماذج', 'عينات', 'أصوات', 'الأصوات'],
+        'demo' => ['demo', 'try', 'trial', 'تجربة', 'جرب', 'تجريب'],
+        'dialects' => ['dialect', 'dialects', 'لهجة', 'لهجات', 'اللهجات'],
+        'accents' => ['accent', 'accents', 'لكنة', 'لكنات'],
+        'booking' => ['book', 'booking', 'appointment', 'reserve', 'حجز', 'احجز', 'موعد', 'مواعيد'],
+        'about' => ['about', 'من نحن'],
+    ];
+
+    /** Listen's own pages, for its own agent (HouseAgent): the kind of page and its address. */
+    private const HOUSE_PAGES = ['pricing' => '/pricing', 'contact' => '/contact-us', 'register' => '/register', 'agents' => '/voice-agents',
+        'samples' => '/voice-samples', 'demo' => '/demo', 'dialects' => '/arabic-dialects', 'accents' => '/english-accents'];
+
+    /**
+     * One page of the business's own website a caller asked for (show_links' page: "pricing",
+     * "صفحة الحجز"): Listen's own pages for its own agent, else the best match among the pages read
+     * from the website (their titles and addresses). Null when none fits: never a guess.
+     *
+     * @return array{network: string, url: string}|null
+     */
+    public static function askedPage(Agent $agent, string $asked): ?array
+    {
+        $asked = mb_strtolower(trim($asked));
+        if ($asked === '') {
+            return null;
+        }
+        $kinds = [];
+        foreach (self::PAGE_WORDS as $kind => $words) {
+            foreach ($words as $w) {
+                // A word on its own, or with the Arabic "the" before it (الرسوم, بالأسعار).
+                if (preg_match('/(?<![\p{L}])(?:ال|وال|بال|لل)?'.preg_quote($w, '/').'/u', $asked)) {
+                    $kinds[$kind] = true;
+                }
+            }
+        }
+        if ($agent->setting('house')) {
+            foreach (array_keys($kinds) as $kind) {
+                if (isset(self::HOUSE_PAGES[$kind])) {
+                    return ['network' => 'website', 'url' => url('/'.($agent->language === 'en' ? 'en' : 'ar').self::HOUSE_PAGES[$kind])];
+                }
+            }
+
+            return null;
+        }
+        // The words to look for: what was asked, and every word of the kinds of page it names.
+        $look = preg_split('/[\s,،\-\/]+/u', $asked, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        foreach (array_keys($kinds) as $kind) {
+            $look = array_merge($look, self::PAGE_WORDS[$kind]);
+        }
+        $look = array_values(array_unique(array_filter($look, fn ($w) => mb_strlen($w) >= 3)));
+        $best = null;
+        $score = 0;
+        foreach ($agent->sources()->where('kind', \App\Models\AgentSource::PAGE)->whereNotNull('url')->get(['title', 'url']) as $page) {
+            $clean = self::clean((string) $page->url, $agent->website_url);
+            if ($clean === null || $clean['network'] !== 'website') {
+                continue;
+            }
+            $hay = mb_strtolower(urldecode((string) $page->url).' '.$page->title);
+            $s = 0;
+            foreach ($look as $w) {
+                if (str_contains($hay, $w)) {
+                    $s++;
+                }
+            }
+            // A shorter address wins a tie: the section's own page rather than one inside it.
+            if ($s > $score || ($s === $score && $s > 0 && $best && strlen($clean['url']) < strlen($best['url']))) {
+                [$best, $score] = [$clean, $s];
+            }
+        }
+
+        return $score > 0 ? $best : null;
+    }
+
+    /**
      * What a person sees for each link: where it goes, written short ("instagram.com/sos_ksa").
      *
      * @param  list<array{network: string, url: string}>  $links

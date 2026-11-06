@@ -995,6 +995,18 @@
         hearing = n;
       });
     }
+    // Their words as they say them (onHearWords): the dots give way to them, a word at a time.
+    function hearWords(text) {
+      if (!parts.lines || look.captions === false || parts.lines.hidden) return;
+      if (!hearing) hear(true);
+      smoothly(function () {
+        var n = hearing;
+        if (!n) return;
+        if (n.className.indexOf('is-typing') >= 0) { n.className = 'lva-line is-caller'; n.dir = 'auto'; n.textContent = ''; n.__text = ''; }
+        addWords(n, n.__text || '', text);
+        n.__text = text;
+      });
+    }
     function hold(t) {
       if (t.role !== 'caller') return;
       if (!hearing) hear(true);
@@ -1011,8 +1023,10 @@
           n = t.view;
           n.className = 'lva-line is-' + t.role;
           n.removeAttribute('aria-hidden');
-          n.textContent = '';
-          n.appendChild(el('span', 'lva-w', t.text));
+          // Words already there (as they were said): the line carries on from them, or is written anew.
+          if (n.__text && t.text.indexOf(n.__text) === 0) addWords(n, n.__text, t.text);
+          else { n.textContent = ''; n.appendChild(el('span', 'lva-w', t.text)); }
+          n.__text = '';
         } else if (t.role === 'agent' && t.live && liveView && liveView.n === t.live) {
           // Shown as it was said: the line ends where it is, with any last words.
           n = liveView.el;
@@ -1135,6 +1149,7 @@
           onWords: words,
           onHold: hold,
           onHear: hear,
+          onHearWords: hearWords,
           onFix: fixLine,
           onLinks: linksLine,
           onLevel: level,
