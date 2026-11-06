@@ -298,7 +298,7 @@
    * BARGE_MIN and three times what the speakers usually leave in the microphone, for BARGE_PIECES
    * pieces (0.1 s each) in a row, after the first BARGE_LEARN ms of the agent's line. Then the pieces
    * held back (0.4 s) go first, so their first word is not lost, and everything goes until the agent
-   * stops.
+   * stops. A caller who starts as the agent stops keeps what was held back too.
    */
   var ECHO_TAIL = 300, BARGE_MIN = 1000, BARGE_PIECES = 3, BARGE_LEARN = 400, BARGE_HOLD = 4;
   function micLevel(buffer) {
@@ -309,7 +309,12 @@
   function micGate() {
     var echo = 0, loud = 0, held = [], open = false, since = 0;
     return function (buffer, agentOn, now) {
-      if (!agentOn) { open = false; loud = 0; held = []; since = 0; return [buffer]; }
+      if (!agentOn) {
+        // The agent has just stopped: a caller who had started speaking keeps what was held back.
+        var keep = !open && loud ? held.concat([buffer]) : [buffer];
+        open = false; loud = 0; held = []; since = 0;
+        return keep;
+      }
       if (open) return [buffer];
       if (!since) since = now;
       var l = micLevel(buffer);
