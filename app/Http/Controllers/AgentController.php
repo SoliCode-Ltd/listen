@@ -305,7 +305,20 @@ class AgentController extends Controller
             $agent->status = $data['status'];
         }
         $setupChanged = $updatesChanged || $linksChanged || $agent->isDirty(['name', 'business_name', 'first_message', 'knowledge', 'choices', 'script', 'dialect']);
+        $oldName = $agent->isDirty('name') ? trim((string) $agent->getOriginal('name')) : null;
         $agent->save();
+        if ($oldName !== null && $oldName !== '') {
+            // A call button titled with the agent's old name (the owner typed it in Design) takes the
+            // new one: a new voice that brings its name, or a rename, shows on the card too.
+            foreach ($agent->widgets()->get() as $w) {
+                $look = (array) ($w->appearance ?? []);
+                if (trim((string) ($look['title'] ?? '')) === $oldName) {
+                    $look['title'] = $agent->name;
+                    $w->appearance = $look;
+                    $w->save();
+                }
+            }
+        }
         if ($setupChanged) {
             $this->reviewAgain($agent);
         }

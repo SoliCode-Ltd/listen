@@ -152,6 +152,24 @@ class AgentVoiceNameTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_a_call_button_titled_with_the_old_name_shows_the_new_one(): void
+    {
+        Http::fake();
+        $owner = User::factory()->create();
+        $agent = $this->agent($owner, ['name' => 'سمية', 'first_message' => 'أهلًا، معاك سمية من عيادة البسمة.']);
+        $widget = $agent->mainWidget();
+        // The owner typed the agent's name as the card's title (Design tab).
+        $widget->forceFill(['appearance' => ['title' => 'سمية'] + (array) $widget->appearance])->save();
+
+        $this->actingAs($owner)->patchAgent($agent, ['speaker_id' => self::FATIMA])->assertOk()->assertJsonPath('agent.name', 'فاطمة');
+        $this->assertSame('فاطمة', $widget->fresh()->appearance['title']);
+
+        // A title of the owner's own (not the old name) stays as it is.
+        $widget->forceFill(['appearance' => ['title' => 'عيادة البسمة'] + (array) $widget->fresh()->appearance])->save();
+        $this->actingAs($owner)->patchAgent($agent->fresh(), ['name' => 'منى'])->assertOk();
+        $this->assertSame('عيادة البسمة', $widget->fresh()->appearance['title']);
+    }
+
     public function test_a_name_sent_with_the_voice_is_the_one_kept(): void
     {
         Http::fake();

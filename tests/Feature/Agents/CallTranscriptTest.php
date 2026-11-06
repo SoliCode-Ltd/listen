@@ -100,4 +100,22 @@ class CallTranscriptTest extends TestCase
         $this->assertStringContainsString('var now = Date.now(), agentOn = sources.size > 0 || now - voiceEndAt < ECHO_TAIL;', $call);
         $this->assertStringNotContainsString("ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64(e.data)", $call);
     }
+
+    public function test_the_call_cards_orb_flows_like_the_sites_own_orbs(): void
+    {
+        $widget = (string) file_get_contents(public_path('js/agent-widget.js'));
+        $orbs = (string) file_get_contents(public_path('js/listen-orbs.js'));
+
+        // The same light as Listen's own orbs, drawn in the card's own canvas, moving with the voice.
+        foreach (['float v = fbm(s * 0.8 + 1.7 * w);', 'float ring = sin(r * 17.0 + (w.x - 0.5) * 7.0 - uTime * 5.0);', "col = mix(col, mix(uC2, uC3, 0.7), uLift);"] as $line) {
+            $this->assertStringContainsString($line, $orbs);
+            $this->assertStringContainsString($line, $widget);
+        }
+        $this->assertStringContainsString('if (!small) flowOrb(orbEl);', $widget);
+        $this->assertStringContainsString('orbEl.__lvl = Math.max(a, c * 0.35);', $widget);
+        $this->assertStringContainsString("'.lva-orb.is-gl::before,.lva-orb.is-gl::after{display:none}',", $widget);
+        // Without WebGL the CSS ball stays; it stops (and gives its context back) once its card is gone.
+        $this->assertStringContainsString("try { gl = cv.getContext('webgl'", $widget);
+        $this->assertStringContainsString("if (lose) lose.loseContext(); return;", $widget);
+    }
 }
