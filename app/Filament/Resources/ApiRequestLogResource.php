@@ -34,6 +34,12 @@ class ApiRequestLogResource extends Resource
 
     protected static ?string $modelLabel = 'API request';
 
+    /** Requests are under each key (System → API keys → a key); their own pages stay. */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function canCreate(): bool
     {
         return false;

@@ -137,6 +137,13 @@ class ApiKeysAdminTest extends TestCase
         Livewire::actingAs($this->admin)->test(ViewApiRequestLog::class, ['record' => ApiRequestLog::first()->getRouteKey()])->assertOk();
     }
 
+    public function test_requests_are_under_each_key_not_in_the_menu(): void
+    {
+        $this->assertFalse(ApiRequestLogResource::shouldRegisterNavigation());
+        $this->actingAs($this->admin)->get(ApiKeyResource::getUrl('index'))->assertOk()
+            ->assertDontSee('href="'.ApiRequestLogResource::getUrl('index').'"', false);
+    }
+
     public function test_members_cannot_open_it(): void
     {
         $this->actingAs($this->member)->get(ApiKeyResource::getUrl('view', ['record' => $this->limited]))->assertForbidden();
