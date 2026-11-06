@@ -24,7 +24,7 @@
       'agent' => $c['agent'],
       'business' => $c['business'] ?? '',
       'dialect' => $c['dialect'],
-      'avatar' => asset('images/speakers/'.$c['avatar'].'.webp').'?v=1',
+      'avatar' => \App\Support\SpeakerAvatar::bySlug($c['avatar']),
       'dir' => $english ? 'ltr' : 'rtl', 'lang' => $english ? 'en' : 'ar',
       'turns' => array_map(fn ($t) => [
         'role' => $t[0],

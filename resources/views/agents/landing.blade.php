@@ -17,7 +17,7 @@
     $ui = __('agents_landing.steps_ui');
     $app = __('agents_landing.how_app');
     $inbox = __('agents_landing.inbox');
-    $speaker = fn (string $slug) => asset('images/speakers/'.$slug.'.webp').'?v=1';
+    $speaker = fn (string $slug) => \App\Support\SpeakerAvatar::bySlug($slug);
     $check = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
     // Every dialect (Arabic page) or accent (English page) the agent speaks, in the studio's own
     // regions (VoiceFlag::region), each with a few of its countries' round flags.

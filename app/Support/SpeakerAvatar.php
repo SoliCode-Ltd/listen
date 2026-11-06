@@ -46,6 +46,14 @@ final class SpeakerAvatar
     }
 
     /**
+     * The avatar's address by its file name ("ar-maha"), with the file's time as its version.
+     */
+    public static function bySlug(string $slug): string
+    {
+        return asset(self::DIR.'/'.$slug.'.webp').'?v='.(self::files()[$slug] ?? 1);
+    }
+
+    /**
      * @return array<string, int>
      */
     private static function files(): array
