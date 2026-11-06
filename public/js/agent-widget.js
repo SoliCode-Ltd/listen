@@ -90,6 +90,10 @@
     '.lva-orb::before{content:"";position:absolute;inset:-35%;background:conic-gradient(from 0deg,transparent 0 12%,var(--c3) 26%,transparent 42%,var(--c4) 62%,transparent 80%);filter:blur(14px);opacity:.55;mix-blend-mode:screen;animation:lva-spin 11s linear infinite}',
     '.lva-orb::after{content:"";position:absolute;top:9%;left:19%;width:46%;height:30%;border-radius:50%;background:radial-gradient(ellipse at 50% 40%,rgba(255,255,255,.78),transparent 72%)}',
     '.lva.is-speaking .lva-orb::before{animation-duration:3.4s;opacity:.85}',
+    // Drawn as the site's own orbs (flowOrb): the light flows inside the ball; the CSS one stays without WebGL.
+    '.lva-orb.is-gl{background:none;box-shadow:0 20px 44px -18px var(--c2)}',
+    '.lva-orb.is-gl::before,.lva-orb.is-gl::after{display:none}',
+    '.lva-gl{position:absolute;inset:0;width:100%;height:100%;display:block}',
     '.lva.is-connecting .lva-orb{animation:lva-breathe 1.4s ease-in-out infinite}',
     '.lva-rings i{position:absolute;inset:0;border-radius:50%;border:2px solid var(--c3);opacity:0}',
     // The orb moves with the voice inside the ball only, as every orb on the site does: no rings spread round it.
@@ -246,6 +250,120 @@
   };
   var WAVE = [0.3, 0.5, 0.72, 0.9, 1, 0.9, 0.72, 0.5, 0.3];
 
+  /*
+   * The card's big orb drawn as Listen's own orbs are (listen-orbs.js, the same light): soft, grainy
+   * colour flowing inside the ball, drifting at rest and flowing faster and brighter with the agent's
+   * voice, rings rippling inside it with the loudness. The card lives in its own shadow root on any
+   * website, so it draws in a WebGL canvas of its own; without WebGL the CSS ball stays, and with
+   * reduced motion the orb keeps a still frame. It stops when the card is gone.
+   */
+  var ORB_FRAG = [
+    'precision highp float;',
+    'uniform float uSize; uniform float uTime; uniform float uLevel; uniform float uSeed; uniform float uLift;',
+    'uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3;',
+    'float hash(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }',
+    'float noise(vec3 x){',
+    '  vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);',
+    '  return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x), mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),',
+    '             mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x), mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);',
+    '}',
+    'float fbm(vec3 p){ float a = 0.55; float s = 0.0; for (int i = 0; i < 3; i++){ s += a * noise(p); p = p * 2.07 + vec3(1.7, 9.2, 3.1); a *= 0.45; } return s; }',
+    'void main(){',
+    '  vec2 uv = (gl_FragCoord.xy / uSize) * 2.0 - 1.0;',
+    '  float r = length(uv);',
+    '  if (r > 1.0) { gl_FragColor = vec4(0.0); return; }',
+    '  vec3 n = vec3(uv, sqrt(max(0.0, 1.0 - r * r)));',
+    '  float a = uTime * 0.16 + uSeed;',
+    '  vec3 q = vec3(n.x * cos(a) - n.z * sin(a), n.y, n.x * sin(a) + n.z * cos(a));',
+    '  vec3 s = q * 0.7 + uSeed;',
+    '  vec3 w = vec3(fbm(s + vec3(0.0, 0.0, uTime * 0.11)), fbm(s + vec3(5.2, 1.3, 2.8 + uTime * 0.05)), fbm(s + vec3(1.7, 9.2, uTime * 0.08)));',
+    '  float v = fbm(s * 0.8 + 1.7 * w);',
+    '  float ring = sin(r * 17.0 + (w.x - 0.5) * 7.0 - uTime * 5.0);',
+    '  v += ring * 0.1 * uLevel * smoothstep(0.08, 0.4, r) * (1.0 - r * 0.6);',
+    '  v = clamp((v - 0.26) / 0.42, 0.0, 1.0);',
+    '  vec3 col = mix(uC0, uC1, smoothstep(0.0, 0.38, v));',
+    '  col = mix(col, uC2, smoothstep(0.35, 0.8, v));',
+    '  col = mix(col, uC3, smoothstep(0.75, 1.0, v) * 0.85);',
+    '  vec3 L = normalize(vec3(-0.45, 0.55, 0.8));',
+    '  float diff = dot(n, L) * 0.5 + 0.5;',
+    '  col *= 0.8 + 0.32 * diff;',
+    '  float glow = pow(max(dot(n, L), 0.0), 6.0);',
+    '  col = mix(col, uC3, glow * 0.22);',
+    '  float rim = pow(1.0 - n.z, 2.6);',
+    '  col = mix(col, mix(uC2, uC3, 0.6), rim * 0.55);',
+    '  col += uLevel * 0.05 * uC3;',
+    '  col = mix(col, mix(uC2, uC3, 0.7), uLift);',
+    '  float g = hash(vec3(floor(gl_FragCoord.xy), floor(uTime * 10.0)));',
+    '  col += (g - 0.5) * 0.05;',
+    '  float edge = 1.0 - smoothstep(1.0 - 1.6 / uSize, 1.0, r);',
+    '  gl_FragColor = vec4(clamp(col, 0.0, 1.0) * edge, edge);',
+    '}'
+  ].join('\n');
+  // A CSS colour as 0..1 red, green and blue.
+  var paint = null;
+  function rgb3(c) {
+    paint = paint || document.createElement('canvas').getContext('2d');
+    paint.fillStyle = '#000'; paint.fillStyle = String(c || '').trim() || '#7659FA';
+    var v = paint.fillStyle;
+    if (v.charAt(0) === '#') return [parseInt(v.slice(1, 3), 16) / 255, parseInt(v.slice(3, 5), 16) / 255, parseInt(v.slice(5, 7), 16) / 255];
+    var m = v.match(/[\d.]+/g) || [0, 0, 0];
+    return [m[0] / 255, m[1] / 255, m[2] / 255];
+  }
+  function flowOrb(orb) {
+    var cv = document.createElement('canvas'), gl = null;
+    try { gl = cv.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false }); } catch (e) {}
+    if (!gl) return;
+    var sh = function (type, src) { var o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return gl.getShaderParameter(o, gl.COMPILE_STATUS) ? o : null; };
+    var vs = sh(gl.VERTEX_SHADER, 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }'), fs = sh(gl.FRAGMENT_SHADER, ORB_FRAG);
+    if (!vs || !fs) return;
+    var prog = gl.createProgram();
+    gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+    gl.useProgram(prog);
+    var buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    var at = gl.getAttribLocation(prog, 'p');
+    gl.enableVertexAttribArray(at); gl.vertexAttribPointer(at, 2, gl.FLOAT, false, 0, 0);
+    var u = {};
+    ['uSize', 'uTime', 'uLevel', 'uSeed', 'uLift', 'uC0', 'uC1', 'uC2', 'uC3'].forEach(function (k) { u[k] = gl.getUniformLocation(prog, k); });
+    cv.className = 'lva-gl';
+    cv.setAttribute('aria-hidden', 'true');
+    orb.appendChild(cv);
+    orb.classList.add('is-gl');
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var o = { time: Math.random() * 30, speed: 0.7, level: 0, lift: 0, seed: Math.random() * 10 }, last = 0, n = 0, colors = null, seen = false, still = false;
+    function draw() {
+      var dpr = Math.min(window.devicePixelRatio || 1, 2), size = Math.max(8, Math.round((orb.offsetWidth || 112) * dpr));
+      if (cv.width !== size) { cv.width = size; cv.height = size; }
+      if (!colors || n % 30 === 0) {
+        var st = getComputedStyle(orb);
+        colors = ['--c1', '--c2', '--c3', '--c4'].map(function (k) { return rgb3(st.getPropertyValue(k)); });
+      }
+      gl.viewport(0, 0, size, size);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.uniform1f(u.uSize, size); gl.uniform1f(u.uTime, o.time); gl.uniform1f(u.uLevel, o.level);
+      gl.uniform1f(u.uSeed, o.seed); gl.uniform1f(u.uLift, o.lift);
+      gl.uniform3fv(u.uC0, colors[0]); gl.uniform3fv(u.uC1, colors[1]); gl.uniform3fv(u.uC2, colors[2]); gl.uniform3fv(u.uC3, colors[3]);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+    (function tick(now) {
+      // Gone with its card (once it was shown): its drawing stops and its context is given back.
+      if (orb.isConnected) seen = true;
+      else if (seen || n > 600) { var lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext(); return; }
+      var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
+      last = now;
+      var voice = Math.max(0, Math.min(1, orb.__lvl || 0)), k = Math.min(1, dt * 8);
+      o.level += (voice - o.level) * k;
+      o.lift += ((voice > 0.02 ? 0.1 + 0.22 * voice : 0) - o.lift) * k;
+      o.speed += ((voice > 0.02 ? 2.2 + 2.6 * voice : 0.9) - o.speed) * Math.min(1, dt * 4);
+      o.time += dt * o.speed;
+      // Drawn only while it can be seen (the card open); with reduced motion, one still frame.
+      if (orb.isConnected && orb.getClientRects().length && (!reduce || !still)) { draw(); still = true; }
+      n++;
+      requestAnimationFrame(tick);
+    })(0);
+  }
   function el(tag, cls, text) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
@@ -376,7 +494,9 @@
         rings.appendChild(el('i')); rings.appendChild(el('i'));
         wrap.appendChild(rings);
         wrap.appendChild(el('i', 'lva-spin'));
-        wrap.appendChild(el('i', 'lva-orb'));
+        var orbEl = el('i', 'lva-orb');
+        wrap.appendChild(orbEl);
+        if (!small) flowOrb(orbEl);
         if (!small) {
           var ring = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
           ring.setAttribute('class', 'lva-ring');
@@ -751,7 +871,7 @@
       if (!v) return;
       if (look.style !== 'waves') {
         var orbEl = v.querySelector('.lva-orb');
-        if (orbEl) orbEl.style.setProperty('--s', (1 + a * 0.12 + c * 0.04).toFixed(3));
+        if (orbEl) { orbEl.style.setProperty('--s', (1 + a * 0.12 + c * 0.04).toFixed(3)); orbEl.__lvl = Math.max(a, c * 0.35); }
         return;
       }
       var bars = v.children, t = Date.now() / 95, small = look.style === 'bar';
