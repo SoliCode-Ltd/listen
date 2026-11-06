@@ -156,27 +156,35 @@ class ManualPaymentService
             // its day (by card, or paid by hand) gives way.
             $planChanges->supersede($request->user, 'replaced_by_payment');
 
-            // Paid before the plan paid by hand has ended (the reminders ask members to
-            // renew before then): the new period follows the one already paid for, so
-            // no paid day is lost. Otherwise it starts now.
-            $paidUntil = $this->paidByHandUntil($currentSubscription);
-            $from = $paidUntil ?? now();
-            $periodEnd = strtolower($request->billing_cycle) === 'yearly'
-                ? $from->copy()->addYear()
-                : $from->copy()->addMonth();
+            if (is_array($priceSnapshot['upgrade'] ?? null)) {
+                // A move up from a plan paid by hand, priced less the days left on it
+                // (App\Services\Billing\ManualUpgrade): as on a card, the higher plan
+                // starts now with a period of its own, and the credits used carry on.
+                $periodEnd = strtolower($request->billing_cycle) === 'yearly' ? now()->addYear() : now()->addMonth();
+                $subscription = $this->planAccessService->assignPlan($request->user, $request->plan, 'active', $periodEnd, now());
+            } else {
+                // Paid before the plan paid by hand has ended (the reminders ask members to
+                // renew before then): the new period follows the one already paid for, so
+                // no paid day is lost. Otherwise it starts now.
+                $paidUntil = $this->paidByHandUntil($currentSubscription);
+                $from = $paidUntil ?? now();
+                $periodEnd = strtolower($request->billing_cycle) === 'yearly'
+                    ? $from->copy()->addYear()
+                    : $from->copy()->addMonth();
 
-            // Paid in full for a period of its own: its credits start afresh, even
-            // when it replaces a plan given by the team before that one ends (a plan
-            // change by card carries the credits on instead, App\Support\CreditPeriod).
-            // A period that follows one paid by hand keeps that one's start, so its
-            // credits run to its end and the new period's credits start fresh then.
-            $subscription = CreditPeriod::startingAfresh(fn (): Subscription => $this->planAccessService->assignPlan(
-                $request->user,
-                $request->plan,
-                'active',
-                $periodEnd,
-                $paidUntil !== null ? ($currentSubscription->current_period_start ?? $currentSubscription->created_at) : null,
-            ));
+                // Paid in full for a period of its own: its credits start afresh, even
+                // when it replaces a plan given by the team before that one ends (a plan
+                // change by card carries the credits on instead, App\Support\CreditPeriod).
+                // A period that follows one paid by hand keeps that one's start, so its
+                // credits run to its end and the new period's credits start fresh then.
+                $subscription = CreditPeriod::startingAfresh(fn (): Subscription => $this->planAccessService->assignPlan(
+                    $request->user,
+                    $request->plan,
+                    'active',
+                    $periodEnd,
+                    $paidUntil !== null ? ($currentSubscription->current_period_start ?? $currentSubscription->created_at) : null,
+                ));
+            }
 
             $subscription->forceFill([
                 'billing_payment_state' => 'manual_override',
