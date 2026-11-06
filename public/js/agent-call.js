@@ -739,9 +739,11 @@
         if (sc.inputTranscription && sc.inputTranscription.text) {
           heardAt = Date.now(); nudged = 0; quietEndAt = 0;
           if (agentText.trim()) { turn('agent', agentText); agentText = ''; }
-          // A new line from the caller: its place in the chat now, while they speak.
-          if (!callerText.trim() && spoken(sc.inputTranscription.text).trim() && opts.onHear) opts.onHear(true);
+          // A new line from the caller (its first real words, not a noise mark): its place in the chat
+          // now, while they speak.
+          var saidBefore = spoken(callerText).trim();
           callerText += sc.inputTranscription.text;
+          if (!saidBefore && spoken(callerText).trim() && opts.onHear) opts.onHear(true);
         }
         if (sc.outputTranscription && sc.outputTranscription.text && !hungUp && !dropTurn) {
           if (callerText.trim()) { turn('caller', callerText); callerText = ''; }

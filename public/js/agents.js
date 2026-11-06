@@ -676,7 +676,8 @@
       hearing.setAttribute('aria-hidden', 'true');
       hearing.innerHTML = '<small></small>' + DOTS;
       hearing.firstChild.textContent = T.you || '';
-      place(hearing, true);
+      // They started speaking now: after everything said before (an answer they talk over included).
+      place(hearing);
     }
     function hold(t) {
       if (t.role !== 'caller') return;

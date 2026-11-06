@@ -864,13 +864,12 @@
         return;
       }
       if (hearing) return;
+      // They started speaking now: after everything said before (an answer they talk over included).
       smoothly(function () {
         var n = el('div', 'lva-line is-caller is-typing');
         n.setAttribute('aria-hidden', 'true');
         n.innerHTML = '<i></i><i></i><i></i>';
-        var after = (liveView && liveView.el) || typing;
-        if (after && after.parentNode === parts.lines) parts.lines.insertBefore(n, after);
-        else parts.lines.appendChild(n);
+        parts.lines.appendChild(n);
         hearing = n;
       });
     }

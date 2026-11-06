@@ -43,7 +43,7 @@ class CallTranscriptTest extends TestCase
         // A plainly English answer to a caller who speaks English is not written in Arabic letters.
         $this->assertStringContainsString('latinArabic(text) && !english(text)) writeAgain(t, text);', $call);
         // The caller's line keeps its place from their first word, and while it is written again.
-        $this->assertStringContainsString('if (!callerText.trim() && spoken(sc.inputTranscription.text).trim() && opts.onHear) opts.onHear(true);', $call);
+        $this->assertStringContainsString('if (!saidBefore && spoken(callerText).trim() && opts.onHear) opts.onHear(true);', $call);
         $this->assertStringContainsString('if (t.wait && opts.onHold) opts.onHold(t);', $call);
         $this->assertStringContainsString("else if (role === 'caller' && opts.onHear) opts.onHear(false);", $call);
     }
