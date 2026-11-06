@@ -126,10 +126,14 @@ class CallBackgroundTest extends TestCase
         $agent = $this->agent($owner, ['speaker_id' => $voice['id']]);
 
         $page = $this->actingAs($owner)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk();
-        // Under the two choices: a button for each, with the choice's own name.
-        $page->assertSee('data-ag-sound-try', false)->assertSee('data-ag-sound="office"', false)->assertSee('data-ag-sound="none"', false)
-            ->assertSee(__('agents.design.background_try'))
-            ->assertSee(__('agents.design.background_listen.office'))->assertSee(__('agents.design.background_listen.none'));
+        // Each choice in one tile with its own play button, and no second row naming them again.
+        $html = $page->getContent();
+        $page->assertSee('data-ag-sound-try', false)->assertSee(__('agents.design.background_listen.office'))->assertSee(__('agents.design.background_listen.none'));
+        foreach (AgentWidget::BACKGROUNDS as $b) {
+            $this->assertMatchesRegularExpression('/<div class="ag-sound-choice">\s*<label class="ag-choice"><input type="radio" name="background" value="'.$b.'"[^>]*>.*?<\/label>\s*<button type="button" class="ag-sound-play" data-ag-sound="'.$b.'"/s', $html);
+        }
+        $this->assertSame(2, substr_count($html, 'class="ag-sound-play"'));
+        $this->assertStringNotContainsString('ag-sound-try-row', $html);
         // What it plays: the agent's own voice, and the office exactly as a call gets it.
         $config = $this->pageConfig($page->getContent());
         $this->assertSame(CallBackground::sound('office'), $config['design']['sound']);
@@ -137,9 +141,7 @@ class CallBackgroundTest extends TestCase
         $mine = collect($config['voices']['ar'])->firstWhere('id', $config['agent']['speaker_id']);
         $this->assertSame($voice['preview'], $mine['preview']);
 
-        // In both languages; what a screen reader says for each button starts with the words on it.
-        $this->assertSame('اسمع الفرق', trans('agents.design.background_try', [], 'ar'));
-        $this->assertSame('Hear the difference', trans('agents.design.background_try', [], 'en'));
+        // In both languages; what a screen reader says for each button starts with the name of its choice.
         foreach (['ar', 'en'] as $l) {
             foreach (AgentWidget::BACKGROUNDS as $b) {
                 $this->assertStringStartsWith(trans('agents.design.backgrounds.'.$b, [], $l).':', trans('agents.design.background_listen.'.$b, [], $l));

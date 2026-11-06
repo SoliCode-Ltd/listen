@@ -1664,11 +1664,16 @@
     var box = $('[data-ag-sound-try]'), S = C.design && C.design.sound, AC = window.ListenAgentCall;
     var Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     if (!box) return;
-    if (!S || !S.url || !Offline || !window.fetch || !window.Blob || !window.URL || !AC || !AC.officeLevel || !AC.spokenPower || !clip()) { box.hidden = true; return; }
+    var buttons = $$('[data-ag-sound]', box);
+    if (!S || !S.url || !Offline || !window.fetch || !window.Blob || !window.URL || !AC || !AC.officeLevel || !AC.spokenPower || !clip()) {
+      buttons.forEach(function (b) { b.hidden = true; });
+      box.classList.add('is-silent');
+      return;
+    }
     // The call's own rate (the voice and the office are both 24 kHz), the office alone before the
     // voice starts, and after it ends.
     var RATE = 24000, LEAD = 0.6, TAIL = 0.8;
-    var buttons = $$('[data-ag-sound]', box), els = null, takes = null, building = {}, decoded = {}, silent = null;
+    var els = null, takes = null, building = {}, decoded = {}, silent = null;
     var cur = null, want = null, frame = 0;
     // The agent's voice now (another may have been picked since the page opened).
     function clip() {
