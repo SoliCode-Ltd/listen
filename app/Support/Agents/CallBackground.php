@@ -43,7 +43,17 @@ final class CallBackground
      */
     public static function for(?AgentWidget $widget): ?array
     {
-        $name = (string) ($widget?->look('background') ?? AgentWidget::DEFAULT_APPEARANCE['background']);
+        return self::sound((string) ($widget?->look('background') ?? AgentWidget::DEFAULT_APPEARANCE['background']));
+    }
+
+    /**
+     * A background by its name, whatever a call button has chosen: what the call client plays, and
+     * what the Design tab plays under the agent's voice when the owner listens to the difference.
+     *
+     * @return array{url: string, loop: array{0: float, 1: float}, rms: float, under: float}|null
+     */
+    public static function sound(string $name): ?array
+    {
         $path = self::path($name);
         if ($path === null || ! is_file($path)) {
             return null;

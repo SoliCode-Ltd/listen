@@ -43,7 +43,9 @@
  * sound): colleagues talking quietly far off, as on a real office line. A seamless loop played
  * straight to the speaker, apart from the agent's own sound (the orb and the level never move with
  * it) and steady, never dipping while the agent speaks; it fades in as the call connects and out
- * as it ends. It sits `under` dB below the agent's voice, as that voice is heard on this call.
+ * as it ends. It sits `under` dB below the agent's voice, as that voice is heard on this call
+ * (officeLevel); Design → Call sound → Hear the difference plays the agent's preview line with the
+ * office at the same depth, measured the same way (spokenPower).
  */
 (function () {
   'use strict';
@@ -162,6 +164,28 @@
   // The agent's voice on a call, before it has said a word (RMS of its spoken 0.05 s pieces; a real
   // call measured -15 dBFS): the background starts under this, then follows the voice as it is heard.
   var VOICE_USUAL = 0.178;
+  // A 0.05 s piece of the agent's voice counts as speech when louder than -40 dBFS (its mean power).
+  var SPOKEN = 1e-4;
+  // How loud the office plays under a voice whose spoken pieces have the mean power `pow` (0 before
+  // it has said a word): `under` dB below that voice. A call and the Design tab's sample both use it.
+  function officeLevel(pow, bg) {
+    var voice = pow > 0 ? Math.sqrt(pow) : VOICE_USUAL;
+    voice = Math.max(VOICE_USUAL / 2.5, Math.min(VOICE_USUAL * 2.5, voice));
+    return voice * Math.pow(10, -(+bg.under || 49) / 20) / (+bg.rms || 0.05);
+  }
+  // The mean power of a recording's spoken 0.05 s pieces, as a call measures its agent (hearVoice).
+  function spokenPower(f, rate) {
+    var size = Math.max(1, Math.round(rate * 0.05)), sum = 0, n = 0;
+    for (var i = 0; i + size <= f.length; i += size) {
+      var p = 0;
+      for (var j = i; j < i + size; j++) p += f[j] * f[j];
+      p /= size;
+      if (p < SPOKEN) continue;
+      sum += p;
+      n++;
+    }
+    return n ? sum / n : 0;
+  }
 
   var WORKLET = [
     'class ListenPcm extends AudioWorkletProcessor {',
@@ -525,9 +549,7 @@
       }).catch(function () { bg = null; });
     }
     function backgroundLevel() {
-      var voice = voiceN ? Math.sqrt(voicePow) : VOICE_USUAL;
-      voice = Math.max(VOICE_USUAL / 2.5, Math.min(VOICE_USUAL * 2.5, voice));
-      return voice * Math.pow(10, -(+bg.under || 49) / 20) / (+bg.rms || 0.05);
+      return officeLevel(voiceN ? voicePow : 0, bg);
     }
     function startBackground() {
       bgOn = true;
@@ -557,7 +579,7 @@
         var p = 0;
         for (var j = i; j < i + 1200; j++) p += f[j] * f[j];
         p /= 1200;
-        if (p < 1e-4) continue;
+        if (p < SPOKEN) continue;
         voiceN++;
         voicePow += (p - voicePow) / Math.min(voiceN, 400);
       }
@@ -789,5 +811,5 @@
     };
   }
 
-  window.ListenAgentCall = { start: start };
+  window.ListenAgentCall = { start: start, officeLevel: officeLevel, spokenPower: spokenPower };
 })();

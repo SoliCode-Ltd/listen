@@ -7,6 +7,8 @@ use App\Models\AgentWidget;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Models\Voice;
+use App\Support\Agents\AgentVoices;
 use App\Support\Agents\CallBackground;
 use App\Support\AudioEffects;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -110,6 +112,73 @@ class CallBackgroundTest extends TestCase
         $this->assertSame('صوت المكالمة', trans('agents.design.group_sound', [], 'ar'));
         $this->assertSame('مكتب هادئ', trans('agents.design.backgrounds.office', [], 'ar'));
         $this->assertSame('Quiet office', trans('agents.design.backgrounds.office', [], 'en'));
+    }
+
+    public function test_the_design_tab_lets_the_owner_hear_the_difference_in_their_agents_own_voice(): void
+    {
+        $owner = $this->owner();
+        Voice::query()->create([
+            'language' => 'ar', 'gender' => 'female', 'tier' => 'hd', 'display_name' => 'Sumaya', 'dialect' => 'ar-EG',
+            'internal_voice_id' => 'ar-Gemini-HD-Achernar', 'provider' => 'gemini', 'provider_voice_id' => 'Achernar', 'is_active' => true,
+        ]);
+        $voice = AgentVoices::all('ar', true)[0];
+        $this->assertNotNull($voice['preview'], "the sample is the voice's own preview line");
+        $agent = $this->agent($owner, ['speaker_id' => $voice['id']]);
+
+        $page = $this->actingAs($owner)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk();
+        // Under the two choices: a button for each, with the choice's own name.
+        $page->assertSee('data-ag-sound-try', false)->assertSee('data-ag-sound="office"', false)->assertSee('data-ag-sound="none"', false)
+            ->assertSee(__('agents.design.background_try'))
+            ->assertSee(__('agents.design.background_listen.office'))->assertSee(__('agents.design.background_listen.none'));
+        // What it plays: the agent's own voice, and the office exactly as a call gets it.
+        $config = $this->pageConfig($page->getContent());
+        $this->assertSame(CallBackground::sound('office'), $config['design']['sound']);
+        $this->assertSame(CallBackground::for($agent->mainWidget()), $config['design']['sound']);
+        $mine = collect($config['voices']['ar'])->firstWhere('id', $config['agent']['speaker_id']);
+        $this->assertSame($voice['preview'], $mine['preview']);
+
+        // In both languages; what a screen reader says for each button starts with the words on it.
+        $this->assertSame('اسمع الفرق', trans('agents.design.background_try', [], 'ar'));
+        $this->assertSame('Hear the difference', trans('agents.design.background_try', [], 'en'));
+        foreach (['ar', 'en'] as $l) {
+            foreach (AgentWidget::BACKGROUNDS as $b) {
+                $this->assertStringStartsWith(trans('agents.design.backgrounds.'.$b, [], $l).':', trans('agents.design.background_listen.'.$b, [], $l));
+            }
+        }
+        $this->assertNull(CallBackground::sound('none'));
+        $this->assertNull(CallBackground::sound('jungle'));
+    }
+
+    public function test_the_sample_sits_as_far_under_the_voice_as_on_a_call(): void
+    {
+        $call = (string) file_get_contents(public_path('js/agent-call.js'));
+        $page = (string) file_get_contents(public_path('js/agents.js'));
+
+        // One measure for both: the call's own office depth, shared with the Design tab.
+        $this->assertStringContainsString('window.ListenAgentCall = { start: start, officeLevel: officeLevel, spokenPower: spokenPower };', $call);
+        $this->assertStringContainsString('return officeLevel(voiceN ? voicePow : 0, bg);', $call);
+        $this->assertSame(2, substr_count($call, 'if (p < SPOKEN) continue;'), 'a call and the sample count the same pieces as speech');
+
+        // The sample: the agent's preview line at the call's rate with the office under it at that depth,
+        // from a different moment of the office each time, played as plain audio (a phone on silent plays it).
+        $this->assertStringContainsString('var level = AC.officeLevel(AC.spokenPower(voice, RATE), S)', $page);
+        $this->assertStringContainsString('RATE = 24000', $page);
+        $this->assertStringContainsString('office[from + (at + i) % span] * g', $page);
+        $this->assertStringContainsString("type: 'audio/wav'", $page);
+        $this->assertStringContainsString('a = new Audio();', $page);
+        // Pressing the other while one plays carries on at the same moment.
+        $this->assertStringContainsString('!from.paused && !from.ended ? from.currentTime : 0', $page);
+        // One sound at a time: a voice preview, leaving the tab and a call starting stop it; it stops a preview.
+        $this->assertSame(3, substr_count($page, 'stopTry();'));
+        $this->assertMatchesRegularExpression('/function press\(k\) \{[^}]*\}\s*stopPreview\(\);/', $page);
+    }
+
+    /** The page's settings for agents.js (window.LISTEN_AGENTS, which Js::from writes as JSON.parse('...')). */
+    private function pageConfig(string $html): array
+    {
+        $this->assertSame(1, preg_match("/window\\.LISTEN_AGENTS = JSON\\.parse\\('(.*?)'\\);/s", $html, $m));
+
+        return json_decode((string) json_decode('"'.$m[1].'"'), true);
     }
 
     public function test_the_sound_is_the_same_file_for_every_website_and_kept_by_browsers(): void
