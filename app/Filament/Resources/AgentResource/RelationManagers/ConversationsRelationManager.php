@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Model;
 /** An agent's calls, newest first; each opens on its own page in Calls. Read only. */
 class ConversationsRelationManager extends RelationManager
 {
+    use \App\Filament\Concerns\SimplePages;
+
     protected static string $relationship = 'conversations';
 
     protected static ?string $title = 'Calls';
@@ -40,6 +42,8 @@ class ConversationsRelationManager extends RelationManager
             ->columns(AgentConversationResource::tableColumns(withAgent: false))
             ->filters(AgentConversationResource::tableFilters(withAgent: false))
             ->defaultSort('started_at', 'desc')
+            // Pages without counting every call first: quick however many calls the agent has had.
+            ->paginationPageOptions([25, 50, 100])
             ->recordUrl(fn (AgentConversation $record): string => AgentConversationResource::getUrl('view', ['record' => $record]))
             ->actions([
                 Tables\Actions\Action::make('open')

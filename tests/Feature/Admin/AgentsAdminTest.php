@@ -389,24 +389,31 @@ class AgentsAdminTest extends TestCase
         $this->assertSame('1', AgentConversationResource::getNavigationBadge());
     }
 
-    public function test_nothing_in_agents_can_be_added_changed_or_deleted(): void
+    public function test_nothing_in_agents_can_be_added_or_changed_and_only_agents_can_be_deleted(): void
     {
         foreach ([AgentResource::class, AgentConversationResource::class, AgentContactResource::class] as $resource) {
             $this->assertFalse($resource::canCreate(), $resource);
-            $this->assertFalse($resource::canDeleteAny(), $resource);
             $this->assertSame([], array_intersect(['create', 'edit'], array_keys($resource::getPages())), $resource);
         }
+        $this->assertTrue(AgentResource::canDeleteAny());
+        $this->assertFalse(AgentConversationResource::canDeleteAny());
+        $this->assertFalse(AgentContactResource::canDeleteAny());
         foreach ([$this->agent, $this->call, $this->contact] as $record) {
             $resource = Filament::getModelResource($record);
             $this->assertFalse($resource::canEdit($record));
-            $this->assertFalse($resource::canDelete($record));
         }
+        $this->assertTrue(AgentResource::canDelete($this->agent));
+        // Listen's own agent is never deleted from here.
+        $this->assertFalse(AgentResource::canDelete($this->house));
+        $this->assertFalse(AgentConversationResource::canDelete($this->call));
+        $this->assertFalse(AgentContactResource::canDelete($this->contact));
 
         Livewire::actingAs($this->admin)->test(ListAgents::class)
             ->assertTableActionExists('view')
             ->assertTableActionDoesNotExist('edit')
-            ->assertTableActionDoesNotExist('delete')
-            ->assertTableBulkActionDoesNotExist('delete');
+            ->assertTableActionVisible('delete', $this->agent)
+            ->assertTableActionHidden('delete', $this->house)
+            ->assertTableBulkActionExists('delete');
         Livewire::actingAs($this->admin)->test(ListAgentConversations::class)
             ->assertTableActionDoesNotExist('edit')
             ->assertTableActionDoesNotExist('delete')

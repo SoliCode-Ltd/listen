@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ListAgentConversations extends ListRecords
 {
+    use \App\Filament\Concerns\SimplePages;
+
     protected static string $resource = AgentConversationResource::class;
 
     public function getTabs(): array

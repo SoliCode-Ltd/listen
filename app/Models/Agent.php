@@ -98,6 +98,12 @@ class Agent extends Model
         return $this->hasMany(AgentWidget::class);
     }
 
+    /** Every website its call button has loaded on (AgentWidgetSite), newest first. */
+    public function sites(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(AgentWidgetSite::class)->orderByDesc('last_seen_at');
+    }
+
     public function conversations(): HasMany
     {
         return $this->hasMany(AgentConversation::class);

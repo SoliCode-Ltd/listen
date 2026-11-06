@@ -46,6 +46,12 @@ class ApiKey extends Model
         return $this->belongsTo(User::class);
     }
 
+    /** Every request made with this key (ApiRequestLog, kept 90 days), newest last. */
+    public function requestLogs(): HasMany
+    {
+        return $this->hasMany(ApiRequestLog::class);
+    }
+
     public function usages(): HasMany
     {
         return $this->hasMany(ApiKeyUsage::class);

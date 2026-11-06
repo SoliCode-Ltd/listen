@@ -57,12 +57,16 @@ class AgentCallController extends Controller
             return response()->json(['error' => 'not_found'], 404);
         }
         $origin = self::askingOrigin($request);
+        $via = (string) $request->query('via', '');
+        $via = in_array($via, ['wordpress', 'shopify', 'wix', 'laravel'], true) ? $via : null;
         if (! $widget->allowsOrigin($origin)) {
             $widget->noteRefused($origin);
+            \App\Models\AgentWidgetSite::note($widget, $origin, false, $via);
 
             return response()->json(['error' => 'origin', 'message' => __('agents.error_origin')], 403);
         }
         $this->seen($widget, $request);
+        \App\Models\AgentWidgetSite::note($widget, $origin, true, $via);
 
         return response()->json($this->card($agent, $widget))->header('Cache-Control', 'public, max-age=60');
     }
@@ -377,6 +381,31 @@ class AgentCallController extends Controller
         return response()->json(['text' => $this->calls->writeAgentLine($c, (int) ($in['n'] ?? 0), Str::limit((string) ($in['text'] ?? ''), 600, ''), ! empty($in['wrong']))]);
     }
 
+    /**
+     * One part of the call's recording (base64, in order: part 0, 1, 2 ...), sent every 10 s and
+     * as the call ends. Answers { result }: kept, again (had it), or why it was not kept.
+     */
+    public function recording(Request $request, string $conversation): JsonResponse
+    {
+        $in = $this->body($request);
+        $c = $this->calls->findByKey($conversation, (string) ($in['call_key'] ?? ''));
+        if (! $c) {
+            return $this->error('not_found', 404);
+        }
+        $audio = (string) ($in['audio'] ?? '');
+        $bytes = $audio !== '' && strlen($audio) <= (int) ceil(\App\Support\Agents\CallRecordings::MAX_PART_BYTES * 4 / 3) + 8 ? base64_decode($audio, true) : false;
+        if ($bytes === false) {
+            return response()->json(['result' => 'bad'], 422);
+        }
+        $result = \App\Support\Agents\CallRecordings::add($c, max(0, (int) ($in['part'] ?? 0)), $bytes, (string) ($in['type'] ?? ''));
+        // The last part: the file is packed whole, after the answer (the caller's page may be closing).
+        if ($result === 'kept' && ! empty($in['last'])) {
+            dispatch(fn () => \App\Support\Agents\CallRecordings::finish($c->fresh()))->afterResponse();
+        }
+
+        return response()->json(['result' => $result], in_array($result, ['kept', 'again', 'off'], true) ? 200 : 422);
+    }
+
     public function end(Request $request, string $conversation): JsonResponse
     {
         $in = $this->body($request);
@@ -411,6 +440,8 @@ class AgentCallController extends Controller
             'transcribe' => AgentAccess::callerTranscribe(),
             // An Arabic agent's line that comes out in Latin letters is written in Arabic ones (agent-line).
             'arabic_lines' => $agent->language !== 'en',
+            // The call's sound is recorded in the browser and sent in parts (CallRecordings, recording).
+            'record' => \App\Support\Agents\CallRecordings::enabled(),
             // The language it speaks, as the model is told it: a line in another language is stopped
             // as it starts and the agent is asked to say it again in this one (agent-call.js).
             'speaks' => \App\Support\Agents\AgentInstructions::speaks($agent),

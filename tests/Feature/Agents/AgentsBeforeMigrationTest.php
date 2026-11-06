@@ -27,7 +27,7 @@ class AgentsBeforeMigrationTest extends TestCase
         Subscription::create(['user_id' => $member->id, 'plan_id' => $plan->id, 'status' => 'active']);
 
         // The server as it is between the deploy and the migration: no agents tables yet.
-        foreach (['agent_contacts', 'agent_conversations', 'agent_widgets', 'agent_sources', 'agents'] as $table) {
+        foreach (['agent_widget_sites', 'agent_contacts', 'agent_conversations', 'agent_widgets', 'agent_sources', 'agents'] as $table) {
             Schema::dropIfExists($table);
         }
 
