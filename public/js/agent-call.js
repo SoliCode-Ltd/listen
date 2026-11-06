@@ -290,6 +290,37 @@
     reset();
     return { rate: to, push: push, end: function () { var y = push(new Float32Array(H)); reset(); return y; }, reset: reset };
   }
+  /*
+   * What the microphone hears while the agent's voice plays (and ECHO_TAIL ms after) is mostly that
+   * voice coming back from the speakers. The voice model took it for the caller: on a laptop it cut
+   * the agent's greeting and answered the echo of one of its own words ("إسمع"), so the greeting
+   * came twice. So it is sent as silence unless the caller plainly speaks over the agent: louder than
+   * BARGE_MIN and three times what the speakers usually leave in the microphone, for BARGE_PIECES
+   * pieces (0.1 s each) in a row, after the first BARGE_LEARN ms of the agent's line. Then the pieces
+   * held back (0.4 s) go first, so their first word is not lost, and everything goes until the agent
+   * stops.
+   */
+  var ECHO_TAIL = 300, BARGE_MIN = 1000, BARGE_PIECES = 3, BARGE_LEARN = 400, BARGE_HOLD = 4;
+  function micLevel(buffer) {
+    var a = new Int16Array(buffer), sum = 0, n = 0;
+    for (var i = 0; i < a.length; i += 4) { sum += a[i] * a[i]; n++; }
+    return n ? Math.sqrt(sum / n) : 0;
+  }
+  function micGate() {
+    var echo = 0, loud = 0, held = [], open = false, since = 0;
+    return function (buffer, agentOn, now) {
+      if (!agentOn) { open = false; loud = 0; held = []; since = 0; return [buffer]; }
+      if (open) return [buffer];
+      if (!since) since = now;
+      var l = micLevel(buffer);
+      held.push(buffer);
+      if (held.length > BARGE_HOLD) held.shift();
+      if (now - since >= BARGE_LEARN && l > Math.max(BARGE_MIN, 3 * echo)) loud++;
+      else { loud = 0; echo = echo ? echo + (l - echo) * 0.15 : l; }
+      if (loud >= BARGE_PIECES) { open = true; var out = held; held = []; return out; }
+      return [new ArrayBuffer(buffer.byteLength)];
+    };
+  }
   function rms(analyser, buf) {
     analyser.getFloatTimeDomainData(buf);
     var s = 0;
@@ -312,6 +343,13 @@
     // greeting stopped arriving for 0.8 s after its first 0.76 s, and 30 ms in hand left 0.18 s of
     // silence mid-word. Within a line a late piece plays at once (any wait would only lengthen a gap).
     var playFrame = 0, sources = new Set(), voiceEndAt = 0, START_LEAD = 0.15, conv = null;
+    // The echo guard (micGate, above), and when the caller last spoke with the agent quiet.
+    var gate = micGate(), callerVoiceAt = 0;
+    // The caller's words come on their own, in no set order, often after the agent has started its
+    // answer. Words of a line they said before the agent's line (lineAt, when its voice started)
+    // that was not cut short (cutLine) are written above that line, and it stays whole; they end
+    // LATE_GAP ms after their last piece, or with the agent's turn.
+    var lineAt = 0, cutLine = false, lateCaller = false, lateTimer = 0, LATE_GAP = 900;
     var info = null, pending = [], agentText = '', callerText = '', usage = null;
     // The agent's line on the page while it says it: its number, its whole words, how many show.
     var live = null, liveSeq = 0;
@@ -552,7 +590,15 @@
       }
       return { data: b64(out.buffer.slice(0, at * 2)), rate: half ? 8000 : 16000 };
     }
+    // A caller line whose words came late: it ends (endLate) after its last piece, before the agent's line.
+    function endLate() {
+      clearTimeout(lateTimer);
+      if (!lateCaller) return;
+      lateCaller = false;
+      if (callerText.trim()) { turn('caller', callerText); callerText = ''; }
+    }
     function flushTurns() {
+      endLate();
       if (callerText.trim()) { turn('caller', callerText); callerText = ''; }
       if (agentText.trim()) {
         // A hang-up the model wrote out instead of calling end_call: its goodbye plays, then the
@@ -586,6 +632,7 @@
       if (!f.length) return;
       if (bg) hearVoice(f);
       var fresh = !sources.size && Date.now() - voiceEndAt > 400;
+      if (fresh) { lineAt = Date.now(); cutLine = false; }
       if (fresh && conv) conv.reset();
       queueVoice(conv ? conv.push(f) : f, fresh);
       set('speaking');
@@ -783,18 +830,21 @@
         }
         var sc = m.serverContent;
         if (!sc) return;
-        if (sc.interrupted) { hush(); dropTurn = false; if (closing) closingDone = true; }
+        if (sc.interrupted) { endLate(); cutLine = true; hush(); dropTurn = false; if (closing) closingDone = true; }
         if (sc.inputTranscription && sc.inputTranscription.text) {
           heardAt = Date.now(); nudged = 0; quietEndAt = 0;
-          if (agentText.trim()) { turn('agent', agentText); agentText = ''; }
+          // Said before the agent's line that is coming now (they did not talk over it): above it.
+          var late = !!agentText.trim() && !cutLine && callerVoiceAt < lineAt;
+          if (agentText.trim() && !late) { turn('agent', agentText); agentText = ''; }
           // A new line from the caller (its first real words, not a noise mark): its place in the chat
           // now, while they speak.
           var saidBefore = spoken(callerText).trim();
           callerText += sc.inputTranscription.text;
-          if (!saidBefore && spoken(callerText).trim() && opts.onHear) opts.onHear(true);
+          if (!saidBefore && spoken(callerText).trim() && opts.onHear) opts.onHear(true, late);
+          if (late) { lateCaller = true; clearTimeout(lateTimer); lateTimer = setTimeout(endLate, LATE_GAP); }
         }
         if (sc.outputTranscription && sc.outputTranscription.text && !hungUp && !dropTurn) {
-          if (callerText.trim()) { turn('caller', callerText); callerText = ''; }
+          if (callerText.trim() && !lateCaller) { turn('caller', callerText); callerText = ''; }
           agentText += sc.outputTranscription.text;
           if (redone < MAX_REDO && wrongTongue(agentText)) stopWrong();
           else showLive();
@@ -811,6 +861,7 @@
       var links = (list || []).filter(function (l) { return l && typeof l.url === 'string' && /^https?:\/\//i.test(l.url); })
         .map(function (l) { return { url: l.url, label: String(l.label || l.url), network: String(l.network || '') }; });
       if (!links.length) return;
+      endLate();
       if (callerText.trim()) { turn('caller', callerText); callerText = ''; }
       if (agentText.trim()) { turn('agent', agentText); agentText = ''; }
       queue.push({ role: 'links', links: links, text: '' });
@@ -863,7 +914,7 @@
       ended = true;
       flushTurns();
       release();
-      clearInterval(pingTimer); clearInterval(quietTimer); clearTimeout(stopTimer); clearTimeout(waitTimer); cancelAnimationFrame(raf);
+      clearInterval(pingTimer); clearInterval(quietTimer); clearTimeout(stopTimer); clearTimeout(waitTimer); clearTimeout(lateTimer); cancelAnimationFrame(raf);
       stopBackground();
       try { ws && ws.close(); } catch (e) {}
       try { mic && mic.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
@@ -916,7 +967,11 @@
       ws.onclose = function () { if (!ended) finish(state === 'connecting' ? 'error' : 'caller_left'); };
       node.port.onmessage = function (e) {
         if (muted || !ws || ws.readyState !== 1 || state === 'connecting') return;
-        ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64(e.data), mimeType: 'audio/pcm;rate=16000' } } }));
+        var now = Date.now(), agentOn = sources.size > 0 || now - voiceEndAt < ECHO_TAIL;
+        if (!agentOn && micLevel(e.data) > VOICED) callerVoiceAt = now;
+        gate(e.data, agentOn, now).forEach(function (b) {
+          ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64(b), mimeType: 'audio/pcm;rate=16000' } } }));
+        });
         if (info.transcribe) keepHeard(e.data);
       };
       pingTimer = setInterval(ping, 12000);
@@ -945,5 +1000,5 @@
     };
   }
 
-  window.ListenAgentCall = { start: start, officeLevel: officeLevel, spokenPower: spokenPower, converter: converter };
+  window.ListenAgentCall = { start: start, officeLevel: officeLevel, spokenPower: spokenPower, converter: converter, micGate: micGate };
 })();

@@ -115,7 +115,7 @@ class CallBackgroundTest extends TestCase
         $this->assertStringNotContainsString('stopTry', $page);
         $this->assertStringNotContainsString('.ag-sound-', (string) file_get_contents(public_path('css/agents.css')));
         $call = (string) file_get_contents(public_path('js/agent-call.js'));
-        $this->assertStringContainsString('window.ListenAgentCall = { start: start, officeLevel: officeLevel, spokenPower: spokenPower, converter: converter };', $call);
+        $this->assertStringContainsString('window.ListenAgentCall = { start: start, officeLevel: officeLevel, spokenPower: spokenPower, converter: converter, micGate: micGate };', $call);
         $this->assertStringContainsString('return officeLevel(voiceN ? voicePow : 0, bg);', $call);
         $this->assertNull(CallBackground::sound('none'));
         $this->assertNull(CallBackground::sound('jungle'));

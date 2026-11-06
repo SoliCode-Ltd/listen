@@ -43,7 +43,7 @@ class CallTranscriptTest extends TestCase
         // A plainly English answer to a caller who speaks English is not written in Arabic letters.
         $this->assertStringContainsString('latinArabic(text) && !english(text)) writeAgain(t, text);', $call);
         // The caller's line keeps its place from their first word, and while it is written again.
-        $this->assertStringContainsString('if (!saidBefore && spoken(callerText).trim() && opts.onHear) opts.onHear(true);', $call);
+        $this->assertStringContainsString('if (!saidBefore && spoken(callerText).trim() && opts.onHear) opts.onHear(true, late);', $call);
         $this->assertStringContainsString('if (t.wait && opts.onHold) opts.onHold(t);', $call);
         $this->assertStringContainsString("else if (role === 'caller' && opts.onHear) opts.onHear(false);", $call);
     }
@@ -68,5 +68,36 @@ class CallTranscriptTest extends TestCase
         $this->assertStringNotContainsString("n.className = 'lva-line is-agent is-fixed';", $widget);
         // The Design tab's pretend call shows its words the same way.
         $this->assertStringContainsString("line({ role: 'agent', text: text, live: n });", $widget);
+    }
+    public function test_the_callers_late_words_go_above_the_answer_and_its_echo_never_cuts_the_agent(): void
+    {
+        $call = (string) file_get_contents(public_path('js/agent-call.js'));
+        $widget = (string) file_get_contents(public_path('js/agent-widget.js'));
+        $page = (string) file_get_contents(public_path('js/agents.js'));
+
+        // The caller's words come on their own, often after the agent has started its answer: words of a
+        // line said before it (not cut short) go above it, and the answer is not split.
+        $this->assertStringContainsString('var late = !!agentText.trim() && !cutLine && callerVoiceAt < lineAt;', $call);
+        $this->assertStringContainsString("if (agentText.trim() && !late) { turn('agent', agentText); agentText = ''; }", $call);
+        $this->assertStringContainsString('opts.onHear(true, late);', $call);
+        $this->assertStringContainsString("if (callerText.trim() && !lateCaller) { turn('caller', callerText); callerText = ''; }", $call);
+        $this->assertStringContainsString('lateTimer = setTimeout(endLate, LATE_GAP);', $call);
+        $this->assertMatchesRegularExpression('/function flushTurns\(\) \{\s*endLate\(\);/', $call);
+        $this->assertStringContainsString('if (sc.interrupted) { endLate(); cutLine = true; hush();', $call);
+        $this->assertStringContainsString('if (fresh) { lineAt = Date.now(); cutLine = false; }', $call);
+        // Both cards put such a line above the answer that is coming.
+        $this->assertStringContainsString('function hear(on, before) {', $widget);
+        $this->assertStringContainsString('var next = before && ((liveView && liveView.el) || typing);', $widget);
+        $this->assertStringContainsString('function hear(on, before) {', $page);
+        $this->assertStringContainsString('place(hearing, before);', $page);
+
+        // While the agent speaks, what the speakers leave in the microphone goes as silence: only a caller
+        // plainly speaking over it gets through (with the 0.4 s before), so its own echo never cuts it.
+        $this->assertStringContainsString('var ECHO_TAIL = 300, BARGE_MIN = 1000, BARGE_PIECES = 3, BARGE_LEARN = 400, BARGE_HOLD = 4;', $call);
+        $this->assertStringContainsString('l > Math.max(BARGE_MIN, 3 * echo)', $call);
+        $this->assertStringContainsString('return [new ArrayBuffer(buffer.byteLength)];', $call);
+        $this->assertStringContainsString('gate(e.data, agentOn, now).forEach(function (b) {', $call);
+        $this->assertStringContainsString('var now = Date.now(), agentOn = sources.size > 0 || now - voiceEndAt < ECHO_TAIL;', $call);
+        $this->assertStringNotContainsString("ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64(e.data)", $call);
     }
 }
