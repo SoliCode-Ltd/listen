@@ -242,6 +242,54 @@
     }
     return out;
   }
+  /*
+   * The agent's voice comes at 24 kHz and plays in the microphone's own engine, at the speaker's rate:
+   * one engine for both, as every phone plays it (a second engine of the voice's own rate stayed
+   * silent on phones). Each piece is brought to the engine's rate here, carrying on from the piece
+   * before, with the kind of converter a browser uses for a whole stream: a 64-tap Blackman-windowed
+   * sinc, cut at 0.92 of the lower rate's top. Pieces played at 24 kHz in a faster engine would each
+   * be converted on their own, roughly: a metallic shimmer above the voice and a dull top.
+   * push(piece) gives what is ready (it holds 0.67 ms back for the next piece), end() the rest of
+   * a line, reset() drops what it holds. Null for a rate it has no table for (then the browser
+   * converts, as before).
+   */
+  function converter(from, to) {
+    from = Math.round(from); to = Math.round(to);
+    if (from === to) return { rate: to, push: function (x) { return x; }, end: function () { return new Float32Array(0); }, reset: function () {} };
+    var a = from, b = to;
+    while (b) { var t = a % b; a = b; b = t; }
+    var L = to / a, M = from / a, H = 32, W = 2 * H;
+    if (!(L >= 1 && L <= 4096)) return null;
+    var fc = 0.92 * Math.min(1, L / M), table = new Float32Array(L * W);
+    for (var p = 0; p < L; p++) {
+      var sum = 0;
+      for (var k = 0; k < W; k++) {
+        var d = k - H + 1 - p / L, u = d / H, x = Math.PI * fc * d;
+        var h = (x ? Math.sin(x) / x : 1) * (0.42 + 0.5 * Math.cos(Math.PI * u) + 0.08 * Math.cos(2 * Math.PI * u));
+        table[p * W + k] = h; sum += h;
+      }
+      for (k = 0; k < W; k++) table[p * W + k] /= sum;
+    }
+    var rest, phase;
+    function reset() { rest = new Float32Array(H - 1); phase = 0; }
+    function push(x) {
+      var all = new Float32Array(rest.length + x.length);
+      all.set(rest); all.set(x, rest.length);
+      var y = new Float32Array(Math.ceil(all.length * L / M) + 2), j = 0, cur = 0;
+      while (cur + W <= all.length) {
+        var o = phase * W, s = 0;
+        for (var k = 0; k < W; k++) s += table[o + k] * all[cur + k];
+        y[j++] = s;
+        phase += M;
+        cur += Math.floor(phase / L);
+        phase %= L;
+      }
+      rest = all.slice(cur);
+      return y.subarray(0, j);
+    }
+    reset();
+    return { rate: to, push: push, end: function () { var y = push(new Float32Array(H)); reset(); return y; }, reset: reset };
+  }
   function rms(analyser, buf) {
     analyser.getFloatTimeDomainData(buf);
     var s = 0;
@@ -263,7 +311,7 @@
     // short pause in the voice model's stream early in the line does not break a word: a test call's
     // greeting stopped arriving for 0.8 s after its first 0.76 s, and 30 ms in hand left 0.18 s of
     // silence mid-word. Within a line a late piece plays at once (any wait would only lengthen a gap).
-    var playHead = 0, sources = new Set(), voiceEndAt = 0, START_LEAD = 0.15;
+    var playFrame = 0, sources = new Set(), voiceEndAt = 0, START_LEAD = 0.15, conv = null;
     var info = null, pending = [], agentText = '', callerText = '', usage = null;
     // The agent's line on the page while it says it: its number, its whole words, how many show.
     var live = null, liveSeq = 0;
@@ -289,22 +337,6 @@
 
     function set(s) { if (state !== s) { state = s; opts.onState && opts.onState(s); } }
 
-    /*
-     * The agent's voice (and the office behind it) in an audio engine of its own, at the voice's own
-     * 24 kHz: each piece plays exactly as it came, and the browser brings the whole voice to the speaker's
-     * rate with its best converter. Played piece by piece in an engine at the speaker's rate, every piece
-     * would be converted on its own with a rough one: a metallic shimmer above the voice and a dull top. The
-     * microphone stays in an engine at the device's rate (some browsers take a microphone at no other).
-     */
-    function voiceEngine() {
-      var AC = window.AudioContext || window.webkitAudioContext;
-      try {
-        var c = new AC({ sampleRate: 24000 });
-        if (c.sampleRate === 24000) return c;
-        c.close();
-      } catch (e) {}
-      return null;
-    }
     function closeEngines(delay) {
       var list = [ctx, vctx].filter(function (c, i, all) { return c && all.indexOf(c) === i; });
       var close = function () { list.forEach(function (c) { try { c.close(); } catch (e) {} }); };
@@ -553,15 +585,25 @@
       var f = pcmFrom(data);
       if (!f.length) return;
       if (bg) hearVoice(f);
-      var b = vctx.createBuffer(1, f.length, 24000);
-      b.copyToChannel(f, 0);
+      var fresh = !sources.size && Date.now() - voiceEndAt > 400;
+      if (fresh && conv) conv.reset();
+      queueVoice(conv ? conv.push(f) : f, fresh);
+      set('speaking');
+    }
+    // A piece of the voice, straight after the one before, starting on one of the engine's frames
+    // (so it plays sample for sample). A converted piece is at the engine's rate; without a converter
+    // it stays at 24 kHz and the browser converts it.
+    function queueVoice(y, fresh) {
+      if (!y.length) return;
+      var rate = conv ? conv.rate : 24000, R = vctx.sampleRate;
+      var b = vctx.createBuffer(1, y.length, rate);
+      b.copyToChannel(y, 0);
       var src = vctx.createBufferSource();
       src.buffer = b;
       src.connect(out);
-      var fresh = !sources.size && Date.now() - voiceEndAt > 400;
-      var at = Math.max(vctx.currentTime + (fresh ? START_LEAD : 0.03), playHead);
-      src.start(at);
-      playHead = at + b.duration;
+      var at = Math.max(Math.ceil((vctx.currentTime + (fresh ? START_LEAD : 0.03)) * R), playFrame);
+      src.start(at / R);
+      playFrame = at + Math.round(b.duration * R);
       sources.add(src);
       heardAt = Date.now();
       src.onended = function () {
@@ -573,7 +615,12 @@
           if (state === 'speaking') set('listening');
         }
       };
-      set('speaking');
+    }
+    // The end of the agent's turn: the last 0.67 ms the converter holds, straight after the rest
+    // while it still plays (afterwards it is only the silence after the voice).
+    function endVoice() {
+      if (!conv) return;
+      if (sources.size) queueVoice(conv.end(), false); else conv.reset();
     }
     // Whether an agent line is in a language it should not speak: never another language; an
     // Arabic agent speaks English only after the caller did, and an English agent Arabic.
@@ -685,7 +732,8 @@
       sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
       sources.clear();
       voiceEndAt = Date.now();
-      playHead = vctx ? vctx.currentTime : 0;
+      playFrame = 0;
+      if (conv) conv.reset();
       if (state === 'speaking') set('listening');
     }
 
@@ -752,7 +800,7 @@
           else showLive();
         }
         (sc.modelTurn && sc.modelTurn.parts || []).forEach(function (p) { if (p.inlineData && p.inlineData.data) play(p.inlineData.data); });
-        if (sc.turnComplete) { flushTurns(); dropTurn = false; if (closing) closingDone = true; }
+        if (sc.turnComplete) { endVoice(); flushTurns(); dropTurn = false; if (closing) closingDone = true; }
       };
       if (typeof ev.data === 'string') handle(ev.data);
       else if (ev.data && ev.data.text) ev.data.text().then(handle);
@@ -837,7 +885,9 @@
       mic = stream;
       if (ended) { stream.getTracks().forEach(function (t) { t.stop(); }); return null; }
       ctx = new (window.AudioContext || window.webkitAudioContext)();
-      vctx = voiceEngine() || ctx;
+      // One engine for the microphone and the voice (converter(), above).
+      vctx = ctx;
+      conv = converter(24000, ctx.sampleRate);
       out = vctx.createGain();
       outAnalyser = vctx.createAnalyser(); outAnalyser.fftSize = 1024;
       out.connect(outAnalyser); outAnalyser.connect(vctx.destination);
@@ -875,7 +925,6 @@
       stopTimer = setTimeout(function () { finish('limit'); }, Math.max(30, data.max_seconds || 600) * 1000);
       window.addEventListener('pagehide', onLeave);
       if (ctx.state === 'suspended') ctx.resume();
-      if (vctx !== ctx && vctx.state === 'suspended') vctx.resume();
       loop();
     }).catch(function (err) {
       if (!ended) {
@@ -896,5 +945,5 @@
     };
   }
 
-  window.ListenAgentCall = { start: start, officeLevel: officeLevel, spokenPower: spokenPower };
+  window.ListenAgentCall = { start: start, officeLevel: officeLevel, spokenPower: spokenPower, converter: converter };
 })();

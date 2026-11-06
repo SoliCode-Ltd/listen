@@ -5,9 +5,9 @@ namespace App\Support\Agents;
 use App\Models\AgentWidget;
 
 /**
- * What a caller hears behind the agent's voice (Design → Call sound): by default a quiet office,
- * people at other desks having their own conversations far off, with pauses and quiet spells, and
- * no keys or ticks, as on a real office line; or nothing.
+ * What a caller hears behind the agent's voice on every call: a quiet office, people at other desks
+ * having their own conversations far off, with pauses and quiet spells, and no keys or ticks, as on a
+ * real office line.
  *
  * The sound is resources/audio/agents/office.mp3 (scripts/audio/build_environments.py, office(),
  * the same room as the studio's Office environment): mono at the call's 24 kHz, 64 kbps, a
@@ -36,14 +36,14 @@ final class CallBackground
     }
 
     /**
-     * What the call client needs to play the call's background, or null for none. A test call or
-     * a demo has no call button of its own: the agent's first one decides.
+     * What the call client needs to play the call's background. Every call has the quiet office
+     * behind it: owners no longer choose (a call button saved with "none" before gets it too).
      *
      * @return array{url: string, loop: array{0: float, 1: float}, rms: float, under: float}|null
      */
     public static function for(?AgentWidget $widget): ?array
     {
-        return self::sound((string) ($widget?->look('background') ?? AgentWidget::DEFAULT_APPEARANCE['background']));
+        return self::sound('office');
     }
 
     /**
