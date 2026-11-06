@@ -14,10 +14,12 @@ use App\Models\SiteSetting;
 use App\Models\Voice;
 use App\Services\Agents\AgentCalls;
 use App\Support\Agents\AgentInstructions;
+use App\Support\Agents\AgentPurge;
 use App\Support\Agents\HouseAgent;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
 use Filament\Infolists;
+use Filament\Notifications\Notification;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
@@ -35,8 +37,10 @@ use Illuminate\Support\Str;
  * Agents (read only): every voice agent members made, and Listen's own
  * (HouseAgent), with everything it was set up with: its business, its voice,
  * its script and the decisions taken at setup, what it knows and where it
- * learned it, its call button and link page, and what its calls used. Its
- * calls and the customers it saved are under it, and in Calls and Customers.
+ * learned it, its call button and link page, every website the button runs on,
+ * and what its calls used. Its calls (with their recordings) and the customers it
+ * saved are under it. The admin can delete any agent for good (AgentPurge), except
+ * Listen's own.
  */
 class AgentResource extends Resource
 {
@@ -84,12 +88,40 @@ class AgentResource extends Resource
         'laravel' => 'Laravel',
     ];
 
+    /** The admin deletes agents for good (AgentPurge); nothing else is changed here. */
+    public static function canDelete(Model $record): bool
+    {
+        return $record instanceof Agent && AgentPurge::canPurge($record);
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return true;
+    }
+
+    /** Calls on right now, across every agent (the calls are under each agent). */
+    public static function getNavigationBadge(): ?string
+    {
+        return AgentConversationResource::getNavigationBadge();
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'success';
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Calls live right now';
+    }
+
     /** Deleted agents stay in the list, marked: their calls and customers still point to them. */
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
             ->withoutGlobalScopes([SoftDeletingScope::class])
-            ->with('user:id,name,email');
+            ->with('user:id,name,email')
+            ->when(self::sitesReady(), fn (Builder $q): Builder => $q->withCount('sites'));
     }
 
     public static function getGloballySearchableAttributes(): array
@@ -128,6 +160,13 @@ class AgentResource extends Resource
                     ->limit(26)
                     ->tooltip(fn (Agent $record): ?string => $record->user?->email)
                     ->placeholder('Account deleted'),
+                Tables\Columns\TextColumn::make('sites_count')
+                    ->label('Websites')
+                    ->state(fn (Agent $record): ?string => self::sitesLine($record))
+                    ->description(fn (Agent $record): ?string => self::sitesMore($record))
+                    ->tooltip('Every website its call button has loaded on (the agent\'s page lists them all, allowed or refused).')
+                    ->placeholder('Not on a website yet')
+                    ->wrap(),
                 Tables\Columns\TextColumn::make('language')
                     ->label('Language and voice')
                     ->formatStateUsing(fn (?string $state, Agent $record): string => implode(' · ', array_filter([
@@ -244,8 +283,23 @@ class AgentResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make()->iconButton(),
+                self::deleteAction()->iconButton(),
             ])
-            ->bulkActions([])
+            ->bulkActions([
+                Tables\Actions\BulkAction::make('delete')
+                    ->label('Delete for good')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Delete these agents for good?')
+                    ->modalDescription(self::DELETE_NOTE.' Listen\'s own agents in the selection are kept.')
+                    ->modalSubmitActionLabel('Delete for good')
+                    ->deselectRecordsAfterCompletion()
+                    ->action(function (\Illuminate\Support\Collection $records): void {
+                        $gone = $records->filter(fn (Agent $agent): bool => AgentPurge::purge($agent))->count();
+                        Notification::make()->title(self::plural($gone, 'agent').' deleted')->success()->send();
+                    }),
+            ])
             ->emptyStateHeading('No agents yet')
             ->emptyStateDescription('Agents members make on the Agents page show here, with Listen\'s own.');
     }
@@ -466,12 +520,68 @@ class AgentResource extends Resource
         ]);
     }
 
+    public const DELETE_NOTE = 'The agent goes for good, with its calls, their recordings, its knowledge files and its call buttons (they stop working on every website). Calls still on are ended first, so the credits they held go back to the owner. The customers it saved stay in the owner\'s list. This cannot be undone.';
+
+    /** Delete for good (AgentPurge), on the list and on the agent's page; never Listen's own. */
+    public static function deleteAction(): Tables\Actions\Action
+    {
+        return Tables\Actions\Action::make('delete')
+            ->label('Delete for good')
+            ->icon('heroicon-o-trash')
+            ->color('danger')
+            ->visible(fn (Agent $record): bool => AgentPurge::canPurge($record))
+            ->requiresConfirmation()
+            ->modalHeading(fn (Agent $record): string => 'Delete '.$record->name.' for good?')
+            ->modalDescription(self::DELETE_NOTE)
+            ->modalSubmitActionLabel('Delete for good')
+            ->action(function (Agent $record): void {
+                AgentPurge::purge($record);
+                Notification::make()->title('Agent deleted')->success()->send();
+            });
+    }
+
+    /** The websites table exists (not in the minute between a deploy and its migration). */
+    public static function sitesReady(): bool
+    {
+        return once(fn (): bool => rescue(fn (): bool => \Illuminate\Support\Facades\Schema::hasTable('agent_widget_sites'), false, false));
+    }
+
+    /** "clinic.example", the website its button was last seen on; null when none. */
+    public static function sitesLine(Agent $agent): ?string
+    {
+        if (self::sitesCount($agent) === 0) {
+            return null;
+        }
+        // Where it shows first (the newest), else the newest website that was refused.
+        $last = $agent->sites()->reorder()->orderByDesc('allowed')->orderByDesc('last_seen_at')->first(['origin', 'allowed']);
+
+        return $last ? $last->host().($last->allowed ? '' : ' (refused)') : null;
+    }
+
+    public static function sitesMore(Agent $agent): ?string
+    {
+        $more = self::sitesCount($agent) - 1;
+
+        return $more > 0 ? 'and '.self::plural($more, 'more website') : null;
+    }
+
+    /** How many websites (counted with the list's query, or here for one agent). */
+    public static function sitesCount(Agent $agent): int
+    {
+        if (! self::sitesReady()) {
+            return 0;
+        }
+
+        return (int) ($agent->getAttribute('sites_count') ?? $agent->sites()->count());
+    }
+
     public static function getRelations(): array
     {
-        return [
+        return array_values(array_filter([
+            self::sitesReady() ? RelationManagers\SitesRelationManager::class : null,
             RelationManagers\ConversationsRelationManager::class,
             RelationManagers\ContactsRelationManager::class,
-        ];
+        ]));
     }
 
     public static function getWidgets(): array
@@ -617,21 +727,28 @@ class AgentResource extends Resource
     {
         return once(function () use ($agent): array {
             $calls = fn (): Builder => AgentConversation::query()->where('agent_id', $agent->getKey());
+            // One pass over its calls (by channel), however many there are, instead of one a figure.
+            $rows = $calls()->toBase()->selectRaw('channel, count(*) as calls, sum(duration_seconds) as seconds, sum(billed_seconds) as billed,
+                sum(credits) as credits, sum(case when free = 1 then 1 else 0 end) as free, sum(case when free = 1 then billed_seconds else 0 end) as free_seconds,
+                sum(case when status = ? then 1 else 0 end) as failed, sum(case when lead is not null then 1 else 0 end) as leads,
+                sum(coalesce(cost_usd, 0)) as cost, max(started_at) as last', [AgentConversation::FAILED])
+                ->groupBy('channel')->get();
+            $sum = fn (string $key): int => (int) $rows->sum(fn ($r): int => (int) $r->{$key});
 
             return [
-                'calls' => $calls()->count(),
-                'by_channel' => $calls()->selectRaw('channel, count(*) as aggregate')->groupBy('channel')->pluck('aggregate', 'channel')->map(fn ($n): int => (int) $n)->all(),
-                'seconds' => (int) $calls()->sum('duration_seconds'),
-                'billed' => (int) $calls()->sum('billed_seconds'),
-                'credits' => (int) $calls()->sum('credits'),
-                'free' => $calls()->where('free', true)->count(),
-                'free_seconds' => (int) $calls()->where('free', true)->sum('billed_seconds'),
+                'calls' => $sum('calls'),
+                'by_channel' => $rows->mapWithKeys(fn ($r): array => [(string) $r->channel => (int) $r->calls])->all(),
+                'seconds' => $sum('seconds'),
+                'billed' => $sum('billed'),
+                'credits' => $sum('credits'),
+                'free' => $sum('free'),
+                'free_seconds' => $sum('free_seconds'),
                 'live' => AgentConversationResource::whereLiveNow($calls())->count(),
-                'failed' => $calls()->where('status', AgentConversation::FAILED)->count(),
-                'last' => $calls()->max('started_at'),
-                'leads' => $calls()->whereNotNull('lead')->count(),
+                'failed' => $sum('failed'),
+                'last' => $rows->max('last'),
+                'leads' => $sum('leads'),
                 'contacts' => AgentContact::query()->where('agent_id', $agent->getKey())->count(),
-                'cost' => (float) $calls()->sum('cost_usd'),
+                'cost' => (float) $rows->sum(fn ($r): float => (float) $r->cost),
             ];
         });
     }

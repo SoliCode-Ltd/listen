@@ -81,6 +81,20 @@ class ViewAgent extends ViewRecord
                     \Filament\Notifications\Notification::make()->title('Suspension lifted')->success()->send();
                 })
                 ->visible(fn (): bool => (bool) $this->agent()->setting('suspended')),
+            Actions\Action::make('delete')
+                ->label('Delete for good')
+                ->icon('heroicon-o-trash')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading(fn (): string => 'Delete '.$this->agent()->name.' for good?')
+                ->modalDescription(AgentResource::DELETE_NOTE)
+                ->modalSubmitActionLabel('Delete for good')
+                ->visible(fn (): bool => \App\Support\Agents\AgentPurge::canPurge($this->agent()))
+                ->action(function (): void {
+                    \App\Support\Agents\AgentPurge::purge($this->agent());
+                    \Filament\Notifications\Notification::make()->title('Agent deleted')->success()->send();
+                    $this->redirect(AgentResource::getUrl('index'));
+                }),
         ];
     }
 

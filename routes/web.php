@@ -50,6 +50,11 @@ Route::middleware('auth')->get('/admin-audio/cloned-voices/{voice}/{kind}', Admi
     ->whereIn('kind', ['sample', 'consent'])
     ->name('admin.cloned-voices.audio');
 
+// A voice agent's call recording (CallRecordings), for the admin's call page.
+Route::middleware('auth')->get('/admin-audio/agent-calls/{call}', \App\Http\Controllers\AdminAgentRecordingController::class)
+    ->where('call', 'cnv_[a-z0-9]{24}')
+    ->name('admin.agent-calls.recording');
+
 Route::middleware('auth')->get('/admin-video/dubs/{dub}/{kind}', \App\Http\Controllers\AdminVideoDubFileController::class)
     ->whereNumber('dub')
     ->whereIn('kind', ['clean', 'preview'])

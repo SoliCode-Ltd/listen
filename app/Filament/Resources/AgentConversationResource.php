@@ -117,6 +117,12 @@ class AgentConversationResource extends Resource
         ]);
     }
 
+    /** Calls are under each agent (Agents → an agent → Calls); their own pages stay. */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function getNavigationBadge(): ?string
     {
         $count = rescue(fn (): int => self::whereLiveNow(AgentConversation::query())->count(), 0, false);
@@ -188,6 +194,15 @@ class AgentConversationResource extends Resource
                     $record->page_url,
                 ])) ?: null)
                 ->searchable(['origin', 'page_url']),
+            Tables\Columns\IconColumn::make('recording_bytes')
+                ->label('Recording')
+                ->state(fn (AgentConversation $record): bool => filled($record->recording_path))
+                ->boolean()
+                ->trueIcon('heroicon-o-speaker-wave')
+                ->falseIcon('heroicon-o-minus')
+                ->trueColor('primary')
+                ->falseColor('gray')
+                ->tooltip(fn (AgentConversation $record): ?string => filled($record->recording_path) ? 'Recorded: play it on the call\'s page' : null),
             Tables\Columns\TextColumn::make('country')
                 ->formatStateUsing(fn (?string $state): string => Countries::label($state))
                 ->placeholder('—')
@@ -415,6 +430,13 @@ class AgentConversationResource extends Resource
                     Infolists\Components\TextEntry::make('lead.email')->label('Email')->copyable()->placeholder('—'),
                     Infolists\Components\TextEntry::make('lead.note')->label('What they want')->placeholder('—')
                         ->formatStateUsing(fn ($state): ?HtmlString => AgentResource::isolate(is_scalar($state) ? (string) $state : null)),
+                ]),
+
+            Infolists\Components\Section::make('Recording')
+                ->description('The call as the caller\'s browser heard it: the caller and the agent together. Kept '.\App\Support\Agents\CallRecordings::KEEP_DAYS.' days.')
+                ->schema([
+                    Infolists\Components\ViewEntry::make('recording_path')->hiddenLabel()
+                        ->view('filament.agents.recording'),
                 ]),
 
             Infolists\Components\Section::make('Conversation')

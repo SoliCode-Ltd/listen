@@ -56,6 +56,11 @@
  * show it, never written in the chat, and the agent is asked to say it again in the call's
  * language (speaks). tongue() sorts a line the same way as App\Support\Agents\Tongue.
  *
+ * The call's recording (info.record, App\Support\Agents\CallRecordings): the microphone and the
+ * agent's voice together, compressed in the browser (MediaRecorder) and sent in parts every 10 s
+ * and as the call ends; nothing more is asked of the voice service. Browsers that cannot record
+ * simply do not.
+ *
  * The office behind the agent (background, App\Support\Agents\CallBackground; Design → Call
  * sound): colleagues talking quietly far off, as on a real office line. A seamless loop played
  * straight to the speaker, apart from the agent's own sound (the orb and the level never move with
@@ -1015,9 +1020,53 @@
       }).catch(function () { pending = turns.concat(pending); });
     }
 
+    // The call's recording (CallRecordings): the caller's microphone and the agent's voice together,
+    // as this browser hears them, compressed in the browser and sent in parts every 10 s and at the
+    // end, in order. Nothing more is asked of the voice service. The office behind the agent is not in it.
+    var recorder = null, recPart = 0, recChain = null, recType = '', recLast = false;
+    function startRecording() {
+      if (!info || !info.record || !window.MediaRecorder || !ctx || !ctx.createMediaStreamDestination || !micSource || !out) return;
+      try {
+        recType = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'].filter(function (t) {
+          return MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t);
+        })[0] || '';
+        if (!recType) return;
+        var dest = ctx.createMediaStreamDestination();
+        micSource.connect(dest);
+        out.connect(dest);
+        recorder = new MediaRecorder(dest.stream, { mimeType: recType, audioBitsPerSecond: 32000 });
+        recChain = Promise.resolve();
+        recorder.ondataavailable = function (e) { if (e.data && e.data.size) sendPart(e.data, recLast); };
+        recorder.start(10000);
+      } catch (e) { recorder = null; }
+    }
+    function sendPart(blob, last) {
+      var n = recPart++, call = info;
+      recChain = recChain.then(function () {
+        return new Promise(function (done) {
+          var reader = new FileReader();
+          reader.onloadend = function () {
+            var data = String(reader.result || '').replace(/^data:[^,]*,/, '');
+            // The last part goes as the page may be closing: keepalive carries it, when it is small
+            // enough for it (browsers take 64 KB at most that way).
+            post(call.api + '/recording', { call_key: call.call_key, part: n, type: recType, last: last ? 1 : 0, audio: data }, last && data.length < 60000)
+              .then(done, done);
+          };
+          reader.onerror = done;
+          reader.readAsDataURL(blob);
+        });
+      });
+    }
+    function stopRecording() {
+      if (!recorder || recorder.state === 'inactive') return;
+      recLast = true;
+      try { recorder.stop(); } catch (e) {}
+    }
+
     function finish(reason) {
       if (ended) return;
       ended = true;
+      stopRecording();
       flushTurns();
       release();
       clearInterval(pingTimer); clearInterval(quietTimer); clearTimeout(stopTimer); clearTimeout(waitTimer); clearTimeout(lateTimer); cancelAnimationFrame(raf);
@@ -1081,6 +1130,7 @@
         if (info.transcribe) keepHeard(e.data);
       };
       pingTimer = setInterval(ping, 12000);
+      startRecording();
       heardAt = Date.now();
       quietTimer = setInterval(checkQuiet, 1000);
       stopTimer = setTimeout(function () { finish('limit'); }, Math.max(30, data.max_seconds || 600) * 1000);

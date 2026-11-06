@@ -35,6 +35,11 @@ class AgentConversation extends Model
         'visitor_hash',
         'origin',
         'page_url',
+        // The call's recording on Listen's disk (CallRecordings).
+        'recording_path',
+        'recording_type',
+        'recording_bytes',
+        'recording_parts',
         'country',
         'status',
         'end_reason',
@@ -60,6 +65,8 @@ class AgentConversation extends Model
     protected $hidden = ['call_key_hash'];
 
     protected $casts = [
+        'recording_bytes' => 'integer',
+        'recording_parts' => 'integer',
         'started_at' => 'datetime',
         'last_seen_at' => 'datetime',
         'ended_at' => 'datetime',

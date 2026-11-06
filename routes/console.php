@@ -57,3 +57,5 @@ Schedule::command('agents:settle-calls')->everyMinute()->withoutOverlapping(5);
 Schedule::command('agents:read-links')->hourly()->withoutOverlapping(30);
 // Every page of live agents' websites, for what callers ask (AgentSite): never read, or not for a week.
 Schedule::command('agents:read-websites')->hourly()->withoutOverlapping(30);
+// Listen Agents: call recordings older than CallRecordings::KEEP_DAYS days go (the call's words stay).
+Schedule::call(fn () => \App\Support\Agents\CallRecordings::prune())->name('agents:prune-recordings')->dailyAt('04:10')->withoutOverlapping(60);
