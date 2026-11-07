@@ -7,8 +7,10 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\BillingLifecycleMail;
 use App\Services\Billing\RenewalGrace;
+use App\Services\Newsletter\PlanEndReminder;
 use App\Support\LiveServer;
 use App\Support\StripeInvoice;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Cashier;
 
@@ -37,29 +39,24 @@ class BillingLifecycleService
         }
 
         $sent = 0;
-        $days = array_values(array_unique(array_filter(
-            array_map(fn ($v) => (int) $v, (array) config('listen.billing.pre_renewal_reminder_days', [7, 1])),
-            fn (int $v) => $v >= 0
-        )));
+        // Newsletter → Reminder sets the days: the first reminder is kept in
+        // billing_reminder_7d_sent_at and the second in billing_reminder_1d_sent_at.
+        $reminder = app(PlanEndReminder::class);
+        $days = array_filter(['7d' => $reminder->days()['first'], '1d' => $reminder->days()['second']]);
 
-        foreach ($days as $day) {
+        foreach ($days as $slot => $day) {
+            $column = 'billing_reminder_'.$slot.'_sent_at';
             $query = Subscription::query()
                 ->with(['user', 'plan'])
                 ->where('status', 'active')
                 ->whereNotNull('current_period_end')
                 ->whereDate('current_period_end', now()->copy()->addDays($day)->toDateString())
-                ->whereHas('plan', fn ($q) => $q->where('price_cents', '>', 0)->where('is_active', true));
+                ->whereHas('plan', fn ($q) => $q->where('price_cents', '>', 0)->where('is_active', true))
+                // A reminder sent more than two days ago was for an earlier end date (the
+                // plan was renewed or extended since), so this one is still to be sent.
+                ->where(fn ($q) => $q->whereNull($column)->orWhere($column, '<', now()->subDays(2)));
 
-            // A reminder sent more than two days ago was for an earlier end date (the
-            // plan was renewed or extended since), so this one is still to be sent.
-            if ($day === 7) {
-                $query->where(fn ($q) => $q->whereNull('billing_reminder_7d_sent_at')->orWhere('billing_reminder_7d_sent_at', '<', now()->subDays(2)));
-            }
-            if ($day === 1) {
-                $query->where(fn ($q) => $q->whereNull('billing_reminder_1d_sent_at')->orWhere('billing_reminder_1d_sent_at', '<', now()->subDays(2)));
-            }
-
-            $query->chunkById(100, function ($subscriptions) use ($day, &$sent) {
+            $query->chunkById(100, function ($subscriptions) use ($day, $column, $reminder, &$sent) {
                 foreach ($subscriptions as $subscription) {
                     /** @var Subscription $subscription */
                     $user = $subscription->user;
@@ -84,10 +81,7 @@ class BillingLifecycleService
                         && $subscription->current_period_end
                         && abs($change->starts_at->diffInMinutes($subscription->current_period_end, false)) <= 24 * 60) {
                         if (app(\App\Services\Billing\PlanChangeEmails::class)->sendReminder($change, $day)) {
-                            $subscription->forceFill([
-                                'billing_reminder_7d_sent_at' => $day === 7 ? now() : $subscription->billing_reminder_7d_sent_at,
-                                'billing_reminder_1d_sent_at' => $day === 1 ? now() : $subscription->billing_reminder_1d_sent_at,
-                            ])->save();
+                            $subscription->forceFill([$column => now()])->save();
                             $sent++;
                         }
 
@@ -96,39 +90,24 @@ class BillingLifecycleService
 
                     // So this plan does not renew by card (paid by InstaPay / Vodafone
                     // Cash, or given by the team): say when it ends, not that it renews.
-                    $periodEnd = $subscription->current_period_end?->format('M j, Y') ?? 'soon';
-                    $planName = (string) ($subscription->plan?->name ?? 'your plan');
+                    if (! $reminder->enabled()) {
+                        continue;
+                    }
+                    $key = 'plan-end-reminder:'.$subscription->id.':'.$day.':'.$subscription->current_period_end?->toDateString();
+                    if (! Cache::add($key, 1, now()->addDays(14))) {
+                        continue;
+                    }
+                    try {
+                        $reminder->send($user, $subscription, $day);
+                    } catch (\Throwable $e) {
+                        // Not sent and not marked: another run today tries again.
+                        Cache::forget($key);
+                        Log::warning('A plan end reminder was not sent.', ['subscription_id' => $subscription->id, 'days' => $day, 'error' => $e->getMessage()]);
 
-                    $subject = $day === 1
-                        ? 'Your plan ends tomorrow'
-                        : 'Your plan ends in '.$day.' days';
-                    $body = $this->mail->compose(
-                        $user,
-                        ["{$planName} ends on {$periodEnd}. It does not renew by itself."],
-                        [
-                            'Plan' => $planName,
-                            'End Date' => $periodEnd,
-                            'Days Remaining' => (string) $day,
-                            'Subscription Status' => ucfirst((string) ($subscription->status ?? 'active')),
-                        ],
-                        'To keep it, renew or choose a plan at '.$this->mail->manageBillingUrl()
-                    );
-
-                    $wasSent = $this->mail->send(
-                        $user,
-                        $subject,
-                        $body,
-                        "renewal-reminder:{$subscription->id}:{$day}:{$periodEnd}",
-                        24 * 14
-                    );
-                    if (! $wasSent) {
                         continue;
                     }
 
-                    $subscription->forceFill([
-                        'billing_reminder_7d_sent_at' => $day === 7 ? now() : $subscription->billing_reminder_7d_sent_at,
-                        'billing_reminder_1d_sent_at' => $day === 1 ? now() : $subscription->billing_reminder_1d_sent_at,
-                    ])->save();
+                    $subscription->forceFill([$column => now()])->save();
 
                     $sent++;
                 }

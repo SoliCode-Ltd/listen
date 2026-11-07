@@ -846,6 +846,7 @@ class ScheduledDowngradeTest extends TestCase
         $user->forceFill(['stripe_id' => 'cus_dn'])->save();
         $this->subscribe($user, 'starter', 'monthly', ['payment_method' => 'pm_card'])->assertOk();
         $this->partialMock(\App\Services\Billing\BillingLifecycleMail::class, fn ($mock) => $mock->shouldNotReceive('send'));
+        \App\Models\SiteSetting::set('plan_reminder_first_days', '7', 'plan_reminder');
 
         // Seven days before the end.
         app(\App\Services\BillingLifecycleService::class)->sendPreRenewalReminders();
@@ -863,6 +864,7 @@ class ScheduledDowngradeTest extends TestCase
         $this->subscribe($user, 'starter')->assertOk();
         \Illuminate\Support\Facades\Mail::fake();
         Carbon::setTestNow(Carbon::createFromTimestamp($this->periodEnd)->subDays(7)->addHour());
+        \App\Models\SiteSetting::set('plan_reminder_first_days', '7', 'plan_reminder');
 
         app(\App\Services\BillingLifecycleService::class)->sendPreRenewalReminders();
 
