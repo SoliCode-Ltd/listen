@@ -257,6 +257,7 @@ class DiscountTermsTest extends TestCase
         Mail::fake();
         $paid = Plan::factory()->create(['slug' => 'starter', 'price_cents' => 900, 'is_active' => true]);
         $renews = now()->addDays(7);
+        \App\Models\SiteSetting::set('plan_reminder_first_days', '7', 'plan_reminder');
 
         $card = User::factory()->create();
         Subscription::query()->create(['user_id' => $card->id, 'plan_id' => $paid->id, 'status' => 'active', 'current_period_start' => now()->subMonth(), 'current_period_end' => $renews]);

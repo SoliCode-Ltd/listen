@@ -2,21 +2,25 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\PlanEndReminderEmail;
 use App\Models\BillingSubscription;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\BillingLifecycleService;
+use App\Services\Newsletter\PlanEndReminder;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
+use Livewire\Livewire;
 use Stripe\ApiRequestor;
 use Tests\Support\FakeStripeHttpClient;
 use Tests\TestCase;
 
 /**
- * A plan that does not renew by card is reminded before it ends, every time it
- * ends, in words that say it ends. An email that could not be sent is tried
+ * A plan that does not renew by card is reminded before it ends (Newsletter →
+ * Reminder), every time it ends, in Arabic and English, in words that say it ends. An email that could not be sent is tried
  * again, and staging never emails members.
  */
 class PlanEndReminderTest extends TestCase
@@ -45,7 +49,7 @@ class PlanEndReminderTest extends TestCase
     }
 
     /** A Starter month paid by InstaPay that ends in $days days. */
-    private function paidByHand(int $days = 7, array $state = []): Subscription
+    private function paidByHand(int $days = 3, array $state = []): Subscription
     {
         $member = User::factory()->create(['name' => 'Mona']);
 
@@ -72,6 +76,7 @@ class PlanEndReminderTest extends TestCase
             ->map(fn ($message) => [
                 'subject' => (string) $message->getOriginalMessage()->getSubject(),
                 'body' => (string) $message->getOriginalMessage()->getTextBody(),
+                'html' => (string) $message->getOriginalMessage()->getHtmlBody(),
             ])
             ->values()
             ->all();
@@ -80,30 +85,54 @@ class PlanEndReminderTest extends TestCase
         return $sent;
     }
 
-    public function test_a_plan_paid_by_hand_is_told_when_it_ends_not_that_it_renews(): void
+    public function test_a_plan_paid_by_hand_is_told_when_it_ends_in_both_languages(): void
     {
-        $plan = $this->paidByHand(7);
+        $plan = $this->paidByHand(3);
 
         $this->assertSame(1, $this->remind());
 
         [$mail] = $this->sentMail();
-        $this->assertSame('Your plan ends in 7 days', $mail['subject']);
-        $this->assertStringContainsString('Starter ends on '.$plan->current_period_end->format('M j, Y'), $mail['body']);
-        $this->assertStringNotContainsString('renews on', $mail['body']);
-        $this->assertStringNotContainsStringIgnoringCase('update your payment method', $mail['body']);
+        $this->assertSame('Your Starter plan ends in 3 days · باقة مبتدئ تنتهي بعد 3 أيام', $mail['subject']);
+        $this->assertStringContainsString('Hi Mona, your Starter plan ends on '.$plan->current_period_end->format('j F Y').'. It does not renew by itself.', $mail['body']);
+        $this->assertStringContainsString('أهلاً Mona', $mail['body']);
+        $this->assertStringContainsString('/en/manage-subscription', $mail['html']);
+        $this->assertStringContainsString('/ar/manage-subscription', $mail['html']);
+        foreach (['{name}', '{plan}', '{date}', '{when}', '{days}'] as $placeholder) {
+            $this->assertStringNotContainsString($placeholder, $mail['html']);
+        }
+        $this->assertStringNotContainsString('unsubscribe', strtolower($mail['body']));
         $this->assertNotNull($plan->fresh()->billing_reminder_7d_sent_at);
+    }
+
+    public function test_the_days_are_set_in_newsletter_reminder(): void
+    {
+        app(PlanEndReminder::class)->save(['first_days' => '5', 'second_days' => '2']);
+        $five = $this->paidByHand(5);
+        $three = $this->paidByHand(3);
+        $two = $this->paidByHand(2);
+
+        $this->assertSame(2, $this->remind());
+        $this->assertSame(['Your Starter plan ends in 2 days · باقة مبتدئ تنتهي بعد يومين', 'Your Starter plan ends in 5 days · باقة مبتدئ تنتهي بعد 5 أيام'], collect($this->sentMail())->pluck('subject')->sort()->values()->all());
+        $this->assertNotNull($five->fresh()->billing_reminder_7d_sent_at);
+        $this->assertNull($three->fresh()->billing_reminder_7d_sent_at);
+        $this->assertNotNull($two->fresh()->billing_reminder_1d_sent_at);
+
+        // Turned off: nothing goes out.
+        app(PlanEndReminder::class)->save(['enabled' => false]);
+        $this->paidByHand(5);
+        $this->assertSame(0, $this->remind());
     }
 
     public function test_every_new_end_date_gets_its_own_reminders(): void
     {
         // Reminded for last month's end date, then renewed by hand.
         $plan = $this->paidByHand(1, [
-            'billing_reminder_7d_sent_at' => now()->subDays(36),
+            'billing_reminder_7d_sent_at' => now()->subDays(33),
             'billing_reminder_1d_sent_at' => now()->subDays(30),
         ]);
 
         $this->assertSame(1, $this->remind());
-        $this->assertSame('Your plan ends tomorrow', $this->sentMail()[0]['subject']);
+        $this->assertSame('Your Starter plan ends tomorrow · باقة مبتدئ تنتهي غداً', $this->sentMail()[0]['subject']);
         $this->assertTrue($plan->fresh()->billing_reminder_1d_sent_at->isToday());
 
         // Run again the same day: not sent twice.
@@ -111,10 +140,22 @@ class PlanEndReminderTest extends TestCase
         $this->assertSame([], $this->sentMail());
     }
 
+    public function test_a_card_plan_gets_no_reminder_from_the_site(): void
+    {
+        $plan = $this->paidByHand(3);
+        BillingSubscription::query()->create([
+            'user_id' => $plan->user_id, 'type' => 'default', 'stripe_id' => 'sub_card',
+            'stripe_status' => 'active', 'stripe_price' => 'price_starter_m', 'quantity' => 1,
+        ]);
+
+        $this->assertSame(0, $this->remind());
+        $this->assertSame([], $this->sentMail());
+    }
+
     public function test_staging_sends_no_reminders(): void
     {
         config(['listen.live_actions' => false]);
-        $plan = $this->paidByHand(7);
+        $plan = $this->paidByHand(3);
 
         $this->assertSame(0, $this->remind());
 
@@ -124,17 +165,43 @@ class PlanEndReminderTest extends TestCase
 
     public function test_a_reminder_that_could_not_be_sent_is_tried_again(): void
     {
-        $plan = $this->paidByHand(7);
-        $mailer = app('mail.manager');
-        Mail::shouldReceive('raw')->andThrow(new \RuntimeException('The mailbox is over its sending limit.'));
+        $plan = $this->paidByHand(3);
+        $this->mock(PlanEndReminder::class, function ($mock): void {
+            $mock->shouldReceive('days')->andReturn(['first' => 3, 'second' => 1]);
+            $mock->shouldReceive('enabled')->andReturn(true);
+            $mock->shouldReceive('send')->once()->andThrow(new \RuntimeException('The mailbox is over its sending limit.'));
+        });
 
         $this->assertSame(0, $this->remind());
         $this->assertNull($plan->fresh()->billing_reminder_7d_sent_at);
 
-        Mail::swap($mailer);
+        $this->app->forgetInstance(PlanEndReminder::class);
+        $this->app->offsetUnset(PlanEndReminder::class);
         $this->assertSame(1, $this->remind());
-        $this->assertSame('Your plan ends in 7 days', $this->sentMail()[0]['subject']);
+        $this->assertStringContainsString('ends in 3 days', $this->sentMail()[0]['subject']);
         $this->assertNotNull($plan->fresh()->billing_reminder_7d_sent_at);
+    }
+
+    public function test_the_admin_page_shows_saves_and_previews_the_reminder(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->actingAs($admin);
+
+        Livewire::test(PlanEndReminderEmail::class)
+            ->assertSee('Members who pay by card never get it')
+            ->set('data.first_days', '4')
+            ->call('save')
+            ->assertHasNoErrors();
+        $this->assertSame(4, app(PlanEndReminder::class)->days()['first']);
+
+        // The last reminder must come after the first.
+        Livewire::test(PlanEndReminderEmail::class)->set('data.second_days', '6')->call('save');
+        $this->assertSame(1, app(PlanEndReminder::class)->days()['second']);
+
+        $html = app(PlanEndReminder::class)->previewHtml();
+        $this->assertStringContainsString('ends in 4 days', $html);
+        $this->assertStringContainsString('تنتهي بعد 4 أيام', $html);
     }
 
     public function test_a_payment_warning_that_could_not_be_sent_is_tried_at_the_next_failure(): void
