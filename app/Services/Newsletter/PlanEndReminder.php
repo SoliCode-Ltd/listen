@@ -39,7 +39,8 @@ class PlanEndReminder
     {
         return [
             'enabled' => '1',
-            'order' => 'ar_en',
+            // English first, then Arabic.
+            'order' => 'en_ar',
             // A monthly plan paid by hand: three days leaves time to transfer and be
             // approved, and the day before is the last call.
             'first_days' => '3',
@@ -200,7 +201,7 @@ class PlanEndReminder
     {
         $fields = [
             'language' => Newsletter::LANGUAGE_BOTH,
-            'bilingual_order' => ($settings['order'] ?? 'ar_en') === 'en_ar' ? 'en_ar' : 'ar_en',
+            'bilingual_order' => ($settings['order'] ?? 'en_ar') === 'ar_en' ? 'ar_en' : 'en_ar',
         ];
 
         foreach (['en', 'ar'] as $lang) {
