@@ -29,7 +29,7 @@ use Throwable;
  */
 class StripeRecurringRevenue
 {
-    public const CACHE_KEY = 'stripe_recurring_revenue:v1';
+    public const CACHE_KEY = 'stripe_recurring_revenue:v2';
 
     private const CACHE_TTL_SECONDS = 600;
 
@@ -150,6 +150,10 @@ class StripeRecurringRevenue
             'bill_cents' => (int) round($billCents),
             'monthly_cents' => $monthlyFactor > 0 ? (int) round($billCents / $monthlyFactor) : 0,
             'next_bill_at' => $nextBill,
+            'customer' => (string) ($subscription->customer ?? ''),
+            // When a cancelled one stops: its cancel date, else the end of the period it was paid for.
+            'ends_at' => (int) ($subscription->cancel_at ?? 0) ?: (int) ($first->current_period_end ?? $subscription->current_period_end ?? 0),
+            'canceled_at' => (int) ($subscription->canceled_at ?? 0),
         ];
     }
 
@@ -265,6 +269,8 @@ class StripeRecurringRevenue
         $byPlan = [];
         $due30 = ['count' => 0, 'cents' => []];
         $soon = $now->copy()->addDays(30)->getTimestamp();
+        // Who cancelled and still has paid time, soonest to end first (the dashboard's list).
+        $cancelling = [];
 
         foreach ($rows as $row) {
             $k = &$kinds[$row['kind']];
@@ -280,6 +286,18 @@ class StripeRecurringRevenue
                 $plan[$row['kind']]++;
                 $plan['monthly_cents'][$row['currency']] = ($plan['monthly_cents'][$row['currency']] ?? 0) + $row['monthly_cents'];
                 unset($plan);
+            }
+
+            if ($row['kind'] === 'cancelling') {
+                $cancelling[] = [
+                    'customer' => $row['customer'],
+                    'plan' => $row['plan'],
+                    'cycle' => $row['cycle'],
+                    'currency' => $row['currency'],
+                    'monthly_cents' => $row['monthly_cents'],
+                    'ends_at' => $row['ends_at'],
+                    'canceled_at' => $row['canceled_at'],
+                ];
             }
 
             if ($row['kind'] === 'renewing' && $row['next_bill_at'] > 0 && $row['next_bill_at'] <= $soon) {
@@ -304,6 +322,7 @@ class StripeRecurringRevenue
             'due_30d' => $due30 + ['net_cents' => $net($due30['cents'])],
             'fees' => $fees,
             'by_plan' => array_values($byPlan),
+            'cancelling' => collect($cancelling)->sortBy('ends_at')->values()->all(),
         ];
     }
 }
