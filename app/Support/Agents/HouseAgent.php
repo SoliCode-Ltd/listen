@@ -128,7 +128,7 @@ final class HouseAgent
 
 # التواصل
 - البريد: help@listenai.studio
-TXT).($support !== '' ? "\n- واتساب: {$support}" : '');
+TXT).($support !== '' ? "\n- واتساب: {$support}" : '').self::details(true);
         }
 
         return trim(<<<TXT
@@ -155,7 +155,15 @@ Listen is an Arabic-first AI voice platform, in Arabic and English.
 
 # Contact
 - Email: help@listenai.studio
-TXT).($support !== '' ? "\n- WhatsApp: {$support}" : '');
+TXT).($support !== '' ? "\n- WhatsApp: {$support}" : '').self::details(false);
+    }
+
+    /** The full product sheet after the summary (HouseKnowledge), kept within what goes into a call. */
+    private static function details(bool $ar): string
+    {
+        $details = rescue(fn () => HouseKnowledge::details($ar), '', false);
+
+        return $details === '' ? '' : "\n\n".$details;
     }
 
     /**
@@ -182,12 +190,13 @@ TXT).($support !== '' ? "\n- WhatsApp: {$support}" : '');
                     'never' => [
                         'لا تذكر أبدًا الشركات أو التقنيات التي يعمل بها إسمع، ولا أي شركة أخرى.',
                         'لا تعد بخصم أو بميزة غير موجودة في المعلومات.',
+                        'لا تقل أبدًا إن إسمع لا يوفر شيئًا قبل أن تبحث عنه في كل المعلومات (مكتبة الأصوات واللهجات والمشاعر والأماكن الصوتية والباقات)، فأغلب ما يُطلب موجود، مثل أصوات الأطفال وكبار السن. وإن لم تجده فقل إنك ستتأكد، وخذ رقم المتصل أو بريده ليرد عليه الفريق.',
                         'لا تطلب أبدًا أرقام البطاقات أو كلمات المرور.',
                         'لا تتحدث أبدًا عن تكاليف إسمع أو أرباحه أو مورّديه أو أي شأن داخلي، ولا تعرض أن يتواصل الفريق بشأنها: قل بلطف إنها ليست مما تشاركه، وارجع إلى ما يحتاجه المتصل.',
                     ],
                     'steps' => [
                         'رحّب بالمتصل واسأله عما يحتاجه.',
-                        'أجب من المعلومات فقط، وباختصار.',
+                        'أجب من المعلومات فقط، وباختصار، واذكر أمثلة منها (مثل أسماء الأصوات أو اللهجات).',
                         'رشّح الباقة المناسبة لعدد الدقائق الذي يحتاجه.',
                         'لمشاكل الحساب أو الدفع أو الاسترداد خذ الاسم ورقم الهاتف أو البريد ليتواصل الفريق.',
                     ],
@@ -204,12 +213,13 @@ TXT).($support !== '' ? "\n- WhatsApp: {$support}" : '');
                 'never' => [
                     'Never name the companies or the technology behind Listen, or any other company.',
                     'Never promise a discount or a feature that is not in the facts.',
+                    "Never say Listen does not offer something before looking for it in all the facts (the voice library, dialects, emotions, sound places and plans): most of what callers ask for is there, such as children's and elders' voices. If it is not there, say you will check, and take their phone number or email for the team.",
                     'Never ask for card numbers or passwords.',
                     "Never talk about Listen's costs, profits, suppliers or anything internal, and do not offer a call back about them: say kindly it is not something you share, and return to what the caller needs.",
                 ],
                 'steps' => [
                     'Greet the caller and ask what they need.',
-                    'Answer from the facts only, briefly.',
+                    'Answer from the facts only, briefly, with examples from them (voice names, dialects).',
                     'Suggest the plan that fits the minutes they need.',
                     'For account, payment or refund problems, take their name and a phone number or email for the team.',
                 ],
