@@ -218,4 +218,25 @@ class AgentsAdminRecordsTest extends TestCase
         $this->actingAs($this->admin)->get(AgentResource::getUrl('view', ['record' => $this->agent]))->assertOk()
             ->assertSee('Websites')->assertSee('Delete for good');
     }
+
+    public function test_a_link_shows_its_posts_or_page_in_words_and_its_own_site_without_a_feed_says_so(): void
+    {
+        $json = fn (array $read): string => json_encode($read, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        AgentSource::create(['agent_id' => $this->agent->id, 'kind' => AgentSource::LINK, 'title' => 'listenai.studio', 'url' => 'https://shoes.example',
+            'status' => AgentSource::READY, 'chars' => 0, 'content' => $json(['kind' => 'none', 'title' => 'Beirut Shoes', 'items' => [], 'text' => ''])]);
+        AgentSource::create(['agent_id' => $this->agent->id, 'kind' => AgentSource::LINK, 'title' => 'X', 'url' => 'https://x.com/beirutshoes',
+            'status' => AgentSource::READY, 'chars' => 30, 'content' => $json(['kind' => 'posts', 'title' => 'Beirut Shoes', 'text' => '',
+                'items' => [['at' => '2026-11-07', 'about' => false, 'text' => 'Winter boots are in, 20% off this week']]])]);
+        AgentSource::create(['agent_id' => $this->agent->id, 'kind' => AgentSource::LINK, 'title' => 'Our story', 'url' => 'https://shoes.example/about',
+            'status' => AgentSource::READY, 'chars' => 24, 'content' => $json(['kind' => 'page', 'title' => 'About us', 'items' => [], 'text' => 'Family shoemakers since 1972'])]);
+
+        $this->actingAs($this->admin)->get(AgentResource::getUrl('view', ['record' => $this->agent]))->assertOk()
+            ->assertSee('No news feed')
+            ->assertSee('it has no news feed, so there is nothing new to read from this link', false)
+            ->assertSee('Show the posts it read (1)')
+            ->assertSee('2026-11-07')->assertSee('Winter boots are in, 20% off this week')
+            ->assertSee('Family shoemakers since 1972')
+            ->assertDontSee('{&quot;kind&quot;', false)
+            ->assertDontSee('"kind":', false);
+    }
 }
