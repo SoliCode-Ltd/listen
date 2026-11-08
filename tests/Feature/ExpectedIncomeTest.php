@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\UserResource;
 use App\Filament\Widgets\ExpectedIncome;
 use App\Models\User;
 use App\Services\Analytics\BusinessStatsService;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Stripe\ApiRequestor;
+use Stripe\Exception\ApiConnectionException;
 use Stripe\HttpClient\ClientInterface;
 use Tests\TestCase;
 
@@ -173,6 +175,27 @@ class ExpectedIncomeTest extends TestCase
             ->assertSee('$17.60 a month if the trials pay · $9.00 a month unpaid');
     }
 
+    public function test_the_cancelled_card_opens_a_list_of_who_cancelled_soonest_first(): void
+    {
+        $this->scriptStripe();
+        $admin = User::factory()->create(['is_admin' => true]);
+        $leaving = User::factory()->create(['name' => 'Huda Leaving', 'email' => 'huda@example.test', 'stripe_id' => 'cus_sub_leaving']);
+
+        $r = app(StripeRecurringRevenue::class)->build();
+        $this->assertSame(['cus_sub_leaving', 'cus_sub_leaving_date'], array_column($r['cancelling'], 'customer'), 'the one ending first comes first');
+
+        Livewire::actingAs($admin)->test(ExpectedIncome::class, ['filters' => ['months' => 6]])
+            ->assertSee('See who')
+            ->assertSeeHtml("open-modal', { id: 'cancelled-members' }")
+            ->assertSee('Huda Leaving')
+            ->assertSee('huda@example.test')
+            ->assertSeeHtml(UserResource::getUrl('view', ['record' => $leaving->id]))
+            ->assertSee('Starter')
+            ->assertSee('$9.00')
+            // A Stripe customer with no member on the site is still listed, by its id.
+            ->assertSee('cus_sub_leaving_date');
+    }
+
     public function test_the_card_says_when_stripe_cannot_be_read(): void
     {
         $this->stripe->unreachable = true;
@@ -303,7 +326,7 @@ class RevenueStripeClient implements ClientInterface
     public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
     {
         if ($this->unreachable) {
-            throw \Stripe\Exception\ApiConnectionException::factory('Could not connect to Stripe (test).');
+            throw ApiConnectionException::factory('Could not connect to Stripe (test).');
         }
 
         $path = (string) parse_url($absUrl, PHP_URL_PATH);
