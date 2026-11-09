@@ -50,4 +50,51 @@ class HomeInceptionTest extends TestCase
         // NVIDIA's green, unchanged.
         $this->assertStringContainsString('#76b900', $svg);
     }
+
+    public function test_search_engines_read_the_membership_on_every_page_in_both_languages(): void
+    {
+        foreach (['en', 'ar'] as $locale) {
+            foreach (['home', 'pricing', 'agents-landing'] as $route) {
+                app()->setLocale($locale);
+                $organization = collect($this->jsonLd((string) $this->getLocalizedRoute($route)->assertOk()->getContent()))
+                    ->firstWhere('@type', 'Organization');
+                $membership = $organization['memberOf'][0] ?? null;
+                $this->assertNotNull($membership, "{$locale} {$route}");
+                $this->assertSame('ProgramMembership', $membership['@type']);
+                $this->assertSame('NVIDIA Inception', $membership['programName']);
+                $this->assertSame('https://www.nvidia.com/en-us/startups/', $membership['url']);
+                $this->assertSame('NVIDIA', $membership['hostingOrganization']['name']);
+            }
+        }
+    }
+
+    public function test_ai_assistants_read_it_in_llms_txt_and_the_homes_markdown(): void
+    {
+        $llms = (string) $this->get('/llms.txt')->assertOk()->getContent();
+        $this->assertStringContainsString('Listen is a member of NVIDIA Inception, NVIDIA\'s program for startups building AI solutions.', $llms);
+        $this->assertDoesNotMatchRegularExpression('/gemini|google/i', $llms, 'the speech provider is never named');
+
+        app()->setLocale('en');
+        $markdown = (string) $this->withHeaders(['Accept' => 'text/markdown'])->getLocalizedRoute('home')->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/Listen is a member of \*\*NVIDIA Inception\*\*, a program for startups building AI solutions\./', $markdown);
+    }
+
+    /**
+     * Every node of the page's JSON-LD.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function jsonLd(string $html): array
+    {
+        preg_match_all('#<script type="application/ld\+json">(.*?)</script>#s', $html, $m);
+        $nodes = [];
+        foreach ($m[1] as $json) {
+            $data = json_decode($json, true);
+            foreach ($data['@graph'] ?? [$data] as $node) {
+                $nodes[] = $node;
+            }
+        }
+
+        return $nodes;
+    }
 }
