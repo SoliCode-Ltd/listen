@@ -742,6 +742,63 @@
       }
     }
 
+    /* NVIDIA Inception under the hero. It starts below the lowest point the speakers' bubbles reach (the
+       bottom speakers' bubbles end about 50px above the hero's edge on desktops; on phones the caption card ends
+       at it), so the space above it matches the next section's space below it. The badge stays 30px or more
+       (NVIDIA's minimum) and is never recoloured. */
+    .inception-strip {
+      position: relative;
+      width: fit-content;
+      max-width: min(1100px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 30px 72px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+    }
+    .inception-strip::before,
+    .inception-strip::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0, var(--line) 24%, var(--line) 76%, transparent 100%);
+    }
+    .inception-strip::before { top: 0; }
+    .inception-strip::after { bottom: 0; }
+    .inception-strip img {
+      display: block;
+      flex: none;
+      height: 40px;
+      width: auto;
+    }
+    .inception-strip p {
+      margin: 0;
+      font-size: .97rem;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+    .inception-strip p b { font-weight: 600; color: var(--text); }
+    html[dir="rtl"] .inception-strip p { font-size: 1rem; line-height: 1.8; }
+    @media (max-width: 960px) {
+      .inception-strip {
+        width: calc(100% - 32px);
+        margin-top: 1.4rem;
+        flex-direction: column;
+        gap: 16px;
+        padding: 28px 20px;
+        text-align: center;
+      }
+      .inception-strip img { height: 36px; }
+      .inception-strip p { font-size: .9rem; max-width: 30ch; text-wrap: balance; }
+      html[dir="rtl"] .inception-strip p { font-size: .94rem; }
+    }
+    @media (max-width: 640px) {
+      .inception-strip { margin-top: 2.1rem; }
+    }
+
     /* Voice cloning: one slim line under the facts strip. */
     .clone-announce {
       padding: 1rem 0 var(--landing-section-space);
@@ -999,6 +1056,13 @@
           @include('components.home.hero-art')
         </aside>
       </div>
+    </section>
+
+    {{-- NVIDIA Inception, right under the hero: NVIDIA's own badge (public/images/partners, unchanged but for its
+         empty margin) beside one line, between two rules that span only the strip and fade at their ends. --}}
+    <section class="inception-strip" aria-label="{{ __('ui.landing.inception_program') }}">
+      <img src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.landing.inception_badge') }}" width="109" height="40" loading="lazy" decoding="async">
+      <p>{!! __('ui.landing.inception_line', ['program' => '<b>'.e(__('ui.landing.inception_program')).'</b>']) !!}</p>
     </section>
 
     {{-- Listen Agents, right under the hero: a voice agent for a business, shown working (while Agents are open to this visitor). --}}

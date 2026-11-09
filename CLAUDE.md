@@ -13,6 +13,10 @@ These are the owner's standing instructions. Follow them in every session.
 ## Site content
 - Never mention other companies or products in the site's text or UI
   (for example competing voice platforms or the speech provider's name).
+  The one exception the owner approved is NVIDIA Inception (Listen is a
+  member): its badge and name under the homepage hero and in the footer, using
+  NVIDIA's own badge file unchanged (`public/images/partners/`), never larger
+  than Listen's logo, never under 30px.
 
 ## Email
 - Never send email. Draft it only, and let the owner send it.

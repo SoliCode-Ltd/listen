@@ -87,6 +87,7 @@ return [
     // ===== FOOTER =====
     'footer' => [
         'tagline' => 'Premium AI-powered text-to-speech. Natural voices for every project.',
+        'inception_badge' => 'NVIDIA Inception Program',
         'product' => 'Product',
         'solutions' => 'Solutions',
         'demo' => 'Try Demo',
@@ -102,6 +103,10 @@ return [
         'showcase_play' => 'Play',
         'showcase_pause' => 'Pause',
         'showcase_more' => 'Show all voices',
+        // The strip under the hero (NVIDIA Inception, the one other company the site names; see CLAUDE.md).
+        'inception_line' => 'Listen is a member of :program, a program for startups building AI solutions.',
+        'inception_program' => 'NVIDIA Inception',
+        'inception_badge' => 'NVIDIA Inception Program',
         'showcase_title' => 'Voices from across the English-speaking world',
         'showcase_body' => 'From London to Lagos, natural voices with delivery for every kind of content. Press play on any card.',
         'hero_art_label' => 'Two people talking, with voice waves flowing between them',
