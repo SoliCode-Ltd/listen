@@ -856,6 +856,7 @@ class SeoHelper
             "# {$siteName}",
             '',
             '> Listen (Arabic: إسمع, also written منصة إسمع) is a professional AI voice studio for Arabic and English at ' . $base . ', made by SoliCode Ltd. '
+                . 'Listen is a member of NVIDIA Inception, NVIDIA\'s program for startups building AI solutions. '
                 . ($library !== '' ? 'Its library has ' . $library . '. ' : '')
                 . ($cloning !== null ? 'Members can clone their own voice and have it speak the dialect they choose. ' : '')
                 . (StudioFacts::dubbing() ? 'It also dubs videos into an Arabic dialect or English accent. ' : '')
@@ -1372,6 +1373,7 @@ class SeoHelper
                 'disambiguatingDescription' => self::disambiguatingDescription($locale),
                 'logo' => $logo !== '' ? $logo : null,
                 'parentOrganization' => ['@type' => 'Organization', 'name' => 'SoliCode Ltd'],
+                'memberOf' => self::programMemberships(),
                 'contactPoint' => [
                     '@type' => 'ContactPoint',
                     'contactType' => 'customer support',
@@ -1736,6 +1738,29 @@ class SeoHelper
     }
 
     /** Which "Listen" this is: the voice studio at listenai.studio, not the other apps with the name. */
+    /**
+     * The programs Listen is a member of, for search engines (schema.org ProgramMembership): NVIDIA Inception,
+     * the one other company the site names (CLAUDE.md), as on the homepage strip and in the footer.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function programMemberships(): array
+    {
+        return [[
+            '@type' => 'ProgramMembership',
+            'programName' => 'NVIDIA Inception',
+            'alternateName' => 'إنسبشن من إنفيديا',
+            'description' => 'NVIDIA\'s program for startups building AI solutions.',
+            'url' => 'https://www.nvidia.com/en-us/startups/',
+            'hostingOrganization' => [
+                '@type' => 'Organization',
+                'name' => 'NVIDIA',
+                'url' => 'https://www.nvidia.com/',
+                'sameAs' => 'https://en.wikipedia.org/wiki/Nvidia',
+            ],
+        ]];
+    }
+
     private static function disambiguatingDescription(string $locale): string
     {
         return $locale === 'ar'
