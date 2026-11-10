@@ -815,18 +815,19 @@
         linear-gradient(90deg, rgba(98, 71, 238, 0), #6247EE 42%, #4C2DEB 66%, rgba(98, 71, 238, 0)) center / 100% 2px no-repeat,
         radial-gradient(ellipse 36% 50% at 62% 50%, rgba(118, 89, 250, .55), rgba(118, 89, 250, 0) 100%) center / 100% 100% no-repeat;
     }
-    /* The light comes out of the badge at full strength, slows and fades as it travels, then rests before the
-       next pass; both sides in step. Only a transform and opacity move; it stands still for visitors who ask
-       for less motion. */
+    /* The light eases out of the badge, glides the length of the line in about four seconds, fading as it
+       goes, then rests a moment before the next pass; both sides in step. Only a transform and opacity move;
+       it stands still for visitors who ask for less motion. */
     @media (prefers-reduced-motion: no-preference) {
       .inception-beam::after {
         will-change: transform, opacity;
-        animation: inceptionGlint 5s cubic-bezier(.3, .55, .35, 1) infinite;
+        animation: inceptionGlint 5.5s cubic-bezier(.4, 0, .5, 1) infinite;
       }
     }
     @keyframes inceptionGlint {
-      0% { transform: translateX(-100%); opacity: 1; }
-      45% { opacity: .75; }
+      0% { transform: translateX(-100%); opacity: 0; }
+      6% { opacity: 1; }
+      48% { opacity: .8; }
       78%, 100% { transform: translateX(100cqw); opacity: 0; }
     }
     .inception-strip p {
