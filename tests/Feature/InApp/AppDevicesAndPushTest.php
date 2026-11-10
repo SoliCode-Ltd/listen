@@ -11,6 +11,7 @@ use App\Models\VideoDub;
 use App\Services\Push\AppPush;
 use App\Services\Push\FcmSender;
 use App\Support\GenerationSource;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
 
@@ -188,6 +189,19 @@ class AppDevicesAndPushTest extends InAppTestCase
             && $request->hasHeader('Authorization', 'Bearer ya29.test'));
     }
 
+    public function test_a_long_voice_made_in_the_app_is_announced_too(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $this->configureMessaging();
+        $this->fakeMessaging();
+        $member = $this->memberOn('starter');
+        $this->device($member, 'en');
+
+        app(AppPush::class)->voiceReady($this->longVoice($member, GenerationSource::APP));
+
+        $this->assertCount(1, $this->sent());
+    }
+
     public function test_a_voice_that_was_ready_at_once_is_not_announced(): void
     {
         $this->seedPlansWithEverythingOpen();
@@ -262,7 +276,7 @@ class AppDevicesAndPushTest extends InAppTestCase
         app(AppPush::class)->voiceReady($this->longVoice($member));
         $this->assertSame(1, AppDevice::query()->count());
 
-        Http::fake(fn () => throw new \Illuminate\Http\Client\ConnectionException('timed out'));
+        Http::fake(fn () => throw new ConnectionException('timed out'));
         app(AppPush::class)->voiceReady($this->longVoice($member));
         $this->assertSame(1, AppDevice::query()->count());
     }

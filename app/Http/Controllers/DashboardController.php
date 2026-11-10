@@ -5,10 +5,11 @@ namespace App\Http\Controllers;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
-use App\Models\DesignedVoice;
 use App\Models\DemoVoiceGeneration;
+use App\Models\DesignedVoice;
 use App\Models\Plan;
 use App\Rules\DoesNotContainProfanity;
+use App\Services\Api\ApiAccountSummary;
 use App\Services\Api\ApiSpeechService;
 use App\Services\AudioGenerationRecorder;
 use App\Services\Auth\EmailVerificationMailer;
@@ -21,17 +22,20 @@ use App\Services\VoiceCloningService;
 use App\Support\AudioEffects;
 use App\Support\AudioFiles;
 use App\Support\AudioUrl;
+use App\Support\CreditPeriod;
 use App\Support\DialogueSpeakers;
 use App\Support\EmailVerification;
+use App\Support\GeminiVocalTags;
 use App\Support\GenerationMessage;
+use App\Support\GenerationSource;
+use App\Support\InApp\InApp;
 use App\Support\PlanFeatures;
 use App\Support\PlanPricingLines;
-use App\Support\CreditPeriod;
 use App\Support\PlanUsageGuard;
 use App\Support\SpeechLanguages;
 use App\Support\TtsStudioConfig;
-use App\Support\VideoDubbing;
 use App\Support\UsageSnapshot;
+use App\Support\VideoDubbing;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceCloningAccess;
 use App\Support\VoiceDesign;
@@ -167,8 +171,8 @@ class DashboardController extends Controller
         $developerApi = null;
         try {
             // Developer keys are for computers: the phone app leaves the section out.
-            if (! \App\Support\InApp\InApp::hidesPlans() && \App\Services\Api\ApiAccountSummary::shownFor($activePlan)) {
-                $developerApi = app(\App\Services\Api\ApiAccountSummary::class)->for($request->user());
+            if (! InApp::hidesPlans() && ApiAccountSummary::shownFor($activePlan)) {
+                $developerApi = app(ApiAccountSummary::class)->for($request->user());
             }
         } catch (\Throwable) {
             // Before the developer API migration has run on a server.
@@ -346,7 +350,7 @@ class DashboardController extends Controller
         ]);
 
         // Moods and sounds go with words: a script of tags alone has nothing to speak.
-        if (! \App\Support\GeminiVocalTags::hasWords(trim((string) ($validated['content'] ?? $validated['text'] ?? '')))) {
+        if (! GeminiVocalTags::hasWords(trim((string) ($validated['content'] ?? $validated['text'] ?? '')))) {
             throw ValidationException::withMessages(['content' => __('ui.backend.dashboard_text_needs_words')]);
         }
 
@@ -432,7 +436,7 @@ class DashboardController extends Controller
         $recorded = app(MemberUsageMeter::class)->reserve($userId, $quotaPlan, $estimate, fn (array $reservation): array => $this->audioGenerationRecorder->createForUser(
             $userId,
             [
-                'source_type' => 'message',
+                'source_type' => GenerationSource::studio(),
                 'title' => $validated['title'] ?? null,
                 'content' => $text,
                 'language' => $sourceLanguage,

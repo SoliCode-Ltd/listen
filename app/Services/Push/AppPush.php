@@ -37,7 +37,7 @@ class AppPush
             }
             // The extension, the API and AI apps have their own ways of saying it is ready.
             $source = $generation->text_item_id ? TextItem::query()->whereKey($generation->text_item_id)->value('source_type') : null;
-            if ($source !== null && $source !== GenerationSource::STUDIO) {
+            if ($source !== null && ! GenerationSource::isStudio($source)) {
                 return;
             }
 
