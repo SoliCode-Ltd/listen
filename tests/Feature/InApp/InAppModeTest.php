@@ -87,7 +87,10 @@ class InAppModeTest extends InAppTestCase
 
         foreach (['en', 'ar'] as $locale) {
             $page = $this->inApp($member, $locale)->page('app.plan')->assertOk();
-            $page->assertSee(__('app.not_sold_here', [], $locale))
+            // The member's own plan and credits, and no word about buying: not even that it cannot be done here.
+            $page->assertSee(__('app.plan.plan_heading', [], $locale))
+                ->assertSee(__('app.plan.credits_left', [], $locale))
+                ->assertDontSee(__('app.not_sold_here', [], $locale))
                 ->assertSee(__('app.plan.delete_account', [], $locale))
                 ->assertSee(__('app.plan.sign_out', [], $locale));
             $this->assertNoPurchasePath($page->getContent(), "the plan page ($locale)");
@@ -204,7 +207,16 @@ class InAppModeTest extends InAppTestCase
 
         $page = $this->inApp($member)->page('dashboard')->assertOk();
 
-        $page->assertDontSee('id="packOffer"', false)->assertDontSee('class="plan-offer-price"', false);
+        $page->assertDontSee('id="packOffer"', false)->assertDontSee('class="plan-offer-price"', false)
+            ->assertDontSee(__('app.not_sold_here'));
+
+        // What they are told: that the credits are used, and when they come back when that is known.
+        foreach (['en', 'ar'] as $locale) {
+            app()->setLocale($locale);
+            $line = InApp::noCreditsLine($member->id);
+            $this->assertContains($line, [__('app.no_credits'), __('app.no_credits_until', ['date' => InApp::renewsOn($member->id)])]);
+            $this->assertDoesNotMatchRegularExpression(self::SELLING_WORDS, $line);
+        }
         $this->assertNothingSold($page->getContent(), 'the studio without credits');
     }
 

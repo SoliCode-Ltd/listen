@@ -1925,8 +1925,8 @@
 
           {{-- Inside the Listen app nothing is offered for sale: a member out of credits is told so, and that is all. --}}
           @inapp
-            @if(!empty($packOffer) && ($packOffer['state'] ?? '') !== 'has_pack' && (int) ($usageSnapshot['remaining_chars'] ?? 0) <= 0)
-              <div class="note" id="inAppNoCredits">{{ __('app.no_credits') }} {{ __('app.not_sold_here') }}</div>
+            @if((int) ($usageSnapshot['remaining_chars'] ?? 0) <= 0)
+              <div class="note" id="inAppNoCredits">{{ \App\Support\InApp\InApp::noCreditsLine(auth()->id()) }}</div>
             @endif
           @endinapp
           @if(!empty($packOffer) && ! \App\Support\InApp\InApp::active())
@@ -2106,7 +2106,7 @@
         @if($planShowcase ?? false)
           <div class="plan-showcase-note">
             @inapp
-              <p>{{ __('app.no_credits') }} {{ __('app.not_sold_here') }}</p>
+              <p>{{ \App\Support\InApp\InApp::noCreditsLine(auth()->id()) }}</p>
             @else
             <p>{{ __('ui.pack.showcase_note') }}</p>
             <a class="btn btn-primary" href="{{ route('pricing') }}">{{ __('ui.pack.offer_choose_title') }}</a>
@@ -2302,7 +2302,9 @@
 
         @endunless
         @inapp
-          <p class="in-app-note">{{ __('app.not_sold_here') }}</p>
+          <div class="sidebar-actions">
+            <a class="btn btn-primary" href="{{ route('app.plan') }}" data-in-app-plan>{{ __('app.plan.title') }}</a>
+          </div>
         @else
         <div class="sidebar-actions">
           <a class="btn" href="{{ route('pricing') }}">{{ __('ui.dashboard.pricing_and_plans') }}</a>
@@ -4234,7 +4236,7 @@
       if (generateInFlight) return;
       // No plan and no characters: the options are shown, generating needs a plan.
       if (@json((bool) ($planShowcase ?? false))) {
-        showFormMessage('error', @json(\App\Support\InApp\InApp::active() ? __('app.no_credits') : __('ui.pack.showcase_note')));
+        showFormMessage('error', @json(\App\Support\InApp\InApp::active() ? \App\Support\InApp\InApp::noCreditsLine(auth()->id()) : __('ui.pack.showcase_note')));
         return;
       }
       // Check if still in cooldown

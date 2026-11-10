@@ -150,7 +150,8 @@
 
   // ------------------------------------------------- saving and sharing
 
-  var MIME = { mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', ogg: 'audio/ogg', opus: 'audio/ogg', flac: 'audio/flac', mp4: 'video/mp4', webm: 'video/webm', zip: 'application/zip', pdf: 'application/pdf' };
+  // The phone saves and shares sound and video; any other file is left to the app's own download.
+  var MIME = { mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', opus: 'audio/ogg', flac: 'audio/flac', mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime' };
 
   function extensionOf(name) {
     var m = /\.([a-z0-9]{2,5})$/i.exec(String(name || ''));
@@ -175,15 +176,16 @@
       return fetch(href).then(function (r) { return r.blob(); }).then(function (blob) {
         var ext = extensionOf(name) || (blob.type.indexOf('wav') > -1 ? 'wav' : 'mp3');
         if (!extensionOf(name)) name = (name || 'listen-audio') + '.' + ext;
+        var type = /^(audio|video)\//.test(blob.type) ? blob.type : (MIME[ext] || 'audio/mpeg');
         return blobToBase64(blob).then(function (base64) {
-          return { base64: base64, fileName: name, mimeType: blob.type || MIME[ext] || 'application/octet-stream' };
+          return { base64: base64, fileName: name, mimeType: type };
         });
       });
     }
     var url = new URL(href, location.href);
     var ext2 = extensionOf(name) || extensionOf(url.pathname) || (/\/dub-my-video\//.test(url.pathname) ? 'mp4' : 'mp3');
     if (!extensionOf(name)) name = (name || (ext2 === 'mp4' ? 'listen-video' : 'listen-audio')) + '.' + ext2;
-    return Promise.resolve({ url: url.href, fileName: name, mimeType: MIME[ext2] || 'application/octet-stream' });
+    return Promise.resolve({ url: url.href, fileName: name, mimeType: MIME[ext2] || 'audio/mpeg' });
   }
 
   function offerFile(filePromise) {
@@ -211,10 +213,15 @@
 
   function isDownloadLink(link) {
     if (!link || !link.href) return false;
-    if (link.hasAttribute('download')) return true;
     try {
+      if (link.href.indexOf('blob:') === 0 || link.href.indexOf('data:') === 0) return link.hasAttribute('download');
       var url = new URL(link.href, location.href);
-      return url.origin === location.origin && /\/dub-my-video\/[A-Za-z0-9]+\/download$/.test(url.pathname);
+      if (url.origin !== location.origin) return false;
+      if (/\/dub-my-video\/[A-Za-z0-9]+\/download$/.test(url.pathname)) return true;
+      if (!link.hasAttribute('download')) return false;
+      // A file that is not sound or video (a zip, a PDF) is the app's own download to handle.
+      var ext = extensionOf(link.getAttribute('download')) || extensionOf(url.pathname);
+      return ext === '' || !!MIME[ext];
     } catch (e) { return false; }
   }
 
@@ -340,9 +347,8 @@
   function registerPush() {
     if (!pushWired) {
       pushWired = true;
+      // The token arrives here, now and whenever the phone changes it.
       on('PushNotifications', 'registration', function (data) { sendToken(data && data.value); });
-      // The app is open: a short line instead of a notification; the page's own list shows the rest.
-      on('PushNotifications', 'pushNotificationReceived', function (n) { if (n && n.title) toast(n.title); });
     }
     return quiet(call('PushNotifications', 'register'));
   }

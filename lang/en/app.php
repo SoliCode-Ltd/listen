@@ -5,11 +5,16 @@
 return [
     'not_sold_here' => 'Plans can\'t be bought or changed in this app.',
     'not_in_plan' => 'This feature isn\'t part of your current plan.',
-    'no_credits' => 'You have no credits left on your current plan.',
+    'no_credits' => 'You have used all your credits for now.',
+    'no_credits_until' => 'You have used all your credits. They are back on :date.',
     'signin_failed' => 'We couldn\'t finish signing you in. Please try again.',
 
     'plan' => [
-        'title' => 'Your plan',
+        'title' => 'My account',
+        'plan_heading' => 'Your plan',
+        'hello' => 'Hello, :name',
+        'used' => ':used of :total credits used',
+        'renews' => 'Credits renew on',
         'current' => 'Current plan',
         'credits_left' => 'Credits left',
         'ends' => 'Ends on',

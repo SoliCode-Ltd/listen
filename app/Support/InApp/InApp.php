@@ -109,6 +109,28 @@ class InApp
         return $locale.'/app/plan';
     }
 
+    /**
+     * What a member out of credits reads in the app: that they are out, and when
+     * credits come back. Nothing about buying.
+     */
+    public static function noCreditsLine(?int $userId): string
+    {
+        $renews = $userId ? self::renewsOn($userId) : null;
+
+        return $renews ? __('app.no_credits_until', ['date' => $renews]) : __('app.no_credits');
+    }
+
+    /** The day the member's credits are given again ("1 December"), or null when that is not known. */
+    public static function renewsOn(int $userId): ?string
+    {
+        return rescue(function () use ($userId): ?string {
+            $period = \App\Support\CreditPeriod::current($userId);
+            $end = $period['plan_ends_at'] ?? null ? null : ($period['ends_at'] ?? null);
+
+            return $end && $end->isFuture() ? $end->copy()->locale(app()->getLocale())->translatedFormat('j F') : null;
+        }, null, false);
+    }
+
     /** Where the app starts and where its dead ends lead: the studio for a member, sign-in for a guest. */
     public static function homeUrl(): string
     {

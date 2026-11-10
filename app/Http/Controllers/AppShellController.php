@@ -67,6 +67,7 @@ class AppShellController extends Controller
             'plan' => $plan,
             'usage' => $usage,
             'studioUrl' => $this->memberHome($user, app()->getLocale()),
+            'renewsOn' => InApp::renewsOn((int) $user->id),
         ]);
     }
 
