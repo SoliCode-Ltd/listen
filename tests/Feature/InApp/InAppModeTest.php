@@ -464,4 +464,20 @@ class InAppModeTest extends InAppTestCase
         $this->assertSame(0, $planTabs((string) $this->inApp($member)->page('voice-agents.index')->assertOk()->getContent()));
         $this->assertStringContainsString('agents.menu_plan', (string) file_get_contents(resource_path('views/agents/index.blade.php')));
     }
+
+    public function test_the_apps_bar_has_the_language_choice_and_its_notification_offer_speaks_of_voices_only(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $member = $this->memberOn('starter');
+
+        $html = (string) $this->inApp($member)->page('dashboard')->assertOk()->getContent();
+        $this->assertSame(1, preg_match('#<header class="app-header is-app.*?</header>#s', $html, $bar));
+        $this->assertStringContainsString('hreflang="ar"', $bar[0]);
+        $this->assertStringContainsString('hreflang="en"', $bar[0]);
+
+        // Video dubbing is not open to members, so the app does not speak of videos.
+        foreach (['en', 'ar'] as $locale) {
+            $this->assertDoesNotMatchRegularExpression('/video|فيديو/iu', (string) trans('app.shell.notify_text', [], $locale));
+        }
+    }
 }
