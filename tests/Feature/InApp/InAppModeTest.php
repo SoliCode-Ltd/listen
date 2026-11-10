@@ -133,15 +133,17 @@ class InAppModeTest extends InAppTestCase
         $this->assertStringEndsWith('/dashboard', (string) $this->inApp($paid)->get('/app/start')->headers->get('Location'));
         $this->assertStringEndsWith('/demo', (string) $this->inApp($free)->get('/app/start')->headers->get('Location'));
         $this->assertStringEndsWith('/login', (string) $this->inApp(null)->get('/app/start')->headers->get('Location'));
-        // The phone's language chooses the page's.
-        $this->assertStringContainsString('/ar/', (string) $this->inApp(null)->withHeader('Accept-Language', 'ar-EG,ar;q=0.9,en;q=0.5')->get('/app/start')->headers->get('Location'));
-        $this->assertStringContainsString('/en/', (string) $this->inApp(null)->withHeader('Accept-Language', 'en-GB,en;q=0.9')->get('/app/start')->headers->get('Location'));
+        // The app opens in English whatever the phone is set to, until the member chooses.
+        $this->assertStringContainsString('/en/', (string) $this->inApp(null)->withHeader('Accept-Language', 'ar-EG,ar;q=0.9,en;q=0.5')->get('/app/start')->headers->get('Location'));
+        // Their choice is remembered past the session.
+        $this->assertStringContainsString('/ar/', (string) $this->inApp(null)->withUnencryptedCookie(InApp::LANGUAGE_COOKIE, 'ar')->get('/app/start')->headers->get('Location'));
+        $this->withUnencryptedCookie(InApp::LANGUAGE_COOKIE, '');
 
         // The language of the page is kept: from an Arabic page the studio opens in Arabic,
         // whatever language this phone used before.
         foreach (['ar', 'en'] as $locale) {
             $other = $locale === 'ar' ? 'en' : 'ar';
-            app()->setLocale($locale);
+            $this->app->instance('request', Request::create('/'.$locale.'/voice-samples'));
             $this->assertSame(url('/app/start').'?locale='.$locale, InApp::homeUrl());
             $this->assertStringContainsString('/'.$locale.'/dashboard', (string) $this->inApp($paid)->withSession(['locale' => $other])->get('/app/start?locale='.$locale)->headers->get('Location'));
         }
@@ -446,5 +448,16 @@ class InAppModeTest extends InAppTestCase
         $this->assertStringNotContainsString('class="app-footer', $html);
         $this->assertStringNotContainsString('id="mobileNav"', $html);
 
+    }
+
+    public function test_agents_in_the_app_have_no_plan_tab(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $member = $this->memberOn('starter');
+
+        // The plan is on the Account tab: no tab of the agents' own row leads to it.
+        $planTabs = fn (string $html): int => (int) preg_match_all('#<a class="ag-tab" href="[^"]*/(app/plan|billing)"#', $html);
+        $this->assertSame(0, $planTabs((string) $this->inApp($member)->page('voice-agents.index')->assertOk()->getContent()));
+        $this->assertStringContainsString('agents.menu_plan', (string) file_get_contents(resource_path('views/agents/index.blade.php')));
     }
 }

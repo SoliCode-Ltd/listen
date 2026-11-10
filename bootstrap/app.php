@@ -82,7 +82,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // The listen_demo_fp cookie is set by client-side JavaScript (unencrypted).
         // It must be excluded from Laravel's cookie encryption so the backend
         // can read the fingerprint components on GET requests (page loads).
-        $middleware->encryptCookies(except: ['listen_demo_fp', InApp::COOKIE]);
+        $middleware->encryptCookies(except: ['listen_demo_fp', InApp::COOKIE, InApp::LANGUAGE_COOKIE]);
 
         // www. pages move to the main address first, so a page and its requests are one site.
         $middleware->prepend(CanonicalHost::class);

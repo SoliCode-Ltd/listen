@@ -32,6 +32,13 @@ class InAppMode
             return $next($request);
         }
 
+        // The app's language: the page's own when its address names one (and that is remembered),
+        // else the member's last choice, else English, whatever the phone is set to.
+        $pageLanguage = InApp::pageLanguage($request);
+        if ($pageLanguage === null && $request->hasSession()) {
+            $request->session()->put('locale', InApp::language($request));
+        }
+
         $route = (string) $request->route()?->getName();
         $reads = in_array($request->method(), ['GET', 'HEAD'], true) && ! $request->expectsJson();
 
@@ -61,6 +68,9 @@ class InAppMode
                 $response->headers->set('Cache-Control', 'private, no-cache');
             }
             $response->headers->set('Vary', 'User-Agent', false);
+        }
+        if ($pageLanguage !== null && $request->cookies->get(InApp::LANGUAGE_COOKIE) !== $pageLanguage) {
+            $response->headers->setCookie(cookie(InApp::LANGUAGE_COOKIE, $pageLanguage, 60 * 24 * 365, '/', null, $request->isSecure(), true, false, 'lax'));
         }
         // The app's mark, for the requests it makes without its name (InApp::COOKIE).
         if (InApp::namedApp($request) && $request->cookies->get(InApp::COOKIE) !== '1') {

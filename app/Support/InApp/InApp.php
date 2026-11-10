@@ -32,6 +32,11 @@ class InApp
      */
     public const COOKIE = 'listen_app';
 
+    /** The language the member last used in the app, kept past the session. The app opens in English until they choose. */
+    public const LANGUAGE_COOKIE = 'listen_app_lang';
+
+    public const DEFAULT_LANGUAGE = 'en';
+
     public const SIGN_IN_SESSION = 'app_signin.started_at';
 
     /** How long the sign-in tab counts as the app. */
@@ -192,9 +197,30 @@ class InApp
     public static function homeUrl(): string
     {
         // In the language of the page the member is on: an Arabic page never leads to an English studio.
-        $locale = app()->getLocale();
+        $locale = self::pageLanguage();
 
-        return url('/app/start').(in_array($locale, ['ar', 'en'], true) ? '?locale='.$locale : '');
+        return url('/app/start').($locale ? '?locale='.$locale : '');
+    }
+
+    /** The language in the page's own address ("/ar/dashboard" → "ar"), or null when it names none. */
+    public static function pageLanguage(?Request $request = null): ?string
+    {
+        $first = strtolower((string) ($request ?? request())->segment(1));
+
+        return in_array($first, ['ar', 'en'], true) ? $first : null;
+    }
+
+    /** The app's language when a page names none: the member's last choice, else English. */
+    public static function language(?Request $request = null): string
+    {
+        $request ??= request();
+        $kept = (string) $request->cookies->get(self::LANGUAGE_COOKIE, '');
+        if (in_array($kept, ['ar', 'en'], true)) {
+            return $kept;
+        }
+        $session = $request->hasSession() ? (string) $request->session()->get('locale', '') : '';
+
+        return in_array($session, ['ar', 'en'], true) ? $session : self::DEFAULT_LANGUAGE;
     }
 
     /** The neutral page that stands in for every purchase page. */
