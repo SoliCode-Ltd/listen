@@ -91,12 +91,12 @@ class AppServiceProvider extends ServiceProvider
 
         // The Listen app (App\Support\InApp\InApp): @inapp ... @else ... @endinapp in the pages,
         // and signing out on a phone stops that phone's notifications.
-        \Illuminate\Support\Facades\Blade::if('inapp', fn (): bool => \App\Support\InApp\InApp::active());
+        \Illuminate\Support\Facades\Blade::if('inapp', fn (): bool => \App\Support\InApp\InApp::hidesPlans());
         // Inside the app every link the site makes to a purchase page is the neutral plan page's
         // link instead, wherever it is made (a page, a script's settings, a JSON reply), so no
         // page has to remember. Browsers get the links as they always were.
         URL::formatPathUsing(function (string $path, $route = null): string {
-            if ($route === null || ! \App\Support\InApp\InApp::sellsRoute((string) $route->getName()) || ! \App\Support\InApp\InApp::active()) {
+            if ($route === null || ! \App\Support\InApp\InApp::sellsRoute((string) $route->getName()) || ! \App\Support\InApp\InApp::hidesPlans()) {
                 return $path;
             }
 

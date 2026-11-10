@@ -44,6 +44,45 @@ class InApp
         'home', 'seo.*', 'agents-landing', 'browsers-extension.page', 'developers',
     ];
 
+    /** Plans in the app: shown as on the website, and bought in the phone's browser. */
+    public const PLANS_ON_WEB = 'web';
+
+    /** Plans in the app: nothing about them is shown at all. */
+    public const PLANS_HIDDEN = 'hidden';
+
+    /**
+     * How the app treats plans (ANDROID_APP_PLANS in .env):
+     *
+     * - "web": a member sees prices and plans as on the website, and choosing
+     *   one opens the phone's browser, already signed in, on the billing page
+     *   with what they chose. Nothing is ever paid inside the app.
+     * - "hidden": no price, plan or upgrade is shown in the app at all. This
+     *   is the setting that Google Play's payment rules ask for in most
+     *   countries; switching to it needs no new app version.
+     */
+    public static function plansMode(): string
+    {
+        return config('services.android_app.plans') === self::PLANS_HIDDEN ? self::PLANS_HIDDEN : self::PLANS_ON_WEB;
+    }
+
+    /** In the app, and the app shows nothing about plans. */
+    public static function hidesPlans(?Request $request = null): bool
+    {
+        return self::plansMode() === self::PLANS_HIDDEN && self::active($request);
+    }
+
+    /** In the app's own web view, where plans are shown and bought in the browser. */
+    public static function buysOnWeb(?Request $request = null): bool
+    {
+        return self::plansMode() === self::PLANS_ON_WEB && self::fromApp($request);
+    }
+
+    /** Pages and requests that take a payment or change a plan: never served inside the app. */
+    public static function paysRoute(string $name): bool
+    {
+        return $name !== 'pricing' && self::sellsRoute($name);
+    }
+
     public static function active(?Request $request = null): bool
     {
         $request ??= request();

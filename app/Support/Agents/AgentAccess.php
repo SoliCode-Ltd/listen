@@ -168,7 +168,7 @@ final class AgentAccess
     public static function upgrade(bool $arabic): array
     {
         // Inside the Listen app nothing is sold: there is no plan to offer.
-        if (\App\Support\InApp\InApp::active()) {
+        if (\App\Support\InApp\InApp::hidesPlans()) {
             return ['url' => \App\Support\InApp\InApp::planUrl(), 'plan' => null, 'none' => true];
         }
 

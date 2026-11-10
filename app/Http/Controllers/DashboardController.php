@@ -167,7 +167,7 @@ class DashboardController extends Controller
         $developerApi = null;
         try {
             // Developer keys are for computers: the phone app leaves the section out.
-            if (! \App\Support\InApp\InApp::active() && \App\Services\Api\ApiAccountSummary::shownFor($activePlan)) {
+            if (! \App\Support\InApp\InApp::hidesPlans() && \App\Services\Api\ApiAccountSummary::shownFor($activePlan)) {
                 $developerApi = app(\App\Services\Api\ApiAccountSummary::class)->for($request->user());
             }
         } catch (\Throwable) {

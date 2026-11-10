@@ -5,17 +5,29 @@ live site, https://listenai.studio, and adds what a phone app should have: notif
 playing audio with the screen off, saving and sharing audio, the microphone, sign-in that
 lasts, and links that open in the app.
 
-Two things to know first:
+Three things to know first:
 
-1. **Nothing is sold inside the app.** Google Play only allows its own billing (it keeps
-   15–30%) for plans sold inside an app, and removes apps that show or link to other ways
-   to pay. So the app is sign-in-and-use: members subscribe on the website, as they do today.
-   Inside the app the site shows no price, plan, pack, upgrade, payment method or checkout,
-   and no link to one. It does not say "go to the website to pay" (Google does not allow
-   that), and it does not say "you cannot buy here" either: a member simply sees their plan,
-   their credits and the day the credits renew, on a "My account" page. Plan limits stay
-   exactly as they are.
-2. **The app is the site.** A change to the site shows in the app the same minute, with no
+1. **Nothing is paid inside the app.** Google Play only allows its own billing (it keeps
+   15–30%) for plans paid inside an app. So paying always happens on the website, as today,
+   and Google gets no cut.
+2. **How the app treats plans is a setting you can change at any time**, in the server's
+   `.env`, with no new app version:
+
+   | `ANDROID_APP_PLANS=` | What a member sees in the app |
+   |---|---|
+   | `web` (the default) | Prices and plans, as on the website. Choosing a plan opens the phone's browser, already signed in, on the billing page with the plan and the monthly or yearly choice they made. A visitor who is not signed in signs in (or up) and lands on the same page. |
+   | `hidden` | No price, plan, pack or upgrade anywhere in the app, and no link to one. A member sees a "My account" page with their plan, credits and the day credits renew. |
+
+   **Please read this before publishing.** Google Play's payments policy does not let an app
+   lead people to pay somewhere other than Google's billing, in most countries (Egypt and
+   the Gulf included). `web` does exactly that, so Google may reject the app or remove it
+   later. `hidden` is the setting that follows the policy. The United States and the
+   European Economic Area have exceptions, through programs you enrol in from the Play
+   Console. A sensible way to run it: submit and get approved with `hidden`, and decide
+   about `web` knowing the risk; if Google ever objects, set `hidden` and the app complies
+   the same minute. After changing the setting, rebuild the config cache ("Server deploy"
+   → `settings`).
+3. **The app is the site.** A change to the site shows in the app the same minute, with no
    app update. A new app version is needed only when something in this folder changes.
 
 Nothing here costs money except the Google Play developer account (25 US dollars, once).
@@ -262,7 +274,7 @@ Communication or Other**):
 - Can users interact or exchange content with each other? **No** (each member only sees
   their own work).
 - Does the app share the user's current location with other users? **No**.
-- Does the app allow purchases of digital goods? **No**.
+- Does the app allow purchases of digital goods? **No** (nothing is paid in the app).
 - Is it a web browser or a search engine? **No**.
 
 **Other "App content" declarations**
@@ -344,7 +356,12 @@ Which links open in the app: the studio, the demo, agents, dubbing and email con
 The home page, pricing and billing links keep opening in the browser on purpose,
 so a link in an advert or an invoice email still reaches the page that sells.
 
-**Keeping rule 1 true.** If a new page or a new "upgrade" prompt is added to the site
+**Moving between pages.** Every page takes the server most of a second. The app hides that
+wait: the next page starts loading when a finger touches its link, a thin line shows at once,
+the pages cross-fade with the header held still, and going back shows the earlier page
+instantly. Making the server itself answer faster would help the website and the app alike.
+
+**Keeping the `hidden` setting true.** If a new page or a new "upgrade" prompt is added to the site
 later, `tests/Feature/InApp/InAppModeTest.php` fails when it would show in the app. Fix it
 by wrapping the block in `@inapp … @else … @endinapp` (or `@unless(InApp::active())`), or by
 adding the line's key to `lang/*/in_app.php`. Links made with `route('pricing')`,
@@ -363,8 +380,10 @@ debug APK (or the internal test) and go through them once:
       opening it again.
 - [ ] "Continue with Google" opens the browser, and after choosing an account you land
       back in the app, signed in.
-- [ ] No price, plan to buy, or payment anywhere: studio, demo, agents, dubbing, menu,
-      "My account".
+- [ ] With `ANDROID_APP_PLANS=hidden`: no price, plan to buy, or payment anywhere: studio,
+      demo, agents, dubbing, menu, "My account".
+- [ ] With `ANDROID_APP_PLANS=web`: choose a plan in the app; the browser opens on the
+      billing page with that plan, signed in as you; no card form ever shows in the app.
 - [ ] Generate a long text (ask first: it uses the shared speech quota). After you start,
       the app asks about notifications; say yes; leave the app; the notification arrives
       and opens the studio. (Needs steps 3 and 4.)

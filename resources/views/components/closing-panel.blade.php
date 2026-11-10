@@ -11,7 +11,7 @@
   <div class="closing-actions">
     <a class="closing-btn is-solid" href="{{ $primary['href'] }}">{{ $primary['label'] }}</a>
     {{-- Inside the Listen app a purchase link is the plan page's (AppServiceProvider): it is left out. --}}
-    @if($secondary && ! (\App\Support\InApp\InApp::active() && str_contains((string) $secondary['href'], '/app/plan')))
+    @if($secondary && ! (\App\Support\InApp\InApp::hidesPlans() && str_contains((string) $secondary['href'], '/app/plan')))
       <a class="closing-btn is-ghost" href="{{ $secondary['href'] }}">{{ $secondary['label'] }}</a>
     @endif
   </div>

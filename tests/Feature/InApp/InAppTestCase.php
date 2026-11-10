@@ -29,12 +29,20 @@ abstract class InAppTestCase extends TestCase
     {
         parent::setUp();
         config(['services.stripe.key' => '', 'services.stripe.secret' => '']);
+        // These tests are of the app with plans hidden (ANDROID_APP_PLANS=hidden), the setting Google
+        // Play's payment rules ask for; AppPlansOnWebTest covers plans shown and bought in the browser.
+        config(['services.android_app.plans' => $this->plansMode()]);
         // Routes have no locale prefix in tests (TestCase::localizedRoute).
         $this->withoutMiddleware([
             \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
             \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
             \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
         ]);
+    }
+
+    protected function plansMode(): string
+    {
+        return \App\Support\InApp\InApp::PLANS_HIDDEN;
     }
 
     protected function seedPlansWithEverythingOpen(): void

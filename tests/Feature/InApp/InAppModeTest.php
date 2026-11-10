@@ -175,7 +175,9 @@ class InAppModeTest extends InAppTestCase
                     if ($route !== 'legal.privacy') {
                         $this->assertNothingSold($response->getContent(), $where);
                     }
-                    $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'), $where);
+                    // Never kept by a shared cache for a browser; kept by the app itself, so going back is instant.
+                    $this->assertStringContainsString('private', (string) $response->headers->get('Cache-Control'), $where);
+                    $this->assertStringContainsString('User-Agent', implode(',', $response->headers->all('vary')), $where);
                     $response->assertSee('listen-app.js', false);
                 }
             }
@@ -265,6 +267,8 @@ class InAppModeTest extends InAppTestCase
         foreach (['en', 'ar'] as $locale) {
             $own = \Illuminate\Support\Arr::dot(require lang_path("$locale/app.php"));
             unset($own['not_sold_here']);
+            // The lines of the other setting, where plans are bought in the browser.
+            $own = array_filter($own, fn (string $key): bool => ! str_starts_with($key, 'web.') && $key !== 'shell.web_failed', ARRAY_FILTER_USE_KEY);
             foreach ($own as $key => $line) {
                 $this->assertDoesNotMatchRegularExpression(self::SELLING_WORDS, $line, "app.$key ($locale)");
             }
@@ -298,6 +302,8 @@ class InAppModeTest extends InAppTestCase
     {
         // The page's own last-resort style rule names the paths it hides.
         $html = (string) preg_replace('#<style id="listen-in-app-style">.*?</style>#s', '', $html);
+        // And the list of pages the app must never load ahead of a tap names them too.
+        $html = (string) preg_replace('#<script type="speculationrules">.*?</script>#s', '', $html);
 
         $this->assertDoesNotMatchRegularExpression(self::PURCHASE_PATHS, $html, "A purchase address is in $where.");
 

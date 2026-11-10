@@ -70,7 +70,7 @@
   }
   // Inside the Listen app (App\Support\InApp\InApp) nothing is sold: no home page, plans or
   // extension in the menu; the logo leads to the studio, and "Your plan" stands in for billing.
-  $inApp = \App\Support\InApp\InApp::active();
+  $inApp = \App\Support\InApp\InApp::hidesPlans();
   $brandHref = $inApp ? \App\Support\InApp\InApp::homeUrl() : route('home');
   if ($inApp) {
     $navLinks = [

@@ -39,6 +39,9 @@ class AppShellController extends Controller
 
     private const CODE_MINUTES = 3;
 
+    /** How long the app's link into the browser signs the member in. */
+    private const WEB_MINUTES = 5;
+
     public function __construct(private PlanAccessService $plans) {}
 
     /** The app's first page. */
@@ -158,6 +161,61 @@ class AppShellController extends Controller
         return redirect()->to($this->memberHome($user, $locale));
     }
 
+    /**
+     * A page that takes a payment or changes a plan, asked for inside the app:
+     * it opens in the phone's browser instead, on the same address, so what
+     * the member chose (the plan, monthly or yearly) goes with them. A member
+     * signed in to the app is signed in there too, with a link that works
+     * once and for a few minutes; a visitor meets the site's own sign-in,
+     * which already leads on to the page they asked for.
+     */
+    public function openOnWeb(Request $request): Response
+    {
+        $to = '/'.ltrim($request->getRequestUri(), '/');
+        $user = $request->user();
+        $webUrl = url($to);
+
+        if ($user) {
+            $code = Str::random(64);
+            Cache::put(self::webKey($code), (int) $user->id, now()->addMinutes(self::WEB_MINUTES));
+            $webUrl = url('/app/continue').'?'.http_build_query(['code' => $code, 'to' => $to]);
+        }
+
+        return response()->view('app.open-web', [
+            'webUrl' => $webUrl,
+            'backUrl' => $user ? $this->memberHome($user, app()->getLocale()) : $this->localized('login', $this->locale($request)),
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * The browser's side of openOnWeb: the member is signed in, when the link
+     * still holds, and sent on to the page. A link that has run out simply
+     * leads to the page, which asks them to sign in and then goes on.
+     */
+    public function continueOnWeb(Request $request, BlockedUserService $blocked): RedirectResponse
+    {
+        $to = (string) $request->query('to', '');
+        // Only a page of this site: a path, never an address.
+        if (preg_match('#^/(?![/\\\\])[^\s\\\\]*$#', $to) !== 1 || str_starts_with($to, '/app/continue')) {
+            $to = '/';
+        }
+        // The link belongs in a browser; the app itself goes back to where it starts.
+        if (InApp::fromApp($request)) {
+            return redirect()->to(InApp::homeUrl());
+        }
+
+        $code = (string) $request->query('code', '');
+        $userId = preg_match('/^[A-Za-z0-9]{64}$/', $code) === 1 ? (int) Cache::pull(self::webKey($code), 0) : 0;
+        $user = $userId > 0 ? User::query()->find($userId) : null;
+
+        if ($user && ! $blocked->isBlocked($user) && (int) $request->user()?->id !== (int) $user->id) {
+            Auth::login($user, true);
+            $request->session()->regenerate();
+        }
+
+        return redirect()->to(url($to));
+    }
+
     /** The phone's messaging token, kept for the member who is signed in on it. */
     public function registerDevice(Request $request): JsonResponse
     {
@@ -246,6 +304,11 @@ class AppShellController extends Controller
     private function localized(string $route, string $locale): string
     {
         return (string) LaravelLocalization::getLocalizedURL($locale, route($route, [], true), [], true);
+    }
+
+    private static function webKey(string $code): string
+    {
+        return 'app-web:'.hash('sha256', $code);
     }
 
     private static function codeKey(string $code): string

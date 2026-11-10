@@ -2,6 +2,7 @@
 // English, light and dark, at 360x800 and 412x915, with the app's user agent.
 // It fails on a purchase link, selling words, sideways scrolling, anything cut off, the wrong
 // direction or theme, or a script error, and keeps a screenshot of every page.
+// It checks the "hidden" setting: put ANDROID_APP_PLANS=hidden in the local .env first.
 // Run against a LOCAL copy of the site with the test members of seed.php (see mobile/README.md,
 // section 8). It makes no voice and no payment: it only opens pages.
 //   BASE=http://127.0.0.1:8123 AGENT=agt_... node in-app-pages.js [guest,free,starter,max]

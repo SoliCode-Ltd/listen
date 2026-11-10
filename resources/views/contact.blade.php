@@ -4,7 +4,7 @@
   $contactEmail = trim((string) \App\Models\SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio';
   // "Delete my account" is how a member asks for their account and data to be removed (the
   // Listen app's store listing links here). Nothing is sold in the app, so it has no billing topic.
-  $contactTopics = \App\Support\InApp\InApp::active()
+  $contactTopics = \App\Support\InApp\InApp::hidesPlans()
     ? ['voices', 'account', 'delete', 'other']
     : ['billing', 'voices', 'account', 'delete', 'other'];
   // A link can pick the topic for the visitor (the pricing page's "Contact us" picks plans and billing).

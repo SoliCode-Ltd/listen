@@ -1528,7 +1528,7 @@
   @auth
     {{-- Only while a referral campaign runs: without one no reward is given. --}}
     {{-- Not inside the Listen app: its reward is tied to a friend's paid plan, and nothing is sold there. --}}
-    @if (\App\Models\ReferralCampaign::active() && ! \App\Support\InApp\InApp::active())
+    @if (\App\Models\ReferralCampaign::active() && ! \App\Support\InApp\InApp::hidesPlans())
       @include('referral.popup')
     @endif
   @endauth

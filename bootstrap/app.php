@@ -101,6 +101,12 @@ return Application::configure(basePath: dirname(__DIR__))
             before: \App\Http\Middleware\AuthenticateApiKey::class,
             prepend: \App\Http\Middleware\AuthenticateMcp::class,
         );
+        // The Listen app: a page that pays is handed to the phone's browser (or left out) before
+        // 'auth' can send a visitor to sign in inside the app.
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            prepend: \App\Http\Middleware\InAppMode::class,
+        );
         // A friend opening a referral link is not signed in yet: the visit is recorded
         // (and the referral cookie set) before 'auth' sends them to sign in. Without
         // this, Laravel's priority order runs 'auth' first and the referral is lost.

@@ -55,7 +55,7 @@ final class VideoDubbing
     {
         // Inside the Listen app nothing is sold, so the free dub that leads to a plan is not
         // offered there: dubbing shows for members whose plan includes it.
-        if (\App\Support\InApp\InApp::active()
+        if (\App\Support\InApp\InApp::hidesPlans()
             && ! ($user && self::planIncludes(app(PlanAccessService::class)->resolveAccessPlanForUserId((int) $user->id)))) {
             return false;
         }

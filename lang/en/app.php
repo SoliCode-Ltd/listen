@@ -29,6 +29,14 @@ return [
         'sign_out' => 'Sign out',
     ],
 
+    'web' => [
+        'title' => 'Continue in your browser',
+        'text' => 'Plans and payments open in your browser, so your payment stays with your bank and our secure checkout. You are already signed in there.',
+        'text_guest' => 'Plans and payments open in your browser. Sign in there and you will go straight to what you chose.',
+        'button' => 'Open in browser',
+        'back' => 'Back to the app',
+    ],
+
     'signin' => [
         'done_title' => 'You\'re signed in',
         'done_text' => 'Signed in as :email. Go back to the app to continue.',
@@ -49,6 +57,7 @@ return [
 
     // The app's own parts of the page (public/js/listen-app.js).
     'shell' => [
+        'web_failed' => 'Your browser could not be opened. Please try again.',
         'save' => 'Save to phone',
         'share' => 'Share',
         'cancel' => 'Cancel',

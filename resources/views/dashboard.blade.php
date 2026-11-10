@@ -1929,7 +1929,7 @@
               <div class="note" id="inAppNoCredits">{{ \App\Support\InApp\InApp::noCreditsLine(auth()->id()) }}</div>
             @endif
           @endinapp
-          @if(!empty($packOffer) && ! \App\Support\InApp\InApp::active())
+          @if(!empty($packOffer) && ! \App\Support\InApp\InApp::hidesPlans())
             @php
               $offer = $packOffer;
               $offerBody = match (true) {
@@ -2255,7 +2255,7 @@
           $onPaidPlan = (int) ($activePlan?->price_cents ?? 0) > 0 && !$packMode;
           $charsValue = match (true) {
             $packMode => __('ui.pack.meter_text', ['remaining' => number_format((int) $usageSnapshot['remaining_chars']), 'total' => number_format((int) $usageSnapshot['plan_chars'])]),
-            !empty($freeNoChars) => \App\Support\InApp\InApp::active() ? '0' : __('ui.pack.no_chars_value'),
+            !empty($freeNoChars) => \App\Support\InApp\InApp::hidesPlans() ? '0' : __('ui.pack.no_chars_value'),
             default => number_format((int) $planChars).' '.__('ui.pricing.characters_per_month'),
           };
         @endphp
@@ -2276,7 +2276,7 @@
         </div>
 
         {{-- The browser extension is for computers: its key is not shown inside the phone app. --}}
-        @unless(\App\Support\InApp\InApp::active())
+        @unless(\App\Support\InApp\InApp::hidesPlans())
         <div class="info-list">
           <div class="info-row">
             <span class="info-label">{{ __('ui.dashboard.extension_api_key') }}</span>
@@ -2701,7 +2701,7 @@
             </section>
             <div class="vc-notice" id="vcLimitNotice" @if(! $vcAtLimit) style="display:none" @endif>
               <p>{{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}</p>
-              @unless(\App\Support\InApp\InApp::active())
+              @unless(\App\Support\InApp\InApp::hidesPlans())
               <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.voice_cloning.upgrade_cta') }}</a>
               @endunless
             </div><!-- /vcLimitNotice -->
@@ -4236,7 +4236,7 @@
       if (generateInFlight) return;
       // No plan and no characters: the options are shown, generating needs a plan.
       if (@json((bool) ($planShowcase ?? false))) {
-        showFormMessage('error', @json(\App\Support\InApp\InApp::active() ? \App\Support\InApp\InApp::noCreditsLine(auth()->id()) : __('ui.pack.showcase_note')));
+        showFormMessage('error', @json(\App\Support\InApp\InApp::hidesPlans() ? \App\Support\InApp\InApp::noCreditsLine(auth()->id()) : __('ui.pack.showcase_note')));
         return;
       }
       // Check if still in cooldown

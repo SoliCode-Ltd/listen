@@ -44,15 +44,32 @@
     return Promise.reject(new Error('no-method'));
   }
 
-  /** Listens to a native event. */
-  function on(name, event, handler) {
+  /**
+   * Listens to a native event. The phone forgets its listeners whenever a page
+   * starts, also when this page is shown again from the back/forward cache, so
+   * they are kept here to be put back (resubscribe).
+   */
+  var subscriptions = [];
+  function attach(sub) {
     var c = cap();
     if (!c) return;
     try {
-      var p = plugin(name);
-      if (p && typeof p.addListener === 'function') { p.addListener(event, handler); return; }
-      if (typeof c.addListener === 'function') c.addListener(name, event, handler);
+      var p = plugin(sub.name);
+      if (p && typeof p.addListener === 'function') sub.handle = p.addListener(sub.event, sub.handler);
+      else if (typeof c.addListener === 'function') sub.handle = c.addListener(sub.name, sub.event, sub.handler);
     } catch (e) { /* an app without this event */ }
+  }
+  function on(name, event, handler) {
+    var sub = { name: name, event: event, handler: handler, handle: null };
+    subscriptions.push(sub);
+    attach(sub);
+  }
+  function resubscribe() {
+    subscriptions.forEach(function (sub) {
+      try { if (sub.handle && typeof sub.handle.remove === 'function') sub.handle.remove(); } catch (e) {}
+      sub.handle = null;
+      attach(sub);
+    });
   }
 
   function shell(method, args) { return call('ListenShell', method, args); }
@@ -84,6 +101,13 @@
     '.la-sheet button.is-quiet{border-color:transparent;color:var(--muted,#a0a0ad);font-weight:500}',
     '.la-sheet button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
     '.la-sheet button[disabled]{opacity:.6}',
+    // Moving to another page: a thin line across the top from the first instant of the tap.
+    '.la-load{position:fixed;top:0;inset-inline:0;height:3px;z-index:2147483003;pointer-events:none;opacity:0;transition:opacity .2s}',
+    '.la-load.is-on{opacity:1}',
+    '.la-load i{display:block;height:100%;width:100%;transform-origin:0 50%;transform:scaleX(0);background:var(--brand-accent,#7659FA);border-radius:0 3px 3px 0}',
+    'html[dir="rtl"] .la-load i{transform-origin:100% 50%;border-radius:3px 0 0 3px}',
+    '.la-load.is-on i{animation:la-load 6s cubic-bezier(.1,.7,.1,1) forwards}',
+    '@keyframes la-load{0%{transform:scaleX(0)}8%{transform:scaleX(.35)}40%{transform:scaleX(.75)}100%{transform:scaleX(.95)}}',
     '@media (prefers-reduced-motion:reduce){.la-toast,.la-sheet,.la-sheet-back{transition:none}}'
   ].join('');
   document.head.appendChild(style);
@@ -392,6 +416,68 @@
     };
   }
 
+  // --------------------------------------------------- moving between pages
+
+  // A page takes the server most of a second: the app answers the tap at once with a line
+  // across the top, and (in the page head) starts loading on touch and cross-fades when ready.
+  var loadEl = null, loadTimer = 0;
+  function loading(onOff) {
+    if (!loadEl) {
+      loadEl = document.createElement('div');
+      loadEl.className = 'la-load';
+      loadEl.appendChild(document.createElement('i'));
+      (document.body || document.documentElement).appendChild(loadEl);
+    }
+    clearTimeout(loadTimer);
+    loadEl.classList.toggle('is-on', !!onOff);
+    // Never left running: a tap that turned out to be a download, or a page that never came.
+    if (onOff) loadTimer = setTimeout(function () { loading(false); }, 12000);
+  }
+
+  function leavesPage(link) {
+    if (!link || !link.href || link.target === '_blank' || link.hasAttribute('download')) return false;
+    if (link.hasAttribute('data-app-open-web') || link.hasAttribute('data-app-signin')) return false;
+    try {
+      var url = new URL(link.href, location.href);
+      if (url.origin !== location.origin || !/^https?:$/.test(url.protocol)) return false;
+      // The same page at another place (#section) loads nothing.
+      return !(url.pathname === location.pathname && url.search === location.search && url.hash);
+    } catch (e) { return false; }
+  }
+
+  document.addEventListener('click', function (event) {
+    if (event.defaultPrevented || event.button || event.metaKey || event.ctrlKey) return;
+    var link = event.target && event.target.closest ? event.target.closest('a') : null;
+    if (leavesPage(link) && !isDownloadLink(link)) loading(true);
+  });
+  document.addEventListener('submit', function (event) {
+    var form = event.target;
+    // The page's own forms that answer without leaving (they stop the event) show their own progress.
+    setTimeout(function () { if (!event.defaultPrevented && form && form.tagName === 'FORM' && form.target !== '_blank') loading(true); }, 0);
+  });
+  window.addEventListener('pagehide', function () { loading(false); });
+
+  // ------------------------------------------------- plans and payment: in the browser
+
+  // A page that takes a payment is never shown in the app: it opens in the phone's browser,
+  // signed in, with what was chosen (AppShellController::openOnWeb). The app then steps back
+  // to the page the member was on.
+  function openOnWeb(url, thenBack) {
+    return shell('openExternal', { url: url }).then(function () {
+      if (!thenBack) return;
+      setTimeout(function () {
+        var back = document.querySelector('[data-app-web-back]');
+        if (history.length > 1) history.back(); else if (back) location.replace(back.href);
+      }, 700);
+    });
+  }
+  document.addEventListener('click', function (event) {
+    var link = event.target && event.target.closest ? event.target.closest('[data-app-open-web]') : null;
+    if (!link || !cap()) return;
+    event.preventDefault();
+    openOnWeb(link.href, false).catch(function () { toast(t.web_failed); });
+  }, true);
+
   // ------------------------------------------- back, refresh, theme, sign-in
 
   function closeOverlay() {
@@ -421,11 +507,29 @@
     quiet(shell('setTheme', { dark: document.documentElement.getAttribute('data-theme') !== 'light' }));
   }
 
-  function boot() {
+  function settle() {
     quiet(shell('setBackHandler', { enabled: true }));
     quiet(shell('setPullToRefresh', { enabled: !!cfg.refresh }));
     syncTheme();
+  }
+
+  // Shown again by going back: the page is as it was left, and the phone is told again what
+  // this page wants (it forgot when the other page started).
+  window.addEventListener('pageshow', function (event) {
+    if (!event.persisted) return;
+    loading(false);
+    resubscribe();
+    settle();
+  });
+
+  function boot() {
+    settle();
     new MutationObserver(syncTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+    // Reached a page that pays: straight to the browser, then back to where the member was.
+    if (window.LISTEN_APP_OPEN_WEB && cap()) {
+      openOnWeb(window.LISTEN_APP_OPEN_WEB, true).catch(function () {});
+    }
 
     document.addEventListener('click', function (event) {
       var button = event.target && event.target.closest ? event.target.closest('[data-app-signin]') : null;

@@ -228,6 +228,8 @@ Route::get('/.well-known/assetlinks.json', [\App\Http\Controllers\AppShellContro
 Route::prefix('app')->group(function (): void {
     Route::get('/start', [\App\Http\Controllers\AppShellController::class, 'start'])->name('app.start');
     Route::get('/signin/start', [\App\Http\Controllers\AppShellController::class, 'signInStart'])->middleware('throttle:20,1,app-signin-start')->name('app.signin.start');
+    // A purchase page asked for in the app opens here, in the phone's browser, signed in.
+    Route::get('/continue', [\App\Http\Controllers\AppShellController::class, 'continueOnWeb'])->middleware('throttle:20,1,app-continue')->name('app.continue');
     Route::get('/signin/complete', [\App\Http\Controllers\AppShellController::class, 'signInComplete'])->middleware('throttle:10,1,app-signin-complete')->name('app.signin.complete');
     Route::middleware(['auth', 'throttle:30,1,app-devices'])->group(function (): void {
         Route::post('/devices', [\App\Http\Controllers\AppShellController::class, 'registerDevice'])->name('app.devices.register');

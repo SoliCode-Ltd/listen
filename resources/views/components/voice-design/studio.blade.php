@@ -217,7 +217,7 @@
             </ul>
           </div>
           {{-- Inside the Listen app nothing is sold: the note stands alone. --}}
-          @unless(\App\Support\InApp\InApp::active())
+          @unless(\App\Support\InApp\InApp::hidesPlans())
           <a class="btn btn-primary vd-design-btn" href="{{ $vd['upgrade_url'] }}" data-vd-upgrade>
             {!! $icon['spark'] !!}<span>{{ $vd['upgrade_plan'] ? __('voice_design.upgrade_cta', ['plan' => $vd['upgrade_plan']]) : __('voice_design.upgrade_cta_any') }}</span>
           </a>
@@ -312,7 +312,7 @@
           <div class="vd-upsell" data-vd-upsell hidden>
             <strong>{{ __('voice_design.demo_keep_title') }}</strong>
             <p>{{ __('voice_design.demo_keep_text') }}</p>
-            @unless(\App\Support\InApp\InApp::active())
+            @unless(\App\Support\InApp\InApp::hidesPlans())
             <a class="btn btn-primary" href="{{ $vd['upgrade_url'] }}">{{ __('voice_design.demo_keep_cta') }}</a>
             @endunless
           </div>

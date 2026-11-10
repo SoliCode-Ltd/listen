@@ -81,7 +81,7 @@ class VoiceCloningAccess
         }
 
         // Inside the Listen app nothing is sold: a feature that is not on the plan is not shown.
-        if (\App\Support\InApp\InApp::active()) {
+        if (\App\Support\InApp\InApp::hidesPlans()) {
             return false;
         }
 
