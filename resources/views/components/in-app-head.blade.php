@@ -61,6 +61,12 @@
       html:has(.app-tabs) .dashboard-shell { padding-top: 3.4rem !important; padding-bottom: 1.5rem !important; }
       html:has(.app-tabs) #generatedAudioWrap.output-dock { bottom: calc(62px + .75rem + env(safe-area-inset-bottom, 0px)); }
     }
+    /* A row of tabs that slides sideways fades at the edge where more tabs wait (listen-app.js). */
+    .la-strip { scrollbar-width: none; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+    .la-strip::-webkit-scrollbar { display: none; }
+    .la-strip.la-more-left { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px); mask-image: linear-gradient(to right, transparent, #000 44px); }
+    .la-strip.la-more-right { -webkit-mask-image: linear-gradient(to left, transparent, #000 44px); mask-image: linear-gradient(to left, transparent, #000 44px); }
+    .la-strip.la-more-left.la-more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); }
     .app-header.is-app .header-center { display: none; }
     .app-header.is-app .header-inner { justify-content: space-between; }
     .app-header.is-app .locale-switch { display: none; }

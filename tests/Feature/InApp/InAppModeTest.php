@@ -423,4 +423,28 @@ class InAppModeTest extends InAppTestCase
         // The same link opened by a browser leads to billing itself.
         $this->inBrowser($member)->page('app.upgrade')->assertRedirect(route('billing.page'));
     }
+
+    public function test_the_app_is_known_by_its_own_cookie_when_a_request_comes_without_its_name(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $member = $this->memberOn('starter');
+        $cookie = InApp::COOKIE;
+
+        // The app's first page leaves its mark; a browser never gets one.
+        $this->inApp($member)->page('dashboard')->assertPlainCookie($cookie, '1');
+        $this->inBrowser($member)->page('samples')->assertCookieMissing($cookie);
+        // Without the mark a browser gets the website.
+        $this->inBrowser($member)->get('/app/plan')->assertRedirect();
+
+        // A request of the app's that does not carry its name (a page fetched ahead of a tap)
+        // gets the app's page all the same: no billing page, no website menu, no footer.
+        $unnamed = fn () => $this->actingAs($member)->withHeader('User-Agent', self::BROWSER_UA)->withUnencryptedCookie($cookie, '1');
+        $unnamed()->get($this->localizedRoute('app.plan'))->assertOk()->assertSee('data-app-tab="account"', false);
+        $this->assertStringEndsWith('/app/plan', (string) $unnamed()->get('/billing')->assertRedirect()->headers->get('Location'));
+        $html = (string) $unnamed()->get($this->localizedRoute('samples'))->assertOk()->getContent();
+        $this->assertStringContainsString('data-app-tab="studio"', $html);
+        $this->assertStringNotContainsString('class="app-footer', $html);
+        $this->assertStringNotContainsString('id="mobileNav"', $html);
+
+    }
 }

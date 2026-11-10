@@ -478,6 +478,69 @@
     openOnWeb(link.href, false).catch(function () { toast(t.web_failed); });
   }, true);
 
+  // ------------------------------------------------- rows of tabs that slide sideways
+
+  // A row with more tabs than fit (the studio's sections, an agent's pages, the voice filters):
+  // its edge fades where more tabs wait, and the tab that is tapped or lit moves to the middle,
+  // so the next ones come into view without anyone having to know the row slides.
+  var STRIPS = '.dashboard-menu-list, .ag-tabs, .samples-jump, .samples-moods';
+  var LIT = '.active, .is-current, .is-on, .is-active, [aria-current], [aria-selected="true"]';
+
+  function stripEdges(strip) {
+    var box = strip.getBoundingClientRect(), left = false, right = false;
+    for (var i = 0; i < strip.children.length; i++) {
+      var r = strip.children[i].getBoundingClientRect();
+      if (!r.width) continue;
+      if (r.left < box.left - 4) left = true;
+      if (r.right > box.right + 4) right = true;
+    }
+    strip.classList.toggle('la-more-left', left);
+    strip.classList.toggle('la-more-right', right);
+  }
+  function stripShow(strip, item, smooth) {
+    if (!item || strip.scrollWidth <= strip.clientWidth + 4) return;
+    var box = strip.getBoundingClientRect(), r = item.getBoundingClientRect();
+    if (!r.width) return;
+    var by = (r.left + r.width / 2) - (box.left + box.width / 2);
+    if (Math.abs(by) < 6) return;
+    var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    try { strip.scrollBy({ left: by, behavior: smooth && !calm ? 'smooth' : 'auto' }); } catch (e) { strip.scrollLeft += by; }
+  }
+  function stripItem(strip, node) {
+    while (node && node.parentNode !== strip) node = node.parentNode;
+    return node || null;
+  }
+  function stripSetUp(strip) {
+    if (strip.laStrip) { stripEdges(strip); return; }
+    strip.laStrip = true;
+    strip.classList.add('la-strip');
+    strip.addEventListener('scroll', function () { stripEdges(strip); }, { passive: true });
+    strip.addEventListener('click', function (event) {
+      var item = stripItem(strip, event.target);
+      if (item) stripShow(strip, item, true);
+    });
+    // The lit tab can change without a tap (the page scrolled to another section).
+    if (window.MutationObserver) {
+      new MutationObserver(function (changes) {
+        for (var i = 0; i < changes.length; i++) {
+          var el = changes[i].target;
+          if (el !== strip && el.matches && el.matches(LIT)) { stripShow(strip, stripItem(strip, el), true); break; }
+        }
+      }).observe(strip, { subtree: true, attributes: true, attributeFilter: ['class', 'aria-current', 'aria-selected'] });
+    }
+    var lit = strip.querySelector(LIT);
+    if (lit) stripShow(strip, stripItem(strip, lit), false);
+    stripEdges(strip);
+  }
+  function strips() {
+    var all = document.querySelectorAll(STRIPS);
+    for (var i = 0; i < all.length; i++) stripSetUp(all[i]);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', strips); else strips();
+  window.addEventListener('load', strips);
+  window.addEventListener('pageshow', strips);
+  window.addEventListener('resize', strips);
+
   // ------------------------------------------- back, refresh, theme, sign-in
 
   function closeOverlay() {

@@ -11,11 +11,40 @@ use App\Console\Commands\SyncArabicTranslationsCommand;
 use App\Console\Commands\SyncBillingSubscriptionsCommand;
 use App\Console\Commands\SyncStripePlansCommand;
 use App\Console\Commands\ValidateVoiceCatalogCommand;
+use App\Http\Middleware\AgentCors;
+use App\Http\Middleware\ApiRequestContext;
+use App\Http\Middleware\AuthenticateApiKey;
+use App\Http\Middleware\AuthenticateMcp;
+use App\Http\Middleware\CanonicalHost;
+use App\Http\Middleware\CaptureAdClickId;
+use App\Http\Middleware\CaptureReferralVisit;
+use App\Http\Middleware\EnsureAuthMethodEnabled;
+use App\Http\Middleware\EnsureDemoEmailVerified;
+use App\Http\Middleware\EnsureFreeDemoAccess;
+use App\Http\Middleware\EnsurePaidPlan;
+use App\Http\Middleware\EnsureUserIsNotBlocked;
+use App\Http\Middleware\InAppMode;
+use App\Http\Middleware\RequireApiScope;
+use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\ServePagesToAgents;
+use App\Http\Middleware\SyncSubscriptionStatus;
+use App\Mcp\McpErrors;
+use App\Support\Api\ApiError;
+use App\Support\Api\ApiErrorRenderer;
+use App\Support\InApp\InApp;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Session\TokenMismatchException;
+use Illuminate\Support\Facades\Route;
+use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
+use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRoutes;
+use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath;
+use Mcamara\LaravelLocalization\Middleware\LocaleCookieRedirect;
+use Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -26,11 +55,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
         then: function (): void {
             // Developer API: https://<site>/v1/... (see routes/v1.php).
-            \Illuminate\Support\Facades\Route::middleware(['api', \App\Http\Middleware\ApiRequestContext::class])
+            Route::middleware(['api', ApiRequestContext::class])
                 ->prefix('v1')
                 ->group(base_path('routes/v1.php'));
             // Listen Agents' calls, from the websites that carry a call button (see routes/agents.php).
-            \Illuminate\Support\Facades\Route::middleware(['api', \App\Http\Middleware\AgentCors::class])
+            Route::middleware(['api', AgentCors::class])
                 ->prefix('agent-api')
                 ->group(base_path('routes/agents.php'));
         },
@@ -53,80 +82,80 @@ return Application::configure(basePath: dirname(__DIR__))
         // The listen_demo_fp cookie is set by client-side JavaScript (unencrypted).
         // It must be excluded from Laravel's cookie encryption so the backend
         // can read the fingerprint components on GET requests (page loads).
-        $middleware->encryptCookies(except: ['listen_demo_fp']);
+        $middleware->encryptCookies(except: ['listen_demo_fp', InApp::COOKIE]);
 
         // www. pages move to the main address first, so a page and its requests are one site.
-        $middleware->prepend(\App\Http\Middleware\CanonicalHost::class);
+        $middleware->prepend(CanonicalHost::class);
 
         $middleware->web(append: [
-            \App\Http\Middleware\EnsureUserIsNotBlocked::class,
-            \App\Http\Middleware\CaptureAdClickId::class,
+            EnsureUserIsNotBlocked::class,
+            CaptureAdClickId::class,
             // The Listen app: nothing is sold inside it (App\Support\InApp\InApp).
-            \App\Http\Middleware\InAppMode::class,
-            \App\Http\Middleware\SecurityHeaders::class,
-            \App\Http\Middleware\ServePagesToAgents::class,
+            InAppMode::class,
+            SecurityHeaders::class,
+            ServePagesToAgents::class,
         ]);
 
         $middleware->alias([
-            'subscription.sync' => \App\Http\Middleware\SyncSubscriptionStatus::class,
-            'demo.free' => \App\Http\Middleware\EnsureFreeDemoAccess::class,
-            'demo.verified' => \App\Http\Middleware\EnsureDemoEmailVerified::class,
-            'user.not_blocked' => \App\Http\Middleware\EnsureUserIsNotBlocked::class,
-            'auth.method' => \App\Http\Middleware\EnsureAuthMethodEnabled::class,
-            'referral.capture' => \App\Http\Middleware\CaptureReferralVisit::class,
-            'paid.plan' => \App\Http\Middleware\EnsurePaidPlan::class,
-            'localize' => \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRoutes::class,
-            'localizationRedirect' => \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
-            'localeSessionRedirect' => \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
-            'localeCookieRedirect' => \Mcamara\LaravelLocalization\Middleware\LocaleCookieRedirect::class,
-            'localeViewPath' => \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
-            'api.key' => \App\Http\Middleware\AuthenticateApiKey::class,
-            'api.scope' => \App\Http\Middleware\RequireApiScope::class,
+            'subscription.sync' => SyncSubscriptionStatus::class,
+            'demo.free' => EnsureFreeDemoAccess::class,
+            'demo.verified' => EnsureDemoEmailVerified::class,
+            'user.not_blocked' => EnsureUserIsNotBlocked::class,
+            'auth.method' => EnsureAuthMethodEnabled::class,
+            'referral.capture' => CaptureReferralVisit::class,
+            'paid.plan' => EnsurePaidPlan::class,
+            'localize' => LaravelLocalizationRoutes::class,
+            'localizationRedirect' => LaravelLocalizationRedirectFilter::class,
+            'localeSessionRedirect' => LocaleSessionRedirect::class,
+            'localeCookieRedirect' => LocaleCookieRedirect::class,
+            'localeViewPath' => LaravelLocalizationViewPath::class,
+            'api.key' => AuthenticateApiKey::class,
+            'api.scope' => RequireApiScope::class,
         ]);
 
         // The developer API's rate limit is per key and per plan, so the key
         // must be known before the limiter runs.
         $middleware->prependToPriorityList(
-            before: \Illuminate\Routing\Middleware\ThrottleRequests::class,
-            prepend: \App\Http\Middleware\AuthenticateApiKey::class,
+            before: ThrottleRequests::class,
+            prepend: AuthenticateApiKey::class,
         );
         // And the request id and the admin's request log come first of all,
         // so refused keys are logged too.
         $middleware->prependToPriorityList(
-            before: \App\Http\Middleware\AuthenticateApiKey::class,
-            prepend: \App\Http\Middleware\ApiRequestContext::class,
+            before: AuthenticateApiKey::class,
+            prepend: ApiRequestContext::class,
         );
         // The MCP server (routes/ai.php) signs in with a key or an OAuth token, in the same place.
         $middleware->prependToPriorityList(
-            before: \App\Http\Middleware\AuthenticateApiKey::class,
-            prepend: \App\Http\Middleware\AuthenticateMcp::class,
+            before: AuthenticateApiKey::class,
+            prepend: AuthenticateMcp::class,
         );
         // The Listen app: a page that pays is handed to the phone's browser (or left out) before
         // 'auth' can send a visitor to sign in inside the app.
         $middleware->prependToPriorityList(
-            before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
-            prepend: \App\Http\Middleware\InAppMode::class,
+            before: AuthenticatesRequests::class,
+            prepend: InAppMode::class,
         );
         // A friend opening a referral link is not signed in yet: the visit is recorded
         // (and the referral cookie set) before 'auth' sends them to sign in. Without
         // this, Laravel's priority order runs 'auth' first and the referral is lost.
         $middleware->prependToPriorityList(
-            before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
-            prepend: \App\Http\Middleware\CaptureReferralVisit::class,
+            before: AuthenticatesRequests::class,
+            prepend: CaptureReferralVisit::class,
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Developer API (/v1): every error in one JSON shape, never an HTML page.
-        $exceptions->dontReport(\App\Support\Api\ApiError::class);
-        $exceptions->render(function (\Throwable $e, Request $request) {
-            return \App\Support\Api\ApiErrorRenderer::appliesTo($request)
-                ? \App\Support\Api\ApiErrorRenderer::render($e, $request)
+        $exceptions->dontReport(ApiError::class);
+        $exceptions->render(function (Throwable $e, Request $request) {
+            return ApiErrorRenderer::appliesTo($request)
+                ? ApiErrorRenderer::render($e, $request)
                 : null;
         });
         // The MCP server (/mcp): the same refusals, as JSON-RPC errors.
-        $exceptions->render(function (\Throwable $e, Request $request) {
-            return \App\Mcp\McpErrors::appliesTo($request)
-                ? \App\Mcp\McpErrors::render($e, $request)
+        $exceptions->render(function (Throwable $e, Request $request) {
+            return McpErrors::appliesTo($request)
+                ? McpErrors::render($e, $request)
                 : null;
         });
 
