@@ -69,7 +69,11 @@
     .la-strip.la-more-left.la-more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); }
     .app-header.is-app .header-center { display: none; }
     .app-header.is-app .header-inner { justify-content: space-between; }
-    .app-header.is-app .locale-switch { display: none; }
+    /* The bar keeps clear of the screen's edges, and the language choice is always on it. */
+    .app-header .header-inner { padding-inline: 1rem; }
+    .app-header.is-app .header-actions { gap: .6rem; }
+    .app-header.is-app .locale-switch { display: inline-grid; min-width: 8.75rem; padding: 3px; }
+    @media (max-width: 350px) { .app-header.is-app .locale-switch { min-width: 7.5rem; } }
     /* A tap answers at once, before the next page has come. */
     a:active, button:active, .btn:active { opacity: .72; transition: opacity 0s; }
   </style>

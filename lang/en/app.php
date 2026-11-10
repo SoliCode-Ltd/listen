@@ -72,7 +72,7 @@ return [
         'save_failed' => 'The file could not be saved. Please try again.',
         'preparing' => 'Getting the file ready…',
         'notify_title' => 'Tell you when it\'s ready?',
-        'notify_text' => 'Long texts and videos take a while. We can send a notification when yours is ready, so you don\'t have to wait here.',
+        'notify_text' => 'Long texts take a while. We can send a notification when your voice is ready, so you don\'t have to wait here.',
         'notify_yes' => 'Yes, notify me',
         'notify_no' => 'Not now',
         'mic_denied' => 'The microphone is off for Listen. Turn it on in your phone\'s settings to record.',
