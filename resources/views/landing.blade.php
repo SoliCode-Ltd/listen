@@ -791,33 +791,43 @@
       margin-top: -.5px;
       background: linear-gradient(90deg, rgba(118, 89, 250, .75) 0, rgba(118, 89, 250, .28) 45%, rgba(118, 89, 250, 0) 100%);
     }
-    /* The glint: off the line (and unseen) until it moves. */
+    html[data-theme="light"] .inception-beam::before {
+      background: linear-gradient(90deg, rgba(98, 71, 238, .9) 0, rgba(118, 89, 250, .4) 45%, rgba(118, 89, 250, 0) 100%);
+    }
+    /* The glint: a bright core on the line inside a soft halo, off the line (and unseen) until it moves. On white
+       the core is a deeper violet and the halo stronger, so it glows there as it does on dark. */
     .inception-beam::after {
       content: "";
       position: absolute;
       left: 0;
       top: 50%;
-      width: min(140px, 60%);
-      height: 2px;
-      margin-top: -1px;
-      border-radius: 2px;
-      background: linear-gradient(90deg, rgba(118, 89, 250, 0), var(--brand-accent) 60%, #B9AAFF 80%, rgba(118, 89, 250, 0));
+      width: min(200px, 80%);
+      height: 36px;
+      margin-top: -18px;
+      background:
+        linear-gradient(90deg, rgba(118, 89, 250, 0), var(--brand-accent) 45%, #D6CCFF 66%, rgba(118, 89, 250, 0)) center / 100% 2px no-repeat,
+        radial-gradient(ellipse 36% 50% at 62% 50%, rgba(118, 89, 250, .5), rgba(118, 89, 250, 0) 100%) center / 100% 100% no-repeat;
       opacity: 0;
       transform: translateX(-100%);
     }
-    /* One slow pass from the badge to the line's end, both sides in step, then again. Only a transform and
-       opacity move; it stands still for visitors who ask for less motion. */
+    html[data-theme="light"] .inception-beam::after {
+      background:
+        linear-gradient(90deg, rgba(98, 71, 238, 0), #6247EE 42%, #4C2DEB 66%, rgba(98, 71, 238, 0)) center / 100% 2px no-repeat,
+        radial-gradient(ellipse 36% 50% at 62% 50%, rgba(118, 89, 250, .55), rgba(118, 89, 250, 0) 100%) center / 100% 100% no-repeat;
+    }
+    /* The light comes out of the badge at full strength, slows and fades as it travels, then rests before the
+       next pass; both sides in step. Only a transform and opacity move; it stands still for visitors who ask
+       for less motion. */
     @media (prefers-reduced-motion: no-preference) {
       .inception-beam::after {
         will-change: transform, opacity;
-        animation: inceptionGlint 5.5s cubic-bezier(.45, 0, .2, 1) infinite;
+        animation: inceptionGlint 5s cubic-bezier(.3, .55, .35, 1) infinite;
       }
     }
     @keyframes inceptionGlint {
-      0% { transform: translateX(-100%); opacity: 0; }
-      8% { opacity: 1; }
-      70% { opacity: .5; }
-      100% { transform: translateX(100cqw); opacity: 0; }
+      0% { transform: translateX(-100%); opacity: 1; }
+      45% { opacity: .75; }
+      78%, 100% { transform: translateX(100cqw); opacity: 0; }
     }
     .inception-strip p {
       margin: 0;
