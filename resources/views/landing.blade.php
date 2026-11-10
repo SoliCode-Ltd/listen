@@ -742,43 +742,81 @@
       }
     }
 
-    /* NVIDIA Inception under the hero. It starts below the lowest point the speakers' bubbles reach (the
-       bottom speakers' bubbles end about 50px above the hero's edge on desktops; on phones the caption card ends
-       at it), so the space above it matches the next section's space below it. The badge stays 30px or more
-       (NVIDIA's minimum) and is never recoloured. */
+    /* NVIDIA Inception under the hero: NVIDIA's badge in the middle of Listen's own sound wave, which runs out to
+       both sides and fades, with one line under it. The strip starts below the lowest point the speakers'
+       bubbles reach (the hero's own bottom padding on desktops, the margin here on phones). The badge is
+       NVIDIA's file, never recoloured, never under 30px (CLAUDE.md). */
     .inception-strip {
-      position: relative;
-      width: fit-content;
-      max-width: min(1100px, calc(100% - 32px));
+      width: 100%;
+      max-width: 1100px;
       margin: 0 auto;
-      padding: 38px 88px;
+      padding: 40px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+    /* Always left to right, so the wave mirrors around the badge in Arabic too. */
+    .inception-row {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 40px;
+      gap: 28px;
+      width: 100%;
+      direction: ltr;
     }
-    .inception-strip::before,
-    .inception-strip::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent 0, var(--line) 24%, var(--line) 76%, transparent 100%);
-    }
-    .inception-strip::before { top: 0; }
-    .inception-strip::after { bottom: 0; }
     .inception-strip img {
       display: block;
       flex: none;
-      height: 48px;
+      height: 56px;
       width: auto;
+    }
+    /* One side of the wave: bars from the badge outwards, cut softly where the strip ends. */
+    .inception-wave {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 52px;
+      overflow: hidden;
+      -webkit-mask-image: linear-gradient(90deg, #000 55%, transparent 100%);
+      mask-image: linear-gradient(90deg, #000 55%, transparent 100%);
+    }
+    .inception-wave-start {
+      flex-direction: row-reverse;
+      -webkit-mask-image: linear-gradient(270deg, #000 55%, transparent 100%);
+      mask-image: linear-gradient(270deg, #000 55%, transparent 100%);
+    }
+    .inception-wave i {
+      flex: none;
+      width: 4px;
+      height: var(--h);
+      border-radius: 2px;
+      background: var(--brand-accent);
+      opacity: var(--o);
+    }
+    .inception-wave-narrow { display: none; }
+    /* A slow ripple that travels out from the badge: each bar breathes a little after the one before it.
+       Only transforms move, so it stays smooth; it stands still for visitors who ask for less motion. */
+    @media (prefers-reduced-motion: no-preference) {
+      .inception-wave i {
+        transform-origin: center;
+        will-change: transform;
+        animation: inceptionRipple 2.8s cubic-bezier(.45, 0, .55, 1) infinite;
+        animation-delay: calc(var(--i) * 85ms - 6s);
+      }
+    }
+    @keyframes inceptionRipple {
+      0%, 100% { transform: scaleY(.5); }
+      50% { transform: scaleY(1); }
     }
     .inception-strip p {
       margin: 0;
       font-size: 1.1rem;
       line-height: 1.6;
       color: var(--muted);
+      text-align: center;
     }
     .inception-strip p b { font-weight: 600; color: var(--text); }
     html[dir="rtl"] .inception-strip p { font-size: 1.12rem; line-height: 1.75; }
@@ -786,12 +824,15 @@
       .inception-strip {
         width: calc(100% - 32px);
         margin-top: 1.4rem;
-        flex-direction: column;
         gap: 18px;
-        padding: 34px 20px;
-        text-align: center;
+        padding: 32px 0;
       }
-      .inception-strip img { height: 42px; }
+      .inception-row { gap: 16px; }
+      .inception-strip img { height: 48px; }
+      .inception-wave { gap: 5px; height: 40px; }
+      .inception-wave i { width: 3px; }
+      .inception-wave-wide { display: none; }
+      .inception-wave-narrow { display: flex; }
       .inception-strip p { font-size: 1rem; max-width: 32ch; text-wrap: balance; }
       html[dir="rtl"] .inception-strip p { font-size: 1.04rem; }
     }
@@ -1059,9 +1100,31 @@
     </section>
 
     {{-- NVIDIA Inception, right under the hero: NVIDIA's own badge (public/images/partners, unchanged but for its
-         empty margin) beside one line, between two rules that span only the strip and fade at their ends. --}}
+         empty margin) in the middle of Listen's sound wave, with one line under it. The wave is drawn here, the
+         same on every load: a long one for wide screens and a short one for phones. --}}
+    @php
+      $inceptionWave = static function (int $count, int $tallest): string {
+          $bars = '';
+          for ($i = 0; $i < $count; $i++) {
+              // 1 beside the badge, 0 at the far end: the bars shrink and fade as they go.
+              $near = (1 - $i / max(1, $count - 1)) ** 1.25;
+              $height = max(4, (int) round($tallest * $near * (0.45 + 0.55 * abs(sin($i * 1.9) * cos($i * 0.7)))));
+              $bars .= '<i style="--i:'.$i.';--h:'.$height.'px;--o:'.number_format(0.2 + 0.8 * $near, 2).'"></i>';
+          }
+
+          return $bars;
+      };
+      $inceptionWide = $inceptionWave(40, 48);
+      $inceptionNarrow = $inceptionWave(12, 38);
+    @endphp
     <section class="inception-strip" aria-label="{{ __('ui.landing.inception_program') }}">
-      <img src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.landing.inception_badge') }}" width="131" height="48" loading="lazy" decoding="async">
+      <div class="inception-row">
+        <span class="inception-wave inception-wave-start inception-wave-wide" aria-hidden="true">{!! $inceptionWide !!}</span>
+        <span class="inception-wave inception-wave-start inception-wave-narrow" aria-hidden="true">{!! $inceptionNarrow !!}</span>
+        <img src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.landing.inception_badge') }}" width="152" height="56" decoding="async">
+        <span class="inception-wave inception-wave-wide" aria-hidden="true">{!! $inceptionWide !!}</span>
+        <span class="inception-wave inception-wave-narrow" aria-hidden="true">{!! $inceptionNarrow !!}</span>
+      </div>
       <p>{!! __('ui.landing.inception_line', ['program' => '<b>'.e(__('ui.landing.inception_program')).'</b>']) !!}</p>
     </section>
 

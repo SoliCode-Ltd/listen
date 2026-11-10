@@ -968,7 +968,7 @@ html[data-theme="light"] .app-footer {
 .footer-inception {
   display: block;
   margin-top: 1.5rem;
-  height: 44px;
+  height: 54px;
   width: auto;
 }
 
