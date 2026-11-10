@@ -105,8 +105,14 @@ jobs:
         working-directory: mobile/android
         run: ./gradlew testDebugUnitTest
 
+      # Signed with the upload key when the signing step above ran, so each test APK installs
+      # over the last one; with the build machine's own throwaway key otherwise.
       - name: Build the debug APK
         working-directory: mobile/android
+        env:
+          LISTEN_KEYSTORE_PASSWORD: ${{ env.USE_SECRETS == 'true' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+          LISTEN_KEY_ALIAS: ${{ env.USE_SECRETS == 'true' && secrets.ANDROID_KEY_ALIAS || '' }}
+          LISTEN_KEY_PASSWORD: ${{ env.USE_SECRETS == 'true' && secrets.ANDROID_KEY_PASSWORD || '' }}
         run: ./gradlew assembleDebug
 
       # Signed when the signing step above ran, unsigned otherwise.

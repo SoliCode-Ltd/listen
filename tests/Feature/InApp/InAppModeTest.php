@@ -393,10 +393,15 @@ class InAppModeTest extends InAppTestCase
             $this->assertSame(1, preg_match_all('/class="app-tab is-on"/', $html), $route);
         }
 
-        // The Account page holds what the menu used to: language, help and signing out.
+        // The Account page holds what the menu used to: help and signing out. The language is on the
+        // bar at the top of every page, and on this page its links lead back here: they must not be
+        // taken for purchase links and hidden (the rule in components/in-app-head).
         $account = (string) $this->inApp($member)->page('app.plan')->getContent();
-        $this->assertStringContainsString('data-app-language="ar"', $account);
-        $this->assertStringContainsString('data-app-language="en"', $account);
+        $this->assertSame(1, preg_match('#<header class="app-header.*?</header>#s', $account, $bar));
+        $this->assertSame(1, preg_match_all('#<a class="app-lang"[^>]*>#', $bar[0], $links));
+        $this->assertStringContainsString('data-in-app-plan', $links[0][0]);
+        // The language is on the bar only: no second switch on the page itself.
+        $this->assertStringNotContainsString('data-app-language', $account);
         $this->assertStringContainsString(route('logout'), $account);
 
         // The website keeps its own menu, and a guest in the app has no tabs to tools they cannot open.
@@ -471,9 +476,12 @@ class InAppModeTest extends InAppTestCase
         $member = $this->memberOn('starter');
 
         $html = (string) $this->inApp($member)->page('dashboard')->assertOk()->getContent();
+        // One link to the other language, as on the sign-in page; the website's two-sided switch is not used.
         $this->assertSame(1, preg_match('#<header class="app-header is-app.*?</header>#s', $html, $bar));
-        $this->assertStringContainsString('hreflang="ar"', $bar[0]);
-        $this->assertStringContainsString('hreflang="en"', $bar[0]);
+        $this->assertSame(1, preg_match_all('#<a class="app-lang"[^>]*hreflang="(ar|en)"[^>]*>\s*(العربية|English)\s*</a>#u', $bar[0], $link));
+        $this->assertSame(['ar' => 'العربية', 'en' => 'English'][$link[1][0]], $link[2][0]);
+        $this->assertStringNotContainsString('locale-switch', $bar[0]);
+        $this->assertStringContainsString('class="locale-switch', (string) $this->inBrowser($member)->page('samples')->getContent());
 
         // Video dubbing is not open to members, so the app does not speak of videos.
         foreach (['en', 'ar'] as $locale) {

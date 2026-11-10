@@ -541,6 +541,146 @@
   window.addEventListener('pageshow', strips);
   window.addEventListener('resize', strips);
 
+  // ------------------------------------------------- typing: the keyboard is up
+
+  // The keyboard takes half the screen and the bars at the top cover part of the rest, so the
+  // field being typed in is brought fully into what is left, and the tab bar steps aside.
+  var typingField = null, typingSince = 0, tallest = window.innerHeight, widthThen = window.innerWidth;
+
+  function isTextField(el) {
+    if (!el || !el.tagName) return false;
+    if (el.isContentEditable || el.tagName === 'TEXTAREA') return true;
+    return el.tagName === 'INPUT' && !/^(checkbox|radio|range|button|submit|reset|file|color|image|hidden)$/i.test(el.type || 'text');
+  }
+  // Where the page really starts: under the header and any bar held beneath it.
+  function coveredTop() {
+    var edge = 0, bars = document.querySelectorAll('.app-header, .dashboard-menu, .samples-bar, .ag-tabs');
+    for (var i = 0; i < bars.length; i++) {
+      var pos = getComputedStyle(bars[i]).position;
+      if (pos !== 'fixed' && pos !== 'sticky') continue;
+      var r = bars[i].getBoundingClientRect();
+      if (r.height && r.top <= edge + 2 && r.bottom > edge) edge = r.bottom;
+    }
+    return edge;
+  }
+  // Where the line being typed is on the screen ({top, bottom}), or null when it cannot be told.
+  // A text box gives no such thing itself, so its text up to the cursor is laid out in a copy.
+  var caretMirror = null;
+  function caretLine(el) {
+    try {
+      if (el.isContentEditable) {
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return null;
+        var rects = sel.getRangeAt(0).getClientRects();
+        var rr = rects.length ? rects[rects.length - 1] : null;
+        return rr && rr.height ? { top: rr.top, bottom: rr.bottom } : null;
+      }
+      var box = el.getBoundingClientRect(), cs = getComputedStyle(el);
+      var line = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.5 || 24;
+      var padTop = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.paddingTop) || 0);
+      if (el.tagName !== 'TEXTAREA' || typeof el.selectionStart !== 'number') {
+        return { top: box.top, bottom: box.bottom };
+      }
+      // The copy sits beside the box, so it takes the same font and sizing from the page around
+      // it, inside a wrapper with no height: it is measured but never seen and moves nothing.
+      if (!caretMirror) {
+        caretMirror = document.createElement('div');
+        caretMirror.style.cssText = 'white-space:pre-wrap;overflow-wrap:break-word;word-wrap:break-word;margin:0;border:0 solid transparent;';
+        var wrap = document.createElement('div');
+        wrap.setAttribute('aria-hidden', 'true');
+        wrap.style.cssText = 'position:absolute;top:0;left:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;';
+        wrap.appendChild(caretMirror);
+      }
+      if (caretMirror.parentNode.parentNode !== el.parentNode) el.parentNode.appendChild(caretMirror.parentNode);
+      var copy = ['fontFamily', 'fontSize', 'fontSizeAdjust', 'fontWeight', 'fontStyle', 'fontStretch', 'fontKerning', 'fontFeatureSettings', 'fontVariationSettings', 'unicodeBidi', 'wordBreak', 'letterSpacing', 'lineHeight', 'textTransform', 'wordSpacing', 'textIndent', 'direction', 'paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth', 'boxSizing', 'tabSize'];
+      for (var i = 0; i < copy.length; i++) caretMirror.style[copy[i]] = cs[copy[i]];
+      var width = el.clientWidth + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0) + 'px';
+      caretMirror.parentNode.style.width = width;
+      caretMirror.style.width = width;
+      // A character after the cursor, so an empty last line still has its height.
+      caretMirror.textContent = el.value.slice(0, el.selectionStart) + '\u200b';
+      var bottomOfLine = box.top + padTop + caretMirror.offsetHeight - el.scrollTop;
+      return { top: bottomOfLine - line, bottom: bottomOfLine };
+    } catch (e) { return null; }
+  }
+  // The room left for the page while typing: under the bars at the top, above the keyboard.
+  function typingRoom() {
+    var top = coveredTop() + 12;
+    var bottom = (window.visualViewport ? window.visualViewport.height : window.innerHeight) - 12;
+    // The browser's own "bring the cursor into view" then keeps clear of the bars too.
+    document.documentElement.style.setProperty('--la-covered', top + 'px');
+    return { top: top, bottom: bottom };
+  }
+  function showTypingField(first) {
+    var el = typingField;
+    if (!el || document.activeElement !== el) return;
+    var room = typingRoom(), r = el.getBoundingClientRect(), by = 0;
+    if (r.height <= room.bottom - room.top) {
+      // The whole field fits: show all of it.
+      if (r.top < room.top) by = r.top - room.top; else if (r.bottom > room.bottom) by = r.bottom - room.bottom;
+    } else {
+      // Taller than the room left: the line being typed is what must be seen.
+      var line = caretLine(el) || { top: r.top, bottom: r.top + 28 };
+      var startBy = r.top - room.top;
+      if (first === true && line.bottom - startBy <= room.bottom - 8) by = startBy; // from the start of the box, while the line stays in view
+      else if (line.top < room.top + 6) by = Math.max(line.top - room.top - 14, startBy);
+      else if (line.bottom > room.bottom - 6) by = line.bottom - room.bottom + 14;
+    }
+    if (Math.abs(by) > 3) window.scrollBy(0, by);
+  }
+  // Runs once now and once more shortly after: the browser moves the page itself a moment
+  // after a key or a tap, and that move is the one that hides the line.
+  var typingChecks = 0, lastTypingEvent = 0;
+  function checkTyping(first) {
+    lastTypingEvent = Date.now();
+    var mine = ++typingChecks;
+    requestAnimationFrame(function () { showTypingField(first); });
+    setTimeout(function () { if (mine === typingChecks) showTypingField(first); }, 140);
+    setTimeout(function () { if (mine === typingChecks) showTypingField(first); }, 460);
+  }
+  function setTyping(el) {
+    typingField = el;
+    document.documentElement.classList.toggle('la-typing', !!el);
+    if (el) { typingSince = Date.now(); typingRoom(); }
+  }
+  document.addEventListener('focusin', function (event) {
+    if (!isTextField(event.target)) return;
+    setTyping(event.target);
+    checkTyping(true);
+  });
+  document.addEventListener('focusout', function () {
+    setTimeout(function () { if (!isTextField(document.activeElement)) setTyping(null); }, 120);
+  });
+  window.addEventListener('resize', function () {
+    if (window.innerWidth !== widthThen) { widthThen = window.innerWidth; tallest = window.innerHeight; }
+    tallest = Math.max(tallest, window.innerHeight);
+    if (!typingField) return;
+    // The keyboard is rising (or changed height): the page got shorter.
+    if (window.innerHeight < tallest - 120) { checkTyping(Date.now() - typingSince < 1200); return; }
+    // The keyboard was put away with the field still chosen: the bar comes back.
+    if (Date.now() - typingSince > 500) document.documentElement.classList.remove('la-typing');
+  });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', function () { if (typingField) checkTyping(Date.now() - typingSince < 1200); });
+  }
+  // Each key, and each move of the cursor: the line stays in view.
+  document.addEventListener('input', function (event) {
+    if (event.target !== typingField) return;
+    document.documentElement.classList.add('la-typing');
+    checkTyping(false);
+  });
+  document.addEventListener('selectionchange', function () {
+    if (typingField && document.activeElement === typingField) checkTyping(false);
+  });
+  // The browser's own jump right after a key or the keyboard (not a finger moving the page,
+  // which is left alone): put the line back.
+  var typingScrollTimer = 0;
+  window.addEventListener('scroll', function () {
+    if (!typingField || Date.now() - lastTypingEvent > 700) return;
+    clearTimeout(typingScrollTimer);
+    typingScrollTimer = setTimeout(function () { showTypingField(false); }, 90);
+  }, { passive: true });
+
   // ------------------------------------------- back, refresh, theme, sign-in
 
   function closeOverlay() {

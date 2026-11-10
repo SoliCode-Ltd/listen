@@ -62,8 +62,11 @@ public class MainActivity extends BridgeActivity {
     private static final String ERROR_PAGE = "offline.html";
     private static final String PREFS = "listen_shell";
     private static final String KEY_SITE_THEME = "site_theme";
-    /** The launch screen never stays longer than this, whatever the network does. */
-    private static final long SPLASH_MAX_MS = 4000;
+    /** The opening screen never stays longer than this, whatever the network does. */
+    private static final long SPLASH_MAX_MS = 6000;
+    /** Nor shorter than this, so the logo is seen to move and does not just blink. */
+    private static final long SPLASH_MIN_MS = 700;
+    private static final long SPLASH_FADE_MS = 240;
     private static final long REFRESH_SPINNER_MAX_MS = 12_000;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -76,6 +79,9 @@ public class MainActivity extends BridgeActivity {
 
     private long createdAt;
     private boolean firstPageVisible;
+    /** The moving logo over the first page while it loads (null once it has gone). */
+    @Nullable
+    private LaunchWaveView launchView;
     private boolean pullToRefresh;
     private boolean backHandler;
     private boolean showingError;
@@ -88,9 +94,10 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        SplashScreen splash = SplashScreen.installSplashScreen(this);
+        // The system's launch screen shows the still logo on white for the first instant; the
+        // moving logo (LaunchWaveView) takes over from the first frame and stays until the page is there.
+        SplashScreen.installSplashScreen(this);
         createdAt = SystemClock.elapsedRealtime();
-        splash.setKeepOnScreenCondition(() -> !firstPageVisible && SystemClock.elapsedRealtime() - createdAt < SPLASH_MAX_MS);
 
         urls = new AppUrls(BuildConfig.APP_URL);
         // Opened from a link or a notification: start on that page instead of the default one.
@@ -117,6 +124,7 @@ public class MainActivity extends BridgeActivity {
             onDownloadRequested(url, contentDisposition, mimeType)
         );
 
+        if (savedInstanceState == null) showLaunchView();
         setUpInsets();
         setUpPullToRefresh();
         setUpBackButton();
@@ -273,6 +281,30 @@ public class MainActivity extends BridgeActivity {
     void onPageVisible() {
         firstPageVisible = true;
         swipe.setRefreshing(false);
+        long shown = SystemClock.elapsedRealtime() - createdAt;
+        handler.postDelayed(this::hideLaunchView, Math.max(0, SPLASH_MIN_MS - shown));
+    }
+
+    // ------------------------------------------------------------------ opening screen
+
+    /** Covers the whole window, bars included, with the moving logo on white. */
+    private void showLaunchView() {
+        launchView = new LaunchWaveView(this);
+        addContentView(launchView, new android.view.ViewGroup.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+        handler.postDelayed(this::hideLaunchView, SPLASH_MAX_MS);
+    }
+
+    /** Fades the opening screen away over the page (or over the "can't connect" page). */
+    private void hideLaunchView() {
+        final LaunchWaveView view = launchView;
+        if (view == null) return;
+        launchView = null;
+        // The bars take the page's own colours again as the white leaves.
+        if (ready) applyTheme(isDark());
+        view.animate().alpha(0f).setDuration(SPLASH_FADE_MS).withEndAction(() -> {
+            if (view.getParent() instanceof android.view.ViewGroup) ((android.view.ViewGroup) view.getParent()).removeView(view);
+        }).start();
     }
 
     void onMainFrameError(String failedUrl) {
@@ -359,8 +391,9 @@ public class MainActivity extends BridgeActivity {
         root.setBackgroundColor(background);
         webView.setBackgroundColor(background);
         // Icon contrast: light icons on dark, dark icons on light. On Android 7 the navigation
-        // bar cannot have dark icons, so it gets a dark scrim there instead.
-        SystemBarStyle style = dark
+        // bar cannot have dark icons, so it gets a dark scrim there instead. The opening screen
+        // is white whatever the theme, so the icons are dark while it shows.
+        SystemBarStyle style = dark && launchView == null
             ? SystemBarStyle.dark(Color.TRANSPARENT)
             : SystemBarStyle.light(Color.TRANSPARENT, Color.argb(0x80, 0x1b, 0x1b, 0x1b));
         EdgeToEdge.enable(this, style, style);

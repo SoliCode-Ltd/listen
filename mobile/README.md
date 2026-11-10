@@ -131,7 +131,10 @@ When it finishes, download the artifacts from the run's page:
 
 - **the release bundle** (`.aab`): this is what you upload to Google Play;
 - **the debug APK** (`.apk`): install this one on your own phone to try the app first
-  (it is marked "debug" and cannot be uploaded to the store).
+  (it is marked "debug" and cannot be uploaded to the store). Runs you start by hand sign it
+  with your upload key, so each new test APK installs over the last one. A test APK from
+  before that change (or one built on a computer) has another key: Android then refuses the
+  update, so uninstall the old app once and install the new one.
 
 Section 5 explains building on your own computer instead.
 

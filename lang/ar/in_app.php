@@ -96,4 +96,6 @@ return [
     'voice_design.demo_keep_title' => 'صوت خاص بك',
     'voice_design.demo_keep_cta' => 'باقتك',
     'agents.balance.state_plan_none' => 'باقتك لا تشمل تشغيل الوكلاء. يمكنك بناء وكيل وتجربته الآن.',
+    // The app's menu is the bar at the bottom, not the top of the page.
+    'agents.start_continue_note' => 'يمكنك التنقل بين الاستوديو والوكلاء في أي وقت، من الشريط أسفل كل صفحة.',
 ];

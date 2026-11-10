@@ -30,7 +30,7 @@
       ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
     }
     /* The member's app: the tools on a bar at the bottom, as in any phone app. */
-    .app-tabs { position: fixed; inset-inline: 0; bottom: 0; z-index: 950; display: flex; align-items: stretch;
+    .app-tabs { position: fixed; inset-inline: 0; bottom: 0; z-index: 96; display: flex; align-items: stretch;
       background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px);
       view-transition-name: la-tabs; }
     ::view-transition-group(la-tabs) { animation: none; }
@@ -44,6 +44,20 @@
     .app-tab.is-on { color: var(--brand-accent); }
     html:not([data-theme="light"]) .app-tab.is-on { color: var(--brand-subtle, #A99CFF); }
     html:has(.app-tabs) body { padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)); }
+    html:has(.app-tabs) .la-toast { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+    /* The agents' own notice (saved, copied...) shows above the bar, not behind it. */
+    html:has(.app-tabs) .ag-toast { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); z-index: 120; }
+    html.la-typing:has(.app-tabs) .ag-toast { bottom: 16px; }
+    /* Agents start right under the header: the room kept for the Studio | Agents switch is not needed. */
+    html:has(.app-tabs) main.ag.ag-page { padding-top: .35rem; }
+    /* While the keyboard is up the screen belongs to what is being typed: no bar above the keys. */
+    html.la-typing .app-tabs { display: none; }
+    /* The browser brings the cursor into view by itself; told how much the bars at the top cover
+       (listen-app.js sets it), it keeps the line clear of them instead of sliding it underneath. */
+    html.la-typing { scroll-padding-top: var(--la-covered, 131px); scroll-padding-bottom: 12px; }
+    html.la-typing:has(.app-tabs) body { padding-bottom: 0; }
+    html.la-typing:has(.app-tabs) .la-toast { bottom: 16px; }
+    html.la-typing #generatedAudioWrap.output-dock { bottom: .75rem !important; }
     /* The bar switches between Studio and Agents, so the pages' own switch is not shown twice. */
     html:has(.app-tabs) .app-switch { display: none !important; }
     /* The studio's own sections (create, design, cloning...) sit in one strip under the header,
@@ -69,11 +83,16 @@
     .la-strip.la-more-left.la-more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); }
     .app-header.is-app .header-center { display: none; }
     .app-header.is-app .header-inner { justify-content: space-between; }
-    /* The bar keeps clear of the screen's edges, and the language choice is always on it. */
+    /* The bar keeps clear of the screen's edges. The language is one quiet link to the other
+       language beside the theme switch, as on the sign-in page (public/css/auth.css). */
     .app-header .header-inner { padding-inline: 1rem; }
-    .app-header.is-app .header-actions { gap: .6rem; }
-    .app-header.is-app .locale-switch { display: inline-grid; min-width: 8.75rem; padding: 3px; }
-    @media (max-width: 350px) { .app-header.is-app .locale-switch { min-width: 7.5rem; } }
+    .app-header .header-actions { gap: 6px; }
+    .app-lang { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: 999px;
+      color: var(--muted); font-size: 14px; font-weight: 500; line-height: 1; text-decoration: none; white-space: nowrap; }
+    .app-lang[lang="ar"] { font-family: var(--font-body-ar, inherit); font-size: 15px; }
+    .app-lang:active { color: var(--text); background: var(--surface2); }
+    .app-header .theme-toggle { width: 36px; height: 36px; padding: 0; border: 0; background: transparent; color: var(--muted); box-shadow: none; }
+    .app-header .theme-toggle .icon { width: 18px; height: 18px; }
     /* A tap answers at once, before the next page has come. */
     a:active, button:active, .btn:active { opacity: .72; transition: opacity 0s; }
   </style>

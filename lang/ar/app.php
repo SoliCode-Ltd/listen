@@ -16,7 +16,6 @@ return [
 
     'plan' => [
         'upgrade' => 'ترقية الباقة',
-        'language' => 'اللغة',
         'title' => 'حسابي',
         'plan_heading' => 'باقتك',
         'hello' => 'أهلاً، :name',

@@ -1476,7 +1476,7 @@
         if (again) again.focus({ preventScroll: true });
       }
       empty.hidden = shown.length > 0;
-      empty.textContent = state.tab === 'favorites' && !q && !state.gender && !state.age ? t(meta, 'no_favorites') : (all.length ? t(meta, 'no_results') : t(meta, 'no_voices'));
+      empty.textContent = state.tab === 'favorites' && !state.query && !state.gender && !state.age ? t(meta, 'no_favorites') : (all.length ? t(meta, 'no_results') : t(meta, 'no_voices'));
     }
     tabs.forEach(function (tab) {
       tab.addEventListener('click', function () { state.tab = tab.dataset.vsLibTab; render(); });
