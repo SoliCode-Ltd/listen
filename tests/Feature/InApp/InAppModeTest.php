@@ -278,7 +278,7 @@ class InAppModeTest extends InAppTestCase
         // The app's own lines (lang/*/app.php) sell nothing either, except the one that says so.
         foreach (['en', 'ar'] as $locale) {
             $own = Arr::dot(require lang_path("$locale/app.php"));
-            unset($own['not_sold_here']);
+            unset($own['not_sold_here'], $own['plan.upgrade']);
             // The lines of the other setting, where plans are bought in the browser.
             $own = array_filter($own, fn (string $key): bool => ! str_starts_with($key, 'web.') && $key !== 'shell.web_failed', ARRAY_FILTER_USE_KEY);
             foreach ($own as $key => $line) {
@@ -352,6 +352,8 @@ class InAppModeTest extends InAppTestCase
         $html = (string) preg_replace('#<(textarea|audio)\b.*?</\1>#si', ' ', $html);
         $html = (string) preg_replace('#<(article|div|section)\b[^>]*class="[^"]*\b(vs-read|vs-card|long-sample|sample-text)[^"]*"[^>]*>.*?</\1>#si', ' ', $html);
         $html = (string) preg_replace('#<p\b[^>]*\blang="[a-z-]+"[^>]*>.*?</p>#si', ' ', $html);
+        // The one way to a bigger plan: the account page's button, which opens billing in the browser.
+        $html = (string) preg_replace('#<a\b[^>]*data-app-upgrade[^>]*>.*?</a>#si', ' ', $html);
         $text = $this->visibleText($html);
         // The example of what a member's own business may tell its agent ("Teeth whitening: 1,500 EGP").
         $text = (string) preg_replace('/(Teeth whitening|تبييض الأسنان)[^.]*\./u', ' ', $text);
@@ -367,5 +369,58 @@ class InAppModeTest extends InAppTestCase
             $this->fail("Something is sold in $where: \"".mb_strcut($text, max(0, $match[0][1] - 80), 220).'"');
         }
         $this->assertTrue(true);
+    }
+
+    public function test_a_member_in_the_app_gets_tabs_for_the_tools_and_no_menu_of_pages(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $member = $this->memberOn('starter');
+
+        foreach (['dashboard', 'samples', 'app.plan', 'contact'] as $route) {
+            $html = (string) $this->inApp($member)->page($route)->assertOk()->getContent();
+            foreach (['studio', 'voices', 'account'] as $tab) {
+                $this->assertStringContainsString('data-app-tab="'.$tab.'"', $html, $route);
+            }
+            $this->assertStringNotContainsString('id="mobileNav"', $html, $route);
+            $this->assertStringNotContainsString('class="desktop-nav"', $html, $route);
+            $this->assertStringNotContainsString('id="userMenu"', $html, $route);
+            $this->assertSame(1, preg_match_all('/class="app-tab is-on"/', $html), $route);
+        }
+
+        // The Account page holds what the menu used to: language, help and signing out.
+        $account = (string) $this->inApp($member)->page('app.plan')->getContent();
+        $this->assertStringContainsString('data-app-language="ar"', $account);
+        $this->assertStringContainsString('data-app-language="en"', $account);
+        $this->assertStringContainsString(route('logout'), $account);
+
+        // The website keeps its own menu, and a guest in the app has no tabs to tools they cannot open.
+        $this->assertStringNotContainsString('data-app-tab=', (string) $this->inBrowser($member)->page('samples')->getContent());
+        $this->assertStringNotContainsString('data-app-tab=', (string) $this->inApp(null)->page('samples')->getContent());
+    }
+
+    public function test_upgrade_on_the_account_page_opens_billing_in_the_browser_signed_in(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $member = $this->memberOn('starter');
+
+        $this->assertStringContainsString(route('app.upgrade'), (string) $this->inApp($member)->page('app.plan')->getContent());
+
+        $page = (string) $this->inApp($member)->page('app.upgrade')->assertOk()->getContent();
+        $this->assertSame(1, preg_match('#/app/continue\?code=([A-Za-z0-9]{64})&(?:amp;)?to=([^"&<\s]+)#', $page, $m));
+        $this->assertStringContainsString('billing', urldecode($m[2]));
+
+        // The browser: signed in by the link and on the real billing page, even straight after
+        // signing in through the app's browser tab.
+        auth()->logout();
+        $this->flushSession();
+        $landed = $this->inBrowser(null)->withSession([InApp::SIGN_IN_SESSION => now()->getTimestamp()])
+            ->get('/app/continue?code='.$m[1].'&to='.$m[2]);
+        $landed->assertRedirect();
+        $this->assertStringEndsWith('/billing', (string) $landed->headers->get('Location'));
+        $this->assertAuthenticatedAs($member);
+        $landed->assertSessionMissing(InApp::SIGN_IN_SESSION);
+
+        // The same link opened by a browser leads to billing itself.
+        $this->inBrowser($member)->page('app.upgrade')->assertRedirect(route('billing.page'));
     }
 }

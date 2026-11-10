@@ -187,9 +187,9 @@ class AppShellController extends Controller
      * once and for a few minutes; a visitor meets the site's own sign-in,
      * which already leads on to the page they asked for.
      */
-    public function openOnWeb(Request $request): Response
+    public function openOnWeb(Request $request, ?string $to = null): Response
     {
-        $to = '/'.ltrim($request->getRequestUri(), '/');
+        $to ??= '/'.ltrim($request->getRequestUri(), '/');
         $user = $request->user();
         $webUrl = url($to);
 
@@ -203,6 +203,20 @@ class AppShellController extends Controller
             'webUrl' => $webUrl,
             'backUrl' => $user ? $this->memberHome($user, app()->getLocale()) : $this->localized('login', $this->locale($request)),
         ])->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * "Upgrade" on the app's account page: the billing page, opened in the
+     * phone's browser with the member already signed in. Nothing is bought
+     * inside the app.
+     */
+    public function upgrade(Request $request): Response|RedirectResponse
+    {
+        if (! InApp::fromApp($request)) {
+            return redirect()->route('billing.page');
+        }
+
+        return $this->openOnWeb($request, '/'.app()->getLocale().'/billing');
     }
 
     /**
@@ -230,6 +244,8 @@ class AppShellController extends Controller
             Auth::login($user, true);
             $request->session()->regenerate();
         }
+        // This browser is now on the website itself, not the app's sign-in tab.
+        $request->session()->forget(InApp::SIGN_IN_SESSION);
 
         return redirect()->to(url($to));
     }

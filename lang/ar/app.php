@@ -9,7 +9,14 @@ return [
     'no_credits_until' => 'استخدمت كل رصيدك. يتجدد رصيدك يوم :date.',
     'signin_failed' => 'تعذّر إكمال تسجيل الدخول. حاول مرة أخرى.',
 
+    'tabs' => [
+        'voices' => 'الأصوات',
+        'account' => 'حسابي',
+    ],
+
     'plan' => [
+        'upgrade' => 'ترقية الباقة',
+        'language' => 'اللغة',
         'title' => 'حسابي',
         'plan_heading' => 'باقتك',
         'hello' => 'أهلاً، :name',

@@ -91,11 +91,31 @@
     $inAppMemberLinks[] = ['route' => 'contact', 'label' => __('ui.nav.contact')];
     $authNavLinks = $inAppMemberLinks;
   }
+  // A signed-in member in the app gets an app, not a website: no menu of pages, only the tools
+  // on a bar at the bottom (Studio, Agents, Voices, Account). Help, language and signing out are
+  // on the Account page (app/plan).
+  $appTabs = $inApp && auth()->check();
+  $appTabLinks = [];
+  if ($appTabs) {
+    $onAgents = str_starts_with($currentRoute, 'voice-agents.');
+    $onVoices = $currentRoute === 'samples';
+    $onAccount = in_array($currentRoute, ['app.plan', 'app.upgrade', 'contact'], true) || str_starts_with($currentRoute, 'legal.');
+    $appTabLinks[] = ['key' => 'studio', 'href' => route('dashboard'), 'label' => __('agents.switch_studio'), 'on' => ! $onAgents && ! $onVoices && ! $onAccount,
+      'icon' => '<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>'];
+    if ($agentsOpen) {
+      $appTabLinks[] = ['key' => 'agents', 'href' => route('voice-agents.index'), 'label' => __('agents.switch_agents'), 'on' => $onAgents,
+        'icon' => '<path d="M21 12a8 8 0 0 1-11.8 7L4 20l1.1-4.6A8 8 0 1 1 21 12z"/><path d="M9 11v2M12 9.5v5M15 11v2"/>'];
+    }
+    $appTabLinks[] = ['key' => 'voices', 'href' => route('samples'), 'label' => __('app.tabs.voices'), 'on' => $onVoices,
+      'icon' => '<path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4"/>'];
+    $appTabLinks[] = ['key' => 'account', 'href' => route('app.plan'), 'label' => __('app.tabs.account'), 'on' => $onAccount,
+      'icon' => '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'];
+  }
   // The link that is lit: the page's own, and Dashboard anywhere in the app (Studio or Agents).
   $navActive = fn (string $route) => $currentRoute === $route || ($route === 'dashboard' && str_starts_with($currentRoute, 'voice-agents.'));
 @endphp
 
-<header class="app-header">
+<header class="app-header {{ $appTabs ? 'is-app' : '' }}">
   <div class="header-inner">
     <a class="brand" href="{{ $brandHref }}" aria-label="{{ __('ui.header.brand_home', ['name' => $brandName]) }}">
       @if($logoUrl)
@@ -113,11 +133,13 @@
 
     {{-- The middle of the bar: the links. --}}
     <div class="header-center">
+    @unless($appTabs)
     <nav class="desktop-nav" aria-label="{{ __('ui.header.main_nav') }}">
       @foreach(auth()->check() ? $authNavLinks : $navLinks as $link)
         <a href="{{ route($link['route']) }}" class="nav-link {{ $navActive($link['route']) ? 'active' : '' }}" @if($link['route'] === 'app.plan') data-in-app-plan @endif @if($navActive($link['route'])) aria-current="page" @endif>{{ $link['label'] }}</a>
       @endforeach
     </nav>
+    @endunless
     </div>
 
     <div class="header-actions">
@@ -137,7 +159,8 @@
         <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
       </button>
 
-      @auth
+      @if($appTabs)
+      @elseauth
         <div class="user-menu" id="userMenu">
           <button type="button" class="user-trigger" id="userMenuTrigger" aria-expanded="false" aria-haspopup="true">
             <div class="user-avatar">
@@ -226,16 +249,28 @@
           <a class="btn btn-ghost" href="{{ route('login') }}">{{ __('ui.nav.sign_in') }}</a>
           <a class="btn btn-primary" href="{{ route('register') }}">{{ __('ui.nav.get_started') }}</a>
         </div>
-      @endauth
+      @endif
     </div>
 
+    @unless($appTabs)
     <button type="button" class="mobile-toggle" id="mobileMenuToggle" aria-label="{{ __('ui.header.toggle_menu') }}" aria-expanded="false">
       <span class="hamburger"></span>
     </button>
+    @endunless
   </div>
 
 </header>
 
+@if($appTabs)
+<nav class="app-tabs" aria-label="{{ __('ui.header.main_nav') }}">
+  @foreach($appTabLinks as $tab)
+    <a href="{{ $tab['href'] }}" class="app-tab {{ $tab['on'] ? 'is-on' : '' }}" data-app-tab="{{ $tab['key'] }}" @if($tab['key'] === 'account') data-in-app-plan @endif @if($tab['on']) aria-current="page" @endif>
+      <svg viewBox="0 0 24 24" aria-hidden="true">{!! $tab['icon'] !!}</svg>
+      <span>{{ $tab['label'] }}</span>
+    </a>
+  @endforeach
+</nav>
+@else
 <div class="mobile-nav" id="mobileNav" aria-hidden="true">
   <nav class="mobile-nav-inner">
     <div class="mobile-nav-top">
@@ -295,3 +330,4 @@
     @endauth
   </nav>
 </div>
+@endif

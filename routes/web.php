@@ -1,24 +1,55 @@
 <?php
 
+use App\Http\Controllers\AdminAgentRecordingController;
 use App\Http\Controllers\AdminClonedVoiceAudioController;
+use App\Http\Controllers\AdminDriveController;
 use App\Http\Controllers\AdminManualPaymentProofController;
+use App\Http\Controllers\AdminVideoDubFileController;
+use App\Http\Controllers\AgentCallController;
+use App\Http\Controllers\AgentController;
+use App\Http\Controllers\AgentFileController;
+use App\Http\Controllers\AppShellController;
+use App\Http\Controllers\AudioDownloadController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\CharPackController;
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DemoAgentController;
+use App\Http\Controllers\DeveloperController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ExtensionController;
+use App\Http\Controllers\FavoriteVoicesController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ManualPaymentController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\NewsletterUnsubscribeController;
+use App\Http\Controllers\PronunciationController;
+use App\Http\Controllers\ReferralController;
+use App\Http\Controllers\StartController;
+use App\Http\Controllers\TrialBillingController;
+use App\Http\Controllers\VideoDubController;
 use App\Http\Controllers\VoiceCloningController;
 use App\Http\Controllers\VoiceDesignController;
+use App\Http\Middleware\CaptureAdClickId;
+use App\Http\Middleware\EnsureAgentsOpen;
+use App\Http\Middleware\EnsureUserIsNotBlocked;
+use App\Http\Middleware\InAppMode;
 use App\Models\SiteSetting;
+use App\Services\PlanAccessService;
 use App\Support\AgentDiscovery;
+use App\Support\SeoDialectPages;
+use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
+use App\Support\VoiceCloningAccess;
 use Carbon\Carbon;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
 
 // Audio files need no session, cookies or form token: playing one starts
@@ -28,18 +59,18 @@ use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
 Route::get('/media/{path}', [MediaController::class, 'show'])
     ->where('path', '.*')
     ->withoutMiddleware([
-        \Illuminate\Cookie\Middleware\EncryptCookies::class,
-        \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-        \Illuminate\Session\Middleware\StartSession::class,
-        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
-        \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
-        \App\Http\Middleware\EnsureUserIsNotBlocked::class,
-        \App\Http\Middleware\CaptureAdClickId::class,
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        ValidateCsrfToken::class,
+        EnsureUserIsNotBlocked::class,
+        CaptureAdClickId::class,
     ])
     ->name('media.file');
 
 // A member's own audio in a file type the browser cannot make (M4A, OGG, FLAC).
-Route::middleware('auth')->get('/audio-download', \App\Http\Controllers\AudioDownloadController::class)
+Route::middleware('auth')->get('/audio-download', AudioDownloadController::class)
     ->name('audio.download');
 
 Route::middleware('auth')->get('/manual-payment-proof/{email}/{proof_token}', AdminManualPaymentProofController::class)
@@ -51,20 +82,20 @@ Route::middleware('auth')->get('/admin-audio/cloned-voices/{voice}/{kind}', Admi
     ->name('admin.cloned-voices.audio');
 
 // A voice agent's call recording (CallRecordings), for the admin's call page.
-Route::middleware('auth')->get('/admin-audio/agent-calls/{call}', \App\Http\Controllers\AdminAgentRecordingController::class)
+Route::middleware('auth')->get('/admin-audio/agent-calls/{call}', AdminAgentRecordingController::class)
     ->where('call', 'cnv_[a-z0-9]{24}')
     ->name('admin.agent-calls.recording');
 
-Route::middleware('auth')->get('/admin-video/dubs/{dub}/{kind}', \App\Http\Controllers\AdminVideoDubFileController::class)
+Route::middleware('auth')->get('/admin-video/dubs/{dub}/{kind}', AdminVideoDubFileController::class)
     ->whereNumber('dub')
     ->whereIn('kind', ['clean', 'preview'])
     ->name('admin.video-dubs.file');
 
 // Video Dubbing → Settings: connect the site's Google Drive, where the dubbed videos are kept.
 // The callback's address is the one added to the Google client's redirect addresses.
-Route::middleware('auth')->get('/admin-drive/google/connect', [\App\Http\Controllers\AdminDriveController::class, 'connect'])
+Route::middleware('auth')->get('/admin-drive/google/connect', [AdminDriveController::class, 'connect'])
     ->name('admin.drive.connect');
-Route::middleware('auth')->get('/admin-drive/google/callback', [\App\Http\Controllers\AdminDriveController::class, 'callback'])
+Route::middleware('auth')->get('/admin-drive/google/callback', [AdminDriveController::class, 'callback'])
     ->name('admin.drive.callback');
 
 // SEO: Sitemap. Building it reads every public page (about 170 addresses) and takes seconds,
@@ -72,7 +103,7 @@ Route::middleware('auth')->get('/admin-drive/google/callback', [\App\Http\Contro
 // (or until a setting changes).
 Route::get('/sitemap.xml', function () {
     $xml = Cache::remember(SeoHelper::SITEMAP_CACHE, now()->addHour(), function (): string {
-        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $dom = new DOMDocument('1.0', 'UTF-8');
         $dom->formatOutput = true;
 
         $xsl = $dom->createProcessingInstruction('xml-stylesheet', 'type="text/xsl" href="/sitemap.xsl"');
@@ -126,6 +157,7 @@ Route::get('/sitemap.xml', function () {
 // SEO: robots.txt
 Route::get('/robots.txt', function () {
     $content = (string) SiteSetting::get('robots_txt', SeoHelper::defaultRobotsTxt());
+
     return response($content, 200)->header('Content-Type', 'text/plain');
 })->name('robots');
 
@@ -139,11 +171,11 @@ Route::get('/indexnow-key.txt', function () {
 
 // SEO: llms.txt
 Route::get('/llms.txt', function () {
-    if (!SeoHelper::llmsTxtEnabled()) {
+    if (! SeoHelper::llmsTxtEnabled()) {
         abort(404);
     }
 
-    return response(SeoHelper::llmsTxtContent() . "\n", 200)
+    return response(SeoHelper::llmsTxtContent()."\n", 200)
         ->header('Content-Type', 'text/plain; charset=UTF-8');
 })->name('llms');
 
@@ -213,32 +245,32 @@ Route::get('/newsletter/unsubscribe', NewsletterUnsubscribeController::class)
 // The Listen Android app (mobile/, App\Http\Controllers\AppShellController): where it starts,
 // signing in through the phone's browser, the phone's messaging token, and the file that lets
 // links to the site open in the app.
-Route::get('/.well-known/assetlinks.json', [\App\Http\Controllers\AppShellController::class, 'assetLinks'])
+Route::get('/.well-known/assetlinks.json', [AppShellController::class, 'assetLinks'])
     ->withoutMiddleware([
-        \Illuminate\Cookie\Middleware\EncryptCookies::class,
-        \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-        \Illuminate\Session\Middleware\StartSession::class,
-        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
-        \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
-        \App\Http\Middleware\EnsureUserIsNotBlocked::class,
-        \App\Http\Middleware\CaptureAdClickId::class,
-        \App\Http\Middleware\InAppMode::class,
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        ValidateCsrfToken::class,
+        EnsureUserIsNotBlocked::class,
+        CaptureAdClickId::class,
+        InAppMode::class,
     ])
     ->name('app.assetlinks');
 Route::prefix('app')->group(function (): void {
-    Route::get('/start', [\App\Http\Controllers\AppShellController::class, 'start'])->name('app.start');
-    Route::get('/signin/start', [\App\Http\Controllers\AppShellController::class, 'signInStart'])->middleware('throttle:20,1,app-signin-start')->name('app.signin.start');
+    Route::get('/start', [AppShellController::class, 'start'])->name('app.start');
+    Route::get('/signin/start', [AppShellController::class, 'signInStart'])->middleware('throttle:20,1,app-signin-start')->name('app.signin.start');
     // A purchase page asked for in the app opens here, in the phone's browser, signed in.
-    Route::get('/continue', [\App\Http\Controllers\AppShellController::class, 'continueOnWeb'])->middleware('throttle:20,1,app-continue')->name('app.continue');
-    Route::get('/signin/complete', [\App\Http\Controllers\AppShellController::class, 'signInComplete'])->middleware('throttle:10,1,app-signin-complete')->name('app.signin.complete');
+    Route::get('/continue', [AppShellController::class, 'continueOnWeb'])->middleware('throttle:20,1,app-continue')->name('app.continue');
+    Route::get('/signin/complete', [AppShellController::class, 'signInComplete'])->middleware('throttle:10,1,app-signin-complete')->name('app.signin.complete');
     Route::middleware(['auth', 'throttle:30,1,app-devices'])->group(function (): void {
-        Route::post('/devices', [\App\Http\Controllers\AppShellController::class, 'registerDevice'])->name('app.devices.register');
-        Route::delete('/devices', [\App\Http\Controllers\AppShellController::class, 'forgetDevice'])->name('app.devices.forget');
+        Route::post('/devices', [AppShellController::class, 'registerDevice'])->name('app.devices.register');
+        Route::delete('/devices', [AppShellController::class, 'forgetDevice'])->name('app.devices.forget');
     });
 });
 
 // Listen Agents: an agent's link page (and QR code), in the agent's language.
-Route::get('/talk/{slug}', [\App\Http\Controllers\AgentCallController::class, 'talk'])
+Route::get('/talk/{slug}', [AgentCallController::class, 'talk'])
     ->where('slug', '[a-z0-9-]{3,90}')->name('agent-talk');
 
 Route::group([
@@ -249,31 +281,31 @@ Route::group([
     Route::get('/pricing', [HomeController::class, 'pricingPage'])->name('pricing');
     Route::get('/voice-samples', [HomeController::class, 'samplesPage'])->name('samples');
     // Listen Agents, for visitors: what a voice agent does, shown working.
-    Route::view('/voice-agents', 'agents.landing')->middleware(\App\Http\Middleware\EnsureAgentsOpen::class)->name('agents-landing');
+    Route::view('/voice-agents', 'agents.landing')->middleware(EnsureAgentsOpen::class)->name('agents-landing');
     Route::get('/free-trial', [HomeController::class, 'startFreeTrial'])->name('trial.start');
-    Route::get('/premium-pack', [\App\Http\Controllers\CharPackController::class, 'start'])->name('pack.start');
+    Route::get('/premium-pack', [CharPackController::class, 'start'])->name('pack.start');
     Route::get('/ai-text-to-speech', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_text_to_speech')->name('seo.ai-text-to-speech');
     Route::get('/ai-voice-generator', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_voice_generator')->name('seo.ai-voice-generator');
     Route::get('/text-to-speech-arabic', [HomeController::class, 'seoLandingPage'])->defaults('page', 'text_to_speech_arabic')->name('seo.text-to-speech-arabic');
     Route::get('/text-to-speech', [HomeController::class, 'seoLandingPage'])->defaults('page', 'text_to_speech')->name('seo.text-to-speech');
     Route::get('/arabic-dialects', [HomeController::class, 'dialectHubPage'])->name('seo.arabic-dialects');
     Route::get('/arabic-dialects/{dialect}', [HomeController::class, 'dialectPage'])
-        ->whereIn('dialect', \App\Support\SeoDialectPages::slugs())
+        ->whereIn('dialect', SeoDialectPages::slugs())
         ->name('seo.dialect');
     Route::get('/english-accents', [HomeController::class, 'accentHubPage'])->name('seo.english-accents');
     Route::get('/english-accents/{accent}', [HomeController::class, 'accentPage'])
-        ->whereIn('accent', \App\Support\SeoEnglishPages::slugs())
+        ->whereIn('accent', SeoEnglishPages::slugs())
         ->name('seo.accent');
     Route::view('/privacy-policy', 'legal.privacy')->name('legal.privacy');
     Route::view('/terms-of-service', 'legal.terms')->name('legal.terms');
     Route::view('/cookie-policy', 'legal.cookies')->name('legal.cookies');
     Route::get('/browsers-extension', [ExtensionController::class, 'show'])->name('browsers-extension.page');
-    Route::get('/developers', [\App\Http\Controllers\DeveloperController::class, 'docs'])->name('developers');
+    Route::get('/developers', [DeveloperController::class, 'docs'])->name('developers');
 
-    Route::get('/contact-us', [\App\Http\Controllers\ContactController::class, 'show'])->name('contact');
-    Route::post('/contact-us', [\App\Http\Controllers\ContactController::class, 'submit'])->middleware('throttle:contact')->name('contact.submit');
+    Route::get('/contact-us', [ContactController::class, 'show'])->name('contact');
+    Route::post('/contact-us', [ContactController::class, 'submit'])->middleware('throttle:contact')->name('contact.submit');
     Route::get('/contact', fn () => redirect()->route('contact', status: 301));
-    Route::post('/contact', [\App\Http\Controllers\ContactController::class, 'submit'])->middleware('throttle:contact');
+    Route::post('/contact', [ContactController::class, 'submit'])->middleware('throttle:contact');
 
     Route::middleware('guest')->group(function () {
         Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -322,8 +354,9 @@ Route::group([
     // The Listen app: the plan page that stands in for every purchase page there, and the page
     // that hands a member who signed in through the browser back to the app.
     Route::middleware('auth')->group(function (): void {
-        Route::get('/app/plan', [\App\Http\Controllers\AppShellController::class, 'plan'])->name('app.plan');
-        Route::get('/app/signin/done', [\App\Http\Controllers\AppShellController::class, 'signInDone'])->name('app.signin.done');
+        Route::get('/app/plan', [AppShellController::class, 'plan'])->name('app.plan');
+        Route::get('/app/upgrade', [AppShellController::class, 'upgrade'])->name('app.upgrade');
+        Route::get('/app/signin/done', [AppShellController::class, 'signInDone'])->name('app.signin.done');
     });
 
     // Referral capture runs BEFORE auth so guests landing on the demo page
@@ -340,29 +373,29 @@ Route::group([
             Route::post('/demo/voice-design', [HomeController::class, 'designVoice'])->middleware(['demo.verified', 'throttle:6,1,demo-voice-design'])->name('demo.voice-design');
             // The Voice agents tab: a live call with a sample business's agent, from the member's free
             // test seconds, and the time left after it (App\Support\Agents\DemoAgent).
-            Route::post('/demo/agent-call', [\App\Http\Controllers\DemoAgentController::class, 'start'])->middleware(['demo.verified', 'throttle:6,1,demo-agent-call'])->name('demo.agent-call');
-            Route::get('/demo/agent-call', [\App\Http\Controllers\DemoAgentController::class, 'left'])->middleware('throttle:30,1,demo-agent-left')->name('demo.agent-left');
+            Route::post('/demo/agent-call', [DemoAgentController::class, 'start'])->middleware(['demo.verified', 'throttle:6,1,demo-agent-call'])->name('demo.agent-call');
+            Route::get('/demo/agent-call', [DemoAgentController::class, 'left'])->middleware('throttle:30,1,demo-agent-left')->name('demo.agent-left');
         });
     });
 
     // Dub my video: the page for everyone it is open to; the rest needs an account.
-    Route::get('/dub-my-video', [\App\Http\Controllers\VideoDubController::class, 'show'])->name('dub.page');
+    Route::get('/dub-my-video', [VideoDubController::class, 'show'])->name('dub.page');
     Route::middleware(['auth', 'subscription.sync'])->prefix('dub-my-video')->group(function (): void {
-        Route::post('/', [\App\Http\Controllers\VideoDubController::class, 'store'])->middleware('throttle:10,1,dub-store')->name('dub.store');
+        Route::post('/', [VideoDubController::class, 'store'])->middleware('throttle:10,1,dub-store')->name('dub.store');
         // The video itself, sent in pieces before the dub is asked for.
-        Route::post('/upload', [\App\Http\Controllers\VideoDubController::class, 'startUpload'])->middleware('throttle:10,1,dub-upload')->name('dub.upload.start');
-        Route::get('/{code}/status', [\App\Http\Controllers\VideoDubController::class, 'status'])->where('code', '[A-Za-z0-9]{32}')->name('dub.status');
-        Route::get('/{code}/watch', [\App\Http\Controllers\VideoDubController::class, 'watch'])->where('code', '[A-Za-z0-9]{32}')->name('dub.watch');
-        Route::get('/{code}/download', [\App\Http\Controllers\VideoDubController::class, 'download'])->where('code', '[A-Za-z0-9]{32}')->name('dub.download');
+        Route::post('/upload', [VideoDubController::class, 'startUpload'])->middleware('throttle:10,1,dub-upload')->name('dub.upload.start');
+        Route::get('/{code}/status', [VideoDubController::class, 'status'])->where('code', '[A-Za-z0-9]{32}')->name('dub.status');
+        Route::get('/{code}/watch', [VideoDubController::class, 'watch'])->where('code', '[A-Za-z0-9]{32}')->name('dub.watch');
+        Route::get('/{code}/download', [VideoDubController::class, 'download'])->where('code', '[A-Za-z0-9]{32}')->name('dub.download');
     });
     // Each piece of a video: kept light (no plan check), many a minute for a large one.
     // Each limit counts on its own (the third part names it): the pieces never use up the dub's.
-    Route::middleware(['auth', 'throttle:600,1,dub-piece'])->post('/dub-my-video/upload/{id}', [\App\Http\Controllers\VideoDubController::class, 'uploadChunk'])
+    Route::middleware(['auth', 'throttle:600,1,dub-piece'])->post('/dub-my-video/upload/{id}', [VideoDubController::class, 'uploadChunk'])
         ->where('id', '[A-Za-z0-9]{40}')->name('dub.upload.chunk');
 
     Route::middleware(['auth'])->group(function () {
-        Route::get('/referral/stats', [\App\Http\Controllers\ReferralController::class, 'stats'])->name('referral.stats');
-        Route::post('/referral/share', [\App\Http\Controllers\ReferralController::class, 'share'])->name('referral.share');
+        Route::get('/referral/stats', [ReferralController::class, 'stats'])->name('referral.stats');
+        Route::post('/referral/share', [ReferralController::class, 'share'])->name('referral.share');
     });
 
     // What an open studio page asks while it works, every few seconds: these only
@@ -380,24 +413,24 @@ Route::group([
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::post('/dashboard/queue', [DashboardController::class, 'queue'])->middleware('throttle:studio-generate')->name('dashboard.queue');
         // The member's pronunciations, from the studio's panel.
-        Route::post('/dashboard/pronunciations', [\App\Http\Controllers\PronunciationController::class, 'store'])->middleware('throttle:60,1')->name('dashboard.pronunciations.save');
-        Route::delete('/dashboard/pronunciations/{pronunciation}', [\App\Http\Controllers\PronunciationController::class, 'destroy'])->whereNumber('pronunciation')->middleware('throttle:60,1')->name('dashboard.pronunciations.delete');
+        Route::post('/dashboard/pronunciations', [PronunciationController::class, 'store'])->middleware('throttle:60,1')->name('dashboard.pronunciations.save');
+        Route::delete('/dashboard/pronunciations/{pronunciation}', [PronunciationController::class, 'destroy'])->whereNumber('pronunciation')->middleware('throttle:60,1')->name('dashboard.pronunciations.delete');
         Route::post('/dashboard/generate', [DashboardController::class, 'queue'])->middleware('throttle:studio-generate')->name('dashboard.generate');
         Route::delete('/dashboard/jobs/{job}', [DashboardController::class, 'destroy'])->name('dashboard.jobs.destroy');
         Route::delete('/dashboard/demo-jobs/{generation}', [DashboardController::class, 'destroyDemo'])->name('dashboard.demo-jobs.destroy');
-        Route::put('/dashboard/favorite-voices', [\App\Http\Controllers\FavoriteVoicesController::class, 'update'])->name('dashboard.favorite-voices');
+        Route::put('/dashboard/favorite-voices', [FavoriteVoicesController::class, 'update'])->name('dashboard.favorite-voices');
 
         Route::get('/billing', [BillingController::class, 'index'])->name('billing.page');
-        Route::get('/billing/pack', [\App\Http\Controllers\CharPackController::class, 'show'])->name('billing.pack');
-        Route::post('/billing/pack/card', [\App\Http\Controllers\CharPackController::class, 'payByCard'])->middleware('throttle:10,1')->name('billing.pack.card');
-        Route::post('/billing/pack/card/confirm', [\App\Http\Controllers\CharPackController::class, 'confirmCard'])->middleware('throttle:20,1')->name('billing.pack.card.confirm');
+        Route::get('/billing/pack', [CharPackController::class, 'show'])->name('billing.pack');
+        Route::post('/billing/pack/card', [CharPackController::class, 'payByCard'])->middleware('throttle:10,1')->name('billing.pack.card');
+        Route::post('/billing/pack/card/confirm', [CharPackController::class, 'confirmCard'])->middleware('throttle:20,1')->name('billing.pack.card.confirm');
         Route::get('/billing/manual', [ManualPaymentController::class, 'instructions'])->name('billing.manual.instructions');
         Route::post('/billing/manual/confirm', [ManualPaymentController::class, 'confirm'])->name('billing.manual.confirm');
         Route::get('/manage-subscription', [BillingController::class, 'manage'])->name('manage-subscription.page');
         Route::post('/billing/subscribe', [BillingController::class, 'subscribe'])->name('billing.subscribe');
         Route::post('/billing/plan-change/preview', [BillingController::class, 'planChangePreview'])->middleware('throttle:30,1')->name('billing.plan-change.preview');
-        Route::post('/billing/trial/setup', [\App\Http\Controllers\TrialBillingController::class, 'setup'])->name('billing.trial.setup');
-        Route::post('/billing/trial/confirm', [\App\Http\Controllers\TrialBillingController::class, 'confirm'])->name('billing.trial.confirm');
+        Route::post('/billing/trial/setup', [TrialBillingController::class, 'setup'])->name('billing.trial.setup');
+        Route::post('/billing/trial/confirm', [TrialBillingController::class, 'confirm'])->name('billing.trial.confirm');
         Route::post('/billing/payment-method/intent', [BillingController::class, 'paymentMethodIntent'])->name('billing.payment-method.intent');
         Route::post('/billing/payment-method', [BillingController::class, 'updatePaymentMethod'])->name('billing.payment-method');
         Route::post('/billing/cancel', [BillingController::class, 'cancel'])->name('billing.cancel');
@@ -413,10 +446,10 @@ Route::group([
         Route::get('/browsers-extension/download', [ExtensionController::class, 'download'])->name('browsers-extension.download');
 
         // Developer API keys (the API itself is routes/v1.php).
-        Route::get('/dashboard/api-keys', [\App\Http\Controllers\DeveloperController::class, 'keys'])->name('developers.keys');
-        Route::post('/dashboard/api-keys', [\App\Http\Controllers\DeveloperController::class, 'store'])->middleware('throttle:20,1')->name('developers.keys.store');
-        Route::put('/dashboard/api-keys/{apiKey}', [\App\Http\Controllers\DeveloperController::class, 'update'])->middleware('throttle:30,1')->name('developers.keys.update');
-        Route::delete('/dashboard/api-keys/{apiKey}', [\App\Http\Controllers\DeveloperController::class, 'revoke'])->middleware('throttle:30,1')->name('developers.keys.revoke');
+        Route::get('/dashboard/api-keys', [DeveloperController::class, 'keys'])->name('developers.keys');
+        Route::post('/dashboard/api-keys', [DeveloperController::class, 'store'])->middleware('throttle:20,1')->name('developers.keys.store');
+        Route::put('/dashboard/api-keys/{apiKey}', [DeveloperController::class, 'update'])->middleware('throttle:30,1')->name('developers.keys.update');
+        Route::delete('/dashboard/api-keys/{apiKey}', [DeveloperController::class, 'revoke'])->middleware('throttle:30,1')->name('developers.keys.revoke');
 
         // Voice Cloning lives under dashboard for signed-in users.
         Route::prefix('dashboard/voice-cloning')->group(function (): void {
@@ -441,46 +474,46 @@ Route::group([
         });
 
         // A new member's first page: voice-overs or a voice agent (shown once, after sign-up).
-        Route::get('/start', \App\Http\Controllers\StartController::class)->name('onboarding.start');
+        Route::get('/start', StartController::class)->name('onboarding.start');
 
         // Listen Agents: the owner's side (App\Http\Controllers\AgentController). The names say
         // voice-agents because agents.* already names the AI-agent discovery files.
-        Route::prefix('agents')->middleware(\App\Http\Middleware\EnsureAgentsOpen::class)->group(function (): void {
-            Route::get('/', [\App\Http\Controllers\AgentController::class, 'index'])->name('voice-agents.index');
-            Route::get('/new', [\App\Http\Controllers\AgentController::class, 'create'])->name('voice-agents.create');
-            Route::post('/', [\App\Http\Controllers\AgentController::class, 'store'])->middleware('throttle:10,1,agent-write')->name('voice-agents.store');
-            Route::get('/{agent}', [\App\Http\Controllers\AgentController::class, 'show'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.show');
-            Route::get('/{agent}/setup', [\App\Http\Controllers\AgentController::class, 'edit'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.edit');
-            Route::patch('/{agent}', [\App\Http\Controllers\AgentController::class, 'update'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:60,1')->name('voice-agents.update');
-            Route::post('/{agent}/write', [\App\Http\Controllers\AgentController::class, 'write'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:10,1,agent-write')->name('voice-agents.write');
-            Route::post('/{agent}/correct', [\App\Http\Controllers\AgentController::class, 'correct'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1')->name('voice-agents.correct');
+        Route::prefix('agents')->middleware(EnsureAgentsOpen::class)->group(function (): void {
+            Route::get('/', [AgentController::class, 'index'])->name('voice-agents.index');
+            Route::get('/new', [AgentController::class, 'create'])->name('voice-agents.create');
+            Route::post('/', [AgentController::class, 'store'])->middleware('throttle:10,1,agent-write')->name('voice-agents.store');
+            Route::get('/{agent}', [AgentController::class, 'show'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.show');
+            Route::get('/{agent}/setup', [AgentController::class, 'edit'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.edit');
+            Route::patch('/{agent}', [AgentController::class, 'update'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:60,1')->name('voice-agents.update');
+            Route::post('/{agent}/write', [AgentController::class, 'write'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:10,1,agent-write')->name('voice-agents.write');
+            Route::post('/{agent}/correct', [AgentController::class, 'correct'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1')->name('voice-agents.correct');
             // Knowledge → Social media links: read the website again for its accounts.
-            Route::post('/{agent}/links', [\App\Http\Controllers\AgentController::class, 'findLinks'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:6,1,agent-links')->name('voice-agents.links');
-            Route::get('/{agent}/links', [\App\Http\Controllers\AgentController::class, 'linkReads'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:120,1')->name('voice-agents.links.reads');
-            Route::get('/{agent}/site', [\App\Http\Controllers\AgentController::class, 'siteState'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:120,1')->name('voice-agents.site');
-            Route::post('/{agent}/site', [\App\Http\Controllers\AgentController::class, 'siteRead'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:4,10,agent-site')->name('voice-agents.site.read');
-            Route::post('/{agent}/test-call', [\App\Http\Controllers\AgentController::class, 'testCall'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:10,1,agent-test')->name('voice-agents.test-call');
-            Route::delete('/{agent}', [\App\Http\Controllers\AgentController::class, 'destroy'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.destroy');
+            Route::post('/{agent}/links', [AgentController::class, 'findLinks'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:6,1,agent-links')->name('voice-agents.links');
+            Route::get('/{agent}/links', [AgentController::class, 'linkReads'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:120,1')->name('voice-agents.links.reads');
+            Route::get('/{agent}/site', [AgentController::class, 'siteState'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:120,1')->name('voice-agents.site');
+            Route::post('/{agent}/site', [AgentController::class, 'siteRead'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:4,10,agent-site')->name('voice-agents.site.read');
+            Route::post('/{agent}/test-call', [AgentController::class, 'testCall'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:10,1,agent-test')->name('voice-agents.test-call');
+            Route::delete('/{agent}', [AgentController::class, 'destroy'])->where('agent', 'agt_[a-z0-9]{24}')->name('voice-agents.destroy');
             // What the agent knows from files: upload, list, see what it learned, read again, remove.
-            Route::get('/{agent}/files', [\App\Http\Controllers\AgentFileController::class, 'index'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:120,1')->name('voice-agents.files.index');
-            Route::post('/{agent}/files', [\App\Http\Controllers\AgentFileController::class, 'store'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1,agent-files')->name('voice-agents.files.store');
-            Route::get('/{agent}/files/{source}', [\App\Http\Controllers\AgentFileController::class, 'show'])->where(['agent' => 'agt_[a-z0-9]{24}', 'source' => '[0-9]+'])->name('voice-agents.files.show');
-            Route::post('/{agent}/files/{source}/retry', [\App\Http\Controllers\AgentFileController::class, 'retry'])->where(['agent' => 'agt_[a-z0-9]{24}', 'source' => '[0-9]+'])->middleware('throttle:10,1')->name('voice-agents.files.retry');
-            Route::delete('/{agent}/files/{source}', [\App\Http\Controllers\AgentFileController::class, 'destroy'])->where(['agent' => 'agt_[a-z0-9]{24}', 'source' => '[0-9]+'])->name('voice-agents.files.destroy');
-            Route::get('/{agent}/install-status', [\App\Http\Controllers\AgentController::class, 'installStatus'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1')->name('voice-agents.install-status');
-            Route::get('/{agent}/plugin/{platform}', [\App\Http\Controllers\AgentController::class, 'plugin'])->where(['agent' => 'agt_[a-z0-9]{24}', 'platform' => 'wordpress'])->middleware('throttle:20,1')->name('voice-agents.plugin');
+            Route::get('/{agent}/files', [AgentFileController::class, 'index'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:120,1')->name('voice-agents.files.index');
+            Route::post('/{agent}/files', [AgentFileController::class, 'store'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1,agent-files')->name('voice-agents.files.store');
+            Route::get('/{agent}/files/{source}', [AgentFileController::class, 'show'])->where(['agent' => 'agt_[a-z0-9]{24}', 'source' => '[0-9]+'])->name('voice-agents.files.show');
+            Route::post('/{agent}/files/{source}/retry', [AgentFileController::class, 'retry'])->where(['agent' => 'agt_[a-z0-9]{24}', 'source' => '[0-9]+'])->middleware('throttle:10,1')->name('voice-agents.files.retry');
+            Route::delete('/{agent}/files/{source}', [AgentFileController::class, 'destroy'])->where(['agent' => 'agt_[a-z0-9]{24}', 'source' => '[0-9]+'])->name('voice-agents.files.destroy');
+            Route::get('/{agent}/install-status', [AgentController::class, 'installStatus'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:30,1')->name('voice-agents.install-status');
+            Route::get('/{agent}/plugin/{platform}', [AgentController::class, 'plugin'])->where(['agent' => 'agt_[a-z0-9]{24}', 'platform' => 'wordpress'])->middleware('throttle:20,1')->name('voice-agents.plugin');
         });
 
         // Legacy user URL kept as redirect to dashboard voice-cloning section.
         Route::get('/voice-cloning', function () {
             $user = auth()->user();
-            $plan = app(\App\Services\PlanAccessService::class)->resolveActivePlanForUserId((int) $user->id);
+            $plan = app(PlanAccessService::class)->resolveActivePlanForUserId((int) $user->id);
 
-            if (! \App\Support\VoiceCloningAccess::allows($user, $plan) && ! \App\Support\VoiceCloningAccess::showsUpgrade($user, $plan)) {
+            if (! VoiceCloningAccess::allows($user, $plan) && ! VoiceCloningAccess::showsUpgrade($user, $plan)) {
                 return redirect()->route('dashboard');
             }
 
-            return redirect()->to(route('dashboard') . '#voiceCloningSection', 301);
+            return redirect()->to(route('dashboard').'#voiceCloningSection', 301);
         });
     });
 });
