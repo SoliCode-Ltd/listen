@@ -180,12 +180,12 @@ No other company or product is named, and no price.
 • التحكم في الأداء: المشاعر، الأسلوب، السرعة، والوقفات
 • حوارات بأكثر من صوت
 • استنساخ صوتك من تسجيل قصير (في الباقات التي تشمله)
-• دبلجة الفيديو مع الحفاظ على الموسيقى والمؤثرات (في الباقات التي تشمله)
+• تصميم أي صوت بوصفه في جملة (في الباقات التي تشمله)
 • وكلاء صوتيون يردّون على عملائك بلهجتهم
 
 في التطبيق:
 • استمع والشاشة مغلقة، وتحكّم من شاشة القفل
-• إشعار عندما يجهز صوتك الطويل أو الفيديو المدبلج
+• إشعار عندما يجهز صوتك الطويل
 • احفظ الملف على هاتفك أو شاركه مباشرة مع أي تطبيق
 • سجّل صوتك بالميكروفون
 • عربي وإنجليزي، وضع فاتح وداكن
@@ -205,12 +205,12 @@ What you can do:
 • Direct the performance: emotion, style, pace and pauses
 • Dialogues with more than one voice
 • Clone your own voice from a short recording (on plans that include it)
-• Dub a video while keeping its music and effects (on plans that include it)
+• Design any voice by describing it in a sentence (on plans that include it)
 • Voice agents that answer your customers in their dialect
 
 In the app:
 • Keep listening with the screen off, with controls on the lock screen
-• A notification when a long voice or a dubbed video is ready
+• A notification when a long voice is ready
 • Save the file to your phone or share it straight to any app
 • Record your voice with the microphone
 • Arabic and English, light and dark
@@ -229,7 +229,8 @@ Privacy: https://listenai.studio/en/privacy-policy
   - `feature-ar-1024x500.png` and `feature-en-1024x500.png`: the feature graphic for each language.
   - `phone-ar-1…8.png` and `phone-en-1…8.png`: eight phone screenshots (1080×1920) for each
     language, in this order: the studio, Arabic dialects, English accents, emotions, voice
-    cloning, dubbing, voice agents, voices in more languages. They are made from the real
+    cloning, voice design, voice agents, voices in more languages. (Video dubbing is not
+    public on the live site, so it is not in the images or the listing text; add it when it is.) They are made from the real
     pages and show no price. Screen 8 shows the French, Spanish, German and other voices of
     the samples page: leave it out if members cannot generate in those languages yet.
 
@@ -257,7 +258,7 @@ does not count as sharing). "Processed ephemerally": no.
 | Personal info → Phone number (only if phone sign-in is on) | Account management | Optional |
 | Location → Approximate location (the country, from the network address) | Fraud prevention and security, analytics | Required |
 | Audio → Voice or sound recordings (voice cloning samples, calls with an agent) | App functionality | Optional |
-| Photos and videos → Videos (a video sent for dubbing) | App functionality | Optional |
+| Photos and videos → Videos (a video sent for dubbing; tick this only once dubbing is public) | App functionality | Optional |
 | App activity → Other user-generated content (the texts turned into speech) | App functionality | Required |
 | Device or other IDs (the notification token of this phone) | App functionality | Optional |
 
