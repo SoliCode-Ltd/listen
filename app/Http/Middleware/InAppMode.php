@@ -62,6 +62,10 @@ class InAppMode
             }
             $response->headers->set('Vary', 'User-Agent', false);
         }
+        // The app's mark, for the requests it makes without its name (InApp::COOKIE).
+        if (InApp::namedApp($request) && $request->cookies->get(InApp::COOKIE) !== '1') {
+            $response->headers->setCookie(cookie(InApp::COOKIE, '1', 60 * 24 * 365, '/', null, $request->isSecure(), true, false, 'lax'));
+        }
 
         return $response;
     }

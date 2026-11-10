@@ -25,6 +25,13 @@ class InApp
     public const UA_TOKEN = 'ListenApp';
 
     /** Session key: when the app's sign-in tab was opened (a timestamp). */
+    /**
+     * The app's own mark, kept in its cookie jar from its first page on. The phone's browser has
+     * another jar, so only the app carries it: a request the app makes without its name (a page
+     * fetched ahead of a tap, a download) is still known to be the app's.
+     */
+    public const COOKIE = 'listen_app';
+
     public const SIGN_IN_SESSION = 'app_signin.started_at';
 
     /** How long the sign-in tab counts as the app. */
@@ -106,6 +113,14 @@ class InApp
 
     /** The request comes from the app's own web view. */
     public static function fromApp(?Request $request = null): bool
+    {
+        $request ??= request();
+
+        return self::namedApp($request) || $request->cookies->get(self::COOKIE) === '1';
+    }
+
+    /** The request says it is the app's, in its own name ("ListenApp/1.0.0"). */
+    public static function namedApp(?Request $request = null): bool
     {
         $request ??= request();
 
