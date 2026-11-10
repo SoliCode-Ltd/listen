@@ -484,7 +484,7 @@
   // its edge fades where more tabs wait, and the tab that is tapped or lit moves to the middle,
   // so the next ones come into view without anyone having to know the row slides.
   var STRIPS = '.dashboard-menu-list, .ag-tabs, .samples-jump, .samples-moods';
-  var LIT = '.active, .is-current, .is-on, .is-active, [aria-current], [aria-selected="true"]';
+  var LIT = '.active, .is-current, .is-on, .is-active, [aria-current]:not([aria-current="false"]), [aria-selected="true"]';
 
   function stripEdges(strip) {
     var box = strip.getBoundingClientRect(), left = false, right = false;
