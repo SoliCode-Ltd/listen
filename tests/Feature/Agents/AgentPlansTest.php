@@ -156,6 +156,10 @@ class AgentPlansTest extends TestCase
             ->assertSee(__('agents.balance.left_label'))->assertSee('data-ag-balance', false)->assertSee('<strong>100</strong>', false)
             // More call time is the card's one solid button, in every state.
             ->assertSee(__('agents.balance.more'))
+            // For phones: a bar of the month used, and each fact as a name and its value (rows, not pills).
+            ->assertSee('<div class="ag-balance-bar" aria-hidden="true"><i style="width: 0%"></i></div>', false)
+            ->assertSee('<b class="ag-fact-v">'.number_format(100 * $rate).'</b> <span class="ag-fact-k">'.__('ui.dashboard.credits_left_suffix').'</span>', false)
+            ->assertSee('<span class="ag-fact-k">'.__('agents.balance.stat_rate').'</span> <b class="ag-fact-v">', false)
             // Nothing used yet: no "where your credits went".
             ->assertDontSee('href="#usage-breakdown"', false);
         // The account's call time is on the agents list only; an agent's page shows a line when it needs the owner.
