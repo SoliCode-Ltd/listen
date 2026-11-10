@@ -15,17 +15,17 @@ Three things to know first:
 
    | `ANDROID_APP_PLANS=` | What a member sees in the app |
    |---|---|
-   | `web` (the default) | Prices and plans, as on the website. Choosing a plan opens the phone's browser, already signed in, on the billing page with the plan and the monthly or yearly choice they made. A visitor who is not signed in signs in (or up) and lands on the same page. |
-   | `hidden` | No price, plan, pack or upgrade anywhere in the app, and no link to one. A member sees a "My account" page with their plan, credits and the day credits renew. |
+   | `hidden` (the default) | No price, plan, pack or upgrade anywhere in the app, and no link to one. A member sees a "My account" page with their plan, credits and the day credits renew. |
+   | `web` | Prices and plans, as on the website. Choosing a plan opens the phone's browser, already signed in, on the billing page with the plan and the monthly or yearly choice they made. A visitor who is not signed in signs in (or up) and lands on the same page. |
 
    **Please read this before publishing.** Google Play's payments policy does not let an app
    lead people to pay somewhere other than Google's billing, in most countries (Egypt and
    the Gulf included). `web` does exactly that, so Google may reject the app or remove it
    later. `hidden` is the setting that follows the policy. The United States and the
    European Economic Area have exceptions, through programs you enrol in from the Play
-   Console. A sensible way to run it: submit and get approved with `hidden`, and decide
-   about `web` knowing the risk; if Google ever objects, set `hidden` and the app complies
-   the same minute. After changing the setting, rebuild the config cache ("Server deploy"
+   Console. A sensible way to run it: submit and get approved with `hidden` (nothing to
+   set: it is the default), and decide about `web` knowing the risk; to try it, add
+   `ANDROID_APP_PLANS=web` to `.env`, and remove the line again if Google ever objects. After changing the setting, rebuild the config cache ("Server deploy"
    → `settings`).
 3. **The app is the site.** A change to the site shows in the app the same minute, with no
    app update. A new app version is needed only when something in this folder changes.
