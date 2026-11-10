@@ -17,10 +17,12 @@
         <item name="android:windowBackground">@color/site_background</item>
     </style>
 
-    <!-- Launch screen: the logo on the site's background, then hands over to the theme above. -->
+    <!-- Launch screen: the logo on white (in dark mode too), dark icons in the bars over it. The
+         moving logo (LaunchWaveView) takes over at the first frame, then the theme above. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/site_background</item>
+        <item name="windowSplashScreenBackground">@color/launch_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
+        <item name="android:windowLightStatusBar">true</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>

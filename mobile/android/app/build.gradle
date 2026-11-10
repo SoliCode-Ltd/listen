@@ -88,6 +88,12 @@ android {
     buildTypes {
         debug {
             debuggable true
+            // With the upload key at hand (manual runs and main in CI), test builds are signed
+            // with it too: every test APK then installs over the last one, instead of each
+            // build machine's own throwaway key forcing an uninstall first.
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
         release {
             debuggable false

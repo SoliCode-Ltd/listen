@@ -4,4 +4,6 @@
     <!-- Follows the phone's light/dark setting (see values-night). -->
     <color name="site_background">#FFFFFF</color>
     <color name="ic_launcher_background">#7659FA</color>
+    <!-- The opening screen is white in light and in dark mode alike (not overridden in values-night). -->
+    <color name="launch_background">#FFFFFF</color>
 </resources>
