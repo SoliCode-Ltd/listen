@@ -1,7 +1,10 @@
 {{-- Call time, as the studio shows its credits: one ring of how much of the month is used, the
      minutes left in large type with the month under it, the plain facts as chips, and a clear way to
      get more time (App\Support\Agents\AgentBalance). Brand violet in every state: when time runs out
-     one line says so. Latin digits in both languages. --}}
+     one line says so. Latin digits in both languages.
+     On a phone the same card reads top to bottom from the start edge: the minutes left, a bar of the
+     month used in place of the ring, then the facts as rows, each with its name and its value
+     (public/css/agents.css). The spans below name the two halves of a fact for those rows. --}}
 @props(['balance'])
 @php
   $b = $balance;
@@ -40,14 +43,15 @@
         @if($b['included'])<span class="ag-balance-tag">{{ __('agents.balance.shared') }}</span>@endif
       </div>
       <p class="ag-balance-value"><strong>{{ number_format($n) }}</strong><span>{{ trans_choice('agents.balance.unit', $n) }}</span></p>
-      <p class="ag-balance-sub">{{ trans_choice('agents.balance.of_month', $total, ['count' => number_format($total)]) }} · {{ trans_choice('agents.balance.used', $b['used_minutes'], ['count' => number_format($b['used_minutes'])]) }}</p>
+      <div class="ag-balance-bar" aria-hidden="true"><i style="width: {{ $usedPct }}%"></i></div>
+      <p class="ag-balance-sub"><span>{{ trans_choice('agents.balance.of_month', $total, ['count' => number_format($total)]) }}</span><span class="ag-balance-dot" aria-hidden="true"> · </span><span>{{ trans_choice('agents.balance.used', $b['used_minutes'], ['count' => number_format($b['used_minutes'])]) }}</span></p>
       @if($state === 'out')
         <p class="ag-balance-out" role="alert">{{ $b['by_cap'] && $date ? __('agents.balance.state_out_cap', ['count' => number_format($b['cap']), 'date' => $date]) : __('agents.balance.state_out') }}</p>
       @endif
       <div class="ag-balance-chips">
-        <span class="ag-fact"><x-credit-icon /><span><b>{{ number_format($b['credits_left']) }}</b> {{ __('ui.dashboard.credits_left_suffix') }}</span></span>
-        <span class="ag-fact">{{ __('agents.balance.stat_rate') }} <b>{{ __('agents.balance.stat_rate_value', ['rate' => number_format($b['rate'])]) }}</b></span>
-        @if($date)<span class="ag-fact">{{ $b['pack'] ? __('agents.balance.pack_ends', ['date' => $date]) : __('agents.balance.renews', ['date' => $date]) }}</span>@endif
+        <span class="ag-fact"><x-credit-icon /><span class="ag-fact-t"><b class="ag-fact-v">{{ number_format($b['credits_left']) }}</b> <span class="ag-fact-k">{{ __('ui.dashboard.credits_left_suffix') }}</span></span></span>
+        <span class="ag-fact"><span class="ag-fact-k">{{ __('agents.balance.stat_rate') }}</span> <b class="ag-fact-v">{{ __('agents.balance.stat_rate_value', ['rate' => number_format($b['rate'])]) }}</b></span>
+        @if($date)<span class="ag-fact">{!! str_replace('@@', '<span class="ag-fact-v ag-fact-date">'.e($date).'</span>', e($b['pack'] ? __('agents.balance.pack_ends', ['date' => '@@']) : __('agents.balance.renews', ['date' => '@@']))) !!}</span>@endif
         @if($hasUse ?? false)
         <a class="ag-fact ag-fact-link" href="#usage-breakdown">{{ __('usage.where') }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a>
         @endif

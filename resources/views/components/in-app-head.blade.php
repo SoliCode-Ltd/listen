@@ -78,6 +78,11 @@
     /* A row of tabs that slides sideways fades at the edge where more tabs wait (listen-app.js). */
     .la-strip { scrollbar-width: none; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
     .la-strip::-webkit-scrollbar { display: none; }
+    /* The agents' row of tabs stays put over the page as it scrolls: it has its own fades and a
+       ground of its own, so it is not faded through to the page behind it, and nothing shows
+       between it and the header. */
+    .ag-tabs.la-strip { -webkit-mask-image: none !important; mask-image: none !important; }
+    html:has(.app-tabs) .ag-tabs { background: var(--bg); box-shadow: 0 -12px 0 var(--bg); }
     .la-strip.la-more-left { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px); mask-image: linear-gradient(to right, transparent, #000 44px); }
     .la-strip.la-more-right { -webkit-mask-image: linear-gradient(to left, transparent, #000 44px); mask-image: linear-gradient(to left, transparent, #000 44px); }
     .la-strip.la-more-left.la-more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); }
