@@ -2026,11 +2026,16 @@ class HomeController extends Controller
         ];
     }
 
+    // What demo_voice_generations.primary_identity_hash holds (MySQL refuses more).
+    private const IDENTITY_COLUMN_LENGTH = 255;
+
     private function extractClientFingerprint(Request $request): string
     {
         // 1. Canvas/WebGL fingerprint — strongest signal, unique per device hardware.
+        // The demo page sends 64 characters. A longer one, with its prefix, would not
+        // fit the column: the voice would be made but never stored, so never counted.
         $fp = trim((string) $request->header('X-Client-FP', ''));
-        if ($fp !== '' && strlen($fp) >= 16 && strlen($fp) <= 256) {
+        if ($fp !== '' && strlen($fp) >= 16 && strlen('fp:'.$fp) <= self::IDENTITY_COLUMN_LENGTH) {
             return 'fp:'.$fp;
         }
 
