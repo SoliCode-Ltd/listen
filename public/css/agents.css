@@ -1136,10 +1136,38 @@ html[dir="rtl"] .ag-fact-link svg { transform: scaleX(-1); }
   .ag-balance-ring::before { inset: 14px; }
   .ag-balance-ring-inner b { font-size: 1.35rem; }
 }
-@media (max-width: 430px) {
-  .ag-balance:not(.is-plan) { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; }
-  .ag-balance:not(.is-plan) .ag-balance-head, .ag-balance:not(.is-plan) .ag-balance-value, .ag-balance:not(.is-plan) .ag-balance-chips { justify-content: center; }
+.ag-balance-bar { display: none; }
+/* Phones: the card reads top to bottom from the start edge. The minutes left lead, a bar shows how
+   much of the month is used (the ring would take a third of the screen to say the same), and the
+   facts are rows, a name and its value, not a pile of pills. */
+@media (max-width: 640px) {
+  .ag-balance:not(.is-plan) { display: block; padding: 1.2rem 1.15rem .3rem; text-align: start; }
+  .ag-balance:not(.is-plan) .ag-balance-ring { display: none; }
   .ag-balance-main { width: 100%; }
+  .ag-balance:not(.is-plan) .ag-balance-head { flex-direction: column; align-items: flex-start; gap: .5rem; }
+  .ag-balance:not(.is-plan) .ag-balance-head h2 { font-size: 1.02rem; line-height: 1.5; }
+  .ag-balance:not(.is-plan) .ag-balance-value { justify-content: flex-start; gap: .55rem; margin-top: 1rem; }
+  .ag-balance:not(.is-plan) .ag-balance-value strong { font-size: 3rem; }
+  .ag-balance:not(.is-plan) .ag-balance-value span { font-size: 1.1rem; }
+  .ag-balance:not(.is-plan) .ag-balance-sub { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .1rem 1rem; margin-top: .6rem; font-size: .92rem; line-height: 1.6; }
+  .ag-balance:not(.is-plan) .ag-balance-sub span::first-letter { text-transform: uppercase; }
+  .ag-balance-dot { display: none; }
+  .ag-balance-bar { display: block; height: 8px; margin-top: 1rem; border-radius: 999px; background: color-mix(in oklab, var(--a) 13%, var(--line)); overflow: hidden; }
+  .ag-balance-bar i { display: block; height: 100%; min-width: 0; border-radius: inherit; background: linear-gradient(90deg, #A28FFF, #5B3FE6); }
+  html[dir="rtl"] .ag-balance-bar i { background: linear-gradient(270deg, #A28FFF, #5B3FE6); }
+  .ag-balance:not(.is-plan) .ag-balance-chips { display: block; margin-top: 1.1rem; border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+  .ag-balance .ag-fact { display: flex; width: 100%; min-height: 54px; gap: .6rem; padding: .6rem 0; border: 0; border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent); border-radius: 0;
+    background: none; color: var(--muted); font-size: .98rem; line-height: 1.5; }
+  .ag-balance .ag-fact:last-child { border-bottom: 0; }
+  .ag-balance .ag-fact-t { display: contents; }
+  .ag-balance .ag-fact-k { order: 1; }
+  .ag-balance .ag-fact-k::first-letter { text-transform: uppercase; }
+  .ag-balance .ag-fact-v { order: 2; margin-inline-start: auto; color: var(--text); font-weight: 700; text-align: end; font-variant-numeric: tabular-nums; }
+  .ag-balance .ag-fact .credit-icon { order: 0; font-size: 1.15rem; }
+  .ag-balance .ag-fact-link { color: var(--accent-text, var(--a)); font-weight: 700; }
+  .ag-balance .ag-fact-link svg { width: 18px; height: 18px; margin-inline-start: auto; }
+  .ag-balance:not(.is-plan) .ag-balance-cta { display: flex; width: 100%; margin: .9rem 0 .85rem; }
+  .ag-balance-out { margin-top: .8rem; }
 }
 
 /* The agents list in the studio's frame: a side menu, then the title and the call time in a panel. */
@@ -1152,6 +1180,12 @@ html[dir="rtl"] .ag-home-head h1 { letter-spacing: 0; }
 .ag-home-plan svg { width: 16px; height: 16px; fill: none; stroke: var(--accent-text, var(--a)); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 /* Under the header and the strip of tabs (tablets and phones). */
 .ag-home [id], .ag-home .us.us-embed { scroll-margin-top: 135px; }
+/* Phones: the overview is not a card holding a card. Its heading sits on the page and the call
+   time card takes the full width under it. */
+@media (max-width: 640px) {
+  .ag-home-card { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .ag-home-head { padding-top: .2rem; }
+}
 .ag-tabs a.ag-tab { text-decoration: none; }
 /* The cards fill each row (two or three to a row, set by the page). */
 .ag-home .ag-grid { grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
