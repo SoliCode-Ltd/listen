@@ -393,10 +393,15 @@ class InAppModeTest extends InAppTestCase
             $this->assertSame(1, preg_match_all('/class="app-tab is-on"/', $html), $route);
         }
 
-        // The Account page holds what the menu used to: language, help and signing out.
+        // The Account page holds what the menu used to: help and signing out. The language is on the
+        // bar at the top of every page, and on this page its links lead back here: they must not be
+        // taken for purchase links and hidden (the rule in components/in-app-head).
         $account = (string) $this->inApp($member)->page('app.plan')->getContent();
-        $this->assertStringContainsString('data-app-language="ar"', $account);
-        $this->assertStringContainsString('data-app-language="en"', $account);
+        $this->assertSame(1, preg_match('#<div class="locale-switch.*?</div>#s', $account, $switch));
+        $this->assertSame(2, preg_match_all('#<a\b[^>]*class="locale-link[^>]*>#s', $switch[0], $links));
+        foreach ($links[0] as $link) {
+            $this->assertStringContainsString('data-in-app-plan', $link);
+        }
         $this->assertStringContainsString(route('logout'), $account);
 
         // The website keeps its own menu, and a guest in the app has no tabs to tools they cannot open.

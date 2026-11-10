@@ -30,7 +30,7 @@
       ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
     }
     /* The member's app: the tools on a bar at the bottom, as in any phone app. */
-    .app-tabs { position: fixed; inset-inline: 0; bottom: 0; z-index: 950; display: flex; align-items: stretch;
+    .app-tabs { position: fixed; inset-inline: 0; bottom: 0; z-index: 96; display: flex; align-items: stretch;
       background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px);
       view-transition-name: la-tabs; }
     ::view-transition-group(la-tabs) { animation: none; }
@@ -44,6 +44,17 @@
     .app-tab.is-on { color: var(--brand-accent); }
     html:not([data-theme="light"]) .app-tab.is-on { color: var(--brand-subtle, #A99CFF); }
     html:has(.app-tabs) body { padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)); }
+    html:has(.app-tabs) .la-toast { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+    /* The agents' own notice (saved, copied...) shows above the bar, not behind it. */
+    html:has(.app-tabs) .ag-toast { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); z-index: 120; }
+    html.la-typing:has(.app-tabs) .ag-toast { bottom: 16px; }
+    /* Agents start right under the header: the room kept for the Studio | Agents switch is not needed. */
+    html:has(.app-tabs) main.ag.ag-page { padding-top: .35rem; }
+    /* While the keyboard is up the screen belongs to what is being typed: no bar above the keys. */
+    html.la-typing .app-tabs { display: none; }
+    html.la-typing:has(.app-tabs) body { padding-bottom: 0; }
+    html.la-typing:has(.app-tabs) .la-toast { bottom: 16px; }
+    html.la-typing #generatedAudioWrap.output-dock { bottom: .75rem !important; }
     /* The bar switches between Studio and Agents, so the pages' own switch is not shown twice. */
     html:has(.app-tabs) .app-switch { display: none !important; }
     /* The studio's own sections (create, design, cloning...) sit in one strip under the header,

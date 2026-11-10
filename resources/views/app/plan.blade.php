@@ -46,10 +46,6 @@
     .acct-row.is-quiet { color: var(--muted); font-weight: 500; }
     .acct-row.is-quiet .acct-ico { color: var(--muted); }
     .acct-row:active { opacity: .7; }
-    .acct-lang { cursor: default; }
-    .acct-lang-pick { flex: none; display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface2); }
-    .acct-lang-pick a { padding: .4rem .9rem; border-radius: 999px; color: var(--muted); font-size: .95rem; font-weight: 600; line-height: 1.5; text-decoration: none; }
-    .acct-lang-pick a.is-on { background: var(--brand-accent); color: #fff; }
     .acct-card.is-list { padding-block: .6rem; }
     .acct-card.is-list h2 { padding: .85rem 0 .35rem; }
   </style>
@@ -115,17 +111,6 @@
     <section class="acct-card is-list" aria-labelledby="acctMore">
       <h2 id="acctMore">{{ __('app.plan.account') }}</h2>
       <ul class="acct-list">
-        <li>
-          <div class="acct-row acct-lang">
-            <svg class="acct-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
-            <span>{{ __('app.plan.language') }}</span>
-            <div class="acct-lang-pick">
-              @foreach(['ar' => 'العربية', 'en' => 'English'] as $code => $name)
-                <a href="{{ \Mcamara\LaravelLocalization\Facades\LaravelLocalization::getLocalizedURL($code, null, [], true) }}" hreflang="{{ $code }}" data-in-app-plan data-app-language="{{ $code }}" class="{{ $locale === $code ? 'is-on' : '' }}" @if($locale === $code) aria-current="true" @endif>{{ $name }}</a>
-              @endforeach
-            </div>
-          </div>
-        </li>
         <li><a class="acct-row" href="{{ route('contact') }}"><svg class="acct-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg><span>{{ __('app.plan.help') }}</span>{!! $go !!}</a></li>
         <li><a class="acct-row" href="{{ route('legal.privacy') }}"><svg class="acct-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-2.9 8.3-7 10-4.1-1.700-7-5.400-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span>{{ __('app.plan.privacy') }}</span>{!! $go !!}</a></li>
         <li><a class="acct-row" href="{{ route('legal.terms') }}"><svg class="acct-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg><span>{{ __('app.plan.terms') }}</span>{!! $go !!}</a></li>

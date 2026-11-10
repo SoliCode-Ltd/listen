@@ -150,6 +150,7 @@
             href="{{ $language['url'] }}"
             hreflang="{{ $language['code'] }}"
             class="locale-link {{ $language['active'] ? 'active' : '' }}"
+            @if($inApp) data-in-app-plan @endif
           >{{ $language['label'] }}</a>
         @endforeach
       </div>
@@ -305,6 +306,7 @@
           href="{{ $language['url'] }}"
           hreflang="{{ $language['code'] }}"
           class="locale-link {{ $language['active'] ? 'active' : '' }}"
+            @if($inApp) data-in-app-plan @endif
         >{{ $language['label'] }}</a>
       @endforeach
     </div>

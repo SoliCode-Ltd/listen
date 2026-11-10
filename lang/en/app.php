@@ -16,7 +16,6 @@ return [
 
     'plan' => [
         'upgrade' => 'Upgrade plan',
-        'language' => 'Language',
         'title' => 'My account',
         'plan_heading' => 'Your plan',
         'hello' => 'Hello, :name',

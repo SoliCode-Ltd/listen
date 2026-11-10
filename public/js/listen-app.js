@@ -541,6 +541,71 @@
   window.addEventListener('pageshow', strips);
   window.addEventListener('resize', strips);
 
+  // ------------------------------------------------- typing: the keyboard is up
+
+  // The keyboard takes half the screen and the bars at the top cover part of the rest, so the
+  // field being typed in is brought fully into what is left, and the tab bar steps aside.
+  var typingField = null, typingSince = 0, tallest = window.innerHeight, widthThen = window.innerWidth;
+
+  function isTextField(el) {
+    if (!el || !el.tagName) return false;
+    if (el.isContentEditable || el.tagName === 'TEXTAREA') return true;
+    return el.tagName === 'INPUT' && !/^(checkbox|radio|range|button|submit|reset|file|color|image|hidden)$/i.test(el.type || 'text');
+  }
+  // Where the page really starts: under the header and any bar held beneath it.
+  function coveredTop() {
+    var edge = 0, bars = document.querySelectorAll('.app-header, .dashboard-menu, .samples-bar, .ag-tabs');
+    for (var i = 0; i < bars.length; i++) {
+      var pos = getComputedStyle(bars[i]).position;
+      if (pos !== 'fixed' && pos !== 'sticky') continue;
+      var r = bars[i].getBoundingClientRect();
+      if (r.height && r.top <= edge + 2 && r.bottom > edge) edge = r.bottom;
+    }
+    return edge;
+  }
+  function showTypingField() {
+    var el = typingField;
+    if (!el || document.activeElement !== el) return;
+    var top = coveredTop() + 12;
+    var bottom = (window.visualViewport ? window.visualViewport.height : window.innerHeight) - 12;
+    var r = el.getBoundingClientRect(), by = 0;
+    if (r.height <= bottom - top) {
+      if (r.top < top) by = r.top - top; else if (r.bottom > bottom) by = r.bottom - bottom;
+    } else {
+      // Taller than the room left: start where the writing starts, unless they are far into a long text.
+      var far = !el.isContentEditable && typeof el.selectionStart === 'number' && el.selectionStart > 160;
+      if (!far) by = r.top - top;
+    }
+    if (Math.abs(by) > 4) window.scrollBy(0, by);
+  }
+  function setTyping(el) {
+    typingField = el;
+    document.documentElement.classList.toggle('la-typing', !!el);
+    if (el) typingSince = Date.now();
+  }
+  document.addEventListener('focusin', function (event) {
+    if (!isTextField(event.target)) return;
+    setTyping(event.target);
+    // Once now, and again as the keyboard finishes rising (the page gets shorter then).
+    setTimeout(showTypingField, 80);
+    setTimeout(showTypingField, 420);
+  });
+  document.addEventListener('focusout', function () {
+    setTimeout(function () { if (!isTextField(document.activeElement)) setTyping(null); }, 120);
+  });
+  window.addEventListener('resize', function () {
+    if (window.innerWidth !== widthThen) { widthThen = window.innerWidth; tallest = window.innerHeight; }
+    tallest = Math.max(tallest, window.innerHeight);
+    if (!typingField) return;
+    if (window.innerHeight < tallest - 120) { setTimeout(showTypingField, 60); return; }
+    // The keyboard was put away with the field still chosen: the bar comes back.
+    if (Date.now() - typingSince > 500) document.documentElement.classList.remove('la-typing');
+  });
+  // Typing again in a field whose keyboard had been put away.
+  document.addEventListener('input', function (event) {
+    if (event.target === typingField) document.documentElement.classList.add('la-typing');
+  });
+
   // ------------------------------------------- back, refresh, theme, sign-in
 
   function closeOverlay() {

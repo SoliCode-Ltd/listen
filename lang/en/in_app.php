@@ -96,4 +96,6 @@ return [
     'voice_design.demo_keep_title' => 'A voice of your own',
     'voice_design.demo_keep_cta' => 'Your plan',
     'agents.balance.state_plan_none' => 'Your plan doesn\'t include live agents. You can build and test one now.',
+    // The app's menu is the bar at the bottom, not the top of the page.
+    'agents.start_continue_note' => 'You can switch between the Studio and Agents any time, from the bar at the bottom of every page.',
 ];
