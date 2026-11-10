@@ -17,7 +17,7 @@ These are the owner's standing instructions. Follow them in every session.
   member): its badge and name under the homepage hero and in the footer, using
   NVIDIA's own badge file unchanged (`public/images/partners/`), never larger
   than Listen's logo when the two sit side by side, never under 30px (the
-  owner chose 56px for the homepage strip, 48px on phones, 54px in the
+  owner chose 64px for the homepage strip, 54px on phones, 54px in the
   footer); and for search engines and AI tools,
   the membership in the structured data (`memberOf`) and in llms.txt.
 

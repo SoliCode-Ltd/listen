@@ -742,123 +742,70 @@
       }
     }
 
-    /* NVIDIA Inception under the hero: NVIDIA's badge on one fine line. The line leaves each side of the badge,
-       touching its edge, violet at the badge and fading to nothing; a glowing pulse of sound wave glides out
-       along it. One line of text sits under it. The strip starts below the lowest point the speakers' bubbles reach
-       (the hero's own bottom padding on desktops, the margin here on phones). The badge is NVIDIA's file,
-       never recoloured, never under 30px (CLAUDE.md). */
+    /* NVIDIA Inception under the hero. It starts below the lowest point the speakers' bubbles reach (the
+       bottom speakers' bubbles end about 50px above the hero's edge on desktops; on phones the caption card ends
+       at it), so the space above it matches the next section's space below it. The badge stays 30px or more
+       (NVIDIA's minimum) and is never recoloured. */
     .inception-strip {
-      width: 100%;
-      max-width: 1100px;
+      position: relative;
+      width: fit-content;
+      max-width: min(1100px, calc(100% - 32px));
       margin: 0 auto;
-      padding: 40px 24px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 24px;
-    }
-    /* Always left to right, so the two sides mirror around the badge in Arabic too. No gap: the line meets the badge. */
-    .inception-row {
+      padding: 40px 88px;
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 100%;
-      direction: ltr;
+      gap: 44px;
     }
-    .inception-strip img {
-      display: block;
-      flex: none;
-      height: 56px;
-      width: auto;
-    }
-    /* One side of the line, from the badge outwards (the other side is this one mirrored). */
-    .inception-beam {
-      position: relative;
-      flex: 1;
-      min-width: 0;
-      height: 56px;
-      overflow: hidden;
-      container-type: inline-size;
-    }
-    .inception-beam-start { transform: scaleX(-1); }
-    .inception-beam::before {
+    .inception-strip::before,
+    .inception-strip::after {
       content: "";
       position: absolute;
       left: 0;
       right: 0;
-      top: 50%;
       height: 1px;
-      margin-top: -.5px;
-      background: linear-gradient(90deg, rgba(118, 89, 250, .75) 0, rgba(118, 89, 250, .28) 45%, rgba(118, 89, 250, 0) 100%);
+      background: linear-gradient(90deg, transparent 0, var(--line) 24%, var(--line) 76%, transparent 100%);
     }
-    html[data-theme="light"] .inception-beam::before {
-      background: linear-gradient(90deg, rgba(98, 71, 238, .9) 0, rgba(118, 89, 250, .4) 45%, rgba(118, 89, 250, 0) 100%);
-    }
-    /* The pulse: a short burst of sound wave on the line, inside a soft halo, off the line (and unseen) until
-       it moves. Its ends fade so it grows out of the line and settles back into it. On white the wave is a
-       deeper violet and the halo stronger, so it glows there as it does on dark. */
-    .inception-pulse {
-      position: absolute;
-      left: 0;
-      top: 50%;
-      width: min(220px, 92%);
-      height: 40px;
-      margin-top: -20px;
-      color: #C9BDFF;
-      background: radial-gradient(ellipse 38% 50% at 60% 50%, rgba(118, 89, 250, .5), rgba(118, 89, 250, 0) 100%) center / 100% 100% no-repeat;
-      -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 28%, #000 86%, transparent 100%);
-      mask-image: linear-gradient(90deg, transparent 0, #000 28%, #000 86%, transparent 100%);
-      opacity: 0;
-      transform: translateX(-100%);
-    }
-    .inception-pulse svg {
+    .inception-strip::before { top: 0; }
+    .inception-strip::after { bottom: 0; }
+    .inception-strip img {
       display: block;
-      width: 100%;
-      max-width: none;
-      height: 100%;
-    }
-    html[data-theme="light"] .inception-pulse {
-      color: #5B3DF5;
-      background: radial-gradient(ellipse 38% 50% at 60% 50%, rgba(118, 89, 250, .5), rgba(118, 89, 250, 0) 100%) center / 100% 100% no-repeat;
-    }
-    /* The pulse eases out of the badge, glides the length of the line in a few seconds, fading as it goes,
-       then rests about a second before the next pass; both sides in step. Only a transform and opacity move;
-       it stands still for visitors who ask for less motion. */
-    @media (prefers-reduced-motion: no-preference) {
-      .inception-pulse {
-        will-change: transform, opacity;
-        animation: inceptionPulse 5.5s cubic-bezier(.4, 0, .5, 1) infinite;
-      }
-    }
-    @keyframes inceptionPulse {
-      0% { transform: translateX(-100%); opacity: 0; }
-      5% { opacity: 1; }
-      58% { opacity: .8; }
-      92%, 100% { transform: translateX(100cqw); opacity: 0; }
+      flex: none;
+      height: 64px;
+      width: auto;
     }
     .inception-strip p {
       margin: 0;
-      font-size: 1.1rem;
+      font-size: 1.15rem;
       line-height: 1.6;
       color: var(--muted);
-      text-align: center;
+      text-wrap: balance;
     }
-    .inception-strip p b { font-weight: 600; color: var(--text); }
-    html[dir="rtl"] .inception-strip p { font-size: 1.12rem; line-height: 1.75; }
+    /* The program's name never breaks across two lines. */
+    .inception-strip p b { font-weight: 600; color: var(--text); white-space: nowrap; }
+    html[dir="rtl"] .inception-strip p { font-size: 1.17rem; line-height: 1.75; }
+    /* Where the sentence no longer fits on one line beside the badge, it sits on two short lines that hug the
+       badge, so the strip stays centred. */
+    @media (max-width: 1180px) {
+      .inception-strip p { max-width: 31ch; }
+    }
     @media (max-width: 960px) {
       .inception-strip {
         width: calc(100% - 32px);
         margin-top: 1.4rem;
-        gap: 18px;
-        padding: 32px 0;
+        flex-direction: column;
+        gap: 20px;
+        padding: 36px 20px;
+        text-align: center;
       }
-      .inception-strip img { height: 48px; }
-      .inception-beam { height: 48px; }
-      .inception-strip p { font-size: 1rem; max-width: 32ch; text-wrap: balance; }
+      .inception-strip img { height: 54px; }
+      .inception-strip p { font-size: 1rem; max-width: 32ch; }
       html[dir="rtl"] .inception-strip p { font-size: 1.04rem; }
     }
     @media (max-width: 640px) {
       .inception-strip { margin-top: 2.1rem; }
+      /* Arabic fits on two even lines on a phone at this size. */
+      html[dir="rtl"] .inception-strip p { font-size: .96rem; max-width: none; }
     }
 
     /* Voice cloning: one slim line under the facts strip. */
@@ -1121,26 +1068,9 @@
     </section>
 
     {{-- NVIDIA Inception, right under the hero: NVIDIA's own badge (public/images/partners, unchanged but for its
-         empty margin) on one fine line that runs out of both its sides, with one line of text under it. A pulse
-         of sound wave travels out along the line: a few ripples that swell and die away, drawn here. --}}
-    @php
-      $inceptionPulse = (static function (): string {
-          $path = '';
-          for ($x = 0; $x <= 220; $x += 2) {
-              // Ripples 20px apart, tallest (13px) at 60% of the pulse, where its halo is.
-              $y = 20 + 13 * exp(-((($x - 132) / 42) ** 2)) * sin(2 * M_PI * $x / 20);
-              $path .= ($x === 0 ? 'M' : ' L').$x.','.round($y, 1);
-          }
-
-          return '<i class="inception-pulse"><svg viewBox="0 0 220 40" preserveAspectRatio="none" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path vector-effect="non-scaling-stroke" d="'.$path.'"/></svg></i>';
-      })();
-    @endphp
+         empty margin) beside one line, between two rules that span only the strip and fade at their ends. --}}
     <section class="inception-strip" aria-label="{{ __('ui.landing.inception_program') }}">
-      <div class="inception-row">
-        <span class="inception-beam inception-beam-start" aria-hidden="true">{!! $inceptionPulse !!}</span>
-        <img src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.landing.inception_badge') }}" width="152" height="56" decoding="async">
-        <span class="inception-beam" aria-hidden="true">{!! $inceptionPulse !!}</span>
-      </div>
+      <img src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.landing.inception_badge') }}" width="174" height="64" loading="lazy" decoding="async">
       <p>{!! __('ui.landing.inception_line', ['program' => '<b>'.e(__('ui.landing.inception_program')).'</b>']) !!}</p>
     </section>
 
