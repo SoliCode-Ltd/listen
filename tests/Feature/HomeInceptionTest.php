@@ -33,18 +33,20 @@ class HomeInceptionTest extends TestCase
             ->assertSee('إسمع عضو في برنامج <b>إنسبشن من إنفيديا</b> للشركات الناشئة في مجال الذكاء الاصطناعي.', false);
     }
 
-    public function test_the_badge_sits_in_listens_sound_wave_which_stands_still_for_reduced_motion(): void
+    public function test_lines_flow_out_of_both_sides_of_the_badge_and_stand_still_for_reduced_motion(): void
     {
         app()->setLocale('en');
         $html = (string) $this->getLocalizedRoute('home')->assertOk()->getContent();
 
-        // A wave on each side of the badge, a long one for wide screens and a short one for phones, hidden from screen readers.
+        // Lines on each side of the badge, longer waves for wide screens and shorter for phones, hidden from screen readers.
         $this->assertSame(2, substr_count($html, 'class="inception-wave inception-wave-start '));
         $this->assertSame(4, substr_count($html, '<span class="inception-wave '));
-        $this->assertSame(4, substr_count($html, 'aria-hidden="true"><i style="--i:0;'));
-        $this->assertSame(2 * 40 + 2 * 12, substr_count($html, '<i style="--i:'));
-        // It only moves for visitors who have not asked for less motion.
-        $this->assertMatchesRegularExpression('/@media \(prefers-reduced-motion: no-preference\) \{\s*\.inception-wave i \{[^}]*animation: inceptionRipple/', $html);
+        $this->assertSame(4, substr_count($html, 'aria-hidden="true"><svg style="--w:150px;') + substr_count($html, 'aria-hidden="true"><svg style="--w:63px;'));
+        $this->assertSame(4 * 3, substr_count($html, '<svg style="--w:'));
+        // They touch the badge: the row has no gap.
+        $this->assertDoesNotMatchRegularExpression('/\.inception-row \{[^}]*gap:/', $html);
+        // They only move for visitors who have not asked for less motion.
+        $this->assertMatchesRegularExpression('/@media \(prefers-reduced-motion: no-preference\) \{\s*\.inception-wave svg \{[^}]*animation: inceptionDrift/', $html);
     }
 
     public function test_the_footer_shows_the_badge_on_every_page(): void

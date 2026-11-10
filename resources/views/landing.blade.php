@@ -742,10 +742,10 @@
       }
     }
 
-    /* NVIDIA Inception under the hero: NVIDIA's badge in the middle of Listen's own sound wave, which runs out to
-       both sides and fades, with one line under it. The strip starts below the lowest point the speakers'
-       bubbles reach (the hero's own bottom padding on desktops, the margin here on phones). The badge is
-       NVIDIA's file, never recoloured, never under 30px (CLAUDE.md). */
+    /* NVIDIA Inception under the hero: NVIDIA's badge with a voice flowing out of it. Three thin lines leave each
+       side of the badge, touching its edge, drift outwards and fade; one line of text sits under it. The strip
+       starts below the lowest point the speakers' bubbles reach (the hero's own bottom padding on desktops,
+       the margin here on phones). The badge is NVIDIA's file, never recoloured, never under 30px (CLAUDE.md). */
     .inception-strip {
       width: 100%;
       max-width: 1100px;
@@ -756,60 +756,54 @@
       align-items: center;
       gap: 24px;
     }
-    /* Always left to right, so the wave mirrors around the badge in Arabic too. */
+    /* Always left to right, so the lines mirror around the badge in Arabic too. No gap: they start at its edge. */
     .inception-row {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 28px;
       width: 100%;
       direction: ltr;
     }
     .inception-strip img {
+      position: relative;
+      z-index: 1;
       display: block;
       flex: none;
       height: 56px;
       width: auto;
     }
-    /* One side of the wave: bars from the badge outwards, cut softly where the strip ends. */
+    /* One side: the lines from the badge outwards. They thin out and fade the further they travel. */
     .inception-wave {
+      position: relative;
       flex: 1;
       min-width: 0;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      height: 52px;
+      height: 56px;
       overflow: hidden;
-      -webkit-mask-image: linear-gradient(90deg, #000 55%, transparent 100%);
-      mask-image: linear-gradient(90deg, #000 55%, transparent 100%);
+      color: var(--brand-accent);
+      -webkit-mask-image: radial-gradient(ellipse 100% 62% at 0% 50%, #000 0, #000 22%, transparent 100%);
+      mask-image: radial-gradient(ellipse 100% 62% at 0% 50%, #000 0, #000 22%, transparent 100%);
     }
-    .inception-wave-start {
-      flex-direction: row-reverse;
-      -webkit-mask-image: linear-gradient(270deg, #000 55%, transparent 100%);
-      mask-image: linear-gradient(270deg, #000 55%, transparent 100%);
-    }
-    .inception-wave i {
-      flex: none;
-      width: 4px;
-      height: var(--h);
-      border-radius: 2px;
-      background: var(--brand-accent);
-      opacity: var(--o);
+    .inception-wave-start { transform: scaleX(-1); }
+    .inception-wave svg {
+      position: absolute;
+      top: 0;
+      left: calc(var(--w) * -1);
+      width: auto;
+      max-width: none;
+      height: 100%;
     }
     .inception-wave-narrow { display: none; }
-    /* A slow ripple that travels out from the badge: each bar breathes a little after the one before it.
-       Only transforms move, so it stays smooth; it stands still for visitors who ask for less motion. */
+    /* Each line slides by exactly one of its own waves, so the loop has no seam; only a transform moves, at a
+       steady speed. It stands still for visitors who ask for less motion. */
     @media (prefers-reduced-motion: no-preference) {
-      .inception-wave i {
-        transform-origin: center;
+      .inception-wave svg {
         will-change: transform;
-        animation: inceptionRipple 2.8s cubic-bezier(.45, 0, .55, 1) infinite;
-        animation-delay: calc(var(--i) * 85ms - 6s);
+        animation: inceptionDrift var(--d) linear infinite;
       }
     }
-    @keyframes inceptionRipple {
-      0%, 100% { transform: scaleY(.5); }
-      50% { transform: scaleY(1); }
+    @keyframes inceptionDrift {
+      from { transform: translateX(0); }
+      to { transform: translateX(var(--w)); }
     }
     .inception-strip p {
       margin: 0;
@@ -827,12 +821,10 @@
         gap: 18px;
         padding: 32px 0;
       }
-      .inception-row { gap: 16px; }
       .inception-strip img { height: 48px; }
-      .inception-wave { gap: 5px; height: 40px; }
-      .inception-wave i { width: 3px; }
+      .inception-wave { height: 44px; }
       .inception-wave-wide { display: none; }
-      .inception-wave-narrow { display: flex; }
+      .inception-wave-narrow { display: block; }
       .inception-strip p { font-size: 1rem; max-width: 32ch; text-wrap: balance; }
       html[dir="rtl"] .inception-strip p { font-size: 1.04rem; }
     }
@@ -1100,22 +1092,25 @@
     </section>
 
     {{-- NVIDIA Inception, right under the hero: NVIDIA's own badge (public/images/partners, unchanged but for its
-         empty margin) in the middle of Listen's sound wave, with one line under it. The wave is drawn here, the
-         same on every load: a long one for wide screens and a short one for phones. --}}
+         empty margin) with three thin lines flowing out of each side, and one line of text under it. The lines
+         are drawn here: longer waves for wide screens, shorter ones for phones. --}}
     @php
-      $inceptionWave = static function (int $count, int $tallest): string {
-          $bars = '';
-          for ($i = 0; $i < $count; $i++) {
-              // 1 beside the badge, 0 at the far end: the bars shrink and fade as they go.
-              $near = (1 - $i / max(1, $count - 1)) ** 1.25;
-              $height = max(4, (int) round($tallest * $near * (0.45 + 0.55 * abs(sin($i * 1.9) * cos($i * 0.7)))));
-              $bars .= '<i style="--i:'.$i.';--h:'.$height.'px;--o:'.number_format(0.2 + 0.8 * $near, 2).'"></i>';
+      // Three sine lines (wavelength, height, seconds for one wave to pass, stroke, opacity), each drawn long
+      // enough to slide by one wavelength without showing its end.
+      $inceptionLines = static function (int $height, float $scale, int $length): string {
+          $middle = $height / 2;
+          $lines = '';
+          foreach ([[150, 0.40, 9, 1.8, 1], [210, 0.28, 13, 1.5, 0.6], [110, 0.17, 7, 1.3, 0.4]] as [$wave, $rise, $seconds, $stroke, $opacity]) {
+              $wave = (int) round($wave * $scale);
+              $half = $wave / 2;
+              $path = 'M0,'.$middle.' q'.($wave / 4).','.round(-2 * $rise * $height, 1).' '.$half.',0'.str_repeat(' t'.$half.',0', (int) ceil($length / $half));
+              $lines .= '<svg style="--w:'.$wave.'px;--d:'.$seconds.'s;opacity:'.$opacity.'" width="'.$length.'" height="'.$height.'" viewBox="0 0 '.$length.' '.$height.'" fill="none" stroke="currentColor" stroke-width="'.$stroke.'" stroke-linecap="round"><path d="'.$path.'"/></svg>';
           }
 
-          return $bars;
+          return $lines;
       };
-      $inceptionWide = $inceptionWave(40, 48);
-      $inceptionNarrow = $inceptionWave(12, 38);
+      $inceptionWide = $inceptionLines(56, 1, 900);
+      $inceptionNarrow = $inceptionLines(44, 0.42, 500);
     @endphp
     <section class="inception-strip" aria-label="{{ __('ui.landing.inception_program') }}">
       <div class="inception-row">
