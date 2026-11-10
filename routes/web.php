@@ -210,6 +210,33 @@ Route::get('/favicon.ico', function () {
 Route::get('/newsletter/unsubscribe', NewsletterUnsubscribeController::class)
     ->name('newsletter.unsubscribe');
 
+// The Listen Android app (mobile/, App\Http\Controllers\AppShellController): where it starts,
+// signing in through the phone's browser, the phone's messaging token, and the file that lets
+// links to the site open in the app.
+Route::get('/.well-known/assetlinks.json', [\App\Http\Controllers\AppShellController::class, 'assetLinks'])
+    ->withoutMiddleware([
+        \Illuminate\Cookie\Middleware\EncryptCookies::class,
+        \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+        \Illuminate\Session\Middleware\StartSession::class,
+        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+        \App\Http\Middleware\EnsureUserIsNotBlocked::class,
+        \App\Http\Middleware\CaptureAdClickId::class,
+        \App\Http\Middleware\InAppMode::class,
+    ])
+    ->name('app.assetlinks');
+Route::prefix('app')->group(function (): void {
+    Route::get('/start', [\App\Http\Controllers\AppShellController::class, 'start'])->name('app.start');
+    Route::get('/signin/start', [\App\Http\Controllers\AppShellController::class, 'signInStart'])->middleware('throttle:20,1,app-signin-start')->name('app.signin.start');
+    // A purchase page asked for in the app opens here, in the phone's browser, signed in.
+    Route::get('/continue', [\App\Http\Controllers\AppShellController::class, 'continueOnWeb'])->middleware('throttle:20,1,app-continue')->name('app.continue');
+    Route::get('/signin/complete', [\App\Http\Controllers\AppShellController::class, 'signInComplete'])->middleware('throttle:10,1,app-signin-complete')->name('app.signin.complete');
+    Route::middleware(['auth', 'throttle:30,1,app-devices'])->group(function (): void {
+        Route::post('/devices', [\App\Http\Controllers\AppShellController::class, 'registerDevice'])->name('app.devices.register');
+        Route::delete('/devices', [\App\Http\Controllers\AppShellController::class, 'forgetDevice'])->name('app.devices.forget');
+    });
+});
+
 // Listen Agents: an agent's link page (and QR code), in the agent's language.
 Route::get('/talk/{slug}', [\App\Http\Controllers\AgentCallController::class, 'talk'])
     ->where('slug', '[a-z0-9-]{3,90}')->name('agent-talk');
@@ -291,6 +318,13 @@ Route::group([
     Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])
         ->middleware(['auth', 'throttle:verify-email'])
         ->name('verification.send');
+
+    // The Listen app: the plan page that stands in for every purchase page there, and the page
+    // that hands a member who signed in through the browser back to the app.
+    Route::middleware('auth')->group(function (): void {
+        Route::get('/app/plan', [\App\Http\Controllers\AppShellController::class, 'plan'])->name('app.plan');
+        Route::get('/app/signin/done', [\App\Http\Controllers\AppShellController::class, 'signInDone'])->name('app.signin.done');
+    });
 
     // Referral capture runs BEFORE auth so guests landing on the demo page
     // with ?ref=CODE still record the visit and get the referral cookie set

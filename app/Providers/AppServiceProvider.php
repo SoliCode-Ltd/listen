@@ -89,6 +89,26 @@ class AppServiceProvider extends ServiceProvider
     {
         \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, \App\Services\Geo\UserCountryRecorder::class);
 
+        // The Listen app (App\Support\InApp\InApp): @inapp ... @else ... @endinapp in the pages,
+        // and signing out on a phone stops that phone's notifications.
+        \Illuminate\Support\Facades\Blade::if('inapp', fn (): bool => \App\Support\InApp\InApp::hidesPlans());
+        // Inside the app every link the site makes to a purchase page is the neutral plan page's
+        // link instead, wherever it is made (a page, a script's settings, a JSON reply), so no
+        // page has to remember. Browsers get the links as they always were.
+        URL::formatPathUsing(function (string $path, $route = null): string {
+            if ($route === null || ! \App\Support\InApp\InApp::sellsRoute((string) $route->getName()) || ! \App\Support\InApp\InApp::hidesPlans()) {
+                return $path;
+            }
+
+            return \App\Support\InApp\InApp::planPath($path);
+        });
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Logout::class, function (): void {
+            $deviceId = request()->hasSession() ? (int) request()->session()->get('app_device_id', 0) : 0;
+            if ($deviceId > 0) {
+                \App\Models\AppDevice::query()->whereKey($deviceId)->delete();
+            }
+        });
+
         // Every Gemini reply's token counts, for what each voice really cost (App\Support\GeminiSpend).
         \Illuminate\Support\Facades\Http::globalMiddleware(\App\Support\GeminiSpend::middleware());
 

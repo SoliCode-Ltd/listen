@@ -191,7 +191,12 @@
           {{-- One red notice under the generate button: the error, with the upgrade button when more credit would help. --}}
           <div id="errorBox" class="s-card error-box" role="alert" style="display:none;">
             <span class="error-text" id="errorText"></span>
+            {{-- Inside the Listen app nothing is sold: the message stands alone (the script still finds its element). --}}
+            @inapp
+              <span id="errorUpgrade" hidden></span>
+            @else
             <a class="btn btn-primary error-upgrade" id="errorUpgrade" href="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}" hidden>{{ __('ui.demo.upgrade_plan') }}</a>
+            @endinapp
           </div>
         </div>
 
@@ -240,7 +245,11 @@
             id="previewAudio"
             controls
             preload="none"
+            @inapp
+              data-download-disabled="1"
+            @else
             data-download-redirect-url="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}"
+            @endinapp
           ></audio>
           <div class="audio-meta" id="audioMeta" role="status"></div>
         </div>
@@ -322,7 +331,11 @@
               </p>
               <p class="demo-agent-used" data-demo-used role="status" @if($demoCanCall) hidden @endif>{{ __('agents.demo.used_up') }}</p>
               <div class="demo-agent-actions">
+                @inapp
+                  <span data-demo-plans hidden></span>
+                @else
                 <a class="ag-btn ag-btn-primary" href="{{ route('pricing') }}" data-demo-plans @if($demoCanCall) hidden @endif>{{ __('agents.demo.plans') }}</a>
+                @endinapp
                 <a class="ag-btn" href="{{ route('voice-agents.create') }}">{{ __('agents.demo.build') }}</a>
               </div>
             </footer>
@@ -1514,7 +1527,8 @@
   <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
   @auth
     {{-- Only while a referral campaign runs: without one no reward is given. --}}
-    @if (\App\Models\ReferralCampaign::active())
+    {{-- Not inside the Listen app: its reward is tied to a friend's paid plan, and nothing is sold there. --}}
+    @if (\App\Models\ReferralCampaign::active() && ! \App\Support\InApp\InApp::hidesPlans())
       @include('referral.popup')
     @endif
   @endauth

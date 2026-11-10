@@ -13,3 +13,4 @@
   @include('components.seo', ['pageTitle' => $pageTitle, 'page' => $page, 'faqItems' => $faqItems])
   @include('components.site-fonts')
   @include('components.styles')
+  @include('components.in-app-head')

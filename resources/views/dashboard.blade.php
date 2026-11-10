@@ -1923,7 +1923,13 @@
 
           @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
 
-          @if(!empty($packOffer))
+          {{-- Inside the Listen app nothing is offered for sale: a member out of credits is told so, and that is all. --}}
+          @inapp
+            @if((int) ($usageSnapshot['remaining_chars'] ?? 0) <= 0)
+              <div class="note" id="inAppNoCredits">{{ \App\Support\InApp\InApp::noCreditsLine(auth()->id()) }}</div>
+            @endif
+          @endinapp
+          @if(!empty($packOffer) && ! \App\Support\InApp\InApp::hidesPlans())
             @php
               $offer = $packOffer;
               $offerBody = match (true) {
@@ -2099,8 +2105,12 @@
         <h1><span class="grad-text">{{ __('ui.dashboard.generate_new_voice') }}</span></h1>
         @if($planShowcase ?? false)
           <div class="plan-showcase-note">
+            @inapp
+              <p>{{ \App\Support\InApp\InApp::noCreditsLine(auth()->id()) }}</p>
+            @else
             <p>{{ __('ui.pack.showcase_note') }}</p>
             <a class="btn btn-primary" href="{{ route('pricing') }}">{{ __('ui.pack.offer_choose_title') }}</a>
+            @endinapp
           </div>
         @endif
         @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
@@ -2245,7 +2255,7 @@
           $onPaidPlan = (int) ($activePlan?->price_cents ?? 0) > 0 && !$packMode;
           $charsValue = match (true) {
             $packMode => __('ui.pack.meter_text', ['remaining' => number_format((int) $usageSnapshot['remaining_chars']), 'total' => number_format((int) $usageSnapshot['plan_chars'])]),
-            !empty($freeNoChars) => __('ui.pack.no_chars_value'),
+            !empty($freeNoChars) => \App\Support\InApp\InApp::hidesPlans() ? '0' : __('ui.pack.no_chars_value'),
             default => number_format((int) $planChars).' '.__('ui.pricing.characters_per_month'),
           };
         @endphp
@@ -2265,6 +2275,8 @@
           <div class="info-row"><span class="info-label">{{ __('ui.dashboard.english_default') }}</span><span class="info-value">{{ app()->getLocale() === 'ar' ? (($voiceNameMap[$defaultVoiceEn] ?? [])['label_ar'] ?? ($voiceNameMap[$defaultVoiceEn] ?? [])['label'] ?? __('ui.dashboard.default')) : (($voiceNameMap[$defaultVoiceEn] ?? [])['label'] ?? __('ui.dashboard.default')) }}</span></div>
         </div>
 
+        {{-- The browser extension is for computers: its key is not shown inside the phone app. --}}
+        @unless(\App\Support\InApp\InApp::hidesPlans())
         <div class="info-list">
           <div class="info-row">
             <span class="info-label">{{ __('ui.dashboard.extension_api_key') }}</span>
@@ -2288,6 +2300,12 @@
           @endif
         </div>
 
+        @endunless
+        @inapp
+          <div class="sidebar-actions">
+            <a class="btn btn-primary" href="{{ route('app.plan') }}" data-in-app-plan>{{ __('app.plan.title') }}</a>
+          </div>
+        @else
         <div class="sidebar-actions">
           <a class="btn" href="{{ route('pricing') }}">{{ __('ui.dashboard.pricing_and_plans') }}</a>
           <a class="btn btn-primary" href="{{ $onPaidPlan ? route('billing.page') : route('pricing') }}">{{ $onPaidPlan ? __('ui.dashboard.upgrade_plan') : __('ui.pack.offer_choose_title') }}</a>
@@ -2300,6 +2318,7 @@
             {{ __('ui.dashboard.manage_extension_key') }}
           </a>
         </div>
+        @endinapp
       </article>
     </section>
 
@@ -2682,7 +2701,9 @@
             </section>
             <div class="vc-notice" id="vcLimitNotice" @if(! $vcAtLimit) style="display:none" @endif>
               <p>{{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}</p>
+              @unless(\App\Support\InApp\InApp::hidesPlans())
               <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.voice_cloning.upgrade_cta') }}</a>
+              @endunless
             </div><!-- /vcLimitNotice -->
           @endif
 
@@ -4215,7 +4236,7 @@
       if (generateInFlight) return;
       // No plan and no characters: the options are shown, generating needs a plan.
       if (@json((bool) ($planShowcase ?? false))) {
-        showFormMessage('error', @json(__('ui.pack.showcase_note')));
+        showFormMessage('error', @json(\App\Support\InApp\InApp::hidesPlans() ? \App\Support\InApp\InApp::noCreditsLine(auth()->id()) : __('ui.pack.showcase_note')));
         return;
       }
       // Check if still in cooldown

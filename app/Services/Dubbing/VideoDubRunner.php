@@ -79,9 +79,12 @@ class VideoDubRunner
                 'has_preview' => $disk->exists($dub->path('dub-preview.mp4')),
                 'report' => $report,
             ]);
+            // The Listen app: "your dubbed video is ready". It never throws.
+            app(\App\Services\Push\AppPush::class)->dubReady($dub);
         } catch (\Throwable $e) {
             Log::warning('A video dub failed.', ['video_dub_id' => $dub->id, 'error' => $e->getMessage()]);
             if ($this->fail($dub->id, self::messageFor($e))) {
+                app(\App\Services\Push\AppPush::class)->dubFailed($dub);
                 // What it had done up to there, and why it stopped, for the admin's page.
                 $dub->forceFill(['report' => $this->dubber->lastReport ?: ['error' => mb_substr($e->getMessage(), 0, 300)]])->save();
             }

@@ -53,6 +53,8 @@
         @endif
       </div>
     </div>
+    @unless(\App\Support\InApp\InApp::hidesPlans())
     <a class="ag-balance-cta" href="{{ route('billing.page') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/></svg>{{ __('agents.balance.more') }}</a>
+    @endunless
   @endif
 </section>

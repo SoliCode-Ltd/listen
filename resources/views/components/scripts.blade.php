@@ -1092,11 +1092,16 @@
 @unless(request()->routeIs('dashboard'))
 {{-- Not on pages that belong to a member's own customers (an agent's link page). --}}
 @unless($noSupportChat ?? false)
+  {{-- Inside the Listen app help is in the menu ("Help and contact"): on a phone the floating
+       button sits over the page's own controls. --}}
+  @unless(\App\Support\InApp\InApp::active())
   @include('components.whatsapp-widget')
+  @endunless
   @php
     // Listen's own agent answers visitors on its public pages (php artisan agents:house).
     $houseRoute = (string) (Route::currentRouteName() ?? '');
-    $houseAgent = (in_array($houseRoute, ['home', 'pricing', 'samples', 'agents-landing', 'contact'], true) || str_starts_with($houseRoute, 'seo.'))
+    // Not inside the Listen app: it answers questions about plans and prices, and nothing is sold there.
+    $houseAgent = (! \App\Support\InApp\InApp::active() && (in_array($houseRoute, ['home', 'pricing', 'samples', 'agents-landing', 'contact'], true) || str_starts_with($houseRoute, 'seo.')))
       ? \App\Support\Agents\HouseAgent::for(app()->getLocale()) : null;
   @endphp
   @if($houseAgent)
@@ -1109,3 +1114,4 @@
   @endif
 @endunless
 @endunless
+@include('components.in-app-scripts')

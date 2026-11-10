@@ -1,0 +1,142 @@
+name: Android build
+
+# Builds the Android app (mobile/) on every pull request and on pushes to main that touch
+# it: lint, unit tests, a debug APK you can install on a phone, and the release bundle
+# (AAB) for Google Play. Both files are attached to the run as artifacts.
+#
+# It needs no secrets: without them the release bundle is simply left unsigned and the
+# app is built without push notifications. When these repository secrets exist, pushes to
+# main and manual runs (never pull requests) use them:
+#
+#   ANDROID_KEYSTORE_BASE64      the upload keystore file, base64-encoded
+#   ANDROID_KEYSTORE_PASSWORD    its password
+#   ANDROID_KEY_ALIAS            the key's alias inside the keystore
+#   ANDROID_KEY_PASSWORD         the key's password (leave unset if same as the keystore's)
+#   GOOGLE_SERVICES_JSON_BASE64  Firebase's google-services.json, base64-encoded (turns push on)
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/android-build.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/android-build.yml'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version shown to people, e.g. 1.0.3 (blank = default)'
+        required: false
+        type: string
+      version_code:
+        description: 'Version number for Google Play; must go up with every upload (blank = default)'
+        required: false
+        type: string
+      app_url:
+        description: 'Site the app opens (blank = https://listenai.studio)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Blank values fall back to the defaults in mobile/android/app/build.gradle.
+      LISTEN_VERSION_NAME: ${{ inputs.version_name }}
+      LISTEN_VERSION_CODE: ${{ inputs.version_code }}
+      LISTEN_APP_URL: ${{ inputs.app_url }}
+      # Secrets are used only outside pull requests, and only when they exist.
+      USE_SECRETS: ${{ github.event_name != 'pull_request' }}
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      HAS_GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install Capacitor
+        working-directory: mobile
+        run: npm ci
+
+      # Copies the bundled offline page and generates the plugin list the Android project reads.
+      - name: Sync the Android project
+        working-directory: mobile
+        run: npx cap sync android
+
+      - name: Add the push configuration (only when the secret exists)
+        if: env.USE_SECRETS == 'true' && env.HAS_GOOGLE_SERVICES == 'true'
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > mobile/android/app/google-services.json
+
+      - name: Prepare the signing key (only when the secrets exist)
+        if: env.USE_SECRETS == 'true' && env.HAS_KEYSTORE == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload-keystore.jks"
+          echo "LISTEN_KEYSTORE_FILE=$RUNNER_TEMP/upload-keystore.jks" >> "$GITHUB_ENV"
+
+      - name: Lint
+        working-directory: mobile/android
+        run: ./gradlew lint
+
+      - name: Unit tests
+        working-directory: mobile/android
+        run: ./gradlew testDebugUnitTest
+
+      - name: Build the debug APK
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug
+
+      # Signed when the signing step above ran, unsigned otherwise.
+      - name: Build the release bundle
+        working-directory: mobile/android
+        env:
+          LISTEN_KEYSTORE_PASSWORD: ${{ env.USE_SECRETS == 'true' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+          LISTEN_KEY_ALIAS: ${{ env.USE_SECRETS == 'true' && secrets.ANDROID_KEY_ALIAS || '' }}
+          LISTEN_KEY_PASSWORD: ${{ env.USE_SECRETS == 'true' && secrets.ANDROID_KEY_PASSWORD || '' }}
+        run: ./gradlew bundleRelease
+
+      - name: Attach the debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: listen-debug-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Attach the release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: listen-release-aab
+          path: mobile/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      - name: Attach the lint and test reports (when something failed)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: listen-android-reports
+          path: |
+            mobile/android/app/build/reports/
+          if-no-files-found: ignore

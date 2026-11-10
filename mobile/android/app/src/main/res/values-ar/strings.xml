@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">إسمع</string>
+
+    <string name="notification_channel_voice_ready_name">صوتك</string>
+    <string name="notification_channel_voice_ready_description">ننبّهك عندما يجهز الصوت الذي طلبته</string>
+    <string name="notification_channel_playback_name">التشغيل</string>
+    <string name="notification_channel_playback_description">يعرض ما يتم تشغيله مع زرّي التشغيل والإيقاف المؤقت</string>
+
+    <string name="media_play">تشغيل</string>
+    <string name="media_pause">إيقاف مؤقت</string>
+    <string name="media_rewind">رجوع ١٠ ثوانٍ</string>
+    <string name="media_forward">تقديم ١٠ ثوانٍ</string>
+
+    <string name="mic_rationale_title">السماح باستخدام الميكروفون</string>
+    <string name="mic_rationale_message">يحتاج «إسمع» إلى الميكروفون لتسجيل عيّنة صوتك. لا يبدأ التسجيل إلا عندما تضغط زر التسجيل.</string>
+    <string name="mic_settings_title">الميكروفون غير مفعّل</string>
+    <string name="mic_settings_message">لتسجيل صوتك، فعّل الميكروفون لتطبيق «إسمع» من إعدادات هاتفك.</string>
+
+    <string name="notif_rationale_title">السماح بالإشعارات</string>
+    <string name="notif_rationale_message">يستطيع «إسمع» أن ينبّهك عندما يجهز صوتك، فلا تحتاج إلى إبقاء التطبيق مفتوحًا.</string>
+    <string name="notif_settings_title">الإشعارات غير مفعّلة</string>
+    <string name="notif_settings_message">لنخبرك عندما يجهز صوتك، فعّل الإشعارات لتطبيق «إسمع» من إعدادات هاتفك.</string>
+
+    <string name="action_continue">متابعة</string>
+    <string name="action_not_now">ليس الآن</string>
+    <string name="action_open_settings">فتح الإعدادات</string>
+
+    <string name="download_saved">تم الحفظ في التنزيلات ‹ Listen</string>
+    <string name="download_failed">تعذّر حفظ الملف. حاول مرة أخرى.</string>
+</resources>

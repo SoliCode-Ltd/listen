@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Listen</string>
+
+    <!-- Notification channels -->
+    <string name="notification_channel_voice_ready_id" translatable="false">voice_ready</string>
+    <string name="notification_channel_voice_ready_name">Your audio</string>
+    <string name="notification_channel_voice_ready_description">Tells you when audio you asked for is ready</string>
+    <string name="notification_channel_playback_name">Playback</string>
+    <string name="notification_channel_playback_description">Shows what is playing, with play and pause</string>
+
+    <!-- Playback controls -->
+    <string name="media_play">Play</string>
+    <string name="media_pause">Pause</string>
+    <string name="media_rewind">Back 10 seconds</string>
+    <string name="media_forward">Forward 10 seconds</string>
+
+    <!-- Microphone permission -->
+    <string name="mic_rationale_title">Allow the microphone</string>
+    <string name="mic_rationale_message">Listen needs the microphone to record your voice sample. Recording starts only when you press record.</string>
+    <string name="mic_settings_title">Microphone is turned off</string>
+    <string name="mic_settings_message">To record your voice, turn on the microphone for Listen in your phone\'s settings.</string>
+
+    <!-- Notification permission -->
+    <string name="notif_rationale_title">Allow notifications</string>
+    <string name="notif_rationale_message">Listen can tell you when your audio is ready, so you don\'t have to keep the app open.</string>
+    <string name="notif_settings_title">Notifications are turned off</string>
+    <string name="notif_settings_message">To hear when your audio is ready, turn on notifications for Listen in your phone\'s settings.</string>
+
+    <!-- Dialog buttons -->
+    <string name="action_continue">Continue</string>
+    <string name="action_not_now">Not now</string>
+    <string name="action_open_settings">Open settings</string>
+
+    <!-- Sharing and downloads -->
+    <string name="download_saved">Saved to Downloads › Listen</string>
+    <string name="download_failed">Couldn\'t save the file. Please try again.</string>
+</resources>

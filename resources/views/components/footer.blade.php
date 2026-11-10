@@ -45,6 +45,23 @@
   }
 @endphp
 
+{{-- Inside the Listen app (App\Support\InApp\InApp): the legal links and nothing that sells. --}}
+@inapp
+<footer class="app-footer app-footer-in-app">
+  <div class="footer-container">
+    <div class="footer-bottom single" style="display: grid; gap: .6rem; justify-items: center; text-align: center;">
+      <p style="margin: 0; display: flex; flex-wrap: wrap; gap: .4rem 1rem; justify-content: center;">
+        <a href="{{ route('legal.privacy') }}">{{ __('ui.footer.privacy') }}</a>
+        <a href="{{ route('legal.terms') }}">{{ __('ui.footer.terms') }}</a>
+        <a href="{{ route('contact') }}">{{ __('ui.nav.contact') }}</a>
+      </p>
+      <div class="footer-copyright">
+        <p>{{ __('ui.footer.copyright', ['year' => $currentYear, 'name' => $brandName]) }}</p>
+      </div>
+    </div>
+  </div>
+</footer>
+@else
 <footer class="app-footer">
   @php
     $hasSocialLinks = !empty($socialLinks);
@@ -123,3 +140,5 @@
   </div>
 </footer>
 @include('components.webmcp')
+@endinapp
+

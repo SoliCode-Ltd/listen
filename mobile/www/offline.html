@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Listen</title>
+<!--
+  Shown by the app when a page cannot be loaded (no network, timeout, DNS).
+  Bundled inside the app: no external files. Arabic or English by phone language,
+  light or dark by phone theme (the app can override the theme with __listenTheme).
+  "Try again" navigates to /__retry, which the app catches and turns into a reload
+  of the page that failed.
+-->
+<style>
+  :root { --bg:#FFFFFF; --fg:#0B0B0F; --muted:#5E5E6B; --brand:#7659FA; --brand-fg:#FFFFFF; --ring:rgba(118,89,250,.35); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg:#0B0B0F; --fg:#F4F4F6; --muted:#A3A3B2; }
+  }
+  :root[data-theme="dark"] { --bg:#0B0B0F; --fg:#F4F4F6; --muted:#A3A3B2; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:var(--bg); color:var(--fg);
+    font-family:system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Arabic", "Noto Naskh Arabic", sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px; text-align:center; -webkit-tap-highlight-color:transparent;
+  }
+  main { width:100%; max-width:340px; }
+  svg.logo { width:88px; height:88px; margin-bottom:28px; }
+  svg.logo rect { fill:var(--brand); opacity:.9; }
+  h1 { font-size:22px; line-height:1.35; margin:0 0 10px; font-weight:700; }
+  p { font-size:16px; line-height:1.6; margin:0 0 28px; color:var(--muted); }
+  button {
+    appearance:none; border:0; border-radius:14px; background:var(--brand); color:var(--brand-fg);
+    font:inherit; font-size:17px; font-weight:600; width:100%; min-height:52px; padding:12px 20px; cursor:pointer;
+  }
+  button:focus-visible { outline:3px solid var(--ring); outline-offset:2px; }
+  button:active { opacity:.85; }
+  button[disabled] { opacity:.6; }
+</style>
+</head>
+<body>
+<main>
+  <svg class="logo" viewBox="0 0 128 128" aria-hidden="true">
+    <rect x="5" y="59" width="10" height="10" rx="5"/><rect x="23" y="42" width="10" height="44" rx="5"/>
+    <rect x="41" y="28" width="10" height="72" rx="5"/><rect x="59" y="14" width="10" height="100" rx="5"/>
+    <rect x="77" y="28" width="10" height="72" rx="5"/><rect x="95" y="42" width="10" height="44" rx="5"/>
+    <rect x="113" y="59" width="10" height="10" rx="5"/>
+  </svg>
+  <h1 id="title">Can't connect</h1>
+  <p id="text">Check your internet connection and try again.</p>
+  <button id="retry" type="button">Try again</button>
+</main>
+<script>
+(function () {
+  var texts = {
+    en: { title: "Can't connect", text: "Check your internet connection and try again.", retry: "Try again", trying: "Trying…" },
+    ar: { title: "تعذّر الاتصال", text: "تحقّق من اتصالك بالإنترنت ثم حاول مرة أخرى.", retry: "إعادة المحاولة", trying: "جارٍ المحاولة…" }
+  };
+  var lang = /^ar\b/i.test(navigator.language || "") ? "ar" : "en";
+  var t = texts[lang];
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("text").textContent = t.text;
+  var button = document.getElementById("retry");
+  button.textContent = t.retry;
+
+  // The app calls this when the site's own light/dark choice differs from the phone's.
+  window.__listenTheme = function (dark) {
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  };
+
+  var busy = false;
+  function retry() {
+    if (busy) return;
+    busy = true;
+    button.disabled = true;
+    button.textContent = t.trying;
+    // If the app does not take over within a few seconds, let the person try again.
+    setTimeout(function () { busy = false; button.disabled = false; button.textContent = t.retry; }, 6000);
+    location.href = "/__retry";
+  }
+  button.addEventListener("click", retry);
+  window.addEventListener("online", retry);
+})();
+</script>
+</body>
+</html>

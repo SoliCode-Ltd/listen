@@ -42,6 +42,26 @@ return [
         'verify_ssl' => env('GOOGLE_OAUTH_VERIFY_SSL', true),
     ],
 
+    // The Listen app's notifications (App\Services\Push): the Firebase project's service
+    // account, as JSON (or base64 of it) or as a file's path. Empty: nothing is sent.
+    'fcm' => [
+        'credentials_json' => env('FCM_CREDENTIALS_JSON', ''),
+        'credentials_path' => env('FCM_CREDENTIALS_PATH', ''),
+        // A voice ready sooner than this is not announced: the member is still looking at it.
+        'voice_min_seconds' => (int) env('FCM_VOICE_MIN_SECONDS', 20),
+    ],
+
+    // The Listen Android app (mobile/): its package and the SHA-256 fingerprints of the keys
+    // that sign it (comma separated), served at /.well-known/assetlinks.json so that links to
+    // the site open in the app.
+    'android_app' => [
+        'package' => env('ANDROID_APP_PACKAGE', 'studio.listenai.app'),
+        'cert_fingerprints' => env('ANDROID_APP_CERT_SHA256', ''),
+        // "web": plans show in the app and are bought in the phone's browser. "hidden": the app
+        // shows nothing about plans (App\Support\InApp\InApp::plansMode).
+        'plans' => env('ANDROID_APP_PLANS', 'web'),
+    ],
+
     'google_tts' => [
         'endpoint' => env('SPEECH_TTS_ENDPOINT', env('GOOGLE_TTS_ENDPOINT', 'https://texttospeech.googleapis.com/v1/text:synthesize')),
         'api_key' => env('SPEECH_TTS_API_KEY', env('GOOGLE_TTS_API_KEY', '')),

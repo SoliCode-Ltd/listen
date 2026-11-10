@@ -37,7 +37,7 @@
     <p class="ag-talk-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>{{ $note }}</p>
   @endif
   @if($blocked)
-    <p class="ag-talk-blocked" id="ag-talk-blocked">{{ $blockedText }}@if(in_array($blocked, ['plan', 'credits'], true)) <a href="{{ route('pricing') }}">{{ __('agents.talk_blocked_plans') }}</a>@endif</p>
+    <p class="ag-talk-blocked" id="ag-talk-blocked">{{ $blockedText }}@if(in_array($blocked, ['plan', 'credits'], true) && ! \App\Support\InApp\InApp::hidesPlans()) <a href="{{ route('pricing') }}">{{ __('agents.talk_blocked_plans') }}</a>@endif</p>
   @endif
   <p class="ag-talk-state" data-ag-talk-state aria-live="polite"></p>
   {{-- The link page ($callback): every line busy, the caller's place in line and a way to leave a

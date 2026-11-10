@@ -166,7 +166,8 @@ class DashboardController extends Controller
         // The Developer API section: keys and usage for plans with the API, which plans have it for other paying members.
         $developerApi = null;
         try {
-            if (\App\Services\Api\ApiAccountSummary::shownFor($activePlan)) {
+            // Developer keys are for computers: the phone app leaves the section out.
+            if (! \App\Support\InApp\InApp::hidesPlans() && \App\Services\Api\ApiAccountSummary::shownFor($activePlan)) {
                 $developerApi = app(\App\Services\Api\ApiAccountSummary::class)->for($request->user());
             }
         } catch (\Throwable) {

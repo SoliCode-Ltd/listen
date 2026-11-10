@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand">#7659FA</color>
+    <!-- Follows the phone's light/dark setting (see values-night). -->
+    <color name="site_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#7659FA</color>
+</resources>

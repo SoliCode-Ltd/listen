@@ -45,8 +45,11 @@
               @if($hasUse)
                 <a class="ag-tab" href="#usage-breakdown"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>{{ __('usage.where') }}</span></a>
               @endif
-              <a class="ag-tab" href="{{ route('billing.page') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 10h18M7 14.5h4"/></svg><span>{{ __('agents.menu_plan') }}</span></a>
+              {{-- Inside the Listen app: the plan as it is (nothing is sold there), and no marketing page. --}}
+              <a class="ag-tab" href="{{ route('billing.page') }}" @inapp data-in-app-plan @endinapp><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 10h18M7 14.5h4"/></svg><span>{{ __('agents.menu_plan') }}</span></a>
+              @unless(\App\Support\InApp\InApp::hidesPlans())
               <a class="ag-tab" href="{{ route('agents-landing') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5"/></svg><span>{{ __('agents.menu_guide') }}</span></a>
+              @endunless
             </nav>
             @include('agents.partials.side-foot')
           </div>
@@ -139,7 +142,7 @@
             <b>{{ __('agents.new_agent') }}</b>
             <small>{{ trans_choice('agents.new_agent_left', $limits['agents'] - $agents->count(), ['count' => $limits['agents'] - $agents->count()]) }}</small>
           </a>
-        @elseif($moreAgents)
+        @elseif($moreAgents && ! \App\Support\InApp\InApp::hidesPlans())
           <a class="ag-agent-new" href="{{ route('pricing') }}">
             <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></span>
             <b>{{ __('agents.more_agents') }}</b>

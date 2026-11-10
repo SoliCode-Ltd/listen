@@ -1,0 +1,25 @@
+{
+  "appId": "studio.listenai.app",
+  "appName": "Listen",
+  "webDir": "www",
+  "server": {
+    "url": "https://listenai.studio",
+    "appStartPath": "/app/start",
+    "errorPath": "offline.html",
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "App": {
+      "disableBackButtonHandler": true
+    },
+    "SystemBars": {
+      "insetsHandling": "disable"
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "alert",
+        "sound"
+      ]
+    }
+  }
+}
