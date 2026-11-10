@@ -57,9 +57,10 @@ return [
     'android_app' => [
         'package' => env('ANDROID_APP_PACKAGE', 'studio.listenai.app'),
         'cert_fingerprints' => env('ANDROID_APP_CERT_SHA256', ''),
-        // "web": plans show in the app and are bought in the phone's browser. "hidden": the app
-        // shows nothing about plans (App\Support\InApp\InApp::plansMode).
-        'plans' => env('ANDROID_APP_PLANS', 'web'),
+        // "hidden" (the default): the app shows nothing about plans, as Google Play's payment
+        // rules ask. "web": plans show in the app and are bought in the phone's browser
+        // (App\Support\InApp\InApp::plansMode).
+        'plans' => env('ANDROID_APP_PLANS', 'hidden'),
     ],
 
     'google_tts' => [

@@ -6,8 +6,8 @@ use App\Support\InApp\InApp;
 use Illuminate\Testing\TestResponse;
 
 /**
- * Plans shown in the app and bought on the web (ANDROID_APP_PLANS=web, the
- * default): a member sees prices and plans in the app as on the website, and
+ * Plans shown in the app and bought on the web (ANDROID_APP_PLANS=web; the
+ * default is hidden): a member sees prices and plans in the app as on the website, and
  * a page that takes a payment opens in the phone's browser instead, already
  * signed in, with the plan and cycle they chose. Nothing is paid in the app.
  */
@@ -27,12 +27,14 @@ class AppPlansOnWebTest extends InAppTestCase
         return html_entity_decode($m[1]);
     }
 
-    public function test_the_setting_is_web_unless_it_says_hidden(): void
+    public function test_plans_are_hidden_unless_the_setting_says_web(): void
     {
-        foreach (['web' => InApp::PLANS_ON_WEB, 'hidden' => InApp::PLANS_HIDDEN, '' => InApp::PLANS_ON_WEB, 'anything' => InApp::PLANS_ON_WEB] as $value => $mode) {
+        foreach (['web' => InApp::PLANS_ON_WEB, 'hidden' => InApp::PLANS_HIDDEN, '' => InApp::PLANS_HIDDEN, 'anything' => InApp::PLANS_HIDDEN] as $value => $mode) {
             config(['services.android_app.plans' => $value]);
             $this->assertSame($mode, InApp::plansMode());
         }
+        // With nothing in .env at all, the app shows nothing about plans.
+        $this->assertSame('hidden', (require config_path('services.php'))['android_app']['plans']);
     }
 
     public function test_the_app_shows_prices_and_plans_as_the_website_does(): void

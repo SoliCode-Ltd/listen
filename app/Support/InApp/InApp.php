@@ -53,16 +53,18 @@ class InApp
     /**
      * How the app treats plans (ANDROID_APP_PLANS in .env):
      *
+     * - "hidden" (the default, and anything that is not "web"): no price, plan
+     *   or upgrade is shown in the app at all. This is what Google Play's
+     *   payment rules ask for in most countries.
      * - "web": a member sees prices and plans as on the website, and choosing
      *   one opens the phone's browser, already signed in, on the billing page
      *   with what they chose. Nothing is ever paid inside the app.
-     * - "hidden": no price, plan or upgrade is shown in the app at all. This
-     *   is the setting that Google Play's payment rules ask for in most
-     *   countries; switching to it needs no new app version.
+     *
+     * Changing it needs no new app version.
      */
     public static function plansMode(): string
     {
-        return config('services.android_app.plans') === self::PLANS_HIDDEN ? self::PLANS_HIDDEN : self::PLANS_ON_WEB;
+        return config('services.android_app.plans') === self::PLANS_ON_WEB ? self::PLANS_ON_WEB : self::PLANS_HIDDEN;
     }
 
     /** In the app, and the app shows nothing about plans. */
