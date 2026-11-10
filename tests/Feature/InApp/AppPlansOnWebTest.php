@@ -149,7 +149,7 @@ class AppPlansOnWebTest extends InAppTestCase
         $member = $this->memberOn('starter');
         $url = $this->webUrl($this->inApp($member)->page('billing.page'));
 
-        $this->inApp($member)->get($url)->assertRedirect(url('/app/start'));
+        $this->assertStringStartsWith(url('/app/start'), (string) $this->inApp($member)->get($url)->assertRedirect()->headers->get('Location'));
     }
 
     public function test_a_blocked_member_is_not_signed_in_by_the_link(): void

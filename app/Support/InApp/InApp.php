@@ -2,6 +2,7 @@
 
 namespace App\Support\InApp;
 
+use App\Support\CreditPeriod;
 use Illuminate\Http\Request;
 
 /**
@@ -165,7 +166,7 @@ class InApp
     public static function renewsOn(int $userId): ?string
     {
         return rescue(function () use ($userId): ?string {
-            $period = \App\Support\CreditPeriod::current($userId);
+            $period = CreditPeriod::current($userId);
             $end = $period['plan_ends_at'] ?? null ? null : ($period['ends_at'] ?? null);
 
             return $end && $end->isFuture() ? $end->copy()->locale(app()->getLocale())->translatedFormat('j F') : null;
@@ -175,7 +176,10 @@ class InApp
     /** Where the app starts and where its dead ends lead: the studio for a member, sign-in for a guest. */
     public static function homeUrl(): string
     {
-        return url('/app/start');
+        // In the language of the page the member is on: an Arabic page never leads to an English studio.
+        $locale = app()->getLocale();
+
+        return url('/app/start').(in_array($locale, ['ar', 'en'], true) ? '?locale='.$locale : '');
     }
 
     /** The neutral page that stands in for every purchase page. */

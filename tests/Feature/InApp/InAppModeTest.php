@@ -3,10 +3,13 @@
 namespace Tests\Feature\InApp;
 
 use App\Models\Agent;
-use App\Models\User;
+use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Support\InApp\InApp;
 use App\Support\PlanFeatures;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -78,7 +81,7 @@ class InAppModeTest extends InAppTestCase
         $plan = $this->localizedRoute('app.plan');
 
         foreach (['pricing', 'billing.page', 'billing.pack', 'billing.manual.instructions', 'manage-subscription.page', 'pack.start', 'trial.start'] as $route) {
-            $response = $this->inApp($member)->get('/'.ltrim(\Illuminate\Support\Facades\Route::getRoutes()->getByName($route)->uri(), '/'));
+            $response = $this->inApp($member)->get('/'.ltrim(Route::getRoutes()->getByName($route)->uri(), '/'));
             $response->assertRedirect();
             $this->assertSame($plan, parse_url((string) $response->headers->get('Location'), PHP_URL_PATH), $route);
         }
@@ -123,7 +126,7 @@ class InAppModeTest extends InAppTestCase
         $free = $this->memberOn('free');
 
         foreach (['home', 'seo.ai-text-to-speech', 'seo.arabic-dialects', 'agents-landing', 'browsers-extension.page', 'developers'] as $route) {
-            $this->inApp($paid)->page($route)->assertRedirect(url('/app/start'));
+            $this->assertStringStartsWith(url('/app/start'), (string) $this->inApp($paid)->page($route)->assertRedirect()->headers->get('Location'));
         }
 
         $this->inApp($paid)->get('/app/start')->assertRedirect();
@@ -133,6 +136,15 @@ class InAppModeTest extends InAppTestCase
         // The phone's language chooses the page's.
         $this->assertStringContainsString('/ar/', (string) $this->inApp(null)->withHeader('Accept-Language', 'ar-EG,ar;q=0.9,en;q=0.5')->get('/app/start')->headers->get('Location'));
         $this->assertStringContainsString('/en/', (string) $this->inApp(null)->withHeader('Accept-Language', 'en-GB,en;q=0.9')->get('/app/start')->headers->get('Location'));
+
+        // The language of the page is kept: from an Arabic page the studio opens in Arabic,
+        // whatever language this phone used before.
+        foreach (['ar', 'en'] as $locale) {
+            $other = $locale === 'ar' ? 'en' : 'ar';
+            app()->setLocale($locale);
+            $this->assertSame(url('/app/start').'?locale='.$locale, InApp::homeUrl());
+            $this->assertStringContainsString('/'.$locale.'/dashboard', (string) $this->inApp($paid)->withSession(['locale' => $other])->get('/app/start?locale='.$locale)->headers->get('Location'));
+        }
     }
 
     public function test_no_page_a_member_reaches_in_the_app_sells_anything(): void
@@ -205,7 +217,7 @@ class InAppModeTest extends InAppTestCase
     {
         $this->seedPlansWithEverythingOpen();
         $member = $this->memberOn('free');
-        \App\Models\Plan::query()->where('slug', 'free')->update(['monthly_chars' => 0]);
+        Plan::query()->where('slug', 'free')->update(['monthly_chars' => 0]);
 
         $page = $this->inApp($member)->page('dashboard')->assertOk();
 
@@ -265,7 +277,7 @@ class InAppModeTest extends InAppTestCase
 
         // The app's own lines (lang/*/app.php) sell nothing either, except the one that says so.
         foreach (['en', 'ar'] as $locale) {
-            $own = \Illuminate\Support\Arr::dot(require lang_path("$locale/app.php"));
+            $own = Arr::dot(require lang_path("$locale/app.php"));
             unset($own['not_sold_here']);
             // The lines of the other setting, where plans are bought in the browser.
             $own = array_filter($own, fn (string $key): bool => ! str_starts_with($key, 'web.') && $key !== 'shell.web_failed', ARRAY_FILTER_USE_KEY);
@@ -306,7 +318,7 @@ class InAppModeTest extends InAppTestCase
     public function test_the_app_gets_no_trackers_and_no_price_data_in_the_page_head(): void
     {
         $this->seedPlansWithEverythingOpen();
-        \App\Models\SiteSetting::set('google_analytics_id', 'G-TEST12345');
+        SiteSetting::set('google_analytics_id', 'G-TEST12345');
 
         $browser = $this->inBrowser(null)->page('samples')->assertOk()->getContent();
         $app = $this->inApp(null)->page('samples')->assertOk()->getContent();
