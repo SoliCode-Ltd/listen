@@ -9,7 +9,14 @@ return [
     'no_credits_until' => 'You have used all your credits. They are back on :date.',
     'signin_failed' => 'We couldn\'t finish signing you in. Please try again.',
 
+    'tabs' => [
+        'voices' => 'Voices',
+        'account' => 'Account',
+    ],
+
     'plan' => [
+        'upgrade' => 'Upgrade plan',
+        'language' => 'Language',
         'title' => 'My account',
         'plan_heading' => 'Your plan',
         'hello' => 'Hello, :name',

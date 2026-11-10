@@ -3,10 +3,13 @@
 namespace Tests\Feature\InApp;
 
 use App\Models\Agent;
-use App\Models\User;
+use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Support\InApp\InApp;
 use App\Support\PlanFeatures;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -78,7 +81,7 @@ class InAppModeTest extends InAppTestCase
         $plan = $this->localizedRoute('app.plan');
 
         foreach (['pricing', 'billing.page', 'billing.pack', 'billing.manual.instructions', 'manage-subscription.page', 'pack.start', 'trial.start'] as $route) {
-            $response = $this->inApp($member)->get('/'.ltrim(\Illuminate\Support\Facades\Route::getRoutes()->getByName($route)->uri(), '/'));
+            $response = $this->inApp($member)->get('/'.ltrim(Route::getRoutes()->getByName($route)->uri(), '/'));
             $response->assertRedirect();
             $this->assertSame($plan, parse_url((string) $response->headers->get('Location'), PHP_URL_PATH), $route);
         }
@@ -123,7 +126,7 @@ class InAppModeTest extends InAppTestCase
         $free = $this->memberOn('free');
 
         foreach (['home', 'seo.ai-text-to-speech', 'seo.arabic-dialects', 'agents-landing', 'browsers-extension.page', 'developers'] as $route) {
-            $this->inApp($paid)->page($route)->assertRedirect(url('/app/start'));
+            $this->assertStringStartsWith(url('/app/start'), (string) $this->inApp($paid)->page($route)->assertRedirect()->headers->get('Location'));
         }
 
         $this->inApp($paid)->get('/app/start')->assertRedirect();
@@ -133,6 +136,15 @@ class InAppModeTest extends InAppTestCase
         // The phone's language chooses the page's.
         $this->assertStringContainsString('/ar/', (string) $this->inApp(null)->withHeader('Accept-Language', 'ar-EG,ar;q=0.9,en;q=0.5')->get('/app/start')->headers->get('Location'));
         $this->assertStringContainsString('/en/', (string) $this->inApp(null)->withHeader('Accept-Language', 'en-GB,en;q=0.9')->get('/app/start')->headers->get('Location'));
+
+        // The language of the page is kept: from an Arabic page the studio opens in Arabic,
+        // whatever language this phone used before.
+        foreach (['ar', 'en'] as $locale) {
+            $other = $locale === 'ar' ? 'en' : 'ar';
+            app()->setLocale($locale);
+            $this->assertSame(url('/app/start').'?locale='.$locale, InApp::homeUrl());
+            $this->assertStringContainsString('/'.$locale.'/dashboard', (string) $this->inApp($paid)->withSession(['locale' => $other])->get('/app/start?locale='.$locale)->headers->get('Location'));
+        }
     }
 
     public function test_no_page_a_member_reaches_in_the_app_sells_anything(): void
@@ -205,7 +217,7 @@ class InAppModeTest extends InAppTestCase
     {
         $this->seedPlansWithEverythingOpen();
         $member = $this->memberOn('free');
-        \App\Models\Plan::query()->where('slug', 'free')->update(['monthly_chars' => 0]);
+        Plan::query()->where('slug', 'free')->update(['monthly_chars' => 0]);
 
         $page = $this->inApp($member)->page('dashboard')->assertOk();
 
@@ -265,8 +277,8 @@ class InAppModeTest extends InAppTestCase
 
         // The app's own lines (lang/*/app.php) sell nothing either, except the one that says so.
         foreach (['en', 'ar'] as $locale) {
-            $own = \Illuminate\Support\Arr::dot(require lang_path("$locale/app.php"));
-            unset($own['not_sold_here']);
+            $own = Arr::dot(require lang_path("$locale/app.php"));
+            unset($own['not_sold_here'], $own['plan.upgrade']);
             // The lines of the other setting, where plans are bought in the browser.
             $own = array_filter($own, fn (string $key): bool => ! str_starts_with($key, 'web.') && $key !== 'shell.web_failed', ARRAY_FILTER_USE_KEY);
             foreach ($own as $key => $line) {
@@ -284,10 +296,29 @@ class InAppModeTest extends InAppTestCase
             ->assertRedirect(route('billing.page', ['plan' => 'creator']));
     }
 
+    public function test_there_is_no_footer_inside_the_app_with_either_setting(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $member = $this->memberOn('starter');
+
+        foreach ([InApp::PLANS_HIDDEN, InApp::PLANS_ON_WEB] as $setting) {
+            config(['services.android_app.plans' => $setting]);
+            foreach (['samples', 'contact', 'legal.privacy'] as $route) {
+                $this->inApp($member)->page($route)->assertOk()->assertDontSee('class="app-footer', false);
+                $this->inApp(null, 'ar')->page($route)->assertOk()->assertDontSee('class="app-footer', false);
+            }
+        }
+        // A browser keeps it.
+        $this->inBrowser(null)->page('samples')->assertOk()->assertSee('<footer class="app-footer"', false);
+        // The legal pages stay one tap away in the app.
+        config(['services.android_app.plans' => InApp::PLANS_HIDDEN]);
+        $this->inApp($member)->page('app.plan')->assertSee($this->localizedRoute('legal.privacy'), false)->assertSee($this->localizedRoute('legal.terms'), false);
+    }
+
     public function test_the_app_gets_no_trackers_and_no_price_data_in_the_page_head(): void
     {
         $this->seedPlansWithEverythingOpen();
-        \App\Models\SiteSetting::set('google_analytics_id', 'G-TEST12345');
+        SiteSetting::set('google_analytics_id', 'G-TEST12345');
 
         $browser = $this->inBrowser(null)->page('samples')->assertOk()->getContent();
         $app = $this->inApp(null)->page('samples')->assertOk()->getContent();
@@ -321,6 +352,8 @@ class InAppModeTest extends InAppTestCase
         $html = (string) preg_replace('#<(textarea|audio)\b.*?</\1>#si', ' ', $html);
         $html = (string) preg_replace('#<(article|div|section)\b[^>]*class="[^"]*\b(vs-read|vs-card|long-sample|sample-text)[^"]*"[^>]*>.*?</\1>#si', ' ', $html);
         $html = (string) preg_replace('#<p\b[^>]*\blang="[a-z-]+"[^>]*>.*?</p>#si', ' ', $html);
+        // The one way to a bigger plan: the account page's button, which opens billing in the browser.
+        $html = (string) preg_replace('#<a\b[^>]*data-app-upgrade[^>]*>.*?</a>#si', ' ', $html);
         $text = $this->visibleText($html);
         // The example of what a member's own business may tell its agent ("Teeth whitening: 1,500 EGP").
         $text = (string) preg_replace('/(Teeth whitening|تبييض الأسنان)[^.]*\./u', ' ', $text);
@@ -336,5 +369,58 @@ class InAppModeTest extends InAppTestCase
             $this->fail("Something is sold in $where: \"".mb_strcut($text, max(0, $match[0][1] - 80), 220).'"');
         }
         $this->assertTrue(true);
+    }
+
+    public function test_a_member_in_the_app_gets_tabs_for_the_tools_and_no_menu_of_pages(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $member = $this->memberOn('starter');
+
+        foreach (['dashboard', 'samples', 'app.plan', 'contact'] as $route) {
+            $html = (string) $this->inApp($member)->page($route)->assertOk()->getContent();
+            foreach (['studio', 'voices', 'account'] as $tab) {
+                $this->assertStringContainsString('data-app-tab="'.$tab.'"', $html, $route);
+            }
+            $this->assertStringNotContainsString('id="mobileNav"', $html, $route);
+            $this->assertStringNotContainsString('class="desktop-nav"', $html, $route);
+            $this->assertStringNotContainsString('id="userMenu"', $html, $route);
+            $this->assertSame(1, preg_match_all('/class="app-tab is-on"/', $html), $route);
+        }
+
+        // The Account page holds what the menu used to: language, help and signing out.
+        $account = (string) $this->inApp($member)->page('app.plan')->getContent();
+        $this->assertStringContainsString('data-app-language="ar"', $account);
+        $this->assertStringContainsString('data-app-language="en"', $account);
+        $this->assertStringContainsString(route('logout'), $account);
+
+        // The website keeps its own menu, and a guest in the app has no tabs to tools they cannot open.
+        $this->assertStringNotContainsString('data-app-tab=', (string) $this->inBrowser($member)->page('samples')->getContent());
+        $this->assertStringNotContainsString('data-app-tab=', (string) $this->inApp(null)->page('samples')->getContent());
+    }
+
+    public function test_upgrade_on_the_account_page_opens_billing_in_the_browser_signed_in(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $member = $this->memberOn('starter');
+
+        $this->assertStringContainsString(route('app.upgrade'), (string) $this->inApp($member)->page('app.plan')->getContent());
+
+        $page = (string) $this->inApp($member)->page('app.upgrade')->assertOk()->getContent();
+        $this->assertSame(1, preg_match('#/app/continue\?code=([A-Za-z0-9]{64})&(?:amp;)?to=([^"&<\s]+)#', $page, $m));
+        $this->assertStringContainsString('billing', urldecode($m[2]));
+
+        // The browser: signed in by the link and on the real billing page, even straight after
+        // signing in through the app's browser tab.
+        auth()->logout();
+        $this->flushSession();
+        $landed = $this->inBrowser(null)->withSession([InApp::SIGN_IN_SESSION => now()->getTimestamp()])
+            ->get('/app/continue?code='.$m[1].'&to='.$m[2]);
+        $landed->assertRedirect();
+        $this->assertStringEndsWith('/billing', (string) $landed->headers->get('Location'));
+        $this->assertAuthenticatedAs($member);
+        $landed->assertSessionMissing(InApp::SIGN_IN_SESSION);
+
+        // The same link opened by a browser leads to billing itself.
+        $this->inBrowser($member)->page('app.upgrade')->assertRedirect(route('billing.page'));
     }
 }
