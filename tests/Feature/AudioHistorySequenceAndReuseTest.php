@@ -68,9 +68,10 @@ class AudioHistorySequenceAndReuseTest extends TestCase
         $response = $this->actingAs($user)->getLocalizedRoute('dashboard');
 
         $response->assertOk();
-        $response->assertSee('#1</td>', false);
-        $response->assertSee('#2</td>', false);
-        $response->assertDontSee('#35</td>', false);
+        // Each voice's card carries the member's own number for it, not the row's id.
+        $response->assertSee('<span class="hx-num">#1</span>', false);
+        $response->assertSee('<span class="hx-num">#2</span>', false);
+        $response->assertDontSee('<span class="hx-num">#35</span>', false);
     }
 
     public function test_dashboard_shows_reuse_link_for_premium_and_standard_records(): void

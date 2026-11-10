@@ -882,6 +882,8 @@ class DashboardController extends Controller
             'display_number' => $job->displayNumber(),
             'title' => (string) ($job->textItem?->title ?? ''),
             'text_excerpt' => (string) Str::limit(trim((string) preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, ''),
+            // The card's title in the history when the voice has no name: the start of its text.
+            'text_preview' => (string) Str::limit(trim((string) preg_replace('/\s+/u', ' ', (string) $job->input_text)), 110, '…'),
             'status' => (string) $job->status,
             'source_language' => $job->source_language ?: '-',
             'target_language' => (string) $job->target_language,
