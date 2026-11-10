@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Network -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Recording a voice sample in the page (getUserMedia) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
+    <!-- "Your audio is ready" notifications and the playback notification (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Playback that continues with the screen off -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Saving to Downloads needs this only on Android 9 and older; newer versions use MediaStore. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"
+        tools:ignore="ScopedStorage" />
+
+    <!-- Not used: no ads, no analytics. Removed in case a library ever adds them. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID" tools:node="remove" />
+
+    <!-- What the app may ask the system about: a browser for links, and apps for mail / phone links. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".ListenApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:enableOnBackInvokedCallback="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="false"
+        tools:targetApi="36">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|layoutDirection|smallestScreenSize|screenLayout|uiMode|navigation|density|fontScale"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:windowSoftInputMode="adjustResize">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              App Links: only the signed-in product pages open in the app. The home page,
+              pricing and billing are deliberately NOT listed, so they keep opening in the browser.
+              `path` is an exact match, `pathPrefix` is "starts with" (the same as the
+              patterns /app/.*, /(ar|en)/dashboard.* and so on; Android patterns have no "ar|en",
+              so each language is listed).
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="${appHost}" />
+                <data android:path="/app/start" />
+                <data android:pathPrefix="/ar/dashboard" />
+                <data android:pathPrefix="/en/dashboard" />
+                <data android:pathPrefix="/ar/demo" />
+                <data android:pathPrefix="/en/demo" />
+                <data android:pathPrefix="/ar/agents" />
+                <data android:pathPrefix="/en/agents" />
+                <data android:pathPrefix="/ar/dub-my-video" />
+                <data android:pathPrefix="/en/dub-my-video" />
+                <data android:pathPrefix="/ar/email/verify/" />
+                <data android:pathPrefix="/en/email/verify/" />
+                <data android:path="/ar/start" />
+                <data android:path="/en/start" />
+            </intent-filter>
+
+            <!-- The return link after signing in through the browser: studio.listenai.app://signin?code=... -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${appScheme}" />
+            </intent-filter>
+        </activity>
+
+        <!-- Keeps playback alive with the screen off; shows the lock-screen / notification controls. -->
+        <service
+            android:name=".MediaPlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Shares generated audio from the app's cache with other apps (read-only, per share). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Push: look and channel of notifications the system shows while the app is closed. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="@string/notification_channel_voice_ready_id" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_listen" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/brand" />
+        <!-- No push token is created until the page asks for one (PushNotifications.register()). -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="false" />
+    </application>
+</manifest>

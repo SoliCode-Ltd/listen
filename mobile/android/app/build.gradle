@@ -1,0 +1,154 @@
+apply plugin: 'com.android.application'
+
+// ---------------------------------------------------------------------------
+// Build-time settings. Each one can come from an environment variable or from
+// a Gradle property with the same name (-PLISTEN_APP_URL=... on the command
+// line, or a line in ~/.gradle/gradle.properties). Defaults build the live app.
+// ---------------------------------------------------------------------------
+def setting = { String name, String fallback ->
+    def value = System.getenv(name) ?: (project.findProperty(name) as String)
+    return (value != null && !value.trim().isEmpty()) ? value.trim() : fallback
+}
+
+// The site the app shows. https only; no path, query or trailing slash.
+def listenAppUrl = setting('LISTEN_APP_URL', 'https://listenai.studio').replaceAll('/+$', '')
+def listenAppUri = new URI(listenAppUrl)
+if (listenAppUri.scheme != 'https' || !listenAppUri.host || (listenAppUri.path ?: '') != '' || listenAppUri.query != null) {
+    throw new GradleException("LISTEN_APP_URL must look like https://host (got '${listenAppUrl}')")
+}
+def listenAppHost = listenAppUri.host.toLowerCase(Locale.ROOT)
+
+def listenVersionCode = setting('LISTEN_VERSION_CODE', '1').toInteger()
+def listenVersionName = setting('LISTEN_VERSION_NAME', '1.0.0')
+// Optional, e.g. ".staging": lets a staging build sit next to the live app on one phone.
+def listenAppIdSuffix = setting('LISTEN_APP_ID_SUFFIX', '')
+
+// Upload-key signing: environment variables first, then an untracked
+// android/keystore.properties. With neither, the release build is left unsigned.
+def keystoreProps = new Properties()
+def keystorePropsFile = rootProject.file('keystore.properties')
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+def signingValue = { String envName, String propName ->
+    def value = System.getenv(envName) ?: keystoreProps.getProperty(propName)
+    return (value != null && !value.trim().isEmpty()) ? value.trim() : null
+}
+def listenStoreFile = signingValue('LISTEN_KEYSTORE_FILE', 'storeFile')
+def listenStorePassword = signingValue('LISTEN_KEYSTORE_PASSWORD', 'storePassword')
+def listenKeyAlias = signingValue('LISTEN_KEY_ALIAS', 'keyAlias')
+def listenKeyPassword = signingValue('LISTEN_KEY_PASSWORD', 'keyPassword') ?: listenStorePassword
+def hasReleaseSigning = listenStoreFile && listenStorePassword && listenKeyAlias
+
+android {
+    namespace = "studio.listenai.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        applicationId "studio.listenai.app"
+        if (listenAppIdSuffix) {
+            applicationIdSuffix listenAppIdSuffix
+        }
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode listenVersionCode
+        versionName listenVersionName
+
+        buildConfigField "String", "APP_URL", "\"${listenAppUrl}\""
+        buildConfigField "String", "APP_HOST", "\"${listenAppHost}\""
+        // The sign-in return link. Fixed (not the applicationId) because the site redirects to it.
+        buildConfigField "String", "APP_SCHEME", "\"studio.listenai.app\""
+        manifestPlaceholders = [appHost: listenAppHost, appScheme: "studio.listenai.app"]
+
+        // Only the two languages the app has texts for.
+        resourceConfigurations += ['en', 'ar']
+
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile rootProject.file(listenStoreFile)
+                storePassword listenStorePassword
+                keyAlias listenKeyAlias
+                keyPassword listenKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+        }
+        release {
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    // Keep both languages in every install: the permission dialogs follow the page's
+    // language (Arabic or English), which is not always the phone's.
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = true
+        lintConfig = file('lint.xml')
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.activity:activity:$androidxActivityVersion"
+    implementation "androidx.core:core:$androidxCoreVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation "androidx.webkit:webkit:$androidxWebkitVersion"
+    implementation "androidx.swiperefreshlayout:swiperefreshlayout:$androidxSwipeRefreshVersion"
+    implementation "androidx.browser:browser:$androidxBrowserVersion"
+    implementation "androidx.media:media:$androidxMediaVersion"
+    // Same version the push plugin uses; needed here to ask whether push is configured.
+    implementation "com.google.firebase:firebase-messaging:$firebaseMessagingVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+// Push needs app/google-services.json (from the Firebase console, never committed).
+// Without it the app still builds and runs; push simply reports "unavailable".
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
+} else {
+    logger.lifecycle("google-services.json not found: building without push notifications")
+}
