@@ -39,6 +39,9 @@ class AppShellController extends Controller
 
     private const CODE_MINUTES = 3;
 
+    /** How long a code still signs the same app in after its first use (a repeated request). */
+    private const CODE_REUSE_SECONDS = 60;
+
     /** How long the app's link into the browser signs the member in. */
     private const WEB_MINUTES = 5;
 
@@ -135,24 +138,39 @@ class AppShellController extends Controller
         $locale = $this->locale($request);
         $code = (string) $request->query('code', '');
         $verifier = (string) $request->query('verifier', '');
-        $failed = redirect()->to($this->localized('login', $locale))->withErrors(['auth' => __('app.signin_failed')]);
+        // Made only when it is needed: a redirect with an error puts the error in the session at
+        // once, so one made in advance would show after a sign-in that worked.
+        $failed = fn (): RedirectResponse => redirect()->to($this->localized('login', $locale))->withErrors(['auth' => __('app.signin_failed')]);
 
         if (preg_match('/^[A-Za-z0-9]{64}$/', $code) !== 1 || preg_match('/^[A-Za-z0-9_-]{43,128}$/', $verifier) !== 1) {
-            return $failed;
+            return $this->signedInAlready($request, $locale) ?? $failed();
         }
 
-        $held = Cache::pull(self::codeKey($code));
+        // Some phones ask for this address twice (the web view's own second request for a page it
+        // was told to load): the code stays good for a minute after its first use, for the same
+        // secret only, so the second ask signs in the same member instead of failing.
+        $key = self::codeKey($code);
+        $held = Cache::get($key);
         $expected = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
         if (! is_array($held) || ! hash_equals((string) ($held['challenge'] ?? ''), $expected)) {
-            return $failed;
+            // A wrong secret uses the code up.
+            Cache::forget($key);
+
+            return $this->signedInAlready($request, $locale) ?? $failed();
+        }
+        if (empty($held['used'])) {
+            Cache::put($key, $held + ['used' => true], now()->addSeconds(self::CODE_REUSE_SECONDS));
         }
 
         $user = User::query()->find((int) ($held['user_id'] ?? 0));
         if (! $user) {
-            return $failed;
+            return $failed();
         }
         if ($blocked->isBlocked($user)) {
             return redirect()->to($this->localized('login', $locale))->with('blocked_notice', $blocked->noticePayload($user));
+        }
+        if ((int) $request->user()?->id === (int) $user->id) {
+            return redirect()->to($this->memberHome($user, $locale));
         }
 
         Auth::login($user, true);
@@ -275,6 +293,12 @@ class AppShellController extends Controller
         ]];
 
         return response()->json($statements, 200, ['Cache-Control' => 'public, max-age=3600'], JSON_UNESCAPED_SLASHES);
+    }
+
+    /** A sign-in that cannot be finished, asked by an app that is signed in: no error, just the studio. */
+    private function signedInAlready(Request $request, string $locale): ?RedirectResponse
+    {
+        return $request->user() ? redirect()->to($this->memberHome($request->user(), $locale)) : null;
     }
 
     /** The studio for a paying member (or the admin), the free demo for the rest, as after any sign-in. */

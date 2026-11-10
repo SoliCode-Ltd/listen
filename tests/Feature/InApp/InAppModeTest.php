@@ -284,6 +284,25 @@ class InAppModeTest extends InAppTestCase
             ->assertRedirect(route('billing.page', ['plan' => 'creator']));
     }
 
+    public function test_there_is_no_footer_inside_the_app_with_either_setting(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $member = $this->memberOn('starter');
+
+        foreach ([InApp::PLANS_HIDDEN, InApp::PLANS_ON_WEB] as $setting) {
+            config(['services.android_app.plans' => $setting]);
+            foreach (['samples', 'contact', 'legal.privacy'] as $route) {
+                $this->inApp($member)->page($route)->assertOk()->assertDontSee('class="app-footer', false);
+                $this->inApp(null, 'ar')->page($route)->assertOk()->assertDontSee('class="app-footer', false);
+            }
+        }
+        // A browser keeps it.
+        $this->inBrowser(null)->page('samples')->assertOk()->assertSee('<footer class="app-footer"', false);
+        // The legal pages stay one tap away in the app.
+        config(['services.android_app.plans' => InApp::PLANS_HIDDEN]);
+        $this->inApp($member)->page('app.plan')->assertSee($this->localizedRoute('legal.privacy'), false)->assertSee($this->localizedRoute('legal.terms'), false);
+    }
+
     public function test_the_app_gets_no_trackers_and_no_price_data_in_the_page_head(): void
     {
         $this->seedPlansWithEverythingOpen();

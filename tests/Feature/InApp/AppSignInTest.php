@@ -88,28 +88,73 @@ class AppSignInTest extends InAppTestCase
         $response->assertRedirect();
         $this->assertStringEndsWith('/dashboard', (string) $response->headers->get('Location'));
         $this->assertAuthenticatedAs($member);
+        // A sign-in that worked says nothing about failing (it once did, on the studio's first page).
+        $response->assertSessionHasNoErrors();
+        $this->inApp($member)->page('dashboard')->assertOk()->assertDontSee(__('app.signin_failed'));
         // Signed in to stay: the app is not asked again after a restart.
         $this->assertNotNull($member->fresh()->remember_token);
     }
 
-    public function test_a_code_works_once(): void
+    public function test_a_repeated_request_signs_in_the_same_app_and_shows_no_error(): void
     {
         $this->seedPlansWithEverythingOpen();
         $member = $this->memberOn('starter');
         $code = $this->codeFor($member);
+        $url = '/app/signin/complete?code='.$code.'&verifier='.self::VERIFIER;
 
         $this->app['auth']->forgetGuards();
         $this->flushSession();
-        $this->inApp(null)->get('/app/signin/complete?code='.$code.'&verifier='.self::VERIFIER)->assertRedirect();
+        $this->inApp(null)->get($url)->assertRedirect();
+        $this->assertAuthenticatedAs($member);
+
+        // Some phones ask for the address a second time. With the session of the first: the studio, no error.
+        $again = $this->inApp($member)->get($url);
+        $this->assertStringEndsWith('/dashboard', (string) $again->headers->get('Location'));
+        $again->assertSessionHasNoErrors();
+
+        // Without it (the two asks crossed): the same member is signed in, no error.
+        auth()->logout();
+        $this->app['auth']->forgetGuards();
+        $this->flushSession();
+        $crossed = $this->inApp(null)->get($url);
+        $this->assertStringEndsWith('/dashboard', (string) $crossed->headers->get('Location'));
+        $crossed->assertSessionHasNoErrors();
+        $this->assertAuthenticatedAs($member);
+    }
+
+    public function test_a_used_code_stops_working_after_a_minute(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $member = $this->memberOn('starter');
+        $code = $this->codeFor($member);
+        $url = '/app/signin/complete?code='.$code.'&verifier='.self::VERIFIER;
+
+        $this->app['auth']->forgetGuards();
+        $this->flushSession();
+        $this->inApp(null)->get($url)->assertRedirect();
         $this->assertAuthenticated();
 
         auth()->logout();
+        $this->app['auth']->forgetGuards();
         $this->flushSession();
-        $again = $this->inApp(null)->get('/app/signin/complete?code='.$code.'&verifier='.self::VERIFIER);
+        $this->travel(61)->seconds();
+        $late = $this->inApp(null)->get($url);
 
-        $this->assertStringEndsWith('/login', (string) $again->headers->get('Location'));
-        $again->assertSessionHasErrors('auth');
+        $this->assertStringEndsWith('/login', (string) $late->headers->get('Location'));
+        $late->assertSessionHasErrors('auth');
         $this->assertGuest();
+    }
+
+    public function test_a_member_already_signed_in_never_sees_a_sign_in_error(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $member = $this->memberOn('starter');
+
+        foreach (['/app/signin/complete?code='.str_repeat('a', 64).'&verifier='.self::VERIFIER, '/app/signin/complete?code=bad&verifier=bad'] as $url) {
+            $response = $this->inApp($member)->get($url);
+            $this->assertStringEndsWith('/dashboard', (string) $response->headers->get('Location'));
+            $response->assertSessionHasNoErrors();
+        }
     }
 
     public function test_a_code_is_of_no_use_without_the_apps_secret(): void
