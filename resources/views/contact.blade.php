@@ -2,7 +2,11 @@
   $contactWhatsapp = preg_replace('/\D+/', '', (string) \App\Models\SiteSetting::get('whatsapp_number', '201553212603'));
   $contactWhatsappUrl = 'https://wa.me/'.$contactWhatsapp.'?text='.rawurlencode(__('ui.contact.whatsapp_message'));
   $contactEmail = trim((string) \App\Models\SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio';
-  $contactTopics = ['billing', 'voices', 'account', 'other'];
+  // "Delete my account" is how a member asks for their account and data to be removed (the
+  // Listen app's store listing links here). Nothing is sold in the app, so it has no billing topic.
+  $contactTopics = \App\Support\InApp\InApp::active()
+    ? ['voices', 'account', 'delete', 'other']
+    : ['billing', 'voices', 'account', 'delete', 'other'];
   // A link can pick the topic for the visitor (the pricing page's "Contact us" picks plans and billing).
   $contactTopic = in_array(request()->query('topic'), $contactTopics, true) ? __('ui.contact.topic_'.request()->query('topic')) : '';
   // The wave's resting shape: tall in the middle, like the Listen mark, with some life in it.

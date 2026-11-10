@@ -69,7 +69,7 @@
         @if(($missed['callbacks'] ?? 0) > 0 || $missed['reason'] === 'lines')
           <span class="ag-notice-actions">
             @if(($missed['callbacks'] ?? 0) > 0)<button type="button" class="ag-btn ag-btn-sm" data-ag-tab-go="customers">{{ __('agents.missed_see_customers') }}</button>@endif
-            @if($missed['reason'] === 'lines')<a class="ag-btn ag-btn-sm ag-btn-primary" href="{{ route('pricing') }}">{{ __('agents.missed_more_lines') }}</a>@endif
+            @if($missed['reason'] === 'lines' && ! \App\Support\InApp\InApp::active())<a class="ag-btn ag-btn-sm ag-btn-primary" href="{{ route('pricing') }}">{{ __('agents.missed_more_lines') }}</a>@endif
           </span>
         @endif
       </div>

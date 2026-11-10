@@ -61,6 +61,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\EnsureUserIsNotBlocked::class,
             \App\Http\Middleware\CaptureAdClickId::class,
+            // The Listen app: nothing is sold inside it (App\Support\InApp\InApp).
+            \App\Http\Middleware\InAppMode::class,
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\ServePagesToAgents::class,
         ]);

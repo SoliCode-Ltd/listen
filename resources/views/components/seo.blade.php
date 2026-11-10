@@ -32,9 +32,13 @@
 {!! SeoHelper::ogTags($resolvedPageTitle, $pageKey) !!}
 {!! SeoHelper::twitterCard($resolvedPageTitle, $pageKey) !!}
 {!! SeoHelper::verificationTags() !!}
+{{-- Not inside the Listen app (App\Support\InApp\InApp): the structured data lists the plans'
+     prices, and the app declares no analytics or advertising trackers to its store. --}}
+@unless(\App\Support\InApp\InApp::active())
 {!! SeoHelper::structuredData($faqItems, $resolvedPageTitle, $pageKey) !!}
 {!! SeoHelper::analyticsScript() !!}
 {!! SeoHelper::facebookPixelScript() !!}
+@endunless
 {!! SeoHelper::llmsDiscoveryTag() !!}
 
 @if(SeoHelper::customCss())

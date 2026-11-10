@@ -437,6 +437,9 @@ class GenerateAudioJob implements ShouldQueue
             if ($generation->text_item_id) {
                 TextItem::whereKey($generation->text_item_id)->update(['status' => 'done']);
             }
+
+            // The Listen app: "your voice is ready" for one that took a while. It never throws.
+            app(\App\Services\Push\AppPush::class)->voiceReady($generation);
         } catch (\Throwable $e) {
             $spend->stop();
             // A try that failed was still billed for the requests Google answered.

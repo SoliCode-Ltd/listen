@@ -462,6 +462,7 @@ return [
         'topic_billing' => 'الباقات والدفع',
         'topic_voices' => 'الأصوات واللهجات',
         'topic_account' => 'حسابي',
+        'topic_delete' => 'حذف حسابي',
         'topic_other' => 'موضوع آخر',
         'other_ways' => 'طرق أخرى للتواصل',
         'whatsapp' => 'واتساب',

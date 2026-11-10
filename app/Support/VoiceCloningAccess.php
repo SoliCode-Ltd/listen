@@ -80,6 +80,11 @@ class VoiceCloningAccess
             return false;
         }
 
+        // Inside the Listen app nothing is sold: a feature that is not on the plan is not shown.
+        if (\App\Support\InApp\InApp::active()) {
+            return false;
+        }
+
         if (self::audience() !== self::AUDIENCE_EVERYONE) {
             return (int) ($plan?->price_cents ?? 0) <= 0;
         }

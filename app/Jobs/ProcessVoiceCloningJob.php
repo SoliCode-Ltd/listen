@@ -92,6 +92,8 @@ class ProcessVoiceCloningJob implements ShouldQueue
                 ]),
             ]);
 
+            app(\App\Services\Push\AppPush::class)->clonedVoiceReady($clonedVoice);
+
             Log::info('Voice cloning succeeded.', [
                 'cloned_voice_id' => $clonedVoice->id,
                 'user_id' => $clonedVoice->user_id,

@@ -461,6 +461,7 @@ return [
         'topic_billing' => 'Plans and billing',
         'topic_voices' => 'Voices and audio',
         'topic_account' => 'My account',
+        'topic_delete' => 'Delete my account',
         'topic_other' => 'Something else',
         'other_ways' => 'Other ways to reach us',
         'whatsapp' => 'WhatsApp',

@@ -117,6 +117,11 @@ final class PlanFeatures
             return null;
         }
 
+        // Inside the Listen app nothing is sold, so there is nothing to offer: the option stays hidden.
+        if (\App\Support\InApp\InApp::active()) {
+            return ['url' => \App\Support\InApp\InApp::planUrl(), 'plan' => null, 'none' => true];
+        }
+
         $plan = self::cheapestWith($feature);
         if (! $plan) {
             // No plan on sale includes it: nothing to offer, so the option stays hidden.

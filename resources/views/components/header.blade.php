@@ -68,13 +68,36 @@
     $navLinks = array_values(array_filter($navLinks, fn ($l) => $l['route'] !== 'agents-landing'));
     $authNavLinks = array_values(array_filter($authNavLinks, fn ($l) => $l['route'] !== 'agents-landing'));
   }
+  // Inside the Listen app (App\Support\InApp\InApp) nothing is sold: no home page, plans or
+  // extension in the menu; the logo leads to the studio, and "Your plan" stands in for billing.
+  $inApp = \App\Support\InApp\InApp::active();
+  $brandHref = $inApp ? \App\Support\InApp\InApp::homeUrl() : route('home');
+  if ($inApp) {
+    $navLinks = [
+      ['route' => 'samples', 'label' => __('ui.nav.samples')],
+      ['route' => 'contact', 'label' => __('ui.nav.contact')],
+    ];
+    $inAppMemberLinks = [
+      ['route' => 'dashboard', 'label' => __('ui.nav.dashboard')],
+      ['route' => 'samples', 'label' => __('ui.nav.samples')],
+    ];
+    if ($agentsOpen) {
+      $inAppMemberLinks[] = ['route' => 'voice-agents.index', 'label' => __('agents.switch_agents')];
+    }
+    if (in_array('demo.page', array_column($authNavLinks, 'route'), true)) {
+      $inAppMemberLinks[] = ['route' => 'demo.page', 'label' => __('ui.nav.demo')];
+    }
+    $inAppMemberLinks[] = ['route' => 'app.plan', 'label' => __('app.plan.title')];
+    $inAppMemberLinks[] = ['route' => 'contact', 'label' => __('ui.nav.contact')];
+    $authNavLinks = $inAppMemberLinks;
+  }
   // The link that is lit: the page's own, and Dashboard anywhere in the app (Studio or Agents).
   $navActive = fn (string $route) => $currentRoute === $route || ($route === 'dashboard' && str_starts_with($currentRoute, 'voice-agents.'));
 @endphp
 
 <header class="app-header">
   <div class="header-inner">
-    <a class="brand" href="{{ route('home') }}" aria-label="{{ __('ui.header.brand_home', ['name' => $brandName]) }}">
+    <a class="brand" href="{{ $brandHref }}" aria-label="{{ __('ui.header.brand_home', ['name' => $brandName]) }}">
       @if($logoUrl)
         <img src="{{ $logoUrl }}" alt="{{ $brandName }}" style="max-height: 40px; width: auto;" />
       @else
@@ -92,7 +115,7 @@
     <div class="header-center">
     <nav class="desktop-nav" aria-label="{{ __('ui.header.main_nav') }}">
       @foreach(auth()->check() ? $authNavLinks : $navLinks as $link)
-        <a href="{{ route($link['route']) }}" class="nav-link {{ $navActive($link['route']) ? 'active' : '' }}" @if($navActive($link['route'])) aria-current="page" @endif>{{ $link['label'] }}</a>
+        <a href="{{ route($link['route']) }}" class="nav-link {{ $navActive($link['route']) ? 'active' : '' }}" @if($link['route'] === 'app.plan') data-in-app-plan @endif @if($navActive($link['route'])) aria-current="page" @endif>{{ $link['label'] }}</a>
       @endforeach
     </nav>
     </div>
@@ -154,6 +177,12 @@
               {{ __('agents.my_agents') }}
             </a>
             @endif
+            @if($inApp)
+            <a href="{{ route('app.plan') }}" class="dropdown-item" data-in-app-plan>
+              <svg viewBox="0 0 24 24"><path d="M12 2v6M6 8h12M4 12h16M7 16h10M9 20h6"/></svg>
+              {{ __('app.plan.title') }}
+            </a>
+            @else
             <a href="{{ route('browsers-extension.page') }}" class="dropdown-item">
               <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
               {{ __('ui.nav.extension') }}
@@ -174,7 +203,8 @@
               <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
               {{ __('ui.nav.pricing') }}
             </a>
-            @if(auth()->user()->is_admin)
+            @endif
+            @if(auth()->user()->is_admin && ! $inApp)
             <div class="dropdown-divider"></div>
             <a href="{{ url('/admin') }}" class="dropdown-item">
               <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
@@ -209,7 +239,7 @@
 <div class="mobile-nav" id="mobileNav" aria-hidden="true">
   <nav class="mobile-nav-inner">
     <div class="mobile-nav-top">
-      <a class="mobile-nav-brand" href="{{ route('home') }}" aria-label="{{ __('ui.header.brand_home', ['name' => $brandName]) }}">
+      <a class="mobile-nav-brand" href="{{ $brandHref }}" aria-label="{{ __('ui.header.brand_home', ['name' => $brandName]) }}">
         @if($logoUrl)
           <img src="{{ $logoUrl }}" alt="{{ $brandName }}" />
         @else
@@ -246,9 +276,9 @@
     <div class="mobile-nav-divider"></div>
     @auth
       @foreach($authNavLinks as $link)
-        <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $navActive($link['route']) ? 'active' : '' }}">{{ $link['label'] }}</a>
+        <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $navActive($link['route']) ? 'active' : '' }}" @if($link['route'] === 'app.plan') data-in-app-plan @endif>{{ $link['label'] }}</a>
       @endforeach
-      @if(auth()->user()->is_admin)
+      @if(auth()->user()->is_admin && ! $inApp)
       <a href="{{ url('/admin') }}" class="mobile-nav-link">{{ __('ui.nav.admin_dashboard') }}</a>
       @endif
       <form method="POST" action="{{ route('logout') }}">

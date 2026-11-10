@@ -216,9 +216,12 @@
               @endforeach
             </ul>
           </div>
+          {{-- Inside the Listen app nothing is sold: the note stands alone. --}}
+          @unless(\App\Support\InApp\InApp::active())
           <a class="btn btn-primary vd-design-btn" href="{{ $vd['upgrade_url'] }}" data-vd-upgrade>
             {!! $icon['spark'] !!}<span>{{ $vd['upgrade_plan'] ? __('voice_design.upgrade_cta', ['plan' => $vd['upgrade_plan']]) : __('voice_design.upgrade_cta_any') }}</span>
           </a>
+          @endunless
           @else
           <div class="vd-summary" data-vd-summary @if($limit !== null) hidden @endif>
             <dl>
@@ -240,7 +243,11 @@
             <div>
               <strong data-vd-limit-title>{{ $limit ? __('voice_design.limit_'.$limit.'_title') : '' }}</strong>
               <p data-vd-limit-text>{{ $limit ? __('voice_design.limit_'.$limit.'_text') : '' }}</p>
+              @inapp
+                <span data-vd-limit-link hidden></span>
+              @else
               <a class="vd-limit-link" href="{{ $vd['demo'] ? $vd['upgrade_url'] : route('billing.page') }}" data-vd-limit-link @if(! in_array($limit, ['demo', 'total'], true)) hidden @endif>{{ __('voice_design.limit_cta') }}</a>
+              @endinapp
             </div>
           </div>
           <button type="submit" class="btn btn-primary vd-design-btn" data-vd-submit @if($limit !== null) hidden disabled @endif>
@@ -305,7 +312,9 @@
           <div class="vd-upsell" data-vd-upsell hidden>
             <strong>{{ __('voice_design.demo_keep_title') }}</strong>
             <p>{{ __('voice_design.demo_keep_text') }}</p>
+            @unless(\App\Support\InApp\InApp::active())
             <a class="btn btn-primary" href="{{ $vd['upgrade_url'] }}">{{ __('voice_design.demo_keep_cta') }}</a>
+            @endunless
           </div>
           <p class="vd-note" data-vd-demo-note></p>
         @else
