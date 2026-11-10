@@ -16,7 +16,9 @@ These are the owner's standing instructions. Follow them in every session.
   The one exception the owner approved is NVIDIA Inception (Listen is a
   member): its badge and name under the homepage hero and in the footer, using
   NVIDIA's own badge file unchanged (`public/images/partners/`), never larger
-  than Listen's logo, never under 30px; and for search engines and AI tools,
+  than Listen's logo when the two sit side by side, never under 30px (the
+  owner chose 48px for the homepage strip, 42px on phones, 44px in the
+  footer); and for search engines and AI tools,
   the membership in the structured data (`memberOf`) and in llms.txt.
 
 ## Email
