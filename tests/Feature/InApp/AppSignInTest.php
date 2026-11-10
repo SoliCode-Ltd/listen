@@ -183,7 +183,9 @@ class AppSignInTest extends InAppTestCase
         config(['services.google.client_id' => 'id', 'services.google.client_secret' => 'secret']);
 
         foreach (['login', 'register'] as $route) {
+            // The same button as on the website, with the page's own words ("Sign up with Google" when signing up).
             $this->inApp(null)->page($route)->assertOk()
+                ->assertSee(__($route === 'register' ? 'ui.auth.signup_google' : 'ui.auth.continue_google'))
                 ->assertSee('data-app-signin', false)
                 ->assertDontSee('/auth/social/redirect', false)
                 ->assertDontSee('firebaseGoogleSignInBtn', false);
