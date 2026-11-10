@@ -32,7 +32,7 @@ class InApp
      */
     public const COOKIE = 'listen_app';
 
-    /** The language the member last used in the app, kept past the session. The app opens in English until they choose. */
+    /** The language the member last used in the app, kept past the session. Until they choose, the app follows the phone. */
     public const LANGUAGE_COOKIE = 'listen_app_lang';
 
     public const DEFAULT_LANGUAGE = 'en';
@@ -210,7 +210,10 @@ class InApp
         return in_array($first, ['ar', 'en'], true) ? $first : null;
     }
 
-    /** The app's language when a page names none: the member's last choice, else English. */
+    /**
+     * The app's language when a page names none: the member's last choice, else the phone's own
+     * language (Arabic or English), else English.
+     */
     public static function language(?Request $request = null): string
     {
         $request ??= request();
@@ -218,9 +221,10 @@ class InApp
         if (in_array($kept, ['ar', 'en'], true)) {
             return $kept;
         }
-        $session = $request->hasSession() ? (string) $request->session()->get('locale', '') : '';
+        // The phone's first language only: "fr, ar" is a French phone, and gets English.
+        $phone = strtolower(substr((string) ($request->getLanguages()[0] ?? ''), 0, 2));
 
-        return in_array($session, ['ar', 'en'], true) ? $session : self::DEFAULT_LANGUAGE;
+        return in_array($phone, ['ar', 'en'], true) ? $phone : self::DEFAULT_LANGUAGE;
     }
 
     /** The neutral page that stands in for every purchase page. */

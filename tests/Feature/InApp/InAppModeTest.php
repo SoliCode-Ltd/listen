@@ -133,10 +133,14 @@ class InAppModeTest extends InAppTestCase
         $this->assertStringEndsWith('/dashboard', (string) $this->inApp($paid)->get('/app/start')->headers->get('Location'));
         $this->assertStringEndsWith('/demo', (string) $this->inApp($free)->get('/app/start')->headers->get('Location'));
         $this->assertStringEndsWith('/login', (string) $this->inApp(null)->get('/app/start')->headers->get('Location'));
-        // The app opens in English whatever the phone is set to, until the member chooses.
-        $this->assertStringContainsString('/en/', (string) $this->inApp(null)->withHeader('Accept-Language', 'ar-EG,ar;q=0.9,en;q=0.5')->get('/app/start')->headers->get('Location'));
+        // The app follows the phone: Arabic on an Arabic phone, English on an English one or any other.
+        $start = fn (string $phone): string => (string) $this->inApp(null)->withHeader('Accept-Language', $phone)->get('/app/start')->headers->get('Location');
+        $this->assertStringContainsString('/ar/', $start('ar-EG,ar;q=0.9,en;q=0.5'));
+        $this->assertStringContainsString('/en/', $start('en-GB,en;q=0.9,ar;q=0.5'));
+        $this->assertStringContainsString('/en/', $start('fr-FR,fr;q=0.9,ar;q=0.5'));
+        $this->assertStringContainsString('/en/', $start(''));
         // Their choice is remembered past the session.
-        $this->assertStringContainsString('/ar/', (string) $this->inApp(null)->withUnencryptedCookie(InApp::LANGUAGE_COOKIE, 'ar')->get('/app/start')->headers->get('Location'));
+        $this->assertStringContainsString('/ar/', (string) $this->inApp(null)->withHeader('Accept-Language', 'en-GB,en;q=0.9')->withUnencryptedCookie(InApp::LANGUAGE_COOKIE, 'ar')->get('/app/start')->headers->get('Location'));
         $this->withUnencryptedCookie(InApp::LANGUAGE_COOKIE, '');
 
         // The language of the page is kept: from an Arabic page the studio opens in Arabic,

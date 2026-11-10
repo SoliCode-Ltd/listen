@@ -326,7 +326,7 @@ class AppShellController extends Controller
         return $this->localized($paid || $user->is_admin ? 'dashboard' : 'demo.page', $locale);
     }
 
-    /** The language asked for; in the app, else the member's last choice, else English; in a browser, the browser's. */
+    /** The language asked for; in the app, else the member's last choice, else the phone's (InApp::language); in a browser, the browser's. */
     private function locale(Request $request): string
     {
         $asked = (string) $request->query('locale', '');

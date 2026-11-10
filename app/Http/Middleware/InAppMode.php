@@ -33,7 +33,7 @@ class InAppMode
         }
 
         // The app's language: the page's own when its address names one (and that is remembered),
-        // else the member's last choice, else English, whatever the phone is set to.
+        // else the member's last choice, else the phone's language (Arabic or English), else English.
         $pageLanguage = InApp::pageLanguage($request);
         if ($pageLanguage === null && $request->hasSession()) {
             $request->session()->put('locale', InApp::language($request));
