@@ -1132,6 +1132,69 @@
       animation: rowHighlight 3.5s ease-out forwards;
     }
 
+    /* ===== History: one card per voice ===== */
+    .hx-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: .9rem; margin: 0; padding: 0; list-style: none; }
+    @media (min-width: 900px) { .hx-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; } }
+    .hx-card { display: flex; flex-direction: column; gap: .8rem; min-width: 0; padding: 1rem 1rem .9rem; border: 1px solid var(--line);
+      border-radius: 18px; background: var(--surface); }
+    .hx-card[hidden] { display: none; }
+    .hx-card.new-job-row { animation: rowSlideIn 1.3s cubic-bezier(0.16, 1, 0.3, 1) forwards, hxFresh 3.5s ease-out forwards; }
+    @keyframes hxFresh { 0% { border-color: var(--brand-accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 22%, transparent); } 100% { border-color: var(--line); box-shadow: none; } }
+    .hx-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+    .hx-title { margin: 0; min-width: 0; color: var(--text); font-family: var(--font-body); font-size: 1.02rem; font-weight: 700; line-height: 1.55;
+      letter-spacing: 0; text-align: start; overflow-wrap: anywhere;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .hx-num { flex: none; padding-top: .28rem; color: var(--muted); font-size: .8rem; font-weight: 600; unicode-bidi: isolate; }
+    .hx-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .5rem; margin: -.4rem 0 0; color: var(--muted); font-size: .86rem; line-height: 1.6; }
+    .hx-meta b { color: var(--text); font-weight: 600; }
+    .hx-meta i { flex: none; width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: .6; }
+    .hx-arrow { display: inline-block; }
+    html[dir="rtl"] .hx-arrow { transform: scaleX(-1); }
+    /* The player (components/scripts: initCustomAudioPlayers) fills the card; its track is drawn as a wave. */
+    .hx-player { min-width: 0; margin-top: auto; }
+    .hx-player .custom-audio-wrapper { width: 100%; min-width: 0; max-width: none; gap: .65rem; padding: .5rem .8rem .5rem .5rem; border: 0; border-radius: 14px;
+      background: var(--surface2); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+    .hx-player .custom-audio-wrapper:hover { transform: none; box-shadow: none; }
+    .hx-player .custom-audio-play { width: 44px; height: 44px; }
+    .hx-player .custom-audio-play svg { width: 19px; height: 19px; }
+    .hx-player .custom-audio-progress-container { flex: 1 1 60px; min-width: 60px; height: 34px; }
+    .hx-player .custom-audio-track { height: 28px; border-radius: 0; box-shadow: none; background: color-mix(in oklab, var(--muted) 42%, transparent);
+      -webkit-mask: var(--hx-wave) 0 50% / 96px 28px repeat-x; mask: var(--hx-wave) 0 50% / 96px 28px repeat-x; }
+    .hx-player .custom-audio-progress { border-radius: 0; }
+    .hx-player .custom-audio-thumb { opacity: 0; }
+    .hx-player .custom-audio-notice:empty { display: none; }
+    .hx-list { --hx-wave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='28'%3E%3Cg fill='%23000'%3E%3Crect x='1' y='10' width='3' height='8' rx='1.5'/%3E%3Crect x='7' y='6' width='3' height='16' rx='1.5'/%3E%3Crect x='13' y='11' width='3' height='6' rx='1.5'/%3E%3Crect x='19' y='3' width='3' height='22' rx='1.5'/%3E%3Crect x='25' y='8' width='3' height='12' rx='1.5'/%3E%3Crect x='31' y='12' width='3' height='4' rx='1.5'/%3E%3Crect x='37' y='5' width='3' height='18' rx='1.5'/%3E%3Crect x='43' y='9' width='3' height='10' rx='1.5'/%3E%3Crect x='49' y='1' width='3' height='26' rx='1.5'/%3E%3Crect x='55' y='7' width='3' height='14' rx='1.5'/%3E%3Crect x='61' y='11' width='3' height='6' rx='1.5'/%3E%3Crect x='67' y='4' width='3' height='20' rx='1.5'/%3E%3Crect x='73' y='9' width='3' height='10' rx='1.5'/%3E%3Crect x='79' y='12' width='3' height='4' rx='1.5'/%3E%3Crect x='85' y='6' width='3' height='16' rx='1.5'/%3E%3Crect x='91' y='10' width='3' height='8' rx='1.5'/%3E%3C/g%3E%3C/svg%3E"); }
+    .hx-state { display: flex; align-items: center; gap: .7rem; margin: auto 0 0; padding: .8rem .9rem; border-radius: 14px; font-size: .92rem; line-height: 1.6; }
+    .hx-state.is-making { background: color-mix(in oklab, var(--a) 9%, transparent); color: var(--accent-text, var(--brand-accent)); font-weight: 600; }
+    .hx-state.is-failed { background: color-mix(in oklab, var(--danger) 8%, transparent); color: var(--danger); }
+    .hx-spin { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid color-mix(in oklab, var(--a) 25%, transparent); border-top-color: var(--brand-accent); animation: hxSpin .9s linear infinite; }
+    @keyframes hxSpin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .hx-spin { animation: none; } .hx-card.new-job-row { animation: none; } }
+    .hx-actions { display: flex; align-items: stretch; flex-wrap: nowrap; gap: .5rem; }
+    /* Each button as wide as its words need, sharing what room is left. */
+    .hx-download { display: flex; flex: 1 1 auto; min-width: 0; }
+    .hx-download[hidden] { display: none; }
+    .hx-actions .hx-btn { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; flex: 1 1 auto; min-width: 0; width: auto; height: auto; min-height: 44px;
+      padding: 0 .7rem; border: 1px solid var(--line); border-radius: 12px; background: transparent; color: var(--text);
+      font: inherit; font-size: .9rem; font-weight: 600; line-height: 1.3; text-decoration: none; white-space: nowrap; cursor: pointer;
+      transition: background .15s ease, border-color .15s ease; }
+    .hx-actions .hx-btn span { overflow: hidden; text-overflow: ellipsis; }
+    .hx-actions .hx-btn svg { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    @media (hover: hover) { .hx-actions .hx-btn:hover { background: var(--surface2); border-color: color-mix(in oklab, var(--a) 30%, var(--line)); color: var(--text); } }
+    .hx-actions .hx-btn:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+    .hx-actions .hx-btn:disabled { opacity: .55; cursor: default; }
+    .hx-actions .hx-btn.is-delete { flex: none; width: 48px; padding: 0; margin-inline-start: auto; color: var(--danger); border-color: color-mix(in oklab, var(--danger) 28%, var(--line)); }
+    @media (hover: hover) { .hx-actions .hx-btn.is-delete:hover { background: color-mix(in oklab, var(--danger) 8%, transparent); border-color: color-mix(in oklab, var(--danger) 45%, var(--line)); color: var(--danger); } }
+    /* Phones: the cards are the page, with no box drawn around the list of them. */
+    @media (max-width: 640px) {
+      #recentVoicesSection .jobs-shell { padding: .35rem 0 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+      #recentVoicesSection .jobs-shell::before, #recentVoicesSection .jobs-shell::after { display: none; }
+      #recentVoicesSection .table-header { padding-inline: .15rem; }
+      .hx-list { gap: .75rem; }
+      .hx-actions .hx-btn { font-size: .88rem; }
+    }
+    .hx-empty { grid-column: 1 / -1; padding: 2rem 1rem; border: 1px dashed var(--line); border-radius: 18px; color: var(--muted); text-align: center; line-height: 1.7; }
+
     .s-card {
       background: color-mix(in oklab, var(--surface) 72%, transparent);
       backdrop-filter: blur(18px);
@@ -2334,21 +2397,23 @@
         </div>
         {{-- What happened in the history (a delete that failed), where the member is, and read out. --}}
         <div id="jobsMessage" aria-live="polite"></div>
-        <div style="overflow-x: auto;">
-          <table>
-            <thead>
-              <tr>
-                <th>{{ __('ui.dashboard.table_id') }}</th><th>{{ __('ui.dashboard.table_title') }}</th><th>{{ __('ui.dashboard.table_status') }}</th><th>{{ __('ui.dashboard.table_flow') }}</th><th>{{ __('ui.dashboard.table_speaker') }}</th><th>{{ __('ui.dashboard.table_audio') }}</th><th>{{ __('ui.dashboard.table_created') }}</th><th>{{ __('ui.dashboard.table_actions') }}</th>
-              </tr>
-            </thead>
-            <tbody id="jobsTableBody">
+        {{-- One card per voice: what it says, who speaks it, the player and its actions, all in view on
+             any screen. The page draws ten at a time (renderJobsPage); the cards here are what it
+             starts from, the first ten whole and the rest as their data only, so a long history stays light. --}}
+        <ul class="hx-list" id="jobsTableBody">
               @forelse($jobs as $job)
-                <tr data-job-id="{{ $job->id }}" data-job-data="{{ json_encode([
+                @php
+                  $hxWhole = $loop->index < 10;
+                  $hxTranslated = $job->translate && $job->source_language && $job->source_language !== $job->target_language;
+                  $hxTitle = $job->textItem?->title ?: \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 110, '…');
+                @endphp
+                <li class="hx-card" data-job-id="{{ $job->id }}" @unless($hxWhole) hidden @endunless data-job-data="{{ json_encode([
                   'id' => $job->id,
                   'row_key' => 'audio:'.$job->id,
                   'display_number' => $job->displayNumber(),
                   'title' => $job->textItem?->title,
                   'text_excerpt' => \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, ''),
+                  'text_preview' => \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 110, '…'),
                   'status' => $job->status,
                   'source_language' => $job->source_language,
                   'target_language' => $job->target_language,
@@ -2364,51 +2429,53 @@
                   'reuse_url' => $job->hasReusableSettings() ? route('dashboard', ['reuse' => $job->displayNumber()]).'#generateVoiceSection' : null,
                   'is_demo_history' => false,
                 ]) }}">
-                  <td>#{{ $job->displayNumber() }}</td>
-                  <td>{{ $job->textItem?->title ?: '-' }}</td>
-                  <td><span class="status {{ $job->status }}">{{ $statusLabelByKey($job->status) }}</span></td>
-                  <td>{{ $languageLabelByCode($job->source_language) }} -> {{ $languageLabelByCode($job->target_language) }}</td>
-	                  <td>{{ $speakerDisplayLabel($job->voice_name) }}</td>
-                  <td>
+                  @if($hxWhole)
+                  <div class="hx-top">
+                    <h2 class="hx-title" dir="auto">{{ $hxTitle !== '' ? $hxTitle : __('ui.dashboard.preview') }}</h2>
+                    <span class="hx-num">#{{ $job->displayNumber() }}</span>
+                  </div>
+                  <p class="hx-meta">
+                    <b>{{ $speakerDisplayLabel($job->voice_name) }}</b><i aria-hidden="true"></i>
+                    <span>@if($hxTranslated){{ $languageLabelByCode($job->source_language) }} <span class="hx-arrow" aria-hidden="true">→</span> @endif{{ $languageLabelByCode($job->target_language) }}</span><i aria-hidden="true"></i>
+                    <span>{{ $job->created_at?->diffForHumans() }}</span>
+                  </p>
                     @if($job->audio_path)
+                  <div class="hx-player">
                       <audio
                         controls
                         preload="none"
                         src="{{ \App\Support\AudioUrl::fromPath($job->audio_path) }}"
                         data-download-language="{{ $job->target_language }}"
                         data-download-text="{{ \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, '') }}"
-	                        data-download-speaker="{{ $speakerDisplayLabel($job->voice_name) }}"
+                        data-download-speaker="{{ $speakerDisplayLabel($job->voice_name) }}"
                         data-download-quality="{{ \App\Support\VoiceTier::label((string) ($job->voice_tier ?: \App\Support\VoiceTier::STANDARD)) }}"
                       ></audio>
+                  </div>
                     @elseif($job->status === 'failed')
-	                      <small style="color: var(--danger);">{{ \App\Support\GenerationMessage::forDisplay($job->error_message) ?: __('ui.dashboard.generation_failed') }}</small>
-	                    @else
-	                      <small style="color: var(--muted);">{{ __('ui.dashboard.processing_ellipsis') }}</small>
-	                    @endif
-                  </td>
-                  <td>{{ $job->created_at?->diffForHumans() }}</td>
-                  <td>
-                    <div class="job-actions">
-                      @if($job->hasReusableSettings())
-                        <a class="job-reuse-btn" href="{{ route('dashboard', ['reuse' => $job->displayNumber()]) }}#generateVoiceSection">{{ __('ui.dashboard.reuse_settings') }}</a>
-                      @endif
-                      <button
-                        type="button"
-                        class="pagination-btn job-delete-btn"
-                        data-action="delete-job"
-                        data-job-id="{{ $job->id }}"
-                      >
-	                      {{ __('ui.dashboard.delete') }}
-	                    </button>
-                    </div>
-                  </td>
-                </tr>
+                  <p class="hx-state is-failed" dir="auto">{{ \App\Support\GenerationMessage::forDisplay($job->error_message) ?: __('ui.dashboard.generation_failed') }}</p>
+                    @else
+                  <p class="hx-state is-making"><span class="hx-spin" aria-hidden="true"></span>{{ __('ui.dashboard.history_making') }}</p>
+                    @endif
+                  <div class="hx-actions job-actions">
+                    @if($job->audio_path)<span class="hx-download" data-hx-download></span>@endif
+                    @if($job->hasReusableSettings())
+                      <a class="job-reuse-btn hx-btn" href="{{ route('dashboard', ['reuse' => $job->displayNumber()]) }}#generateVoiceSection"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.500h-4.500M20 12a8 8 0 0 1-13.7 5.7L4 15.500M4 20v-4.500h4.500"/></svg><span>{{ $job->status === 'failed' ? __('ui.dashboard.history_try_again') : __('ui.dashboard.history_use_again') }}</span></a>
+                    @endif
+                    <button
+                      type="button"
+                      class="job-delete-btn hx-btn is-delete"
+                      data-action="delete-job"
+                      data-job-id="{{ $job->id }}"
+                      aria-label="{{ __('ui.dashboard.delete') }}"
+                      title="{{ __('ui.dashboard.delete') }}"
+                    ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+                  </div>
+                  @endif
+                </li>
               @empty
-	                <tr id="jobsEmptyRow"><td colspan="8" style="color: var(--muted);">{{ __('ui.dashboard.no_jobs_yet') }}</td></tr>
+                <li id="jobsEmptyRow" class="hx-empty">{{ __('ui.dashboard.no_jobs_yet') }}</li>
               @endforelse
-            </tbody>
-          </table>
-        </div>
+        </ul>
         <div class="pagination" id="jobsPagination"></div>
         {{-- The newest 500 voices are listed; older ones come a page at a time. --}}
         <div class="pagination jobs-older" id="jobsOlder" @if(! ($olderJobsBefore ?? null)) hidden @endif>
@@ -2839,6 +2906,10 @@
       'next' => __('ui.dashboard.next'),
       'older_voices_failed' => __('ui.dashboard.older_voices_failed'),
       'reuse_settings' => __('ui.dashboard.reuse_settings'),
+      'history_download' => __('ui.dashboard.history_download'),
+      'history_use_again' => __('ui.dashboard.history_use_again'),
+      'history_try_again' => __('ui.dashboard.history_try_again'),
+      'history_making' => __('ui.dashboard.history_making'),
       'language_ar' => __('ui.dashboard.arabic'),
       'language_en' => __('ui.dashboard.english'),
       'confirm_delete' => __('ui.dashboard.confirm_delete'),
@@ -3692,8 +3763,6 @@
       const jobKey = resolveJobKey(job);
       const status = String(job?.status || 'processing').toLowerCase();
       const statusClass = ['queued', 'processing', 'done', 'failed'].includes(status) ? status : 'processing';
-      const statusText = statusLabel(statusClass);
-      const title = escapeHtml(job?.title || '-');
       const sourceLanguageCode = String(job?.source_language || '-');
       const targetLanguageCode = String(job?.target_language || '-');
       const sourceLanguage = escapeHtml(languageLabel(sourceLanguageCode));
@@ -3707,35 +3776,61 @@
       const errorMessage = escapeHtml(job?.error_message || i18n.generation_failed);
       const audioUrl = job?.audio_url ? escapeHtml(job.audio_url) : '';
       const displayNumber = escapeHtml(String(job?.display_number ?? job?.id ?? 0));
-      const titleWithBadge = isDemoHistory
-        ? (title + '<span class="history-source-badge">' + escapeHtml(i18n.demo_paid_tag) + '</span>')
-        : title;
 
-      let audioCell = '<small style="color: var(--muted);">' + i18n.processing_ellipsis + '</small>';
-      if (audioUrl) audioCell = '<audio controls preload="' + (preloadAudio ? 'auto' : 'none') + '" src="' + audioUrl + '" data-download-language="' + escapeHtml(targetLanguageCode) + '" data-download-text="' + textExcerpt + '" data-download-speaker="' + voiceLabel + '" data-download-quality="' + voiceTier + '"></audio>';
-      else if (statusClass === 'failed') audioCell = '<small style="color: var(--danger);">' + errorMessage + '</small>';
+      // The words of the voice lead the card: its title, else the start of its text.
+      const preview = String(job?.title || job?.text_preview || job?.text_excerpt || '').trim();
+      const cardTitle = (preview ? escapeHtml(preview) : escapeHtml(i18n.preview))
+        + (isDemoHistory ? '<span class="history-source-badge">' + escapeHtml(i18n.demo_paid_tag) + '</span>' : '');
+      const translated = Boolean(job?.translate) && sourceLanguageCode !== '-' && sourceLanguageCode !== targetLanguageCode;
+      const languageLine = (translated ? sourceLanguage + ' <span class="hx-arrow" aria-hidden="true">→</span> ' : '') + targetLanguageValue;
+
+      let body = '<p class="hx-state is-making"><span class="hx-spin" aria-hidden="true"></span>' + escapeHtml(i18n.history_making) + '</p>';
+      if (audioUrl) body = '<div class="hx-player">' + '<audio controls preload="' + (preloadAudio ? 'auto' : 'none') + '" src="' + audioUrl + '" data-download-language="' + escapeHtml(targetLanguageCode) + '" data-download-text="' + textExcerpt + '" data-download-speaker="' + voiceLabel + '" data-download-quality="' + voiceTier + '"></audio>' + '</div>';
+      else if (statusClass === 'failed') body = '<p class="hx-state is-failed" dir="auto">' + errorMessage + '</p>';
 
       const actions = [];
+      // The player's own download button is moved here once the player is built (placeHistoryDownloads).
+      if (audioUrl) actions.push('<span class="hx-download" data-hx-download></span>');
       if (job?.can_reuse_settings && job?.reuse_url) {
-        actions.push('<a class="job-reuse-btn" href="' + escapeHtml(job.reuse_url) + '">' + i18n.reuse_settings + '</a>');
+        actions.push('<a class="job-reuse-btn hx-btn" href="' + escapeHtml(job.reuse_url) + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.500h-4.500M20 12a8 8 0 0 1-13.7 5.7L4 15.500M4 20v-4.500h4.500"/></svg><span>' + escapeHtml(statusClass === 'failed' ? i18n.history_try_again : i18n.history_use_again) + '</span></a>');
       }
       const deleteSource = isDemoHistory ? 'demo' : 'audio';
-      actions.push('<button type="button" class="pagination-btn job-delete-btn" data-action="delete-job" data-job-source="' + deleteSource + '" data-job-id="' + Number(job?.id || 0) + '">' + i18n.delete + '</button>');
+      actions.push('<button type="button" class="job-delete-btn hx-btn is-delete" data-action="delete-job" data-job-source="' + deleteSource + '" data-job-id="' + Number(job?.id || 0) + '" aria-label="' + escapeHtml(i18n.delete) + '" title="' + escapeHtml(i18n.delete) + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>');
 
-      return '<tr data-job-key="' + escapeHtml(jobKey) + '" data-job-id="' + escapeHtml(String(job?.id ?? '')) + '" data-job-data="' + escapeHtml(JSON.stringify(job)) + '">' +
-        '<td>#' + displayNumber + '</td>' +
-        '<td>' + titleWithBadge + '</td>' +
-        '<td><span class="status ' + statusClass + '">' + statusText + '</span></td>' +
-        '<td>' + sourceLanguage + ' -> ' + targetLanguageValue + '</td>' +
-        '<td>' + voiceLabel + '</td>' +
-        '<td>' + audioCell + '</td>' +
-        '<td>' + created + '</td>' +
-        '<td><div class="job-actions">' + actions.join('') + '</div></td>' +
-      '</tr>';
+      return '<li class="hx-card" data-job-status="' + statusClass + '" data-job-key="' + escapeHtml(jobKey) + '" data-job-id="' + escapeHtml(String(job?.id ?? '')) + '" data-job-data="' + escapeHtml(JSON.stringify(job)) + '">' +
+        '<div class="hx-top"><h2 class="hx-title" dir="auto">' + cardTitle + '</h2><span class="hx-num">#' + displayNumber + '</span></div>' +
+        '<p class="hx-meta"><b>' + voiceLabel + '</b><i aria-hidden="true"></i><span>' + languageLine + '</span><i aria-hidden="true"></i><span>' + created + '</span></p>' +
+        body +
+        '<div class="hx-actions job-actions">' + actions.join('') + '</div>' +
+      '</li>';
+    }
+
+    // The player builds its own small download button; in a card it sits with the other actions,
+    // with its name beside the icon. It is the same button, so the file types, the busy state and
+    // the app's "save or share" all work as they do anywhere else.
+    function placeHistoryDownloads() {
+      if (!jobsTableBody) return;
+      jobsTableBody.querySelectorAll('.hx-card').forEach(function(card) {
+        const slot = card.querySelector('[data-hx-download]');
+        if (!slot || slot.firstElementChild) return;
+        const button = card.querySelector('.hx-player .custom-audio-menu');
+        if (!button) { slot.hidden = true; return; }
+        button.classList.add('hx-btn');
+        button.insertAdjacentHTML('beforeend', '<span>' + escapeHtml(i18n.history_download) + '</span>');
+        slot.appendChild(button);
+      });
+      // The length of each voice is known already: it shows before the file is fetched.
+      jobsTableBody.querySelectorAll('.hx-card[data-job-data]').forEach(function(card) {
+        const end = card.querySelector('.hx-player .custom-audio-time.end');
+        if (!end || end.textContent !== '0:00') return;
+        let seconds = 0;
+        try { seconds = Math.round(Number(JSON.parse(card.getAttribute('data-job-data'))?.duration_seconds || 0)); } catch (e) {}
+        if (seconds > 0) end.textContent = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
+      });
     }
 
     function loadJobsFromTable() {
-      const rows = jobsTableBody.querySelectorAll('tr[data-job-data]');
+      const rows = jobsTableBody.querySelectorAll('[data-job-data]');
       const mergedJobs = [];
       rows.forEach(function(row) {
         try {
@@ -3777,7 +3872,7 @@
 
       jobsTableBody.innerHTML = '';
       if (pageJobs.length === 0) {
-        jobsTableBody.innerHTML = '<tr id="jobsEmptyRow"><td colspan="8" style="color: var(--muted);">' + i18n.no_jobs_yet + '</td></tr>';
+        jobsTableBody.innerHTML = '<li id="jobsEmptyRow" class="hx-empty">' + escapeHtml(i18n.no_jobs_yet) + '</li>';
       } else {
         // The newest finished voice loads ahead, so it plays at once; the others wait for a click.
         const newestReady = allJobs.find((job) => String(job?.status || '') === 'done' && job?.audio_url);
@@ -3802,6 +3897,7 @@
       }
       renderPagination(totalPages);
       if (window.initCustomAudioPlayers) window.initCustomAudioPlayers();
+      placeHistoryDownloads();
     }
 
     function renderPagination(totalPages) {
@@ -3838,6 +3934,9 @@
       if (isNaN(page) || page < 1 || page > totalPages || page === jobsCurrentPage) return;
       jobsCurrentPage = page;
       renderJobsPage();
+      // The next ten start at the top of the list, not wherever the last page was left.
+      const shell = jobsTableBody?.closest('.jobs-shell');
+      if (shell && shell.getBoundingClientRect().top < 0) shell.scrollIntoView({ behavior: 'auto', block: 'start' });
     }
 
     function upsertJobRow(job) {
@@ -3862,7 +3961,7 @@
 
       if (isNew) {
         setTimeout(function() {
-          const firstRow = jobsTableBody.querySelector('tr[data-job-key="' + escapeCss(incomingKey) + '"]');
+          const firstRow = jobsTableBody.querySelector('[data-job-key="' + escapeCss(incomingKey) + '"]');
           if (firstRow) {
             firstRow.classList.add('new-job-row');
             firstRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
