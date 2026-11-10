@@ -751,11 +751,11 @@
       width: fit-content;
       max-width: min(1100px, calc(100% - 32px));
       margin: 0 auto;
-      padding: 30px 72px;
+      padding: 38px 88px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 32px;
+      gap: 40px;
     }
     .inception-strip::before,
     .inception-strip::after {
@@ -771,29 +771,29 @@
     .inception-strip img {
       display: block;
       flex: none;
-      height: 40px;
+      height: 48px;
       width: auto;
     }
     .inception-strip p {
       margin: 0;
-      font-size: .97rem;
+      font-size: 1.1rem;
       line-height: 1.6;
       color: var(--muted);
     }
     .inception-strip p b { font-weight: 600; color: var(--text); }
-    html[dir="rtl"] .inception-strip p { font-size: 1rem; line-height: 1.8; }
+    html[dir="rtl"] .inception-strip p { font-size: 1.12rem; line-height: 1.75; }
     @media (max-width: 960px) {
       .inception-strip {
         width: calc(100% - 32px);
         margin-top: 1.4rem;
         flex-direction: column;
-        gap: 16px;
-        padding: 28px 20px;
+        gap: 18px;
+        padding: 34px 20px;
         text-align: center;
       }
-      .inception-strip img { height: 36px; }
-      .inception-strip p { font-size: .9rem; max-width: 30ch; text-wrap: balance; }
-      html[dir="rtl"] .inception-strip p { font-size: .94rem; }
+      .inception-strip img { height: 42px; }
+      .inception-strip p { font-size: 1rem; max-width: 32ch; text-wrap: balance; }
+      html[dir="rtl"] .inception-strip p { font-size: 1.04rem; }
     }
     @media (max-width: 640px) {
       .inception-strip { margin-top: 2.1rem; }
@@ -1061,7 +1061,7 @@
     {{-- NVIDIA Inception, right under the hero: NVIDIA's own badge (public/images/partners, unchanged but for its
          empty margin) beside one line, between two rules that span only the strip and fade at their ends. --}}
     <section class="inception-strip" aria-label="{{ __('ui.landing.inception_program') }}">
-      <img src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.landing.inception_badge') }}" width="109" height="40" loading="lazy" decoding="async">
+      <img src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.landing.inception_badge') }}" width="131" height="48" loading="lazy" decoding="async">
       <p>{!! __('ui.landing.inception_line', ['program' => '<b>'.e(__('ui.landing.inception_program')).'</b>']) !!}</p>
     </section>
 
