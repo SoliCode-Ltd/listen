@@ -52,6 +52,9 @@
     html:has(.app-tabs) main.ag.ag-page { padding-top: .35rem; }
     /* While the keyboard is up the screen belongs to what is being typed: no bar above the keys. */
     html.la-typing .app-tabs { display: none; }
+    /* The browser brings the cursor into view by itself; told how much the bars at the top cover
+       (listen-app.js sets it), it keeps the line clear of them instead of sliding it underneath. */
+    html.la-typing { scroll-padding-top: var(--la-covered, 131px); scroll-padding-bottom: 12px; }
     html.la-typing:has(.app-tabs) body { padding-bottom: 0; }
     html.la-typing:has(.app-tabs) .la-toast { bottom: 16px; }
     html.la-typing #generatedAudioWrap.output-dock { bottom: .75rem !important; }
