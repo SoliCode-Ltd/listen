@@ -224,10 +224,14 @@ Privacy: https://listenai.studio/en/privacy-policy
 
 - Category: **Productivity**. Tags: text to speech, voice.
 - Contact email: the support address the site already shows. Website: `https://listenai.studio`.
-- Graphics you need to make: the icon 512×512 (the site's mark, white on the brand purple
-  `#7659FA`, as the app's icon is), a feature graphic 1024×500, and at least two phone
-  screenshots (take them from the app on your phone: the studio, the player, the agents
-  page). Do not use a screenshot that shows a price.
+- Graphics: they are ready in `mobile/store/`. Upload them as they are:
+  - `icon-512.png`: the app icon (512×512).
+  - `feature-ar-1024x500.png` and `feature-en-1024x500.png`: the feature graphic for each language.
+  - `phone-ar-1…8.png` and `phone-en-1…8.png`: eight phone screenshots (1080×1920) for each
+    language, in this order: the studio, Arabic dialects, English accents, emotions, voice
+    cloning, dubbing, voice agents, voices in more languages. They are made from the real
+    pages and show no price. Screen 8 shows the French, Spanish, German and other voices of
+    the samples page: leave it out if members cannot generate in those languages yet.
 
 ---
 
