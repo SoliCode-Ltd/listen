@@ -743,8 +743,8 @@
     }
 
     /* NVIDIA Inception under the hero: NVIDIA's badge on one fine line. The line leaves each side of the badge,
-       touching its edge, violet at the badge and fading to nothing; a small glint of light glides out along
-       it. One line of text sits under it. The strip starts below the lowest point the speakers' bubbles reach
+       touching its edge, violet at the badge and fading to nothing; a glowing pulse of sound wave glides out
+       along it. One line of text sits under it. The strip starts below the lowest point the speakers' bubbles reach
        (the hero's own bottom padding on desktops, the margin here on phones). The badge is NVIDIA's file,
        never recoloured, never under 30px (CLAUDE.md). */
     .inception-strip {
@@ -794,41 +794,47 @@
     html[data-theme="light"] .inception-beam::before {
       background: linear-gradient(90deg, rgba(98, 71, 238, .9) 0, rgba(118, 89, 250, .4) 45%, rgba(118, 89, 250, 0) 100%);
     }
-    /* The glint: a bright core on the line inside a soft halo, off the line (and unseen) until it moves. On white
-       the core is a deeper violet and the halo stronger, so it glows there as it does on dark. */
-    .inception-beam::after {
-      content: "";
+    /* The pulse: a short burst of sound wave on the line, inside a soft halo, off the line (and unseen) until
+       it moves. Its ends fade so it grows out of the line and settles back into it. On white the wave is a
+       deeper violet and the halo stronger, so it glows there as it does on dark. */
+    .inception-pulse {
       position: absolute;
       left: 0;
       top: 50%;
-      width: min(200px, 80%);
-      height: 36px;
-      margin-top: -18px;
-      background:
-        linear-gradient(90deg, rgba(118, 89, 250, 0), var(--brand-accent) 45%, #D6CCFF 66%, rgba(118, 89, 250, 0)) center / 100% 2px no-repeat,
-        radial-gradient(ellipse 36% 50% at 62% 50%, rgba(118, 89, 250, .5), rgba(118, 89, 250, 0) 100%) center / 100% 100% no-repeat;
+      width: min(220px, 92%);
+      height: 40px;
+      margin-top: -20px;
+      color: #C9BDFF;
+      background: radial-gradient(ellipse 38% 50% at 60% 50%, rgba(118, 89, 250, .5), rgba(118, 89, 250, 0) 100%) center / 100% 100% no-repeat;
+      -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 28%, #000 86%, transparent 100%);
+      mask-image: linear-gradient(90deg, transparent 0, #000 28%, #000 86%, transparent 100%);
       opacity: 0;
       transform: translateX(-100%);
     }
-    html[data-theme="light"] .inception-beam::after {
-      background:
-        linear-gradient(90deg, rgba(98, 71, 238, 0), #6247EE 42%, #4C2DEB 66%, rgba(98, 71, 238, 0)) center / 100% 2px no-repeat,
-        radial-gradient(ellipse 36% 50% at 62% 50%, rgba(118, 89, 250, .55), rgba(118, 89, 250, 0) 100%) center / 100% 100% no-repeat;
+    .inception-pulse svg {
+      display: block;
+      width: 100%;
+      max-width: none;
+      height: 100%;
     }
-    /* The light eases out of the badge, glides the length of the line in about four seconds, fading as it
-       goes, then rests a moment before the next pass; both sides in step. Only a transform and opacity move;
+    html[data-theme="light"] .inception-pulse {
+      color: #5B3DF5;
+      background: radial-gradient(ellipse 38% 50% at 60% 50%, rgba(118, 89, 250, .5), rgba(118, 89, 250, 0) 100%) center / 100% 100% no-repeat;
+    }
+    /* The pulse eases out of the badge, glides the length of the line in a few seconds, fading as it goes,
+       then rests about a second before the next pass; both sides in step. Only a transform and opacity move;
        it stands still for visitors who ask for less motion. */
     @media (prefers-reduced-motion: no-preference) {
-      .inception-beam::after {
+      .inception-pulse {
         will-change: transform, opacity;
-        animation: inceptionGlint 5.5s cubic-bezier(.4, 0, .5, 1) infinite;
+        animation: inceptionPulse 5.5s cubic-bezier(.4, 0, .5, 1) infinite;
       }
     }
-    @keyframes inceptionGlint {
+    @keyframes inceptionPulse {
       0% { transform: translateX(-100%); opacity: 0; }
-      6% { opacity: 1; }
-      48% { opacity: .8; }
-      78%, 100% { transform: translateX(100cqw); opacity: 0; }
+      5% { opacity: 1; }
+      58% { opacity: .8; }
+      92%, 100% { transform: translateX(100cqw); opacity: 0; }
     }
     .inception-strip p {
       margin: 0;
@@ -1115,12 +1121,25 @@
     </section>
 
     {{-- NVIDIA Inception, right under the hero: NVIDIA's own badge (public/images/partners, unchanged but for its
-         empty margin) on one fine line that runs out of both its sides, with one line of text under it. --}}
+         empty margin) on one fine line that runs out of both its sides, with one line of text under it. A pulse
+         of sound wave travels out along the line: a few ripples that swell and die away, drawn here. --}}
+    @php
+      $inceptionPulse = (static function (): string {
+          $path = '';
+          for ($x = 0; $x <= 220; $x += 2) {
+              // Ripples 20px apart, tallest (13px) at 60% of the pulse, where its halo is.
+              $y = 20 + 13 * exp(-((($x - 132) / 42) ** 2)) * sin(2 * M_PI * $x / 20);
+              $path .= ($x === 0 ? 'M' : ' L').$x.','.round($y, 1);
+          }
+
+          return '<i class="inception-pulse"><svg viewBox="0 0 220 40" preserveAspectRatio="none" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path vector-effect="non-scaling-stroke" d="'.$path.'"/></svg></i>';
+      })();
+    @endphp
     <section class="inception-strip" aria-label="{{ __('ui.landing.inception_program') }}">
       <div class="inception-row">
-        <span class="inception-beam inception-beam-start" aria-hidden="true"></span>
+        <span class="inception-beam inception-beam-start" aria-hidden="true">{!! $inceptionPulse !!}</span>
         <img src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.landing.inception_badge') }}" width="152" height="56" decoding="async">
-        <span class="inception-beam" aria-hidden="true"></span>
+        <span class="inception-beam" aria-hidden="true">{!! $inceptionPulse !!}</span>
       </div>
       <p>{!! __('ui.landing.inception_line', ['program' => '<b>'.e(__('ui.landing.inception_program')).'</b>']) !!}</p>
     </section>

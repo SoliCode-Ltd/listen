@@ -33,19 +33,19 @@ class HomeInceptionTest extends TestCase
             ->assertSee('إسمع عضو في برنامج <b>إنسبشن من إنفيديا</b> للشركات الناشئة في مجال الذكاء الاصطناعي.', false);
     }
 
-    public function test_one_line_runs_out_of_both_sides_of_the_badge_and_its_glint_stands_still_for_reduced_motion(): void
+    public function test_one_line_runs_out_of_both_sides_of_the_badge_and_its_pulse_stands_still_for_reduced_motion(): void
     {
         app()->setLocale('en');
         $html = (string) $this->getLocalizedRoute('home')->assertOk()->getContent();
 
-        // A line on each side of the badge, hidden from screen readers, and nothing else in the row.
-        $this->assertSame(1, substr_count($html, '<span class="inception-beam inception-beam-start" aria-hidden="true"></span>'));
-        $this->assertSame(1, substr_count($html, '<span class="inception-beam" aria-hidden="true"></span>'));
-        $this->assertStringNotContainsString('inception-wave', $html);
+        // A line on each side of the badge, each with one pulse of sound wave, hidden from screen readers.
+        $this->assertSame(1, substr_count($html, '<span class="inception-beam inception-beam-start" aria-hidden="true"><i class="inception-pulse"><svg '));
+        $this->assertSame(1, substr_count($html, '<span class="inception-beam" aria-hidden="true"><i class="inception-pulse"><svg '));
+        $this->assertSame(2, substr_count($html, 'class="inception-pulse"'));
         // It touches the badge: the row has no gap.
         $this->assertDoesNotMatchRegularExpression('/\\.inception-row \\{[^}]*gap:/', $html);
-        // The glint only moves for visitors who have not asked for less motion.
-        $this->assertMatchesRegularExpression('/@media \\(prefers-reduced-motion: no-preference\\) \\{\\s*\\.inception-beam::after \\{[^}]*animation: inceptionGlint/', $html);
+        // The pulse only moves for visitors who have not asked for less motion.
+        $this->assertMatchesRegularExpression('/@media \\(prefers-reduced-motion: no-preference\\) \\{\\s*\\.inception-pulse \\{[^}]*animation: inceptionPulse/', $html);
     }
 
     public function test_the_footer_shows_the_badge_on_every_page(): void
