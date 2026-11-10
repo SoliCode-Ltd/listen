@@ -967,8 +967,8 @@ html[data-theme="light"] .app-footer {
 /* NVIDIA's badge under the tagline: full colour on both themes (a white box on dark, as NVIDIA shows it), 30px or more. */
 .footer-inception {
   display: block;
-  margin-top: 1.35rem;
-  height: 34px;
+  margin-top: 1.5rem;
+  height: 44px;
   width: auto;
 }
 
