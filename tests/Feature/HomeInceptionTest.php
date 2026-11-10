@@ -33,20 +33,19 @@ class HomeInceptionTest extends TestCase
             ->assertSee('إسمع عضو في برنامج <b>إنسبشن من إنفيديا</b> للشركات الناشئة في مجال الذكاء الاصطناعي.', false);
     }
 
-    public function test_lines_flow_out_of_both_sides_of_the_badge_and_stand_still_for_reduced_motion(): void
+    public function test_one_line_runs_out_of_both_sides_of_the_badge_and_its_glint_stands_still_for_reduced_motion(): void
     {
         app()->setLocale('en');
         $html = (string) $this->getLocalizedRoute('home')->assertOk()->getContent();
 
-        // Lines on each side of the badge, longer waves for wide screens and shorter for phones, hidden from screen readers.
-        $this->assertSame(2, substr_count($html, 'class="inception-wave inception-wave-start '));
-        $this->assertSame(4, substr_count($html, '<span class="inception-wave '));
-        $this->assertSame(4, substr_count($html, 'aria-hidden="true"><svg style="--w:150px;') + substr_count($html, 'aria-hidden="true"><svg style="--w:63px;'));
-        $this->assertSame(4 * 3, substr_count($html, '<svg style="--w:'));
-        // They touch the badge: the row has no gap.
-        $this->assertDoesNotMatchRegularExpression('/\.inception-row \{[^}]*gap:/', $html);
-        // They only move for visitors who have not asked for less motion.
-        $this->assertMatchesRegularExpression('/@media \(prefers-reduced-motion: no-preference\) \{\s*\.inception-wave svg \{[^}]*animation: inceptionDrift/', $html);
+        // A line on each side of the badge, hidden from screen readers, and nothing else in the row.
+        $this->assertSame(1, substr_count($html, '<span class="inception-beam inception-beam-start" aria-hidden="true"></span>'));
+        $this->assertSame(1, substr_count($html, '<span class="inception-beam" aria-hidden="true"></span>'));
+        $this->assertStringNotContainsString('inception-wave', $html);
+        // It touches the badge: the row has no gap.
+        $this->assertDoesNotMatchRegularExpression('/\\.inception-row \\{[^}]*gap:/', $html);
+        // The glint only moves for visitors who have not asked for less motion.
+        $this->assertMatchesRegularExpression('/@media \\(prefers-reduced-motion: no-preference\\) \\{\\s*\\.inception-beam::after \\{[^}]*animation: inceptionGlint/', $html);
     }
 
     public function test_the_footer_shows_the_badge_on_every_page(): void
