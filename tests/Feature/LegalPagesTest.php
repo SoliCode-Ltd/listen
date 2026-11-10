@@ -19,7 +19,10 @@ class LegalPagesTest extends TestCase
     public function test_the_privacy_policy_says_what_is_kept_and_where_it_goes(): void
     {
         $this->page('en', 'legal.privacy')
-            ->assertSee('Effective date: November 4, 2026')
+            ->assertSee('Effective date: November 10, 2026')
+            // The phone app: its notification address and its use of the microphone.
+            ->assertSee('In the Listen phone app: if you allow notifications')
+            ->assertSee('It is removed when you sign out of the app or turn its notifications off.')
             ->assertSee('if you call our assistant on our website while signed in, so our team knows who called')
             ->assertSee('with your name and email if that business&#039;s website says you are signed in to it', false)
             ->assertSee('The text you convert is kept with its audio in your history until you delete it.')
@@ -35,7 +38,8 @@ class LegalPagesTest extends TestCase
             ->assertDontSee('through your dashboard');
 
         $this->page('ar', 'legal.privacy')
-            ->assertSee('تاريخ السريان: 4 نوفمبر 2026')
+            ->assertSee('تاريخ السريان: 10 نوفمبر 2026')
+            ->assertSee('في تطبيق إسمع على الهاتف: إذا سمحت بالإشعارات')
             ->assertSee('إن اتصلت بمساعدنا على موقعنا وأنت مسجّل الدخول، ليعرف فريقنا من اتصل')
             ->assertSee('يُحفظ النص الذي تحوّله مع صوته في سجلك إلى أن تحذفه.')
             ->assertSee('يبقى الصوت الذي تنشئه في سجلك إلى أن تحذفه.')

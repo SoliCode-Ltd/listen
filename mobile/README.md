@@ -228,13 +228,16 @@ Privacy: https://listenai.studio/en/privacy-policy
 - Category: **Productivity**. Tags: text to speech, voice.
 - Contact email: the support address the site already shows. Website: `https://listenai.studio`.
 - Graphics: they are ready in `mobile/store/`. Upload them as they are:
-  - `icon-512.png`: the app icon (512×512).
+  - `icon-512.png`: the app icon (512×512, a 32-bit PNG as Google asks).
   - `feature-ar-1024x500.png` and `feature-en-1024x500.png`: the feature graphic for each language.
   - `phone-ar-1…8.png` and `phone-en-1…8.png`: eight phone screenshots (1080×1920) for each
     language, in this order: the studio, Arabic dialects, English accents, emotions, voice
     cloning, voice design, voice agents, voices in more languages. (Video dubbing is not
     public on the live site, so it is not in the images or the listing text; add it when it is.) They are made from the real
-    pages and show no price. Screen 8 shows the French, Spanish, German and other voices of
+    pages as the app shows them (its bar of tabs at the bottom, no website menu) and show no price. The Arabic dialects
+    screen is the Arabic voices page and the two English voices screens are the English one, in both listings, because
+    each page lists its own language's voices. Take them again whenever the app's look changes: the store asks that
+    screenshots show the app as it is. Screen 8 shows the French, Spanish, German and other voices of
     the samples page: leave it out if members cannot generate in those languages yet.
 
 ---
@@ -294,8 +297,22 @@ Communication or Other**):
   account. Create an ordinary member account for Google's reviewers on a paid plan (so they
   can open the studio), and give its email and password here. Without it the review fails.
 - Target audience: **18 and over**.
+- Target Android version: the app targets Android 16 (API level 36), which is what Google
+  Play asks of new apps since 31 August 2026. Nothing to enter; the upload is checked for it.
 - News app: No. Health: none. Financial features: none. Government: No.
 - Advertising ID: **No** (the permission is removed from the app).
+- Foreground service permissions (Google asks because the app keeps audio playing with the
+  screen off). Type: **Media playback**. It asks for a description and a link to a short
+  video:
+  - Description: `Listen plays the voice-overs a member makes. When the member presses play
+    and then locks the screen or leaves the app, a media playback service keeps that audio
+    playing and shows play, pause and seek controls in the notification and on the lock
+    screen. It starts only when the member presses play and stops when the audio ends or is
+    paused.`
+  - Video: record your phone's screen for 20 to 30 seconds: open the app, open History,
+    press play on a voice, pull down the notification shade to show the player, lock the
+    phone and show the audio still playing on the lock screen. Upload it to YouTube as
+    **Unlisted** (or to Google Drive with "anyone with the link") and paste the link.
 - AI-generated content: the app makes speech with AI. Google asks such apps for a way to
   report content. Answer that reports go through the in-app "Help and contact" page
   (`https://listenai.studio/en/contact-us`), and that the service blocks abusive wording.
