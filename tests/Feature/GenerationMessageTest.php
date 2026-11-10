@@ -97,7 +97,7 @@ class GenerationMessageTest extends TestCase
 
         $html = $this->actingAs($user)->getLocalizedRoute('dashboard')->assertOk()->getContent();
 
-        $this->assertStringContainsString('<small style="color: var(--danger);">'.e(trans('ui.backend.dashboard_voice_generation_failed_try_again', [], 'ar')).'</small>', $html);
+        $this->assertStringContainsString('<p class="hx-state is-failed" dir="auto">'.e(trans('ui.backend.dashboard_voice_generation_failed_try_again', [], 'ar')).'</p>', $html);
         $this->assertStringNotContainsString(self::FORMER_FAILED, $html);
     }
 
