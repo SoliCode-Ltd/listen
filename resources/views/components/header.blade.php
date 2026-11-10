@@ -143,6 +143,15 @@
     </div>
 
     <div class="header-actions">
+      @if($inApp)
+      {{-- In the app, as on the sign-in page: one link to the other language, in its own name. On
+           the account page it leads back to that page, so it is marked as the page's own link. --}}
+      @foreach($languageLinks as $language)
+        @unless($language['active'])
+          <a class="app-lang" href="{{ $language['url'] }}" hreflang="{{ $language['code'] }}" lang="{{ $language['code'] }}" data-in-app-plan aria-label="{{ __('design.auth.switch_language') }}">{{ $language['code'] === 'ar' ? 'العربية' : 'English' }}</a>
+        @endunless
+      @endforeach
+      @else
       <div class="locale-switch {{ $isArabicUi ? 'ar-active' : '' }}" aria-label="{{ __('ui.locale.switch') }}">
         <span class="locale-indicator" aria-hidden="true"></span>
         @foreach($languageLinks as $language)
@@ -150,10 +159,10 @@
             href="{{ $language['url'] }}"
             hreflang="{{ $language['code'] }}"
             class="locale-link {{ $language['active'] ? 'active' : '' }}"
-            @if($inApp) data-in-app-plan @endif
           >{{ $language['label'] }}</a>
         @endforeach
       </div>
+      @endif
 
       <button type="button" class="btn-icon theme-toggle" id="themeToggle" data-theme-toggle aria-label="{{ __('ui.header.toggle_theme') }}">
         <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
@@ -298,6 +307,7 @@
         </button>
       </div>
     </div>
+    @unless($inApp)
     <div class="mobile-nav-divider"></div>
     <div class="mobile-locale-switch {{ $isArabicUi ? 'ar-active' : '' }}" aria-label="{{ __('ui.locale.switch') }}">
       <span class="locale-indicator" aria-hidden="true"></span>
@@ -306,10 +316,10 @@
           href="{{ $language['url'] }}"
           hreflang="{{ $language['code'] }}"
           class="locale-link {{ $language['active'] ? 'active' : '' }}"
-            @if($inApp) data-in-app-plan @endif
         >{{ $language['label'] }}</a>
       @endforeach
     </div>
+    @endunless
     <div class="mobile-nav-divider"></div>
     @auth
       @foreach($authNavLinks as $link)
