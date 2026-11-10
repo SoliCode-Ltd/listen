@@ -1661,15 +1661,7 @@
       .usage-ring::before { inset: 14px; }
       .usage-ring-inner b { font-size: 1.4rem; }
     }
-    @media (max-width: 420px) {
-      /* Phones: the ring on top, everything centred under it. */
-      #commandCenterSection .usage-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; }
-      #commandCenterSection .usage-hero-main { width: 100%; }
-      #commandCenterSection .usage-hero-head,
-      #commandCenterSection .usage-hero-value,
-      #commandCenterSection .usage-hero-chips { justify-content: center; }
-      #commandCenterSection .usage-hero-cta { width: 100%; }
-    }
+    .usage-bar, .usage-bar-note { display: none; }
 
     /* One meter: minutes left, the credits behind them, and a way back to the studio. */
     .usage-hero-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: .25rem .6rem; }
@@ -1705,6 +1697,57 @@
     .usage-hero-cta svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
     @media (max-width: 760px) {
       .usage-hero-cta { justify-self: stretch; justify-content: center; }
+    }
+
+    /* Phones: the overview reads top to bottom from the start edge, as the agents' call time does
+       (css/agents.css). The minutes left lead, a bar shows the month used in place of the ring, the
+       facts are rows with a name and a value, the month's three numbers share one card as rows, and
+       the voices' states are three numbers side by side. No card inside a card. */
+    @media (max-width: 640px) {
+      #commandCenterSection .command-card { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+      #commandCenterSection .command-card > h1 { padding-top: .7rem; }
+      #commandCenterSection .usage-hero { display: block; padding: 1.2rem 1.15rem 1.15rem; text-align: start; }
+      #commandCenterSection .usage-ring { display: none; }
+      #commandCenterSection .usage-hero-head { flex-direction: column; align-items: flex-start; gap: .5rem; }
+      #commandCenterSection .usage-hero-label { font-size: 1.02rem; line-height: 1.5; }
+      #commandCenterSection .usage-hero-value { justify-content: flex-start; gap: .55rem; margin: 1rem 0 0; }
+      #commandCenterSection .usage-hero-value strong { font-size: 3rem; }
+      #commandCenterSection .usage-hero-value span { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+      .usage-bar { display: block; height: 8px; margin-top: 1rem; border-radius: 999px; background: color-mix(in oklab, var(--a) 13%, var(--line)); overflow: hidden; }
+      .usage-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #A28FFF, #5B3FE6); transition: width .5s ease; }
+      html[dir="rtl"] .usage-bar i { background: linear-gradient(270deg, #A28FFF, #5B3FE6); }
+      .usage-bar.is-high i { background: #F59E0B; }
+      .usage-bar.is-low i { background: #EF4444; }
+      .usage-bar-note { display: block; margin: .6rem 0 0; color: var(--muted); font-size: .92rem; line-height: 1.6; }
+      .usage-bar-note b { color: var(--text); font-variant-numeric: tabular-nums; }
+      #commandCenterSection .usage-hero-chips { display: block; margin-top: 1.1rem; border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+      #commandCenterSection .usage-chip { display: flex; width: 100%; min-height: 54px; gap: .6rem; padding: .6rem 0; border: 0; border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent); border-radius: 0;
+        background: none; color: var(--muted); font-size: .98rem; line-height: 1.5; }
+      #commandCenterSection .usage-chip:last-child { border-bottom: 0; }
+      #commandCenterSection .usage-chip-t { display: contents; }
+      #commandCenterSection .usage-chip-k { order: 1; }
+      #commandCenterSection .usage-chip-k::first-letter { text-transform: uppercase; }
+      #commandCenterSection .usage-chip-v { order: 2; margin-inline-start: auto; color: var(--text); font-weight: 700; text-align: end; font-variant-numeric: tabular-nums; }
+      #commandCenterSection .usage-chip .credit-icon { order: 0; font-size: 1.15rem; }
+      #commandCenterSection .usage-chip-link { color: var(--accent-text, var(--a)); font-weight: 700; }
+      #commandCenterSection .usage-chip-link svg { width: 18px; height: 18px; margin-inline-start: auto; }
+      #commandCenterSection .usage-hero-cta { display: flex; width: 100%; min-height: 50px; margin-top: .7rem; }
+
+      #commandCenterSection .usage-tiles { display: block; margin-top: .9rem; padding: .2rem 1.15rem; border-radius: 16px; border: 1px solid color-mix(in oklab, var(--line) 85%, transparent); background: var(--surface); }
+      #commandCenterSection .usage-tile { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .3rem .8rem; padding: .95rem 0; border: 0; border-radius: 0; background: none;
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+      #commandCenterSection .usage-tile:last-child { border-bottom: 0; }
+      #commandCenterSection .usage-tile-head small { font-size: .98rem; color: var(--text); }
+      #commandCenterSection .usage-tile > b { font-size: 1.35rem; text-align: end; }
+      #commandCenterSection .usage-tile .meter-track, #commandCenterSection .usage-tile-foot { grid-column: 1 / -1; }
+      #commandCenterSection .usage-tile-foot { font-size: .9rem; }
+
+      #commandCenterSection .usage-health { display: block; padding: 1rem 1.15rem 1.05rem; }
+      #commandCenterSection .usage-health-title { display: block; font-size: 1.02rem; }
+      #commandCenterSection .usage-health-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin-top: .8rem; }
+      #commandCenterSection .usage-health-item { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .45rem; min-width: 0; }
+      #commandCenterSection .usage-health-item b { order: -1; flex: 0 0 100%; font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+      #commandCenterSection .usage-health-item small { flex: 1 1 0; min-width: 0; font-size: .9rem; line-height: 1.4; }
     }
 
     /* ── Studio ── */
@@ -2086,15 +2129,18 @@
                 <strong id="usageMinutesLeft">{{ number_format($minutesLeft) }}</strong>
                 <span id="usageMinutesTotal">{{ __('ui.dashboard.minutes_left_of', ['total' => number_format($minutesTotal)]) }}</span>
               </div>
+              {{-- Phones: the month used as a bar under the number, in place of the ring. --}}
+              <div class="usage-bar {{ $ringState }}" id="usageBar" aria-hidden="true"><i style="width: {{ $ringPercent }}%"></i></div>
+              <p class="usage-bar-note" aria-hidden="true"><b id="usageBarPercent">{{ $ringPercent }}%</b> {{ __('ui.dashboard.used_short') }}</p>
               <small class="usage-hero-caption" id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
               <div class="usage-hero-chips">
-                <span class="usage-chip" title="{{ __('ui.pricing.credits_hint') }}"><x-credit-icon /><span><b id="usageCreditsLeft">{{ number_format($remainingChars) }}</b> {{ __('ui.dashboard.credits_left_suffix') }}</span></span>
+                <span class="usage-chip" title="{{ __('ui.pricing.credits_hint') }}"><x-credit-icon /><span class="usage-chip-t"><b class="usage-chip-v" id="usageCreditsLeft">{{ number_format($remainingChars) }}</b> <span class="usage-chip-k">{{ __('ui.dashboard.credits_left_suffix') }}</span></span></span>
                 @php $creditUse ??= \App\Support\CreditUsage::for(auth()->user()); @endphp
                 @if(\App\Support\CreditUsage::hasUse($creditUse))
                 <a class="usage-chip usage-chip-link" href="#usage-breakdown" data-usage-jump>{{ __('usage.where') }}<svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>
                 @endif
                 @if ($packMode && $packEndsOn)
-                  <span class="usage-chip">{{ __('ui.pack.meter_ends', ['date' => $packEndsOn]) }}</span>
+                  <span class="usage-chip">{!! str_replace('@@', '<span class="usage-chip-v">'.e($packEndsOn).'</span>', e(__('ui.pack.meter_ends', ['date' => '@@']))) !!}</span>
                 @endif
                 @if (($giftChars ?? 0) > 0)
                   <span class="usage-chip gift-chars-note" data-gift-chars="{{ (int) $giftChars }}">🎁 {{ __('ui.dashboard.gift_chars_note', ['count' => number_format((int) $giftChars)]) }}</span>
@@ -3702,6 +3748,15 @@
         ring.classList.toggle('is-low', p >= 95);
         ring.setAttribute('aria-label', formatQuotaText(@json(__('ui.dashboard.credits_used_percent')), { percent: p }));
         if (ringPercent) ringPercent.textContent = p + '%';
+        // The same on phones, where a bar stands in for the ring.
+        const bar = document.getElementById('usageBar');
+        if (bar) {
+          bar.classList.toggle('is-high', p >= 80 && p < 95);
+          bar.classList.toggle('is-low', p >= 95);
+          if (bar.firstElementChild) bar.firstElementChild.style.width = p + '%';
+        }
+        const barPercent = document.getElementById('usageBarPercent');
+        if (barPercent) barPercent.textContent = p + '%';
       }
       if (usageRequestsMeter) usageRequestsMeter.style.width = meterWidthFromUsedPercent(usage.requests_percent);
       if (kpiRequests) kpiRequests.textContent = formatNumber(usage.total_requests);

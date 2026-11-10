@@ -62,6 +62,10 @@ class DashboardUsageMeterTest extends TestCase
         // The ring: 20,000 of 500,000 credits used this month.
         $response->assertSee('id="usageCreditsRing" style="--p: 4"', false);
         $response->assertSee('id="usageCreditsPercent">4%</b>', false);
+        // Phones show the same month as a bar under the number, and the credits left as a name and a value.
+        $response->assertSee('<div class="usage-bar " id="usageBar" aria-hidden="true"><i style="width: 4%"></i></div>', false);
+        $response->assertSee('id="usageBarPercent">4%</b>', false);
+        $response->assertSee('<b class="usage-chip-v" id="usageCreditsLeft">480,000</b> <span class="usage-chip-k">credits left</span>', false);
         $response->assertSee('id="usageRequestsMeter" style="width:72%"', false);
     }
 }
