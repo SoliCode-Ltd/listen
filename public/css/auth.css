@@ -384,6 +384,11 @@ html body.auth-split-body .auth-card .status-box {
   font-size: 14px;
   line-height: 1.5;
 }
+/* A notice above the sign-in choices (email confirmed, password changed, reset link sent)
+   keeps clear of the button or field under it. */
+html body.auth-split-body .auth-card .status-box[role="status"] {
+  margin: 0 0 16px;
+}
 html body.auth-split-body .auth-card .error-box {
   border: 1px solid color-mix(in oklab, var(--au-danger) 35%, transparent);
   background: var(--au-danger-soft);
