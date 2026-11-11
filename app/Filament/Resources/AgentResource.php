@@ -750,10 +750,12 @@ class AgentResource extends Resource
     {
         return once(function () use ($agent): array {
             $calls = fn (): Builder => AgentConversation::query()->where('agent_id', $agent->getKey());
+            // "lead" is a reserved word in MySQL 8: written as the database quotes a column.
+            $lead = $calls()->getQuery()->getGrammar()->wrap('lead');
             // One pass over its calls (by channel), however many there are, instead of one a figure.
             $rows = $calls()->toBase()->selectRaw('channel, count(*) as calls, sum(duration_seconds) as seconds, sum(billed_seconds) as billed,
                 sum(credits) as credits, sum(case when free = 1 then 1 else 0 end) as free, sum(case when free = 1 then billed_seconds else 0 end) as free_seconds,
-                sum(case when status = ? then 1 else 0 end) as failed, sum(case when lead is not null then 1 else 0 end) as leads,
+                sum(case when status = ? then 1 else 0 end) as failed, sum(case when '.$lead.' is not null then 1 else 0 end) as leads,
                 sum(coalesce(cost_usd, 0)) as cost, max(started_at) as last', [AgentConversation::FAILED])
                 ->groupBy('channel')->get();
             $sum = fn (string $key): int => (int) $rows->sum(fn ($r): int => (int) $r->{$key});
