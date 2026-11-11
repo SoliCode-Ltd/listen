@@ -49,6 +49,14 @@ class RateLimitServiceProvider extends ServiceProvider
             Limit::perHour(10)->by('verify-email-ip:'.$request->ip())->response($this->verifyEmailResponse()),
         ]);
 
+        // A password reset link: a few an hour for each address and for each network
+        // address, so the page cannot flood anyone's inbox or be used to try many addresses.
+        RateLimiter::for('password-reset', fn (Request $request) => [
+            Limit::perHour(5)->by('password-reset-email:'.strtolower(trim((string) $request->input('email'))))
+                ->response($this->passwordResetResponse()),
+            Limit::perHour(20)->by('password-reset-ip:'.$request->ip())->response($this->passwordResetResponse()),
+        ]);
+
         RateLimiter::for('contact', fn (Request $request) => [
             Limit::perMinutes(10, 5)->by('contact:'.$request->ip())->response($this->formResponse()),
             Limit::perDay(30)->by('contact-day:'.$request->ip())->response($this->formResponse()),
@@ -125,6 +133,18 @@ class RateLimitServiceProvider extends ServiceProvider
 
             return redirect()->back(fallback: route('demo.page'))
                 ->with('verify_email_notice', ['type' => 'error', 'message' => $message]);
+        };
+    }
+
+    /** In minutes, as for a new confirmation link, on the page that asks for the reset link. */
+    private function passwordResetResponse(): \Closure
+    {
+        return function (Request $request, array $headers) {
+            $minutes = max(1, (int) ceil(((int) ($headers['Retry-After'] ?? 60)) / 60));
+
+            return redirect()->route('password.request')
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => trans_choice('ui.reset_password.too_many', $minutes, ['count' => $minutes])]);
         };
     }
 

@@ -751,11 +751,11 @@
       width: fit-content;
       max-width: min(1100px, calc(100% - 32px));
       margin: 0 auto;
-      padding: 38px 88px;
+      padding: 40px 88px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 40px;
+      gap: 44px;
     }
     .inception-strip::before,
     .inception-strip::after {
@@ -771,32 +771,41 @@
     .inception-strip img {
       display: block;
       flex: none;
-      height: 48px;
+      height: 64px;
       width: auto;
     }
     .inception-strip p {
       margin: 0;
-      font-size: 1.1rem;
+      font-size: 1.15rem;
       line-height: 1.6;
       color: var(--muted);
+      text-wrap: balance;
     }
-    .inception-strip p b { font-weight: 600; color: var(--text); }
-    html[dir="rtl"] .inception-strip p { font-size: 1.12rem; line-height: 1.75; }
+    /* The program's name never breaks across two lines. */
+    .inception-strip p b { font-weight: 600; color: var(--text); white-space: nowrap; }
+    html[dir="rtl"] .inception-strip p { font-size: 1.17rem; line-height: 1.75; }
+    /* Where the sentence no longer fits on one line beside the badge, it sits on two short lines that hug the
+       badge, so the strip stays centred. */
+    @media (max-width: 1180px) {
+      .inception-strip p { max-width: 31ch; }
+    }
     @media (max-width: 960px) {
       .inception-strip {
         width: calc(100% - 32px);
         margin-top: 1.4rem;
         flex-direction: column;
-        gap: 18px;
-        padding: 34px 20px;
+        gap: 20px;
+        padding: 36px 20px;
         text-align: center;
       }
-      .inception-strip img { height: 42px; }
-      .inception-strip p { font-size: 1rem; max-width: 32ch; text-wrap: balance; }
+      .inception-strip img { height: 54px; }
+      .inception-strip p { font-size: 1rem; max-width: 32ch; }
       html[dir="rtl"] .inception-strip p { font-size: 1.04rem; }
     }
     @media (max-width: 640px) {
       .inception-strip { margin-top: 2.1rem; }
+      /* Arabic fits on two even lines on a phone at this size. */
+      html[dir="rtl"] .inception-strip p { font-size: .96rem; max-width: none; }
     }
 
     /* Voice cloning: one slim line under the facts strip. */
@@ -1061,7 +1070,7 @@
     {{-- NVIDIA Inception, right under the hero: NVIDIA's own badge (public/images/partners, unchanged but for its
          empty margin) beside one line, between two rules that span only the strip and fade at their ends. --}}
     <section class="inception-strip" aria-label="{{ __('ui.landing.inception_program') }}">
-      <img src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.landing.inception_badge') }}" width="131" height="48" loading="lazy" decoding="async">
+      <img src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.landing.inception_badge') }}" width="174" height="64" loading="lazy" decoding="async">
       <p>{!! __('ui.landing.inception_line', ['program' => '<b>'.e(__('ui.landing.inception_program')).'</b>']) !!}</p>
     </section>
 

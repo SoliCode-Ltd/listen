@@ -37,7 +37,7 @@ class PlanEndReminderEmail extends Page implements HasForms
 
     protected static ?string $navigationLabel = 'Reminder';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 6;
 
     protected static ?string $title = 'Reminder before a plan ends';
 

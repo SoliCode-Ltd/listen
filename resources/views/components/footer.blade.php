@@ -70,7 +70,7 @@
         </a>
         <p class="footer-tagline">{{ __('ui.footer.tagline') }}</p>
         {{-- NVIDIA's badge, unchanged (see CLAUDE.md: the one other company the site names). --}}
-        <img class="footer-inception" src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.footer.inception_badge') }}" width="120" height="44" loading="lazy" decoding="async">
+        <img class="footer-inception" src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.footer.inception_badge') }}" width="147" height="54" loading="lazy" decoding="async">
       </div>
 
       <div class="footer-links">
