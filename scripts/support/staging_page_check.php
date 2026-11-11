@@ -13,7 +13,9 @@
  * plan is set with model events off (no welcome email) and taken back at the
  * end. As the free member it also checks that the demo waits for a confirmed
  * email and that a confirmation link works through the host's proxy (no email
- * is sent). Refuses to run on the live site.
+ * is sent). Then it opens the admin's lists as the first admin account (only
+ * opened, nothing changed; none that read Stripe, whose keys are also emptied
+ * for the run). Refuses to run on the live site.
  *
  *   ssh user@host 'cd ~/public_html && LOCALE=en php' < scripts/support/staging_page_check.php
  */
@@ -92,23 +94,24 @@ $pages = [
 ];
 
 $failed = 0;
-foreach ($pages as [$who, $path, $expected]) {
+// One page opened as $who (signed out when null): its status, size and time, and FAIL with the reason.
+$open = function (?User $who, string $uri, array $expected, string $as) use ($app, $kernel, &$failed): void {
     $guard = $app['auth']->guard('web');
     if ($who) {
         $guard->setUser($who);
     } else {
         $guard->forgetUser();
     }
-    $request = Request::create('/'.$locale.($path === '' ? '' : '/'.$path), 'GET', [], [], [], ['HTTP_ACCEPT' => 'text/html']);
+    $request = Request::create($uri, 'GET', [], [], [], ['HTTP_ACCEPT' => 'text/html']);
     $started = microtime(true);
     try {
         $response = $kernel->handle($request);
         $kernel->terminate($request, $response);
     } catch (Throwable $e) {
         $failed++;
-        printf("  FAIL  %-34s %s: %s\n", '/'.$locale.'/'.$path, get_class($e), mb_substr($e->getMessage(), 0, 300));
+        printf("  FAIL  %-34s %s: %s\n", $uri, get_class($e), mb_substr($e->getMessage(), 0, 300));
 
-        continue;
+        return;
     }
     $status = $response->getStatusCode();
     $body = (string) $response->getContent();
@@ -120,12 +123,14 @@ foreach ($pages as [$who, $path, $expected]) {
     if ($problem !== null && $error) {
         $problem .= ' ('.get_class($error).': '.mb_substr($error->getMessage(), 0, 300).')';
     }
-    $who = $who === $paid ? 'paying' : ($who === $free ? 'free' : 'visitor');
     $where = $status >= 300 && $status < 400 ? ' -> '.parse_url((string) $response->headers->get('Location'), PHP_URL_PATH) : '';
-    printf("  %-4s  %-34s %-8s %d %s%s, %d ms%s\n", $problem ? 'FAIL' : 'ok', '/'.$locale.($path === '' ? '' : '/'.$path), $who,
+    printf("  %-4s  %-34s %-8s %d %s%s, %d ms%s\n", $problem ? 'FAIL' : 'ok', $uri, $as,
         $status, $status === 200 ? number_format(strlen($body)).' bytes' : '', $where, (int) round((microtime(true) - $started) * 1000),
         $problem ? ': '.$problem : '');
     $failed += $problem ? 1 : 0;
+};
+foreach ($pages as [$who, $path, $expected]) {
+    $open($who, '/'.$locale.($path === '' ? '' : '/'.$path), $expected, $who === $paid ? 'paying' : ($who === $free ? 'free' : 'visitor'));
 }
 
 // Confirming an email (App\Support\EmailVerification). The demo refuses the
@@ -134,13 +139,17 @@ foreach ($pages as [$who, $path, $expected]) {
 // Then the link its email would carry, opened signed out at the site's own
 // address through the host's proxy as a mail app would, confirms the address.
 // No email is sent; the member is left unconfirmed again for the next run.
-$app->instance(Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class, new class($app, $app['encrypter']) extends Illuminate\Foundation\Http\Middleware\ValidateCsrfToken
+// The form check (CSRF) lets the requests below through: it is called PreventRequestForgery
+// from Laravel 13, and ValidateCsrfToken (its old name) before.
+$noFormCheck = new class($app, $app['encrypter']) extends Illuminate\Foundation\Http\Middleware\ValidateCsrfToken
 {
     public function handle($request, Closure $next)
     {
         return $next($request);
     }
-});
+};
+$app->instance(Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class, $noFormCheck);
+$app->instance('Illuminate\Foundation\Http\Middleware\PreventRequestForgery', $noFormCheck);
 $guard = $app['auth']->guard('web');
 $guard->setUser($free);
 $request = Request::create('/'.$locale.'/demo', 'POST', ['text' => ''], [], [], ['HTTP_ACCEPT' => 'application/json', 'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest']);
@@ -196,6 +205,24 @@ if (App\Services\DemoLinkedAccounts::available()) {
 } else {
     echo "  --    the member_devices table is not there yet: run the migration\n";
 }
+
+// The admin's lists, opened (nothing is changed) as the first admin account: the ones this
+// site's own database fills. The dashboard, plans, payments, billing and the settings pages
+// are left out: some read Stripe, and staging runs the live keys. The Stripe keys are also
+// emptied for this run, so nothing below can reach Stripe.
+config(['services.stripe.secret' => '', 'services.stripe.key' => '', 'cashier.secret' => '', 'cashier.key' => '']);
+$admin = User::query()->where('is_admin', true)->orderBy('id')->first();
+if ($admin === null) {
+    echo "  --    no admin account: the admin's lists are not checked\n";
+} else {
+    foreach (['users', 'suspicious-users', 'audio-generations', 'demo-voice-generations', 'agent-calls', 'agents',
+        'usage-counters', 'subscriptions', 'video-dubs', 'contacts', 'generation-errors', 'text-items',
+        'api-request-logs', 'cloned-voices', 'designed-voices', 'manual-payment-requests', 'referral-conversions',
+        'social-share-logs', 'voices', 'voice-samples', 'demo-fraud-signals'] as $list) {
+        $open($admin, '/admin/'.$list, [200], 'admin');
+    }
+}
+$app['auth']->guard('web')->forgetUser();
 
 // The paying test member goes back to the free plan.
 Subscription::withoutEvents(fn () => $access->assignPlan($paid, $freePlan));

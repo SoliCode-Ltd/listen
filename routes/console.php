@@ -53,6 +53,9 @@ Schedule::command('voice-design:prune')->everyThirtyMinutes()->withoutOverlappin
 // Listen Agents: calls whose browser went quiet are charged up to their last sign of life.
 Schedule::command('agents:settle-calls')->everyMinute()->withoutOverlapping(5);
 
+// Admin → Suspicious Users' list and its badge, worked out ahead of time (App\Services\DemoSuspects).
+Schedule::command('listen:warm-demo-suspects')->everyFiveMinutes()->withoutOverlapping(10);
+
 // Listen Agents: the newest posts on agents' links read again every few hours (AgentLinkReads).
 Schedule::command('agents:read-links')->hourly()->withoutOverlapping(30);
 // Every page of live agents' websites, for what callers ask (AgentSite): never read, or not for a week.

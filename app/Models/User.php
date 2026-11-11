@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Services\PlanAccessService;
+use App\Support\MailboxKey;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -26,6 +27,21 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
 
     protected static function booted(): void
     {
+        // The inbox the address reaches (App\Support\MailboxKey), kept with it, so the free
+        // demo counts jane.doe+2@gmail.com and janedoe@gmail.com as one person. Only once
+        // the column exists, and only when the address itself was loaded.
+        static::saving(static function (self $user): void {
+            $attributes = $user->getAttributes();
+            $needsKey = $user->isDirty('email') || ($attributes[MailboxKey::COLUMN] ?? null) === null;
+            if (! array_key_exists('email', $attributes) || ! $needsKey || ! MailboxKey::available()) {
+                return;
+            }
+            $key = MailboxKey::for($attributes['email']);
+            if ($key !== ($attributes[MailboxKey::COLUMN] ?? null)) {
+                $user->setAttribute(MailboxKey::COLUMN, $key);
+            }
+        });
+
         static::created(static function (self $user): void {
             try {
                 app(PlanAccessService::class)->ensureFreePlanForUser($user);
@@ -84,6 +100,15 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
     public function planSubscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
+    }
+
+    /**
+     * The newest active plan subscription (the highest id with status active),
+     * as Admin → Users shows it: loaded for a whole page of members at once.
+     */
+    public function latestActiveSubscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class)->ofMany(['id' => 'max'], fn ($query) => $query->where('status', 'active'));
     }
 
     public function usageCounters(): HasMany

@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Query\Expression;
+use Illuminate\Support\Facades\DB;
 use App\Support\AudioFiles;
 use App\Support\TtsStudioConfig;
 use App\Support\VoiceCatalog;
@@ -13,6 +15,29 @@ use App\Support\VoiceTier;
 class AudioGeneration extends Model
 {
     use HasFactory;
+
+    /** A member's own voices in order (migration 2026_11_26_120000_add_list_indexes). */
+    public const MEMBER_ID_INDEX = 'audio_generations_user_id_id_index';
+
+    /**
+     * The columns for "this member's voices, newest first" (where user_id = ?, by id
+     * descending), with a hint that MySQL reads them from the member's own rows.
+     * Without it MySQL often reads the whole table backwards from the newest voice
+     * on the site until it has found enough of the member's: about a second for a
+     * member with many voices made a while ago. The hint is a comment: an older
+     * MySQL, or a server where the index is not there yet, only notes it and goes
+     * on as before; SQLite ignores it. The rows and their order are the same.
+     *
+     * @param  list<string>  $columns
+     * @return list<string|Expression>
+     */
+    public static function memberNewestColumns(array $columns = ['*']): array
+    {
+        $first = (string) array_shift($columns);
+        $first = $first === '*' ? 'audio_generations.*' : (str_contains($first, '.') ? $first : 'audio_generations.'.$first);
+
+        return [DB::raw('/*+ INDEX(audio_generations '.self::MEMBER_ID_INDEX.') */ '.$first), ...$columns];
+    }
 
     protected $fillable = [
         'user_sequence_number',

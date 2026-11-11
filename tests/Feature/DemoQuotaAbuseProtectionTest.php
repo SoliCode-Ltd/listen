@@ -188,6 +188,42 @@ class DemoQuotaAbuseProtectionTest extends TestCase
         $this->preview('Hello')->assertOk();
     }
 
+    public function test_an_overlong_fingerprint_header_cannot_leave_a_demo_voice_uncounted(): void
+    {
+        // The column keeps 255 characters and MySQL (live) refuses more: the voice was
+        // made but never stored, so once its 10-minute hold ran out the demo was whole
+        // again, every 11 minutes, for ever. Tests run on SQLite, which keeps any length.
+        $user = User::factory()->create(['registration_ip' => '203.0.113.23']);
+        $this->actingAs($user);
+
+        $this->withHeaders(['X-Client-FP' => str_repeat('f', 256)])
+            ->preview(str_repeat('a', 300))
+            ->assertOk();
+
+        $stored = DemoVoiceGeneration::query()->sole();
+        $this->assertLessThanOrEqual(255, strlen($stored->primary_identity_hash));
+        $this->assertSame(300, (int) $stored->billable_chars);
+
+        $this->travel(11)->minutes();
+
+        $this->withHeaders(['X-Client-FP' => str_repeat('f', 256)])
+            ->preview(str_repeat('a', 300))
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('ui.backend.demo_trial_exhausted'));
+        $this->assertCount(1, $this->spokenTexts);
+    }
+
+    public function test_the_fingerprint_the_demo_page_sends_is_kept_as_it_was(): void
+    {
+        $user = User::factory()->create(['registration_ip' => '203.0.113.24']);
+        $this->actingAs($user);
+        $fingerprint = hash('sha256', 'the demo page');
+
+        $this->withHeaders(['X-Client-FP' => $fingerprint])->preview('Hello')->assertOk();
+
+        $this->assertSame('fp:'.$fingerprint, DemoVoiceGeneration::query()->value('primary_identity_hash'));
+    }
+
     public function test_the_allowance_set_in_the_admin_is_both_the_total_and_the_longest_text(): void
     {
         SiteSetting::set(DemoAllowance::SETTING_KEY, '50');

@@ -58,7 +58,9 @@ class VideoDubStats extends BaseWidget
         $waits = $done->map(fn (VideoDub $d): float => (float) ($d->report['total_seconds'] ?? 0))->filter();
         $freeCap = (int) config('listen.dubbing.free_per_day', 50);
         $freeToday = $today->where('is_free', true)->whereNotIn('status', VideoDub::GIVEN_BACK)->count();
-        $daily = collect(range(29, 0))->map(fn (int $ago): int => $month->filter(fn (VideoDub $d): bool => $d->created_at->isSameDay(now()->subDays($ago)))->count())->all();
+        // Each of the last 30 days, counted in one pass over the month (not once a day).
+        $byDay = $month->countBy(fn (VideoDub $d): string => $d->created_at->toDateString());
+        $daily = collect(range(29, 0))->map(fn (int $ago): int => (int) ($byDay[now()->subDays($ago)->toDateString()] ?? 0))->all();
 
         // Members who had their free dub and then paid for one: what the free dub is for.
         $freeUsers = VideoDub::query()->where('is_free', true)->whereNotIn('status', VideoDub::GIVEN_BACK)->distinct()->pluck('user_id');

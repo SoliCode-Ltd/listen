@@ -648,7 +648,7 @@ class IpLinkedDemoAbusePreventionTest extends TestCase
         $quota->assertJsonPath('quota.remaining_chars', 300);
     }
 
-    public function test_accounts_made_on_one_network_within_three_days_share_the_allowance(): void
+    public function test_accounts_made_on_one_network_within_a_day_share_the_allowance(): void
     {
         $this->seedVoice();
         $sharedIp = '100.64.10.21';
@@ -656,7 +656,7 @@ class IpLinkedDemoAbusePreventionTest extends TestCase
         $userA = User::factory()->create(['registration_ip' => $sharedIp]);
         $this->storeDemoUsage($userA, 260);
 
-        $this->travel(71)->hours();
+        $this->travel(23)->hours();
         $userB = User::factory()->create(['registration_ip' => $sharedIp]);
         $this->storeDemoUsage($userB, 20);
 
@@ -664,6 +664,23 @@ class IpLinkedDemoAbusePreventionTest extends TestCase
             ->assertJsonPath('quota.used_chars', 280);
         $this->actingAs($userA)->postJsonLocalizedRoute('demo.quota', [])
             ->assertJsonPath('quota.used_chars', 280);
+    }
+
+    public function test_two_people_signing_up_on_one_network_more_than_a_day_apart_keep_their_own_allowance(): void
+    {
+        // A mobile network, an office or a home: the same address, two different people.
+        $this->seedVoice();
+        $sharedIp = '100.64.10.23';
+
+        $first = User::factory()->create(['registration_ip' => $sharedIp]);
+        $this->storeDemoUsage($first, 300);
+
+        $this->travel(25)->hours();
+        $second = User::factory()->create(['registration_ip' => $sharedIp]);
+
+        $this->actingAs($second)->postJsonLocalizedRoute('demo.quota', [])
+            ->assertJsonPath('quota.used_chars', 0)
+            ->assertJsonPath('quota.remaining_chars', 300);
     }
 
     public function test_the_address_a_request_comes_from_does_not_pool_strangers(): void

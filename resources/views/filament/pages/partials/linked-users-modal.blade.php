@@ -8,9 +8,15 @@
             </div>
             <div>
                 <span class="font-medium text-gray-500 dark:text-gray-400">{{ __('ui.admin.suspicious.group_total_chars') }}:</span>
-                <span class="ml-1 font-semibold {{ $users->sum('demo_chars') >= $charAllowance ? 'text-red-600 dark:text-red-400' : '' }}">
-                    {{ number_format($users->sum('demo_chars')) }} / {{ number_format($charAllowance) }}
+                @php
+                    $usedByGroup = (int) ($groupChars ?? $users->sum('demo_chars'));
+                @endphp
+                <span class="ml-1 font-semibold {{ $usedByGroup >= $charAllowance ? 'text-red-600 dark:text-red-400' : '' }}">
+                    {{ number_format($usedByGroup) }} / {{ number_format($charAllowance) }}
                 </span>
+                @if ($usedByGroup > (int) $users->sum('demo_chars'))
+                    <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('ui.admin.suspicious.deleted_accounts_note') }}</div>
+                @endif
             </div>
             <div class="col-span-2">
                 <span class="font-medium text-gray-500 dark:text-gray-400">{{ __('ui.admin.suspicious.shared_ips') }}:</span>

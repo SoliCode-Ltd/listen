@@ -70,6 +70,7 @@ class DashboardController extends Controller
         // (the counts below are still of every generation). Older ones come a page at a
         // time from older(), which goes on from the oldest of these by id.
         $jobs = (clone $baseQuery)
+            ->select(AudioGeneration::memberNewestColumns())
             ->with(['textItem:id,title'])
             ->latest('id')
             ->limit(self::HISTORY_PAGE)
@@ -588,6 +589,7 @@ class DashboardController extends Controller
         $voiceNameMap = $this->voiceNameMapForUser($userId);
 
         $jobs = $this->userHistoryQuery($userId)
+            ->select(AudioGeneration::memberNewestColumns())
             ->with('textItem:id,title')
             ->where('id', '>', max(0, (int) $request->integer('after')))
             ->latest('id')
@@ -612,6 +614,7 @@ class DashboardController extends Controller
         $voiceNameMap = $this->voiceNameMapForUser($userId);
 
         $jobs = $this->userHistoryQuery($userId)
+            ->select(AudioGeneration::memberNewestColumns())
             ->with('textItem:id,title')
             ->where('id', '<', max(0, (int) $request->integer('before')))
             ->latest('id')

@@ -10,15 +10,25 @@ class SiteSetting extends Model
 {
     protected $fillable = ['key', 'value', 'group'];
 
+    // Kept in the cache for a setting that is not saved, so it is not looked up on every read.
+    private const NOT_SAVED = '__site_setting_not_saved_7f3a9c__';
+
     /**
      * Get a setting value by key with optional default.
+     *
+     * Kept for 60 seconds, a setting that is not saved too: the cache keeps no
+     * empty value, so without NOT_SAVED a page asked the database again for each
+     * setting the admin never saved, every time it read one (21 on the homepage).
      */
     public static function get(string $key, mixed $default = null): mixed
     {
-        return Cache::remember("site_setting.{$key}", 60, function () use ($key, $default) {
+        $value = Cache::remember("site_setting.{$key}", 60, function () use ($key, $default) {
             $setting = static::where('key', $key)->first();
-            return $setting?->value ?? $default;
+
+            return $setting?->value ?? $default ?? self::NOT_SAVED;
         });
+
+        return $value === self::NOT_SAVED ? $default : $value;
     }
 
     /**

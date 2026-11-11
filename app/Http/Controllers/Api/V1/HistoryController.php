@@ -33,7 +33,7 @@ class HistoryController extends Controller
         ]);
         $pageSize = (int) ($filters['page_size'] ?? 30);
 
-        $query = $this->historyQuery($request)->orderByDesc('id');
+        $query = $this->historyQuery($request)->select(AudioGeneration::memberNewestColumns())->orderByDesc('id');
         if (isset($filters['before'])) {
             $query->where('id', '<', (int) $filters['before']);
         }

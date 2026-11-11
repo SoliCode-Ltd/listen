@@ -45,6 +45,7 @@ use App\Support\VoiceCloningAccess;
 use Carbon\Carbon;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Cache;
@@ -63,6 +64,8 @@ Route::get('/media/{path}', [MediaController::class, 'show'])
         AddQueuedCookiesToResponse::class,
         StartSession::class,
         ShareErrorsFromSession::class,
+        // Laravel 13's name, and 12's: the servers run either for a minute while a deploy's packages go in.
+        PreventRequestForgery::class,
         ValidateCsrfToken::class,
         EnsureUserIsNotBlocked::class,
         CaptureAdClickId::class,
@@ -251,6 +254,8 @@ Route::get('/.well-known/assetlinks.json', [AppShellController::class, 'assetLin
         AddQueuedCookiesToResponse::class,
         StartSession::class,
         ShareErrorsFromSession::class,
+        // Laravel 13's name, and 12's: the servers run either for a minute while a deploy's packages go in.
+        PreventRequestForgery::class,
         ValidateCsrfToken::class,
         EnsureUserIsNotBlocked::class,
         CaptureAdClickId::class,

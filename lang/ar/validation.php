@@ -15,9 +15,11 @@ return [
     'alpha_num' => 'يجب أن يحتوي :attribute على حروف وأرقام فقط.',
     'any_of' => 'قيمة :attribute غير صحيحة.',
     'array' => 'يجب أن يكون :attribute قائمة.',
+    'array_keys' => 'يجب ألا يحتوي :attribute إلا على المفاتيح التالية: :values.',
     'ascii' => 'يجب أن يحتوي :attribute على حروف وأرقام ورموز إنجليزية فقط.',
     'before' => 'يجب أن يكون :attribute تاريخًا قبل :date.',
     'before_or_equal' => 'يجب أن يكون :attribute تاريخًا في :date أو قبله.',
+    'base64' => 'يجب أن يكون :attribute نصاً صالحاً بترميز Base64.',
     'between' => [
         'array' => 'يجب أن يحتوي :attribute على عدد عناصر بين :min و:max.',
         'file' => 'يجب أن يكون حجم :attribute بين :min و:max كيلوبايت.',

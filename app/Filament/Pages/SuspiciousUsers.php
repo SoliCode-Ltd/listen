@@ -2,10 +2,16 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Resources\UserResource;
 use App\Models\DemoVoiceGeneration;
 use App\Models\User;
 use App\Services\BlockedUserService;
+use App\Services\DemoSamePerson;
+use App\Services\DemoSuspects;
+use App\Services\MultiAccountEnforcementService;
 use App\Services\UserDeletionService;
+use App\Support\DemoAllowance;
+use App\Support\PaidMember;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
@@ -15,10 +21,17 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * The accounts the free demo counts as one person with at least one other
+ * account (App\Services\DemoSuspects), with the numbers the demo itself uses
+ * (App\Services\DemoSamePerson): how many accounts share this one's demo and
+ * what that whole group has used of it.
+ */
 class SuspiciousUsers extends Page implements HasForms, HasTable
 {
     use InteractsWithForms;
@@ -32,13 +45,11 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
 
     protected static string $view = 'filament.pages.suspicious-users';
 
-    /**
-     * @var array{
-     *   ips: array<string, true>,
-     *   device_ids: array<string, true>
-     * }|null
-     */
-    private ?array $sharedSignalSets = null;
+    /** @var array<int, array{ids: list<int>, chars: int}> the shared demo of each account shown, worked out once a page */
+    private array $groups = [];
+
+    /** @var array<int, list<string>>|null */
+    private ?array $suspects = null;
 
     public static function getNavigationLabel(): string
     {
@@ -91,48 +102,44 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                         filled($record->google_id) => 'success',
                         default => 'gray',
                     }),
-                Tables\Columns\TextColumn::make('registration_ip')
-                    ->label(__('ui.admin.suspicious.registration_ip'))
-                    ->searchable()
-                    ->copyable(),
-                Tables\Columns\TextColumn::make('last_login_ip')
-                    ->label(__('ui.admin.suspicious.last_login_ip'))
-                    ->searchable()
-                    ->copyable(),
                 Tables\Columns\TextColumn::make('suspicion_signals')
                     ->label(__('ui.admin.suspicious.suspicion_signals'))
                     ->badge()
                     ->getStateUsing(fn (User $record): string => $this->describeSuspicionSignals($record))
-                    ->color(function (User $record): string {
-                        $signals = $this->describeSuspicionSignals($record);
-
-                        return str_contains($signals, 'Device')
-                            ? 'danger'
-                            : 'warning';
-                    }),
+                    ->color(fn (User $record): string => $this->strongestLink($record) ? 'danger' : 'warning'),
+                Tables\Columns\TextColumn::make('registration_ip')
+                    ->label(__('ui.admin.suspicious.registration_ip'))
+                    ->searchable()
+                    ->copyable()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('last_login_ip')
+                    ->label(__('ui.admin.suspicious.last_login_ip'))
+                    ->searchable()
+                    ->copyable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('registration_device_id')
                     ->label(__('ui.admin.suspicious.registration_device_id'))
                     ->searchable()
                     ->copyable()
                     ->placeholder('-')
                     ->visible(fn () => $this->hasDeviceColumns())
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('last_seen_device_id')
                     ->label(__('ui.admin.suspicious.last_seen_device_id'))
                     ->searchable()
                     ->copyable()
                     ->placeholder('-')
                     ->visible(fn () => $this->hasDeviceColumns())
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('linked_count')
                     ->label(__('ui.admin.suspicious.linked_accounts'))
                     ->badge()
+                    ->getStateUsing(fn (User $record): int => count($this->groupOf($record)['ids']) - 1)
                     ->color(fn ($state): string => match (true) {
                         ((int) $state) >= 5 => 'danger',
                         ((int) $state) >= 2 => 'warning',
                         default => 'gray',
-                    })
-                    ->sortable(),
+                    }),
                 Tables\Columns\TextColumn::make('demo_chars_used')
                     ->label(__('ui.admin.suspicious.demo_chars'))
                     ->numeric()
@@ -141,8 +148,8 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->label(__('ui.admin.suspicious.group_total_chars'))
                     ->numeric()
                     ->badge()
-                    ->color(fn ($state): string => ((int) $state) >= \App\Support\DemoAllowance::chars() ? 'danger' : 'success')
-                    ->sortable(),
+                    ->getStateUsing(fn (User $record): int => $this->groupOf($record)['chars'])
+                    ->color(fn ($state): string => ((int) $state) >= DemoAllowance::chars() ? 'danger' : 'success'),
                 Tables\Columns\TextColumn::make('blocked_status')
                     ->label(__('ui.admin.suspicious.status'))
                     ->badge()
@@ -170,27 +177,24 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('min_linked')
-                    ->label(__('ui.admin.suspicious.min_linked_filter'))
-                    ->options([
-                        '1' => '1+',
-                        '2' => '2+',
-                        '5' => '5+',
-                        '10' => '10+',
-                    ])
-                    ->query(fn (Builder $query, array $data) => $data['value']
-                        ? $query->having('linked_count', '>=', (int) $data['value'])
+                Tables\Filters\SelectFilter::make('linked_by')
+                    ->label(__('ui.admin.suspicious.linked_by_filter'))
+                    ->options(collect(DemoSuspects::KINDS)->mapWithKeys(fn (string $kind): array => [$kind => __('ui.admin.suspicious.link_'.$kind)])->all())
+                    ->query(fn (Builder $query, array $data) => filled($data['value'] ?? null)
+                        ? $query->whereIn('users.id', $this->suspectIdsLinkedBy((string) $data['value']))
                         : $query),
                 Tables\Filters\Filter::make('has_demo_usage')
                     ->label(__('ui.admin.suspicious.has_demo_usage'))
-                    ->query(fn (Builder $query) => $query->having('demo_chars_used', '>', 0)),
-                Tables\Filters\Filter::make('exceeded_limit')
-                    ->label(__('ui.admin.suspicious.exceeded_limit'))
-                    ->query(fn (Builder $query) => $query->having(
-                        'ip_group_total_chars',
-                        '>=',
-                        \App\Support\DemoAllowance::chars()
-                    )),
+                    ->query(fn (Builder $query) => $query->whereExists(fn ($sub) => $sub->selectRaw('1')
+                        ->from('demo_voice_generations')
+                        ->whereColumn('demo_voice_generations.user_id', 'users.id')
+                        ->where('demo_voice_generations.billable_chars', '>', 0))),
+                Tables\Filters\TernaryFilter::make('is_blocked')
+                    ->label(__('ui.admin.suspicious.blocked_filter'))
+                    ->queries(
+                        true: fn (Builder $query) => $query->where('users.is_blocked', true),
+                        false: fn (Builder $query) => $query->where(fn ($q) => $q->where('users.is_blocked', false)->orWhereNull('users.is_blocked')),
+                    ),
                 Tables\Filters\TernaryFilter::make('multi_account_whitelisted')
                     ->label(__('ui.admin.suspicious.whitelisted_filter'))
                     ->queries(
@@ -208,11 +212,9 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->modalHeading(__('ui.admin.suspicious.delete_confirm_title'))
                     ->modalDescription(__('ui.admin.suspicious.delete_confirm_description'))
                     ->action(function (User $record): void {
-                        $userId = $record->id;
-                        $deletion = app(UserDeletionService::class);
-
                         // Checked before anything is removed: a member who would still be charged is kept.
-                        $refusal = $deletion->refusal($record);
+                        $refusal = app(UserDeletionService::class)->delete($record, auth()->user(), withDemoHistory: true);
+                        app(DemoSuspects::class)->forget();
                         if ($refusal !== null) {
                             Notification::make()
                                 ->danger()
@@ -223,19 +225,6 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
 
                             return;
                         }
-
-                        DemoVoiceGeneration::where('user_id', $userId)->delete();
-
-                        if (Schema::hasTable(config('session.table', 'sessions'))) {
-                            DB::table(config('session.table', 'sessions'))
-                                ->where('user_id', $userId)
-                                ->delete();
-                        }
-
-                        $deletion->delete($record, auth()->user());
-
-                        Cache::forget("demo:ip_linked_users:{$userId}");
-                        Cache::forget('admin:suspicious_users_count');
 
                         Notification::make()
                             ->success()
@@ -249,7 +238,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->visible(fn (User $record) => ! $record->isBlocked() && ! $record->is_admin)
                     ->requiresConfirmation()
                     ->action(function (User $record): void {
-                        $enforcement = app(\App\Services\MultiAccountEnforcementService::class);
+                        $enforcement = app(MultiAccountEnforcementService::class);
                         $reasonEn = $enforcement->blockReasonEn();
                         $reasonAr = $enforcement->blockReasonAr();
 
@@ -262,6 +251,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                                 'ar' => $reasonAr,
                             ],
                         );
+                        app(DemoSuspects::class)->forget();
 
                         Notification::make()
                             ->success()
@@ -276,6 +266,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->requiresConfirmation()
                     ->action(function (User $record): void {
                         app(BlockedUserService::class)->unblock($record);
+                        app(DemoSuspects::class)->forget();
 
                         Notification::make()
                             ->success()
@@ -286,7 +277,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     Tables\Actions\Action::make('viewUser')
                         ->label(__('ui.admin.suspicious.view_user'))
                         ->icon('heroicon-o-eye')
-                        ->url(fn (User $record): string => \App\Filament\Resources\UserResource::getUrl('view', ['record' => $record]))
+                        ->url(fn (User $record): string => UserResource::getUrl('view', ['record' => $record]))
                         ->openUrlInNewTab(),
                     Tables\Actions\Action::make('viewLinked')
                         ->label(__('ui.admin.suspicious.view_linked'))
@@ -296,7 +287,8 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                         ->modalContent(fn (User $record) => view('filament.pages.partials.linked-users-modal', [
                             'users' => $this->getLinkedUsers($record),
                             'sourceUser' => $record,
-                            'charAllowance' => \App\Support\DemoAllowance::chars(),
+                            'groupChars' => $this->groupOf($record)['chars'],
+                            'charAllowance' => DemoAllowance::chars(),
                         ]))
                         ->modalSubmitAction(false)
                         ->modalCancelActionLabel(__('ui.admin.suspicious.close')),
@@ -307,11 +299,12 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                         ->requiresConfirmation()
                         ->modalHeading(__('ui.admin.users.reset_demo_confirm_title'))
                         ->modalDescription(__('ui.admin.users.reset_demo_confirm_description'))
-                        ->visible(fn (User $record) => DemoVoiceGeneration::where('user_id', $record->id)->exists())
+                        // From the row's own query: no extra lookup for each row.
+                        ->visible(fn (User $record) => (int) $record->demo_chars_used > 0)
                         ->action(function (User $record): void {
                             DemoVoiceGeneration::where('user_id', $record->id)->delete();
                             Cache::forget("demo:ip_linked_users:{$record->id}");
-                            Cache::forget('admin:suspicious_users_count');
+                            app(DemoSuspects::class)->forget();
 
                             Notification::make()
                                 ->success()
@@ -320,205 +313,100 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                         }),
                 ]),
             ])
-            ->defaultSort('linked_count', 'desc')
+            ->bulkActions([
+                Tables\Actions\BulkAction::make('deleteSelected')
+                    ->label(__('ui.admin.suspicious.bulk_delete'))
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading(__('ui.admin.suspicious.bulk_delete_confirm_title'))
+                    ->modalDescription(__('ui.admin.suspicious.bulk_delete_confirm_description'))
+                    ->deselectRecordsAfterCompletion()
+                    ->action(fn (EloquentCollection $records) => $this->deleteSelected($records)),
+            ])
+            ->defaultSort('created_at', 'desc')
             ->striped()
             ->paginated([10, 25, 50]);
     }
 
+    /**
+     * Deletes the chosen accounts one by one, as Delete User does, and says what was
+     * kept: admins and the admin's own account, members who pay or have paid (each
+     * one is the admin's own decision, from their row), and members still charged.
+     */
+    public function deleteSelected(EloquentCollection $records): void
+    {
+        $deletion = app(UserDeletionService::class);
+        $deleted = 0;
+        $kept = [];
+
+        foreach ($records as $record) {
+            if ($record->is_admin || (int) auth()->id() === (int) $record->id) {
+                $kept[] = __('ui.admin.suspicious.bulk_kept_admin', ['email' => $record->email]);
+
+                continue;
+            }
+            if (PaidMember::is($record)) {
+                $kept[] = __('ui.admin.suspicious.bulk_kept_paid', ['email' => $record->email]);
+
+                continue;
+            }
+            $refusal = $deletion->delete($record, auth()->user(), withDemoHistory: true);
+            if ($refusal !== null) {
+                $kept[] = $record->email.': '.$refusal;
+
+                continue;
+            }
+            $deleted++;
+        }
+        app(DemoSuspects::class)->forget();
+
+        $note = Notification::make()
+            ->title(trans_choice('ui.admin.suspicious.bulk_deleted', $deleted, ['count' => $deleted]));
+        if ($kept === []) {
+            $note->success();
+        } else {
+            $note->warning()->body(implode("\n", $kept))->persistent();
+        }
+        $note->send();
+    }
+
     protected function getSuspiciousUsersQuery(): Builder
     {
-        $sharedIps = $this->getSharedIps();
-        $sharedDeviceIds = $this->getSharedDeviceIds();
+        $ids = array_keys($this->suspects());
 
-        if ($sharedIps->isEmpty() && $sharedDeviceIds->isEmpty()) {
-            return User::query()
-                ->selectRaw('users.*, 0 as linked_count, 0 as demo_chars_used, 0 as ip_group_total_chars')
-                ->whereRaw('1 = 0');
-        }
-
-        $hasDeviceColumns = $this->hasDeviceColumns();
-        $allSharedIps = $sharedIps->toArray();
-        $allSharedDeviceIds = $sharedDeviceIds->toArray();
-
-        return User::query()
+        $query = User::query()
             ->select('users.*')
-            ->selectSub(
-                User::query()
-                    ->selectRaw('COUNT(DISTINCT u2.id)')
-                    ->from('users as u2')
-                    ->whereColumn('u2.id', '!=', 'users.id')
-                    ->where(function ($q) use ($hasDeviceColumns) {
-                        $q->whereRaw('u2.registration_ip = users.registration_ip AND users.registration_ip IS NOT NULL')
-                          ->orWhereRaw('u2.registration_ip = users.last_login_ip AND users.last_login_ip IS NOT NULL')
-                          ->orWhereRaw('u2.last_login_ip = users.registration_ip AND users.registration_ip IS NOT NULL')
-                          ->orWhereRaw('u2.last_login_ip = users.last_login_ip AND users.last_login_ip IS NOT NULL');
-
-                        if ($hasDeviceColumns) {
-                            $q->orWhereRaw('u2.registration_device_id = users.registration_device_id AND users.registration_device_id IS NOT NULL')
-                                ->orWhereRaw('u2.registration_device_id = users.last_seen_device_id AND users.last_seen_device_id IS NOT NULL')
-                                ->orWhereRaw('u2.last_seen_device_id = users.registration_device_id AND users.registration_device_id IS NOT NULL')
-                                ->orWhereRaw('u2.last_seen_device_id = users.last_seen_device_id AND users.last_seen_device_id IS NOT NULL');
-                        }
-                    }),
-                'linked_count'
-            )
             ->selectSub(
                 DemoVoiceGeneration::query()
                     ->selectRaw('COALESCE(SUM(billable_chars), 0)')
                     ->whereColumn('user_id', 'users.id'),
                 'demo_chars_used'
-            )
-            ->selectSub(
-                DemoVoiceGeneration::query()
-                    ->selectRaw('COALESCE(SUM(billable_chars), 0)')
-                    ->whereIn('user_id', function ($sub) use ($hasDeviceColumns) {
-                        $sub->select('u3.id')
-                            ->from('users as u3')
-                            ->where(function ($q) use ($hasDeviceColumns) {
-                                $q->whereRaw('u3.registration_ip = users.registration_ip AND users.registration_ip IS NOT NULL')
-                                  ->orWhereRaw('u3.registration_ip = users.last_login_ip AND users.last_login_ip IS NOT NULL')
-                                  ->orWhereRaw('u3.last_login_ip = users.registration_ip AND users.registration_ip IS NOT NULL')
-                                  ->orWhereRaw('u3.last_login_ip = users.last_login_ip AND users.last_login_ip IS NOT NULL');
+            );
 
-                                if ($hasDeviceColumns) {
-                                    $q->orWhereRaw('u3.registration_device_id = users.registration_device_id AND users.registration_device_id IS NOT NULL')
-                                        ->orWhereRaw('u3.registration_device_id = users.last_seen_device_id AND users.last_seen_device_id IS NOT NULL')
-                                        ->orWhereRaw('u3.last_seen_device_id = users.registration_device_id AND users.registration_device_id IS NOT NULL')
-                                        ->orWhereRaw('u3.last_seen_device_id = users.last_seen_device_id AND users.last_seen_device_id IS NOT NULL');
-                                }
-                            })
-                            ->orWhereColumn('u3.id', 'users.id');
-                    }),
-                'ip_group_total_chars'
-            )
-            ->where(function ($q) use ($allSharedIps, $allSharedDeviceIds, $hasDeviceColumns) {
-                $q->whereIn('users.registration_ip', $allSharedIps)
-                  ->orWhereIn('users.last_login_ip', $allSharedIps);
-
-                if ($hasDeviceColumns) {
-                    $q->orWhereIn('users.registration_device_id', $allSharedDeviceIds)
-                        ->orWhereIn('users.last_seen_device_id', $allSharedDeviceIds);
-                }
-            });
+        return $ids === [] ? $query->whereRaw('1 = 0') : $query->whereIn('users.id', $ids);
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, string>
+     * The accounts that share this one's free demo (it included), as the demo counts
+     * them, each with its own demo characters.
+     *
+     * @return Collection<int, User>
      */
-    protected function getSharedIps(): \Illuminate\Support\Collection
+    protected function getLinkedUsers(User $user): Collection
     {
-        $regIps = DB::table('users')
-            ->select('registration_ip as ip')
-            ->whereNotNull('registration_ip')
-            ->groupBy('registration_ip')
-            ->havingRaw('COUNT(*) > 1')
-            ->pluck('ip');
-
-        $loginIps = DB::table('users')
-            ->select('last_login_ip as ip')
-            ->whereNotNull('last_login_ip')
-            ->groupBy('last_login_ip')
-            ->havingRaw('COUNT(*) > 1')
-            ->pluck('ip');
-
-        $crossIps = DB::table('users as u1')
-            ->join('users as u2', function ($join) {
-                $join->on('u1.registration_ip', '=', 'u2.last_login_ip')
-                     ->whereColumn('u1.id', '!=', 'u2.id');
-            })
-            ->whereNotNull('u1.registration_ip')
-            ->distinct()
-            ->pluck('u1.registration_ip');
-
-        return $regIps->merge($loginIps)->merge($crossIps)->unique()->values();
-    }
-
-    /**
-     * @return \Illuminate\Support\Collection<int, string>
-     */
-    protected function getSharedDeviceIds(): \Illuminate\Support\Collection
-    {
-        if (! $this->hasDeviceColumns()) {
+        $ids = $this->groupOf($user)['ids'];
+        if (count($ids) < 2) {
             return collect();
         }
 
-        $regDeviceIds = DB::table('users')
-            ->select('registration_device_id as device_id')
-            ->whereNotNull('registration_device_id')
-            ->groupBy('registration_device_id')
-            ->havingRaw('COUNT(*) > 1')
-            ->pluck('device_id');
+        $chars = DemoVoiceGeneration::query()->whereIn('user_id', $ids)
+            ->groupBy('user_id')->selectRaw('user_id, COALESCE(SUM(billable_chars), 0) as chars')
+            ->pluck('chars', 'user_id');
 
-        $seenDeviceIds = DB::table('users')
-            ->select('last_seen_device_id as device_id')
-            ->whereNotNull('last_seen_device_id')
-            ->groupBy('last_seen_device_id')
-            ->havingRaw('COUNT(*) > 1')
-            ->pluck('device_id');
-
-        $crossRegToSeen = DB::table('users as u1')
-            ->join('users as u2', function ($join) {
-                $join->on('u1.registration_device_id', '=', 'u2.last_seen_device_id')
-                    ->whereColumn('u1.id', '!=', 'u2.id');
-            })
-            ->whereNotNull('u1.registration_device_id')
-            ->distinct()
-            ->pluck('u1.registration_device_id');
-
-        $crossSeenToReg = DB::table('users as u1')
-            ->join('users as u2', function ($join) {
-                $join->on('u1.last_seen_device_id', '=', 'u2.registration_device_id')
-                    ->whereColumn('u1.id', '!=', 'u2.id');
-            })
-            ->whereNotNull('u1.last_seen_device_id')
-            ->distinct()
-            ->pluck('u1.last_seen_device_id');
-
-        return $regDeviceIds
-            ->merge($seenDeviceIds)
-            ->merge($crossRegToSeen)
-            ->merge($crossSeenToReg)
-            ->filter()
-            ->unique()
-            ->values();
-    }
-
-    /**
-     * @return \Illuminate\Support\Collection<int, User>
-     */
-    protected function getLinkedUsers(User $user): \Illuminate\Support\Collection
-    {
-        $ips = collect([$user->registration_ip, $user->last_login_ip])
-            ->filter()
-            ->unique()
-            ->values()
-            ->toArray();
-
-        $deviceIds = collect([$user->registration_device_id, $user->last_seen_device_id])
-            ->filter()
-            ->unique()
-            ->values()
-            ->toArray();
-
-        if ($ips === [] && $deviceIds === []) {
-            return collect();
-        }
-
-        return User::query()
-            ->where(function ($q) use ($ips, $deviceIds) {
-                if ($ips !== []) {
-                    $q->whereIn('registration_ip', $ips)
-                        ->orWhereIn('last_login_ip', $ips);
-                }
-
-                if ($this->hasDeviceColumns() && $deviceIds !== []) {
-                    $q->orWhereIn('registration_device_id', $deviceIds)
-                        ->orWhereIn('last_seen_device_id', $deviceIds);
-                }
-            })
-            ->get()
-            ->map(function (User $u) {
-                $u->setAttribute('demo_chars', (int) DemoVoiceGeneration::where('user_id', $u->id)->sum('billable_chars'));
+        return User::query()->whereIn('id', $ids)->get()
+            ->map(function (User $u) use ($chars): User {
+                $u->setAttribute('demo_chars', (int) ($chars[$u->id] ?? 0));
 
                 return $u;
             });
@@ -526,27 +414,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
 
     public static function getNavigationBadge(): ?string
     {
-        $count = Cache::remember('admin:suspicious_users_count', 300, function () {
-            $sharedIps = static::collectSharedIpsForBadge();
-            $sharedDeviceIds = static::collectSharedDeviceIdsForBadge();
-            $hasDeviceColumns = static::hasDeviceColumnsStatic();
-
-            if ($sharedIps->isEmpty() && $sharedDeviceIds->isEmpty()) {
-                return 0;
-            }
-
-            return User::query()
-                ->where(function ($query) use ($sharedIps, $sharedDeviceIds, $hasDeviceColumns) {
-                    $query->whereIn('registration_ip', $sharedIps)
-                        ->orWhereIn('last_login_ip', $sharedIps);
-
-                    if ($hasDeviceColumns) {
-                        $query->orWhereIn('registration_device_id', $sharedDeviceIds)
-                            ->orWhereIn('last_seen_device_id', $sharedDeviceIds);
-                    }
-                })
-                ->count();
-        });
+        $count = app(DemoSuspects::class)->count();
 
         return $count > 0 ? (string) $count : null;
     }
@@ -557,162 +425,47 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, string>
+     * This account's shared demo, as the demo itself counts it: the accounts that are
+     * the same person (deleted ones' use included) and what they have used together.
+     *
+     * @return array{ids: list<int>, chars: int}
      */
-    protected static function collectSharedIpsForBadge(): \Illuminate\Support\Collection
+    private function groupOf(User $user): array
     {
-        $sharedRegistrationIps = DB::table('users')
-            ->select('registration_ip as ip')
-            ->whereNotNull('registration_ip')
-            ->groupBy('registration_ip')
-            ->havingRaw('COUNT(*) > 1')
-            ->pluck('ip');
-
-        $sharedLoginIps = DB::table('users')
-            ->select('last_login_ip as ip')
-            ->whereNotNull('last_login_ip')
-            ->groupBy('last_login_ip')
-            ->havingRaw('COUNT(*) > 1')
-            ->pluck('ip');
-
-        $crossRegToLoginIps = DB::table('users as u1')
-            ->join('users as u2', function ($join) {
-                $join->on('u1.registration_ip', '=', 'u2.last_login_ip')
-                    ->whereColumn('u1.id', '!=', 'u2.id');
-            })
-            ->whereNotNull('u1.registration_ip')
-            ->distinct()
-            ->pluck('u1.registration_ip');
-
-        $crossLoginToRegIps = DB::table('users as u1')
-            ->join('users as u2', function ($join) {
-                $join->on('u1.last_login_ip', '=', 'u2.registration_ip')
-                    ->whereColumn('u1.id', '!=', 'u2.id');
-            })
-            ->whereNotNull('u1.last_login_ip')
-            ->distinct()
-            ->pluck('u1.last_login_ip');
-
-        return $sharedRegistrationIps
-            ->merge($sharedLoginIps)
-            ->merge($crossRegToLoginIps)
-            ->merge($crossLoginToRegIps)
-            ->filter()
-            ->unique()
-            ->values();
-    }
-
-    /**
-     * @return \Illuminate\Support\Collection<int, string>
-     */
-    protected static function collectSharedDeviceIdsForBadge(): \Illuminate\Support\Collection
-    {
-        if (! static::hasDeviceColumnsStatic()) {
-            return collect();
+        if (! isset($this->groups[$user->id])) {
+            $this->groups[$user->id] = app(DemoSamePerson::class)->demoUsage($user);
         }
 
-        $sharedRegistrationDeviceIds = DB::table('users')
-            ->select('registration_device_id as device_id')
-            ->whereNotNull('registration_device_id')
-            ->groupBy('registration_device_id')
-            ->havingRaw('COUNT(*) > 1')
-            ->pluck('device_id');
+        return $this->groups[$user->id];
+    }
 
-        $sharedSeenDeviceIds = DB::table('users')
-            ->select('last_seen_device_id as device_id')
-            ->whereNotNull('last_seen_device_id')
-            ->groupBy('last_seen_device_id')
-            ->havingRaw('COUNT(*) > 1')
-            ->pluck('device_id');
+    /** @return array<int, list<string>> */
+    private function suspects(): array
+    {
+        return $this->suspects ??= app(DemoSuspects::class)->all();
+    }
 
-        $crossRegToSeenDeviceIds = DB::table('users as u1')
-            ->join('users as u2', function ($join) {
-                $join->on('u1.registration_device_id', '=', 'u2.last_seen_device_id')
-                    ->whereColumn('u1.id', '!=', 'u2.id');
-            })
-            ->whereNotNull('u1.registration_device_id')
-            ->distinct()
-            ->pluck('u1.registration_device_id');
+    /** @return list<int> */
+    private function suspectIdsLinkedBy(string $kind): array
+    {
+        $ids = array_keys(array_filter($this->suspects(), fn (array $kinds): bool => in_array($kind, $kinds, true)));
 
-        $crossSeenToRegDeviceIds = DB::table('users as u1')
-            ->join('users as u2', function ($join) {
-                $join->on('u1.last_seen_device_id', '=', 'u2.registration_device_id')
-                    ->whereColumn('u1.id', '!=', 'u2.id');
-            })
-            ->whereNotNull('u1.last_seen_device_id')
-            ->distinct()
-            ->pluck('u1.last_seen_device_id');
-
-        return $sharedRegistrationDeviceIds
-            ->merge($sharedSeenDeviceIds)
-            ->merge($crossRegToSeenDeviceIds)
-            ->merge($crossSeenToRegDeviceIds)
-            ->filter()
-            ->unique()
-            ->values();
+        return $ids === [] ? [0] : $ids;
     }
 
     private function describeSuspicionSignals(User $user): string
     {
-        $signals = [];
-        $sets = $this->sharedSignalSets();
+        $kinds = $this->suspects()[$user->id] ?? [];
 
-        if (
-            $this->valueInSet($sets['ips'], $user->registration_ip)
-            || $this->valueInSet($sets['ips'], $user->last_login_ip)
-        ) {
-            $signals[] = 'IP';
-        }
-
-        if (
-            $this->hasDeviceColumns()
-            && (
-                $this->valueInSet($sets['device_ids'], $user->registration_device_id)
-                || $this->valueInSet($sets['device_ids'], $user->last_seen_device_id)
-            )
-        ) {
-            $signals[] = 'Device';
-        }
-
-        return $signals !== [] ? implode(' + ', array_unique($signals)) : 'IP';
+        return $kinds === []
+            ? '-'
+            : implode(' + ', array_map(fn (string $kind): string => __('ui.admin.suspicious.link_'.$kind), $kinds));
     }
 
-    /**
-     * @return array{
-     *   ips: array<string, true>,
-     *   device_ids: array<string, true>
-     * }
-     */
-    private function sharedSignalSets(): array
+    /** Linked by a browser, a device or an inbox: the same person beyond doubt. */
+    private function strongestLink(User $user): bool
     {
-        if ($this->sharedSignalSets !== null) {
-            return $this->sharedSignalSets;
-        }
-
-        $ips = $this->getSharedIps()
-            ->mapWithKeys(fn ($value) => [(string) $value => true])
-            ->all();
-
-        $deviceIds = $this->getSharedDeviceIds()
-            ->mapWithKeys(fn ($value) => [(string) $value => true])
-            ->all();
-
-        $this->sharedSignalSets = [
-            'ips' => $ips,
-            'device_ids' => $deviceIds,
-        ];
-
-        return $this->sharedSignalSets;
-    }
-
-    private function valueInSet(array $set, mixed $value): bool
-    {
-        $normalized = trim((string) $value);
-        if ($normalized === '') {
-            return false;
-        }
-
-        return isset($set[$normalized]);
+        return array_intersect($this->suspects()[$user->id] ?? [], [DemoSuspects::BROWSER, DemoSuspects::DEVICE, DemoSuspects::INBOX]) !== [];
     }
 
     protected function hasDeviceColumns(): bool
@@ -722,7 +475,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
 
     protected static function hasDeviceColumnsStatic(): bool
     {
-        return Schema::hasColumn('users', 'registration_device_id')
-            && Schema::hasColumn('users', 'last_seen_device_id');
+        return once(fn (): bool => Schema::hasColumn('users', 'registration_device_id')
+            && Schema::hasColumn('users', 'last_seen_device_id'));
     }
 }
