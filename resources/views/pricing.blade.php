@@ -450,7 +450,8 @@
         top: 64px;
         z-index: 20;
         display: block;
-        margin: 1.1rem calc(50% - 50vw) 0;
+        /* Close under the monthly / yearly switch: the two choices read as one group. */
+        margin: 0 calc(50% - 50vw);
         padding: 8px calc(50vw - 50%);
         background: var(--bg);
         transition: box-shadow .2s ease;
