@@ -47,9 +47,9 @@ class ApiReserveLockOrderTest extends TestCase
             }
             $this->fail("No query in a transaction matches {$pattern}");
         };
-        // Laravel 13 quotes the alias ("aggregate"); 12 did not.
-        $generations = $first('/select max\("id"\) as "?aggregate"? from "audio_generations" where "user_id"/');
-        $usageRow = $first('/from "usage_counters" where "user_id"/');
+        // Laravel 13 quotes the alias ("aggregate"); 12 did not. SQLite quotes names with ", MySQL with `.
+        $generations = $first('/select max\(["`]id["`]\) as ["`]?aggregate["`]? from ["`]audio_generations["`] where ["`]user_id["`]/');
+        $usageRow = $first('/from ["`]usage_counters["`] where ["`]user_id["`]/');
         $this->assertLessThan($usageRow, $generations, 'the generations are locked before the usage row');
     }
 }
