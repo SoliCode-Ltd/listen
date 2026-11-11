@@ -13,9 +13,10 @@ class MultiAccountEnforcementService
 {
     public const DEFAULT_MAX_ACCOUNTS = 2;
 
-    public const BLOCK_REASON_EN = 'Your account has been suspended because multiple accounts were created from the same network.';
+    // The rule counts accounts made on one browser or device, not on one network.
+    public const BLOCK_REASON_EN = 'Your account has been suspended because multiple accounts were created on the same device.';
 
-    public const BLOCK_REASON_AR = 'تم تعليق حسابك بسبب إنشاء حسابات متعددة من نفس الشبكة.';
+    public const BLOCK_REASON_AR = 'تم تعليق حسابك بسبب إنشاء حسابات متعددة على نفس الجهاز.';
     public const EVASION_REASON_EN = 'Your account has been suspended because it was created after another account on this device was suspended.';
 
     public const EVASION_REASON_AR = 'تم تعليق حسابك لأنه أُنشئ بعد إيقاف حساب آخر على نفس الجهاز.';
@@ -278,7 +279,13 @@ class MultiAccountEnforcementService
 
     private function hasDeviceColumns(): bool
     {
-        return Schema::hasColumn('users', 'registration_device_id')
-            && Schema::hasColumn('users', 'last_seen_device_id');
+        return self::deviceColumnsExist();
+    }
+
+    /** Asked of the database once (Admin → Users asked it for every row on the page). */
+    private static function deviceColumnsExist(): bool
+    {
+        return once(fn (): bool => Schema::hasColumn('users', 'registration_device_id')
+            && Schema::hasColumn('users', 'last_seen_device_id'));
     }
 }

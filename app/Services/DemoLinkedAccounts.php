@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\MemberDevice;
 use App\Models\User;
+use App\Support\MailboxKey;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -185,8 +186,10 @@ final class DemoLinkedAccounts
     }
 
     /**
-     * These accounts and every account that shares a browser with them,
-     * followed from account to account: one browser is one person's.
+     * These accounts and every account that shares a browser or an inbox with
+     * them (App\Support\MailboxKey: jane.doe+2@gmail.com is janedoe@gmail.com),
+     * followed from account to account: one browser is one person's, and so is
+     * one inbox.
      *
      * @param  list<int>  $ids
      * @param  list<string>  $browsers  more browsers that belong to these accounts
@@ -196,9 +199,13 @@ final class DemoLinkedAccounts
     {
         $ids = array_values(array_unique(array_map('intval', $ids)));
         $followed = [];
+        $followedInboxes = [];
+        $inboxes = MailboxKey::available();
+        $columns = $inboxes ? ['registration_device_id', 'last_seen_device_id', MailboxKey::COLUMN] : ['registration_device_id', 'last_seen_device_id'];
 
         for ($round = 0; $round < 4 && count($ids) < self::MAX_ACCOUNTS; $round++) {
-            $theirs = User::query()->whereIn('id', $ids)->get(['registration_device_id', 'last_seen_device_id'])
+            $accounts = User::query()->whereIn('id', $ids)->get([...$columns, 'email_verified_at']);
+            $theirs = $accounts
                 ->flatMap(fn (User $u): array => [(string) $u->registration_device_id, (string) $u->last_seen_device_id])
                 ->all();
             if (self::available()) {
@@ -206,18 +213,33 @@ final class DemoLinkedAccounts
                     ->whereIn('user_id', $ids)->pluck('signal')->all());
             }
             $new = array_values(array_diff(array_unique(array_filter(array_merge($browsers, $theirs))), $followed));
+            // Only a confirmed address links by its inbox: anyone can type someone else's
+            // address (or a +tag of it) into an account they never confirm.
+            $newInboxes = $inboxes
+                ? array_values(array_diff(array_unique(array_filter($accounts
+                    ->filter(fn (User $u): bool => MailboxKey::confirmed($u))
+                    ->map(fn (User $u): string => (string) $u->getAttribute(MailboxKey::COLUMN))->all())), $followedInboxes))
+                : [];
             $browsers = [];
-            if ($new === []) {
+            if ($new === [] && $newInboxes === []) {
                 break;
             }
             $followed = array_merge($followed, $new);
+            $followedInboxes = array_merge($followedInboxes, $newInboxes);
 
-            $more = User::query()
-                ->where(fn ($q) => $q->whereIn('registration_device_id', $new)->orWhereIn('last_seen_device_id', $new))
-                ->limit(self::MAX_ACCOUNTS)->pluck('id')->all();
-            if (self::available()) {
-                $more = array_merge($more, MemberDevice::query()->where('kind', MemberDevice::BROWSER)
-                    ->whereIn('signal', $new)->limit(self::MAX_ACCOUNTS)->pluck('user_id')->all());
+            $more = [];
+            if ($new !== []) {
+                $more = User::query()
+                    ->where(fn ($q) => $q->whereIn('registration_device_id', $new)->orWhereIn('last_seen_device_id', $new))
+                    ->limit(self::MAX_ACCOUNTS)->pluck('id')->all();
+                if (self::available()) {
+                    $more = array_merge($more, MemberDevice::query()->where('kind', MemberDevice::BROWSER)
+                        ->whereIn('signal', $new)->limit(self::MAX_ACCOUNTS)->pluck('user_id')->all());
+                }
+            }
+            if ($newInboxes !== []) {
+                $more = array_merge($more, MailboxKey::confirmedOnly(User::query()->whereIn(MailboxKey::COLUMN, $newInboxes))
+                    ->limit(self::MAX_ACCOUNTS)->pluck('id')->all());
             }
             $ids = array_values(array_unique(array_merge($ids, array_map('intval', $more))));
         }

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\VideoDub;
 use App\Models\Voice;
 use App\Services\DemoLinkedAccounts;
+use App\Services\DemoSamePerson;
 use App\Services\PlanAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -109,9 +110,13 @@ final class VideoDubbing
      */
     public static function freeUsed(User $user, Request $request): bool
     {
-        $ids = rescue(fn () => app(DemoLinkedAccounts::class)->linkedUserIds($user, $request), [$user->id], false);
+        // One person, as the text demo counts them (App\Services\DemoSamePerson), deleted accounts included.
+        $ids = self::samePersonIds($user, $request);
         $browser = DemoLinkedAccounts::browserFrom($request);
         $device = DemoLinkedAccounts::deviceFrom($request)['signal'] ?? null;
+        if (rescue(fn () => app(DemoSamePerson::class)->leftBehindFreeDub($user, $request), false, false)) {
+            return true;
+        }
 
         return VideoDub::query()
             ->where('is_free', true)
@@ -126,6 +131,17 @@ final class VideoDubbing
                 }
             })
             ->exists();
+    }
+
+    /**
+     * The member and every account that is the same person for the free demo
+     * (App\Services\DemoSamePerson). If that cannot be worked out, the member alone.
+     *
+     * @return list<int>
+     */
+    public static function samePersonIds(User $user, Request $request): array
+    {
+        return rescue(fn () => app(DemoSamePerson::class)->ids($user, $request), [(int) $user->id], false);
     }
 
     /** Whether today's free dubs for the whole site are used up. */

@@ -167,6 +167,29 @@ class BillingEmailsTest extends TestCase
         ];
     }
 
+    public function test_another_sites_sale_on_the_shared_stripe_account_sends_a_member_no_email(): void
+    {
+        $emails = app(StripeWebhookEmailService::class);
+
+        // The buyer used the member's address, as their customer at the other site.
+        $emails->sendForEvent($this->event('checkout.session.completed', [
+            'id' => 'cs_other_site', 'mode' => 'payment', 'customer' => 'cus_other_site', 'amount_total' => 4500, 'currency' => 'usd',
+            'customer_details' => ['email' => 'sara@example.test'], 'created' => now()->timestamp,
+        ]));
+        $emails->sendForEvent($this->event('invoice.paid', [
+            'id' => 'in_other_site', 'customer' => 'cus_other_site', 'customer_email' => 'sara@example.test',
+            'amount_paid' => 4500, 'currency' => 'usd', 'billing_reason' => 'subscription_create', 'created' => now()->timestamp,
+        ]));
+        $this->assertCount(0, $this->sentEmails());
+
+        // The member's own purchase still gets its email.
+        $emails->sendForEvent($this->event('checkout.session.completed', [
+            'id' => 'cs_member', 'mode' => 'payment', 'customer' => 'cus_mail', 'amount_total' => 500, 'currency' => 'usd',
+            'created' => now()->timestamp,
+        ]));
+        $this->assertCount(1, $this->sentEmails());
+    }
+
     public function test_the_billing_settings_switch_decides_whether_they_are_sent(): void
     {
         $emails = app(StripeWebhookEmailService::class);

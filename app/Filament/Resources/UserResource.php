@@ -216,6 +216,12 @@ HTML;
     public static function table(Table $table): Table
     {
         return $table
+            // Each row's plan and demo characters, for the whole page in two queries (not three a row).
+            ->modifyQueryUsing(fn (Builder $query) => $query
+                ->with('latestActiveSubscription.plan')
+                ->withSum('demoVoiceGenerations as demo_chars_list_sum', 'billable_chars')
+                ->withExists('demoVoiceGenerations as has_demo_history')
+                ->withExists('planSubscriptions as has_any_subscription'))
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->sortable(),
@@ -245,11 +251,8 @@ HTML;
                     ->label('Plan')
                     ->badge()
                     ->getStateUsing(function (User $record): string {
-                        $subscription = Subscription::where('user_id', $record->id)
-                            ->where('status', 'active')
-                            ->with('plan')
-                            ->latest('id')
-                            ->first();
+                        // The newest active subscription, loaded with the page (latestActiveSubscription).
+                        $subscription = $record->latestActiveSubscription;
 
                         if (! $subscription || ! $subscription->plan) {
                             return 'Free';
@@ -260,11 +263,7 @@ HTML;
                             : 'Free';
                     })
                     ->color(function (User $record): string {
-                        $subscription = Subscription::where('user_id', $record->id)
-                            ->where('status', 'active')
-                            ->with('plan')
-                            ->latest('id')
-                            ->first();
+                        $subscription = $record->latestActiveSubscription;
 
                         if (! $subscription || ! $subscription->plan || $subscription->plan->price_cents <= 0) {
                             return 'gray';
@@ -302,7 +301,10 @@ HTML;
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('demo_chars_used')
                     ->label(__('ui.admin.users.demo_chars_used'))
-                    ->getStateUsing(fn (User $record) => (int) DemoVoiceGeneration::where('user_id', $record->id)->sum('billable_chars'))
+                    // Added up with the page (table()'s query), else for this member alone.
+                    ->getStateUsing(fn (User $record) => array_key_exists('demo_chars_list_sum', $record->getAttributes())
+                        ? (int) $record->getAttribute('demo_chars_list_sum')
+                        : (int) DemoVoiceGeneration::where('user_id', $record->id)->sum('billable_chars'))
                     ->numeric()
                     ->sortable(query: fn ($query, string $direction) => $query
                         ->withSum('demoVoiceGenerations as demo_chars_sum', 'billable_chars')
@@ -310,9 +312,7 @@ HTML;
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('ip_linked_accounts')
                     ->label(__('ui.admin.users.ip_linked_accounts'))
-                    ->getStateUsing(function (User $record): int {
-                        return self::linkedUsersQuery($record)->count();
-                    })
+                    ->getStateUsing(fn (User $record): int => self::linkedCount($record))
                     ->badge()
                     ->color(fn ($state) => ((int) $state) > 0 ? 'danger' : 'gray')
                     ->toggleable(),
@@ -403,7 +403,9 @@ HTML;
                     ->label('Gift characters')
                     ->icon('heroicon-o-gift')
                     ->color('success')
-                    ->visible(fn (User $record): bool => self::latestSubscription($record) !== null)
+                    ->visible(fn (User $record): bool => array_key_exists('has_any_subscription', $record->getAttributes())
+                        ? (bool) $record->getAttribute('has_any_subscription')
+                        : self::latestSubscription($record) !== null)
                     ->modalHeading(fn (User $record): string => 'Gift characters to '.$record->email)
                     ->modalDescription(fn (User $record): string => SubscriptionResource::giftModalDescription(self::latestSubscription($record)))
                     ->form(SubscriptionResource::giftFormSchema())
@@ -476,7 +478,9 @@ HTML;
                     ->modalHeading(__('ui.admin.users.reset_demo_confirm_title'))
                     ->modalDescription(__('ui.admin.users.reset_demo_confirm_description'))
                     ->modalSubmitActionLabel(__('ui.admin.users.reset_demo_chars'))
-                    ->visible(fn (User $record) => DemoVoiceGeneration::where('user_id', $record->id)->exists())
+                    ->visible(fn (User $record) => array_key_exists('has_demo_history', $record->getAttributes())
+                        ? (bool) $record->getAttribute('has_demo_history')
+                        : DemoVoiceGeneration::where('user_id', $record->id)->exists())
                     ->action(function (User $record): void {
                         DemoVoiceGeneration::where('user_id', $record->id)->delete();
                         Cache::forget("demo:ip_linked_users:{$record->id}");
@@ -544,6 +548,19 @@ HTML;
             'view' => Pages\ViewUser::route('/{record}'),
             'edit' => Pages\EditUser::route('/{record}/edit'),
         ];
+    }
+
+    /** Counted once for each row on the page (its badge asks again for its colour); none to count without signals. */
+    private static function linkedCount(User $record): int
+    {
+        return once(function () use ($record): int {
+            $signals = app(MultiAccountEnforcementService::class)->linkedSignals($record);
+            if (($signals['ips'] ?? []) === [] && ($signals['device_ids'] ?? []) === []) {
+                return 0;
+            }
+
+            return self::linkedUsersQuery($record)->count();
+        });
     }
 
     private static function linkedUsersQuery(User $record): Builder

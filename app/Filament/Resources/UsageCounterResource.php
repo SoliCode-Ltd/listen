@@ -127,8 +127,11 @@ class UsageCounterResource extends Resource
                 // periods that follow a plan's own dates ("2026-10-14 08:37") alike.
                 Tables\Filters\SelectFilter::make('period_ym')
                     ->label('Month')
+                    // The months themselves from the database, not every member's row.
                     ->options(fn (): array => UsageCounter::query()
-                        ->pluck('period_ym')
+                        ->selectRaw('substr(period_ym, 1, 7) as ym')
+                        ->distinct()
+                        ->pluck('ym')
                         ->map(fn (string $key): string => substr($key, 0, 7))
                         ->unique()->sortDesc()->take(24)
                         ->mapWithKeys(fn (string $ym): array => [$ym => (new UsageCounter(['period_ym' => $ym]))->monthLabel()])

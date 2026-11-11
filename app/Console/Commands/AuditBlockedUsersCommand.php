@@ -29,8 +29,11 @@ class AuditBlockedUsersCommand extends Command
         $this->info($fix ? 'MODE: FIX (will unblock false positives)' : 'MODE: DRY-RUN (preview only)');
         $this->newLine();
 
+        // Only blocks the rule made by itself: an admin's own block (Suspicious Users → Block
+        // uses the same wording) records the admin, and is theirs to undo, never this command's.
         $query = User::query()
             ->where('is_blocked', true)
+            ->whereNull('blocked_by')
             ->where(function ($q) {
                 $q->where('blocked_reason_en', 'like', '%multiple accounts%')
                     ->orWhere('blocked_reason', 'like', '%multiple accounts%')

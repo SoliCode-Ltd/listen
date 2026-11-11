@@ -59,6 +59,9 @@ class AppServiceProvider extends ServiceProvider
             ]);
         }
 
+        // One for each request, so a demo request works out who is the same person once.
+        $this->app->scoped(\App\Services\DemoSamePerson::class);
+
         // Register TTS providers as singletons
         $this->app->singleton(GoogleCloudTtsProvider::class);
         $this->app->singleton(GeminiTtsProvider::class);

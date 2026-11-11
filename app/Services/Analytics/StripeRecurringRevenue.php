@@ -23,8 +23,9 @@ use Throwable;
  *   paused      payment collection paused
  *
  * Net is after Stripe's fees, at the rate this account really paid on its
- * card charges in the last 90 days. Admin accounts are left out, like
- * everywhere else on the dashboard. Read-only; kept for ten minutes, and
+ * card charges in the last 90 days. Only Listen's subscriptions count (a
+ * member's, or for a Listen product: the Stripe account is shared with other
+ * sites); admin accounts are left out, like everywhere else on the dashboard. Read-only; kept for ten minutes, and
  * forgotten whenever Stripe tells the site a subscription or invoice changed.
  */
 class StripeRecurringRevenue
@@ -83,13 +84,19 @@ class StripeRecurringRevenue
 
         try {
             $stripe = Cashier::stripe();
-            $admins = $this->adminCustomers();
+            $members = $this->memberCustomers();
+            $products = $this->listenProducts($stripe);
 
             $rows = [];
             foreach (self::STATUSES as $status) {
                 $list = $stripe->subscriptions->all(['status' => $status, 'limit' => 100, 'expand' => ['data.discounts']]);
                 foreach ($list->autoPagingIterator() as $subscription) {
-                    if (isset($admins[(string) ($subscription->customer ?? '')])) {
+                    $customer = (string) ($subscription->customer ?? '');
+                    // Admins' own are left out. So are other sites' on the same Stripe account:
+                    // a subscription is Listen's when it is a member's, or for a Listen product
+                    // (a member who deleted their account can still be paying).
+                    if (($members[$customer] ?? false) === true
+                        || (! isset($members[$customer]) && ! $this->forListenProduct($subscription, $products))) {
                         continue;
                     }
                     $rows[] = $this->row($subscription, $now);
@@ -252,14 +259,49 @@ class StripeRecurringRevenue
      *
      * @return array<string, true>
      */
-    private function adminCustomers(): array
+    /**
+     * Listen's products in Stripe: each carries its plan (StripeProductSyncService).
+     *
+     * @return array<string, true>
+     */
+    private function listenProducts(object $stripe): array
+    {
+        $products = [];
+        foreach ($stripe->products->all(['limit' => 100])->autoPagingIterator() as $product) {
+            $meta = $product->metadata ?? null;
+            if (trim((string) ($meta->listen_plan_id ?? $meta->listen_plan_slug ?? '')) !== '') {
+                $products[(string) $product->id] = true;
+            }
+        }
+
+        return $products;
+    }
+
+    /** @param  array<string, true>  $products */
+    private function forListenProduct(object $subscription, array $products): bool
+    {
+        foreach ($subscription->items->data ?? [] as $item) {
+            $product = $item->price->product ?? null;
+            if (isset($products[(string) (is_object($product) ? ($product->id ?? '') : $product)])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The Stripe customers that are Listen accounts, each with whether it is an admin's.
+     *
+     * @return array<string, bool>
+     */
+    private function memberCustomers(): array
     {
         return DB::table('users')
-            ->where('is_admin', true)
             ->whereNotNull('stripe_id')
-            ->pluck('stripe_id')
-            ->filter()
-            ->mapWithKeys(fn ($id) => [(string) $id => true])
+            ->where('stripe_id', '!=', '')
+            ->pluck('is_admin', 'stripe_id')
+            ->mapWithKeys(fn ($admin, $id) => [(string) $id => (bool) $admin])
             ->all();
     }
 

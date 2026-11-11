@@ -663,10 +663,10 @@ class StripeWebhookEmailService
     {
         $stripeCustomerId = trim((string) $stripeCustomerId);
         if ($stripeCustomerId !== '') {
-            $user = User::query()->where('stripe_id', $stripeCustomerId)->first();
-            if ($user) {
-                return $user;
-            }
+            // A Stripe customer no member has is not Listen's: the Stripe account is shared
+            // with other sites, whose sales reach this webhook too, and their buyer may use
+            // the same address as a member. Only an event without a customer goes by address.
+            return User::query()->where('stripe_id', $stripeCustomerId)->first();
         }
 
         $fallbackEmail = trim((string) $fallbackEmail);
