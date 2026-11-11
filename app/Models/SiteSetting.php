@@ -22,10 +22,11 @@ class SiteSetting extends Model
      */
     public static function get(string $key, mixed $default = null): mixed
     {
-        $value = Cache::remember("site_setting.{$key}", 60, function () use ($key, $default) {
-            $setting = static::where('key', $key)->first();
-
-            return $setting?->value ?? $default ?? self::NOT_SAVED;
+        // Only what is saved is kept, never the caller's fallback: two callers can ask
+        // with different fallbacks (the yearly discount: 20 for pricing, 0 elsewhere),
+        // and the first one's must not become everyone's for a minute.
+        $value = Cache::remember("site_setting.{$key}", 60, function () use ($key) {
+            return static::where('key', $key)->value('value') ?? self::NOT_SAVED;
         });
 
         return $value === self::NOT_SAVED ? $default : $value;
