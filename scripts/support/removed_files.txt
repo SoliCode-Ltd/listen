@@ -17,3 +17,10 @@ app/Filament/Resources/SourceAccountResource/Pages/CreateSourceAccount.php
 app/Filament/Resources/SourceAccountResource/Pages/EditSourceAccount.php
 app/Filament/Resources/SourceAccountResource/Pages/ListSourceAccounts.php
 app/Filament/Resources/SourceAccountResource/Pages/ViewSourceAccount.php
+
+# The old "Saved cards" pages, replaced by Billing → Payments. Their resource
+# (SavedPaymentMethodResource.php) stays in the code with no pages and no
+# access; its two old pages were still on the servers, and the admin loads
+# every file in its folder.
+app/Filament/Resources/SavedPaymentMethodResource/Pages/ListSavedPaymentMethods.php
+app/Filament/Resources/SavedPaymentMethodResource/Pages/ViewSavedPaymentMethod.php
