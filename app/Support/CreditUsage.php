@@ -41,7 +41,7 @@ final class CreditUsage
         $audio = AudioGeneration::query()->with('textItem:id,title')
             ->where('user_id', $id)->where('status', 'done')->where('created_at', '>=', $from)
             ->latest('id')->limit(500)
-            ->get(['id', 'text_item_id', 'api_key_id', 'billable_chars', 'duration_seconds', 'created_at', 'is_dialogue']);
+            ->get(AudioGeneration::memberNewestColumns(['id', 'text_item_id', 'api_key_id', 'billable_chars', 'duration_seconds', 'created_at', 'is_dialogue']));
         // No calls before the agents tables exist (a deploy just ahead of its migration).
         $calls = \App\Support\Agents\AgentAccess::tablesReady() ? AgentConversation::query()->with('agent:id,name')
             ->where('user_id', $id)->where('free', false)->whereNotNull('settled_at')->where('started_at', '>=', $from)

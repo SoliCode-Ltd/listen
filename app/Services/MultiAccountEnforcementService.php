@@ -279,7 +279,13 @@ class MultiAccountEnforcementService
 
     private function hasDeviceColumns(): bool
     {
-        return Schema::hasColumn('users', 'registration_device_id')
-            && Schema::hasColumn('users', 'last_seen_device_id');
+        return self::deviceColumnsExist();
+    }
+
+    /** Asked of the database once (Admin → Users asked it for every row on the page). */
+    private static function deviceColumnsExist(): bool
+    {
+        return once(fn (): bool => Schema::hasColumn('users', 'registration_device_id')
+            && Schema::hasColumn('users', 'last_seen_device_id'));
     }
 }

@@ -102,6 +102,15 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
         return $this->hasMany(Subscription::class);
     }
 
+    /**
+     * The newest active plan subscription (the highest id with status active),
+     * as Admin → Users shows it: loaded for a whole page of members at once.
+     */
+    public function latestActiveSubscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class)->ofMany(['id' => 'max'], fn ($query) => $query->where('status', 'active'));
+    }
+
     public function usageCounters(): HasMany
     {
         return $this->hasMany(UsageCounter::class);
