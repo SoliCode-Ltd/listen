@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 /**
- * The pricing page says what yearly billing saves before anyone presses the switch: a pill
+ * The pricing page says what yearly billing saves before anyone presses the switch: green words
  * inside the switch's yearly half with the share ("Save 20%"), and on yearly each card
  * shows, beside what the year costs, what it saves in money.
  */
