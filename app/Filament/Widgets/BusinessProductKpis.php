@@ -12,7 +12,7 @@ class BusinessProductKpis extends BaseWidget
 
     protected static ?int $sort = -28;
 
-    protected static ?string $pollingInterval = null;
+    protected ?string $pollingInterval = null;
 
     protected ?string $heading = 'Product usage & growth channels (last 30 days)';
 

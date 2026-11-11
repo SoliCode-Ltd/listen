@@ -2,10 +2,27 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\KeyValue;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\VoiceSampleResource\Pages\ListVoiceSamples;
+use App\Filament\Resources\VoiceSampleResource\Pages\CreateVoiceSample;
+use App\Filament\Resources\VoiceSampleResource\Pages\EditVoiceSample;
 use App\Filament\Resources\VoiceSampleResource\Pages;
 use App\Models\VoiceSample;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -14,63 +31,63 @@ class VoiceSampleResource extends Resource
 {
     protected static ?string $model = VoiceSample::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-play-circle';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-play-circle';
 
-    protected static ?string $navigationGroup = 'Content';
+    protected static string | \UnitEnum | null $navigationGroup = 'Content';
 
     protected static ?int $navigationSort = 8;
 
     protected static ?string $navigationLabel = 'Voice Samples';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Sample Details')
+        return $schema
+            ->components([
+                Section::make('Sample Details')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('title')
+                        TextInput::make('title')
                             ->required()
                             ->maxLength(255)
                             ->helperText('Display title (English).'),
-                        Forms\Components\TextInput::make('title_ar')
+                        TextInput::make('title_ar')
                             ->label('Title (Arabic)')
                             ->maxLength(255)
                             ->helperText('Display title for Arabic locale.'),
-                        Forms\Components\TextInput::make('description')
+                        TextInput::make('description')
                             ->maxLength(500)
                             ->helperText('Short English description shown on card.'),
-                        Forms\Components\TextInput::make('description_ar')
+                        TextInput::make('description_ar')
                             ->label('Description (Arabic)')
                             ->maxLength(500)
                             ->helperText('Short Arabic description shown on card.'),
-                        Forms\Components\TextInput::make('icon')
+                        TextInput::make('icon')
                             ->maxLength(100)
                             ->helperText('Flag emoji or icon (e.g. 🇸🇦).'),
-                        Forms\Components\TextInput::make('country')
+                        TextInput::make('country')
                             ->maxLength(10)
                             ->helperText('2-letter country code (e.g. SA, EG, US).'),
-                        Forms\Components\Textarea::make('sample_text')
+                        Textarea::make('sample_text')
                             ->label('Sample Text')
                             ->required()
                             ->rows(4)
                             ->columnSpanFull()
                             ->helperText('The text that was spoken in this sample.'),
-                        Forms\Components\Textarea::make('sample_text_ar')
+                        Textarea::make('sample_text_ar')
                             ->label('Sample Text (Arabic)')
                             ->rows(4)
                             ->columnSpanFull()
                             ->helperText('Arabic version of the sample text. Falls back to sample_text if empty.'),
-                        Forms\Components\TextInput::make('audio_path')
+                        TextInput::make('audio_path')
                             ->label('Audio File Path')
                             ->required()
                             ->maxLength(500)
                             ->helperText('Path to audio file relative to public/ (e.g. audio/samples/greeting.mp3).'),
                     ]),
-                Forms\Components\Section::make('Classification')
+                Section::make('Classification')
                     ->columns(3)
                     ->schema([
-                        Forms\Components\Select::make('language')
+                        Select::make('language')
                             ->options([
                                 'ar' => 'Arabic',
                                 'en' => 'English',
@@ -83,7 +100,7 @@ class VoiceSampleResource extends Resource
                             ])
                             ->default('ar')
                             ->required(),
-                        Forms\Components\Select::make('dialect')
+                        Select::make('dialect')
                             ->options([
                                 '' => 'None',
                                 'ar-XA' => 'MSA',
@@ -103,7 +120,7 @@ class VoiceSampleResource extends Resource
                                 'en-IN' => 'Indian',
                             ])
                             ->searchable(),
-                        Forms\Components\Select::make('emotion')
+                        Select::make('emotion')
                             ->options([
                                 'neutral' => 'Neutral',
                                 'warm' => 'Warm',
@@ -117,7 +134,7 @@ class VoiceSampleResource extends Resource
                                 'angry' => 'Angry',
                             ])
                             ->default('neutral'),
-                        Forms\Components\Select::make('category')
+                        Select::make('category')
                             ->options([
                                 'hero' => 'Hero Section',
                                 'demo' => 'Demo Page',
@@ -128,44 +145,44 @@ class VoiceSampleResource extends Resource
                             ->default('hero')
                             ->required()
                             ->helperText('Content grouping used by the site. Display placement is controlled below.'),
-                        Forms\Components\TextInput::make('voice_name')
+                        TextInput::make('voice_name')
                             ->label('Voice Name')
                             ->maxLength(255)
                             ->helperText('Name of the TTS voice used.'),
-                        Forms\Components\TextInput::make('provider')
+                        TextInput::make('provider')
                             ->maxLength(50)
                             ->helperText('e.g. google_cloud or gemini'),
-                        Forms\Components\Select::make('gender')
+                        Select::make('gender')
                             ->options([
                                 'male' => 'Male',
                                 'female' => 'Female',
                             ])
                             ->default('male'),
                     ]),
-                Forms\Components\Section::make('Display')
+                Section::make('Display')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Toggle::make('is_active')
+                        Toggle::make('is_active')
                             ->label('Active')
                             ->default(true)
                             ->helperText('Global availability. Turn this off to hide the sample everywhere.'),
-                        Forms\Components\Toggle::make('show_in_hero')
+                        Toggle::make('show_in_hero')
                             ->label('Show In Hero')
                             ->default(false)
                             ->helperText('Allow this sample to be used for the homepage hero audio player.'),
-                        Forms\Components\Toggle::make('show_in_showcase')
+                        Toggle::make('show_in_showcase')
                             ->label('Show In Voice Samples')
                             ->default(true)
                             ->helperText('Show this sample in the voice samples gallery/cards section.'),
-                        Forms\Components\Toggle::make('is_featured')
+                        Toggle::make('is_featured')
                             ->label('Featured')
                             ->default(false)
                             ->helperText('Featured items are prioritized first within hero/showcase lists.'),
-                        Forms\Components\TextInput::make('sort_order')
+                        TextInput::make('sort_order')
                             ->numeric()
                             ->default(0)
                             ->helperText('Lower = appears first.'),
-                        Forms\Components\KeyValue::make('metadata')
+                        KeyValue::make('metadata')
                             ->label('Metadata (JSON)')
                             ->addActionLabel('Add Field')
                             ->helperText('Extra data: duration, quality tier, etc.'),
@@ -177,12 +194,12 @@ class VoiceSampleResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')->sortable(),
-                Tables\Columns\TextColumn::make('title')->searchable()->sortable()->limit(40),
-                Tables\Columns\TextColumn::make('language')->badge()->sortable(),
-                Tables\Columns\TextColumn::make('dialect')->badge()->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('emotion')->badge()->color('info')->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('category')->badge()
+                TextColumn::make('id')->sortable(),
+                TextColumn::make('title')->searchable()->sortable()->limit(40),
+                TextColumn::make('language')->badge()->sortable(),
+                TextColumn::make('dialect')->badge()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('emotion')->badge()->color('info')->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('category')->badge()
                     ->color(fn (?string $state): string => match ($state) {
                         'hero' => 'success',
                         'demo' => 'info',
@@ -190,36 +207,36 @@ class VoiceSampleResource extends Resource
                         'comparison' => 'primary',
                         default => 'gray',
                     })->sortable(),
-                Tables\Columns\TextColumn::make('provider')->badge()->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\IconColumn::make('is_featured')->label('Featured')->boolean(),
-                Tables\Columns\IconColumn::make('is_active')->label('Active')->boolean()->sortable(),
-                Tables\Columns\IconColumn::make('show_in_hero')->label('Hero')->boolean(),
-                Tables\Columns\IconColumn::make('show_in_showcase')->label('Showcase')->boolean(),
-                Tables\Columns\TextColumn::make('sort_order')->sortable()->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('provider')->badge()->toggleable(isToggledHiddenByDefault: true),
+                IconColumn::make('is_featured')->label('Featured')->boolean(),
+                IconColumn::make('is_active')->label('Active')->boolean()->sortable(),
+                IconColumn::make('show_in_hero')->label('Hero')->boolean(),
+                IconColumn::make('show_in_showcase')->label('Showcase')->boolean(),
+                TextColumn::make('sort_order')->sortable()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('created_at')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('category')
+                SelectFilter::make('category')
                     ->options([
                         'hero' => 'Hero Section',
                         'demo' => 'Demo Page',
                         'feature' => 'Feature Showcase',
                         'comparison' => 'Quality Comparison',
                     ]),
-                Tables\Filters\SelectFilter::make('language')
+                SelectFilter::make('language')
                     ->options(fn () => VoiceSample::query()->distinct()->pluck('language', 'language')->toArray()),
-                Tables\Filters\TernaryFilter::make('is_active')->label('Active'),
-                Tables\Filters\TernaryFilter::make('is_featured')->label('Featured'),
-                Tables\Filters\TernaryFilter::make('show_in_hero')->label('Show In Hero'),
-                Tables\Filters\TernaryFilter::make('show_in_showcase')->label('Show In Voice Samples'),
+                TernaryFilter::make('is_active')->label('Active'),
+                TernaryFilter::make('is_featured')->label('Featured'),
+                TernaryFilter::make('show_in_hero')->label('Show In Hero'),
+                TernaryFilter::make('show_in_showcase')->label('Show In Voice Samples'),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                ViewAction::make(),
+                EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('sort_order', 'asc');
@@ -228,9 +245,9 @@ class VoiceSampleResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListVoiceSamples::route('/'),
-            'create' => Pages\CreateVoiceSample::route('/create'),
-            'edit' => Pages\EditVoiceSample::route('/{record}/edit'),
+            'index' => ListVoiceSamples::route('/'),
+            'create' => CreateVoiceSample::route('/create'),
+            'edit' => EditVoiceSample::route('/{record}/edit'),
         ];
     }
 }

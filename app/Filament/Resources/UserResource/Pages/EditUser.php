@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\UserResource\Pages;
 
+use Filament\Actions\ViewAction;
+use Filament\Actions\DeleteAction;
 use App\Filament\Resources\UserResource;
 use App\Models\User;
 use App\Services\UserDeletionService;
@@ -19,10 +21,10 @@ class EditUser extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\ViewAction::make(),
+            ViewAction::make(),
             // A member who would still be charged is kept, with the reason.
-            Actions\DeleteAction::make()
-                ->action(function (Actions\DeleteAction $action, User $record): void {
+            DeleteAction::make()
+                ->action(function (DeleteAction $action, User $record): void {
                     $refusal = app(UserDeletionService::class)->delete($record, Auth::user());
                     if ($refusal !== null) {
                         Notification::make()

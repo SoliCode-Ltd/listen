@@ -2,6 +2,22 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Textarea;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\DemoVoiceGenerationResource\Pages\ListDemoVoiceGenerations;
+use App\Filament\Resources\DemoVoiceGenerationResource\Pages\ViewDemoVoiceGeneration;
 use App\Filament\Resources\DemoVoiceGenerationResource\Pages;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
@@ -10,7 +26,6 @@ use App\Services\PlanAccessService;
 use App\Support\AudioUrl;
 use App\Support\GenerationChoiceLabels;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -21,102 +36,102 @@ class DemoVoiceGenerationResource extends Resource
     /** @var array<int, array{label:string,is_paid:bool}> */
     private static array $planBadgeByUserId = [];
 
-    protected static ?string $navigationIcon = 'heroicon-o-speaker-wave';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-speaker-wave';
 
-    protected static ?string $navigationGroup = 'Demo';
+    protected static string | \UnitEnum | null $navigationGroup = 'Demo';
 
     protected static ?int $navigationSort = 4;
 
     protected static ?string $navigationLabel = 'Voice Generations';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Generation')
+        return $schema
+            ->components([
+                Section::make('Generation')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('user_name')
+                        TextInput::make('user_name')
                             ->label('User')
                             ->disabled()
                             ->dehydrated(false)
                             ->formatStateUsing(fn ($record) => $record?->user?->name),
-                        Forms\Components\TextInput::make('user_email')
+                        TextInput::make('user_email')
                             ->label('Email')
                             ->disabled()
                             ->dehydrated(false)
                             ->formatStateUsing(fn ($record) => $record?->user?->email),
-                        Forms\Components\Placeholder::make('voice_choice')
+                        Placeholder::make('voice_choice')
                             ->label('Voice')
                             ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::voice($record?->voice_name)),
-                        Forms\Components\TextInput::make('voice_provider')
+                        TextInput::make('voice_provider')
                             ->label('Voice engine')
                             ->disabled(),
-                        Forms\Components\Placeholder::make('tier_choice')
+                        Placeholder::make('tier_choice')
                             ->label('Quality')
                             ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::tier($record?->voice_tier)),
-                        Forms\Components\Placeholder::make('source_language_choice')
+                        Placeholder::make('source_language_choice')
                             ->label('Text language')
                             ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::language($record?->source_language)),
-                        Forms\Components\Placeholder::make('target_language_choice')
+                        Placeholder::make('target_language_choice')
                             ->label('Voice language')
                             ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::language($record?->target_language)),
-                        Forms\Components\Toggle::make('translate')
+                        Toggle::make('translate')
                             ->disabled(),
-                        Forms\Components\TextInput::make('billable_chars')
+                        TextInput::make('billable_chars')
                             ->numeric()
                             ->disabled(),
-                        Forms\Components\TextInput::make('duration_seconds')
+                        TextInput::make('duration_seconds')
                             ->numeric()
                             ->disabled(),
-                        Forms\Components\TextInput::make('public_audio_url')
+                        TextInput::make('public_audio_url')
                             ->label('Public Audio URL')
                             ->formatStateUsing(fn (?DemoVoiceGeneration $record): string => self::resolvePublicAudioUrl($record))
                             ->readOnly()
                             ->dehydrated(false)
                             ->columnSpanFull(),
                     ]),
-                Forms\Components\Section::make('Studio Controls')
+                Section::make('Studio Controls')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Placeholder::make('accent_choice')
+                        Placeholder::make('accent_choice')
                             ->label('Accent')
                             ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::accent($record?->dialect, $record?->target_language, $record?->voice_tier))
                             ->columnSpanFull(),
-                        Forms\Components\Placeholder::make('performance_style_choice')
+                        Placeholder::make('performance_style_choice')
                             ->label('Performance style')
                             ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::performanceStyle($record?->performance_style)),
-                        Forms\Components\Placeholder::make('emotion_choice')
+                        Placeholder::make('emotion_choice')
                             ->label('Emotion')
                             ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::emotion($record?->emotion)),
-                        Forms\Components\TextInput::make('speed')->numeric()->disabled(),
-                        Forms\Components\TextInput::make('pitch')->numeric()->disabled(),
-                        Forms\Components\Textarea::make('style_prompt')
+                        TextInput::make('speed')->numeric()->disabled(),
+                        TextInput::make('pitch')->numeric()->disabled(),
+                        Textarea::make('style_prompt')
                             ->rows(3)
                             ->columnSpanFull()
                             ->disabled(),
                     ]),
-                Forms\Components\Section::make('Text')
+                Section::make('Text')
                     ->schema([
-                        Forms\Components\Textarea::make('input_text')
+                        Textarea::make('input_text')
                             ->rows(5)
                             ->columnSpanFull()
                             ->disabled(),
-                        Forms\Components\Textarea::make('speech_text')
+                        Textarea::make('speech_text')
                             ->rows(5)
                             ->columnSpanFull()
                             ->disabled(),
                     ]),
-                Forms\Components\Section::make('Tracking')
+                Section::make('Tracking')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('tts_model')->disabled(),
-                        Forms\Components\TextInput::make('tts_latency_ms')->numeric()->disabled(),
-                        Forms\Components\Toggle::make('tts_fallback_used')->disabled(),
-                        Forms\Components\TextInput::make('tts_cost_estimate_usd')->numeric()->disabled(),
-                        Forms\Components\TextInput::make('quota_limit_chars')->numeric()->disabled(),
-                        Forms\Components\TextInput::make('quota_remaining_chars')->numeric()->disabled(),
-                        Forms\Components\Textarea::make('metadata')
+                        TextInput::make('tts_model')->disabled(),
+                        TextInput::make('tts_latency_ms')->numeric()->disabled(),
+                        Toggle::make('tts_fallback_used')->disabled(),
+                        TextInput::make('tts_cost_estimate_usd')->numeric()->disabled(),
+                        TextInput::make('quota_limit_chars')->numeric()->disabled(),
+                        TextInput::make('quota_remaining_chars')->numeric()->disabled(),
+                        Textarea::make('metadata')
                             ->rows(12)
                             ->columnSpanFull()
                             ->formatStateUsing(static function ($state): string {
@@ -136,14 +151,14 @@ class DemoVoiceGenerationResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')
+                TextColumn::make('id')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('user.email')
+                TextColumn::make('user.email')
                     ->label('User')
                     ->searchable()
                     ->sortable()
                     ->placeholder('-'),
-                Tables\Columns\TextColumn::make('paid_user_status')
+                TextColumn::make('paid_user_status')
                     ->label('Plan')
                     ->state(fn (DemoVoiceGeneration $record): string => self::resolvePlanBadge($record)['label'])
                     ->formatStateUsing(fn (?string $state): string => self::cleanPlanLabel((string) $state))
@@ -161,11 +176,11 @@ class DemoVoiceGenerationResource extends Resource
 
                         return ($badge['is_paid'] ?? false) ? 'success' : 'gray';
                     }),
-                Tables\Columns\TextColumn::make('voice_label')
+                TextColumn::make('voice_label')
                     ->label('Voice')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('voice_provider')
+                TextColumn::make('voice_provider')
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
                         'gemini' => 'info',
@@ -174,7 +189,7 @@ class DemoVoiceGenerationResource extends Resource
                         default => 'gray',
                     })
                     ->sortable(),
-                Tables\Columns\TextColumn::make('voice_tier')
+                TextColumn::make('voice_tier')
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
                         'hd' => 'warning',
@@ -182,64 +197,64 @@ class DemoVoiceGenerationResource extends Resource
                         default => 'gray',
                     })
                     ->sortable(),
-                Tables\Columns\TextColumn::make('target_language')
+                TextColumn::make('target_language')
                     ->badge()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('dialect')
+                TextColumn::make('dialect')
                     ->label('Accent')
                     ->state(fn (DemoVoiceGeneration $record): string => $record->dialect
                         ? GenerationChoiceLabels::accent($record->dialect, $record->target_language, $record->voice_tier)
                         : '—')
                     ->wrap()
                     ->toggleable(),
-                Tables\Columns\IconColumn::make('translate')
+                IconColumn::make('translate')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('billable_chars')
+                TextColumn::make('billable_chars')
                     ->label('Chars')
                     ->numeric()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('duration_seconds')
+                TextColumn::make('duration_seconds')
                     ->label('Duration')
                     ->suffix(' s')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('quota_remaining_chars')
+                TextColumn::make('quota_remaining_chars')
                     ->label('Quota Left')
                     ->numeric()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('public_audio_url')
+                TextColumn::make('public_audio_url')
                     ->label('Public URL')
                     ->state(fn (DemoVoiceGeneration $record): string => self::resolvePublicAudioUrl($record))
                     ->copyable()
                     ->wrap()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('target_language')
+                SelectFilter::make('target_language')
                     ->options([
                         'ar' => 'Arabic',
                         'en' => 'English',
                     ]),
-                Tables\Filters\SelectFilter::make('voice_tier')
+                SelectFilter::make('voice_tier')
                     ->options([
                         'standard' => 'Standard',
                         'hd' => 'HD',
                     ]),
-                Tables\Filters\SelectFilter::make('voice_provider')
+                SelectFilter::make('voice_provider')
                     ->options([
                         'google_cloud' => 'Google Cloud',
                         'gemini' => 'Gemini',
                         'cache' => 'Cache',
                     ]),
-                Tables\Filters\SelectFilter::make('dialect')
+                SelectFilter::make('dialect')
                     ->label('Accent')
                     ->options(fn (): array => GenerationChoiceLabels::accentOptions())
                     ->searchable(),
-                Tables\Filters\TernaryFilter::make('translate')
+                TernaryFilter::make('translate')
                     ->label('Translated'),
-                Tables\Filters\TernaryFilter::make('paid_user')
+                TernaryFilter::make('paid_user')
                     ->label('Paid User')
                     ->queries(
                         true: fn ($query) => $query->where('metadata->paid_user', true),
@@ -249,18 +264,18 @@ class DemoVoiceGenerationResource extends Resource
                         blank: fn ($query) => $query,
                     ),
             ])
-            ->actions([
-                Tables\Actions\Action::make('audio')
+            ->recordActions([
+                Action::make('audio')
                     ->label('Open Audio')
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->url(fn (DemoVoiceGeneration $record): ?string => $record->audio_path ? AudioUrl::fromPath($record->audio_path) : null)
                     ->openUrlInNewTab()
                     ->visible(fn (DemoVoiceGeneration $record): bool => filled($record->audio_path)),
-                Tables\Actions\ViewAction::make(),
+                ViewAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
@@ -269,8 +284,8 @@ class DemoVoiceGenerationResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListDemoVoiceGenerations::route('/'),
-            'view' => Pages\ViewDemoVoiceGeneration::route('/{record}'),
+            'index' => ListDemoVoiceGenerations::route('/'),
+            'view' => ViewDemoVoiceGeneration::route('/{record}'),
         ];
     }
 

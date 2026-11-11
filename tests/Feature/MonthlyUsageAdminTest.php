@@ -201,10 +201,11 @@ class MonthlyUsageAdminTest extends TestCase
             ->assertSee('1 of 2')
             ->assertSee('1 paying now made nothing');
 
+        // Filament 4 draws an action's modal apart from the page: read the modal itself.
         Livewire::test(ListUsageCounters::class)
             ->mountAction('idlePaying')
-            ->assertSee('idle@example.test')
-            ->assertDontSee('busy@example.test');
+            ->assertMountedActionModalSee('idle@example.test')
+            ->assertMountedActionModalDontSee('busy@example.test');
     }
 
     public function test_the_details_page_shows_what_the_member_made_in_the_period(): void

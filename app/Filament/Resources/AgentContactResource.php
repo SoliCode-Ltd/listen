@@ -2,6 +2,13 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Forms\Components\DatePicker;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Actions\Action;
+use App\Filament\Resources\AgentContactResource\Pages\ListAgentContacts;
 use App\Filament\Resources\AgentContactResource\Pages;
 use App\Filament\Resources\Concerns\ReadOnlyResource;
 use App\Models\AgentContact;
@@ -27,9 +34,9 @@ class AgentContactResource extends Resource
 
     protected static ?string $model = AgentContact::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-identification';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-identification';
 
-    protected static ?string $navigationGroup = 'Agents';
+    protected static string | \UnitEnum | null $navigationGroup = 'Agents';
 
     protected static ?int $navigationSort = 3;
 
@@ -58,11 +65,11 @@ class AgentContactResource extends Resource
             ->columns(self::tableColumns())
             ->defaultSort('last_contact_at', 'desc')
             ->filters([
-                Tables\Filters\SelectFilter::make('agent_id')
+                SelectFilter::make('agent_id')
                     ->label('Agent')
                     ->options(fn (): array => AgentConversationResource::agentOptions())
                     ->searchable(),
-                Tables\Filters\TernaryFilter::make('house')
+                TernaryFilter::make('house')
                     ->label('Listen\'s own agents')
                     ->placeholder('All agents')
                     ->trueLabel('Only Listen\'s own')
@@ -72,22 +79,22 @@ class AgentContactResource extends Resource
                         false: fn (Builder $query): Builder => $query->whereHas('agent', fn (Builder $agent): Builder => AgentResource::whereHouse($agent, false)),
                         blank: fn (Builder $query): Builder => $query,
                     ),
-                Tables\Filters\TernaryFilter::make('phone')
+                TernaryFilter::make('phone')
                     ->label('Phone number')
                     ->placeholder('With or without')
                     ->trueLabel('Left a phone number')
                     ->falseLabel('No phone number')
                     ->nullable(),
-                Tables\Filters\TernaryFilter::make('email')
+                TernaryFilter::make('email')
                     ->label('Email')
                     ->placeholder('With or without')
                     ->trueLabel('Left an email')
                     ->falseLabel('No email')
                     ->nullable(),
-                Tables\Filters\Filter::make('last_contact_at')
+                Filter::make('last_contact_at')
                     ->form([
-                        Forms\Components\DatePicker::make('from')->label('Last contact from'),
-                        Forms\Components\DatePicker::make('until')->label('Last contact until'),
+                        DatePicker::make('from')->label('Last contact from'),
+                        DatePicker::make('until')->label('Last contact until'),
                     ])
                     ->query(fn (Builder $query, array $data): Builder => $query
                         ->when($data['from'] ?? null, fn (Builder $q, $date): Builder => $q->whereDate('agent_contacts.last_contact_at', '>=', $date))
@@ -98,10 +105,10 @@ class AgentContactResource extends Resource
                     ]))),
             ])
             ->recordUrl(fn (AgentContact $record): ?string => self::callUrl($record))
-            ->actions([
+            ->recordActions([
                 self::openCallAction(),
             ])
-            ->bulkActions([])
+            ->toolbarActions([])
             ->emptyStateHeading('No customers yet')
             ->emptyStateDescription('When a caller leaves their name and phone number (or email) with an agent, they show here.');
     }
@@ -114,13 +121,13 @@ class AgentContactResource extends Resource
     public static function tableColumns(bool $withAgent = true): array
     {
         return array_values(array_filter([
-            Tables\Columns\TextColumn::make('name')
+            TextColumn::make('name')
                 ->weight(FontWeight::SemiBold)
                 ->formatStateUsing(fn (?string $state): ?HtmlString => AgentResource::isolate(Str::limit((string) $state, 40)))
                 ->searchable()
                 ->sortable()
                 ->placeholder('No name given'),
-            Tables\Columns\TextColumn::make('phone')
+            TextColumn::make('phone')
                 ->label('Phone and email')
                 // The email takes the phone's place when there is no phone, so the line under it is never lost.
                 ->state(fn (AgentContact $record): ?string => $record->phone ?: $record->email)
@@ -128,7 +135,7 @@ class AgentContactResource extends Resource
                 ->searchable(['phone', 'email'])
                 ->copyable()
                 ->placeholder('—'),
-            Tables\Columns\TextColumn::make('note')
+            TextColumn::make('note')
                 ->label('What they want')
                 ->formatStateUsing(fn (?string $state): ?HtmlString => AgentResource::isolate(Str::limit((string) $state, 80)))
                 ->tooltip(fn (AgentContact $record): ?string => mb_strlen((string) $record->note) > 80 ? $record->note : null)
@@ -137,7 +144,7 @@ class AgentContactResource extends Resource
                 ->searchable()
                 ->placeholder('—'),
             $withAgent ? AgentResource::agentColumn() : null,
-            $withAgent ? Tables\Columns\TextColumn::make('owner_email')
+            $withAgent ? TextColumn::make('owner_email')
                 ->label('Owner')
                 ->url(fn (AgentContact $record): ?string => AgentResource::ownerUrl($record->user_id))
                 ->limit(28)
@@ -149,13 +156,13 @@ class AgentContactResource extends Resource
                 ->sortable()
                 ->placeholder('Account deleted')
                 ->toggleable(isToggledHiddenByDefault: true) : null,
-            Tables\Columns\TextColumn::make('last_contact_at')
+            TextColumn::make('last_contact_at')
                 ->label('Last contact')
                 ->since()
                 ->dateTimeTooltip()
                 ->sortable()
                 ->placeholder('—'),
-            Tables\Columns\TextColumn::make('created_at')
+            TextColumn::make('created_at')
                 ->label('First saved')
                 ->dateTime()
                 ->sortable()
@@ -164,9 +171,9 @@ class AgentContactResource extends Resource
     }
 
     /** The call the customer last left their details on. */
-    public static function openCallAction(): Tables\Actions\Action
+    public static function openCallAction(): Action
     {
-        return Tables\Actions\Action::make('openCall')
+        return Action::make('openCall')
             ->label('Open the call')
             ->tooltip('Open the call they left their details on')
             ->iconButton()
@@ -183,7 +190,7 @@ class AgentContactResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListAgentContacts::route('/'),
+            'index' => ListAgentContacts::route('/'),
         ];
     }
 }

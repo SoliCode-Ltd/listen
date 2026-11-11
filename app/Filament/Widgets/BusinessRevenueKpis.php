@@ -12,7 +12,7 @@ class BusinessRevenueKpis extends BaseWidget
 
     protected static ?int $sort = -29;
 
-    protected static ?string $pollingInterval = null;
+    protected ?string $pollingInterval = null;
 
     protected ?string $heading = 'Revenue & conversion';
 

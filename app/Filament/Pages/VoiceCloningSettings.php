@@ -2,12 +2,19 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Placeholder;
+use App\Models\ClonedVoice;
 use App\Models\SiteSetting;
 use App\Support\VoiceCloningAccess;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 
@@ -15,9 +22,9 @@ class VoiceCloningSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
-    protected static ?string $navigationGroup = 'Voice Cloning';
+    protected static string | \UnitEnum | null $navigationGroup = 'Voice Cloning';
 
     protected static ?int $navigationSort = 2;
 
@@ -25,7 +32,7 @@ class VoiceCloningSettings extends Page implements HasForms
 
     protected static ?string $title = 'Voice Cloning Settings';
 
-    protected static string $view = 'filament.pages.voice-cloning-settings';
+    protected string $view = 'filament.pages.voice-cloning-settings';
 
     public ?array $data = [];
 
@@ -42,19 +49,19 @@ class VoiceCloningSettings extends Page implements HasForms
         ]);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Voice Cloning Feature')
+        return $schema
+            ->components([
+                Section::make('Voice Cloning Feature')
                     ->description('Control voice cloning availability and limits for Listen Studio.')
                     ->schema([
-                        Forms\Components\Toggle::make('voice_cloning_enabled')
+                        Toggle::make('voice_cloning_enabled')
                             ->label('Enable Voice Cloning')
                             ->helperText('Globally enable or disable the voice cloning feature. Per-plan access is controlled in each Plan\'s settings.')
                             ->default(true),
 
-                        Forms\Components\Radio::make('voice_cloning_audience')
+                        Radio::make('voice_cloning_audience')
                             ->label('Who can use voice cloning')
                             ->options([
                                 VoiceCloningAccess::AUDIENCE_PREVIEW => 'Admin email only',
@@ -67,16 +74,16 @@ class VoiceCloningSettings extends Page implements HasForms
                             ->default(VoiceCloningAccess::AUDIENCE_PREVIEW)
                             ->required(),
 
-                        Forms\Components\Toggle::make('voice_cloning_recording_enabled')
+                        Toggle::make('voice_cloning_recording_enabled')
                             ->label('Enable Browser Recording')
                             ->helperText('Allow users to record voice samples directly in the browser.')
                             ->default(true),
                     ]),
 
-                Forms\Components\Section::make('Global Defaults & Validation')
+                Section::make('Global Defaults & Validation')
                     ->description('These are global defaults. Per-plan limits (set in Plan settings) take priority when configured.')
                     ->schema([
-                        Forms\Components\TextInput::make('voice_cloning_max_per_user')
+                        TextInput::make('voice_cloning_max_per_user')
                             ->label('Default Max Cloned Voices Per User')
                             ->numeric()
                             ->minValue(1)
@@ -84,7 +91,7 @@ class VoiceCloningSettings extends Page implements HasForms
                             ->default(5)
                             ->helperText('Fallback limit when a plan does not specify its own limit.'),
 
-                        Forms\Components\TextInput::make('voice_cloning_min_duration')
+                        TextInput::make('voice_cloning_min_duration')
                             ->label('Minimum Sample Duration (seconds)')
                             ->numeric()
                             ->minValue(5)
@@ -92,7 +99,7 @@ class VoiceCloningSettings extends Page implements HasForms
                             ->default(10)
                             ->helperText('Minimum audio sample duration in seconds.'),
 
-                        Forms\Components\TextInput::make('voice_cloning_max_upload_mb')
+                        TextInput::make('voice_cloning_max_upload_mb')
                             ->label('Maximum Upload Size (MB)')
                             ->numeric()
                             ->minValue(1)
@@ -101,10 +108,10 @@ class VoiceCloningSettings extends Page implements HasForms
                             ->helperText('Maximum file upload size in megabytes.'),
                     ]),
 
-                Forms\Components\Section::make('Listen voice service')
+                Section::make('Listen voice service')
                     ->description('Region used when Listen creates a cloned voice.')
                     ->schema([
-                        Forms\Components\Select::make('voice_cloning_region')
+                        Select::make('voice_cloning_region')
                             ->label('API Region')
                             ->options([
                                 'global' => 'Global',
@@ -118,15 +125,15 @@ class VoiceCloningSettings extends Page implements HasForms
                             ->helperText('Region Listen uses for voice cloning.'),
                     ]),
 
-                Forms\Components\Section::make('Statistics')
+                Section::make('Statistics')
                     ->schema([
-                        Forms\Components\Placeholder::make('stats')
+                        Placeholder::make('stats')
                             ->label('')
                             ->content(function () {
-                                $total = \App\Models\ClonedVoice::count();
-                                $ready = \App\Models\ClonedVoice::where('status', 'ready')->count();
-                                $processing = \App\Models\ClonedVoice::whereIn('status', ['pending', 'validating', 'processing'])->count();
-                                $failed = \App\Models\ClonedVoice::where('status', 'failed')->count();
+                                $total = ClonedVoice::count();
+                                $ready = ClonedVoice::where('status', 'ready')->count();
+                                $processing = ClonedVoice::whereIn('status', ['pending', 'validating', 'processing'])->count();
+                                $failed = ClonedVoice::where('status', 'failed')->count();
 
                                 return "Total: {$total} | Ready: {$ready} | Processing: {$processing} | Failed: {$failed}";
                             }),

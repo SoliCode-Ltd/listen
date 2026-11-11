@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\PlanResource\Pages;
 
+use Filament\Actions\Action;
+use Filament\Actions\CreateAction;
 use App\Filament\Resources\PlanResource;
 use App\Services\StripeProductSyncService;
 use Filament\Actions;
@@ -14,7 +16,7 @@ class ListPlans extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('syncAllStripe')
+            Action::make('syncAllStripe')
                 ->label('Sync All to Stripe')
                 ->icon('heroicon-o-arrow-path')
                 ->color('success')
@@ -27,7 +29,7 @@ class ListPlans extends ListRecords
 
                     PlanResource::stripeSyncCountsNotice($result['synced'], $result['failed'], $result['skipped'])->send();
                 }),
-            Actions\CreateAction::make(),
+            CreateAction::make(),
         ];
     }
 }

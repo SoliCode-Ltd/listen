@@ -2,16 +2,17 @@
 
 namespace App\Filament\Resources\AgentConversationResource\Pages;
 
+use App\Filament\Concerns\SimplePages;
+use Filament\Schemas\Components\Tabs\Tab;
 use App\Filament\Resources\AgentConversationResource;
 use App\Filament\Resources\AgentResource;
 use App\Models\AgentConversation;
-use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 
 class ListAgentConversations extends ListRecords
 {
-    use \App\Filament\Concerns\SimplePages;
+    use SimplePages;
 
     protected static string $resource = AgentConversationResource::class;
 

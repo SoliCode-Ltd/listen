@@ -9,15 +9,15 @@ class BusinessUsageChart extends ChartWidget
 {
     use UsesBusinessStats;
 
-    protected static ?string $heading = 'Usage: generations and audio minutes';
+    protected ?string $heading = 'Usage: generations and audio minutes';
 
-    protected static ?string $description = 'Member generations per month (successful vs failed) and minutes of audio produced.';
+    protected ?string $description = 'Member generations per month (successful vs failed) and minutes of audio produced.';
 
     protected static ?int $sort = -19;
 
-    protected static ?string $pollingInterval = null;
+    protected ?string $pollingInterval = null;
 
-    protected static ?string $maxHeight = '300px';
+    protected ?string $maxHeight = '300px';
 
     protected function getData(): array
     {

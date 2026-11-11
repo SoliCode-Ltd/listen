@@ -2,13 +2,17 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Placeholder;
+use Throwable;
 use App\Models\SiteSetting;
 use App\Support\TitanMailbox;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Mail;
@@ -17,9 +21,9 @@ class NewsletterMailbox extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-inbox';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-inbox';
 
-    protected static ?string $navigationGroup = 'Newsletter';
+    protected static string | \UnitEnum | null $navigationGroup = 'Newsletter';
 
     protected static ?string $navigationLabel = 'Mailbox';
 
@@ -27,7 +31,7 @@ class NewsletterMailbox extends Page implements HasForms
 
     protected static ?string $title = 'Titan mailbox';
 
-    protected static string $view = 'filament.pages.newsletter-mailbox';
+    protected string $view = 'filament.pages.newsletter-mailbox';
 
     public ?array $data = [];
 
@@ -43,40 +47,40 @@ class NewsletterMailbox extends Page implements HasForms
         ]);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Titan Email')
+        return $schema
+            ->components([
+                Section::make('Titan Email')
                     ->description('Newsletters send through the Titan mailbox for listenai.studio. Use the password for help@listenai.studio. Before the first send, sign in at https://app.titan.email/mail/ as that mailbox, open Settings, and turn on Enable Titan on other apps. Two-factor authentication on the mailbox blocks SMTP even when the password is correct.')
                     ->schema([
-                        Forms\Components\TextInput::make('host')
+                        TextInput::make('host')
                             ->label('SMTP host')
                             ->required()
                             ->default(TitanMailbox::HOST),
-                        Forms\Components\TextInput::make('port')
+                        TextInput::make('port')
                             ->label('SMTP port')
                             ->numeric()
                             ->required()
                             ->default(TitanMailbox::PORT),
-                        Forms\Components\TextInput::make('username')
+                        TextInput::make('username')
                             ->label('Mailbox')
                             ->email()
                             ->required()
                             ->default(TitanMailbox::ADDRESS)
                             ->helperText('Titan only lets this address appear in the From line.'),
-                        Forms\Components\TextInput::make('from_name')
+                        TextInput::make('from_name')
                             ->label('From name')
                             ->required()
                             ->default('Listen'),
-                        Forms\Components\TextInput::make('password')
+                        TextInput::make('password')
                             ->label('Mailbox password')
                             ->password()
                             ->revealable()
                             ->helperText(fn (): string => TitanMailbox::hasPassword()
                                 ? 'A password is already saved. Leave this blank to keep it, or paste a new one to replace it.'
                                 : 'Paste the Titan password for help@listenai.studio. Nothing can be sent until this is saved.'),
-                        Forms\Components\Placeholder::make('password_saved')
+                        Placeholder::make('password_saved')
                             ->label('Status')
                             ->content(fn (): string => TitanMailbox::hasPassword()
                                 ? 'Ready to send from '.TitanMailbox::username().'.'
@@ -95,8 +99,8 @@ class NewsletterMailbox extends Page implements HasForms
                 ->icon('heroicon-o-paper-airplane')
                 ->modalDescription('Sends one plain message through Titan. It does not email your users.')
                 ->modalSubmitActionLabel('Send test')
-                ->form([
-                    Forms\Components\TextInput::make('email')
+                ->schema([
+                    TextInput::make('email')
                         ->label('Send the test to')
                         ->email()
                         ->required()
@@ -116,7 +120,7 @@ class NewsletterMailbox extends Page implements HasForms
                                     ->subject('Listen mailbox test');
                             }
                         );
-                    } catch (\Throwable $exception) {
+                    } catch (Throwable $exception) {
                         Notification::make()
                             ->title('Mailbox test was not sent')
                             ->body(TitanMailbox::explainFailure($exception->getMessage()))

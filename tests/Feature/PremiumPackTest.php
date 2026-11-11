@@ -441,6 +441,23 @@ class PremiumPackTest extends TestCase
         $this->assertSame(20000, app(CharPackService::class)->remaining($user->id));
     }
 
+    public function test_the_admin_takes_back_what_is_unused_of_a_pack_from_its_list(): void
+    {
+        $member = $this->member();
+        $purchase = $this->paidPurchase($member);
+        $packs = app(CharPackService::class);
+        $this->assertSame((int) $purchase->chars, $packs->wallet($member->id)->remaining());
+
+        $this->actingAs($this->admin());
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+        \Livewire\Livewire::test(\App\Filament\Resources\CharPackPurchaseResource\Pages\ListCharPackPurchases::class)
+            ->callTableAction('takeBack', $purchase)
+            ->assertNotified(number_format((int) $purchase->chars).' characters taken back');
+
+        $this->assertSame(CharPackPurchase::STATUS_REFUNDED, $purchase->fresh()->status);
+        $this->assertSame(0, $packs->wallet($member->id)->remaining());
+    }
+
     public function test_a_card_refund_takes_the_pack_back(): void
     {
         $user = $this->member();

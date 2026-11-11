@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets\Concerns;
 
+use Illuminate\Support\Carbon;
 use App\Services\Analytics\BusinessStatsService;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 
@@ -57,6 +58,6 @@ trait UsesBusinessStats
 
     protected static function monthLabel(string $ym): string
     {
-        return \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $ym.'-01')->format('M Y');
+        return Carbon::createFromFormat('Y-m-d', $ym.'-01')->format('M Y');
     }
 }

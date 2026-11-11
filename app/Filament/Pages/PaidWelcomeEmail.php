@@ -2,6 +2,14 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Textarea;
+use Throwable;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Newsletter\PaidWelcomeEmail as WelcomeEmail;
@@ -9,7 +17,6 @@ use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\HtmlString;
@@ -22,9 +29,9 @@ class PaidWelcomeEmail extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-sparkles';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-sparkles';
 
-    protected static ?string $navigationGroup = 'Newsletter';
+    protected static string | \UnitEnum | null $navigationGroup = 'Newsletter';
 
     protected static ?string $navigationLabel = 'Paid welcome email';
 
@@ -32,7 +39,7 @@ class PaidWelcomeEmail extends Page implements HasForms
 
     protected static ?string $title = 'Welcome email for paid members';
 
-    protected static string $view = 'filament.pages.paid-welcome-email';
+    protected string $view = 'filament.pages.paid-welcome-email';
 
     public ?array $data = [];
 
@@ -43,55 +50,55 @@ class PaidWelcomeEmail extends Page implements HasForms
         $this->form->fill($settings);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Sending')
+        return $schema
+            ->components([
+                Section::make('Sending')
                     ->description('Goes out by itself each time a member starts a paid plan: after paying online, after a trial is paid, when you set a paid plan for them in Subscriptions, or when they move to another paid plan. Renewals of the same plan do not send it. Members on an unpaid trial do not get it until the trial is paid. You can always send it again by hand with the buttons above.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Toggle::make('enabled')
+                        Toggle::make('enabled')
                             ->label('Send it automatically to new paid members')
                             ->columnSpan(2),
-                        Forms\Components\Select::make('order')
+                        Select::make('order')
                             ->label('Language order in the email')
                             ->options(['ar_en' => 'Arabic, then English', 'en_ar' => 'English, then Arabic'])
                             ->required(),
-                        Forms\Components\TextInput::make('review_url')
+                        TextInput::make('review_url')
                             ->label('Review link (the button)')
                             ->url()
                             ->required()
                             ->default(WelcomeEmail::REVIEW_URL),
-                        Forms\Components\Placeholder::make('tracking')
+                        Placeholder::make('tracking')
                             ->label('Status')
                             ->content(fn (): string => WelcomeEmail::canTrack()
                                 ? 'Ready.'
                                 : 'Ready. Run the database migration to keep the list of who was welcomed.')
                             ->columnSpan(2),
                     ]),
-                Forms\Components\Section::make('English')
+                Section::make('English')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('subject_en')->label('Subject')->required()->maxLength(200)->columnSpan(2),
-                        Forms\Components\TextInput::make('headline_en')->label('Headline')->maxLength(200)->helperText('{name} becomes the member\'s first name, {plan} the name of their paid plan (in this language).')->columnSpan(2),
-                        Forms\Components\Textarea::make('body_en')->label('Message')->rows(6)->required()->helperText('A blank line starts a new paragraph. {name} and {plan} work here too, and in the subject.')->columnSpan(2),
-                        Forms\Components\TextInput::make('cta_label_en')->label('Button text')->maxLength(80),
-                        Forms\Components\TextInput::make('footer_en')->label('Small print at the bottom')->maxLength(300),
+                        TextInput::make('subject_en')->label('Subject')->required()->maxLength(200)->columnSpan(2),
+                        TextInput::make('headline_en')->label('Headline')->maxLength(200)->helperText('{name} becomes the member\'s first name, {plan} the name of their paid plan (in this language).')->columnSpan(2),
+                        Textarea::make('body_en')->label('Message')->rows(6)->required()->helperText('A blank line starts a new paragraph. {name} and {plan} work here too, and in the subject.')->columnSpan(2),
+                        TextInput::make('cta_label_en')->label('Button text')->maxLength(80),
+                        TextInput::make('footer_en')->label('Small print at the bottom')->maxLength(300),
                     ]),
-                Forms\Components\Section::make('العربية')
+                Section::make('العربية')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('subject_ar')->label('Subject')->required()->maxLength(200)->extraInputAttributes(['dir' => 'rtl'])->columnSpan(2),
-                        Forms\Components\TextInput::make('headline_ar')->label('Headline')->maxLength(200)->extraInputAttributes(['dir' => 'rtl'])->columnSpan(2),
-                        Forms\Components\Textarea::make('body_ar')->label('Message')->rows(6)->required()->extraInputAttributes(['dir' => 'rtl'])->columnSpan(2),
-                        Forms\Components\TextInput::make('cta_label_ar')->label('Button text')->maxLength(80)->extraInputAttributes(['dir' => 'rtl']),
-                        Forms\Components\TextInput::make('footer_ar')->label('Small print at the bottom')->maxLength(300)->extraInputAttributes(['dir' => 'rtl']),
+                        TextInput::make('subject_ar')->label('Subject')->required()->maxLength(200)->extraInputAttributes(['dir' => 'rtl'])->columnSpan(2),
+                        TextInput::make('headline_ar')->label('Headline')->maxLength(200)->extraInputAttributes(['dir' => 'rtl'])->columnSpan(2),
+                        Textarea::make('body_ar')->label('Message')->rows(6)->required()->extraInputAttributes(['dir' => 'rtl'])->columnSpan(2),
+                        TextInput::make('cta_label_ar')->label('Button text')->maxLength(80)->extraInputAttributes(['dir' => 'rtl']),
+                        TextInput::make('footer_ar')->label('Small print at the bottom')->maxLength(300)->extraInputAttributes(['dir' => 'rtl']),
                     ]),
-                Forms\Components\Section::make('Recently welcomed')
+                Section::make('Recently welcomed')
                     ->collapsed()
                     ->schema([
-                        Forms\Components\Placeholder::make('recent')
+                        Placeholder::make('recent')
                             ->label('')
                             ->content(fn (): HtmlString|string => $this->recentTable()),
                     ]),
@@ -126,8 +133,8 @@ class PaidWelcomeEmail extends Page implements HasForms
                 ->icon('heroicon-o-paper-airplane')
                 ->color('gray')
                 ->modalDescription('Saves your changes and sends one copy to the address below. No member gets anything and nothing is recorded.')
-                ->form([
-                    Forms\Components\TextInput::make('email')
+                ->schema([
+                    TextInput::make('email')
                         ->label('Send the test to')
                         ->email()
                         ->required()
@@ -141,8 +148,8 @@ class PaidWelcomeEmail extends Page implements HasForms
                 ->label('Send to a member')
                 ->icon('heroicon-o-envelope')
                 ->modalDescription('Saves your changes and sends the welcome email to one paid member now, even if they already had it.')
-                ->form([
-                    Forms\Components\Select::make('user_id')
+                ->schema([
+                    Select::make('user_id')
                         ->label('Paid member')
                         ->searchable()
                         ->getSearchResultsUsing(fn (string $search): array => self::paidMemberOptions($search))
@@ -167,7 +174,7 @@ class PaidWelcomeEmail extends Page implements HasForms
 
         try {
             app(WelcomeEmail::class)->send($user, $testTo);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Notification::make()->title('The email was not sent')->body($e->getMessage())->danger()->persistent()->send();
 
             return;

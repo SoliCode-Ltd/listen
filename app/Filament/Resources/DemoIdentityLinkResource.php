@@ -2,10 +2,23 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\DemoIdentityLinkResource\Pages\ListDemoIdentityLinks;
 use App\Filament\Resources\DemoIdentityLinkResource\Pages;
 use App\Models\DemoIdentityLink;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -14,9 +27,9 @@ class DemoIdentityLinkResource extends Resource
 {
     protected static ?string $model = DemoIdentityLink::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-link';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-link';
 
-    protected static ?string $navigationGroup = 'Demo Tracking';
+    protected static string | \UnitEnum | null $navigationGroup = 'Demo Tracking';
 
     protected static ?int $navigationSort = 2;
 
@@ -24,20 +37,20 @@ class DemoIdentityLinkResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Identity Link')
+        return $schema
+            ->components([
+                Section::make('Identity Link')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('identity_hash')
+                        TextInput::make('identity_hash')
                             ->required()
                             ->maxLength(80),
-                        Forms\Components\TextInput::make('link_group')
+                        TextInput::make('link_group')
                             ->required()
                             ->maxLength(80),
-                        Forms\Components\Select::make('identity_type')
+                        Select::make('identity_type')
                             ->options([
                                 'fp' => 'Fingerprint',
                                 'cv' => 'Canvas',
@@ -49,13 +62,13 @@ class DemoIdentityLinkResource extends Resource
                                 'ip' => 'IP Address',
                             ])
                             ->required(),
-                        Forms\Components\TextInput::make('confidence')
+                        TextInput::make('confidence')
                             ->numeric()
                             ->default(1.0)
                             ->step(0.1)
                             ->minValue(0)
                             ->maxValue(1),
-                        Forms\Components\Toggle::make('is_primary')
+                        Toggle::make('is_primary')
                             ->default(false),
                     ]),
             ]);
@@ -65,19 +78,19 @@ class DemoIdentityLinkResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')
+                TextColumn::make('id')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('identity_hash')
+                TextColumn::make('identity_hash')
                     ->label('Identity')
                     ->searchable()
                     ->limit(16)
                     ->tooltip(fn ($record) => $record->identity_hash),
-                Tables\Columns\TextColumn::make('link_group')
+                TextColumn::make('link_group')
                     ->label('Link Group')
                     ->searchable()
                     ->limit(16)
                     ->tooltip(fn ($record) => $record->link_group),
-                Tables\Columns\BadgeColumn::make('identity_type')
+                BadgeColumn::make('identity_type')
                     ->label('Type')
                     ->colors([
                         'primary' => 'fp',
@@ -85,18 +98,18 @@ class DemoIdentityLinkResource extends Resource
                         'warning' => fn ($state) => in_array($state, ['dv', 'ua', 'ft']),
                         'danger' => 'ip',
                     ]),
-                Tables\Columns\TextColumn::make('confidence')
+                TextColumn::make('confidence')
                     ->numeric(2)
                     ->sortable(),
-                Tables\Columns\IconColumn::make('is_primary')
+                IconColumn::make('is_primary')
                     ->label('Primary')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('identity_type')
+                SelectFilter::make('identity_type')
                     ->options([
                         'fp' => 'Fingerprint',
                         'cv' => 'Canvas',
@@ -107,14 +120,14 @@ class DemoIdentityLinkResource extends Resource
                         'ua' => 'User Agent',
                         'ip' => 'IP Address',
                     ]),
-                Tables\Filters\TernaryFilter::make('is_primary'),
+                TernaryFilter::make('is_primary'),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
+            ->recordActions([
+                ViewAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
@@ -123,7 +136,7 @@ class DemoIdentityLinkResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListDemoIdentityLinks::route('/'),
+            'index' => ListDemoIdentityLinks::route('/'),
         ];
     }
 }

@@ -2,10 +2,17 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\NewsletterSuppressionResource\Pages\ListNewsletterSuppressions;
+use App\Filament\Resources\NewsletterSuppressionResource\Pages\CreateNewsletterSuppression;
 use App\Filament\Resources\NewsletterSuppressionResource\Pages;
 use App\Models\NewsletterSuppression;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -14,9 +21,9 @@ class NewsletterSuppressionResource extends Resource
 {
     protected static ?string $model = NewsletterSuppression::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-no-symbol';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-no-symbol';
 
-    protected static ?string $navigationGroup = 'Newsletter';
+    protected static string | \UnitEnum | null $navigationGroup = 'Newsletter';
 
     protected static ?string $navigationLabel = 'Unsubscribes';
 
@@ -28,10 +35,10 @@ class NewsletterSuppressionResource extends Resource
 
     protected static ?int $navigationSort = 5;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
-            Forms\Components\TextInput::make('email')
+        return $schema->components([
+            TextInput::make('email')
                 ->email()
                 ->required()
                 ->maxLength(255)
@@ -43,22 +50,22 @@ class NewsletterSuppressionResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('email')
+                TextColumn::make('email')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('unsubscribed_at')
+                TextColumn::make('unsubscribed_at')
                     ->dateTime()
                     ->sortable(),
             ])
             ->defaultSort('unsubscribed_at', 'desc')
-            ->actions([
-                Tables\Actions\DeleteAction::make()
+            ->recordActions([
+                DeleteAction::make()
                     ->label('Allow emails again')
                     ->modalHeading('Allow emails again')
                     ->modalDescription('Removes this address from the unsubscribe list. A later newsletter can include it.'),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->emptyStateHeading('No unsubscribes')
@@ -68,8 +75,8 @@ class NewsletterSuppressionResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListNewsletterSuppressions::route('/'),
-            'create' => Pages\CreateNewsletterSuppression::route('/create'),
+            'index' => ListNewsletterSuppressions::route('/'),
+            'create' => CreateNewsletterSuppression::route('/create'),
         ];
     }
 }

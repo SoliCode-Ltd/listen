@@ -12,7 +12,7 @@ class BusinessGrowthKpis extends BaseWidget
 
     protected static ?int $sort = -30;
 
-    protected static ?string $pollingInterval = null;
+    protected ?string $pollingInterval = null;
 
     protected ?string $heading = 'Members & engagement';
 

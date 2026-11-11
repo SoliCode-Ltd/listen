@@ -111,6 +111,19 @@ class ListSpeedTest extends TestCase
         $this->assertSame('fallback', SiteSetting::get('never_saved_setting', 'fallback'));
     }
 
+    public function test_a_fallback_for_a_setting_not_saved_is_the_callers_own_never_the_first_callers(): void
+    {
+        // The agents' costs read the yearly discount with 0, the pricing page with 20.
+        $this->assertSame(0, SiteSetting::get('billing_yearly_discount_percentage', 0));
+        $this->assertSame('20', SiteSetting::get('billing_yearly_discount_percentage', '20'));
+        $this->assertSame(20, SiteSetting::yearlyDiscountPercent());
+        $this->assertNull(SiteSetting::get('billing_yearly_discount_percentage'));
+
+        SiteSetting::set('billing_yearly_discount_percentage', '25');
+        $this->assertSame('25', SiteSetting::get('billing_yearly_discount_percentage', 0));
+        $this->assertSame(25, SiteSetting::yearlyDiscountPercent());
+    }
+
     public function test_the_users_list_shows_the_same_plan_and_demo_use_with_the_same_queries_for_any_page_size(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);

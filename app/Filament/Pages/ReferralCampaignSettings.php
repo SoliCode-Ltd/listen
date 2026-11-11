@@ -2,11 +2,16 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use App\Models\ReferralCampaign;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 
@@ -14,9 +19,9 @@ class ReferralCampaignSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-gift';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-gift';
 
-    protected static ?string $navigationGroup = 'Referrals';
+    protected static string | \UnitEnum | null $navigationGroup = 'Referrals';
 
     protected static ?int $navigationSort = 1;
 
@@ -24,7 +29,7 @@ class ReferralCampaignSettings extends Page implements HasForms
 
     protected static ?string $navigationLabel = 'Campaign Settings';
 
-    protected static string $view = 'filament.pages.referral-campaign-settings';
+    protected string $view = 'filament.pages.referral-campaign-settings';
 
     public ?array $data = [];
 
@@ -65,26 +70,26 @@ class ReferralCampaignSettings extends Page implements HasForms
         $this->form->fill($state);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Campaign')
+        return $schema
+            ->components([
+                Section::make('Campaign')
                     ->description('Controls the single active referral program. Switch off to pause without losing data.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('slug')
+                        TextInput::make('slug')
                             ->required()
                             ->maxLength(60)
                             ->helperText('Internal identifier. Leave as "default" unless you run multiple campaigns.')
                             ->default('default'),
-                        Forms\Components\TextInput::make('name')
+                        TextInput::make('name')
                             ->required()
                             ->maxLength(120),
-                        Forms\Components\Toggle::make('is_active')
+                        Toggle::make('is_active')
                             ->label('Campaign Active')
                             ->helperText('If disabled, new conversions stop being created but existing balances remain.'),
-                        Forms\Components\Select::make('qualification_step')
+                        Select::make('qualification_step')
                             ->label('Reward Trigger')
                             ->required()
                             ->options([
@@ -96,10 +101,10 @@ class ReferralCampaignSettings extends Page implements HasForms
                             ->helperText('The event that promotes a pending conversion to approved. Default: paid plan purchase.'),
                     ]),
 
-                Forms\Components\Section::make('Reward')
+                Section::make('Reward')
                     ->columns(3)
                     ->schema([
-                        Forms\Components\TextInput::make('reward_chars')
+                        TextInput::make('reward_chars')
                             ->label('Reward Characters')
                             ->numeric()
                             ->minValue(0)
@@ -108,7 +113,7 @@ class ReferralCampaignSettings extends Page implements HasForms
                             ->default(1000)
                             ->suffix('chars')
                             ->helperText('Amount of demo-only bonus characters granted per approved conversion.'),
-                        Forms\Components\TextInput::make('visit_window_days')
+                        TextInput::make('visit_window_days')
                             ->label('Visit Attribution Window')
                             ->numeric()
                             ->minValue(1)
@@ -119,17 +124,17 @@ class ReferralCampaignSettings extends Page implements HasForms
                             ->helperText('How long a tracked visit remains valid for binding a referrer after a guest lands.'),
                     ]),
 
-                Forms\Components\Section::make('Anti-Abuse Limits')
+                Section::make('Anti-Abuse Limits')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('max_conversions_per_referrer_per_day')
+                        TextInput::make('max_conversions_per_referrer_per_day')
                             ->label('Daily Cap per Referrer')
                             ->numeric()
                             ->minValue(0)
                             ->maxValue(1000)
                             ->default(5)
                             ->helperText('Daily ceiling — excess conversions get flagged for review, not rejected outright.'),
-                        Forms\Components\TextInput::make('max_conversions_per_referrer_total')
+                        TextInput::make('max_conversions_per_referrer_total')
                             ->label('Lifetime Cap per Referrer')
                             ->numeric()
                             ->minValue(0)
@@ -138,9 +143,9 @@ class ReferralCampaignSettings extends Page implements HasForms
                             ->helperText('Lifetime ceiling — beyond this, new conversions are flagged for admin review.'),
                     ]),
 
-                Forms\Components\Section::make('Notes')
+                Section::make('Notes')
                     ->schema([
-                        Forms\Components\Textarea::make('notes')
+                        Textarea::make('notes')
                             ->rows(3)
                             ->maxLength(2000)
                             ->helperText('Optional internal notes about the campaign (not shown to users).'),

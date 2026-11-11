@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ApiKeyResource\Pages;
 
+use Filament\Actions\Action;
 use App\Filament\Resources\ApiKeyResource;
 use App\Models\ApiKey;
 use Filament\Actions;
@@ -30,7 +31,7 @@ class ViewApiKey extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('revoke')
+            Action::make('revoke')
                 ->label('Revoke')
                 ->icon('heroicon-o-no-symbol')
                 ->color('danger')

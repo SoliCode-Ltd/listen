@@ -2,6 +2,13 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Placeholder;
 use App\Models\SiteSetting;
 use App\Support\Agents\AgentAccess;
 use App\Support\Agents\AgentCost;
@@ -10,7 +17,6 @@ use App\Support\VoiceCloningAccess;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\HtmlString;
@@ -26,9 +32,9 @@ class AgentSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
-    protected static ?string $navigationGroup = 'Agents';
+    protected static string | \UnitEnum | null $navigationGroup = 'Agents';
 
     protected static ?int $navigationSort = 9;
 
@@ -36,7 +42,7 @@ class AgentSettings extends Page implements HasForms
 
     protected static ?string $title = 'Agents Settings';
 
-    protected static string $view = 'filament.pages.agent-settings';
+    protected string $view = 'filament.pages.agent-settings';
 
     private const GROUP = 'agents';
 
@@ -59,13 +65,13 @@ class AgentSettings extends Page implements HasForms
         ]);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Who sees Agents')
+        return $schema
+            ->components([
+                Section::make('Who sees Agents')
                     ->schema([
-                        Forms\Components\Radio::make('agents_audience')
+                        Radio::make('agents_audience')
                             ->label('Agents in the menu, the homepage, the Agents page and the dashboard')
                             ->options([
                                 AgentAccess::AUDIENCE_EVERYONE => 'Everyone',
@@ -79,74 +85,74 @@ class AgentSettings extends Page implements HasForms
                             ])
                             ->required(),
                     ]),
-                Forms\Components\Section::make('What a call minute uses')
+                Section::make('What a call minute uses')
                     ->description('Calls are paid from the member\'s plan credits, the same credits as their voice-overs (900 credits make one audio minute). A call minute costs Listen several times an audio minute, so it uses more credits.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('agents_credits_per_minute')
+                        TextInput::make('agents_credits_per_minute')
                             ->label('Credits a call minute uses')
                             ->numeric()->integer()->minValue(Credits::PER_MINUTE)->maxValue(Credits::PER_MINUTE * 10)->step(100)
                             ->suffix('credits')
                             ->placeholder(fn (): string => number_format(self::recommendedRate()).' (follows the plans)')
                             ->live(onBlur: true)
-                            ->helperText(fn (Forms\Get $get): string => sprintf('Leave it empty and it follows the plans: now %s, the fewest credits that keep %d%% on every plan for a typical call (the plan whose credits cost least sets it, with its yearly price), so members get the most call minutes their plan can give. It changes by itself when plan prices or credits change. Type a number only to fix it. %s An agent with a great deal to know uses more on a long call, so no call earns less.',
+                            ->helperText(fn (Get $get): string => sprintf('Leave it empty and it follows the plans: now %s, the fewest credits that keep %d%% on every plan for a typical call (the plan whose credits cost least sets it, with its yearly price), so members get the most call minutes their plan can give. It changes by itself when plan prices or credits change. Type a number only to fix it. %s An agent with a great deal to know uses more on a long call, so no call earns less.',
                                 number_format(self::recommendedRate()), (int) round(AgentCost::MARGIN * 100),
                                 filled($get('agents_credits_per_minute'))
                                     ? 'Now fixed at '.number_format((int) $get('agents_credits_per_minute')).' ('.rtrim(rtrim(number_format(max(1, (int) $get('agents_credits_per_minute')) / Credits::PER_MINUTE, 2), '0'), '.').' audio minutes a call minute).'
                                     : '')),
-                        Forms\Components\TextInput::make('agents_free_test_minutes')
+                        TextInput::make('agents_free_test_minutes')
                             ->label('Free test minutes for each member')
                             ->numeric()->minValue(0)->maxValue(30)->step(0.5)
                             ->suffix('minutes')
                             ->required()
                             ->helperText('Once per member, across all their agents: their own test calls, before they pay for calls.'),
-                        Forms\Components\Toggle::make('agents_house_charged')
+                        Toggle::make('agents_house_charged')
                             ->label('Listen\'s own agents use their owner\'s credits')
                             ->helperText('Their calls (visitors\' and test calls) take credits from the account that owns them, like a member\'s agent, so you see what they use. A call that account cannot pay for in full (no plan with agents, or its minutes or credits used up) goes on free: visitors are never turned away. Off: all their calls are free.')
                             ->columnSpan(2),
-                        Forms\Components\Placeholder::make('agents_plans')
+                        Placeholder::make('agents_plans')
                             ->label('Each plan, at this rate')
-                            ->content(fn (Forms\Get $get): HtmlString => self::plansTable(filled($get('agents_credits_per_minute')) ? max(1, (int) $get('agents_credits_per_minute')) : self::recommendedRate()))
+                            ->content(fn (Get $get): HtmlString => self::plansTable(filled($get('agents_credits_per_minute')) ? max(1, (int) $get('agents_credits_per_minute')) : self::recommendedRate()))
                             ->columnSpan(2),
                     ]),
-                Forms\Components\Section::make('Safety')
+                Section::make('Safety')
                     ->description('Ceilings on what calls can cost, whatever happens: a flood of calls on one agent, accounts made only for the free minutes, or a problem nobody has seen yet.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Toggle::make('agents_calls_stopped')
+                        Toggle::make('agents_calls_stopped')
                             ->label('Stop all calls now')
                             ->helperText('No call starts on any agent, Listen\'s own agent and test calls included; callers hear the agent is not available. Calls already on finish. Switch it off to start again.')
                             ->onColor('danger')
                             ->columnSpan(2),
-                        Forms\Components\TextInput::make('agents_site_daily_minutes')
+                        TextInput::make('agents_site_daily_minutes')
                             ->label('Members\' calls a day, all agents together')
                             ->numeric()->integer()->minValue(0)->maxValue(1000000)
                             ->suffix('minutes')
                             ->required()
                             ->helperText(fn (): string => '0: no limit. Past it, callers hear the agent is busy until midnight (UTC). At the heavy call\'s cost, 1,000 minutes is about $'.number_format(1000 * AgentCost::heavy(), 0).'.'),
-                        Forms\Components\TextInput::make('agents_free_daily_minutes')
+                        TextInput::make('agents_free_daily_minutes')
                             ->label('Free test minutes a day, all members together')
                             ->numeric()->integer()->minValue(0)->maxValue(100000)
                             ->suffix('minutes')
                             ->required()
                             ->helperText('Past it, free test calls wait for tomorrow ("busy, try again later"); paid test calls go on.'),
-                        Forms\Components\TextInput::make('agents_house_daily_minutes')
+                        TextInput::make('agents_house_daily_minutes')
                             ->label('Listen\'s own agent, minutes a day')
                             ->numeric()->integer()->minValue(0)->maxValue(100000)
                             ->suffix('minutes')
                             ->required()
                             ->helperText('The agent visitors talk to on Listen\'s public pages: its own ceiling, so a flood there never stops the members\' agents.'),
-                        Forms\Components\Toggle::make('agents_review')
+                        Toggle::make('agents_review')
                             ->label('Check each agent before it first goes live')
                             ->helperText('The text model reads what the agent is told and stops one set up to collect card numbers or passwords, pose as a bank, a government office or a real person, or anything harmful. Agents it is unsure of go live and are marked for you (Agents → filter "Marked for review").'),
-                        Forms\Components\Toggle::make('agents_caller_transcribe')
+                        Toggle::make('agents_caller_transcribe')
                             ->label('Write each caller line again from the caller\'s voice')
                             ->helperText('The live call\'s own transcription sometimes writes Arabic as English ("unbelievable") or in Latin letters, and spaces phone numbers out. On: each caller line is written again by the text model from that line\'s sound, in the agent\'s dialect, for the caller\'s screen and the call\'s transcript (about a second later, a fraction of a cent a line). The sound is never kept. Off: the live transcription as it is.')
                             ->columnSpan(2),
                     ]),
-                Forms\Components\Section::make('Real calls so far')
+                Section::make('Real calls so far')
                     ->schema([
-                        Forms\Components\Placeholder::make('agents_measured')
+                        Placeholder::make('agents_measured')
                             ->label('Last 30 days')
                             ->content(function (): string {
                                 $m = AgentCost::measured();

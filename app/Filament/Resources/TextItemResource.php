@@ -2,10 +2,24 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Textarea;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\TextItemResource\Pages\ListTextItems;
+use App\Filament\Resources\TextItemResource\Pages\CreateTextItem;
+use App\Filament\Resources\TextItemResource\Pages\ViewTextItem;
+use App\Filament\Resources\TextItemResource\Pages\EditTextItem;
 use App\Filament\Resources\TextItemResource\Pages;
 use App\Models\TextItem;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -17,9 +31,9 @@ class TextItemResource extends Resource
 {
     protected static ?string $model = TextItem::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-document-text';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-document-text';
 
-    protected static ?string $navigationGroup = 'Content';
+    protected static string | \UnitEnum | null $navigationGroup = 'Content';
 
     protected static ?int $navigationSort = 4;
 
@@ -39,25 +53,25 @@ class TextItemResource extends Resource
         });
     }
 
-    public static function form(Form $form): Form
+    public static function form(\Filament\Schemas\Schema $schema): \Filament\Schemas\Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Text Item Details')
+        return $schema
+            ->components([
+                Section::make('Text Item Details')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Select::make('user_id')
+                        Select::make('user_id')
                             ->relationship('user', 'name')
                             ->searchable()
                             ->preload()
                             ->required(),
-                        Forms\Components\TextInput::make('source_type')
+                        TextInput::make('source_type')
                             ->maxLength(255),
-                        Forms\Components\TextInput::make('external_id')
+                        TextInput::make('external_id')
                             ->maxLength(255),
-                        Forms\Components\TextInput::make('title')
+                        TextInput::make('title')
                             ->maxLength(255),
-                        Forms\Components\Select::make('language')
+                        Select::make('language')
                             ->searchable()
                             ->options([
                                 'en' => 'English',
@@ -69,18 +83,18 @@ class TextItemResource extends Resource
                                 'ko' => 'Korean',
                                 'zh' => 'Chinese',
                             ]),
-                        Forms\Components\Select::make('status')
+                        Select::make('status')
                             ->options([
                                 'pending' => 'Pending',
                                 'processing' => 'Processing',
                                 'completed' => 'Completed',
                                 'failed' => 'Failed',
                             ]),
-                        Forms\Components\DateTimePicker::make('received_at'),
+                        DateTimePicker::make('received_at'),
                     ]),
-                Forms\Components\Section::make('Content')
+                Section::make('Content')
                     ->schema([
-                        Forms\Components\Textarea::make('content')
+                        Textarea::make('content')
                             ->rows(8)
                             ->columnSpanFull(),
                     ]),
@@ -91,23 +105,23 @@ class TextItemResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')
+                TextColumn::make('id')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('user.name')
+                TextColumn::make('user.name')
                     ->label('User')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('title')
+                TextColumn::make('title')
                     ->searchable()
                     ->sortable()
                     ->limit(40),
-                Tables\Columns\TextColumn::make('source_type')
+                TextColumn::make('source_type')
                     ->badge()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('language')
+                TextColumn::make('language')
                     ->badge()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
                         'completed' => 'success',
@@ -117,32 +131,32 @@ class TextItemResource extends Resource
                         default => 'gray',
                     })
                     ->sortable(),
-                Tables\Columns\TextColumn::make('received_at')
+                TextColumn::make('received_at')
                     ->dateTime()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->options([
                         'pending' => 'Pending',
                         'processing' => 'Processing',
                         'completed' => 'Completed',
                         'failed' => 'Failed',
                     ]),
-                Tables\Filters\SelectFilter::make('source_type')
+                SelectFilter::make('source_type')
                     ->options(fn () => TextItem::query()->distinct()->whereNotNull('source_type')->pluck('source_type', 'source_type')->toArray()),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                ViewAction::make(),
+                EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
@@ -151,10 +165,10 @@ class TextItemResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListTextItems::route('/'),
-            'create' => Pages\CreateTextItem::route('/create'),
-            'view' => Pages\ViewTextItem::route('/{record}'),
-            'edit' => Pages\EditTextItem::route('/{record}/edit'),
+            'index' => ListTextItems::route('/'),
+            'create' => CreateTextItem::route('/create'),
+            'view' => ViewTextItem::route('/{record}'),
+            'edit' => EditTextItem::route('/{record}/edit'),
         ];
     }
 }

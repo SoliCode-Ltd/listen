@@ -2,6 +2,28 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Select;
+use App\Models\User;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\Action;
+use App\Services\Newsletter\PaidWelcomeEmail;
+use Throwable;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions;
+use App\Filament\Resources\SubscriptionResource\Pages\CreateSubscription;
+use App\Filament\Resources\SubscriptionResource\Pages\ViewSubscription;
+use App\Filament\Resources\SubscriptionResource\Pages\EditSubscription;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use InvalidArgumentException;
 use App\Filament\Resources\SubscriptionResource\Pages;
 use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
@@ -14,7 +36,6 @@ use App\Services\Billing\CharGiftService;
 use App\Support\Countries;
 use App\Support\CreditPeriod;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -27,9 +48,9 @@ class SubscriptionResource extends Resource
 {
     protected static ?string $model = Subscription::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-credit-card';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-credit-card';
 
-    protected static ?string $navigationGroup = 'Billing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
 
     protected static ?int $navigationSort = 2;
 
@@ -70,26 +91,26 @@ class SubscriptionResource extends Resource
         return $data;
     }
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Subscription Details')
+        return $schema
+            ->components([
+                Section::make('Subscription Details')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Select::make('user_id')
+                        Select::make('user_id')
                             ->relationship('user', 'name')
-                            ->getOptionLabelFromRecordUsing(fn (\App\Models\User $user): string => trim($user->name.' ('.$user->email.')'))
+                            ->getOptionLabelFromRecordUsing(fn (User $user): string => trim($user->name.' ('.$user->email.')'))
                             ->searchable(['name', 'email'])
                             ->preload()
                             ->required(),
-                        Forms\Components\Select::make('plan_id')
+                        Select::make('plan_id')
                             // A pack is not a subscription: members get packs by buying them.
                             ->relationship('plan', 'name', fn ($query) => $query->subscriptionPlans())
                             ->searchable()
                             ->preload()
                             ->required(),
-                        Forms\Components\Select::make('status')
+                        Select::make('status')
                             ->options([
                                 'active' => 'Active',
                                 'canceled' => 'Canceled',
@@ -99,7 +120,7 @@ class SubscriptionResource extends Resource
                                 'incomplete' => 'Incomplete',
                             ])
                             ->required(),
-                        Forms\Components\Select::make('billing_payment_state')
+                        Select::make('billing_payment_state')
                             ->options([
                                 'paid' => 'Paid',
                                 'pending' => 'Pending',
@@ -109,31 +130,31 @@ class SubscriptionResource extends Resource
                             ])
                             ->helperText('A paid plan given to a member who has no card subscription is always saved as Manual Override, so it stays exactly as set and ends on its end date.'),
                     ]),
-                Forms\Components\Section::make('Billing Period')
+                Section::make('Billing Period')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\DateTimePicker::make('current_period_start'),
-                        Forms\Components\DateTimePicker::make('current_period_end'),
-                        Forms\Components\DateTimePicker::make('billing_grace_ends_at')
+                        DateTimePicker::make('current_period_start'),
+                        DateTimePicker::make('current_period_end'),
+                        DateTimePicker::make('billing_grace_ends_at')
                             ->label('Grace Period Ends'),
                     ]),
-                Forms\Components\Section::make('Notifications & Lifecycle')
+                Section::make('Notifications & Lifecycle')
                     ->columns(2)
                     ->collapsible()
                     ->collapsed()
                     ->schema([
-                        Forms\Components\DateTimePicker::make('billing_reminder_7d_sent_at')
+                        DateTimePicker::make('billing_reminder_7d_sent_at')
                             ->label('7-Day Reminder Sent'),
-                        Forms\Components\DateTimePicker::make('billing_reminder_1d_sent_at')
+                        DateTimePicker::make('billing_reminder_1d_sent_at')
                             ->label('1-Day Reminder Sent'),
-                        Forms\Components\DateTimePicker::make('billing_failed_notice_sent_at')
+                        DateTimePicker::make('billing_failed_notice_sent_at')
                             ->label('Failed Notice Sent'),
-                        Forms\Components\DateTimePicker::make('billing_downgraded_at')
+                        DateTimePicker::make('billing_downgraded_at')
                             ->label('Downgraded At'),
                     ]),
-                Forms\Components\Section::make('Usage History')
+                Section::make('Usage History')
                     ->schema([
-                        Forms\Components\Placeholder::make('usage_table')
+                        Placeholder::make('usage_table')
                             ->label('')
                             ->content(function (?Subscription $record): HtmlString|string {
                                 if (! $record || ! $record->user_id) {
@@ -181,10 +202,10 @@ class SubscriptionResource extends Resource
                                 return new HtmlString($html);
                             }),
                     ]),
-                Forms\Components\Section::make('Gifts from Listen')
+                Section::make('Gifts from Listen')
                     ->visibleOn('view')
                     ->schema([
-                        Forms\Components\Placeholder::make('gifts_table')
+                        Placeholder::make('gifts_table')
                             ->label('')
                             ->content(fn (?Subscription $record): HtmlString|string => self::giftsTable($record)),
                     ]),
@@ -243,28 +264,28 @@ class SubscriptionResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')
+                TextColumn::make('id')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('user.name')
+                TextColumn::make('user.name')
                     ->label('User')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('user.email')
+                TextColumn::make('user.email')
                     ->label('Email')
                     ->searchable()
                     ->sortable()
                     ->copyable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('user.country_code')
+                TextColumn::make('user.country_code')
                     ->label('Country')
                     ->formatStateUsing(fn (?string $state) => Countries::label($state))
                     ->placeholder('—')
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('plan.name')
+                TextColumn::make('plan.name')
                     ->label('Plan')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->state(fn (Subscription $record): string => self::displayStatus($record))
                     ->formatStateUsing(fn (string $state): string => Str::headline($state))
                     ->badge()
@@ -276,7 +297,7 @@ class SubscriptionResource extends Resource
                         default => 'gray',
                     })
                     ->sortable(),
-                Tables\Columns\TextColumn::make('billing_payment_state')
+                TextColumn::make('billing_payment_state')
                     ->label('Payment')
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
@@ -287,7 +308,7 @@ class SubscriptionResource extends Resource
                         'manual_override' => 'primary',
                         default => 'gray',
                     }),
-                Tables\Columns\TextColumn::make('paid_with')
+                TextColumn::make('paid_with')
                     ->label('Paid with')
                     ->badge()
                     ->formatStateUsing(fn (?string $state): string => Payment::methodLabel($state))
@@ -295,17 +316,17 @@ class SubscriptionResource extends Resource
                     ->placeholder('—')
                     ->tooltip('How the member last paid')
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('current_period_end')
+                TextColumn::make('current_period_end')
                     ->label('Period Ends')
                     ->dateTime()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('country')
+                SelectFilter::make('country')
                     ->label('Country')
                     ->options(fn () => ['__unknown' => 'Not known yet'] + Countries::optionsInUse())
                     ->searchable()
@@ -314,7 +335,7 @@ class SubscriptionResource extends Resource
                         '__unknown' => $query->whereHas('user', fn (Builder $q) => $q->whereNull('country_code')),
                         default => $query->whereHas('user', fn (Builder $q) => $q->where('country_code', $data['value'])),
                     }),
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->options([
                         'active' => 'Active',
                         'canceled' => 'Canceled',
@@ -336,41 +357,41 @@ class SubscriptionResource extends Resource
                             default => $query->where('status', $value),
                         };
                     }),
-                Tables\Filters\SelectFilter::make('plan_id')
+                SelectFilter::make('plan_id')
                     ->relationship('plan', 'name')
                     ->label('Plan'),
-                Tables\Filters\SelectFilter::make('paid_with')
+                SelectFilter::make('paid_with')
                     ->label('Has paid with')
                     ->options(Payment::METHODS)
                     ->query(fn (Builder $query, array $data) => filled($data['value'] ?? null)
                         ? $query->whereIn('subscriptions.user_id', Payment::query()->select('user_id')->where('method', $data['value']))
                         : $query),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\Action::make('giftChars')
+            ->recordActions([
+                ViewAction::make(),
+                EditAction::make(),
+                Action::make('giftChars')
                     ->label('Gift characters')
                     ->icon('heroicon-o-gift')
                     ->color('success')
                     ->modalHeading(fn (Subscription $record): string => 'Gift characters to '.($record->user?->email ?? 'this member'))
                     ->modalDescription(fn (Subscription $record): string => self::giftModalDescription($record))
-                    ->form(self::giftFormSchema())
+                    ->schema(self::giftFormSchema())
                     ->action(fn (Subscription $record, array $data) => self::grantGift($record, $data)),
-                Tables\Actions\Action::make('sendWelcome')
+                Action::make('sendWelcome')
                     ->label('Send welcome email')
                     ->icon('heroicon-o-envelope')
                     ->color('gray')
                     ->visible(fn (Subscription $record): bool => (string) $record->status === 'active' && (int) ($record->plan?->price_cents ?? 0) > 0)
                     ->requiresConfirmation()
                     ->modalHeading(fn (Subscription $record): string => 'Send the paid welcome email to '.($record->user?->email ?? 'this member').'?')
-                    ->modalDescription(fn (Subscription $record): string => \App\Services\Newsletter\PaidWelcomeEmail::canTrack() && $record->user?->paid_welcome_sent_at
+                    ->modalDescription(fn (Subscription $record): string => PaidWelcomeEmail::canTrack() && $record->user?->paid_welcome_sent_at
                         ? 'They were already welcomed on '.$record->user->paid_welcome_sent_at->format('Y-m-d').'. This sends it again. Edit the words in Newsletter → Paid welcome email.'
                         : 'Edit the words in Newsletter → Paid welcome email.')
                     ->action(function (Subscription $record): void {
                         try {
-                            app(\App\Services\Newsletter\PaidWelcomeEmail::class)->send($record->user);
-                        } catch (\Throwable $e) {
+                            app(PaidWelcomeEmail::class)->send($record->user);
+                        } catch (Throwable $e) {
                             Notification::make()->title('The email was not sent')->body($e->getMessage())->danger()->persistent()->send();
 
                             return;
@@ -378,9 +399,9 @@ class SubscriptionResource extends Resource
                         Notification::make()->title('Welcome email sent to '.$record->user->email)->success()->send();
                     }),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
@@ -389,20 +410,20 @@ class SubscriptionResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListSubscriptions::route('/'),
-            'create' => Pages\CreateSubscription::route('/create'),
-            'view' => Pages\ViewSubscription::route('/{record}'),
-            'edit' => Pages\EditSubscription::route('/{record}/edit'),
+            'index' => ListSubscriptions::route('/'),
+            'create' => CreateSubscription::route('/create'),
+            'view' => ViewSubscription::route('/{record}'),
+            'edit' => EditSubscription::route('/{record}/edit'),
         ];
     }
 
     /**
-     * @return array<int, \Filament\Forms\Components\Component>
+     * @return array<int, \Filament\Schemas\Components\Component>
      */
     public static function giftFormSchema(): array
     {
         return [
-            Forms\Components\TextInput::make('chars')
+            TextInput::make('chars')
                 ->label('Characters to gift')
                 ->numeric()
                 ->integer()
@@ -410,7 +431,7 @@ class SubscriptionResource extends Resource
                 ->minValue(1)
                 ->maxValue(CharGiftService::MAX_GIFT)
                 ->helperText('Added on top of the plan for the current billing month only ('.now()->format('F Y').'). They end with the month, like the plan\'s own characters.'),
-            Forms\Components\Textarea::make('note')
+            Textarea::make('note')
                 ->label('Note (only admins see this)')
                 ->rows(2)
                 ->maxLength(500),
@@ -429,10 +450,10 @@ class SubscriptionResource extends Resource
                 isset($data['note']) ? (string) $data['note'] : null,
                 auth()->user(),
             );
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('The gift was not added')
-                ->body($e instanceof \InvalidArgumentException ? $e->getMessage() : 'Something went wrong; nothing was changed. If this is a new server, run the database migration first.')
+                ->body($e instanceof InvalidArgumentException ? $e->getMessage() : 'Something went wrong; nothing was changed. If this is a new server, run the database migration first.')
                 ->danger()
                 ->send();
 

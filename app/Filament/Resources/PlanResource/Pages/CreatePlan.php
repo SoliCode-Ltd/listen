@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PlanResource\Pages;
 
+use Exception;
 use App\Filament\Resources\PlanResource;
 use App\Models\Plan;
 use App\Services\StripeProductSyncService;
@@ -67,7 +68,7 @@ class CreatePlan extends CreateRecord
                         'Plan automatically synced to Stripe.',
                     )->send();
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Notification::make()
                     ->title('Stripe Sync Failed')
                     ->body($e->getMessage())

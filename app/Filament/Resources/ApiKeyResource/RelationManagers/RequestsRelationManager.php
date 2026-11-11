@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\ApiKeyResource\RelationManagers;
 
+use App\Filament\Concerns\SimplePages;
+use App\Support\Api\ApiKeyStatus;
 use App\Filament\Resources\ApiRequestLogResource;
 use App\Models\ApiRequestLog;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -16,13 +18,13 @@ use Illuminate\Database\Eloquent\Model;
  */
 class RequestsRelationManager extends RelationManager
 {
-    use \App\Filament\Concerns\SimplePages;
+    use SimplePages;
 
     protected static string $relationship = 'requestLogs';
 
     protected static ?string $title = 'Requests';
 
-    protected static ?string $icon = 'heroicon-o-signal';
+    protected static string | \BackedEnum | null $icon = 'heroicon-o-signal';
 
     public function isReadOnly(): bool
     {
@@ -32,7 +34,7 @@ class RequestsRelationManager extends RelationManager
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
         // This period's count (kept with the key), not a count over the whole log.
-        $n = \App\Support\Api\ApiKeyStatus::of($ownerRecord)['requests'];
+        $n = ApiKeyStatus::of($ownerRecord)['requests'];
 
         return $n > 0 ? number_format($n).' this period' : null;
     }

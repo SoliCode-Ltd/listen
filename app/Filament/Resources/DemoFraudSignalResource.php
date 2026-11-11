@@ -2,10 +2,21 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\KeyValue;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\DemoFraudSignalResource\Pages\ListDemoFraudSignals;
 use App\Filament\Resources\DemoFraudSignalResource\Pages;
 use App\Models\DemoFraudSignal;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -14,9 +25,9 @@ class DemoFraudSignalResource extends Resource
 {
     protected static ?string $model = DemoFraudSignal::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-shield-exclamation';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shield-exclamation';
 
-    protected static ?string $navigationGroup = 'Demo Tracking';
+    protected static string | \UnitEnum | null $navigationGroup = 'Demo Tracking';
 
     protected static ?int $navigationSort = 3;
 
@@ -24,17 +35,17 @@ class DemoFraudSignalResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Fraud Signal')
+        return $schema
+            ->components([
+                Section::make('Fraud Signal')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('identity_hash')
+                        TextInput::make('identity_hash')
                             ->required()
                             ->maxLength(80),
-                        Forms\Components\Select::make('signal_type')
+                        Select::make('signal_type')
                             ->options([
                                 'automation_detected' => 'Automation Detected',
                                 'missing_client_hints' => 'Missing Client Hints',
@@ -47,9 +58,9 @@ class DemoFraudSignalResource extends Resource
                             ])
                             ->required(),
                     ]),
-                Forms\Components\Section::make('Signal Data')
+                Section::make('Signal Data')
                     ->schema([
-                        Forms\Components\KeyValue::make('signal_data'),
+                        KeyValue::make('signal_data'),
                     ]),
             ]);
     }
@@ -58,14 +69,14 @@ class DemoFraudSignalResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')
+                TextColumn::make('id')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('identity_hash')
+                TextColumn::make('identity_hash')
                     ->label('Identity')
                     ->searchable()
                     ->limit(16)
                     ->tooltip(fn ($record) => $record->identity_hash),
-                Tables\Columns\BadgeColumn::make('signal_type')
+                BadgeColumn::make('signal_type')
                     ->label('Signal Type')
                     ->searchable()
                     ->colors([
@@ -73,18 +84,18 @@ class DemoFraudSignalResource extends Resource
                         'warning' => fn ($state) => in_array($state, ['fingerprint_blocking', 'ip_fingerprint_flood', 'vpn_detected']),
                         'gray' => fn ($state) => in_array($state, ['missing_client_hints', 'private_ip']),
                     ]),
-                Tables\Columns\TextColumn::make('signal_data')
+                TextColumn::make('signal_data')
                     ->label('Data')
                     ->formatStateUsing(fn ($state) => is_array($state) ? json_encode($state, JSON_UNESCAPED_UNICODE) : $state)
                     ->limit(50)
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Detected At')
                     ->dateTime()
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('signal_type')
+                SelectFilter::make('signal_type')
                     ->multiple()
                     ->options([
                         'automation_detected' => 'Automation Detected',
@@ -97,12 +108,12 @@ class DemoFraudSignalResource extends Resource
                         'bot_suspected' => 'Bot Suspected',
                     ]),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
+            ->recordActions([
+                ViewAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
@@ -111,7 +122,7 @@ class DemoFraudSignalResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListDemoFraudSignals::route('/'),
+            'index' => ListDemoFraudSignals::route('/'),
         ];
     }
 }

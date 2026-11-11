@@ -2,6 +2,10 @@
 
 namespace App\Filament\Resources\AgentResource\RelationManagers;
 
+use Filament\Tables\Columns\TextColumn;
+use Filament\Support\Enums\FontWeight;
+use Illuminate\Support\Str;
+use Filament\Tables\Filters\TernaryFilter;
 use App\Filament\Resources\AgentConversationResource;
 use App\Filament\Resources\AgentResource;
 use App\Models\AgentConversation;
@@ -23,7 +27,7 @@ class SitesRelationManager extends RelationManager
 
     protected static ?string $title = 'Websites';
 
-    protected static ?string $icon = 'heroicon-o-globe-alt';
+    protected static string | \BackedEnum | null $icon = 'heroicon-o-globe-alt';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
@@ -41,33 +45,33 @@ class SitesRelationManager extends RelationManager
             ->recordTitleAttribute('origin')
             ->defaultSort('last_seen_at', 'desc')
             ->columns([
-                Tables\Columns\TextColumn::make('origin')
+                TextColumn::make('origin')
                     ->label('Website')
                     ->formatStateUsing(fn (string $state, AgentWidgetSite $record): string => $record->host())
                     ->url(fn (AgentWidgetSite $record): ?string => AgentConversationResource::safeUrl($record->origin), true)
-                    ->weight(\Filament\Support\Enums\FontWeight::SemiBold)
+                    ->weight(FontWeight::SemiBold)
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('allowed')
+                TextColumn::make('allowed')
                     ->label('Button')
                     ->badge()
                     ->formatStateUsing(fn (bool $state): string => $state ? 'Shows there' : 'Refused (not on its list)')
                     ->color(fn (bool $state): string => $state ? 'success' : 'danger')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('installed_via')
+                TextColumn::make('installed_via')
                     ->label('Added with')
-                    ->formatStateUsing(fn (?string $state): string => AgentResource::INSTALLED_VIA[$state] ?? \Illuminate\Support\Str::headline((string) $state))
+                    ->formatStateUsing(fn (?string $state): string => AgentResource::INSTALLED_VIA[$state] ?? Str::headline((string) $state))
                     ->placeholder('Pasted code'),
-                Tables\Columns\TextColumn::make('calls')
+                TextColumn::make('calls')
                     ->label('Calls from it')
                     ->state(fn (AgentWidgetSite $record): int => AgentConversation::query()
                         ->where('agent_id', $record->agent_id)->where('origin', $record->origin)->count())
                     ->numeric(),
-                Tables\Columns\TextColumn::make('first_seen_at')->label('First seen')->dateTime()->sortable(),
-                Tables\Columns\TextColumn::make('last_seen_at')->label('Last seen')->since()->dateTimeTooltip()->sortable(),
+                TextColumn::make('first_seen_at')->label('First seen')->dateTime()->sortable(),
+                TextColumn::make('last_seen_at')->label('Last seen')->since()->dateTimeTooltip()->sortable(),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('allowed')
+                TernaryFilter::make('allowed')
                     ->label('Button')
                     ->placeholder('Shows or refused')
                     ->trueLabel('Shows there')
