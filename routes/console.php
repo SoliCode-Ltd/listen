@@ -56,6 +56,11 @@ Schedule::command('agents:settle-calls')->everyMinute()->withoutOverlapping(5);
 // Admin → Suspicious Users' list and its badge, worked out ahead of time (App\Services\DemoSuspects).
 Schedule::command('listen:warm-demo-suspects')->everyFiveMinutes()->withoutOverlapping(10);
 
+// The admin dashboard's numbers, rebuilt ahead of time on the live site only (they read
+// Stripe; staging runs the live keys). In the background: at a large size a rebuild takes
+// a minute, and the jobs due every minute must not wait for it.
+Schedule::command('listen:warm-business-stats')->everyFiveMinutes()->withoutOverlapping(15)->runInBackground();
+
 // Listen Agents: the newest posts on agents' links read again every few hours (AgentLinkReads).
 Schedule::command('agents:read-links')->hourly()->withoutOverlapping(30);
 // Every page of live agents' websites, for what callers ask (AgentSite): never read, or not for a week.

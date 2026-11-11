@@ -53,7 +53,7 @@ class BusinessStatsService
     public function snapshot(int $months = self::DEFAULT_MONTHS, bool $fresh = false): array
     {
         $months = self::normalizeMonths($months);
-        $key = "business_stats:v3:{$months}";
+        $key = self::cacheKey($months);
 
         if ($fresh) {
             Cache::forget($key);
@@ -62,10 +62,29 @@ class BusinessStatsService
         return Cache::remember($key, self::CACHE_TTL_SECONDS, fn () => $this->build($months));
     }
 
+    /**
+     * A new snapshot, put in the old one's place in one step: an admin who opens
+     * the dashboard meanwhile reads the old one and never waits for a rebuild
+     * (listen:warm-business-stats). The Stripe part keeps its own ten minutes.
+     */
+    public function refresh(int $months = self::DEFAULT_MONTHS): array
+    {
+        $months = self::normalizeMonths($months);
+        $snapshot = $this->build($months);
+        Cache::put(self::cacheKey($months), $snapshot, self::CACHE_TTL_SECONDS);
+
+        return $snapshot;
+    }
+
+    public static function cacheKey(int $months): string
+    {
+        return 'business_stats:v3:'.self::normalizeMonths($months);
+    }
+
     public function forget(): void
     {
         foreach (self::PERIODS as $months) {
-            Cache::forget("business_stats:v3:{$months}");
+            Cache::forget(self::cacheKey($months));
         }
         StripeRecurringRevenue::forget();
     }

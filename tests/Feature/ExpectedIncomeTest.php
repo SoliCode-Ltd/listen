@@ -103,6 +103,12 @@ class ExpectedIncomeTest extends TestCase
                 ]]]),
                 // An admin's own subscription: never counted.
                 $sub('sub_admin', 'active', $item('price_pro_m', 4900, 'month', $now + 9 * $day)),
+                // Another site's, on the same Stripe account (no member, and not a Listen product): never counted.
+                $sub('sub_other_site', 'active', ['object' => 'list', 'data' => [[
+                    'id' => 'si_other', 'object' => 'subscription_item', 'quantity' => 1, 'current_period_end' => $now + 8 * $day,
+                    'price' => ['id' => 'price_other_site', 'object' => 'price', 'currency' => 'usd', 'unit_amount' => 9900,
+                        'product' => 'prod_other_site', 'recurring' => ['interval' => 'month', 'interval_count' => 1]],
+                ]]]),
             ],
             'trialing' => [
                 // A trial with 20% off its first bill: $17.60 a month when it pays.
@@ -157,6 +163,7 @@ class ExpectedIncomeTest extends TestCase
         $this->assertSame(1, $plans['Starter monthly']['cancelling']);
         $this->assertTrue($plans->has('Launch price monthly'), 'a price no plan knows is listed, not dropped');
         $this->assertSame(1, $plans['Pro monthly']['renewing'], "the admin's own Pro subscription is left out");
+        $this->assertFalse($plans->has('Other price monthly'), "another site's subscription on the shared Stripe account is left out");
     }
 
     public function test_the_card_shows_the_expected_income_and_what_is_not_counted(): void
@@ -318,6 +325,13 @@ class RevenueStripeClient implements ClientInterface
     /** @var array<string, array> */
     public array $coupons = [];
 
+    /** @var list<array> Listen's products carry their plan; another site's on the shared account does not. */
+    public array $products = [
+        ['id' => 'prod_x', 'object' => 'product', 'metadata' => ['listen_plan_id' => '2', 'listen_plan_slug' => 'creator']],
+        ['id' => 'prod_old', 'object' => 'product', 'metadata' => ['listen_plan_slug' => 'launch']],
+        ['id' => 'prod_other_site', 'object' => 'product', 'metadata' => []],
+    ];
+
     /** @var array<string, list<array{amount:int, fee:int}>> */
     public array $transactions = [];
 
@@ -337,6 +351,9 @@ class RevenueStripeClient implements ClientInterface
             $data = $this->subscriptions[$params['status'] ?? ''] ?? [];
 
             return $this->json(['object' => 'list', 'data' => $data, 'has_more' => false, 'url' => '/v1/subscriptions']);
+        }
+        if ($path === '/v1/products') {
+            return $this->json(['object' => 'list', 'data' => $this->products, 'has_more' => false, 'url' => '/v1/products']);
         }
         if (str_starts_with($path, '/v1/coupons/')) {
             return $this->json($this->coupons[substr($path, 12)] ?? []);
