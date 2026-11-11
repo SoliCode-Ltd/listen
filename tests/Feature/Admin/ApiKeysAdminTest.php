@@ -90,6 +90,20 @@ class ApiKeysAdminTest extends TestCase
             ->assertSee('No limit set on this key: the member&#039;s plan credits apply', false);
     }
 
+    public function test_a_keys_permissions_are_listed_once(): void
+    {
+        // Filament 5 formats a list item by item: the whole line was shown once per permission.
+        $scoped = ApiKey::issue($this->member, 'surface laptop', ['text_to_speech', 'voices_read', 'history_read', 'history_write', 'user_read'])['key'];
+
+        $html = Livewire::actingAs($this->admin)->test(ListApiKeys::class)
+            ->assertCanSeeTableRecords([$scoped])
+            ->assertSee('text_to_speech, voices_read, history_read, history_write, user_read')
+            ->assertSee('All')
+            ->html();
+
+        $this->assertSame(1, substr_count($html, 'history_write'));
+    }
+
     public function test_a_key_stopped_by_the_daily_limit_today_says_so_and_can_be_found(): void
     {
         $this->log($this->open, ['status' => 429, 'error_code' => ApiKeyStatus::DAILY, 'credits' => null]);

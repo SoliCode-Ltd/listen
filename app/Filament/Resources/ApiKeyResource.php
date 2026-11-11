@@ -84,7 +84,9 @@ class ApiKeyResource extends Resource
                     ->description(fn (ApiKey $record): string => $record->maskedKey()),
                 TextColumn::make('scopes')
                     ->label('Permissions')
-                    ->formatStateUsing(fn (ApiKey $record): string => $record->scopes === null ? 'All' : implode(', ', $record->scopes))
+                    // One line, as a whole: Filament 5 formats a list item by item, so a format of the
+                    // whole list was shown once per permission.
+                    ->state(fn (ApiKey $record): string => $record->scopes === null ? 'All' : implode(', ', $record->scopes))
                     ->placeholder('All')
                     ->wrap()
                     ->toggleable(),

@@ -122,10 +122,11 @@ class ReferralConversionResource extends Resource
                     ->sortable(),
                 TextColumn::make('fraud_indicators')
                     ->label('Flags')
-                    ->formatStateUsing(function ($state) {
-                        if (! is_array($state) || empty($state)) return '—';
-                        return implode(', ', array_slice($state, 0, 3));
-                    })
+                    // The first three flags, as one line (Filament formats a list item by item, so this
+                    // showed "—" for each flag instead of the flags).
+                    ->state(fn (ReferralConversion $record): string => is_array($record->fraud_indicators) && $record->fraud_indicators !== []
+                        ? implode(', ', array_slice($record->fraud_indicators, 0, 3))
+                        : '—')
                     ->toggleable(),
                 TextColumn::make('qualified_at')
                     ->label('Qualified')
