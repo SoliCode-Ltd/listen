@@ -101,20 +101,11 @@
     .billing-toggle button:hover { color: var(--text); }
     .billing-toggle button.active { color: var(--text); }
     .billing-toggle button:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
-    /* The yearly saving, as a quiet pill inside the yearly half: seen before anyone presses it. */
-    .billing-save {
-      display: inline-flex;
-      align-items: center;
-      height: 22px;
-      padding: 0 .55rem;
-      border-radius: var(--radius-full);
-      background: color-mix(in oklab, var(--brand-accent) 13%, transparent);
-      color: var(--brand-accent);
-      font-size: .74rem;
-      font-weight: 700;
-      line-height: 1;
-    }
-    html:not([data-theme="light"]) .billing-save { background: color-mix(in oklab, var(--brand-accent) 26%, transparent); color: #C9BDFF; }
+    /* The yearly saving, as green words beside "Yearly" (no shape of its own, the same green
+       as the saving on the cards): seen before anyone presses the switch. */
+    #yearlyBtn { gap: .3rem; }
+    .billing-save { font-size: .86rem; font-weight: 700; color: #1F9D63; }
+    html:not([data-theme="light"]) .billing-save { color: #4ADE95; }
 
     /* ── The plans ──
        Every plan as a card: three in a row and the others centred under them. A card's
