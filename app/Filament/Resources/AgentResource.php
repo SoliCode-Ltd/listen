@@ -2,6 +2,27 @@
 
 namespace App\Filament\Resources;
 
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkAction;
+use Illuminate\Support\Collection;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
+use App\Http\Controllers\AgentReportController;
+use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Actions\Action;
+use App\Filament\Resources\AgentResource\RelationManagers\SitesRelationManager;
+use App\Filament\Resources\AgentResource\RelationManagers\ConversationsRelationManager;
+use App\Filament\Resources\AgentResource\RelationManagers\ContactsRelationManager;
+use App\Filament\Resources\AgentResource\Pages\ListAgents;
+use App\Filament\Resources\AgentResource\Pages\ViewAgent;
 use App\Filament\Resources\AgentResource\Pages;
 use App\Filament\Resources\AgentResource\RelationManagers;
 use App\Filament\Resources\Concerns\ReadOnlyResource;
@@ -20,7 +41,6 @@ use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
 use Filament\Infolists;
 use Filament\Notifications\Notification;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
@@ -48,9 +68,9 @@ class AgentResource extends Resource
 
     protected static ?string $model = Agent::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-chat-bubble-left-right';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-chat-bubble-left-right';
 
-    protected static ?string $navigationGroup = 'Agents';
+    protected static string | \UnitEnum | null $navigationGroup = 'Agents';
 
     protected static ?int $navigationSort = 1;
 
@@ -88,15 +108,15 @@ class AgentResource extends Resource
         'laravel' => 'Laravel',
     ];
 
-    /** The admin deletes agents for good (AgentPurge); nothing else is changed here. */
-    public static function canDelete(Model $record): bool
+    /** The admin deletes agents for good (AgentPurge); nothing else is changed here. Filament 4 checks these. */
+    public static function getDeleteAuthorizationResponse(Model $record): AccessResponse
     {
-        return $record instanceof Agent && AgentPurge::canPurge($record);
+        return $record instanceof Agent && AgentPurge::canPurge($record) ? AccessResponse::allow() : AccessResponse::deny();
     }
 
-    public static function canDeleteAny(): bool
+    public static function getDeleteAnyAuthorizationResponse(): AccessResponse
     {
-        return true;
+        return AccessResponse::allow();
     }
 
     /** Calls on right now, across every agent (the calls are under each agent). */
@@ -145,14 +165,19 @@ class AgentResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            // The calls' minutes and credits, for the Calls column's line and their own
+            // columns: loaded here, as Filament 4 skips the sums of hidden columns.
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query
+                ->withSum('conversations', 'duration_seconds')
+                ->withSum('conversations', 'credits'))
             ->columns([
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->label('Agent')
                     ->weight(FontWeight::SemiBold)
                     ->description(fn (Agent $record): ?HtmlString => self::isolate(Str::limit((string) $record->business_name, 30)))
                     ->searchable(['name', 'business_name', 'public_id'])
                     ->sortable(),
-                Tables\Columns\TextColumn::make('user.email')
+                TextColumn::make('user.email')
                     ->label('Owner')
                     ->description(fn (Agent $record): ?string => $record->user?->name)
                     ->url(fn (Agent $record): ?string => self::ownerUrl($record->user_id))
@@ -160,14 +185,14 @@ class AgentResource extends Resource
                     ->limit(26)
                     ->tooltip(fn (Agent $record): ?string => $record->user?->email)
                     ->placeholder('Account deleted'),
-                Tables\Columns\TextColumn::make('sites_count')
+                TextColumn::make('sites_count')
                     ->label('Websites')
                     ->state(fn (Agent $record): ?string => self::sitesLine($record))
                     ->description(fn (Agent $record): ?string => self::sitesMore($record))
                     ->tooltip('Every website its call button has loaded on (the agent\'s page lists them all, allowed or refused).')
                     ->placeholder('Not on a website yet')
                     ->wrap(),
-                Tables\Columns\TextColumn::make('language')
+                TextColumn::make('language')
                     ->label('Language and voice')
                     ->formatStateUsing(fn (?string $state, Agent $record): string => implode(' · ', array_filter([
                         self::LANGUAGES[$state] ?? strtoupper((string) $state),
@@ -175,13 +200,13 @@ class AgentResource extends Resource
                     ])))
                     ->description(fn (Agent $record): string => self::voiceLabel($record) ?? 'No voice picked yet')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->state(fn (Agent $record): array => self::badges($record))
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => self::BADGES[$state] ?? Str::headline($state))
                     ->color(fn (string $state): string => self::badgeColor($state))
                     ->sortable(),
-                Tables\Columns\TextColumn::make('conversations_count')
+                TextColumn::make('conversations_count')
                     ->label('Calls')
                     ->counts('conversations')
                     ->numeric()
@@ -189,22 +214,20 @@ class AgentResource extends Resource
                         .' · '.number_format((int) $record->conversations_sum_credits).' credits')
                     ->tooltip('Calls, their minutes, and the credits they took from the owner\'s plan. Sort by minutes or credits from their own columns (column menu).')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('conversations_sum_duration_seconds')
+                TextColumn::make('conversations_sum_duration_seconds')
                     ->label('Minutes')
-                    ->sum('conversations', 'duration_seconds')
                     ->formatStateUsing(fn ($state): string => self::minutes((int) $state))
                     ->tooltip(fn (Agent $record): string => number_format((int) $record->conversations_sum_duration_seconds).' seconds talked')
                     ->placeholder('0 min')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('conversations_sum_credits')
+                TextColumn::make('conversations_sum_credits')
                     ->label('Credits used')
-                    ->sum('conversations', 'credits')
                     ->formatStateUsing(fn ($state): string => number_format((int) $state))
                     ->placeholder('0')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('conversations_max_started_at')
+                TextColumn::make('conversations_max_started_at')
                     ->label('Last call')
                     ->max('conversations', 'started_at')
                     // "none" rather than a placeholder, so the created date still shows under it.
@@ -214,22 +237,22 @@ class AgentResource extends Resource
                     ->tooltip(fn (Agent $record): ?string => filled($record->conversations_max_started_at) ? Carbon::parse($record->conversations_max_started_at)->toDayDateTimeString() : null)
                     ->description(fn (Agent $record): string => 'created '.$record->created_at?->format('j M Y'))
                     ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Created')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('business_type')
+                TextColumn::make('business_type')
                     ->label('Kind of business')
                     ->formatStateUsing(fn (?string $state): string => self::businessTypeLabel($state))
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('website_url')
+                TextColumn::make('website_url')
                     ->label('Website')
                     ->limit(40)
                     ->url(fn (Agent $record): ?string => AgentConversationResource::safeUrl($record->website_url), true)
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('public_id')
+                TextColumn::make('public_id')
                     ->label('Agent id')
                     ->fontFamily('mono')
                     ->copyable()
@@ -237,11 +260,11 @@ class AgentResource extends Resource
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->options(self::STATUSES),
-                Tables\Filters\SelectFilter::make('language')
+                SelectFilter::make('language')
                     ->options(self::LANGUAGES),
-                Tables\Filters\TernaryFilter::make('house')
+                TernaryFilter::make('house')
                     ->label('Listen\'s own agents')
                     ->placeholder('All agents')
                     ->trueLabel('Only Listen\'s own')
@@ -251,7 +274,7 @@ class AgentResource extends Resource
                         false: fn (Builder $query): Builder => self::whereHouse($query, false),
                         blank: fn (Builder $query): Builder => $query,
                     ),
-                Tables\Filters\TernaryFilter::make('has_calls')
+                TernaryFilter::make('has_calls')
                     ->label('Calls')
                     ->placeholder('With or without calls')
                     ->trueLabel('Has had calls')
@@ -261,16 +284,16 @@ class AgentResource extends Resource
                         false: fn (Builder $query): Builder => $query->whereDoesntHave('conversations'),
                         blank: fn (Builder $query): Builder => $query,
                     ),
-                Tables\Filters\SelectFilter::make('business_type')
+                SelectFilter::make('business_type')
                     ->label('Kind of business')
                     ->options(fn (): array => collect(Agent::BUSINESS_TYPES)->mapWithKeys(fn (string $type): array => [$type => self::businessTypeLabel($type)])->all()),
-                Tables\Filters\Filter::make('attention')
+                Filter::make('attention')
                     ->label('Marked for review, reported or suspended')
                     ->query(fn (Builder $query): Builder => $query->where(fn (Builder $q): Builder => $q
                         ->whereIn('agents.settings->review->verdict', ['review', 'block'])
                         ->orWhereNotNull('agents.settings->suspended')
                         ->orWhereNotNull('agents.settings->reports'))),
-                Tables\Filters\TernaryFilter::make('deleted')
+                TernaryFilter::make('deleted')
                     ->label('Deleted by the owner')
                     ->placeholder('Deleted or not')
                     ->trueLabel('Only deleted agents')
@@ -281,12 +304,12 @@ class AgentResource extends Resource
                         blank: fn (Builder $query): Builder => $query,
                     ),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make()->iconButton(),
+            ->recordActions([
+                ViewAction::make()->iconButton(),
                 self::deleteAction()->iconButton(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkAction::make('delete')
+            ->toolbarActions([
+                BulkAction::make('delete')
                     ->label('Delete for good')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
@@ -295,7 +318,7 @@ class AgentResource extends Resource
                     ->modalDescription(self::DELETE_NOTE.' Listen\'s own agents in the selection are kept.')
                     ->modalSubmitActionLabel('Delete for good')
                     ->deselectRecordsAfterCompletion()
-                    ->action(function (\Illuminate\Support\Collection $records): void {
+                    ->action(function (Collection $records): void {
                         $gone = $records->filter(fn (Agent $agent): bool => AgentPurge::purge($agent))->count();
                         Notification::make()->title(self::plural($gone, 'agent').' deleted')->success()->send();
                     }),
@@ -304,129 +327,129 @@ class AgentResource extends Resource
             ->emptyStateDescription('Agents members make on the Agents page show here, with Listen\'s own.');
     }
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Schema $schema): Schema
     {
-        return $infolist->schema([
-            Infolists\Components\Section::make('Agent')
+        return $schema->components([
+            Section::make('Agent')
                 ->columns(4)
                 ->schema([
-                    Infolists\Components\TextEntry::make('name')->label('Name')->weight(FontWeight::SemiBold)
+                    TextEntry::make('name')->label('Name')->weight(FontWeight::SemiBold)
                         ->formatStateUsing(fn (?string $state): ?HtmlString => self::isolate($state)),
-                    Infolists\Components\TextEntry::make('business_name')->label('Business')
+                    TextEntry::make('business_name')->label('Business')
                         ->formatStateUsing(fn (?string $state): ?HtmlString => self::isolate($state)),
-                    Infolists\Components\TextEntry::make('business_type')->label('Kind of business')
+                    TextEntry::make('business_type')->label('Kind of business')
                         ->formatStateUsing(fn (?string $state): string => self::businessTypeLabel($state)),
-                    Infolists\Components\TextEntry::make('jobs')->label('What it does')
+                    TextEntry::make('jobs')->label('What it does')
                         ->badge()->color('gray')
                         ->formatStateUsing(fn (?string $state): string => self::jobLabel($state))
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('user.email')->label('Owner')
+                    TextEntry::make('user.email')->label('Owner')
                         ->url(fn (Agent $record): ?string => self::ownerUrl($record->user_id))
                         ->helperText(fn (Agent $record): ?string => $record->user?->name)
                         ->copyable()
                         ->placeholder('Account deleted'),
-                    Infolists\Components\TextEntry::make('status')
+                    TextEntry::make('status')
                         ->state(fn (Agent $record): array => self::badges($record))
                         ->badge()
                         ->formatStateUsing(fn (string $state): string => self::BADGES[$state] ?? Str::headline($state))
                         ->color(fn (string $state): string => self::badgeColor($state)),
-                    Infolists\Components\TextEntry::make('language')
+                    TextEntry::make('language')
                         ->formatStateUsing(fn (?string $state): string => self::LANGUAGES[$state] ?? strtoupper((string) $state)),
-                    Infolists\Components\TextEntry::make('dialect')->label('Dialect or accent')
+                    TextEntry::make('dialect')->label('Dialect or accent')
                         ->state(fn (Agent $record): ?string => self::accentLabel($record))
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('website_url')->label('Website')
+                    TextEntry::make('website_url')->label('Website')
                         ->url(fn (Agent $record): ?string => AgentConversationResource::safeUrl($record->website_url), true)
                         ->placeholder('None given'),
-                    Infolists\Components\TextEntry::make('max_call_seconds')->label('Longest call')
+                    TextEntry::make('max_call_seconds')->label('Longest call')
                         ->formatStateUsing(fn ($state): string => self::clock((int) $state).' ('.number_format((int) $state).' s)')
                         ->helperText(fn (Agent $record): ?string => self::isHouse($record) ? 'Listen\'s own agents stop at '.self::clock(HouseAgent::MAX_SECONDS).'.' : null),
-                    Infolists\Components\TextEntry::make('public_id')->label('Agent id')->copyable()->fontFamily('mono'),
-                    Infolists\Components\TextEntry::make('id')->label('Database id'),
-                    Infolists\Components\TextEntry::make('created_at')->label('Created')->dateTime(),
-                    Infolists\Components\TextEntry::make('updated_at')->label('Last changed')->dateTime(),
-                    Infolists\Components\TextEntry::make('tested_at')->label('Last tested by the owner')->dateTime()->placeholder('Never'),
-                    Infolists\Components\TextEntry::make('went_live_at')->label('Went live')->dateTime()->placeholder('Not yet'),
-                    Infolists\Components\TextEntry::make('deleted_at')->label('Deleted by the owner')->dateTime()->color('danger')
+                    TextEntry::make('public_id')->label('Agent id')->copyable()->fontFamily('mono'),
+                    TextEntry::make('id')->label('Database id'),
+                    TextEntry::make('created_at')->label('Created')->dateTime(),
+                    TextEntry::make('updated_at')->label('Last changed')->dateTime(),
+                    TextEntry::make('tested_at')->label('Last tested by the owner')->dateTime()->placeholder('Never'),
+                    TextEntry::make('went_live_at')->label('Went live')->dateTime()->placeholder('Not yet'),
+                    TextEntry::make('deleted_at')->label('Deleted by the owner')->dateTime()->color('danger')
                         ->visible(fn (Agent $record): bool => $record->trashed()),
                 ]),
 
-            Infolists\Components\Section::make('Calls and credits')
+            Section::make('Calls and credits')
                 ->description(fn (): string => 'Every call it has had. Calls take '.number_format(AgentCalls::creditsPerMinute()).' credits a minute from the owner\'s plan; Listen\'s own agents and the owner\'s free test seconds take none.')
                 ->columns(5)
                 ->schema([
-                    Infolists\Components\TextEntry::make('totals_calls')->label('Calls')
+                    TextEntry::make('totals_calls')->label('Calls')
                         ->state(fn (Agent $record): string => number_format(self::totals($record)['calls']))
                         ->helperText(fn (Agent $record): ?string => AgentConversationResource::channelBreakdown(self::totals($record)['by_channel'])),
-                    Infolists\Components\TextEntry::make('totals_minutes')->label('Talk time')
+                    TextEntry::make('totals_minutes')->label('Talk time')
                         ->state(fn (Agent $record): string => self::minutes(self::totals($record)['seconds']))
                         ->helperText(fn (Agent $record): string => number_format(self::totals($record)['seconds']).' seconds'),
-                    Infolists\Components\TextEntry::make('totals_billed')->label('Billed time')
+                    TextEntry::make('totals_billed')->label('Billed time')
                         ->state(fn (Agent $record): string => self::minutes(self::totals($record)['billed']))
                         ->helperText(fn (Agent $record): string => number_format(self::totals($record)['billed']).' seconds'),
-                    Infolists\Components\TextEntry::make('totals_credits')->label('Credits used')
+                    TextEntry::make('totals_credits')->label('Credits used')
                         ->state(fn (Agent $record): string => number_format(self::totals($record)['credits'])),
-                    Infolists\Components\TextEntry::make('totals_free')->label('Free calls')
+                    TextEntry::make('totals_free')->label('Free calls')
                         ->state(fn (Agent $record): string => number_format(self::totals($record)['free']))
                         ->helperText(fn (Agent $record): ?string => self::totals($record)['free'] > 0 ? self::minutes(self::totals($record)['free_seconds']).' at no charge' : null),
-                    Infolists\Components\TextEntry::make('totals_live')->label('Live right now')
+                    TextEntry::make('totals_live')->label('Live right now')
                         ->state(fn (Agent $record): string => number_format(self::totals($record)['live']))
                         ->color(fn (Agent $record): ?string => self::totals($record)['live'] > 0 ? 'success' : null),
-                    Infolists\Components\TextEntry::make('totals_failed')->label('Failed calls')
+                    TextEntry::make('totals_failed')->label('Failed calls')
                         ->state(fn (Agent $record): string => number_format(self::totals($record)['failed']))
                         ->color(fn (Agent $record): ?string => self::totals($record)['failed'] > 0 ? 'danger' : null),
-                    Infolists\Components\TextEntry::make('totals_last')->label('Last call')
+                    TextEntry::make('totals_last')->label('Last call')
                         ->state(fn (Agent $record): ?string => self::totals($record)['last'])
                         ->since()
                         ->dateTimeTooltip()
                         ->placeholder('No calls yet'),
-                    Infolists\Components\TextEntry::make('totals_leads')->label('Customers saved')
+                    TextEntry::make('totals_leads')->label('Customers saved')
                         ->state(fn (Agent $record): string => number_format(self::totals($record)['contacts']))
                         ->helperText(fn (Agent $record): string => self::plural(self::totals($record)['leads'], 'call').' left their details'),
-                    Infolists\Components\TextEntry::make('totals_cost')->label('Cost to us (estimate)')
+                    TextEntry::make('totals_cost')->label('Cost to us (estimate)')
                         ->state(fn (Agent $record): string => '$'.number_format(self::totals($record)['cost'], 4))
                         ->helperText('From the tokens each call counted'),
                 ]),
 
-            Infolists\Components\Section::make('Voice')
+            Section::make('Voice')
                 ->columns(3)
                 ->schema([
-                    Infolists\Components\TextEntry::make('speaker_id')->label('Speaker (voice library)')
+                    TextEntry::make('speaker_id')->label('Speaker (voice library)')
                         ->state(fn (Agent $record): ?string => self::speakerLabel($record->speaker_id))
                         ->placeholder('Not picked yet'),
-                    Infolists\Components\TextEntry::make('live_voice')->label('Voice it speaks with on calls')
+                    TextEntry::make('live_voice')->label('Voice it speaks with on calls')
                         ->placeholder('Not picked yet'),
-                    Infolists\Components\ViewEntry::make('first_message')->label('What it says first')
+                    ViewEntry::make('first_message')->label('What it says first')
                         ->view('filament.agents.paragraph', ['empty' => 'Nothing set: it opens in its own words.'])
                         ->columnSpanFull(),
                 ]),
 
-            Infolists\Components\Section::make('Script')
+            Section::make('Script')
                 ->description('What the agent is told before every call, as the owner left it. Every agent also keeps Listen\'s own rules (answer only about the business, never guess, read a phone number back).')
                 ->schema([
-                    Infolists\Components\ViewEntry::make('script.identity')->label('Who it is')
+                    ViewEntry::make('script.identity')->label('Who it is')
                         ->view('filament.agents.paragraph'),
-                    Infolists\Components\ViewEntry::make('script.never')->label('What it must never do')
+                    ViewEntry::make('script.never')->label('What it must never do')
                         ->view('filament.agents.text-list', ['ordered' => false, 'empty' => 'Nothing added by the owner.']),
-                    Infolists\Components\ViewEntry::make('script.steps')->label('Its steps on a call')
+                    ViewEntry::make('script.steps')->label('Its steps on a call')
                         ->view('filament.agents.text-list', ['ordered' => true, 'empty' => 'No steps.']),
-                    Infolists\Components\ViewEntry::make('script.handoff')->label('When it passes the caller to a person')
+                    ViewEntry::make('script.handoff')->label('When it passes the caller to a person')
                         ->view('filament.agents.paragraph'),
                 ]),
 
-            Infolists\Components\Section::make('Decided at setup')
+            Section::make('Decided at setup')
                 ->description('The questions the setup asked the owner, with the answer the agent follows.')
                 ->collapsible()
                 ->schema([
-                    Infolists\Components\ViewEntry::make('choices')->hiddenLabel()
+                    ViewEntry::make('choices')->hiddenLabel()
                         ->view('filament.agents.choices'),
                 ]),
 
-            Infolists\Components\Section::make('Safety')
+            Section::make('Safety')
                 ->description('The check before it went live, what callers reported, and whether the team suspended it (Suspend, at the top of the page).')
                 ->columns(3)
                 ->schema([
-                    Infolists\Components\TextEntry::make('review_verdict')->label('Check before going live')
+                    TextEntry::make('review_verdict')->label('Check before going live')
                         ->state(fn (Agent $record): string => match ($record->setting('review.verdict')) {
                             'allow' => 'Looks fine',
                             'review' => 'Marked for review',
@@ -437,81 +460,81 @@ class AgentResource extends Resource
                         ->color(fn (Agent $record): string => match ($record->setting('review.verdict')) {
                             'allow' => 'success', 'review' => 'warning', 'block' => 'danger', default => 'gray',
                         }),
-                    Infolists\Components\TextEntry::make('review_reason')->label('What the check said')
+                    TextEntry::make('review_reason')->label('What the check said')
                         ->state(fn (Agent $record): string => (string) ($record->setting('review.reason') ?: '—'))
                         ->columnSpan(2),
-                    Infolists\Components\TextEntry::make('suspended_reason')->label('Suspended by the team')
+                    TextEntry::make('suspended_reason')->label('Suspended by the team')
                         ->state(fn (Agent $record): string => $record->setting('suspended')
                             ? trim((string) $record->setting('suspended.reason')).' ('.Carbon::parse((string) $record->setting('suspended.at'))->toDayDateTimeString().')'
                             : 'No')
                         ->color(fn (Agent $record): ?string => $record->setting('suspended') ? 'danger' : null)
                         ->columnSpan(3),
-                    Infolists\Components\TextEntry::make('reports_list')->label('Reported by callers')
+                    TextEntry::make('reports_list')->label('Reported by callers')
                         ->state(fn (Agent $record): array => collect((array) $record->setting('reports', []))->reverse()->take(10)
-                            ->map(fn ($r): string => Carbon::parse((string) ($r['at'] ?? now()))->toDayDateTimeString().' · '.(\App\Http\Controllers\AgentReportController::REASONS[$r['reason'] ?? 'other'] ?? 'Other')
+                            ->map(fn ($r): string => Carbon::parse((string) ($r['at'] ?? now()))->toDayDateTimeString().' · '.(AgentReportController::REASONS[$r['reason'] ?? 'other'] ?? 'Other')
                                 .(filled($r['note'] ?? null) ? ': '.Str::limit((string) $r['note'], 200) : ''))
                             ->values()->all() ?: ['No reports'])
                         ->listWithLineBreaks()
                         ->columnSpan(3),
                 ]),
 
-            Infolists\Components\Section::make('Settings')
+            Section::make('Settings')
                 ->description('Anything else saved with the agent.')
                 ->collapsible()
                 ->schema([
-                    Infolists\Components\ViewEntry::make('settings')->hiddenLabel()
+                    ViewEntry::make('settings')->hiddenLabel()
                         ->view('filament.agents.key-values', ['empty' => 'No other settings.']),
                 ]),
 
-            Infolists\Components\Section::make('What it knows')
+            Section::make('What it knows')
                 ->description(fn (Agent $record): string => number_format(mb_strlen((string) $record->knowledge)).' characters. The agent answers only from these facts; up to '.number_format(AgentInstructions::MAX_KNOWLEDGE_CHARS).' characters go into every call.')
                 ->collapsible()
                 ->collapsed(fn (Agent $record): bool => mb_strlen((string) $record->knowledge) > 1500)
                 ->schema([
-                    Infolists\Components\ViewEntry::make('knowledge')->hiddenLabel()
+                    ViewEntry::make('knowledge')->hiddenLabel()
                         ->view('filament.agents.long-text', ['empty' => 'Nothing yet.']),
                 ]),
 
-            Infolists\Components\Section::make('Where it learned it')
+            Section::make('Where it learned it')
                 ->description('Its knowledge sources: the website it read, the owner\'s notes and corrections, and files.')
                 ->schema([
-                    Infolists\Components\ViewEntry::make('sources')->hiddenLabel()
+                    ViewEntry::make('sources')->hiddenLabel()
                         ->view('filament.agents.sources'),
                 ]),
 
-            Infolists\Components\Section::make('Call button and link page')
+            Section::make('Call button and link page')
                 ->description('Where customers reach it: the button a website loads with one line of code, and its link page (also its QR code).')
                 ->schema([
-                    Infolists\Components\RepeatableEntry::make('widgets')
+                    RepeatableEntry::make('widgets')
                         ->hiddenLabel()
                         ->columns(4)
                         ->schema([
-                            Infolists\Components\TextEntry::make('slug')->label('Link page')
+                            TextEntry::make('slug')->label('Link page')
                                 ->state(fn (AgentWidget $record): string => self::talkUrl($record) ?? '/talk/'.$record->slug)
                                 ->url(fn (AgentWidget $record): ?string => self::talkUrl($record), true)
                                 ->copyable()
                                 ->columnSpan(2),
-                            Infolists\Components\TextEntry::make('public_key')->label('Call button key (in the website\'s code)')
+                            TextEntry::make('public_key')->label('Call button key (in the website\'s code)')
                                 ->copyable()->fontFamily('mono')
                                 ->columnSpan(2),
-                            Infolists\Components\IconEntry::make('enabled')->label('Call button on')->boolean(),
-                            Infolists\Components\IconEntry::make('link_enabled')->label('Link page on')->boolean(),
-                            Infolists\Components\TextEntry::make('installed_via')->label('Installed with')
+                            IconEntry::make('enabled')->label('Call button on')->boolean(),
+                            IconEntry::make('link_enabled')->label('Link page on')->boolean(),
+                            TextEntry::make('installed_via')->label('Installed with')
                                 ->formatStateUsing(fn (?string $state): string => self::INSTALLED_VIA[$state] ?? Str::headline((string) $state))
                                 ->placeholder('Not installed yet'),
-                            Infolists\Components\TextEntry::make('last_seen_at')->label('Last seen')
+                            TextEntry::make('last_seen_at')->label('Last seen')
                                 ->since()->dateTimeTooltip()
                                 ->placeholder('Never'),
-                            Infolists\Components\TextEntry::make('allowed_origins')->label('Websites allowed to load it')
+                            TextEntry::make('allowed_origins')->label('Websites allowed to load it')
                                 ->state(fn (AgentWidget $record): array => array_values(array_filter((array) $record->allowed_origins)))
                                 ->listWithLineBreaks()
                                 ->placeholder('Any website')
                                 ->columnSpan(2),
-                            Infolists\Components\TextEntry::make('last_seen_origin')->label('Last seen on')
+                            TextEntry::make('last_seen_origin')->label('Last seen on')
                                 ->url(fn (AgentWidget $record): ?string => AgentConversationResource::safeUrl($record->last_seen_origin), true)
                                 ->placeholder('Never')
                                 ->columnSpan(2),
-                            Infolists\Components\ViewEntry::make('appearance')->label('How the button looks')
+                            ViewEntry::make('appearance')->label('How the button looks')
                                 ->view('filament.agents.key-values', ['defaults' => AgentWidget::DEFAULT_APPEARANCE, 'empty' => 'The default look.'])
                                 ->columnSpanFull(),
                         ])
@@ -523,9 +546,9 @@ class AgentResource extends Resource
     public const DELETE_NOTE = 'The agent goes for good, with its calls, their recordings, its knowledge files and its call buttons (they stop working on every website). Calls still on are ended first, so the credits they held go back to the owner. The customers it saved stay in the owner\'s list. This cannot be undone.';
 
     /** Delete for good (AgentPurge), on the list and on the agent's page; never Listen's own. */
-    public static function deleteAction(): Tables\Actions\Action
+    public static function deleteAction(): Action
     {
-        return Tables\Actions\Action::make('delete')
+        return Action::make('delete')
             ->label('Delete for good')
             ->icon('heroicon-o-trash')
             ->color('danger')
@@ -578,9 +601,9 @@ class AgentResource extends Resource
     public static function getRelations(): array
     {
         return array_values(array_filter([
-            self::sitesReady() ? RelationManagers\SitesRelationManager::class : null,
-            RelationManagers\ConversationsRelationManager::class,
-            RelationManagers\ContactsRelationManager::class,
+            self::sitesReady() ? SitesRelationManager::class : null,
+            ConversationsRelationManager::class,
+            ContactsRelationManager::class,
         ]));
     }
 
@@ -592,8 +615,8 @@ class AgentResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListAgents::route('/'),
-            'view' => Pages\ViewAgent::route('/{record}'),
+            'index' => ListAgents::route('/'),
+            'view' => ViewAgent::route('/{record}'),
         ];
     }
 
@@ -762,9 +785,9 @@ class AgentResource extends Resource
      * The Agent cell of the calls and customers lists: the business above, the
      * agent's name, and the owner's email below. It opens the agent.
      */
-    public static function agentColumn(): Tables\Columns\TextColumn
+    public static function agentColumn(): TextColumn
     {
-        return Tables\Columns\TextColumn::make('agent.name')
+        return TextColumn::make('agent.name')
             ->label('Agent')
             ->weight(FontWeight::SemiBold)
             ->description(fn (Model $record): ?HtmlString => $record->agent

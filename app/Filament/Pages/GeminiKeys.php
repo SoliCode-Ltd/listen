@@ -14,15 +14,15 @@ class GeminiKeys extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-key';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-key';
 
-    protected static ?string $navigationGroup = 'System';
+    protected static string | \UnitEnum | null $navigationGroup = 'System';
 
     protected static ?int $navigationSort = 4;
 
     protected static ?string $title = 'Gemini API Keys';
 
-    protected static string $view = 'filament.pages.gemini-keys';
+    protected string $view = 'filament.pages.gemini-keys';
 
     public string $newApiKey = '';
 

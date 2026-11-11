@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\AgentConversationResource\Pages;
 
+use Filament\Actions\Action;
 use App\Filament\Resources\AgentConversationResource;
 use App\Filament\Resources\AgentResource;
 use App\Models\AgentConversation;
@@ -36,13 +37,13 @@ class ViewAgentConversation extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('agent')
+            Action::make('agent')
                 ->label('The agent')
                 ->icon('heroicon-o-chat-bubble-left-right')
                 ->color('gray')
                 ->url(fn (): ?string => $this->call()->agent ? AgentResource::getUrl('view', ['record' => $this->call()->agent]) : null)
                 ->visible(fn (): bool => $this->call()->agent !== null),
-            Actions\Action::make('owner')
+            Action::make('owner')
                 ->label('Owner\'s account')
                 ->icon('heroicon-o-user')
                 ->color('gray')

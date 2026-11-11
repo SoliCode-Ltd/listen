@@ -2,6 +2,21 @@
 
 namespace App\Filament\Resources;
 
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\Action;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Illuminate\Support\Carbon;
+use Filament\Infolists\Components\RepeatableEntry;
+use App\Filament\Resources\ApiKeyResource\RelationManagers\RequestsRelationManager;
+use App\Filament\Resources\ApiKeyResource\Pages\ListApiKeys;
+use App\Filament\Resources\ApiKeyResource\Pages\ViewApiKey;
+use Throwable;
 use App\Filament\Resources\ApiKeyResource\Pages;
 use App\Filament\Resources\ApiKeyResource\RelationManagers;
 use App\Models\ApiKey;
@@ -10,7 +25,6 @@ use App\Models\ApiRequestLog;
 use App\Support\Api\ApiKeyStatus;
 use App\Support\PlanUsageGuard;
 use Filament\Infolists;
-use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
@@ -29,27 +43,30 @@ class ApiKeyResource extends Resource
 {
     protected static ?string $model = ApiKey::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-key';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-key';
 
-    protected static ?string $navigationGroup = 'System';
+    protected static string | \UnitEnum | null $navigationGroup = 'System';
 
     protected static ?string $navigationLabel = 'API keys';
 
     protected static ?string $modelLabel = 'API key';
 
-    public static function canCreate(): bool
+    // Filament 4 checks this (pages, buttons and canCreate() alike): never allowed here.
+    public static function getCreateAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canEdit(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canEdit() alike): never allowed here.
+    public static function getEditAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canDelete(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canDelete() alike): never allowed here.
+    public static function getDeleteAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
     public static function table(Table $table): Table
@@ -59,36 +76,36 @@ class ApiKeyResource extends Resource
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('user:id,name,email'))
             ->recordUrl(fn (ApiKey $record): string => self::getUrl('view', ['record' => $record]))
             ->columns([
-                Tables\Columns\TextColumn::make('id')->label('#')->sortable(),
-                Tables\Columns\TextColumn::make('user.email')->label('Member')->searchable()->copyable()
+                TextColumn::make('id')->label('#')->sortable(),
+                TextColumn::make('user.email')->label('Member')->searchable()->copyable()
                     ->description(fn (ApiKey $record): ?string => $record->user?->name)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('name')->searchable()->weight(FontWeight::SemiBold)
+                TextColumn::make('name')->searchable()->weight(FontWeight::SemiBold)
                     ->description(fn (ApiKey $record): string => $record->maskedKey()),
-                Tables\Columns\TextColumn::make('scopes')
+                TextColumn::make('scopes')
                     ->label('Permissions')
                     ->formatStateUsing(fn (ApiKey $record): string => $record->scopes === null ? 'All' : implode(', ', $record->scopes))
                     ->placeholder('All')
                     ->wrap()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('month_credits')
+                TextColumn::make('month_credits')
                     // The member's current credit period (their plan's own month).
                     ->label('Credits this period')
                     ->state(fn (ApiKey $record): string => ApiKeyStatus::creditsLine($record))
                     ->description(fn (ApiKey $record): string => ApiKeyStatus::creditsNote($record))
                     ->color(fn (ApiKey $record): ?string => ApiKeyStatus::hitKeyLimit($record) ? 'danger' : null)
                     ->wrap(),
-                Tables\Columns\TextColumn::make('month_requests')
+                TextColumn::make('month_requests')
                     ->label('Requests this period')
                     ->state(fn (ApiKey $record): int => ApiKeyStatus::of($record)['requests'])
                     ->numeric(),
-                Tables\Columns\TextColumn::make('today')
+                TextColumn::make('today')
                     ->label('Today (member)')
                     ->state(fn (ApiKey $record): string => ApiKeyStatus::todayLine($record))
                     ->description(fn (ApiKey $record): string => ApiKeyStatus::todayNote($record))
                     ->tooltip('The daily limit counts the member\'s generations in the studio and the API together; the day starts at midnight Cairo time.')
                     ->wrap(),
-                Tables\Columns\TextColumn::make('limits')
+                TextColumn::make('limits')
                     ->label('Limits hit')
                     ->state(fn (ApiKey $record): array => array_values(array_filter([
                         ApiKeyStatus::hitDailyToday($record) ? 'Daily limit today' : null,
@@ -97,43 +114,43 @@ class ApiKeyResource extends Resource
                     ->badge()
                     ->color('danger')
                     ->placeholder('None'),
-                Tables\Columns\TextColumn::make('last_used_at')->label('Last used')->since()->dateTimeTooltip()->sortable()->placeholder('Never'),
-                Tables\Columns\TextColumn::make('last_used_ip')->label('Last IP')->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('created_at')->label('Created')->dateTime()->sortable()->toggleable(),
-                Tables\Columns\TextColumn::make('revoked_at')
+                TextColumn::make('last_used_at')->label('Last used')->since()->dateTimeTooltip()->sortable()->placeholder('Never'),
+                TextColumn::make('last_used_ip')->label('Last IP')->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('created_at')->label('Created')->dateTime()->sortable()->toggleable(),
+                TextColumn::make('revoked_at')
                     ->label('Status')
                     ->badge()
                     ->state(fn (ApiKey $record): string => $record->isRevoked() ? 'Revoked' : 'Active')
                     ->color(fn (string $state): string => $state === 'Active' ? 'success' : 'gray'),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('revoked_at')
+                TernaryFilter::make('revoked_at')
                     ->label('Status')
                     ->nullable()
                     ->trueLabel('Revoked')
                     ->falseLabel('Active')
                     ->default(false),
-                Tables\Filters\Filter::make('daily_today')
+                Filter::make('daily_today')
                     ->label('Stopped by the daily limit today')
                     ->query(fn (Builder $query): Builder => $query->whereIn('api_keys.id', ApiRequestLog::query()->select('api_key_id')
                         ->where('error_code', ApiKeyStatus::DAILY)->where('created_at', '>=', PlanUsageGuard::startOfMemberDay()))),
-                Tables\Filters\Filter::make('key_limit')
+                Filter::make('key_limit')
                     ->label('Stopped by its own limit (last 31 days)')
                     ->query(fn (Builder $query): Builder => $query->whereIn('api_keys.id', ApiRequestLog::query()->select('api_key_id')
                         ->where('error_code', ApiKeyStatus::KEY_LIMIT)->where('created_at', '>=', now()->subDays(31)))),
-                Tables\Filters\Filter::make('used_today')
+                Filter::make('used_today')
                     ->label('Used today')
                     ->query(fn (Builder $query): Builder => $query->where('last_used_at', '>=', PlanUsageGuard::startOfMemberDay())),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make()->iconButton(),
+            ->recordActions([
+                ViewAction::make()->iconButton(),
                 self::revokeAction(),
             ]);
     }
 
-    public static function revokeAction(): Tables\Actions\Action
+    public static function revokeAction(): Action
     {
-        return Tables\Actions\Action::make('revoke')
+        return Action::make('revoke')
             ->label('Revoke')
             ->icon('heroicon-o-no-symbol')
             ->color('danger')
@@ -146,65 +163,65 @@ class ApiKeyResource extends Resource
             });
     }
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Schema $schema): Schema
     {
-        return $infolist->schema([
-            Infolists\Components\Section::make('Key')
+        return $schema->components([
+            Section::make('Key')
                 ->columns(4)
                 ->schema([
-                    Infolists\Components\TextEntry::make('name')->weight(FontWeight::SemiBold),
-                    Infolists\Components\TextEntry::make('key')->label('Key')->state(fn (ApiKey $record): string => $record->maskedKey())->fontFamily('mono'),
-                    Infolists\Components\TextEntry::make('user.email')->label('Member')->copyable()
+                    TextEntry::make('name')->weight(FontWeight::SemiBold),
+                    TextEntry::make('key')->label('Key')->state(fn (ApiKey $record): string => $record->maskedKey())->fontFamily('mono'),
+                    TextEntry::make('user.email')->label('Member')->copyable()
                         ->url(fn (ApiKey $record): ?string => $record->user_id ? UserResource::getUrl('view', ['record' => $record->user_id]) : null)
                         ->helperText(fn (ApiKey $record): ?string => $record->user?->name)
                         ->placeholder('Account deleted'),
-                    Infolists\Components\TextEntry::make('status')
+                    TextEntry::make('status')
                         ->state(fn (ApiKey $record): string => $record->isRevoked() ? 'Revoked '.$record->revoked_at?->toDayDateTimeString() : 'Active')
                         ->badge()->color(fn (ApiKey $record): string => $record->isRevoked() ? 'gray' : 'success'),
-                    Infolists\Components\TextEntry::make('scopes')->label('Permissions')
+                    TextEntry::make('scopes')->label('Permissions')
                         ->state(fn (ApiKey $record): string => $record->scopes === null ? 'All' : implode(', ', $record->scopes))
                         ->columnSpan(2),
-                    Infolists\Components\TextEntry::make('kind')->label('Made as')
+                    TextEntry::make('kind')->label('Made as')
                         ->state(fn (ApiKey $record): string => $record->isConnectedApp() ? 'A connected app (sign-in)' : 'A key the member made'),
-                    Infolists\Components\TextEntry::make('id')->label('Database id'),
-                    Infolists\Components\TextEntry::make('created_at')->label('Created')->dateTime(),
-                    Infolists\Components\TextEntry::make('last_used_at')->label('Last used')->dateTime()->placeholder('Never'),
-                    Infolists\Components\TextEntry::make('last_used_ip')->label('Last IP')->placeholder('—'),
+                    TextEntry::make('id')->label('Database id'),
+                    TextEntry::make('created_at')->label('Created')->dateTime(),
+                    TextEntry::make('last_used_at')->label('Last used')->dateTime()->placeholder('Never'),
+                    TextEntry::make('last_used_ip')->label('Last IP')->placeholder('—'),
                 ]),
-            Infolists\Components\Section::make('Limits')
+            Section::make('Limits')
                 ->description('Credits this period against the key\'s own limit, and the member\'s day against their plan\'s daily limit.')
                 ->columns(4)
                 ->schema([
-                    Infolists\Components\TextEntry::make('credits_period')->label('Credits this period')
+                    TextEntry::make('credits_period')->label('Credits this period')
                         ->state(fn (ApiKey $record): string => ApiKeyStatus::creditsLine($record))
                         ->helperText(fn (ApiKey $record): string => ApiKeyStatus::creditsNote($record))
                         ->color(fn (ApiKey $record): ?string => ApiKeyStatus::hitKeyLimit($record) ? 'danger' : null),
-                    Infolists\Components\TextEntry::make('requests_period')->label('Requests this period')
+                    TextEntry::make('requests_period')->label('Requests this period')
                         ->state(fn (ApiKey $record): string => number_format(ApiKeyStatus::of($record)['requests']))
                         ->helperText(fn (ApiKey $record): string => ApiKeyStatus::of($record)['period']['starts_at']->toFormattedDateString().' to '.ApiKeyStatus::of($record)['period']['ends_at']->toFormattedDateString()),
-                    Infolists\Components\TextEntry::make('today_line')->label('The member today')
+                    TextEntry::make('today_line')->label('The member today')
                         ->state(fn (ApiKey $record): string => ApiKeyStatus::todayLine($record))
                         ->helperText(fn (ApiKey $record): string => ApiKeyStatus::todayNote($record))
                         ->color(fn (ApiKey $record): ?string => ApiKeyStatus::hitDailyToday($record) ? 'danger' : null),
-                    Infolists\Components\TextEntry::make('refusals')->label('Refused for a limit')
+                    TextEntry::make('refusals')->label('Refused for a limit')
                         ->state(fn (ApiKey $record): string => number_format(ApiKeyStatus::of($record)['refused_today']).' today (daily limit) · '
                             .number_format(ApiKeyStatus::of($record)['key_refused']).' this period (key limit)')
-                        ->helperText(fn (ApiKey $record): ?string => ($at = ApiKeyStatus::of($record)['last_refused_at']) ? 'Last refused '.\Illuminate\Support\Carbon::parse($at)->diffForHumans() : 'Never refused for a limit'),
+                        ->helperText(fn (ApiKey $record): ?string => ($at = ApiKeyStatus::of($record)['last_refused_at']) ? 'Last refused '.Carbon::parse($at)->diffForHumans() : 'Never refused for a limit'),
                 ]),
-            Infolists\Components\Section::make('Use by period')
+            Section::make('Use by period')
                 ->description('Every credit period this key was used in, newest first.')
                 ->collapsible()
                 ->schema([
-                    Infolists\Components\RepeatableEntry::make('periods')->hiddenLabel()
+                    RepeatableEntry::make('periods')->hiddenLabel()
                         ->state(fn (ApiKey $record): array => ApiKeyUsage::query()->where('api_key_id', $record->id)->orderByDesc('id')->limit(36)
                             ->get(['period_ym', 'requests', 'credits'])->map(fn (ApiKeyUsage $u): array => [
                                 'period' => $u->period_ym, 'requests' => number_format((int) $u->requests), 'credits' => number_format((int) $u->credits),
                             ])->all())
                         ->columns(3)
                         ->schema([
-                            Infolists\Components\TextEntry::make('period')->label('Period'),
-                            Infolists\Components\TextEntry::make('requests')->label('Requests'),
-                            Infolists\Components\TextEntry::make('credits')->label('Credits'),
+                            TextEntry::make('period')->label('Period'),
+                            TextEntry::make('requests')->label('Requests'),
+                            TextEntry::make('credits')->label('Credits'),
                         ])
                         ->placeholder('Not used yet.'),
                 ]),
@@ -213,14 +230,14 @@ class ApiKeyResource extends Resource
 
     public static function getRelations(): array
     {
-        return [RelationManagers\RequestsRelationManager::class];
+        return [RequestsRelationManager::class];
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListApiKeys::route('/'),
-            'view' => Pages\ViewApiKey::route('/{record}'),
+            'index' => ListApiKeys::route('/'),
+            'view' => ViewApiKey::route('/{record}'),
         ];
     }
 
@@ -229,7 +246,7 @@ class ApiKeyResource extends Resource
     {
         try {
             $count = ApiKey::query()->whereNull('revoked_at')->count();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Before the migration has run.
             return null;
         }

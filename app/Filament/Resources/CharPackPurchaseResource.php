@@ -2,6 +2,11 @@
 
 namespace App\Filament\Resources;
 
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\Action;
+use App\Filament\Resources\CharPackPurchaseResource\Pages\ListCharPackPurchases;
 use App\Filament\Resources\CharPackPurchaseResource\Pages;
 use App\Models\CharPackPurchase;
 use App\Services\Billing\CharPackService;
@@ -18,9 +23,9 @@ class CharPackPurchaseResource extends Resource
 {
     protected static ?string $model = CharPackPurchase::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-shopping-bag';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shopping-bag';
 
-    protected static ?string $navigationGroup = 'Billing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
 
     protected static ?string $navigationLabel = 'Pack purchases';
 
@@ -28,19 +33,22 @@ class CharPackPurchaseResource extends Resource
 
     protected static ?int $navigationSort = 6;
 
-    public static function canCreate(): bool
+    // Filament 4 checks this (pages, buttons and canCreate() alike): never allowed here.
+    public static function getCreateAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canEdit(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canEdit() alike): never allowed here.
+    public static function getEditAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canDelete(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canDelete() alike): never allowed here.
+    public static function getDeleteAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
     public static function table(Table $table): Table
@@ -48,14 +56,14 @@ class CharPackPurchaseResource extends Resource
         return $table
             ->defaultSort('id', 'desc')
             ->columns([
-                Tables\Columns\TextColumn::make('id')->label('#')->sortable(),
-                Tables\Columns\TextColumn::make('user.email')->label('Member')->searchable()->copyable(),
-                Tables\Columns\TextColumn::make('plan.name')->label('Pack')->placeholder('—'),
-                Tables\Columns\TextColumn::make('chars')->label('Characters')->numeric(),
-                Tables\Columns\TextColumn::make('amount_minor')
+                TextColumn::make('id')->label('#')->sortable(),
+                TextColumn::make('user.email')->label('Member')->searchable()->copyable(),
+                TextColumn::make('plan.name')->label('Pack')->placeholder('—'),
+                TextColumn::make('chars')->label('Characters')->numeric(),
+                TextColumn::make('amount_minor')
                     ->label('Amount')
                     ->formatStateUsing(fn (CharPackPurchase $record): string => number_format($record->amount_minor / 100, 2).' '.$record->currency),
-                Tables\Columns\TextColumn::make('method')
+                TextColumn::make('method')
                     ->label('Paid by')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => match ($state) {
@@ -64,7 +72,7 @@ class CharPackPurchaseResource extends Resource
                         'vodafone_cash' => 'Vodafone Cash',
                         default => $state,
                     }),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         CharPackPurchase::STATUS_PAID => 'success',
@@ -72,25 +80,25 @@ class CharPackPurchaseResource extends Resource
                         CharPackPurchase::STATUS_REFUNDED => 'warning',
                         default => 'gray',
                     }),
-                Tables\Columns\TextColumn::make('failure_message')->label('Why it failed')->limit(60)->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('paid_at')->dateTime()->sortable()->placeholder('—'),
-                Tables\Columns\TextColumn::make('created_at')->label('Started')->dateTime()->sortable(),
+                TextColumn::make('failure_message')->label('Why it failed')->limit(60)->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('paid_at')->dateTime()->sortable()->placeholder('—'),
+                TextColumn::make('created_at')->label('Started')->dateTime()->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('status')->options([
+                SelectFilter::make('status')->options([
                     CharPackPurchase::STATUS_PAID => 'Paid',
                     CharPackPurchase::STATUS_PENDING => 'Pending',
                     CharPackPurchase::STATUS_FAILED => 'Failed',
                     CharPackPurchase::STATUS_REFUNDED => 'Refunded',
                 ]),
-                Tables\Filters\SelectFilter::make('method')->label('Paid by')->options([
+                SelectFilter::make('method')->label('Paid by')->options([
                     'card' => 'Card',
                     'instapay' => 'InstaPay',
                     'vodafone_cash' => 'Vodafone Cash',
                 ]),
             ])
-            ->actions([
-                Tables\Actions\Action::make('takeBack')
+            ->recordActions([
+                Action::make('takeBack')
                     ->label('Take back characters')
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->color('warning')
@@ -110,7 +118,7 @@ class CharPackPurchaseResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListCharPackPurchases::route('/'),
+            'index' => ListCharPackPurchases::route('/'),
         ];
     }
 }

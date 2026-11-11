@@ -2,11 +2,27 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\KeyValue;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\BulkAction;
+use App\Filament\Resources\DemoGuestUsageResource\Pages\ListDemoGuestUsages;
+use App\Filament\Resources\DemoGuestUsageResource\Pages\ViewDemoGuestUsage;
 use App\Filament\Resources\DemoGuestUsageResource\Pages;
 use App\Models\DemoGuestUsage;
 use App\Models\DemoIdentityLink;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -16,9 +32,9 @@ class DemoGuestUsageResource extends Resource
 {
     protected static ?string $model = DemoGuestUsage::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-user-group';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-user-group';
 
-    protected static ?string $navigationGroup = 'Demo Tracking';
+    protected static string | \UnitEnum | null $navigationGroup = 'Demo Tracking';
 
     protected static ?int $navigationSort = 1;
 
@@ -26,31 +42,31 @@ class DemoGuestUsageResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Guest Usage')
+        return $schema
+            ->components([
+                Section::make('Guest Usage')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('identity_hash')
+                        TextInput::make('identity_hash')
                             ->required()
                             ->maxLength(255),
-                        Forms\Components\TextInput::make('link_group')
+                        TextInput::make('link_group')
                             ->maxLength(80),
-                        Forms\Components\TextInput::make('used_chars')
+                        TextInput::make('used_chars')
                             ->numeric()
                             ->required(),
-                        Forms\Components\TextInput::make('abuse_score')
+                        TextInput::make('abuse_score')
                             ->numeric()
                             ->default(0),
-                        Forms\Components\Toggle::make('is_blocked')
+                        Toggle::make('is_blocked')
                             ->default(false),
-                        Forms\Components\DateTimePicker::make('last_seen_at'),
+                        DateTimePicker::make('last_seen_at'),
                     ]),
-                Forms\Components\Section::make('Metadata')
+                Section::make('Metadata')
                     ->schema([
-                        Forms\Components\KeyValue::make('metadata'),
+                        KeyValue::make('metadata'),
                     ]),
             ]);
     }
@@ -59,23 +75,23 @@ class DemoGuestUsageResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')
+                TextColumn::make('id')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('identity_hash')
+                TextColumn::make('identity_hash')
                     ->label('Identity')
                     ->searchable()
                     ->limit(16)
                     ->tooltip(fn ($record) => $record->identity_hash),
-                Tables\Columns\TextColumn::make('link_group')
+                TextColumn::make('link_group')
                     ->label('Link Group')
                     ->searchable()
                     ->limit(16)
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('used_chars')
+                TextColumn::make('used_chars')
                     ->label('Chars Used')
                     ->numeric()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('abuse_score')
+                TextColumn::make('abuse_score')
                     ->label('Abuse Score')
                     ->numeric()
                     ->sortable()
@@ -85,35 +101,35 @@ class DemoGuestUsageResource extends Resource
                         $state > 0 => 'gray',
                         default => null,
                     }),
-                Tables\Columns\IconColumn::make('is_blocked')
+                IconColumn::make('is_blocked')
                     ->label('Blocked')
                     ->boolean()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('last_seen_at')
+                TextColumn::make('last_seen_at')
                     ->dateTime()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('is_blocked')
+                TernaryFilter::make('is_blocked')
                     ->label('Blocked'),
-                Tables\Filters\Filter::make('high_abuse')
+                Filter::make('high_abuse')
                     ->label('High Abuse Score')
                     ->query(fn ($query) => $query->where('abuse_score', '>=', 50)),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\Action::make('reset_chars')
+            ->recordActions([
+                ViewAction::make(),
+                Action::make('reset_chars')
                     ->label('Reset Chars')
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
                     ->requiresConfirmation()
                     ->modalDescription('Reset used_chars to 0 for this identity only.')
                     ->action(fn ($record) => $record->update(['used_chars' => 0])),
-                Tables\Actions\Action::make('reset_link_group')
+                Action::make('reset_link_group')
                     ->label('Reset Link Group')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
@@ -136,14 +152,14 @@ class DemoGuestUsageResource extends Resource
                             ->body("All identities in group {$linkGroup} have been reset.")
                             ->send();
                     }),
-                Tables\Actions\Action::make('block')
+                Action::make('block')
                     ->label('Block')
                     ->icon('heroicon-o-no-symbol')
                     ->color('danger')
                     ->requiresConfirmation()
                     ->visible(fn ($record) => ! $record->is_blocked)
                     ->action(fn ($record) => $record->update(['is_blocked' => true])),
-                Tables\Actions\Action::make('unblock')
+                Action::make('unblock')
                     ->label('Unblock')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
@@ -151,22 +167,22 @@ class DemoGuestUsageResource extends Resource
                     ->visible(fn ($record) => $record->is_blocked)
                     ->action(fn ($record) => $record->update(['is_blocked' => false])),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                    Tables\Actions\BulkAction::make('reset_chars_selected')
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                    BulkAction::make('reset_chars_selected')
                         ->label('Reset Chars')
                         ->icon('heroicon-o-arrow-path')
                         ->color('warning')
                         ->requiresConfirmation()
                         ->action(fn ($records) => $records->each->update(['used_chars' => 0])),
-                    Tables\Actions\BulkAction::make('block_selected')
+                    BulkAction::make('block_selected')
                         ->label('Block Selected')
                         ->icon('heroicon-o-no-symbol')
                         ->color('danger')
                         ->requiresConfirmation()
                         ->action(fn ($records) => $records->each->update(['is_blocked' => true])),
-                    Tables\Actions\BulkAction::make('unblock_selected')
+                    BulkAction::make('unblock_selected')
                         ->label('Unblock Selected')
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
@@ -180,8 +196,8 @@ class DemoGuestUsageResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListDemoGuestUsages::route('/'),
-            'view' => Pages\ViewDemoGuestUsage::route('/{record}'),
+            'index' => ListDemoGuestUsages::route('/'),
+            'view' => ViewDemoGuestUsage::route('/{record}'),
         ];
     }
 }

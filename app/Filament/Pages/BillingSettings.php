@@ -2,6 +2,20 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Placeholder;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Select;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Textarea;
+use Throwable;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\Billing\TrialEligibilityService;
@@ -9,7 +23,6 @@ use App\Services\StripeProductSyncService;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 
@@ -17,15 +30,15 @@ class BillingSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-credit-card';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-credit-card';
 
-    protected static ?string $navigationGroup = 'Billing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
 
     protected static ?int $navigationSort = 3;
 
     protected static ?string $title = 'Billing Settings';
 
-    protected static string $view = 'filament.pages.billing-settings';
+    protected string $view = 'filament.pages.billing-settings';
 
     public ?array $data = [];
 
@@ -68,38 +81,38 @@ class BillingSettings extends Page implements HasForms
         $this->form->fill($state);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Stripe Connection')
+        return $schema
+            ->components([
+                Section::make('Stripe Connection')
                     ->description('Stripe API keys are set via environment variables (.env). This panel shows their current status.')
                     ->columns(3)
                     ->schema([
-                        Forms\Components\Placeholder::make('stripe_key_status')
+                        Placeholder::make('stripe_key_status')
                             ->label('Publishable Key')
-                            ->content(fn (Forms\Get $get): string => $get('stripe_key_set')
+                            ->content(fn (Get $get): string => $get('stripe_key_set')
                                 ? '✅ Configured'
                                 : '❌ Not set — add STRIPE_KEY to .env'),
-                        Forms\Components\Placeholder::make('stripe_secret_status')
+                        Placeholder::make('stripe_secret_status')
                             ->label('Secret Key')
-                            ->content(fn (Forms\Get $get): string => $get('stripe_secret_set')
+                            ->content(fn (Get $get): string => $get('stripe_secret_set')
                                 ? '✅ Configured'
                                 : '❌ Not set — add STRIPE_SECRET to .env'),
-                        Forms\Components\Placeholder::make('stripe_webhook_status')
+                        Placeholder::make('stripe_webhook_status')
                             ->label('Webhook Secret')
-                            ->content(fn (Forms\Get $get): string => $get('stripe_webhook_secret_set')
+                            ->content(fn (Get $get): string => $get('stripe_webhook_secret_set')
                                 ? '✅ Configured'
                                 : '⚠️ Not set — add STRIPE_WEBHOOK_SECRET to .env'),
                     ]),
 
-                Forms\Components\Section::make('Stripe Products & Prices')
+                Section::make('Stripe Products & Prices')
                     ->description('Stripe prices are now automatically synced from the Plans resource. Use the "Sync Stripe" button on each plan.')
                     ->schema([
-                        Forms\Components\Placeholder::make('stripe_sync_info')
+                        Placeholder::make('stripe_sync_info')
                             ->label('How it works')
                             ->content('Go to Billing → Plans, then click "Sync Stripe" on any plan to create its product and prices in Stripe automatically. You no longer need to manually enter Price IDs.'),
-                        Forms\Components\Placeholder::make('stripe_plans_status')
+                        Placeholder::make('stripe_plans_status')
                             ->label('Plans Status')
                             ->content(function (): string {
                                 $plans = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->get();
@@ -109,10 +122,10 @@ class BillingSettings extends Page implements HasForms
                             }),
                     ]),
 
-                Forms\Components\Section::make('Billing Behavior')
+                Section::make('Billing Behavior')
                     ->columns(3)
                     ->schema([
-                        Forms\Components\TextInput::make('yearly_discount_percentage')
+                        TextInput::make('yearly_discount_percentage')
                             ->label('Yearly Billing Discount (%)')
                             ->numeric()
                             ->minValue(0)
@@ -121,39 +134,39 @@ class BillingSettings extends Page implements HasForms
                             ->suffix('%')
                             ->helperText('Discount applied when users choose yearly billing (e.g. 20 = 20% off). Affects pricing page, checkout, and Stripe prices. A plan\'s offer is for monthly billing only and never adds to this.')
                             ->live(onBlur: true)
-                            ->afterStateUpdated(fn (Forms\Set $set, ?string $state) => $set('yearly_discount_preview', $state)),
-                        Forms\Components\Placeholder::make('yearly_discount_preview')
+                            ->afterStateUpdated(fn (Set $set, ?string $state) => $set('yearly_discount_preview', $state)),
+                        Placeholder::make('yearly_discount_preview')
                             ->label('Yearly Multiplier Preview')
-                            ->content(function (Forms\Get $get): string {
+                            ->content(function (Get $get): string {
                                 $percent = max(0, min(99, (int) ($get('yearly_discount_percentage') ?? 20)));
                                 $multiplier = round(1 - ($percent / 100), 2);
                                 return "Monthly price x 12 x {$multiplier} = yearly price ({$percent}% off)";
                             }),
-                        Forms\Components\Toggle::make('require_saved_payment_method')
+                        Toggle::make('require_saved_payment_method')
                             ->label('Require Saved Payment Method')
                             ->helperText('Require users to have a payment method saved before subscribing.'),
-                        Forms\Components\TextInput::make('grace_days')
+                        TextInput::make('grace_days')
                             ->label('Grace Period (days)')
                             ->numeric()
                             ->minValue(1)
                             ->maxValue(90)
                             ->default(7)
                             ->helperText('Days a member keeps their paid plan after a renewal payment fails. If it is still unpaid then, the subscription is canceled and they move to the free plan. The first payment after a free trial gets no grace days. Keep it shorter than Stripe\'s own retry period for failed payments, so Stripe keeps retrying the card throughout and never ends the subscription first, and shorter than a billing month, so no further renewal falls inside it.'),
-                        Forms\Components\Toggle::make('webhook_emails_enabled')
+                        Toggle::make('webhook_emails_enabled')
                             ->label('Webhook Email Notifications')
                             ->helperText('Send email notifications on subscription lifecycle events.'),
                     ]),
 
-                Forms\Components\Section::make('Card trial')
+                Section::make('Card trial')
                     ->description('Customers can start the free trial on the plans and billing cycles checked below. Stripe charges that plan when the trial ends. Usage during the trial follows the cap below. Confirm and Pay is unchanged.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Toggle::make('trial_enabled')
+                        Toggle::make('trial_enabled')
                             ->label('Enable free card trial')
                             ->helperText('Off removes the trial button, the pricing callout, and the homepage callout. People already in a trial keep it until it ends or they cancel. Confirm and Pay stays available.')
                             ->dehydrated()
                             ->columnSpanFull(),
-                        Forms\Components\CheckboxList::make('trial_plan_slugs')
+                        CheckboxList::make('trial_plan_slugs')
                             ->label('Plans that offer the trial')
                             ->options(fn (): array => Plan::query()->subscriptionPlans()
                                 ->where('is_active', true)
@@ -169,7 +182,7 @@ class BillingSettings extends Page implements HasForms
                             ->columns(2)
                             ->bulkToggleable()
                             ->helperText('Unchecked plans keep normal checkout only. The trial button, the pricing chip, and the pricing line follow this list. Nothing checked hides the trial everywhere. People already in a trial keep it.'),
-                        Forms\Components\CheckboxList::make('trial_cycles')
+                        CheckboxList::make('trial_cycles')
                             ->label('Billing cycles that offer the trial')
                             ->options([
                                 'monthly' => 'Monthly',
@@ -177,7 +190,7 @@ class BillingSettings extends Page implements HasForms
                             ])
                             ->columns(2)
                             ->helperText('A yearly trial charges the full yearly price when it ends. A plan also needs a Stripe price for that cycle.'),
-                        Forms\Components\Select::make('trial_quota_plan_slug')
+                        Select::make('trial_quota_plan_slug')
                             ->label('Usage cap during the trial')
                             ->options(fn (): array => Plan::query()->subscriptionPlans()
                                 ->where('is_active', true)
@@ -187,7 +200,7 @@ class BillingSettings extends Page implements HasForms
                             ->required()
                             ->native(false)
                             ->helperText('The customer keeps the features of the plan they picked. Character and minute limits follow this plan, with overage off. Starter is the default cap.'),
-                        Forms\Components\TextInput::make('trial_days')
+                        TextInput::make('trial_days')
                             ->label('Trial length (days)')
                             ->numeric()
                             ->minValue(1)
@@ -197,54 +210,54 @@ class BillingSettings extends Page implements HasForms
                             ->helperText('New trials use this length. A trial that already started keeps its original end date.'),
                     ]),
 
-                Forms\Components\Section::make('Country Detection & Fallback')
+                Section::make('Country Detection & Fallback')
                     ->columns(3)
                     ->schema([
-                        Forms\Components\TextInput::make('pricing_forced_country_code')
+                        TextInput::make('pricing_forced_country_code')
                             ->label('Force Country Code')
                             ->maxLength(2)
                             ->placeholder('EG')
                             ->helperText('Optional global override for testing or temporary launches.'),
-                        Forms\Components\TextInput::make('pricing_local_country_code')
+                        TextInput::make('pricing_local_country_code')
                             ->label('Local Dev Country Code')
                             ->maxLength(2)
                             ->required()
                             ->default('EG')
                             ->helperText('Used on localhost, .test, .local, and private-network development requests.'),
-                        Forms\Components\TextInput::make('pricing_local_currency_code')
+                        TextInput::make('pricing_local_currency_code')
                             ->label('Local Dev Currency')
                             ->maxLength(3)
                             ->required()
                             ->default('EGP')
                             ->helperText('Keeps local development pricing aligned with the local market override.'),
-                        Forms\Components\Toggle::make('pricing_local_detect_public_ip')
+                        Toggle::make('pricing_local_detect_public_ip')
                             ->label('Use Public IP Lookup on Localhost')
                             ->helperText('Optional. When enabled, localhost tries public-IP geolocation before using the local dev market.'),
-                        Forms\Components\TextInput::make('pricing_fallback_country_code')
+                        TextInput::make('pricing_fallback_country_code')
                             ->label('Fallback Country Code')
                             ->maxLength(2)
                             ->required()
                             ->default('US'),
-                        Forms\Components\TextInput::make('pricing_fallback_currency_code')
+                        TextInput::make('pricing_fallback_currency_code')
                             ->label('Fallback Currency')
                             ->maxLength(3)
                             ->required()
                             ->default('USD'),
-                        Forms\Components\Placeholder::make('pricing_detection_order')
+                        Placeholder::make('pricing_detection_order')
                             ->label('Detection Order')
                             ->columnSpanFull()
                             ->content('For localhost/private-network requests, local market override is applied first (or public-IP lookup if enabled). For public traffic, trusted CDN headers are checked first, then IP geolocation providers and Accept-Language region. If no signal is available, fallback market is used.'),
                     ]),
 
-                Forms\Components\Section::make('Egypt Manual Payment Methods')
+                Section::make('Egypt Manual Payment Methods')
                     ->description('Shown directly on the billing page for Egyptian visitors.')
                     ->schema([
-                        Forms\Components\Tabs::make('manual_payment_tabs')
+                        Tabs::make('manual_payment_tabs')
                             ->columnSpanFull()
                             ->tabs([
-                                Forms\Components\Tabs\Tab::make('Stripe')
+                                Tab::make('Stripe')
                                     ->schema([
-                                        Forms\Components\FileUpload::make('payment_logo_stripe')
+                                        FileUpload::make('payment_logo_stripe')
                                             ->label('Stripe Logo')
                                             ->disk('public')
                                             ->directory('settings/payments/logos')
@@ -254,13 +267,13 @@ class BillingSettings extends Page implements HasForms
                                             ->maxSize(2048)
                                             ->helperText('Recommended: transparent PNG/WebP, wide ratio for best checkout card rendering.'),
                                     ]),
-                                Forms\Components\Tabs\Tab::make('InstaPay')
+                                Tab::make('InstaPay')
                                     ->columns(2)
                                     ->schema([
-                                        Forms\Components\Toggle::make('manual_instapay_enabled')
+                                        Toggle::make('manual_instapay_enabled')
                                             ->label('Enable InstaPay')
                                             ->columnSpanFull(),
-                                        Forms\Components\FileUpload::make('payment_logo_instapay')
+                                        FileUpload::make('payment_logo_instapay')
                                             ->label('InstaPay Logo')
                                             ->disk('public')
                                             ->directory('settings/payments/logos')
@@ -269,12 +282,12 @@ class BillingSettings extends Page implements HasForms
                                             ->imageEditor()
                                             ->maxSize(2048)
                                             ->helperText('Use the official brand logo image (PNG/WebP preferred).'),
-                                        Forms\Components\TextInput::make('manual_instapay_payment_link')
+                                        TextInput::make('manual_instapay_payment_link')
                                             ->label('InstaPay Payment Link')
                                             ->url()
                                             ->maxLength(500)
                                             ->helperText('Optional. Users can open this link directly to continue payment.'),
-                                        Forms\Components\FileUpload::make('manual_instapay_qr_image')
+                                        FileUpload::make('manual_instapay_qr_image')
                                             ->label('InstaPay QR Image')
                                             ->disk('public')
                                             ->directory('settings/payments/qr')
@@ -285,13 +298,13 @@ class BillingSettings extends Page implements HasForms
                                             ->helperText('Optional. Upload PNG/JPG/WebP QR code image.')
                                             ->columnSpanFull(),
                                     ]),
-                                Forms\Components\Tabs\Tab::make('Vodafone Cash')
+                                Tab::make('Vodafone Cash')
                                     ->columns(2)
                                     ->schema([
-                                        Forms\Components\Toggle::make('manual_vodafone_cash_enabled')
+                                        Toggle::make('manual_vodafone_cash_enabled')
                                             ->label('Enable Vodafone Cash')
                                             ->columnSpanFull(),
-                                        Forms\Components\FileUpload::make('payment_logo_vodafone_cash')
+                                        FileUpload::make('payment_logo_vodafone_cash')
                                             ->label('Vodafone Cash Logo')
                                             ->disk('public')
                                             ->directory('settings/payments/logos')
@@ -300,12 +313,12 @@ class BillingSettings extends Page implements HasForms
                                             ->imageEditor()
                                             ->maxSize(2048)
                                             ->helperText('Use the official brand logo image (PNG/WebP preferred).'),
-                                        Forms\Components\TextInput::make('manual_vodafone_cash_payment_link')
+                                        TextInput::make('manual_vodafone_cash_payment_link')
                                             ->label('Vodafone Cash Payment Link')
                                             ->url()
                                             ->maxLength(500)
                                             ->helperText('Optional. Users can open this link directly to continue payment.'),
-                                        Forms\Components\FileUpload::make('manual_vodafone_cash_qr_image')
+                                        FileUpload::make('manual_vodafone_cash_qr_image')
                                             ->label('Vodafone Cash QR Image')
                                             ->disk('public')
                                             ->directory('settings/payments/qr')
@@ -316,12 +329,12 @@ class BillingSettings extends Page implements HasForms
                                             ->helperText('Optional. Upload PNG/JPG/WebP QR code image.')
                                             ->columnSpanFull(),
                                     ]),
-                                Forms\Components\Tabs\Tab::make('Instructions')
+                                Tab::make('Instructions')
                                     ->schema([
-                                        Forms\Components\Textarea::make('manual_payment_instructions_en')
+                                        Textarea::make('manual_payment_instructions_en')
                                             ->label('Manual Instructions (English)')
                                             ->rows(3),
-                                        Forms\Components\Textarea::make('manual_payment_instructions_ar')
+                                        Textarea::make('manual_payment_instructions_ar')
                                             ->label('Manual Instructions (Arabic)')
                                             ->rows(3),
                                     ]),
@@ -455,7 +468,7 @@ class BillingSettings extends Page implements HasForms
 
         try {
             $result = $sync->syncAllPlans();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $result = ['synced' => 0, 'failed' => 1, 'skipped' => 0, 'errors' => ['all plans' => $e->getMessage()]];
         }
 

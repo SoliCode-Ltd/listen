@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Concerns;
 
+use Illuminate\Auth\Access\Response as AccessResponse;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -11,53 +12,63 @@ use Illuminate\Database\Eloquent\Model;
  */
 trait ReadOnlyResource
 {
-    public static function canCreate(): bool
+    // Filament 4 checks this (pages, buttons and canCreate() alike): never allowed here.
+    public static function getCreateAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canEdit(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canEdit() alike): never allowed here.
+    public static function getEditAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canDelete(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canDelete() alike): never allowed here.
+    public static function getDeleteAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canDeleteAny(): bool
+    // Filament 4 checks this (pages, buttons and canDeleteAny() alike): never allowed here.
+    public static function getDeleteAnyAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canForceDelete(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canForceDelete() alike): never allowed here.
+    public static function getForceDeleteAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canForceDeleteAny(): bool
+    // Filament 4 checks this (pages, buttons and canForceDeleteAny() alike): never allowed here.
+    public static function getForceDeleteAnyAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canRestore(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canRestore() alike): never allowed here.
+    public static function getRestoreAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canRestoreAny(): bool
+    // Filament 4 checks this (pages, buttons and canRestoreAny() alike): never allowed here.
+    public static function getRestoreAnyAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canReplicate(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canReplicate() alike): never allowed here.
+    public static function getReplicateAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canReorder(): bool
+    // Filament 4 checks this (pages, buttons and canReorder() alike): never allowed here.
+    public static function getReorderAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 }

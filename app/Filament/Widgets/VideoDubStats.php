@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use Throwable;
 use App\Models\VideoDub;
 use App\Support\VideoDubbing;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
@@ -18,7 +19,7 @@ class VideoDubStats extends BaseWidget
 
     protected static bool $isLazy = false;
 
-    protected static ?string $pollingInterval = '30s';
+    protected ?string $pollingInterval = '30s';
 
     protected ?string $heading = 'Dub my video';
 
@@ -33,7 +34,7 @@ class VideoDubStats extends BaseWidget
     {
         try {
             return $this->stats();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // The list of dubs must open whatever goes wrong here.
             report($e);
 

@@ -2,6 +2,9 @@
 
 namespace App\Filament\Resources\PlanResource\Pages;
 
+use Filament\Actions\ViewAction;
+use Filament\Actions\DeleteAction;
+use Exception;
 use App\Filament\Resources\PlanResource;
 use App\Models\Plan;
 use App\Services\Billing\KeptCredits;
@@ -23,8 +26,8 @@ class EditPlan extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\ViewAction::make(),
-            Actions\DeleteAction::make(),
+            ViewAction::make(),
+            DeleteAction::make(),
         ];
     }
 
@@ -104,7 +107,7 @@ class EditPlan extends EditRecord
                         'Plan automatically synced to Stripe.',
                     )->send();
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Notification::make()
                     ->title('Stripe Sync Failed')
                     ->body($e->getMessage())

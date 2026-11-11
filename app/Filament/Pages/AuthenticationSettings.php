@@ -2,12 +2,19 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use App\Models\SiteSetting;
 use App\Services\Auth\AuthSettingsService;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Validation\ValidationException;
@@ -16,15 +23,15 @@ class AuthenticationSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-shield-check';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shield-check';
 
-    protected static ?string $navigationGroup = 'System';
+    protected static string | \UnitEnum | null $navigationGroup = 'System';
 
     protected static ?int $navigationSort = 4;
 
     protected static ?string $title = 'Authentication';
 
-    protected static string $view = 'filament.pages.authentication-settings';
+    protected string $view = 'filament.pages.authentication-settings';
 
     public ?array $data = [];
 
@@ -52,49 +59,49 @@ class AuthenticationSettings extends Page implements HasForms
         ]);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Sign-in Methods')
+        return $schema
+            ->components([
+                Section::make('Sign-in Methods')
                     ->description('Control which authentication methods are visible and allowed in backend routes.')
                     ->schema([
-                        Forms\Components\Toggle::make('auth_email_enabled')
+                        Toggle::make('auth_email_enabled')
                             ->label('Email / Password')
                             ->helperText('Keeps classic email/password login and registration available.')
                             ->default(true),
-                        Forms\Components\Toggle::make('auth_google_enabled')
+                        Toggle::make('auth_google_enabled')
                             ->label('Google Sign-in (Socialite/OAuth)')
                             ->helperText('Server-side OAuth. Requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in environment.')
                             ->default(true),
-                        Forms\Components\Toggle::make('auth_phone_enabled')
+                        Toggle::make('auth_phone_enabled')
                             ->label('Phone Number (Firebase)')
                             ->helperText('Enables OTP authentication with Firebase phone verification.')
                             ->default(false),
-                        Forms\Components\Toggle::make('firebase_google_enabled')
+                        Toggle::make('firebase_google_enabled')
                             ->label('Google Sign-in (Firebase)')
                             ->helperText('Client-side Google sign-in via Firebase. Requires Firebase config below. Uses the same Firebase identity system as phone auth.')
                             ->default(false),
-                        Forms\Components\Hidden::make('google_configured'),
-                        Forms\Components\Placeholder::make('google_runtime_status')
+                        Hidden::make('google_configured'),
+                        Placeholder::make('google_runtime_status')
                             ->label('Google Runtime Status')
-                            ->content(fn (Forms\Get $get): string => (bool) $get('google_configured')
+                            ->content(fn (Get $get): string => (bool) $get('google_configured')
                                 ? 'Socialite OAuth: Configured in environment.'
                                 : 'Socialite OAuth: Missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in environment.')
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
 
-                Forms\Components\Section::make('Firebase Configuration')
+                Section::make('Firebase Configuration')
                     ->description('Client configuration keys for Firebase web SDK. Used by Phone Auth and Firebase Google Sign-in.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Toggle::make('firebase_phone_enabled')
+                        Toggle::make('firebase_phone_enabled')
                             ->label('Enable Firebase Phone Auth Globally')
                             ->helperText('Must be enabled together with "Phone Number (Firebase)" above for live phone auth.')
                             ->default(false)
                             ->columnSpanFull(),
-                        Forms\Components\Select::make('firebase_recaptcha_mode')
+                        Select::make('firebase_recaptcha_mode')
                             ->label('reCAPTCHA Mode')
                             ->options([
                                 'invisible' => 'Invisible',
@@ -103,42 +110,42 @@ class AuthenticationSettings extends Page implements HasForms
                             ->required()
                             ->native(false)
                             ->default('invisible'),
-                        Forms\Components\TextInput::make('firebase_recaptcha_site_key')
+                        TextInput::make('firebase_recaptcha_site_key')
                             ->label('reCAPTCHA Site Key')
                             ->maxLength(255)
                             ->placeholder('6Lc...')
                             ->helperText('Optional storage only. Firebase Phone Auth uses Firebase-managed reCAPTCHA and ignores custom site keys here.'),
-                        Forms\Components\Toggle::make('firebase_phone_testing_mode')
+                        Toggle::make('firebase_phone_testing_mode')
                             ->label('Firebase Test Mode (Local/Testing only)')
                             ->helperText('Disables app verification in Firebase Web SDK for local/testing runs. Use only with Firebase test phone numbers; ignored in production.')
                             ->default(false)
                             ->columnSpanFull(),
-                        Forms\Components\TextInput::make('firebase_api_key')
+                        TextInput::make('firebase_api_key')
                             ->label('Firebase API Key')
                             ->maxLength(255)
                             ->placeholder('AIza...')
-                            ->required(fn (Forms\Get $get): bool => (bool) $get('auth_phone_enabled') || (bool) $get('firebase_google_enabled')),
-                        Forms\Components\TextInput::make('firebase_auth_domain')
+                            ->required(fn (Get $get): bool => (bool) $get('auth_phone_enabled') || (bool) $get('firebase_google_enabled')),
+                        TextInput::make('firebase_auth_domain')
                             ->label('Firebase Auth Domain')
                             ->maxLength(255)
                             ->placeholder('your-project.firebaseapp.com')
                             ->helperText('Use host only (no https:// and no trailing slash).')
-                            ->required(fn (Forms\Get $get): bool => (bool) $get('auth_phone_enabled') || (bool) $get('firebase_google_enabled')),
-                        Forms\Components\TextInput::make('firebase_project_id')
+                            ->required(fn (Get $get): bool => (bool) $get('auth_phone_enabled') || (bool) $get('firebase_google_enabled')),
+                        TextInput::make('firebase_project_id')
                             ->label('Firebase Project ID')
                             ->maxLength(255)
-                            ->required(fn (Forms\Get $get): bool => (bool) $get('auth_phone_enabled') || (bool) $get('firebase_google_enabled')),
-                        Forms\Components\TextInput::make('firebase_app_id')
+                            ->required(fn (Get $get): bool => (bool) $get('auth_phone_enabled') || (bool) $get('firebase_google_enabled')),
+                        TextInput::make('firebase_app_id')
                             ->label('Firebase App ID')
                             ->maxLength(255)
-                            ->required(fn (Forms\Get $get): bool => (bool) $get('auth_phone_enabled') || (bool) $get('firebase_google_enabled')),
-                        Forms\Components\TextInput::make('firebase_messaging_sender_id')
+                            ->required(fn (Get $get): bool => (bool) $get('auth_phone_enabled') || (bool) $get('firebase_google_enabled')),
+                        TextInput::make('firebase_messaging_sender_id')
                             ->label('Firebase Messaging Sender ID')
                             ->maxLength(255),
-                        Forms\Components\TextInput::make('firebase_storage_bucket')
+                        TextInput::make('firebase_storage_bucket')
                             ->label('Firebase Storage Bucket')
                             ->maxLength(255),
-                        Forms\Components\TextInput::make('firebase_measurement_id')
+                        TextInput::make('firebase_measurement_id')
                             ->label('Firebase Measurement ID')
                             ->maxLength(255),
                     ]),

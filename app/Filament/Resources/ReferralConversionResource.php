@@ -2,6 +2,24 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\KeyValue;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\ReferralConversionResource\Pages\ListReferralConversions;
+use App\Filament\Resources\ReferralConversionResource\Pages\ViewReferralConversion;
+use Throwable;
+use Illuminate\Support\Facades\Log;
 use App\Filament\Resources\ReferralConversionResource\Pages;
 use App\Models\DemoRewardTransaction;
 use App\Models\ReferralConversion;
@@ -10,7 +28,6 @@ use App\Services\Referral\DemoRewardLedgerService;
 use App\Services\Referral\ReferralQualificationService;
 use App\Services\Referral\ReferralService;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -21,9 +38,9 @@ class ReferralConversionResource extends Resource
 {
     protected static ?string $model = ReferralConversion::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-users';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-users';
 
-    protected static ?string $navigationGroup = 'Referrals';
+    protected static string | \UnitEnum | null $navigationGroup = 'Referrals';
 
     protected static ?int $navigationSort = 2;
 
@@ -31,16 +48,16 @@ class ReferralConversionResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'id';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Conversion')
+        return $schema
+            ->components([
+                Section::make('Conversion')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('id')
+                        TextInput::make('id')
                             ->disabled(),
-                        Forms\Components\Select::make('status')
+                        Select::make('status')
                             ->options([
                                 ReferralConversion::STATUS_PENDING => 'Pending',
                                 ReferralConversion::STATUS_APPROVED => 'Approved',
@@ -49,23 +66,23 @@ class ReferralConversionResource extends Resource
                             ])
                             ->disabled()
                             ->helperText('Use the Approve / Reject actions above to change status.'),
-                        Forms\Components\TextInput::make('referrer.email')
+                        TextInput::make('referrer.email')
                             ->label('Referrer')
                             ->disabled(),
-                        Forms\Components\TextInput::make('referredUser.email')
+                        TextInput::make('referredUser.email')
                             ->label('Referred User')
                             ->disabled(),
-                        Forms\Components\TextInput::make('qualification_step')
+                        TextInput::make('qualification_step')
                             ->disabled(),
-                        Forms\Components\TextInput::make('reward_chars')
+                        TextInput::make('reward_chars')
                             ->disabled(),
-                        Forms\Components\Textarea::make('rejection_reason')
+                        Textarea::make('rejection_reason')
                             ->disabled()
                             ->columnSpanFull(),
-                        Forms\Components\KeyValue::make('fraud_indicators')
+                        KeyValue::make('fraud_indicators')
                             ->disabled()
                             ->columnSpanFull(),
-                        Forms\Components\Textarea::make('reviewer_notes')
+                        Textarea::make('reviewer_notes')
                             ->rows(3)
                             ->columnSpanFull()
                             ->helperText('Internal notes visible only to admins.'),
@@ -77,8 +94,8 @@ class ReferralConversionResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')->sortable()->label('#'),
-                Tables\Columns\BadgeColumn::make('status')
+                TextColumn::make('id')->sortable()->label('#'),
+                BadgeColumn::make('status')
                     ->colors([
                         'warning' => ReferralConversion::STATUS_PENDING,
                         'success' => ReferralConversion::STATUS_APPROVED,
@@ -86,46 +103,46 @@ class ReferralConversionResource extends Resource
                         'gray' => ReferralConversion::STATUS_FLAGGED,
                     ])
                     ->sortable(),
-                Tables\Columns\TextColumn::make('referrer.email')
+                TextColumn::make('referrer.email')
                     ->label('Referrer')
                     ->searchable()
                     ->limit(30)
                     ->tooltip(fn ($record) => $record->referrer?->email),
-                Tables\Columns\TextColumn::make('referredUser.email')
+                TextColumn::make('referredUser.email')
                     ->label('Referred')
                     ->searchable()
                     ->limit(30)
                     ->tooltip(fn ($record) => $record->referredUser?->email),
-                Tables\Columns\TextColumn::make('qualification_step')
+                TextColumn::make('qualification_step')
                     ->label('Trigger')
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('reward_chars')
+                TextColumn::make('reward_chars')
                     ->label('Reward')
                     ->numeric()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('fraud_indicators')
+                TextColumn::make('fraud_indicators')
                     ->label('Flags')
                     ->formatStateUsing(function ($state) {
                         if (! is_array($state) || empty($state)) return '—';
                         return implode(', ', array_slice($state, 0, 3));
                     })
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('qualified_at')
+                TextColumn::make('qualified_at')
                     ->label('Qualified')
                     ->dateTime()
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('approved_at')
+                TextColumn::make('approved_at')
                     ->label('Approved')
                     ->dateTime()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Created')
                     ->dateTime()
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->options([
                         ReferralConversion::STATUS_PENDING => 'Pending',
                         ReferralConversion::STATUS_APPROVED => 'Approved',
@@ -133,7 +150,7 @@ class ReferralConversionResource extends Resource
                         ReferralConversion::STATUS_FLAGGED => 'Flagged',
                     ])
                     ->multiple(),
-                Tables\Filters\SelectFilter::make('qualification_step')
+                SelectFilter::make('qualification_step')
                     ->options([
                         'paid_plan' => 'Paid Plan',
                         'signup' => 'Signup',
@@ -141,16 +158,16 @@ class ReferralConversionResource extends Resource
                         'first_demo_generation' => 'First Demo',
                     ]),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\Action::make('approve')
+            ->recordActions([
+                ViewAction::make(),
+                Action::make('approve')
                     ->label('Approve')
                     ->icon('heroicon-o-check-badge')
                     ->color('success')
                     ->visible(fn (ReferralConversion $record) => $record->status !== ReferralConversion::STATUS_APPROVED)
                     ->requiresConfirmation()
-                    ->form([
-                        Forms\Components\Textarea::make('notes')
+                    ->schema([
+                        Textarea::make('notes')
                             ->label('Reviewer notes (optional)')
                             ->rows(3),
                     ])
@@ -164,18 +181,18 @@ class ReferralConversionResource extends Resource
                             ->success()
                             ->send();
                     }),
-                Tables\Actions\Action::make('reject')
+                Action::make('reject')
                     ->label('Reject')
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->visible(fn (ReferralConversion $record) => $record->status !== ReferralConversion::STATUS_REJECTED)
                     ->requiresConfirmation()
-                    ->form([
-                        Forms\Components\TextInput::make('reason')
+                    ->schema([
+                        TextInput::make('reason')
                             ->label('Rejection reason')
                             ->maxLength(120)
                             ->required(),
-                        Forms\Components\Textarea::make('notes')
+                        Textarea::make('notes')
                             ->label('Reviewer notes (optional)')
                             ->rows(3),
                     ])
@@ -189,16 +206,16 @@ class ReferralConversionResource extends Resource
                             ->danger()
                             ->send();
                     }),
-                Tables\Actions\DeleteAction::make()
+                DeleteAction::make()
                     ->modalHeading('Delete conversion & revoke reward')
                     ->modalDescription('Any demo reward characters granted from this conversion will be revoked from the referrer.')
                     ->before(function (ReferralConversion $record) {
                         self::revokeRewardForConversion($record);
                     }),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
                         ->before(function (Collection $records) {
                             $records->each(fn (ReferralConversion $record) => self::revokeRewardForConversion($record));
                         }),
@@ -210,8 +227,8 @@ class ReferralConversionResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListReferralConversions::route('/'),
-            'view' => Pages\ViewReferralConversion::route('/{record}'),
+            'index' => ListReferralConversions::route('/'),
+            'view' => ViewReferralConversion::route('/{record}'),
         ];
     }
 
@@ -242,8 +259,8 @@ class ReferralConversionResource extends Resource
                     }
                 }
             }
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Failed to revoke reward on conversion delete (Filament).', [
+        } catch (Throwable $e) {
+            Log::warning('Failed to revoke reward on conversion delete (Filament).', [
                 'conversion_id' => $conversion->id,
                 'exception' => $e->getMessage(),
             ]);

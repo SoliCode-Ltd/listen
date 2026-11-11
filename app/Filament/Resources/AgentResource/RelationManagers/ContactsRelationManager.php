@@ -16,7 +16,7 @@ class ContactsRelationManager extends RelationManager
 
     protected static ?string $title = 'Customers';
 
-    protected static ?string $icon = 'heroicon-o-identification';
+    protected static string | \BackedEnum | null $icon = 'heroicon-o-identification';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
@@ -36,7 +36,7 @@ class ContactsRelationManager extends RelationManager
             ->columns(AgentContactResource::tableColumns(withAgent: false))
             ->defaultSort('last_contact_at', 'desc')
             ->recordUrl(fn (AgentContact $record): ?string => AgentContactResource::callUrl($record))
-            ->actions([
+            ->recordActions([
                 AgentContactResource::openCallAction(),
             ])
             ->emptyStateHeading('No customers yet')

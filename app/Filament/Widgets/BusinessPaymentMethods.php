@@ -19,7 +19,7 @@ class BusinessPaymentMethods extends BaseWidget
 
     protected static ?int $sort = -28;
 
-    protected static ?string $pollingInterval = null;
+    protected ?string $pollingInterval = null;
 
     protected function getHeading(): ?string
     {
@@ -71,7 +71,7 @@ class BusinessPaymentMethods extends BaseWidget
 
     private function months(): int
     {
-        return BusinessStatsService::normalizeMonths($this->filters['months'] ?? null);
+        return BusinessStatsService::normalizeMonths($this->pageFilters['months'] ?? null);
     }
 
     /** "USD 37.40 · EGP 995.00": never added up across currencies. */

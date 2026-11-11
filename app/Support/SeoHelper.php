@@ -811,7 +811,8 @@ class SeoHelper
      */
     public static function defaultRobotsTxt(): string
     {
-        $private = ['Disallow: /admin', 'Disallow: /livewire/'];
+        // /livewire covers Livewire's own addresses, which carry a code since Livewire 4 (/livewire-4aeeedbb/...).
+        $private = ['Disallow: /admin', 'Disallow: /livewire'];
         $agents = static fn (array $names): array => array_map(static fn (string $name): string => 'User-agent: ' . $name, $names);
 
         return implode("\n", [

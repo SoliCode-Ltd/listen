@@ -2,6 +2,22 @@
 
 namespace App\Filament\Pages;
 
+use App\Support\SpeechText;
+use App\Support\Pronunciations;
+use App\Services\Tts\GeminiKeyManager;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Placeholder;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Forms\Components\Repeater;
+use Filament\Schemas\Components\Actions;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Textarea;
 use App\Models\SiteSetting;
 use App\Models\Voice;
 use App\Support\GeminiTtsModel;
@@ -12,7 +28,6 @@ use App\Support\VoiceTier;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 
@@ -20,15 +35,15 @@ class TtsSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-speaker-wave';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-speaker-wave';
 
-    protected static ?string $navigationGroup = 'System';
+    protected static string | \UnitEnum | null $navigationGroup = 'System';
 
     protected static ?int $navigationSort = 2;
 
     protected static ?string $title = 'TTS Settings';
 
-    protected static string $view = 'filament.pages.tts-settings';
+    protected string $view = 'filament.pages.tts-settings';
 
     public ?array $data = [];
 
@@ -38,11 +53,11 @@ class TtsSettings extends Page implements HasForms
             // Global mode
             'tts_mode' => SiteSetting::get('tts_mode', config('listen.tts.mode', 'google')),
             StandardVoiceEngine::SETTING_KEY => StandardVoiceEngine::current(),
-            \App\Support\SpeechText::SETTING => \App\Support\SpeechText::enabled(),
-            \App\Support\Pronunciations::SETTING => \App\Support\Pronunciations::enabled(),
+            SpeechText::SETTING => SpeechText::enabled(),
+            Pronunciations::SETTING => Pronunciations::enabled(),
 
             // Gemini config
-            'gemini_api_key_set' => count(app(\App\Services\Tts\GeminiKeyManager::class)->getAllKeys()) > 0,
+            'gemini_api_key_set' => count(app(GeminiKeyManager::class)->getAllKeys()) > 0,
             'gemini_default_voice' => SiteSetting::get('gemini_default_voice', config('services.gemini_tts.default_voice', 'Kore')),
             'gemini_timeout_seconds' => (int) SiteSetting::get('gemini_timeout_seconds', config('listen.tts.gemini_timeout_seconds', 30)),
 
@@ -66,7 +81,7 @@ class TtsSettings extends Page implements HasForms
         ]);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
         $performanceStyleOptions = collect(TtsStudioConfig::performanceStyleCatalog())
             ->mapWithKeys(fn (array $row): array => [$row['value'] => $row['label']])
@@ -83,13 +98,13 @@ class TtsSettings extends Page implements HasForms
         $arabicVoiceOptions = $this->voiceOptionsForLanguage('ar');
         $englishVoiceOptions = $this->voiceOptionsForLanguage('en');
 
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Global TTS Mode')
+        return $schema
+            ->components([
+                Section::make('Global TTS Mode')
                     ->description('Controls which TTS engine is used for audio generation across the platform.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Select::make('tts_mode')
+                        Select::make('tts_mode')
                             ->label('TTS Routing Mode')
                             ->options([
                                 'google' => 'Google Cloud TTS (WaveNet & Chirp)',
@@ -98,37 +113,37 @@ class TtsSettings extends Page implements HasForms
                             ->required()
                             ->helperText('Standard voices always use Google Cloud (the engine chosen here). HD voices always use the Gemini model selected below, in either mode, and never fall back to a standard voice: if Gemini is busy or down, the generation fails and the member gets their credits back. The mode only picks which voices the HD lists show (Hybrid: the Gemini voices).')
                             ->reactive(),
-                        Forms\Components\Select::make(StandardVoiceEngine::SETTING_KEY)
+                        Select::make(StandardVoiceEngine::SETTING_KEY)
                             ->label('Standard voice engine')
                             ->options(StandardVoiceEngine::options())
                             ->default(StandardVoiceEngine::WAVENET)
                             ->required()
                             ->helperText('Reads Standard-quality generations only: the free plan, and the demo if a visitor switches it to Standard. Paid plans and the demo default use HD (Gemini) and are not affected. With Chirp 3 HD, each standard voice in the picker is read by a matching Chirp 3 HD voice of the same language and gender. Pitch is ignored by Chirp 3 HD. Switch back at any time.'),
-                        Forms\Components\Toggle::make(\App\Support\SpeechText::SETTING)
+                        Toggle::make(SpeechText::SETTING)
                             ->label('Smooth abbreviations and punctuation')
                             ->helperText('Before a voice is read, abbreviations that would pause like the end of a sentence are written out (د. أحمد → دكتور أحمد, الساعة ٩ م → الساعة ٩ مساءً, Dr. Lee → Dr Lee, e.g. → for example), and doubled marks (!!! ؟؟) become one. Only abbreviations with one meaning where they stand are changed. The member\'s text in their history is never changed.')
                             ->default(true)
                             ->columnSpanFull(),
-                        Forms\Components\Toggle::make(\App\Support\Pronunciations::SETTING)
+                        Toggle::make(Pronunciations::SETTING)
                             ->label('Members\' pronunciations (the «النطق» button)')
                             ->helperText('On: members save how a word should be said, from the «النطق» button in the studio and the demo, and their new voices say it that way. Off: the button is gone, nothing can be saved, and every voice is made from the text as written, exactly as before. Saved words are kept and work again when switched back on. Separate from smoothing above.')
                             ->default(false)
                             ->columnSpanFull(),
                     ]),
 
-                Forms\Components\Section::make('Gemini TTS Configuration')
+                Section::make('Gemini TTS Configuration')
                     ->description('Every HD voice speaks with Gemini\'s latest speech model. Standard voices stay on Google Cloud.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Placeholder::make('gemini_tts_model')
+                        Placeholder::make('gemini_tts_model')
                             ->label('Gemini model')
                             ->content(GeminiTtsModel::LATEST.' (always the latest)'),
-                        Forms\Components\Placeholder::make('gemini_api_key_status')
+                        Placeholder::make('gemini_api_key_status')
                             ->label('Gemini API Key')
-                            ->content(fn (Forms\Get $get): string => $get('gemini_api_key_set')
+                            ->content(fn (Get $get): string => $get('gemini_api_key_set')
                                 ? '✅ Configured (set via GEMINI_TTS_API_KEY env variable)'
                                 : '❌ Not configured — set GEMINI_TTS_API_KEY in your .env file'),
-                        Forms\Components\Select::make('gemini_default_voice')
+                        Select::make('gemini_default_voice')
                             ->label('Default Gemini Voice')
                             ->options([
                                 'Zephyr' => 'Zephyr (Bright)',
@@ -144,7 +159,7 @@ class TtsSettings extends Page implements HasForms
                             ])
                             ->required()
                             ->helperText('Used when no specific voice is requested by the user.'),
-                        Forms\Components\TextInput::make('gemini_timeout_seconds')
+                        TextInput::make('gemini_timeout_seconds')
                             ->label('Gemini Timeout (seconds)')
                             ->numeric()
                             ->minValue(5)
@@ -153,60 +168,60 @@ class TtsSettings extends Page implements HasForms
                             ->helperText('Maximum time to wait for a Gemini API response. HD voices never fall back to Google Cloud.'),
                     ]),
 
-                Forms\Components\Tabs::make('studio_focus_tabs')
+                Tabs::make('studio_focus_tabs')
                     ->tabs([
-                        Forms\Components\Tabs\Tab::make('Studio Defaults')
+                        Tab::make('Studio Defaults')
                             ->schema([
-                                Forms\Components\Section::make('Studio Defaults (Demo + Dashboard)')
+                                Section::make('Studio Defaults (Demo + Dashboard)')
                                     ->description('These defaults are used when the user has not chosen a custom value yet.')
                                     ->columns(2)
                                     ->schema([
-                                        Forms\Components\Select::make('tts_default_voice_ar')
+                                        Select::make('tts_default_voice_ar')
                                             ->label('Default Arabic Speaker')
                                             ->options($arabicVoiceOptions)
                                             ->searchable()
                                             ->placeholder('Use automatic fallback'),
-                                        Forms\Components\Select::make('tts_default_voice_en')
+                                        Select::make('tts_default_voice_en')
                                             ->label('Default English Speaker')
                                             ->options($englishVoiceOptions)
                                             ->searchable()
                                             ->placeholder('Use automatic fallback'),
-                                        Forms\Components\Select::make('tts_default_performance_style_ar')
+                                        Select::make('tts_default_performance_style_ar')
                                             ->label('Default Arabic Performance Style')
                                             ->options($performanceStyleOptions)
                                             ->searchable()
                                             ->required(),
-                                        Forms\Components\Select::make('tts_default_performance_style_en')
+                                        Select::make('tts_default_performance_style_en')
                                             ->label('Default English Performance Style')
                                             ->options($performanceStyleOptions)
                                             ->searchable()
                                             ->required(),
-                                        Forms\Components\Select::make('tts_default_emotion_ar')
+                                        Select::make('tts_default_emotion_ar')
                                             ->label('Default Arabic Emotion')
                                             ->options($emotionOptions)
                                             ->searchable()
                                             ->required(),
-                                        Forms\Components\Select::make('tts_default_emotion_en')
+                                        Select::make('tts_default_emotion_en')
                                             ->label('Default English Emotion')
                                             ->options($emotionOptions)
                                             ->searchable()
                                             ->required(),
-                                        Forms\Components\Select::make('tts_default_dialect_ar')
+                                        Select::make('tts_default_dialect_ar')
                                             ->label('Default Arabic Dialect')
                                             ->options(['' => 'Auto-detect'] + $arabicDialectOptions)
                                             ->searchable(),
-                                        Forms\Components\Select::make('tts_default_dialect_en')
+                                        Select::make('tts_default_dialect_en')
                                             ->label('Default English Dialect')
                                             ->options(['' => 'Auto-detect'] + $englishDialectOptions)
                                             ->searchable(),
                                     ]),
                             ]),
-                        Forms\Components\Tabs\Tab::make('Custom Studio Catalogs')
+                        Tab::make('Custom Studio Catalogs')
                             ->schema([
-                                Forms\Components\Section::make('Custom Studio Catalogs')
+                                Section::make('Custom Studio Catalogs')
                                     ->description('Add custom options and optional Gemini instruction prompts.')
                                     ->schema([
-                                        Forms\Components\Repeater::make('tts_performance_styles_catalog')
+                                        Repeater::make('tts_performance_styles_catalog')
                                             ->label('Custom Performance Styles')
                                             ->schema($this->styleCatalogRowSchema())
                                             ->default([])
@@ -214,7 +229,7 @@ class TtsSettings extends Page implements HasForms
                                             ->reorderableWithButtons()
                                             ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
                                             ->addActionLabel('Add performance style'),
-                                        Forms\Components\Repeater::make('tts_emotions_catalog')
+                                        Repeater::make('tts_emotions_catalog')
                                             ->label('Custom Emotions')
                                             ->schema($this->emotionCatalogRowSchema())
                                             ->default([])
@@ -222,7 +237,7 @@ class TtsSettings extends Page implements HasForms
                                             ->reorderableWithButtons()
                                             ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
                                             ->addActionLabel('Add emotion'),
-                                        Forms\Components\Repeater::make('tts_dialects_catalog_ar')
+                                        Repeater::make('tts_dialects_catalog_ar')
                                             ->label('Custom Arabic Dialects')
                                             ->schema($this->catalogRowSchema())
                                             ->default([])
@@ -230,7 +245,7 @@ class TtsSettings extends Page implements HasForms
                                             ->reorderableWithButtons()
                                             ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
                                             ->addActionLabel('Add Arabic dialect'),
-                                        Forms\Components\Repeater::make('tts_dialects_catalog_en')
+                                        Repeater::make('tts_dialects_catalog_en')
                                             ->label('Custom English Dialects')
                                             ->schema($this->catalogRowSchema())
                                             ->default([])
@@ -242,17 +257,17 @@ class TtsSettings extends Page implements HasForms
                             ]),
                     ]),
 
-                Forms\Components\Section::make('API Keys Status')
+                Section::make('API Keys Status')
                     ->description('Manage API keys in the dedicated Gemini API Keys page.')
                     ->schema([
-                        Forms\Components\Placeholder::make('keys_info')
+                        Placeholder::make('keys_info')
                             ->content(function () {
-                                $stats = app(\App\Services\Tts\GeminiKeyManager::class)->getAggregateStats();
+                                $stats = app(GeminiKeyManager::class)->getAggregateStats();
 
                                 return "🔑 {$stats['total_keys']} API keys configured, {$stats['available_keys']} available now";
                             }),
-                        Forms\Components\Actions::make([
-                            Forms\Components\Actions\Action::make('manage_keys')
+                        Actions::make([
+                            Action::make('manage_keys')
                                 ->label('Manage Gemini API Keys')
                                 ->icon('heroicon-o-key')
                                 ->url(fn () => route('filament.admin.pages.gemini-keys'))
@@ -271,8 +286,8 @@ class TtsSettings extends Page implements HasForms
         // Save scalar settings
         $scalarKeys = [
             'tts_mode',
-            \App\Support\SpeechText::SETTING,
-            \App\Support\Pronunciations::SETTING,
+            SpeechText::SETTING,
+            Pronunciations::SETTING,
             StandardVoiceEngine::SETTING_KEY,
             'gemini_default_voice',
             'gemini_timeout_seconds',
@@ -318,7 +333,7 @@ class TtsSettings extends Page implements HasForms
      */
     public function getUsageStats(): array
     {
-        return app(\App\Services\Tts\GeminiKeyManager::class)->getAggregateStats();
+        return app(GeminiKeyManager::class)->getAggregateStats();
     }
 
     /**
@@ -326,7 +341,7 @@ class TtsSettings extends Page implements HasForms
      */
     public function resetCounters(): void
     {
-        app(\App\Services\Tts\GeminiKeyManager::class)->resetAllCounters();
+        app(GeminiKeyManager::class)->resetAllCounters();
 
         Notification::make()
             ->title('Usage counters reset')
@@ -336,39 +351,39 @@ class TtsSettings extends Page implements HasForms
     }
 
     /**
-     * @return array<int, Forms\Components\Component>
+     * @return array<int, \Filament\Schemas\Components\Component>
      */
     private function catalogRowSchema(): array
     {
         return [
-            Forms\Components\TextInput::make('value')
+            TextInput::make('value')
                 ->label('Value')
                 ->required()
                 ->helperText('Slug/code (letters, numbers, underscore, dash). Examples: confident_plus, ar-EG')
                 ->regex('/^[A-Za-z0-9_-]+$/')
                 ->maxLength(50),
-            Forms\Components\TextInput::make('label')
+            TextInput::make('label')
                 ->label('Label (EN)')
                 ->required()
                 ->maxLength(120),
-            Forms\Components\TextInput::make('label_ar')
+            TextInput::make('label_ar')
                 ->label('Label (AR)')
                 ->maxLength(120),
         ];
     }
 
     /**
-     * @return array<int, Forms\Components\Component>
+     * @return array<int, \Filament\Schemas\Components\Component>
      */
     private function styleCatalogRowSchema(): array
     {
         $base = $this->catalogRowSchema();
-        $base[] = Forms\Components\Textarea::make('instruction_en')
+        $base[] = Textarea::make('instruction_en')
             ->label('Instruction Prompt (EN)')
             ->rows(3)
             ->maxLength(2000)
             ->helperText('Optional detailed instruction used by Gemini for this style when custom prompt is empty.');
-        $base[] = Forms\Components\Textarea::make('instruction_ar')
+        $base[] = Textarea::make('instruction_ar')
             ->label('Instruction Prompt (AR)')
             ->rows(3)
             ->maxLength(2000)
@@ -378,17 +393,17 @@ class TtsSettings extends Page implements HasForms
     }
 
     /**
-     * @return array<int, Forms\Components\Component>
+     * @return array<int, \Filament\Schemas\Components\Component>
      */
     private function emotionCatalogRowSchema(): array
     {
         $base = $this->catalogRowSchema();
-        $base[] = Forms\Components\Textarea::make('instruction_en')
+        $base[] = Textarea::make('instruction_en')
             ->label('Instruction Prompt (EN)')
             ->rows(3)
             ->maxLength(2000)
             ->helperText('Optional detailed instruction used by Gemini for this emotion when custom prompt is empty.');
-        $base[] = Forms\Components\Textarea::make('instruction_ar')
+        $base[] = Textarea::make('instruction_ar')
             ->label('Instruction Prompt (AR)')
             ->rows(3)
             ->maxLength(2000)

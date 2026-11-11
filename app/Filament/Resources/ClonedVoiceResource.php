@@ -2,12 +2,24 @@
 
 namespace App\Filament\Resources;
 
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\BulkAction;
+use Filament\Actions\Action;
+use App\Filament\Resources\ClonedVoiceResource\Pages\ListClonedVoices;
+use App\Filament\Resources\ClonedVoiceResource\Pages\ViewClonedVoice;
 use App\Filament\Resources\ClonedVoiceResource\Pages;
 use App\Jobs\ProcessVoiceCloningJob;
 use App\Models\ClonedVoice;
 use App\Services\VoiceCloningService;
 use Filament\Infolists;
-use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -18,9 +30,9 @@ class ClonedVoiceResource extends Resource
 {
     protected static ?string $model = ClonedVoice::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-microphone';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-microphone';
 
-    protected static ?string $navigationGroup = 'Voice Cloning';
+    protected static string | \UnitEnum | null $navigationGroup = 'Voice Cloning';
 
     protected static ?int $navigationSort = 1;
 
@@ -75,69 +87,69 @@ class ClonedVoiceResource extends Resource
         };
     }
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Schema $schema): Schema
     {
-        return $infolist->schema([
-            Infolists\Components\Section::make('Voice')
+        return $schema->components([
+            Section::make('Voice')
                 ->columns(3)
                 ->schema([
-                    Infolists\Components\TextEntry::make('name'),
-                    Infolists\Components\TextEntry::make('user.email')
+                    TextEntry::make('name'),
+                    TextEntry::make('user.email')
                         ->label('Owner')
                         ->copyable(),
-                    Infolists\Components\TextEntry::make('status')
+                    TextEntry::make('status')
                         ->badge()
                         ->formatStateUsing(fn (?string $state): string => self::STATUSES[$state] ?? (string) $state)
                         ->color(fn (?string $state): string => self::statusColor($state)),
-                    Infolists\Components\TextEntry::make('language_code')->label('Voice language'),
-                    Infolists\Components\TextEntry::make('metadata.consent_language')
+                    TextEntry::make('language_code')->label('Voice language'),
+                    TextEntry::make('metadata.consent_language')
                         ->label('Consent language')
                         ->placeholder('Same as voice'),
-                    Infolists\Components\TextEntry::make('source_type')
+                    TextEntry::make('source_type')
                         ->label('Source')
                         ->formatStateUsing(fn (?string $state): string => $state === 'recording' ? 'Recorded in browser' : 'Uploaded file'),
-                    Infolists\Components\TextEntry::make('source_audio_duration_seconds')
+                    TextEntry::make('source_audio_duration_seconds')
                         ->label('Sample length')
                         ->suffix(' s'),
-                    Infolists\Components\TextEntry::make('metadata.consent_duration_seconds')
+                    TextEntry::make('metadata.consent_duration_seconds')
                         ->label('Consent length')
                         ->suffix(' s')
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('provider_voice_key')
+                    TextEntry::make('provider_voice_key')
                         ->label('Listen voice id')
                         ->copyable()
                         ->fontFamily('mono')
                         ->placeholder('Not created yet'),
-                    Infolists\Components\TextEntry::make('created_at')->dateTime(),
-                    Infolists\Components\TextEntry::make('updated_at')->label('Last change')->since(),
-                    Infolists\Components\TextEntry::make('metadata.model')->label('Model')->placeholder('—'),
+                    TextEntry::make('created_at')->dateTime(),
+                    TextEntry::make('updated_at')->label('Last change')->since(),
+                    TextEntry::make('metadata.model')->label('Model')->placeholder('—'),
                 ]),
-            Infolists\Components\Section::make('Recordings')
+            Section::make('Recordings')
                 ->columns(2)
                 ->schema([
-                    Infolists\Components\ViewEntry::make('sample_audio')
+                    ViewEntry::make('sample_audio')
                         ->label('Voice sample')
                         ->view('filament.cloned-voice-audio', ['kind' => 'sample']),
-                    Infolists\Components\ViewEntry::make('consent_audio')
+                    ViewEntry::make('consent_audio')
                         ->label('Consent sentence')
                         ->view('filament.cloned-voice-audio', ['kind' => 'consent']),
-                    Infolists\Components\TextEntry::make('metadata.consent_script')
+                    TextEntry::make('metadata.consent_script')
                         ->label('Sentence the user was asked to read')
                         ->columnSpanFull()
                         ->placeholder('—'),
                 ]),
-            Infolists\Components\Section::make('Why it failed')
+            Section::make('Why it failed')
                 ->visible(fn (ClonedVoice $record): bool => $record->isFailed())
                 ->schema([
-                    Infolists\Components\TextEntry::make('metadata.failure_code')
+                    TextEntry::make('metadata.failure_code')
                         ->label('Cause')
                         ->badge()
                         ->color('danger')
                         ->formatStateUsing(fn (?string $state): string => self::FAILURE_CODES[$state] ?? (string) $state),
-                    Infolists\Components\TextEntry::make('public_message')
+                    TextEntry::make('public_message')
                         ->label('What the user sees')
                         ->state(fn (ClonedVoice $record): string => VoiceCloningService::publicFailureMessage($record)),
-                    Infolists\Components\TextEntry::make('technical_detail')
+                    TextEntry::make('technical_detail')
                         ->label('Listen reply')
                         ->state(fn (ClonedVoice $record): string => VoiceCloningService::technicalFailureDetail($record))
                         ->formatStateUsing(fn (?string $state): string => nl2br(e((string) $state)))
@@ -155,52 +167,52 @@ class ClonedVoiceResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')->sortable()->toggleable(),
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('id')->sortable()->toggleable(),
+                TextColumn::make('name')
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
                     ->description(fn (ClonedVoice $record): string => (string) $record->user?->email),
-                Tables\Columns\TextColumn::make('user.email')
+                TextColumn::make('user.email')
                     ->label('Owner')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn (?string $state): string => self::STATUSES[$state] ?? (string) $state)
                     ->color(fn (?string $state): string => self::statusColor($state))
                     ->sortable(),
-                Tables\Columns\TextColumn::make('metadata.failure_code')
+                TextColumn::make('metadata.failure_code')
                     ->label('Cause')
                     ->badge()
                     ->color('danger')
                     ->formatStateUsing(fn (?string $state): string => self::FAILURE_CODES[$state] ?? (string) $state)
                     ->placeholder('—')
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('language_code')
+                TextColumn::make('language_code')
                     ->label('Language')
                     ->badge()
                     ->color('gray'),
-                Tables\Columns\TextColumn::make('source_audio_duration_seconds')
+                TextColumn::make('source_audio_duration_seconds')
                     ->label('Sample')
                     ->suffix(' s')
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('provider_voice_key')
+                TextColumn::make('provider_voice_key')
                     ->label('Listen voice id')
                     ->fontFamily('mono')
                     ->copyable()
                     ->limit(22)
                     ->placeholder('—')
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Created')
                     ->since()
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
-                Tables\Filters\SelectFilter::make('status')->options(self::STATUSES),
-                Tables\Filters\SelectFilter::make('language_code')
+                SelectFilter::make('status')->options(self::STATUSES),
+                SelectFilter::make('language_code')
                     ->label('Language')
                     ->options([
                         'ar-XA' => 'Arabic',
@@ -208,20 +220,20 @@ class ClonedVoiceResource extends Resource
                         'en-GB' => 'English (UK)',
                         'en-AU' => 'English (AU)',
                     ]),
-                Tables\Filters\SelectFilter::make('user')
+                SelectFilter::make('user')
                     ->relationship('user', 'email')
                     ->searchable()
                     ->preload()
                     ->label('Owner'),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
+            ->recordActions([
+                ViewAction::make(),
                 self::resendAction(),
                 self::purgeAction(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkAction::make('purge')
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('purge')
                         ->label('Delete everywhere')
                         ->icon('heroicon-o-trash')
                         ->color('danger')
@@ -238,9 +250,9 @@ class ClonedVoiceResource extends Resource
             ->emptyStateDescription('Voices created in the dashboard studio appear here.');
     }
 
-    public static function resendAction(): Tables\Actions\Action
+    public static function resendAction(): Action
     {
-        return Tables\Actions\Action::make('resend')
+        return Action::make('resend')
             ->label('Resend to Listen')
             ->icon('heroicon-o-arrow-path')
             ->color('warning')
@@ -252,9 +264,9 @@ class ClonedVoiceResource extends Resource
             });
     }
 
-    public static function purgeAction(): Tables\Actions\Action
+    public static function purgeAction(): Action
     {
-        return Tables\Actions\Action::make('purge')
+        return Action::make('purge')
             ->label('Delete')
             ->icon('heroicon-o-trash')
             ->color('danger')
@@ -289,9 +301,10 @@ class ClonedVoiceResource extends Resource
                 ->send();
     }
 
-    public static function canCreate(): bool
+    // Filament 4 checks this (pages, buttons and canCreate() alike): never allowed here.
+    public static function getCreateAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
     public static function getRelations(): array
@@ -302,8 +315,8 @@ class ClonedVoiceResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListClonedVoices::route('/'),
-            'view' => Pages\ViewClonedVoice::route('/{record}'),
+            'index' => ListClonedVoices::route('/'),
+            'view' => ViewClonedVoice::route('/{record}'),
         ];
     }
 }

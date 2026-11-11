@@ -2,19 +2,20 @@
 
 namespace App\Filament\Pages;
 
+use App\Support\DemoAllowance;
 use Filament\Pages\Page;
 
 class SystemInfo extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-server-stack';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-server-stack';
 
-    protected static ?string $navigationGroup = 'System';
+    protected static string | \UnitEnum | null $navigationGroup = 'System';
 
     protected static ?int $navigationSort = 4;
 
     protected static ?string $title = 'System Info';
 
-    protected static string $view = 'filament.pages.system-info';
+    protected string $view = 'filament.pages.system-info';
 
     public array $systemInfo = [];
 
@@ -46,7 +47,7 @@ class SystemInfo extends Page
                 'Default Voice Tier' => config('listen.voice.default_tier'),
                 'Billing Grace Days' => config('listen.billing.grace_days'),
                 'Subscription Sync TTL (min)' => config('listen.billing.subscription_sync_ttl_minutes'),
-                'Demo Characters per Member' => \App\Support\DemoAllowance::chars(),
+                'Demo Characters per Member' => DemoAllowance::chars(),
                 'Demo User Char Allowance' => config('listen.demo.user_char_allowance'),
             ],
             'disk' => [

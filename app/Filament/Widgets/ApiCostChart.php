@@ -9,15 +9,15 @@ class ApiCostChart extends ChartWidget
 {
     use UsesBusinessStats;
 
-    protected static ?string $heading = 'API cost and characters per month';
+    protected ?string $heading = 'API cost and characters per month';
 
-    protected static ?string $description = 'Text-to-speech cost by provider (USD, stacked) and characters processed, members + demo + admins.';
+    protected ?string $description = 'Text-to-speech cost by provider (USD, stacked) and characters processed, members + demo + admins.';
 
     protected static ?int $sort = -17;
 
-    protected static ?string $pollingInterval = null;
+    protected ?string $pollingInterval = null;
 
-    protected static ?string $maxHeight = '300px';
+    protected ?string $maxHeight = '300px';
 
     protected function getData(): array
     {

@@ -2,6 +2,9 @@
 
 namespace App\Filament\Resources\SubscriptionResource\Pages;
 
+use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
+use Filament\Actions\EditAction;
 use App\Filament\Resources\SubscriptionResource;
 use App\Models\CharGift;
 use App\Models\Subscription;
@@ -19,21 +22,21 @@ class ViewSubscription extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('giftChars')
+            Action::make('giftChars')
                 ->label('Gift characters')
                 ->icon('heroicon-o-gift')
                 ->color('success')
                 ->modalHeading(fn (Subscription $record): string => 'Gift characters to '.($record->user?->email ?? 'this member'))
                 ->modalDescription(fn (Subscription $record): string => SubscriptionResource::giftModalDescription($record))
-                ->form(SubscriptionResource::giftFormSchema())
+                ->schema(SubscriptionResource::giftFormSchema())
                 ->action(fn (Subscription $record, array $data) => SubscriptionResource::grantGift($record, $data)),
-            Actions\Action::make('revokeGift')
+            Action::make('revokeGift')
                 ->label('Take back a gift')
                 ->icon('heroicon-o-arrow-uturn-left')
                 ->color('gray')
                 ->visible(fn (Subscription $record): bool => $this->revokableGifts($record) !== [])
-                ->form(fn (Subscription $record): array => [
-                    Forms\Components\Select::make('gift_id')
+                ->schema(fn (Subscription $record): array => [
+                    Select::make('gift_id')
                         ->label('Gift to take back')
                         ->options($this->revokableGifts($record))
                         ->required(),
@@ -47,7 +50,7 @@ class ViewSubscription extends ViewRecord
                         Notification::make()->title(number_format($gift->chars).' gift characters taken back')->success()->send();
                     }
                 }),
-            Actions\EditAction::make(),
+            EditAction::make(),
         ];
     }
 

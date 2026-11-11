@@ -72,6 +72,24 @@ class BillingAdminTest extends TestCase
         $this->assertSame(950000, (int) $this->creator->fresh()->monthly_chars);
     }
 
+    public function test_opening_and_saving_a_plan_unchanged_makes_no_new_stripe_price_and_keeps_its_amounts(): void
+    {
+        $this->stripeConfigured();
+
+        $this->editCreator()
+            ->assertSee('$182.40/year ($15.20/mo) — 20% off')
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $creator = $this->creator->fresh();
+        $this->assertSame(1900, (int) $creator->price_cents);
+        $this->assertSame('price_month_1900', $creator->stripe_price_monthly);
+        $this->assertSame('price_year_18240', $creator->stripe_price_yearly);
+        $newPrices = array_filter($this->stripe->requests, fn (array $r): bool => $r['method'] === 'post' && $r['path'] === '/v1/prices');
+        $this->assertSame([], array_values($newPrices), 'no new Stripe price');
+        $this->assertTrue($this->stripe->prices['price_month_1900']['active'] && $this->stripe->prices['price_year_18240']['active'], 'the prices members are on stay active');
+    }
+
     public function test_saving_a_plan_says_stripe_synced_only_when_it_did(): void
     {
         $this->stripeConfigured();

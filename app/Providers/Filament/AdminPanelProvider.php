@@ -2,13 +2,20 @@
 
 namespace App\Providers\Filament;
 
+use App\Http\Middleware\EnsureUserIsNotBlocked;
+use App\Http\Middleware\ForceAdminLocale;
+use App\Http\Middleware\SecurityHeaders;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Schemas\Components\Fieldset;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Support\Colors\Color;
+use Filament\Tables\Table;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -19,6 +26,42 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
 {
+    /**
+     * Filament 4 changed a few defaults; the admin keeps Filament 3's, so it looks
+     * and works as before: form sections, grids and field groups take the full width
+     * (not one column each), and a list's filters apply as soon as they are chosen
+     * (no Apply button). Settings made on a component itself still win.
+     */
+    public function boot(): void
+    {
+        if (! self::packagesReady()) {
+            return;
+        }
+
+        Section::configureUsing(fn (Section $section) => $section->columnSpanFull());
+        Grid::configureUsing(fn (Grid $grid) => $grid->columnSpanFull());
+        Fieldset::configureUsing(fn (Fieldset $fieldset) => $fieldset->columnSpanFull());
+        Table::configureUsing(fn (Table $table) => $table->deferFilters(false));
+    }
+
+    /**
+     * A deploy puts the code on the server a minute before its packages (the composer
+     * step). The admin is written for Filament 5: on the packages before it (Filament 3),
+     * loading it would fail on every page, members' included. Until Filament 5 is there,
+     * the admin is left out, so the site keeps working and only /admin waits.
+     */
+    public function register(): void
+    {
+        if (self::packagesReady()) {
+            parent::register();
+        }
+    }
+
+    public static function packagesReady(): bool
+    {
+        return class_exists(\Filament\Schemas\Schema::class);
+    }
+
     public function panel(Panel $panel): Panel
     {
         return $panel
@@ -27,6 +70,8 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName(config('app.name', 'Listen') . ' Admin')
+            // Filament's stylesheet with the admin's own pages' classes (resources/css/filament/admin/theme.css).
+            ->theme(asset('css/filament/admin/theme.css'))
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -40,15 +85,15 @@ class AdminPanelProvider extends PanelProvider
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
                 AuthenticateSession::class,
-                \App\Http\Middleware\EnsureUserIsNotBlocked::class,
+                EnsureUserIsNotBlocked::class,
                 ShareErrorsFromSession::class,
                 // Laravel 13's name, else 12's (between a deploy and its packages).
                 class_exists(PreventRequestForgery::class) ? PreventRequestForgery::class : VerifyCsrfToken::class,
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
-                \App\Http\Middleware\ForceAdminLocale::class,
-                \App\Http\Middleware\SecurityHeaders::class,
+                ForceAdminLocale::class,
+                SecurityHeaders::class,
             ])
             ->authMiddleware([
                 Authenticate::class,

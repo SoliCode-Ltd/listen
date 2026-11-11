@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\GenerationErrorResource\Pages;
 
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use App\Filament\Resources\GenerationErrorResource;
 use App\Models\GenerationError;
 use Filament\Actions;
@@ -15,7 +17,7 @@ class ViewGenerationError extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('resolve')
+            Action::make('resolve')
                 ->label('Mark resolved')
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
@@ -24,7 +26,7 @@ class ViewGenerationError extends ViewRecord
                     GenerationErrorResource::setResolved(new Collection([$record]), true);
                     $record->refresh();
                 }),
-            Actions\Action::make('reopen')
+            Action::make('reopen')
                 ->label('Reopen')
                 ->icon('heroicon-o-arrow-uturn-left')
                 ->visible(fn (GenerationError $record): bool => $record->resolved_at !== null)
@@ -32,7 +34,7 @@ class ViewGenerationError extends ViewRecord
                     GenerationErrorResource::setResolved(new Collection([$record]), false);
                     $record->refresh();
                 }),
-            Actions\DeleteAction::make(),
+            DeleteAction::make(),
         ];
     }
 }

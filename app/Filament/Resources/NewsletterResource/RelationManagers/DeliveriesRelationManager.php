@@ -2,6 +2,12 @@
 
 namespace App\Filament\Resources\NewsletterResource\RelationManagers;
 
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
 use App\Models\Newsletter;
 use App\Services\Newsletter\NewsletterSender;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -24,23 +30,23 @@ class DeliveriesRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('email')
             ->columns([
-                Tables\Columns\TextColumn::make('sent_at')
+                TextColumn::make('sent_at')
                     ->label('When')
                     ->dateTime()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('email')
+                TextColumn::make('email')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('locale')
+                TextColumn::make('locale')
                     ->label('Language')
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'ar' => 'Arabic',
                         'both' => 'English and Arabic',
                         default => 'English',
                     }),
-                Tables\Columns\IconColumn::make('is_test')
+                IconColumn::make('is_test')
                     ->label('Example')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'sent' => 'Sent',
@@ -55,14 +61,14 @@ class DeliveriesRelationManager extends RelationManager
                         'sending' => 'info',
                         default => 'danger',
                     }),
-                Tables\Columns\TextColumn::make('error')
+                TextColumn::make('error')
                     ->limit(80)
                     ->tooltip(fn ($record): ?string => $record->error)
                     ->toggleable(),
             ])
             ->defaultSort('id', 'desc')
             ->headerActions([
-                Tables\Actions\Action::make('clearLog')
+                Action::make('clearLog')
                     ->label('Clear log')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
@@ -78,16 +84,16 @@ class DeliveriesRelationManager extends RelationManager
                         }
                     }),
             ])
-            ->actions([
-                Tables\Actions\DeleteAction::make()
+            ->recordActions([
+                DeleteAction::make()
                     ->label('Remove')
                     ->modalHeading('Remove this log row')
                     ->modalDescription('If this row was a successful send, that address can be included again the next time this newsletter skips people who already received it.')
                     ->modalSubmitActionLabel('Remove'),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
                         ->label('Remove selected'),
                 ]),
             ])

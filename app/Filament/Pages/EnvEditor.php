@@ -2,13 +2,17 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Actions\Action;
+use Throwable;
 use Filament\Forms;
-use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
-use Filament\Forms\Get;
 use App\Support\EnvFile;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -21,15 +25,15 @@ class EnvEditor extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-document-magnifying-glass';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-document-magnifying-glass';
 
-    protected static ?string $navigationGroup = 'System';
+    protected static string | \UnitEnum | null $navigationGroup = 'System';
 
     protected static ?int $navigationSort = 3;
 
     protected static ?string $title = 'Environment Editor';
 
-    protected static string $view = 'filament.pages.env-editor';
+    protected string $view = 'filament.pages.env-editor';
 
     public ?array $data = [];
 
@@ -66,18 +70,18 @@ class EnvEditor extends Page implements HasForms
         $this->form->fill(['entries' => $entries]);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Environment Variables')
+        return $schema
+            ->components([
+                Section::make('Environment Variables')
                     ->description('Edit .env values, or add a new one with "Add variable" at the bottom. Sensitive keys are masked. Existing variables cannot be renamed or removed here.')
                     ->schema([
-                        Forms\Components\Repeater::make('entries')
+                        Repeater::make('entries')
                             ->schema([
-                                Forms\Components\Hidden::make('is_new')
+                                Hidden::make('is_new')
                                     ->default(true),
-                                Forms\Components\TextInput::make('key')
+                                TextInput::make('key')
                                     ->label('Key')
                                     ->placeholder('NEW_SETTING_NAME')
                                     ->required()
@@ -86,7 +90,7 @@ class EnvEditor extends Page implements HasForms
                                     ->validationMessages(['regex' => 'Use capital letters, digits and underscores, starting with a letter (e.g. LISTEN_STRIPE_TRIAL_ACTIONS).'])
                                     ->disabled(fn (Get $get): bool => ! $get('is_new'))
                                     ->dehydrated(),
-                                Forms\Components\TextInput::make('value')
+                                TextInput::make('value')
                                     ->label('Value')
                                     ->password(fn ($get) => $this->isSensitive($get('key') ?? ''))
                                     ->revealable(fn ($get) => $this->isSensitive($get('key') ?? '')),
@@ -209,7 +213,7 @@ class EnvEditor extends Page implements HasForms
             }
 
             return 'The new values are in use from the next request.';
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Env editor could not rebuild the config cache.', ['error' => $e->getMessage()]);
 
             return 'Saved, but the settings cache could not be rebuilt. Run "php artisan config:cache" on the server.';

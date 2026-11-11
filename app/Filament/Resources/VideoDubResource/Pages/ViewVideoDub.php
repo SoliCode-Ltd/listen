@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VideoDubResource\Pages;
 
+use Filament\Actions\Action;
 use App\Filament\Resources\VideoDubResource;
 use App\Models\VideoDub;
 use Filament\Actions;
@@ -14,7 +15,7 @@ class ViewVideoDub extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('failStuck')
+            Action::make('failStuck')
                 ->label('Mark failed and refund')
                 ->icon('heroicon-o-arrow-uturn-left')
                 ->color('warning')
@@ -25,9 +26,9 @@ class ViewVideoDub extends ViewRecord
                     VideoDubResource::failStuck($record);
                     $this->refreshFormData(['status', 'error_message']);
                 }),
-            VideoDubResource::removeAction(Actions\Action::make('remove'))
+            VideoDubResource::removeAction(Action::make('remove'))
                 ->after(fn () => $this->refreshFormData(['status', 'files_deleted_at'])),
-            Actions\Action::make('deleteFiles')
+            Action::make('deleteFiles')
                 ->icon('heroicon-o-trash')
                 ->color('danger')
                 ->label('Delete only the videos')

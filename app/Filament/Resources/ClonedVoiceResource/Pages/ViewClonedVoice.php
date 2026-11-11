@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ClonedVoiceResource\Pages;
 
+use Filament\Actions\Action;
 use App\Filament\Resources\ClonedVoiceResource;
 use App\Models\ClonedVoice;
 use App\Services\VoiceCloningService;
@@ -16,7 +17,7 @@ class ViewClonedVoice extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('resend')
+            Action::make('resend')
                 ->label('Resend to Listen')
                 ->icon('heroicon-o-arrow-path')
                 ->color('warning')
@@ -27,7 +28,7 @@ class ViewClonedVoice extends ViewRecord
                     ClonedVoiceResource::resend($record);
                     $this->refreshFormData(['status', 'provider_voice_key', 'failure_reason', 'metadata']);
                 }),
-            Actions\Action::make('purge')
+            Action::make('purge')
                 ->label('Delete')
                 ->icon('heroicon-o-trash')
                 ->color('danger')

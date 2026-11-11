@@ -9,15 +9,15 @@ class BusinessRevenueChart extends ChartWidget
 {
     use UsesBusinessStats;
 
-    protected static ?string $heading = 'Monetisation: new vs lost customers';
+    protected ?string $heading = 'Monetisation: new vs lost customers';
 
-    protected static ?string $description = 'Stripe subscriptions started and ended, trials started and paid, and approved manual payments per month.';
+    protected ?string $description = 'Stripe subscriptions started and ended, trials started and paid, and approved manual payments per month.';
 
     protected static ?int $sort = -18;
 
-    protected static ?string $pollingInterval = null;
+    protected ?string $pollingInterval = null;
 
-    protected static ?string $maxHeight = '300px';
+    protected ?string $maxHeight = '300px';
 
     protected function getData(): array
     {

@@ -2,6 +2,13 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkAction;
 use App\Filament\Resources\UserResource;
 use App\Models\DemoVoiceGeneration;
 use App\Models\User;
@@ -37,13 +44,13 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
     use InteractsWithForms;
     use InteractsWithTable;
 
-    protected static ?string $navigationIcon = 'heroicon-o-shield-exclamation';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shield-exclamation';
 
-    protected static ?string $navigationGroup = 'Demo';
+    protected static string | \UnitEnum | null $navigationGroup = 'Demo';
 
     protected static ?int $navigationSort = 10;
 
-    protected static string $view = 'filament.pages.suspicious-users';
+    protected string $view = 'filament.pages.suspicious-users';
 
     /** @var array<int, array{ids: list<int>, chars: int}> the shared demo of each account shown, worked out once a page */
     private array $groups = [];
@@ -71,23 +78,23 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
         return $table
             ->query($this->getSuspiciousUsersQuery())
             ->columns([
-                Tables\Columns\TextColumn::make('id')
+                TextColumn::make('id')
                     ->label('ID')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->label(__('ui.admin.suspicious.name'))
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('email')
+                TextColumn::make('email')
                     ->label(__('ui.admin.suspicious.email'))
                     ->searchable()
                     ->sortable()
                     ->copyable(),
-                Tables\Columns\TextColumn::make('phone_number')
+                TextColumn::make('phone_number')
                     ->label(__('ui.admin.suspicious.phone'))
                     ->placeholder('-')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('auth_method_display')
+                TextColumn::make('auth_method_display')
                     ->label(__('ui.admin.suspicious.auth_method'))
                     ->badge()
                     ->getStateUsing(fn (User $record): string => match (true) {
@@ -102,36 +109,36 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                         filled($record->google_id) => 'success',
                         default => 'gray',
                     }),
-                Tables\Columns\TextColumn::make('suspicion_signals')
+                TextColumn::make('suspicion_signals')
                     ->label(__('ui.admin.suspicious.suspicion_signals'))
                     ->badge()
                     ->getStateUsing(fn (User $record): string => $this->describeSuspicionSignals($record))
                     ->color(fn (User $record): string => $this->strongestLink($record) ? 'danger' : 'warning'),
-                Tables\Columns\TextColumn::make('registration_ip')
+                TextColumn::make('registration_ip')
                     ->label(__('ui.admin.suspicious.registration_ip'))
                     ->searchable()
                     ->copyable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('last_login_ip')
+                TextColumn::make('last_login_ip')
                     ->label(__('ui.admin.suspicious.last_login_ip'))
                     ->searchable()
                     ->copyable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('registration_device_id')
+                TextColumn::make('registration_device_id')
                     ->label(__('ui.admin.suspicious.registration_device_id'))
                     ->searchable()
                     ->copyable()
                     ->placeholder('-')
                     ->visible(fn () => $this->hasDeviceColumns())
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('last_seen_device_id')
+                TextColumn::make('last_seen_device_id')
                     ->label(__('ui.admin.suspicious.last_seen_device_id'))
                     ->searchable()
                     ->copyable()
                     ->placeholder('-')
                     ->visible(fn () => $this->hasDeviceColumns())
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('linked_count')
+                TextColumn::make('linked_count')
                     ->label(__('ui.admin.suspicious.linked_accounts'))
                     ->badge()
                     ->getStateUsing(fn (User $record): int => count($this->groupOf($record)['ids']) - 1)
@@ -140,17 +147,17 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                         ((int) $state) >= 2 => 'warning',
                         default => 'gray',
                     }),
-                Tables\Columns\TextColumn::make('demo_chars_used')
+                TextColumn::make('demo_chars_used')
                     ->label(__('ui.admin.suspicious.demo_chars'))
                     ->numeric()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('ip_group_total_chars')
+                TextColumn::make('ip_group_total_chars')
                     ->label(__('ui.admin.suspicious.group_total_chars'))
                     ->numeric()
                     ->badge()
                     ->getStateUsing(fn (User $record): int => $this->groupOf($record)['chars'])
                     ->color(fn ($state): string => ((int) $state) >= DemoAllowance::chars() ? 'danger' : 'success'),
-                Tables\Columns\TextColumn::make('blocked_status')
+                TextColumn::make('blocked_status')
                     ->label(__('ui.admin.suspicious.status'))
                     ->badge()
                     ->getStateUsing(function (User $record): string {
@@ -171,39 +178,39 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
 
                         return $record->multi_account_whitelisted ? 'info' : 'success';
                     }),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label(__('ui.admin.suspicious.registered_at'))
                     ->dateTime()
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('linked_by')
+                SelectFilter::make('linked_by')
                     ->label(__('ui.admin.suspicious.linked_by_filter'))
                     ->options(collect(DemoSuspects::KINDS)->mapWithKeys(fn (string $kind): array => [$kind => __('ui.admin.suspicious.link_'.$kind)])->all())
                     ->query(fn (Builder $query, array $data) => filled($data['value'] ?? null)
                         ? $query->whereIn('users.id', $this->suspectIdsLinkedBy((string) $data['value']))
                         : $query),
-                Tables\Filters\Filter::make('has_demo_usage')
+                Filter::make('has_demo_usage')
                     ->label(__('ui.admin.suspicious.has_demo_usage'))
                     ->query(fn (Builder $query) => $query->whereExists(fn ($sub) => $sub->selectRaw('1')
                         ->from('demo_voice_generations')
                         ->whereColumn('demo_voice_generations.user_id', 'users.id')
                         ->where('demo_voice_generations.billable_chars', '>', 0))),
-                Tables\Filters\TernaryFilter::make('is_blocked')
+                TernaryFilter::make('is_blocked')
                     ->label(__('ui.admin.suspicious.blocked_filter'))
                     ->queries(
                         true: fn (Builder $query) => $query->where('users.is_blocked', true),
                         false: fn (Builder $query) => $query->where(fn ($q) => $q->where('users.is_blocked', false)->orWhereNull('users.is_blocked')),
                     ),
-                Tables\Filters\TernaryFilter::make('multi_account_whitelisted')
+                TernaryFilter::make('multi_account_whitelisted')
                     ->label(__('ui.admin.suspicious.whitelisted_filter'))
                     ->queries(
                         true: fn (Builder $query) => $query->where('users.multi_account_whitelisted', true),
                         false: fn (Builder $query) => $query->where(fn ($q) => $q->where('users.multi_account_whitelisted', false)->orWhereNull('users.multi_account_whitelisted')),
                     ),
             ])
-            ->actions([
-                Tables\Actions\Action::make('deleteUser')
+            ->recordActions([
+                Action::make('deleteUser')
                     ->label(__('ui.admin.suspicious.delete_user'))
                     ->icon('heroicon-o-trash')
                     ->color('danger')
@@ -231,7 +238,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                             ->title(__('ui.admin.suspicious.delete_success'))
                             ->send();
                     }),
-                Tables\Actions\Action::make('blockUser')
+                Action::make('blockUser')
                     ->label(__('ui.admin.users.block'))
                     ->icon('heroicon-o-no-symbol')
                     ->color('danger')
@@ -258,7 +265,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                             ->title(__('ui.admin.users.blocked_success'))
                             ->send();
                     }),
-                Tables\Actions\Action::make('unblockUser')
+                Action::make('unblockUser')
                     ->label(__('ui.admin.users.unblock'))
                     ->icon('heroicon-o-lock-open')
                     ->color('success')
@@ -273,13 +280,13 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                             ->title(__('ui.admin.users.unblocked_success'))
                             ->send();
                     }),
-                Tables\Actions\ActionGroup::make([
-                    Tables\Actions\Action::make('viewUser')
+                ActionGroup::make([
+                    Action::make('viewUser')
                         ->label(__('ui.admin.suspicious.view_user'))
                         ->icon('heroicon-o-eye')
                         ->url(fn (User $record): string => UserResource::getUrl('view', ['record' => $record]))
                         ->openUrlInNewTab(),
-                    Tables\Actions\Action::make('viewLinked')
+                    Action::make('viewLinked')
                         ->label(__('ui.admin.suspicious.view_linked'))
                         ->icon('heroicon-o-link')
                         ->color('warning')
@@ -292,7 +299,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                         ]))
                         ->modalSubmitAction(false)
                         ->modalCancelActionLabel(__('ui.admin.suspicious.close')),
-                    Tables\Actions\Action::make('resetDemoChars')
+                    Action::make('resetDemoChars')
                         ->label(__('ui.admin.users.reset_demo_chars'))
                         ->icon('heroicon-o-arrow-path')
                         ->color('warning')
@@ -313,8 +320,8 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                         }),
                 ]),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkAction::make('deleteSelected')
+            ->toolbarActions([
+                BulkAction::make('deleteSelected')
                     ->label(__('ui.admin.suspicious.bulk_delete'))
                     ->icon('heroicon-o-trash')
                     ->color('danger')

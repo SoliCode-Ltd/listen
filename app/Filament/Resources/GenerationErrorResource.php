@@ -2,11 +2,25 @@
 
 namespace App\Filament\Resources;
 
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Throwable;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\BulkAction;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\GenerationErrorResource\Pages\ListGenerationErrors;
+use App\Filament\Resources\GenerationErrorResource\Pages\ViewGenerationError;
 use App\Filament\Resources\GenerationErrorResource\Pages;
 use App\Models\GenerationError;
 use App\Support\GenerationChoiceLabels;
 use Filament\Infolists\Components;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -23,9 +37,9 @@ class GenerationErrorResource extends Resource
 {
     protected static ?string $model = GenerationError::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-exclamation-triangle';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-exclamation-triangle';
 
-    protected static ?string $navigationGroup = 'Content';
+    protected static string | \UnitEnum | null $navigationGroup = 'Content';
 
     protected static ?int $navigationSort = 4;
 
@@ -33,9 +47,10 @@ class GenerationErrorResource extends Resource
 
     protected static ?string $modelLabel = 'generation error';
 
-    public static function canCreate(): bool
+    // Filament 4 checks this (pages, buttons and canCreate() alike): never allowed here.
+    public static function getCreateAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
     /**
@@ -54,7 +69,7 @@ class GenerationErrorResource extends Resource
                     ->unresolved()
                     ->where('severity', GenerationError::SEVERITY_ERROR)
                     ->count();
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 return 0;
             }
         });
@@ -72,86 +87,86 @@ class GenerationErrorResource extends Resource
         return 'Unresolved generation errors';
     }
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(\Filament\Schemas\Schema $schema): \Filament\Schemas\Schema
     {
-        return $infolist->schema([
-            Components\Section::make('What happened')
+        return $schema->components([
+            Section::make('What happened')
                 ->columns(3)
                 ->schema([
-                    Components\TextEntry::make('severity')
+                    TextEntry::make('severity')
                         ->badge()
                         ->color(fn (string $state): string => self::severityColor($state))
                         ->formatStateUsing(fn (string $state): string => ucfirst($state)),
-                    Components\TextEntry::make('source')
+                    TextEntry::make('source')
                         ->badge()
                         ->formatStateUsing(fn (string $state): string => GenerationError::sourceLabels()[$state] ?? $state),
-                    Components\TextEntry::make('occurrences')
+                    TextEntry::make('occurrences')
                         ->label('Times seen'),
-                    Components\TextEntry::make('created_at')
+                    TextEntry::make('created_at')
                         ->label('First seen')
                         ->dateTime(),
-                    Components\TextEntry::make('last_seen_at')
+                    TextEntry::make('last_seen_at')
                         ->label('Last seen')
                         ->dateTime(),
-                    Components\TextEntry::make('resolved_at')
+                    TextEntry::make('resolved_at')
                         ->label('Resolved')
                         ->dateTime()
                         ->placeholder('Not resolved'),
-                    Components\TextEntry::make('message')
+                    TextEntry::make('message')
                         ->label('Error')
                         ->columnSpanFull(),
-                    Components\TextEntry::make('user_message')
+                    TextEntry::make('user_message')
                         ->label('What the member was told')
                         ->placeholder('—')
                         ->columnSpanFull(),
                 ]),
-            Components\Section::make('Member')
+            Section::make('Member')
                 ->columns(3)
                 ->schema([
-                    Components\TextEntry::make('user.name')
+                    TextEntry::make('user.name')
                         ->label('Name')
                         ->placeholder('—'),
-                    Components\TextEntry::make('user.email')
+                    TextEntry::make('user.email')
                         ->label('Email')
                         ->placeholder('—')
                         ->url(fn (GenerationError $record): ?string => $record->user_id ? UserResource::getUrl('view', ['record' => $record->user_id]) : null),
-                    Components\TextEntry::make('subject')
+                    TextEntry::make('subject')
                         ->label('Record')
                         ->state(fn (GenerationError $record): string => self::subjectLabel($record))
                         ->url(fn (GenerationError $record): ?string => self::subjectUrl($record)),
                 ]),
-            Components\Section::make('Choices')
+            Section::make('Choices')
                 ->columns(3)
                 ->schema([
-                    Components\TextEntry::make('voice_name')
+                    TextEntry::make('voice_name')
                         ->label('Voice')
                         ->state(fn (GenerationError $record): string => GenerationChoiceLabels::voice($record->voice_name)),
-                    Components\TextEntry::make('voice_tier')
+                    TextEntry::make('voice_tier')
                         ->label('Quality')
                         ->state(fn (GenerationError $record): string => GenerationChoiceLabels::tier($record->voice_tier)),
-                    Components\TextEntry::make('target_language')
+                    TextEntry::make('target_language')
                         ->label('Language')
                         ->state(fn (GenerationError $record): string => GenerationChoiceLabels::language($record->target_language)),
-                    Components\TextEntry::make('dialect')
+                    TextEntry::make('dialect')
                         ->label('Accent')
                         ->state(fn (GenerationError $record): string => GenerationChoiceLabels::accent($record->dialect, $record->target_language, $record->voice_tier)),
-                    Components\TextEntry::make('performance_style')
+                    TextEntry::make('performance_style')
                         ->label('Performance style')
                         ->state(fn (GenerationError $record): string => GenerationChoiceLabels::performanceStyle($record->context['performance_style'] ?? null)),
-                    Components\TextEntry::make('emotion')
+                    TextEntry::make('emotion')
                         ->label('Emotion')
                         ->state(fn (GenerationError $record): string => GenerationChoiceLabels::emotion($record->context['emotion'] ?? null)),
                 ]),
-            Components\Section::make('Technical details')
+            Section::make('Technical details')
                 ->collapsed()
                 ->schema([
-                    Components\TextEntry::make('provider')
+                    TextEntry::make('provider')
                         ->label('Voice engine')
                         ->placeholder('—'),
-                    Components\TextEntry::make('exception_class')
+                    TextEntry::make('exception_class')
                         ->label('Exception')
                         ->placeholder('—'),
-                    Components\TextEntry::make('context')
+                    TextEntry::make('context')
                         ->label('Context')
                         ->state(fn (GenerationError $record): string => json_encode($record->context ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '{}')
                         ->fontFamily('mono')
@@ -165,46 +180,46 @@ class GenerationErrorResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('last_seen_at')
+                TextColumn::make('last_seen_at')
                     ->label('Last seen')
                     ->dateTime()
                     ->since()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('severity')
+                TextColumn::make('severity')
                     ->badge()
                     ->color(fn (string $state): string => self::severityColor($state))
                     ->formatStateUsing(fn (string $state): string => ucfirst($state)),
-                Tables\Columns\TextColumn::make('source')
+                TextColumn::make('source')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => GenerationError::sourceLabels()[$state] ?? $state),
-                Tables\Columns\TextColumn::make('user.email')
+                TextColumn::make('user.email')
                     ->label('Member')
                     ->searchable()
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('message')
+                TextColumn::make('message')
                     ->label('Error')
                     ->limit(90)
                     ->tooltip(fn (GenerationError $record): string => $record->message)
                     ->searchable()
                     ->wrap(),
-                Tables\Columns\TextColumn::make('dialect')
+                TextColumn::make('dialect')
                     ->label('Accent')
                     ->state(fn (GenerationError $record): string => $record->dialect ? GenerationChoiceLabels::accent($record->dialect, $record->target_language, $record->voice_tier) : '—')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('provider')
+                TextColumn::make('provider')
                     ->label('Engine')
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('occurrences')
+                TextColumn::make('occurrences')
                     ->label('Times')
                     ->sortable(),
-                Tables\Columns\IconColumn::make('resolved_at')
+                IconColumn::make('resolved_at')
                     ->label('Resolved')
                     ->boolean()
                     ->state(fn (GenerationError $record): bool => $record->resolved_at !== null),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('resolved')
+                TernaryFilter::make('resolved')
                     ->label('Status')
                     ->placeholder('All')
                     ->trueLabel('Resolved')
@@ -215,14 +230,14 @@ class GenerationErrorResource extends Resource
                         false: fn (Builder $query) => $query->whereNull('resolved_at'),
                         blank: fn (Builder $query) => $query,
                     ),
-                Tables\Filters\SelectFilter::make('severity')
+                SelectFilter::make('severity')
                     ->options([
                         GenerationError::SEVERITY_ERROR => 'Error (no audio)',
                         GenerationError::SEVERITY_WARNING => 'Warning (got audio another way)',
                     ]),
-                Tables\Filters\SelectFilter::make('source')
+                SelectFilter::make('source')
                     ->options(GenerationError::sourceLabels()),
-                Tables\Filters\SelectFilter::make('period')
+                SelectFilter::make('period')
                     ->label('When')
                     ->options([
                         '24h' => 'Last 24 hours',
@@ -238,28 +253,28 @@ class GenerationErrorResource extends Resource
                         };
                     }),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\Action::make('resolve')
+            ->recordActions([
+                ViewAction::make(),
+                Action::make('resolve')
                     ->label('Mark resolved')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->visible(fn (GenerationError $record): bool => $record->resolved_at === null)
                     ->action(fn (GenerationError $record) => self::setResolved(new Collection([$record]), true)),
-                Tables\Actions\Action::make('reopen')
+                Action::make('reopen')
                     ->label('Reopen')
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->visible(fn (GenerationError $record): bool => $record->resolved_at !== null)
                     ->action(fn (GenerationError $record) => self::setResolved(new Collection([$record]), false)),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkAction::make('resolve')
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('resolve')
                         ->label('Mark resolved')
                         ->icon('heroicon-o-check-circle')
                         ->action(fn (Collection $records) => self::setResolved($records, true))
                         ->deselectRecordsAfterCompletion(),
-                    Tables\Actions\DeleteBulkAction::make(),
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('last_seen_at', 'desc')
@@ -269,8 +284,8 @@ class GenerationErrorResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListGenerationErrors::route('/'),
-            'view' => Pages\ViewGenerationError::route('/{record}'),
+            'index' => ListGenerationErrors::route('/'),
+            'view' => ViewGenerationError::route('/{record}'),
         ];
     }
 

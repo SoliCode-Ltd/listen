@@ -2,6 +2,16 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Placeholder;
+use Filament\Schemas\Components\Actions;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Fieldset;
+use Illuminate\Support\Carbon;
 use App\Models\SiteSetting;
 use App\Models\VideoDub;
 use App\Services\Dubbing\DriveArchive;
@@ -11,7 +21,6 @@ use App\Support\VoiceCloningAccess;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Crypt;
@@ -27,9 +36,9 @@ class VideoDubbingSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
-    protected static ?string $navigationGroup = 'Video Dubbing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Video Dubbing';
 
     protected static ?int $navigationSort = 2;
 
@@ -37,7 +46,7 @@ class VideoDubbingSettings extends Page implements HasForms
 
     protected static ?string $title = 'Video Dubbing Settings';
 
-    protected static string $view = 'filament.pages.video-dubbing-settings';
+    protected string $view = 'filament.pages.video-dubbing-settings';
 
     private const GROUP = 'video_dubbing';
 
@@ -60,14 +69,14 @@ class VideoDubbingSettings extends Page implements HasForms
         ]);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Dub my video')
+        return $schema
+            ->components([
+                Section::make('Dub my video')
                     ->description('A member uploads a short video and gets it back in the Arabic dialect or English accent they choose.')
                     ->schema([
-                        Forms\Components\Radio::make('video_dubbing_audience')
+                        Radio::make('video_dubbing_audience')
                             ->label('Who can see the page')
                             ->options([
                                 VideoDubbing::AUDIENCE_OFF => 'Off for everyone',
@@ -81,11 +90,11 @@ class VideoDubbingSettings extends Page implements HasForms
                             ])
                             ->required(),
                     ]),
-                Forms\Components\Section::make('Uploads and the free dub')
+                Section::make('Uploads and the free dub')
                     ->description('What the upload box shows: the largest file, and the longest video. A plan\'s longest video is set on the plan (Plans → Dub my video).')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('video_dubbing_free_max_upload_mb')
+                        TextInput::make('video_dubbing_free_max_upload_mb')
                             ->label('Largest video for the free dub (demo)')
                             ->numeric()
                             ->integer()
@@ -94,7 +103,7 @@ class VideoDubbingSettings extends Page implements HasForms
                             ->suffix('MB')
                             ->required()
                             ->helperText('Members without a plan with dubbing.'),
-                        Forms\Components\TextInput::make('video_dubbing_max_upload_mb')
+                        TextInput::make('video_dubbing_max_upload_mb')
                             ->label('Largest video for plans with dubbing')
                             ->numeric()
                             ->integer()
@@ -103,7 +112,7 @@ class VideoDubbingSettings extends Page implements HasForms
                             ->suffix('MB')
                             ->required()
                             ->helperText(fn (): string => 'Members whose plan includes dubbing. Videos are sent in pieces of '.intdiv(VideoDubbing::chunkBytes(), 1024 * 1024).' MB, so the server\'s own upload limit does not cap this.'),
-                        Forms\Components\TextInput::make('video_dubbing_free_max_seconds')
+                        TextInput::make('video_dubbing_free_max_seconds')
                             ->label('Longest free video')
                             ->numeric()
                             ->integer()
@@ -112,7 +121,7 @@ class VideoDubbingSettings extends Page implements HasForms
                             ->suffix('seconds')
                             ->required()
                             ->helperText('Also a plan\'s longest video when the plan sets none.'),
-                        Forms\Components\TextInput::make('video_dubbing_free_keep_hours')
+                        TextInput::make('video_dubbing_free_keep_hours')
                             ->label('Free video stays on the member\'s dashboard for')
                             ->numeric()
                             ->integer()
@@ -122,14 +131,14 @@ class VideoDubbingSettings extends Page implements HasForms
                             ->required()
                             ->helperText('Then the member no longer sees it. A plan\'s videos stay as long as the plan keeps voices (Plans → "Recent Voices Retention").'),
                     ]),
-                Forms\Components\Section::make('Taking the old voices out')
+                Section::make('Taking the old voices out')
                     ->description('Before the new voices go in, a separation model on this server takes the original voices out of the video\'s sound and keeps its music and effects, and a speech isolation keeps the voices further back than the main speaker (children reciting, a crowd), so only the main speaker is replaced. Without it, simple filters are used, which leave some of the old voice.')
                     ->schema([
-                        Forms\Components\Placeholder::make('separator_status')
+                        Placeholder::make('separator_status')
                             ->label('Status')
                             ->content(fn (): HtmlString => self::separatorStatus()),
-                        Forms\Components\Actions::make([
-                            Forms\Components\Actions\Action::make('install_separator')
+                        Actions::make([
+                            Action::make('install_separator')
                                 ->label(fn (): string => VoiceSeparator::installed() ? 'Install again' : 'Install on this server')
                                 ->icon('heroicon-o-arrow-down-tray')
                                 ->color(fn (): string => VoiceSeparator::installed() ? 'gray' : 'primary')
@@ -141,30 +150,30 @@ class VideoDubbingSettings extends Page implements HasForms
                                     Notification::make()->title('Installing in the background: refresh this page in a minute or two.')->success()->send();
                                 }),
                         ]),
-                        Forms\Components\Toggle::make('video_dubbing_separation')
+                        Toggle::make('video_dubbing_separation')
                             ->label('Use it for every dub')
                             ->helperText('On: the old voices are taken out of the whole track. Off: the filters only.'),
                     ]),
-                Forms\Components\Section::make('Where the videos are kept')
+                Section::make('Where the videos are kept')
                     ->description('Members see their videos only while their time lasts. You keep every video and all the figures here, in Video Dubbing → Dubs.')
                     ->schema([
-                        Forms\Components\Placeholder::make('drive_status')
+                        Placeholder::make('drive_status')
                             ->label('Google Drive')
                             ->content(fn (): HtmlString => self::driveStatus()),
-                        Forms\Components\Actions::make([
-                            Forms\Components\Actions\Action::make('connect_drive')
+                        Actions::make([
+                            Action::make('connect_drive')
                                 ->label(fn (): string => DriveArchive::connected() ? 'Connect another Google account' : 'Connect Google Drive')
                                 ->icon('heroicon-o-link')
                                 ->color(fn (): string => DriveArchive::connected() ? 'gray' : 'primary')
                                 ->url(fn (): string => route('admin.drive.connect')),
-                            Forms\Components\Actions\Action::make('open_drive')
+                            Action::make('open_drive')
                                 ->label('Open the Listen Studio folder')
                                 ->icon('heroicon-o-folder-open')
                                 ->color('gray')
                                 ->visible(fn (): bool => DriveArchive::connected())
                                 ->url(fn (): ?string => DriveArchive::folderUrl())
                                 ->openUrlInNewTab(),
-                            Forms\Components\Actions\Action::make('disconnect_drive')
+                            Action::make('disconnect_drive')
                                 ->label('Disconnect')
                                 ->icon('heroicon-o-x-mark')
                                 ->color('danger')
@@ -177,10 +186,10 @@ class VideoDubbingSettings extends Page implements HasForms
                                     Notification::make()->title('Google Drive disconnected')->success()->send();
                                 }),
                         ]),
-                        Forms\Components\Toggle::make('video_dubbing_drive_enabled')
+                        Toggle::make('video_dubbing_drive_enabled')
                             ->label('Keep the videos in Google Drive')
                             ->helperText('On: each video goes to Listen Studio → Paid or Free → the member\'s folder (a paid one as soon as it is ready, a free one when the member\'s time is over) and is deleted from the server. Off: new videos stay on the server.'),
-                        Forms\Components\TextInput::make('video_dubbing_server_keep_days')
+                        TextInput::make('video_dubbing_server_keep_days')
                             ->label('Videos on the server are kept for')
                             ->numeric()
                             ->integer()
@@ -189,23 +198,23 @@ class VideoDubbingSettings extends Page implements HasForms
                             ->suffix('days')
                             ->required()
                             ->helperText('When Google Drive is off or not connected. Never before the member\'s time is over. 0 keeps them on the server.'),
-                        Forms\Components\Fieldset::make('Google client (only if the Connect button says it is missing)')
+                        Fieldset::make('Google client (only if the Connect button says it is missing)')
                             ->columns(2)
                             ->schema([
-                                Forms\Components\TextInput::make('video_dubbing_drive_client_id')
+                                TextInput::make('video_dubbing_drive_client_id')
                                     ->label('Client ID')
                                     ->maxLength(255)
                                     ->placeholder(fn (): string => filled(config('services.google.client_id')) ? 'The site\'s Google sign-in client is used' : 'From Google Cloud → APIs & Services → Credentials'),
-                                Forms\Components\TextInput::make('video_dubbing_drive_client_secret')
+                                TextInput::make('video_dubbing_drive_client_secret')
                                     ->label('Client secret')
                                     ->password()
                                     ->maxLength(255)
                                     ->placeholder(fn (): string => filled(SiteSetting::get('video_dubbing_drive_client_secret', '')) ? 'Saved (leave empty to keep it)' : 'Leave empty to use the site\'s Google sign-in client'),
                             ]),
                     ]),
-                Forms\Components\Section::make('Statistics')
+                Section::make('Statistics')
                     ->schema([
-                        Forms\Components\Placeholder::make('stats')
+                        Placeholder::make('stats')
                             ->label('')
                             ->content(function (): string {
                                 $all = VideoDub::query();
@@ -239,7 +248,7 @@ class VideoDubbingSettings extends Page implements HasForms
                 : ' <span style="color:#b45309">Without the speech detection: press Install again to add it (each line then starts and ends where the speaker\'s mouth opens and closes, even over music).</span>';
 
             return new HtmlString(sprintf('<strong>Installed</strong>%s.'.$isolation.' One dub uses it at a time (about 1.4 GB of memory while it runs), and only when %d MB are free; a dub that cannot wait for it, or finds too little memory free, uses the filters. Should the server run short anyway, the system stops the separation first, never the site.%s%s',
-                isset($d['installed_at']) ? ' on '.e(\Illuminate\Support\Carbon::parse($d['installed_at'])->toDayDateTimeString()).' (Python '.e(substr((string) ($d['python_version'] ?? ''), 0, 1).'.'.substr((string) ($d['python_version'] ?? ''), 1)).')' : '',
+                isset($d['installed_at']) ? ' on '.e(Carbon::parse($d['installed_at'])->toDayDateTimeString()).' (Python '.e(substr((string) ($d['python_version'] ?? ''), 0, 1).'.'.substr((string) ($d['python_version'] ?? ''), 1)).')' : '',
                 (int) config('listen.dubbing.separator.min_free_mb', 2048), self::memoryLine(), $last));
         }
         $python = VoiceSeparator::python();

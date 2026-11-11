@@ -11,7 +11,7 @@ class ApiUsageBreakdown extends Widget
 
     protected static ?int $sort = -15;
 
-    protected static string $view = 'filament.widgets.api-usage-breakdown';
+    protected string $view = 'filament.widgets.api-usage-breakdown';
 
     protected int|string|array $columnSpan = 'full';
 

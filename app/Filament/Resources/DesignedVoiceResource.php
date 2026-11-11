@@ -2,6 +2,16 @@
 
 namespace App\Filament\Resources;
 
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
+use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\BulkAction;
+use App\Filament\Resources\DesignedVoiceResource\Pages\ListDesignedVoices;
 use App\Filament\Resources\DesignedVoiceResource\Pages;
 use App\Models\DesignedVoice;
 use App\Services\VoiceDesignService;
@@ -21,9 +31,9 @@ class DesignedVoiceResource extends Resource
 {
     protected static ?string $model = DesignedVoice::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-sparkles';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-sparkles';
 
-    protected static ?string $navigationGroup = 'Voice Design';
+    protected static string | \UnitEnum | null $navigationGroup = 'Voice Design';
 
     protected static ?int $navigationSort = 1;
 
@@ -49,75 +59,75 @@ class DesignedVoiceResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')->sortable()->toggleable(),
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('id')->sortable()->toggleable(),
+                TextColumn::make('name')
                     ->label('Voice')
                     ->searchable()
                     ->weight('bold')
                     ->placeholder(fn (DesignedVoice $record): string => 'Take '.$record->take)
                     ->description(fn (DesignedVoice $record): string => (string) $record->user?->email),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn (?string $state): string => $state === DesignedVoice::SAVED ? 'Kept' : 'Waiting to be kept')
                     ->color(fn (?string $state): string => $state === DesignedVoice::SAVED ? 'success' : 'gray')
                     ->sortable(),
-                Tables\Columns\ViewColumn::make('preview_audio_path')
+                ViewColumn::make('preview_audio_path')
                     ->label('Take')
                     ->view('filament.designed-voice-audio'),
-                Tables\Columns\TextColumn::make('description')
+                TextColumn::make('description')
                     ->limit(70)
                     ->tooltip(fn (DesignedVoice $record): string => (string) $record->description)
                     ->searchable()
                     ->wrap()
                     ->extraAttributes(['style' => 'min-width: 18rem']),
-                Tables\Columns\TextColumn::make('language')
+                TextColumn::make('language')
                     ->badge()
                     ->color('gray')
                     ->formatStateUsing(fn (?string $state): string => $state === 'en' ? 'English' : 'Arabic'),
-                Tables\Columns\ToggleColumn::make('is_showcase')
+                ToggleColumn::make('is_showcase')
                     ->label('On the card')
                     ->tooltip('Played around the orb on the Voice Design card, for everyone.')
                     ->disabled(fn (DesignedVoice $record): bool => ! $record->isSaved()),
-                Tables\Columns\TextColumn::make('preview_text')
+                TextColumn::make('preview_text')
                     ->label('Line')
                     ->limit(50)
                     ->placeholder('Its own sample')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('key_name')
+                TextColumn::make('key_name')
                     ->label('Key')
                     ->badge()
                     ->color('gray')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('last_used_at')
+                TextColumn::make('last_used_at')
                     ->label('Last spoke')
                     ->since()
                     ->placeholder('Not yet')
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Made')
                     ->since()
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->options([DesignedVoice::SAVED => 'Kept', DesignedVoice::DRAFT => 'Waiting to be kept'])
                     ->default(DesignedVoice::SAVED),
-                Tables\Filters\TernaryFilter::make('is_showcase')->label('On the card'),
-                Tables\Filters\SelectFilter::make('language')->options(['ar' => 'Arabic', 'en' => 'English']),
-                Tables\Filters\SelectFilter::make('user')
+                TernaryFilter::make('is_showcase')->label('On the card'),
+                SelectFilter::make('language')->options(['ar' => 'Arabic', 'en' => 'English']),
+                SelectFilter::make('user')
                     ->relationship('user', 'email')
                     ->searchable()
                     ->label('Owner'),
             ])
-            ->actions([
-                Tables\Actions\Action::make('listen')
+            ->recordActions([
+                Action::make('listen')
                     ->label('Open take')
                     ->icon('heroicon-o-play')
                     ->url(fn (DesignedVoice $record): ?string => AudioUrl::fromPath($record->preview_audio_path), shouldOpenInNewTab: true)
                     ->visible(fn (DesignedVoice $record): bool => filled($record->preview_audio_path)),
-                Tables\Actions\Action::make('purge')
+                Action::make('purge')
                     ->label('Delete')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
@@ -128,9 +138,9 @@ class DesignedVoiceResource extends Resource
                         Notification::make()->title('Designed voice deleted')->success()->send();
                     }),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkAction::make('purge')
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('purge')
                         ->label('Delete everywhere')
                         ->icon('heroicon-o-trash')
                         ->color('danger')
@@ -146,15 +156,16 @@ class DesignedVoiceResource extends Resource
             ->emptyStateDescription('Voices members design and keep in the dashboard appear here.');
     }
 
-    public static function canCreate(): bool
+    // Filament 4 checks this (pages, buttons and canCreate() alike): never allowed here.
+    public static function getCreateAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListDesignedVoices::route('/'),
+            'index' => ListDesignedVoices::route('/'),
         ];
     }
 }
