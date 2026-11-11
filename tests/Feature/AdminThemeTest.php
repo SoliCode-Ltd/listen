@@ -28,6 +28,18 @@ class AdminThemeTest extends TestCase
         );
     }
 
+    public function test_sections_and_popups_are_never_wider_than_the_screen(): void
+    {
+        // Filament sizes their one column by its content: on a phone the dashboard's cards and
+        // the "who cancelled" popup were wider than the screen, cut off on the right.
+        $css = (string) file_get_contents(public_path('css/filament/admin/theme.css'));
+
+        $this->assertStringContainsString(
+            '.fi-section.fi-section-not-contained:not(.fi-aside),.fi-section.fi-section-not-contained:not(.fi-aside):not(.fi-collapsed)>.fi-section-content-ctn,.fi-modal-window-ctn{grid-template-columns:minmax(0,1fr)}',
+            $css,
+        );
+    }
+
     public function test_the_admin_uses_its_theme(): void
     {
         $this->assertStringEndsWith('css/filament/admin/theme.css', (string) Filament::getPanel('admin')->getTheme()->getPath());

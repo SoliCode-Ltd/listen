@@ -24,3 +24,17 @@ html:not(.dark) .fi-btn.fi-color.fi-color-primary:not(.fi-outlined) {
     --text: var(--color-white);
     --hover-text: var(--color-white);
 }
+
+/*
+ * Never wider than the screen, as before Filament 4. Filament lays these out as a grid
+ * of one column sized by its content, so on a phone a long line (a dashboard card's
+ * description) or a wide table (the "who cancelled" popup) made the whole card or
+ * popup wider than the screen, cut off on the right. With the column held to the
+ * width there is, text wraps and a wide table scrolls inside its popup. On a wide
+ * screen nothing changes: the column was already the full width.
+ */
+.fi-section.fi-section-not-contained:not(.fi-aside),
+.fi-section.fi-section-not-contained:not(.fi-aside):not(.fi-collapsed) > .fi-section-content-ctn,
+.fi-modal-window-ctn {
+    grid-template-columns: minmax(0, 1fr);
+}

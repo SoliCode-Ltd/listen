@@ -200,7 +200,10 @@ class ExpectedIncomeTest extends TestCase
             ->assertSee('Starter')
             ->assertSee('$9.00')
             // A Stripe customer with no member on the site is still listed, by its id.
-            ->assertSee('cus_sub_leaving_date');
+            ->assertSee('cus_sub_leaving_date')
+            // The date the list is in order of comes next to the member, so a phone shows it without scrolling sideways.
+            ->assertSeeInOrder(['Member', 'Plan ends', 'Plan', 'Cancelled on', 'A month', 'Huda Leaving'])
+            ->assertSee('Soonest to end first.');
     }
 
     public function test_the_card_says_when_stripe_cannot_be_read(): void
