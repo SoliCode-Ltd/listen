@@ -11,6 +11,7 @@ use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
@@ -41,7 +42,8 @@ class AdminPanelProvider extends PanelProvider
                 AuthenticateSession::class,
                 \App\Http\Middleware\EnsureUserIsNotBlocked::class,
                 ShareErrorsFromSession::class,
-                VerifyCsrfToken::class,
+                // Laravel 13's name, else 12's (between a deploy and its packages).
+                class_exists(PreventRequestForgery::class) ? PreventRequestForgery::class : VerifyCsrfToken::class,
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
