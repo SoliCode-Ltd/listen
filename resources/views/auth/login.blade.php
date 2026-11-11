@@ -290,6 +290,22 @@
     .remember-row input {
       width: auto;
     }
+    /* "Remember me" and "Forgot your password?" on one line, the link at the far end. */
+    .remember-forgot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: .4rem 1rem;
+    }
+    .remember-forgot .remember-row { margin: 0; }
+    .forgot-link {
+      color: var(--accent-text, var(--a));
+      font-size: .9rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .forgot-link:hover { text-decoration: underline; }
     .submit-btn,
     .phone-btn {
       padding: .85rem;
@@ -564,6 +580,11 @@
         <div class="status-box success" role="status">{{ session('verify_email_status') }}</div>
       @endif
 
+      {{-- The password was just changed with the emailed link: sign in with the new one. --}}
+      @if(session('password_reset_status'))
+        <div class="status-box success" role="status">{{ session('password_reset_status') }}</div>
+      @endif
+
       @if($appSignIn)
         <button type="button" class="google-btn" data-app-signin>
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 31.367 32"><path d="M31.367,16.368a18.825,18.825,0,0,0-.276-3.251H16v6.161h8.642a7.4,7.4,0,0,1-3.2,4.862v4H26.6A15.626,15.626,0,0,0,31.367,16.368Z" fill="#4285f4"></path><path d="M16,32a15.317,15.317,0,0,0,10.606-3.862l-5.156-4A9.7,9.7,0,0,1,7.022,19.066H1.7v4.122A16,16,0,0,0,16,32Z" fill="#34a853"></path><path d="M7.016,19.066a9.583,9.583,0,0,1,0-6.125V8.819H1.7a16.017,16.017,0,0,0,0,14.369Z" fill="#fbbc04"></path><path d="M16,6.333a8.694,8.694,0,0,1,6.138,2.4h0l4.568-4.568A15.376,15.376,0,0,0,16,0,16,16,0,0,0,1.7,8.819l5.314,4.122A9.57,9.57,0,0,1,16,6.333Z" fill="#ea4335"></path></svg>
@@ -624,10 +645,13 @@
             <label for="password">{{ __('ui.auth.password') }}</label>
             <input type="password" id="password" name="password" required autocomplete="current-password">
           </div>
-          <label class="remember-row">
-            <input type="checkbox" name="remember" value="1" checked>
-            {{ __('ui.auth.remember_me') }}
-          </label>
+          <div class="remember-forgot">
+            <label class="remember-row">
+              <input type="checkbox" name="remember" value="1" checked>
+              {{ __('ui.auth.remember_me') }}
+            </label>
+            <a class="forgot-link" href="{{ route('password.request') }}">{{ __('ui.reset_password.forgot_link') }}</a>
+          </div>
           <button class="submit-btn" type="submit">{{ __('ui.auth.sign_in') }}</button>
         </form>
 

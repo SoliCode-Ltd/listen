@@ -24,6 +24,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ManualPaymentController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\NewsletterUnsubscribeController;
+use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PronunciationController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\StartController;
@@ -343,6 +344,24 @@ Route::group([
             ->middleware(['auth.method:firebase_google', 'throttle:auth-bridge'])
             ->name('auth.firebase-google.verify');
     });
+
+    // "Forgot your password?" on the sign-in page: ask for the link (a few an hour), then the
+    // link from the email and the new password it sets. All of it works whether or not anyone
+    // is signed in (a member who is signed in on one device may have forgotten it too); the
+    // link works once, for an hour.
+    Route::get('/forgot-password', [PasswordResetController::class, 'showForgot'])
+        ->middleware('auth.method:email')
+        ->name('password.request');
+    Route::post('/forgot-password', [PasswordResetController::class, 'sendLink'])
+        ->middleware(['auth.method:email', 'throttle:password-reset'])
+        ->name('password.email');
+    Route::get('/reset-password/{token}', [PasswordResetController::class, 'showReset'])
+        ->where('token', '[A-Za-z0-9]{20,128}')
+        ->middleware(['auth.method:email', 'throttle:30,1'])
+        ->name('password.reset');
+    Route::post('/reset-password', [PasswordResetController::class, 'reset'])
+        ->middleware(['auth.method:email', 'throttle:10,1'])
+        ->name('password.update');
 
     // Confirming the email of an account made with an email and a password. The
     // link works whether or not the member is signed in, and confirms only the
