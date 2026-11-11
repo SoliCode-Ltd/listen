@@ -62,6 +62,23 @@ class AdminPanelProvider extends PanelProvider
         return class_exists(\Filament\Schemas\Schema::class);
     }
 
+    /**
+     * The admin theme's version: the fingerprint on its first line (what it was built from,
+     * scripts/build-admin-theme.mjs). Cloudflare and browsers keep the file for a year, so
+     * without it a rebuilt theme would not reach them; Filament versions only its own files.
+     */
+    public static function themeVersion(): string
+    {
+        $file = public_path('css/filament/admin/theme.css');
+        $handle = is_file($file) ? @fopen($file, 'r') : false;
+        $first = $handle ? (string) fgets($handle, 200) : '';
+        if ($handle) {
+            fclose($handle);
+        }
+
+        return preg_match('/sources:([0-9a-f]{12})/', $first, $m) ? $m[1] : (string) (@filemtime($file) ?: '0');
+    }
+
     public function panel(Panel $panel): Panel
     {
         return $panel
@@ -70,8 +87,9 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName(config('app.name', 'Listen') . ' Admin')
-            // Filament's stylesheet with the admin's own pages' classes (resources/css/filament/admin/theme.css).
-            ->theme(asset('css/filament/admin/theme.css'))
+            // Filament's stylesheet with the admin's own pages' classes (resources/css/filament/admin/theme.css),
+            // at an address that changes with its content (themeVersion()).
+            ->theme(asset('css/filament/admin/theme.css').'?v='.self::themeVersion())
             ->colors([
                 'primary' => Color::Amber,
             ])

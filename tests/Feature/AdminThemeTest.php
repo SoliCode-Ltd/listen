@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Providers\Filament\AdminPanelProvider;
 use Filament\Facades\Filament;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
@@ -42,7 +43,14 @@ class AdminThemeTest extends TestCase
 
     public function test_the_admin_uses_its_theme(): void
     {
-        $this->assertStringEndsWith('css/filament/admin/theme.css', (string) Filament::getPanel('admin')->getTheme()->getPath());
+        $this->assertStringEndsWith('css/filament/admin/theme.css?v='.substr(self::fingerprint(), 0, 12), (string) Filament::getPanel('admin')->getTheme()->getPath());
+    }
+
+    public function test_the_themes_address_changes_with_its_content(): void
+    {
+        // Cloudflare and browsers keep it for a year: a rebuilt theme must have a new address.
+        $this->assertSame(substr(self::fingerprint(), 0, 12), AdminPanelProvider::themeVersion());
+        $this->get('/admin/login')->assertOk()->assertSee('css/filament/admin/theme.css?v='.AdminPanelProvider::themeVersion(), false);
     }
 
     /** As scripts/build-admin-theme.mjs works it out. */
