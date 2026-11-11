@@ -125,7 +125,7 @@ if php artisan list --raw 2>/dev/null | grep '^passport:keys' >/dev/null; then
     chmod 640 storage/oauth-private.key storage/oauth-public.key
     echo "Sign-in keys: made"
   fi
-  ls -l storage/oauth-private.key storage/oauth-public.key .env | awk '{print "  "$1" "$3":"$4" "$NF}'
+  ls -l storage/oauth-private.key storage/oauth-public.key .env 2>/dev/null | awk '{print "  "$1" "$3":"$4" "$NF}' || true
 fi
 # Then the caches, as deploy rebuilds them (never the app cache; routes only with route:trans:cache).
 step 6 php artisan optimize:clear --except=cache
