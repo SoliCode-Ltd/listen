@@ -20,9 +20,9 @@ class PasswordResetRequestResource extends Resource
 {
     protected static ?string $model = PasswordResetRequest::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-key';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';
 
-    protected static ?string $navigationGroup = 'Newsletter';
+    protected static string|\UnitEnum|null $navigationGroup = 'Newsletter';
 
     protected static ?string $navigationLabel = 'Password resets';
 
@@ -117,8 +117,8 @@ class PasswordResetRequestResource extends Resource
                         default => $query,
                     }),
             ])
-            ->actions([])
-            ->bulkActions([])
+            ->recordActions([])
+            ->toolbarActions([])
             ->emptyStateHeading('No password resets yet')
             ->emptyStateDescription('When someone uses "Forgot your password?" on the sign-in page, the request shows here with its result.');
     }
