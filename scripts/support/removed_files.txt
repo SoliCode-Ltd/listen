@@ -1,0 +1,19 @@
+# Files taken out of the code that the servers may still have.
+#
+# The Server deploy workflow uploads files and never deletes, so a file taken
+# out of the code stays on the servers. Where such a file is still loaded
+# there, it must go: the deploy moves each file listed here to
+# storage/app/listen-deploy/removed/ (kept there, not deleted), unless the code
+# being deployed has that file again. The inspect step lists every file the
+# servers have in the code folders that the code does not.
+#
+# One path per line, from the app's folder. Lines starting with # are notes.
+
+# The Source Accounts admin tab, removed on 11 November 2026. The admin finds
+# its pages by their folder, so the old files kept the tab on the servers, and
+# Filament 5 cannot load them (the admin would not start).
+app/Filament/Resources/SourceAccountResource.php
+app/Filament/Resources/SourceAccountResource/Pages/CreateSourceAccount.php
+app/Filament/Resources/SourceAccountResource/Pages/EditSourceAccount.php
+app/Filament/Resources/SourceAccountResource/Pages/ListSourceAccounts.php
+app/Filament/Resources/SourceAccountResource/Pages/ViewSourceAccount.php
