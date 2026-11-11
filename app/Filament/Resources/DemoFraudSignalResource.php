@@ -86,7 +86,11 @@ class DemoFraudSignalResource extends Resource
                     ]),
                 TextColumn::make('signal_data')
                     ->label('Data')
-                    ->formatStateUsing(fn ($state) => is_array($state) ? json_encode($state, JSON_UNESCAPED_UNICODE) : $state)
+                    // One line, as Filament 3 showed it (its values, a nested one as JSON), cut at 50
+                    // as a whole: Filament 5 would format and cut each value on its own.
+                    ->state(fn (DemoFraudSignal $record): ?string => is_array($record->signal_data)
+                        ? implode(', ', array_map(fn (mixed $value): string => is_array($value) ? (string) json_encode($value) : (string) $value, $record->signal_data))
+                        : $record->signal_data)
                     ->limit(50)
                     ->toggleable(),
                 TextColumn::make('created_at')
