@@ -143,6 +143,22 @@ class DemoOnePersonTest extends TestCase
         $this->quota($b, 'browser_chain_b_0123456789abcdefgh')->assertJsonPath('quota.remaining_chars', 0);
     }
 
+    public function test_someone_typing_your_address_into_an_account_they_never_confirm_cannot_use_up_your_demo(): void
+    {
+        // The attacker's own account, which has spent its demo, in the attacker's browser.
+        $attacker = $this->member('198.51.100.16', 'browser_griefer_0123456789abcdefgh', 'griefer@example.org');
+        $this->usedDemo($attacker, 300);
+        // The victim: a confirmed Gmail account that has not used its demo.
+        $victim = $this->member('203.0.113.16', 'browser_victim_0123456789abcdefghi', 'victim.person@gmail.com');
+
+        // In the attacker's browser, an account with a +tag of the victim's address, never confirmed.
+        User::factory()->create(['email' => 'victimperson+x@gmail.com', 'email_verified_at' => null,
+            'registration_device_id' => 'browser_griefer_0123456789abcdefgh', 'last_seen_device_id' => 'browser_griefer_0123456789abcdefgh']);
+
+        $this->quota($victim, 'browser_victim_0123456789abcdefghi')->assertJsonPath('quota.remaining_chars', 300);
+        $this->assertArrayNotHasKey($victim->id, app(DemoSuspects::class)->all());
+    }
+
     public function test_a_referral_between_one_inbox_is_held_for_review(): void
     {
         $referrer = $this->member('198.51.100.15', 'browser_ref_a_0123456789abcdefghij', 'friend@gmail.com');
@@ -290,6 +306,8 @@ class DemoOnePersonTest extends TestCase
             $this->assertStringNotContainsString($detail, $stored);
         }
         $this->assertSame(64, strlen(DemoLeftBehindSignal::query()->value('signal')));
+        // Keyed with the app's secret: a plain hash of a network address could be worked back.
+        $this->assertNotContains(hash('sha256', '198.51.100.42'), DemoLeftBehindSignal::query()->pluck('signal')->all());
     }
 
     public function test_an_account_that_used_none_of_the_demo_leaves_nothing_behind(): void
@@ -326,6 +344,10 @@ class DemoOnePersonTest extends TestCase
 
     public function test_everything_works_before_the_new_migrations_have_run(): void
     {
+        if (DB::getDriverName() !== 'sqlite') {
+            // Dropping tables commits the test's transaction there: the rows of later tests would be wrong.
+            $this->markTestSkipped('Runs where table changes are rolled back with the test (the suite\'s SQLite).');
+        }
         Schema::drop('demo_left_behind_signals');
         Schema::drop('demo_left_behind');
         Schema::table('users', function ($table): void {
@@ -334,16 +356,23 @@ class DemoOnePersonTest extends TestCase
         });
         Once::flush();
 
-        $first = $this->member('198.51.100.50', 'browser_before_0123456789abcdefghi', 'before@gmail.com');
-        $this->usedDemo($first, 300);
-        $second = $this->member('203.0.113.50', 'browser_before_0123456789abcdefghi', 'b.e.f.o.r.e@gmail.com');
-        $this->quota($second, 'browser_before_0123456789abcdefghi')->assertJsonPath('quota.remaining_chars', 0);
+        try {
+            $first = $this->member('198.51.100.50', 'browser_before_0123456789abcdefghi', 'before@gmail.com');
+            $this->usedDemo($first, 300);
+            $second = $this->member('203.0.113.50', 'browser_before_0123456789abcdefghi', 'b.e.f.o.r.e@gmail.com');
+            $this->quota($second, 'browser_before_0123456789abcdefghi')->assertJsonPath('quota.remaining_chars', 0);
 
-        $this->assertNull(app(UserDeletionService::class)->delete($first, null, withDemoHistory: true));
-        $this->assertIsArray(app(DemoSuspects::class)->all());
-        $admin = User::factory()->create(['is_admin' => true]);
-        $this->actingAs($admin);
-        Livewire::test(SuspiciousUsers::class)->assertOk();
+            $this->assertNull(app(UserDeletionService::class)->delete($first, null, withDemoHistory: true));
+            $this->assertIsArray(app(DemoSuspects::class)->all());
+            $admin = User::factory()->create(['is_admin' => true]);
+            $this->actingAs($admin);
+            Livewire::test(SuspiciousUsers::class)->assertOk();
+        } finally {
+            // Put them back: on MySQL a dropped table is not rolled back with the test.
+            (require database_path('migrations/2026_11_25_120000_add_email_key_to_users_table.php'))->up();
+            (require database_path('migrations/2026_11_25_120100_create_demo_left_behind_tables.php'))->up();
+            Once::flush();
+        }
     }
 
     // ── Admin → Suspicious Users ────────────────────────────────────────────────

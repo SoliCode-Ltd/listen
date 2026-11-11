@@ -181,7 +181,9 @@ final class DemoSamePerson
         $add(DemoLeftBehindSignal::BROWSER, $user->registration_device_id);
         $add(DemoLeftBehindSignal::BROWSER, $user->last_seen_device_id);
         $add(DemoLeftBehindSignal::NETWORK, $user->registration_ip);
-        $add(DemoLeftBehindSignal::MAILBOX, MailboxKey::for($user->email));
+        if (MailboxKey::confirmed($user)) {
+            $add(DemoLeftBehindSignal::MAILBOX, MailboxKey::for($user->email));
+        }
         if (DemoLinkedAccounts::available()) {
             foreach (MemberDevice::query()->where('user_id', $userId)->get(['kind', 'signal', 'touch']) as $device) {
                 $add($device->kind === MemberDevice::DEVICE ? DemoLeftBehindSignal::DEVICE : DemoLeftBehindSignal::BROWSER, $device->signal, (bool) $device->touch);
@@ -256,7 +258,7 @@ final class DemoSamePerson
      */
     private function findLeftBehind(User $user, array $ids, ?Request $request): Collection
     {
-        $columns = ['id', 'created_at', 'registration_ip', 'registration_device_id', 'last_seen_device_id'];
+        $columns = ['id', 'created_at', 'registration_ip', 'registration_device_id', 'last_seen_device_id', 'email_verified_at'];
         if (MailboxKey::available()) {
             $columns[] = MailboxKey::COLUMN;
         }
@@ -271,7 +273,7 @@ final class DemoSamePerson
                     $anyTime[DemoLeftBehindSignal::BROWSER][DemoLeftBehindSignal::hash((string) $browser)] = true;
                 }
             }
-            $inbox = MailboxKey::available() ? $account->getAttribute(MailboxKey::COLUMN) : null;
+            $inbox = MailboxKey::available() && MailboxKey::confirmed($account) ? $account->getAttribute(MailboxKey::COLUMN) : null;
             if (filled($inbox)) {
                 $anyTime[DemoLeftBehindSignal::MAILBOX][DemoLeftBehindSignal::hash((string) $inbox)] = true;
             }

@@ -35,8 +35,13 @@ class DemoLeftBehindSignal extends Model
         'account_created_at' => 'datetime',
     ];
 
+    /**
+     * A one-way hash keyed with the app's own secret: a network address has few enough
+     * values that a plain hash could be worked back to it; this one cannot be without
+     * the key.
+     */
     public static function hash(string $value): string
     {
-        return hash('sha256', $value);
+        return hash_hmac('sha256', $value, 'demo-left-behind|'.(string) config('app.key'));
     }
 }

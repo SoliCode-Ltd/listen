@@ -216,13 +216,15 @@ class SuspiciousUsersComprehensiveTest extends TestCase
 
     public function test_unblock_clears_all_blocking_fields_and_whitelists(): void
     {
+        // A real admin, not account number 1: on MySQL numbers do not start again with each test.
+        $admin = User::factory()->create(['is_admin' => true]);
         $user = User::factory()->create([
             'is_blocked' => true,
             'blocked_at' => now(),
             'blocked_reason' => 'test',
             'blocked_reason_ar' => 'سبب',
             'blocked_reason_en' => 'reason',
-            'blocked_by' => 1,
+            'blocked_by' => $admin->id,
         ]);
 
         $service = app(BlockedUserService::class);

@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\User;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -45,6 +46,34 @@ final class MailboxKey
         }
 
         return mb_substr($local.'@'.$domain, 0, 255);
+    }
+
+    /**
+     * Whether this account's address counts for its inbox: confirmed (the link in its
+     * email was opened, or Google said so). Anyone can type another person's address,
+     * or a +tag of it, into an account they never confirm; such an account must not
+     * pull that person's demo into theirs. Where the site does not ask for a confirmed
+     * address before the free demo, every address counts.
+     */
+    public static function confirmed(User $user): bool
+    {
+        return ! self::confirmationRequired() || $user->email_verified_at !== null;
+    }
+
+    /**
+     * @template T of \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder
+     *
+     * @param  T  $query  over the users table
+     * @return T
+     */
+    public static function confirmedOnly($query, string $table = 'users')
+    {
+        return self::confirmationRequired() ? $query->whereNotNull($table.'.email_verified_at') : $query;
+    }
+
+    private static function confirmationRequired(): bool
+    {
+        return (bool) config('listen.demo.require_verified_email', true);
     }
 
     /** False until the migration that adds users.email_key has run: nothing reads or writes it before. */

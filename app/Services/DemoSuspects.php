@@ -44,7 +44,9 @@ final class DemoSuspects
     /** The navigation badge's number (forgotten wherever accounts or their links change). */
     public const COUNT_KEY = 'admin:suspicious_users_count';
 
-    public const CACHE_MINUTES = 5;
+    // Kept this long; listen:warm-demo-suspects works it out again every 5 minutes, so an
+    // admin opening the page (or any admin page, for its badge) never waits for it.
+    public const CACHE_MINUTES = 15;
 
     // One grouping of linked accounts larger than this is checked by neighbours in time only.
     private const PAIRWISE_LIMIT = 60;
@@ -65,6 +67,16 @@ final class DemoSuspects
         Cache::put(self::CACHE_KEY, $found, now()->addMinutes(self::CACHE_MINUTES));
 
         return $found;
+    }
+
+    /** Works the list out again now and keeps it (the scheduler's listen:warm-demo-suspects). */
+    public function refresh(): int
+    {
+        $found = $this->compute();
+        Cache::put(self::CACHE_KEY, $found, now()->addMinutes(self::CACHE_MINUTES));
+        Cache::put(self::COUNT_KEY, count($found), now()->addMinutes(self::CACHE_MINUTES));
+
+        return count($found);
     }
 
     public function count(): int
@@ -103,16 +115,27 @@ final class DemoSuspects
     /** @return list<int> */
     private function sharedBrowser(): array
     {
-        $sources = DB::table('users')->select('registration_device_id as s', 'id as u')
-            ->whereNotNull('registration_device_id')->where('registration_device_id', '!=', '')
-            ->unionAll(DB::table('users')->select('last_seen_device_id as s', 'id as u')
-                ->whereNotNull('last_seen_device_id')->where('last_seen_device_id', '!=', ''));
-        if (DemoLinkedAccounts::available()) {
-            $sources->unionAll(DB::table('member_devices')->select('signal as s', 'user_id as u')->where('kind', MemberDevice::BROWSER));
+        // A browser (its cookie) two accounts have, in any of the places it is kept: a few
+        // grouping and joining queries over indexed columns (one grouping over all of them
+        // together took seconds at hundreds of thousands of accounts).
+        $shared = [];
+        foreach (['registration_device_id', 'last_seen_device_id'] as $column) {
+            $shared[] = User::query()->whereNotNull($column)->where($column, '!=', '')
+                ->groupBy($column)->havingRaw('COUNT(*) > 1')->pluck($column)->all();
         }
-
-        $shared = DB::query()->fromSub($sources, 'browsers')->select('s')->groupBy('s')
-            ->havingRaw('COUNT(DISTINCT u) > 1')->pluck('s')->all();
+        $shared[] = DB::table('users as a')->join('users as b', 'b.last_seen_device_id', '=', 'a.registration_device_id')
+            ->whereColumn('a.id', '!=', 'b.id')->where('a.registration_device_id', '!=', '')
+            ->distinct()->pluck('a.registration_device_id')->all();
+        if (DemoLinkedAccounts::available()) {
+            $shared[] = MemberDevice::query()->where('kind', MemberDevice::BROWSER)
+                ->groupBy('signal')->havingRaw('COUNT(DISTINCT user_id) > 1')->pluck('signal')->all();
+            foreach (['registration_device_id', 'last_seen_device_id'] as $column) {
+                $shared[] = DB::table('member_devices as m')->join('users as u', "u.{$column}", '=', 'm.signal')
+                    ->where('m.kind', MemberDevice::BROWSER)->whereColumn('u.id', '!=', 'm.user_id')
+                    ->distinct()->pluck('m.signal')->all();
+            }
+        }
+        $shared = array_values(array_unique(array_merge(...$shared)));
 
         $ids = [];
         foreach (array_chunk($shared, 1000) as $chunk) {
@@ -133,12 +156,13 @@ final class DemoSuspects
         if (! MailboxKey::available()) {
             return [];
         }
-        $shared = User::query()->whereNotNull(MailboxKey::COLUMN)->groupBy(MailboxKey::COLUMN)
+        // Confirmed addresses only, as the demo counts them (MailboxKey::confirmed()).
+        $shared = MailboxKey::confirmedOnly(User::query()->whereNotNull(MailboxKey::COLUMN))->groupBy(MailboxKey::COLUMN)
             ->havingRaw('COUNT(*) > 1')->pluck(MailboxKey::COLUMN)->all();
 
         $ids = [];
         foreach (array_chunk($shared, 1000) as $chunk) {
-            $ids = array_merge($ids, User::query()->whereIn(MailboxKey::COLUMN, $chunk)->pluck('id')->all());
+            $ids = array_merge($ids, MailboxKey::confirmedOnly(User::query()->whereIn(MailboxKey::COLUMN, $chunk))->pluck('id')->all());
         }
 
         return $ids;

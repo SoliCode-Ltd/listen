@@ -204,7 +204,7 @@ final class DemoLinkedAccounts
         $columns = $inboxes ? ['registration_device_id', 'last_seen_device_id', MailboxKey::COLUMN] : ['registration_device_id', 'last_seen_device_id'];
 
         for ($round = 0; $round < 4 && count($ids) < self::MAX_ACCOUNTS; $round++) {
-            $accounts = User::query()->whereIn('id', $ids)->get($columns);
+            $accounts = User::query()->whereIn('id', $ids)->get([...$columns, 'email_verified_at']);
             $theirs = $accounts
                 ->flatMap(fn (User $u): array => [(string) $u->registration_device_id, (string) $u->last_seen_device_id])
                 ->all();
@@ -213,8 +213,12 @@ final class DemoLinkedAccounts
                     ->whereIn('user_id', $ids)->pluck('signal')->all());
             }
             $new = array_values(array_diff(array_unique(array_filter(array_merge($browsers, $theirs))), $followed));
+            // Only a confirmed address links by its inbox: anyone can type someone else's
+            // address (or a +tag of it) into an account they never confirm.
             $newInboxes = $inboxes
-                ? array_values(array_diff(array_unique(array_filter($accounts->map(fn (User $u): string => (string) $u->getAttribute(MailboxKey::COLUMN))->all())), $followedInboxes))
+                ? array_values(array_diff(array_unique(array_filter($accounts
+                    ->filter(fn (User $u): bool => MailboxKey::confirmed($u))
+                    ->map(fn (User $u): string => (string) $u->getAttribute(MailboxKey::COLUMN))->all())), $followedInboxes))
                 : [];
             $browsers = [];
             if ($new === [] && $newInboxes === []) {
@@ -234,7 +238,7 @@ final class DemoLinkedAccounts
                 }
             }
             if ($newInboxes !== []) {
-                $more = array_merge($more, User::query()->whereIn(MailboxKey::COLUMN, $newInboxes)
+                $more = array_merge($more, MailboxKey::confirmedOnly(User::query()->whereIn(MailboxKey::COLUMN, $newInboxes))
                     ->limit(self::MAX_ACCOUNTS)->pluck('id')->all());
             }
             $ids = array_values(array_unique(array_merge($ids, array_map('intval', $more))));
