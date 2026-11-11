@@ -13,9 +13,10 @@
  * plan is set with model events off (no welcome email) and taken back at the
  * end. As the free member it also checks that the demo waits for a confirmed
  * email and that a confirmation link works through the host's proxy (no email
- * is sent). Then it opens the admin's lists as the first admin account (only
+ * is sent). Then it opens the admin's lists as the first admin account, each
+ * list's newest record (its view and edit pages) and the settings pages (only
  * opened, nothing changed; none that read Stripe, whose keys are also emptied
- * for the run). Refuses to run on the live site.
+ * for the run; no email or queued work for the run). Refuses to run on the live site.
  *
  *   ssh user@host 'cd ~/public_html && LOCALE=en php' < scripts/support/staging_page_check.php
  */
@@ -215,11 +216,48 @@ $admin = User::query()->where('is_admin', true)->orderBy('id')->first();
 if ($admin === null) {
     echo "  --    no admin account: the admin's lists are not checked\n";
 } else {
-    foreach (['users', 'suspicious-users', 'audio-generations', 'demo-voice-generations', 'agent-calls', 'agents',
+    $lists = ['users', 'suspicious-users', 'audio-generations', 'demo-voice-generations', 'agent-calls', 'agents',
         'usage-counters', 'subscriptions', 'video-dubs', 'contacts', 'generation-errors', 'text-items',
         'api-request-logs', 'cloned-voices', 'designed-voices', 'manual-payment-requests', 'referral-conversions',
-        'social-share-logs', 'voices', 'voice-samples', 'demo-fraud-signals'] as $list) {
+        'social-share-logs', 'voices', 'voice-samples', 'demo-fraud-signals'];
+    foreach ($lists as $list) {
         $open($admin, '/admin/'.$list, [200], 'admin');
+    }
+
+    // Opening a page sends no email and starts no queued work in this run.
+    config(['mail.default' => 'array', 'queue.connections.page-check-held' => ['driver' => 'null'], 'queue.default' => 'page-check-held']);
+    $path = fn (string $url): string => (string) parse_url($url, PHP_URL_PATH);
+    $panel = Filament\Facades\Filament::getPanel('admin');
+
+    // Each of those lists' newest record, its own pages too (what they show depends on the
+    // record: an agent's totals, a member's plan). Opened only; a page the admin may not
+    // open must refuse (403).
+    foreach ($panel->getResources() as $resource) {
+        if (! in_array($resource::getSlug(), $lists, true)) {
+            continue;
+        }
+        $model = $resource::getModel();
+        $record = $resource::getEloquentQuery()->orderByDesc((new $model)->getKeyName())->first();
+        if ($record === null) {
+            printf("  --    %-34s no record to open\n", '/admin/'.$resource::getSlug().'/…');
+
+            continue;
+        }
+        foreach (['view' => 'canView', 'edit' => 'canEdit'] as $page => $can) {
+            if ($resource::hasPage($page)) {
+                $open($admin, $path($resource::getUrl($page, ['record' => $record])), $resource::$can($record) ? [200] : [403], 'admin');
+            }
+        }
+    }
+
+    // The settings pages that read only this site's own settings (not the dashboard, billing
+    // or the .env editor).
+    foreach ($panel->getPages() as $page) {
+        if (in_array(class_basename($page), ['AgentSettings', 'AuthenticationSettings', 'ExtensionSettings', 'GeminiKeys',
+            'NewsletterMailbox', 'PaidWelcomeEmail', 'PlanEndReminderEmail', 'ReferralCampaignSettings', 'SeoSettings',
+            'SiteSettings', 'SystemInfo', 'TtsSettings', 'VideoDubbingSettings', 'VoiceCloningSettings', 'VoiceDesignSettings'], true)) {
+            $open($admin, $path($page::getUrl()), [200], 'admin');
+        }
     }
 }
 $app['auth']->guard('web')->forgetUser();
