@@ -10,7 +10,7 @@
   $displayMonthlyFormatted = $wholePrice((string) ($plan['display_price_monthly_formatted'] ?? '$0.00'));
   $displayYearlyMonthlyFormatted = $wholePrice((string) ($plan['display_price_yearly_monthly_formatted'] ?? $displayMonthlyFormatted));
   $displayYearlyTotalFormatted = (string) ($plan['display_price_yearly_total_formatted'] ?? $displayYearlyMonthlyFormatted);
-  $displaySavingsFormatted = (string) ($plan['display_savings_formatted'] ?? '');
+  $displaySavingsFormatted = $wholePrice((string) ($plan['display_savings_formatted'] ?? ''));
   $isFree = $state['is_free'];
   $savingsCents = $monthlyCents > 0 ? max(0, ($monthlyCents * 12) - $yearlyCents) : 0;
   $hasDiscount = !empty($plan['has_discount']);

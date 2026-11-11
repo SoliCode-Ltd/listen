@@ -13,9 +13,10 @@
 
     /* The title on the page's own background, short, so the plans' prices and buttons
        come into view on the first screen. */
+    /* The switch at its foot changes the plans under it, so it sits close to them. */
     .page-hero {
       text-align: center;
-      padding: 2.4rem 1rem 1.8rem;
+      padding: 2.4rem 1rem .6rem;
     }
     /* One line, one colour: the words carry it. */
     .page-hero h1 {
@@ -100,6 +101,20 @@
     .billing-toggle button:hover { color: var(--text); }
     .billing-toggle button.active { color: var(--text); }
     .billing-toggle button:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+    /* The yearly saving, as a quiet pill inside the yearly half: seen before anyone presses it. */
+    .billing-save {
+      display: inline-flex;
+      align-items: center;
+      height: 22px;
+      padding: 0 .55rem;
+      border-radius: var(--radius-full);
+      background: color-mix(in oklab, var(--brand-accent) 13%, transparent);
+      color: var(--brand-accent);
+      font-size: .74rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    html:not([data-theme="light"]) .billing-save { background: color-mix(in oklab, var(--brand-accent) 26%, transparent); color: #C9BDFF; }
 
     /* ── The plans ──
        Every plan as a card: three in a row and the others centred under them. A card's
@@ -108,7 +123,7 @@
     .pricing-page { --ease-out: cubic-bezier(.22, 1, .36, 1); }
     .page-hero .billing-toggle { margin-top: 1.6rem; }
     .page-hero .billing-toggle button { min-width: 7.5rem; }
-    .plans { padding-top: clamp(1.2rem, 2.5vw, 2rem); }
+    .plans { padding-top: .9rem; }
     .plans-title { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     /* Phones: one card under another. */
     .plan-grid {
@@ -244,6 +259,21 @@
     .price-note { color: var(--muted); font-size: .86rem; line-height: 1.5; }
     .price-note:empty { display: none; }
     .price-note.savings { color: color-mix(in oklab, var(--ok) 50%, var(--text)); font-weight: 600; }
+    /* On yearly: what the year costs, and beside it what the year saves, in money. */
+    .price-note.has-saving { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .2rem .5rem; }
+    .price-note .price-total { white-space: nowrap; }
+    .price-note .price-saving {
+      display: inline-flex;
+      align-items: center;
+      padding: .12rem .5rem;
+      border-radius: var(--radius-full);
+      background: color-mix(in oklab, var(--ok) 13%, transparent);
+      color: color-mix(in oklab, var(--ok) 62%, var(--text));
+      font-size: .78rem;
+      font-weight: 700;
+      line-height: 1.3;
+      white-space: nowrap;
+    }
     /* An offer is for monthly billing only: on yearly the label, the offer's struck price and the
        time left go, on the cards, in the rows, in the table and in the calculator. Yearly shows its
        price per month with the usual monthly price struck through beside it instead. */
@@ -1089,7 +1119,7 @@
     }
     @media (max-width: 600px) {
       .pricing-page { width: min(100% - 2rem, 1320px); }
-      .page-hero { padding: 1.75rem 0 1.4rem; }
+      .page-hero { padding: 1.75rem 0 .6rem; }
       .page-hero .lead { font-size: .95rem; line-height: 1.6; }
       /* The three things every plan has, as compact rows: the icon beside its title. */
       .features-grid { gap: .75rem; }
@@ -1156,6 +1186,22 @@
       if ($mainPlans === []) {
         $mainPlans = $pricingPlans;
       }
+      // What yearly billing saves against twelve months, for the pill on the switch: the same
+      // share on every plan ("Save 20%"), or the largest when plans differ ("Save up to 20%").
+      $yearlySavePercents = [];
+      foreach ($mainPlans as $pricingPlan) {
+        $planMonthlyCents = (int) ($pricingPlan['original_price_monthly_cents'] ?? 0) ?: (int) ($pricingPlan['price_monthly_cents'] ?? 0);
+        if ($planMonthlyCents <= 0) {
+          continue;
+        }
+        $planYearlyCents = (int) ($pricingPlan['price_yearly_cents'] ?? 0);
+        if ($planYearlyCents <= 0) {
+          $planYearlyCents = (int) round($planMonthlyCents * 12 * \App\Models\SiteSetting::yearlyDiscountMultiplier());
+        }
+        $yearlySavePercents[] = max(0, (int) round((1 - $planYearlyCents / ($planMonthlyCents * 12)) * 100));
+      }
+      $yearlySavePercent = $yearlySavePercents === [] ? 0 : max($yearlySavePercents);
+      $yearlySaveSame = count(array_unique($yearlySavePercents)) <= 1;
       // "$9.00" reads as "$9"; "$86.40" keeps its cents.
       $wholePrice = static fn (string $price): string => (string) preg_replace('/[.,]00(?=\D*$)/u', '', $price);
       // The icon drawn beside each line, on the cards and in the comparison table.
@@ -1274,8 +1320,9 @@
       <div class="billing-toggle" id="billingToggle" role="group" aria-label="{{ __('ui.pricing.monthly') }} / {{ __('ui.pricing.yearly') }}">
         <span class="billing-indicator" aria-hidden="true"></span>
         <button type="button" id="monthlyBtn" class="active" aria-pressed="true">{{ __('ui.pricing.monthly') }}</button>
-        {{-- The yearly saving shows on the cards (the usual price struck through, and the button). --}}
-        <button type="button" id="yearlyBtn" aria-pressed="false">{{ __('ui.pricing.yearly') }}</button>
+        {{-- The yearly saving on the switch itself, so it is seen before the switch is pressed;
+             each card then says what its year saves in money. --}}
+        <button type="button" id="yearlyBtn" aria-pressed="false">{{ __('ui.pricing.yearly') }}@if($yearlySavePercent > 0)<span class="billing-save">{{ __($yearlySaveSame ? 'ui.pricing.yearly_pill' : 'ui.pricing.yearly_pill_up_to', ['percent' => $yearlySavePercent]) }}</span>@endif</button>
       </div>
     </section>
 
@@ -1580,6 +1627,7 @@
       'billed_yearly_total' => __('ui.pricing.billed_yearly_total'),
       'or_yearly' => __('ui.pricing.or_yearly'),
       'save' => __('ui.pricing.save'),
+      'save_amount' => __('ui.pricing.save_amount'),
     ];
   @endphp
   <script>
@@ -1621,9 +1669,21 @@
             priceNote.textContent = i18n.free_forever;
             priceNote.className = 'price-note price-note-text';
           } else if (isYearly) {
+            // What the year costs (the amount really charged), and what it saves against twelve months.
             priceValue.textContent = displayYearlyMonthly;
-            priceNote.textContent = i18n.billed_yearly_total.replace(':total', ltr(displayYearlyTotal));
-            priceNote.className = 'price-note price-note-text';
+            var saves = displaySavings !== '' && Number(card.getAttribute('data-savings-cents') || 0) > 0;
+            priceNote.textContent = '';
+            var total = document.createElement('span');
+            total.className = 'price-total';
+            total.textContent = i18n.billed_yearly_total.replace(':total', ltr(displayYearlyTotal));
+            priceNote.appendChild(total);
+            if (saves) {
+              var saving = document.createElement('span');
+              saving.className = 'price-saving';
+              saving.textContent = i18n.save_amount.replace(':amount', ltr(displaySavings));
+              priceNote.appendChild(saving);
+            }
+            priceNote.className = 'price-note price-note-text' + (saves ? ' has-saving' : '');
           } else {
             // The switch above already says "monthly": point to the yearly price instead,
             // unless the card is busy with its own offer.
