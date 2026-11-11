@@ -362,6 +362,10 @@
       border-color: color-mix(in oklab, #2bb673 45%, var(--line));
       color: color-mix(in oklab, #2bb673 70%, var(--text));
     }
+    /* A notice above the sign-in choices (email confirmed, password changed) keeps clear of them. */
+    .status-box[role="status"] {
+      margin: 0 0 1rem;
+    }
     .blocked-notice {
       margin: 0 0 1.25rem;
       padding: 0;
