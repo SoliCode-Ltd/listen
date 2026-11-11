@@ -14,6 +14,7 @@ use App\Services\Billing\CharPackService;
 use App\Services\Billing\TrialEligibilityService;
 use App\Services\DemoFraudService;
 use App\Services\DemoLinkedAccounts;
+use App\Services\DemoSamePerson;
 use App\Services\GenerationErrorRecorder;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
@@ -69,12 +70,6 @@ class HomeController extends Controller
 
     // A request that dies mid-generation must not hold its chars forever.
     private const DEMO_PENDING_TTL_SECONDS = 600;
-
-    // Accounts made on one network address, or with one browser fingerprint,
-    // share the demo only when made this close together (several accounts in a
-    // row). Further apart they are usually strangers on one mobile network,
-    // campus or office, or on identical phones.
-    private const DEMO_LINK_WINDOW_HOURS = 72;
 
     public function __construct(
         private readonly PlanAccessService $planAccessService,
@@ -686,7 +681,7 @@ class HomeController extends Controller
             // Voice Design, beside it too: one take from the demo's characters (App\Support\VoiceDesign).
             'voiceDesign' => VoiceDesign::openTo($member)
                 ? VoiceDesign::studio($member, $this->planAccessService->resolveAccessPlanForUserId((int) $member->id), true)
-                    + ['demo_used' => $this->usedDemoDesign($this->demoLinkedUserIds((int) $member->id, $request))]
+                    + ['demo_used' => $this->usedDemoDesign($member, $request)]
                 : null,
             // A Voice agent: a live call with a sample business's agent, from the free test seconds
             // (App\Support\Agents\DemoAgent).
@@ -1135,7 +1130,7 @@ class HomeController extends Controller
             return response()->json(['ok' => false, 'message' => __('voice_design.errors.busy')], 429);
         }
         try {
-            if ($this->usedDemoDesign($group)) {
+            if ($this->usedDemoDesign($user, $request)) {
                 return response()->json(['ok' => false, 'message' => __('voice_design.errors.demo_used'), 'demo_used' => true], 422);
             }
 
@@ -1146,17 +1141,13 @@ class HomeController extends Controller
     }
 
     /**
-     * Whether any of these accounts (a member and those the demo links to them,
-     * demoLinkedUserIds) has had the demo's one Voice Design try: a design that came back.
-     *
-     * @param  list<int>  $userIds
+     * Whether this person (the member and those the demo links to them, deleted
+     * accounts included: App\Services\DemoSamePerson) has had the demo's one Voice
+     * Design try: a design that came back.
      */
-    private function usedDemoDesign(array $userIds): bool
+    private function usedDemoDesign(User $member, Request $request): bool
     {
-        return DemoVoiceGeneration::query()
-            ->whereIn('user_id', $userIds)
-            ->whereNotNull('metadata->voice_design')
-            ->exists();
+        return app(DemoSamePerson::class)->designUsed($member, $request);
     }
 
     private function designDemoVoice(Request $request, VoiceDesignService $designer)
@@ -1376,7 +1367,7 @@ class HomeController extends Controller
         // their base allowance drain naturally first.
         $linkedIds = $this->demoLinkedUserIds($userId, $request);
         $lifetimeCap = $this->demoCharAllowance($request);
-        $usedChars = $this->usedDemoCharsForUserIds($linkedIds) + $this->pendingDemoChars($linkedIds);
+        $usedChars = app(DemoSamePerson::class)->demoCharsUsed($user, $request) + $this->pendingDemoChars($linkedIds);
         $overflowNeeded = max(0, ($usedChars + $chars) - $lifetimeCap);
         $rewardBalance = app(DemoRewardLedgerService::class)->balanceFor($user);
 
@@ -1850,211 +1841,40 @@ class HomeController extends Controller
         ];
     }
 
+    /** Demo characters the member has used, with every account that is the same person (App\Services\DemoSamePerson). */
     private function trialUsedCharsByUser(int $userId, ?Request $request = null): int
     {
-        return $this->usedDemoCharsForUserIds($this->demoLinkedUserIds($userId, $request));
+        $member = $this->demoMember($userId, $request);
+
+        return $member ? app(DemoSamePerson::class)->demoCharsUsed($member, $request) : 0;
     }
 
     /**
-     * @param  list<int>  $userIds
-     */
-    private function usedDemoCharsForUserIds(array $userIds): int
-    {
-        return (int) (DemoVoiceGeneration::query()
-            ->whereIn('user_id', $userIds)
-            ->sum('billable_chars') ?? 0);
-    }
-
-    /**
-     * The user plus every account linked to them: the same browser (device
-     * cookie) or the same device (an incognito window keeps it), through
-     * App\Services\DemoLinkedAccounts, or the same sign-up network address
-     * or older fingerprint within DEMO_LINK_WINDOW_HOURS of each other.
+     * The member and every account that is the same person for the free demo:
+     * the same browser or inbox, the same device in another window, the same
+     * sign-up network or demo fingerprint when made close together
+     * (App\Services\DemoSamePerson).
      *
      * @return list<int>
      */
     private function demoLinkedUserIds(int $userId, ?Request $request = null): array
     {
-        $userIds = $this->ipLinkedUserIds($userId);
-        $member = User::query()->find($userId);
-        $deviceLinkedIds = $member
-            ? app(DemoLinkedAccounts::class)->linkedUserIds($member, $request)
-            : $this->deviceLinkedUserIds($userId, $request);
-        $fpLinkedIds = $this->fingerprintLinkedUserIds($userId, $request);
+        $member = $this->demoMember($userId, $request);
 
-        // Request signature is intentionally excluded — it is a browser-config
-        // hash (Chrome version + platform), NOT a unique fingerprint. Including
-        // it would pool demo chars across unrelated users who simply share the
-        // same browser version. The address of the current request and sign-in
-        // addresses are left out for the same reason: strangers share them.
-
-        return array_values(array_unique(array_merge(
-            $userIds,
-            $deviceLinkedIds,
-            $fpLinkedIds
-        )));
+        return $member ? app(DemoSamePerson::class)->ids($member, $request) : [$userId];
     }
 
-    /**
-     * Find all user IDs that share a browser/device cookie identity.
-     * This blocks VPN bypass in the same browser even before IPs reconnect.
-     *
-     * @return list<int>
-     */
-    private function deviceLinkedUserIds(int $userId, ?Request $request = null): array
+    /** The signed-in member when it is them (already loaded), else the account by its id. */
+    private function demoMember(int $userId, ?Request $request): ?User
     {
-        $deviceIds = [];
+        $signedIn = $request?->user();
 
-        if ($request) {
-            $requestDeviceId = $this->demoDeviceIdFromRequest($request);
-            if ($requestDeviceId !== null) {
-                $deviceIds[] = $requestDeviceId;
-            }
-        }
-
-        $user = User::query()
-            ->select(['id', 'registration_device_id', 'last_seen_device_id'])
-            ->find($userId);
-
-        if ($user) {
-            if (filled($user->registration_device_id)) {
-                $deviceIds[] = (string) $user->registration_device_id;
-            }
-            if (filled($user->last_seen_device_id)) {
-                $deviceIds[] = (string) $user->last_seen_device_id;
-            }
-        }
-
-        $deviceIds = array_values(array_unique(array_filter($deviceIds)));
-        if ($deviceIds === []) {
-            return [$userId];
-        }
-
-        $linkedIds = User::query()
-            ->where(fn ($q) => $q->whereIn('registration_device_id', $deviceIds)->orWhereIn('last_seen_device_id', $deviceIds))
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        if (! in_array($userId, $linkedIds, true)) {
-            $linkedIds[] = $userId;
-        }
-
-        return $linkedIds;
+        return $signedIn instanceof User && (int) $signedIn->id === $userId ? $signedIn : User::query()->find($userId);
     }
-
-    /**
-     * Find all user IDs made from the same network address as the given user
-     * within DEMO_LINK_WINDOW_HOURS of it: several accounts made in a row.
-     *
-     * @return list<int>
-     */
-    private function ipLinkedUserIds(int $userId): array
-    {
-        // Not cached: a second account made a minute ago must count at once.
-        $user = User::query()->find($userId);
-        if (! $user || ! filled($user->registration_ip) || ! $user->created_at) {
-            return [$userId];
-        }
-
-        $linkedIds = User::query()
-            ->where('registration_ip', $user->registration_ip)
-            ->whereBetween('created_at', $this->demoLinkWindow($user))
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        if (! in_array($userId, $linkedIds, true)) {
-            $linkedIds[] = $userId;
-        }
-
-        return $linkedIds;
-    }
-
-    /**
-     * Find all user IDs whose demo generations share the same browser fingerprint.
-     * This catches multi-account abuse even through VPN/IP changes. Identical
-     * phones share a fingerprint and everyone on one address shares the
-     * address-and-browser fallback, so those count only within
-     * DEMO_LINK_WINDOW_HOURS; the device cookie is this browser's own.
-     *
-     * @return list<int>
-     */
-    private function fingerprintLinkedUserIds(int $userId, ?Request $request = null): array
-    {
-        $fp = $request ? $this->extractClientFingerprint($request) : null;
-
-        if (! $fp || $fp === '') {
-            return [$userId];
-        }
-
-        $linkedIds = DemoVoiceGeneration::query()
-            ->where('primary_identity_hash', $fp)
-            ->whereNotNull('user_id')
-            ->distinct()
-            ->pluck('user_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        if ($linkedIds !== [] && ! str_starts_with($fp, 'dc:')) {
-            $user = User::query()->select(['id', 'created_at'])->find($userId);
-            $linkedIds = $user?->created_at
-                ? User::query()
-                    ->whereIn('id', $linkedIds)
-                    ->whereBetween('created_at', $this->demoLinkWindow($user))
-                    ->pluck('id')
-                    ->map(fn ($id) => (int) $id)
-                    ->all()
-                : [];
-        }
-
-        if (! in_array($userId, $linkedIds, true)) {
-            $linkedIds[] = $userId;
-        }
-
-        return $linkedIds;
-    }
-
-    /**
-     * @return array{0: \Illuminate\Support\Carbon, 1: \Illuminate\Support\Carbon}
-     */
-    private function demoLinkWindow(User $user): array
-    {
-        return [
-            $user->created_at->copy()->subHours(self::DEMO_LINK_WINDOW_HOURS),
-            $user->created_at->copy()->addHours(self::DEMO_LINK_WINDOW_HOURS),
-        ];
-    }
-
-    // What demo_voice_generations.primary_identity_hash holds (MySQL refuses more).
-    private const IDENTITY_COLUMN_LENGTH = 255;
 
     private function extractClientFingerprint(Request $request): string
     {
-        // 1. Canvas/WebGL fingerprint — strongest signal, unique per device hardware.
-        // The demo page sends 64 characters. A longer one, with its prefix, would not
-        // fit the column: the voice would be made but never stored, so never counted.
-        $fp = trim((string) $request->header('X-Client-FP', ''));
-        if ($fp !== '' && strlen($fp) >= 16 && strlen('fp:'.$fp) <= self::IDENTITY_COLUMN_LENGTH) {
-            return 'fp:'.$fp;
-        }
-
-        // 2. Device cookie — unique random token per browser instance.
-        $deviceId = $this->demoDeviceIdFromRequest($request);
-        if ($deviceId !== null) {
-            return 'dc:'.$deviceId;
-        }
-
-        // 3. IP + User-Agent hash — weak last resort.
-        // Request signature (Sec-CH-UA headers) is intentionally skipped:
-        // it is a browser-config hash, not a fingerprint — millions of users
-        // with the same Chrome version produce the same value.
-        $requestIdentity = trim((string) $request->ip()).'|'.trim((string) $request->userAgent());
-        if ($requestIdentity !== '|') {
-            return 'rq:'.hash('sha256', strtolower($requestIdentity));
-        }
-
-        return 'u:'.(int) ($request->user()?->id ?? 0);
+        return DemoSamePerson::fingerprintFrom($request);
     }
 
     private function demoDeviceIdFromRequest(Request $request): ?string

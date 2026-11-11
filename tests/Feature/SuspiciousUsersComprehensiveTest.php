@@ -1075,20 +1075,20 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $this->assertNotContains($loner->id, $ids);
     }
 
-    public function test_suspicious_users_query_finds_cross_column_ip_matches(): void
+    public function test_signing_in_from_another_accounts_sign_up_address_is_not_a_link(): void
     {
+        // Strangers sign in from one mobile network or office every day: the demo never
+        // pools them for that, so the page does not list them for it either.
         $sharedIp = '172.16.99.1';
 
-        // User A's registration_ip = User B's last_login_ip
         $u1 = User::factory()->create(['registration_ip' => $sharedIp, 'last_login_ip' => '1.2.3.4']);
         $u2 = User::factory()->create(['registration_ip' => '5.6.7.8', 'last_login_ip' => $sharedIp]);
 
         $page = new \App\Filament\Pages\SuspiciousUsers();
-        $query = $this->invokeProtected($page, 'getSuspiciousUsersQuery');
-        $ids = $query->pluck('id')->toArray();
+        $ids = $this->invokeProtected($page, 'getSuspiciousUsersQuery')->pluck('id')->toArray();
 
-        $this->assertContains($u1->id, $ids);
-        $this->assertContains($u2->id, $ids);
+        $this->assertNotContains($u1->id, $ids);
+        $this->assertNotContains($u2->id, $ids);
     }
 
     public function test_suspicious_users_query_finds_shared_device_ids(): void
@@ -1154,7 +1154,7 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $this->assertSame(0, $query->count());
     }
 
-    public function test_suspicious_users_linked_count_is_correct(): void
+    public function test_suspicious_users_linked_count_is_the_accounts_sharing_the_demo(): void
     {
         $sharedIp = '192.168.70.1';
 
@@ -1163,12 +1163,11 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $target = User::factory()->create(['registration_ip' => $sharedIp, 'last_login_ip' => $sharedIp]);
 
         $page = new \App\Filament\Pages\SuspiciousUsers();
-        $query = $this->invokeProtected($page, 'getSuspiciousUsersQuery');
-        $row = $query->where('users.id', $target->id)->first();
+        $this->assertContains($target->id, $this->invokeProtected($page, 'getSuspiciousUsersQuery')->pluck('id')->toArray());
 
-        $this->assertNotNull($row);
-        // linked_count = other users sharing signals = 2
-        $this->assertSame(2, (int) $row->linked_count);
+        // Made on one network the same day: the other 2 share this one's demo.
+        $group = $this->invokeProtected($page, 'groupOf', $target);
+        $this->assertCount(3, $group['ids']);
     }
 
     public function test_get_linked_users_returns_all_ip_linked_users(): void
@@ -1325,7 +1324,7 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $this->assertSame(150, (int) $row->demo_chars_used);
     }
 
-    public function test_suspicious_users_query_aggregates_ip_group_total_chars(): void
+    public function test_the_group_total_is_what_the_shared_demo_has_used(): void
     {
         $sharedIp = '192.168.101.1';
 
@@ -1349,12 +1348,9 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         }
 
         $page = new \App\Filament\Pages\SuspiciousUsers();
-        $query = $this->invokeProtected($page, 'getSuspiciousUsersQuery');
-        $row = $query->where('users.id', $u1->id)->first();
-
-        $this->assertNotNull($row);
-        // ip_group_total_chars should include both u1 (100) and u2 (200) = 300
-        $this->assertSame(300, (int) $row->ip_group_total_chars);
+        // u1 (100) and u2 (200) share one demo: 300, as u1's own demo counts it.
+        $this->assertSame(300, $this->invokeProtected($page, 'groupOf', $u1)['chars']);
+        $this->actingAs($u1)->postJsonLocalizedRoute('demo.quota', [])->assertJsonPath('quota.used_chars', 300);
     }
 
     // ══════════════════════════════════════════════════════════════════════

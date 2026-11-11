@@ -216,8 +216,9 @@ class VideoDubController extends Controller
 
         try {
             if ($free) {
-                // Two at once from one person must not both be their free one.
-                $dub = Cache::lock('video-dub-free:'.$user->id, 15)->block(10, function () use ($user, $request, $row): VideoDub {
+                // Two at once from one person, from any of their accounts, must not both be their free one.
+                $person = min(VideoDubbing::samePersonIds($user, $request));
+                $dub = Cache::lock('video-dub-free:'.$person, 15)->block(10, function () use ($user, $request, $row): VideoDub {
                     $this->assertMayDubFree($user, $request);
 
                     return VideoDub::query()->create($row);

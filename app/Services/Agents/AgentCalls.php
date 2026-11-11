@@ -60,19 +60,63 @@ class AgentCalls
         return (int) ceil(max(0, $seconds) * $rate / 60);
     }
 
-    /** Free test seconds the owner has left (their own test calls, all agents but Listen's own). */
+    /**
+     * Free test seconds the owner has left (test calls, all agents but Listen's own). They are
+     * one allowance for one person: the account's and those of every account that is the
+     * same person for the free demo (App\Services\DemoSamePerson), deleted ones included. A
+     * member who pays or has paid keeps their own account's, as before.
+     */
     public function freeTestSecondsLeft(int $userId): int
     {
+        [$ids, $leftBehind] = $this->freeTestPerson($userId);
         // A live free call counts its whole hold until it is settled. Calls to Listen's own agents
         // never use the free test minutes of the account that owns them.
         $house = HouseAgent::agentKeys();
         $used = AgentConversation::query()
-            ->where('user_id', $userId)->where('channel', 'test')->where('free', true)
+            ->whereIn('user_id', $ids)->where('channel', 'test')->where('free', true)
             ->when($house !== [], fn ($q) => $q->whereNotIn('agent_id', $house))
             ->get(['billed_seconds', 'reservation', 'settled_at'])
             ->sum(fn (AgentConversation $c) => $c->settled_at ? (int) $c->billed_seconds : (int) ($c->reservation['seconds'] ?? 0));
 
-        return max(0, AgentAccess::freeTestSeconds() - $used);
+        return max(0, AgentAccess::freeTestSeconds() - $used - $leftBehind);
+    }
+
+    /**
+     * The accounts whose free test seconds are one allowance, and the seconds their
+     * deleted accounts had used. The owner alone when they pay or have paid, or when
+     * the person cannot be worked out.
+     *
+     * @return array{0: list<int>, 1: int}
+     */
+    private function freeTestPerson(int $userId): array
+    {
+        return rescue(function () use ($userId): array {
+            $owner = \App\Models\User::query()->find($userId);
+            if ($owner === null || \App\Support\PaidMember::is($owner)) {
+                return [[$userId], 0];
+            }
+            $person = app(\App\Services\DemoSamePerson::class);
+            // The browser of this request is the owner's own only when it is the owner asking.
+            $request = app()->bound('request') && (int) request()->user()?->id === $userId ? request() : null;
+
+            return [$person->ids($owner, $request), $person->leftBehindCallSeconds($owner, $request)];
+        }, [[$userId], 0], false);
+    }
+
+    /**
+     * One free test call starting at a time for one person, from the check of the
+     * seconds left until the call is kept, so calls started together never share
+     * out the same free seconds. Null when it could not be had in time.
+     */
+    private function freeTestLock(int $userId): ?\Illuminate\Contracts\Cache\Lock
+    {
+        try {
+            $lock = Cache::lock('agent-free-test:'.min($this->freeTestPerson($userId)[0]), 15);
+
+            return $lock->block(5) ? $lock : null;
+        } catch (\BadMethodCallException|\Illuminate\Contracts\Cache\LockTimeoutException) {
+            return null;
+        }
     }
 
     /**
@@ -223,8 +267,25 @@ class AgentCalls
 
         // One start at a time for an owner's callers, from the calls-at-once check until the call is
         // kept, so callers arriving together never pass the plan's number between them.
-        $lock = $house || $channel === 'test' ? null : $this->startLock($userId);
+        // A free test call: one at a time for one person (freeTestLock), and its seconds counted
+        // again under the lock, so calls started at the same moment never share out the same seconds.
+        $lock = match (true) {
+            $house => null,
+            $free => $this->freeTestLock($userId),
+            $channel === 'test' => null,
+            default => $this->startLock($userId),
+        };
         try {
+            if ($free && ! $house) {
+                if ($lock === null) {
+                    return ['ok' => false, 'error' => 'busy'];
+                }
+                $left = $this->freeTestSecondsLeft($userId);
+                if ($left < 20) {
+                    return ['ok' => false, 'error' => ! empty($context['free_only']) ? 'free_used' : 'busy'];
+                }
+                $max = min($max, $left);
+            }
             if (! $house) {
                 // The members' calls together, a day (Agents → Settings): a ceiling on what the site spends.
                 if (($siteMinutes = AgentAccess::siteDailyMinutes()) > 0) {

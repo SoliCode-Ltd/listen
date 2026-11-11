@@ -4,8 +4,12 @@ namespace App\Services;
 
 use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
+use App\Models\DemoVoiceGeneration;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Deleting an account from the admin. Stripe keeps charging a card
@@ -48,12 +52,24 @@ class UserDeletionService
     /**
      * Deletes the account unless refusal() says no. Returns that reason, or
      * null once the account is gone.
+     *
+     * What it had used of the free demo is kept first (DemoSamePerson::leaveBehind),
+     * so the same person's other accounts do not get it back. With
+     * $withDemoHistory its demo voices go too (Suspicious Users: "and all their
+     * demo data"); without, they stay for the admin's demo list, as before.
      */
-    public function delete(User $user, ?User $admin): ?string
+    public function delete(User $user, ?User $admin, bool $withDemoHistory = false): ?string
     {
         $refusal = $this->refusal($user);
         if ($refusal !== null) {
             return $refusal;
+        }
+
+        try {
+            app(DemoSamePerson::class)->leaveBehind($user, $admin);
+        } catch (\Throwable $e) {
+            // Never stops the deletion: the admin asked for it.
+            Log::warning('What a deleted account used of the demo could not be kept.', ['user_id' => $user->id, 'error' => $e->getMessage()]);
         }
 
         // Voices the member removed themselves too: their recordings can still be on disk.
@@ -62,7 +78,17 @@ class UserDeletionService
             $this->voiceCloning->purge($voice);
         }
 
+        if ($withDemoHistory) {
+            DemoVoiceGeneration::query()->where('user_id', $user->id)->delete();
+        }
+        if (Schema::hasTable(config('session.table', 'sessions'))) {
+            DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
+        }
+
         $user->delete();
+
+        Cache::forget("demo:ip_linked_users:{$user->id}");
+        Cache::forget('admin:suspicious_users_count');
 
         Log::info('An admin deleted a member account.', [
             'user_id' => $user->id,

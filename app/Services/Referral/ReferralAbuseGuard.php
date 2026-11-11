@@ -7,6 +7,7 @@ use App\Models\ReferralConversion;
 use App\Models\User;
 use App\Models\UserReferralProfile;
 use App\Services\DemoLinkedAccounts;
+use App\Support\MailboxKey;
 
 /**
  * Evaluates fraud indicators for a referred user prior to approving a conversion.
@@ -77,6 +78,12 @@ class ReferralAbuseGuard
             $referred->registration_device_id,
             $referred->last_seen_device_id,
         ]);
+
+        // One inbox: jane.doe+2@gmail.com and janedoe@gmail.com (App\Support\MailboxKey).
+        $referrerInbox = MailboxKey::for($referrer->email);
+        if ($referrerInbox !== null && $referrerInbox === MailboxKey::for($referred->email)) {
+            $indicators[] = 'shared_mailbox';
+        }
 
         if (! empty(array_intersect($referrerDevices, $referredDevices))) {
             $indicators[] = 'shared_device_id';
