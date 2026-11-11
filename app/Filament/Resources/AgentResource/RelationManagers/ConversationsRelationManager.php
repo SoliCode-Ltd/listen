@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\AgentResource\RelationManagers;
 
+use App\Filament\Concerns\SimplePages;
+use Filament\Actions\Action;
 use App\Filament\Resources\AgentConversationResource;
 use App\Models\AgentConversation;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -13,13 +15,13 @@ use Illuminate\Database\Eloquent\Model;
 /** An agent's calls, newest first; each opens on its own page in Calls. Read only. */
 class ConversationsRelationManager extends RelationManager
 {
-    use \App\Filament\Concerns\SimplePages;
+    use SimplePages;
 
     protected static string $relationship = 'conversations';
 
     protected static ?string $title = 'Calls';
 
-    protected static ?string $icon = 'heroicon-o-phone';
+    protected static string | \BackedEnum | null $icon = 'heroicon-o-phone';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
@@ -45,8 +47,8 @@ class ConversationsRelationManager extends RelationManager
             // Pages without counting every call first: quick however many calls the agent has had.
             ->paginationPageOptions([25, 50, 100])
             ->recordUrl(fn (AgentConversation $record): string => AgentConversationResource::getUrl('view', ['record' => $record]))
-            ->actions([
-                Tables\Actions\Action::make('open')
+            ->recordActions([
+                Action::make('open')
                     ->label('Open')
                     ->icon('heroicon-o-eye')
                     ->url(fn (AgentConversation $record): string => AgentConversationResource::getUrl('view', ['record' => $record])),

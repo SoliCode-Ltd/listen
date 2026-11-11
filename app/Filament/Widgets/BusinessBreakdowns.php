@@ -11,7 +11,7 @@ class BusinessBreakdowns extends Widget
 
     protected static ?int $sort = -10;
 
-    protected static string $view = 'filament.widgets.business-breakdowns';
+    protected string $view = 'filament.widgets.business-breakdowns';
 
     protected int|string|array $columnSpan = 'full';
 

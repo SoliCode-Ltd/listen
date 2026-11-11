@@ -2,6 +2,18 @@
 
 namespace App\Filament\Resources;
 
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Tables\Columns\TextColumn;
+use App\Support\Credits;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Actions\ViewAction;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
+use App\Filament\Resources\UsageCounterResource\Pages\ListUsageCounters;
+use App\Filament\Resources\UsageCounterResource\Pages\ViewUsageCounter;
 use App\Filament\Resources\UsageCounterResource\Pages;
 use App\Models\CharGift;
 use App\Models\Plan;
@@ -14,7 +26,6 @@ use App\Services\PlanAccessService;
 use App\Support\PlanUsageGuard;
 use Filament\Forms;
 use Filament\Infolists;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -31,9 +42,9 @@ class UsageCounterResource extends Resource
 {
     protected static ?string $model = UsageCounter::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-chart-bar';
 
-    protected static ?string $navigationGroup = 'Billing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
 
     protected static ?int $navigationSort = 3;
 
@@ -46,19 +57,22 @@ class UsageCounterResource extends Resource
     /** @var array<string, array{plan:?Plan, allowance:?int, current:bool}> */
     private static array $planCache = [];
 
-    public static function canCreate(): bool
+    // Filament 4 checks this (pages, buttons and canCreate() alike): never allowed here.
+    public static function getCreateAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canEdit(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canEdit() alike): never allowed here.
+    public static function getEditAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canDelete(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canDelete() alike): never allowed here.
+    public static function getDeleteAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
     public static function getEloquentQuery(): Builder
@@ -71,24 +85,24 @@ class UsageCounterResource extends Resource
         return $table
             ->defaultSort('total_chars', 'desc')
             ->columns([
-                Tables\Columns\TextColumn::make('user.email')
+                TextColumn::make('user.email')
                     ->label('Member')
                     ->description(fn (UsageCounter $record): string => (string) ($record->user?->name ?? 'Deleted account'))
                     ->searchable(['email', 'name'])
                     ->url(fn (UsageCounter $record): ?string => $record->user ? UserResource::getUrl('edit', ['record' => $record->user]) : null)
                     ->placeholder('Deleted account'),
-                Tables\Columns\TextColumn::make('plan_now')
+                TextColumn::make('plan_now')
                     ->label('Plan now')
                     ->badge()
                     ->state(fn (UsageCounter $record): string => self::planNow($record)?->name ?? 'Free')
                     ->color(fn (UsageCounter $record): string => (int) (self::planNow($record)?->price_cents ?? 0) > 0 ? 'success' : 'gray'),
-                Tables\Columns\TextColumn::make('period_ym')
+                TextColumn::make('period_ym')
                     ->label('Month')
                     ->formatStateUsing(fn (UsageCounter $record): string => $record->monthLabel())
                     // A paid plan's credits restart on its own dates, so a month can end early.
                     ->description(fn (UsageCounter $record): string => self::isCurrent($record) ? 'Current period' : 'Ended')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('total_chars')
+                TextColumn::make('total_chars')
                     ->label('Credits used')
                     ->sortable()
                     ->formatStateUsing(fn (UsageCounter $record): string => self::creditsLabel($record))
@@ -102,22 +116,22 @@ class UsageCounterResource extends Resource
                         return $percent >= 90 ? 'danger' : ($percent >= 70 ? 'warning' : null);
                     })
                     ->tooltip('Credits used out of the credits allowed: the plan the member is on now, plus that period\'s gifts.'),
-                Tables\Columns\TextColumn::make('total_requests')
+                TextColumn::make('total_requests')
                     ->label('Generations')
                     ->numeric()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('total_seconds')
+                TextColumn::make('total_seconds')
                     ->label('Audio length')
                     ->formatStateUsing(fn (UsageCounter $record): string => $record->audioLabel()
-                        .(self::allowance($record) ? ' of '.number_format(\App\Support\Credits::minutesFor((int) self::allowance($record))).' min' : ''))
+                        .(self::allowance($record) ? ' of '.number_format(Credits::minutesFor((int) self::allowance($record))).' min' : ''))
                     ->tooltip('The real length of the audio made in the period, out of the voice minutes its credits allow.')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('bonus_chars')
+                TextColumn::make('bonus_chars')
                     ->label('Gifted')
                     ->numeric()
                     ->sortable()
                     ->formatStateUsing(fn ($state): string => (int) $state > 0 ? '🎁 '.number_format((int) $state) : '—'),
-                Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->label('Last generation')
                     ->since()
                     ->sortable(),
@@ -125,7 +139,7 @@ class UsageCounterResource extends Resource
             ->filters([
                 // By the month a period started in: calendar months ("2026-10") and
                 // periods that follow a plan's own dates ("2026-10-14 08:37") alike.
-                Tables\Filters\SelectFilter::make('period_ym')
+                SelectFilter::make('period_ym')
                     ->label('Month')
                     // The months themselves from the database, not every member's row.
                     ->options(fn (): array => UsageCounter::query()
@@ -140,74 +154,74 @@ class UsageCounterResource extends Resource
                         ? $query->where('period_ym', 'like', $data['value'].'%')
                         : $query)
                     ->default(now()->format('Y-m')),
-                Tables\Filters\SelectFilter::make('plan')
+                SelectFilter::make('plan')
                     ->label('Plan now')
                     ->options(fn (): array => ['paid' => 'Any paid plan', 'free' => 'Free']
                         + Plan::query()->subscriptionPlans()->where('price_cents', '>', 0)->orderBy('price_cents')->pluck('name', 'id')->all())
                     ->query(fn (Builder $query, array $data): Builder => self::onPlan($query, $data['value'] ?? null)),
-                Tables\Filters\Filter::make('gifted')
+                Filter::make('gifted')
                     ->label('Received gifted credits')
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->where('bonus_chars', '>', 0)),
-                Tables\Filters\Filter::make('members_only')
+                Filter::make('members_only')
                     ->label('Leave out admin accounts')
                     ->toggle()
                     ->default()
                     ->query(fn (Builder $query): Builder => self::withoutAdmins($query)),
-                Tables\Filters\Filter::make('active')
+                Filter::make('active')
                     ->label('Generated at least once')
                     ->toggle()
                     ->default()
                     ->query(fn (Builder $query): Builder => $query->where('total_requests', '>', 0)),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make()->label('Details'),
+            ->recordActions([
+                ViewAction::make()->label('Details'),
             ])
             ->emptyStateHeading('No usage for this selection')
             ->emptyStateDescription('Try another month in the filters, or switch off "Generated at least once".');
     }
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Schema $schema): Schema
     {
-        return $infolist->schema([
-            Infolists\Components\Section::make('Member')
+        return $schema->components([
+            Section::make('Member')
                 ->columns(3)
                 ->schema([
-                    Infolists\Components\TextEntry::make('user.name')->label('Name')->placeholder('Deleted account'),
-                    Infolists\Components\TextEntry::make('user.email')
+                    TextEntry::make('user.name')->label('Name')->placeholder('Deleted account'),
+                    TextEntry::make('user.email')
                         ->label('Email')
                         ->copyable()
                         ->url(fn (UsageCounter $record): ?string => $record->user ? UserResource::getUrl('edit', ['record' => $record->user]) : null),
-                    Infolists\Components\TextEntry::make('plan_now')
+                    TextEntry::make('plan_now')
                         ->label('Plan now')
                         ->badge()
                         ->state(fn (UsageCounter $record): string => self::planNow($record)?->name ?? 'Free'),
                 ]),
-            Infolists\Components\Section::make(fn (UsageCounter $record): string => 'Usage in '.$record->monthLabel())
+            Section::make(fn (UsageCounter $record): string => 'Usage in '.$record->monthLabel())
                 ->description('Generations in the dashboard and the browser extension that counted against the monthly allowance. Demo generations and premium pack characters are not included; failed generations are given back.')
                 ->columns(3)
                 ->schema([
-                    Infolists\Components\TextEntry::make('total_chars')
+                    TextEntry::make('total_chars')
                         ->label('Credits used')
                         ->state(fn (UsageCounter $record): string => self::creditsLabel($record)),
-                    Infolists\Components\TextEntry::make('remaining')
+                    TextEntry::make('remaining')
                         ->label('Left this month')
                         ->visible(fn (UsageCounter $record): bool => self::isCurrent($record) && self::allowance($record) !== null)
                         ->state(fn (UsageCounter $record): string => number_format(max(0, (int) self::allowance($record) - (int) $record->total_chars))),
-                    Infolists\Components\TextEntry::make('total_requests')->label('Generations')->numeric(),
-                    Infolists\Components\TextEntry::make('total_seconds')
+                    TextEntry::make('total_requests')->label('Generations')->numeric(),
+                    TextEntry::make('total_seconds')
                         ->label('Audio length')
                         ->state(fn (UsageCounter $record): string => $record->audioLabel()),
-                    Infolists\Components\TextEntry::make('bonus_chars')
+                    TextEntry::make('bonus_chars')
                         ->label('Gifted credits')
                         ->state(fn (UsageCounter $record): string => number_format((int) $record->bonus_chars)),
-                    Infolists\Components\TextEntry::make('updated_at')->label('Last generation')->dateTime()->since(),
+                    TextEntry::make('updated_at')->label('Last generation')->dateTime()->since(),
                 ]),
-            Infolists\Components\Section::make('What they made')
+            Section::make('What they made')
                 ->description('Every generation charged to this period, pack characters included: how often, what they chose and where.')
                 ->visible(fn (UsageCounter $record): bool => $record->user_id !== null)
                 ->schema([
-                    Infolists\Components\ViewEntry::make('insights')
+                    ViewEntry::make('insights')
                         ->hiddenLabel()
                         ->view('filament.infolists.usage-insights')
                         ->state(function (UsageCounter $record): array {
@@ -217,10 +231,10 @@ class UsageCounterResource extends Resource
                             return ['summary' => $insights->summary($generations), 'breakdowns' => $insights->breakdowns($generations)];
                         }),
                 ]),
-            Infolists\Components\Section::make('Gifts this month')
+            Section::make('Gifts this month')
                 ->visible(fn (UsageCounter $record): bool => (int) $record->bonus_chars > 0)
                 ->schema([
-                    Infolists\Components\TextEntry::make('gifts')
+                    TextEntry::make('gifts')
                         ->hiddenLabel()
                         ->state(fn (UsageCounter $record): HtmlString => self::giftsList($record)),
                 ]),
@@ -230,8 +244,8 @@ class UsageCounterResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListUsageCounters::route('/'),
-            'view' => Pages\ViewUsageCounter::route('/{record}'),
+            'index' => ListUsageCounters::route('/'),
+            'view' => ViewUsageCounter::route('/{record}'),
         ];
     }
 

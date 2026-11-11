@@ -2,6 +2,14 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Placeholder;
+use Throwable;
 use App\Models\BillingSubscription;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -11,7 +19,6 @@ use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\HtmlString;
@@ -24,9 +31,9 @@ class PlanEndReminderEmail extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-bell-alert';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-bell-alert';
 
-    protected static ?string $navigationGroup = 'Newsletter';
+    protected static string | \UnitEnum | null $navigationGroup = 'Newsletter';
 
     protected static ?string $navigationLabel = 'Reminder';
 
@@ -34,7 +41,7 @@ class PlanEndReminderEmail extends Page implements HasForms
 
     protected static ?string $title = 'Reminder before a plan ends';
 
-    protected static string $view = 'filament.pages.plan-end-reminder-email';
+    protected string $view = 'filament.pages.plan-end-reminder-email';
 
     public ?array $data = [];
 
@@ -45,55 +52,55 @@ class PlanEndReminderEmail extends Page implements HasForms
         $this->form->fill($settings);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
         $placeholders = '{name} is the member\'s first name, {plan} their plan, {date} the day it ends, {when} "in 3 days" / "tomorrow", {days} the number of days.';
 
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Sending')
+        return $schema
+            ->components([
+                Section::make('Sending')
                     ->description('Goes out by itself, every morning at 9:00 (UTC), to members whose plan does not renew by itself: paid by InstaPay or Vodafone Cash, or given by the team. Members who pay by card never get it: their card renews the plan, and Stripe sends them its own reminder. A member who renews or gets a new end date is reminded again for the new date.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Toggle::make('enabled')
+                        Toggle::make('enabled')
                             ->label('Send the reminder automatically')
                             ->columnSpan(2),
-                        Forms\Components\TextInput::make('first_days')
+                        TextInput::make('first_days')
                             ->label('First reminder: days before the plan ends')
                             ->numeric()->integer()->minValue(1)->maxValue(PlanEndReminder::MAX_DAYS)->required()
                             ->helperText('Recommended: 3. Close enough to act on, with time to transfer and for you to approve it.'),
-                        Forms\Components\TextInput::make('second_days')
+                        TextInput::make('second_days')
                             ->label('Last reminder: days before the plan ends')
                             ->numeric()->integer()->minValue(0)->maxValue(PlanEndReminder::MAX_DAYS)->required()
                             ->helperText('Recommended: 1 (the day before). 0 sends only the first. Must be fewer days than the first.'),
-                        Forms\Components\Select::make('order')
+                        Select::make('order')
                             ->label('Language order in the email')
                             ->options(['ar_en' => 'Arabic, then English', 'en_ar' => 'English, then Arabic'])
                             ->required(),
                     ]),
-                Forms\Components\Section::make('English')
+                Section::make('English')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('subject_en')->label('Subject')->required()->maxLength(200)->columnSpan(2),
-                        Forms\Components\TextInput::make('headline_en')->label('Headline')->maxLength(200)->helperText($placeholders)->columnSpan(2),
-                        Forms\Components\Textarea::make('body_en')->label('Message')->rows(6)->required()->helperText('A blank line starts a new paragraph. The placeholders work here and in the subject too.')->columnSpan(2),
-                        Forms\Components\TextInput::make('cta_label_en')->label('Button text (opens Manage subscription)')->maxLength(80),
-                        Forms\Components\TextInput::make('footer_en')->label('Small print at the bottom')->maxLength(300),
+                        TextInput::make('subject_en')->label('Subject')->required()->maxLength(200)->columnSpan(2),
+                        TextInput::make('headline_en')->label('Headline')->maxLength(200)->helperText($placeholders)->columnSpan(2),
+                        Textarea::make('body_en')->label('Message')->rows(6)->required()->helperText('A blank line starts a new paragraph. The placeholders work here and in the subject too.')->columnSpan(2),
+                        TextInput::make('cta_label_en')->label('Button text (opens Manage subscription)')->maxLength(80),
+                        TextInput::make('footer_en')->label('Small print at the bottom')->maxLength(300),
                     ]),
-                Forms\Components\Section::make('العربية')
+                Section::make('العربية')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('subject_ar')->label('Subject')->required()->maxLength(200)->extraInputAttributes(['dir' => 'rtl'])->columnSpan(2),
-                        Forms\Components\TextInput::make('headline_ar')->label('Headline')->maxLength(200)->extraInputAttributes(['dir' => 'rtl'])->columnSpan(2),
-                        Forms\Components\Textarea::make('body_ar')->label('Message')->rows(6)->required()->extraInputAttributes(['dir' => 'rtl'])->columnSpan(2),
-                        Forms\Components\TextInput::make('cta_label_ar')->label('Button text')->maxLength(80)->extraInputAttributes(['dir' => 'rtl']),
-                        Forms\Components\TextInput::make('footer_ar')->label('Small print at the bottom')->maxLength(300)->extraInputAttributes(['dir' => 'rtl']),
+                        TextInput::make('subject_ar')->label('Subject')->required()->maxLength(200)->extraInputAttributes(['dir' => 'rtl'])->columnSpan(2),
+                        TextInput::make('headline_ar')->label('Headline')->maxLength(200)->extraInputAttributes(['dir' => 'rtl'])->columnSpan(2),
+                        Textarea::make('body_ar')->label('Message')->rows(6)->required()->extraInputAttributes(['dir' => 'rtl'])->columnSpan(2),
+                        TextInput::make('cta_label_ar')->label('Button text')->maxLength(80)->extraInputAttributes(['dir' => 'rtl']),
+                        TextInput::make('footer_ar')->label('Small print at the bottom')->maxLength(300)->extraInputAttributes(['dir' => 'rtl']),
                     ]),
-                Forms\Components\Section::make('Coming up')
+                Section::make('Coming up')
                     ->description('Plans that do not renew by card and end in the next 14 days.')
                     ->collapsed()
                     ->schema([
-                        Forms\Components\Placeholder::make('upcoming')
+                        Placeholder::make('upcoming')
                             ->label('')
                             ->content(fn (): HtmlString|string => $this->upcomingTable()),
                     ]),
@@ -135,8 +142,8 @@ class PlanEndReminderEmail extends Page implements HasForms
                 ->icon('heroicon-o-paper-airplane')
                 ->color('gray')
                 ->modalDescription('Saves your changes and sends one copy to the address below, for your own plan (or a sample one) ending in the first reminder\'s days. No member gets anything and nothing is recorded.')
-                ->form([
-                    Forms\Components\TextInput::make('email')
+                ->schema([
+                    TextInput::make('email')
                         ->label('Send the test to')
                         ->email()
                         ->required()
@@ -168,7 +175,7 @@ class PlanEndReminderEmail extends Page implements HasForms
 
         try {
             $reminder->send($user, $subscription, $days, $to);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Notification::make()->title('The email was not sent')->body($e->getMessage())->danger()->persistent()->send();
 
             return;

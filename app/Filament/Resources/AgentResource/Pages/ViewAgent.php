@@ -2,6 +2,10 @@
 
 namespace App\Filament\Resources\AgentResource\Pages;
 
+use Filament\Actions\Action;
+use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Notification;
+use App\Support\Agents\AgentPurge;
 use App\Filament\Resources\AgentResource;
 use App\Models\Agent;
 use App\Models\AgentWidget;
@@ -33,27 +37,27 @@ class ViewAgent extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('owner')
+            Action::make('owner')
                 ->label('Owner\'s account')
                 ->icon('heroicon-o-user')
                 ->color('gray')
                 ->url(fn (): ?string => AgentResource::ownerUrl($this->agent()->user_id))
                 ->visible(fn (): bool => $this->agent()->user !== null),
-            Actions\Action::make('linkPage')
+            Action::make('linkPage')
                 ->label('Open its link page')
                 ->icon('heroicon-o-arrow-top-right-on-square')
                 ->color('gray')
                 ->url(fn (): ?string => ($widget = $this->widget()) ? AgentResource::talkUrl($widget) : null, shouldOpenInNewTab: true)
                 ->visible(fn (): bool => ($widget = $this->widget()) !== null && $widget->link_enabled && AgentResource::talkUrl($widget) !== null),
-            Actions\Action::make('suspend')
+            Action::make('suspend')
                 ->label('Suspend')
                 ->icon('heroicon-o-no-symbol')
                 ->color('danger')
                 ->requiresConfirmation()
                 ->modalHeading('Suspend this agent?')
                 ->modalDescription('It stops taking calls at once (callers hear it is not available) and its owner cannot put it live again. They see that Listen suspended it, with the reason below. Nothing is deleted; lift the suspension at any time.')
-                ->form([
-                    \Filament\Forms\Components\Textarea::make('reason')
+                ->schema([
+                    Textarea::make('reason')
                         ->label('Reason the owner sees')
                         ->placeholder('For example: it asks callers for their card numbers.')
                         ->maxLength(300)
@@ -64,10 +68,10 @@ class ViewAgent extends ViewRecord
                     $settings = (array) ($agent->settings ?? []);
                     $settings['suspended'] = ['reason' => trim((string) $data['reason']), 'at' => now()->toIso8601String(), 'by' => auth()->id()];
                     $agent->forceFill(['settings' => $settings, 'status' => $agent->isLive() ? Agent::PAUSED : $agent->status])->save();
-                    \Filament\Notifications\Notification::make()->title('Agent suspended')->success()->send();
+                    Notification::make()->title('Agent suspended')->success()->send();
                 })
                 ->visible(fn (): bool => ! $this->agent()->setting('suspended') && ! $this->agent()->setting('house')),
-            Actions\Action::make('unsuspend')
+            Action::make('unsuspend')
                 ->label('Lift the suspension')
                 ->icon('heroicon-o-check-circle')
                 ->color('gray')
@@ -78,10 +82,10 @@ class ViewAgent extends ViewRecord
                     $settings = (array) ($agent->settings ?? []);
                     unset($settings['suspended']);
                     $agent->forceFill(['settings' => $settings])->save();
-                    \Filament\Notifications\Notification::make()->title('Suspension lifted')->success()->send();
+                    Notification::make()->title('Suspension lifted')->success()->send();
                 })
                 ->visible(fn (): bool => (bool) $this->agent()->setting('suspended')),
-            Actions\Action::make('delete')
+            Action::make('delete')
                 ->label('Delete for good')
                 ->icon('heroicon-o-trash')
                 ->color('danger')
@@ -89,10 +93,10 @@ class ViewAgent extends ViewRecord
                 ->modalHeading(fn (): string => 'Delete '.$this->agent()->name.' for good?')
                 ->modalDescription(AgentResource::DELETE_NOTE)
                 ->modalSubmitActionLabel('Delete for good')
-                ->visible(fn (): bool => \App\Support\Agents\AgentPurge::canPurge($this->agent()))
+                ->visible(fn (): bool => AgentPurge::canPurge($this->agent()))
                 ->action(function (): void {
-                    \App\Support\Agents\AgentPurge::purge($this->agent());
-                    \Filament\Notifications\Notification::make()->title('Agent deleted')->success()->send();
+                    AgentPurge::purge($this->agent());
+                    Notification::make()->title('Agent deleted')->success()->send();
                     $this->redirect(AgentResource::getUrl('index'));
                 }),
         ];

@@ -2,6 +2,15 @@
 
 namespace App\Filament\Resources;
 
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\SocialShareLogResource\Pages\ListSocialShareLogs;
 use App\Filament\Resources\SocialShareLogResource\Pages;
 use App\Models\SocialShareLog;
 use Filament\Resources\Resource;
@@ -12,9 +21,9 @@ class SocialShareLogResource extends Resource
 {
     protected static ?string $model = SocialShareLog::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-share';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-share';
 
-    protected static ?string $navigationGroup = 'Referrals';
+    protected static string | \UnitEnum | null $navigationGroup = 'Referrals';
 
     protected static ?int $navigationSort = 3;
 
@@ -24,13 +33,13 @@ class SocialShareLogResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')->label('#')->sortable(),
-                Tables\Columns\TextColumn::make('user.email')
+                TextColumn::make('id')->label('#')->sortable(),
+                TextColumn::make('user.email')
                     ->label('User')
                     ->searchable()
                     ->limit(30)
                     ->tooltip(fn ($record) => $record->user?->email),
-                Tables\Columns\BadgeColumn::make('platform')
+                BadgeColumn::make('platform')
                     ->colors([
                         'primary' => ['facebook', 'twitter', 'linkedin'],
                         'success' => ['whatsapp', 'telegram'],
@@ -38,29 +47,29 @@ class SocialShareLogResource extends Resource
                         'gray' => ['copy_link'],
                     ])
                     ->searchable(),
-                Tables\Columns\TextColumn::make('locale')
+                TextColumn::make('locale')
                     ->badge(),
-                Tables\Columns\TextColumn::make('referral_code')
+                TextColumn::make('referral_code')
                     ->searchable()
                     ->copyable()
                     ->limit(16),
-                Tables\Columns\TextColumn::make('visitor_ip')
+                TextColumn::make('visitor_ip')
                     ->label('IP')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('At')
                     ->dateTime()
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('platform')
+                SelectFilter::make('platform')
                     ->options(array_combine(SocialShareLog::PLATFORMS, SocialShareLog::PLATFORMS))
                     ->multiple(),
-                Tables\Filters\SelectFilter::make('locale')
+                SelectFilter::make('locale')
                     ->options(['en' => 'English', 'ar' => 'Arabic']),
             ])
-            ->actions([
-                Tables\Actions\Action::make('view_post')
+            ->recordActions([
+                Action::make('view_post')
                     ->label('View post')
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->color('primary')
@@ -68,25 +77,26 @@ class SocialShareLogResource extends Resource
                     ->openUrlInNewTab()
                     ->visible(fn (SocialShareLog $record): bool => self::postSearchUrl($record) !== null)
                     ->tooltip('Open the platform and find any public post that includes this referral URL.'),
-                Tables\Actions\ViewAction::make(),
+                ViewAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
     }
 
-    public static function canCreate(): bool
+    // Filament 4 checks this (pages, buttons and canCreate() alike): never allowed here.
+    public static function getCreateAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListSocialShareLogs::route('/'),
+            'index' => ListSocialShareLogs::route('/'),
         ];
     }
 

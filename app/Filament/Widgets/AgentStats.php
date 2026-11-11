@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use Throwable;
 use App\Filament\Resources\AgentConversationResource;
 use App\Filament\Resources\AgentResource;
 use App\Models\Agent;
@@ -23,7 +24,7 @@ class AgentStats extends BaseWidget
 
     protected static bool $isLazy = false;
 
-    protected static ?string $pollingInterval = '30s';
+    protected ?string $pollingInterval = '30s';
 
     protected ?string $heading = 'Agents at a glance';
 
@@ -38,7 +39,7 @@ class AgentStats extends BaseWidget
     {
         try {
             return $this->stats();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // The list of agents must open whatever goes wrong here.
             report($e);
 

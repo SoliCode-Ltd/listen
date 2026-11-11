@@ -2,12 +2,23 @@
 
 namespace App\Filament\Resources;
 
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Actions\ViewAction;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Forms\Components\DatePicker;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\IconEntry;
+use App\Filament\Resources\PaymentResource\Pages\ListPayments;
+use App\Filament\Resources\PaymentResource\Pages\ViewPayment;
 use App\Filament\Resources\PaymentResource\Pages;
 use App\Models\Payment;
 use App\Support\Countries;
 use Filament\Forms;
 use Filament\Infolists;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -23,25 +34,28 @@ class PaymentResource extends Resource
 {
     protected static ?string $model = Payment::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-banknotes';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationGroup = 'Billing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
 
     protected static ?int $navigationSort = 3;
 
-    public static function canCreate(): bool
+    // Filament 4 checks this (pages, buttons and canCreate() alike): never allowed here.
+    public static function getCreateAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canEdit(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canEdit() alike): never allowed here.
+    public static function getEditAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
-    public static function canDelete(Model $record): bool
+    // Filament 4 checks this (pages, buttons and canDelete() alike): never allowed here.
+    public static function getDeleteAuthorizationResponse(Model $record): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
     public static function table(Table $table): Table
@@ -49,39 +63,39 @@ class PaymentResource extends Resource
         return $table
             ->defaultSort('paid_at', 'desc')
             ->columns([
-                Tables\Columns\TextColumn::make('paid_at')->label('Paid')->dateTime()->sortable(),
-                Tables\Columns\TextColumn::make('user.name')->label('Member')->searchable()->placeholder('—')
+                TextColumn::make('paid_at')->label('Paid')->dateTime()->sortable(),
+                TextColumn::make('user.name')->label('Member')->searchable()->placeholder('—')
                     ->description(fn (Payment $record): string => (string) ($record->user?->email ?? '')),
-                Tables\Columns\TextColumn::make('user.country_code')->label('Country')
+                TextColumn::make('user.country_code')->label('Country')
                     ->formatStateUsing(fn (?string $state) => Countries::label($state))->placeholder('—')->toggleable(),
-                Tables\Columns\TextColumn::make('method')->label('Paid with')->badge()
+                TextColumn::make('method')->label('Paid with')->badge()
                     ->formatStateUsing(fn (?string $state): string => Payment::methodLabel($state))
                     ->color(fn (?string $state): string => Payment::methodColor($state))
                     ->description(fn (Payment $record): string => (string) $record->cardLabel()),
-                Tables\Columns\TextColumn::make('amount_minor')->label('Amount')->sortable()
+                TextColumn::make('amount_minor')->label('Amount')->sortable()
                     ->formatStateUsing(fn (Payment $record): string => number_format($record->amount_minor / 100, 2).' '.$record->currency)
                     ->description(fn (Payment $record): string => match (true) {
                         $record->refunded_minor <= 0 => '',
                         $record->refunded_minor >= $record->amount_minor => 'Refunded',
                         default => number_format($record->refunded_minor / 100, 2).' refunded',
                     }),
-                Tables\Columns\TextColumn::make('description')->label('For')->placeholder('—')->limit(50)->toggleable(),
-                Tables\Columns\TextColumn::make('card_expiry')->label('Card expires')
+                TextColumn::make('description')->label('For')->placeholder('—')->limit(50)->toggleable(),
+                TextColumn::make('card_expiry')->label('Card expires')
                     ->state(fn (Payment $record): ?string => self::expiry($record))->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('card_funding')->label('Funding')
+                TextColumn::make('card_funding')->label('Funding')
                     ->formatStateUsing(fn (?string $state): string => Str::headline((string) $state))->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
+            ->recordActions([
+                ViewAction::make(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('method')->label('Paid with')->options(Payment::METHODS),
-                Tables\Filters\Filter::make('paid_at')
+                SelectFilter::make('method')->label('Paid with')->options(Payment::METHODS),
+                Filter::make('paid_at')
                     ->form([
-                        Forms\Components\DatePicker::make('from')->label('Paid from'),
-                        Forms\Components\DatePicker::make('until')->label('Paid until'),
+                        DatePicker::make('from')->label('Paid from'),
+                        DatePicker::make('until')->label('Paid until'),
                     ])
                     ->query(fn (Builder $query, array $data): Builder => $query
                         ->when($data['from'] ?? null, fn (Builder $q, $date) => $q->whereDate('paid_at', '>=', $date))
@@ -89,58 +103,58 @@ class PaymentResource extends Resource
             ]);
     }
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Schema $schema): Schema
     {
-        return $infolist->schema([
-            Infolists\Components\Section::make('Payment')
+        return $schema->components([
+            Section::make('Payment')
                 ->columns(3)
                 ->schema([
-                    Infolists\Components\TextEntry::make('paid_at')->label('Paid')->dateTime(),
-                    Infolists\Components\TextEntry::make('user.name')->label('Member')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('user.email')->label('Email')->copyable()->placeholder('—'),
-                    Infolists\Components\TextEntry::make('user_id')->label('Member id')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('method')->label('Paid with')->badge()
+                    TextEntry::make('paid_at')->label('Paid')->dateTime(),
+                    TextEntry::make('user.name')->label('Member')->placeholder('—'),
+                    TextEntry::make('user.email')->label('Email')->copyable()->placeholder('—'),
+                    TextEntry::make('user_id')->label('Member id')->placeholder('—'),
+                    TextEntry::make('method')->label('Paid with')->badge()
                         ->formatStateUsing(fn (?string $state): string => Payment::methodLabel($state))
                         ->color(fn (?string $state): string => Payment::methodColor($state)),
-                    Infolists\Components\TextEntry::make('amount_minor')->label('Amount')
+                    TextEntry::make('amount_minor')->label('Amount')
                         ->formatStateUsing(fn (Payment $record): string => number_format($record->amount_minor / 100, 2).' '.$record->currency),
-                    Infolists\Components\TextEntry::make('refunded_minor')->label('Refunded')
+                    TextEntry::make('refunded_minor')->label('Refunded')
                         ->formatStateUsing(fn (Payment $record): string => $record->refunded_minor > 0 ? number_format($record->refunded_minor / 100, 2).' '.$record->currency : 'Nothing'),
-                    Infolists\Components\TextEntry::make('description')->label('For')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('reference')->label('Reference')->copyable()->fontFamily('mono'),
+                    TextEntry::make('description')->label('For')->placeholder('—'),
+                    TextEntry::make('reference')->label('Reference')->copyable()->fontFamily('mono'),
                 ]),
-            Infolists\Components\Section::make('Card')
+            Section::make('Card')
                 ->description('The full card number and CVC are never stored. Stripe keeps those.')
                 ->visible(fn (Payment $record): bool => (bool) ($record->card_brand || $record->card_last4))
                 ->columns(3)
                 ->schema([
-                    Infolists\Components\TextEntry::make('card_brand')->label('Brand')->formatStateUsing(fn (?string $state): string => Str::headline((string) $state)),
-                    Infolists\Components\TextEntry::make('card_last4')->label('Last 4'),
-                    Infolists\Components\TextEntry::make('card_expiry')->label('Expires')
+                    TextEntry::make('card_brand')->label('Brand')->formatStateUsing(fn (?string $state): string => Str::headline((string) $state)),
+                    TextEntry::make('card_last4')->label('Last 4'),
+                    TextEntry::make('card_expiry')->label('Expires')
                         ->state(fn (Payment $record): ?string => self::expiry($record))->placeholder('—'),
-                    Infolists\Components\TextEntry::make('card_funding')->label('Funding')
+                    TextEntry::make('card_funding')->label('Funding')
                         ->formatStateUsing(fn (?string $state): string => Str::headline((string) $state))->placeholder('—'),
-                    Infolists\Components\TextEntry::make('card_country')->label('Issued in')
+                    TextEntry::make('card_country')->label('Issued in')
                         ->formatStateUsing(fn (?string $state) => Countries::label($state))->placeholder('—'),
-                    Infolists\Components\TextEntry::make('card_cvc_check')->label('CVC check')
+                    TextEntry::make('card_cvc_check')->label('CVC check')
                         ->formatStateUsing(fn (?string $state): string => Str::headline((string) $state))->placeholder('Not checked'),
-                    Infolists\Components\TextEntry::make('card_fingerprint')->label('Fingerprint')
+                    TextEntry::make('card_fingerprint')->label('Fingerprint')
                         ->helperText('The same card always has the same fingerprint, on any account.')
                         ->copyable()->fontFamily('mono')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('stripe_customer_id')->label('Stripe customer')->copyable()->fontFamily('mono')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('stripe_payment_method_id')->label('Stripe payment method')->copyable()->fontFamily('mono')->placeholder('—'),
+                    TextEntry::make('stripe_customer_id')->label('Stripe customer')->copyable()->fontFamily('mono')->placeholder('—'),
+                    TextEntry::make('stripe_payment_method_id')->label('Stripe payment method')->copyable()->fontFamily('mono')->placeholder('—'),
                 ]),
-            Infolists\Components\Section::make('Card on file')
+            Section::make('Card on file')
                 ->description('This card is kept for the member\'s renewals and trials.')
                 ->visible(fn (Payment $record): bool => $record->savedCard !== null)
                 ->columns(3)
                 ->schema([
-                    Infolists\Components\TextEntry::make('savedCard.purpose')->label('Saved for')->badge()
+                    TextEntry::make('savedCard.purpose')->label('Saved for')->badge()
                         ->formatStateUsing(fn (?string $state): string => Str::headline((string) $state)),
-                    Infolists\Components\IconEntry::make('savedCard.is_default')->label('Default card')->boolean(),
-                    Infolists\Components\IconEntry::make('savedCard.off_session_ready')->label('Can be charged without the member (off-session)')->boolean(),
-                    Infolists\Components\TextEntry::make('savedCard.setup_intent_id')->label('Setup intent')->copyable()->fontFamily('mono')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('savedCard.created_at')->label('Saved')->dateTime(),
+                    IconEntry::make('savedCard.is_default')->label('Default card')->boolean(),
+                    IconEntry::make('savedCard.off_session_ready')->label('Can be charged without the member (off-session)')->boolean(),
+                    TextEntry::make('savedCard.setup_intent_id')->label('Setup intent')->copyable()->fontFamily('mono')->placeholder('—'),
+                    TextEntry::make('savedCard.created_at')->label('Saved')->dateTime(),
                 ]),
         ]);
     }
@@ -155,8 +169,8 @@ class PaymentResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPayments::route('/'),
-            'view' => Pages\ViewPayment::route('/{record}'),
+            'index' => ListPayments::route('/'),
+            'view' => ViewPayment::route('/{record}'),
         ];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Support\Facades\Process;
 use Tests\TestCase;
 
 /**
@@ -64,6 +65,92 @@ class ServerDeployWorkflowTest extends TestCase
         foreach (array_unique($matches[1]) as $script) {
             $this->assertFileExists(base_path('scripts/support/'.$script));
         }
+    }
+
+    public function test_the_removed_files_list_names_only_files_the_code_no_longer_has(): void
+    {
+        $paths = self::removedFiles((string) file_get_contents(base_path('scripts/support/removed_files.txt')));
+
+        $this->assertContains('app/Filament/Resources/SourceAccountResource.php', $paths);
+        foreach ($paths as $path) {
+            $this->assertDoesNotMatchRegularExpression('#^/|\.\.#', $path, "{$path}: a path from the app's folder, never above it");
+            $this->assertFileDoesNotExist(base_path($path), "{$path} is in the code again: take it off scripts/support/removed_files.txt");
+        }
+    }
+
+    /**
+     * The deploy's own lines, run on a sample app folder: only the listed files
+     * that are on the server and not in the code deployed are moved, they are
+     * kept under storage/app/listen-deploy/removed/, and a second run changes nothing.
+     */
+    public function test_the_deploy_moves_aside_only_the_listed_files_the_code_no_longer_has(): void
+    {
+        $deploy = self::runScripts((string) file_get_contents(base_path('.github/workflows/server-deploy.yml')));
+        $script = collect($deploy)->first(fn (string $s): bool => str_contains($s, 'removed_files.txt ]; then'));
+        $this->assertNotNull($script);
+        $this->assertSame(1, preg_match('/^if \[ -f scripts\/support\/removed_files\.txt \]; then\n.*?^fi\n/ms', $script, $block));
+
+        $root = sys_get_temp_dir().'/listen-removed-'.bin2hex(random_bytes(4));
+        $app = $root.'/app-folder';
+        $put = function (string $path, string $text) use ($app): void {
+            @mkdir(dirname($app.'/'.$path), 0777, true);
+            file_put_contents($app.'/'.$path, $text);
+        };
+        $put('app/Filament/Resources/OldResource.php', 'old resource');
+        $put('app/Filament/Resources/OldResource/Pages/ListOld.php', 'old page');
+        $put('app/Filament/Resources/BackResource.php', 'in the code again');
+        $put('app/Filament/Resources/OtherResource.php', 'never listed');
+        $put('app/Kept.php', 'kept');
+        file_put_contents($root.'/outside.php', 'outside the app');
+        $put('storage/app/listen-deploy/manifest.md5', implode("\n", [
+            md5('in the code again').'  app/Filament/Resources/BackResource.php',
+            md5('kept').'  app/Kept.php',
+            md5('never listed').'  app/Filament/Resources/OtherResource.php',
+        ])."\n");
+        $put('scripts/support/removed_files.txt', implode("\n", [
+            '# a note',
+            '',
+            'app/Filament/Resources/OldResource.php',
+            'app/Filament/Resources/OldResource/Pages/ListOld.php',
+            'app/Filament/Resources/BackResource.php',
+            'app/NotOnTheServer.php',
+            '../outside.php',
+            $root.'/outside.php',
+        ])."\n");
+
+        try {
+            $run = fn () => Process::path($app)->run(['bash', '-c', "set -euo pipefail\n".$block[0]]);
+
+            $first = $run();
+            $this->assertTrue($first->successful(), $first->errorOutput());
+            $this->assertSame(
+                "Moved aside (no longer in the code): app/Filament/Resources/OldResource.php\nMoved aside (no longer in the code): app/Filament/Resources/OldResource/Pages/ListOld.php\n",
+                $first->output(),
+            );
+            $this->assertSame('old resource', file_get_contents($app.'/storage/app/listen-deploy/removed/app/Filament/Resources/OldResource.php'));
+            $this->assertSame('old page', file_get_contents($app.'/storage/app/listen-deploy/removed/app/Filament/Resources/OldResource/Pages/ListOld.php'));
+            $this->assertFileDoesNotExist($app.'/app/Filament/Resources/OldResource.php');
+            $this->assertDirectoryDoesNotExist($app.'/app/Filament/Resources/OldResource');
+            $this->assertSame('in the code again', file_get_contents($app.'/app/Filament/Resources/BackResource.php'));
+            $this->assertSame('never listed', file_get_contents($app.'/app/Filament/Resources/OtherResource.php'));
+            $this->assertSame('kept', file_get_contents($app.'/app/Kept.php'));
+            $this->assertSame('outside the app', file_get_contents($root.'/outside.php'));
+
+            $second = $run();
+            $this->assertTrue($second->successful(), $second->errorOutput());
+            $this->assertSame('', $second->output());
+            $this->assertSame('old resource', file_get_contents($app.'/storage/app/listen-deploy/removed/app/Filament/Resources/OldResource.php'));
+        } finally {
+            Process::run(['rm', '-rf', $root]);
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function removedFiles(string $list): array
+    {
+        return array_values(array_filter(array_map('trim', explode("\n", $list)), static fn (string $l): bool => $l !== '' && ! str_starts_with($l, '#')));
     }
 
     /**

@@ -2,6 +2,28 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Placeholder;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\UserResource\RelationManagers\FeatureGrantsRelationManager;
+use App\Filament\Resources\UserResource\Pages\ListUsers;
+use App\Filament\Resources\UserResource\Pages\CreateUser;
+use App\Filament\Resources\UserResource\Pages\ViewUser;
+use App\Filament\Resources\UserResource\Pages\EditUser;
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Subscription;
@@ -13,7 +35,6 @@ use App\Services\UserDeletionService;
 use App\Support\Countries;
 use App\Support\DemoAllowance;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -28,99 +49,99 @@ class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-users';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-users';
 
-    protected static ?string $navigationGroup = 'Content';
+    protected static string | \UnitEnum | null $navigationGroup = 'Content';
 
     protected static ?int $navigationSort = 1;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make(__('ui.admin.users.account_section'))
+        return $schema
+            ->components([
+                Section::make(__('ui.admin.users.account_section'))
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('name')
+                        TextInput::make('name')
                             ->required()
                             ->maxLength(255),
-                        Forms\Components\TextInput::make('email')
+                        TextInput::make('email')
                             ->email()
                             ->required()
                             ->maxLength(255),
-                        Forms\Components\TextInput::make('password')
+                        TextInput::make('password')
                             ->password()
                             ->dehydrated(fn ($state) => filled($state))
                             ->required(fn (string $operation): bool => $operation === 'create')
                             ->maxLength(255),
-                        Forms\Components\Toggle::make('is_admin')
+                        Toggle::make('is_admin')
                             ->label(__('ui.admin.users.is_admin'))
                             ->helperText(__('ui.admin.users.is_admin_help')),
                     ]),
-                Forms\Components\Section::make(__('ui.admin.users.blocking_section'))
+                Section::make(__('ui.admin.users.blocking_section'))
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Toggle::make('is_blocked')
+                        Toggle::make('is_blocked')
                             ->label(__('ui.admin.users.is_blocked'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\DateTimePicker::make('blocked_at')
+                        DateTimePicker::make('blocked_at')
                             ->label(__('ui.admin.users.blocked_at'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\Textarea::make('blocked_reason')
+                        Textarea::make('blocked_reason')
                             ->label(__('ui.admin.users.blocked_reason'))
                             ->rows(3)
                             ->helperText(__('ui.admin.users.blocked_reason_legacy_help'))
                             ->columnSpanFull()
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\Textarea::make('blocked_reason_ar')
+                        Textarea::make('blocked_reason_ar')
                             ->label(__('ui.admin.users.blocked_reason_ar'))
                             ->rows(3)
                             ->columnSpanFull()
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\Textarea::make('blocked_reason_en')
+                        Textarea::make('blocked_reason_en')
                             ->label(__('ui.admin.users.blocked_reason_en'))
                             ->rows(3)
                             ->columnSpanFull()
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\Toggle::make('multi_account_whitelisted')
+                        Toggle::make('multi_account_whitelisted')
                             ->label(__('ui.admin.users.whitelisted_label'))
                             ->helperText(__('ui.admin.users.whitelisted_help'))
                             ->disabled()
                             ->dehydrated(false),
                     ]),
-                Forms\Components\Section::make(__('ui.admin.users.ip_demo_section'))
+                Section::make(__('ui.admin.users.ip_demo_section'))
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Placeholder::make('country')
+                        Placeholder::make('country')
                             ->label('Country')
                             ->content(fn (?User $record) => Countries::label($record?->country_code)),
-                        Forms\Components\TextInput::make('registration_ip')
+                        TextInput::make('registration_ip')
                             ->label(__('ui.admin.users.registration_ip'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\TextInput::make('last_login_ip')
+                        TextInput::make('last_login_ip')
                             ->label(__('ui.admin.users.last_login_ip'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\TextInput::make('registration_device_id')
+                        TextInput::make('registration_device_id')
                             ->label(__('ui.admin.suspicious.registration_device_id'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\TextInput::make('last_seen_device_id')
+                        TextInput::make('last_seen_device_id')
                             ->label(__('ui.admin.suspicious.last_seen_device_id'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\Placeholder::make('demo_chars_used_display')
+                        Placeholder::make('demo_chars_used_display')
                             ->label(__('ui.admin.users.demo_chars_used'))
                             ->content(fn (?User $record): string => $record
                                 ? number_format((int) DemoVoiceGeneration::where('user_id', $record->id)->sum('billable_chars')).' / '.number_format(DemoAllowance::chars())
                                 : '0'),
-                        Forms\Components\Placeholder::make('pack_chars_display')
+                        Placeholder::make('pack_chars_display')
                             ->label('Premium pack')
                             ->content(function (?User $record): string {
                                 $pack = $record ? app(CharPackService::class)->summary((int) $record->id) : null;
@@ -129,7 +150,7 @@ class UserResource extends Resource
                                     ? number_format($pack['remaining']).' of '.number_format($pack['total']).' characters left, until '.$pack['expires_at']->format('j M Y')
                                     : 'None';
                             }),
-                        Forms\Components\Placeholder::make('ip_linked_accounts_display')
+                        Placeholder::make('ip_linked_accounts_display')
                             ->label(__('ui.admin.users.ip_linked_accounts'))
                             ->columnSpanFull()
                             ->content(function (?User $record): HtmlString|string {
@@ -174,38 +195,38 @@ HTML;
                                 return new HtmlString('<ul style="margin: 0; padding-left: 18px;">'.$items.'</ul>');
                             }),
                     ]),
-                Forms\Components\Section::make(__('ui.admin.users.oauth_section'))
+                Section::make(__('ui.admin.users.oauth_section'))
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('phone_number')
+                        TextInput::make('phone_number')
                             ->label(__('ui.admin.users.phone_number'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\DateTimePicker::make('phone_verified_at')
+                        DateTimePicker::make('phone_verified_at')
                             ->label(__('ui.admin.users.phone_verified_at'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\TextInput::make('firebase_uid')
+                        TextInput::make('firebase_uid')
                             ->label(__('ui.admin.users.firebase_uid'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\TextInput::make('auth_provider')
+                        TextInput::make('auth_provider')
                             ->label(__('ui.admin.users.auth_provider'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\TextInput::make('google_id')
+                        TextInput::make('google_id')
                             ->label(__('ui.admin.users.google_id'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\TextInput::make('google_avatar')
+                        TextInput::make('google_avatar')
                             ->label(__('ui.admin.users.google_avatar'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\TextInput::make('api_key_last4')
+                        TextInput::make('api_key_last4')
                             ->label(__('ui.admin.users.api_key_last4'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\DateTimePicker::make('api_key_created_at')
+                        DateTimePicker::make('api_key_created_at')
                             ->label(__('ui.admin.users.api_key_created_at'))
                             ->disabled()
                             ->dehydrated(false),
@@ -223,9 +244,9 @@ HTML;
                 ->withExists('demoVoiceGenerations as has_demo_history')
                 ->withExists('planSubscriptions as has_any_subscription'))
             ->columns([
-                Tables\Columns\TextColumn::make('id')
+                TextColumn::make('id')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('blocked_status')
+                TextColumn::make('blocked_status')
                     ->label(__('ui.admin.users.status'))
                     ->badge()
                     ->getStateUsing(function (User $record): string {
@@ -247,7 +268,7 @@ HTML;
                         return $record->multi_account_whitelisted ? 'info' : 'success';
                     })
                     ->sortable(query: fn ($query, string $direction) => $query->orderBy('is_blocked', $direction)),
-                Tables\Columns\TextColumn::make('current_plan')
+                TextColumn::make('current_plan')
                     ->label('Plan')
                     ->badge()
                     ->getStateUsing(function (User $record): string {
@@ -272,34 +293,34 @@ HTML;
                         return 'warning';
                     })
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('email')
+                TextColumn::make('email')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('country_code')
+                TextColumn::make('country_code')
                     ->label('Country')
                     ->formatStateUsing(fn (?string $state) => Countries::label($state))
                     ->placeholder('—')
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('phone_number')
+                TextColumn::make('phone_number')
                     ->label(__('ui.admin.users.phone_number'))
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->searchable(),
-                Tables\Columns\TextColumn::make('registration_ip')
+                TextColumn::make('registration_ip')
                     ->label(__('ui.admin.users.registration_ip'))
                     ->searchable()
                     ->copyable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('last_login_ip')
+                TextColumn::make('last_login_ip')
                     ->label(__('ui.admin.users.last_login_ip'))
                     ->searchable()
                     ->copyable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('demo_chars_used')
+                TextColumn::make('demo_chars_used')
                     ->label(__('ui.admin.users.demo_chars_used'))
                     // Added up with the page (table()'s query), else for this member alone.
                     ->getStateUsing(fn (User $record) => array_key_exists('demo_chars_list_sum', $record->getAttributes())
@@ -310,17 +331,17 @@ HTML;
                         ->withSum('demoVoiceGenerations as demo_chars_sum', 'billable_chars')
                         ->orderBy('demo_chars_sum', $direction))
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('ip_linked_accounts')
+                TextColumn::make('ip_linked_accounts')
                     ->label(__('ui.admin.users.ip_linked_accounts'))
                     ->getStateUsing(fn (User $record): int => self::linkedCount($record))
                     ->badge()
                     ->color(fn ($state) => ((int) $state) > 0 ? 'danger' : 'gray')
                     ->toggleable(),
-                Tables\Columns\IconColumn::make('is_admin')
+                IconColumn::make('is_admin')
                     ->label(__('ui.admin.users.admin'))
                     ->boolean()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('auth_method_display')
+                TextColumn::make('auth_method_display')
                     ->label(__('ui.admin.users.auth_provider'))
                     ->badge()
                     ->getStateUsing(fn (User $record): string => match (true) {
@@ -336,35 +357,35 @@ HTML;
                         default => 'gray',
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('google_id')
+                TextColumn::make('google_id')
                     ->label(__('ui.admin.users.google'))
                     ->badge()
                     ->getStateUsing(fn (User $record) => $record->google_id ? __('ui.admin.users.connected') : '-')
                     ->color(fn (User $record) => $record->google_id ? 'success' : 'gray')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('api_key_last4')
+                TextColumn::make('api_key_last4')
                     ->label(__('ui.admin.users.api_key'))
                     ->getStateUsing(fn (User $record) => $record->api_key_last4 ? '****'.$record->api_key_last4 : '-')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('blocked_at')
+                TextColumn::make('blocked_at')
                     ->label(__('ui.admin.users.blocked_at'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('blockedBy.name')
+                TextColumn::make('blockedBy.name')
                     ->label(__('ui.admin.users.blocked_by'))
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('country_code')
+                SelectFilter::make('country_code')
                     ->label('Country')
                     ->options(fn () => ['__unknown' => 'Not known yet'] + Countries::optionsInUse())
                     ->searchable()
@@ -373,33 +394,33 @@ HTML;
                         '__unknown' => $query->whereNull('country_code'),
                         default => $query->where('country_code', $data['value']),
                     }),
-                Tables\Filters\TernaryFilter::make('is_admin')
+                TernaryFilter::make('is_admin')
                     ->label(__('ui.admin.users.admin_filter')),
-                Tables\Filters\TernaryFilter::make('is_blocked')
+                TernaryFilter::make('is_blocked')
                     ->label(__('ui.admin.users.blocked_filter')),
-                Tables\Filters\TernaryFilter::make('multi_account_whitelisted')
+                TernaryFilter::make('multi_account_whitelisted')
                     ->label(__('ui.admin.users.whitelisted_filter')),
-                Tables\Filters\Filter::make('has_api_key')
+                Filter::make('has_api_key')
                     ->label(__('ui.admin.users.has_api_key'))
                     ->query(fn ($query) => $query->whereNotNull('api_key_hash')),
-                Tables\Filters\Filter::make('has_google')
+                Filter::make('has_google')
                     ->label(__('ui.admin.users.google_connected'))
                     ->query(fn ($query) => $query->whereNotNull('google_id')),
-                Tables\Filters\Filter::make('has_phone')
+                Filter::make('has_phone')
                     ->label(__('ui.admin.users.phone_connected'))
                     ->query(fn ($query) => $query->whereNotNull('phone_number')),
-                Tables\Filters\Filter::make('paid_users')
+                Filter::make('paid_users')
                     ->label('Paid Users')
                     ->query(fn ($query) => $query->whereHas('planSubscriptions', fn ($q) => $q
                         ->where('status', 'active')
                         ->whereHas('plan', fn ($p) => $p->where('price_cents', '>', 0))
                     )),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                ViewAction::make(),
+                EditAction::make(),
                 // Free members are not in Subscriptions any more, so gifts can be given from here.
-                Tables\Actions\Action::make('giftChars')
+                Action::make('giftChars')
                     ->label('Gift characters')
                     ->icon('heroicon-o-gift')
                     ->color('success')
@@ -408,9 +429,9 @@ HTML;
                         : self::latestSubscription($record) !== null)
                     ->modalHeading(fn (User $record): string => 'Gift characters to '.$record->email)
                     ->modalDescription(fn (User $record): string => SubscriptionResource::giftModalDescription(self::latestSubscription($record)))
-                    ->form(SubscriptionResource::giftFormSchema())
+                    ->schema(SubscriptionResource::giftFormSchema())
                     ->action(fn (User $record, array $data) => SubscriptionResource::grantGift(self::latestSubscription($record), $data)),
-                Tables\Actions\Action::make('blockUser')
+                Action::make('blockUser')
                     ->label(__('ui.admin.users.block'))
                     ->icon('heroicon-o-no-symbol')
                     ->color('danger')
@@ -419,14 +440,14 @@ HTML;
                     ->modalHeading(__('ui.admin.users.block_confirm_title'))
                     ->modalDescription(__('ui.admin.users.block_confirm_description'))
                     ->modalSubmitActionLabel(__('ui.admin.users.block'))
-                    ->form([
-                        Forms\Components\Textarea::make('reason_ar')
+                    ->schema([
+                        Textarea::make('reason_ar')
                             ->label(__('ui.admin.users.block_reason_label_ar'))
                             ->placeholder(__('ui.admin.users.block_reason_placeholder_ar'))
                             ->default(fn (): string => BlockedUserService::DEFAULT_REASON_AR)
                             ->rows(3)
                             ->maxLength(1000),
-                        Forms\Components\Textarea::make('reason_en')
+                        Textarea::make('reason_en')
                             ->label(__('ui.admin.users.block_reason_label_en'))
                             ->placeholder(__('ui.admin.users.block_reason_placeholder_en'))
                             ->default(fn (): string => BlockedUserService::DEFAULT_REASON_EN)
@@ -453,7 +474,7 @@ HTML;
                             ->title(__('ui.admin.users.blocked_success'))
                             ->send();
                     }),
-                Tables\Actions\Action::make('unblockUser')
+                Action::make('unblockUser')
                     ->label(__('ui.admin.users.unblock'))
                     ->icon('heroicon-o-lock-open')
                     ->color('success')
@@ -470,7 +491,7 @@ HTML;
                             ->title(__('ui.admin.users.unblocked_success'))
                             ->send();
                     }),
-                Tables\Actions\Action::make('resetDemoChars')
+                Action::make('resetDemoChars')
                     ->label(__('ui.admin.users.reset_demo_chars'))
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
@@ -491,7 +512,7 @@ HTML;
                             ->title(__('ui.admin.users.reset_demo_success'))
                             ->send();
                     }),
-                Tables\Actions\Action::make('revokeApiKey')
+                Action::make('revokeApiKey')
                     ->label(__('ui.admin.users.revoke_api_key'))
                     ->icon('heroicon-o-key')
                     ->color('danger')
@@ -499,11 +520,11 @@ HTML;
                     ->visible(fn (User $record) => $record->api_key_hash !== null)
                     ->action(fn (User $record) => $record->revokeApiKey()),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
+            ->toolbarActions([
+                BulkActionGroup::make([
                     // Members who would still be charged are kept; the notice says how many.
-                    Tables\Actions\DeleteBulkAction::make()
-                        ->action(function (Tables\Actions\DeleteBulkAction $action, Collection $records): void {
+                    DeleteBulkAction::make()
+                        ->action(function (DeleteBulkAction $action, Collection $records): void {
                             $deletion = app(UserDeletionService::class);
                             $kept = 0;
                             foreach ($records as $user) {
@@ -536,17 +557,17 @@ HTML;
     public static function getRelations(): array
     {
         return [
-            UserResource\RelationManagers\FeatureGrantsRelationManager::class,
+            FeatureGrantsRelationManager::class,
         ];
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListUsers::route('/'),
-            'create' => Pages\CreateUser::route('/create'),
-            'view' => Pages\ViewUser::route('/{record}'),
-            'edit' => Pages\EditUser::route('/{record}/edit'),
+            'index' => ListUsers::route('/'),
+            'create' => CreateUser::route('/create'),
+            'view' => ViewUser::route('/{record}'),
+            'edit' => EditUser::route('/{record}/edit'),
         ];
     }
 

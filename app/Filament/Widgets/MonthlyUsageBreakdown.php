@@ -16,7 +16,7 @@ class MonthlyUsageBreakdown extends Widget
 
     protected static bool $isDiscovered = false;
 
-    protected static string $view = 'filament.widgets.usage-breakdown';
+    protected string $view = 'filament.widgets.usage-breakdown';
 
     protected int|string|array $columnSpan = 'full';
 

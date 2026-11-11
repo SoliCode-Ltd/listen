@@ -233,7 +233,16 @@ TXT).($support !== '' ? "\n- WhatsApp: {$support}" : '').self::details(false);
     {
         $saved = $agent->setting('house_texts');
         if (is_string($saved) && $saved !== '') {
-            return hash_equals($saved, self::textsHash($agent));
+            if (hash_equals($saved, self::textsHash($agent))) {
+                return true;
+            }
+            // Marked before the fingerprint ignored key order (MySQL keeps a JSON column's keys
+            // in its own order, so those never matched once saved): untouched while they are
+            // still the words Listen writes for the voice they were written for.
+            $written = self::texts($agent->language, ['name' => (string) $agent->name, 'gender' => (string) ($agent->setting('texts_gender') ?: 'female')]);
+
+            return (string) $agent->name === $written['name'] && (string) $agent->first_message === $written['first_message']
+                && self::canonical($agent->script ?? []) === self::canonical($written['script']);
         }
         // Set up before the words were marked: untouched while they are still the first ones.
         $first = self::texts($agent->language, null);
@@ -255,8 +264,23 @@ TXT).($support !== '' ? "\n- WhatsApp: {$support}" : '').self::details(false);
         ]);
     }
 
+    /** The words' fingerprint, whatever order the database keeps the script's keys in. */
     private static function textsHash(Agent $agent): string
     {
-        return hash('sha256', json_encode([(string) $agent->name, (string) $agent->first_message, $agent->script ?? []], JSON_UNESCAPED_UNICODE));
+        return hash('sha256', json_encode([(string) $agent->name, (string) $agent->first_message, self::canonical($agent->script ?? [])], JSON_UNESCAPED_UNICODE));
+    }
+
+    /** The same value with every keyed array's keys in one order (lists keep theirs). */
+    private static function canonical(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+        $value = array_map(self::canonical(...), $value);
+        if (! array_is_list($value)) {
+            ksort($value);
+        }
+
+        return $value;
     }
 }

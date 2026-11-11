@@ -2,6 +2,13 @@
 
 namespace App\Filament\Resources\NewsletterResource\Pages;
 
+use Filament\Actions\Action;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Throwable;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Checkbox;
+use Filament\Actions\DeleteAction;
 use App\Filament\Resources\NewsletterResource;
 use App\Filament\Resources\NewsletterResource\Pages\Concerns\PreviewsNewsletter;
 use App\Models\Newsletter;
@@ -35,7 +42,7 @@ class EditNewsletter extends EditRecord
     {
         return [
             $this->refreshPreviewAction(),
-            Actions\Action::make('countAudience')
+            Action::make('countAudience')
                 ->label('Count audience')
                 ->icon('heroicon-o-users')
                 ->color('gray')
@@ -47,20 +54,20 @@ class EditNewsletter extends EditRecord
                         ->success()
                         ->send();
                 }),
-            Actions\Action::make('sendExample')
+            Action::make('sendExample')
                 ->label('Send example to my email')
                 ->icon('heroicon-o-paper-airplane')
                 ->color('primary')
                 ->modalHeading('Send an example')
                 ->modalDescription('This emails only the address you type. It does not email the audience.')
                 ->modalSubmitActionLabel('Send example only')
-                ->form([
-                    Forms\Components\TextInput::make('email')
+                ->schema([
+                    TextInput::make('email')
                         ->label('Your email')
                         ->email()
                         ->required()
                         ->helperText('One address. The audience is not included.'),
-                    Forms\Components\Select::make('language')
+                    Select::make('language')
                         ->label('Language of this example')
                         ->options([
                             Newsletter::LANGUAGE_EN => 'English',
@@ -79,7 +86,7 @@ class EditNewsletter extends EditRecord
                             (string) $data['email'],
                             (string) $data['language'],
                         );
-                    } catch (\Throwable $exception) {
+                    } catch (Throwable $exception) {
                         Notification::make()
                             ->title('Example was not sent')
                             ->body(TitanMailbox::explainFailure($exception->getMessage()))
@@ -98,13 +105,13 @@ class EditNewsletter extends EditRecord
 
                     $this->redirect(NewsletterResource::getUrl('edit', ['record' => $this->record]));
                 }),
-            Actions\Action::make('sendToAudience')
+            Action::make('sendToAudience')
                 ->label('Send next batch')
                 ->icon('heroicon-o-paper-airplane')
                 ->color('danger')
                 ->modalHeading('Send the next batch')
                 ->modalSubmitActionLabel('Send next batch')
-                ->form(function (): array {
+                ->schema(function (): array {
                     $draft = $this->draftFromForm();
                     $progress = app(NewsletterSender::class)->progress($this->record);
                     $waiting = app(NewsletterAudience::class)->waitingCount($draft);
@@ -131,10 +138,10 @@ class EditNewsletter extends EditRecord
                         : 'This mailbox has used Titan\'s limit for this hour or for today. '.$limitNote.' Nothing is sent until that room opens up again.';
 
                     return [
-                        Forms\Components\Placeholder::make('audience_count')
+                        Placeholder::make('audience_count')
                             ->label('This newsletter')
                             ->content(new HtmlString(e($summary).'<br><br>'.e($intro))),
-                        Forms\Components\TextInput::make('batch_size')
+                        TextInput::make('batch_size')
                             ->label('How many to send this time')
                             ->numeric()
                             ->required()
@@ -144,7 +151,7 @@ class EditNewsletter extends EditRecord
                             ->helperText($room > 0
                                 ? 'Maximum '.$room.' right now. That is what Titan still allows ('.$pace->hourlyLimit().' per hour, '.$pace->dailyLimit().' per day).'
                                 : 'Titan\'s hourly or daily limit is already used. Wait, then send again.'),
-                        Forms\Components\Checkbox::make('confirm')
+                        Checkbox::make('confirm')
                             ->label('I checked the preview and I want to send these now')
                             ->accepted(),
                     ];
@@ -157,7 +164,7 @@ class EditNewsletter extends EditRecord
                             (int) ($data['batch_size'] ?? app(NewsletterPace::class)->availableNow()),
                             true,
                         );
-                    } catch (\Throwable $exception) {
+                    } catch (Throwable $exception) {
                         Notification::make()
                             ->title('Emails were not sent')
                             ->body(TitanMailbox::explainFailure($exception->getMessage()))
@@ -205,7 +212,7 @@ class EditNewsletter extends EditRecord
 
                     $this->redirect(NewsletterResource::getUrl('edit', ['record' => $this->record]));
                 }),
-            Actions\Action::make('resumeSending')
+            Action::make('resumeSending')
                 ->label('Resume sending')
                 ->icon('heroicon-o-play')
                 ->color('warning')
@@ -221,7 +228,7 @@ class EditNewsletter extends EditRecord
                         ->success()
                         ->send();
                 }),
-            Actions\Action::make('unlockDraft')
+            Action::make('unlockDraft')
                 ->label('Stop this batch')
                 ->icon('heroicon-o-lock-open')
                 ->color('warning')
@@ -239,7 +246,7 @@ class EditNewsletter extends EditRecord
                         ->send();
                     $this->redirect(NewsletterResource::getUrl('edit', ['record' => $this->record]));
                 }),
-            Actions\DeleteAction::make()
+            DeleteAction::make()
                 ->modalDescription('Deletes this newsletter and its send log. Mail that already went out stays sent.'),
         ];
     }

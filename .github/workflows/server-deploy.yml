@@ -4,9 +4,14 @@ name: Server deploy
 # tracked on main onto the server (staging: on the branch the run was started
 # from, so a branch can be tried there before it is merged; live: always main). It never deletes, and never touches .env,
 # storage/, vendor/, node_modules/, uploads, or the per-server extension
-# config (public/extensions/*/config.js).
-#   inspect: lists the files that differ from what would be deployed (nothing changes).
-#   deploy:  copies main over the app, then clears and rebuilds caches (never
+# config (public/extensions/*/config.js). The one exception: the files
+# scripts/support/removed_files.txt lists (taken out of the code, and still
+# loaded where they are left) are moved to storage/app/listen-deploy/removed/.
+#   inspect: lists the files that differ from what would be deployed, and the
+#            files the server has in the code folders that the code does not
+#            (nothing changes).
+#   deploy:  copies main over the app, moves aside the files removed_files.txt
+#            lists, then clears and rebuilds caches (never
 #            the app cache; routes only with route:trans:cache). Any failing
 #            step fails the run, and so does /en or /ar not answering 200.
 #   ffmpeg:  puts a static ffmpeg in storage/app/bin (for the sound
@@ -286,6 +291,13 @@ jobs:
               echo "  $file: last changed $day $time UTC$( [ "$sum" = "$main_sum" ] && echo ', same as main' || true)"
             done < server.txt
           fi
+          # The upload never deletes: what the server still has in the code folders that this code does not
+          # (scripts/support/removed_files.txt lists those the deploy moves aside).
+          echo "== Files on the server that $DEPLOY_REF does not have (app, bootstrap, config, database, lang, resources, routes) =="
+          $S "$FIND; find app bootstrap/app.php bootstrap/providers.php config database lang resources routes -type f 2>/dev/null | LC_ALL=C sort" > server-files.txt || true
+          LC_ALL=C sort files.txt | LC_ALL=C comm -13 - server-files.txt > extra.txt || true
+          while IFS= read -r f; do echo "  $f$(grep -qxF "$f" scripts/support/removed_files.txt 2>/dev/null && echo '  (the deploy moves it aside)' || true)"; done < extra.txt
+          echo "== $(wc -l < extra.txt) file(s) =="
           echo "New or changed migrations:"; grep '^database/migrations/' diff.txt || echo "  none"
           echo "composer.lock:"; grep -q '^composer.lock' diff.txt && echo "  CHANGED: after the deploy, run this workflow with mode composer" || echo "  same"
           echo "ffmpeg (sound environments, download formats):"
@@ -646,6 +658,21 @@ jobs:
             printf '%s\n' "$out" | tail -n "$lines"
           }
           tar -xzf storage/app/listen-deploy/bundle.tgz --no-same-owner --no-overwrite-dir
+          # Files taken out of the code stay behind (the upload never deletes). Those
+          # scripts/support/removed_files.txt lists are moved to storage/app/listen-deploy/removed/
+          # (kept), unless the code deployed has them again.
+          if [ -f scripts/support/removed_files.txt ]; then
+            cut -c35- storage/app/listen-deploy/manifest.md5 > storage/app/listen-deploy/deployed-files.txt
+            while IFS= read -r f; do
+              case "$f" in ''|'#'*|/*|*..*) continue;; esac
+              [ -f "$f" ] || continue
+              grep -qxF "$f" storage/app/listen-deploy/deployed-files.txt && continue
+              mkdir -p "storage/app/listen-deploy/removed/$(dirname "$f")"
+              mv -f "$f" "storage/app/listen-deploy/removed/$f"
+              rmdir -p --ignore-fail-on-non-empty "$(dirname "$f")" 2>/dev/null || true
+              echo "Moved aside (no longer in the code): $f"
+            done < scripts/support/removed_files.txt
+          fi
           c=0; [ -f bootstrap/cache/config.php ] && c=1
           r=0; [ -f bootstrap/cache/routes-v7.php ] && r=1
           # The app cache stays: it holds the Stripe webhook and email de-duplication,

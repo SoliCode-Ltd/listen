@@ -2,6 +2,11 @@
 
 namespace App\Filament\Resources\ContactResource\Pages;
 
+use Filament\Actions\Action;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\TextInput;
 use App\Filament\Resources\ContactResource;
 use App\Models\SiteSetting;
 use Filament\Actions;
@@ -16,7 +21,7 @@ class ListContacts extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('contactSettings')
+            Action::make('contactSettings')
                 ->label('Contact Settings')
                 ->icon('heroicon-o-cog-6-tooth')
                 ->modalHeading('Contact Settings')
@@ -32,25 +37,25 @@ class ListContacts extends ListRecords
                         config('app.name', 'Listen') . ' Contact'
                     ),
                 ])
-                ->form([
-                    Forms\Components\Tabs::make('contact_settings_tabs')
+                ->schema([
+                    Tabs::make('contact_settings_tabs')
                         ->tabs([
-                            Forms\Components\Tabs\Tab::make('Controls')
+                            Tab::make('Controls')
                                 ->icon('heroicon-o-adjustments-horizontal')
                                 ->schema([
-                                    Forms\Components\Toggle::make('contact_form_enabled')
+                                    Toggle::make('contact_form_enabled')
                                         ->label('Enable Contact Form')
                                         ->helperText('Turn this off to disable the contact form on the frontend.'),
                                 ]),
-                            Forms\Components\Tabs\Tab::make('Email Delivery')
+                            Tab::make('Email Delivery')
                                 ->icon('heroicon-o-envelope')
                                 ->schema([
-                                    Forms\Components\TextInput::make('contact_submission_email')
+                                    TextInput::make('contact_submission_email')
                                         ->label('Submission Recipient Email')
                                         ->email()
                                         ->maxLength(255)
                                         ->helperText('All new contact submissions will be sent to this email address.'),
-                                    Forms\Components\TextInput::make('contact_submission_name')
+                                    TextInput::make('contact_submission_name')
                                         ->label('Recipient Name')
                                         ->maxLength(255)
                                         ->helperText('Optional display name used for delivered contact emails.'),

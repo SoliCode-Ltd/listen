@@ -2,6 +2,47 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Select;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\DateTimePicker;
+use Carbon\Carbon;
+use Filament\Schemas\Components\Utilities\Set;
+use App\Support\Credits;
+use App\Support\PlanCostEstimate;
+use Filament\Forms\Components\Radio;
+use App\Services\Billing\KeptCredits;
+use App\Services\Api\ApiSpeechService;
+use Filament\Forms\Components\CheckboxList;
+use App\Support\AudioFormats;
+use App\Services\Api\ApiConcurrency;
+use App\Support\VoiceDesign;
+use App\Support\Agents\AgentAccess;
+use Filament\Schemas\Components\Grid;
+use Filament\Forms\Components\Repeater;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\Action;
+use Exception;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\BulkAction;
+use Illuminate\Database\Eloquent\Collection;
+use App\Filament\Resources\PlanResource\Pages\ListPlans;
+use App\Filament\Resources\PlanResource\Pages\CreatePlan;
+use App\Filament\Resources\PlanResource\Pages\ViewPlan;
+use App\Filament\Resources\PlanResource\Pages\EditPlan;
+use App\Support\Agents\AgentCost;
+use Illuminate\Support\Str;
 use App\Filament\Resources\PlanResource\Pages;
 use App\Models\Plan;
 use App\Models\SiteSetting;
@@ -9,9 +50,6 @@ use App\Services\StripeProductSyncService;
 use App\Support\DiscountTerms;
 use App\Support\PlanPricingLines;
 use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Forms\Get;
-use Filament\Forms\Set;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -22,37 +60,37 @@ class PlanResource extends Resource
 {
     protected static ?string $model = Plan::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Billing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
 
     protected static ?int $navigationSort = 1;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Plan Identity')
+        return $schema
+            ->components([
+                Section::make('Plan Identity')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('slug')
+                        TextInput::make('slug')
                             ->required()
                             ->maxLength(255)
                             ->unique(ignoreRecord: true)
                             ->helperText('URL-safe identifier (e.g. "free", "creator", "pro")'),
-                        Forms\Components\TextInput::make('name')
+                        TextInput::make('name')
                             ->required()
                             ->maxLength(255)
                             ->helperText('Internal name (fallback if localized names are empty)'),
-                        Forms\Components\Toggle::make('is_active')
+                        Toggle::make('is_active')
                             ->label('Active')
                             ->default(true)
                             ->helperText('Inactive plans are hidden from pricing page'),
-                        Forms\Components\Toggle::make('is_featured')
+                        Toggle::make('is_featured')
                             ->label('Featured Plan')
                             ->default(false)
                             ->helperText('Highlighted as "Most Popular" on pricing pages.'),
-                        Forms\Components\Select::make('kind')
+                        Select::make('kind')
                             ->label('Type')
                             ->options([
                                 Plan::KIND_SUBSCRIPTION => 'Monthly plan (subscription)',
@@ -62,7 +100,7 @@ class PlanResource extends Resource
                             ->required()
                             ->live()
                             ->helperText('A pack is paid once (card, InstaPay or Vodafone Cash) and never renews. Members on the free plan who buy it get its features while its characters last.'),
-                        Forms\Components\TextInput::make('pack_days')
+                        TextInput::make('pack_days')
                             ->label('Days the pack lasts')
                             ->numeric()
                             ->integer()
@@ -74,34 +112,34 @@ class PlanResource extends Resource
                             ->visible(fn (Get $get): bool => $get('kind') === Plan::KIND_PACK)
                             ->helperText('Counted from each purchase. Buying again adds the characters and starts this many days again; what is unused at the end is lost.'),
                     ]),
-                Forms\Components\Section::make('Localized Content (English)')
+                Section::make('Localized Content (English)')
                     ->description('English display names and descriptions shown on pricing pages.')
                     ->collapsed()
                     ->schema([
-                        Forms\Components\TextInput::make('name_en')
+                        TextInput::make('name_en')
                             ->label('Plan Name (English)')
                             ->maxLength(255)
                             ->placeholder('e.g. Creator, Professional')
                             ->helperText('Leave empty to use translation file or fallback name'),
-                        Forms\Components\Textarea::make('description_en')
+                        Textarea::make('description_en')
                             ->label('Plan Description (English)')
                             ->rows(2)
                             ->maxLength(500)
                             ->placeholder('Short tagline for the pricing card'),
-                        Forms\Components\TextInput::make('button_text_en')
+                        TextInput::make('button_text_en')
                             ->label('Button Text (English)')
                             ->maxLength(50)
                             ->placeholder('e.g. Get Started, Upgrade Now'),
                     ]),
-                Forms\Components\Section::make('المحتوى المترجم (العربية)')
+                Section::make('المحتوى المترجم (العربية)')
                     ->description('الأسماء والأوصاف العربية المعروضة على صفحات الأسعار.')
                     ->schema([
                         // The Arabic pages (pricing, dashboard, developer docs) show only Arabic.
-                        Forms\Components\TextInput::make('name_ar')
+                        TextInput::make('name_ar')
                             ->label('اسم الخطة (العربية)')
                             ->maxLength(255)
                             ->placeholder('مثل: المبدع، الاحترافي')
-                            ->afterStateHydrated(function (Forms\Components\TextInput $component, $state, ?Plan $record): void {
+                            ->afterStateHydrated(function (TextInput $component, $state, ?Plan $record): void {
                                 // Prefilled from the site's own translation, when the plan has one.
                                 $key = 'ui.pricing.plan_name_'.($record?->slug ?? '');
                                 if (blank($state) && $record && __($key, [], 'ar') !== $key) {
@@ -109,21 +147,21 @@ class PlanResource extends Resource
                                 }
                             })
                             ->helperText('املأه دائمًا: تعرض الصفحات العربية (الأسعار ولوحة التحكم وتوثيق المطورين) الاسم العربي فقط، وإن تُرك فارغًا ظهر الاسم الإنجليزي فيها.'),
-                        Forms\Components\Textarea::make('description_ar')
+                        Textarea::make('description_ar')
                             ->label('وصف الخطة (العربية)')
                             ->rows(2)
                             ->maxLength(500)
                             ->placeholder('وصف قصير لبطاقة الأسعار'),
-                        Forms\Components\TextInput::make('button_text_ar')
+                        TextInput::make('button_text_ar')
                             ->label('نص الزر (العربية)')
                             ->maxLength(50)
                             ->placeholder('مثل: ابدأ الآن، ترقية'),
                     ]),
-                Forms\Components\Section::make('Pricing')
+                Section::make('Pricing')
                     ->description('Enter prices in dollars. Stored as cents in the database. Yearly auto-calculated at 20% discount.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('price_dollars')
+                        TextInput::make('price_dollars')
                             ->label('Monthly Price ($)')
                             ->numeric()
                             ->minValue(0)
@@ -132,7 +170,7 @@ class PlanResource extends Resource
                             ->step('0.01')
                             ->required()
                             ->dehydrated(false) // Virtual field — we handle saving manually
-                            ->afterStateHydrated(function (Forms\Components\TextInput $component, ?Plan $record) {
+                            ->afterStateHydrated(function (TextInput $component, ?Plan $record) {
                                 if ($record) {
                                     $component->state(number_format($record->price_cents / 100, 2, '.', ''));
                                 } else {
@@ -140,7 +178,7 @@ class PlanResource extends Resource
                                 }
                             })
                             ->helperText(fn () => 'Yearly price is auto-calculated at ' . SiteSetting::yearlyDiscountPercent() . '% discount (configurable in Billing Settings)'),
-                        Forms\Components\Placeholder::make('yearly_preview')
+                        Placeholder::make('yearly_preview')
                             ->label('Yearly Price Preview')
                             ->content(function (?Plan $record) {
                                 if (!$record || $record->price_cents <= 0) return 'Free';
@@ -150,11 +188,11 @@ class PlanResource extends Resource
                                 return '$' . number_format($yearlyDollars, 2) . '/year ($' . number_format($yearlyDollars / 12, 2) . '/mo) — ' . $percent . '% off';
                             }),
                     ]),
-                Forms\Components\Section::make('Discount / Promotion')
+                Section::make('Discount / Promotion')
                     ->description('Set a time-limited discount for monthly billing. The discounted price shows on the pricing page with a countdown timer, and the pricing page and checkout say exactly how long each buyer keeps it and what they pay after. Yearly billing keeps its usual yearly discount, with no offer on top. After the offer ends, new buyers pay the normal price.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('discount_percentage')
+                        TextInput::make('discount_percentage')
                             ->label('Discount (%)')
                             ->numeric()
                             ->minValue(1)
@@ -163,14 +201,14 @@ class PlanResource extends Resource
                             ->nullable()
                             ->reactive()
                             ->helperText('Leave empty to disable discount'),
-                        Forms\Components\DateTimePicker::make('discount_ends_at')
+                        DateTimePicker::make('discount_ends_at')
                             ->label('Offer Ends At')
                             ->nullable()
                             ->native(false)
                             ->displayFormat('M d, Y H:i')
                             ->visible(fn (Get $get) => ! empty($get('discount_percentage')))
                             ->helperText('When new buyers stop getting the discount. Leave empty to keep the offer on.'),
-                        Forms\Components\Select::make('discount_duration')
+                        Select::make('discount_duration')
                             ->label('How long each buyer keeps it')
                             ->options([
                                 Plan::DISCOUNT_FIRST_PAYMENT => 'First payment only',
@@ -182,7 +220,7 @@ class PlanResource extends Resource
                             ->reactive()
                             ->visible(fn (Get $get) => ! empty($get('discount_percentage')))
                             ->helperText('Buyers who already have the discount keep what they bought. Monthly billing only: yearly buyers get the yearly discount instead.'),
-                        Forms\Components\TextInput::make('discount_duration_months')
+                        TextInput::make('discount_duration_months')
                             ->label('Number of months')
                             ->numeric()
                             ->minValue(2)
@@ -193,7 +231,7 @@ class PlanResource extends Resource
                             ->visible(fn (Get $get) => ! empty($get('discount_percentage')) && $get('discount_duration') === Plan::DISCOUNT_FIRST_MONTHS)
                             ->required(fn (Get $get) => ! empty($get('discount_percentage')) && $get('discount_duration') === Plan::DISCOUNT_FIRST_MONTHS)
                             ->helperText('2 to 12 monthly payments.'),
-                        Forms\Components\Placeholder::make('discount_preview')
+                        Placeholder::make('discount_preview')
                             ->label('What buyers see')
                             ->visible(fn (Get $get) => ! empty($get('discount_percentage')))
                             ->columnSpanFull()
@@ -203,7 +241,7 @@ class PlanResource extends Resource
                                 if ($priceDollars <= 0 || $discount <= 0) return 'N/A';
                                 $discounted = round($priceDollars * (1 - $discount / 100), 2);
                                 $endsAt = $get('discount_ends_at');
-                                $endLabel = $endsAt ? 'Offer until ' . \Carbon\Carbon::parse($endsAt)->format('M j, Y g:i A') : 'Offer has no end date';
+                                $endLabel = $endsAt ? 'Offer until ' . Carbon::parse($endsAt)->format('M j, Y g:i A') : 'Offer has no end date';
                                 $preview = new Plan([
                                     'discount_duration' => $get('discount_duration'),
                                     'discount_duration_months' => $get('discount_duration_months'),
@@ -213,10 +251,10 @@ class PlanResource extends Resource
                                 return '$' . number_format($priceDollars, 2) . ' → $' . number_format($discounted, 2) . '/mo. ' . $endLabel . '. Monthly buyers read: "' . str_replace(["\u{2066}", "\u{2069}"], '', $terms) . '"';
                             }),
                     ]),
-                Forms\Components\Section::make('Voice & Quality')
+                Section::make('Voice & Quality')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Select::make('voice_tier')
+                        Select::make('voice_tier')
                             ->label('Voice Quality Tier')
                             ->live()
                             ->options([
@@ -225,7 +263,7 @@ class PlanResource extends Resource
                             ])
                             ->required()
                             ->helperText('Voice quality level users get on this plan'),
-                        Forms\Components\Select::make('processing_priority')
+                        Select::make('processing_priority')
                             ->options([
                                 'standard' => 'Standard',
                                 'standard_plus' => 'Standard plus',
@@ -236,64 +274,64 @@ class PlanResource extends Resource
                             ->required()
                             ->default('standard')
                             ->helperText('Sets the developer API\'s default limits when the plan sets none (see Developer API below). High, priority and highest also send the API\'s and the extension\'s background generations to the faster queue; the studio is as fast on every plan.'),
-                        Forms\Components\Toggle::make('commercial_use_allowed')
+                        Toggle::make('commercial_use_allowed')
                             ->label('Commercial Use Allowed')
                             ->helperText('Whether users can use generated audio commercially'),
                     ]),
-                Forms\Components\Section::make('Usage Limits')
+                Section::make('Usage Limits')
                     ->description('Set 0 for unlimited requests.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('monthly_chars')
+                        TextInput::make('monthly_chars')
                             ->label(fn (Get $get): string => $get('kind') === Plan::KIND_PACK ? 'Credits in the pack' : 'Monthly credits')
                             ->numeric()
                             // A paid plan with no credits would stop every member on it at once.
                             ->minValue(fn (Get $get): int => is_numeric($get('price_dollars')) && (float) $get('price_dollars') > 0 ? 1 : 0)
                             ->required()
                             ->live(debounce: 600)
-                            ->afterStateUpdated(fn (Set $set, $state) => $set('monthly_minutes', \App\Support\Credits::minutesFor((int) $state)))
+                            ->afterStateUpdated(fn (Set $set, $state) => $set('monthly_minutes', Credits::minutesFor((int) $state)))
                             ->helperText(fn (Get $get): string => ($get('kind') === Plan::KIND_PACK
                                 ? 'Credits each purchase adds (members are charged 15 credits a second of audio they get). Unused credits move into the plan a member upgrades to. '
                                 : 'Members are charged for the audio they get: 15 credits a second (900 a minute). ')
-                                .\App\Support\PlanCostEstimate::adminLine(
+                                .PlanCostEstimate::adminLine(
                                     (int) $get('monthly_chars'),
                                     is_numeric($get('price_dollars')) ? (float) $get('price_dollars') : null,
                                     $get('voice_tier') === 'hd',
                                 )),
-                        Forms\Components\TextInput::make('monthly_minutes')
+                        TextInput::make('monthly_minutes')
                             ->label('Voice minutes a month')
                             ->suffix('min')
                             ->disabled()
                             ->dehydrated()
-                            ->afterStateHydrated(fn (Forms\Components\TextInput $component, Get $get) => $component->state(\App\Support\Credits::minutesFor((int) $get('monthly_chars'))))
-                            ->dehydrateStateUsing(fn (Get $get): int => \App\Support\Credits::minutesFor((int) $get('monthly_chars')))
-                            ->helperText('Set by the credits ('.number_format(\App\Support\Credits::PER_MINUTE).' credits = 1 minute of audio). Credits are charged for the real length of each audio, so members always get exactly these minutes.'),
+                            ->afterStateHydrated(fn (TextInput $component, Get $get) => $component->state(Credits::minutesFor((int) $get('monthly_chars'))))
+                            ->dehydrateStateUsing(fn (Get $get): int => Credits::minutesFor((int) $get('monthly_chars')))
+                            ->helperText('Set by the credits ('.number_format(Credits::PER_MINUTE).' credits = 1 minute of audio). Credits are charged for the real length of each audio, so members always get exactly these minutes.'),
                         // Lowering the credits: who gets the lower amount (App\Services\Billing\KeptCredits).
-                        Forms\Components\Radio::make('lower_credits_for')
+                        Radio::make('lower_credits_for')
                             ->label('You are lowering the credits. Who gets the lower amount?')
                             ->options([
-                                \App\Services\Billing\KeptCredits::NEXT_PERIOD => 'Everyone, from their next billing period',
-                                \App\Services\Billing\KeptCredits::NEW_ONLY => 'New subscribers only',
+                                KeptCredits::NEXT_PERIOD => 'Everyone, from their next billing period',
+                                KeptCredits::NEW_ONLY => 'New subscribers only',
                             ])
                             ->descriptions([
-                                \App\Services\Billing\KeptCredits::NEXT_PERIOD => 'Members on this plan now keep their current credits until the period they paid for renews (a yearly plan: once a year), including any days a late payment is retried. After that they get the new amount.',
-                                \App\Services\Billing\KeptCredits::NEW_ONLY => 'Members on this plan now keep their current credits for as long as they stay on it. Only people who subscribe from now on get the new amount, and so does a member who leaves the plan and comes back after their paid period ran out.',
+                                KeptCredits::NEXT_PERIOD => 'Members on this plan now keep their current credits until the period they paid for renews (a yearly plan: once a year), including any days a late payment is retried. After that they get the new amount.',
+                                KeptCredits::NEW_ONLY => 'Members on this plan now keep their current credits for as long as they stay on it. Only people who subscribe from now on get the new amount, and so does a member who leaves the plan and comes back after their paid period ran out.',
                             ])
                             ->helperText(fn (?Plan $record): string => $record
-                                ? number_format(app(\App\Services\Billing\KeptCredits::class)->membersOn($record)).' members are on this plan now. Nothing changes for anyone in the period they are in. Members in a free trial not paid yet count as new subscribers.'
+                                ? number_format(app(KeptCredits::class)->membersOn($record)).' members are on this plan now. Nothing changes for anyone in the period they are in. Members in a free trial not paid yet count as new subscribers.'
                                 : '')
                             ->visible(fn (Get $get, ?Plan $record): bool => static::lowersCredits($get, $record))
                             ->required(fn (Get $get, ?Plan $record): bool => static::lowersCredits($get, $record))
                             ->dehydrated(false)
                             ->columnSpanFull(),
-                        Forms\Components\TextInput::make('monthly_requests')
+                        TextInput::make('monthly_requests')
                             ->label('Monthly Requests')
                             ->numeric()
                             ->minValue(0)
                             ->required()
                             ->default(0)
                             ->helperText('0 = unlimited requests'),
-                        Forms\Components\TextInput::make('daily_requests')
+                        TextInput::make('daily_requests')
                             ->label('Generations per day')
                             ->numeric()
                             ->integer()
@@ -301,28 +339,28 @@ class PlanResource extends Resource
                             ->default(0)
                             ->required()
                             ->helperText('Most generations a member on this plan can make in one day, in the dashboard, the browser extension and the developer API together. Failed ones do not count. 0 = no daily limit. The day restarts at midnight '.config('listen.billing.daily_limit_timezone', 'Africa/Cairo').' time.'),
-                        Forms\Components\TextInput::make('max_chars_per_request')
+                        TextInput::make('max_chars_per_request')
                             ->label('Max Characters Per Request')
                             ->numeric()
                             ->integer()
                             ->minValue(0)
                             ->required()
-                            ->helperText('The studio and the browser extension take at most '.number_format(\App\Services\Api\ApiSpeechService::MAX_TEXT).' characters in one request, whatever is set here; under 200 counts as 200, and 0 hides this line on the pricing card. The developer API also caps one request at '.number_format(\App\Services\Api\ApiSpeechService::SYNC_MAX_TEXT).' when the client waits for the file and '.number_format(\App\Services\Api\ApiSpeechService::ASYNC_MAX_TEXT).' in the background.'),
-                        Forms\Components\TextInput::make('recent_voices_days')
+                            ->helperText('The studio and the browser extension take at most '.number_format(ApiSpeechService::MAX_TEXT).' characters in one request, whatever is set here; under 200 counts as 200, and 0 hides this line on the pricing card. The developer API also caps one request at '.number_format(ApiSpeechService::SYNC_MAX_TEXT).' when the client waits for the file and '.number_format(ApiSpeechService::ASYNC_MAX_TEXT).' in the background.'),
+                        TextInput::make('recent_voices_days')
                             ->label('Recent Voices Retention (days)')
                             ->numeric()
                             ->minValue(0)
                             ->default(7)
                             ->helperText('How many days generated voices are retained. 0 = unlimited.'),
                     ]),
-                Forms\Components\Section::make('Overage & Top-Up Pricing')
+                Section::make('Overage & Top-Up Pricing')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Toggle::make('allow_overage')
+                        Toggle::make('allow_overage')
                             ->label('Allow Overage')
                             ->disabled()
                             ->helperText('Off for every plan: overage is not charged, so members always stop at their credits and voice minutes.'),
-                        Forms\Components\TextInput::make('overage_price_dollars')
+                        TextInput::make('overage_price_dollars')
                             ->label('Overage Price per 1M chars ($)')
                             ->numeric()
                             ->minValue(0)
@@ -330,21 +368,21 @@ class PlanResource extends Resource
                             ->step('0.01')
                             ->dehydrated(false) // Virtual field — handled manually
                             ->visible(fn (Get $get) => $get('allow_overage'))
-                            ->afterStateHydrated(function (Forms\Components\TextInput $component, ?Plan $record) {
+                            ->afterStateHydrated(function (TextInput $component, ?Plan $record) {
                                 if ($record && $record->overage_price_per_million_cents !== null) {
                                     $component->state(number_format($record->overage_price_per_million_cents / 100, 2, '.', ''));
                                 } else {
                                     $component->state('0.00');
                                 }
                             }),
-                        Forms\Components\TextInput::make('topup_char_price_dollars')
+                        TextInput::make('topup_char_price_dollars')
                             ->label('Top-Up Price per 1K chars ($)')
                             ->numeric()
                             ->minValue(0)
                             ->prefix('$')
                             ->step('0.01')
                             ->dehydrated(false)
-                            ->afterStateHydrated(function (Forms\Components\TextInput $component, ?Plan $record) {
+                            ->afterStateHydrated(function (TextInput $component, ?Plan $record) {
                                 if ($record && $record->topup_char_price_cents !== null) {
                                     $component->state(number_format($record->topup_char_price_cents / 100, 2, '.', ''));
                                 } else {
@@ -352,14 +390,14 @@ class PlanResource extends Resource
                                 }
                             })
                             ->helperText('Price per 1,000 extra characters (stored as cents).'),
-                        Forms\Components\TextInput::make('topup_minute_price_dollars')
+                        TextInput::make('topup_minute_price_dollars')
                             ->label('Top-Up Price per Minute ($)')
                             ->numeric()
                             ->minValue(0)
                             ->prefix('$')
                             ->step('0.01')
                             ->dehydrated(false)
-                            ->afterStateHydrated(function (Forms\Components\TextInput $component, ?Plan $record) {
+                            ->afterStateHydrated(function (TextInput $component, ?Plan $record) {
                                 if ($record && $record->topup_minute_price_cents !== null) {
                                     $component->state(number_format($record->topup_minute_price_cents / 100, 2, '.', ''));
                                 } else {
@@ -369,73 +407,73 @@ class PlanResource extends Resource
                             ->helperText('Price per extra audio minute (stored as cents).'),
                     ]),
                 // The engine follows the voice type alone (Standard or HD), so a plan has no engine settings.
-                Forms\Components\Section::make('Studio features')
+                Section::make('Studio features')
                     ->description('Extra studio tools members on this plan can use.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Toggle::make('dialogue_enabled')
+                        Toggle::make('dialogue_enabled')
                             ->label('Dialogue Mode')
                             ->helperText('Allow users to create multi-speaker dialogue audio.')
                             ->default(false),
-                        Forms\Components\Toggle::make('custom_prompt_enabled')
+                        Toggle::make('custom_prompt_enabled')
                             ->label('Custom Prompt')
                             ->helperText('Allow users to provide custom voice styling instructions (Gemini voices).')
                             ->default(false),
-                        Forms\Components\Toggle::make('sound_effects_enabled')
+                        Toggle::make('sound_effects_enabled')
                             ->label('Sound environments')
                             ->helperText('Echo, hall, phone call, radio and the other effects on the whole recording. Needs ffmpeg on the server. Plans without it see the option locked, with an upgrade button.')
                             ->default(false),
                     ]),
-                Forms\Components\Section::make('Downloads')
+                Section::make('Downloads')
                     ->description('The audio file types members on this plan can download. With more than one, the download button opens a small menu.')
                     ->schema([
-                        Forms\Components\CheckboxList::make('download_formats')
+                        CheckboxList::make('download_formats')
                             ->label('File types')
-                            ->options(\App\Support\AudioFormats::options())
-                            ->default(\App\Support\AudioFormats::DEFAULT)
+                            ->options(AudioFormats::options())
+                            ->default(AudioFormats::DEFAULT)
                             ->columns(5)
                             ->helperText(fn (): string => 'Nothing ticked keeps MP3. MP3 and WAV are made in the browser. M4A, OGG and FLAC are converted on the server'
-                                .(\App\Support\AudioFormats::serverCanConvert()
-                                    ? '. Ready on this server: '.(implode(', ', array_filter(['m4a', 'ogg', 'flac'], fn (string $f): bool => \App\Support\AudioFormats::serverSupports($f))) ?: 'none').'. A type the server cannot make stays hidden from members.'
+                                .(AudioFormats::serverCanConvert()
+                                    ? '. Ready on this server: '.(implode(', ', array_filter(['m4a', 'ogg', 'flac'], fn (string $f): bool => AudioFormats::serverSupports($f))) ?: 'none').'. A type the server cannot make stays hidden from members.'
                                     : '; this server has no ffmpeg yet, so they stay hidden from members until it does.')),
                     ]),
-                Forms\Components\Section::make('Developer API')
+                Section::make('Developer API')
                     ->description('Whether members on this plan can create API keys and call the developer API (/v1), and how fast. API generations use the plan\'s credits exactly like the dashboard. Leave the limits empty to use the defaults for the plan\'s processing priority.')
                     ->columns(3)
                     ->schema([
-                        Forms\Components\Toggle::make('api_access_enabled')
+                        Toggle::make('api_access_enabled')
                             ->label('Include the developer API')
                             ->helperText('On by default. The API only works on a paid plan (or pack) on the Premium voices that also allows commercial use: never on a free plan, a Standard-voices plan or during an unpaid trial. Turning it off, or turning commercial use off, stops this plan\'s keys at once (the keys are kept). Limits, credits, voices and the developer docs always follow this plan\'s current settings.')
                             ->default(true)
                             ->columnSpan(3),
-                        Forms\Components\TextInput::make('api_requests_per_minute')
+                        TextInput::make('api_requests_per_minute')
                             ->label('Generation requests a minute (whole account)')
                             ->numeric()
                             ->integer()
                             ->minValue(0)
                             ->maxValue(10000)
                             ->helperText('For all of a member\'s keys together. Status checks and other reads get three times this, at least 300 a minute. Empty or 0: the default for the plan\'s priority.')
-                            ->placeholder(fn (Forms\Get $get): string => 'Default: '.(config('listen.api.requests_per_minute')[(string) ($get('processing_priority') ?: 'standard')] ?? 60)),
-                        Forms\Components\TextInput::make('api_concurrency')
+                            ->placeholder(fn (Get $get): string => 'Default: '.(config('listen.api.requests_per_minute')[(string) ($get('processing_priority') ?: 'standard')] ?? 60)),
+                        TextInput::make('api_concurrency')
                             ->label('Generations at the same time')
                             ->numeric()
                             ->integer()
                             ->minValue(0)
-                            ->maxValue(\App\Services\Api\ApiConcurrency::MAX_MEMBER_SLOTS)
+                            ->maxValue(ApiConcurrency::MAX_MEMBER_SLOTS)
                             ->helperText('While the client waits for the file. Background generations waiting or running: five times this, at least 10. Empty or 0: the default for the plan\'s priority.')
-                            ->placeholder(fn (Forms\Get $get): string => 'Default: '.(config('listen.api.concurrency')[(string) ($get('processing_priority') ?: 'standard')] ?? 2)),
+                            ->placeholder(fn (Get $get): string => 'Default: '.(config('listen.api.concurrency')[(string) ($get('processing_priority') ?: 'standard')] ?? 2)),
                     ]),
-                Forms\Components\Section::make('Voice Cloning')
+                Section::make('Voice Cloning')
                     ->description('Turn cloning on for this plan, then set how many cloned voices each subscriber can keep. 0 uses the site-wide default.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Toggle::make('voice_cloning_enabled')
+                        Toggle::make('voice_cloning_enabled')
                             ->label('Enable Voice Cloning')
                             ->helperText('Subscribers on this plan can clone voices only while this is on. The site-wide voice cloning switch must also be on.')
                             ->default(false)
                             ->live()
                             ->columnSpan(2),
-                        Forms\Components\TextInput::make('voice_cloning_max_voices')
+                        TextInput::make('voice_cloning_max_voices')
                             ->label('Max Cloned Voices')
                             ->numeric()
                             ->minValue(0)
@@ -445,24 +483,24 @@ class PlanResource extends Resource
                             ->suffix('voices')
                             ->helperText('Leave this at 0 to use the site-wide default. Set 1–100 for an exact cap on this plan.'),
                     ]),
-                Forms\Components\Section::make('Voice Design')
+                Section::make('Voice Design')
                     ->description('Members on this plan describe a voice in words, compare the takes and keep the ones they like, then use them in the studio. Each design is paid from the plan\'s credits: every take speaks a short line, charged like any premium audio. Who sees Voice Design at all: Voice Design → Settings.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Toggle::make('voice_design_enabled')
+                        Toggle::make('voice_design_enabled')
                             ->label('Include Voice Design')
                             ->helperText('Off for every plan until you turn it on here and set its numbers. Until a plan has it, only the admin email sees Voice Design, whatever Voice Design → Settings says. Off on this plan, once another has it: its members try the tools and hear the voices, and the design button leads to the cheapest plan with it.')
                             ->default(false)
                             ->live()
                             ->columnSpan(2),
-                        Forms\Components\Toggle::make('voice_design_unlimited')
+                        Toggle::make('voice_design_unlimited')
                             ->label('No limit')
                             ->helperText('No monthly number and no cap on the voices a member keeps (each design is still paid from the plan\'s credits). The pricing card says "Unlimited".')
                             ->default(false)
                             ->live()
                             ->columnSpan(2)
-                            ->visible(fn (Forms\Get $get): bool => (bool) $get('voice_design_enabled')),
-                        Forms\Components\TextInput::make('voice_design_max_voices')
+                            ->visible(fn (Get $get): bool => (bool) $get('voice_design_enabled')),
+                        TextInput::make('voice_design_max_voices')
                             ->label('Designed voices in all')
                             ->numeric()
                             ->integer()
@@ -471,8 +509,8 @@ class PlanResource extends Resource
                             ->required()
                             ->suffix('voices')
                             ->helperText('While the subscription lasts. Every voice a member keeps counts, deleted ones too: deleting one does not give it back.')
-                            ->visible(fn (Forms\Get $get): bool => (bool) $get('voice_design_enabled') && ! $get('voice_design_unlimited')),
-                        Forms\Components\TextInput::make('voice_design_monthly_voices')
+                            ->visible(fn (Get $get): bool => (bool) $get('voice_design_enabled') && ! $get('voice_design_unlimited')),
+                        TextInput::make('voice_design_monthly_voices')
                             ->label('New voices a month')
                             ->numeric()
                             ->integer()
@@ -481,23 +519,23 @@ class PlanResource extends Resource
                             ->required()
                             ->suffix('voices')
                             ->helperText('New voices a member may keep in a credit month, on top of the total; deleting one does not give it back. 0: no monthly count, only the total.')
-                            ->visible(fn (Forms\Get $get): bool => (bool) $get('voice_design_enabled') && ! $get('voice_design_unlimited')),
-                        Forms\Components\Placeholder::make('voice_design_cost')
+                            ->visible(fn (Get $get): bool => (bool) $get('voice_design_enabled') && ! $get('voice_design_unlimited')),
+                        Placeholder::make('voice_design_cost')
                             ->label('What a design costs')
-                            ->content(fn (): string => \App\Support\VoiceDesign::costSummary())
+                            ->content(fn (): string => VoiceDesign::costSummary())
                             ->columnSpan(2)
-                            ->visible(fn (Forms\Get $get): bool => (bool) $get('voice_design_enabled')),
+                            ->visible(fn (Get $get): bool => (bool) $get('voice_design_enabled')),
                     ]),
-                Forms\Components\Section::make('Dub my video')
+                Section::make('Dub my video')
                     ->description('Members on this plan dub videos into an Arabic dialect and download them without the Listen mark. Each dub is paid from the plan\'s credits: one second of voice for each second of video (a 30-second video uses 30 seconds, 450 credits). Everyone else gets one free dub with the mark. Who sees the page at all: Video Dubbing → Settings.')
                     ->columns(3)
                     ->schema([
-                        Forms\Components\Toggle::make('video_dubbing_enabled')
+                        Toggle::make('video_dubbing_enabled')
                             ->label('Include video dubbing')
                             ->default(false)
                             ->live()
                             ->columnSpan(3),
-                        Forms\Components\TextInput::make('video_dubs_per_month')
+                        TextInput::make('video_dubs_per_month')
                             ->label('Videos a month')
                             ->numeric()
                             ->integer()
@@ -507,8 +545,8 @@ class PlanResource extends Resource
                             ->required()
                             ->suffix('videos')
                             ->helperText('0: no count, only the credits limit them. Members see how many they have left.')
-                            ->visible(fn (Forms\Get $get): bool => (bool) $get('video_dubbing_enabled')),
-                        Forms\Components\TextInput::make('video_dub_max_seconds')
+                            ->visible(fn (Get $get): bool => (bool) $get('video_dubbing_enabled')),
+                        TextInput::make('video_dub_max_seconds')
                             ->label('Longest video')
                             ->numeric()
                             ->integer()
@@ -518,70 +556,70 @@ class PlanResource extends Resource
                             ->required()
                             ->suffix('seconds')
                             ->helperText('Up to 180 seconds. A longer video waits longer and uses more credits.')
-                            ->visible(fn (Forms\Get $get): bool => (bool) $get('video_dubbing_enabled')),
-                        Forms\Components\Placeholder::make('video_dub_example')
+                            ->visible(fn (Get $get): bool => (bool) $get('video_dubbing_enabled')),
+                        Placeholder::make('video_dub_example')
                             ->label('What a member gets')
-                            ->content(function (Forms\Get $get): string {
+                            ->content(function (Get $get): string {
                                 $credits = (int) $get('monthly_chars');
                                 $seconds = max(5, (int) ($get('video_dub_max_seconds') ?: 60));
-                                $byCredits = intdiv(max(0, $credits), \App\Support\Credits::forSeconds($seconds));
+                                $byCredits = intdiv(max(0, $credits), Credits::forSeconds($seconds));
                                 $count = (int) $get('video_dubs_per_month');
 
                                 return sprintf('Their credits cover about %s videos of %d seconds a month%s.', number_format($byCredits), $seconds,
                                     $count > 0 ? ', and the count stops them at '.number_format($count) : '');
                             })
-                            ->visible(fn (Forms\Get $get): bool => (bool) $get('video_dubbing_enabled')),
+                            ->visible(fn (Get $get): bool => (bool) $get('video_dubbing_enabled')),
                     ]),
-                Forms\Components\Section::make('Voice agents')
+                Section::make('Voice agents')
                     ->description('Members on this plan put voice agents live: agents that answer their customers on their website, a link and a QR code. Calls are paid from the plan\'s credits, at the rate in Agents → Settings. A member whose plan does not include agents can still build and test one agent with the free test minutes, and sees the cheapest plan that has them. Who sees Agents at all: Agents → Settings.')
                     ->columns(2)
-                    ->visible(fn (): bool => \App\Support\Agents\AgentAccess::planColumns())
+                    ->visible(fn (): bool => AgentAccess::planColumns())
                     ->schema([
-                        Forms\Components\Toggle::make('agents_enabled')
+                        Toggle::make('agents_enabled')
                             ->label('Include voice agents')
                             ->helperText('Off: this plan\'s members cannot put an agent live, and the agents of members who move to it stop taking calls (callers hear the agent is not available; nothing is deleted).')
                             ->default(false)
                             ->live()
                             ->columnSpan(2),
-                        Forms\Components\TextInput::make('agents_max')
+                        TextInput::make('agents_max')
                             ->label('Agents a member can have')
                             ->numeric()->integer()->minValue(0)->maxValue(100)->default(0)->required()
                             ->suffix('agents')
                             ->helperText(fn (): string => '0 uses the site default ('.(int) config('listen.agents.max_agents', 10).').')
-                            ->visible(fn (Forms\Get $get): bool => (bool) $get('agents_enabled')),
-                        Forms\Components\TextInput::make('agent_minutes_per_month')
+                            ->visible(fn (Get $get): bool => (bool) $get('agents_enabled')),
+                        TextInput::make('agent_minutes_per_month')
                             ->label('Call minutes a month')
                             ->numeric()->integer()->minValue(0)->maxValue(100000)->default(0)->required()
                             ->suffix('minutes')
                             ->helperText('0: only the plan\'s credits limit them. A number keeps calls below it even when credits are left (they stay for voice-overs). Members see the minutes left.')
-                            ->visible(fn (Forms\Get $get): bool => (bool) $get('agents_enabled')),
-                        Forms\Components\TextInput::make('agent_concurrent_calls')
+                            ->visible(fn (Get $get): bool => (bool) $get('agents_enabled')),
+                        TextInput::make('agent_concurrent_calls')
                             ->label('Calls at the same time')
                             ->numeric()->integer()->minValue(0)->maxValue(50)->default(0)->required()
                             ->suffix('calls')
                             ->helperText(fn (): string => 'Across all of a member\'s agents (one agent can use them all). A caller who rings while they are all busy waits for the next free one, and can leave a number to be called back. 0 uses the site default ('.(int) config('listen.agents.concurrent_calls', 3).').')
-                            ->visible(fn (Forms\Get $get): bool => (bool) $get('agents_enabled')),
-                        Forms\Components\TextInput::make('agent_max_call_minutes')
+                            ->visible(fn (Get $get): bool => (bool) $get('agents_enabled')),
+                        TextInput::make('agent_max_call_minutes')
                             ->label('Longest call')
-                            ->numeric()->integer()->minValue(0)->maxValue(\App\Support\Agents\AgentAccess::MAX_CALL_MINUTES)->default(0)->required()
+                            ->numeric()->integer()->minValue(0)->maxValue(AgentAccess::MAX_CALL_MINUTES)->default(0)->required()
                             ->suffix('minutes')
-                            ->helperText(fn (): string => 'Up to '.\App\Support\Agents\AgentAccess::MAX_CALL_MINUTES.' minutes; the agent says goodbye as the time runs out. Each owner can set less on an agent. 0 uses the site default ('.intdiv((int) config('listen.agents.max_call_seconds', 600), 60).').')
-                            ->visible(fn (Forms\Get $get): bool => (bool) $get('agents_enabled')),
-                        Forms\Components\Placeholder::make('agents_cost')
+                            ->helperText(fn (): string => 'Up to '.AgentAccess::MAX_CALL_MINUTES.' minutes; the agent says goodbye as the time runs out. Each owner can set less on an agent. 0 uses the site default ('.intdiv((int) config('listen.agents.max_call_seconds', 600), 60).').')
+                            ->visible(fn (Get $get): bool => (bool) $get('agents_enabled')),
+                        Placeholder::make('agents_cost')
                             ->label('What a member gets, and what it costs')
-                            ->content(fn (Forms\Get $get): HtmlString => self::agentEconomics($get))
+                            ->content(fn (Get $get): HtmlString => self::agentEconomics($get))
                             ->columnSpan(2)
-                            ->visible(fn (Forms\Get $get): bool => (bool) $get('agents_enabled')),
+                            ->visible(fn (Get $get): bool => (bool) $get('agents_enabled')),
                     ]),
-                Forms\Components\Section::make('Pricing page')
+                Section::make('Pricing page')
                     ->description('The lines under the price on this plan\'s card. They are written for you in English and Arabic from this plan\'s settings above, so changing a setting updates the card by itself. Tick the ones to show.')
                     ->schema([
-                        Forms\Components\Toggle::make('pricing_use_custom_text')
+                        Toggle::make('pricing_use_custom_text')
                             ->label('Use my own text instead')
                             ->default(false)
                             ->live()
                             ->helperText('Off: the card shows the lines ticked below. On: it shows the English and Arabic lists you write yourself, which open below. Lists you wrote before are still saved.'),
-                        Forms\Components\CheckboxList::make('pricing_lines')
+                        CheckboxList::make('pricing_lines')
                             ->label('Show on the pricing page')
                             ->options(PlanPricingLines::adminOptions())
                             ->descriptions(fn (Get $get, ?Plan $record): array => self::pricingLineDescriptions(self::planFromForm($get, $record)))
@@ -591,35 +629,35 @@ class PlanResource extends Resource
                             ->bulkToggleable()
                             ->live()
                             ->hidden(fn (Get $get): bool => (bool) $get('pricing_use_custom_text')),
-                        Forms\Components\Grid::make(2)
+                        Grid::make(2)
                             ->hidden(fn (Get $get): bool => (bool) $get('pricing_use_custom_text'))
                             ->schema([
                                 self::extraLinesRepeater('pricing_extra_lines_en', 'Extra lines (English)', 'e.g. Arabic and English voices'),
                                 self::extraLinesRepeater('pricing_extra_lines_ar', 'Extra lines (Arabic)', 'مثل: أصوات عربية وإنجليزية'),
                             ]),
-                        Forms\Components\Placeholder::make('pricing_preview')
+                        Placeholder::make('pricing_preview')
                             ->label('Preview')
                             ->content(fn (Get $get, ?Plan $record): HtmlString => self::pricingPreview(self::planFromForm($get, $record), $get))
                             ->hidden(fn (Get $get): bool => (bool) $get('pricing_use_custom_text')),
                     ]),
-                Forms\Components\Section::make('Plan Features (English)')
+                Section::make('Plan Features (English)')
                     ->description('Your own lines for the English card, used while "Use my own text instead" is on. An empty list starts from the automatic lines. Write {agents} as a value to show this plan\'s voice agents and call minutes, always as its settings are.')
                     ->visible(fn (Get $get): bool => (bool) $get('pricing_use_custom_text'))
                     ->schema([
-                        Forms\Components\Repeater::make('features_en')
+                        Repeater::make('features_en')
                             ->label('Features List (EN)')
                             ->schema([
-                                Forms\Components\TextInput::make('label')
+                                TextInput::make('label')
                                     ->label('Label')
                                     ->required()
                                     ->placeholder('e.g. Requests')
                                     ->columnSpan(1),
-                                Forms\Components\TextInput::make('value')
+                                TextInput::make('value')
                                     ->label('Value')
                                     ->required()
                                     ->placeholder('e.g. Unlimited')
                                     ->columnSpan(1),
-                                Forms\Components\Select::make('icon')
+                                Select::make('icon')
                                     ->label('Icon')
                                     ->options([
                                         'activity' => '📈 Activity (Requests)',
@@ -642,7 +680,7 @@ class PlanResource extends Resource
                                     ->columnSpan(1),
                             ])
                             ->columns(3)
-                            ->afterStateHydrated(fn (Forms\Components\Repeater $component, ?Plan $record) => self::hydrateOwnLines($component, $record, 'en'))
+                            ->afterStateHydrated(fn (Repeater $component, ?Plan $record) => self::hydrateOwnLines($component, $record, 'en'))
                             ->addActionLabel('Add Feature')
                             ->defaultItems(0)
                             // Drag a line by its handle; the arrows still move it one place.
@@ -651,24 +689,24 @@ class PlanResource extends Resource
                             ->itemLabel(fn (array $state): ?string => self::lineLabel($state))
                             ->collapsible(),
                     ]),
-                Forms\Components\Section::make('خصائص الخطة (العربية)')
+                Section::make('خصائص الخطة (العربية)')
                     ->description('سطورك الخاصة لبطاقة الأسعار العربية، وتُستخدم عند تفعيل "Use my own text instead". القائمة الفارغة تبدأ من السطور التلقائية. اكتب {agents} في القيمة ليظهر عدد الوكلاء ودقائق المكالمات كما في إعدادات الباقة دائمًا.')
                     ->visible(fn (Get $get): bool => (bool) $get('pricing_use_custom_text'))
                     ->schema([
-                        Forms\Components\Repeater::make('features_ar')
+                        Repeater::make('features_ar')
                             ->label('قائمة الخصائص (AR)')
                             ->schema([
-                                Forms\Components\TextInput::make('label')
+                                TextInput::make('label')
                                     ->label('التسمية')
                                     ->required()
                                     ->placeholder('مثل: الطلبات')
                                     ->columnSpan(1),
-                                Forms\Components\TextInput::make('value')
+                                TextInput::make('value')
                                     ->label('القيمة')
                                     ->required()
                                     ->placeholder('مثل: غير محدود')
                                     ->columnSpan(1),
-                                Forms\Components\Select::make('icon')
+                                Select::make('icon')
                                     ->label('الأيقونة')
                                     ->options([
                                         'activity' => '📈 النشاط (الطلبات)',
@@ -691,7 +729,7 @@ class PlanResource extends Resource
                                     ->columnSpan(1),
                             ])
                             ->columns(3)
-                            ->afterStateHydrated(fn (Forms\Components\Repeater $component, ?Plan $record) => self::hydrateOwnLines($component, $record, 'ar'))
+                            ->afterStateHydrated(fn (Repeater $component, ?Plan $record) => self::hydrateOwnLines($component, $record, 'ar'))
                             ->addActionLabel('إضافة خاصية')
                             ->defaultItems(0)
                             // Drag a line by its handle; the arrows still move it one place.
@@ -707,19 +745,19 @@ class PlanResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->searchable()
                     ->sortable()
                     ->weight('bold'),
-                Tables\Columns\TextColumn::make('slug')
+                TextColumn::make('slug')
                     ->searchable()
                     ->sortable()
                     ->color('gray'),
-                Tables\Columns\TextColumn::make('price_cents')
+                TextColumn::make('price_cents')
                     ->label('Monthly')
                     ->formatStateUsing(fn (int $state) => $state <= 0 ? 'Free' : '$' . number_format($state / 100, 2))
                     ->sortable(),
-                Tables\Columns\TextColumn::make('voice_tier')
+                TextColumn::make('voice_tier')
                     ->label('Voice Tier')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => match ($state) {
@@ -730,40 +768,40 @@ class PlanResource extends Resource
                         'hd' => 'success',
                         default => 'gray',
                     }),
-                Tables\Columns\TextColumn::make('monthly_chars')
+                TextColumn::make('monthly_chars')
                     ->label('Credits/mo')
                     ->numeric()
-                    ->description(fn (Plan $record): string => number_format(\App\Support\Credits::minutesFor((int) $record->monthly_chars)).' voice min')
+                    ->description(fn (Plan $record): string => number_format(Credits::minutesFor((int) $record->monthly_chars)).' voice min')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('monthly_requests')
+                TextColumn::make('monthly_requests')
                     ->label('Requests/mo')
                     ->formatStateUsing(fn (int $state) => $state <= 0 ? 'Unlimited' : number_format($state))
                     ->sortable(),
-                Tables\Columns\IconColumn::make('is_active')
+                IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean()
                     ->sortable(),
-                Tables\Columns\IconColumn::make('is_featured')
+                IconColumn::make('is_featured')
                     ->label('Featured')
                     ->boolean()
                     ->sortable(),
-                Tables\Columns\IconColumn::make('dialogue_enabled')
+                IconColumn::make('dialogue_enabled')
                     ->label('Dialogue')
                     ->boolean()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\IconColumn::make('custom_prompt_enabled')
+                IconColumn::make('custom_prompt_enabled')
                     ->label('Custom Prompt')
                     ->boolean()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\IconColumn::make('sound_effects_enabled')
+                IconColumn::make('sound_effects_enabled')
                     ->label('Sound environments')
                     ->boolean()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\IconColumn::make('commercial_use_allowed')
+                IconColumn::make('commercial_use_allowed')
                     ->label('Commercial')
                     ->boolean()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('discount_percentage')
+                TextColumn::make('discount_percentage')
                     ->label('Discount')
                     ->formatStateUsing(fn (?int $state, Plan $record) => $record->hasActiveDiscount()
                         ? $state . '%'
@@ -771,24 +809,24 @@ class PlanResource extends Resource
                     ->color(fn (Plan $record) => $record->hasActiveDiscount() ? 'success' : 'gray')
                     ->badge()
                     ->toggleable(isToggledHiddenByDefault: false),
-                Tables\Columns\IconColumn::make('voice_cloning_enabled')
+                IconColumn::make('voice_cloning_enabled')
                     ->label('Voice Cloning')
                     ->boolean()
                     ->toggleable(isToggledHiddenByDefault: false),
-                Tables\Columns\TextColumn::make('agents_max')
+                TextColumn::make('agents_max')
                     ->label('Voice agents')
                     ->state(function (Plan $record): string {
-                        if (! \App\Support\Agents\AgentAccess::planIncludes($record)) {
+                        if (! AgentAccess::planIncludes($record)) {
                             return 'Off';
                         }
-                        $limits = \App\Support\Agents\AgentAccess::limits($record);
+                        $limits = AgentAccess::limits($record);
 
                         return trans_choice(':count agent|:count agents', $limits['agents'], [], 'en')
                             .($limits['minutes'] > 0 ? ' · '.number_format($limits['minutes']).' min' : '');
                     })
-                    ->visible(fn (): bool => \App\Support\Agents\AgentAccess::planColumns())
+                    ->visible(fn (): bool => AgentAccess::planColumns())
                     ->toggleable(isToggledHiddenByDefault: false),
-                Tables\Columns\TextColumn::make('voice_design_max_voices')
+                TextColumn::make('voice_design_max_voices')
                     ->label('Voice Design')
                     ->formatStateUsing(function ($state, Plan $record): string {
                         if (! $record->voice_design_enabled) {
@@ -802,7 +840,7 @@ class PlanResource extends Resource
                         return (int) $record->voice_design_monthly_voices > 0 ? $kept.', '.$record->voice_design_monthly_voices.' new a month' : $kept;
                     })
                     ->toggleable(isToggledHiddenByDefault: false),
-                Tables\Columns\TextColumn::make('voice_cloning_max_voices')
+                TextColumn::make('voice_cloning_max_voices')
                     ->label('Clone limit')
                     ->formatStateUsing(function ($state, Plan $record): string {
                         if (! $record->voice_cloning_enabled) {
@@ -814,7 +852,7 @@ class PlanResource extends Resource
                         return $configured > 0 ? $configured.' voices' : 'Site default';
                     })
                     ->toggleable(isToggledHiddenByDefault: false),
-                Tables\Columns\IconColumn::make('stripe_synced')
+                IconColumn::make('stripe_synced')
                     ->label('Stripe')
                     ->state(fn (Plan $record): bool => $record->hasStripeConfig())
                     ->boolean()
@@ -825,13 +863,13 @@ class PlanResource extends Resource
                     ->tooltip(fn (Plan $record): string => $record->hasStripeConfig()
                         ? 'Product ID: ' . ($record->stripe_product_id ?? '-')
                         : 'Not synced to Stripe'),
-                Tables\Columns\TextColumn::make('stripe_price_monthly')
+                TextColumn::make('stripe_price_monthly')
                     ->label('Stripe monthly price')
                     ->placeholder('-')
                     ->copyable()
                     ->color(fn (Plan $record): ?string => self::priceIsShared($record->stripe_price_monthly) ? 'danger' : null)
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('stripe_price_yearly')
+                TextColumn::make('stripe_price_yearly')
                     ->label('Stripe yearly price')
                     ->placeholder('-')
                     ->copyable()
@@ -839,18 +877,18 @@ class PlanResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('is_active')
+                TernaryFilter::make('is_active')
                     ->label('Active'),
-                Tables\Filters\SelectFilter::make('voice_tier')
+                SelectFilter::make('voice_tier')
                     ->options([
                         'standard' => 'Standard',
                         'hd' => 'Premium',
                     ]),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\Action::make('syncStripe')
+            ->recordActions([
+                ViewAction::make(),
+                EditAction::make(),
+                Action::make('syncStripe')
                     ->label('Sync Stripe')
                     ->icon('heroicon-o-arrow-path')
                     ->color('success')
@@ -866,7 +904,7 @@ class PlanResource extends Resource
                                 'Stripe Sync Successful',
                                 "Plan '{$record->name}' has been synced to Stripe.",
                             )->send();
-                        } catch (\Exception $e) {
+                        } catch (Exception $e) {
                             Notification::make()
                                 ->title('Stripe Sync Failed')
                                 ->body($e->getMessage())
@@ -875,16 +913,16 @@ class PlanResource extends Resource
                         }
                     }),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                    Tables\Actions\BulkAction::make('syncAllStripe')
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                    BulkAction::make('syncAllStripe')
                         ->label('Sync All to Stripe')
                         ->icon('heroicon-o-arrow-path')
                         ->color('success')
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
-                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                        ->action(function (Collection $records) {
                             $syncService = app(StripeProductSyncService::class);
                             $success = 0;
                             $failed = 0;
@@ -900,7 +938,7 @@ class PlanResource extends Resource
                                     } else {
                                         $failed++;
                                     }
-                                } catch (\Exception $e) {
+                                } catch (Exception $e) {
                                     $failed++;
                                 }
                             }
@@ -919,10 +957,10 @@ class PlanResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPlans::route('/'),
-            'create' => Pages\CreatePlan::route('/create'),
-            'view' => Pages\ViewPlan::route('/{record}'),
-            'edit' => Pages\EditPlan::route('/{record}/edit'),
+            'index' => ListPlans::route('/'),
+            'create' => CreatePlan::route('/create'),
+            'view' => ViewPlan::route('/{record}'),
+            'edit' => EditPlan::route('/{record}/edit'),
         ];
     }
 
@@ -933,14 +971,14 @@ class PlanResource extends Resource
      */
     private static function agentEconomics(Get $get): HtmlString
     {
-        $rate = \App\Support\Agents\AgentAccess::creditsPerMinute();
+        $rate = AgentAccess::creditsPerMinute();
         $credits = max(0, (int) $get('monthly_chars'));
         $price = max(0.0, (float) ($get('price_dollars') ?? 0));
         $cap = max(0, (int) $get('agent_minutes_per_month'));
         $byCredits = intdiv($credits, $rate);
         $minutes = $cap > 0 ? min($cap, $byCredits) : $byCredits;
-        $typical = \App\Support\Agents\AgentCost::typical();
-        $heavy = \App\Support\Agents\AgentCost::heavy();
+        $typical = AgentCost::typical();
+        $heavy = AgentCost::heavy();
         $earns = $byCredits > 0 ? $price / ($credits / $rate) : 0.0;
         $money = fn (float $v): string => '$'.number_format($v, $v < 1 ? 3 : 2);
         $margin = fn (float $cost): string => $earns > 0 ? (int) round(($earns - $cost) / $earns * 100).'%' : '—';
@@ -949,7 +987,7 @@ class PlanResource extends Resource
             sprintf('Their %s credits pay for about <b>%s call minutes</b> a month at %s credits a minute%s (the same credits as their voice-overs: a call minute uses %s audio minutes).',
                 number_format($credits), number_format($byCredits), number_format($rate),
                 $cap > 0 && $cap < $byCredits ? ', and this plan stops calls at <b>'.number_format($cap).'</b>' : '',
-                rtrim(rtrim(number_format($rate / \App\Support\Credits::PER_MINUTE, 1), '0'), '.')),
+                rtrim(rtrim(number_format($rate / Credits::PER_MINUTE, 1), '0'), '.')),
             sprintf('A call minute earns about <b>%s</b> at %s a month.', $money($earns), $money($price)),
             sprintf('A call minute costs Listen about <b>%s</b> on a typical call (3 minutes, an agent with notes): <b>%s</b> margin; about <b>%s</b> on a heavy one (10 minutes, every note and file slot full): <b>%s</b> margin.',
                 $money($typical), $margin($typical), $money($heavy), $margin($heavy)),
@@ -1003,25 +1041,25 @@ class PlanResource extends Resource
         return $descriptions;
     }
 
-    private static function extraLinesRepeater(string $name, string $label, string $placeholder): Forms\Components\Repeater
+    private static function extraLinesRepeater(string $name, string $label, string $placeholder): Repeater
     {
-        return Forms\Components\Repeater::make($name)
+        return Repeater::make($name)
             ->label($label)
             ->helperText('Shown after the automatic lines. Leave the value empty for a check mark.')
             ->schema([
-                Forms\Components\TextInput::make('label')
+                TextInput::make('label')
                     ->label('Text')
                     ->required()
                     ->maxLength(80)
                     ->placeholder($placeholder)
                     ->live(onBlur: true)
                     ->columnSpan(2),
-                Forms\Components\TextInput::make('value')
+                TextInput::make('value')
                     ->label('Value')
                     ->maxLength(40)
                     ->placeholder('✓')
                     ->live(onBlur: true),
-                Forms\Components\Select::make('icon')
+                Select::make('icon')
                     ->label('Icon')
                     ->options(PlanPricingLines::ICONS)
                     ->default('check')
@@ -1067,7 +1105,7 @@ class PlanResource extends Resource
                     .'<span>'.e($line['label']).'</span><strong>'.e($line['value']).'</strong></li>';
             }
             $headline = number_format((int) $plan->monthly_chars).' '.e(__('ui.pricing.characters_per_month', [], $locale))
-                .' · '.e(__('ui.pricing.voice_minutes_short', ['count' => number_format(\App\Support\Credits::minutesFor((int) $plan->monthly_chars))], $locale));
+                .' · '.e(__('ui.pricing.voice_minutes_short', ['count' => number_format(Credits::minutesFor((int) $plan->monthly_chars))], $locale));
             $columns .= '<div dir="'.$dir.'" style="flex:1;min-width:16rem">'
                 .'<div style="font-weight:600;margin-bottom:.4rem">'.$headline.'</div>'
                 .'<ul style="margin:0;padding:0;list-style:none">'.($rows !== '' ? $rows : '<li>—</li>').'</ul></div>';
@@ -1121,7 +1159,7 @@ class PlanResource extends Resource
      * ones to start from. Each line is keyed the way the repeater keys its items, so
      * dragging one sends keys it knows (numbered keys broke the drag with a 500).
      */
-    private static function hydrateOwnLines(Forms\Components\Repeater $component, ?Plan $record, string $locale): void
+    private static function hydrateOwnLines(Repeater $component, ?Plan $record, string $locale): void
     {
         if (! $record) {
             return;
@@ -1132,7 +1170,7 @@ class PlanResource extends Resource
             $lines = self::normalizeRepeaterItems(PlanPricingLines::automatic($record, $locale));
         }
 
-        $component->state(collect($lines)->mapWithKeys(fn (array $line): array => [(string) \Illuminate\Support\Str::uuid() => $line])->all());
+        $component->state(collect($lines)->mapWithKeys(fn (array $line): array => [(string) Str::uuid() => $line])->all());
     }
 
     /**

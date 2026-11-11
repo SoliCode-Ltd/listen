@@ -2,13 +2,19 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Placeholder;
+use Filament\Schemas\Components\Utilities\Get;
 use App\Models\DesignedVoice;
 use App\Models\SiteSetting;
 use App\Support\VoiceDesign;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 
@@ -21,9 +27,9 @@ class VoiceDesignSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
-    protected static ?string $navigationGroup = 'Voice Design';
+    protected static string | \UnitEnum | null $navigationGroup = 'Voice Design';
 
     protected static ?int $navigationSort = 2;
 
@@ -31,7 +37,7 @@ class VoiceDesignSettings extends Page implements HasForms
 
     protected static ?string $title = 'Voice Design Settings';
 
-    protected static string $view = 'filament.pages.voice-design-settings';
+    protected string $view = 'filament.pages.voice-design-settings';
 
     public ?array $data = [];
 
@@ -45,14 +51,14 @@ class VoiceDesignSettings extends Page implements HasForms
         ]);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Who can use Voice Design')
+        return $schema
+            ->components([
+                Section::make('Who can use Voice Design')
                     ->description('Which plans include it, how many voices their members keep and how many new ones a month: Admin → Plans → Voice Design.')
                     ->schema([
-                        Forms\Components\Radio::make('voice_design_audience')
+                        Radio::make('voice_design_audience')
                             ->label('Open to')
                             ->options([
                                 VoiceDesign::AUDIENCE_OFF => 'Nobody (switched off)',
@@ -68,17 +74,17 @@ class VoiceDesignSettings extends Page implements HasForms
                             ->required(),
                     ]),
 
-                Forms\Components\Section::make('Designs')
+                Section::make('Designs')
                     ->columns(3)
                     ->schema([
-                        Forms\Components\Select::make('voice_design_takes')
+                        Select::make('voice_design_takes')
                             ->label('Takes a design makes')
                             ->options([1 => '1 take', 2 => '2 takes', 3 => '3 takes'])
                             ->default(3)
                             ->live()
                             ->required()
                             ->helperText('Each take is a voice of its own speaking the same line, and is charged. The demo always makes one.'),
-                        Forms\Components\TextInput::make('voice_design_max_per_user')
+                        TextInput::make('voice_design_max_per_user')
                             ->label('Voices a member keeps (site default)')
                             ->numeric()
                             ->integer()
@@ -87,7 +93,7 @@ class VoiceDesignSettings extends Page implements HasForms
                             ->default(10)
                             ->required()
                             ->helperText('Used by plans whose own number is 0.'),
-                        Forms\Components\TextInput::make('voice_design_hourly_limit')
+                        TextInput::make('voice_design_hourly_limit')
                             ->label('Designs a member may start an hour')
                             ->numeric()
                             ->integer()
@@ -95,15 +101,15 @@ class VoiceDesignSettings extends Page implements HasForms
                             ->maxValue(200)
                             ->default(12)
                             ->required(),
-                        Forms\Components\Placeholder::make('cost')
+                        Placeholder::make('cost')
                             ->label('What a design costs')
-                            ->content(fn (Forms\Get $get): string => VoiceDesign::costSummary((int) ($get('voice_design_takes') ?: 3)))
+                            ->content(fn (Get $get): string => VoiceDesign::costSummary((int) ($get('voice_design_takes') ?: 3)))
                             ->columnSpanFull(),
                     ]),
 
-                Forms\Components\Section::make('Statistics')
+                Section::make('Statistics')
                     ->schema([
-                        Forms\Components\Placeholder::make('stats')
+                        Placeholder::make('stats')
                             ->label('')
                             ->content(function (): string {
                                 $kept = DesignedVoice::query()->saved()->count();

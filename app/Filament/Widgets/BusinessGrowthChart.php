@@ -9,15 +9,15 @@ class BusinessGrowthChart extends ChartWidget
 {
     use UsesBusinessStats;
 
-    protected static ?string $heading = 'Growth: signups vs active members';
+    protected ?string $heading = 'Growth: signups vs active members';
 
-    protected static ?string $description = 'Monthly signups (excl. admins), members who generated audio that month, and demo generations.';
+    protected ?string $description = 'Monthly signups (excl. admins), members who generated audio that month, and demo generations.';
 
     protected static ?int $sort = -20;
 
-    protected static ?string $pollingInterval = null;
+    protected ?string $pollingInterval = null;
 
-    protected static ?string $maxHeight = '300px';
+    protected ?string $maxHeight = '300px';
 
     protected function getData(): array
     {

@@ -1,0 +1,26 @@
+/*
+ * The admin's look: Filament's own stylesheet, plus the styling classes the admin's
+ * own pages use (app/Filament and resources/views/filament), which Filament's
+ * ready-made stylesheet does not carry. Compiled once into
+ * public/css/filament/admin/theme.css (committed; the servers need no build step):
+ *
+ *   npm install && npm run build:admin-theme
+ *
+ * Run it again whenever a class is added in those folders: AdminThemeTest says when.
+ */
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+
+/*
+ * Filled primary buttons keep the look they had before Filament 4: the brand orange
+ * (shade 600, lighter on hover) with white text. Filament 4 would pick the light amber
+ * (400) with dark text instead. Light mode only; dark mode is Filament's own.
+ */
+html:not(.dark) .fi-btn.fi-color.fi-color-primary:not(.fi-outlined) {
+    --bg: var(--primary-600);
+    --hover-bg: var(--primary-500);
+    --text: var(--color-white);
+    --hover-text: var(--color-white);
+}

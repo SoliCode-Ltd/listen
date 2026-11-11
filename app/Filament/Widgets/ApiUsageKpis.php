@@ -12,7 +12,7 @@ class ApiUsageKpis extends BaseWidget
 
     protected static ?int $sort = -27;
 
-    protected static ?string $pollingInterval = null;
+    protected ?string $pollingInterval = null;
 
     protected ?string $heading = 'API usage & cost (last 30 days)';
 

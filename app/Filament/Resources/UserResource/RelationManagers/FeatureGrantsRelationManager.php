@@ -2,10 +2,18 @@
 
 namespace App\Filament\Resources\UserResource\RelationManagers;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Actions\CreateAction;
+use Filament\Actions\Action;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
 use App\Models\UserFeatureGrant;
 use App\Support\PlanFeatures;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -26,14 +34,14 @@ class FeatureGrantsRelationManager extends RelationManager
         return false;
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form->schema([
-            Forms\Components\Select::make('feature')
+        return $schema->components([
+            Select::make('feature')
                 ->label('Option')
                 ->options(PlanFeatures::GRANTABLE)
                 ->required(),
-            Forms\Components\TextInput::make('days')
+            TextInput::make('days')
                 ->label('For how many days')
                 ->numeric()
                 ->minValue(1)
@@ -42,11 +50,11 @@ class FeatureGrantsRelationManager extends RelationManager
                 ->required()
                 ->helperText('The option switches itself off after this, for this member only.')
                 ->visibleOn('create'),
-            Forms\Components\DateTimePicker::make('expires_at')
+            DateTimePicker::make('expires_at')
                 ->label('Ends')
                 ->required()
                 ->visibleOn('edit'),
-            Forms\Components\TextInput::make('note')
+            TextInput::make('note')
                 ->label('Note (only admins see it)')
                 ->maxLength(255),
         ]);
@@ -58,29 +66,29 @@ class FeatureGrantsRelationManager extends RelationManager
             ->recordTitleAttribute('feature')
             ->defaultSort('expires_at', 'desc')
             ->columns([
-                Tables\Columns\TextColumn::make('feature')
+                TextColumn::make('feature')
                     ->label('Option')
                     ->formatStateUsing(fn (string $state): string => PlanFeatures::GRANTABLE[$state] ?? $state),
-                Tables\Columns\TextColumn::make('expires_at')
+                TextColumn::make('expires_at')
                     ->label('Ends')
                     ->dateTime()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->label('Status')
                     ->badge()
                     ->state(fn (UserFeatureGrant $record): string => $record->isActive() ? 'Active' : 'Ended')
                     ->color(fn (string $state): string => $state === 'Active' ? 'success' : 'gray'),
-                Tables\Columns\TextColumn::make('grantedBy.email')
+                TextColumn::make('grantedBy.email')
                     ->label('Given by')
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('note')
+                TextColumn::make('note')
                     ->limit(60)
                     ->toggleable(),
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make()
+                CreateAction::make()
                     ->label('Give an option for a few days')
-                    ->mutateFormDataUsing(function (array $data): array {
+                    ->mutateDataUsing(function (array $data): array {
                         $data['expires_at'] = now()->addDays(max(1, min(30, (int) ($data['days'] ?? 2))));
                         $data['granted_by'] = auth()->id();
                         unset($data['days']);
@@ -88,15 +96,15 @@ class FeatureGrantsRelationManager extends RelationManager
                         return $data;
                     }),
             ])
-            ->actions([
-                Tables\Actions\Action::make('end')
+            ->recordActions([
+                Action::make('end')
                     ->label('End now')
                     ->color('danger')
                     ->requiresConfirmation()
                     ->visible(fn (UserFeatureGrant $record): bool => $record->isActive())
                     ->action(fn (UserFeatureGrant $record) => $record->update(['expires_at' => now()])),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                EditAction::make(),
+                DeleteAction::make(),
             ]);
     }
 }

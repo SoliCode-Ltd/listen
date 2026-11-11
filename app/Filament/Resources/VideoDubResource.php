@@ -2,13 +2,28 @@
 
 namespace App\Filament\Resources;
 
+use Illuminate\Auth\Access\Response as AccessResponse;
+use App\Support\VoiceFlag;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Illuminate\Database\Eloquent\Collection;
+use App\Filament\Widgets\VideoDubStats;
+use App\Filament\Resources\VideoDubResource\Pages\ListVideoDubs;
+use App\Filament\Resources\VideoDubResource\Pages\ViewVideoDub;
 use App\Filament\Resources\VideoDubResource\Pages;
 use App\Models\VideoDub;
 use App\Models\Voice;
 use App\Services\Dubbing\VideoDubRunner;
 use App\Support\VideoDubbing;
 use Filament\Infolists;
-use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -25,9 +40,9 @@ class VideoDubResource extends Resource
 {
     protected static ?string $model = VideoDub::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-film';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-film';
 
-    protected static ?string $navigationGroup = 'Video Dubbing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Video Dubbing';
 
     protected static ?int $navigationSort = 1;
 
@@ -70,7 +85,7 @@ class VideoDubResource extends Resource
 
     public static function dialectLabel(?string $code): string
     {
-        return \App\Support\VoiceFlag::label((string) $code, false);
+        return VoiceFlag::label((string) $code, false);
     }
 
     /** The studio's name for the voice (the library card it was picked as), with the speech engine's. */
@@ -101,34 +116,34 @@ class VideoDubResource extends Resource
         return $value === null ? '—' : '$'.number_format($value, $decimals);
     }
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Schema $schema): Schema
     {
         $seconds = fn (string $key) => fn (VideoDub $r): ?string => isset($r->report[$key]['seconds']) ? number_format((float) $r->report[$key]['seconds'], 1).' s' : null;
 
-        return $infolist->schema([
-            Infolists\Components\Section::make('Dub')
+        return $schema->components([
+            Section::make('Dub')
                 ->columns(4)
                 ->schema([
-                    Infolists\Components\TextEntry::make('user.email')->label('Member')->copyable(),
-                    Infolists\Components\TextEntry::make('status')
+                    TextEntry::make('user.email')->label('Member')->copyable(),
+                    TextEntry::make('status')
                         ->badge()
                         ->formatStateUsing(fn (?string $state): string => self::STATUSES[$state] ?? (string) $state)
                         ->color(fn (?string $state): string => self::statusColor($state)),
-                    Infolists\Components\TextEntry::make('is_free')
+                    TextEntry::make('is_free')
                         ->label('Paid by')
                         ->badge()
                         ->formatStateUsing(fn (bool $state): string => $state ? 'Free (with the mark)' : 'Plan credits')
                         ->color(fn (bool $state): string => $state ? 'gray' : 'primary'),
-                    Infolists\Components\TextEntry::make('created_at')->label('Sent')->dateTime(),
-                    Infolists\Components\TextEntry::make('original_name')->label('File')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('video_seconds')->label('Video length')->suffix(' s'),
-                    Infolists\Components\TextEntry::make('language')->formatStateUsing(fn (?string $state): string => $state === 'en' ? 'English' : 'Arabic'),
-                    Infolists\Components\TextEntry::make('dialect')->label('Dialect or accent')->formatStateUsing(fn (?string $state): string => self::dialectLabel($state)),
-                    Infolists\Components\TextEntry::make('voice')->state(fn (VideoDub $r): string => self::voiceLabel($r)),
-                    Infolists\Components\TextEntry::make('performance_style')->label('Style')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('emotion')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('report.segments')->label('Lines spoken')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('report.separation.method')
+                    TextEntry::make('created_at')->label('Sent')->dateTime(),
+                    TextEntry::make('original_name')->label('File')->placeholder('—'),
+                    TextEntry::make('video_seconds')->label('Video length')->suffix(' s'),
+                    TextEntry::make('language')->formatStateUsing(fn (?string $state): string => $state === 'en' ? 'English' : 'Arabic'),
+                    TextEntry::make('dialect')->label('Dialect or accent')->formatStateUsing(fn (?string $state): string => self::dialectLabel($state)),
+                    TextEntry::make('voice')->state(fn (VideoDub $r): string => self::voiceLabel($r)),
+                    TextEntry::make('performance_style')->label('Style')->placeholder('—'),
+                    TextEntry::make('emotion')->placeholder('—'),
+                    TextEntry::make('report.segments')->label('Lines spoken')->placeholder('—'),
+                    TextEntry::make('report.separation.method')
                         ->label('Old voices taken out by')
                         ->formatStateUsing(fn (?string $state): string => match ($state) {
                             'model' => 'The separation model',
@@ -136,73 +151,73 @@ class VideoDubResource extends Resource
                             default => '—',
                         })
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('report.fit.sped_up')
+                    TextEntry::make('report.fit.sped_up')
                         ->label('Lines sped up to fit')
                         ->state(fn (VideoDub $r): ?string => isset($r->report['fit']) ? $r->report['fit']['sped_up'].' (fastest ×'.$r->report['fit']['max_tempo'].')' : null)
                         ->placeholder('—'),
                 ]),
-            Infolists\Components\Section::make('Why it failed')
+            Section::make('Why it failed')
                 ->visible(fn (VideoDub $r): bool => $r->status === VideoDub::FAILED)
                 ->schema([
-                    Infolists\Components\TextEntry::make('error_message')->label('What the member saw')
+                    TextEntry::make('error_message')->label('What the member saw')
                         ->state(fn (VideoDub $r): string => $r->errorText())->placeholder('—'),
-                    Infolists\Components\TextEntry::make('report.error')->label('What went wrong')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('steps')->label('How far it got')
+                    TextEntry::make('report.error')->label('What went wrong')->placeholder('—'),
+                    TextEntry::make('steps')->label('How far it got')
                         ->state(fn (VideoDub $r): ?string => self::failedSteps($r))->placeholder('—'),
                 ]),
-            Infolists\Components\Section::make('Videos')
+            Section::make('Videos')
                 ->description(fn (VideoDub $r): string => self::keptText($r))
                 ->columns(2)
                 ->schema([
-                    Infolists\Components\ViewEntry::make('clean_video')
+                    ViewEntry::make('clean_video')
                         ->label('Without the mark')
                         ->view('filament.video-dub-video', ['kind' => 'clean']),
-                    Infolists\Components\ViewEntry::make('preview_video')
+                    ViewEntry::make('preview_video')
                         ->label('With the Listen mark')
                         ->view('filament.video-dub-video', ['kind' => 'preview']),
                 ]),
-            Infolists\Components\Section::make('Money')
+            Section::make('Money')
                 ->columns(4)
                 ->schema([
-                    Infolists\Components\TextEntry::make('reservation.credits')
+                    TextEntry::make('reservation.credits')
                         ->label('Charged to the member')
                         ->state(fn (VideoDub $r): ?string => is_array($r->reservation)
                             ? number_format((int) $r->reservation['credits']).' credits ('.((bool) $r->reservation['billed_to_pack'] ? 'from a pack' : 'from the plan, '.$r->reservation['period']).')'
                             : null)
                         ->placeholder('Nothing'),
-                    Infolists\Components\TextEntry::make('cost_total')
+                    TextEntry::make('cost_total')
                         ->label('Cost to us (estimate)')
                         ->state(fn (VideoDub $r): string => self::usd(VideoDubbing::cost($r->report)['total'] ?? null)),
-                    Infolists\Components\TextEntry::make('cost_model')
+                    TextEntry::make('cost_model')
                         ->label('Writing out and rewriting')
                         ->state(fn (VideoDub $r): string => self::usd(VideoDubbing::cost($r->report)['model'] ?? null)),
-                    Infolists\Components\TextEntry::make('cost_voice')
+                    TextEntry::make('cost_voice')
                         ->label('Voicing')
                         ->state(fn (VideoDub $r): string => self::usd(VideoDubbing::cost($r->report)['voice'] ?? null)),
-                    Infolists\Components\TextEntry::make('report.transcribe.input_tokens')->label('Model tokens in')->numeric()->placeholder('—'),
-                    Infolists\Components\TextEntry::make('report.transcribe.audio_tokens')->label('of which sound')->numeric()->placeholder('—'),
-                    Infolists\Components\TextEntry::make('report.transcribe.output_tokens')->label('Model tokens out')->numeric()->placeholder('—'),
-                    Infolists\Components\TextEntry::make('report.voicing.voiced_seconds')->label('Seconds voiced')->suffix(' s')->placeholder('—'),
+                    TextEntry::make('report.transcribe.input_tokens')->label('Model tokens in')->numeric()->placeholder('—'),
+                    TextEntry::make('report.transcribe.audio_tokens')->label('of which sound')->numeric()->placeholder('—'),
+                    TextEntry::make('report.transcribe.output_tokens')->label('Model tokens out')->numeric()->placeholder('—'),
+                    TextEntry::make('report.voicing.voiced_seconds')->label('Seconds voiced')->suffix(' s')->placeholder('—'),
                 ]),
-            Infolists\Components\Section::make('Time and server')
+            Section::make('Time and server')
                 ->columns(5)
                 ->collapsed()
                 ->schema([
-                    Infolists\Components\TextEntry::make('t_write')->label('Writing out')->state($seconds('transcribe'))->placeholder('—'),
-                    Infolists\Components\TextEntry::make('t_voice')->label('Voicing')->state($seconds('voicing'))->placeholder('—'),
-                    Infolists\Components\TextEntry::make('t_mux')->label('Onto the picture')->state($seconds('mux'))->placeholder('—'),
-                    Infolists\Components\TextEntry::make('t_preview')->label('Adding the mark')->state($seconds('preview_encode'))->placeholder('—'),
-                    Infolists\Components\TextEntry::make('report.total_seconds')->label('Total wait')->suffix(' s')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('report.transcribe.model')->label('Text model')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('report.input_bytes')->label('Upload size')
+                    TextEntry::make('t_write')->label('Writing out')->state($seconds('transcribe'))->placeholder('—'),
+                    TextEntry::make('t_voice')->label('Voicing')->state($seconds('voicing'))->placeholder('—'),
+                    TextEntry::make('t_mux')->label('Onto the picture')->state($seconds('mux'))->placeholder('—'),
+                    TextEntry::make('t_preview')->label('Adding the mark')->state($seconds('preview_encode'))->placeholder('—'),
+                    TextEntry::make('report.total_seconds')->label('Total wait')->suffix(' s')->placeholder('—'),
+                    TextEntry::make('report.transcribe.model')->label('Text model')->placeholder('—'),
+                    TextEntry::make('report.input_bytes')->label('Upload size')
                         ->formatStateUsing(fn ($state): string => number_format((int) $state / 1048576, 1).' MB')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('report.output_bytes')->label('Dubbed video size')
+                    TextEntry::make('report.output_bytes')->label('Dubbed video size')
                         ->formatStateUsing(fn ($state): string => number_format((int) $state / 1048576, 1).' MB')->placeholder('—'),
                 ]),
-            Infolists\Components\Section::make('What was said, and the dub')
+            Section::make('What was said, and the dub')
                 ->visible(fn (VideoDub $r): bool => ! empty($r->report['lines']))
                 ->schema([
-                    Infolists\Components\ViewEntry::make('lines')->hiddenLabel()->view('filament.video-dub-lines'),
+                    ViewEntry::make('lines')->hiddenLabel()->view('filament.video-dub-lines'),
                 ]),
         ]);
     }
@@ -211,44 +226,44 @@ class VideoDubResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')->sortable()->toggleable(),
-                Tables\Columns\TextColumn::make('user.email')
+                TextColumn::make('id')->sortable()->toggleable(),
+                TextColumn::make('user.email')
                     ->label('Member')
                     ->searchable()
                     ->limit(30),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn (?string $state): string => self::STATUSES[$state] ?? (string) $state)
                     ->color(fn (?string $state): string => self::statusColor($state))
                     ->sortable(),
-                Tables\Columns\TextColumn::make('is_free')
+                TextColumn::make('is_free')
                     ->label('Paid by')
                     ->badge()
                     ->formatStateUsing(fn (bool $state): string => $state ? 'Free' : 'Plan')
                     ->color(fn (bool $state): string => $state ? 'gray' : 'primary'),
-                Tables\Columns\TextColumn::make('dialect')
+                TextColumn::make('dialect')
                     ->formatStateUsing(fn (?string $state): string => self::dialectLabel($state))
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('voice')
+                TextColumn::make('voice')
                     ->state(fn (VideoDub $r): string => self::voiceLabel($r))
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('video_seconds')
+                TextColumn::make('video_seconds')
                     ->label('Length')
                     ->formatStateUsing(fn ($state): string => number_format((float) $state, 0).' s')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('reservation')
+                TextColumn::make('reservation')
                     ->label('Credits')
                     ->state(fn (VideoDub $r): ?string => is_array($r->reservation) ? number_format((int) $r->reservation['credits']) : null)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('cost')
+                TextColumn::make('cost')
                     ->label('Cost to us')
                     ->state(fn (VideoDub $r): string => self::usd(VideoDubbing::cost($r->report)['total'] ?? null)),
-                Tables\Columns\TextColumn::make('report.total_seconds')
+                TextColumn::make('report.total_seconds')
                     ->label('Wait')
                     ->formatStateUsing(fn ($state): string => number_format((float) $state, 0).' s')
                     ->placeholder('—')
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('files_deleted_at')
+                TextColumn::make('files_deleted_at')
                     ->label('Video kept in')
                     ->state(fn (VideoDub $r): string => match (true) {
                         filled($r->drive_file_id) => 'Google Drive',
@@ -263,24 +278,24 @@ class VideoDubResource extends Resource
                         default => 'gray',
                     })
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Sent')
                     ->since()
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
-                Tables\Filters\SelectFilter::make('status')->options(self::STATUSES),
-                Tables\Filters\TernaryFilter::make('is_free')
+                SelectFilter::make('status')->options(self::STATUSES),
+                TernaryFilter::make('is_free')
                     ->label('Paid by')
                     ->trueLabel('Free dubs')
                     ->falseLabel('Plan credits'),
-                Tables\Filters\SelectFilter::make('language')
+                SelectFilter::make('language')
                     ->options(['ar' => 'Arabic', 'en' => 'English']),
-                Tables\Filters\SelectFilter::make('dialect')
+                SelectFilter::make('dialect')
                     ->options(VideoDubbing::dialects(false, 'ar') + VideoDubbing::dialects(false, 'en'))
                     ->searchable(),
-                Tables\Filters\SelectFilter::make('period')
+                SelectFilter::make('period')
                     ->label('Sent')
                     ->options(['today' => 'Today', '7' => 'Last 7 days', '30' => 'Last 30 days'])
                     ->query(fn (Builder $query, array $data): Builder => match ($data['value'] ?? null) {
@@ -289,19 +304,19 @@ class VideoDubResource extends Resource
                         default => $query,
                     }),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                self::removeAction(Tables\Actions\Action::make('remove')),
+            ->recordActions([
+                ViewAction::make(),
+                self::removeAction(Action::make('remove')),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkAction::make('removeSelected')
+            ->toolbarActions([
+                BulkAction::make('removeSelected')
                     ->label('Remove and give back')
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->color('danger')
                     ->requiresConfirmation()
                     ->modalDescription(self::REMOVE_TEXT)
                     ->deselectRecordsAfterCompletion()
-                    ->action(function (\Illuminate\Database\Eloquent\Collection $records): void {
+                    ->action(function (Collection $records): void {
                         $count = $records->filter(fn (VideoDub $dub): bool => app(VideoDubRunner::class)->remove((int) $dub->id))->count();
                         Notification::make()->title($count.' dub(s) removed and given back')->success()->send();
                     }),
@@ -314,12 +329,12 @@ class VideoDubResource extends Resource
      * Remove: the video goes and what it took comes back to the member
      * (VideoDubRunner::remove()), for a row of the list or a dub's page.
      *
-     * @template T of \Filament\Actions\Action|\Filament\Tables\Actions\Action
+     * @template T of Action
      *
      * @param  T  $action
      * @return T
      */
-    public static function removeAction(\Filament\Actions\Action|Tables\Actions\Action $action): \Filament\Actions\Action|Tables\Actions\Action
+    public static function removeAction(Action $action): Action
     {
         return $action
             ->label('Remove')
@@ -340,7 +355,7 @@ class VideoDubResource extends Resource
     /** Where the videos are, and until when the member sees them. */
     public static function keptText(VideoDub $dub): string
     {
-        $until = \App\Support\VideoDubbing::availableUntil($dub);
+        $until = VideoDubbing::availableUntil($dub);
         $member = $dub->status !== VideoDub::READY ? '' : ($until === null
             ? ' The member sees it for as long as their plan keeps voices (no limit).'
             : ($until->isFuture() ? ' The member sees it until '.$until->toDayDateTimeString().'.' : ' The member no longer sees it (since '.$until->toDayDateTimeString().').'));
@@ -370,21 +385,22 @@ class VideoDubResource extends Resource
         Notification::make()->title('Marked failed; any credits were given back')->success()->send();
     }
 
-    public static function canCreate(): bool
+    // Filament 4 checks this (pages, buttons and canCreate() alike): never allowed here.
+    public static function getCreateAuthorizationResponse(): AccessResponse
     {
-        return false;
+        return AccessResponse::deny();
     }
 
     public static function getWidgets(): array
     {
-        return [\App\Filament\Widgets\VideoDubStats::class];
+        return [VideoDubStats::class];
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListVideoDubs::route('/'),
-            'view' => Pages\ViewVideoDub::route('/{record}'),
+            'index' => ListVideoDubs::route('/'),
+            'view' => ViewVideoDub::route('/{record}'),
         ];
     }
 }

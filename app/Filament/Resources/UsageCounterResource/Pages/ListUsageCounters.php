@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\UsageCounterResource\Pages;
 
+use Filament\Actions\Action;
 use App\Filament\Resources\UsageCounterResource;
 use App\Filament\Resources\UserResource;
 use App\Filament\Widgets\MonthlyUsageBreakdown;
@@ -34,7 +35,7 @@ class ListUsageCounters extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('idlePaying')
+            Action::make('idlePaying')
                 ->label('Paying but idle')
                 ->icon('heroicon-o-moon')
                 ->color('gray')

@@ -21,10 +21,10 @@ class ExpectedIncome extends BaseWidget
 
     protected static ?int $sort = -31;
 
-    protected static ?string $pollingInterval = '120s';
+    protected ?string $pollingInterval = '120s';
 
     /** The stats as usual, and the popup listing who cancelled (cancelledMembers()). */
-    protected static string $view = 'filament.widgets.expected-income';
+    protected string $view = 'filament.widgets.expected-income';
 
     public const CANCELLED_MODAL = 'cancelled-members';
 

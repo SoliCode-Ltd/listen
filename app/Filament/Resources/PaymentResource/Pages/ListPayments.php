@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PaymentResource\Pages;
 
+use Throwable;
 use App\Filament\Resources\PaymentResource;
 use App\Services\Billing\PaymentLedger;
 use Filament\Actions\Action;
@@ -23,7 +24,7 @@ class ListPayments extends ListRecords
                 ->action(function (): void {
                     try {
                         $added = app(PaymentLedger::class)->importAll();
-                    } catch (\Throwable $e) {
+                    } catch (Throwable $e) {
                         Notification::make()->title('Stripe could not be read')->body($e->getMessage())->danger()->persistent()->send();
 
                         return;
