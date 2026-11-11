@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\OnlineSchema;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,9 @@ use Illuminate\Support\Facades\Schema;
  * Nothing else changes. Each index is added only when its table and columns are
  * there and it is not there yet, so this is safe to run again. On MySQL each is
  * built in place while the table stays in use (ALGORITHM=INPLACE, LOCK=NONE): if
- * that is not possible MySQL refuses at once rather than locking the table.
+ * that is not possible MySQL refuses at once rather than locking the table. Each
+ * waits a few seconds at most for a busy table, so members' pages are never held
+ * up behind it (App\Support\OnlineSchema).
  */
 return new class extends Migration
 {
@@ -56,12 +59,14 @@ return new class extends Migration
                 if (! Schema::hasColumns($table, $columns) || $this->has($table, $name)) {
                     continue;
                 }
-                if (DB::getDriverName() === 'mysql') {
-                    $list = implode(', ', array_map(fn (string $c): string => '`'.$c.'`', $columns));
-                    DB::statement("ALTER TABLE `{$table}` ADD INDEX `{$name}` ({$list}), ALGORITHM=INPLACE, LOCK=NONE");
-                } else {
-                    Schema::table($table, fn (Blueprint $t) => $t->index($columns, $name));
-                }
+                OnlineSchema::change(function () use ($table, $columns, $name): void {
+                    if (DB::getDriverName() === 'mysql') {
+                        $list = implode(', ', array_map(fn (string $c): string => '`'.$c.'`', $columns));
+                        DB::statement("ALTER TABLE `{$table}` ADD INDEX `{$name}` ({$list}), ALGORITHM=INPLACE, LOCK=NONE");
+                    } else {
+                        Schema::table($table, fn (Blueprint $t) => $t->index($columns, $name));
+                    }
+                });
             }
         }
     }
