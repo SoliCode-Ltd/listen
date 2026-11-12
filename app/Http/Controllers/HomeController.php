@@ -676,6 +676,8 @@ class HomeController extends Controller
             'demoQuota' => $this->demoQuotaForPageLoad($request),
             'trialAllowanceChars' => $this->demoCharAllowance($request),
             'upgradePlanSlug' => $upgradePlanSlug,
+            // Under a voice the demo has just made: the plan offer running now, if any.
+            'demoOffer' => \App\Support\DemoOffer::current(),
             // Dub a video, beside the text studio: the free dub (App\Support\VideoDubbing).
             'dubStudio' => VideoDubbing::openTo($member) ? VideoDubbing::studio($member, $request) : null,
             // Voice Design, beside it too: one take from the demo's characters (App\Support\VoiceDesign).

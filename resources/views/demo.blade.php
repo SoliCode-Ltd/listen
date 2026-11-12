@@ -252,6 +252,23 @@
             @endinapp
           ></audio>
           <div class="audio-meta" id="audioMeta" role="status"></div>
+          {{-- A voice has just been made: the plan offer running now, if any (App\Support\DemoOffer).
+               Inside the Listen app nothing is sold. --}}
+          @inapp
+          @else
+            @if(!empty($demoOffer))
+              <div class="demo-offer" id="demoOffer">
+                <div class="demo-offer-text">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>
+                  <div>
+                    <h3>{{ __('ui.demo.offer_title') }}</h3>
+                    <p>{!! __('ui.demo.offer_text', ['offer' => '<b>'.e($demoOffer['offer']).'</b>']) !!}@if($demoOffer['ends']) {{ __('ui.demo.offer_ends', ['date' => $demoOffer['ends']]) }}@endif</p>
+                  </div>
+                </div>
+                <a class="demo-offer-btn" href="{{ $demoOffer['url'] }}">{{ __('ui.demo.offer_button') }}</a>
+              </div>
+            @endif
+          @endinapp
         </div>
 
         <div class="s-card output-panel reveal" id="outputPlaceholder">
