@@ -940,7 +940,6 @@ return [
         'hero_point_4' => 'معاينة صوتية فورية',
         'offer_title' => 'أعجبك الصوت؟',
         'offer_text' => 'اشترك الآن واحصل على :offer.',
-        'offer_up_to' => 'يصل إلى :percent%',
         'offer_ends' => 'ينتهي العرض :date.',
         'offer_button' => 'احصل على الخصم',
         'voice_coverage' => 'تغطية الأصوات',

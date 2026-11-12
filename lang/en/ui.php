@@ -941,7 +941,6 @@ return [
         'hero_point_4' => 'Instant audio preview',
         'offer_title' => 'Like the voice?',
         'offer_text' => 'Subscribe now and get :offer.',
-        'offer_up_to' => 'up to :percent%',
         'offer_ends' => 'The offer ends :date.',
         'offer_button' => 'Get the offer',
         'voice_coverage' => 'Voice coverage',

@@ -6,46 +6,38 @@ use App\Models\Plan;
 
 /**
  * The plan offer the free demo shows under a voice it has just made: "Like the voice?
- * Subscribe now and get 50% off your first month. The offer ends 15 Nov." with a button to
- * the plans. It shows by itself while any paid plan has an offer running (Admin → Billing →
- * Plans → Discount / Promotion) and goes when the last one ends.
+ * Subscribe now and get 50% off your first month. The offer ends 15 November." Its button
+ * opens the checkout for the Starter plan, so the words are Starter's own offer: it shows by
+ * itself while Starter has one running (Admin → Billing → Plans → Discount / Promotion) and
+ * goes when it ends.
  */
 final class DemoOffer
 {
+    /** The plan the button takes the member to. */
+    public const PLAN = 'starter';
+
     /**
-     * The biggest offer running now, or null when none is.
+     * Starter's offer running now, or null when it has none.
      *
      * @return array{offer: string, ends: ?string, url: string}|null
      */
     public static function current(): ?array
     {
-        $plans = Plan::query()->subscriptionPlans()
+        $plan = Plan::query()->subscriptionPlans()
+            ->where('slug', self::PLAN)
             ->where('is_active', true)
             ->where('price_cents', '>', 0)
-            ->where('discount_percentage', '>', 0)
-            ->get()
-            ->filter(fn (Plan $plan): bool => $plan->hasActiveDiscount())
-            // The biggest saving first; among equals, the offer that ends soonest.
-            ->sortBy(fn (Plan $plan): array => [-(int) $plan->discount_percentage, $plan->discount_ends_at?->getTimestamp() ?? PHP_INT_MAX])
-            ->values();
-
-        $best = $plans->first();
-        if (! $best) {
+            ->first();
+        if (! $plan || ! $plan->hasActiveDiscount()) {
             return null;
         }
 
-        $percent = (int) $best->discount_percentage;
-        $offer = DiscountTerms::offer($best, 'monthly', $percent);
-        // Plans with smaller offers too: "up to 50%", so the words hold for every plan.
-        if ($plans->pluck('discount_percentage')->map(fn ($value): int => (int) $value)->unique()->count() > 1) {
-            $offer = str_replace($percent.'%', __('ui.demo.offer_up_to', ['percent' => $percent]), $offer);
-        }
-
         return [
-            'offer' => $offer,
-            // The last day of the offer ("15 Nov"); one ending at midnight ends the day before.
-            'ends' => $best->discount_ends_at?->copy()->subSecond()->locale(app()->getLocale())->translatedFormat('j F'),
-            'url' => route('pricing'),
+            'offer' => DiscountTerms::offer($plan, 'monthly', (int) $plan->discount_percentage),
+            // The last day of the offer ("15 November"); one ending at midnight ends the day before.
+            'ends' => $plan->discount_ends_at?->copy()->subSecond()->locale(app()->getLocale())->translatedFormat('j F'),
+            // Straight to the checkout for that plan, monthly: the offer is for monthly billing.
+            'url' => route('billing.page', ['plan' => (string) $plan->slug, 'billing_cycle' => 'monthly']),
         ];
     }
 }

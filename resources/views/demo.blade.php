@@ -252,8 +252,8 @@
             @endinapp
           ></audio>
           <div class="audio-meta" id="audioMeta" role="status"></div>
-          {{-- A voice has just been made: the plan offer running now, if any (App\Support\DemoOffer).
-               Inside the Listen app nothing is sold. --}}
+          {{-- A voice has just been made: Starter's offer running now, if any, with a button straight
+               to its checkout (App\Support\DemoOffer). Inside the Listen app nothing is sold. --}}
           @inapp
           @else
             @if(!empty($demoOffer))
