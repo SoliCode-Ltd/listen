@@ -71,6 +71,14 @@ class BillingController extends Controller
             ->pluck('slug')
             ->all();
         $locale = app()->getLocale();
+        // A member without a paid plan looking at a plan's checkout: noted, so a reminder can
+        // follow if they leave without paying (Newsletter → Purchase follow-ups).
+        if (in_array($selectedPlan, $validPlanSlugs, true) && (! $activePlan || (int) $activePlan->price_cents <= 0)) {
+            $chosenPlan = Plan::query()->where('slug', $selectedPlan)->first();
+            if ($chosenPlan) {
+                app(\App\Services\Billing\PurchaseFollowUps::class)->checkoutOpened($user, $chosenPlan, (string) $request->query('billing_cycle', 'monthly'), $locale);
+            }
+        }
         $scheduled = $this->planChanges->scheduledFor($user);
         // A plan paid by hand or given by the team that still runs: a lower plan starts when it ends.
         $heldUntil = $this->planChanges->heldUntil($user);

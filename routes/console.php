@@ -18,6 +18,9 @@ Schedule::command('listen:billing-sync')->everyFifteenMinutes()->withoutOverlapp
 Schedule::command('listen:billing-reminders')->dailyAt('09:00')->withoutOverlapping(120);
 Schedule::command('listen:billing-enforce-grace')->hourly()->withoutOverlapping(50);
 Schedule::command('plans:expire-discounts')->everyFiveMinutes()->withoutOverlapping(10);
+// A declined first payment or a checkout left without paying: the follow-up emails that are due,
+// and who bought a plan since (App\Services\Billing\PurchaseFollowUps).
+Schedule::command('listen:purchase-follow-ups')->everyFiveMinutes()->withoutOverlapping(10);
 // Lower plans whose day has come take over (paid by hand, or by card after a plan paid by hand).
 Schedule::command('listen:plan-changes')->everyMinute()->withoutOverlapping(10);
 

@@ -628,6 +628,62 @@ html[dir="rtl"] .perf-grid select {
   font-weight: 500;
 }
 
+/* Under a voice the demo has just made: the plan offer running now, after a hairline.
+   The saving in the site's green for savings, one button to the plans. */
+.demo-offer {
+  --save: #1F9D63;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--line);
+}
+html:not([data-theme="light"]) .demo-offer { --save: #4ADE95; }
+.demo-offer-text { display: flex; align-items: flex-start; gap: .7rem; min-width: 0; }
+.demo-offer-text svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: .15rem;
+  fill: none;
+  stroke: var(--save);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.demo-offer h3 { margin: 0; font-size: 1rem; font-weight: 700; line-height: 1.5; color: var(--text); }
+.demo-offer p { margin: .1rem 0 0; font-size: .9rem; line-height: 1.6; color: var(--muted); }
+.demo-offer b { font-weight: 700; color: var(--save); }
+.demo-offer-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 1.5rem;
+  border-radius: 999px;
+  background: var(--brand-accent, #7659FA);
+  color: #fff;
+  font-size: .95rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.demo-offer-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px color-mix(in oklab, var(--brand-accent, #7659FA) 30%, transparent); }
+.demo-offer-btn:focus-visible { outline: 2px solid var(--brand-accent, #7659FA); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .demo-offer { flex-direction: column; align-items: stretch; }
+  .demo-offer-btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-offer-btn { transition: none; }
+  .demo-offer-btn:hover { transform: none; }
+}
+
 .output-placeholder {
   display: flex;
   flex-direction: column;
