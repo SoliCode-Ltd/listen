@@ -98,6 +98,14 @@ class StripeWebhookController extends Controller
                 default => null,
             };
 
+            // A first payment the bank declined: noted for its follow-up email, with the bank's reason
+            // when Stripe sends it (Newsletter → Purchase follow-ups). Renewals have their own path above.
+            if ($type === 'invoice.payment_failed') {
+                app(\App\Services\Billing\PurchaseFollowUps::class)->paymentFailed($event->data->object);
+            } elseif ($type === 'payment_intent.payment_failed' || $type === 'charge.failed') {
+                app(\App\Services\Billing\PurchaseFollowUps::class)->declineReason($event->data->object);
+            }
+
             $trialOutcomeService->handleStripeEvent($event);
             app(\App\Services\Billing\AdsPurchases::class)->handleStripeEvent($event);
             // How the member paid, for Billing → Payments and the dashboard.
