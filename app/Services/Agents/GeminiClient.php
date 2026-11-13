@@ -88,9 +88,10 @@ class GeminiClient
      */
     public function converse(string $system, array $contents, array $tools = [], int $timeout = 25, int $maxOutputTokens = 600): ?array
     {
-        // A chat reply is a short answer from facts it was given: the model thinks as little as it
-        // may before writing, so the customer is not kept waiting (listen.agents.chat_thinking).
-        $thinking = (string) config('listen.agents.chat_thinking', 'minimal');
+        // A chat reply is a short answer from facts it was given: the model thinks little before
+        // writing, so the customer is not kept waiting (listen.agents.chat_thinking). Measured on
+        // staging: "low" answered in 3 to 6 seconds; "minimal" was slower (4 to 9).
+        $thinking = (string) config('listen.agents.chat_thinking', 'low');
         $config = ['temperature' => 0.4, 'maxOutputTokens' => $maxOutputTokens] + ($thinking !== '' ? ['thinkingConfig' => ['thinkingLevel' => $thinking]] : []);
         $deadline = microtime(true) + $timeout;
         foreach (self::WRITER_MODELS as $model) {
