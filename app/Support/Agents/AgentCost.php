@@ -139,6 +139,69 @@ final class AgentCost
         return self::perMinute(self::HEAVY['minutes'], self::HEAVY['instructions']);
     }
 
+    /**
+     * The written chat. Around one reply the model reads the agent's instructions, the
+     * conversation so far and what a tool found (CHAT_CONTEXT tokens beside the instructions),
+     * and writes a short answer after a little thinking (CHAT_OUTPUT). A reply that used a tool
+     * is two rounds; the allowance counts one reply in three as such.
+     */
+    private const CHAT_CONTEXT = 900;
+
+    private const CHAT_OUTPUT = 260;
+
+    private const CHAT_ROUNDS = 1.35;
+
+    /** Dollars one written reply costs, for instructions this big. */
+    public static function perReply(int $instructionTokens): float
+    {
+        $price = (array) config('listen.agents.chat_price_per_million', []);
+        $in = (float) ($price['in'] ?? 0.5);
+        $out = (float) ($price['out'] ?? 3.0);
+
+        return self::CHAT_ROUNDS * (($instructionTokens + self::CHAT_CONTEXT) * $in + self::CHAT_OUTPUT * $out) / 1e6;
+    }
+
+    /** Dollars a written reply really cost, from the tokens the model counted. */
+    public static function replyCost(int $tokensIn, int $tokensOut): float
+    {
+        $price = (array) config('listen.agents.chat_price_per_million', []);
+
+        return round(($tokensIn * (float) ($price['in'] ?? 0.5) + $tokensOut * (float) ($price['out'] ?? 3.0)) / 1e6, 6);
+    }
+
+    /** Tokens of an agent's instructions for a written chat (cached for the request). */
+    public static function chatInstructionTokens(\App\Models\Agent $agent): int
+    {
+        return once(fn (): int => self::tokensIn(AgentInstructions::build($agent, true)));
+    }
+
+    /**
+     * The fewest credits a written reply can use and still keep MARGIN on a typical agent on
+     * every plan on sale, rounded up to the next 5. Null: no paid plan yet.
+     */
+    public static function recommendedChatRate(): ?int
+    {
+        $perDollar = self::creditsPerDollar();
+
+        return $perDollar ? max(5, (int) (ceil(self::perReply(self::TYPICAL['instructions']) * $perDollar / 5) * 5)) : null;
+    }
+
+    /**
+     * Credits one written reply of this agent uses: the site's rate, or more for an agent with a
+     * great deal to know (every reply reads all of it), so that no reply earns less than MARGIN.
+     * One fixed number per agent, so its owner always knows what a reply costs.
+     */
+    public static function chatRateFor(\App\Models\Agent $agent): int
+    {
+        $base = AgentAccess::chatCreditsPerReply();
+        $perDollar = self::creditsPerDollar();
+        if (! $perDollar || ! $agent->exists) {
+            return $base;
+        }
+
+        return max($base, (int) (ceil(self::perReply(self::chatInstructionTokens($agent)) * $perDollar / 5) * 5));
+    }
+
     /** Tokens in an agent's instructions, estimated from the text (Arabic letters take more). */
     public static function tokensIn(string $text): int
     {

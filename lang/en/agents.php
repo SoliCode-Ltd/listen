@@ -188,6 +188,33 @@ return [
     'talk_correct_saved' => 'Learned. It will answer this way from now on.',
     // The small line that closes a call: how long it lasted.
     'talk_ended_after' => 'Call ended after :time',
+    // The written chat in the agent's card (agent-widget.js). `card` goes to the browser as it is.
+    'chat' => [
+        'greeting' => 'Hello, this is :name. How can I help?',
+        'away' => 'The chat is not available right now.',
+        'busy' => 'Too many chats right now. Please try again in a little while.',
+        'failed' => 'That did not go through. Please send it again.',
+        'over' => 'This conversation has ended.',
+        'empty' => 'Write a message first.',
+        'card' => [
+            'placeholder' => 'Write a message',
+            'send' => 'Send',
+            'call' => 'Call',
+            'to_chat' => 'Chat',
+            'online' => 'Available now',
+            'typing' => 'Writing',
+            'retry' => 'Send again',
+            'failed' => 'That did not go through.',
+            'over' => 'This conversation has ended.',
+            'new_chat' => 'Start a new chat',
+            'away' => 'The chat is not available right now.',
+            'call_started' => 'Call started',
+            'call_ended' => 'Call ended',
+            'on_call' => 'On a call',
+            'continue' => 'Continue in chat',
+            'too_long' => 'That message is too long.',
+        ],
+    ],
     // The last half minute of a call: the timer counts down, and the card says why it ended.
     'talk_ends_in' => 'Ends in :time',
     'talk_ended_limit' => 'Call time is up',

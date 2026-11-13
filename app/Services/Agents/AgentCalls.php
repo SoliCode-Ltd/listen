@@ -212,7 +212,7 @@ class AgentCalls
     }
 
     /**
-     * @param  array{origin?: ?string, page_url?: ?string, visitor?: ?string, country?: ?string, network?: ?string, free_only?: bool, caller?: ?array{email: string, name: ?string}}  $context
+     * @param  array{origin?: ?string, page_url?: ?string, visitor?: ?string, country?: ?string, network?: ?string, free_only?: bool, caller?: ?array{email: string, name: ?string}, before?: ?string}  $context  before: what the caller wrote in the chat just before calling (AgentChats::spokenBefore)
      * @return array{ok: bool, error?: string, conversation?: AgentConversation, call_key?: string, token?: string, max_seconds?: int, free?: bool}
      */
     public function start(Agent $agent, string $channel, ?AgentWidget $widget = null, array $context = []): array
@@ -386,7 +386,7 @@ class AgentCalls
             $lock?->release();
         }
 
-        $key = $this->gemini->liveToken(LiveSession::setupFor($agent), $max + 20);
+        $key = $this->gemini->liveToken(LiveSession::setupFor($agent, $context['before'] ?? null), $max + 20);
         if ($key === null) {
             $this->settle($conversation, 'failed', 0);
 
@@ -606,7 +606,9 @@ class AgentCalls
     public function findByKey(string $publicId, string $callKey): ?AgentConversation
     {
         $conversation = AgentConversation::where('public_id', $publicId)->first();
-        if (! $conversation || ! hash_equals((string) $conversation->call_key_hash, hash('sha256', $callKey))) {
+        // A written chat (AgentChats) is never a call: its key opens none of a call's doors (ending
+        // it as a call would hand its whole hold back).
+        if (! $conversation || AgentChats::isChat($conversation) || ! hash_equals((string) $conversation->call_key_hash, hash('sha256', $callKey))) {
             return null;
         }
 

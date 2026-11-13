@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Log;
  * and the next one is tried, as the studio does.
  *
  * - generate(): the text model, for writing agents and summing up calls.
+ * - converse(): the same model in a written chat with a customer (AgentChats): instructions,
+ *   the conversation so far and tools in, its words or tool calls and its token counts out.
  * - readFile(): the same model reading a file the owner uploaded (a PDF, a photo of a menu).
  * - transcribe(): the same model writing down what a caller said, from their voice.
  * - liveToken(): a short-lived key for one live call, locked to the agent's
@@ -69,6 +71,77 @@ class GeminiClient
                     return $text;
                 }
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * One turn of a written conversation: the agent's instructions, what was written so far, and
+     * the tools it may call. Returns what the model answered (its words, or the tools it calls),
+     * its own parts to keep in the conversation, and the tokens the turn used; null when no model
+     * answered in time. The second writer model is tried when the first fails.
+     *
+     * @param  array<int, array{role: string, parts: array<int, array<string, mixed>>}>  $contents
+     * @param  array<int, array<string, mixed>>  $tools  function declarations
+     * @return array{text: string, calls: array<int, array{name: string, args: array<string, mixed>}>, parts: array<int, array<string, mixed>>, usage: array{in: int, out: int, thoughts: int}, model: string}|null
+     */
+    public function converse(string $system, array $contents, array $tools = [], int $timeout = 25, int $maxOutputTokens = 600): ?array
+    {
+        $config = ['temperature' => 0.4, 'maxOutputTokens' => $maxOutputTokens, 'thinkingConfig' => ['thinkingLevel' => 'low']];
+        $deadline = microtime(true) + $timeout;
+        foreach (self::WRITER_MODELS as $model) {
+            $left = (int) floor($deadline - microtime(true));
+            if ($left < 4) {
+                break;
+            }
+            $ask = fn (array $config, int $seconds) => $this->post("/models/{$model}:generateContent", array_filter([
+                'systemInstruction' => ['parts' => [['text' => $system]]],
+                'contents' => $contents,
+                'tools' => $tools !== [] ? [['functionDeclarations' => $tools]] : null,
+                'generationConfig' => $config,
+            ]), $model, $seconds);
+            $response = $ask($config, $left);
+            // A model that does not take that thinking level is asked again with its own.
+            if ($response?->status() === 400 && str_contains(strtolower((string) $response->body()), 'thinking')) {
+                unset($config['thinkingConfig']);
+                $left = (int) floor($deadline - microtime(true));
+                $response = $left >= 4 ? $ask($config, $left) : null;
+            }
+            if (! $response?->successful()) {
+                continue;
+            }
+            $parts = array_values(array_filter((array) data_get($response->json(), 'candidates.0.content.parts', []), 'is_array'));
+            $text = '';
+            $calls = [];
+            foreach ($parts as $part) {
+                // The model's own thinking is never part of what it says.
+                if (! empty($part['thought'])) {
+                    continue;
+                }
+                if (isset($part['text']) && is_string($part['text'])) {
+                    $text .= $part['text'];
+                }
+                if (isset($part['functionCall']['name'])) {
+                    $calls[] = ['name' => (string) $part['functionCall']['name'], 'args' => (array) ($part['functionCall']['args'] ?? [])];
+                }
+            }
+            if (trim($text) === '' && $calls === []) {
+                continue;
+            }
+            $usage = (array) data_get($response->json(), 'usageMetadata', []);
+
+            return [
+                'text' => trim($text),
+                'calls' => $calls,
+                'parts' => $parts,
+                'usage' => [
+                    'in' => (int) ($usage['promptTokenCount'] ?? 0),
+                    'out' => (int) ($usage['candidatesTokenCount'] ?? 0),
+                    'thoughts' => (int) ($usage['thoughtsTokenCount'] ?? 0),
+                ],
+                'model' => $model,
+            ];
         }
 
         return null;

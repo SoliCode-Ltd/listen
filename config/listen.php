@@ -244,5 +244,19 @@ return [
             'text_out' => (float) env('LISTEN_AGENT_PRICE_TEXT_OUT', 4.5),
             'audio_out' => (float) env('LISTEN_AGENT_PRICE_AUDIO_OUT', 12.0),
         ],
+        // The written chat (AgentChats). A reply's credits when Agents → Settings sets none and no
+        // paid plan gives a rate; what the text model charges per million tokens, to keep each
+        // reply's cost; and what one conversation, one visitor and one message may take.
+        'chat_credits_per_reply' => (int) env('LISTEN_AGENT_CHAT_CREDITS_PER_REPLY', 60),
+        'chat_price_per_million' => [
+            'in' => (float) env('LISTEN_AGENT_CHAT_PRICE_IN', 0.5),
+            'out' => (float) env('LISTEN_AGENT_CHAT_PRICE_OUT', 3.0),
+        ],
+        'chat_replies_per_conversation' => (int) env('LISTEN_AGENT_CHAT_REPLIES', 40),
+        'chat_message_chars' => (int) env('LISTEN_AGENT_CHAT_MESSAGE_CHARS', 1000),
+        'chats_per_visitor_hour' => (int) env('LISTEN_AGENT_CHATS_PER_VISITOR_HOUR', 6),
+        'chats_per_visitor_day' => (int) env('LISTEN_AGENT_CHATS_PER_VISITOR_DAY', 15),
+        // A chat nobody wrote in for this long is closed: its unused credits go back to the owner.
+        'chat_idle_minutes' => (int) env('LISTEN_AGENT_CHAT_IDLE_MINUTES', 15),
     ],
 ];

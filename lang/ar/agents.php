@@ -190,6 +190,33 @@ return [
     'talk_correct_saved' => 'تعلّم. سيجيب هكذا من الآن.',
     // السطر الصغير الذي يختم المكالمة: كم استمرت.
     'talk_ended_after' => 'انتهت المكالمة بعد :time',
+    // The written chat in the agent's card (agent-widget.js). `card` goes to the browser as it is.
+    'chat' => [
+        'greeting' => 'أهلاً بك، معك :name. كيف أساعدك؟',
+        'away' => 'المحادثة غير متاحة الآن.',
+        'busy' => 'المحادثات كثيرة الآن. حاول مجدداً بعد قليل.',
+        'failed' => 'لم تصل رسالتك. أرسلها مجدداً.',
+        'over' => 'انتهت هذه المحادثة.',
+        'empty' => 'اكتب رسالتك أولاً.',
+        'card' => [
+            'placeholder' => 'اكتب رسالتك',
+            'send' => 'إرسال',
+            'call' => 'اتصال',
+            'to_chat' => 'المحادثة',
+            'online' => 'متاح الآن',
+            'typing' => 'يكتب',
+            'retry' => 'أرسل مجدداً',
+            'failed' => 'لم تصل رسالتك.',
+            'over' => 'انتهت هذه المحادثة.',
+            'new_chat' => 'ابدأ محادثة جديدة',
+            'away' => 'المحادثة غير متاحة الآن.',
+            'call_started' => 'بدأت المكالمة',
+            'call_ended' => 'انتهت المكالمة',
+            'on_call' => 'مكالمة جارية',
+            'continue' => 'تابع بالمحادثة',
+            'too_long' => 'الرسالة طويلة جداً.',
+        ],
+    ],
     // The last half minute of a call: the timer counts down, and the card says why it ended.
     'talk_ends_in' => 'تنتهي خلال :time',
     'talk_ended_limit' => 'انتهى وقت المكالمة',
