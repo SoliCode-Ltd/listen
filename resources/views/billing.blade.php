@@ -971,6 +971,35 @@
         gap: .15rem;
       }
     }
+    /* A first purchase on a phone: the way to pay belongs on the first screen. The boxes that
+       only say "Free, Standard, Not saved" and the two hint lines step aside there; a member
+       with a plan or a saved card keeps them, and so does every wider screen. */
+    @media (max-width: 640px) {
+      .first-purchase .status-grid,
+      .first-purchase .page-header p,
+      .first-purchase .upgrade-hint {
+        display: none;
+      }
+      /* The floating help button never sits on a way to pay: it steps aside while the wallet
+         button or the pay button is on screen (the script at the foot of the page). */
+      .wa-widget {
+        transition: opacity .2s ease, transform .2s ease, visibility 0s;
+      }
+      .wa-widget.is-aside:not(.open) {
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(8px);
+        pointer-events: none;
+        transition: opacity .2s ease, transform .2s ease, visibility 0s .2s;
+      }
+    }
+    @media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+      .wa-widget,
+      .wa-widget.is-aside:not(.open) {
+        transition: none;
+        transform: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1032,10 +1061,17 @@
       ? 'success'
       : ($initialMessageText !== '' ? 'error' : '');
     $paymentBrandAssets = is_array($paymentBrandAssets ?? null) ? $paymentBrandAssets : [];
+    // Buying for the first time: no plan of their own, no saved card, no change waiting and
+    // nothing owed. On a phone this page then starts with the choice and the way to pay
+    // (the styles under .first-purchase).
+    $firstPurchase = (! $activePlan || (int) $activePlan->price_cents <= 0)
+      && ! $defaultPaymentMethod
+      && empty($planChange)
+      && empty($paymentOverdueNotice ?? null);
   @endphp
   @include('components.header')
 
-  <main class="container main-content">
+  <main class="container main-content{{ $firstPurchase ? ' first-purchase' : '' }}">
     <div class="page-header">
       <h1>{{ __('ui.billing.title') }}</h1>
       <p>{{ __('ui.billing.subtitle') }}</p>
@@ -1075,7 +1111,7 @@
       <div class="card">
         <div class="card-header">
           <h2>{{ $currentCycle !== null ? __('ui.billing.change_plan') : __('ui.billing.upgrade_plan') }}</h2>
-          <p>{{ __('ui.billing.upgrade_plan_hint') }}</p>
+          <p class="upgrade-hint">{{ __('ui.billing.upgrade_plan_hint') }}</p>
         </div>
         @if(!empty($planChange))
           <div class="message info plan-change-notice" id="planChangeNotice" role="status">
@@ -2716,6 +2752,27 @@
         }
       });
     }
+
+    // On a phone the floating help button steps aside while a way to pay is on screen (the
+    // wallet button, the pay button, the trial button) and comes back when none is.
+    (function () {
+      if (!('IntersectionObserver' in window) || !window.matchMedia) return;
+      const phone = window.matchMedia('(max-width: 640px)');
+      const onScreen = new Set();
+      const apply = () => {
+        const widget = document.getElementById('whatsappWidget');
+        if (widget) widget.classList.toggle('is-aside', phone.matches && onScreen.size > 0);
+      };
+      const watch = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => { if (entry.isIntersecting) onScreen.add(entry.target); else onScreen.delete(entry.target); });
+        apply();
+      });
+      ['wallet', 'subscribeBtn', 'trialBtn'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) watch.observe(el);
+      });
+      if (phone.addEventListener) phone.addEventListener('change', apply);
+    })();
   </script>
 </body>
 </html>
