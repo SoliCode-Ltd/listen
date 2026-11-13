@@ -248,7 +248,10 @@
             @inapp
               data-download-disabled="1"
             @else
-            data-download-redirect-url="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}"
+            {{-- Downloading needs a plan: pressing it shows why, under the player, with a button to
+                 the checkout (the link is the fallback should that note be missing). --}}
+            data-download-notice="demoDownload"
+            data-download-redirect-url="{{ \App\Support\DemoOffer::checkoutUrl($upgradePlanSlug) }}"
             @endinapp
           ></audio>
           <div class="audio-meta" id="audioMeta" role="status"></div>
@@ -268,6 +271,18 @@
                 <a class="demo-offer-btn" href="{{ $demoOffer['url'] }}">{{ __('ui.demo.offer_button') }}</a>
               </div>
             @endif
+            {{-- Shown in the offer's place once "download" is pressed: why a plan is needed, the
+                 offer when one is running, and a button to the checkout. --}}
+            <div class="demo-offer is-download" id="demoDownload" data-replaces="demoOffer" tabindex="-1" role="status" hidden>
+              <div class="demo-offer-text">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <div>
+                  <h3>{{ __('ui.demo.download_title') }}</h3>
+                  <p>@if(!empty($demoOffer)){!! __('ui.demo.download_text_offer', ['offer' => e($demoOffer['offer'])]) !!}@else{{ __('ui.demo.download_text') }}@endif</p>
+                </div>
+              </div>
+              <a class="demo-offer-btn" href="{{ \App\Support\DemoOffer::checkoutUrl($upgradePlanSlug) }}">{{ __('ui.demo.download_button') }}</a>
+            </div>
           @endinapp
         </div>
 

@@ -17,6 +17,21 @@ final class DemoOffer
     public const PLAN = 'starter';
 
     /**
+     * The checkout a demo button opens: Starter's, monthly. When Starter is not on sale, the
+     * plan the page gives instead (its cheapest one).
+     */
+    public static function checkoutUrl(string $otherwise): string
+    {
+        $starter = Plan::query()->subscriptionPlans()
+            ->where('slug', self::PLAN)
+            ->where('is_active', true)
+            ->where('price_cents', '>', 0)
+            ->exists();
+
+        return route('billing.page', ['plan' => $starter ? self::PLAN : $otherwise, 'billing_cycle' => 'monthly']);
+    }
+
+    /**
      * Starter's offer running now, or null when it has none.
      *
      * @return array{offer: string, ends: ?string, url: string}|null

@@ -844,6 +844,49 @@
         menuBtn.addEventListener('click', function(e) {
           e.preventDefault();
           e.stopPropagation();
+          // Where downloading needs a plan (the free demo): a note on the page says so, with its
+          // own button to the checkout, instead of leaving the page without a word.
+          var notice = audio.dataset.downloadNotice ? document.getElementById(audio.dataset.downloadNotice) : null;
+          if (notice) {
+            var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            var go = notice.querySelector('a');
+            var settle = function() {
+              notice.scrollIntoView({ block: 'nearest', behavior: calm ? 'auto' : 'smooth' });
+            };
+            // Already there (a second press): bring it into view, nothing to replay.
+            if (!notice.hidden) { settle(); if (go) go.focus({ preventScroll: true }); return; }
+            if (notice.dataset.opening) return;
+            var replaced = notice.dataset.replaces ? document.getElementById(notice.dataset.replaces) : null;
+            if (replaced && (replaced.hidden || !replaced.offsetHeight)) replaced = null;
+            // The note eases into the place of what it replaces: from that height to its own, so
+            // nothing below it jumps; with nothing to replace it grows from nothing.
+            var open = function(fromHeight) {
+              if (replaced) replaced.hidden = true;
+              notice.hidden = false;
+              delete notice.dataset.opening;
+              if (go) go.focus({ preventScroll: true });
+              if (calm || !notice.animate) { settle(); return; }
+              var own = window.getComputedStyle(notice);
+              var from = { opacity: 0, height: fromHeight + 'px', overflow: 'hidden' };
+              var to = { opacity: 1, height: notice.offsetHeight + 'px', overflow: 'hidden' };
+              if (!fromHeight) {
+                from.paddingTop = from.paddingBottom = from.marginTop = '0px';
+                to.paddingTop = own.paddingTop; to.paddingBottom = own.paddingBottom; to.marginTop = own.marginTop;
+              }
+              var entering = notice.animate([from, to], { duration: 300, easing: 'cubic-bezier(.2, .7, .2, 1)' });
+              entering.onfinish = settle;
+              entering.oncancel = settle;
+            };
+            if (replaced && !calm && replaced.animate) {
+              notice.dataset.opening = '1';
+              var height = replaced.offsetHeight;
+              var leaving = replaced.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: 'ease-out', fill: 'forwards' });
+              leaving.onfinish = function() { open(height); leaving.cancel(); };
+            } else {
+              open(0);
+            }
+            return;
+          }
           var redirectUrl = String(audio.dataset.downloadRedirectUrl || audio.dataset.downloadRedirect || '').trim();
           if (redirectUrl) {
             window.location.href = redirectUrl;

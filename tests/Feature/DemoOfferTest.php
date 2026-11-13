@@ -86,6 +86,37 @@ class DemoOfferTest extends TestCase
         $this->demo('en')->assertDontSee('Like the voice?');
     }
 
+    public function test_pressing_download_shows_why_a_plan_is_needed_with_the_offer_and_a_button_to_starters_checkout(): void
+    {
+        $this->offer(['starter'], 50);
+        $checkout = e(route('billing.page', ['plan' => 'starter', 'billing_cycle' => 'monthly']));
+
+        // The player hands "download" to the note on the page; the note waits hidden, in the offer's place.
+        $this->demo('en')
+            ->assertSee('data-download-notice="demoDownload"', false)
+            ->assertSee('<div class="demo-offer is-download" id="demoDownload" data-replaces="demoOffer" tabindex="-1" role="status" hidden>', false)
+            ->assertSee('Downloading is part of every plan')
+            ->assertSee('Subscribe with <b>50% off your first month</b> and download your voice right away.', false)
+            ->assertSee('<a class="demo-offer-btn" href="'.$checkout.'">Subscribe and download</a>', false);
+
+        $this->demo('ar')
+            ->assertSee('التحميل متاح مع أي باقة')
+            ->assertSee('اشترك الآن مع <b>خصم 50% على أول شهر</b>.', false)
+            ->assertSee('اشترك وحمّل');
+    }
+
+    public function test_with_no_offer_running_the_download_note_names_no_discount(): void
+    {
+        $this->demo('en')
+            ->assertSee('id="demoDownload"', false)
+            ->assertSee('Subscribe and download your voice right away.')
+            ->assertDontSee('% off');
+
+        // Starter not on sale: the button opens the cheapest plan's checkout instead.
+        Plan::query()->where('slug', 'starter')->update(['is_active' => false]);
+        $this->demo('en')->assertSee('href="'.e(route('billing.page', ['plan' => 'basic', 'billing_cycle' => 'monthly'])).'">Subscribe and download</a>', false);
+    }
+
     public function test_it_goes_by_itself_when_the_offer_ends(): void
     {
         $this->travelTo('2026-11-12 10:00:00');
