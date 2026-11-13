@@ -285,6 +285,28 @@ if ($has('audio_generations')) {
 }
 krsort($daily);
 $out['daily'] = $daily;
+// Studio voices (paying members) by hour of the day, with how many members made them and how
+// they ended: a day that stops at an hour, or only fails, shows here.
+if ($has('audio_generations')) {
+    $byHour = [];
+    foreach (DB::table('audio_generations')->where('created_at', '>=', $since)->get(['user_id', 'status', 'created_at']) as $g) {
+        $at = Carbon::parse($g->created_at);
+        $slot = &$byHour[$at->toDateString()][$at->format('H')];
+        $slot['n'] = ($slot['n'] ?? 0) + 1;
+        $slot['status'][(string) $g->status] = ($slot['status'][(string) $g->status] ?? 0) + 1;
+        $slot['members'][(int) $g->user_id] = true;
+        unset($slot);
+    }
+    foreach ($byHour as $day => $hours) {
+        ksort($hours);
+        foreach ($hours as $hour => $slot) {
+            $byHour[$day][$hour] = $slot['n'].' by '.count($slot['members']).' member(s): '.json_encode($slot['status']);
+        }
+        $byHour[$day] = $hours ? array_map(fn ($h) => $byHour[$day][$h], array_combine(array_keys($hours), array_keys($hours))) : [];
+    }
+    krsort($byHour);
+    $out['studio_voices_by_hour_utc'] = $byHour;
+}
 // Per sign-up day: how many of that day's new members ever made a voice.
 $cohort = [];
 foreach ($users as $u) {
