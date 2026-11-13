@@ -1181,6 +1181,8 @@
       if (!data || ended) return;
       if (!data.token) throw new Error(data.message || '');
       info = data;
+      // The call's own id and key, for the card (a chat that follows it reads what was said).
+      opts.onInfo && opts.onInfo({ conversation: data.conversation, call_key: data.call_key });
       loadBackground();
       ws = new WebSocket(data.ws + '?access_token=' + encodeURIComponent(data.token));
       ws.onopen = function () { ws.send(JSON.stringify({ setup: { model: data.model } })); };

@@ -543,6 +543,11 @@ class AgentCallController extends Controller
             return $this->error('not_found', 404);
         }
         $language = $c->agent?->language === 'en' ? 'en' : 'ar';
+        // A voice call made from this chat's card since it opened: what was said is context too.
+        if (is_array($in['call'] ?? null) && ! isset($c->reservation['after_call'])
+            && ($call = $this->calls->findByKey((string) ($in['call']['conversation'] ?? ''), (string) ($in['call']['call_key'] ?? '')))) {
+            $chats->comesAfter($c, $call);
+        }
         $result = $chats->reply($c, (string) ($in['id'] ?? ''), (string) ($in['text'] ?? ''));
         if (! $result['ok']) {
             // closed / limit: this conversation is over, a new one can start. failed / busy: the
