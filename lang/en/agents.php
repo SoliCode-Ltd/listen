@@ -188,6 +188,11 @@ return [
     'talk_correct_saved' => 'Learned. It will answer this way from now on.',
     // The small line that closes a call: how long it lasted.
     'talk_ended_after' => 'Call ended after :time',
+    // The last half minute of a call: the timer counts down, and the card says why it ended.
+    'talk_ends_in' => 'Ends in :time',
+    'talk_ended_limit' => 'Call time is up',
+    'talk_lasted' => 'Call length :time',
+    'talk_again' => 'Call again',
     'talk_you' => 'You',
     'talk_saved_contact' => 'Saved the caller\'s details: :details',
     'talk_skip' => 'Skip for now',

@@ -76,6 +76,11 @@
     '.lva-pill{display:none;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;background:var(--soft);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}',
     '.lva-pill i{width:7px;height:7px;border-radius:50%;background:#E2445F;animation:lva-blink 1.4s ease-in-out infinite}',
     '.lva.is-live .lva-pill{display:inline-flex}',
+    /* The last half minute: the timer counts down, in plain amber words (no box round them). */
+    '.lva-pill{transition:background .35s ease,color .35s ease,padding .35s ease}',
+    '.lva-pill.is-ending{background:transparent;padding:0;color:#B45309;white-space:nowrap}',
+    '.lva[data-theme="dark"] .lva-pill.is-ending{color:#FCD34D}',
+    '.lva-pill.is-ending i{background:currentColor;animation:none}',
     '.lva-x{width:34px;height:34px;margin:-4px;border-radius:50%;border:0;background:transparent;display:grid;place-items:center;color:var(--muted);flex:0 0 auto}',
     '.lva-x:hover{background:var(--soft);color:var(--text)}',
     '.lva-x svg,.lva-call svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
@@ -701,7 +706,7 @@
         parts.state.classList.toggle('is-error', stateNow === 'error' || stateNow === 'mic');
       }
       if (parts.pos) { parts.pos.hidden = !waiting; parts.posText.textContent = waiting ? waitText() : ''; }
-      if (parts.sub) parts.sub.textContent = waiting ? (lineText().hold || '') : '';
+      if (parts.sub) parts.sub.textContent = waiting ? (lineText().hold || '') : (timeUp() && !message && endedFor >= 1 && text.lasted ? String(text.lasted).replace(':time', clock(endedFor)) : '');
       if (parts.leave) parts.leave.hidden = !waiting;
       if (parts.callBox) parts.callBox.hidden = form;
       if (parts.slot) parts.slot.hidden = !form;
@@ -709,10 +714,10 @@
         // While waiting the button quietly gives up the wait; "leave my number" is the main way on.
         parts.call.classList.toggle('is-live', on);
         parts.call.classList.toggle('is-quiet', waiting);
-        parts.callLabel.textContent = waiting ? (lineText().cancel || text.end) : on ? text.end : text.start;
+        parts.callLabel.textContent = waiting ? (lineText().cancel || text.end) : on ? text.end : (timeUp() && text.again) || text.start;
         parts.callIcon.innerHTML = waiting ? '' : on ? ICONS.end : ICONS.phone;
       }
-      if (parts.barState) parts.barState.textContent = on && startedAt && stateNow !== 'connecting' ? clock(elapsed()) : (form ? '' : msg);
+      if (parts.barState) parts.barState.textContent = on && startedAt && stateNow !== 'connecting' ? timeText() : (form ? '' : msg);
       if (parts.tip) {
         var err = stateNow === 'error' || stateNow === 'mic';
         parts.tip.hidden = !(err || waiting || form);
@@ -819,9 +824,20 @@
       setTimeout(function () { done.focus(); }, 60);
     }
     var endedFor = 0;
+    // The call's time limit: when it ends (set once the agent has warned the caller, so the timer
+    // counts down from there), and why the last call ended ("limit": its time was up).
+    var endsAt = 0, endedWhy = '';
     function elapsed() { return startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0; }
-    // "Call ended after 01:24", in place of "Call ended", once a call that was answered is over.
-    function endedText() { return stateNow === 'ended' && endedFor >= 1 && text.ended_after ? String(text.ended_after).replace(':time', clock(endedFor)) : ''; }
+    function leftNow() { return endsAt ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000)) : 0; }
+    // "Ends in 00:29" while the last half minute runs (a card cached before these words came keeps the plain timer).
+    function ending() { return live() && endsAt > 0 && !!text.ends_in; }
+    function timeUp() { return stateNow === 'ended' && endedWhy === 'limit' && !!text.ended_limit; }
+    // "Call ended after 01:24", in place of "Call ended", once a call that was answered is over;
+    // "The call's time is up" when it reached its limit (its length goes on the line under it).
+    function endedText() {
+      if (timeUp()) return text.ended_limit;
+      return stateNow === 'ended' && endedFor >= 1 && text.ended_after ? String(text.ended_after).replace(':time', clock(endedFor)) : '';
+    }
     function setState(s, message) {
       if (s === 'error' && !message && pendingError) message = pendingError;
       // The internet dropped during the call: said in the card's language, not "something went wrong".
@@ -837,9 +853,12 @@
       else hideTyping(0);
       if (live() && !was) {
         startedAt = 0;
+        endsAt = 0;
+        endedWhy = '';
         clearInterval(tick);
         tick = setInterval(timer, 1000);
       }
+      if (s === 'idle') endedWhy = '';
       if ((s === 'listening' || s === 'speaking') && !startedAt) startedAt = Date.now();
       if (s === 'busy' && before !== 'busy') showForm();
       if (s === 'sent') showSent();
@@ -855,9 +874,12 @@
       paintState(message);
       timer();
     }
+    // The call's time as it shows: counting up, or "Ends in 00:29" through its last half minute.
+    function timeText() { return ending() ? String(text.ends_in).replace(':time', clock(leftNow())) : clock(elapsed()); }
     function timer() {
-      var t = clock(elapsed());
+      var t = timeText();
       if (parts.pillTime) parts.pillTime.textContent = t;
+      if (parts.pillTime && parts.pillTime.parentNode) parts.pillTime.parentNode.classList.toggle('is-ending', ending());
       if (live() && startedAt) {
         if (parts.launchLabel && !open) parts.launchLabel.textContent = t;
         if (parts.barState && stateNow !== 'connecting') parts.barState.textContent = t;
@@ -1145,6 +1167,9 @@
             }).then(function (r) { return r.json().catch(function () { return {}; }); });
           },
           onState: function (s) { setState(s); },
+          // The agent has told the caller the time is nearly up: the timer counts down from here.
+          onLimit: function (at) { endsAt = Number(at) || 0; timer(); },
+          onEnd: function (reason) { endedWhy = String(reason || ''); },
           onTurn: line,
           onWords: words,
           onHold: hold,

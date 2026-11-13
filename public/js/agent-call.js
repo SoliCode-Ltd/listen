@@ -372,6 +372,13 @@
     // The agent hangs up (end_call): what it is still saying plays to the end of its turn (closing; the
     // goodbye's last words can come after the hang-up), then nothing more (hungUp).
     var hungUp = false, closing = false, closingDone = false;
+    // The call's time (max_seconds, often shorter than the owner's setting: credit, daily budgets,
+    // a free test): it never ends as a surprise. With WARN_LEAD seconds left the agent tells the
+    // caller, in the call's language, at a pause; with LAST_LEAD left it says one short goodbye;
+    // at the end its last words play out (LIMIT_GRACE at most, never charged: the call's cost is
+    // capped at its reserved time). endsAt follows the server's clock when a ping says less is left.
+    var WARN_LEAD = 30, LAST_LEAD = 8, LIMIT_GRACE = 5000, WARN_WAIT = 6000;
+    var endsAt = 0, warnLead = 0, warnTimer = 0, lastTimer = 0, warned = false, lastWords = false, timeUp = false;
     var buf = new Float32Array(1024);
     // A caller who goes quiet: asked once if they are still there, then the agent says goodbye
     // (Listen pays for every second the line stays open).
@@ -911,7 +918,7 @@
       var quiet = (Date.now() - heardAt) / 1000;
       var limit = Math.max(8, info.silence_seconds || 20);
       if (quietEndAt && Date.now() > quietEndAt) { finish('silence'); return; }
-      if (quiet < limit || !ws || ws.readyState !== 1) return;
+      if (quiet < limit || !ws || ws.readyState !== 1 || lastWords || timeUp) return;
       heardAt = Date.now();
       nudged++;
       if (nudged === 1) {
@@ -1007,8 +1014,58 @@
       (function check() {
         if (ended) return;
         if (closingDone || Date.now() - since > 4000) hungUp = true;
-        if (hungUp && !sources.size) { setTimeout(function () { finish('done'); }, 400); return; }
+        if (hungUp && !sources.size) { setTimeout(function () { finish(lastWords ? 'limit' : 'done'); }, 400); return; }
         setTimeout(check, 150);
+      })();
+    }
+
+    // The call's clock: when the warning, the goodbye and the end come, counted from endsAt. Set as
+    // the call starts and again whenever the server says less time is left than the browser thought.
+    function armLimit() {
+      clearTimeout(warnTimer); clearTimeout(lastTimer); clearTimeout(stopTimer);
+      if (ended || !endsAt) return;
+      var left = endsAt - Date.now(), total = Math.max(30, (info && info.max_seconds) || 600);
+      // A short call (under a minute) is warned at its half.
+      warnLead = Math.min(WARN_LEAD, Math.floor(total / 2)) * 1000;
+      // A pause is looked for from a few seconds earlier, so the caller is told with the full
+      // WARN_LEAD still left even when someone is speaking as it comes.
+      if (!warned) warnTimer = setTimeout(warnOfEnd, Math.max(0, left - warnLead - WARN_WAIT));
+      if (!lastWords) lastTimer = setTimeout(sayLastWords, Math.max(0, left - LAST_LEAD * 1000));
+      stopTimer = setTimeout(endAtLimit, Math.max(0, left));
+    }
+    function secondsLeft() { return endsAt ? Math.max(0, Math.round((endsAt - Date.now()) / 1000)) : 0; }
+    // Whether someone is speaking now: the warning waits for a pause, it never talks over the caller.
+    function talking() { return sources.size > 0 || Date.now() - callerVoiceAt < 900 || Date.now() - voiceEndAt < 400; }
+    function warnOfEnd() {
+      if (ended || warned || closing || timeUp) return;
+      (function wait() {
+        if (ended || warned || closing || timeUp) return;
+        if (talking() && endsAt - Date.now() > warnLead) { warnTimer = setTimeout(wait, 200); return; }
+        warned = true;
+        var left = secondsLeft();
+        // On the screen first (the countdown), then said by the agent.
+        opts.onLimit && opts.onLimit(endsAt, left);
+        if (!ws || ws.readyState !== 1 || left <= LAST_LEAD + 2) return;
+        var about = left >= 25 ? 'about half a minute is' : 'about ' + left + ' seconds are';
+        ws.send(JSON.stringify({ realtimeInput: { text: '(A note from the call system, not from the caller: ' + about + ' left before this call reaches its time limit and ends. Tell the caller that now, in one short, warm sentence in ' + callTongue() + ', and offer ' + (opts.afterLimit === 'chat' ? 'to carry on in the written chat on this page' : 'to take their name and number so the team can follow up') + '. Then go on helping until the time is up. Do not call end_call for this, and do not mention this note.)' } }));
+      })();
+    }
+    function sayLastWords() {
+      if (ended || lastWords || closing || timeUp) return;
+      lastWords = true;
+      if (!warned) { warned = true; opts.onLimit && opts.onLimit(endsAt, secondsLeft()); }
+      if (!ws || ws.readyState !== 1) return;
+      ws.send(JSON.stringify({ realtimeInput: { text: '(A note from the call system, not from the caller: the call\'s time is up. Say one short, warm goodbye now in ' + callTongue() + ', a single sentence, then stop speaking. Do not call end_call, and do not mention this note.)' } }));
+    }
+    // The time is up: nothing new is asked of the agent; what it is saying plays out, then the call ends.
+    function endAtLimit() {
+      if (ended || timeUp) return;
+      timeUp = true;
+      var since = Date.now();
+      (function check() {
+        if (ended) return;
+        if (!sources.size || Date.now() - since > LIMIT_GRACE) { finish('limit'); return; }
+        setTimeout(check, 120);
       })();
     }
 
@@ -1016,7 +1073,15 @@
       if (ended) return;
       var turns = pending.splice(0);
       post(info.api + '/ping', { call_key: info.call_key, turns: turns }).then(function (r) {
-        if (r && r.stop) finish('limit');
+        if (!r) return;
+        if (r.stop) { endAtLimit(); return; }
+        // The server's clock started a little before the browser's: its count wins when it is shorter.
+        var left = Number(r.seconds_left);
+        if (left > 0 && endsAt && Date.now() + left * 1000 < endsAt - 1500) {
+          endsAt = Date.now() + left * 1000;
+          armLimit();
+          if (warned) opts.onLimit && opts.onLimit(endsAt, secondsLeft());
+        }
       }).catch(function () { pending = turns.concat(pending); });
     }
 
@@ -1069,7 +1134,7 @@
       stopRecording();
       flushTurns();
       release();
-      clearInterval(pingTimer); clearInterval(quietTimer); clearTimeout(stopTimer); clearTimeout(waitTimer); clearTimeout(lateTimer); cancelAnimationFrame(raf);
+      clearInterval(pingTimer); clearInterval(quietTimer); clearTimeout(stopTimer); clearTimeout(warnTimer); clearTimeout(lastTimer); clearTimeout(waitTimer); clearTimeout(lateTimer); cancelAnimationFrame(raf);
       stopBackground();
       try { ws && ws.close(); } catch (e) {}
       try { mic && mic.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
@@ -1077,6 +1142,8 @@
       closeEngines(300);
       if (info) post(info.api + '/end', { call_key: info.call_key, turns: pending.splice(0), usage: usageOut(), reason: reason || 'done' }, true);
       opts.onLevel && opts.onLevel(0, 0);
+      // Why it ended, before the state: the card says "the call's time is up" for a time limit.
+      opts.onEnd && opts.onEnd(reason || 'done');
       set(reason === 'error' ? 'error' : 'ended');
       window.removeEventListener('pagehide', onLeave);
     }
@@ -1133,7 +1200,8 @@
       startRecording();
       heardAt = Date.now();
       quietTimer = setInterval(checkQuiet, 1000);
-      stopTimer = setTimeout(function () { finish('limit'); }, Math.max(30, data.max_seconds || 600) * 1000);
+      endsAt = Date.now() + Math.max(30, data.max_seconds || 600) * 1000;
+      armLimit();
       window.addEventListener('pagehide', onLeave);
       if (ctx.state === 'suspended') ctx.resume();
       loop();

@@ -751,6 +751,11 @@ class AgentCalls
             $conversation->usage = $usage;
             $conversation->cost_usd = self::costOf($usage);
         }
+        // A call that ran to its time limit ended for that reason, whatever the agent gave when it
+        // said goodbye in its last seconds (only an abusive caller's reason stands, for the block).
+        if ($reason === 'limit' && $conversation->end_reason !== 'abusive') {
+            $conversation->end_reason = 'limit';
+        }
         // Kept before settling, which reads the call afresh under its lock.
         $conversation->save();
         $seconds = (int) min(

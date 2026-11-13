@@ -115,6 +115,12 @@ class AgentCallController extends Controller
                 'close' => trans('agents.widget_close', [], $locale),
                 // After a call, one line: "Call ended after 01:24".
                 'ended_after' => trans('agents.talk_ended_after', [], $locale),
+                // The call's time limit: "Ends in 00:29" through its last half minute, then
+                // "Call time is up", its length, and "Call again".
+                'ends_in' => trans('agents.talk_ends_in', [], $locale),
+                'ended_limit' => trans('agents.talk_ended_limit', [], $locale),
+                'lasted' => trans('agents.talk_lasted', [], $locale),
+                'again' => trans('agents.talk_again', [], $locale),
             ] + self::lineText($agent, $locale),
         ];
     }

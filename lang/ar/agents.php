@@ -190,6 +190,11 @@ return [
     'talk_correct_saved' => 'تعلّم. سيجيب هكذا من الآن.',
     // السطر الصغير الذي يختم المكالمة: كم استمرت.
     'talk_ended_after' => 'انتهت المكالمة بعد :time',
+    // The last half minute of a call: the timer counts down, and the card says why it ended.
+    'talk_ends_in' => 'تنتهي خلال :time',
+    'talk_ended_limit' => 'انتهى وقت المكالمة',
+    'talk_lasted' => 'مدة المكالمة :time',
+    'talk_again' => 'اتصل مجدداً',
     'talk_you' => 'أنت',
     'talk_saved_contact' => 'حُفظت بيانات المتصل: :details',
     'talk_skip' => 'تخطَّ الآن',
