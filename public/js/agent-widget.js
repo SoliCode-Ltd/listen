@@ -694,7 +694,8 @@
       var on = live(), waiting = stateNow === 'waiting', form = stateNow === 'busy' || stateNow === 'sent';
       var msg = message || (stateNow === 'mic' ? text.mic : waiting ? (lineText().waiting || '') : endedText() || states[stateNow] || '');
       // Before and after a call the owner may hide the line under the orb (look.ready_show).
-      var quiet = !on && !waiting && stateNow !== 'error' && stateNow !== 'mic' && !message && look.ready_show === false;
+      // (Why a call ended at its time limit is always said: it is news, not the line that waits for a call.)
+      var quiet = !on && !waiting && stateNow !== 'error' && stateNow !== 'mic' && !message && look.ready_show === false && !timeUp();
       box.classList.toggle('is-live', on);
       box.classList.toggle('is-waiting', waiting);
       box.classList.toggle('is-connecting', stateNow === 'connecting');

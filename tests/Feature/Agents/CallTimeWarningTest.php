@@ -138,6 +138,8 @@ class CallTimeWarningTest extends TestCase
         $this->assertStringContainsString("onEnd: function (reason) { endedWhy = String(reason || ''); },", $widget);
         $this->assertStringContainsString("function timeUp() { return stateNow === 'ended' && endedWhy === 'limit' && !!text.ended_limit; }", $widget);
         $this->assertStringContainsString('(timeUp() && text.again) || text.start', $widget);
+        // An owner who hides the line under the orb before a call still has the time limit said.
+        $this->assertStringContainsString("&& look.ready_show === false && !timeUp();", $widget);
         // A card cached before these words came keeps the plain timer and the old ending.
         $this->assertStringContainsString("function ending() { return live() && endsAt > 0 && !!text.ends_in; }", $widget);
     }
