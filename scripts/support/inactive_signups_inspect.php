@@ -397,4 +397,74 @@ if (config('session.driver') === 'file') {
 
 $out['never_made_a_voice_accounts'] = array_slice($rows, 0, 40);
 
+// Members who nearly bought a plan (Newsletter → Purchase follow-ups): every checkout opened
+// and left, and every declined first payment, in the window: who (id and country only), which
+// plan, how soon after signing up, whether they had tried the demo, and whether they bought after.
+if ($has('purchase_follow_ups')) {
+    $cases = DB::table('purchase_follow_ups as f')
+        ->leftJoin('users as u', 'u.id', '=', 'f.user_id')
+        ->where('f.created_at', '>=', $since)
+        ->orderBy('f.id')
+        ->get(['f.id', 'f.user_id', 'f.kind', 'f.plan_slug', 'f.billing_cycle', 'f.locale', 'f.reason', 'f.opens', 'f.email_status', 'f.email_note', 'f.created_at', 'f.happened_at', 'f.paid_at', 'f.paid_plan_slug', 'u.country_code', 'u.created_at as joined_at']);
+    $caseUsers = $cases->pluck('user_id')->filter()->unique()->values()->all();
+    $demoTimes = $has('demo_voice_generations') && $caseUsers
+        ? DB::table('demo_voice_generations')->whereIn('user_id', $caseUsers)->get(['user_id', 'created_at'])->groupBy('user_id')
+        : collect();
+    $manual = $has('manual_payment_requests') && $caseUsers
+        ? DB::table('manual_payment_requests')->whereIn('user_id', $caseUsers)->selectRaw('user_id as uid, count(*) as n')->groupBy('user_id')->pluck('n', 'uid')->all()
+        : [];
+    $bump = static function (array &$bucket, string $key): void {
+        $bucket[$key] = ($bucket[$key] ?? 0) + 1;
+    };
+    $sum = ['first_case_utc' => (string) ($cases->first()->created_at ?? '-'), 'cases' => $cases->count(), 'members' => count($caseUsers)];
+    $left = ['cases' => 0, 'members' => [], 'bought_after' => 0, 'also_had_a_declined_payment' => 0, 'by_country' => [], 'by_plan' => [], 'by_cycle' => [], 'by_language' => [], 'opened_checkout' => [], 'signed_up_to_checkout' => [], 'tried_the_demo_first' => [], 'asked_to_pay_by_hand' => 0];
+    $declined = ['cases' => 0, 'bought_after' => 0, 'by_reason' => [], 'by_country' => [], 'by_plan' => []];
+    $declinedUsers = $cases->where('kind', 'payment_failed')->pluck('user_id')->unique()->all();
+    $list = [];
+    foreach ($cases as $c) {
+        $country = strtoupper((string) ($c->country_code ?: '?'));
+        $minutes = $c->joined_at ? (int) round((strtotime((string) $c->created_at) - strtotime((string) $c->joined_at)) / 60) : null;
+        $demoBefore = ($demoTimes->get($c->user_id) ?? collect())->filter(fn ($d) => (string) $d->created_at < (string) $c->created_at)->count();
+        $demoAll = ($demoTimes->get($c->user_id) ?? collect())->count();
+        if ($c->kind === 'checkout_left') {
+            $left['cases']++;
+            $left['members'][$c->user_id] = true;
+            $left['bought_after'] += $c->paid_at ? 1 : 0;
+            $left['also_had_a_declined_payment'] += in_array($c->user_id, $declinedUsers, true) ? 1 : 0;
+            $left['asked_to_pay_by_hand'] += ($manual[$c->user_id] ?? 0) > 0 ? 1 : 0;
+            $bump($left['by_country'], $country);
+            $bump($left['by_plan'], (string) ($c->plan_slug ?: '-'));
+            $bump($left['by_cycle'], (string) $c->billing_cycle);
+            $bump($left['by_language'], (string) $c->locale);
+            $bump($left['opened_checkout'], (int) $c->opens > 1 ? 'more than once' : 'once');
+            $bump($left['signed_up_to_checkout'], match (true) {
+                $minutes === null => 'unknown',
+                $minutes <= 5 => 'within 5 minutes of signing up',
+                $minutes <= 60 => 'within an hour',
+                $minutes <= 1440 => 'within a day',
+                default => 'later than a day',
+            });
+            $bump($left['tried_the_demo_first'], $demoBefore > 0 ? 'yes' : ($demoAll > 0 ? 'no, but tried it after' : 'never tried the demo'));
+        } else {
+            $declined['cases']++;
+            $declined['bought_after'] += $c->paid_at ? 1 : 0;
+            $bump($declined['by_reason'], (string) ($c->reason ?: 'unknown'));
+            $bump($declined['by_country'], $country);
+            $bump($declined['by_plan'], (string) ($c->plan_slug ?: '-'));
+        }
+        $list[] = [
+            'case' => $c->id, 'member' => $c->user_id, 'what' => $c->kind, 'country' => $country, 'plan' => $c->plan_slug, 'cycle' => $c->billing_cycle,
+            'language' => $c->locale, 'opens' => (int) $c->opens, 'reason' => $c->reason, 'first_utc' => (string) $c->created_at, 'last_utc' => (string) $c->happened_at,
+            'minutes_after_signup' => $minutes, 'demo_voices_before' => $demoBefore, 'demo_voices_in_all' => $demoAll, 'manual_requests' => (int) ($manual[$c->user_id] ?? 0),
+            'email' => $c->email_status, 'email_note' => $c->email_note, 'bought_after' => $c->paid_at ? (string) $c->paid_plan_slug : null,
+        ];
+    }
+    $left['members'] = count($left['members']);
+    foreach (['by_country', 'by_plan'] as $key) {
+        arsort($left[$key]);
+        arsort($declined[$key]);
+    }
+    $out['purchase_follow_ups'] = ['summary' => $sum, 'checkouts_left' => $left, 'payments_declined' => $declined, 'cases' => array_slice(array_reverse($list), 0, 120)];
+}
+
 echo json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), "\n";
