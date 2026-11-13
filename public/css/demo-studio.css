@@ -653,6 +653,22 @@ html:not([data-theme="light"]) .demo-offer { --save: #4ADE95; }
   box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--brand-accent, #7659FA) 45%, transparent);
 }
 .demo-offer.is-download:focus { outline: none; }
+/* Scrolled into view clear of the header and of the floating buttons at the bottom. */
+.demo-offer.is-download { scroll-margin: 108px 0 110px; }
+
+/* The demo's messages arrive, they do not pop: the result with its offer and the notice under
+   the generate button ease in each time they are shown. (The download note eases into the
+   offer's place from the player's script, which also carries the height across.) */
+@keyframes demoMessageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+#audioWrap,
+#errorBox { animation: demoMessageIn .32s cubic-bezier(.2, .7, .2, 1); }
+@media (prefers-reduced-motion: reduce) {
+  #audioWrap,
+  #errorBox { animation: none; }
+}
 .demo-offer.is-download .demo-offer-text svg { stroke: var(--brand-accent, #7659FA); }
 .demo-offer-text { display: flex; align-items: flex-start; gap: .7rem; min-width: 0; }
 .demo-offer-text svg {
