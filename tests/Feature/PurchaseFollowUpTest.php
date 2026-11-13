@@ -80,6 +80,23 @@ class PurchaseFollowUpTest extends TestCase
         $this->assertTrue($row->email_due_at->gt(now()->addHours(2)));
     }
 
+    public function test_a_page_the_browser_only_fetched_ahead_of_time_is_not_an_opened_checkout(): void
+    {
+        app()->setLocale('ar');
+        $this->openCheckout($this->member, 'plan=starter');
+
+        // The site prefetches the page's other language: that must not count, nor change the language.
+        app()->setLocale('en');
+        foreach ([['Sec-Purpose' => 'prefetch'], ['Purpose' => 'prefetch'], ['Sec-Purpose' => 'prefetch;prerender'], ['X-Moz' => 'prefetch']] as $headers) {
+            $this->withHeaders($headers)->openCheckout($this->member, 'plan=starter');
+            $this->flushHeaders();
+        }
+
+        $row = PurchaseFollowUp::query()->sole();
+        $this->assertSame(1, $row->opens);
+        $this->assertSame('ar', $row->locale);
+    }
+
     public function test_a_checkout_with_no_plan_chosen_a_paid_member_and_an_admin_are_not_noted(): void
     {
         $this->openCheckout($this->member, '');

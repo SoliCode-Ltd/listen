@@ -73,7 +73,11 @@ class BillingController extends Controller
         $locale = app()->getLocale();
         // A member without a paid plan looking at a plan's checkout: noted, so a reminder can
         // follow if they leave without paying (Newsletter → Purchase follow-ups).
-        if (in_array($selectedPlan, $validPlanSlugs, true) && (! $activePlan || (int) $activePlan->price_cents <= 0)) {
+        // Not when a browser only fetches the page ahead of time (the site prefetches a page's
+        // other language): nobody opened anything then.
+        $prefetched = str_contains(strtolower((string) $request->header('Sec-Purpose', (string) $request->header('Purpose', ''))), 'prefetch')
+            || strtolower((string) $request->header('X-Moz', '')) === 'prefetch';
+        if (! $prefetched && in_array($selectedPlan, $validPlanSlugs, true) && (! $activePlan || (int) $activePlan->price_cents <= 0)) {
             $chosenPlan = Plan::query()->where('slug', $selectedPlan)->first();
             if ($chosenPlan) {
                 app(\App\Services\Billing\PurchaseFollowUps::class)->checkoutOpened($user, $chosenPlan, (string) $request->query('billing_cycle', 'monthly'), $locale);
