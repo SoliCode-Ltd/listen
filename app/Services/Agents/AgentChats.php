@@ -49,8 +49,12 @@ class AgentChats
     /** A chat's status while it can still be written in. */
     public const OPEN = 'open';
 
-    /** Rounds one reply may take: its tools once, then it must answer in words. */
-    private const MAX_ROUNDS = 2;
+    /**
+     * Rounds one reply may take: its tools twice at most (it looks something up, then saves a
+     * number), then it must answer in words. With one tool round only, a real reply on the test
+     * server came back empty when the first tool had nothing and the model wanted a second.
+     */
+    private const MAX_ROUNDS = 3;
 
     /** The conversation the model reads again with each message: its last turns, within this many characters. */
     private const HISTORY_TURNS = 24;

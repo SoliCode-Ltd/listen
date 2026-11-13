@@ -677,6 +677,7 @@ class AgentChatMoneyTest extends TestCase
     {
         Http::fake(['*:generateContent' => Http::sequence()
             ->push(self::calls('end_call', ['reason' => 'abusive']))
+            ->push(self::calls('look_up', ['query' => 'prices']))
             ->push(self::says('كيف أساعدك؟'))]);
         $owner = $this->owner();
         $chat = $this->open($this->liveAgent($owner))->assertOk();
@@ -685,9 +686,12 @@ class AgentChatMoneyTest extends TestCase
         $this->assertNull($row->end_reason);
         $this->assertSame(AgentChats::OPEN, $row->status);
         Http::assertSent(fn (ModelRequest $r): bool => data_get($r->data(), 'contents.2.parts.0.functionResponse.response.result') === 'unknown_tool'
-            // The round that must answer in words keeps the tools declared, and may call none.
+            // The third round must answer in words: the tools stay declared, and none may be called.
             && data_get($r->data(), 'toolConfig.functionCallingConfig.mode') === 'NONE'
             && data_get($r->data(), 'tools.0.functionDeclarations') !== null);
+        Http::assertSentCount(3);
+        $this->assertSame(3, $row->transcript[1]['rounds']);
+        $this->assertSame(['end_call', 'look_up'], $row->transcript[1]['tools']);
     }
 
     public function test_marks_that_hide_or_turn_text_go_and_a_sign_that_is_not_a_tag_stays(): void

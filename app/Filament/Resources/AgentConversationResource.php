@@ -573,7 +573,7 @@ class AgentConversationResource extends Resource
                     TextEntry::make('chat_rounds')->label('Model calls')
                         ->visible(fn (AgentConversation $record): bool => self::isChat($record))
                         ->state(fn (AgentConversation $record): string => number_format((int) ($record->usage['rounds'] ?? 0)))
-                        ->helperText('One a reply, two when it used a tool'),
+                        ->helperText('One a reply, more when it used its tools'),
                     TextEntry::make('chat_cached')->label('Read from the cache')
                         ->visible(fn (AgentConversation $record): bool => self::isChat($record))
                         ->state(fn (AgentConversation $record): string => number_format((int) ($record->usage['cached'] ?? 0)).' tokens')
