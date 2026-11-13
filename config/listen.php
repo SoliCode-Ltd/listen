@@ -262,7 +262,7 @@ return [
             ['from' => '2027-01-01', 'in' => 1.5, 'out' => 7.5, 'cached' => 0.15],
         ],
         // How much the text model thinks before a chat reply (minimal, low, medium, high; empty: its own).
-        'chat_thinking' => (string) env('LISTEN_AGENT_CHAT_THINKING', 'low'),
+        'chat_thinking' => (string) env('LISTEN_AGENT_CHAT_THINKING', 'minimal'),
         'chat_replies_per_conversation' => (int) env('LISTEN_AGENT_CHAT_REPLIES', 40),
         'chat_message_chars' => (int) env('LISTEN_AGENT_CHAT_MESSAGE_CHARS', 1000),
         'chats_per_visitor_hour' => (int) env('LISTEN_AGENT_CHATS_PER_VISITOR_HOUR', 6),

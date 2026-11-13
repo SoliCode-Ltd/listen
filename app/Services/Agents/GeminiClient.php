@@ -28,7 +28,7 @@ class GeminiClient
     public const WRITER_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash'];
 
     /** On the test server only, for a side-by-side of chat replies: taken out again before anything goes live. */
-    public const CHAT_TEST_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    public const CHAT_TEST_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.8-flash'];
 
     /**
      * The tokens generate() last used (what it read, what it wrote with its thinking, the part
