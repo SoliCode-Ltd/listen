@@ -642,6 +642,18 @@ html[dir="rtl"] .perf-grid select {
   border-top: 1px solid var(--line);
 }
 html:not([data-theme="light"]) .demo-offer { --save: #4ADE95; }
+.demo-offer[hidden] { display: none; }
+/* In the offer's place once "download" is pressed: why a plan is needed, in a soft brand box. */
+.demo-offer.is-download {
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border-top: 0;
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--brand-accent, #7659FA) 8%, var(--surface));
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--brand-accent, #7659FA) 45%, transparent);
+}
+.demo-offer.is-download:focus { outline: none; }
+.demo-offer.is-download .demo-offer-text svg { stroke: var(--brand-accent, #7659FA); }
 .demo-offer-text { display: flex; align-items: flex-start; gap: .7rem; min-width: 0; }
 .demo-offer-text svg {
   flex: none;

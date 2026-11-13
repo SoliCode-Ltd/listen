@@ -844,6 +844,19 @@
         menuBtn.addEventListener('click', function(e) {
           e.preventDefault();
           e.stopPropagation();
+          // Where downloading needs a plan (the free demo): a note on the page says so, with its
+          // own button to the checkout, instead of leaving the page without a word.
+          var notice = audio.dataset.downloadNotice ? document.getElementById(audio.dataset.downloadNotice) : null;
+          if (notice) {
+            var replaced = notice.dataset.replaces ? document.getElementById(notice.dataset.replaces) : null;
+            if (replaced) replaced.hidden = true;
+            notice.hidden = false;
+            var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            notice.scrollIntoView({ block: 'nearest', behavior: calm ? 'auto' : 'smooth' });
+            var go = notice.querySelector('a');
+            if (go) go.focus({ preventScroll: true });
+            return;
+          }
           var redirectUrl = String(audio.dataset.downloadRedirectUrl || audio.dataset.downloadRedirect || '').trim();
           if (redirectUrl) {
             window.location.href = redirectUrl;
