@@ -33,3 +33,12 @@ These are the owner's standing instructions. Follow them in every session.
   never run payment tests there. Test billing in the Stripe sandbox instead.
 - The Gemini speech quota is shared between staging and live: ask before
   running anything that generates audio.
+
+## Checking on live
+- For any check on live that needs a signed-in member, use the test member
+  "Claude test member" (member 8215; the owner's Gmail address with
+  "+claude-test" before the @). Never sign in as a real member.
+- No password is stored. Sign in by asking the site for a password reset for
+  that address and reading the link through the Gmail connection.
+- Look only: never pay with it (live Stripe takes real money), and ask before
+  generating audio with it.
