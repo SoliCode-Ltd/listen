@@ -101,7 +101,7 @@ class DemoOfferTest extends TestCase
 
         $this->demo('ar')
             ->assertSee('التحميل متاح مع أي باقة')
-            ->assertSee('اشترك <b>بخصم 50% على أول شهر</b> وحمّل صوتك فوراً.', false)
+            ->assertSee('اشترك الآن مع <b>خصم 50% على أول شهر</b>.', false)
             ->assertSee('اشترك وحمّل');
     }
 

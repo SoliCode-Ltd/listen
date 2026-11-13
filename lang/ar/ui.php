@@ -943,7 +943,7 @@ return [
         'offer_ends' => 'ينتهي العرض :date.',
         'offer_button' => 'احصل على الخصم',
         'download_title' => 'التحميل متاح مع أي باقة',
-        'download_text_offer' => 'اشترك <b>ب:offer</b> وحمّل صوتك فوراً.',
+        'download_text_offer' => 'اشترك الآن مع <b>:offer</b>.',
         'download_text' => 'اشترك وحمّل صوتك فوراً.',
         'download_button' => 'اشترك وحمّل',
         'voice_coverage' => 'تغطية الأصوات',
