@@ -245,12 +245,21 @@ return [
             'audio_out' => (float) env('LISTEN_AGENT_PRICE_AUDIO_OUT', 12.0),
         ],
         // The written chat (AgentChats). A reply's credits when Agents → Settings sets none and no
-        // paid plan gives a rate; what the text model charges per million tokens, to keep each
-        // reply's cost; and what one conversation, one visitor and one message may take.
+        // paid plan gives a rate, and what one conversation, one visitor and one message may take.
         'chat_credits_per_reply' => (int) env('LISTEN_AGENT_CHAT_CREDITS_PER_REPLY', 60),
+        // What the text model charges per million tokens, as its price list says (read on
+        // 13 November 2026): what it reads, what it writes (its thinking counted), and what it
+        // reads again from its own cache. The same list doubles each of them on 1 January 2027;
+        // "chat_price_changes" carries every dated change, so a reply's cost and the credits it
+        // needs follow by themselves on the day. A price set in the environment is used as it
+        // is, with no dated change.
         'chat_price_per_million' => [
-            'in' => (float) env('LISTEN_AGENT_CHAT_PRICE_IN', 0.5),
-            'out' => (float) env('LISTEN_AGENT_CHAT_PRICE_OUT', 3.0),
+            'in' => (float) env('LISTEN_AGENT_CHAT_PRICE_IN', 0.75),
+            'out' => (float) env('LISTEN_AGENT_CHAT_PRICE_OUT', 3.75),
+            'cached' => (float) env('LISTEN_AGENT_CHAT_PRICE_CACHED', 0.075),
+        ],
+        'chat_price_changes' => env('LISTEN_AGENT_CHAT_PRICE_IN') !== null || env('LISTEN_AGENT_CHAT_PRICE_OUT') !== null ? [] : [
+            ['from' => '2027-01-01', 'in' => 1.5, 'out' => 7.5, 'cached' => 0.15],
         ],
         // How much the text model thinks before a chat reply (minimal, low, medium, high; empty: its own).
         'chat_thinking' => (string) env('LISTEN_AGENT_CHAT_THINKING', 'low'),
@@ -258,6 +267,12 @@ return [
         'chat_message_chars' => (int) env('LISTEN_AGENT_CHAT_MESSAGE_CHARS', 1000),
         'chats_per_visitor_hour' => (int) env('LISTEN_AGENT_CHATS_PER_VISITOR_HOUR', 6),
         'chats_per_visitor_day' => (int) env('LISTEN_AGENT_CHATS_PER_VISITOR_DAY', 15),
+        // Replies one visitor may have on one agent in an hour and a day (a network: three times
+        // these; on Listen's own agents, which answer free, a third of them).
+        'chat_replies_per_visitor_hour' => (int) env('LISTEN_AGENT_CHAT_REPLIES_PER_VISITOR_HOUR', 80),
+        'chat_replies_per_visitor_day' => (int) env('LISTEN_AGENT_CHAT_REPLIES_PER_VISITOR_DAY', 250),
+        // A chat opened and never written in is closed after this many minutes.
+        'chat_empty_minutes' => (int) env('LISTEN_AGENT_CHAT_EMPTY_MINUTES', 3),
         // A chat nobody wrote in for this long is closed: its unused credits go back to the owner.
         'chat_idle_minutes' => (int) env('LISTEN_AGENT_CHAT_IDLE_MINUTES', 15),
     ],

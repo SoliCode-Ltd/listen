@@ -121,7 +121,8 @@ class CallTimeWarningTest extends TestCase
         // The end waits for the goodbye's sound, for a few seconds at most, and is kept as the limit.
         $this->assertStringContainsString("if (!sources.size || Date.now() - since > LIMIT_GRACE) { finish('limit'); return; }", $call);
         $this->assertStringContainsString("finish(lastWords ? 'limit' : 'done')", $call);
-        $this->assertStringContainsString('if (r.stop) { endAtLimit(); return; }', $call);
+        // A call the server ended for another reason is not called a time limit.
+        $this->assertStringContainsString("if (r.stop) { if (r.ended) finish('done'); else endAtLimit(); return; }", $call);
         $this->assertStringNotContainsString("stopTimer = setTimeout(function () { finish('limit'); }", $call, 'The call is no longer cut mid-word.');
         // The server's shorter count wins, and the card is told the reason before the state.
         $this->assertStringContainsString('if (left > 0 && endsAt && Date.now() + left * 1000 < endsAt - 1500)', $call);
@@ -134,13 +135,14 @@ class CallTimeWarningTest extends TestCase
 
         $this->assertStringContainsString("function timeText() { return ending() ? String(text.ends_in).replace(':time', clock(leftNow())) : clock(elapsed()); }", $widget);
         $this->assertStringContainsString("parts.pillTime.parentNode.classList.toggle('is-ending', ending());", $widget);
-        $this->assertStringContainsString("onLimit: function (at) { endsAt = Number(at) || 0; timer(); },", $widget);
+        $this->assertStringContainsString("onLimit: function (at, left, lead) { endsAt = Number(at) || 0; endsLead = Math.max(5, Number(lead) || 30); timer(); },", $widget);
         $this->assertStringContainsString("onEnd: function (reason) { endedWhy = String(reason || ''); },", $widget);
         $this->assertStringContainsString("function timeUp() { return stateNow === 'ended' && endedWhy === 'limit' && !!text.ended_limit; }", $widget);
         $this->assertStringContainsString('(timeUp() && text.again) || text.start', $widget);
         // An owner who hides the line under the orb before a call still has the time limit said.
         $this->assertStringContainsString("&& look.ready_show === false && !timeUp();", $widget);
         // A card cached before these words came keeps the plain timer and the old ending.
-        $this->assertStringContainsString("function ending() { return live() && endsAt > 0 && !!text.ends_in; }", $widget);
+        // The countdown shows for the last half minute, even when the notice was said a little before.
+        $this->assertStringContainsString("function ending() { return live() && endsAt > 0 && !!text.ends_in && leftNow() <= endsLead; }", $widget);
     }
 }

@@ -622,7 +622,8 @@ class AgentCalls
     public function ping(AgentConversation $conversation, array $turns = []): array
     {
         if (! $conversation->isLive()) {
-            return ['stop' => true, 'seconds_left' => 0];
+            // Ended on the server (settled, or stopped by the team): the card does not call it a time limit.
+            return ['stop' => true, 'ended' => true, 'seconds_left' => 0];
         }
         $this->appendTurns($conversation, $turns);
         $conversation->last_seen_at = now();
@@ -1230,12 +1231,15 @@ class AgentCalls
             $match->where('email', $lead['email']);
         }
         $contact = $match->first() ?? new AgentContact(['user_id' => $userId]);
+        // A customer the owner already has keeps their name and email: anyone can give a number
+        // that is not theirs, and must not rename the customer it belongs to (what they said is
+        // still on the conversation itself). What they want now is the newest.
         $contact->fill(array_filter([
             'agent_id' => $agentId,
             'agent_conversation_id' => $conversationId,
-            'name' => $lead['name'] ?? $contact->name,
+            'name' => filled($contact->name) ? $contact->name : ($lead['name'] ?? null),
             'phone' => $lead['phone'] ?? $contact->phone,
-            'email' => $lead['email'] ?? $contact->email,
+            'email' => filled($contact->email) ? $contact->email : ($lead['email'] ?? null),
             'note' => $lead['note'] ?? $contact->note,
             'last_contact_at' => now(),
         ], fn ($v) => $v !== null))->save();

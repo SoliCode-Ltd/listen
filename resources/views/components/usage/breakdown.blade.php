@@ -1,6 +1,6 @@
 {{-- Where the credits went this period, inside the studio's overview and on the Agents page (the
      same credits pay for both): one bar of what used them, each kind with its credits, the calls by
-     agent, and every item on request. Read from what was charged (App\Support\CreditUsage); Latin
+     agent, the written chats, and every item on request. Read from what was charged (App\Support\CreditUsage); Latin
      digits in both languages; styles in css/usage.css. --}}
 @props(['usage', 'agentsOpen' => true, 'perMinute' => null])
 @php
@@ -10,7 +10,8 @@
   $locale = app()->getLocale();
   $minutes = fn (int $s) => trans_choice('usage.minutes', intdiv($s, 60), ['count' => number_format(intdiv($s, 60))]);
   $length = fn (int $s) => $s > 0 ? sprintf('%d:%02d', intdiv($s, 60), $s % 60) : '—';
-  $kinds = array_values(array_filter(['studio', 'agent', 'api', 'dub'], fn ($k) => ($k !== 'agent' || $agentsOpen || $u['parts']['agent']['count'] > 0) && ($k === 'studio' || $k === 'agent' || $u['parts'][$k]['count'] > 0)));
+  $kinds = array_values(array_filter(['studio', 'agent', 'chat', 'api', 'dub'], fn ($k) => ($k !== 'agent' || $agentsOpen || $u['parts']['agent']['count'] > 0) && ($k === 'studio' || $k === 'agent' || ($u['parts'][$k]['count'] ?? 0) > 0)));
+  $replies = fn (int $n) => trans_choice('usage.replies', $n, ['count' => number_format($n)]);
   $usedParts = max(1, array_sum(array_map(fn ($k) => $u['parts'][$k]['credits'], $kinds)));
   $scale = max(1, $u['total'], $usedParts + $u['left']);
   $icons = [
@@ -18,6 +19,7 @@
     'agent' => '<path d="M5.1 3.5h3.1l1.6 4.1-2 1.3a11.3 11.3 0 0 0 5.3 5.3l1.3-2 4.1 1.6v3.1a2 2 0 0 1-2.2 2A16.6 16.6 0 0 1 3.1 5.7a2 2 0 0 1 2-2.2z"/>',
     'api' => '<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>',
     'dub' => '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M10 9.5v5l4.5-2.5z"/>',
+    'chat' => '<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-6.5L8 20.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/>',
   ];
 @endphp
 @if($hasUse)
@@ -46,7 +48,7 @@
           <span class="us-part-icon is-{{ $k }}" aria-hidden="true"><svg viewBox="0 0 24 24">{!! $icons[$k] !!}</svg></span>
           <div class="us-part-text">
             <b>{{ __('usage.kinds.'.$k) }}</b>
-            <span>{{ trans_choice('usage.kind_detail.'.$k, $p['count'], ['count' => number_format($p['count']), 'minutes' => $minutes($p['seconds'])]) }}</span>
+            <span>{{ trans_choice('usage.kind_detail.'.$k, $p['count'], ['count' => number_format($p['count']), 'minutes' => $minutes($p['seconds']), 'replies' => $replies((int) ($p['replies'] ?? 0))]) }}</span>
           </div>
           <div class="us-part-num">
             <b>{{ number_format($p['credits']) }}</b>
@@ -84,6 +86,7 @@
                 @php
                   $title = match ($item['kind']) {
                     'agent' => __('usage.call_with', ['name' => $item['title']]),
+                    'chat' => __('usage.chat_with', ['name' => $item['title']]),
                     'api' => $item['title'] !== '' ? $item['title'] : __('usage.api_item'),
                     'dub' => $item['title'] !== '' ? $item['title'] : __('usage.dub_item'),
                     default => $item['title'] !== '' ? $item['title'] : __('usage.untitled'),
@@ -92,7 +95,7 @@
                 <tr>
                   <td><span class="us-item"><i class="is-{{ $item['kind'] }}" aria-hidden="true"></i><span><b dir="auto">{{ \Illuminate\Support\Str::limit($title, 70) }}</b><small>{{ __('usage.kinds.'.$item['kind']) }}</small></span></span></td>
                   <td class="us-when">{{ $item['at']?->copy()->locale($locale)->translatedFormat($locale === 'ar' ? 'j M، H:i' : 'j M, H:i') }}</td>
-                  <td class="us-len"><bdi dir="ltr">{{ $length($item['seconds']) }}</bdi></td>
+                  <td class="us-len">@if($item['kind'] === 'chat'){{ $replies((int) ($item['replies'] ?? 0)) }}@else<bdi dir="ltr">{{ $length($item['seconds']) }}</bdi>@endif</td>
                   <td class="is-num"><b>{{ number_format($item['credits']) }}</b></td>
                 </tr>
               @endforeach

@@ -151,22 +151,73 @@ final class AgentCost
 
     private const CHAT_ROUNDS = 1.35;
 
-    /** Dollars one written reply costs, for instructions this big. */
-    public static function perReply(int $instructionTokens): float
+    /**
+     * What the text model charges per million tokens on a day (listen.agents.chat_price_per_million,
+     * and the dated changes its price list announces): what it reads, what it writes, and what
+     * it reads again from its cache.
+     *
+     * @return array{in: float, out: float, cached: float}
+     */
+    public static function chatPrices(?\DateTimeInterface $on = null): array
     {
         $price = (array) config('listen.agents.chat_price_per_million', []);
-        $in = (float) ($price['in'] ?? 0.5);
-        $out = (float) ($price['out'] ?? 3.0);
+        $in = (float) ($price['in'] ?? 0.75);
+        $out = (float) ($price['out'] ?? 3.75);
+        $cached = (float) ($price['cached'] ?? $in / 10);
+        $day = \Illuminate\Support\Carbon::instance($on ?? now())->utc()->toDateString();
+        $changes = array_values(array_filter((array) config('listen.agents.chat_price_changes', []), fn ($c): bool => is_array($c) && isset($c['from'])));
+        usort($changes, fn (array $a, array $b): int => strcmp((string) $a['from'], (string) $b['from']));
+        foreach ($changes as $change) {
+            if ($day >= (string) $change['from']) {
+                $in = (float) ($change['in'] ?? $in);
+                $out = (float) ($change['out'] ?? $out);
+                $cached = (float) ($change['cached'] ?? $in / 10);
+            }
+        }
 
-        return self::CHAT_ROUNDS * (($instructionTokens + self::CHAT_CONTEXT) * $in + self::CHAT_OUTPUT * $out) / 1e6;
+        return ['in' => $in, 'out' => $out, 'cached' => min($cached, $in)];
     }
 
-    /** Dollars a written reply really cost, from the tokens the model counted. */
-    public static function replyCost(int $tokensIn, int $tokensOut): float
+    /** The next dated change of the text model's prices, if one is announced: ['from' => '2027-01-01', 'in' => …]. */
+    public static function nextChatPriceChange(?\DateTimeInterface $on = null): ?array
     {
-        $price = (array) config('listen.agents.chat_price_per_million', []);
+        $day = \Illuminate\Support\Carbon::instance($on ?? now())->utc()->toDateString();
+        $next = collect((array) config('listen.agents.chat_price_changes', []))
+            ->filter(fn ($c): bool => is_array($c) && isset($c['from']) && (string) $c['from'] > $day)
+            ->sortBy('from')->first();
 
-        return round(($tokensIn * (float) ($price['in'] ?? 0.5) + $tokensOut * (float) ($price['out'] ?? 3.0)) / 1e6, 6);
+        return $next ? ['from' => (string) $next['from']] + self::chatPrices(\Illuminate\Support\Carbon::parse((string) $next['from'], 'UTC')) : null;
+    }
+
+    /** Dollars one written reply is expected to cost, for instructions this big. */
+    public static function perReply(int $instructionTokens, ?\DateTimeInterface $on = null): float
+    {
+        $price = self::chatPrices($on);
+
+        return self::CHAT_ROUNDS * (($instructionTokens + self::CHAT_CONTEXT) * $price['in'] + self::CHAT_OUTPUT * $price['out']) / 1e6;
+    }
+
+    /**
+     * Dollars a model call really cost, from the tokens the model counted: what it read (the
+     * part it read from its cache at the cache's price) and what it wrote, its thinking included.
+     */
+    public static function replyCost(int $tokensIn, int $tokensOut, int $cachedIn = 0, ?\DateTimeInterface $on = null): float
+    {
+        $price = self::chatPrices($on);
+        $cachedIn = max(0, min($tokensIn, $cachedIn));
+
+        return round((($tokensIn - $cachedIn) * $price['in'] + $cachedIn * $price['cached'] + $tokensOut * $price['out']) / 1e6, 6);
+    }
+
+    /**
+     * Dollars a credit earns on the plan whose credits cost the least (its yearly price counted):
+     * what a chat's credits are worth at the very least. Null: no paid plan.
+     */
+    public static function dollarsPerCredit(): ?float
+    {
+        $perDollar = self::creditsPerDollar();
+
+        return $perDollar ? 1 / ($perDollar * (1 - self::MARGIN)) : null;
     }
 
     /** Tokens of an agent's instructions for a written chat (cached for the request). */

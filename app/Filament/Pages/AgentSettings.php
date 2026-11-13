@@ -216,17 +216,25 @@ class AgentSettings extends Page implements HasForms
         return new HtmlString($html);
     }
 
-    /** Under the chat rate: what it follows, and what real replies have cost so far. */
+    /** Under the chat rate: what it follows, the model's prices and their next change, and what real replies have cost so far. */
     private static function chatRateHelp(): string
     {
         $measured = AgentCost::measuredChat();
-        $price = (array) config('listen.agents.chat_price_per_million', []);
+        $price = AgentCost::chatPrices();
+        $money = fn (float $v): string => rtrim(rtrim(number_format($v, 3), '0'), '.');
+        $rate = AgentCost::recommendedChatRate() ?? (int) config('listen.agents.chat_credits_per_reply', 60);
+        $next = AgentCost::nextChatPriceChange();
+        $perDollar = AgentCost::creditsPerDollar();
+        $then = $next && $perDollar
+            ? sprintf(' The model\'s price list changes them on %s to $%s in and $%s out: from that day a reply costs more, and this number follows by itself to about %s.',
+                \Illuminate\Support\Carbon::parse($next['from'])->format('j F Y'), $money($next['in']), $money($next['out']),
+                number_format((int) (ceil(AgentCost::perReply(AgentCost::TYPICAL['instructions'], \Illuminate\Support\Carbon::parse($next['from'], 'UTC')) * $perDollar / 5) * 5)))
+            : '';
 
-        return sprintf('Leave it empty and it follows the plans: now %s, the fewest credits that keep %d%% on a typical agent on every plan. An agent with a great deal to know uses more, since every reply reads all of it. The cost is worked out from the text model\'s prices in the server\'s settings ($%s in and $%s out per million tokens): check them against what the model really charges. %s',
-            number_format(AgentCost::recommendedChatRate() ?? (int) config('listen.agents.chat_credits_per_reply', 60)), (int) round(AgentCost::MARGIN * 100),
-            rtrim(rtrim(number_format((float) ($price['in'] ?? 0.5), 3), '0'), '.'), rtrim(rtrim(number_format((float) ($price['out'] ?? 3.0), 3), '0'), '.'),
+        return sprintf('Leave it empty and it follows the plans: now %s, the fewest credits that keep %d%% on a typical agent on every plan. An agent with a great deal to know uses more, since every reply reads all of it; a number set here is never used below what an agent\'s own cost needs. The cost is worked out from the text model\'s published prices ($%s in and $%s out per million tokens).%s %s',
+            number_format($rate), (int) round(AgentCost::MARGIN * 100), $money($price['in']), $money($price['out']), $then,
             $measured['replies'] > 0
-                ? sprintf('Real replies in the last 30 days: %s, $%s each on average at those prices.', number_format($measured['replies']), number_format((float) $measured['per_reply'], 5))
+                ? sprintf('Real replies in the last 30 days: %s, $%s each on average, every model call counted.', number_format($measured['replies']), number_format((float) $measured['per_reply'], 5))
                 : 'No reply has been given yet.');
     }
 

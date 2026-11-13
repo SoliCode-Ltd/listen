@@ -1044,7 +1044,7 @@
         warned = true;
         var left = secondsLeft();
         // On the screen first (the countdown), then said by the agent.
-        opts.onLimit && opts.onLimit(endsAt, left);
+        opts.onLimit && opts.onLimit(endsAt, left, Math.round(warnLead / 1000));
         if (!ws || ws.readyState !== 1 || left <= LAST_LEAD + 2) return;
         var about = left >= 25 ? 'about half a minute is' : 'about ' + left + ' seconds are';
         ws.send(JSON.stringify({ realtimeInput: { text: '(A note from the call system, not from the caller: ' + about + ' left before this call reaches its time limit and ends. Tell the caller that now, in one short, warm sentence in ' + callTongue() + ', and offer ' + (opts.afterLimit === 'chat' ? 'to carry on in the written chat on this page' : 'to take their name and number so the team can follow up') + '. Then go on helping until the time is up. Do not call end_call for this, and do not mention this note.)' } }));
@@ -1053,7 +1053,7 @@
     function sayLastWords() {
       if (ended || lastWords || closing || timeUp) return;
       lastWords = true;
-      if (!warned) { warned = true; opts.onLimit && opts.onLimit(endsAt, secondsLeft()); }
+      if (!warned) { warned = true; opts.onLimit && opts.onLimit(endsAt, secondsLeft(), Math.round(warnLead / 1000)); }
       if (!ws || ws.readyState !== 1) return;
       ws.send(JSON.stringify({ realtimeInput: { text: '(A note from the call system, not from the caller: the call\'s time is up. Say one short, warm goodbye now in ' + callTongue() + ', a single sentence, then stop speaking. Do not call end_call, and do not mention this note.)' } }));
     }
@@ -1074,13 +1074,14 @@
       var turns = pending.splice(0);
       post(info.api + '/ping', { call_key: info.call_key, turns: turns }).then(function (r) {
         if (!r) return;
-        if (r.stop) { endAtLimit(); return; }
+        // Stopped by the server: at its time limit, or because the call is no longer on there (the team stopped it).
+        if (r.stop) { if (r.ended) finish('done'); else endAtLimit(); return; }
         // The server's clock started a little before the browser's: its count wins when it is shorter.
         var left = Number(r.seconds_left);
         if (left > 0 && endsAt && Date.now() + left * 1000 < endsAt - 1500) {
           endsAt = Date.now() + left * 1000;
           armLimit();
-          if (warned) opts.onLimit && opts.onLimit(endsAt, secondsLeft());
+          if (warned) opts.onLimit && opts.onLimit(endsAt, secondsLeft(), Math.round(warnLead / 1000));
         }
       }).catch(function () { pending = turns.concat(pending); });
     }

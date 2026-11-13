@@ -27,6 +27,14 @@ class GeminiClient
 
     public const WRITER_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash'];
 
+    /**
+     * The tokens generate() last used (what it read, what it wrote with its thinking, the part
+     * read from the cache) and the model that answered; null when it gave nothing.
+     *
+     * @var array{in: int, out: int, cached: int, model: string}|null
+     */
+    public ?array $lastUsage = null;
+
     private function base(): string
     {
         return rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
@@ -40,6 +48,7 @@ class GeminiClient
      */
     public function generate(string $prompt, ?array $schema = null, int $timeout = 40, float $temperature = 0.4, ?string $thinking = null): ?string
     {
+        $this->lastUsage = null;
         $config = ['temperature' => $temperature];
         if ($schema !== null) {
             $config['responseMimeType'] = 'application/json';
@@ -68,6 +77,14 @@ class GeminiClient
             if ($response?->successful()) {
                 $text = data_get($response->json(), 'candidates.0.content.parts.0.text');
                 if (is_string($text) && trim($text) !== '') {
+                    $usage = (array) data_get($response->json(), 'usageMetadata', []);
+                    $this->lastUsage = [
+                        'in' => (int) ($usage['promptTokenCount'] ?? 0),
+                        'out' => (int) ($usage['candidatesTokenCount'] ?? 0) + (int) ($usage['thoughtsTokenCount'] ?? 0),
+                        'cached' => (int) ($usage['cachedContentTokenCount'] ?? 0),
+                        'model' => $model,
+                    ];
+
                     return $text;
                 }
             }
@@ -84,9 +101,9 @@ class GeminiClient
      *
      * @param  array<int, array{role: string, parts: array<int, array<string, mixed>>}>  $contents
      * @param  array<int, array<string, mixed>>  $tools  function declarations
-     * @return array{text: string, calls: array<int, array{name: string, args: array<string, mixed>}>, parts: array<int, array<string, mixed>>, usage: array{in: int, out: int, thoughts: int}, model: string}|null
+     * @return array{text: string, calls: array<int, array{name: string, args: array<string, mixed>}>, parts: array<int, array<string, mixed>>, usage: array{in: int, out: int, thoughts: int, cached: int}, model: string}|null
      */
-    public function converse(string $system, array $contents, array $tools = [], int $timeout = 25, int $maxOutputTokens = 600): ?array
+    public function converse(string $system, array $contents, array $tools = [], int $timeout = 25, int $maxOutputTokens = 600, bool $wordsOnly = false): ?array
     {
         // A chat reply is a short answer from facts it was given: the model thinks little before
         // writing, so the customer is not kept waiting (listen.agents.chat_thinking). Measured on
@@ -103,6 +120,9 @@ class GeminiClient
                 'systemInstruction' => ['parts' => [['text' => $system]]],
                 'contents' => $contents,
                 'tools' => $tools !== [] ? [['functionDeclarations' => $tools]] : null,
+                // A round that must answer in words: the tools stay declared (the conversation
+                // above it used them) but none may be called.
+                'toolConfig' => $tools !== [] && $wordsOnly ? ['functionCallingConfig' => ['mode' => 'NONE']] : null,
                 'generationConfig' => $config,
             ]), $model, $seconds);
             $response = $ask($config, $left);
@@ -150,6 +170,8 @@ class GeminiClient
                     'in' => (int) ($usage['promptTokenCount'] ?? 0),
                     'out' => (int) ($usage['candidatesTokenCount'] ?? 0),
                     'thoughts' => (int) ($usage['thoughtsTokenCount'] ?? 0),
+                    // The part of what it read that came from its own cache (billed at the cache's price).
+                    'cached' => (int) ($usage['cachedContentTokenCount'] ?? 0),
                 ],
                 'model' => $model,
             ];
@@ -180,6 +202,14 @@ class GeminiClient
             if ($response?->successful()) {
                 $text = data_get($response->json(), 'candidates.0.content.parts.0.text');
                 if (is_string($text) && trim($text) !== '') {
+                    $usage = (array) data_get($response->json(), 'usageMetadata', []);
+                    $this->lastUsage = [
+                        'in' => (int) ($usage['promptTokenCount'] ?? 0),
+                        'out' => (int) ($usage['candidatesTokenCount'] ?? 0) + (int) ($usage['thoughtsTokenCount'] ?? 0),
+                        'cached' => (int) ($usage['cachedContentTokenCount'] ?? 0),
+                        'model' => $model,
+                    ];
+
                     return $text;
                 }
             }

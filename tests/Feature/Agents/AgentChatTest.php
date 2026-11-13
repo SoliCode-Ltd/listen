@@ -19,11 +19,11 @@ use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * The written chat with an agent. The owner's plan holds the credits of the replies one
- * conversation may have; each reply uses a fixed number of credits, a message that got no answer
- * uses none, a message sent twice is charged once, and what was not used goes back when the chat
- * closes. Every message, each reply's credits, tokens and cost, and the details the customer left
- * are kept. A chat is never a call: its key opens none of a call's doors.
+ * The written chat with an agent. Opening one takes nothing from the owner's plan; each reply
+ * uses a fixed number of credits, taken as it is given: a message that got no answer uses none
+ * and a message sent twice is charged once. Every message, each reply's credits, tokens and
+ * cost, and the details the customer left are kept. A chat is never a call: its key opens none
+ * of a call's doors. (What it costs and what it withstands: AgentChatMoneyTest.)
  */
 class AgentChatTest extends TestCase
 {
@@ -41,7 +41,7 @@ class AgentChatTest extends TestCase
         \App\Models\SiteSetting::set('agents_credits_per_minute', '8100', 'agents');
         // A fixed rate for a reply, so the plans these tests make do not move it.
         \App\Models\SiteSetting::set('agents_chat_credits_per_reply', (string) self::RATE, 'agents');
-        config(['listen.agents.chat_price_per_million' => ['in' => 0.0, 'out' => 0.0]]);
+        config(['listen.agents.chat_price_per_million' => ['in' => 0.0, 'out' => 0.0], 'listen.agents.chat_price_changes' => []]);
     }
 
     private function owner(int $credits = 500000): User
@@ -89,7 +89,7 @@ class AgentChatTest extends TestCase
         return $this->api('/chats', ['key' => $agent->mainWidget()->public_key, 'page_url' => self::SITE.'/prices', 'visitor' => $visitor]);
     }
 
-    public function test_a_chat_holds_its_replies_charges_each_one_once_and_gives_the_rest_back(): void
+    public function test_a_chat_takes_nothing_when_it_opens_and_charges_each_reply_once(): void
     {
         Http::fake(['*:generateContent' => Http::sequence()
             ->push(self::says('التبييض بـ 900 جنيه.', 1500, 30))
@@ -102,16 +102,18 @@ class AgentChatTest extends TestCase
         $id = $start->json('conversation');
         $key = $start->json('chat_key');
         $this->assertSame($replies, $start->json('replies'));
-        $this->assertSame($replies * self::RATE, $this->creditsUsed($owner), 'the whole conversation is held');
+        $this->assertSame(0, $this->creditsUsed($owner), 'opening a chat takes nothing');
 
         $first = $this->api('/chats/'.$id.'/messages', ['chat_key' => $key, 'id' => 'm1', 'text' => 'بكام التبييض؟'])->assertOk();
         $this->assertSame('التبييض بـ 900 جنيه.', $first->json('reply'));
         $this->assertSame($replies - 1, $first->json('left'));
+        $this->assertSame(self::RATE, $this->creditsUsed($owner), 'one reply, one reply\'s credits');
 
         // The same message again (a lost connection, a second tap): the same answer, no second charge, no second model call.
         $again = $this->api('/chats/'.$id.'/messages', ['chat_key' => $key, 'id' => 'm1', 'text' => 'بكام التبييض؟'])->assertOk();
         $this->assertSame('التبييض بـ 900 جنيه.', $again->json('reply'));
         Http::assertSentCount(1);
+        $this->assertSame(self::RATE, $this->creditsUsed($owner));
 
         $this->api('/chats/'.$id.'/messages', ['chat_key' => $key, 'id' => 'm2', 'text' => 'مواعيدكم؟'])->assertOk()->assertJsonPath('reply', 'نفتح من 9 إلى 5.');
 
@@ -119,10 +121,13 @@ class AgentChatTest extends TestCase
         $this->assertSame('chat', $chat->channel);
         $this->assertSame(AgentChats::OPEN, $chat->status);
         $this->assertSame(2 * self::RATE, $chat->credits);
-        $this->assertSame(['chat' => true, 'replies' => 2, 'in' => 3100, 'out' => 70], $chat->usage);
+        $this->assertEquals(['chat' => true, 'replies' => 2, 'in' => 3100, 'out' => 70, 'thoughts' => 20, 'cached' => 0, 'rounds' => 2], $chat->usage);
+        $this->assertSame(2 * self::RATE, $this->creditsUsed($owner));
         $this->assertSame(['caller', 'agent', 'caller', 'agent'], array_column($chat->transcript, 'role'));
         $this->assertSame(self::RATE, $chat->transcript[1]['credits']);
-        $this->assertSame(['in' => 1500, 'out' => 40], $chat->transcript[1]['tokens']);
+        $this->assertSame(['in' => 1500, 'out' => 40, 'thoughts' => 10, 'cached' => 0], $chat->transcript[1]['tokens']);
+        $this->assertSame(1, $chat->transcript[1]['rounds']);
+        $this->assertSame('gemini-3.8-flash', $chat->transcript[1]['model']);
         $this->assertSame(self::SITE.'/prices', $chat->page_url);
 
         // The model read the chat's own instructions and the conversation so far.
@@ -132,7 +137,7 @@ class AgentChatTest extends TestCase
             && data_get($r->data(), 'contents.2.parts.0.text') === 'مواعيدكم؟'
             && ! in_array('end_call', array_column((array) data_get($r->data(), 'tools.0.functionDeclarations', []), 'name'), true));
 
-        // Closed: two replies charged, the other thirty-eight given back.
+        // Closed: two replies charged, and nothing else was ever taken.
         app(AgentChats::class)->close($chat);
         $chat->refresh();
         $this->assertSame(AgentConversation::ENDED, $chat->status);
@@ -160,6 +165,7 @@ class AgentChatTest extends TestCase
         $chat = AgentConversation::query()->where('public_id', $id)->sole();
         $this->assertSame([], $chat->transcript);
         $this->assertSame(0, $chat->credits);
+        $this->assertSame(0, $this->creditsUsed($owner), 'the credits taken for the answer that never came are back');
 
         $this->api('/chats/'.$id.'/messages', ['chat_key' => $start->json('chat_key'), 'id' => 'm1', 'text' => 'مرحبا'])->assertOk()->assertJsonPath('reply', 'أهلاً بك.');
         app(AgentChats::class)->close($chat->refresh());
@@ -211,7 +217,7 @@ class AgentChatTest extends TestCase
         $key = $start->json('chat_key');
         $held = $this->creditsUsed($owner);
 
-        // Ending it as a call would hand the whole hold back: a chat's key opens none of a call's doors.
+        // A chat's key opens none of a call's doors.
         $this->api('/calls/'.$id.'/end', ['call_key' => $key, 'reason' => 'done'])->assertNotFound();
         $this->api('/calls/'.$id.'/ping', ['call_key' => $key])->assertNotFound();
         $this->api('/calls/'.$id.'/tool', ['call_key' => $key, 'name' => 'save_contact', 'args' => ['phone' => '+201001234567']])->assertNotFound();
@@ -223,7 +229,7 @@ class AgentChatTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_the_hold_follows_what_the_owner_can_pay_and_a_conversation_stops_at_its_replies(): void
+    public function test_a_conversation_has_the_replies_its_owner_can_pay_and_stops_there(): void
     {
         Http::fake(['*:generateContent' => Http::response(self::says('تمام'))]);
         // Credits for three replies only.
@@ -231,7 +237,6 @@ class AgentChatTest extends TestCase
         $agent = $this->liveAgent($owner);
         $start = $this->open($agent)->assertOk();
         $this->assertSame(3, $start->json('replies'));
-        $this->assertSame(3 * self::RATE, $this->creditsUsed($owner));
         $id = $start->json('conversation');
         foreach (['a', 'b', 'c'] as $m) {
             $this->api('/chats/'.$id.'/messages', ['chat_key' => $start->json('chat_key'), 'id' => $m, 'text' => 'سؤال '.$m])->assertOk();
@@ -240,7 +245,7 @@ class AgentChatTest extends TestCase
             ->assertStatus(410)->assertJsonPath('error', 'limit')->assertJsonPath('message', 'انتهت هذه المحادثة.');
         Http::assertSentCount(3);
 
-        // Nothing left to hold a second conversation: the chat is not available, and its button says so.
+        // Nothing left for a second conversation: the chat is not available, and its button says so.
         $this->open($agent, 'v-2')->assertStatus(409)->assertJsonPath('error', 'paused')->assertJsonPath('message', 'المحادثة غير متاحة الآن.');
         $this->assertFalse($this->withHeaders(['Origin' => self::SITE])->getJson('/agent-api/widgets/'.$agent->mainWidget()->public_key)->assertOk()->json('channels.chat'));
         // Never below zero.
@@ -288,7 +293,7 @@ class AgentChatTest extends TestCase
         $this->open($agent)->assertOk();
         $this->open($agent)->assertStatus(429)->assertJsonPath('error', 'busy');
 
-        // An hour later nobody has written: both are closed and every held credit is back.
+        // A while later nobody has written: both are closed, and only the reply given is charged.
         $this->api('/chats/'.$first->json('conversation').'/messages', ['chat_key' => $first->json('chat_key'), 'id' => 'm1', 'text' => 'مرحبا'])->assertOk();
         $this->travel(AgentChats::idleMinutes() + 1)->minutes();
         $this->artisan('agents:settle-calls')->assertSuccessful();
@@ -361,7 +366,23 @@ class AgentChatTest extends TestCase
         $this->assertStringContainsString("parts.input.disabled = on || waiting;", $widget);
         // Kept for the visit, never beyond an hour, and never fatal where storage is blocked.
         $this->assertStringContainsString("try { window.sessionStorage.setItem(CHAT_STORE, JSON.stringify({ chat: chat, call: lastCall, log: log.slice(-60), at: Date.now() })); } catch (e) {}", $widget);
-        $this->assertStringContainsString('if (!kept || !kept.at || Date.now() - kept.at > 3600000) return;', $widget);
+        $this->assertStringContainsString("if (!kept || typeof kept !== 'object' || !(kept.at > 0) || kept.at > Date.now() + 60000 || Date.now() - kept.at > 3600000) return;", $widget);
+        // What is kept is checked before it is believed: only this agent's own address, only the card's own kinds of line.
+        $this->assertStringContainsString("{ id: id, key: c.key, api: ctx.origin + '/agent-api/chats/' + id }", $widget);
+        $this->assertStringContainsString("if ((l.k !== 'me' && l.k !== 'agent' && l.k !== 'note') || typeof l.t !== 'string') return null;", $widget);
+        // A message sent just before the next page is kept, and asked again there with its own id.
+        $this->assertStringContainsString("log.push({ k: 'me', t: msg.text, id: msg.id, wait: true });", $widget);
+        $this->assertStringContainsString("if (l.k === 'me' && l.wait && i === log.length - 1) waiting = { id: l.id, text: l.t, view: view, kept: true };", $widget);
+        // A reply is never left hidden from a screen reader; pressing send never drops the keyboard.
+        $this->assertStringContainsString("n.removeAttribute('aria-hidden');\n        writeOut(n, String(data.reply));", $widget);
+        $this->assertStringContainsString("parts.send.addEventListener('pointerdown', function (e) { e.preventDefault(); });", $widget);
+        // On a phone the card rides above the keyboard, and a zoomed page is not a keyboard.
+        $this->assertStringContainsString('bottom:calc(var(--h) + 26px + var(--kb,0px))', $widget);
+        $this->assertStringContainsString('var typingNow = open && under > 120 && !(vv.scale > 1.01) && !!parts.input && root.activeElement === parts.input;', $widget);
+        // No call while a reply is on its way, nothing written during a call, and no button when neither is on offer.
+        $this->assertStringContainsString('if (starting || sending) return;', $widget);
+        $this->assertStringContainsString("if (live() || starting || stateNow === 'waiting' || stateNow === 'connecting') return;", $widget);
+        $this->assertStringContainsString('if (cfg && cfg.channels && cfg.channels.chat === false && cfg.channels.call === false) return;', $widget);
         // The call from the chat: it carries the chat, offers it as the time runs out, and hands its own id back.
         $this->assertStringContainsString("afterLimit: chatOn ? 'chat' : '',", $widget);
         $this->assertStringContainsString('chat: chatRef() }', $widget);
@@ -369,9 +390,9 @@ class AgentChatTest extends TestCase
         $this->assertStringContainsString("(opts.afterLimit === 'chat' ? 'to carry on in the written chat on this page' : 'to take their name and number so the team can follow up')", $call);
         // Phones: the box to write in never makes the page zoom, and the keyboard lifts the card.
         $this->assertStringContainsString('font-size:16px;line-height:22px', $widget);
-        $this->assertStringContainsString("box.style.setProperty('--kb', under > 120 ? under + 'px' : '0px');", $widget);
+        $this->assertStringContainsString("box.style.setProperty('--kb', typingNow ? under + 'px' : '0px');", $widget);
         // Reduced motion: the reply is written at once.
-        $this->assertStringContainsString("if ((window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || bits.length < 2) { node.textContent = words; follow(); return; }", $widget);
+        $this->assertStringContainsString("if ((window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || bits.length < 2) { node.removeAttribute('aria-hidden'); node.textContent = words; follow(); return; }", $widget);
     }
 
     public function test_listens_own_agent_knows_the_offers_running_today_in_a_chat_and_on_a_call(): void

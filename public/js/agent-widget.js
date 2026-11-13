@@ -183,7 +183,7 @@
     '.lva-slot p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5;text-align:center;text-wrap:balance}',
     '.lva-form{display:grid;gap:10px}',
     '.lva-field{display:grid;gap:5px;font-size:12.5px;font-weight:700;color:var(--muted)}',
-    '.lva-field input{font:inherit;font-size:15.5px;font-weight:600;color:var(--text);width:100%;height:46px;padding:0 14px;border-radius:14px;border:1px solid var(--line);background:var(--bg);outline:none;transition:border-color .2s ease,box-shadow .2s ease}',
+    '.lva-field input{font:inherit;font-size:16px;font-weight:600;color:var(--text);width:100%;height:46px;padding:0 14px;border-radius:14px;border:1px solid var(--line);background:var(--bg);outline:none;transition:border-color .2s ease,box-shadow .2s ease}',
     '.lva[data-radius="square"] .lva-field input{border-radius:8px}',
     '.lva-field input:focus{border-color:var(--a);box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 24%,transparent)}',
     '.lva-field input[aria-invalid="true"]{border-color:#D0335F}',
@@ -215,7 +215,7 @@
     '.lva.is-right .lva-bartip{right:0}.lva.is-left .lva-bartip{left:0}',
     '.lva-bartip.is-error{color:#D0335F}',
 
-    '@media (max-width:480px){.lva{bottom:14px}.lva.is-right{right:14px}.lva.is-left{left:14px}.lva:not(.is-preview):not(.is-inline) .lva-panel{position:fixed;left:10px !important;right:10px !important;bottom:calc(var(--h) + 26px);width:auto;max-width:none}}',
+    '@media (max-width:480px){.lva{bottom:14px}.lva.is-right{right:14px}.lva.is-left{left:14px}.lva:not(.is-preview):not(.is-inline) .lva-panel{position:fixed;left:10px !important;right:10px !important;bottom:calc(var(--h) + 26px + var(--kb,0px));width:auto;max-width:none}}',
     '@keyframes lva-enter{from{opacity:0;transform:translateY(14px) scale(.96)}}',
     '@keyframes lva-pop{from{opacity:0;transform:scale(.92)}}',
     '@keyframes lva-hello{to{box-shadow:0 0 0 12px transparent}}',
@@ -470,9 +470,22 @@
     var host = el('div');
     host.setAttribute(preview ? 'data-listen-agent-preview' : 'data-listen-agent', '');
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
-    var style = el('style');
-    style.textContent = CSS;
-    root.appendChild(style);
+    // A constructed sheet where the browser has them (a page whose policy refuses inline styles
+    // still shows the card as drawn); a style element otherwise.
+    var sheeted = false;
+    try {
+      if (root.adoptedStyleSheets && window.CSSStyleSheet && CSSStyleSheet.prototype.replaceSync) {
+        var sheet = new CSSStyleSheet();
+        sheet.replaceSync(CSS);
+        root.adoptedStyleSheets = [sheet];
+        sheeted = true;
+      }
+    } catch (e) { sheeted = false; }
+    if (!sheeted) {
+      var style = el('style');
+      style.textContent = CSS;
+      root.appendChild(style);
+    }
     var box = el('div', 'lva');
     root.appendChild(box);
     (opts.into || document.body).appendChild(host);
@@ -653,13 +666,15 @@
         parts.send.innerHTML = ICONS.send;
         parts.form.appendChild(parts.input); parts.form.appendChild(parts.send);
         parts.input.addEventListener('input', roomToWrite);
-        // Enter sends where there is a keyboard to press Shift on; on a phone it starts a new line.
+        // Enter sends (the key is labelled "send" on a phone); Shift+Enter starts a new line, and
+        // an Enter that only picks a word while composing (Arabic, Chinese, Japanese keyboards) does nothing.
         parts.input.addEventListener('keydown', function (e) {
           if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.keyCode === 229) return;
-          if (window.matchMedia && !matchMedia('(pointer:fine)').matches) return;
           e.preventDefault();
           sendChat();
         });
+        // Pressing send never takes the keyboard away: the box keeps its focus.
+        parts.send.addEventListener('pointerdown', function (e) { e.preventDefault(); });
         parts.form.addEventListener('submit', function (e) { e.preventDefault(); sendChat(); });
         [chead, parts.callBox, parts.slot, parts.lines, parts.form, powered()].forEach(function (n) { cpanel.appendChild(n); });
         box.appendChild(cpanel);
@@ -996,7 +1011,7 @@
     function elapsed() { return startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0; }
     function leftNow() { return endsAt ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000)) : 0; }
     // "Ends in 00:29" while the last half minute runs (a card cached before these words came keeps the plain timer).
-    function ending() { return live() && endsAt > 0 && !!text.ends_in; }
+    function ending() { return live() && endsAt > 0 && !!text.ends_in && leftNow() <= endsLead; }
     function timeUp() { return stateNow === 'ended' && endedWhy === 'limit' && !!text.ended_limit; }
     // "Call ended after 01:24", in place of "Call ended", once a call that was answered is over;
     // "The call's time is up" when it reached its limit (its length goes on the line under it).
@@ -1087,7 +1102,7 @@
      * The chat changes without jumps: its height moves smoothly to the new one (to its most, then
      * it scrolls), and it follows the newest line unless the caller scrolled up to read.
      */
-    var typing = null, typingOff = 0;
+    var typing = null, typingOff = 0, endsLead = 30;
     function smoothly(change) {
       var box = parts.lines;
       if (!box) { change(); return; }
@@ -1335,12 +1350,28 @@
     function loadChat() {
       try {
         var kept = JSON.parse(window.sessionStorage.getItem(CHAT_STORE) || 'null');
-        // Kept for the visit, an hour at most.
-        if (!kept || !kept.at || Date.now() - kept.at > 3600000) return;
-        chat = kept.chat && kept.chat.id && kept.chat.key && kept.chat.api ? kept.chat : null;
-        lastCall = kept.call || null;
-        log = Array.isArray(kept.log) ? kept.log.filter(function (l) { return l && typeof l === 'object'; }) : [];
-      } catch (e) {}
+        // Kept for the visit, an hour at most (and never from a time yet to come).
+        if (!kept || typeof kept !== 'object' || !(kept.at > 0) || kept.at > Date.now() + 60000 || Date.now() - kept.at > 3600000) return;
+        // Another script on the page can write here: only a conversation of this agent's own
+        // address is believed, and only lines of the kinds the card writes.
+        var c = kept.chat, id = c && typeof c.id === 'string' && /^cnv_[a-z0-9]{24}$/.test(c.id) ? c.id : '';
+        chat = id && typeof c.key === 'string' && /^[A-Za-z0-9]{20,80}$/.test(c.key) ? { id: id, key: c.key, api: ctx.origin + '/agent-api/chats/' + id } : null;
+        var k = kept.call;
+        lastCall = k && typeof k.conversation === 'string' && typeof k.call_key === 'string' ? { conversation: k.conversation, call_key: k.call_key } : null;
+        log = (Array.isArray(kept.log) ? kept.log : []).map(function (l) {
+          if (!l || typeof l !== 'object') return null;
+          if (l.k === 'links') {
+            var links = (Array.isArray(l.links) ? l.links : []).filter(function (x) { return x && typeof x === 'object' && /^https?:\/\//i.test(String(x.url || '')); })
+              .map(function (x) { return { url: String(x.url), label: typeof x.label === 'string' ? x.label : '', network: typeof x.network === 'string' ? x.network : '' }; });
+            return links.length ? { k: 'links', links: links } : null;
+          }
+          if ((l.k !== 'me' && l.k !== 'agent' && l.k !== 'note') || typeof l.t !== 'string') return null;
+          var line = { k: l.k, t: l.t.slice(0, 4000) };
+          // A message still waiting for its answer when the page was left.
+          if (l.k === 'me' && l.wait && typeof l.id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(l.id)) { line.wait = true; line.id = l.id; }
+          return line;
+        }).filter(Boolean);
+      } catch (e) { chat = null; lastCall = null; log = []; try { window.sessionStorage.removeItem(CHAT_STORE); } catch (e2) {} }
     }
     // The conversation stays on its newest line (unless the visitor scrolled up to read).
     function follow(now) {
@@ -1369,11 +1400,32 @@
       parts.lines.innerHTML = '';
       parts.lines.__pinned = true;
       if (!log.length && chatText.greeting) parts.lines.appendChild(chatBubble('agent', chatText.greeting));
-      log.forEach(function (l) {
+      var waiting = null;
+      log.forEach(function (l, i) {
         if (l.k === 'links') { linksLine({ links: l.links || [] }); return; }
-        parts.lines.appendChild(chatBubble(l.k, l.t));
+        var view = chatBubble(l.k, l.t);
+        parts.lines.appendChild(view);
+        if (l.k === 'me' && l.wait && i === log.length - 1) waiting = { id: l.id, text: l.t, view: view, kept: true };
       });
       follow(true);
+      // The last message was still waiting for its answer when the page was left: asked again
+      // with its own id, it gets the answer it already has (or its first), charged once.
+      if (waiting && !sending) {
+        sending = true;
+        showTyping();
+        deliver(waiting, 0);
+        roomToWrite();
+      }
+    }
+    // A message as it is kept while its answer is on the way.
+    function keepWaiting(msg) {
+      if (!log.length && chatText.greeting) log.push({ k: 'agent', t: chatText.greeting });
+      log.push({ k: 'me', t: msg.text, id: msg.id, wait: true });
+      saveChat();
+    }
+    function forgetWaiting(msg) {
+      for (var i = log.length - 1; i >= 0; i--) if (log[i].k === 'me' && log[i].id === msg.id) { log.splice(i, 1); break; }
+      saveChat();
     }
     // The box grows with what is written (four lines at most), and the send button wakes with the first letter.
     function roomToWrite() {
@@ -1402,6 +1454,8 @@
     }
     function sendChat(again) {
       if (sending || !parts.input) return;
+      // On a call the conversation is spoken: nothing is written (or sent again) until it ends.
+      if (live() || starting || stateNow === 'waiting' || stateNow === 'connecting') return;
       var msg = again || { id: 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), text: parts.input.value.replace(/^\s+|\s+$/g, '') };
       if (!msg.text) return;
       if (msg.text.length > parts.input.maxLength) { chatNote(chatText.too_long || '', true); return; }
@@ -1420,6 +1474,7 @@
       }
       roomToWrite();
       showTyping();
+      keepWaiting(msg);
       deliver(msg, 0);
     }
     function deliver(msg, tries) {
@@ -1441,7 +1496,8 @@
     }
     function answered(msg, data) {
       sending = false;
-      // The greeting the conversation opened with stays its first line on the next page too.
+      // Kept since it was sent (keepWaiting): it is waiting no more.
+      forgetWaiting(msg);
       if (!log.length && chatText.greeting) log.push({ k: 'agent', t: chatText.greeting });
       log.push({ k: 'me', t: msg.text });
       var links = Array.isArray(data.links) ? data.links.filter(function (l) { return l && /^https?:\/\//i.test(String(l.url || '')); }) : [];
@@ -1456,13 +1512,14 @@
         if (n) n.innerHTML = ''; else { n = el('div'); parts.lines.appendChild(n); }
         n.className = 'lva-line is-agent';
         n.dir = 'auto';
+        n.removeAttribute('aria-hidden');
         writeOut(n, String(data.reply));
       });
       roomToWrite();
     }
     function writeOut(node, words) {
       var bits = words.match(/\s*\S+/g) || [words];
-      if ((window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || bits.length < 2) { node.textContent = words; follow(); return; }
+      if ((window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || bits.length < 2) { node.removeAttribute('aria-hidden'); node.textContent = words; follow(); return; }
       node.setAttribute('aria-hidden', 'true');
       // Never slower than reading: the whole reply is out within about a second and a half.
       var every = Math.max(12, Math.min(45, 1500 / bits.length)), i = 0;
@@ -1476,7 +1533,9 @@
     }
     function failed(msg, words) {
       sending = false;
+      forgetWaiting(msg);
       hideTyping(0);
+      if (!msg.view || !msg.view.parentNode) { msg.view = chatBubble('me', msg.text); parts.lines.appendChild(msg.view); }
       msg.view.classList.add('is-failed');
       msg.fail = chatBubble('error', words || chatText.failed || '');
       var retry = el('button', 'lva-retry', chatText.retry || '');
@@ -1494,20 +1553,33 @@
         if (!chatOn || inline) return;
         var vv = window.visualViewport;
         var under = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-        // Only a keyboard: a pinch-zoom or the address bar moving changes far less.
-        box.style.setProperty('--kb', under > 120 ? under + 'px' : '0px');
-        if (under > 120) box.style.setProperty('--room', Math.max(260, Math.round(vv.height) - 96) + 'px'); else box.style.removeProperty('--room');
+        // Only a keyboard under the box being written in: a page zoomed with two fingers, or the
+        // address bar moving, is not one.
+        var typingNow = open && under > 120 && !(vv.scale > 1.01) && !!parts.input && root.activeElement === parts.input;
+        box.style.setProperty('--kb', typingNow ? under + 'px' : '0px');
+        if (typingNow) box.style.setProperty('--room', Math.max(200, Math.round(vv.height) - 96) + 'px'); else box.style.removeProperty('--room');
         follow(true);
       };
       window.visualViewport.addEventListener('resize', fitKeyboard);
       window.visualViewport.addEventListener('scroll', fitKeyboard);
+      box.addEventListener('focusin', fitKeyboard);
+      box.addEventListener('focusout', function () { setTimeout(fitKeyboard, 60); });
+    }
+    // Back to a page the browser kept as it was left: the conversation may have gone on since,
+    // on the page after it. What is kept for the visit is shown, never the page's old copy.
+    if (!preview) {
+      window.addEventListener('pageshow', function (e) {
+        if (!e.persisted || !chatOn || sending || live() || starting) return;
+        log = []; chat = null;
+        showChat();
+      });
     }
 
     function toggleCall() {
       if (preview) { demo ? demo.stop() : runDemo(); return; }
       if (inline && cfg.available === false) return;
       if (call) { call.end(); return; }
-      if (starting) return;
+      if (starting || sending) return;
       starting = true;
       typing = null;
       liveView = null;
@@ -1534,7 +1606,7 @@
           onInfo: function (i) { lastCall = i && i.conversation ? { conversation: i.conversation, call_key: i.call_key } : null; saveChat(); },
           onState: function (s) { setState(s); },
           // The agent has told the caller the time is nearly up: the timer counts down from here.
-          onLimit: function (at) { endsAt = Number(at) || 0; timer(); },
+          onLimit: function (at, left, lead) { endsAt = Number(at) || 0; endsLead = Math.max(5, Number(lead) || 30); timer(); },
           onEnd: function (reason) { endedWhy = String(reason || ''); },
           onTurn: line,
           onWords: words,
@@ -1600,7 +1672,7 @@
       update: function (next) { render(next); },
       open: function (o) {
         if (look.style !== 'bar') setOpen(true);
-        if (o && o.call && !call && !starting && !demo) toggleCall();
+        if (o && o.call && callOn && !call && !starting && !demo) toggleCall();
       },
       demo: function (on) { if (on && !demo) { if (look.style !== 'bar') setOpen(true); runDemo(); } else if (!on && demo) demo.stop(); },
       destroy: function () { if (demo) demo.stop(); clearInterval(tick); host.remove(); },
@@ -1627,6 +1699,8 @@
 
   function mount(cfg, ctx) {
     if (!document.body || document.querySelector('[data-listen-agent]')) return;
+    // Neither a chat nor calls on offer right now (a chat-only agent that cannot answer): no button.
+    if (cfg && cfg.channels && cfg.channels.chat === false && cfg.channels.call === false) return;
     if (ctx && !ctx.caller) ctx.caller = signedCaller(ctx.key);
     var w = build(cfg, ctx, {});
     // The page can open it too ("Talk to our agent"), and start the call at once.

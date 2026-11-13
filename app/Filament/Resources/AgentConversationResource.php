@@ -105,6 +105,10 @@ class AgentConversationResource extends Resource
         'failed' => 'Could not start',
         'out_of_scope' => 'Off topic',
         'handoff' => 'Passed to a person',
+        // A written chat (AgentChats::close).
+        'idle' => 'Nobody wrote for a while',
+        'empty' => 'Opened, never written in',
+        'cost' => 'Closed: cost more than it earned',
     ];
 
     /** The same, said in full on a call's page. */
@@ -117,6 +121,9 @@ class AgentConversationResource extends Resource
         'failed' => 'The live voice could not be set up, so the call never started; nothing was charged.',
         'out_of_scope' => 'The agent ended the call: the caller wanted something outside the business.',
         'handoff' => 'The agent ended the call to pass the caller to a person at the business.',
+        'idle' => 'Nobody wrote in the chat for a while, so it was closed. Its replies stay charged; nothing else was taken.',
+        'empty' => 'The chat was opened and no message was ever answered. Nothing was taken from the owner\'s plan.',
+        'cost' => 'The conversation had cost Listen more than its credits earn (look-ups and long messages every time), so it was closed. The visitor\'s next message starts a new chat.',
     ];
 
     public const PAID_BY = [
@@ -236,14 +243,20 @@ class AgentConversationResource extends Resource
                 ->sortable(),
             TextColumn::make('duration_seconds')
                 ->label('Length')
-                ->formatStateUsing(fn ($state, AgentConversation $record): string => AgentResource::clock($record->isLive() ? self::secondsSoFar($record) : (int) $state))
+                // A written chat has replies, not minutes.
+                ->formatStateUsing(fn ($state, AgentConversation $record): string => self::isChat($record)
+                    ? AgentResource::plural(self::replies($record), 'reply', 'replies')
+                    : AgentResource::clock($record->isLive() ? self::secondsSoFar($record) : (int) $state))
                 ->description(fn (AgentConversation $record): string => match (true) {
                     $record->isLive() => 'so far · '.($record->free ? 'free' : number_format((int) ($record->reservation['credits'] ?? 0)).' held'),
                     $record->free => 'free',
                     default => number_format((int) $record->credits).' credits',
                 })
-                ->tooltip(fn (AgentConversation $record): string => 'Billed '.number_format((int) $record->billed_seconds).' s'
-                    .($record->free ? ', free ('.(self::PAID_BY[self::paidBy($record)] ?? 'free').')' : ', '.number_format((int) $record->credits).' credits'))
+                ->tooltip(fn (AgentConversation $record): string => self::isChat($record)
+                    ? ($record->free ? 'Free ('.(self::PAID_BY[self::paidBy($record)] ?? 'free').')' : number_format((int) ($record->reservation['rate'] ?? 0)).' credits a reply')
+                        .($record->cost_usd !== null ? ' · cost us $'.number_format((float) $record->cost_usd, 4) : '')
+                    : 'Billed '.number_format((int) $record->billed_seconds).' s'
+                        .($record->free ? ', free ('.(self::PAID_BY[self::paidBy($record)] ?? 'free').')' : ', '.number_format((int) $record->credits).' credits'))
                 ->sortable(),
             TextColumn::make('credits')
                 ->formatStateUsing(fn ($state): string => number_format((int) $state))
@@ -348,7 +361,7 @@ class AgentConversationResource extends Resource
     public static function infolist(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Call')
+            Section::make(fn (AgentConversation $record): string => self::isChat($record) ? 'Chat' : 'Call')
                 ->columns(4)
                 ->schema([
                     TextEntry::make('agent.name')->label('Agent')
@@ -401,8 +414,13 @@ class AgentConversationResource extends Resource
                         ->dateTime()
                         ->placeholder('—'),
                     TextEntry::make('duration_seconds')->label('Length')
+                        ->visible(fn (AgentConversation $record): bool => ! self::isChat($record))
                         ->formatStateUsing(fn ($state): string => AgentResource::clock((int) $state).' ('.number_format((int) $state).' s)')
                         ->helperText(fn (AgentConversation $record): string => 'Billed: '.number_format((int) $record->billed_seconds).' s'),
+                    TextEntry::make('replies')->label('Replies')
+                        ->visible(fn (AgentConversation $record): bool => self::isChat($record))
+                        ->state(fn (AgentConversation $record): string => number_format(self::replies($record)).' of '.number_format((int) ($record->reservation['max'] ?? $record->reservation['replies'] ?? 0)).' it may have')
+                        ->helperText(fn (AgentConversation $record): ?string => ($span = (int) ($record->usage['seconds'] ?? 0)) > 0 ? 'First message to last: '.AgentResource::clock($span) : null),
                     TextEntry::make('origin')->label('Website')
                         ->url(fn (AgentConversation $record): ?string => self::safeUrl($record->origin), true)
                         ->placeholder('—'),
@@ -410,7 +428,7 @@ class AgentConversationResource extends Resource
                         ->url(fn (AgentConversation $record): ?string => self::safeUrl($record->page_url), true)
                         ->placeholder('—')
                         ->columnSpan(2),
-                    TextEntry::make('visitor_hash')->label('Caller (anonymous id)')
+                    TextEntry::make('visitor_hash')->label(fn (AgentConversation $record): string => self::isChat($record) ? 'Visitor (anonymous id)' : 'Caller (anonymous id)')
                         ->formatStateUsing(fn (?string $state): string => Str::limit((string) $state, 12, '…'))
                         ->helperText(fn (AgentConversation $record): ?string => self::callsFromCaller($record))
                         ->fontFamily('mono')
@@ -426,12 +444,12 @@ class AgentConversationResource extends Resource
                         ->helperText(fn (AgentConversation $record): ?string => $record->widget ? 'Key '.$record->widget->public_key : null)
                         ->placeholder(fn (AgentConversation $record): string => $record->channel === 'test' ? 'The owner\'s test screen' : '—')
                         ->columnSpan(2),
-                    TextEntry::make('public_id')->label('Call id')->copyable()->fontFamily('mono'),
+                    TextEntry::make('public_id')->label(fn (AgentConversation $record): string => self::isChat($record) ? 'Chat id' : 'Call id')->copyable()->fontFamily('mono'),
                     TextEntry::make('id')->label('Database id'),
                 ]),
 
             Section::make('Summary')
-                ->description('Written after the call, for the owner\'s list of calls.')
+                ->description(fn (AgentConversation $record): string => self::isChat($record) ? 'Written after the chat closed, for the owner\'s list.' : 'Written after the call, for the owner\'s list of calls.')
                 ->visible(fn (AgentConversation $record): bool => filled($record->summary))
                 ->schema([
                     ViewEntry::make('summary')->hiddenLabel()
@@ -439,7 +457,7 @@ class AgentConversationResource extends Resource
                 ]),
 
             Section::make('Customer details')
-                ->description('What the caller left so the business can call or write back. They are also in Customers.')
+                ->description(fn (AgentConversation $record): string => 'What the '.(self::isChat($record) ? 'customer' : 'caller').' left so the business can call or write back. They are also in Customers.')
                 ->visible(fn (AgentConversation $record): bool => ! empty($record->lead))
                 ->columns(4)
                 ->schema([
@@ -453,6 +471,7 @@ class AgentConversationResource extends Resource
 
             Section::make('Recording')
                 ->description('The call as the caller\'s browser heard it: the caller and the agent together. Kept '.CallRecordings::KEEP_DAYS.' days.')
+                ->visible(fn (AgentConversation $record): bool => ! self::isChat($record))
                 ->schema([
                     ViewEntry::make('recording_path')->hiddenLabel()
                         ->view('filament.agents.recording'),
@@ -466,6 +485,7 @@ class AgentConversationResource extends Resource
                 ]),
 
             Section::make('Credits: held and settled')
+                ->visible(fn (AgentConversation $record): bool => ! self::isChat($record))
                 ->description(fn (): string => 'When a call starts, the owner\'s plan holds credits for its longest length; when it ends, the real length is charged at '
                     .number_format(AgentCalls::creditsPerMinute()).' credits a minute and the rest is given back.')
                 ->columns(4)
@@ -490,8 +510,41 @@ class AgentConversationResource extends Resource
                         ->placeholder('—'),
                 ]),
 
+            Section::make('Credits: what the chat used')
+                ->visible(fn (AgentConversation $record): bool => self::isChat($record))
+                ->description('Nothing is taken when a chat opens. Each reply\'s credits are taken from the owner\'s plan just before the model is asked, and given back if no answer comes. Under each reply above: what it used.')
+                ->columns(4)
+                ->schema([
+                    TextEntry::make('chat_rate')->label('Credits a reply')
+                        ->state(fn (AgentConversation $record): string => $record->free ? 'Free' : number_format((int) ($record->reservation['rate'] ?? 0)).' credits')
+                        ->helperText(fn (AgentConversation $record): ?string => $record->free ? (self::PAID_BY[self::paidBy($record)] ?? null) : 'Fixed for this conversation when it opened'),
+                    TextEntry::make('chat_charged')->label('Charged')
+                        ->state(fn (AgentConversation $record): string => number_format((int) $record->credits).' credits')
+                        ->helperText(fn (AgentConversation $record): string => AgentResource::plural(self::replies($record), 'reply', 'replies').($record->free ? '' : ' × '.number_format((int) ($record->reservation['rate'] ?? 0)))),
+                    TextEntry::make('chat_taken')->label('Taken from the plan')
+                        ->state(fn (AgentConversation $record): string => $record->free ? 'Nothing' : number_format((int) ($record->reservation['credits'] ?? 0)).' credits')
+                        ->helperText(fn (AgentConversation $record): ?string => self::chatBackLine($record)),
+                    TextEntry::make('chat_from')->label('Taken from')
+                        ->state(fn (AgentConversation $record): string => self::PAID_BY[self::paidBy($record)] ?? '—')
+                        ->helperText(fn (AgentConversation $record): ?string => ($month = $record->period_ym ?: ($record->reservation['period'] ?? null)) ? 'Plan month '.$month : null),
+                    TextEntry::make('chat_settled')->label('Settled')
+                        ->state(fn (AgentConversation $record): ?string => $record->settled_at?->toDayDateTimeString())
+                        ->placeholder('Not yet: the chat is still open'),
+                    TextEntry::make('chat_worth')->label('Earned, at the least')
+                        ->state(fn (AgentConversation $record): ?string => ! $record->free && ($worth = \App\Support\Agents\AgentCost::dollarsPerCredit()) !== null
+                            ? '$'.number_format((int) $record->credits * $worth, 5) : null)
+                        ->helperText('What its credits are worth on the plan whose credits cost least')
+                        ->placeholder('—'),
+                    TextEntry::make('chat_margin')->label('Kept')
+                        ->state(fn (AgentConversation $record): ?string => self::chatMargin($record))
+                        ->helperText('Earned less what it cost us')
+                        ->placeholder('—'),
+                ]),
+
             Section::make('Tokens and cost')
-                ->description('What the voice model counted on this call, as the caller\'s browser reported it at the end, and what that cost us at the configured token prices.')
+                ->description(fn (AgentConversation $record): string => self::isChat($record)
+                    ? 'What the text model counted, added up by our server from each of its answers (every round, its thinking, the answers that never came, the summary), and what that cost us at the model\'s prices.'
+                    : 'What the voice model counted on this call, as the caller\'s browser reported it at the end, and what that cost us at the configured token prices.')
                 ->columns(4)
                 ->schema([
                     TextEntry::make('tokens_in')->label('Tokens in')
@@ -503,9 +556,10 @@ class AgentConversationResource extends Resource
                         ->helperText(fn (AgentConversation $record): ?string => self::tokens($record, 'out')[1] ?? null)
                         ->placeholder('Not reported'),
                     TextEntry::make('tokens_thinking')->label('Thinking tokens')
-                        ->state(fn (AgentConversation $record): ?string => is_array($record->usage) ? number_format((int) ($record->usage['thoughtsTokenCount'] ?? 0)) : null)
+                        ->state(fn (AgentConversation $record): ?string => is_array($record->usage) ? number_format((int) ($record->usage['thoughtsTokenCount'] ?? $record->usage['thoughts'] ?? 0)) : null)
+                        ->helperText(fn (AgentConversation $record): ?string => self::isChat($record) ? 'Counted in tokens out (billed as written)' : null)
                         ->placeholder('Not reported'),
-                    TextEntry::make('cost_usd')->label('Cost to us (estimate)')
+                    TextEntry::make('cost_usd')->label('Cost to us')
                         ->formatStateUsing(fn ($state): string => '$'.number_format((float) $state, 5))
                         ->helperText(fn (AgentConversation $record): ?string => match (true) {
                             $record->cost_usd === null => null,
@@ -515,11 +569,31 @@ class AgentConversationResource extends Resource
                             (int) $record->duration_seconds > 0 => '$'.number_format((float) $record->cost_usd / ((int) $record->duration_seconds / 60), 4).' a minute',
                             default => null,
                         })
-                        ->placeholder('Not reported'),
+                        ->placeholder(fn (AgentConversation $record): string => self::isChat($record) ? 'Nothing yet' : 'Not reported'),
+                    TextEntry::make('chat_rounds')->label('Model calls')
+                        ->visible(fn (AgentConversation $record): bool => self::isChat($record))
+                        ->state(fn (AgentConversation $record): string => number_format((int) ($record->usage['rounds'] ?? 0)))
+                        ->helperText('One a reply, two when it used a tool'),
+                    TextEntry::make('chat_cached')->label('Read from the cache')
+                        ->visible(fn (AgentConversation $record): bool => self::isChat($record))
+                        ->state(fn (AgentConversation $record): string => number_format((int) ($record->usage['cached'] ?? 0)).' tokens')
+                        ->helperText('Part of tokens in, at a tenth of the price'),
+                    TextEntry::make('chat_wasted')->label('Answers that never came')
+                        ->visible(fn (AgentConversation $record): bool => self::isChat($record))
+                        ->state(fn (AgentConversation $record): string => number_format((int) ($record->usage['wasted']['answers'] ?? 0)))
+                        ->helperText(fn (AgentConversation $record): string => (int) ($record->usage['wasted']['answers'] ?? 0) > 0
+                            ? number_format((int) ($record->usage['wasted']['in'] ?? 0) + (int) ($record->usage['wasted']['out'] ?? 0)).' tokens, $'.number_format((float) ($record->usage['wasted']['cost'] ?? 0), 5).' (in the cost, never charged)'
+                            : 'Not charged; their cost is in the total'),
+                    TextEntry::make('chat_summary')->label('The summary')
+                        ->visible(fn (AgentConversation $record): bool => self::isChat($record))
+                        ->state(fn (AgentConversation $record): ?string => isset($record->usage['summary']) ? '$'.number_format((float) ($record->usage['summary']['cost'] ?? 0), 5) : null)
+                        ->helperText(fn (AgentConversation $record): ?string => isset($record->usage['summary'])
+                            ? number_format((int) ($record->usage['summary']['in'] ?? 0)).' tokens in, '.number_format((int) ($record->usage['summary']['out'] ?? 0)).' out (in the cost)' : null)
+                        ->placeholder('Written once the chat has closed'),
                 ]),
 
             Section::make('Everything stored')
-                ->description('The call\'s row as it is saved, apart from the conversation (above) and the caller\'s secret call key.')
+                ->description('The row as it is saved, apart from the conversation (above) and the secret key of the caller\'s browser.')
                 ->collapsed()
                 ->schema([
                     ViewEntry::make('raw')->hiddenLabel()
@@ -661,6 +735,10 @@ class AgentConversationResource extends Resource
     public static function turnsLine(AgentConversation $call): string
     {
         $turns = array_values(array_filter((array) $call->transcript, 'is_array'));
+        if (self::isChat($call)) {
+            return $turns === [] ? 'Nothing was written in this chat.'
+                : AgentResource::plural(self::replies($call), 'reply', 'replies').' to '.AgentResource::plural(count(array_filter($turns, fn (array $t): bool => ($t['role'] ?? '') !== 'agent')), 'message').', in order. Times are from when the chat opened. Under each reply: its credits, the tokens the model read and wrote, what it cost us, and how long it took.';
+        }
         if ($turns === []) {
             return 'Nothing was written down for this call.';
         }
@@ -779,6 +857,46 @@ class AgentConversationResource extends Resource
         }
 
         return $parts === [] ? null : implode(' · ', $parts);
+    }
+
+    public static function isChat(AgentConversation $call): bool
+    {
+        return \App\Services\Agents\AgentChats::isChat($call);
+    }
+
+    /** Replies a written chat has had. */
+    public static function replies(AgentConversation $call): int
+    {
+        return (int) ($call->usage['replies'] ?? 0);
+    }
+
+    /** Under "Taken from the plan": what went back, if anything did. */
+    public static function chatBackLine(AgentConversation $call): ?string
+    {
+        if ($call->free) {
+            return null;
+        }
+        $taken = (int) ($call->reservation['credits'] ?? 0);
+        $back = max(0, $taken - (int) $call->credits);
+
+        return match (true) {
+            $call->settled_at === null => $back > 0 ? number_format($back).' for a reply being written now' : 'All of it used by its replies',
+            $back > 0 => number_format($back).' given back when it closed',
+            default => 'All of it used by its replies',
+        };
+    }
+
+    /** "$0.0123 (62%)": what a paid chat earned at the least, less what it cost us. */
+    public static function chatMargin(AgentConversation $call): ?string
+    {
+        $worth = \App\Support\Agents\AgentCost::dollarsPerCredit();
+        if ($call->free || $worth === null || (int) $call->credits < 1) {
+            return null;
+        }
+        $earned = (int) $call->credits * $worth;
+        $kept = $earned - (float) $call->cost_usd;
+
+        return ($kept < 0 ? '-$' : '$').number_format(abs($kept), 5).' ('.(int) round($kept / $earned * 100).'%)';
     }
 
     /** Only web addresses become links. */
