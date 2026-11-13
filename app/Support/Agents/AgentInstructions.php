@@ -141,6 +141,15 @@ final class AgentInstructions
             }
         }
 
+        // Listen's own agent: the offers on its plans right now, in a call and in a chat alike. Read
+        // as the conversation starts, so they are known the moment they begin and gone when they end.
+        if ($agent->setting('house') && ($offers = HouseAgent::offers((string) $agent->language)) !== '') {
+            $lines[] = '';
+            $lines[] = '# Offers running today (true now; they win over any price below)';
+            $lines[] = 'When someone asks about prices, plans, offers or discounts, tell them the offer on the plan they ask about, with what it makes the price and its last day. These are the only discounts: never promise another one, a longer one, or one on a plan not listed here.';
+            $lines[] = $offers;
+        }
+
         // What the owner wrote as the newest: it wins over the facts, the files and the website.
         $updates = trim((string) $agent->setting('updates', ''));
         if ($updates !== '') {

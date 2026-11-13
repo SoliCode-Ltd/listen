@@ -61,6 +61,52 @@ final class HouseAgent
         };
     }
 
+    /**
+     * The offers running on Listen's plans right now, as its own agent is told them at the start
+     * of every call and chat (AgentInstructions::build): each plan's offer, what it makes the
+     * price, and its last day, and what paying yearly saves. Read as the conversation starts, so
+     * an offer the admin sets is known at once and one that has ended is never promised. Empty
+     * when nothing is on offer.
+     */
+    public static function offers(string $language): string
+    {
+        $ar = $language !== 'en';
+        $locale = $ar ? 'ar' : 'en';
+        // "9" or "4.50": whole dollars plain, cents always as two digits.
+        $money = fn (int $cents): string => $cents % 100 === 0 ? (string) intdiv($cents, 100) : number_format($cents / 100, 2, '.', '');
+        $plans = rescue(fn () => Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->orderBy('price_cents')->get(), collect(), false);
+        $lines = [];
+        foreach ($plans as $p) {
+            if (! $p->hasActiveDiscount()) {
+                continue;
+            }
+            $percent = (int) $p->discount_percentage;
+            $offer = match ($p->discountDuration()) {
+                Plan::DISCOUNT_FOREVER => trans('ui.pricing.discount_offer_forever', ['percent' => $percent], $locale),
+                Plan::DISCOUNT_FIRST_MONTHS => trans_choice('ui.pricing.discount_offer_first_months', (int) $p->discountMonths(), ['percent' => $percent, 'months' => (int) $p->discountMonths()], $locale),
+                default => trans('ui.pricing.discount_offer_first_month', ['percent' => $percent], $locale),
+            };
+            $key = 'ui.pricing.plan_name_'.$p->slug;
+            $name = $ar && trans($key, [], 'ar') !== $key ? trans($key, [], 'ar') : $p->name;
+            $now = $money((int) $p->getDiscountedPriceCents());
+            $full = $money((int) $p->price_cents);
+            // The last day of the offer: one ending at midnight ends the day before.
+            $until = $p->discount_ends_at?->copy()->subSecond()->locale($locale)->translatedFormat('j F Y');
+            $forever = $p->discountDuration() === Plan::DISCOUNT_FOREVER;
+            $lines[] = $ar
+                ? "- باقة {$name}: {$offer}. السعر مع العرض {$now} دولار في الشهر".($forever ? '' : " ثم {$full} دولار في الشهر").'، على الاشتراك الشهري.'.($until ? " آخر يوم للعرض {$until}." : '')
+                : "- {$p->name} plan: {$offer}. With the offer it is \${$now} a month".($forever ? '' : ", then \${$full} a month").', on monthly billing.'.($until ? " The offer's last day is {$until}." : '');
+        }
+        $yearly = max(0, min(90, (int) AgentAccess::setting('billing_yearly_discount_percentage', 0)));
+        if ($yearly > 0 && $plans->contains(fn (Plan $p): bool => filled($p->stripe_price_yearly ?? null))) {
+            $lines[] = $ar
+                ? "- الدفع السنوي يوفّر {$yearly}% على السعر الشهري."
+                : "- Paying yearly saves {$yearly}% on the monthly price.";
+        }
+
+        return implode("\n", $lines);
+    }
+
     /** What the house agent knows, in its language. */
     public static function knowledge(string $language): string
     {

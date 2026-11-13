@@ -374,6 +374,40 @@ class AgentChatTest extends TestCase
         $this->assertStringContainsString("if ((window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || bits.length < 2) { node.textContent = words; follow(); return; }", $widget);
     }
 
+    public function test_listens_own_agent_knows_the_offers_running_today_in_a_chat_and_on_a_call(): void
+    {
+        $this->travelTo('2026-11-13 12:00:00');
+        Plan::factory()->create(['slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'monthly_chars' => 90000, 'is_active' => true,
+            'stripe_price_monthly' => 'price_m', 'stripe_price_yearly' => 'price_y', 'discount_percentage' => 50, 'discount_ends_at' => '2026-11-16 00:00:00']);
+        Plan::factory()->create(['slug' => 'creator', 'name' => 'Creator', 'price_cents' => 2200, 'monthly_chars' => 180000, 'is_active' => true]);
+        \App\Models\SiteSetting::set('billing_yearly_discount_percentage', '20', 'billing');
+        $owner = $this->owner();
+        $house = $this->liveAgent($owner, ['language' => 'en', 'dialect' => 'en-US', 'settings' => ['house' => 'en']]);
+        $member = $this->liveAgent($owner, ['language' => 'en', 'dialect' => 'en-US']);
+
+        foreach ([true, false] as $chat) {
+            $told = AgentInstructions::build($house, $chat);
+            $this->assertStringContainsString('# Offers running today', $told);
+            $this->assertStringContainsString("- Starter plan: 50% off your first month. With the offer it is $4.50 a month, then $9 a month, on monthly billing. The offer's last day is 15 November 2026.", $told);
+            $this->assertStringContainsString('- Paying yearly saves 20% on the monthly price.', $told);
+            // A plan with no offer is not listed as having one.
+            $offers = explode("\n# ", explode('# Offers running today', $told)[1])[0];
+            $this->assertStringNotContainsString('Creator', $offers);
+            // A member's own agent is never told Listen's offers.
+            $this->assertStringNotContainsString('# Offers running today', AgentInstructions::build($member, $chat));
+        }
+
+        // In Arabic, in the pricing page's own words.
+        $arabic = $this->liveAgent($owner, ['settings' => ['house' => 'ar']]);
+        $this->assertStringContainsString('خصم 50% على أول شهر. السعر مع العرض 4.50 دولار في الشهر ثم 9 دولار في الشهر، على الاشتراك الشهري. آخر يوم للعرض 15 نوفمبر 2026.', AgentInstructions::build($arabic, true));
+
+        // The day after its last day the offer is gone by itself; the yearly saving stays.
+        $this->travelTo('2026-11-16 00:00:01');
+        $after = AgentInstructions::build($house, true);
+        $this->assertStringNotContainsString('50% off', $after);
+        $this->assertStringContainsString('- Paying yearly saves 20% on the monthly price.', $after);
+    }
+
     public function test_the_chat_instructions_are_written_for_writing_and_the_voice_ones_did_not_change(): void
     {
         $agent = $this->liveAgent($this->owner());
