@@ -153,12 +153,40 @@ class PurchaseFollowUpTest extends TestCase
         $text = (string) $email->getTextBody();
         $this->assertStringContainsString('but your bank declined the payment because the card did not have enough balance. Nothing was charged', $text);
         $this->assertStringContainsString('لكن البنك رفض عملية الدفع لعدم كفاية الرصيد في البطاقة. لم يُخصم منك أي مبلغ', $text);
-        $this->assertStringContainsString('Complete my payment: https://listenai.studio/en/billing?plan=starter&billing_cycle=monthly', $text);
+        // The button is the member's own signed link, in each language, that leads to the payment.
+        $this->assertMatchesRegularExpression('#Complete my payment: https?://\S+/billing/pay/'.$declined->id.'\?expires=\d+&lang=en&signature=[0-9a-f]+#', $text);
+        $this->assertMatchesRegularExpression('#إكمال الدفع: https?://\S+/billing/pay/'.$declined->id.'\?expires=\d+&lang=ar&signature=[0-9a-f]+#u', $text);
+        $this->assertStringNotContainsString('/en/billing?plan=starter', $text);
 
         // The checkout's reminder never follows it.
         $this->travel(1)->days();
         $this->followUps()->run();
         $this->assertCount(1, $this->sentEmails());
+    }
+
+    public function test_the_declined_payments_button_opens_the_payment_page_while_it_is_open_and_the_checkout_after(): void
+    {
+        $this->turnOn();
+        $this->followUps()->checkoutOpened($this->member, $this->starter, 'monthly', 'ar');
+        $this->followUps()->paymentFailed($this->invoice());
+        $this->travel(31)->minutes();
+        $this->followUps()->run();
+        preg_match('#https?://\S+/billing/pay/\d+\?expires=\d+&lang=ar&signature=[0-9a-f]+#', (string) $this->onlyEmail()->getTextBody(), $link);
+        $link = (string) ($link[0] ?? '');
+        $this->assertNotSame('', $link);
+
+        // The payment is still open: straight to its own payment page, signed in or not.
+        $this->invoiceIsOpenAt('https://invoice.stripe.com/i/acct_1/live_abc');
+        $this->get($link)->assertRedirect('https://invoice.stripe.com/i/acct_1/live_abc');
+
+        // A day later it has closed: the checkout for the same plan, in the email's language.
+        $this->invoiceIsOpenAt(null);
+        $this->get($link)->assertRedirect('https://listenai.studio/ar/billing?plan=starter&billing_cycle=monthly');
+
+        // A link that was changed opens the plans, never someone's payment.
+        $this->invoiceIsOpenAt('https://invoice.stripe.com/i/acct_1/live_abc');
+        $this->get(preg_replace('#/pay/\d+#', '/pay/999', $link))->assertRedirect('https://listenai.studio/ar/pricing');
+        $this->get(strtok($link, '?').'?lang=ar')->assertRedirect('https://listenai.studio/ar/pricing');
     }
 
     public function test_the_banks_reason_is_kept_when_it_arrives_before_the_invoice_and_a_renewal_is_left_alone(): void
@@ -333,6 +361,20 @@ class PurchaseFollowUpTest extends TestCase
     private function followUps(): PurchaseFollowUps
     {
         return app(PurchaseFollowUps::class);
+    }
+
+    /** What Stripe answers about the declined payment's invoice: its payment page while open, or null once closed. */
+    private function invoiceIsOpenAt(?string $url): void
+    {
+        $this->app->bind(PurchaseFollowUps::class, fn () => new class($url) extends PurchaseFollowUps
+        {
+            public function __construct(private ?string $openAt) {}
+
+            protected function openInvoiceUrl(string $invoiceId): ?string
+            {
+                return $this->openAt;
+            }
+        });
     }
 
     private function turnOn(): void

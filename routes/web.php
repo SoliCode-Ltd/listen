@@ -25,6 +25,7 @@ use App\Http\Controllers\ManualPaymentController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\NewsletterUnsubscribeController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\PurchaseFollowUpLinkController;
 use App\Http\Controllers\PronunciationController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\StartController;
@@ -245,6 +246,13 @@ Route::get('/favicon.ico', function () {
 // in emails still work when the proxy hands the request over as http.
 Route::get('/newsletter/unsubscribe', NewsletterUnsubscribeController::class)
     ->name('newsletter.unsubscribe');
+
+// The button in the email after a declined first payment: on to Stripe's page for that
+// payment while it is open, else to the checkout (a signed link, checked by the controller).
+Route::get('/billing/pay/{followUp}', PurchaseFollowUpLinkController::class)
+    ->whereNumber('followUp')
+    ->middleware('throttle:30,1')
+    ->name('billing.follow-up');
 
 // The Listen Android app (mobile/, App\Http\Controllers\AppShellController): where it starts,
 // signing in through the phone's browser, the phone's messaging token, and the file that lets

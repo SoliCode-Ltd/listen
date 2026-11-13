@@ -57,7 +57,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
                     ->schema([
                         Toggle::make('failed_enabled')
                             ->label('Email a member whose first payment was declined')
-                            ->helperText('With a button back to the checkout for the same plan.'),
+                            ->helperText('Its button opens the payment page for that same payment, where they pay with another card. That page stays open for about a day; after that the button opens the checkout for the same plan.'),
                         TextInput::make('failed_after_minutes')
                             ->label('Wait before that email (minutes)')
                             ->numeric()->integer()->minValue(5)->maxValue(720)->required()
@@ -104,7 +104,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
             TextInput::make("{$prefix}_subject_{$lang}")->label('Subject')->required()->maxLength(200)->extraInputAttributes($rtl)->columnSpan(2),
             TextInput::make("{$prefix}_headline_{$lang}")->label('Headline')->maxLength(200)->helperText($help)->extraInputAttributes($rtl)->columnSpan(2),
             Textarea::make("{$prefix}_body_{$lang}")->label('Message')->rows(6)->required()->helperText($lang === 'en' ? 'A blank line starts a new paragraph.' : null)->extraInputAttributes($rtl)->columnSpan(2),
-            TextInput::make("{$prefix}_cta_label_{$lang}")->label($lang === 'en' ? 'Button text (opens the checkout for their plan)' : 'Button text')->maxLength(80)->extraInputAttributes($rtl),
+            TextInput::make("{$prefix}_cta_label_{$lang}")->label($lang === 'en' ? ($prefix === 'failed' ? 'Button text (opens the payment page for that payment)' : 'Button text (opens the checkout for their plan)') : 'Button text')->maxLength(80)->extraInputAttributes($rtl),
             TextInput::make("{$prefix}_footer_{$lang}")->label('Small print at the bottom')->maxLength(300)->extraInputAttributes($rtl),
         ];
     }

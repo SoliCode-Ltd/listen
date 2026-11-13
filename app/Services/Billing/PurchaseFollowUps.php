@@ -17,6 +17,7 @@ use App\Support\TitanMailbox;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -24,7 +25,7 @@ use RuntimeException;
  * Members who nearly bought a plan get one email that brings them back:
  *
  *  - their first payment was declined (the bank said no): a little later, an email with a
- *    button back to the checkout for the same plan;
+ *    button to Stripe's own page for that payment (the checkout once that page has closed);
  *  - they opened the checkout and left without paying: a few hours later, a reminder.
  *
  * Both are in Arabic and English, in the newsletter's email design; their words, the waits
@@ -46,6 +47,9 @@ class PurchaseFollowUps
 
     /** A purchase this long after the event still counts as following it. */
     public const PAID_WITHIN_DAYS = 14;
+
+    /** How long the button in a declined payment's email keeps working. */
+    public const LINK_DAYS = 30;
 
     /**
      * @return array<string, string>
@@ -482,7 +486,6 @@ class PurchaseFollowUps
         $prefix = self::prefix((string) $row->kind);
         $plan = $row->plan_slug ? Plan::query()->where('slug', $row->plan_slug)->first() : null;
         $first = trim((string) (preg_split('/\s+/u', trim($memberName))[0] ?? ''));
-        $base = rtrim((string) config('app.url', ''), '/');
         $fields = [
             'language' => Newsletter::LANGUAGE_BOTH,
             'bilingual_order' => ($settings['order'] ?? 'ar_en') === 'en_ar' ? 'en_ar' : 'ar_en',
@@ -502,13 +505,68 @@ class PurchaseFollowUps
                 $fields[$field.'_'.$lang] = $fill((string) ($settings[$prefix.'_'.$field.'_'.$lang] ?? ''));
             }
             $fields['preheader_'.$lang] = $fields['headline_'.$lang];
-            // Back to the checkout for the same plan; with no plan known, to the plans.
-            $fields['cta_url_'.$lang] = $plan
-                ? $base.'/'.$lang.'/billing?'.http_build_query(['plan' => (string) $plan->slug, 'billing_cycle' => $row->billing_cycle === 'yearly' ? 'yearly' : 'monthly'])
-                : $base.'/'.$lang.'/pricing';
+            $fields['cta_url_'.$lang] = $this->buttonUrl($row, $lang);
         }
 
         return new Newsletter($fields);
+    }
+
+    /**
+     * Where the email's button goes. A declined payment: a link of ours that sends the member
+     * on to Stripe's own page for that payment while it can still be paid there, and to the
+     * checkout once it has lapsed (PurchaseFollowUpLinkController), so the button never leads
+     * to a dead page. A checkout left, a preview or a test: the checkout for the plan.
+     */
+    private function buttonUrl(PurchaseFollowUp $row, string $lang): string
+    {
+        if ($row->exists && $row->kind === PurchaseFollowUp::KIND_PAYMENT_FAILED && trim((string) $row->stripe_invoice_id) !== '') {
+            return URL::temporarySignedRoute('billing.follow-up', now()->addDays(self::LINK_DAYS), ['followUp' => $row->id, 'lang' => $lang]);
+        }
+
+        return $this->checkoutUrl($row, $lang);
+    }
+
+    /** The checkout for the case's plan and cycle; with no plan known, the plans. */
+    public function checkoutUrl(PurchaseFollowUp $row, string $lang): string
+    {
+        $lang = $lang === 'en' ? 'en' : 'ar';
+        $base = rtrim((string) config('app.url', ''), '/');
+        $plan = $row->plan_slug ? Plan::query()->where('slug', $row->plan_slug)->first() : null;
+
+        return $plan
+            ? $base.'/'.$lang.'/billing?'.http_build_query(['plan' => (string) $plan->slug, 'billing_cycle' => $row->billing_cycle === 'yearly' ? 'yearly' : 'monthly'])
+            : $base.'/'.$lang.'/pricing';
+    }
+
+    /**
+     * Stripe's page where the declined payment can be paid, while it still can be: the
+     * invoice of a first payment stays open for about a day, then Stripe closes it. Null once
+     * it is closed or paid, or for a case that is not a declined payment.
+     */
+    public function paymentPageUrl(PurchaseFollowUp $row): ?string
+    {
+        $invoiceId = trim((string) $row->stripe_invoice_id);
+        if ($row->kind !== PurchaseFollowUp::KIND_PAYMENT_FAILED || $invoiceId === '') {
+            return null;
+        }
+
+        $url = $this->openInvoiceUrl($invoiceId);
+
+        return is_string($url) && str_starts_with($url, 'https://') ? $url : null;
+    }
+
+    /** Asks Stripe: the invoice's own payment page if the invoice is still open, else null. */
+    protected function openInvoiceUrl(string $invoiceId): ?string
+    {
+        if (trim((string) config('services.stripe.secret', '')) === '' || app()->runningUnitTests()) {
+            return null;
+        }
+
+        return rescue(function () use ($invoiceId): ?string {
+            $invoice = \Laravel\Cashier\Cashier::stripe()->invoices->retrieve($invoiceId, []);
+
+            return (string) ($invoice->status ?? '') === 'open' ? ((string) ($invoice->hosted_invoice_url ?? '') ?: null) : null;
+        }, null, false);
     }
 
     /** {reason}: a few words after "declined the payment", only when the bank's reason helps the member. */
