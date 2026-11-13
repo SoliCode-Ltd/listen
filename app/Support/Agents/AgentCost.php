@@ -202,6 +202,21 @@ final class AgentCost
         return max($base, (int) (ceil(self::perReply(self::chatInstructionTokens($agent)) * $perDollar / 5) * 5));
     }
 
+    /**
+     * What real written replies cost so far, from the tokens the text model counted.
+     *
+     * @return array{replies: int, dollars: float, per_reply: ?float}
+     */
+    public static function measuredChat(int $days = 30): array
+    {
+        $rows = rescue(fn () => AgentConversation::query()->whereIn('channel', ['chat', 'chat_link'])->whereNotNull('cost_usd')
+            ->where('started_at', '>=', now()->subDays($days))->get(['usage', 'cost_usd']), collect(), false);
+        $replies = (int) $rows->sum(fn (AgentConversation $c): int => (int) ($c->usage['replies'] ?? 0));
+        $dollars = (float) $rows->sum(fn (AgentConversation $c): float => (float) $c->cost_usd);
+
+        return ['replies' => $replies, 'dollars' => round($dollars, 4), 'per_reply' => $replies > 0 ? round($dollars / $replies, 6) : null];
+    }
+
     /** Tokens in an agent's instructions, estimated from the text (Arabic letters take more). */
     public static function tokensIn(string $text): int
     {

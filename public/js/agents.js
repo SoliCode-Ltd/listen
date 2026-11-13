@@ -1181,6 +1181,28 @@
       daily.addEventListener('input', function () { dailyOut.textContent = dailyLabels[daily.value] || ''; });
     }
 
+    // Chat and calls: saved as each is switched. One always stays on: the last one switches back,
+    // with a line saying why; a switch that could not be saved goes back too.
+    var ways = $$('[data-ag-channel]'), waysNote = $('[data-ag-channels-note]');
+    ways.forEach(function (sw) {
+      sw.addEventListener('change', function () {
+        var want = {};
+        ways.forEach(function (w) { want[w.getAttribute('data-ag-channel')] = w.checked; });
+        if (waysNote) waysNote.hidden = true;
+        var back = function (message) {
+          sw.checked = !sw.checked;
+          if (waysNote && message) { waysNote.textContent = message; waysNote.hidden = false; }
+        };
+        if (!want.chat && !want.calls) { back(T.channels_one || ''); return; }
+        ways.forEach(function (w) { w.disabled = true; });
+        api('PATCH', C.agent.urls.update, { channels: { chat: !!want.chat, calls: !!want.calls } }).then(function () {
+          toast(T.saved);
+        }).catch(function (err) { back(err.message); }).then(function () {
+          ways.forEach(function (w) { w.disabled = false; });
+        });
+      });
+    });
+
     if (sf) sf.addEventListener('submit', function (e) {
       e.preventDefault();
       var list = function (k) { return $$('[data-ag-list="' + k + '"] input, [data-ag-list="' + k + '"] textarea', sf).map(function (i) { return i.value.trim(); }).filter(Boolean); };

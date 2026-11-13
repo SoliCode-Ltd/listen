@@ -196,6 +196,33 @@
               </div>
             </div>
           @endif
+          {{-- How customers reach the agent: a written chat, voice calls, or both, each with what it
+               costs this owner (AgentChannels). Saved as it is switched; one always stays on. --}}
+          @php
+            $creditsLeft = (int) ($balance['credits_left'] ?? 0);
+            $covers = ['replies' => intdiv($creditsLeft, max(1, (int) $channels['reply'])), 'minutes' => (int) ($balance['minutes_left'] ?? 0)];
+          @endphp
+          <div class="ag-setting" data-ag-channels>
+            <div class="ag-setting-label"><span class="ag-label" id="ag-channels-label">{{ __('agents.channels.label') }}</span><p>{{ __('agents.channels.hint') }}</p></div>
+            <div class="ag-setting-control">
+              <div class="ag-ways" role="group" aria-labelledby="ag-channels-label">
+                <label class="ag-way">
+                  <span class="ag-way-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.900-5.700a8.4 8.4 0 0 1-.9-3.800 8.500 8.500 0 0 1 4.700-7.600 8.400 8.400 0 0 1 3.800-.9h.5a8.500 8.500 0 0 1 8 8z"/></svg></span>
+                  <span class="ag-way-text"><b>{{ __('agents.channels.chat') }}</b><small>{{ __('agents.channels.chat_cost', ['credits' => number_format((int) $channels['reply'])]) }}</small></span>
+                  <input type="checkbox" role="switch" class="ag-switch" data-ag-channel="chat" @checked($channels['chat'])>
+                </label>
+                <label class="ag-way">
+                  <span class="ag-way-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.500 1.500a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></span>
+                  <span class="ag-way-text"><b>{{ __('agents.channels.calls') }}</b><small>{{ __('agents.channels.calls_cost', ['credits' => number_format((int) $channels['minute'])]) }}</small></span>
+                  <input type="checkbox" role="switch" class="ag-switch" data-ag-channel="calls" @checked($channels['calls'])>
+                </label>
+              </div>
+              @if(! empty($balance['included']) && $creditsLeft > 0)
+                <p class="ag-ways-sum">{{ __('agents.channels.covers', ['replies' => number_format($covers['replies']), 'minutes' => number_format($covers['minutes'])]) }}</p>
+              @endif
+              <p class="ag-ways-note" data-ag-channels-note role="status" hidden></p>
+            </div>
+          </div>
           <div class="ag-setting">
             <div class="ag-setting-label"><label for="ag-max">{{ __('agents.edit_max_call') }}</label><p>{{ __('agents.edit_max_call_hint') }}</p></div>
             <div class="ag-setting-control ag-range">
@@ -398,7 +425,11 @@
                 <span class="ag-convo-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></span>
                 <div class="ag-convo-meta">
                   <b>{{ __('agents.conversation_channel.'.$c->channel) }}</b>
-                  <span>{{ __('agents.conversation_duration', ['m' => intdiv($c->duration_seconds, 60), 's' => $c->duration_seconds % 60]) }}@if($c->credits > 0) · {{ __('agents.conversation_credits', ['count' => number_format($c->credits)]) }}@endif</span>
+                  @if(\App\Services\Agents\AgentChats::isChat($c))
+                    <span>{{ trans_choice('agents.conversation_replies', \App\Services\Agents\AgentChats::repliesIn($c), ['count' => \App\Services\Agents\AgentChats::repliesIn($c)]) }}@if($c->credits > 0) · {{ __('agents.conversation_credits', ['count' => number_format($c->credits)]) }}@endif</span>
+                  @else
+                    <span>{{ __('agents.conversation_duration', ['m' => intdiv($c->duration_seconds, 60), 's' => $c->duration_seconds % 60]) }}@if($c->credits > 0) · {{ __('agents.conversation_credits', ['count' => number_format($c->credits)]) }}@endif</span>
+                  @endif
                 </div>
                 <time datetime="{{ $c->started_at->toIso8601String() }}">{{ $c->started_at->diffForHumans() }}</time>
               </header>
@@ -543,7 +574,7 @@
         'mic' => __('agents.talk_mic_blocked'), 'you' => __('agents.talk_you'), 'ended_after' => __('agents.talk_ended_after'),
         'correct' => __('agents.talk_correct'), 'correct_placeholder' => __('agents.talk_correct_placeholder'),
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
-        'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'), 'network' => __('agents.network_error'),
+        'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'), 'channels_one' => __('agents.channels.one'), 'network' => __('agents.network_error'),
         'site_remove' => __('agents.live_site_remove'), 'site_remove_short' => __('agents.live_site_remove_short'), 'site_invalid' => __('agents.live_site_invalid'), 'site_exists' => __('agents.live_site_exists'), 'site_max' => __('agents.live_site_max'),
         'links_remove' => __('agents.links_remove'), 'links_saved' => __('agents.links_saved'), 'links_finding' => __('agents.links_finding'), 'links_your_site' => __('agents.links_your_site'), 'site_again_done' => __('agents.site.again_done'), 'site_again_error' => __('agents.site.again_error'), 'links_read_only' => __('agents.links_read_only'), 'links_read_only_hint' => __('agents.links_read_only_hint'),
         'play' => __('agents.voice_play'), 'pause' => __('agents.voice_pause'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),

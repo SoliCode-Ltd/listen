@@ -297,6 +297,83 @@ class AgentChatTest extends TestCase
         $this->assertSame('idle', AgentConversation::query()->where('public_id', $first->json('conversation'))->sole()->end_reason);
     }
 
+    public function test_the_owner_switches_chat_and_calls_on_the_setup_tab_and_sees_what_each_costs(): void
+    {
+        $owner = $this->owner();
+        $agent = $this->liveAgent($owner);
+        $noLocale = [\Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class, \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class, \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class];
+        $patch = fn (array $channels) => $this->actingAs($owner)->withoutMiddleware($noLocale)->patchJson($this->localizedRoute('voice-agents.update', ['agent' => $agent]), ['channels' => $channels]);
+
+        app()->setLocale('en');
+        $page = $this->actingAs($owner)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk();
+        $page->assertSee('Chat and calls')
+            ->assertSee('Each reply uses '.number_format(AgentChats::creditsPerReply($agent)).' credits')
+            ->assertSee('Each minute uses '.number_format(\App\Services\Agents\AgentCalls::creditsFor(60, $agent)).' credits')
+            ->assertSee('<input type="checkbox" role="switch" class="ag-switch" data-ag-channel="chat" checked>', false)
+            ->assertSee('<input type="checkbox" role="switch" class="ag-switch" data-ag-channel="calls" checked>', false)
+            ->assertSee('Your credits this month cover about '.number_format(intdiv(500000, AgentChats::creditsPerReply($agent))).' replies');
+
+        $patch(['chat' => true, 'calls' => false])->assertOk();
+        $this->assertFalse(AgentChannels::calls($agent->refresh()));
+        $this->assertTrue(AgentChannels::chat($agent));
+        // One always stays on, and nothing is changed by the refusal.
+        $patch(['chat' => false, 'calls' => false])->assertStatus(422)->assertJsonPath('message', 'Keep at least one on, so customers can reach your agent.');
+        $this->assertTrue(AgentChannels::chat($agent->refresh()));
+        // Another member cannot switch this agent's channels.
+        $this->actingAs($this->owner())->withoutMiddleware($noLocale)->patchJson($this->localizedRoute('voice-agents.update', ['agent' => $agent]), ['channels' => ['chat' => false, 'calls' => true]])->assertNotFound();
+        $this->assertTrue(AgentChannels::chat($agent->refresh()));
+    }
+
+    public function test_the_owner_sees_each_chat_with_its_replies_and_credits_and_calls_are_counted_apart(): void
+    {
+        Http::fake(['*:generateContent' => Http::response(self::says('التبييض بـ 900 جنيه.'))]);
+        $owner = $this->owner();
+        $agent = $this->liveAgent($owner);
+        $start = $this->open($agent)->assertOk();
+        $this->api('/chats/'.$start->json('conversation').'/messages', ['chat_key' => $start->json('chat_key'), 'id' => 'm1', 'text' => 'بكام التبييض؟'])->assertOk();
+        $this->api('/chats/'.$start->json('conversation').'/messages', ['chat_key' => $start->json('chat_key'), 'id' => 'm2', 'text' => 'شكراً'])->assertOk();
+        app(AgentChats::class)->close(AgentConversation::query()->sole());
+
+        app()->setLocale('en');
+        $page = $this->actingAs($owner)->getLocalizedRoute('voice-agents.show', ['agent' => $agent])->assertOk();
+        $page->assertSee('<b>Chat</b>', false)->assertSee('2 replies · '.number_format(2 * self::RATE).' credits')->assertSee('بكام التبييض؟');
+        // A chat is not a call: the month's calls stay at none, its credits are counted.
+        $this->assertSame(0, $page->viewData('stats')['calls']);
+        $this->assertSame(2 * self::RATE, $page->viewData('stats')['credits']);
+    }
+
+    public function test_the_card_writes_sends_once_and_keeps_the_conversation_for_the_visit(): void
+    {
+        $widget = (string) file_get_contents(public_path('js/agent-widget.js'));
+        $call = (string) file_get_contents(public_path('js/agent-call.js'));
+
+        // The chat shows only where the settings say it works; old settings keep calls only.
+        $this->assertStringContainsString("chatOn = !preview && !!(cfg.channels && cfg.channels.chat) && !!cfg.chat;", $widget);
+        $this->assertStringContainsString("callOn = !cfg.channels || cfg.channels.call !== false;", $widget);
+        // A message keeps its id when it is sent again, by itself once and by "Send again".
+        $this->assertStringContainsString("askChat(chat.api + '/messages', { chat_key: chat.key, id: msg.id, text: msg.text, call: lastCall || undefined })", $widget);
+        $this->assertStringContainsString("if (res.status >= 500 && tries < 1) { later(1200).then(function () { deliver(msg, tries + 1); }); return; }", $widget);
+        $this->assertStringContainsString("if ((res.status === 410 || res.status === 404) && tries < 1) { chat = null; saveChat(); deliver(msg, tries + 1); return; }", $widget);
+        $this->assertStringContainsString("retry.addEventListener('click', function () { sendChat(msg); });", $widget);
+        // One message at a time, and none while a call is on.
+        $this->assertStringContainsString('if (sending || !parts.input) return;', $widget);
+        $this->assertStringContainsString("parts.input.disabled = on || waiting;", $widget);
+        // Kept for the visit, never beyond an hour, and never fatal where storage is blocked.
+        $this->assertStringContainsString("try { window.sessionStorage.setItem(CHAT_STORE, JSON.stringify({ chat: chat, call: lastCall, log: log.slice(-60), at: Date.now() })); } catch (e) {}", $widget);
+        $this->assertStringContainsString('if (!kept || !kept.at || Date.now() - kept.at > 3600000) return;', $widget);
+        // The call from the chat: it carries the chat, offers it as the time runs out, and hands its own id back.
+        $this->assertStringContainsString("afterLimit: chatOn ? 'chat' : '',", $widget);
+        $this->assertStringContainsString('chat: chatRef() }', $widget);
+        $this->assertStringContainsString("opts.onInfo && opts.onInfo({ conversation: data.conversation, call_key: data.call_key });", $call);
+        $this->assertStringContainsString("(opts.afterLimit === 'chat' ? 'to carry on in the written chat on this page' : 'to take their name and number so the team can follow up')", $call);
+        // Phones: the box to write in never makes the page zoom, and the keyboard lifts the card.
+        $this->assertStringContainsString('font-size:16px;line-height:22px', $widget);
+        $this->assertStringContainsString("box.style.setProperty('--kb', under > 120 ? under + 'px' : '0px');", $widget);
+        // Reduced motion: the reply is written at once.
+        $this->assertStringContainsString("if ((window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || bits.length < 2) { node.textContent = words; follow(); return; }", $widget);
+    }
+
     public function test_the_chat_instructions_are_written_for_writing_and_the_voice_ones_did_not_change(): void
     {
         $agent = $this->liveAgent($this->owner());

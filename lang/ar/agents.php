@@ -190,6 +190,18 @@ return [
     'talk_correct_saved' => 'تعلّم. سيجيب هكذا من الآن.',
     // السطر الصغير الذي يختم المكالمة: كم استمرت.
     'talk_ended_after' => 'انتهت المكالمة بعد :time',
+    // Setup → Chat and calls: how customers reach the agent, and what each costs.
+    'channels' => [
+        'label' => 'المحادثة والمكالمات',
+        'hint' => 'اختر كيف يتواصل العملاء مع وكيلك. يمكنك تفعيل الاثنين أو أحدهما.',
+        'chat' => 'المحادثة الكتابية',
+        'chat_cost' => 'كل رد يستهلك :credits نقطة رصيد',
+        'calls' => 'المكالمات الصوتية',
+        'calls_cost' => 'كل دقيقة تستهلك :credits نقطة رصيد',
+        'covers' => 'رصيدك هذا الشهر يكفي لنحو :replies رد أو :minutes دقيقة مكالمات.',
+        'one' => 'أبقِ واحداً منهما على الأقل ليتمكن العملاء من الوصول إلى وكيلك.',
+        'saved' => 'تم الحفظ',
+    ],
     // The written chat in the agent's card (agent-widget.js). `card` goes to the browser as it is.
     'chat' => [
         'greeting' => 'أهلاً بك، معك :name. كيف أساعدك؟',
@@ -429,11 +441,14 @@ return [
     'conversations_empty' => 'تحدّث مع وكيلك أو شارك رابطه، وستظهر هنا كل مكالمة بملخص قصير وما قيل فيها.',
     'empty_share' => 'شارك الرابط',
     'conversation_channel' => [
+        'chat' => 'محادثة',
+        'chat_link' => 'محادثة (الرابط)',
         'test' => 'تجربتك',
         'widget' => 'الموقع',
         'link' => 'الرابط',
     ],
     'conversation_duration' => ':m دقيقة :s ثانية',
+    'conversation_replies' => 'رد واحد|:count رد',
     'conversation_summary' => 'الملخص',
     'conversation_transcript' => 'ما قيل في المكالمة',
     'conversation_details' => 'بيانات العميل',

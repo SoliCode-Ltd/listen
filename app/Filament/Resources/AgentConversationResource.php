@@ -65,9 +65,13 @@ class AgentConversationResource extends Resource
         'widget' => 'Website button',
         'link' => 'Link page',
         'test' => 'Owner\'s test',
+        // A written chat (AgentChats), from a website's button or the link page.
+        'chat' => 'Chat (website)',
+        'chat_link' => 'Chat (link page)',
     ];
 
     public const STATUSES = [
+        \App\Services\Agents\AgentChats::OPEN => 'Chat open',
         AgentConversation::LIVE => 'Live',
         AgentConversation::ENDED => 'Ended',
         AgentConversation::FAILED => 'Failed',
@@ -77,6 +81,7 @@ class AgentConversationResource extends Resource
     public const STATUS_BADGES = [
         'live' => 'Live now',
         'quiet' => 'Live, gone quiet',
+        \App\Services\Agents\AgentChats::OPEN => 'Chat open',
         AgentConversation::ENDED => 'Ended',
         AgentConversation::FAILED => 'Failed',
     ];
@@ -502,9 +507,14 @@ class AgentConversationResource extends Resource
                         ->placeholder('Not reported'),
                     TextEntry::make('cost_usd')->label('Cost to us (estimate)')
                         ->formatStateUsing(fn ($state): string => '$'.number_format((float) $state, 5))
-                        ->helperText(fn (AgentConversation $record): ?string => $record->cost_usd !== null && (int) $record->duration_seconds > 0
-                            ? '$'.number_format((float) $record->cost_usd / ((int) $record->duration_seconds / 60), 4).' a minute'
-                            : null)
+                        ->helperText(fn (AgentConversation $record): ?string => match (true) {
+                            $record->cost_usd === null => null,
+                            ! empty($record->usage['chat']) => (int) ($record->usage['replies'] ?? 0) > 0
+                                ? '$'.number_format((float) $record->cost_usd / (int) $record->usage['replies'], 5).' a reply'
+                                : null,
+                            (int) $record->duration_seconds > 0 => '$'.number_format((float) $record->cost_usd / ((int) $record->duration_seconds / 60), 4).' a minute',
+                            default => null,
+                        })
                         ->placeholder('Not reported'),
                 ]),
 
@@ -561,6 +571,7 @@ class AgentConversationResource extends Resource
         return match ($state) {
             'widget' => 'info',
             'link' => 'primary',
+            'chat', 'chat_link' => 'success',
             default => 'gray',
         };
     }
@@ -706,6 +717,12 @@ class AgentConversationResource extends Resource
         if (! is_array($usage)) {
             return null;
         }
+        // A written chat keeps its own counts (AgentChats): the text model's, summed over its replies.
+        if (! empty($usage['chat'])) {
+            $replies = (int) ($usage['replies'] ?? 0);
+
+            return [number_format((int) ($usage[$direction] ?? 0)), $replies > 0 ? 'text · '.AgentResource::plural($replies, 'reply', 'replies') : null];
+        }
         $total = (int) ($usage[$direction === 'in' ? 'promptTokenCount' : 'responseTokenCount'] ?? 0);
         $parts = [];
         foreach ((array) ($usage[$direction === 'in' ? 'promptTokensDetails' : 'responseTokensDetails'] ?? []) as $key => $detail) {
@@ -755,6 +772,10 @@ class AgentConversationResource extends Resource
             if ($count > 0) {
                 $parts[] = $where !== null ? number_format($count).' '.$where : AgentResource::plural($count, 'owner test');
             }
+        }
+        $chats = (int) ($byChannel['chat'] ?? 0) + (int) ($byChannel['chat_link'] ?? 0);
+        if ($chats > 0) {
+            $parts[] = AgentResource::plural($chats, 'written chat');
         }
 
         return $parts === [] ? null : implode(' · ', $parts);

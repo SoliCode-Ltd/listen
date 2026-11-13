@@ -54,6 +54,8 @@ class AgentSettings extends Page implements HasForms
             'agents_audience' => AgentAccess::audience(),
             // Empty unless the admin saved a rate of their own: then the rate follows the plans.
             'agents_credits_per_minute' => AgentAccess::rateIsSet() ? AgentAccess::creditsPerMinute() : null,
+            // The same for a written chat reply.
+            'agents_chat_credits_per_reply' => (int) AgentAccess::setting('agents_chat_credits_per_reply', 0) > 0 ? (int) AgentAccess::setting('agents_chat_credits_per_reply', 0) : null,
             'agents_free_test_minutes' => round(AgentAccess::freeTestSeconds() / 60, 1),
             'agents_calls_stopped' => AgentAccess::callsStopped(),
             'agents_site_daily_minutes' => AgentAccess::siteDailyMinutes(),
@@ -114,6 +116,16 @@ class AgentSettings extends Page implements HasForms
                             ->label('Each plan, at this rate')
                             ->content(fn (Get $get): HtmlString => self::plansTable(filled($get('agents_credits_per_minute')) ? max(1, (int) $get('agents_credits_per_minute')) : self::recommendedRate()))
                             ->columnSpan(2),
+                    ]),
+                Section::make('What a chat reply uses')
+                    ->description('A written chat is paid the same way: every reply the agent gives uses a fixed number of the member\'s plan credits. The member sees this number on their agent\'s Setup tab, beside the cost of a call minute.')
+                    ->schema([
+                        TextInput::make('agents_chat_credits_per_reply')
+                            ->label('Credits a chat reply uses')
+                            ->numeric()->integer()->minValue(5)->maxValue(5000)->step(5)
+                            ->suffix('credits')
+                            ->placeholder(fn (): string => number_format(AgentCost::recommendedChatRate() ?? (int) config('listen.agents.chat_credits_per_reply', 60)).' (follows the plans)')
+                            ->helperText(fn (): string => self::chatRateHelp()),
                     ]),
                 Section::make('Safety')
                     ->description('Ceilings on what calls can cost, whatever happens: a flood of calls on one agent, accounts made only for the free minutes, or a problem nobody has seen yet.')
@@ -204,6 +216,20 @@ class AgentSettings extends Page implements HasForms
         return new HtmlString($html);
     }
 
+    /** Under the chat rate: what it follows, and what real replies have cost so far. */
+    private static function chatRateHelp(): string
+    {
+        $measured = AgentCost::measuredChat();
+        $price = (array) config('listen.agents.chat_price_per_million', []);
+
+        return sprintf('Leave it empty and it follows the plans: now %s, the fewest credits that keep %d%% on a typical agent on every plan. An agent with a great deal to know uses more, since every reply reads all of it. The cost is worked out from the text model\'s prices in the server\'s settings ($%s in and $%s out per million tokens): check them against what the model really charges. %s',
+            number_format(AgentCost::recommendedChatRate() ?? (int) config('listen.agents.chat_credits_per_reply', 60)), (int) round(AgentCost::MARGIN * 100),
+            rtrim(rtrim(number_format((float) ($price['in'] ?? 0.5), 3), '0'), '.'), rtrim(rtrim(number_format((float) ($price['out'] ?? 3.0), 3), '0'), '.'),
+            $measured['replies'] > 0
+                ? sprintf('Real replies in the last 30 days: %s, $%s each on average at those prices.', number_format($measured['replies']), number_format((float) $measured['per_reply'], 5))
+                : 'No reply has been given yet.');
+    }
+
     public function save(): void
     {
         $state = $this->form->getState();
@@ -212,6 +238,8 @@ class AgentSettings extends Page implements HasForms
         // Empty: the rate follows the plans. A number fixes it.
         $rate = (int) ($state['agents_credits_per_minute'] ?? 0);
         SiteSetting::set('agents_credits_per_minute', $rate > 0 ? (string) max(Credits::PER_MINUTE, min(Credits::PER_MINUTE * 10, $rate)) : '', self::GROUP);
+        $reply = (int) ($state['agents_chat_credits_per_reply'] ?? 0);
+        SiteSetting::set('agents_chat_credits_per_reply', $reply > 0 ? (string) max(5, min(5000, $reply)) : '', self::GROUP);
         SiteSetting::set('agents_free_test_seconds', (string) max(0, min(1800, (int) round(((float) ($state['agents_free_test_minutes'] ?? 2)) * 60))), self::GROUP);
         SiteSetting::set('agents_calls_stopped', ! empty($state['agents_calls_stopped']) ? '1' : '0', self::GROUP);
         SiteSetting::set('agents_site_daily_minutes', (string) max(0, (int) ($state['agents_site_daily_minutes'] ?? 0)), self::GROUP);

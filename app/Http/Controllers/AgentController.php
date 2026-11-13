@@ -9,9 +9,11 @@ use App\Models\AgentContact;
 use App\Models\AgentConversation;
 use App\Models\AgentSource;
 use App\Services\Agents\AgentCalls;
+use App\Services\Agents\AgentChats;
 use App\Services\Agents\AgentReview;
 use App\Services\Agents\AgentWriter;
 use App\Support\Agents\AgentAccess;
+use App\Support\Agents\AgentChannels;
 use App\Support\Agents\AgentBalance;
 use App\Support\Agents\AgentLinkReads;
 use App\Support\Agents\AgentSite;
@@ -43,8 +45,9 @@ class AgentController extends Controller
         // Each card's numbers are for the month the call time above counts (the credit month).
         $since = CreditPeriod::current((int) $request->user()->id)['starts_at'];
         $calls = AgentConversation::query()->where('user_id', $request->user()->id)->where('started_at', '>=', $since)
-            ->where('channel', '!=', 'test')->selectRaw('agent_id, count(*) as n, sum(billed_seconds) as s')->groupBy('agent_id')->get()->keyBy('agent_id');
-        $lastCalls = AgentConversation::query()->where('user_id', $request->user()->id)->where('channel', '!=', 'test')
+            // Calls only: a written chat (AgentChats) is not a call and has no minutes.
+            ->whereNotIn('channel', ['test', 'chat', 'chat_link'])->selectRaw('agent_id, count(*) as n, sum(billed_seconds) as s')->groupBy('agent_id')->get()->keyBy('agent_id');
+        $lastCalls = AgentConversation::query()->where('user_id', $request->user()->id)->whereNotIn('channel', ['test', 'chat', 'chat_link'])
             ->selectRaw('agent_id, max(started_at) as last')->groupBy('agent_id')->pluck('last', 'agent_id');
         $customers = AgentContact::query()->where('user_id', $request->user()->id)->where('created_at', '>=', $since)
             ->selectRaw('agent_id, count(*) as n')->groupBy('agent_id')->pluck('n', 'agent_id');
@@ -135,7 +138,8 @@ class AgentController extends Controller
             'conversations' => $conversations,
             'contacts' => $agent->contacts()->latest('last_contact_at')->limit(100)->get(),
             'stats' => [
-                'calls' => (clone $month)->count(),
+                // Calls and their minutes; the credits are everything customers used, written chats included.
+                'calls' => (clone $month)->whereNotIn('channel', ['chat', 'chat_link'])->count(),
                 'seconds' => (int) (clone $month)->sum('billed_seconds'),
                 'credits' => (int) (clone $month)->sum('credits'),
                 'contacts' => $agent->contacts()->count(),
@@ -148,6 +152,13 @@ class AgentController extends Controller
             'embed' => $this->embedCode($widget),
             'balance' => AgentBalance::for($request->user()),
             'limits' => AgentAccess::limitsFor((int) $request->user()->id),
+            // Setup → Chat and calls: which are on, and what each one costs this agent's owner.
+            'channels' => [
+                'chat' => AgentChannels::chat($agent),
+                'calls' => AgentChannels::calls($agent),
+                'reply' => AgentChats::creditsPerReply($agent),
+                'minute' => AgentCalls::creditsFor(60, $agent),
+            ],
             'missed' => AgentCalls::missedToday($agent),
             'refused' => $widget->lastRefused(),
         ]);
@@ -183,6 +194,10 @@ class AgentController extends Controller
             'max_call_seconds' => ['sometimes', 'integer', 'min:60', 'max:'.AgentAccess::limitsFor((int) $request->user()->id)['call_seconds']],
             // The owner's own ceiling on callers' minutes a day for this agent (0: none).
             'daily_minutes' => ['sometimes', 'integer', 'min:0', 'max:1440'],
+            // How customers reach the agent: a written chat, voice calls, or both (AgentChannels).
+            'channels' => ['sometimes', 'array'],
+            'channels.chat' => ['required_with:channels', 'boolean'],
+            'channels.calls' => ['required_with:channels', 'boolean'],
             'status' => ['sometimes', 'in:ready,live,paused'],
             'allowed_origins' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'appearance' => ['sometimes', 'array'],
@@ -287,6 +302,12 @@ class AgentController extends Controller
             $links = array_values($links);
             $linksChanged = array_column($links, 'url') !== array_column(AgentLinks::all($agent), 'url');
             $agent->settings = array_merge((array) ($agent->settings ?? []), ['links' => $links, 'links_edited' => true]);
+        }
+        if (array_key_exists('channels', $data)) {
+            // One always stays on: an agent nobody can reach answers nobody.
+            if (! AgentChannels::choose($agent, (bool) $data['channels']['chat'], (bool) $data['channels']['calls'])) {
+                return response()->json(['message' => __('agents.channels.one')], 422);
+            }
         }
         if (array_key_exists('daily_minutes', $data)) {
             $settings = (array) ($agent->settings ?? []);

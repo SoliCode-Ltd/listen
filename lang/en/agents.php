@@ -188,6 +188,18 @@ return [
     'talk_correct_saved' => 'Learned. It will answer this way from now on.',
     // The small line that closes a call: how long it lasted.
     'talk_ended_after' => 'Call ended after :time',
+    // Setup → Chat and calls: how customers reach the agent, and what each costs.
+    'channels' => [
+        'label' => 'Chat and calls',
+        'hint' => 'Choose how customers reach your agent. Turn on both, or just one.',
+        'chat' => 'Written chat',
+        'chat_cost' => 'Each reply uses :credits credits',
+        'calls' => 'Voice calls',
+        'calls_cost' => 'Each minute uses :credits credits',
+        'covers' => 'Your credits this month cover about :replies replies or :minutes call minutes.',
+        'one' => 'Keep at least one on, so customers can reach your agent.',
+        'saved' => 'Saved',
+    ],
     // The written chat in the agent's card (agent-widget.js). `card` goes to the browser as it is.
     'chat' => [
         'greeting' => 'Hello, this is :name. How can I help?',
@@ -426,11 +438,14 @@ return [
     'conversations_empty' => 'Talk to your agent or share its link. Every call shows here with a short summary and what was said.',
     'empty_share' => 'Share the link',
     'conversation_channel' => [
+        'chat' => 'Chat',
+        'chat_link' => 'Chat (link)',
         'test' => 'Your test',
         'widget' => 'Website',
         'link' => 'Link',
     ],
     'conversation_duration' => ':m min :s s',
+    'conversation_replies' => ':count reply|:count replies',
     'conversation_summary' => 'Summary',
     'conversation_transcript' => 'What was said',
     'conversation_details' => 'Customer details',

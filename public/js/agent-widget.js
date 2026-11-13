@@ -264,7 +264,8 @@
     '.lva-compose:focus-within{border-color:var(--a);box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 18%,transparent)}',
     '.lva-compose{transition:border-color .2s ease,box-shadow .2s ease,opacity .25s ease}.lva-compose.is-off{opacity:.5}',
     /* 16px: a smaller box makes phones zoom the page in when it is tapped. */
-    '.lva-compose textarea{flex:1;min-width:0;height:38px;max-height:104px;margin:0;padding:8px 0;border:0;outline:0;background:transparent;resize:none;font:inherit;font-size:16px;line-height:22px;color:var(--text);scrollbar-width:none}',
+    /* width:0 : the box takes the room that is left, and never asks the card to be wider for it. */
+    '.lva-compose textarea{flex:1 1 0;width:0;min-width:0;height:38px;max-height:104px;margin:0;padding:8px 0;border:0;outline:0;background:transparent;resize:none;font:inherit;font-size:16px;line-height:22px;color:var(--text);scrollbar-width:none}',
     '.lva-compose textarea::placeholder{color:var(--muted);opacity:1}',
     '.lva-send{width:38px;height:38px;border-radius:50%;border:0;background:var(--a);color:var(--a-ink) !important;display:grid;place-items:center;flex:0 0 auto;transition:background .2s ease,color .2s ease,transform .2s ' + EASE + '}',
     '.lva-send:active{transform:scale(.92)}',
