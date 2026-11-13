@@ -5,14 +5,15 @@ name: Agent caller calls inspect
 # scripts/support/agent_caller_calls_inspect.php over SSH into the app's own PHP (READ ONLY
 # database session). It prints what the caller said, so run it only when the owner asks to
 # read a caller's calls, and delete the run's log once it has been read. Emails and phone
-# numbers are masked. Nothing is written. A push of this file or the script runs it on live.
+# numbers are masked. Nothing is written. Run from here with the call's id, or by a push of
+# scripts/support/agent_caller_calls.ask, a file of two words: the server and the call's id
+# ("live cnv_..." or "staging cnv_..."); "none" reads nothing.
 
 on:
   push:
     branches: [claude/beautiful-sagan-df90b3]
     paths:
-      - .github/workflows/agent-caller-calls-inspect.yml
-      - scripts/support/agent_caller_calls_inspect.php
+      - scripts/support/agent_caller_calls.ask
   workflow_dispatch:
     inputs:
       target:
@@ -34,8 +35,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Inspect over SSH
         env:
-          TARGET: ${{ inputs.target || 'live' }}
-          CALL_ID: ${{ inputs.call_id || 'cnv_zoqwe4wbn5ngqwartt1wqyrs' }}
+          TARGET: ${{ inputs.target }}
+          CALL_ID: ${{ inputs.call_id }}
           LIVE_HOST: ${{ secrets.LIVE_SSH_HOST }}
           LIVE_USER: ${{ secrets.LIVE_SSH_USER }}
           LIVE_KEY: ${{ secrets.LIVE_SSH_KEY }}
@@ -46,6 +47,11 @@ jobs:
           STAGING_PATH: ${{ secrets.STAGING_APP_PATH }}
         run: |
           set -euo pipefail
+          # A push: what to read is in the ask file ("none": nothing).
+          if [ -z "$CALL_ID" ]; then
+            read -r TARGET CALL_ID < scripts/support/agent_caller_calls.ask || true
+            if [ "${TARGET:-none}" = none ] || [ -z "${CALL_ID:-}" ]; then echo "Nothing asked."; exit 0; fi
+          fi
           case "$TARGET" in
             live) SSH_HOST="$LIVE_HOST"; SSH_USER="$LIVE_USER"; SSH_KEY="$LIVE_KEY"; APP_PATH="$LIVE_PATH" ;;
             staging) SSH_HOST="$STAGING_HOST"; SSH_USER="$STAGING_USER"; SSH_KEY="$STAGING_KEY"; APP_PATH="$STAGING_PATH" ;;

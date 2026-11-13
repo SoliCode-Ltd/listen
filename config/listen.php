@@ -252,6 +252,8 @@ return [
             'in' => (float) env('LISTEN_AGENT_CHAT_PRICE_IN', 0.5),
             'out' => (float) env('LISTEN_AGENT_CHAT_PRICE_OUT', 3.0),
         ],
+        // How much the text model thinks before a chat reply (minimal, low, medium, high; empty: its own).
+        'chat_thinking' => (string) env('LISTEN_AGENT_CHAT_THINKING', 'minimal'),
         'chat_replies_per_conversation' => (int) env('LISTEN_AGENT_CHAT_REPLIES', 40),
         'chat_message_chars' => (int) env('LISTEN_AGENT_CHAT_MESSAGE_CHARS', 1000),
         'chats_per_visitor_hour' => (int) env('LISTEN_AGENT_CHATS_PER_VISITOR_HOUR', 6),

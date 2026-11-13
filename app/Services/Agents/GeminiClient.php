@@ -88,7 +88,10 @@ class GeminiClient
      */
     public function converse(string $system, array $contents, array $tools = [], int $timeout = 25, int $maxOutputTokens = 600): ?array
     {
-        $config = ['temperature' => 0.4, 'maxOutputTokens' => $maxOutputTokens, 'thinkingConfig' => ['thinkingLevel' => 'low']];
+        // A chat reply is a short answer from facts it was given: the model thinks as little as it
+        // may before writing, so the customer is not kept waiting (listen.agents.chat_thinking).
+        $thinking = (string) config('listen.agents.chat_thinking', 'minimal');
+        $config = ['temperature' => 0.4, 'maxOutputTokens' => $maxOutputTokens] + ($thinking !== '' ? ['thinkingConfig' => ['thinkingLevel' => $thinking]] : []);
         $deadline = microtime(true) + $timeout;
         foreach (self::WRITER_MODELS as $model) {
             $left = (int) floor($deadline - microtime(true));
@@ -102,9 +105,16 @@ class GeminiClient
                 'generationConfig' => $config,
             ]), $model, $seconds);
             $response = $ask($config, $left);
-            // A model that does not take that thinking level is asked again with its own.
-            if ($response?->status() === 400 && str_contains(strtolower((string) $response->body()), 'thinking')) {
-                unset($config['thinkingConfig']);
+            // A model that does not take that thinking level is asked again with the next one up, then its own.
+            foreach (['low', null] as $next) {
+                if (! isset($config['thinkingConfig']) || $response?->status() !== 400 || ! str_contains(strtolower((string) $response->body()), 'thinking')) {
+                    break;
+                }
+                if ($next !== null && ($config['thinkingConfig']['thinkingLevel'] ?? '') !== $next) {
+                    $config['thinkingConfig'] = ['thinkingLevel' => $next];
+                } else {
+                    unset($config['thinkingConfig']);
+                }
                 $left = (int) floor($deadline - microtime(true));
                 $response = $left >= 4 ? $ask($config, $left) : null;
             }
