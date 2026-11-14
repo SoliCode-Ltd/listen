@@ -1664,11 +1664,26 @@
     // What depends on how customers reach the agent (Setup: Chat and calls): with the chat on the
     // card opens on it, so the line before a call has no place, the line under the name says
     // "Available now" unless the owner wrote one, and with calls off there is no call to show.
+    function chatNow() { return !!(D.cfg.channels || {}).chat && !!D.cfg.chat; }
+    function callNow() { return (D.cfg.channels || {}).call !== false; }
     function ways() {
-      var ch = D.cfg.channels || {}, chatOn = !!ch.chat && !!D.cfg.chat, sub = $('[name="subtitle"]', box);
+      var chatOn = chatNow(), callOn = callNow(), sub = $('[name="subtitle"]', box);
       box.setAttribute('data-chat', chatOn ? '1' : '0');
+      box.setAttribute('data-call', callOn ? '1' : '0');
       if (sub) sub.placeholder = sub.getAttribute(chatOn ? 'data-chat-placeholder' : 'data-call-placeholder') || sub.placeholder;
-      play.hidden = ch.call === false;
+      play.hidden = !callOn;
+      // How a call looks: nothing to choose with calls off, and no slim bar with the chat on
+      // (the card is the chat, a bar has nowhere to write): a call then shows as the orb.
+      var styles = $('[data-ag-design-styles]', box), slim = $('input[name="style"][value="bar"]', box), orb = $('input[name="style"][value="orb"]', box);
+      if (styles) styles.disabled = !callOn;
+      // With calls off the button is a chat bubble (or the orb, the brand's own mark): no phone to pick.
+      $$('input[name="icon"]', box).forEach(function (i) { i.disabled = !callOn && i.value !== 'orb'; });
+      if (slim) {
+        slim.disabled = chatOn;
+        var note = $('[data-ag-style-note]', slim.parentNode);
+        if (note) note.textContent = note.getAttribute(chatOn ? 'data-chat' : 'data-plain') || '';
+        if (chatOn && slim.checked && orb) { orb.checked = true; look.style = 'orb'; styleBefore = 'orb'; }
+      }
     }
     D.follow = function (change) {
       if (change.channels) D.cfg.channels = change.channels;
@@ -1679,9 +1694,15 @@
     function draw(rebuild) {
       var dark = val('site') === 'dark';
       site.classList.toggle('is-dark', dark);
-      if (widget && !rebuild) { widget.update(cfg()); return; }
-      if (widget) widget.destroy();
-      widget = window.ListenAgentWidget.preview(site, cfg(), { rtl: D.rtl, dark: dark, origin: location.origin, siteFont: getComputedStyle(document.body).fontFamily });
+      // The one preview is kept and changed as it stands (the card sets what changed on itself,
+      // and draws itself again, with no entrance, only for a new style or a channel switched).
+      if (widget) {
+        if (rebuild && playing) widget.demo(false);
+        widget.update(cfg(), { dark: dark });
+        if (!rebuild) return;
+      } else {
+        widget = window.ListenAgentWidget.preview(site, cfg(), { rtl: D.rtl, dark: dark, origin: location.origin, siteFont: getComputedStyle(document.body).fontFamily });
+      }
       if (look.style !== 'bar') widget.open();
       setPlaying(false);
     }
@@ -1744,8 +1765,9 @@
       var restyled = look.style !== styleBefore;
       draw(restyled);
       styleBefore = look.style;
-      // The slim bar only shows during a call: picking it plays a pretend call, so it is seen.
-      if (restyled && look.style === 'bar' && widget) { widget.demo(true); setPlaying(true); stopLater(); }
+      // A style that only shows during a call (the slim bar; with the chat on, every style, in
+      // the call's strip): picking it plays a pretend call, so it is seen.
+      if (restyled && widget && callNow() && (look.style === 'bar' || chatNow())) { widget.demo(true); setPlaying(true); stopLater(); }
       save();
     }
     var stopTimer = 0;
