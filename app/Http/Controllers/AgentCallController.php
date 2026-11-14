@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Agent;
+use App\Models\AgentConversation;
 use App\Models\AgentWidget;
 use App\Services\Agents\AgentCalls;
 use App\Services\Agents\AgentChats;
 use App\Services\Agents\GeminiClient;
 use App\Support\Agents\AgentAccess;
 use App\Support\Agents\AgentChannels;
+use App\Support\Agents\AgentVisits;
 use App\Support\Agents\AgentVoices;
 use App\Support\Agents\CallBackground;
 use App\Support\Agents\CallerIdentity;
@@ -288,7 +290,7 @@ class AgentCallController extends Controller
             // call button only: a link page is on Listen, which never tells a business who you are).
             'caller' => $channel === 'widget' ? CallerIdentity::verify($widget, $in['caller'] ?? null) : null,
             // What the caller wrote in the chat just before pressing call: the call goes on from it.
-            'before' => $this->writtenBefore($agent, $in['chat'] ?? null),
+            'before' => ($chat = $this->chatOf($agent, $in['chat'] ?? null)) ? (AgentChats::spokenBefore($chat) ?: null) : null,
         ]);
         if (! $result['ok'] && $result['error'] === 'lines') {
             // Every line is taken: the call button waits and tries again. Waiting is not a call, so
@@ -312,6 +314,9 @@ class AgentCallController extends Controller
                 ? $this->error('busy', 429, __('agents.error_busy'))
                 : $this->error('paused', 409, __('agents.error_paused'));
         }
+
+        // One visit: the chat this call was made from, or this visitor's last conversation a moment ago.
+        rescue(fn () => AgentVisits::join($result['conversation'], $chat), null, true);
 
         return response()->json(self::startPayload($agent, $result));
     }
@@ -447,14 +452,15 @@ class AgentCallController extends Controller
     }
 
     /** The chat a call follows (its id and key, from the same browser), as the call is told it. */
-    private function writtenBefore(Agent $agent, mixed $chat): ?string
+    /** The written chat a call was made from, when the browser named it with its key (this agent's only). */
+    private function chatOf(Agent $agent, mixed $chat): ?AgentConversation
     {
         if (! is_array($chat) || self::word($chat, 'conversation') === '' || self::word($chat, 'chat_key') === '') {
             return null;
         }
         $c = app(AgentChats::class)->findByKey(self::word($chat, 'conversation'), self::word($chat, 'chat_key'));
 
-        return $c && (int) $c->agent_id === (int) $agent->id ? (AgentChats::spokenBefore($c) ?: null) : null;
+        return $c && (int) $c->agent_id === (int) $agent->id ? $c : null;
     }
 
     /** A value a browser sent, as text: anything that is not plain text or a number is nothing. */
@@ -532,9 +538,12 @@ class AgentCallController extends Controller
         }
         $c = $result['conversation'];
         // A voice call the visitor had just before, in the same card: its words are context.
-        if (is_array($in['call'] ?? null) && ($call = $this->calls->findByKey(self::word($in['call'], 'conversation'), self::word($in['call'], 'call_key')))) {
+        $call = is_array($in['call'] ?? null) ? $this->calls->findByKey(self::word($in['call'], 'conversation'), self::word($in['call'], 'call_key')) : null;
+        if ($call) {
             $chats->comesAfter($c, $call);
         }
+        // One visit: the call this chat follows, or this visitor's last conversation a moment ago.
+        rescue(fn () => AgentVisits::join($c->refresh(), $call), null, true);
 
         return response()->json([
             'conversation' => $c->public_id,
