@@ -23,6 +23,9 @@ CALLS = json.loads((HERE / 'calls.json').read_text(encoding='utf-8'))
 ORDER, SHOWN = CALLS['order'], CALLS['shown']
 
 words = json.loads((HERE / 'voices/words.json').read_text(encoding='utf-8'))
+# A clip whose transcript came back incomplete, timed again by hand (voices/words.fix.json).
+if (HERE / 'voices/words.fix.json').exists():
+    words.update(json.loads((HERE / 'voices/words.fix.json').read_text(encoding='utf-8')))
 
 
 PAUSE = 0.42      # the longest silence left inside a line: people on a call do not wait longer
