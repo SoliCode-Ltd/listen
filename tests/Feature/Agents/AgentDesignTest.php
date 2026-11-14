@@ -119,7 +119,8 @@ class AgentDesignTest extends TestCase
 
         // The card writes it on the chat as on the call card: before, the chat always said "Available now".
         $widget = (string) file_get_contents(public_path('js/agent-widget.js'));
-        $this->assertStringContainsString("conline.appendChild(el('bdi', '', look.subtitle || chatText.online || text.subtitle || ''));", $widget);
+        $this->assertStringContainsString("parts.under = el('bdi', '', look.subtitle || chatText.online || text.subtitle || '');", $widget);
+        $this->assertStringContainsString("if (parts.under) parts.under.textContent = (chatOn ? look.subtitle || chatText.online : '') || text.subtitle || '';", $widget);
         // "Show what is said during the call" switched off holds on the chat card too, for the
         // call's words only: what is written in the chat always shows.
         $this->assertStringNotContainsString('asChat.captions = true', $widget);
@@ -137,7 +138,10 @@ class AgentDesignTest extends TestCase
         // Chat on (as every agent starts): the preview gets the chat, its greeting and its words,
         // and the settings say which of them belong to the call card.
         $on = $page();
-        $on->assertSee('data-ag-design data-chat="1"', false)
+        $on->assertSee('data-ag-design data-chat="1" data-call="1"', false)
+            // The slim bar has no card to write in: not offered while the chat is on.
+            ->assertSee('value="bar"  disabled', false)
+            ->assertSee('Available with written chat off')
             ->assertSee('With written chat on, the card opens on the chat and a call shows inside it.')
             ->assertSee('Shown when written chat is off.')
             ->assertSee('data-chat-placeholder="متاح الآن"', false);
@@ -154,9 +158,14 @@ class AgentDesignTest extends TestCase
         $html = (string) $page()->getContent();
         $config = json_decode(json_decode('"'.\Illuminate\Support\Str::between($html, "window.LISTEN_AGENTS = JSON.parse('", "');").'"'), true);
         $this->assertSame(['chat' => true, 'call' => false], $config['design']['cfg']['channels']);
+        // Calls off: no call style to choose (one line says why), and no phone on the button.
+        $page()->assertSee('data-ag-design data-chat="1" data-call="0"', false)
+            ->assertSee('Voice calls are off. Turn them on in Setup to choose how a call looks.')
+            ->assertSee('With voice calls off, the button shows a chat icon.')
+            ->assertSee('data-ag-design-styles disabled', false);
         \App\Support\Agents\AgentChannels::choose($agent, false, true);
         $agent->save();
-        $page()->assertSee('data-ag-design data-chat="0"', false);
+        $page()->assertSee('data-ag-design data-chat="0" data-call="1"', false)->assertDontSee('data-ag-design-styles disabled', false);
 
         // The page draws it with the same code as the website, takes nothing from the preview's
         // box, and redraws when Setup switches a channel or saves a new greeting.
@@ -168,6 +177,30 @@ class AgentDesignTest extends TestCase
         $this->assertStringContainsString("if (C.design && C.design.follow) C.design.follow({ channels: { chat: !!want.chat, call: !!want.calls } });", $js);
         $this->assertStringContainsString("if (C.design && C.design.follow) C.design.follow({ greeting: \$('[name=\"first_message\"]', sf).value.trim() });", $js);
         $this->assertStringContainsString("box.setAttribute('data-chat', chatOn ? '1' : '0');", $js);
+        // A style that only shows during a call is shown by a pretend call as it is picked.
+        $this->assertStringContainsString("if (restyled && widget && callNow() && (look.style === 'bar' || chatNow())) { widget.demo(true); setPlaying(true); stopLater(); }", $js);
+        $this->assertStringContainsString("if (chatOn && slim.checked && orb) { orb.checked = true; look.style = 'orb'; styleBefore = 'orb'; }", $js);
+    }
+
+    public function test_a_change_is_set_on_the_card_as_it_stands_and_never_makes_it_blink(): void
+    {
+        $widget = (string) file_get_contents(public_path('js/agent-widget.js'));
+        $js = (string) file_get_contents(public_path('js/agents.js'));
+
+        // Words, colours, size, corners, font, theme and side are set on the card that is there;
+        // only a change to its frame draws it again.
+        $this->assertStringContainsString("var MENDED = ['title', 'subtitle', 'label', 'ready_text', 'ready_show', 'accent', 'palette', 'orb_colors', 'colors', 'size', 'radius', 'font', 'theme', 'position', 'background'];", $widget);
+        $this->assertStringContainsString('if (same) { redrawn = false; mend(); return; }', $widget);
+        // The card's own state (open, on a call) is never dropped while its look is set.
+        $this->assertStringNotContainsString("box.className = 'lva is-'", $widget);
+        $this->assertStringContainsString("box.classList.toggle('is-left', side === 'left');", $widget);
+        // Drawn again, the button and the lines already there do not arrive a second time.
+        $this->assertStringContainsString("if (redrawn) launch.classList.add('is-there');", $widget);
+        $this->assertStringContainsString('.lva-launch.is-there,.lva-launch.is-there .lva-ico::after,.lva-line.is-there{animation:none}', $widget);
+        $this->assertStringContainsString("if (showing && redrawn) n.classList.add('is-there');", $widget);
+        // The Design tab keeps its one preview: it is never thrown away and built again.
+        $this->assertStringNotContainsString('widget.destroy()', $js);
+        $this->assertStringContainsString('widget.update(cfg(), { dark: dark });', $js);
     }
 
     public function test_the_design_tab_shows_every_choice_with_a_live_preview(): void

@@ -631,9 +631,12 @@ html[dir="rtl"] .ag-convo-more summary svg { transform: scaleX(-1); }
 .ag-design-field { display: grid; gap: .45rem; min-width: 0; }
 .ag-design-label { font-size: .84rem; font-weight: 700; color: var(--muted); }
 .ag-design-hint { margin: 0; font-size: .84rem; line-height: 1.65; }
-/* Said only while the written chat is on (the card then opens on the chat). */
-.ag-design-when-chat { display: none; }
-.ag-design[data-chat="1"] .ag-design-when-chat { display: block; }
+/* Said only while the written chat is on (the card then opens on the chat), or while calls are off. */
+.ag-design-when-chat, .ag-design-when-nocall { display: none; }
+.ag-design[data-chat="1"] .ag-design-when-chat, .ag-design[data-call="0"] .ag-design-when-nocall { display: block; }
+.ag-design[data-call="0"] .ag-design-when-call { display: none; }
+/* A choice that has no place now (the slim bar with the chat on; every call style with calls off). */
+.ag-style-card input:disabled + span, .ag-icon-choice input:disabled + span { opacity: .45; cursor: not-allowed; }
 .ag-design-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; align-items: start; }
 .ag-choice-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .4rem; }
 .ag-choice { position: relative; display: inline-flex; cursor: pointer; }

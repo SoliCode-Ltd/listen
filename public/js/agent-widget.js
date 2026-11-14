@@ -216,6 +216,7 @@
     '.lva-bartip.is-error{color:#D0335F}',
 
     '@media (max-width:480px){.lva{bottom:14px}.lva.is-right{right:14px}.lva.is-left{left:14px}.lva:not(.is-preview):not(.is-inline) .lva-panel{position:fixed;left:10px !important;right:10px !important;bottom:calc(var(--h) + 26px + var(--kb,0px));width:auto;max-width:none}}',
+    '.lva-launch.is-there,.lva-launch.is-there .lva-ico::after,.lva-line.is-there{animation:none}',
     '@keyframes lva-enter{from{opacity:0;transform:translateY(14px) scale(.96)}}',
     '@keyframes lva-pop{from{opacity:0;transform:scale(.92)}}',
     '@keyframes lva-hello{to{box-shadow:0 0 0 12px transparent}}',
@@ -506,6 +507,37 @@
     var waitPos = 0, sentTo = null;
     var parts = {};
 
+    /*
+     * A change of settings reaches a card that is already on the screen (its owner styling it in
+     * the Design tab, or a visitor's page reading it again). Most changes need nothing built:
+     * the name, the line under it, the button's words, the line before a call, colours, size,
+     * corners, font, light or dark and the side are set on the card as it stands (mend). Only a
+     * change to its frame (frameOf: everything else, such as its style, icon, photo, chat or
+     * calls) draws it again, and then with no entrance: the card and its button are simply there,
+     * so nothing fades or blinks while its owner types.
+     */
+    var MENDED = ['title', 'subtitle', 'label', 'ready_text', 'ready_show', 'accent', 'palette', 'orb_colors', 'colors', 'size', 'radius', 'font', 'theme', 'position', 'background'];
+    var framed = null, redrawn = false;
+    function frameOf(c) {
+      var t = c.text || {}, l = c.look || {}, st = t.states || {}, o = { label: !!t.label, text: {}, states: {}, look: {} }, k;
+      for (k in c) if (k !== 'text' && k !== 'look' && k !== 'colors' && k !== 'assets') o[k] = c[k];
+      for (k in t) if (k !== 'title' && k !== 'subtitle' && k !== 'label' && k !== 'states') o.text[k] = t[k];
+      for (k in st) if (k !== 'idle') o.states[k] = st[k];
+      for (k in l) if (MENDED.indexOf(k) < 0) o.look[k] = l[k];
+      try { return JSON.stringify(o); } catch (e) { return ''; }
+    }
+    function mend() {
+      var name = text.title || cfg.business || '';
+      if (parts.title) parts.title.textContent = text.title || cfg.business || cfg.name || '';
+      if (parts.under) parts.under.textContent = (chatOn ? look.subtitle || chatText.online : '') || text.subtitle || '';
+      if (parts.panel) parts.panel.setAttribute('aria-label', name);
+      if (parts.barTitle) { parts.barTitle.textContent = name; parts.barTitle.parentNode.parentNode.setAttribute('aria-label', name); }
+      if (parts.launch) parts.launch.setAttribute('aria-label', text.label || name);
+      // The line before a call and whether it shows (a problem being said stays as it is).
+      if (stateNow !== 'error' && stateNow !== 'mic') paintState();
+      timer();
+    }
+
     function render(next) {
       cfg = next || cfg;
       text = cfg.text || {};
@@ -528,7 +560,11 @@
       var theme = look.theme === 'dark' || (look.theme !== 'light' && (opts.dark != null ? opts.dark : isDarkPage())) ? 'dark' : 'light';
       var accent = hexRgb(look.accent) ? look.accent : '#7659FA';
 
-      box.className = 'lva is-' + side + (preview ? ' is-preview' : '') + (inline ? ' is-inline' : '');
+      // (Set one by one: the card's own state, open or on a call, stays as it is.)
+      box.classList.toggle('is-left', side === 'left');
+      box.classList.toggle('is-right', side === 'right');
+      box.classList.toggle('is-preview', preview);
+      box.classList.toggle('is-inline', inline);
       box.dir = cfg.dir === 'rtl' ? 'rtl' : 'ltr';
       box.lang = cfg.language === 'en' ? 'en' : 'ar';
       box.setAttribute('data-theme', theme);
@@ -546,6 +582,11 @@
         box.style.setProperty('--room', Math.max(300, (opts.into.clientHeight || 580) - btnH - 48) + 'px');
       }
       ['--c1', '--c2', '--c3', '--c4'].forEach(function (v, i) { box.style.setProperty(v, colors[i] || colors[colors.length - 1]); });
+      // The same frame as the card on the screen: its words and look are set on it, nothing is built.
+      var frame = frameOf(cfg), same = framed !== null && frame !== '' && frame === framed && !!parts.launch;
+      redrawn = framed !== null;
+      framed = frame;
+      if (same) { redrawn = false; mend(); return; }
       box.innerHTML = '';
       parts = {};
       var bar = look.style === 'bar';
@@ -587,6 +628,7 @@
       // The chat card: the name with the call button beside it, a call's bar, the conversation, the box to write in.
       if (!bar && chatOn) {
         var cpanel = el('div', 'lva-panel is-chat');
+        parts.panel = cpanel;
         cpanel.id = 'lva-panel';
         cpanel.setAttribute('role', 'dialog');
         cpanel.setAttribute('aria-label', text.title || cfg.business || '');
@@ -595,12 +637,14 @@
         // The name and the line under it sit on the card's side; each is read in its own
         // direction (an English name on an Arabic card, and the other way round).
         var ctitle = el('strong');
-        ctitle.appendChild(el('bdi', '', text.title || cfg.business || cfg.name));
+        parts.title = el('bdi', '', text.title || cfg.business || cfg.name);
+        ctitle.appendChild(parts.title);
         cwho.appendChild(ctitle);
         var conline = el('small');
         conline.appendChild(el('i'));
         // The owner's own line under the name (Design: "Line under the title"), else "Available now".
-        conline.appendChild(el('bdi', '', look.subtitle || chatText.online || text.subtitle || ''));
+        parts.under = el('bdi', '', look.subtitle || chatText.online || text.subtitle || '');
+        conline.appendChild(parts.under);
         cwho.appendChild(conline);
         var cphoto = look.photo !== false && cfg.avatar && (/^https:\/\//.test(cfg.avatar) || (ctx.origin && cfg.avatar.indexOf(ctx.origin + '/') === 0)) ? cfg.avatar : null;
         if (cphoto) { var cface = el('span', 'lva-face'); var cimg = el('img'); cimg.alt = ''; cimg.src = cphoto; cface.appendChild(cimg); chead.appendChild(cface); }
@@ -692,16 +736,19 @@
       // The card (orb and waves).
       if (!bar && !chatOn) {
         var panel = el('div', 'lva-panel');
+        parts.panel = panel;
         panel.id = 'lva-panel';
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-label', text.title || cfg.business || '');
         var head = el('div', 'lva-head');
         var who = el('div', 'lva-who');
         var title = el('strong');
-        title.appendChild(el('bdi', '', text.title || cfg.business || cfg.name));
+        parts.title = el('bdi', '', text.title || cfg.business || cfg.name);
+        title.appendChild(parts.title);
         who.appendChild(title);
         var under = el('small');
-        under.appendChild(el('bdi', '', text.subtitle || ''));
+        parts.under = el('bdi', '', text.subtitle || '');
+        under.appendChild(parts.under);
         who.appendChild(under);
         var pill = el('span', 'lva-pill');
         pill.appendChild(el('i'));
@@ -764,6 +811,8 @@
       var round = look.shape === 'round' || !text.label;
       var launch = el('button', 'lva-launch' + (round ? ' is-round' : ''));
       launch.type = 'button';
+      // Drawn again: it is already there, so it does not arrive a second time (nor its ring).
+      if (redrawn) launch.classList.add('is-there');
       launch.setAttribute('aria-label', text.label || text.title || cfg.business || '');
       if (!bar) { launch.setAttribute('aria-expanded', open ? 'true' : 'false'); launch.setAttribute('aria-controls', 'lva-panel'); }
       var ico = el('span', 'lva-ico');
@@ -837,6 +886,8 @@
         parts.call.disabled = true;
         if (parts.state) { parts.state.hidden = false; parts.state.textContent = text.paused || ''; }
       }
+      // What is written from here on arrives as it always does.
+      redrawn = false;
     }
 
     function linkButton(label, onClick) {
@@ -869,7 +920,7 @@
       if (v) refreshCard(false, 4000);
       // The chat card: straight to writing where there is a keyboard (on a phone that would open it over the card).
       if (v && chatOn) { setTimeout(function () { if (!preview && window.matchMedia && matchMedia('(pointer:fine)').matches && parts.input) parts.input.focus(); follow(true); }, 80); }
-      else if (v) setTimeout(function () { parts.call && parts.call.focus(); }, 60); else if (!preview) parts.launch.focus();
+      else if (v) setTimeout(function () { if (!preview && parts.call) parts.call.focus(); }, 60); else if (!preview) parts.launch.focus();
       timer();
     }
     root.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) setOpen(false); });
@@ -1406,6 +1457,7 @@
     function chatBubble(kind, words) {
       var n = el('div', 'lva-line ' + (kind === 'me' ? 'is-caller is-typed' : kind === 'note' ? 'is-note' : kind === 'error' ? 'is-note is-error' : 'is-agent'), words || '');
       n.dir = 'auto';
+      if (showing && redrawn) n.classList.add('is-there');
       return n;
     }
     // A small line in the middle of the conversation: a call started, a call ended, a problem.
@@ -1416,19 +1468,22 @@
       if (!isError && !preview) { if (!log.length && chatText.greeting) log.push({ k: 'agent', t: chatText.greeting }); log.push({ k: 'note', t: words }); saveChat(); }
     }
     // The card as it opens: the conversation of this visit, or the agent's greeting.
+    var showing = false;
     function showChat() {
       if (!log.length && !chat && !preview) loadChat();
       if (!parts.lines) return;
       parts.lines.innerHTML = '';
       parts.lines.__pinned = true;
+      showing = true;
       if (!log.length && chatText.greeting) parts.lines.appendChild(chatBubble('agent', chatText.greeting));
       var waiting = null;
       log.forEach(function (l, i) {
-        if (l.k === 'links') { linksLine({ links: l.links || [] }); return; }
+        if (l.k === 'links') { var kept = { links: l.links || [] }; linksLine(kept); if (redrawn && kept.view) kept.view.classList.add('is-there'); return; }
         var view = chatBubble(l.k, l.t);
         parts.lines.appendChild(view);
         if (l.k === 'me' && l.wait && i === log.length - 1) waiting = { id: l.id, text: l.t, view: view, kept: true };
       });
+      showing = false;
       follow(true);
       // The last message was still waiting for its answer when the page was left: asked again
       // with its own id, it gets the answer it already has (or its first), charged once.
@@ -1756,7 +1811,8 @@
 
     render(cfg);
     return {
-      update: function (next) { render(next); },
+      // (o.dark: the Design tab's pretend website switched between light and dark.)
+      update: function (next, o) { if (o && o.dark != null) opts.dark = !!o.dark; render(next); },
       open: function (o) {
         if (look.style !== 'bar') setOpen(true);
         if (o && o.call && callOn && !call && !starting && !demo) toggleCall();

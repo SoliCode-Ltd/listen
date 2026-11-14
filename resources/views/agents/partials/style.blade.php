@@ -7,6 +7,9 @@
   $rtl = $agent->language !== 'en';
   // With the written chat on the card opens on it (Setup: Chat and calls); the page keeps this in step.
   $chatOn = \App\Support\Agents\AgentChannels::chat($agent);
+  $callOn = \App\Support\Agents\AgentChannels::calls($agent);
+  // The slim bar has no card to write in: with the chat on a call shows as the orb.
+  $styleNow = $chatOn && $look['style'] === 'bar' ? 'orb' : $look['style'];
   // The corner as the owner sees it: on a right-to-left website the start is the right.
   $corner = ($look['position'] === 'start') === $rtl ? 'right' : 'left';
   $palettes = \App\Models\AgentWidget::PALETTES;
@@ -21,7 +24,7 @@
     'orb' => '<circle cx="12" cy="12" r="8"/><path d="M8.5 9.2a4.6 4.6 0 0 1 4-2.4"/>',
   ];
 @endphp
-<div class="ag-design" data-ag-design data-chat="{{ $chatOn ? '1' : '0' }}">
+<div class="ag-design" data-ag-design data-chat="{{ $chatOn ? '1' : '0' }}" data-call="{{ $callOn ? '1' : '0' }}">
   {{-- Across both columns, so the settings and the preview start on the same line. --}}
   <div class="ag-design-intro">
     <h2>{{ __('agents.design.title') }}</h2>
@@ -30,24 +33,25 @@
   <div class="ag-design-controls">
 
     {{-- What the call shows. --}}
-    <fieldset class="ag-design-group">
+    <fieldset class="ag-design-group" data-ag-design-styles @disabled(! $callOn)>
       <legend>{{ __('agents.design.group_look') }}</legend>
       <div class="ag-style-cards">
         @foreach(\App\Models\AgentWidget::STYLES as $style)
           @php [$styleName, $styleText] = __('agents.design.styles.'.$style); @endphp
           <label class="ag-choice ag-style-card">
-            <input type="radio" name="style" value="{{ $style }}" @checked($look['style'] === $style)>
+            <input type="radio" name="style" value="{{ $style }}" @checked($styleNow === $style) @disabled($style === 'bar' && $chatOn)>
             <span>
               <i class="ag-style-art is-{{ $style }}" aria-hidden="true">
                 @if($style === 'orb')<b></b>@elseif($style === 'waves')<b></b><b></b><b></b><b></b><b></b>@else<em></em><b></b><u></u>@endif
               </i>
               <strong>{{ $styleName }}</strong>
-              <small>{{ $styleText }}</small>
+              <small @if($style === 'bar') data-ag-style-note data-plain="{{ $styleText }}" data-chat="{{ __('agents.design.chat_bar') }}" @endif>{{ $style === 'bar' && $chatOn ? __('agents.design.chat_bar') : $styleText }}</small>
             </span>
           </label>
         @endforeach
       </div>
-      <p class="ag-design-hint ag-muted ag-design-when-chat">{{ __('agents.design.chat_style') }}</p>
+      <p class="ag-design-hint ag-muted ag-design-when-chat ag-design-when-call">{{ __('agents.design.chat_style') }}</p>
+      <p class="ag-design-hint ag-muted ag-design-when-nocall">{{ __('agents.design.calls_off') }}</p>
     </fieldset>
 
     {{-- The button. --}}
@@ -58,11 +62,12 @@
         <div class="ag-choice-row">
           @foreach(\App\Models\AgentWidget::ICONS as $icon)
             <label class="ag-choice ag-icon-choice" title="{{ __('agents.design.icons.'.$icon) }}">
-              <input type="radio" name="icon" value="{{ $icon }}" @checked($look['icon'] === $icon) aria-label="{{ __('agents.design.icons.'.$icon) }}">
+              <input type="radio" name="icon" value="{{ $icon }}" @checked($look['icon'] === $icon) @disabled(! $callOn && $icon !== 'orb') aria-label="{{ __('agents.design.icons.'.$icon) }}">
               <span><svg viewBox="0 0 24 24" aria-hidden="true">{!! $iconSvg[$icon] !!}</svg></span>
             </label>
           @endforeach
         </div>
+        <p class="ag-design-hint ag-muted ag-design-when-nocall">{{ __('agents.design.calls_off_icon') }}</p>
       </div>
       <div class="ag-design-field">
         <label class="ag-design-label" for="ag-design-label">{{ __('agents.design.label') }}</label>
