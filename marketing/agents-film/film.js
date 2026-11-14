@@ -14,43 +14,30 @@ const C = { paper: '#F4F3F7', ink: '#14121F', quiet: '#B5B2C4', label: '#8B88A0'
 const FACE = 'Display';
 const sec = (u) => M.TS(u);
 
-// Four agents, four dialects: real calls from the homepage (lang/ar/agents_landing.php,
-// real_calls), each with the orb colours an owner can pick for it (AgentWidget::PALETTES).
-// u0..u1: its scene in beats; ask: what the caller wrote, and when; the answer is the recording.
-const CALLS = [
-  { key: 'eg', u0: 14, u1: 31, pal: 'violet', orb: 'orb', agent: 'سمية', who: 'معمل نور للتحاليل', dialect: 'مصرية (قاهرية)', her: 'العميلة',
-    ask: 'السلام عليكم، هو انتو بتعملوا سحب عينات من البيت؟', askAt: 9.75 },
-  { key: 'sa', u0: 36, u1: 54, pal: 'emerald', orb: 'emeraldOrb', agent: 'فاطمة', who: 'عيادة لمسة للأسنان', dialect: 'سعودية (نجدية)', her: 'العميل',
-    ask: 'السلام عليكم، أبي أحجز موعد تنظيف أسنان يوم الخميس العصر', askAt: 24.35 },
-  { key: 'ae', u0: 54, u1: 65, pal: 'ocean', orb: 'oceanOrb', agent: 'حامد', who: 'مطعم بيت السدو', dialect: 'إماراتية', her: 'العميل',
-    ask: 'زين، مشكور', askAt: 36.3 },
-  { key: 'lb', u0: 65, u1: 75, pal: 'rose', orb: 'roseOrb', agent: 'رائد', who: 'مكتب البحر العقاري', dialect: 'لبنانية (جنوبية)', her: 'العميل',
-    ask: 'إيه مظبوط', askAt: 43.6 },
-];
-const DIALECTS = ['مصرية', 'سعودية', 'إماراتية', 'لبنانية', 'كويتية', 'مغربية', 'عراقية', 'أردنية', 'سودانية'];
-const SAVED = { title: 'حُفظ طلب معاودة الاتصال', name: 'جاد', phone: '03 123 456', note: 'شقة غرفتين في صيدا، حتى 600 دولار' };
+// Four calls, four dialects (lines.php): a customer asks, the business's agent answers. Each
+// agent's scene takes one of the orb colours an owner can pick (AgentWidget::PALETTES). When each
+// scene starts and each word is said comes from the recordings (build_audio.py -> audio/vo.json).
+const CAST = {
+  eg: { pal: 'violet', orb: 'orb', agent: 'سمية', who: 'شحن المدار', dialect: 'مصرية', her: 'العميل' },
+  sa: { pal: 'emerald', orb: 'emeraldOrb', agent: 'فهد', who: 'معرض الريادة للسيارات', dialect: 'سعودية', her: 'العميلة' },
+  kw: { pal: 'ocean', orb: 'oceanOrb', agent: 'فاطمة', who: 'فندق المرسى', dialect: 'كويتية', her: 'العميل' },
+  lb: { pal: 'rose', orb: 'roseOrb', agent: 'رائد', who: 'مكتب البحر العقاري', dialect: 'لبنانية', her: 'العميلة' },
+};
+let CALLS = [], SC = {};
+const DIALECTS = ['مصرية', 'سعودية', 'كويتية', 'لبنانية', 'إماراتية', 'مغربية', 'عراقية', 'أردنية', 'سودانية'];
+const SAVED = { title: 'حُفظ موعد المعاينة', name: 'ريم', phone: '03 123 456', note: 'شقة الأشرفية، بكرا 11 الصبح' };
 const LINE = [['يرد', 'على', 'كل', 'مكالمة،'], ['بلهجة', 'عملائك.']];
 const TRY = ['جرّبه', 'على', 'موقعك', 'اليوم.'];
 
+// Every accent: [beat, label, sfx, opts]. The opening is fixed; the rest follows the recordings
+// (filled in once they are read, below).
 const HITS = [
   [0, 'mark', 'blip', { pitch: 'D5' }],
   [4, 'colour', 'sub', { len: 0.8 }],
   [8, 'circle', 'tick'],
-  [14, 'egypt', 'whoosh', { len: 0.6, from: 400, to: 1400 }],
-  [14.65, 'she writes', 'type', { n: 12, len: 1.9 }],
-  [18, 'the agent answers', 'blip', { pitch: 'A5' }],
-  [31, 'dialects', 'sub', { len: 0.6 }],
-  [36, 'saudi', 'tick'],
-  [36.55, 'he writes', 'type', { n: 12, len: 1.7 }],
-  [54, 'emirates', 'tick'],
-  [65, 'lebanon', 'tick'],
-  [75, 'saved', 'bell', { pitch: 'D6' }],
-  [82, 'try it', 'tick'],
-  [88, 'end colour', 'sub', { len: 0.8 }],
-  [89, 'logo', 'bell', { pitch: 'A5' }],
 ];
 
-let VO = { env: [], lines: {} }, LOGO = null, GRAIN = null;
+let VO = { env: [], calls: [], scenes: {} }, LOGO = null, GRAIN = null;
 
 // ---------------------------------------------------------------- the voice
 function loud(t) {
@@ -164,8 +151,8 @@ function logoWhite(ctx, cx, cy, w, a) {
   ctx.globalAlpha = a; ctx.drawImage(LOGO, cx - w / 2, cy - h / 2, w, h); ctx.globalAlpha = 1;
 }
 // The orb: the same silk seen through a sphere, lit from above, breathing with the voice.
-function orb(ctx, t, cx, cy, r, pal, glow) {
-  const v = voice(t), rr = r * (1 + 0.07 * v);
+function orb(ctx, t, cx, cy, r, pal, glow, heard) {
+  const v = heard ? voice(t) : 0, rr = r * (1 + 0.07 * v);
   ctx.save();
   ctx.shadowColor = `rgba(${glow[0]},${glow[1]},${glow[2]},.30)`; ctx.shadowBlur = 70; ctx.shadowOffsetY = 34;
   ctx.beginPath(); ctx.arc(cx, cy, rr, 0, M.TAU); ctx.fillStyle = `rgb(${glow[0]},${glow[1]},${glow[2]})`; ctx.fill();
@@ -252,17 +239,17 @@ function sceneTalk(ctx, t, D) {                 // someone asks, the agent answe
   const t0 = sec(D.u0), t1 = sec(D.u1), pal = PAL[D.pal];
   fill(ctx, C.paper);
   // the first time, the colour steps back into its panel on the right; after that it is there
-  const p = D.key === 'eg' ? E.inOutCubic(clamp((t - t0) / 0.9)) : 1, m = 28 * p;
+  const p = D.first ? E.inOutCubic(clamp((t - t0) / 0.9)) : 1, m = 28 * p;
   const px = lerp(0, 700, p), pw = W - px - m, py = m, ph = H - 2 * m;
   ctx.save(); rrect(ctx, px, py, pw, ph, 34 * p); ctx.clip();
-  silk(ctx, t, pal, 1.3 + D.u0 * 0.37, 0, 0, W, H, 1.1 + 0.004 * (t - t0), D.key === 'eg' ? lerp(0, -0.2, p) : -0.2);
+  silk(ctx, t, pal, 1.3 + D.u0 * 0.37, 0, 0, W, H, 1.1 + 0.004 * (t - t0), D.first ? lerp(0, -0.2, p) : -0.2);
   ctx.restore();
   // the orb's own panel: the agent, where it works, how it speaks
-  const op = D.key === 'eg' ? E.outCubic(clamp((t - t0 - 0.25) / 0.8)) : 1, inn = E.outCubic(clamp((t - t0) / 0.7));
+  const op = D.first ? E.outCubic(clamp((t - t0 - 0.25) / 0.8)) : 1, inn = E.outCubic(clamp((t - t0) / 0.7));
   if (op > 0) {
     ctx.globalAlpha = op; rrect(ctx, 28, 28, 644, H - 56, 34); ctx.fillStyle = C.white; ctx.fill(); ctx.globalAlpha = 1;
-    ctx.save(); ctx.globalAlpha = op * inn; orb(ctx, t, 350, H / 2 - 46, 150 * lerp(0.9, 1, inn), PAL[D.orb], pal[2]); ctx.restore();
-    const name = E.outCubic(clamp((t - t0 - (D.key === 'eg' ? 0.9 : 0.25)) / 0.6));
+    ctx.save(); ctx.globalAlpha = op * inn; orb(ctx, t, 350, H / 2 - 46, 150 * lerp(0.9, 1, inn), PAL[D.orb], pal[2], t > D.answer.at - 0.1 && t < D.answer.end + 0.2); ctx.restore();
+    const name = E.outCubic(clamp((t - t0 - (D.first ? 0.9 : 0.25)) / 0.6));
     ctx.globalAlpha = name; ctx.direction = 'rtl'; ctx.textAlign = 'center';
     ctx.font = font(40, 600, FACE); ctx.fillStyle = C.ink; ctx.fillText(D.agent, 350, H / 2 + 206);
     ctx.font = font(25, 400, FACE); ctx.fillStyle = C.label; ctx.fillText(D.who, 350, H / 2 + 252);
@@ -280,11 +267,11 @@ function sceneTalk(ctx, t, D) {                 // someone asks, the agent answe
   let y = H / 2 - Math.max(0, all - 22) / 2;
   cards.forEach((card) => { const h = talk(ctx, t, card, x, y, w); if (h) y += h + 22; });
   // the last scene lets go softly, into the colour that follows
-  if (D.key === 'lb') { const out = E.inCubic(clamp((t - (t1 - 0.3)) / 0.3)); if (out > 0) { ctx.globalAlpha = out; fill(ctx, C.paper); ctx.globalAlpha = 1; } }
+  if (D.last) { const out = E.inCubic(clamp((t - (t1 - 0.3)) / 0.3)); if (out > 0) { ctx.globalAlpha = out; fill(ctx, C.paper); ctx.globalAlpha = 1; } }
 }
 // Every dialect: their names pass, one after another, on the brand's colour.
-function sceneDialects(ctx, t) {                // u 31..36
-  const t0 = sec(31), t1 = sec(36);
+function sceneDialects(ctx, t) {
+  const t0 = sec(SC.dialects[0]), t1 = sec(SC.dialects[1]);
   silk(ctx, t, PAL.violet, 2.9, 0, 0, W, H, 1.08 + 0.01 * (t - t0));
   const f = font(120, 500, FACE), gap = 110;
   ctx.font = f; ctx.direction = 'rtl'; ctx.textAlign = 'right';
@@ -300,8 +287,8 @@ function sceneDialects(ctx, t) {                // u 31..36
   });
   ctx.globalAlpha = 1;
 }
-function sceneSaved(ctx, t) {                   // u 75..82: what the business is left with
-  const t0 = sec(75);
+function sceneSaved(ctx, t) {                   // what the business is left with
+  const t0 = sec(SC.saved[0]);
   silk(ctx, t, PAL.lilac, 4.2, 0, 0, W, H, 1.08 + 0.015 * (t - t0));
   const a = E.outCubic(clamp((t - t0 - 0.1) / 0.6)), w = 820, h = 430, x = (W - w) / 2, y = (H - h) / 2 + (1 - a) * 22;
   ctx.save(); ctx.globalAlpha = a;
@@ -327,9 +314,9 @@ function sceneSaved(ctx, t) {                   // u 75..82: what the business i
   });
   ctx.restore();
 }
-function sceneTry(ctx, t) {                     // u 82..88
+function sceneTry(ctx, t) {
   fill(ctx, C.paper);
-  sentence(ctx, TRY, t, sec(82) + 0.6, 0.36, H / 2 + 20, 64, C.quiet, C.ink);
+  sentence(ctx, TRY, t, sec(SC.try[0]) + 0.6, 0.36, H / 2 + 20, 64, C.quiet, C.ink);
 }
 
 M.film({
@@ -347,15 +334,22 @@ M.film({
     const g = GRAIN.getContext('2d'), d = g.createImageData(256, 256);
     for (let i = 0; i < 256 * 256; i++) { const v = 128 + (hash01(i, 9) - 0.5) * 255; d.data[i * 4] = v; d.data[i * 4 + 1] = v; d.data[i * 4 + 2] = v; d.data[i * 4 + 3] = 255; }
     g.putImageData(d, 0, 0);
-    // the conversation: her words are written, the agent's come when she says them
-    const f = font(34, 500, FACE), typed = (str, t0, cps) => { let at = t0; return wrap(ctx, str, f, 10, 720).map((ln) => ln.map((w) => { const o = { w, t: at }; at += (w.length + 1) / cps; return o; })); };
-    const said = (key) => { let i = 0; const L = VO.lines[key]; return wrap(ctx, L.words.map((w) => w[0]).join(' '), f, 10, 720).map((ln) => ln.map((w) => ({ w, t: L.words[i++][1] }))); };
-    CALLS.forEach((D) => {
-      TALK[D.key] = [
-        { kind: 'her', who: D.her, t0: D.askAt - 0.4, lines: typed(D.ask, D.askAt, 26) },
-        { kind: 'agent', who: D.agent + ' · ' + D.dialect, t0: VO.lines[D.key].at - 0.35, lines: said(D.key) },
+    // the conversation: both sides are spoken, and every word comes at its own moment
+    const f = font(34, 500, FACE);
+    const said = (line) => { let i = 0; return wrap(ctx, line.words.map((w) => w[0]).join(' '), f, 10, 720).map((ln) => ln.map((w) => ({ w, t: line.words[i++][1] }))); };
+    SC = VO.scenes;
+    CALLS = VO.calls.map((c, i) => ({ ...CAST[c.key], key: c.key, u0: c.u0, u1: c.u1, first: i === 0, last: i === VO.calls.length - 1, answer: c.agent }));
+    VO.calls.forEach((c) => {
+      const D = CAST[c.key];
+      TALK[c.key] = [
+        { kind: 'her', who: D.her, t0: c.ask.at - 0.4, lines: said(c.ask) },
+        { kind: 'agent', who: D.agent + ' · ' + D.who, t0: c.agent.at - 0.35, lines: said(c.agent) },
       ];
+      HITS.push([c.u0, c.key, c === VO.calls[0] ? 'whoosh' : 'tick', c === VO.calls[0] ? { len: 0.6, from: 400, to: 1400 } : {}]);
     });
+    HITS.push([SC.dialects[0], 'dialects', 'sub', { len: 0.6 }], [SC.saved[0], 'saved', 'bell', { pitch: 'D6' }], [SC.try[0], 'try it', 'tick'],
+      [SC.logo[0], 'end colour', 'sub', { len: 0.8 }], [SC.logo[0] + 1, 'logo', 'bell', { pitch: 'A5' }]);
+    HITS.sort((a, b) => a[0] - b[0]);
   },
   draw(ctx, u, t) {
     const call = CALLS.find((D) => u >= D.u0 && u < D.u1);
@@ -363,10 +357,10 @@ M.film({
     else if (u < 8) sceneColour(ctx, t, 4, PAL.violet, 1.3, false);
     else if (u < 14) sceneCircle(ctx, t);
     else if (call) sceneTalk(ctx, t, call);
-    else if (u < 36) sceneDialects(ctx, t);
-    else if (u < 82) sceneSaved(ctx, t);
-    else if (u < 88) sceneTry(ctx, t);
-    else sceneColour(ctx, t, 88, PAL.night, 2.4, true);
+    else if (u < SC.dialects[1]) sceneDialects(ctx, t);
+    else if (u < SC.saved[1]) sceneSaved(ctx, t);
+    else if (u < SC.try[1]) sceneTry(ctx, t);
+    else sceneColour(ctx, t, SC.logo[0], PAL.night, 2.4, true);
   },
   post(ctx, u, t) {
     if (!GRAIN) return;
