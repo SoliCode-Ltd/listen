@@ -2,6 +2,7 @@
 
 namespace App\Services\Tts;
 
+use App\Models\DesignedVoice;
 use App\Support\EnvFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
@@ -23,12 +24,19 @@ class GeminiKeyManager
 {
     // Gemini 2.5 Flash TTS default limits per key
     private const DEFAULT_RPM_LIMIT = 10;
+
     private const DEFAULT_TPM_LIMIT = 10000;
+
     private const DEFAULT_RPD_LIMIT = 100;
+
     private const APPROX_CHARS_PER_TOKEN = 4;
 
     private const CACHE_PREFIX = 'gemini_key';
+
+    private const DESIGNED_COUNTS_KEY = 'gemini_key_designed_voice_counts';
+
     private const CACHE_TTL_DAY = 86400; // 24 hours
+
     private const CACHE_TTL_MINUTE = 60;
 
     /** A key stopped by its project's spending cap is set aside this long, then tried again. */
@@ -52,7 +60,7 @@ class GeminiKeyManager
         $keys = [];
         $envPath = base_path('.env');
 
-        if (!File::exists($envPath)) {
+        if (! File::exists($envPath)) {
             return $keys;
         }
 
@@ -61,7 +69,7 @@ class GeminiKeyManager
 
         foreach ($lines as $line) {
             $line = trim($line);
-            if (str_starts_with($line, '#') || !str_contains($line, '=')) {
+            if (str_starts_with($line, '#') || ! str_contains($line, '=')) {
                 continue;
             }
 
@@ -72,7 +80,7 @@ class GeminiKeyManager
             // Match GEMINI_TTS_API_KEY or GEMINI_TTS_API_KEY_N
             if (preg_match('/^GEMINI_TTS_API_KEY(_(\d+))?$/', $keyName, $matches)) {
                 $index = isset($matches[2]) ? (int) $matches[2] : 1;
-                if (!empty($value)) {
+                if (! empty($value)) {
                     $keys[] = [
                         'key' => $value,
                         'name' => $keyName,
@@ -83,7 +91,7 @@ class GeminiKeyManager
         }
 
         // Sort by index
-        usort($keys, fn($a, $b) => $a['index'] <=> $b['index']);
+        usort($keys, fn ($a, $b) => $a['index'] <=> $b['index']);
 
         return $keys;
     }
@@ -122,7 +130,10 @@ class GeminiKeyManager
                 $keys[] = [$stats['rpm_used'], $keyInfo];
             }
         }
-        usort($keys, fn (array $a, array $b): int => [$a[0], $a[1]['index']] <=> [$b[0], $b[1]['index']]);
+        // A key that holds members' designed voices is kept for them: every other
+        // key with room goes first (designedVoiceCounts()).
+        $held = $this->designedVoiceCounts();
+        usort($keys, fn (array $a, array $b): int => [$held[$a[1]['name']] ?? 0, $a[0], $a[1]['index']] <=> [$held[$b[1]['name']] ?? 0, $b[0], $b[1]['index']]);
 
         return array_column($keys, 1);
     }
@@ -130,7 +141,7 @@ class GeminiKeyManager
     /**
      * Get usage statistics for a specific key.
      *
-     * @param string $keyName The env variable name (e.g., GEMINI_TTS_API_KEY_2)
+     * @param  string  $keyName  The env variable name (e.g., GEMINI_TTS_API_KEY_2)
      * @return array{rpm_used: int, rpm_limit: int, rpm_remaining: int, tpm_used: int, tpm_limit: int, tpm_remaining: int, rpd_used: int, rpd_limit: int, rpd_remaining: int, is_exhausted: bool}
      */
     public function getKeyStats(string $keyName): array
@@ -164,8 +175,8 @@ class GeminiKeyManager
     /**
      * Record a successful API request for a key.
      *
-     * @param string $keyName The env variable name
-     * @param int $charCount Number of characters processed
+     * @param  string  $keyName  The env variable name
+     * @param  int  $charCount  Number of characters processed
      */
     public function recordUsage(string $keyName, int $charCount = 0): void
     {
@@ -190,7 +201,7 @@ class GeminiKeyManager
     /**
      * Mark a key as temporarily exhausted (hit 429).
      *
-     * @param string $keyName The env variable name
+     * @param  string  $keyName  The env variable name
      */
     public function markKeyExhausted(string $keyName): void
     {
@@ -222,9 +233,50 @@ class GeminiKeyManager
 
             return $this->getKeyStats($k['name'])['is_exhausted'] ? 2 : 1;
         };
-        usort($keys, fn ($a, $b) => [$rank($a), $a['index']] <=> [$rank($b), $b['index']]);
+        // Within a rank, the keys that hold fewest designed voices first (designedVoiceCounts()).
+        $held = $this->designedVoiceCounts();
+        usort($keys, fn ($a, $b) => [$rank($a), $held[$a['name']] ?? 0, $a['index']] <=> [$rank($b), $held[$b['name']] ?? 0, $b['index']]);
 
         return $keys;
+    }
+
+    /**
+     * How many saved designed voices each key's project holds, by key name.
+     *
+     * A designed voice lives in the project of the key that made it and cannot
+     * be copied to another (unlike a cloned voice, which is made again from its
+     * recordings), so when that key's day runs out the voice cannot speak until
+     * the reset. Every other voice can use any key: those go to the keys that
+     * hold no designed voices first, and the fewest after, so a key's day is
+     * left for the voices only it can speak. On live in November 2026 the first
+     * key held the designed voices and was also first in line for every other
+     * voice: it ran out twice in one day, and designed voices failed until the reset.
+     *
+     * @return array<string, int>
+     */
+    public function designedVoiceCounts(): array
+    {
+        return (array) rescue(fn () => Cache::remember(self::DESIGNED_COUNTS_KEY, 300, fn (): array => DesignedVoice::query()
+            ->saved()->whereNotNull('key_name')
+            ->selectRaw('key_name, count(*) as held')->groupBy('key_name')
+            ->pluck('held', 'key_name')->map(fn ($n) => (int) $n)->all()), [], false);
+    }
+
+    /** A designed voice was kept or deleted: count them again. */
+    public static function forgetDesignedVoiceCounts(): void
+    {
+        Cache::forget(self::DESIGNED_COUNTS_KEY);
+    }
+
+    /**
+     * The key answered on this model after all (its limit was raised, or the
+     * quota came back early): it is no longer set aside for the day.
+     */
+    public function clearOutForToday(string $keyName, string $model): void
+    {
+        if (Cache::pull($this->outKey($keyName, $model))) {
+            Log::info('Gemini key answered again on this model; no longer set aside for the day.', ['key' => $keyName, 'model' => $model]);
+        }
     }
 
     /**
@@ -339,8 +391,8 @@ class GeminiKeyManager
             $stats = $this->getKeyStats($keyInfo['name']);
             $totalRpmRemaining += $stats['rpm_remaining'];
             $totalRpdRemaining += $stats['rpd_remaining'];
-            
-            if (!$stats['is_exhausted']) {
+
+            if (! $stats['is_exhausted']) {
                 $availableKeys++;
             }
 
@@ -364,7 +416,7 @@ class GeminiKeyManager
     /**
      * Add a new API key to .env file.
      *
-     * @param string $apiKey The new API key value
+     * @param  string  $apiKey  The new API key value
      * @return string The name assigned to the key (e.g., GEMINI_TTS_API_KEY_3)
      */
     /**
@@ -409,7 +461,7 @@ class GeminiKeyManager
     {
         $envPath = base_path('.env');
         $existingKeys = $this->getAllKeys();
-        
+
         // Find the next available index
         $maxIndex = 1;
         foreach ($existingKeys as $keyInfo) {
@@ -433,21 +485,20 @@ class GeminiKeyManager
     /**
      * Remove an API key from .env file.
      *
-     * @param string $keyName The env variable name to remove
-     * @return bool
+     * @param  string  $keyName  The env variable name to remove
      */
     public function removeKey(string $keyName): bool
     {
         $envPath = base_path('.env');
         $envContent = File::get($envPath);
 
-        $pattern = '/^' . preg_quote($keyName, '/') . '=.*/m';
+        $pattern = '/^'.preg_quote($keyName, '/').'=.*/m';
         $newContent = preg_replace($pattern, '', $envContent);
-        
+
         // Clean up double line breaks
         $newContent = preg_replace('/\n{3,}/', "\n\n", $newContent);
-        
-        EnvFile::write($envPath, trim($newContent) . "\n");
+
+        EnvFile::write($envPath, trim($newContent)."\n");
 
         // Clear cached stats for this key
         $this->clearKeyCache($keyName);
@@ -489,7 +540,8 @@ class GeminiKeyManager
     private function getRpdUsage(string $keyName): int
     {
         $today = now()->format('Y-m-d');
-        return (int) Cache::get($this->cacheKey('rpd_' . $today, $keyName), 0);
+
+        return (int) Cache::get($this->cacheKey('rpd_'.$today, $keyName), 0);
     }
 
     /**
@@ -514,7 +566,7 @@ class GeminiKeyManager
     private function incrementRpd(string $keyName): void
     {
         $today = now()->format('Y-m-d');
-        $cacheKey = $this->cacheKey('rpd_' . $today, $keyName);
+        $cacheKey = $this->cacheKey('rpd_'.$today, $keyName);
         $current = (int) Cache::get($cacheKey, 0);
         Cache::put($cacheKey, $current + 1, self::CACHE_TTL_DAY);
     }
@@ -524,12 +576,12 @@ class GeminiKeyManager
         $today = now()->format('Y-m-d');
         Cache::forget($this->cacheKey('rpm', $keyName));
         Cache::forget($this->cacheKey('tpm', $keyName));
-        Cache::forget($this->cacheKey('rpd_' . $today, $keyName));
+        Cache::forget($this->cacheKey('rpd_'.$today, $keyName));
     }
 
     private function cacheKey(string $type, string $keyName): string
     {
-        return self::CACHE_PREFIX . "_{$type}_{$keyName}";
+        return self::CACHE_PREFIX."_{$type}_{$keyName}";
     }
 
     private function maskKey(string $key): string
@@ -538,6 +590,7 @@ class GeminiKeyManager
         if ($length <= 8) {
             return str_repeat('•', $length);
         }
-        return substr($key, 0, 6) . '...' . substr($key, -4);
+
+        return substr($key, 0, 6).'...'.substr($key, -4);
     }
 }

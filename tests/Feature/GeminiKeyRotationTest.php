@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\DesignedVoice;
+use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Support\GeminiTtsModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -50,6 +53,61 @@ class GeminiKeyRotationTest extends TestCase
 
         $this->travelTo(now('America/Los_Angeles')->addDay()->startOfDay()->addMinute());
         $this->assertFalse($manager->isOutForToday('GEMINI_TTS_API_KEY', $model), 'back after Google resets the day');
+    }
+
+    public function test_other_voices_leave_the_key_that_holds_designed_voices_alone_while_another_has_room(): void
+    {
+        $manager = $this->threeKeys();
+        $model = GeminiTtsModel::LATEST;
+        // On live the first key held the designed voices and was first in line for every other voice.
+        $this->designedVoiceOn('GEMINI_TTS_API_KEY', 'voice_a');
+        $this->designedVoiceOn('GEMINI_TTS_API_KEY', 'voice_b');
+        $this->designedVoiceOn('GEMINI_TTS_API_KEY_3', 'voice_c');
+        // A take nobody kept reserves nothing.
+        $this->designedVoiceOn('GEMINI_TTS_API_KEY_2', 'voice_draft', DesignedVoice::DRAFT);
+
+        $this->assertSame(['GEMINI_TTS_API_KEY' => 2, 'GEMINI_TTS_API_KEY_3' => 1], $manager->designedVoiceCounts());
+        $this->assertSame('GEMINI_TTS_API_KEY_2', $manager->getAvailableKey($model)['name'], 'the key with no designed voices first');
+        $this->assertSame(['GEMINI_TTS_API_KEY_2', 'GEMINI_TTS_API_KEY_3', 'GEMINI_TTS_API_KEY'], array_column($manager->keysWithRoom($model), 'name'), 'then the fewest');
+        $this->assertSame(['GEMINI_TTS_API_KEY_2', 'GEMINI_TTS_API_KEY_3', 'GEMINI_TTS_API_KEY'], array_column($manager->keysInOrder($model), 'name'));
+
+        // The others run out: the key that holds designed voices is still used, before a key that is out.
+        $manager->markOutForToday('GEMINI_TTS_API_KEY_2', $model);
+        $this->assertSame(['GEMINI_TTS_API_KEY_3', 'GEMINI_TTS_API_KEY', 'GEMINI_TTS_API_KEY_2'], array_column($manager->keysInOrder($model), 'name'));
+        $manager->markOutForToday('GEMINI_TTS_API_KEY_3', $model);
+        $this->assertSame('GEMINI_TTS_API_KEY', $manager->getAvailableKey($model)['name'], 'members still get audio when it is the only key left');
+
+        // A voice kept or deleted is counted again at once.
+        DesignedVoice::query()->where('key_name', 'GEMINI_TTS_API_KEY')->delete();
+        GeminiKeyManager::forgetDesignedVoiceCounts();
+        $this->assertSame(['GEMINI_TTS_API_KEY_3' => 1], $manager->designedVoiceCounts());
+    }
+
+    public function test_a_stock_voice_is_spoken_on_a_key_that_holds_no_designed_voices(): void
+    {
+        Storage::fake('public');
+        config(['services.gemini_tts.api_key' => '', 'services.gemini_tts.voice_retry_pause' => false, 'services.gemini_tts.dialect_rewrite' => false]);
+        $this->threeKeys();
+        $this->designedVoiceOn('GEMINI_TTS_API_KEY', 'voice_a');
+        $calls = [];
+        Http::fake(function ($request) use (&$calls) {
+            $calls[] = $request->header('x-goog-api-key')[0] ?? '';
+
+            return Http::response(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'audio/L16;rate=24000', 'data' => base64_encode(str_repeat("\0", 4800))]]]]]]]);
+        });
+
+        app(GeminiTtsProvider::class)->synthesize('مرحبا بكم', 'ar', ['voice_name' => 'Kore']);
+
+        $this->assertSame(['k2'], $calls);
+    }
+
+    private function designedVoiceOn(string $keyName, string $voiceId, string $status = DesignedVoice::SAVED): DesignedVoice
+    {
+        return DesignedVoice::query()->create([
+            'user_id' => User::factory()->create()->id, 'status' => $status, 'batch' => 'b-'.$voiceId, 'name' => 'Captain',
+            'description' => 'A gruff old sea captain.', 'language' => 'en', 'provider_voice_key' => $voiceId,
+            'key_name' => $keyName, 'take' => 1,
+        ]);
     }
 
     public function test_daily_and_per_minute_limits_are_told_apart(): void
@@ -116,7 +174,7 @@ class GeminiKeyRotationTest extends TestCase
     public function test_stock_voice_moves_on_from_a_key_out_for_the_day_and_stays_off_it(): void
     {
         // Midday in California: the five minutes below never cross the provider's midnight reset.
-        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-14 12:00:00', 'America/Los_Angeles'));
+        $this->travelTo(Carbon::parse('2026-10-14 12:00:00', 'America/Los_Angeles'));
         Storage::fake('public');
         config(['services.gemini_tts.api_key' => '', 'services.gemini_tts.voice_retry_pause' => false, 'services.gemini_tts.dialect_rewrite' => false]);
         $this->threeKeys();

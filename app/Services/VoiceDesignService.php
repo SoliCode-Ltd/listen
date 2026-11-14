@@ -8,6 +8,7 @@ use App\Services\Tts\GeminiKeyManager;
 use App\Support\AudioDuration;
 use App\Support\ShareableAudio;
 use App\Support\VoiceDesign;
+use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
@@ -134,7 +135,7 @@ class VoiceDesignService
         $takes = max(1, min(3, $takes));
         $failure = fn (string $error, string $code): array => ['batch' => $batch, 'takes' => [], 'spoken' => 0, 'error' => $error, 'error_code' => $code];
 
-        $keys = $this->keysWithRoom();
+        $keys = $this->designKeys();
         if ($keys === []) {
             return $failure('No Gemini key has room for voice design right now.', 'quota');
         }
@@ -249,6 +250,8 @@ class VoiceDesignService
     public function keep(DesignedVoice $take, string $name): DesignedVoice
     {
         $take->forceFill(['status' => DesignedVoice::SAVED, 'name' => $name, 'kept_at' => now()])->save();
+        // Its key now holds a voice only it can speak: other voices leave it alone from here on.
+        GeminiKeyManager::forgetDesignedVoiceCounts();
 
         DesignedVoice::query()->drafts()->where('user_id', $take->user_id)
             ->where('batch', $take->batch)->whereKeyNot($take->id)->get()
@@ -291,7 +294,7 @@ class VoiceDesignService
             foreach ($this->listDesigned($key) as $voice) {
                 if (! str_starts_with($voice['display_name'], self::DISPLAY_TAG.' · '.self::siteTag().' · ') || isset($known[$voice['id']])
                     || ! preg_match('/ · (\d{12})$/', $voice['display_name'], $made)
-                    || \Carbon\Carbon::createFromFormat('YmdHi', $made[1], 'UTC')->greaterThan(now()->subDay())) {
+                    || Carbon::createFromFormat('YmdHi', $made[1], 'UTC')->greaterThan(now()->subDay())) {
                     continue;
                 }
                 $this->deleteRemote($voice['id'], (string) $key['name']);
@@ -317,6 +320,9 @@ class VoiceDesignService
             Storage::disk('public')->delete((string) $voice->preview_audio_path);
         }
         $keepRow ? $voice->delete() : $voice->forceDelete();
+        if ($voice->status === DesignedVoice::SAVED) {
+            GeminiKeyManager::forgetDesignedVoiceCounts();
+        }
     }
 
     /**
@@ -481,6 +487,25 @@ class VoiceDesignService
             $this->voices->apiKeys(self::MODEL),
             fn (array $key): bool => ! $manager->isOutForToday((string) $key['name'], self::MODEL),
         ));
+    }
+
+    /**
+     * The keys a new design may be made on: those that already hold designed
+     * voices first (most first), then the others. Designed voices are kept
+     * together, on keys every other voice leaves alone while another key has
+     * room (GeminiKeyManager::designedVoiceCounts()); a key whose project is
+     * full, or out for the day, passes the design on to the next.
+     *
+     * @return array<int, array{key: string, name: string}>
+     */
+    private function designKeys(): array
+    {
+        $keys = $this->keysWithRoom();
+        $held = app(GeminiKeyManager::class)->designedVoiceCounts();
+        $order = array_flip(array_column($keys, 'name'));
+        usort($keys, fn (array $a, array $b): int => [-($held[$a['name']] ?? 0), $order[$a['name']]] <=> [-($held[$b['name']] ?? 0), $order[$b['name']]]);
+
+        return $keys;
     }
 
     /** One request in the report: never the audio, only what describes it. */
