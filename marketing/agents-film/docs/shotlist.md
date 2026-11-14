@@ -1,4 +1,4 @@
-# Shot list: Arabic cut, 16:9, about 87 seconds, 90 bpm
+# Shot list: about 85 seconds, 90 bpm
 
 The scenes' lengths follow the recordings (`build_audio.py` prints the beats of each).
 
@@ -19,4 +19,6 @@ The scenes' lengths follow the recordings (`build_audio.py` prints the beats of 
 Every line is spoken, customer and agent, and each word appears at the moment it is said. Silences
 inside a line are kept under half a second.
 
-Not in this cut: the vertical 9:16 version, the English cut.
+The same film is made in four cuts: Arabic and English (marketing/agents-film-en: American,
+British, Australian and Irish English), each wide (16:9) and tall (9:16, the orb's panel above
+and the conversation below, the bottom left clear for the apps' own buttons).
