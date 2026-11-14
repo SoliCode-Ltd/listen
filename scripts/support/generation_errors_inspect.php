@@ -40,6 +40,19 @@ foreach ($db->table('audio_generations')->where('created_at', '>=', now()->subDa
     echo "  {$r->d}: failed {$r->failed} / done {$r->ok} / total {$r->total}\n";
 }
 
+echo "\n== Newest 15 audio generations (member id, status, voice) ==\n";
+foreach ($db->table('audio_generations')->orderByDesc('id')->limit(15)->get() as $g) {
+    $a = (array) $g;
+    $voice = '';
+    foreach ($a as $val) {
+        if (is_string($val) && preg_match('/^(designed|cloned)_\d+$/', $val)) {
+            $voice = $val;
+            break;
+        }
+    }
+    echo "  #{$a['id']} {$a['created_at']} member=", $a['user_id'] ?? '?', " status={$a['status']} ", $voice !== '' ? $voice : 'other voice', "\n";
+}
+
 echo "\n== Speech keys marked out (live cache) and today's key warnings in the logs ==\n";
 $km = app(App\Services\Tts\GeminiKeyManager::class);
 $model = App\Services\VoiceCloningService::MODEL;
