@@ -123,6 +123,20 @@ foreach ($calls as $call) {
     ];
 }
 
+// The admin reads conversations as visits (App\Support\Agents\AgentVisits): how the asked-for
+// one is joined, and that the lists' own queries run on this server's database. The start of
+// the visitor's anonymous id tells one visitor from another, never who they are.
+$chatChannels = ['chat', 'chat_link'];
+$out['visit'] = [
+    'conversations' => \App\Support\Agents\AgentVisits::parts($first)->map(static fn (AgentConversation $c): string => $c->public_id.' '.$c->channel.' '.$c->status)->all(),
+    'visitor' => substr((string) $first->visitor_hash, 0, 16),
+    'all_conversations' => AgentConversation::query()->count(),
+    'rows_in_the_list' => \App\Support\Agents\AgentVisits::firstOnly(AgentConversation::query())->count(),
+    'visits_with_a_chat' => \App\Support\Agents\AgentVisits::withAny(\App\Support\Agents\AgentVisits::firstOnly(AgentConversation::query()), static fn ($q) => $q->whereIn('channel', $chatChannels))->count(),
+    'visits_with_a_call' => \App\Support\Agents\AgentVisits::withAny(\App\Support\Agents\AgentVisits::firstOnly(AgentConversation::query()), static fn ($q) => $q->whereNotIn('channel', $chatChannels))->count(),
+    'earlier_ones_joined_at' => \App\Models\SiteSetting::get('agents_visits_joined'),
+];
+
 echo "CALLER_CALLS_JSON_BEGIN\n";
 echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n";
 echo "CALLER_CALLS_JSON_END\n";
