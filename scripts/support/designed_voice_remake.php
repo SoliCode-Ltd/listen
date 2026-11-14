@@ -1,133 +1,72 @@
 <?php
-// WRITES ON LIVE. Re-makes the designed voices listed below on a free speech key,
-// from each one's own saved prompt, and points the member's voice at the new one.
-// The original stays on its first key (a hidden backup row keeps it known, so the
-// nightly cleanup leaves it alone) and can be put back. Safe to run twice: a voice
-// that has already moved is skipped.
+// WRITES ON LIVE, once. The two voices moved by hand on 14 November are put under the
+// site's own rule (VoiceDesignService stand-ins): each is its original voice on its own
+// key again, the voice made that night becomes its stand-in on the other key, and it keeps
+// speaking through the stand-in until the daily reset, as any voice whose key is out does.
+// The hidden backup rows written that night are removed. Safe to run twice: a voice
+// already put back is skipped.
 require 'vendor/autoload.php';
 $app = require 'bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-$from = 'GEMINI_TTS_API_KEY';
-// Every saved voice of the member who is stuck tonight that still sits on the key that is out.
-$ids = App\Models\DesignedVoice::query()->where('user_id', 7535)->where('status', App\Models\DesignedVoice::SAVED)
-    ->whereNotNull('provider_voice_key')->where('key_name', $from)->pluck('id')->all();
-echo 'Voices to move: ', implode(', ', $ids) ?: 'none', "\n";
-$allowed = ['GEMINI_TTS_API_KEY_2', 'GEMINI_TTS_API_KEY_3'];
+use App\Models\DesignedVoice;
+use App\Services\Tts\GeminiKeyManager;
+use App\Services\VoiceDesignService;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
-$model = App\Services\VoiceCloningService::MODEL;
-$cloning = app(App\Services\VoiceCloningService::class);
-$manager = app(App\Services\Tts\GeminiKeyManager::class);
-$keys = array_values(array_filter(
-    $cloning->apiKeys($model),
-    fn ($k) => in_array($k['name'], $allowed, true) && ! $manager->isOutForToday((string) $k['name'], $model),
-));
 echo 'Now (UTC): ', now()->toDateTimeString(), "\n";
-echo 'Free keys to use, freest first: ', implode(', ', array_column($keys, 'name')) ?: 'none', "\n";
-if ($keys === []) {
+if (! method_exists(VoiceDesignService::class, 'copiesOf')) {
+    echo "The site does not have stand-ins yet (not deployed): nothing done.\n";
     exit(1);
 }
-$endpoint = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
-$failed = 0;
 
-foreach ($ids as $id) {
-    $voice = App\Models\DesignedVoice::query()->find($id);
-    if (! $voice || ! $voice->isSaved()) {
-        echo "designed_{$id}: not a saved voice, skipped\n";
-
-        continue;
-    }
-    if ($voice->key_name !== $from) {
-        echo "designed_{$id}: already on {$voice->key_name}, skipped\n";
-
-        continue;
-    }
-    if (blank($voice->engine_prompt)) {
-        echo "designed_{$id}: no saved prompt, skipped\n";
-        $failed++;
+$members = [];
+$moved = DesignedVoice::query()->saved()->get()->filter(fn (DesignedVoice $v): bool => is_array(data_get($v->metadata, 'remade')));
+if ($moved->isEmpty()) {
+    echo "No voice is waiting to be put back.\n";
+}
+foreach ($moved as $voice) {
+    $remade = (array) data_get($voice->metadata, 'remade');
+    $ownId = (string) ($remade['provider_voice_key'] ?? '');
+    $ownKey = (string) ($remade['key_name'] ?? '');
+    if ($ownId === '' || $ownKey === '') {
+        echo "designed_{$voice->id}: its original is not recorded, left as it is\n";
 
         continue;
     }
+    $standInId = (string) $voice->provider_voice_key;
+    $standInKey = (string) $voice->key_name;
 
-    $made = null;
-    foreach ($keys as $key) {
-        foreach ([true, false] as $full) {
-            $body = [
-                'model' => $model,
-                'type' => 'prompted',
-                'display_name' => App\Services\VoiceDesignService::DISPLAY_TAG.' · '.App\Services\VoiceDesignService::siteTag()
-                    .' · U'.$voice->user_id.' · remake'.$id.' · '.((int) $voice->take ?: 1).' · '.now()->utc()->format('YmdHi'),
-                'prompted' => ['input' => $voice->engine_prompt],
-            ];
-            if ($full) {
-                $body['language_code'] = $voice->languageCode();
-                if (in_array($voice->gender, App\Support\VoiceDesign::GENDERS, true)) {
-                    $body['gender'] = $voice->gender;
-                }
-            }
-            try {
-                $response = Illuminate\Support\Facades\Http::timeout(90)->connectTimeout(20)
-                    ->withOptions($cloning->httpOptions())
-                    ->withHeaders(['Content-Type' => 'application/json', 'x-goog-api-key' => $key['key']])
-                    ->post($endpoint.'/voices', ['store' => true, 'voice' => $body]);
-            } catch (Throwable $e) {
-                echo "designed_{$id}: {$key['name']} did not answer (", mb_substr($e->getMessage(), 0, 160), ")\n";
-
-                break;
-            }
-            $newId = $response->successful() ? $cloning->findVoiceId($response->json() ?? []) : null;
-            if ($newId !== null) {
-                $made = ['id' => $newId, 'key' => (string) $key['name']];
-
-                break 2;
-            }
-            echo "designed_{$id}: {$key['name']} answered HTTP {$response->status()}: ",
-                mb_substr(preg_replace('/\s+/u', ' ', (string) $response->body()), 0, 300), "\n";
-            if (! ($response->status() === 400 && preg_match('/language|gender|INVALID_ARGUMENT/i', (string) $response->body()))) {
-                break;
-            }
+    DB::transaction(function () use ($voice, $ownId, $ownKey, $standInId, $standInKey): void {
+        // The backup row holds the original's id: it goes first, so the id is held by one row only.
+        $backups = DesignedVoice::onlyTrashed()->where('user_id', $voice->user_id)->where('provider_voice_key', $ownId)->get()
+            ->filter(fn (DesignedVoice $row): bool => (int) data_get($row->metadata, 'backup_of') === (int) $voice->id);
+        foreach ($backups as $backup) {
+            // The row only: its audio file is the voice's own preview, which stays.
+            DesignedVoice::withTrashed()->whereKey($backup->id)->forceDelete();
+            echo "designed_{$voice->id}: backup row #{$backup->id} removed\n";
         }
-    }
-    if ($made === null) {
-        echo "designed_{$id}: NOT re-made, left as it was\n";
-        $failed++;
-
-        continue;
-    }
-
-    $old = ['provider_voice_key' => $voice->provider_voice_key, 'key_name' => $voice->key_name];
-    $backup = $voice->replicate();
-    $voice->update([
-        'provider_voice_key' => $made['id'],
-        'key_name' => $made['key'],
-        'metadata' => ((array) $voice->metadata) + ['remade' => $old + ['at' => now()->toIso8601String()]],
-    ]);
-    echo "designed_{$id}: now {$made['id']} on {$made['key']} (was {$old['provider_voice_key']} on {$old['key_name']})\n";
-
-    try {
-        $backup->status = App\Models\DesignedVoice::DRAFT;
-        // Not a voice the member kept: it must not count toward the plan's voices.
-        $backup->kept_at = null;
-        $backup->metadata = ((array) $backup->metadata) + ['backup_of' => $id, 'backup_at' => now()->toIso8601String()];
-        $backup->save();
-        $backup->delete();
-        echo "designed_{$id}: original kept as hidden backup row #{$backup->id}\n";
-    } catch (Throwable $e) {
-        echo "designed_{$id}: backup row NOT written (", mb_substr($e->getMessage(), 0, 200), ")\n";
-    }
-}
-
-// A backup row is not a voice the member kept: it must not count toward the plan's voices.
-App\Models\DesignedVoice::onlyTrashed()->whereNotNull('kept_at')->get()
-    ->filter(fn ($row) => data_get($row->metadata, 'backup_of') !== null)
-    ->each(function ($row): void {
-        $row->forceFill(['kept_at' => null])->saveQuietly();
-        echo "backup row #{$row->id}: no longer counted as a kept voice\n";
+        $metadata = (array) $voice->metadata;
+        unset($metadata['remade']);
+        $metadata['copies'] = [$standInKey => $standInId] + (array) ($metadata['copies'] ?? []);
+        $voice->forceFill(['provider_voice_key' => $ownId, 'key_name' => $ownKey, 'metadata' => $metadata])->saveQuietly();
     });
-foreach (array_unique(App\Models\DesignedVoice::query()->whereIn('id', $ids)->pluck('user_id')->all()) as $userId) {
-    echo "member {$userId}: voices in the library ", App\Support\VoiceDesign::savedFor((int) $userId)->count(),
-        ', kept in total ', App\Support\VoiceDesign::keptInTotal((int) $userId), "\n";
+    Cache::put(VoiceDesignService::standInCacheKey($voice), $standInKey, GeminiKeyManager::nextDailyReset()->utc());
+    $members[(int) $voice->user_id] = true;
+    echo "designed_{$voice->id}: its own voice is {$ownId} on {$ownKey} again; stand-in {$standInId} on {$standInKey}, in use until ",
+        GeminiKeyManager::nextDailyReset()->utc()->toDateTimeString(), " UTC\n";
+}
+GeminiKeyManager::forgetDesignedVoiceCounts();
+
+foreach (array_keys($members) as $userId) {
+    echo "member {$userId}: voices in the library ", App\Support\VoiceDesign::savedFor($userId)->count(),
+        ', kept in total ', App\Support\VoiceDesign::keptInTotal($userId), "\n";
 }
 
-App\Services\Tts\GeminiKeyManager::forgetDesignedVoiceCounts();
-exit($failed > 0 ? 1 : 0);
+echo "\n== Saved designed voices by the key that holds them ==\n";
+foreach (DesignedVoice::query()->saved()->selectRaw('key_name, count(*) as held')->groupBy('key_name')->orderBy('key_name')->get() as $row) {
+    echo "  {$row->key_name}: {$row->held}\n";
+}
+echo 'Voices with a stand-in: ', DesignedVoice::query()->saved()->get()->filter(fn (DesignedVoice $v): bool => VoiceDesignService::copiesOf($v) !== [])->count(), "\n";
+echo 'Hidden backup rows left: ', DesignedVoice::onlyTrashed()->get()->filter(fn (DesignedVoice $v): bool => data_get($v->metadata, 'backup_of') !== null)->count(), "\n";
