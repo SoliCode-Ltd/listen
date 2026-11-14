@@ -5,13 +5,16 @@ namespace App\Services;
 use App\Models\DesignedVoice;
 use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
+use App\Services\Tts\GeminiKeysOutException;
 use App\Support\AudioDuration;
 use App\Support\ShareableAudio;
 use App\Support\VoiceDesign;
 use Carbon\Carbon;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -32,6 +35,12 @@ use Illuminate\Support\Str;
  *    DRAFT_MINUTES (voice-design:prune), since each holds one of the 200
  *    voices a project may store.
  *
+ * 4. A kept voice speaks on its own key. While that key is out for the day
+ *    it speaks through a stand-in: the same saved prompt made into a voice
+ *    on another key, kept in the voice's metadata (copies), never a voice of
+ *    its own in the member's library. The member's voice goes back to its own
+ *    key at the next daily reset.
+ *
  * VoiceCloningService does the speaking and holds the site's keys.
  */
 class VoiceDesignService
@@ -43,6 +52,12 @@ class VoiceDesignService
 
     /** What every take's display name starts with on the engine's side, so a lost one can be found. */
     public const DISPLAY_TAG = 'Listen design';
+
+    /** After a stand-in could not be made for a voice, how long before another is tried. */
+    private const STAND_IN_RETRY_SECONDS = 300;
+
+    /** How long one request waits for another that is already making the same voice's stand-in. */
+    private const STAND_IN_WAIT_SECONDS = 100;
 
     /**
      * The server that made a voice (its address's host). Staging shares the
@@ -290,6 +305,13 @@ class VoiceDesignService
 
         $strays = 0;
         $known = DesignedVoice::withTrashed()->whereNotNull('provider_voice_key')->pluck('provider_voice_key')->flip();
+        // A kept voice's stand-ins on other keys are its own, not lost takes.
+        DesignedVoice::query()->saved()->whereNotNull('metadata')->get(['id', 'metadata'])
+            ->each(function (DesignedVoice $voice) use ($known): void {
+                foreach (self::copiesOf($voice) as $id) {
+                    $known[$id] = true;
+                }
+            });
         foreach ($this->voices->apiKeys(self::MODEL) as $key) {
             foreach ($this->listDesigned($key) as $voice) {
                 if (! str_starts_with($voice['display_name'], self::DISPLAY_TAG.' · '.self::siteTag().' · ') || isset($known[$voice['id']])
@@ -315,7 +337,11 @@ class VoiceDesignService
         // A voice another server made (live's, in staging's copy of the members) stays on the engine.
         if (self::madeHere($voice)) {
             $this->deleteRemote($voice->provider_voice_key, $voice->key_name);
+            foreach (self::copiesOf($voice) as $keyName => $id) {
+                $this->deleteRemote($id, $keyName);
+            }
         }
+        Cache::forget(self::standInCacheKey($voice));
         if (filled($voice->preview_audio_path)) {
             Storage::disk('public')->delete((string) $voice->preview_audio_path);
         }
@@ -326,18 +352,198 @@ class VoiceDesignService
     }
 
     /**
-     * A member's saved voice speaking a script, always on the key whose
-     * project holds it.
+     * A member's saved voice speaking a script, on the key whose project
+     * holds it. While that key is out for the day the voice speaks through
+     * its stand-in on another key (made the first time it is needed), and it
+     * keeps to the stand-in until the daily reset, so it does not change back
+     * and forth while its own key lets the odd request through.
      *
      * @return array<string, mixed> as VoiceCloningService::synthesizeWithClonedVoice()
+     *
+     * @throws GeminiKeysOutException when its key is out and no stand-in could speak
      */
     public function synthesize(DesignedVoice $voice, string $text, string $style = ''): array
     {
-        $audio = $this->voices->synthesizeOnKey($text, (string) $voice->provider_voice_key, $style, $voice->key_name);
+        $audio = null;
+        $inUse = Cache::get(self::standInCacheKey($voice));
+        $standIn = is_string($inUse) ? (self::copiesOf($voice)[$inUse] ?? null) : null;
+        if ($standIn !== null) {
+            $audio = $this->speakOnStandIn($voice, $inUse, $standIn, $text, $style);
+            if ($audio === null) {
+                // The stand-in's key is out as well, or it is gone: the voice's own key is asked, then another stand-in.
+                Cache::forget(self::standInCacheKey($voice));
+            }
+        }
+
+        if ($audio === null) {
+            try {
+                $audio = $this->voices->synthesizeOnKey($text, (string) $voice->provider_voice_key, $style, $voice->key_name);
+            } catch (GeminiKeysOutException $e) {
+                $audio = $this->speakThroughStandIn($voice, $text, $style) ?? throw $e;
+            }
+        }
         // Speaking keeps the voice alive on the engine's side (it is deleted after a year unused).
         $voice->forceFill(['last_used_at' => now()])->saveQuietly();
 
         return $audio;
+    }
+
+    /**
+     * The voice's stand-ins: the engine's voice id on each other key it was
+     * made again on, by key name.
+     *
+     * @return array<string, string>
+     */
+    public static function copiesOf(DesignedVoice $voice): array
+    {
+        return array_filter((array) data_get($voice->metadata, 'copies', []), fn ($id): bool => is_string($id) && $id !== '');
+    }
+
+    /** Where the stand-in a voice speaks through today is remembered (the key's name), until the daily reset. */
+    public static function standInCacheKey(DesignedVoice $voice): string
+    {
+        return 'designed_voice_stand_in:'.$voice->id;
+    }
+
+    /**
+     * The voice's own key is out: speak through a stand-in on a key with room,
+     * one it already has or a new one made from its saved prompt. Null when
+     * there is none to speak through (no other key has room, the voice has no
+     * saved prompt, or another server made it).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function speakThroughStandIn(DesignedVoice $voice, string $text, string $style): ?array
+    {
+        if (blank($voice->engine_prompt) || ! self::madeHere($voice)) {
+            return null;
+        }
+        // One request makes the stand-in; the others wait for it instead of each making their own.
+        $lock = Cache::lock('designed_voice_stand_in_lock:'.$voice->id, self::STAND_IN_WAIT_SECONDS + 60);
+        try {
+            $lock->block(self::STAND_IN_WAIT_SECONDS);
+        } catch (LockTimeoutException) {
+            return null;
+        }
+
+        try {
+            $voice->refresh();
+            $keys = array_values(array_filter($this->keysWithRoom(), fn (array $key): bool => $key['name'] !== $voice->key_name));
+            $copies = self::copiesOf($voice);
+            foreach ($keys as $key) {
+                $id = $copies[$key['name']] ?? null;
+                if ($id !== null && ($audio = $this->speakOnStandIn($voice, (string) $key['name'], $id, $text, $style)) !== null) {
+                    return $audio;
+                }
+            }
+
+            if (! Cache::add('designed_voice_stand_in_tried:'.$voice->id, 1, self::STAND_IN_RETRY_SECONDS)) {
+                return null;
+            }
+            // Without the ones just found gone on the engine.
+            $copies = self::copiesOf($voice);
+            foreach ($keys as $key) {
+                if (isset($copies[$key['name']])) {
+                    continue;
+                }
+                $id = $this->createStandIn($key, $voice);
+                if ($id === null) {
+                    continue;
+                }
+                $copies[$key['name']] = $id;
+                $voice->forceFill(['metadata' => ['copies' => $copies] + (array) $voice->metadata])->saveQuietly();
+                Log::info('Voice design: a stand-in was made for a voice whose key is out for the day.', [
+                    'designed_voice_id' => $voice->id, 'own_key' => $voice->key_name, 'stand_in_key' => $key['name'],
+                ]);
+                Cache::forget('designed_voice_stand_in_tried:'.$voice->id);
+                if (($audio = $this->speakOnStandIn($voice, (string) $key['name'], $id, $text, $style)) !== null) {
+                    return $audio;
+                }
+            }
+
+            return null;
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Speaks through one stand-in, and remembers it as the one in use until
+     * the daily reset. Null when its key is out for the day, or the engine no
+     * longer has it (it is then forgotten, so another is made); any other
+     * failure is the script's own and is thrown as it is on the voice's key.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function speakOnStandIn(DesignedVoice $voice, string $keyName, string $id, string $text, string $style): ?array
+    {
+        try {
+            $audio = $this->voices->synthesizeOnKey($text, $id, $style, $keyName);
+        } catch (GeminiKeysOutException) {
+            return null;
+        } catch (\RuntimeException $e) {
+            if (! preg_match('/\b404\b|not found|NOT_FOUND/i', $e->getMessage())) {
+                throw $e;
+            }
+            $copies = self::copiesOf($voice);
+            unset($copies[$keyName]);
+            $voice->forceFill(['metadata' => ['copies' => $copies] + (array) $voice->metadata])->saveQuietly();
+            Log::warning('Voice design: a stand-in is no longer on the engine; it is forgotten.', ['designed_voice_id' => $voice->id, 'key' => $keyName]);
+
+            return null;
+        }
+        Cache::put(self::standInCacheKey($voice), $keyName, GeminiKeyManager::nextDailyReset()->utc());
+
+        return $audio;
+    }
+
+    /**
+     * The voice made again on another key, from the prompt it was first made
+     * with: the engine's id, or null when that key could not make it.
+     *
+     * @param  array{key:string, name:string}  $key
+     */
+    private function createStandIn(array $key, DesignedVoice $voice): ?string
+    {
+        foreach ([true, false] as $full) {
+            $body = [
+                'model' => self::MODEL,
+                'type' => 'prompted',
+                // Tagged like a take, so voice-design:prune can tell whose it is.
+                'display_name' => self::DISPLAY_TAG.' · '.self::siteTag().' · U'.$voice->user_id.' · copy'.$voice->id
+                    .' · '.max(1, (int) $voice->take).' · '.now()->utc()->format('YmdHi'),
+                'prompted' => ['input' => (string) $voice->engine_prompt],
+            ];
+            if ($full) {
+                $body['language_code'] = $voice->languageCode();
+                if (in_array($voice->gender, VoiceDesign::GENDERS, true)) {
+                    $body['gender'] = $voice->gender;
+                }
+            }
+            try {
+                $response = Http::timeout(90)->connectTimeout(20)->withOptions($this->voices->httpOptions())
+                    ->withHeaders(['Content-Type' => 'application/json', 'x-goog-api-key' => $key['key']])
+                    ->post($this->url('/voices'), ['store' => true, 'voice' => $body]);
+            } catch (ConnectionException $e) {
+                Log::warning('Voice design: a stand-in could not be made.', ['designed_voice_id' => $voice->id, 'key' => $key['name'], 'error' => $e->getMessage()]);
+
+                return null;
+            }
+            $this->noteKeyState($key, $response);
+            $id = $response->successful() ? $this->voices->findVoiceId($response->json() ?? []) : null;
+            if ($id !== null) {
+                return $id;
+            }
+            if (! ($response->status() === 400 && preg_match('/language|gender|INVALID_ARGUMENT/i', (string) $response->body()))) {
+                Log::warning('Voice design: a stand-in could not be made.', [
+                    'designed_voice_id' => $voice->id, 'key' => $key['name'], 'code' => $this->classify($response), 'status' => $response->status(),
+                ]);
+
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /**

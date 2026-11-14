@@ -173,6 +173,7 @@ class McpServerTest extends TestCase
 
     public function test_a_link_opens_only_its_own_recording_and_only_while_the_plan_keeps_audio(): void
     {
+        $start = now();
         $user = $this->member();
         $plain = $this->issueKey($user)['plain'];
         $mine = $this->storedGeneration($user);
@@ -198,8 +199,9 @@ class McpServerTest extends TestCase
         $this->travel(2)->days();
         $this->get($link)->assertForbidden();
 
-        // A plan that keeps audio always: the link has no end date.
-        $this->travelBack();
+        // A plan that keeps audio always: the link has no end date. Back to the day the test
+        // began, not to today's real date, which is after the month this member paid for.
+        $this->travelTo($start);
         $this->plan->update(['recent_voices_days' => 0]);
         $speech = $this->callTool($plain, 'list_speech_history')->assertJsonPath('result.isError', false)->json('result.structuredContent.history.0');
         $this->assertSame((int) $mine->id, $speech['history_item_id']);

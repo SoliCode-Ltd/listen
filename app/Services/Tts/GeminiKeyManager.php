@@ -4,6 +4,7 @@ namespace App\Services\Tts;
 
 use App\Models\DesignedVoice;
 use App\Support\EnvFile;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -279,6 +280,12 @@ class GeminiKeyManager
         }
     }
 
+    /** When Google's day turns and a key out for the day has its requests again: midnight Pacific time. */
+    public static function nextDailyReset(): CarbonInterface
+    {
+        return now('America/Los_Angeles')->addDay()->startOfDay();
+    }
+
     /**
      * Google cut this key off for the day on this model (a "per day" 429).
      * It stays skipped until Google's daily reset, midnight Pacific time,
@@ -286,7 +293,7 @@ class GeminiKeyManager
      */
     public function markOutForToday(string $keyName, string $model): void
     {
-        $reset = now('America/Los_Angeles')->addDay()->startOfDay();
+        $reset = self::nextDailyReset();
         Cache::put($this->outKey($keyName, $model), true, $reset->utc());
 
         Log::warning('Gemini key reached its daily limit for this model; using the other keys until it resets.', [
