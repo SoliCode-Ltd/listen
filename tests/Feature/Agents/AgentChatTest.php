@@ -354,7 +354,7 @@ class AgentChatTest extends TestCase
         $call = (string) file_get_contents(public_path('js/agent-call.js'));
 
         // The chat shows only where the settings say it works; old settings keep calls only.
-        $this->assertStringContainsString("chatOn = !preview && !!(cfg.channels && cfg.channels.chat) && !!cfg.chat;", $widget);
+        $this->assertStringContainsString("chatOn = !!(cfg.channels && cfg.channels.chat) && !!cfg.chat;", $widget);
         $this->assertStringContainsString("callOn = !cfg.channels || cfg.channels.call !== false;", $widget);
         // A message keeps its id when it is sent again, by itself once and by "Send again".
         $this->assertStringContainsString("askChat(chat.api + '/messages', { chat_key: chat.key, id: msg.id, text: msg.text, call: lastCall || undefined })", $widget);

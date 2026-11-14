@@ -1201,6 +1201,8 @@
         ways.forEach(function (w) { w.disabled = true; });
         api('PATCH', C.agent.urls.update, { channels: { chat: !!want.chat, calls: !!want.calls } }).then(function () {
           toast(T.saved);
+          // The Design tab's preview is the same card: it follows the switch.
+          if (C.design && C.design.follow) C.design.follow({ channels: { chat: !!want.chat, call: !!want.calls } });
         }).catch(function (err) { back(err.message); }).then(function () {
           ways.forEach(function (w) { w.disabled = false; });
         });
@@ -1225,6 +1227,8 @@
       }).then(function (res) {
         if (res && res.agent && res.agent.name) showName(res.agent.name);
         toast(T.saved);
+        // The preview's chat opens on the greeting just saved.
+        if (C.design && C.design.follow) C.design.follow({ greeting: $('[name="first_message"]', sf).value.trim() });
       }).catch(function (err) { toast(err.message); });
     });
     elsewhere();
@@ -1657,6 +1661,21 @@
       if (look.ready_text) c.text.states = Object.assign({}, c.text.states, { idle: look.ready_text });
       return c;
     }
+    // What depends on how customers reach the agent (Setup: Chat and calls): with the chat on the
+    // card opens on it, so the line before a call has no place, the line under the name says
+    // "Available now" unless the owner wrote one, and with calls off there is no call to show.
+    function ways() {
+      var ch = D.cfg.channels || {}, chatOn = !!ch.chat && !!D.cfg.chat, sub = $('[name="subtitle"]', box);
+      box.setAttribute('data-chat', chatOn ? '1' : '0');
+      if (sub) sub.placeholder = sub.getAttribute(chatOn ? 'data-chat-placeholder' : 'data-call-placeholder') || sub.placeholder;
+      play.hidden = ch.call === false;
+    }
+    D.follow = function (change) {
+      if (change.channels) D.cfg.channels = change.channels;
+      if (change.greeting !== undefined && D.cfg.chat) D.cfg.chat.greeting = change.greeting || D.greeting || '';
+      ways();
+      draw(true);
+    };
     function draw(rebuild) {
       var dark = val('site') === 'dark';
       site.classList.toggle('is-dark', dark);
@@ -1769,6 +1788,7 @@
       if (playing) stopLater();
     });
     read();
+    ways();
     draw(true);
   }
 
