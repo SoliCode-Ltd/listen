@@ -39,3 +39,27 @@ foreach ($db->table('audio_generations')->where('created_at', '>=', now()->subDa
     ->groupBy('d')->orderBy('d')->get() as $r) {
     echo "  {$r->d}: failed {$r->failed} / done {$r->ok} / total {$r->total}\n";
 }
+
+echo "\n== Speech keys marked out (live cache) and today's key warnings in the logs ==\n";
+$km = app(App\Services\Tts\GeminiKeyManager::class);
+$model = App\Services\VoiceCloningService::MODEL;
+try {
+    $ref = new ReflectionClass($km);
+    $keys = $km->getAllKeys();
+    foreach ($keys as $k) {
+        $name = is_array($k) ? ($k['name'] ?? '?') : (string) $k;
+        echo "  key {$name}: out for today on {$model}=", $km->isOutForToday($name, (string) $model) ? 'YES' : 'no', "\n";
+    }
+} catch (Throwable $e) { echo '  (keys not listed: ', $e->getMessage(), ")\n"; }
+$logs = glob(storage_path('logs/*.log')) ?: [];
+usort($logs, fn ($a, $b) => filemtime($b) <=> filemtime($a));
+$n = 0;
+foreach (array_slice($logs, 0, 2) as $f) {
+    foreach (file($f) ?: [] as $line) {
+        if (str_starts_with($line, '['.now()->toDateString()) && preg_match('/daily limit for this model|spending cap|designed voice|Designed voice/i', $line)) {
+            echo '  ', mb_substr(trim(preg_replace('/"text":"[^"]*"/', '"text":"…"', $line)), 0, 400), "\n";
+            if (++$n >= 25) break 2;
+        }
+    }
+}
+if ($n === 0) echo "  none today\n";
