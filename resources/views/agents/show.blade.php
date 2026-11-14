@@ -552,9 +552,15 @@
           'palettes' => \App\Models\AgentWidget::PALETTES,
           'defaults' => \App\Models\AgentWidget::DEFAULT_APPEARANCE,
           'rtl' => $l === 'ar',
+          // The chat's greeting when the agent has none of its own (Setup can clear it).
+          'greeting' => trans('agents.chat.greeting', ['name' => $agent->name], $l),
           'cfg' => [
             'name' => $agent->name, 'business' => $agent->business_name, 'language' => $agent->language, 'dir' => $l === 'ar' ? 'rtl' : 'ltr',
             'avatar' => $voice['avatar'] ?? null,
+            // The card as visitors get it: the chat it opens on, the call beside the name
+            // (the owner's own choice in Setup, as agent-api gives it to their website).
+            'channels' => ['chat' => \App\Support\Agents\AgentChannels::chat($agent), 'call' => \App\Support\Agents\AgentChannels::calls($agent)],
+            'chat' => ['greeting' => trim((string) $agent->first_message) ?: trans('agents.chat.greeting', ['name' => $agent->name], $l)] + (array) trans('agents.chat.card', [], $l),
             'text' => [
               'label' => trans('agents.widget_label', [], $l), 'title' => $agent->business_name,
               'subtitle' => trans($female ? 'agents.widget_subtitle_female' : 'agents.widget_subtitle', [], $l),

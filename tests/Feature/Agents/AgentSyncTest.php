@@ -177,8 +177,11 @@ class AgentSyncTest extends TestCase
         // while it is open, and after the server refused a call or a message.
         $this->assertStringContainsString("'/agent-api/widgets/' + encodeURIComponent(ctx.key) + '?again=1'", $widget);
         $this->assertStringContainsString("'/agent-api/links/' + encodeURIComponent(ctx.slug)", $widget);
-        $this->assertStringContainsString('if (v) refreshCard(false);', $widget);
-        $this->assertStringContainsString("document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshCard(false); });", $widget);
+        // (Opening it and coming back to the page ask at once: the owner has just changed something elsewhere.)
+        $this->assertStringContainsString('if (v) refreshCard(false, 4000);', $widget);
+        $this->assertStringContainsString("document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshCard(false, 2000); });", $widget);
+        $this->assertStringContainsString("window.addEventListener('focus', function () { refreshCard(false, 2000); });", $widget);
+        $this->assertStringContainsString('if (!force && Date.now() - cardAt < (within || 20000)) return;', $widget);
         $this->assertStringContainsString('setInterval(function () { if (open || inline) refreshCard(false); }, 30000);', $widget);
         $this->assertStringContainsString("if ((s === 'error' || s === 'ended') && before !== s) setTimeout(function () { refreshCard(true); }", $widget);
         // Never under a call or a message on its way, and only when something changed.

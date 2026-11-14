@@ -517,10 +517,11 @@
       if (inline && look.style === 'bar') { var asCard = {}; for (var lk in look) asCard[lk] = look[lk]; asCard.style = 'orb'; look = asCard; }
       // How customers reach the agent. Settings from before the chat came have no channels: calls, as before.
       chatText = cfg.chat || {};
-      chatOn = !preview && !!(cfg.channels && cfg.channels.chat) && !!cfg.chat;
+      // (The Design tab's preview draws the same card, so the owner styles what visitors get.)
+      chatOn = !!(cfg.channels && cfg.channels.chat) && !!cfg.chat;
       callOn = !cfg.channels || cfg.channels.call !== false;
-      // With a chat every style is the card (the slim bar has nowhere to write), and what is said shows in it.
-      if (chatOn) { var asChat = {}; for (var ck in look) asChat[ck] = look[ck]; if (asChat.style === 'bar') asChat.style = 'orb'; asChat.captions = true; look = asChat; }
+      // With a chat every style is the card (the slim bar has nowhere to write).
+      if (chatOn && look.style === 'bar') { var asChat = {}; for (var ck in look) asChat[ck] = look[ck]; asChat.style = 'orb'; look = asChat; }
       var colors = cfg.colors || ['#2A1A8F', '#7659FA', '#C9BEFF', '#F4F1FF'];
       var pageRtl = opts.rtl != null ? !!opts.rtl : (getComputedStyle(document.documentElement).direction === 'rtl' || document.documentElement.dir === 'rtl');
       var side = (look.position === 'start') !== pageRtl ? 'left' : 'right';
@@ -591,12 +592,15 @@
         cpanel.setAttribute('aria-label', text.title || cfg.business || '');
         var chead = el('div', 'lva-head');
         var cwho = el('div', 'lva-who');
-        var ctitle = el('strong', '', text.title || cfg.business || cfg.name);
-        ctitle.dir = 'auto';
+        // The name and the line under it sit on the card's side; each is read in its own
+        // direction (an English name on an Arabic card, and the other way round).
+        var ctitle = el('strong');
+        ctitle.appendChild(el('bdi', '', text.title || cfg.business || cfg.name));
         cwho.appendChild(ctitle);
         var conline = el('small');
         conline.appendChild(el('i'));
-        conline.appendChild(el('span', '', chatText.online || text.subtitle || ''));
+        // The owner's own line under the name (Design: "Line under the title"), else "Available now".
+        conline.appendChild(el('bdi', '', look.subtitle || chatText.online || text.subtitle || ''));
         cwho.appendChild(conline);
         var cphoto = look.photo !== false && cfg.avatar && (/^https:\/\//.test(cfg.avatar) || (ctx.origin && cfg.avatar.indexOf(ctx.origin + '/') === 0)) ? cfg.avatar : null;
         if (cphoto) { var cface = el('span', 'lva-face'); var cimg = el('img'); cimg.alt = ''; cimg.src = cphoto; cface.appendChild(cimg); chead.appendChild(cface); }
@@ -661,6 +665,8 @@
         parts.input.placeholder = chatText.placeholder || '';
         parts.input.setAttribute('aria-label', chatText.placeholder || '');
         parts.input.setAttribute('enterkeyhint', 'send');
+        // The Design tab's preview shows the box; nothing is written or sent from it.
+        if (preview) { parts.input.readOnly = true; parts.input.tabIndex = -1; }
         parts.send = el('button', 'lva-send');
         parts.send.type = 'submit';
         parts.send.disabled = true;
@@ -691,10 +697,12 @@
         panel.setAttribute('aria-label', text.title || cfg.business || '');
         var head = el('div', 'lva-head');
         var who = el('div', 'lva-who');
-        var title = el('strong', '', text.title || cfg.business || cfg.name);
-        title.dir = 'auto';
+        var title = el('strong');
+        title.appendChild(el('bdi', '', text.title || cfg.business || cfg.name));
         who.appendChild(title);
-        who.appendChild(el('small', '', text.subtitle || ''));
+        var under = el('small');
+        under.appendChild(el('bdi', '', text.subtitle || ''));
+        who.appendChild(under);
         var pill = el('span', 'lva-pill');
         pill.appendChild(el('i'));
         parts.pillTime = el('span', '', '00:00');
@@ -858,9 +866,9 @@
       open = v;
       box.classList.toggle('is-open', v);
       parts.launch.setAttribute('aria-expanded', v ? 'true' : 'false');
-      if (v) refreshCard(false);
+      if (v) refreshCard(false, 4000);
       // The chat card: straight to writing where there is a keyboard (on a phone that would open it over the card).
-      if (v && chatOn) { setTimeout(function () { if (window.matchMedia && matchMedia('(pointer:fine)').matches && parts.input) parts.input.focus(); follow(true); }, 80); }
+      if (v && chatOn) { setTimeout(function () { if (!preview && window.matchMedia && matchMedia('(pointer:fine)').matches && parts.input) parts.input.focus(); follow(true); }, 80); }
       else if (v) setTimeout(function () { parts.call && parts.call.focus(); }, 60); else if (!preview) parts.launch.focus();
       timer();
     }
@@ -1142,11 +1150,14 @@
         else box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
       }
     }
+    // "Show what is said during the call" switched off (Design): a call's words are not written.
+    // In the chat card that is about the call only: what is written in the chat always shows.
+    function unwritten() { return look.captions === false && (!chatOn || live() || stateNow === 'waiting'); }
     // Three dots in the agent's bubble while it speaks; its words take their place.
     function showTyping() {
       clearTimeout(typingOff);
       // Not under words already coming (a short pause in the voice), only before a line starts.
-      if (typing || liveView || !parts.lines || look.captions === false || parts.lines.hidden) return;
+      if (typing || liveView || !parts.lines || unwritten() || parts.lines.hidden) return;
       smoothly(function () {
         typing = el('div', 'lva-line is-agent is-typing');
         typing.setAttribute('aria-hidden', 'true');
@@ -1171,7 +1182,7 @@
       if (to.length > from.length) node.appendChild(el('span', 'lva-w', to.slice(from.length)));
     }
     function words(w) {
-      if (!parts.lines || look.captions === false) return;
+      if (!parts.lines || unwritten()) return;
       if (w.gone) {
         if (liveView && liveView.n === w.n) {
           var old = liveView.el;
@@ -1203,7 +1214,7 @@
     // that is coming now (its words came late: before) goes above that answer.
     var hearing = null;
     function hear(on, before) {
-      if (!parts.lines || look.captions === false) return;
+      if (!parts.lines || unwritten()) return;
       if (!on) {
         var old = hearing;
         hearing = null;
@@ -1223,7 +1234,7 @@
     }
     // Their words as they say them (onHearWords): the dots give way to them, a word at a time.
     function hearWords(text) {
-      if (!parts.lines || look.captions === false || parts.lines.hidden) return;
+      if (!parts.lines || unwritten() || parts.lines.hidden) return;
       if (!hearing) hear(true);
       smoothly(function () {
         var n = hearing;
@@ -1240,7 +1251,7 @@
       hearing = null;
     }
     function line(t) {
-      if (!parts.lines || look.captions === false) return;
+      if (!parts.lines || unwritten()) return;
       smoothly(function () {
         var n;
         if (t.role === 'caller' && !t.view && hearing) { t.view = hearing; hearing = null; }
@@ -1355,7 +1366,7 @@
     var CHAT_STORE = 'listen_chat_' + (ctx.key || ctx.slug || '');
     function chatRef() { return chat ? { conversation: chat.id, chat_key: chat.key } : undefined; }
     function saveChat() {
-      if (!chatOn) return;
+      if (!chatOn || preview) return;
       try { window.sessionStorage.setItem(CHAT_STORE, JSON.stringify({ chat: chat, call: lastCall, log: log.slice(-60), at: Date.now() })); } catch (e) {}
     }
     function loadChat() {
@@ -1402,11 +1413,11 @@
       if (!parts.lines || !words) return;
       var n = chatBubble(isError ? 'error' : 'note', words);
       smoothly(function () { parts.lines.appendChild(n); });
-      if (!isError) { if (!log.length && chatText.greeting) log.push({ k: 'agent', t: chatText.greeting }); log.push({ k: 'note', t: words }); saveChat(); }
+      if (!isError && !preview) { if (!log.length && chatText.greeting) log.push({ k: 'agent', t: chatText.greeting }); log.push({ k: 'note', t: words }); saveChat(); }
     }
     // The card as it opens: the conversation of this visit, or the agent's greeting.
     function showChat() {
-      if (!log.length && !chat) loadChat();
+      if (!log.length && !chat && !preview) loadChat();
       if (!parts.lines) return;
       parts.lines.innerHTML = '';
       parts.lines.__pinned = true;
@@ -1465,6 +1476,7 @@
     }
     function sendChat(again) {
       if (sending || !parts.input) return;
+      if (preview) return;
       // On a call the conversation is spoken: nothing is written (or sent again) until it ends.
       if (live() || starting || stateNow === 'waiting' || stateNow === 'connecting') return;
       var msg = again || { id: 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), text: parts.input.value.replace(/^\s+|\s+$/g, '') };
@@ -1647,7 +1659,11 @@
       typing = null;
       liveView = null;
       clearTimeout(typingOff);
-      if (parts.lines) parts.lines.innerHTML = '';
+      // The chat card keeps its greeting and the pretend call goes on under it, as a real one
+      // does (so its first line, the same greeting, is not said twice).
+      callNoted = false;
+      if (chatOn) { showChat(); if (sample.length && sample[0].role === 'agent') sample = sample.slice(1); }
+      else if (parts.lines) parts.lines.innerHTML = '';
       setState('connecting');
       var loop = function () {
         if (!alive) return;
@@ -1677,6 +1693,8 @@
           alive = false; timers.forEach(clearTimeout); cancelAnimationFrame(raf); demo = null;
           setState('ended');
           setTimeout(function () { if (!demo) setState('idle'); }, 1200);
+          // The chat card goes back to how it opens.
+          if (chatOn) setTimeout(function () { if (!demo) showChat(); }, 2600);
         },
       };
       at(t + 2500, function () { if (demo) demo.stop(); });
@@ -1694,9 +1712,9 @@
     var cardAt = Date.now(), cardAsking = false;
     function cardMark(c) { var o = {}; for (var k in (c || {})) if (k !== 'assets') o[k] = c[k]; try { return JSON.stringify(o); } catch (e) { return ''; } }
     function cardBusy() { return live() || starting || sending || stateNow === 'waiting' || stateNow === 'busy' || !!demo; }
-    function refreshCard(force) {
+    function refreshCard(force, within) {
       if (preview || cardAsking || !ctx.origin || (!ctx.key && !ctx.slug) || !window.fetch) return;
-      if (!force && Date.now() - cardAt < 20000) return;
+      if (!force && Date.now() - cardAt < (within || 20000)) return;
       if (cardBusy() || document.visibilityState === 'hidden') return;
       cardAsking = true;
       cardAt = Date.now();
@@ -1712,14 +1730,26 @@
         host.style.display = none ? 'none' : '';
         if (none || !next.text || cardMark(next) === cardMark(cfg)) return;
         var typed = parts.input ? parts.input.value : '', had = !!(parts.input && root.activeElement === parts.input);
+        // What is on the card stays on it: a call's spoken lines are kept nowhere else, so when
+        // the card drawn again (still the same kind of card) would show fewer lines than were
+        // there, the lines that were there go back in. Otherwise it is drawn new (a new greeting).
+        var wasChat = chatOn, shown = parts.lines ? Array.prototype.slice.call(parts.lines.childNodes) : [], linked = !!(parts.lines && parts.lines.classList.contains('has-links'));
         render(next);
+        if (parts.lines && wasChat === chatOn && shown.length > parts.lines.childNodes.length) {
+          parts.lines.innerHTML = '';
+          shown.forEach(function (n) { parts.lines.appendChild(n); });
+          parts.lines.classList.toggle('has-links', linked);
+          follow(true);
+        }
         if (parts.input && typed) { parts.input.value = typed; roomToWrite(); }
         if (had && parts.input) parts.input.focus();
       }, function () { cardAsking = false; });
     }
     if (!preview) {
-      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshCard(false); });
-      window.addEventListener('focus', function () { refreshCard(false); });
+      // Coming back to the page (its owner has just changed something in another tab or in the
+      // app) and opening the card ask at once; only the quiet check while it stays open is spaced out.
+      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshCard(false, 2000); });
+      window.addEventListener('focus', function () { refreshCard(false, 2000); });
       window.addEventListener('pageshow', function (e) { if (e.persisted) refreshCard(true); });
       setInterval(function () { if (open || inline) refreshCard(false); }, 30000);
     }

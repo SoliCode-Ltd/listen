@@ -99,6 +99,77 @@ class AgentDesignTest extends TestCase
         $this->assertArrayNotHasKey('note', $config['text']);
     }
 
+    public function test_the_chat_card_shows_the_owners_own_line_under_the_name(): void
+    {
+        $owner = User::factory()->create();
+        $agent = $this->agent($owner);
+        $card = fn (): array => (array) $this->getJson('/agent-api/widgets/'.$agent->mainWidget()->public_key)->assertOk()->json();
+
+        // No line of the owner's: the look says so, and the chat card says "Available now".
+        $none = $card();
+        $this->assertNull($none['look']['subtitle']);
+        $this->assertSame('متاح الآن', $none['chat']['online']);
+
+        // The owner's line (Design: "Line under the title") goes to the website as theirs.
+        $this->actingAs($owner)->withoutLocale()->patchJson($this->localizedRoute('voice-agents.update', ['agent' => $agent]), ['appearance' => ['subtitle' => 'متاح دلوقتي', 'captions' => false]])->assertOk();
+        $mine = $card();
+        $this->assertSame('متاح دلوقتي', $mine['look']['subtitle']);
+        $this->assertSame('متاح دلوقتي', $mine['text']['subtitle']);
+        $this->assertFalse($mine['look']['captions']);
+
+        // The card writes it on the chat as on the call card: before, the chat always said "Available now".
+        $widget = (string) file_get_contents(public_path('js/agent-widget.js'));
+        $this->assertStringContainsString("conline.appendChild(el('bdi', '', look.subtitle || chatText.online || text.subtitle || ''));", $widget);
+        // "Show what is said during the call" switched off holds on the chat card too, for the
+        // call's words only: what is written in the chat always shows.
+        $this->assertStringNotContainsString('asChat.captions = true', $widget);
+        $this->assertStringContainsString("function unwritten() { return look.captions === false && (!chatOn || live() || stateNow === 'waiting'); }", $widget);
+        $this->assertStringNotContainsString("|| look.captions === false)", $widget);
+    }
+
+    public function test_the_design_tab_previews_the_card_visitors_get(): void
+    {
+        $owner = User::factory()->create();
+        $agent = $this->agent($owner, ['first_message' => 'أهلًا بيك في عيادة البسمة']);
+        app()->setLocale('en');
+        $page = fn () => $this->actingAs($owner)->withoutLocale()->get($this->localizedRoute('voice-agents.show', ['agent' => $agent->fresh()]))->assertOk();
+
+        // Chat on (as every agent starts): the preview gets the chat, its greeting and its words,
+        // and the settings say which of them belong to the call card.
+        $on = $page();
+        $on->assertSee('data-ag-design data-chat="1"', false)
+            ->assertSee('With written chat on, the card opens on the chat and a call shows inside it.')
+            ->assertSee('Shown when written chat is off.')
+            ->assertSee('data-chat-placeholder="متاح الآن"', false);
+        $html = (string) $on->getContent();
+        $config = json_decode(json_decode('"'.\Illuminate\Support\Str::between($html, "window.LISTEN_AGENTS = JSON.parse('", "');").'"'), true);
+        $this->assertSame(['chat' => true, 'call' => true], $config['design']['cfg']['channels']);
+        $this->assertSame('أهلًا بيك في عيادة البسمة', $config['design']['cfg']['chat']['greeting']);
+        $this->assertSame('متاح الآن', $config['design']['cfg']['chat']['online']);
+        $this->assertSame('اكتب رسالتك', $config['design']['cfg']['chat']['placeholder']);
+
+        // Calls switched off, then the chat instead: the preview's card follows.
+        \App\Support\Agents\AgentChannels::choose($agent, true, false);
+        $agent->save();
+        $html = (string) $page()->getContent();
+        $config = json_decode(json_decode('"'.\Illuminate\Support\Str::between($html, "window.LISTEN_AGENTS = JSON.parse('", "');").'"'), true);
+        $this->assertSame(['chat' => true, 'call' => false], $config['design']['cfg']['channels']);
+        \App\Support\Agents\AgentChannels::choose($agent, false, true);
+        $agent->save();
+        $page()->assertSee('data-ag-design data-chat="0"', false);
+
+        // The page draws it with the same code as the website, takes nothing from the preview's
+        // box, and redraws when Setup switches a channel or saves a new greeting.
+        $widget = (string) file_get_contents(public_path('js/agent-widget.js'));
+        $js = (string) file_get_contents(public_path('js/agents.js'));
+        $this->assertStringContainsString('if (preview) { parts.input.readOnly = true; parts.input.tabIndex = -1; }', $widget);
+        $this->assertStringContainsString("if (!chatOn || preview) return;", $widget);
+        $this->assertStringContainsString("if (!log.length && !chat && !preview) loadChat();", $widget);
+        $this->assertStringContainsString("if (C.design && C.design.follow) C.design.follow({ channels: { chat: !!want.chat, call: !!want.calls } });", $js);
+        $this->assertStringContainsString("if (C.design && C.design.follow) C.design.follow({ greeting: \$('[name=\"first_message\"]', sf).value.trim() });", $js);
+        $this->assertStringContainsString("box.setAttribute('data-chat', chatOn ? '1' : '0');", $js);
+    }
+
     public function test_the_design_tab_shows_every_choice_with_a_live_preview(): void
     {
         $owner = User::factory()->create();

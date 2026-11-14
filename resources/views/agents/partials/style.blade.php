@@ -5,6 +5,8 @@
 @php
   $look = $widget->style();
   $rtl = $agent->language !== 'en';
+  // With the written chat on the card opens on it (Setup: Chat and calls); the page keeps this in step.
+  $chatOn = \App\Support\Agents\AgentChannels::chat($agent);
   // The corner as the owner sees it: on a right-to-left website the start is the right.
   $corner = ($look['position'] === 'start') === $rtl ? 'right' : 'left';
   $palettes = \App\Models\AgentWidget::PALETTES;
@@ -19,7 +21,7 @@
     'orb' => '<circle cx="12" cy="12" r="8"/><path d="M8.5 9.2a4.6 4.6 0 0 1 4-2.4"/>',
   ];
 @endphp
-<div class="ag-design" data-ag-design>
+<div class="ag-design" data-ag-design data-chat="{{ $chatOn ? '1' : '0' }}">
   {{-- Across both columns, so the settings and the preview start on the same line. --}}
   <div class="ag-design-intro">
     <h2>{{ __('agents.design.title') }}</h2>
@@ -45,6 +47,7 @@
           </label>
         @endforeach
       </div>
+      <p class="ag-design-hint ag-muted ag-design-when-chat">{{ __('agents.design.chat_style') }}</p>
     </fieldset>
 
     {{-- The button. --}}
@@ -131,13 +134,14 @@
         </div>
         <div class="ag-design-field">
           <label class="ag-design-label" for="ag-design-subtitle">{{ __('agents.design.card_subtitle') }}</label>
-          <input class="ag-input" id="ag-design-subtitle" name="subtitle" type="text" maxlength="80" dir="auto" value="{{ $look['subtitle'] }}" placeholder="{{ trans('agents.widget_subtitle', [], $rtl ? 'ar' : 'en') }}">
+          <input class="ag-input" id="ag-design-subtitle" name="subtitle" type="text" maxlength="80" dir="auto" value="{{ $look['subtitle'] }}" placeholder="{{ trans($chatOn ? 'agents.chat.card.online' : 'agents.widget_subtitle', [], $rtl ? 'ar' : 'en') }}" data-chat-placeholder="{{ trans('agents.chat.card.online', [], $rtl ? 'ar' : 'en') }}" data-call-placeholder="{{ trans('agents.widget_subtitle', [], $rtl ? 'ar' : 'en') }}">
         </div>
       </div>
       <div class="ag-design-field">
         <label class="ag-design-label" for="ag-design-ready">{{ __('agents.design.ready') }}</label>
         <input class="ag-input" id="ag-design-ready" name="ready_text" type="text" maxlength="60" dir="auto" value="{{ $look['ready_text'] }}">
         <label class="ag-design-check"><input type="checkbox" name="ready_show" value="1" @checked($look['ready_show'])><span>{{ __('agents.design.ready_show') }}</span></label>
+        <p class="ag-design-hint ag-muted ag-design-when-chat">{{ __('agents.design.chat_ready') }}</p>
       </div>
       <label class="ag-design-check"><input type="checkbox" name="photo" value="1" @checked($look['photo'])><span>{{ __('agents.design.photo') }}</span></label>
       <label class="ag-design-check"><input type="checkbox" name="captions" value="1" @checked($look['captions'])><span>{{ __('agents.design.captions') }}</span></label>
