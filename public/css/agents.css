@@ -570,6 +570,14 @@ html[dir="rtl"] .ag-convo-more summary svg { transform: scaleX(-1); }
 .ag-section h2 { font-size: 1.15rem; font-weight: 800; }
 .ag-toast { position: fixed; inset-inline: 0; bottom: 24px; margin: 0 auto; width: max-content; max-width: calc(100vw - 32px); padding: .7rem 1.1rem; border-radius: 999px; background: var(--text); color: var(--bg); font-weight: 700; font-size: .92rem; z-index: 50; opacity: 0; transform: translateY(12px); pointer-events: none; transition: opacity .25s ease, transform .3s var(--ag-ease); }
 .ag-toast.is-on { opacity: 1; transform: none; }
+/* "This agent was changed on another device": the toast's own look, staying until it is answered, with one plain link. */
+.ag-elsewhere { position: fixed; inset-inline: 0; bottom: 24px; margin: 0 auto; width: max-content; max-width: calc(100vw - 32px); display: flex; align-items: baseline; flex-wrap: wrap; justify-content: center; gap: .15rem .7rem; padding: .7rem 1.2rem; border-radius: 999px; background: var(--text); color: var(--bg); font-weight: 600; font-size: .92rem; line-height: 1.5; z-index: 60; animation: ag-elsewhere-in .35s var(--ag-ease) both; }
+.ag-elsewhere[hidden] { display: none; }
+.ag-elsewhere button { appearance: none; border: 0; padding: 0; background: none; color: inherit; font: inherit; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.ag-elsewhere button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 4px; }
+@keyframes ag-elsewhere-in { from { opacity: 0; transform: translateY(12px); } }
+@media (max-width: 480px) { .ag-elsewhere { border-radius: 18px; } }
+@media (prefers-reduced-motion: reduce) { .ag-elsewhere { animation: none; } }
 
 /* The first visit: what to do first. */
 .ag-start { display: grid; justify-items: center; text-align: center; gap: 1rem; padding: clamp(2rem, 6vw, 4rem) 0 1rem; }

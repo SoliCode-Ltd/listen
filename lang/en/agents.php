@@ -74,6 +74,8 @@ return [
     'back' => 'Back',
     'next' => 'Continue',
     'saved' => 'Saved',
+    'changed_elsewhere' => 'This agent was changed on another device.',
+    'show_latest' => 'Show the latest',
     'network_error' => "Couldn't connect. Check your internet connection and try again.",
     'saving' => 'Saving…',
 

@@ -627,6 +627,17 @@ class AgentController extends Controller
     }
 
     /** A live agent whose setup changed is checked again in the background (paused if it now deceives or harms callers). */
+    /**
+     * The agent as its owner set it, as a short mark: a page already open asks for it when it
+     * is looked at again, and shows the latest when another device changed something (AgentStamp).
+     */
+    public function stamp(Request $request, Agent $agent): JsonResponse
+    {
+        $this->own($request, $agent);
+
+        return response()->json(['stamp' => \App\Support\Agents\AgentStamp::of($agent)])->header('Cache-Control', 'no-store');
+    }
+
     private function reviewAgain(Agent $agent): void
     {
         if ($agent->isLive() && AgentAccess::reviewOn() && ! $agent->setting('house') && ($agent->setting('review.hash') !== AgentReview::hash($agent))) {

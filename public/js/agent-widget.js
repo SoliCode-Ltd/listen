@@ -287,6 +287,8 @@
   ].join('\n');
 
   var ICONS = {
+    // A written chat only (calls switched off): the button never shows a phone or a microphone.
+    chat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-6.5L8 20.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>',
     phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.1 3.5h3.1l1.6 4.1-2 1.3a11.3 11.3 0 0 0 5.3 5.3l1.3-2 4.1 1.6v3.1a2 2 0 0 1-2.2 2A16.6 16.6 0 0 1 3.1 5.7a2 2 0 0 1 2-2.2z"/></svg>',
     mic: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>',
     headset: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="13" width="4.5" height="7" rx="2"/><rect x="16.5" y="13" width="4.5" height="7" rx="2"/><path d="M20 20c0 1-1.5 1.8-4 1.8h-2"/></svg>',
@@ -757,8 +759,12 @@
       launch.setAttribute('aria-label', text.label || text.title || cfg.business || '');
       if (!bar) { launch.setAttribute('aria-expanded', open ? 'true' : 'false'); launch.setAttribute('aria-controls', 'lva-panel'); }
       var ico = el('span', 'lva-ico');
-      if (look.icon === 'orb') { ico.classList.add('is-orb'); ico.appendChild(el('i', 'lva-mini')); }
-      else ico.innerHTML = ICONS[look.icon] || ICONS.phone;
+      // With calls switched off the card is a chat and nothing on it says "call": the button's
+      // phone, microphone or headset becomes a chat bubble (the orb, the brand's own mark, stays).
+      var launchIcon = look.icon === 'orb' ? 'orb' : (chatOn && !callOn ? 'chat' : (ICONS[look.icon] ? look.icon : 'phone'));
+      ico.setAttribute('data-icon', launchIcon);
+      if (launchIcon === 'orb') { ico.classList.add('is-orb'); ico.appendChild(el('i', 'lva-mini')); }
+      else ico.innerHTML = ICONS[launchIcon];
       var eq = el('span', 'lva-eq');
       eq.appendChild(el('i')); eq.appendChild(el('i')); eq.appendChild(el('i'));
       ico.appendChild(eq);
@@ -768,7 +774,7 @@
       launch.addEventListener('click', function () {
         if (bar) toggleCall(); else setOpen(!open);
       });
-      launch.addEventListener('pointerenter', function () { if (!preview) loadCall().catch(function () {}); }, { once: true });
+      launch.addEventListener('pointerenter', function () { if (!preview && callOn) loadCall().catch(function () {}); }, { once: true });
       dock.appendChild(launch);
       parts.launch = launch;
 
@@ -852,6 +858,7 @@
       open = v;
       box.classList.toggle('is-open', v);
       parts.launch.setAttribute('aria-expanded', v ? 'true' : 'false');
+      if (v) refreshCard(false);
       // The chat card: straight to writing where there is a keyboard (on a phone that would open it over the card).
       if (v && chatOn) { setTimeout(function () { if (window.matchMedia && matchMedia('(pointer:fine)').matches && parts.input) parts.input.focus(); follow(true); }, 80); }
       else if (v) setTimeout(function () { parts.call && parts.call.focus(); }, 60); else if (!preview) parts.launch.focus();
@@ -1041,6 +1048,7 @@
       }
       if (s === 'idle') endedWhy = '';
       if ((s === 'listening' || s === 'speaking') && !startedAt) startedAt = Date.now();
+      if (chatOn && (s === 'listening' || s === 'speaking') && !callNoted) { callNoted = true; chatNote(chatText.call_started || ''); }
       if (s === 'busy' && before !== 'busy') showForm();
       if (s === 'sent') showSent();
       // Waiting for a line is part of the call (it can still be given up); after it, all is reset.
@@ -1066,6 +1074,9 @@
         paintState();
         timer();
       }
+      // A call that could not start (the owner switched calls off a moment ago) or has ended:
+      // the card is read again, so a button that no longer works is not left on it.
+      if ((s === 'error' || s === 'ended') && before !== s) setTimeout(function () { refreshCard(true); }, s === 'error' ? 1600 : 400);
     }
     // The call's time as it shows: counting up, or "Ends in 00:29" through its last half minute.
     function timeText() { return ending() ? String(text.ends_in).replace(':time', clock(leftNow())) : clock(elapsed()); }
@@ -1102,7 +1113,7 @@
      * The chat changes without jumps: its height moves smoothly to the new one (to its most, then
      * it scrolls), and it follows the newest line unless the caller scrolled up to read.
      */
-    var typing = null, typingOff = 0, endsLead = 30;
+    var typing = null, typingOff = 0, endsLead = 30, callNoted = false;
     function smoothly(change) {
       var box = parts.lines;
       if (!box) { change(); return; }
@@ -1534,6 +1545,8 @@
     function failed(msg, words) {
       sending = false;
       forgetWaiting(msg);
+      // The chat may have been switched off a moment ago: the card as it is now.
+      setTimeout(function () { refreshCard(true); }, 1600);
       hideTyping(0);
       if (!msg.view || !msg.view.parentNode) { msg.view = chatBubble('me', msg.text); parts.lines.appendChild(msg.view); }
       msg.view.classList.add('is-failed');
@@ -1586,8 +1599,10 @@
       hearing = null;
       clearTimeout(typingOff);
       if (parts.lines) parts.lines.__pinned = true;
-      // The chat card keeps its conversation: the call is one more part of it.
-      if (chatOn) chatNote(chatText.call_started || '');
+      // The chat card keeps its conversation: the call is one more part of it ("Call started" is
+      // written once it really is on, in setState).
+      callNoted = false;
+      if (chatOn) { /* the conversation stays */ }
       else if (parts.lines) { parts.lines.innerHTML = ''; parts.lines.hidden = look.captions === false; parts.lines.classList.remove('has-links'); }
       if (parts.barLinks) parts.barLinks.hidden = true;
       setState('connecting');
@@ -1665,6 +1680,48 @@
         },
       };
       at(t + 2500, function () { if (demo) demo.stop(); });
+    }
+
+    /*
+     * The card follows its owner's settings while the page stays open. Its owner switches calls
+     * off, changes the greeting or pauses the agent from another device: a page already open
+     * would go on showing what it loaded (a call button that answers "not taking calls"). So
+     * the card reads its settings again when it is opened, when the page is looked at again,
+     * every so often while it is open, and right after the server refused something; it is
+     * drawn again only when something really changed, and never under a call or a message on
+     * its way. The conversation and what is being typed stay.
+     */
+    var cardAt = Date.now(), cardAsking = false;
+    function cardMark(c) { var o = {}; for (var k in (c || {})) if (k !== 'assets') o[k] = c[k]; try { return JSON.stringify(o); } catch (e) { return ''; } }
+    function cardBusy() { return live() || starting || sending || stateNow === 'waiting' || stateNow === 'busy' || !!demo; }
+    function refreshCard(force) {
+      if (preview || cardAsking || !ctx.origin || (!ctx.key && !ctx.slug) || !window.fetch) return;
+      if (!force && Date.now() - cardAt < 20000) return;
+      if (cardBusy() || document.visibilityState === 'hidden') return;
+      cardAsking = true;
+      cardAt = Date.now();
+      var url = ctx.origin + (ctx.slug ? '/agent-api/links/' + encodeURIComponent(ctx.slug) : '/agent-api/widgets/' + encodeURIComponent(ctx.key) + '?again=1');
+      fetch(url, { credentials: 'omit', cache: 'no-store' }).then(function (r) {
+        if (r.status === 404) return { gone: true };
+        return r.ok ? r.json() : null;
+      }).then(function (next) {
+        cardAsking = false;
+        if (!next || cardBusy()) return;
+        // Gone, or neither a chat nor calls on offer now: no button (it comes back when they do).
+        var none = !!next.gone || (!inline && !!next.channels && next.channels.chat === false && next.channels.call === false);
+        host.style.display = none ? 'none' : '';
+        if (none || !next.text || cardMark(next) === cardMark(cfg)) return;
+        var typed = parts.input ? parts.input.value : '', had = !!(parts.input && root.activeElement === parts.input);
+        render(next);
+        if (parts.input && typed) { parts.input.value = typed; roomToWrite(); }
+        if (had && parts.input) parts.input.focus();
+      }, function () { cardAsking = false; });
+    }
+    if (!preview) {
+      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshCard(false); });
+      window.addEventListener('focus', function () { refreshCard(false); });
+      window.addEventListener('pageshow', function (e) { if (e.persisted) refreshCard(true); });
+      setInterval(function () { if (open || inline) refreshCard(false); }, 30000);
     }
 
     render(cfg);

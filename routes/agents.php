@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::options('/{any}', fn () => response('', 204))->where('any', '.*');
 Route::get('/widgets/{key}', [AgentCallController::class, 'widget'])->where('key', 'lw_[A-Za-z0-9]{28}')->middleware('throttle:120,1')->name('agent-api.widget');
+// The link page's card, read again by a page already open.
+Route::get('/links/{slug}', [AgentCallController::class, 'linkCard'])->where('slug', '[A-Za-z0-9-]{3,80}')->middleware('throttle:120,1')->name('agent-api.link-card');
 // The office a caller hears behind the agent (CallBackground): one file for every website. No
 // ".mp3" in the address: the server's front would look for it as a file on disk.
 Route::get('/sounds/{name}', [AgentCallController::class, 'sound'])->where('name', '[a-z]+')->name('agent-api.sound');
