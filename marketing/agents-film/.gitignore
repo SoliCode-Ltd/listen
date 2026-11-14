@@ -1,0 +1,4 @@
+# Rendered or regenerated: the score (beats.py, same seed), the voice track (cut from
+# public/audio/agents/calls), the sound effects and the mix.
+audio/*.wav
+audio/stems/
