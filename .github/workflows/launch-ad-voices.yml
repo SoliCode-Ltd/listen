@@ -13,9 +13,9 @@ on:
   workflow_dispatch:
     inputs:
       ad:
-        description: 'Which ad: launch-ad ("Which voice is real?"), emotions-ad ("One line. Every emotion."), prompts-film (the prompts film), voice-previews (the voice library previews, database/seeders/data/voice_previews.php) or speaker-avatars (the missing speaker avatars, with the image model)'
+        description: 'Which ad: launch-ad ("Which voice is real?"), emotions-ad ("One line. Every emotion."), prompts-film (the prompts film), agents-film (the agents film, four calls in four dialects), voice-previews (the voice library previews, database/seeders/data/voice_previews.php) or speaker-avatars (the missing speaker avatars, with the image model)'
         type: choice
-        options: [launch-ad, emotions-ad, prompts-film, voice-previews, voice-library-test, speaker-avatars]
+        options: [launch-ad, emotions-ad, prompts-film, agents-film, voice-previews, voice-library-test, speaker-avatars]
         default: launch-ad
       max:
         description: 'voice-previews only: at most this many clips per key (live shares the quota)'
