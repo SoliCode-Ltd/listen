@@ -8,7 +8,7 @@
 // (audio/vo_ar.json: its loudness 60 times a second, and the moment of each word).
 import * as M from './lib/motion.js';
 
-const { W, H, E, prog, lerp, clamp, font, fill, rrect, hash01 } = M;
+const { W, H, E, prog, lerp, clamp, font, fill, rrect, hash01, mix } = M;
 
 const C = { paper: '#F4F3F7', ink: '#14121F', quiet: '#B5B2C4', label: '#8B88A0', accent: '#7659FA', white: '#FFFFFF' };
 const FACE = 'Display';
@@ -33,8 +33,7 @@ const TRY = ['جرّبه', 'على', 'موقعك', 'اليوم.'];
 // (filled in once they are read, below).
 const HITS = [
   [0, 'mark', 'blip', { pitch: 'D5' }],
-  [4, 'colour', 'sub', { len: 0.8 }],
-  [8, 'circle', 'tick'],
+  [2.4, 'name', 'blip', { pitch: 'A5' }],
 ];
 
 let VO = { env: [], calls: [], scenes: {} }, LOGO = null, GRAIN = null;
@@ -94,6 +93,13 @@ function silk(ctx, t, pal, seed, x, y, w, h, zoom, bias) {
 }
 
 // ---------------------------------------------------------------- type
+// A word being said: how present it is (it starts to appear a breath before its moment) and how
+// far it has taken its full strength (quiet at first, then lit). Both are smooth curves in time,
+// so nothing switches from one frame to the next.
+const smooth = (x) => { const c = clamp(x); return c * c * (3 - 2 * c); };
+const present = (t, at) => smooth((t - (at - 0.1)) / 0.34);
+const lit = (t, at) => smooth((t - (at + 0.06)) / 0.5);
+
 // Words right to left from xr. Each word: { w, a (0..1 how present), c (colour) }.
 function measure(ctx, list, f, gap) {
   ctx.font = f; ctx.direction = 'rtl';
@@ -114,9 +120,11 @@ function sentence(ctx, wordsList, t, t0, every, y, size, quiet, loudC, weight = 
   const f = font(size, weight, FACE), gap = size * 0.3;
   const total = measure(ctx, wordsList, f, gap);
   const here = clamp((t - (t0 - 0.35)) / 0.4);
+  // quiet and loud are the same colour at two strengths (white on the colour) or two colours (on paper)
+  const onColour = loudC === C.white;
   line(ctx, wordsList.map((w, i) => {
-    const p = E.outCubic(clamp((t - (t0 + i * every)) / 0.35));
-    return { w, a: here, c: p > 0.5 ? loudC : quiet };
+    const p = smooth((t - (t0 + i * every)) / 0.55);
+    return onColour ? { w, a: here * lerp(0.42, 1, p), c: C.white } : { w, a: here, c: mix(quiet, loudC, p) };
   }), W / 2 + total / 2, y, f, gap);
 }
 // Text for a card: broken into lines once, right to left.
@@ -137,7 +145,7 @@ function wrap(ctx, str, f, gap, maxW) {
 function mark(ctx, t, t0, cx, cy, k, color) {
   const hs = [10, 44, 72, 100, 72, 44, 10];
   hs.forEach((h, i) => {
-    const p = E.outCubic(clamp((t - t0 - Math.abs(i - 3) * 0.07) / 0.5));
+    const p = smooth((t - t0 - Math.abs(i - 3) * 0.08) / 0.7);
     if (p <= 0) return;
     const hh = lerp(10, h, p) * k, x = cx + (i - 3) * 18 * k;
     ctx.globalAlpha = clamp(p * 2); ctx.fillStyle = color;
@@ -167,14 +175,14 @@ function orb(ctx, t, cx, cy, r, pal, glow, heard) {
 // A card of the conversation: who, then their words as they come. kind: 'her' (white) or 'agent' (glass).
 // As tall as the lines that have begun (and, as it arrives, it takes its room little by little).
 function talkHeight(t, card) {
-  const a = E.outCubic(clamp((t - card.t0) / 0.5));
+  const a = smooth((t - card.t0) / 0.6);
   if (a <= 0) return 0;
   let lines = 0;
-  card.lines.forEach((ln, i) => { lines += i === 0 ? 1 : E.outCubic(clamp((t - ln[0].t + 0.12) / 0.3)); });
+  card.lines.forEach((ln, i) => { lines += i === 0 ? 1 : smooth((t - ln[0].t + 0.3) / 0.6); });
   return (62 + lines * 54 + 22) * a;
 }
 function talk(ctx, t, card, x, y, w) {
-  const a = E.outCubic(clamp((t - card.t0) / 0.5));
+  const a = smooth((t - card.t0) / 0.6);
   if (a <= 0) return 0;
   const pad = 30, lh = 54, top = 62;
   const h = talkHeight(t, card) / a;
@@ -195,8 +203,9 @@ function talk(ctx, t, card, x, y, w) {
   const f = font(34, 500, FACE);
   card.lines.forEach((ln, i) => {
     line(ctx, ln.map((wd) => {
-      const p = clamp((t - wd.t) / 0.16);
-      return { w: wd.w, a: p * a, c: t - wd.t < 0.32 ? quiet : ink };
+      const p = present(t, wd.t), l = lit(t, wd.t);
+      return card.kind === 'her' ? { w: wd.w, a: p * a, c: mix(C.quiet, C.ink, l), dy: (1 - p) * 5 }
+        : { w: wd.w, a: p * a * lerp(0.5, 1, l), c: C.white, dy: (1 - p) * 5 };
     }), x + w - pad, y + top + 36 + i * lh, f, 10);
   });
   ctx.restore();
@@ -205,9 +214,20 @@ function talk(ctx, t, card, x, y, w) {
 }
 
 // ---------------------------------------------------------------- scenes
-function sceneMark(ctx, t) {                    // u 0..4
+function sceneMark(ctx, t, IMG) {               // the mark's bars rise; the name writes itself beside them
   fill(ctx, C.paper);
-  mark(ctx, t, 0.15, W / 2, H / 2, 0.9, C.ink);
+  // the logo's own geometry (public/images/logo-ar-light.svg, 307 x 128): bars around x 64, the name from x 140
+  const k = 1.7, lw = 307 * k, lh = 128 * k, x0 = (W - lw) / 2, y0 = (H - lh) / 2;
+  const join = smooth((t - 1.25) / 0.9);                      // the bars make room for the name
+  const bx = lerp(W / 2, x0 + 64 * k, join);
+  mark(ctx, t, 0.15, bx, H / 2, k, C.accent);
+  if (IMG.logo && join > 0) {
+    const show = smooth((t - 1.5) / 0.9), from = x0 + 140 * k;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(from, y0 - 20, (lw - 140 * k + 30) * show, lh + 40); ctx.clip();
+    ctx.globalAlpha = show; ctx.drawImage(IMG.logo, x0 - (1 - show) * 26, y0, lw, lh);
+    ctx.restore();
+  }
 }
 function sceneColour(ctx, t, u0, pal, seed, withUrl) {   // the logo on the colour
   const t0 = sec(u0), drift = 1.06 + 0.02 * (t - t0);
@@ -220,8 +240,8 @@ function sceneColour(ctx, t, u0, pal, seed, withUrl) {   // the logo on the colo
     ctx.fillText('listenai.studio', W / 2, H / 2 + 130); ctx.globalAlpha = 1;
   }
 }
-function sceneCircle(ctx, t) {                  // u 8..14: a circle opens onto the colour, the line is said in it
-  const t0 = sec(8), t1 = sec(14);
+function sceneCircle(ctx, t) {                  // a circle opens onto the colour, the line is said in it
+  const t0 = sec(SC.line[0]), t1 = sec(SC.line[1]);
   fill(ctx, C.paper);
   const grow = E.inOutCubic(clamp((t - (t1 - 1.5)) / 1.5));
   const r = lerp(330, 356, E.outCubic(clamp((t - t0) / 2.5))) + grow * 950;
@@ -347,15 +367,15 @@ M.film({
       ];
       HITS.push([c.u0, c.key, c === VO.calls[0] ? 'whoosh' : 'tick', c === VO.calls[0] ? { len: 0.6, from: 400, to: 1400 } : {}]);
     });
+    HITS.push([SC.line[0], 'circle', 'tick']);
     HITS.push([SC.dialects[0], 'dialects', 'sub', { len: 0.6 }], [SC.saved[0], 'saved', 'bell', { pitch: 'D6' }], [SC.try[0], 'try it', 'tick'],
       [SC.logo[0], 'end colour', 'sub', { len: 0.8 }], [SC.logo[0] + 1, 'logo', 'bell', { pitch: 'A5' }]);
     HITS.sort((a, b) => a[0] - b[0]);
   },
-  draw(ctx, u, t) {
+  draw(ctx, u, t, IMG) {
     const call = CALLS.find((D) => u >= D.u0 && u < D.u1);
-    if (u < 4) sceneMark(ctx, t);
-    else if (u < 8) sceneColour(ctx, t, 4, PAL.violet, 1.3, false);
-    else if (u < 14) sceneCircle(ctx, t);
+    if (u < SC.line[0]) sceneMark(ctx, t, IMG);
+    else if (u < SC.line[1]) sceneCircle(ctx, t);
     else if (call) sceneTalk(ctx, t, call);
     else if (u < SC.dialects[1]) sceneDialects(ctx, t);
     else if (u < SC.saved[1]) sceneSaved(ctx, t);

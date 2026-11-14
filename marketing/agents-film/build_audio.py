@@ -114,8 +114,9 @@ def timed(slug, start):
     return out
 
 
-calls, clips, u = [], [], 14
-scenes = {}
+# the opening (the mark, then the name beside it), the line in its circle, then the calls
+scenes = {'line': [6, 12]}
+calls, clips, u = [], [], 12
 for i, key in enumerate(ORDER):
     ask, agent = f'af-{key}-ask', f'af-{key}-agent'
     t0 = u * P
