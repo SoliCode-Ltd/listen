@@ -32,22 +32,82 @@ SHOWN = {
 words = json.loads((HERE / 'voices/words.json').read_text(encoding='utf-8'))
 
 
+PAUSE = 0.42      # the longest silence left inside a line: people on a call do not wait longer
+TIGHT = {}
+
+
+def tighten(slug):
+    """The clip with its long silences shortened: its file, its length, a map from a moment in
+    the original to the same moment in it, and where its first words are spoken."""
+    if slug in TIGHT:
+        return TIGHT[slug]
+    src = HERE / f'voices/{slug}.wav'
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', str(src), '-ac', '1', '-ar', '16000', '-f', 's16le', '-'], capture_output=True).stdout
+    pcm = struct.unpack('<%dh' % (len(raw) // 2), raw)
+    hop, step = 320, 0.02
+    env = [math.sqrt(sum(x * x for x in pcm[i:i + hop]) / hop) / 32768 for i in range(0, len(pcm) - hop, hop)]
+    top = max(env) or 1
+    on = [e > 0.06 * top for e in env]
+    first = next(i for i, v in enumerate(on) if v)
+    last = len(on) - 1 - next(i for i, v in enumerate(reversed(on)) if v)
+    # what is kept: from just before the first sound to just after the last, minus the middle of each long silence
+    keep, start, j = [], max(0.0, first * step - 0.05), first
+    while j < last:
+        if not on[j]:
+            k = j
+            while k < last and not on[k]:
+                k += 1
+            if (k - j) * step > PAUSE:
+                keep.append((start, j * step + PAUSE / 2))
+                start = k * step - PAUSE / 2
+            j = k
+        else:
+            j += 1
+    keep.append((start, min(len(on) * step, last * step + 0.2)))
+    out = HERE / f'audio/tight/{slug}.wav'
+    out.parent.mkdir(parents=True, exist_ok=True)
+    parts = ';'.join(f'[0]atrim={a:.3f}:{b:.3f},asetpts=PTS-STARTPTS,afade=t=in:d=0.012,afade=t=out:st={b - a - 0.012:.3f}:d=0.012[p{n}]' for n, (a, b) in enumerate(keep))
+    graph = parts + ';' + ''.join(f'[p{n}]' for n in range(len(keep))) + f'concat=n={len(keep)}:v=0:a=1'
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(src), '-filter_complex', graph, str(out)], check=True)
+
+    def at(t):
+        moved = 0.0
+        for a, b in keep:
+            if t <= b:
+                return round(moved + max(0.0, t - a), 3)
+            moved += b - a
+        return round(moved, 3)
+    length = sum(b - a for a, b in keep)
+    # the first stretch of speech (for words a transcript left out at the start of a line)
+    f_end = first
+    while f_end < last and on[f_end]:
+        f_end += 1
+    TIGHT[slug] = (out, length, at, (at(first * step), at(f_end * step)))
+    return TIGHT[slug]
+
+
 def dur(slug):
-    out = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(HERE / f'voices/{slug}.wav')], capture_output=True, text=True).stdout
-    return float(out.strip())
+    return tighten(slug)[1]
 
 
-def timed(slug, at):
-    """Each shown word with its moment in the film: the heard word of the same place in the line."""
+def timed(slug, start):
+    """Each shown word with its moment in the film. The transcript's words are matched from the
+    end of the line; words it left out at the start (a greeting it did not write down, though it
+    is spoken) are spread over the first stretch of speech."""
+    _, _, at, (f0, f1) = tighten(slug)
     shown = SHOWN[slug].split()
-    heard = [w['start'] for w in words[slug]['words']]
-    if not heard:
-        heard = [0.0]
-    out = []
-    for i, w in enumerate(shown):
-        j = i if len(heard) == len(shown) else round(i * (len(heard) - 1) / max(1, len(shown) - 1))
-        out.append([w, round(at + heard[min(j, len(heard) - 1)], 3)])
-    # never two words on the same instant (a number said as two words, written as one)
+    heard = [at(w['start']) for w in words[slug]['words']] or [0.0]
+    lead = max(0, len(shown) - len(heard))
+    times = []
+    if lead:
+        end = min(f1, heard[0] - 0.15) if heard[0] - 0.15 > f0 else f1
+        sizes = [len(w) + 1 for w in shown[:lead]]
+        acc = 0
+        for n in sizes:
+            times.append(f0 + (end - f0) * acc / sum(sizes))
+            acc += n
+    times += heard[:len(shown) - lead]
+    out = [[w, round(start + t, 3)] for w, t in zip(shown, times)]
     for i in range(1, len(out)):
         if out[i][1] <= out[i - 1][1]:
             out[i][1] = round(out[i - 1][1] + 0.12, 3)
@@ -80,7 +140,7 @@ length = round(total * P, 3)
 # every line at its place, each at the same loudness
 inputs, graph, names = [], [], []
 for n, (slug, at) in enumerate(clips):
-    inputs += ['-i', str(HERE / f'voices/{slug}.wav')]
+    inputs += ['-i', str(tighten(slug)[0])]
     graph.append(f'[{n}]loudnorm=I=-16:TP=-1.5,adelay={round(at * 1000)}:all=1[a{n}]')
     names.append(f'[a{n}]')
 graph.append(''.join(names) + f'amix=inputs={len(clips)}:normalize=0,apad=whole_dur={length}')

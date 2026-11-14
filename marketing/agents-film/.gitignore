@@ -5,3 +5,4 @@ audio/stems/
 
 # Frames of the reference film the owner supplied: studied, never kept in the repository.
 docs/reference/*.png
+audio/tight/
