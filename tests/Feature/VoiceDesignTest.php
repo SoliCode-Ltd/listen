@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\VoiceDesignSettings;
-use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
 use App\Models\DemoVoiceGeneration;
 use App\Models\DesignedVoice;
@@ -12,10 +11,16 @@ use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
 use App\Models\User;
+use App\Services\Tts\GeminiKeyManager;
 use App\Services\VoiceDesignService;
+use App\Support\AudioUrl;
+use App\Support\DemoAllowance;
+use App\Support\GenerationMessage;
 use App\Support\PlanPricingLines;
+use App\Support\UsageEstimator;
 use App\Support\VoiceCloningAccess;
 use App\Support\VoiceDesign;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -66,7 +71,7 @@ class VoiceDesignTest extends TestCase
     }
 
     /* ------------------------------------------------------------ */
-    /*  Who sees it                                                  */
+    /*  Who sees it */
     /* ------------------------------------------------------------ */
 
     public function test_a_plan_with_voice_design_gets_the_studio_in_its_own_section(): void
@@ -159,7 +164,7 @@ class VoiceDesignTest extends TestCase
     }
 
     /* ------------------------------------------------------------ */
-    /*  A design                                                     */
+    /*  A design */
     /* ------------------------------------------------------------ */
 
     public function test_a_design_makes_three_takes_that_speak_the_same_line_and_charges_each(): void
@@ -265,7 +270,7 @@ class VoiceDesignTest extends TestCase
     }
 
     /* ------------------------------------------------------------ */
-    /*  Keeping one                                                  */
+    /*  Keeping one */
     /* ------------------------------------------------------------ */
 
     public function test_keeping_a_take_names_it_and_deletes_the_other_takes(): void
@@ -297,7 +302,7 @@ class VoiceDesignTest extends TestCase
         $this->assertSame('designed_'.$voice->id, $listed[0]['key']);
         $this->assertSame('Captain', $listed[0]['name']);
         // Its take to play, its face and its line under the name.
-        $this->assertSame(\App\Support\AudioUrl::fromPath($voice->preview_audio_path), $listed[0]['preview']);
+        $this->assertSame(AudioUrl::fromPath($voice->preview_audio_path), $listed[0]['preview']);
         $this->assertStringStartsWith('data:image/svg+xml;base64,', $listed[0]['avatar']);
         $this->assertStringContainsString('<circle', base64_decode(substr($listed[0]['avatar'], strlen('data:image/svg+xml;base64,'))));
         $this->assertSame(__('ui.dashboard.library.speaks', ['language' => __('voice_design.language_en')]), $listed[0]['tag']);
@@ -400,7 +405,7 @@ class VoiceDesignTest extends TestCase
         $this->getLocalizedRoute('samples')->assertOk()->assertDontSee('id="designed-voices"', false);
 
         // The admin email sees them first.
-        $admin = User::factory()->create(['email' => \App\Support\VoiceCloningAccess::PREVIEW_EMAIL]);
+        $admin = User::factory()->create(['email' => VoiceCloningAccess::PREVIEW_EMAIL]);
         $this->actingAs($admin)->getLocalizedRoute('samples')->assertOk()->assertSee('id="designed-voices"', false);
     }
 
@@ -423,7 +428,7 @@ class VoiceDesignTest extends TestCase
         $this->fakeEngine();
 
         $this->actingAs($other)->postJsonLocalizedRoute('voice-design.keep', ['name' => 'Mine now'], ['id' => $voice->id])->assertNotFound();
-        $this->actingAs($other)->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+        $this->actingAs($other)->withoutMiddleware(ValidateCsrfToken::class)
             ->deleteJson($this->localizedRoute('voice-design.destroy', ['id' => $voice->id]))->assertNotFound();
         $this->assertNotNull($voice->fresh());
     }
@@ -434,7 +439,7 @@ class VoiceDesignTest extends TestCase
         $voice = $this->savedVoice($member);
         $this->fakeEngine();
 
-        $this->actingAs($member)->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+        $this->actingAs($member)->withoutMiddleware(ValidateCsrfToken::class)
             ->deleteJson($this->localizedRoute('voice-design.destroy', ['id' => $voice->id]))->assertOk();
 
         $this->assertSoftDeleted($voice);
@@ -442,7 +447,7 @@ class VoiceDesignTest extends TestCase
     }
 
     /* ------------------------------------------------------------ */
-    /*  Speaking with a kept voice                                   */
+    /*  Speaking with a kept voice */
     /* ------------------------------------------------------------ */
 
     public function test_the_studio_speaks_with_a_kept_voice_on_the_key_that_holds_it(): void
@@ -480,11 +485,48 @@ class VoiceDesignTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors('voice_key');
     }
 
-    public function test_a_failed_designed_voice_is_told_as_a_limit_on_our_side(): void
+    public function test_a_designed_voice_whose_key_is_out_for_the_day_is_told_as_a_limit_on_our_side(): void
     {
         $member = $this->member($this->designPlan);
         $voice = $this->savedVoice($member);
-        app(\App\Services\Tts\GeminiKeyManager::class)->markOutForToday('GEMINI_TTS_API_KEY', VoiceDesignService::MODEL);
+        $manager = app(GeminiKeyManager::class);
+        $manager->markOutForToday('GEMINI_TTS_API_KEY', VoiceDesignService::MODEL);
+        $this->fakeEngine(['speak_daily_limit' => true]);
+        $speak = fn () => $this->actingAs($member)->postJsonLocalizedRoute('dashboard.queue', [
+            'content' => 'Welcome aboard, crew.',
+            'target_language' => 'en',
+            'voice_key' => $voice->voiceKey(),
+            'voice_tier' => 'hd',
+        ]);
+
+        // The key is asked once, in case its limit was raised: it is still out.
+        $speak();
+        $generation = AudioGeneration::query()->latest('id')->firstOrFail();
+        $this->assertSame('failed', $generation->status);
+        $this->assertSame(GenerationMessage::stored('ui.backend.designed_voices_our_limit'), $generation->error_message);
+        $this->assertCount(1, $this->callsTo('POST', '/interactions'));
+        $this->assertTrue($manager->isOutForToday('GEMINI_TTS_API_KEY', VoiceDesignService::MODEL));
+
+        // Tries in the next minutes are answered at once, without asking the key again.
+        $speak();
+        $speak();
+        $this->assertSame('failed', AudioGeneration::query()->latest('id')->firstOrFail()->status);
+        $this->assertCount(1, $this->callsTo('POST', '/interactions'));
+
+        // After a few minutes it is asked again.
+        $this->travel(6)->minutes();
+        $speak();
+        $this->assertCount(2, $this->callsTo('POST', '/interactions'));
+        $this->assertSame(0, $this->creditsUsed($member), 'nothing is charged for a voice that was not made');
+    }
+
+    public function test_a_designed_voice_speaks_again_as_soon_as_its_key_answers(): void
+    {
+        $member = $this->member($this->designPlan);
+        $voice = $this->savedVoice($member);
+        $manager = app(GeminiKeyManager::class);
+        // Set aside for the day, then its limit is raised (or the quota comes back early).
+        $manager->markOutForToday('GEMINI_TTS_API_KEY', VoiceDesignService::MODEL);
         $this->fakeEngine();
 
         $this->actingAs($member)->postJsonLocalizedRoute('dashboard.queue', [
@@ -492,16 +534,40 @@ class VoiceDesignTest extends TestCase
             'target_language' => 'en',
             'voice_key' => $voice->voiceKey(),
             'voice_tier' => 'hd',
-        ]);
+        ])->assertOk();
 
-        $generation = AudioGeneration::query()->latest('id')->firstOrFail();
-        $this->assertSame('failed', $generation->status);
-        $this->assertSame(\App\Support\GenerationMessage::stored('ui.backend.designed_voices_our_limit'), $generation->error_message);
-        $this->assertSame([], $this->callsTo('POST', '/interactions'));
+        $this->assertSame('done', AudioGeneration::query()->latest('id')->firstOrFail()->status);
+        $this->assertFalse($manager->isOutForToday('GEMINI_TTS_API_KEY', VoiceDesignService::MODEL), 'no longer set aside');
+    }
+
+    public function test_a_new_design_is_made_on_the_key_that_already_holds_designed_voices(): void
+    {
+        config(['services.gemini_tts.api_key' => '']);
+        $manager = \Mockery::mock(GeminiKeyManager::class)->makePartial();
+        $manager->shouldReceive('getAllKeys')->andReturn([
+            ['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1],
+            ['key' => 'k2', 'name' => 'GEMINI_TTS_API_KEY_2', 'index' => 2],
+            ['key' => 'k3', 'name' => 'GEMINI_TTS_API_KEY_3', 'index' => 3],
+        ]);
+        $this->app->instance(GeminiKeyManager::class, $manager);
+        $member = $this->member($this->designPlan);
+        $this->savedVoice($member)->forceFill(['key_name' => 'GEMINI_TTS_API_KEY_2'])->save();
+        $this->fakeEngine();
+        $input = ['description' => 'A gruff old sea captain.', 'language' => 'en', 'gender' => null, 'line' => self::LINE, 'projection' => 50, 'pace' => 50, 'variety' => 50];
+
+        // Other voices use the first key; designed voices are kept together on the second.
+        $result = app(VoiceDesignService::class)->design($member, $input, 1);
+        $this->assertNull($result['error']);
+        $this->assertSame('GEMINI_TTS_API_KEY_2', $result['takes'][0]->key_name);
+
+        // That key out for the day: the design is made on the next key with room.
+        $manager->markOutForToday('GEMINI_TTS_API_KEY_2', VoiceDesignService::MODEL);
+        $result = app(VoiceDesignService::class)->design($member, $input, 1);
+        $this->assertSame('GEMINI_TTS_API_KEY', $result['takes'][0]->key_name);
     }
 
     /* ------------------------------------------------------------ */
-    /*  The demo                                                     */
+    /*  The demo */
     /* ------------------------------------------------------------ */
 
     public function test_the_demo_offers_voice_design_beside_text_to_speech(): void
@@ -521,7 +587,7 @@ class VoiceDesignTest extends TestCase
 
         $response = $this->actingAs($member)->postJsonLocalizedRoute('demo.voice-design', $this->designInput());
 
-        $chars = \App\Support\UsageEstimator::estimate(self::LINE)['chars'];
+        $chars = UsageEstimator::estimate(self::LINE)['chars'];
         $response->assertOk()->assertJson(['ok' => true, 'can_keep' => false, 'estimated_chars' => $chars]);
         $this->assertCount(1, $this->callsTo('POST', '/voices'));
         $this->assertCount(1, $this->callsTo('POST', '/interactions'));
@@ -534,7 +600,7 @@ class VoiceDesignTest extends TestCase
         $this->assertCount(1, $this->callsTo('DELETE', '/voices/voice_t1'));
         Storage::disk('public')->assertExists((string) $demo->audio_path);
         $this->assertStringContainsString('audio/demo/', (string) $response->json('take.url'));
-        $this->assertSame(\App\Support\DemoAllowance::chars() - $chars, $response->json('quota.remaining_chars'));
+        $this->assertSame(DemoAllowance::chars() - $chars, $response->json('quota.remaining_chars'));
         // The member's plan credits are not touched.
         $this->assertSame(0, $this->creditsUsed($member));
     }
@@ -575,7 +641,7 @@ class VoiceDesignTest extends TestCase
 
     public function test_the_admin_email_has_one_demo_try_and_designs_only_on_a_plan_with_it(): void
     {
-        $admin = $this->member($this->freePlan, \App\Support\VoiceCloningAccess::PREVIEW_EMAIL);
+        $admin = $this->member($this->freePlan, VoiceCloningAccess::PREVIEW_EMAIL);
         $this->fakeEngine();
 
         $this->actingAs($admin)->postJsonLocalizedRoute('demo.voice-design', $this->designInput())
@@ -587,7 +653,7 @@ class VoiceDesignTest extends TestCase
     }
 
     /* ------------------------------------------------------------ */
-    /*  Clearing unkept takes                                        */
+    /*  Clearing unkept takes */
     /* ------------------------------------------------------------ */
 
     public function test_prune_deletes_old_unkept_takes_and_lost_ones_but_not_new_ones(): void
@@ -630,7 +696,7 @@ class VoiceDesignTest extends TestCase
     }
 
     /* ------------------------------------------------------------ */
-    /*  The example characters                                       */
+    /*  The example characters */
     /* ------------------------------------------------------------ */
 
     public function test_the_examples_command_records_each_character_and_deletes_its_voice(): void
@@ -668,7 +734,7 @@ class VoiceDesignTest extends TestCase
     }
 
     /* ------------------------------------------------------------ */
-    /*  The admin                                                    */
+    /*  The admin */
     /* ------------------------------------------------------------ */
 
     public function test_the_admin_settings_page_saves_who_sees_it_and_the_takes(): void
@@ -729,7 +795,7 @@ class VoiceDesignTest extends TestCase
     }
 
     /* ------------------------------------------------------------ */
-    /*  Helpers                                                      */
+    /*  Helpers */
     /* ------------------------------------------------------------ */
 
     private function openTo(string $audience): void
@@ -801,6 +867,9 @@ class VoiceDesignTest extends TestCase
                 }
 
                 return Http::response(['id' => 'voice_t'.$take, 'sample_audio' => ['mime_type' => 'audio/wav', 'data' => base64_encode($wav)]]);
+            }
+            if (str_ends_with($path, '/interactions') && ($options['speak_daily_limit'] ?? false)) {
+                return Http::response(['error' => ['code' => 429, 'message' => 'Rate limit exceeded for model gemini-3.8-flash-tts (limit: 100 requests per day on Tier 1).', 'status' => 'RESOURCE_EXHAUSTED']], 429);
             }
             if (str_ends_with($path, '/interactions')) {
                 return Http::response(['steps' => [['type' => 'model_output', 'content' => [['type' => 'audio', 'data' => base64_encode($wav)]]]]]);

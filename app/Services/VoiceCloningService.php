@@ -10,6 +10,7 @@ use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiKeysOutException;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Support\ArabicDialects;
+use App\Support\AudioFormats;
 use App\Support\EnglishAccents;
 use App\Support\GeminiSpend;
 use App\Support\GeminiVocalTags;
@@ -20,6 +21,9 @@ use App\Support\ShareableAudio;
 use App\Support\SpeechJoin;
 use App\Support\TextChunker;
 use App\Support\VoiceCloningAccess;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
@@ -41,6 +45,9 @@ use Illuminate\Support\Str;
 class VoiceCloningService
 {
     public const MODEL = 'gemini-3.8-flash-tts';
+
+    /** How often a designed voice may ask its key again while the key is set aside for the day. */
+    private const OUT_KEY_PROBE_SECONDS = 300;
 
     /** A take up to this size (about 8 minutes of MP3) is also handed back as bytes. */
     private const AUDIO_CONTENT_MAX_BYTES = 10_000_000;
@@ -377,24 +384,44 @@ class VoiceCloningService
     /**
      * Speak with a voice that lives in one key's project only (a designed
      * voice: it cannot be copied to another key and stay the same voice).
-     * Every request goes to that key; one out for today throws
-     * GeminiKeysOutException at once, so the member is told it is a limit on
-     * our side rather than a passing one.
+     * Every request goes to that key. Other voices leave that key alone while
+     * any other has room (GeminiKeyManager::designedVoiceCounts()), so its day
+     * is kept for these.
+     *
+     * A key set aside for the day throws GeminiKeysOutException, so the member
+     * is told it is a limit on our side rather than a passing one. It is still
+     * asked once every few minutes: when its limit was raised, or the quota
+     * came back early, the voices speak again at once, not at the next reset.
      *
      * @return array<string, mixed> as synthesizeWithClonedVoice()
      */
     public function synthesizeOnKey(string $text, string $voiceId, string $style, ?string $keyName): array
     {
-        if ($keyName !== null && app(GeminiKeyManager::class)->isOutForToday($keyName, self::MODEL)) {
+        $manager = app(GeminiKeyManager::class);
+        $setAside = $keyName !== null && $manager->isOutForToday($keyName, self::MODEL);
+        if ($setAside && ! Cache::add('designed_voice_key_probe:'.$keyName, 1, self::OUT_KEY_PROBE_SECONDS)) {
             throw new GeminiKeysOutException('Designed voice synthesis failed: the key that holds the voice is out for now.');
         }
 
         $this->pinnedKeyName = $keyName;
         try {
-            return $this->synthesizeClonedPieces($text, $voiceId, $style);
+            $audio = $this->synthesizeClonedPieces($text, $voiceId, $style);
+        } catch (\RuntimeException $e) {
+            // Asked again and still out: the same answer as when it is not asked.
+            if ($setAside && ! $e instanceof GeminiKeysOutException && $manager->isOutForToday((string) $keyName, self::MODEL)) {
+                throw new GeminiKeysOutException('Designed voice synthesis failed: the key that holds the voice is out for now.', 0, $e);
+            }
+
+            throw $e;
         } finally {
             $this->pinnedKeyName = null;
         }
+
+        if ($setAside) {
+            $manager->clearOutForToday((string) $keyName, self::MODEL);
+        }
+
+        return $audio;
     }
 
     private function synthesizeClonedPieces(string $text, string $voiceCloningKey, string $style): array
@@ -1176,7 +1203,7 @@ class VoiceCloningService
      * When the first slot held by a deleted voice comes back, or null when
      * none is held.
      */
-    public static function deletedVoiceSlotFreesAt(int $userId): ?\Carbon\CarbonInterface
+    public static function deletedVoiceSlotFreesAt(int $userId): ?CarbonInterface
     {
         $deletedAt = self::deletedVoicesHoldingSlots($userId)->min('deleted_at');
 
@@ -1212,7 +1239,7 @@ class VoiceCloningService
         ])->save();
     }
 
-    private static function deletedVoicesHoldingSlots(int $userId): \Illuminate\Database\Eloquent\Builder
+    private static function deletedVoicesHoldingSlots(int $userId): Builder
     {
         return ClonedVoice::onlyTrashed()
             ->forUser($userId)
@@ -1293,7 +1320,7 @@ class VoiceCloningService
             return 0;
         }
 
-        return max(0, (int) \Carbon\Carbon::parse($from)->diffInSeconds(now(), true));
+        return max(0, (int) Carbon::parse($from)->diffInSeconds(now(), true));
     }
 
     public static function minSampleDuration(): int
@@ -1515,7 +1542,7 @@ class VoiceCloningService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Private helpers                                                    */
+    /*  Private helpers */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -1950,7 +1977,7 @@ class VoiceCloningService
         }
 
         // Also the copy the "Server deploy" workflow puts in storage/app/bin.
-        return \App\Support\AudioFormats::ffmpegPath();
+        return AudioFormats::ffmpegPath();
     }
 
     private function loadAudioBytes(string $path): string
