@@ -230,8 +230,7 @@ final class StudioFacts
 
     private static function planName(Plan $plan, string $locale): string
     {
-        $name = $locale === 'ar' ? ($plan->name_ar ?: $plan->name) : ($plan->name_en ?: $plan->name);
-
-        return trim((string) $name);
+        // The name its admin wrote for this language, else the pricing page's own, else its plain name.
+        return trim($plan->getLocalizedName($locale === 'ar' ? 'ar' : 'en'));
     }
 }

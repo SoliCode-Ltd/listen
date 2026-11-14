@@ -242,6 +242,7 @@ return [
         'yearly' => 'Yearly',
         'annual_saves' => 'Annual plan saves 20%',
         'plan_name_free' => 'Free',
+        'plan_name_basic' => 'Basic',
         'plan_name_starter' => 'Starter',
         'plan_name_creator' => 'Creator',
         'plan_name_pro' => 'Pro',

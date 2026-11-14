@@ -391,8 +391,17 @@ class AgentChatTest extends TestCase
         // Phones: the box to write in never makes the page zoom, and the keyboard lifts the card.
         $this->assertStringContainsString('font-size:16px;line-height:22px', $widget);
         $this->assertStringContainsString("box.style.setProperty('--kb', typingNow ? under + 'px' : '0px');", $widget);
+        // The greeting arrives as the card opens: the agent's dots for a moment, then its words
+        // written out, once a page; whole at once when the visitor writes or calls first, when the
+        // card is drawn again, and for a visitor who asked for less motion.
+        $this->assertStringContainsString("if (!log.length && chatText.greeting) greet();", $widget);
+        $this->assertStringContainsString("if (greeted || calm) { greeted = true; parts.lines.appendChild(chatBubble('agent', chatText.greeting)); return; }", $widget);
+        $this->assertStringContainsString("if (v) setTimeout(greetSoon, 260);", $widget);
+        $this->assertStringContainsString("writeOut(g.view, g.words, function () { g.view.classList.remove('is-greeting'); });", $widget);
+        $this->assertMatchesRegularExpression('/function sendChat\(again\) \{\s+if \(sending \|\| !parts\.input\) return;\s+if \(preview\) return;\s+greetNow\(\);/', $widget);
+        $this->assertMatchesRegularExpression('/if \(starting \|\| sending\) return;\s+greetNow\(\);\s+starting = true;/', $widget);
         // Reduced motion: the reply is written at once.
-        $this->assertStringContainsString("if ((window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || bits.length < 2) { node.removeAttribute('aria-hidden'); node.textContent = words; follow(); return; }", $widget);
+        $this->assertStringContainsString("if ((window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || bits.length < 2) { node.removeAttribute('aria-hidden'); node.textContent = words; follow(); if (done) done(); return; }", $widget);
     }
 
     public function test_listens_own_agent_knows_the_offers_running_today_in_a_chat_and_on_a_call(): void

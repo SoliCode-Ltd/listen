@@ -918,6 +918,8 @@
       box.classList.toggle('is-open', v);
       parts.launch.setAttribute('aria-expanded', v ? 'true' : 'false');
       if (v) refreshCard(false, 4000);
+      // The greeting arrives once the card has opened.
+      if (v) setTimeout(greetSoon, 260);
       // The chat card: straight to writing where there is a keyboard (on a phone that would open it over the card).
       if (v && chatOn) { setTimeout(function () { if (!preview && window.matchMedia && matchMedia('(pointer:fine)').matches && parts.input) parts.input.focus(); follow(true); }, 80); }
       else if (v) setTimeout(function () { if (!preview && parts.call) parts.call.focus(); }, 60); else if (!preview) parts.launch.focus();
@@ -1463,11 +1465,63 @@
     // A small line in the middle of the conversation: a call started, a call ended, a problem.
     function chatNote(words, isError) {
       if (!parts.lines || !words) return;
+      greetNow();
       var n = chatBubble(isError ? 'error' : 'note', words);
       smoothly(function () { parts.lines.appendChild(n); });
       if (!isError && !preview) { if (!log.length && chatText.greeting) log.push({ k: 'agent', t: chatText.greeting }); log.push({ k: 'note', t: words }); saveChat(); }
     }
     // The card as it opens: the conversation of this visit, or the agent's greeting.
+    /*
+     * The greeting arrives, it is not just there: the first time a visitor sees the card (as it
+     * opens, or as the link page loads) the agent's dots move for a moment and its greeting is
+     * written out, as its answers are. Once per page; a card drawn again, a visit that already
+     * has a conversation, and a visitor who asked for less motion get the greeting as it is.
+     * Anything the visitor does first (a message, a call) puts the whole greeting in place.
+     */
+    var greeted = false, greeting = null, greetTimer = 0;
+    function greet() {
+      clearTimeout(greetTimer);
+      // Drawn again while it was arriving: it has arrived.
+      if (greeting && greeting.begun) greeted = true;
+      greeting = null;
+      var calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (greeted || calm) { greeted = true; parts.lines.appendChild(chatBubble('agent', chatText.greeting)); return; }
+      var n = el('div', 'lva-line is-agent is-typing is-greeting');
+      n.setAttribute('aria-hidden', 'true');
+      n.innerHTML = '<i></i><i></i><i></i>';
+      if (redrawn) n.classList.add('is-there');
+      parts.lines.appendChild(n);
+      greeting = { view: n, words: chatText.greeting, begun: false };
+      if (open || inline) greetSoon();
+    }
+    // Seen now (the card has opened): the dots for a moment, then the words.
+    function greetSoon() {
+      if (!greeting || greeting.begun) return;
+      var g = greeting;
+      g.begun = true;
+      greetTimer = setTimeout(function () {
+        if (greeting !== g || !g.view.parentNode) return;
+        greeting = null;
+        greeted = true;
+        g.view.className = 'lva-line is-agent is-greeting is-there';
+        g.view.dir = 'auto';
+        g.view.innerHTML = '';
+        writeOut(g.view, g.words, function () { g.view.classList.remove('is-greeting'); });
+      }, 950);
+    }
+    // The visitor is ahead of it: the whole greeting, at once.
+    function greetNow() {
+      if (!greeting) return;
+      var g = greeting;
+      clearTimeout(greetTimer);
+      greeting = null;
+      greeted = true;
+      if (!g.view.parentNode) return;
+      g.view.className = 'lva-line is-agent is-there';
+      g.view.dir = 'auto';
+      g.view.removeAttribute('aria-hidden');
+      g.view.textContent = g.words;
+    }
     var showing = false;
     function showChat() {
       if (!log.length && !chat && !preview) loadChat();
@@ -1475,7 +1529,7 @@
       parts.lines.innerHTML = '';
       parts.lines.__pinned = true;
       showing = true;
-      if (!log.length && chatText.greeting) parts.lines.appendChild(chatBubble('agent', chatText.greeting));
+      if (!log.length && chatText.greeting) greet();
       var waiting = null;
       log.forEach(function (l, i) {
         if (l.k === 'links') { var kept = { links: l.links || [] }; linksLine(kept); if (redrawn && kept.view) kept.view.classList.add('is-there'); return; }
@@ -1532,6 +1586,7 @@
     function sendChat(again) {
       if (sending || !parts.input) return;
       if (preview) return;
+      greetNow();
       // On a call the conversation is spoken: nothing is written (or sent again) until it ends.
       if (live() || starting || stateNow === 'waiting' || stateNow === 'connecting') return;
       var msg = again || { id: 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), text: parts.input.value.replace(/^\s+|\s+$/g, '') };
@@ -1595,9 +1650,9 @@
       });
       roomToWrite();
     }
-    function writeOut(node, words) {
+    function writeOut(node, words, done) {
       var bits = words.match(/\s*\S+/g) || [words];
-      if ((window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || bits.length < 2) { node.removeAttribute('aria-hidden'); node.textContent = words; follow(); return; }
+      if ((window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || bits.length < 2) { node.removeAttribute('aria-hidden'); node.textContent = words; follow(); if (done) done(); return; }
       node.setAttribute('aria-hidden', 'true');
       // Never slower than reading: the whole reply is out within about a second and a half.
       var every = Math.max(12, Math.min(45, 1500 / bits.length)), i = 0;
@@ -1606,7 +1661,7 @@
         node.appendChild(el('span', 'lva-w', bits[i++]));
         follow();
         if (i < bits.length) setTimeout(next, every);
-        else { node.textContent = words; node.removeAttribute('aria-hidden'); follow(); }
+        else { node.textContent = words; node.removeAttribute('aria-hidden'); follow(); if (done) done(); }
       })();
     }
     function failed(msg, words) {
@@ -1660,6 +1715,7 @@
       if (inline && cfg.available === false) return;
       if (call) { call.end(); return; }
       if (starting || sending) return;
+      greetNow();
       starting = true;
       typing = null;
       liveView = null;

@@ -56,6 +56,34 @@ class HouseKnowledgeTest extends TestCase
         $this->assertStringContainsString('# الأماكن الصوتية', $ar);
     }
 
+    public function test_in_arabic_every_plan_has_its_arabic_name(): void
+    {
+        // The Basic plan, with the Arabic name its admin wrote, on offer.
+        $basic = \App\Models\Plan::query()->updateOrCreate(['slug' => 'basic'], ['name' => 'Basic', 'name_ar' => 'الأساسية', 'price_cents' => 400, 'monthly_chars' => 30000, 'is_active' => true,
+            'kind' => 'subscription', 'discount_percentage' => 25, 'discount_ends_at' => now()->addMonth()]);
+        $this->assertTrue($basic->fresh()->hasActiveDiscount());
+
+        foreach ([HouseAgent::offers('ar'), HouseAgent::knowledge('ar')] as $said) {
+            $this->assertStringContainsString('الباقة الأساسية:', $said);
+            $this->assertStringNotContainsString('Basic', $said);
+            $this->assertStringNotContainsString('باقة الأساسية: ', str_replace('الباقة الأساسية', '', $said));
+        }
+        // The plans Listen names itself keep their names ("باقة مبتدئ"), and none is left in English.
+        $ar = HouseAgent::knowledge('ar');
+        $this->assertStringContainsString('- باقة مبتدئ:', $ar);
+        foreach (['Starter', 'Creator', 'Studio Max'] as $english) {
+            $this->assertStringNotContainsString($english, $ar);
+        }
+        // English stays English.
+        $this->assertStringContainsString('- Basic plan:', HouseAgent::offers('en'));
+
+        // The admin wrote the whole name, or none: said as written, or as the pricing page has it.
+        $basic->update(['name_ar' => 'الباقة الأساسية']);
+        $this->assertSame('الباقة الأساسية', HouseAgent::arabicPlan($basic->fresh()));
+        $basic->update(['name_ar' => null]);
+        $this->assertSame('الباقة الأساسية', HouseAgent::arabicPlan($basic->fresh()));
+    }
+
     public function test_it_fits_in_what_goes_into_a_call_and_never_names_the_engine(): void
     {
         foreach (['ar', 'en'] as $language) {

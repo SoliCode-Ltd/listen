@@ -86,15 +86,13 @@ final class HouseAgent
                 Plan::DISCOUNT_FIRST_MONTHS => trans_choice('ui.pricing.discount_offer_first_months', (int) $p->discountMonths(), ['percent' => $percent, 'months' => (int) $p->discountMonths()], $locale),
                 default => trans('ui.pricing.discount_offer_first_month', ['percent' => $percent], $locale),
             };
-            $key = 'ui.pricing.plan_name_'.$p->slug;
-            $name = $ar && trans($key, [], 'ar') !== $key ? trans($key, [], 'ar') : $p->name;
             $now = $money((int) $p->getDiscountedPriceCents());
             $full = $money((int) $p->price_cents);
             // The last day of the offer: one ending at midnight ends the day before.
             $until = $p->discount_ends_at?->copy()->subSecond()->locale($locale)->translatedFormat('j F Y');
             $forever = $p->discountDuration() === Plan::DISCOUNT_FOREVER;
             $lines[] = $ar
-                ? "- باقة {$name}: {$offer}. السعر مع العرض {$now} دولار في الشهر".($forever ? '' : " ثم {$full} دولار في الشهر").'، على الاشتراك الشهري.'.($until ? " آخر يوم للعرض {$until}." : '')
+                ? '- '.self::arabicPlan($p).": {$offer}. السعر مع العرض {$now} دولار في الشهر".($forever ? '' : " ثم {$full} دولار في الشهر").'، على الاشتراك الشهري.'.($until ? " آخر يوم للعرض {$until}." : '')
                 : "- {$p->name} plan: {$offer}. With the offer it is \${$now} a month".($forever ? '' : ", then \${$full} a month").', on monthly billing.'.($until ? " The offer's last day is {$until}." : '');
         }
         $yearly = max(0, min(90, (int) AgentAccess::setting('billing_yearly_discount_percentage', 0)));
@@ -105,6 +103,22 @@ final class HouseAgent
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * A plan as the Arabic agent names it: the Arabic name its admin wrote (Admin → Plans), else
+     * the pricing page's own, so an Arabic answer never carries a plan's English name where an
+     * Arabic one exists. "باقة مبتدئ"; a name that is an adjective, "الباقة الأساسية"; a name that
+     * already says "باقة" is left as it is.
+     */
+    public static function arabicPlan(Plan $plan): string
+    {
+        $name = trim($plan->getLocalizedName('ar'));
+        if (preg_match('/^(?:ال)?باقة(?:\s|$)/u', $name)) {
+            return $name;
+        }
+
+        return (str_starts_with($name, 'ال') ? 'الباقة ' : 'باقة ').$name;
     }
 
     /** What the house agent knows, in its language. */
@@ -118,8 +132,7 @@ final class HouseAgent
             $price = rtrim(rtrim(number_format($p->price_cents / 100, 2, '.', ''), '0'), '.');
 
             // The plan's name as the Arabic pricing page writes it.
-            $key = 'ui.pricing.plan_name_'.$p->slug;
-            $arName = trans($key, [], 'ar') !== $key ? trans($key, [], 'ar') : $p->name;
+            $arPlan = self::arabicPlan($p);
 
             // Whether the plan has agents (Admin → Plans → Voice agents), how many, and up to how many call minutes.
             $limits = AgentAccess::limits($p);
@@ -132,7 +145,7 @@ final class HouseAgent
                 : ($limits['included'] ? ", with agents: {$limits['agents']} ".($limits['agents'] === 1 ? 'agent' : 'agents').' and up to '.number_format($callMinutes).' call minutes a month' : ', without agents');
 
             return $ar
-                ? "- باقة {$arName}: {$price} دولار في الشهر، حوالي {$minutes} دقيقة صوت في الشهر (".number_format((int) $p->monthly_chars)." نقطة رصيد){$agents}."
+                ? "- {$arPlan}: {$price} دولار في الشهر، حوالي {$minutes} دقيقة صوت في الشهر (".number_format((int) $p->monthly_chars)." نقطة رصيد){$agents}."
                 : "- {$p->name} plan: \${$price} a month, about {$minutes} minutes of voice a month (".number_format((int) $p->monthly_chars)." credits){$agents}.";
         })->implode("\n");
         $free = intdiv(AgentAccess::freeTestSeconds(), 60);
