@@ -287,6 +287,8 @@
   ].join('\n');
 
   var ICONS = {
+    // A written chat only (calls switched off): the button never shows a phone or a microphone.
+    chat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-6.5L8 20.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>',
     phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.1 3.5h3.1l1.6 4.1-2 1.3a11.3 11.3 0 0 0 5.3 5.3l1.3-2 4.1 1.6v3.1a2 2 0 0 1-2.2 2A16.6 16.6 0 0 1 3.1 5.7a2 2 0 0 1 2-2.2z"/></svg>',
     mic: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>',
     headset: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="13" width="4.5" height="7" rx="2"/><rect x="16.5" y="13" width="4.5" height="7" rx="2"/><path d="M20 20c0 1-1.5 1.8-4 1.8h-2"/></svg>',
@@ -757,8 +759,12 @@
       launch.setAttribute('aria-label', text.label || text.title || cfg.business || '');
       if (!bar) { launch.setAttribute('aria-expanded', open ? 'true' : 'false'); launch.setAttribute('aria-controls', 'lva-panel'); }
       var ico = el('span', 'lva-ico');
-      if (look.icon === 'orb') { ico.classList.add('is-orb'); ico.appendChild(el('i', 'lva-mini')); }
-      else ico.innerHTML = ICONS[look.icon] || ICONS.phone;
+      // With calls switched off the card is a chat and nothing on it says "call": the button's
+      // phone, microphone or headset becomes a chat bubble (the orb, the brand's own mark, stays).
+      var launchIcon = look.icon === 'orb' ? 'orb' : (chatOn && !callOn ? 'chat' : (ICONS[look.icon] ? look.icon : 'phone'));
+      ico.setAttribute('data-icon', launchIcon);
+      if (launchIcon === 'orb') { ico.classList.add('is-orb'); ico.appendChild(el('i', 'lva-mini')); }
+      else ico.innerHTML = ICONS[launchIcon];
       var eq = el('span', 'lva-eq');
       eq.appendChild(el('i')); eq.appendChild(el('i')); eq.appendChild(el('i'));
       ico.appendChild(eq);
@@ -768,7 +774,7 @@
       launch.addEventListener('click', function () {
         if (bar) toggleCall(); else setOpen(!open);
       });
-      launch.addEventListener('pointerenter', function () { if (!preview) loadCall().catch(function () {}); }, { once: true });
+      launch.addEventListener('pointerenter', function () { if (!preview && callOn) loadCall().catch(function () {}); }, { once: true });
       dock.appendChild(launch);
       parts.launch = launch;
 

@@ -187,6 +187,12 @@ class AgentSyncTest extends TestCase
         // "Call started" is written when the call is on, not when the button is pressed.
         $this->assertStringContainsString("if (chatOn && (s === 'listening' || s === 'speaking') && !callNoted) { callNoted = true; chatNote(chatText.call_started || ''); }", $widget);
 
+        // Calls switched off: nothing on the card says "call". No call button in it (the server
+        // says so in the card), and the button on the page shows a chat bubble, never a phone.
+        $this->assertStringContainsString("var launchIcon = look.icon === 'orb' ? 'orb' : (chatOn && !callOn ? 'chat' : (ICONS[look.icon] ? look.icon : 'phone'));", $widget);
+        $this->assertMatchesRegularExpression("/if \(callOn\) \{\s+(\/\/[^\n]*\s+)*parts\.call = el\('button', 'lva-hcall'\);/", $widget);
+        $this->assertStringContainsString("if (o && o.call && callOn && !call && !starting && !demo) toggleCall();", $widget);
+
         // The owner's page: asks when looked at again; loads the latest unless something is
         // typed and not saved, or a test call is on (then a line with one button).
         $this->assertStringContainsString("document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') check(true); });", $page);
