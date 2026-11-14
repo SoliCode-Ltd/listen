@@ -1,33 +1,57 @@
-// Listen agents (Arabic): a calm launch film. Pure function of time: window.seek(t) paints frame t.
+// Listen agents: a calm launch film. Pure function of time: window.seek(t) paints frame t.
 // 90 bpm; scenes change on the beat (u), words and the voice run in seconds (t).
 //
-// The look follows the reference the owner chose (docs/reference): soft flowing colour fields,
-// small light type that comes in a word at a time, white cards on the colour, an orb beside the
-// conversation, a circle that opens onto the colour. The colour is Listen's own violet, the face
-// is Listen's (Alexandria), and what is said is a real recorded call from the homepage
-// (audio/vo_ar.json: its loudness 60 times a second, and the moment of each word).
+// One film, drawn for two languages and two shapes. The language comes from the folder's
+// film.json ("lang": "ar" here, "en" in marketing/agents-film-en, which loads this same file);
+// the shape from the renderer (16x9, or 9x16 for phones: the orb above, the conversation below).
+//
+// The look follows the reference the owner chose (docs/style_guide.md): soft flowing colour
+// fields, small light type that comes in a word at a time, white cards on the colour, an orb
+// beside the conversation, a circle that opens onto the colour. The colour is Listen's own violet
+// (each agent's scene takes one of the orb colours an owner can pick), the face is Listen's
+// (Alexandria), and every line is a Listen HD voice (lines.php). Where each scene starts and the
+// moment of every word come from the recordings (build_audio.py -> audio/vo.json).
 import * as M from './lib/motion.js';
 
-const { W, H, E, prog, lerp, clamp, font, fill, rrect, hash01, mix } = M;
+const { W, H, E, lerp, clamp, font, fill, rrect, hash01, mix } = M;
 
 const C = { paper: '#F4F3F7', ink: '#14121F', quiet: '#B5B2C4', label: '#8B88A0', accent: '#7659FA', white: '#FFFFFF' };
 const FACE = 'Display';
+const TALL = H > W;                                   // the phone cut
 const sec = (u) => M.TS(u);
 
-// Four calls, four dialects (lines.php): a customer asks, the business's agent answers. Each
-// agent's scene takes one of the orb colours an owner can pick (AgentWidget::PALETTES). When each
-// scene starts and each word is said comes from the recordings (build_audio.py -> audio/vo.json).
-const CAST = {
-  eg: { pal: 'violet', orb: 'orb', agent: 'سمية', who: 'شحن المدار', dialect: 'مصرية', her: 'العميل' },
-  sa: { pal: 'emerald', orb: 'emeraldOrb', agent: 'فهد', who: 'معرض الريادة للسيارات', dialect: 'سعودية', her: 'العميلة' },
-  kw: { pal: 'ocean', orb: 'oceanOrb', agent: 'فاطمة', who: 'فندق المرسى', dialect: 'كويتية', her: 'العميل' },
-  lb: { pal: 'rose', orb: 'roseOrb', agent: 'رائد', who: 'مكتب البحر العقاري', dialect: 'لبنانية', her: 'العميلة' },
+// ---------------------------------------------------------------- what is written, in each language
+const TEXT = {
+  ar: {
+    rtl: true,
+    cast: {
+      eg: { pal: 'violet', orb: 'orb', agent: 'سمية', who: 'شحن المدار', dialect: 'مصرية', her: 'العميل' },
+      sa: { pal: 'emerald', orb: 'emeraldOrb', agent: 'فهد', who: 'معرض الريادة للسيارات', dialect: 'سعودية', her: 'العميلة' },
+      kw: { pal: 'ocean', orb: 'oceanOrb', agent: 'فاطمة', who: 'فندق المرسى', dialect: 'كويتية', her: 'العميل' },
+      lb: { pal: 'rose', orb: 'roseOrb', agent: 'رائد', who: 'مكتب البحر العقاري', dialect: 'لبنانية', her: 'العميلة' },
+    },
+    line: [['يرد', 'على', 'كل', 'مكالمة،'], ['بلهجة', 'عملائك.']],
+    tryIt: ['جرّبه', 'على', 'موقعك', 'اليوم.'],
+    names: ['مصرية', 'سعودية', 'كويتية', 'لبنانية', 'إماراتية', 'مغربية', 'عراقية', 'أردنية', 'سودانية'],
+    saved: { title: 'حُفظ موعد المعاينة', rows: [['الاسم', 'ريم'], ['الهاتف', '03 123 456', true], ['الطلب', 'شقة الأشرفية، بكرا 11 الصبح']] },
+    logo: { w: 307, name: 140 },
+  },
+  en: {
+    rtl: false,
+    cast: {
+      us: { pal: 'violet', orb: 'orb', agent: 'Maya', who: 'Orbit Shipping', dialect: 'American', her: 'Customer' },
+      gb: { pal: 'emerald', orb: 'emeraldOrb', agent: 'Oliver', who: 'Pioneer Motors', dialect: 'British', her: 'Customer' },
+      au: { pal: 'ocean', orb: 'oceanOrb', agent: 'Isla', who: 'The Harbour Hotel', dialect: 'Australian', her: 'Customer' },
+      ie: { pal: 'rose', orb: 'roseOrb', agent: 'Vincent', who: 'Seaview Properties', dialect: 'Irish', her: 'Customer' },
+    },
+    line: [['Answers', 'every', 'call,'], ['in', 'your', 'customers’', 'accent.']],
+    tryIt: ['Try', 'it', 'on', 'your', 'website', 'today.'],
+    names: ['American', 'British', 'Australian', 'Irish', 'Scottish', 'Canadian', 'Indian', 'Nigerian'],
+    saved: { title: 'Viewing saved', rows: [['Name', 'Aoife'], ['Phone', '087 123 4567', true], ['Request', 'Flat in Ranelagh, tomorrow at 11 am']] },
+    logo: { w: 400, name: 140 },
+  },
 };
-let CALLS = [], SC = {};
-const DIALECTS = ['مصرية', 'سعودية', 'كويتية', 'لبنانية', 'إماراتية', 'مغربية', 'عراقية', 'أردنية', 'سودانية'];
-const SAVED = { title: 'حُفظ موعد المعاينة', name: 'ريم', phone: '03 123 456', note: 'شقة الأشرفية، بكرا 11 الصبح' };
-const LINE = [['يرد', 'على', 'كل', 'مكالمة،'], ['بلهجة', 'عملائك.']];
-const TRY = ['جرّبه', 'على', 'موقعك', 'اليوم.'];
+let L = TEXT.ar, RTL = true, CALLS = [], SC = {};
 
 // Every accent: [beat, label, sfx, opts]. The opening is fixed; the rest follows the recordings
 // (filled in once they are read, below).
@@ -48,8 +72,8 @@ function loud(t) {
 const voice = (t) => { let a = 0; for (let k = -3; k <= 3; k++) a += loud(t + k * 0.017); return Math.pow(a / 7, 0.75); };
 
 // ---------------------------------------------------------------- the colour field
-// A soft silk of the brand's violets, flowing slowly: drawn small from a few long waves bent by
-// one another along a slant, then stretched over the frame (so it is smooth by construction).
+// A soft silk of colour, flowing slowly: drawn small from a few long waves bent by one another
+// along a slant, then stretched over the frame (so it is smooth by construction).
 const SILK = { w: 160, h: 90, cv: null, cx: null, img: null };
 const PAL = {
   violet: [[23, 14, 92], [58, 36, 176], [118, 89, 250], [176, 158, 255], [236, 230, 255]],
@@ -68,12 +92,12 @@ function ramp(pal, v) {
   const a = pal[i], b = pal[i + 1];
   return [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, a[2] + (b[2] - a[2]) * s];
 }
-function silkInto(t, pal, seed, zoom, bias) {
+function silkInto(t, pal, seed, zoom, bias, aspect) {
   if (!SILK.cv) { SILK.cv = document.createElement('canvas'); SILK.cv.width = SILK.w; SILK.cv.height = SILK.h; SILK.cx = SILK.cv.getContext('2d'); SILK.img = SILK.cx.createImageData(SILK.w, SILK.h); }
   const d = SILK.img.data, ca = Math.cos(-0.62), sa = Math.sin(-0.62), z = zoom || 1;
   for (let y = 0, o = 0; y < SILK.h; y++) {
     for (let x = 0; x < SILK.w; x++, o += 4) {
-      const nx = ((x / SILK.w) * 2 - 1) * 1.78 / z, ny = ((y / SILK.h) * 2 - 1) / z;
+      const nx = ((x / SILK.w) * 2 - 1) * aspect / z, ny = ((y / SILK.h) * 2 - 1) / z;
       const px = nx * ca - ny * sa, py = (nx * sa + ny * ca) * 2.3;      // long along the slant
       const w1 = Math.sin(py * 1.1 + seed + t * 0.11 + 1.6 * Math.sin(px * 0.7 - t * 0.07 + seed * 2));
       const w2 = Math.sin(px * 0.9 - seed * 3 + t * 0.05 + 1.3 * Math.sin(py * 0.8 + t * 0.09));
@@ -86,9 +110,8 @@ function silkInto(t, pal, seed, zoom, bias) {
   SILK.cx.putImageData(SILK.img, 0, 0);
 }
 function silk(ctx, t, pal, seed, x, y, w, h, zoom, bias) {
-  silkInto(t, pal, seed, zoom, bias);
+  silkInto(t, pal, seed, zoom, bias, w / h);
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  // (a little larger than its place, so its edge pixels never show)
   ctx.drawImage(SILK.cv, 1, 1, SILK.w - 2, SILK.h - 2, x, y, w, h);
 }
 
@@ -100,18 +123,19 @@ const smooth = (x) => { const c = clamp(x); return c * c * (3 - 2 * c); };
 const present = (t, at) => smooth((t - (at - 0.1)) / 0.34);
 const lit = (t, at) => smooth((t - (at + 0.06)) / 0.5);
 
-// Words right to left from xr. Each word: { w, a (0..1 how present), c (colour) }.
 function measure(ctx, list, f, gap) {
-  ctx.font = f; ctx.direction = 'rtl';
+  ctx.font = f;
   return list.reduce((a, w) => a + ctx.measureText(w.w || w).width, 0) + gap * (list.length - 1);
 }
-function line(ctx, list, xr, y, f, gap) {
-  ctx.font = f; ctx.direction = 'rtl'; ctx.textAlign = 'right';
-  let x = xr;
+// Words in reading order from x0: the right edge in Arabic, the left edge in English.
+// Each word: { w, a (0..1 how present), c (colour), dy }.
+function line(ctx, list, x0, y, f, gap) {
+  ctx.font = f; ctx.direction = RTL ? 'rtl' : 'ltr'; ctx.textAlign = RTL ? 'right' : 'left';
+  let x = x0;
   list.forEach((w) => {
     const wd = ctx.measureText(w.w).width;
     if (w.a > 0.004) { ctx.globalAlpha = w.a; ctx.fillStyle = w.c; ctx.fillText(w.w, x, y + (w.dy || 0)); }
-    x -= wd + gap;
+    x += (RTL ? -1 : 1) * (wd + gap);
   });
   ctx.globalAlpha = 1;
 }
@@ -119,17 +143,17 @@ function line(ctx, list, xr, y, f, gap) {
 function sentence(ctx, wordsList, t, t0, every, y, size, quiet, loudC, weight = 500) {
   const f = font(size, weight, FACE), gap = size * 0.3;
   const total = measure(ctx, wordsList, f, gap);
-  const here = clamp((t - (t0 - 0.35)) / 0.4);
+  const here = smooth((t - (t0 - 0.35)) / 0.5);
   // quiet and loud are the same colour at two strengths (white on the colour) or two colours (on paper)
   const onColour = loudC === C.white;
   line(ctx, wordsList.map((w, i) => {
     const p = smooth((t - (t0 + i * every)) / 0.55);
     return onColour ? { w, a: here * lerp(0.42, 1, p), c: C.white } : { w, a: here, c: mix(quiet, loudC, p) };
-  }), W / 2 + total / 2, y, f, gap);
+  }), W / 2 + (RTL ? 1 : -1) * total / 2, y, f, gap);
 }
-// Text for a card: broken into lines once, right to left.
+// Text for a card: broken into lines once.
 function wrap(ctx, str, f, gap, maxW) {
-  ctx.font = f; ctx.direction = 'rtl';
+  ctx.font = f;
   const out = [[]]; let w = 0;
   str.split(' ').forEach((word) => {
     const wd = ctx.measureText(word).width;
@@ -141,7 +165,7 @@ function wrap(ctx, str, f, gap, maxW) {
 }
 
 // ---------------------------------------------------------------- pieces
-// The brand's mark: seven bars (public/images/logo-ar-light.svg), each rising in turn.
+// The brand's mark: seven bars (public/images/logo-*-light.svg), each rising in turn.
 function mark(ctx, t, t0, cx, cy, k, color) {
   const hs = [10, 44, 72, 100, 72, 44, 10];
   hs.forEach((h, i) => {
@@ -158,7 +182,7 @@ function logoWhite(ctx, cx, cy, w, a) {
   const h = w * LOGO.height / LOGO.width;
   ctx.globalAlpha = a; ctx.drawImage(LOGO, cx - w / 2, cy - h / 2, w, h); ctx.globalAlpha = 1;
 }
-// The orb: the same silk seen through a sphere, lit from above, breathing with the voice.
+// The orb: the same silk seen through a sphere, lit from above, breathing with the agent's voice.
 function orb(ctx, t, cx, cy, r, pal, glow, heard) {
   const v = heard ? voice(t) : 0, rr = r * (1 + 0.07 * v);
   ctx.save();
@@ -167,25 +191,25 @@ function orb(ctx, t, cx, cy, r, pal, glow, heard) {
   ctx.restore();
   ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, rr, 0, M.TAU); ctx.clip();
   silk(ctx, t * 1.8 + 40, pal, 3.1, cx - rr * 1.5, cy - rr * 1.5, rr * 3, rr * 3, 1.25);
-  let g = ctx.createRadialGradient(cx - rr * 0.35, cy - rr * 0.45, rr * 0.05, cx, cy, rr * 1.05);
+  const g = ctx.createRadialGradient(cx - rr * 0.35, cy - rr * 0.45, rr * 0.05, cx, cy, rr * 1.05);
   g.addColorStop(0, 'rgba(255,255,255,.42)'); g.addColorStop(0.45, 'rgba(255,255,255,.04)'); g.addColorStop(1, `rgba(${Math.round(glow[0] * 0.3)},${Math.round(glow[1] * 0.3)},${Math.round(glow[2] * 0.4)},.5)`);
   ctx.fillStyle = g; ctx.fillRect(cx - rr, cy - rr, rr * 2, rr * 2);
   ctx.restore();
 }
-// A card of the conversation: who, then their words as they come. kind: 'her' (white) or 'agent' (glass).
-// As tall as the lines that have begun (and, as it arrives, it takes its room little by little).
+// A card of the conversation: who, then their words as they are spoken. kind: 'her' (white) or
+// 'agent' (smoked glass). As tall as the lines that have begun.
+const CARD = TALL ? { w: 968, pad: 34, lh: 62, top: 72, size: 39, label: 25, gap: 11 } : { w: 780, pad: 30, lh: 54, top: 62, size: 34, label: 22, gap: 10 };
 function talkHeight(t, card) {
   const a = smooth((t - card.t0) / 0.6);
   if (a <= 0) return 0;
   let lines = 0;
   card.lines.forEach((ln, i) => { lines += i === 0 ? 1 : smooth((t - ln[0].t + 0.3) / 0.6); });
-  return (62 + lines * 54 + 22) * a;
+  return (CARD.top + lines * CARD.lh + 22) * a;
 }
 function talk(ctx, t, card, x, y, w) {
   const a = smooth((t - card.t0) / 0.6);
   if (a <= 0) return 0;
-  const pad = 30, lh = 54, top = 62;
-  const h = talkHeight(t, card) / a;
+  const { pad, lh, top } = CARD, h = talkHeight(t, card) / a, start = RTL ? x + w - pad : x + pad, dir = RTL ? -1 : 1;
   ctx.save(); ctx.globalAlpha = a; ctx.translate(0, (1 - a) * 18);
   if (card.kind === 'her') {
     ctx.save(); ctx.shadowColor = 'rgba(20,10,80,.22)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 20;
@@ -194,19 +218,19 @@ function talk(ctx, t, card, x, y, w) {
     rrect(ctx, x, y, w, h, 22); ctx.fillStyle = 'rgba(14,10,44,.34)'; ctx.fill();
     ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.30)'; ctx.stroke();
   }
-  const ink = card.kind === 'her' ? C.ink : C.white, quiet = card.kind === 'her' ? C.quiet : 'rgba(255,255,255,.55)';
   // who: a dot and a name
-  ctx.fillStyle = card.kind === 'her' ? '#C4C1D2' : 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(x + w - pad - 6, y + 36, 6, 0, M.TAU); ctx.fill();
-  ctx.font = font(22, 500, FACE); ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.fillStyle = card.kind === 'her' ? C.label : 'rgba(255,255,255,.78)';
-  ctx.fillText(card.who, x + w - pad - 22, y + 44);
+  ctx.fillStyle = card.kind === 'her' ? '#C4C1D2' : 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(start + dir * 6, y + top * 0.58, 6, 0, M.TAU); ctx.fill();
+  ctx.font = font(CARD.label, 500, FACE); ctx.direction = RTL ? 'rtl' : 'ltr'; ctx.textAlign = RTL ? 'right' : 'left';
+  ctx.fillStyle = card.kind === 'her' ? C.label : 'rgba(255,255,255,.78)';
+  ctx.fillText(card.who, start + dir * 22, y + top * 0.58 + CARD.label * 0.36);
   ctx.save(); rrect(ctx, x, y, w, h, 22); ctx.clip();
-  const f = font(34, 500, FACE);
+  const f = font(CARD.size, 500, FACE);
   card.lines.forEach((ln, i) => {
     line(ctx, ln.map((wd) => {
       const p = present(t, wd.t), l = lit(t, wd.t);
       return card.kind === 'her' ? { w: wd.w, a: p * a, c: mix(C.quiet, C.ink, l), dy: (1 - p) * 5 }
         : { w: wd.w, a: p * a * lerp(0.5, 1, l), c: C.white, dy: (1 - p) * 5 };
-    }), x + w - pad, y + top + 36 + i * lh, f, 10);
+    }), start, y + top + CARD.size + 2 + i * lh, f, CARD.gap);
   });
   ctx.restore();
   ctx.restore();
@@ -216,151 +240,161 @@ function talk(ctx, t, card, x, y, w) {
 // ---------------------------------------------------------------- scenes
 function sceneMark(ctx, t, IMG) {               // the mark's bars rise; the name writes itself beside them
   fill(ctx, C.paper);
-  // the logo's own geometry (public/images/logo-ar-light.svg, 307 x 128): bars around x 64, the name from x 140
-  const k = 1.7, lw = 307 * k, lh = 128 * k, x0 = (W - lw) / 2, y0 = (H - lh) / 2;
+  // the logo's own geometry (public/images/logo-*-light.svg, 128 tall): bars around x 64, the name from x 140
+  const k = TALL ? 1.9 : 1.7, lw = L.logo.w * k, lh = 128 * k, x0 = (W - lw) / 2, y0 = (H - lh) / 2;
   const join = smooth((t - 1.25) / 0.9);                      // the bars make room for the name
   const bx = lerp(W / 2, x0 + 64 * k, join);
   mark(ctx, t, 0.15, bx, H / 2, k, C.accent);
   if (IMG.logo && join > 0) {
-    const show = smooth((t - 1.5) / 0.9), from = x0 + 140 * k;
+    const show = smooth((t - 1.5) / 0.9), from = x0 + L.logo.name * k;
     ctx.save();
-    ctx.beginPath(); ctx.rect(from, y0 - 20, (lw - 140 * k + 30) * show, lh + 40); ctx.clip();
+    ctx.beginPath(); ctx.rect(from, y0 - 20, (lw - L.logo.name * k + 30) * show, lh + 40); ctx.clip();
     ctx.globalAlpha = show; ctx.drawImage(IMG.logo, x0 - (1 - show) * 26, y0, lw, lh);
     ctx.restore();
   }
 }
-function sceneColour(ctx, t, u0, pal, seed, withUrl) {   // the logo on the colour
-  const t0 = sec(u0), drift = 1.06 + 0.02 * (t - t0);
-  silk(ctx, t, pal, seed, 0, 0, W, H, drift);
-  const a = E.outCubic(clamp((t - t0 - 0.15) / 0.7));
-  logoWhite(ctx, W / 2, H / 2 - (withUrl ? 30 : 0), 380 + 14 * E.outCubic(clamp((t - t0) / 3)), a);
-  if (withUrl) {
-    const b = E.outCubic(clamp((t - t0 - 1.2) / 0.6));
-    ctx.globalAlpha = b * 0.9; ctx.font = font(34, 400, FACE); ctx.direction = 'ltr'; ctx.textAlign = 'center'; ctx.fillStyle = C.white;
-    ctx.fillText('listenai.studio', W / 2, H / 2 + 130); ctx.globalAlpha = 1;
-  }
+function sceneEnd(ctx, t) {                     // the logo on the colour, then where to find it
+  const t0 = sec(SC.logo[0]);
+  silk(ctx, t, PAL.night, 2.4, 0, 0, W, H, 1.06 + 0.02 * (t - t0));
+  const a = smooth((t - t0 - 0.15) / 0.8);
+  logoWhite(ctx, W / 2, H / 2 - 30, (TALL ? 470 : 400) + 14 * E.outCubic(clamp((t - t0) / 3)), a);
+  const b = smooth((t - t0 - 1.2) / 0.7);
+  ctx.globalAlpha = b * 0.9; ctx.font = font(TALL ? 40 : 34, 400, FACE); ctx.direction = 'ltr'; ctx.textAlign = 'center'; ctx.fillStyle = C.white;
+  ctx.fillText('listenai.studio', W / 2, H / 2 + (TALL ? 150 : 130)); ctx.globalAlpha = 1;
 }
 function sceneCircle(ctx, t) {                  // a circle opens onto the colour, the line is said in it
-  const t0 = sec(SC.line[0]), t1 = sec(SC.line[1]);
+  const t0 = sec(SC.line[0]), t1 = sec(SC.line[1]), base = Math.min(W, H) * 0.31, size = TALL ? 50 : 46;
   fill(ctx, C.paper);
   const grow = E.inOutCubic(clamp((t - (t1 - 1.5)) / 1.5));
-  const r = lerp(330, 356, E.outCubic(clamp((t - t0) / 2.5))) + grow * 950;
+  const r = lerp(base, base * 1.08, E.outCubic(clamp((t - t0) / 2.5))) + grow * Math.hypot(W, H) * 0.5;
   // two fine arcs around it, as it settles
   const ar = E.outCubic(clamp((t - t0 - 0.2) / 1.2)) * (1 - grow);
   if (ar > 0) { ctx.strokeStyle = `rgba(20,18,31,${0.16 * ar})`; ctx.lineWidth = 2; [[-0.5, 0.5], [2.64, 3.64]].forEach(([a, b]) => { ctx.beginPath(); ctx.arc(W / 2, H / 2, r + 46, a, lerp(a, b, ar)); ctx.stroke(); }); }
   ctx.save(); ctx.beginPath(); ctx.arc(W / 2, H / 2, r, 0, M.TAU); ctx.clip();
   silk(ctx, t, PAL.violet, 1.3, 0, 0, W, H, 1.1);
   ctx.restore();
-  sentence(ctx, LINE[0], t, t0 + 0.6, 0.34, H / 2 - 16, 46, 'rgba(255,255,255,.45)', C.white);
-  sentence(ctx, LINE[1], t, t0 + 0.6 + 4 * 0.34, 0.34, H / 2 + 52, 46, 'rgba(255,255,255,.45)', C.white);
+  sentence(ctx, L.line[0], t, t0 + 0.6, 0.34, H / 2 - size * 0.35, size, 'rgba(255,255,255,.45)', C.white);
+  sentence(ctx, L.line[1], t, t0 + 0.6 + L.line[0].length * 0.34, 0.34, H / 2 + size * 1.13, size, 'rgba(255,255,255,.45)', C.white);
+}
+// Where things sit in a call's scene. Wide: the orb's panel on the side reading ends, the colour
+// on the side it starts. Tall: the orb's panel above, the colour below.
+function places() {
+  if (TALL) return { orb: { x: 28, y: 28, w: W - 56, h: 772 }, col: { x: 28, y: 828, w: W - 56, h: H - 856 }, r: 142, oy: 404, mid: 828 + 320 };
+  const orbP = { x: RTL ? 28 : W - 672, y: 28, w: 644, h: H - 56 }, col = { x: RTL ? 700 : 28, y: 28, w: W - 728, h: H - 56 };
+  return { orb: orbP, col, r: 150, oy: H / 2 - 46, mid: H / 2 };
 }
 let TALK = {};
-function sceneTalk(ctx, t, D) {                 // someone asks, the agent answers out loud, in its dialect
-  const t0 = sec(D.u0), t1 = sec(D.u1), pal = PAL[D.pal];
+function sceneTalk(ctx, t, D) {                 // someone asks, the agent answers out loud, in its accent
+  const t0 = sec(D.u0), t1 = sec(D.u1), pal = PAL[D.pal], P = places();
   fill(ctx, C.paper);
-  // the first time, the colour steps back into its panel on the right; after that it is there
-  const p = D.first ? E.inOutCubic(clamp((t - t0) / 0.9)) : 1, m = 28 * p;
-  const px = lerp(0, 700, p), pw = W - px - m, py = m, ph = H - 2 * m;
-  ctx.save(); rrect(ctx, px, py, pw, ph, 34 * p); ctx.clip();
+  // the first time, the colour steps back from the whole frame into its panel; after that it is there
+  const p = D.first ? E.inOutCubic(clamp((t - t0) / 0.9)) : 1;
+  const cx0 = lerp(0, P.col.x, p), cy0 = lerp(0, P.col.y, p), cw = lerp(W, P.col.w, p), ch = lerp(H, P.col.h, p);
+  ctx.save(); rrect(ctx, cx0, cy0, cw, ch, 34 * p); ctx.clip();
+  // (behind a conversation the colour keeps to its deeper half, so white words always read)
   silk(ctx, t, pal, 1.3 + D.u0 * 0.37, 0, 0, W, H, 1.1 + 0.004 * (t - t0), D.first ? lerp(0, -0.2, p) : -0.2);
   ctx.restore();
   // the orb's own panel: the agent, where it works, how it speaks
-  const op = D.first ? E.outCubic(clamp((t - t0 - 0.25) / 0.8)) : 1, inn = E.outCubic(clamp((t - t0) / 0.7));
+  const op = D.first ? smooth((t - t0 - 0.25) / 0.8) : 1, inn = smooth((t - t0) / 0.8), ox = P.orb.x + P.orb.w / 2;
   if (op > 0) {
-    ctx.globalAlpha = op; rrect(ctx, 28, 28, 644, H - 56, 34); ctx.fillStyle = C.white; ctx.fill(); ctx.globalAlpha = 1;
-    ctx.save(); ctx.globalAlpha = op * inn; orb(ctx, t, 350, H / 2 - 46, 150 * lerp(0.9, 1, inn), PAL[D.orb], pal[2], t > D.answer.at - 0.1 && t < D.answer.end + 0.2); ctx.restore();
-    const name = E.outCubic(clamp((t - t0 - (D.first ? 0.9 : 0.25)) / 0.6));
-    ctx.globalAlpha = name; ctx.direction = 'rtl'; ctx.textAlign = 'center';
-    ctx.font = font(40, 600, FACE); ctx.fillStyle = C.ink; ctx.fillText(D.agent, 350, H / 2 + 206);
-    ctx.font = font(25, 400, FACE); ctx.fillStyle = C.label; ctx.fillText(D.who, 350, H / 2 + 252);
-    // the dialect, in a quiet pill
-    ctx.font = font(24, 500, FACE);
-    const tw = ctx.measureText(D.dialect).width + 44;
-    rrect(ctx, 350 - tw / 2, H / 2 + 284, tw, 46, 23); ctx.fillStyle = `rgba(${pal[2][0]},${pal[2][1]},${pal[2][2]},.12)`; ctx.fill();
-    ctx.fillStyle = `rgb(${pal[1][0]},${pal[1][1]},${pal[1][2]})`; ctx.fillText(D.dialect, 350, H / 2 + 316);
+    ctx.globalAlpha = op; rrect(ctx, P.orb.x, P.orb.y, P.orb.w, P.orb.h, 34); ctx.fillStyle = C.white; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.save(); ctx.globalAlpha = op * inn; orb(ctx, t, ox, P.oy, P.r * lerp(0.9, 1, inn), PAL[D.orb], pal[2], t > D.answer.at - 0.1 && t < D.answer.end + 0.2); ctx.restore();
+    const name = smooth((t - t0 - (D.first ? 0.9 : 0.25)) / 0.7), ny = P.oy + P.r + 102;
+    ctx.globalAlpha = name; ctx.direction = RTL ? 'rtl' : 'ltr'; ctx.textAlign = 'center';
+    ctx.font = font(TALL ? 46 : 40, 600, FACE); ctx.fillStyle = C.ink; ctx.fillText(D.agent, ox, ny);
+    ctx.font = font(TALL ? 29 : 25, 400, FACE); ctx.fillStyle = C.label; ctx.fillText(D.who, ox, ny + (TALL ? 52 : 46));
+    // the dialect or accent, in a quiet pill
+    ctx.font = font(TALL ? 27 : 24, 500, FACE);
+    const tw = ctx.measureText(D.dialect).width + 48, py = ny + (TALL ? 84 : 78), ph = TALL ? 52 : 46;
+    rrect(ctx, ox - tw / 2, py, tw, ph, ph / 2); ctx.fillStyle = `rgba(${pal[2][0]},${pal[2][1]},${pal[2][2]},.12)`; ctx.fill();
+    ctx.fillStyle = `rgb(${pal[1][0]},${pal[1][1]},${pal[1][2]})`; ctx.fillText(D.dialect, ox, py + ph * 0.7);
     ctx.globalAlpha = 1;
   }
-  // the conversation, in the middle of its panel whatever its height just now
-  const cards = TALK[D.key], x = px + (pw - 780) / 2, w = 780;
+  // the conversation, around the middle of its panel whatever its height just now
+  const cards = TALK[D.key], x = P.col.x + (P.col.w - CARD.w) / 2;
   let all = 0;
   cards.forEach((card) => { const h = talkHeight(t, card); if (h) all += h + 22; });
-  let y = H / 2 - Math.max(0, all - 22) / 2;
-  cards.forEach((card) => { const h = talk(ctx, t, card, x, y, w); if (h) y += h + 22; });
+  let y = P.mid - Math.max(0, all - 22) / 2;
+  cards.forEach((card) => { const h = talk(ctx, t, card, x, y, CARD.w); if (h) y += h + 22; });
   // the last scene lets go softly, into the colour that follows
   if (D.last) { const out = E.inCubic(clamp((t - (t1 - 0.3)) / 0.3)); if (out > 0) { ctx.globalAlpha = out; fill(ctx, C.paper); ctx.globalAlpha = 1; } }
 }
-// Every dialect: their names pass, one after another, on the brand's colour.
+// Every dialect (every accent): their names pass, one after another, on the brand's colour.
 function sceneDialects(ctx, t) {
   const t0 = sec(SC.dialects[0]), t1 = sec(SC.dialects[1]);
   silk(ctx, t, PAL.violet, 2.9, 0, 0, W, H, 1.08 + 0.01 * (t - t0));
-  const f = font(120, 500, FACE), gap = 110;
-  ctx.font = f; ctx.direction = 'rtl'; ctx.textAlign = 'right';
-  const ws = DIALECTS.map((d) => ctx.measureText(d).width), total = ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1);
-  // they travel from the left to the right (the way Arabic is read), slowing a little to be read
-  const k = (t - t0) / (t1 - t0), shift = lerp(0.12, 0.62, k * 0.75 + 0.25 * E.inOutSine(k)) * total;
-  let x = W * 0.5 + shift + ws[0] / 2;
-  DIALECTS.forEach((d, i) => {
-    const mid = x - ws[i] / 2, far = Math.abs(mid - W / 2) / (W * 0.42);
+  const f = font(TALL ? 104 : 120, 500, FACE), gap = TALL ? 90 : 110, dir = RTL ? 1 : -1;
+  ctx.font = f; ctx.direction = RTL ? 'rtl' : 'ltr'; ctx.textAlign = 'center';
+  const ws = L.names.map((d) => ctx.measureText(d).width), total = ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1);
+  // they travel the way the language is read, slowing a little to be read
+  const k = (t - t0) / (t1 - t0), shift = lerp(0.1, TALL ? 0.5 : 0.62, k * 0.75 + 0.25 * E.inOutSine(k)) * total;
+  let mid = W / 2 + dir * shift;
+  L.names.forEach((d, i) => {
+    const far = Math.abs(mid - W / 2) / (W * (TALL ? 0.6 : 0.42));
     ctx.globalAlpha = clamp(1 - far) * 0.85 + 0.12; ctx.fillStyle = C.white;
-    if (mid > -400 && mid < W + 400) ctx.fillText(d, x, H / 2 + 40);
-    x -= ws[i] + gap;
+    if (mid > -500 && mid < W + 500) ctx.fillText(d, mid, H / 2 + 40);
+    mid -= dir * ((ws[i] + (ws[i + 1] || 0)) / 2 + gap);
   });
   ctx.globalAlpha = 1;
 }
 function sceneSaved(ctx, t) {                   // what the business is left with
-  const t0 = sec(SC.saved[0]);
+  const t0 = sec(SC.saved[0]), z = TALL ? 1.14 : 1;
   silk(ctx, t, PAL.lilac, 4.2, 0, 0, W, H, 1.08 + 0.015 * (t - t0));
-  const a = E.outCubic(clamp((t - t0 - 0.1) / 0.6)), w = 820, h = 430, x = (W - w) / 2, y = (H - h) / 2 + (1 - a) * 22;
+  const a = smooth((t - t0 - 0.1) / 0.7), w = 820 * z, h = 430 * z, x = (W - w) / 2, y = (H - h) / 2 + (1 - a) * 22;
+  const start = RTL ? x + w - 54 * z : x + 54 * z, dir = RTL ? -1 : 1;
   ctx.save(); ctx.globalAlpha = a;
   ctx.save(); ctx.shadowColor = 'rgba(40,20,130,.28)'; ctx.shadowBlur = 80; ctx.shadowOffsetY = 34;
   rrect(ctx, x, y, w, h, 30); ctx.fillStyle = C.white; ctx.fill(); ctx.restore();
   // its title, with a tick
-  const xr = x + w - 54;
-  ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(xr - 22, y + 84, 24, 0, M.TAU); ctx.fill();
-  const tk = E.outCubic(clamp((t - t0 - 0.5) / 0.35));
-  ctx.strokeStyle = C.white; ctx.lineWidth = 4.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.moveTo(xr - 33, y + 85); ctx.lineTo(lerp(xr - 33, xr - 25, clamp(tk * 2)), lerp(y + 85, y + 93, clamp(tk * 2)));
-  if (tk > 0.5) ctx.lineTo(lerp(xr - 25, xr - 11, (tk - 0.5) * 2), lerp(y + 93, y + 76, (tk - 0.5) * 2));
+  const tx = start + dir * 24 * z, ty = y + 84 * z;
+  ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(tx, ty, 24 * z, 0, M.TAU); ctx.fill();
+  const tk = smooth((t - t0 - 0.5) / 0.45);
+  ctx.strokeStyle = C.white; ctx.lineWidth = 4.5 * z; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(tx - 11 * z, ty + 1 * z); ctx.lineTo(lerp(tx - 11 * z, tx - 3 * z, clamp(tk * 2)), lerp(ty + 1 * z, ty + 9 * z, clamp(tk * 2)));
+  if (tk > 0.5) ctx.lineTo(lerp(tx - 3 * z, tx + 11 * z, (tk - 0.5) * 2), lerp(ty + 9 * z, ty - 8 * z, (tk - 0.5) * 2));
   ctx.stroke();
-  ctx.direction = 'rtl'; ctx.textAlign = 'right';
-  ctx.font = font(44, 600, FACE); ctx.fillStyle = C.ink; ctx.fillText(SAVED.title, xr - 64, y + 100);
-  ctx.fillStyle = 'rgba(20,18,31,.08)'; ctx.fillRect(x + 54, y + 146, w - 108, 2);
-  [['الاسم', SAVED.name, false], ['الهاتف', SAVED.phone, true], ['الطلب', SAVED.note, false]].forEach(([k, v, ltr], i) => {
-    const r = E.outCubic(clamp((t - t0 - 0.8 - i * 0.28) / 0.45)), yy = y + 214 + i * 76 + (1 - r) * 12;
+  ctx.direction = RTL ? 'rtl' : 'ltr'; ctx.textAlign = RTL ? 'right' : 'left';
+  ctx.font = font(44 * z, 600, FACE); ctx.fillStyle = C.ink; ctx.fillText(L.saved.title, start + dir * 64 * z, y + 100 * z);
+  ctx.fillStyle = 'rgba(20,18,31,.08)'; ctx.fillRect(x + 54 * z, y + 146 * z, w - 108 * z, 2);
+  L.saved.rows.forEach(([k, v, digits], i) => {
+    const r = smooth((t - t0 - 0.8 - i * 0.28) / 0.55), yy = y + (214 + i * 76) * z + (1 - r) * 12;
     ctx.globalAlpha = a * r;
-    ctx.font = font(26, 400, FACE); ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.fillStyle = C.label; ctx.fillText(k, xr, yy);
-    ctx.font = font(34, 500, FACE); ctx.fillStyle = C.ink;
-    if (ltr) { ctx.direction = 'ltr'; ctx.textAlign = 'right'; ctx.fillText(v, xr - 150, yy + 2); } else ctx.fillText(v, xr - 150, yy + 2);
+    ctx.font = font(26 * z, 400, FACE); ctx.direction = RTL ? 'rtl' : 'ltr'; ctx.textAlign = RTL ? 'right' : 'left'; ctx.fillStyle = C.label; ctx.fillText(k, start, yy);
+    ctx.font = font(34 * z, 500, FACE); ctx.fillStyle = C.ink;
+    if (digits) ctx.direction = 'ltr';
+    ctx.fillText(v, start + dir * 150 * z, yy + 2);
   });
   ctx.restore();
 }
 function sceneTry(ctx, t) {
   fill(ctx, C.paper);
-  sentence(ctx, TRY, t, sec(SC.try[0]) + 0.6, 0.36, H / 2 + 20, 64, C.quiet, C.ink);
+  sentence(ctx, L.tryIt, t, sec(SC.try[0]) + 0.6, 0.36, H / 2 + 20, TALL ? 60 : 64, C.quiet, C.ink);
 }
 
 M.film({
   fonts: [font(54, 500, FACE), font(34, 500, FACE), font(22, 400, FACE), font(44, 600, FACE)],
-  images: { logo: 'assets/logo-ar.svg' },
+  images: { logo: 'assets/logo.svg' },
   hits: HITS,
-  samples: 3,
+  // Nothing in this film moves fast enough to need motion blur: one sample a frame.
+  samples: 1,
   async init(ctx, IMG) {
+    L = TEXT[M.CFG.lang === 'en' ? 'en' : 'ar']; RTL = L.rtl;
     VO = await fetch('audio/vo.json').then((r) => r.json());
-    await Promise.all([400, 500, 600].map((w) => document.fonts.load(font(40, w, FACE), 'يرد على كل مكالمة 100')));
+    await Promise.all([400, 500, 600].map((w) => document.fonts.load(font(40, w, FACE), 'يرد على كل مكالمة 100 Answers every call')));
     // the logo in white, for the colour (the file's own shapes, recoloured once)
-    if (IMG.logo) { LOGO = document.createElement('canvas'); LOGO.width = 921; LOGO.height = 384; const c = LOGO.getContext('2d'); c.filter = 'brightness(0) invert(1)'; c.drawImage(IMG.logo, 0, 0, 921, 384); }
+    if (IMG.logo) { LOGO = document.createElement('canvas'); LOGO.width = L.logo.w * 3; LOGO.height = 384; const c = LOGO.getContext('2d'); c.filter = 'brightness(0) invert(1)'; c.drawImage(IMG.logo, 0, 0, L.logo.w * 3, 384); }
     // a fine grain, so the soft colour never bands
     GRAIN = document.createElement('canvas'); GRAIN.width = 256; GRAIN.height = 256;
     const g = GRAIN.getContext('2d'), d = g.createImageData(256, 256);
     for (let i = 0; i < 256 * 256; i++) { const v = 128 + (hash01(i, 9) - 0.5) * 255; d.data[i * 4] = v; d.data[i * 4 + 1] = v; d.data[i * 4 + 2] = v; d.data[i * 4 + 3] = 255; }
     g.putImageData(d, 0, 0);
     // the conversation: both sides are spoken, and every word comes at its own moment
-    const f = font(34, 500, FACE);
-    const said = (line) => { let i = 0; return wrap(ctx, line.words.map((w) => w[0]).join(' '), f, 10, 720).map((ln) => ln.map((w) => ({ w, t: line.words[i++][1] }))); };
+    const f = font(CARD.size, 500, FACE);
+    const said = (ln) => { let i = 0; return wrap(ctx, ln.words.map((w) => w[0]).join(' '), f, CARD.gap, CARD.w - 2 * CARD.pad).map((row) => row.map((w) => ({ w, t: ln.words[i++][1] }))); };
     SC = VO.scenes;
-    CALLS = VO.calls.map((c, i) => ({ ...CAST[c.key], key: c.key, u0: c.u0, u1: c.u1, first: i === 0, last: i === VO.calls.length - 1, answer: c.agent }));
+    CALLS = VO.calls.map((c, i) => ({ ...L.cast[c.key], key: c.key, u0: c.u0, u1: c.u1, first: i === 0, last: i === VO.calls.length - 1, answer: c.agent }));
     VO.calls.forEach((c) => {
-      const D = CAST[c.key];
+      const D = L.cast[c.key];
       TALK[c.key] = [
         { kind: 'her', who: D.her, t0: c.ask.at - 0.4, lines: said(c.ask) },
         { kind: 'agent', who: D.agent + ' · ' + D.who, t0: c.agent.at - 0.35, lines: said(c.agent) },
@@ -380,7 +414,7 @@ M.film({
     else if (u < SC.dialects[1]) sceneDialects(ctx, t);
     else if (u < SC.saved[1]) sceneSaved(ctx, t);
     else if (u < SC.try[1]) sceneTry(ctx, t);
-    else sceneColour(ctx, t, SC.logo[0], PAL.night, 2.4, true);
+    else sceneEnd(ctx, t);
   },
   post(ctx, u, t) {
     if (!GRAIN) return;

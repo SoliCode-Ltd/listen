@@ -1,33 +1,26 @@
 #!/usr/bin/env python3
 """Lays the film's four calls on its timeline.
 
-Run from marketing/agents-film once the voices are made (the "Launch ad voices" workflow,
-ad: agents-film):
+Run from marketing/ once a cut's voices are made (the "Launch ad voices" workflow, ad:
+agents-film or agents-film-en):
 
-    python3 build_audio.py
+    python3 agents-film/build_audio.py agents-film
+    python3 agents-film/build_audio.py agents-film-en
 
-Reads voices/<slug>.wav and voices/words.json (each word's moment in its clip), and writes
-audio/vo.wav (every line at its place), audio/vo.json (the voice's loudness 60 times a second,
-each word's moment in the film, and where every scene starts and ends, in beats) and the film's
-length in film.json. The score is then made for that length (beats.py, see the end of the run).
+Reads <cut>/calls.json (the calls in order, and what the screen writes for each line: the script
+with its numbers as numbers), <cut>/voices/<slug>.wav and <cut>/voices/words.json (each word's
+moment in its clip). Writes <cut>/audio/vo.wav (every line at its place), <cut>/audio/vo.json (the
+voice's loudness 60 times a second, each word's moment in the film, and where every scene starts
+and ends, in beats) and the film's length in <cut>/film.json. The score is then made for that
+length (beats.py, see the end of the run).
 """
-import json, math, pathlib, struct, subprocess
+import json, math, pathlib, struct, subprocess, sys
 
-HERE = pathlib.Path(__file__).parent
+HERE = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else pathlib.Path(__file__).parent).resolve()
 BPM = 90
 P = 60 / BPM
-ORDER = ['eg', 'sa', 'kw', 'lb']
-# What the screen writes for each line: the script, with its numbers as numbers.
-SHOWN = {
-    'af-eg-ask': 'مساء الخير، شحنتي كان المفروض توصل النهارده. هي فين دلوقتي؟',
-    'af-eg-agent': 'مساء النور يا فندم. شحنتك خرجت مع المندوب من ساعة، وهتوصل لحضرتك قبل الساعة 6. تحب أبعتلك رابط التتبع؟',
-    'af-sa-ask': 'السلام عليكم، أبي أحجز تجربة قيادة يوم السبت.',
-    'af-sa-agent': 'وعليكم السلام، حياك الله. عندنا موعد السبت الساعة 5 العصر، يناسبك؟ بس أحتاج اسمك الكريم ورقم جوالك.',
-    'af-kw-ask': 'هلا، أبي أحجز غرفة حق شخصين، من الخميس لين السبت.',
-    'af-kw-agent': 'هلا والله، حياك. عندنا غرفة تطل على البحر بهالتاريخ، بـ 45 دينار بالليلة. أأكد لك الحجز؟',
-    'af-lb-ask': 'مرحبا، بدّي آخد موعد شوف الشقة يلّي بالأشرفية، بكرا إذا بيصير.',
-    'af-lb-agent': 'أهلا وسهلا فيكي. أكيد، بكرا الساعة 11 الصبح منيح؟ وبس بدّي اسمك ورقمك لأكّد الموعد.',
-}
+CALLS = json.loads((HERE / 'calls.json').read_text(encoding='utf-8'))
+ORDER, SHOWN = CALLS['order'], CALLS['shown']
 
 words = json.loads((HERE / 'voices/words.json').read_text(encoding='utf-8'))
 
@@ -166,4 +159,4 @@ print(f'{total} beats, {length} s')
 for c in calls:
     print(f"  {c['key']}: beats {c['u0']}-{c['u1']}, asks at {c['ask']['at']}, answers {c['agent']['at']}-{c['agent']['end']} ({len(c['ask']['words'])}+{len(c['agent']['words'])} words)")
 print('  ' + ', '.join(f'{k} {a}-{b}' for k, (a, b) in scenes.items()))
-print(f'next: beats.py agents-film --synth --flavor lofi --bpm {BPM} --mode major --tonic D --drop 1 --duration {length} --seed 11')
+print(f'next: beats.py {HERE.name} --synth --flavor lofi --bpm {BPM} --mode major --tonic D --drop 1 --duration {length} --seed 11')

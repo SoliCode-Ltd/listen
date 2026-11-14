@@ -2,7 +2,9 @@
  "title": "Listen agents",
  "duration": 85.333,
  "formats": [
-  "16x9"
+  "16x9",
+  "9x16"
  ],
- "poster": 33.24
+ "poster": 33.24,
+ "lang": "ar"
 }

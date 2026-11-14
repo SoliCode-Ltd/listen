@@ -1,0 +1,18 @@
+{
+ "order": [
+  "us",
+  "gb",
+  "au",
+  "ie"
+ ],
+ "shown": {
+  "af-us-ask": "Hi, my package was supposed to arrive today. Do you know where it is?",
+  "af-us-agent": "Hi there, thanks for calling. Your package left with the driver about an hour ago, and it will reach you before 6. Want me to text you the tracking link?",
+  "af-gb-ask": "Hello, I would like to book a test drive for Saturday, please.",
+  "af-gb-agent": "Of course, lovely to hear from you. We have a slot on Saturday at 5 in the afternoon. Would that suit? I will just need your name and a contact number.",
+  "af-au-ask": "Hi, I am after a room for two, from Thursday through Saturday.",
+  "af-au-agent": "No worries at all. We have a sea view room free on those dates, at one forty a night. Shall I book that in for you?",
+  "af-ie-ask": "Hi there, I would love to arrange a viewing of the flat in Ranelagh, tomorrow if possible.",
+  "af-ie-agent": "You are very welcome. Sure, how does 11 tomorrow morning sound? I will just take your name and number to confirm it."
+ }
+}
