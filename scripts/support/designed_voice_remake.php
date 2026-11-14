@@ -103,6 +103,8 @@ foreach ($ids as $id) {
 
     try {
         $backup->status = App\Models\DesignedVoice::DRAFT;
+        // Not a voice the member kept: it must not count toward the plan's voices.
+        $backup->kept_at = null;
         $backup->metadata = ((array) $backup->metadata) + ['backup_of' => $id, 'backup_at' => now()->toIso8601String()];
         $backup->save();
         $backup->delete();
@@ -110,6 +112,18 @@ foreach ($ids as $id) {
     } catch (Throwable $e) {
         echo "designed_{$id}: backup row NOT written (", mb_substr($e->getMessage(), 0, 200), ")\n";
     }
+}
+
+// A backup row is not a voice the member kept: it must not count toward the plan's voices.
+App\Models\DesignedVoice::onlyTrashed()->whereNotNull('kept_at')->get()
+    ->filter(fn ($row) => data_get($row->metadata, 'backup_of') !== null)
+    ->each(function ($row): void {
+        $row->forceFill(['kept_at' => null])->saveQuietly();
+        echo "backup row #{$row->id}: no longer counted as a kept voice\n";
+    });
+foreach (array_unique(App\Models\DesignedVoice::query()->whereIn('id', $ids)->pluck('user_id')->all()) as $userId) {
+    echo "member {$userId}: voices in the library ", App\Support\VoiceDesign::savedFor((int) $userId)->count(),
+        ', kept in total ', App\Support\VoiceDesign::keptInTotal((int) $userId), "\n";
 }
 
 App\Services\Tts\GeminiKeyManager::forgetDesignedVoiceCounts();
