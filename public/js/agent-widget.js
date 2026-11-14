@@ -76,6 +76,11 @@
     '.lva-pill{display:none;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;background:var(--soft);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}',
     '.lva-pill i{width:7px;height:7px;border-radius:50%;background:#E2445F;animation:lva-blink 1.4s ease-in-out infinite}',
     '.lva.is-live .lva-pill{display:inline-flex}',
+    /* The last half minute: the timer counts down, in plain amber words (no box round them). */
+    '.lva-pill{transition:background .35s ease,color .35s ease,padding .35s ease}',
+    '.lva-pill.is-ending{background:transparent;padding:0;color:#B45309;white-space:nowrap}',
+    '.lva[data-theme="dark"] .lva-pill.is-ending{color:#FCD34D}',
+    '.lva-pill.is-ending i{background:currentColor;animation:none}',
     '.lva-x{width:34px;height:34px;margin:-4px;border-radius:50%;border:0;background:transparent;display:grid;place-items:center;color:var(--muted);flex:0 0 auto}',
     '.lva-x:hover{background:var(--soft);color:var(--text)}',
     '.lva-x svg,.lva-call svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
@@ -178,7 +183,7 @@
     '.lva-slot p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5;text-align:center;text-wrap:balance}',
     '.lva-form{display:grid;gap:10px}',
     '.lva-field{display:grid;gap:5px;font-size:12.5px;font-weight:700;color:var(--muted)}',
-    '.lva-field input{font:inherit;font-size:15.5px;font-weight:600;color:var(--text);width:100%;height:46px;padding:0 14px;border-radius:14px;border:1px solid var(--line);background:var(--bg);outline:none;transition:border-color .2s ease,box-shadow .2s ease}',
+    '.lva-field input{font:inherit;font-size:16px;font-weight:600;color:var(--text);width:100%;height:46px;padding:0 14px;border-radius:14px;border:1px solid var(--line);background:var(--bg);outline:none;transition:border-color .2s ease,box-shadow .2s ease}',
     '.lva[data-radius="square"] .lva-field input{border-radius:8px}',
     '.lva-field input:focus{border-color:var(--a);box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 24%,transparent)}',
     '.lva-field input[aria-invalid="true"]{border-color:#D0335F}',
@@ -210,7 +215,7 @@
     '.lva.is-right .lva-bartip{right:0}.lva.is-left .lva-bartip{left:0}',
     '.lva-bartip.is-error{color:#D0335F}',
 
-    '@media (max-width:480px){.lva{bottom:14px}.lva.is-right{right:14px}.lva.is-left{left:14px}.lva:not(.is-preview):not(.is-inline) .lva-panel{position:fixed;left:10px !important;right:10px !important;bottom:calc(var(--h) + 26px);width:auto;max-width:none}}',
+    '@media (max-width:480px){.lva{bottom:14px}.lva.is-right{right:14px}.lva.is-left{left:14px}.lva:not(.is-preview):not(.is-inline) .lva-panel{position:fixed;left:10px !important;right:10px !important;bottom:calc(var(--h) + 26px + var(--kb,0px));width:auto;max-width:none}}',
     '@keyframes lva-enter{from{opacity:0;transform:translateY(14px) scale(.96)}}',
     '@keyframes lva-pop{from{opacity:0;transform:scale(.92)}}',
     '@keyframes lva-hello{to{box-shadow:0 0 0 12px transparent}}',
@@ -225,6 +230,51 @@
     '@keyframes lva-fix{from{opacity:.4}}',
     '@keyframes lva-word{from{opacity:0}}',
     '@keyframes lva-fill{to{stroke-dashoffset:0}}',
+    /* The written chat (cfg.channels.chat): the card opens on it. The name, the call button beside it,
+       the conversation, and the box to write in. A call runs in a slim bar above the same conversation. */
+    '.lva{bottom:calc(20px + var(--kb,0px))}',
+    '.lva-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}',
+    '.lva-panel.is-chat{height:min(560px,var(--room));padding-bottom:10px;gap:12px}',
+    '.lva-panel.is-chat .lva-lines,.lva-panel.is-chat .lva-lines.has-links{flex:1 1 auto;max-height:none;min-height:0;padding-top:16px}',
+    '.lva-panel.is-chat .lva-who small{display:flex;align-items:center;gap:6px}',
+    '.lva-panel.is-chat .lva-who small i{width:7px;height:7px;border-radius:50%;background:#1F9D63;flex:none}',
+    '.lva-hcall{position:relative;width:38px;height:38px;border-radius:50%;border:0;background:var(--a);color:var(--a-ink) !important;display:grid;place-items:center;flex:0 0 auto;box-shadow:0 10px 22px -12px var(--a);transition:background .25s ease,box-shadow .25s ease,transform .2s ' + EASE + '}',
+    '.lva-hcall:hover{transform:translateY(-1px)}.lva-hcall:active{transform:scale(.94)}',
+    '.lva-hcall svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.lva-hcall.is-live,.lva-hcall.is-quiet{background:#E2445F;color:#fff !important;box-shadow:none}',
+    /* The call's bar: it opens and closes smoothly (its height is its content's, from nothing). */
+    '.lva-callbar{display:grid;grid-template-rows:0fr;flex:none;margin:-6px 0;opacity:0;transition:grid-template-rows .32s ' + EASE + ',opacity .25s ease,margin .32s ' + EASE + '}',
+    '.lva-callbar>div{min-height:0;overflow:hidden;display:grid;gap:8px}',
+    '.lva.is-oncall .lva-callbar{grid-template-rows:1fr;opacity:1;margin:0}',
+    '.lva-cbrow{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:16px;background:var(--soft)}',
+    '.lva-cbviz{position:relative;display:grid;place-items:center;width:30px;height:30px;flex:none}',
+    '.lva-cbviz .lva-orbwrap{width:30px;height:30px}.lva-cbviz .lva-wave{height:26px;gap:3px}.lva-cbviz .lva-wave i{width:3px}',
+    '.lva-cbviz .lva-spin{inset:-4px}',
+    '.lva-cbstate{flex:1;min-width:0;margin:0;font-size:13.5px;font-weight:800;text-align:start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.lva-cbstate.is-error{color:#D0335F;white-space:normal}',
+    '.lva-callbar .lva-pill{display:inline-flex;background:transparent;padding:0}',
+    '.lva-callbar .lva-pos{margin:0}.lva-callbar .lva-sub{margin:0}.lva-callbar .lva-leave{justify-self:center}',
+    '.lva-line.is-typed{background:var(--a);color:var(--a-ink);border-color:transparent;white-space:pre-wrap}',
+    '.lva-line.is-typed.is-failed{opacity:.6}',
+    '.lva-panel.is-chat .lva-line.is-agent{white-space:pre-wrap}',
+    '.lva-line.is-note{align-self:center;max-width:100%;padding:0 4px;background:transparent;color:var(--muted);font-size:12.5px;font-weight:700;text-align:center}',
+    '.lva-line.is-note.is-error{color:#D0335F}',
+    '.lva-retry{display:inline;margin-inline-start:6px;padding:0;border:0;background:transparent;color:var(--a) !important;font:inherit;font-weight:800;text-decoration:underline;text-underline-offset:3px}',
+    '.lva-compose{display:flex;align-items:flex-end;gap:8px;flex:none;margin:0;padding:5px;padding-inline-start:16px;border:1px solid var(--line);border-radius:24px;background:var(--bg);transition:border-color .2s ease,box-shadow .2s ease}',
+    '.lva-compose:focus-within{border-color:var(--a);box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 18%,transparent)}',
+    '.lva-compose{transition:border-color .2s ease,box-shadow .2s ease,opacity .25s ease}.lva-compose.is-off{opacity:.5}',
+    /* 16px: a smaller box makes phones zoom the page in when it is tapped. */
+    /* width:0 : the box takes the room that is left, and never asks the card to be wider for it. */
+    '.lva-compose textarea{flex:1 1 0;width:0;min-width:0;height:38px;max-height:104px;margin:0;padding:8px 0;border:0;outline:0;background:transparent;resize:none;font:inherit;font-size:16px;line-height:22px;color:var(--text);scrollbar-width:none}',
+    '.lva-compose textarea::placeholder{color:var(--muted);opacity:1}',
+    '.lva-send{width:38px;height:38px;border-radius:50%;border:0;background:var(--a);color:var(--a-ink) !important;display:grid;place-items:center;flex:0 0 auto;transition:background .2s ease,color .2s ease,transform .2s ' + EASE + '}',
+    '.lva-send:active{transform:scale(.92)}',
+    '.lva-send:disabled{background:var(--soft);color:var(--muted) !important;cursor:default}',
+    '.lva-send svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.lva[dir="rtl"] .lva-send svg{transform:scaleX(-1)}',
+    '.lva.is-inline .lva-panel.is-chat{height:min(600px,78vh)}',
+    '.lva.is-inline .lva-panel.is-chat .lva-lines{max-height:none}',
+    '@media (max-width:480px){.lva{bottom:calc(14px + var(--kb,0px))}.lva:not(.is-inline) .lva-panel.is-chat{height:min(620px,var(--room))}}',
     '@media (prefers-reduced-motion:reduce){.lva *,.lva *::before,.lva *::after{animation:none !important;transition:none !important}}',
     /* The link page: the same card, open in the page, with no button to open it and nothing to close. */
     '.lva.is-inline,.lva.is-inline.is-right,.lva.is-inline.is-left{position:relative;inset:auto;z-index:auto;display:flex;justify-content:center;width:100%}',
@@ -244,6 +294,7 @@
     micOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V6a3 3 0 0 0-5.7-1.3"/><path d="M19 11a7 7 0 0 1-1.2 3.9M5 11a7 7 0 0 0 10.8 5.9M12 18v3"/></svg>',
     end: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15.2c5-4.6 13-4.6 18 0l-2.3 2.7-3.7-1.4v-2.8a12.4 12.4 0 0 0-6 0v2.8l-3.7 1.4z"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    send: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3L10.5 13.5"/><path d="M21 3l-6.5 18-4-7.500L3 9.500z"/></svg>',
     check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     link: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>',
     callback: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.1 3.5h3.1l1.6 4.1-2 1.3a11.3 11.3 0 0 0 5.3 5.3l1.3-2 4.1 1.6v3.1a2 2 0 0 1-2.2 2A16.6 16.6 0 0 1 3.1 5.7a2 2 0 0 1 2-2.2zM15 3h6v6M21 3l-6.5 6.5"/></svg>',
@@ -419,9 +470,22 @@
     var host = el('div');
     host.setAttribute(preview ? 'data-listen-agent-preview' : 'data-listen-agent', '');
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
-    var style = el('style');
-    style.textContent = CSS;
-    root.appendChild(style);
+    // A constructed sheet where the browser has them (a page whose policy refuses inline styles
+    // still shows the card as drawn); a style element otherwise.
+    var sheeted = false;
+    try {
+      if (root.adoptedStyleSheets && window.CSSStyleSheet && CSSStyleSheet.prototype.replaceSync) {
+        var sheet = new CSSStyleSheet();
+        sheet.replaceSync(CSS);
+        root.adoptedStyleSheets = [sheet];
+        sheeted = true;
+      }
+    } catch (e) { sheeted = false; }
+    if (!sheeted) {
+      var style = el('style');
+      style.textContent = CSS;
+      root.appendChild(style);
+    }
     var box = el('div', 'lva');
     root.appendChild(box);
     (opts.into || document.body).appendChild(host);
@@ -432,6 +496,10 @@
     var inline = !!opts.inline;
     if (inline) open = true;
     var startedAt = 0, tick = 0, demo = null;
+    // The written chat (cfg.channels.chat): the card opens on it, the call beside the name.
+    // chat: the open conversation's id, key and address; log: what the card shows, kept for the
+    // visit (sessionStorage), so the next page of the website goes on with the same conversation.
+    var chatOn = false, callOn = true, chatText = {}, chat = null, sending = false, lastCall = null, log = [];
     // Every line busy: the caller's place in line, then the number they left (waiting, busy, sent).
     var waitPos = 0, sentTo = null;
     var parts = {};
@@ -445,6 +513,12 @@
       states = text.states || {};
       look = cfg.look || {};
       if (inline && look.style === 'bar') { var asCard = {}; for (var lk in look) asCard[lk] = look[lk]; asCard.style = 'orb'; look = asCard; }
+      // How customers reach the agent. Settings from before the chat came have no channels: calls, as before.
+      chatText = cfg.chat || {};
+      chatOn = !preview && !!(cfg.channels && cfg.channels.chat) && !!cfg.chat;
+      callOn = !cfg.channels || cfg.channels.call !== false;
+      // With a chat every style is the card (the slim bar has nowhere to write), and what is said shows in it.
+      if (chatOn) { var asChat = {}; for (var ck in look) asChat[ck] = look[ck]; if (asChat.style === 'bar') asChat.style = 'orb'; asChat.captions = true; look = asChat; }
       var colors = cfg.colors || ['#2A1A8F', '#7659FA', '#C9BEFF', '#F4F1FF'];
       var pageRtl = opts.rtl != null ? !!opts.rtl : (getComputedStyle(document.documentElement).direction === 'rtl' || document.documentElement.dir === 'rtl');
       var side = (look.position === 'start') !== pageRtl ? 'left' : 'right';
@@ -507,8 +581,108 @@
         return wrap;
       }
 
+      // The chat card: the name with the call button beside it, a call's bar, the conversation, the box to write in.
+      if (!bar && chatOn) {
+        var cpanel = el('div', 'lva-panel is-chat');
+        cpanel.id = 'lva-panel';
+        cpanel.setAttribute('role', 'dialog');
+        cpanel.setAttribute('aria-label', text.title || cfg.business || '');
+        var chead = el('div', 'lva-head');
+        var cwho = el('div', 'lva-who');
+        var ctitle = el('strong', '', text.title || cfg.business || cfg.name);
+        ctitle.dir = 'auto';
+        cwho.appendChild(ctitle);
+        var conline = el('small');
+        conline.appendChild(el('i'));
+        conline.appendChild(el('span', '', chatText.online || text.subtitle || ''));
+        cwho.appendChild(conline);
+        var cphoto = look.photo !== false && cfg.avatar && (/^https:\/\//.test(cfg.avatar) || (ctx.origin && cfg.avatar.indexOf(ctx.origin + '/') === 0)) ? cfg.avatar : null;
+        if (cphoto) { var cface = el('span', 'lva-face'); var cimg = el('img'); cimg.alt = ''; cimg.src = cphoto; cface.appendChild(cimg); chead.appendChild(cface); }
+        chead.appendChild(cwho);
+        if (callOn) {
+          // One round button: call, then hang up.
+          parts.call = el('button', 'lva-hcall');
+          parts.call.type = 'button';
+          parts.callIcon = el('span');
+          parts.callIcon.style.display = 'contents';
+          parts.callLabel = el('span', 'lva-sr', chatText.call || text.start);
+          parts.call.appendChild(parts.callIcon); parts.call.appendChild(parts.callLabel);
+          parts.call.addEventListener('click', toggleCall);
+          chead.appendChild(parts.call);
+        }
+        var cclose = el('button', 'lva-x');
+        cclose.type = 'button';
+        cclose.setAttribute('aria-label', text.close || 'Close');
+        cclose.innerHTML = ICONS.close;
+        cclose.addEventListener('click', function () { setOpen(false); });
+        if (!inline) chead.appendChild(cclose);
+        // A call: its voice, what it is doing, its time; while every line is busy, the caller's place.
+        parts.callBox = el('div', 'lva-callbar');
+        var cbar = el('div');
+        var crow = el('div', 'lva-cbrow');
+        var cviz = el('span', 'lva-cbviz');
+        parts.voice = voice(true);
+        cviz.appendChild(parts.voice);
+        parts.state = el('p', 'lva-cbstate', '');
+        parts.state.setAttribute('aria-live', 'polite');
+        var cpill = el('span', 'lva-pill');
+        cpill.appendChild(el('i'));
+        parts.pillTime = el('span', '', '00:00');
+        cpill.appendChild(parts.pillTime);
+        crow.appendChild(cviz); crow.appendChild(parts.state); crow.appendChild(cpill);
+        parts.pos = el('span', 'lva-pos');
+        parts.pos.hidden = true;
+        parts.pos.appendChild(el('i'));
+        parts.posText = el('span');
+        parts.pos.appendChild(parts.posText);
+        parts.sub = el('p', 'lva-sub');
+        parts.leave = leaveButton();
+        parts.leave.hidden = true;
+        [crow, parts.pos, parts.sub, parts.leave].forEach(function (n) { cbar.appendChild(n); });
+        parts.callBox.appendChild(cbar);
+        parts.slot = el('div', 'lva-slot');
+        parts.slot.hidden = true;
+        parts.lines = el('div', 'lva-lines');
+        parts.lines.addEventListener('scroll', function () {
+          var box = parts.lines;
+          if (!box || Date.now() - (box.__auto || 0) < 800) return;
+          box.__pinned = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+        }, { passive: true });
+        parts.lines.setAttribute('role', 'log');
+        parts.lines.setAttribute('aria-live', 'polite');
+        parts.form = el('form', 'lva-compose');
+        parts.form.setAttribute('novalidate', '');
+        parts.input = el('textarea');
+        parts.input.rows = 1;
+        parts.input.dir = 'auto';
+        parts.input.maxLength = Math.max(100, Number(chatText.max_chars) || 1000);
+        parts.input.placeholder = chatText.placeholder || '';
+        parts.input.setAttribute('aria-label', chatText.placeholder || '');
+        parts.input.setAttribute('enterkeyhint', 'send');
+        parts.send = el('button', 'lva-send');
+        parts.send.type = 'submit';
+        parts.send.disabled = true;
+        parts.send.setAttribute('aria-label', chatText.send || 'Send');
+        parts.send.innerHTML = ICONS.send;
+        parts.form.appendChild(parts.input); parts.form.appendChild(parts.send);
+        parts.input.addEventListener('input', roomToWrite);
+        // Enter sends (the key is labelled "send" on a phone); Shift+Enter starts a new line, and
+        // an Enter that only picks a word while composing (Arabic, Chinese, Japanese keyboards) does nothing.
+        parts.input.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.keyCode === 229) return;
+          e.preventDefault();
+          sendChat();
+        });
+        // Pressing send never takes the keyboard away: the box keeps its focus.
+        parts.send.addEventListener('pointerdown', function (e) { e.preventDefault(); });
+        parts.form.addEventListener('submit', function (e) { e.preventDefault(); sendChat(); });
+        [chead, parts.callBox, parts.slot, parts.lines, parts.form, powered()].forEach(function (n) { cpanel.appendChild(n); });
+        box.appendChild(cpanel);
+        showChat();
+      }
+
       // The card (orb and waves).
-      if (!bar) {
+      if (!bar && !chatOn) {
         var panel = el('div', 'lva-panel');
         panel.id = 'lva-panel';
         panel.setAttribute('role', 'dialog');
@@ -678,7 +852,9 @@
       open = v;
       box.classList.toggle('is-open', v);
       parts.launch.setAttribute('aria-expanded', v ? 'true' : 'false');
-      if (v) setTimeout(function () { parts.call && parts.call.focus(); }, 60); else if (!preview) parts.launch.focus();
+      // The chat card: straight to writing where there is a keyboard (on a phone that would open it over the card).
+      if (v && chatOn) { setTimeout(function () { if (window.matchMedia && matchMedia('(pointer:fine)').matches && parts.input) parts.input.focus(); follow(true); }, 80); }
+      else if (v) setTimeout(function () { parts.call && parts.call.focus(); }, 60); else if (!preview) parts.launch.focus();
       timer();
     }
     root.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) setOpen(false); });
@@ -689,19 +865,24 @@
       var on = live(), waiting = stateNow === 'waiting', form = stateNow === 'busy' || stateNow === 'sent';
       var msg = message || (stateNow === 'mic' ? text.mic : waiting ? (lineText().waiting || '') : endedText() || states[stateNow] || '');
       // Before and after a call the owner may hide the line under the orb (look.ready_show).
-      var quiet = !on && !waiting && stateNow !== 'error' && stateNow !== 'mic' && !message && look.ready_show === false;
+      // (Why a call ended at its time limit is always said: it is news, not the line that waits for a call.)
+      var quiet = !on && !waiting && stateNow !== 'error' && stateNow !== 'mic' && !message && look.ready_show === false && !timeUp();
       box.classList.toggle('is-live', on);
       box.classList.toggle('is-waiting', waiting);
       box.classList.toggle('is-connecting', stateNow === 'connecting');
       box.classList.toggle('is-speaking', stateNow === 'speaking');
       box.classList.toggle('is-barlive', look.style === 'bar' && (on || waiting || form || stateNow === 'error' || stateNow === 'mic'));
+      // The chat card: a call's bar is open while there is a call (or a wait) to show, and writing
+      // waits for the call to end (one conversation at a time, spoken or written).
+      box.classList.toggle('is-oncall', chatOn && (on || waiting));
+      if (chatOn && parts.input) { parts.input.disabled = on || waiting; parts.form.classList.toggle('is-off', on || waiting); if (parts.send) parts.send.disabled = on || waiting || sending || !parts.input.value.replace(/\s+/g, ''); }
       if (parts.state) {
         parts.state.hidden = quiet;
         parts.state.textContent = quiet ? '' : msg;
         parts.state.classList.toggle('is-error', stateNow === 'error' || stateNow === 'mic');
       }
       if (parts.pos) { parts.pos.hidden = !waiting; parts.posText.textContent = waiting ? waitText() : ''; }
-      if (parts.sub) parts.sub.textContent = waiting ? (lineText().hold || '') : '';
+      if (parts.sub) parts.sub.textContent = waiting ? (lineText().hold || '') : (timeUp() && !message && endedFor >= 1 && text.lasted ? String(text.lasted).replace(':time', clock(endedFor)) : '');
       if (parts.leave) parts.leave.hidden = !waiting;
       if (parts.callBox) parts.callBox.hidden = form;
       if (parts.slot) parts.slot.hidden = !form;
@@ -709,10 +890,15 @@
         // While waiting the button quietly gives up the wait; "leave my number" is the main way on.
         parts.call.classList.toggle('is-live', on);
         parts.call.classList.toggle('is-quiet', waiting);
-        parts.callLabel.textContent = waiting ? (lineText().cancel || text.end) : on ? text.end : text.start;
+        parts.callLabel.textContent = waiting ? (lineText().cancel || text.end) : on ? text.end : (timeUp() && text.again) || text.start;
         parts.callIcon.innerHTML = waiting ? '' : on ? ICONS.end : ICONS.phone;
+        // The chat card's round button has no words to show: hang up is its icon while waiting too.
+        if (chatOn) {
+          if (waiting) parts.callIcon.innerHTML = ICONS.end;
+          if (!on && !waiting) parts.callLabel.textContent = chatText.call || text.start;
+        }
       }
-      if (parts.barState) parts.barState.textContent = on && startedAt && stateNow !== 'connecting' ? clock(elapsed()) : (form ? '' : msg);
+      if (parts.barState) parts.barState.textContent = on && startedAt && stateNow !== 'connecting' ? timeText() : (form ? '' : msg);
       if (parts.tip) {
         var err = stateNow === 'error' || stateNow === 'mic';
         parts.tip.hidden = !(err || waiting || form);
@@ -819,9 +1005,20 @@
       setTimeout(function () { done.focus(); }, 60);
     }
     var endedFor = 0;
+    // The call's time limit: when it ends (set once the agent has warned the caller, so the timer
+    // counts down from there), and why the last call ended ("limit": its time was up).
+    var endsAt = 0, endedWhy = '';
     function elapsed() { return startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0; }
-    // "Call ended after 01:24", in place of "Call ended", once a call that was answered is over.
-    function endedText() { return stateNow === 'ended' && endedFor >= 1 && text.ended_after ? String(text.ended_after).replace(':time', clock(endedFor)) : ''; }
+    function leftNow() { return endsAt ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000)) : 0; }
+    // "Ends in 00:29" while the last half minute runs (a card cached before these words came keeps the plain timer).
+    function ending() { return live() && endsAt > 0 && !!text.ends_in && leftNow() <= endsLead; }
+    function timeUp() { return stateNow === 'ended' && endedWhy === 'limit' && !!text.ended_limit; }
+    // "Call ended after 01:24", in place of "Call ended", once a call that was answered is over;
+    // "The call's time is up" when it reached its limit (its length goes on the line under it).
+    function endedText() {
+      if (timeUp()) return text.ended_limit;
+      return stateNow === 'ended' && endedFor >= 1 && text.ended_after ? String(text.ended_after).replace(':time', clock(endedFor)) : '';
+    }
     function setState(s, message) {
       if (s === 'error' && !message && pendingError) message = pendingError;
       // The internet dropped during the call: said in the card's language, not "something went wrong".
@@ -837,9 +1034,12 @@
       else hideTyping(0);
       if (live() && !was) {
         startedAt = 0;
+        endsAt = 0;
+        endedWhy = '';
         clearInterval(tick);
         tick = setInterval(timer, 1000);
       }
+      if (s === 'idle') endedWhy = '';
       if ((s === 'listening' || s === 'speaking') && !startedAt) startedAt = Date.now();
       if (s === 'busy' && before !== 'busy') showForm();
       if (s === 'sent') showSent();
@@ -854,10 +1054,25 @@
       }
       paintState(message);
       timer();
+      // The chat card has no place of its own for a call that is over or failed: it is said in
+      // the conversation (why it ended, how long it was), and the card is ready again.
+      if (chatOn && (s === 'ended' || s === 'error' || s === 'mic') && before !== s) {
+        var said = s === 'ended'
+          ? (timeUp() ? text.ended_limit + (endedFor >= 1 && text.lasted ? ' · ' + String(text.lasted).replace(':time', clock(endedFor)) : '') : (endedText() || chatText.call_ended || states.ended || ''))
+          : (message || (s === 'mic' ? text.mic : states.error) || '');
+        if (said) chatNote(said, s !== 'ended');
+        stateNow = 'idle';
+        endedFor = 0;
+        paintState();
+        timer();
+      }
     }
+    // The call's time as it shows: counting up, or "Ends in 00:29" through its last half minute.
+    function timeText() { return ending() ? String(text.ends_in).replace(':time', clock(leftNow())) : clock(elapsed()); }
     function timer() {
-      var t = clock(elapsed());
+      var t = timeText();
       if (parts.pillTime) parts.pillTime.textContent = t;
+      if (parts.pillTime && parts.pillTime.parentNode) parts.pillTime.parentNode.classList.toggle('is-ending', ending());
       if (live() && startedAt) {
         if (parts.launchLabel && !open) parts.launchLabel.textContent = t;
         if (parts.barState && stateNow !== 'connecting') parts.barState.textContent = t;
@@ -887,7 +1102,7 @@
      * The chat changes without jumps: its height moves smoothly to the new one (to its most, then
      * it scrolls), and it follows the newest line unless the caller scrolled up to read.
      */
-    var typing = null, typingOff = 0;
+    var typing = null, typingOff = 0, endsLead = 30;
     function smoothly(change) {
       var box = parts.lines;
       if (!box) { change(); return; }
@@ -1121,18 +1336,259 @@
       });
       return loadCall.p;
     }
+    /*
+     * The written chat. The visitor's message shows at once; the agent's reply comes from Listen
+     * (agent-api/chats) and is written a word at a time. A message that did not go through says so
+     * with "send again"; sent again it keeps its own id, so it is answered, and charged, once.
+     */
+    var CHAT_STORE = 'listen_chat_' + (ctx.key || ctx.slug || '');
+    function chatRef() { return chat ? { conversation: chat.id, chat_key: chat.key } : undefined; }
+    function saveChat() {
+      if (!chatOn) return;
+      try { window.sessionStorage.setItem(CHAT_STORE, JSON.stringify({ chat: chat, call: lastCall, log: log.slice(-60), at: Date.now() })); } catch (e) {}
+    }
+    function loadChat() {
+      try {
+        var kept = JSON.parse(window.sessionStorage.getItem(CHAT_STORE) || 'null');
+        // Kept for the visit, an hour at most (and never from a time yet to come).
+        if (!kept || typeof kept !== 'object' || !(kept.at > 0) || kept.at > Date.now() + 60000 || Date.now() - kept.at > 3600000) return;
+        // Another script on the page can write here: only a conversation of this agent's own
+        // address is believed, and only lines of the kinds the card writes.
+        var c = kept.chat, id = c && typeof c.id === 'string' && /^cnv_[a-z0-9]{24}$/.test(c.id) ? c.id : '';
+        chat = id && typeof c.key === 'string' && /^[A-Za-z0-9]{20,80}$/.test(c.key) ? { id: id, key: c.key, api: ctx.origin + '/agent-api/chats/' + id } : null;
+        var k = kept.call;
+        lastCall = k && typeof k.conversation === 'string' && typeof k.call_key === 'string' ? { conversation: k.conversation, call_key: k.call_key } : null;
+        log = (Array.isArray(kept.log) ? kept.log : []).map(function (l) {
+          if (!l || typeof l !== 'object') return null;
+          if (l.k === 'links') {
+            var links = (Array.isArray(l.links) ? l.links : []).filter(function (x) { return x && typeof x === 'object' && /^https?:\/\//i.test(String(x.url || '')); })
+              .map(function (x) { return { url: String(x.url), label: typeof x.label === 'string' ? x.label : '', network: typeof x.network === 'string' ? x.network : '' }; });
+            return links.length ? { k: 'links', links: links } : null;
+          }
+          if ((l.k !== 'me' && l.k !== 'agent' && l.k !== 'note') || typeof l.t !== 'string') return null;
+          var line = { k: l.k, t: l.t.slice(0, 4000) };
+          // A message still waiting for its answer when the page was left.
+          if (l.k === 'me' && l.wait && typeof l.id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(l.id)) { line.wait = true; line.id = l.id; }
+          return line;
+        }).filter(Boolean);
+      } catch (e) { chat = null; lastCall = null; log = []; try { window.sessionStorage.removeItem(CHAT_STORE); } catch (e2) {} }
+    }
+    // The conversation stays on its newest line (unless the visitor scrolled up to read).
+    function follow(now) {
+      var box = parts.lines;
+      if (!box || box.__pinned === false) return;
+      box.__auto = Date.now();
+      if (now || !box.scrollTo || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) box.scrollTop = box.scrollHeight;
+      else box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+    }
+    function chatBubble(kind, words) {
+      var n = el('div', 'lva-line ' + (kind === 'me' ? 'is-caller is-typed' : kind === 'note' ? 'is-note' : kind === 'error' ? 'is-note is-error' : 'is-agent'), words || '');
+      n.dir = 'auto';
+      return n;
+    }
+    // A small line in the middle of the conversation: a call started, a call ended, a problem.
+    function chatNote(words, isError) {
+      if (!parts.lines || !words) return;
+      var n = chatBubble(isError ? 'error' : 'note', words);
+      smoothly(function () { parts.lines.appendChild(n); });
+      if (!isError) { if (!log.length && chatText.greeting) log.push({ k: 'agent', t: chatText.greeting }); log.push({ k: 'note', t: words }); saveChat(); }
+    }
+    // The card as it opens: the conversation of this visit, or the agent's greeting.
+    function showChat() {
+      if (!log.length && !chat) loadChat();
+      if (!parts.lines) return;
+      parts.lines.innerHTML = '';
+      parts.lines.__pinned = true;
+      if (!log.length && chatText.greeting) parts.lines.appendChild(chatBubble('agent', chatText.greeting));
+      var waiting = null;
+      log.forEach(function (l, i) {
+        if (l.k === 'links') { linksLine({ links: l.links || [] }); return; }
+        var view = chatBubble(l.k, l.t);
+        parts.lines.appendChild(view);
+        if (l.k === 'me' && l.wait && i === log.length - 1) waiting = { id: l.id, text: l.t, view: view, kept: true };
+      });
+      follow(true);
+      // The last message was still waiting for its answer when the page was left: asked again
+      // with its own id, it gets the answer it already has (or its first), charged once.
+      if (waiting && !sending) {
+        sending = true;
+        showTyping();
+        deliver(waiting, 0);
+        roomToWrite();
+      }
+    }
+    // A message as it is kept while its answer is on the way.
+    function keepWaiting(msg) {
+      if (!log.length && chatText.greeting) log.push({ k: 'agent', t: chatText.greeting });
+      log.push({ k: 'me', t: msg.text, id: msg.id, wait: true });
+      saveChat();
+    }
+    function forgetWaiting(msg) {
+      for (var i = log.length - 1; i >= 0; i--) if (log[i].k === 'me' && log[i].id === msg.id) { log.splice(i, 1); break; }
+      saveChat();
+    }
+    // The box grows with what is written (four lines at most), and the send button wakes with the first letter.
+    function roomToWrite() {
+      var input = parts.input;
+      if (!input) return;
+      input.style.height = '38px';
+      input.style.height = Math.min(104, Math.max(38, input.scrollHeight)) + 'px';
+      if (parts.send) parts.send.disabled = sending || !input.value.replace(/\s+/g, '');
+    }
+    function askChat(url, body) {
+      var stop = window.AbortController ? new AbortController() : null;
+      var timer = setTimeout(function () { stop && stop.abort(); }, 55000);
+      return fetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(body), signal: stop ? stop.signal : undefined })
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { clearTimeout(timer); return { ok: r.ok, status: r.status, data: d || {} }; }); },
+          function (e) { clearTimeout(timer); throw e; });
+    }
+    function openChat() {
+      if (chat) return Promise.resolve();
+      var body = ctx.slug ? { slug: ctx.slug, page_url: location.href, visitor: visitorId(), call: lastCall || undefined }
+        : { key: ctx.key, page_url: location.href, visitor: visitorId(), caller: ctx.caller || undefined, call: lastCall || undefined };
+      return askChat(ctx.origin + '/agent-api/chats', body).then(function (res) {
+        if (!res.ok || !res.data.conversation) { var e = new Error(res.data.message || chatText.away || ''); e.said = true; throw e; }
+        chat = { id: res.data.conversation, key: res.data.chat_key, api: res.data.api };
+        saveChat();
+      });
+    }
+    function sendChat(again) {
+      if (sending || !parts.input) return;
+      // On a call the conversation is spoken: nothing is written (or sent again) until it ends.
+      if (live() || starting || stateNow === 'waiting' || stateNow === 'connecting') return;
+      var msg = again || { id: 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), text: parts.input.value.replace(/^\s+|\s+$/g, '') };
+      if (!msg.text) return;
+      if (msg.text.length > parts.input.maxLength) { chatNote(chatText.too_long || '', true); return; }
+      sending = true;
+      // A call that is over, a form that was sent: the card is the chat again.
+      if (stateNow === 'sent' || stateNow === 'busy') setState('idle');
+      if (!again) {
+        parts.input.value = '';
+        msg.view = chatBubble('me', msg.text);
+        parts.lines.__pinned = true;
+        smoothly(function () { parts.lines.appendChild(msg.view); });
+      } else {
+        msg.view.classList.remove('is-failed');
+        if (msg.fail && msg.fail.parentNode) msg.fail.parentNode.removeChild(msg.fail);
+        msg.fail = null;
+      }
+      roomToWrite();
+      showTyping();
+      keepWaiting(msg);
+      deliver(msg, 0);
+    }
+    function deliver(msg, tries) {
+      var later = function (ms) { return new Promise(function (go) { setTimeout(go, ms); }); };
+      openChat().then(function () {
+        return askChat(chat.api + '/messages', { chat_key: chat.key, id: msg.id, text: msg.text, call: lastCall || undefined });
+      }).then(function (res) {
+        if (res.ok && typeof res.data.reply === 'string') { answered(msg, res.data); return; }
+        // This conversation is over (quiet for a while, or all its replies given): a new one, once.
+        if ((res.status === 410 || res.status === 404) && tries < 1) { chat = null; saveChat(); deliver(msg, tries + 1); return; }
+        // The agent did not answer in time: once more, the same message (answered and charged once).
+        if (res.status >= 500 && tries < 1) { later(1200).then(function () { deliver(msg, tries + 1); }); return; }
+        failed(msg, res.data.message || chatText.failed || '');
+      }, function (e) {
+        if (e && e.said) { failed(msg, e.message); return; }
+        if (tries < 1) { later(1500).then(function () { deliver(msg, tries + 1); }); return; }
+        failed(msg, (typeof navigator !== 'undefined' && navigator.onLine === false ? text.offline : chatText.failed) || '');
+      });
+    }
+    function answered(msg, data) {
+      sending = false;
+      // Kept since it was sent (keepWaiting): it is waiting no more.
+      forgetWaiting(msg);
+      if (!log.length && chatText.greeting) log.push({ k: 'agent', t: chatText.greeting });
+      log.push({ k: 'me', t: msg.text });
+      var links = Array.isArray(data.links) ? data.links.filter(function (l) { return l && /^https?:\/\//i.test(String(l.url || '')); }) : [];
+      if (links.length) { linksLine({ links: links }); log.push({ k: 'links', links: links }); }
+      log.push({ k: 'agent', t: data.reply });
+      saveChat();
+      // The dots become the agent's bubble; its words come in a word at a time (all at once for reduced motion).
+      smoothly(function () {
+        var n = typing;
+        typing = null;
+        clearTimeout(typingOff);
+        if (n) n.innerHTML = ''; else { n = el('div'); parts.lines.appendChild(n); }
+        n.className = 'lva-line is-agent';
+        n.dir = 'auto';
+        n.removeAttribute('aria-hidden');
+        writeOut(n, String(data.reply));
+      });
+      roomToWrite();
+    }
+    function writeOut(node, words) {
+      var bits = words.match(/\s*\S+/g) || [words];
+      if ((window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || bits.length < 2) { node.removeAttribute('aria-hidden'); node.textContent = words; follow(); return; }
+      node.setAttribute('aria-hidden', 'true');
+      // Never slower than reading: the whole reply is out within about a second and a half.
+      var every = Math.max(12, Math.min(45, 1500 / bits.length)), i = 0;
+      (function next() {
+        if (!node.parentNode) return;
+        node.appendChild(el('span', 'lva-w', bits[i++]));
+        follow();
+        if (i < bits.length) setTimeout(next, every);
+        else { node.textContent = words; node.removeAttribute('aria-hidden'); follow(); }
+      })();
+    }
+    function failed(msg, words) {
+      sending = false;
+      forgetWaiting(msg);
+      hideTyping(0);
+      if (!msg.view || !msg.view.parentNode) { msg.view = chatBubble('me', msg.text); parts.lines.appendChild(msg.view); }
+      msg.view.classList.add('is-failed');
+      msg.fail = chatBubble('error', words || chatText.failed || '');
+      var retry = el('button', 'lva-retry', chatText.retry || '');
+      retry.type = 'button';
+      retry.addEventListener('click', function () { sendChat(msg); });
+      msg.fail.appendChild(retry);
+      smoothly(function () {
+        if (msg.view.nextSibling) parts.lines.insertBefore(msg.fail, msg.view.nextSibling); else parts.lines.appendChild(msg.fail);
+      });
+      roomToWrite();
+    }
+    // A phone's keyboard covers the bottom of the page: the card lifts above it and fits the room left.
+    if (window.visualViewport && !preview) {
+      var fitKeyboard = function () {
+        if (!chatOn || inline) return;
+        var vv = window.visualViewport;
+        var under = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+        // Only a keyboard under the box being written in: a page zoomed with two fingers, or the
+        // address bar moving, is not one.
+        var typingNow = open && under > 120 && !(vv.scale > 1.01) && !!parts.input && root.activeElement === parts.input;
+        box.style.setProperty('--kb', typingNow ? under + 'px' : '0px');
+        if (typingNow) box.style.setProperty('--room', Math.max(200, Math.round(vv.height) - 96) + 'px'); else box.style.removeProperty('--room');
+        follow(true);
+      };
+      window.visualViewport.addEventListener('resize', fitKeyboard);
+      window.visualViewport.addEventListener('scroll', fitKeyboard);
+      box.addEventListener('focusin', fitKeyboard);
+      box.addEventListener('focusout', function () { setTimeout(fitKeyboard, 60); });
+    }
+    // Back to a page the browser kept as it was left: the conversation may have gone on since,
+    // on the page after it. What is kept for the visit is shown, never the page's old copy.
+    if (!preview) {
+      window.addEventListener('pageshow', function (e) {
+        if (!e.persisted || !chatOn || sending || live() || starting) return;
+        log = []; chat = null;
+        showChat();
+      });
+    }
+
     function toggleCall() {
       if (preview) { demo ? demo.stop() : runDemo(); return; }
       if (inline && cfg.available === false) return;
       if (call) { call.end(); return; }
-      if (starting) return;
+      if (starting || sending) return;
       starting = true;
       typing = null;
       liveView = null;
       hearing = null;
       clearTimeout(typingOff);
       if (parts.lines) parts.lines.__pinned = true;
-      if (parts.lines) { parts.lines.innerHTML = ''; parts.lines.hidden = look.captions === false; parts.lines.classList.remove('has-links'); }
+      // The chat card keeps its conversation: the call is one more part of it.
+      if (chatOn) chatNote(chatText.call_started || '');
+      else if (parts.lines) { parts.lines.innerHTML = ''; parts.lines.hidden = look.captions === false; parts.lines.classList.remove('has-links'); }
       if (parts.barLinks) parts.barLinks.hidden = true;
       setState('connecting');
       loadCall().then(function () {
@@ -1141,10 +1597,17 @@
           begin: function () {
             return fetch(ctx.origin + '/agent-api/calls', {
               method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-              body: JSON.stringify(ctx.slug ? { slug: ctx.slug, page_url: location.href, visitor: visitorId() } : { key: ctx.key, page_url: location.href, visitor: visitorId(), caller: ctx.caller || undefined }),
+              // The chat written just before the call goes with it: the agent goes on from what was written.
+              body: JSON.stringify(ctx.slug ? { slug: ctx.slug, page_url: location.href, visitor: visitorId(), chat: chatRef() } : { key: ctx.key, page_url: location.href, visitor: visitorId(), caller: ctx.caller || undefined, chat: chatRef() }),
             }).then(function (r) { return r.json().catch(function () { return {}; }); });
           },
+          // As the time runs out the agent offers the chat, where the card has one.
+          afterLimit: chatOn ? 'chat' : '',
+          onInfo: function (i) { lastCall = i && i.conversation ? { conversation: i.conversation, call_key: i.call_key } : null; saveChat(); },
           onState: function (s) { setState(s); },
+          // The agent has told the caller the time is nearly up: the timer counts down from here.
+          onLimit: function (at, left, lead) { endsAt = Number(at) || 0; endsLead = Math.max(5, Number(lead) || 30); timer(); },
+          onEnd: function (reason) { endedWhy = String(reason || ''); },
           onTurn: line,
           onWords: words,
           onHold: hold,
@@ -1209,7 +1672,7 @@
       update: function (next) { render(next); },
       open: function (o) {
         if (look.style !== 'bar') setOpen(true);
-        if (o && o.call && !call && !starting && !demo) toggleCall();
+        if (o && o.call && callOn && !call && !starting && !demo) toggleCall();
       },
       demo: function (on) { if (on && !demo) { if (look.style !== 'bar') setOpen(true); runDemo(); } else if (!on && demo) demo.stop(); },
       destroy: function () { if (demo) demo.stop(); clearInterval(tick); host.remove(); },
@@ -1236,6 +1699,8 @@
 
   function mount(cfg, ctx) {
     if (!document.body || document.querySelector('[data-listen-agent]')) return;
+    // Neither a chat nor calls on offer right now (a chat-only agent that cannot answer): no button.
+    if (cfg && cfg.channels && cfg.channels.chat === false && cfg.channels.call === false) return;
     if (ctx && !ctx.caller) ctx.caller = signedCaller(ctx.key);
     var w = build(cfg, ctx, {});
     // The page can open it too ("Talk to our agent"), and start the call at once.

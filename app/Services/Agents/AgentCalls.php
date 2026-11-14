@@ -212,7 +212,7 @@ class AgentCalls
     }
 
     /**
-     * @param  array{origin?: ?string, page_url?: ?string, visitor?: ?string, country?: ?string, network?: ?string, free_only?: bool, caller?: ?array{email: string, name: ?string}}  $context
+     * @param  array{origin?: ?string, page_url?: ?string, visitor?: ?string, country?: ?string, network?: ?string, free_only?: bool, caller?: ?array{email: string, name: ?string}, before?: ?string}  $context  before: what the caller wrote in the chat just before calling (AgentChats::spokenBefore)
      * @return array{ok: bool, error?: string, conversation?: AgentConversation, call_key?: string, token?: string, max_seconds?: int, free?: bool}
      */
     public function start(Agent $agent, string $channel, ?AgentWidget $widget = null, array $context = []): array
@@ -386,7 +386,7 @@ class AgentCalls
             $lock?->release();
         }
 
-        $key = $this->gemini->liveToken(LiveSession::setupFor($agent), $max + 20);
+        $key = $this->gemini->liveToken(LiveSession::setupFor($agent, $context['before'] ?? null), $max + 20);
         if ($key === null) {
             $this->settle($conversation, 'failed', 0);
 
@@ -606,7 +606,9 @@ class AgentCalls
     public function findByKey(string $publicId, string $callKey): ?AgentConversation
     {
         $conversation = AgentConversation::where('public_id', $publicId)->first();
-        if (! $conversation || ! hash_equals((string) $conversation->call_key_hash, hash('sha256', $callKey))) {
+        // A written chat (AgentChats) is never a call: its key opens none of a call's doors (ending
+        // it as a call would hand its whole hold back).
+        if (! $conversation || AgentChats::isChat($conversation) || ! hash_equals((string) $conversation->call_key_hash, hash('sha256', $callKey))) {
             return null;
         }
 
@@ -620,7 +622,8 @@ class AgentCalls
     public function ping(AgentConversation $conversation, array $turns = []): array
     {
         if (! $conversation->isLive()) {
-            return ['stop' => true, 'seconds_left' => 0];
+            // Ended on the server (settled, or stopped by the team): the card does not call it a time limit.
+            return ['stop' => true, 'ended' => true, 'seconds_left' => 0];
         }
         $this->appendTurns($conversation, $turns);
         $conversation->last_seen_at = now();
@@ -750,6 +753,11 @@ class AgentCalls
         if ($usage !== null && $conversation->usage === null) {
             $conversation->usage = $usage;
             $conversation->cost_usd = self::costOf($usage);
+        }
+        // A call that ran to its time limit ended for that reason, whatever the agent gave when it
+        // said goodbye in its last seconds (only an abusive caller's reason stands, for the block).
+        if ($reason === 'limit' && $conversation->end_reason !== 'abusive') {
+            $conversation->end_reason = 'limit';
         }
         // Kept before settling, which reads the call afresh under its lock.
         $conversation->save();
@@ -1223,12 +1231,15 @@ class AgentCalls
             $match->where('email', $lead['email']);
         }
         $contact = $match->first() ?? new AgentContact(['user_id' => $userId]);
+        // A customer the owner already has keeps their name and email: anyone can give a number
+        // that is not theirs, and must not rename the customer it belongs to (what they said is
+        // still on the conversation itself). What they want now is the newest.
         $contact->fill(array_filter([
             'agent_id' => $agentId,
             'agent_conversation_id' => $conversationId,
-            'name' => $lead['name'] ?? $contact->name,
+            'name' => filled($contact->name) ? $contact->name : ($lead['name'] ?? null),
             'phone' => $lead['phone'] ?? $contact->phone,
-            'email' => $lead['email'] ?? $contact->email,
+            'email' => filled($contact->email) ? $contact->email : ($lead['email'] ?? null),
             'note' => $lead['note'] ?? $contact->note,
             'last_contact_at' => now(),
         ], fn ($v) => $v !== null))->save();

@@ -6,6 +6,7 @@
 .us {
   --k-studio: #7659FA;
   --k-agent: #DB2777;
+  --k-chat: #D97706;
   --k-api: #1E88E5;
   --k-dub: #0E9F6E;
   --k-left: color-mix(in srgb, var(--line) 70%, transparent);
@@ -18,7 +19,7 @@
 }
 /* Inside the studio's overview and the Agents page: the host page sets the width. */
 .us.us-embed { max-width: none; margin: 0; padding: 0; scroll-margin-top: 96px; }
-html[data-theme="dark"] .us, html:not([data-theme]) .us { --k-agent: #F472B6; --k-api: #5AA9F0; --k-dub: #34C38F; }
+html[data-theme="dark"] .us, html:not([data-theme]) .us { --k-agent: #F472B6; --k-chat: #FBBF24; --k-api: #5AA9F0; --k-dub: #34C38F; }
 .us *, .us *::before, .us *::after { box-sizing: border-box; }
 .us h1, .us h2, .us h3, .us p { margin: 0; }
 
@@ -56,6 +57,7 @@ html[dir="rtl"] .us-bar i + i { box-shadow: inset -2px 0 0 var(--surface); }
 .us-legend i { width: 10px; height: 10px; border-radius: 3px; }
 .us .is-studio { --k: var(--k-studio); }
 .us .is-agent { --k: var(--k-agent); }
+.us .is-chat { --k: var(--k-chat); }
 .us .is-api { --k: var(--k-api); }
 .us .is-dub { --k: var(--k-dub); }
 .us .is-left { --k: var(--k-left); }

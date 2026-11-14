@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Log;
  * and the next one is tried, as the studio does.
  *
  * - generate(): the text model, for writing agents and summing up calls.
+ * - converse(): the same model in a written chat with a customer (AgentChats): instructions,
+ *   the conversation so far and tools in, its words or tool calls and its token counts out.
  * - readFile(): the same model reading a file the owner uploaded (a PDF, a photo of a menu).
  * - transcribe(): the same model writing down what a caller said, from their voice.
  * - liveToken(): a short-lived key for one live call, locked to the agent's
@@ -24,6 +26,14 @@ class GeminiClient
     public const LIVE_MODEL = 'gemini-3.8-live';
 
     public const WRITER_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash'];
+
+    /**
+     * The tokens generate() last used (what it read, what it wrote with its thinking, the part
+     * read from the cache) and the model that answered; null when it gave nothing.
+     *
+     * @var array{in: int, out: int, cached: int, model: string}|null
+     */
+    public ?array $lastUsage = null;
 
     private function base(): string
     {
@@ -38,6 +48,7 @@ class GeminiClient
      */
     public function generate(string $prompt, ?array $schema = null, int $timeout = 40, float $temperature = 0.4, ?string $thinking = null): ?string
     {
+        $this->lastUsage = null;
         $config = ['temperature' => $temperature];
         if ($schema !== null) {
             $config['responseMimeType'] = 'application/json';
@@ -66,9 +77,104 @@ class GeminiClient
             if ($response?->successful()) {
                 $text = data_get($response->json(), 'candidates.0.content.parts.0.text');
                 if (is_string($text) && trim($text) !== '') {
+                    $usage = (array) data_get($response->json(), 'usageMetadata', []);
+                    $this->lastUsage = [
+                        'in' => (int) ($usage['promptTokenCount'] ?? 0),
+                        'out' => (int) ($usage['candidatesTokenCount'] ?? 0) + (int) ($usage['thoughtsTokenCount'] ?? 0),
+                        'cached' => (int) ($usage['cachedContentTokenCount'] ?? 0),
+                        'model' => $model,
+                    ];
+
                     return $text;
                 }
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * One turn of a written conversation: the agent's instructions, what was written so far, and
+     * the tools it may call. Returns what the model answered (its words, or the tools it calls),
+     * its own parts to keep in the conversation, and the tokens the turn used; null when no model
+     * answered in time. The second writer model is tried when the first fails.
+     *
+     * @param  array<int, array{role: string, parts: array<int, array<string, mixed>>}>  $contents
+     * @param  array<int, array<string, mixed>>  $tools  function declarations
+     * @return array{text: string, calls: array<int, array{name: string, args: array<string, mixed>}>, parts: array<int, array<string, mixed>>, usage: array{in: int, out: int, thoughts: int, cached: int}, model: string}|null
+     */
+    public function converse(string $system, array $contents, array $tools = [], int $timeout = 25, int $maxOutputTokens = 600, bool $wordsOnly = false): ?array
+    {
+        // A chat reply is a short answer from facts it was given: the model thinks little before
+        // writing, so the customer is not kept waiting (listen.agents.chat_thinking). Measured on
+        // staging: "low" answered in 3 to 6 seconds; "minimal" was slower (4 to 9).
+        $thinking = (string) config('listen.agents.chat_thinking', 'low');
+        $config = ['temperature' => 0.4, 'maxOutputTokens' => $maxOutputTokens] + ($thinking !== '' ? ['thinkingConfig' => ['thinkingLevel' => $thinking]] : []);
+        $deadline = microtime(true) + $timeout;
+        foreach (self::WRITER_MODELS as $model) {
+            $left = (int) floor($deadline - microtime(true));
+            if ($left < 4) {
+                break;
+            }
+            $ask = fn (array $config, int $seconds) => $this->post("/models/{$model}:generateContent", array_filter([
+                'systemInstruction' => ['parts' => [['text' => $system]]],
+                'contents' => $contents,
+                'tools' => $tools !== [] ? [['functionDeclarations' => $tools]] : null,
+                // A round that must answer in words: the tools stay declared (the conversation
+                // above it used them) but none may be called.
+                'toolConfig' => $tools !== [] && $wordsOnly ? ['functionCallingConfig' => ['mode' => 'NONE']] : null,
+                'generationConfig' => $config,
+            ]), $model, $seconds);
+            $response = $ask($config, $left);
+            // A model that does not take that thinking level is asked again with the next one up, then its own.
+            foreach (['low', null] as $next) {
+                if (! isset($config['thinkingConfig']) || $response?->status() !== 400 || ! str_contains(strtolower((string) $response->body()), 'thinking')) {
+                    break;
+                }
+                if ($next !== null && ($config['thinkingConfig']['thinkingLevel'] ?? '') !== $next) {
+                    $config['thinkingConfig'] = ['thinkingLevel' => $next];
+                } else {
+                    unset($config['thinkingConfig']);
+                }
+                $left = (int) floor($deadline - microtime(true));
+                $response = $left >= 4 ? $ask($config, $left) : null;
+            }
+            if (! $response?->successful()) {
+                continue;
+            }
+            $parts = array_values(array_filter((array) data_get($response->json(), 'candidates.0.content.parts', []), 'is_array'));
+            $text = '';
+            $calls = [];
+            foreach ($parts as $part) {
+                // The model's own thinking is never part of what it says.
+                if (! empty($part['thought'])) {
+                    continue;
+                }
+                if (isset($part['text']) && is_string($part['text'])) {
+                    $text .= $part['text'];
+                }
+                if (isset($part['functionCall']['name'])) {
+                    $calls[] = ['name' => (string) $part['functionCall']['name'], 'args' => (array) ($part['functionCall']['args'] ?? [])];
+                }
+            }
+            if (trim($text) === '' && $calls === []) {
+                continue;
+            }
+            $usage = (array) data_get($response->json(), 'usageMetadata', []);
+
+            return [
+                'text' => trim($text),
+                'calls' => $calls,
+                'parts' => $parts,
+                'usage' => [
+                    'in' => (int) ($usage['promptTokenCount'] ?? 0),
+                    'out' => (int) ($usage['candidatesTokenCount'] ?? 0),
+                    'thoughts' => (int) ($usage['thoughtsTokenCount'] ?? 0),
+                    // The part of what it read that came from its own cache (billed at the cache's price).
+                    'cached' => (int) ($usage['cachedContentTokenCount'] ?? 0),
+                ],
+                'model' => $model,
+            ];
         }
 
         return null;
@@ -96,6 +202,14 @@ class GeminiClient
             if ($response?->successful()) {
                 $text = data_get($response->json(), 'candidates.0.content.parts.0.text');
                 if (is_string($text) && trim($text) !== '') {
+                    $usage = (array) data_get($response->json(), 'usageMetadata', []);
+                    $this->lastUsage = [
+                        'in' => (int) ($usage['promptTokenCount'] ?? 0),
+                        'out' => (int) ($usage['candidatesTokenCount'] ?? 0) + (int) ($usage['thoughtsTokenCount'] ?? 0),
+                        'cached' => (int) ($usage['cachedContentTokenCount'] ?? 0),
+                        'model' => $model,
+                    ];
+
                     return $text;
                 }
             }

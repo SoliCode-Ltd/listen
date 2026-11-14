@@ -12,7 +12,7 @@ use Illuminate\Support\Collection;
 
 /**
  * Where a member's credits went this credit period, for the Usage page: what is left, what
- * used the rest (studio audio, the developer API, video dubbing, agent calls by agent), and
+ * used the rest (studio audio, the developer API, video dubbing, agent calls by agent, agent chats), and
  * each item with its credits, newest first. Read from what was charged, never estimated.
  */
 final class CreditUsage
@@ -46,7 +46,9 @@ final class CreditUsage
         $calls = \App\Support\Agents\AgentAccess::tablesReady() ? AgentConversation::query()->with('agent:id,name')
             ->where('user_id', $id)->where('free', false)->whereNotNull('settled_at')->where('started_at', '>=', $from)
             ->latest('id')->limit(500)
-            ->get(['id', 'agent_id', 'channel', 'credits', 'billed_seconds', 'started_at']) : collect();
+            ->get(['id', 'agent_id', 'channel', 'credits', 'billed_seconds', 'started_at', 'usage']) : collect();
+        // A written chat is not a call: it has replies, not minutes.
+        [$chats, $calls] = $calls->partition(fn (AgentConversation $c): bool => in_array($c->channel, ['chat', 'chat_link'], true));
         $dubs = rescue(fn () => VideoDub::query()
             ->where('user_id', $id)->where('status', 'done')->where('is_free', false)->where('created_at', '>=', $from)
             ->latest('id')->limit(200)->get(['id', 'original_name', 'video_seconds', 'reservation', 'created_at']), collect(), false);
@@ -70,6 +72,16 @@ final class CreditUsage
                 'credits' => max(0, (int) $c->credits),
             ]);
         }
+        foreach ($chats as $c) {
+            $items->push([
+                'kind' => 'chat',
+                'title' => (string) ($c->agent->name ?? ''),
+                'at' => $c->started_at,
+                'seconds' => 0,
+                'replies' => (int) ($c->usage['replies'] ?? 0),
+                'credits' => max(0, (int) $c->credits),
+            ]);
+        }
         foreach ($dubs as $d) {
             $items->push([
                 'kind' => 'dub',
@@ -81,9 +93,9 @@ final class CreditUsage
         }
 
         $parts = [];
-        foreach (['studio', 'api', 'dub', 'agent'] as $kind) {
+        foreach (['studio', 'api', 'dub', 'agent', 'chat'] as $kind) {
             $of = $items->where('kind', $kind);
-            $parts[$kind] = ['credits' => (int) $of->sum('credits'), 'seconds' => (int) $of->sum('seconds'), 'count' => $of->count()];
+            $parts[$kind] = ['credits' => (int) $of->sum('credits'), 'seconds' => (int) $of->sum('seconds'), 'count' => $of->count(), 'replies' => (int) $of->sum('replies')];
         }
         $agents = $calls->groupBy('agent_id')->map(fn (Collection $rows) => [
             'name' => (string) ($rows->first()->agent->name ?? ''),

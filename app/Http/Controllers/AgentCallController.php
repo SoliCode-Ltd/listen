@@ -5,14 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\Agent;
 use App\Models\AgentWidget;
 use App\Services\Agents\AgentCalls;
+use App\Services\Agents\AgentChats;
 use App\Services\Agents\GeminiClient;
 use App\Support\Agents\AgentAccess;
+use App\Support\Agents\AgentChannels;
 use App\Support\Agents\AgentVoices;
 use App\Support\Agents\CallBackground;
 use App\Support\Agents\CallerIdentity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -99,6 +102,17 @@ class AgentCallController extends Controller
             'avatar' => $look['photo'] ? ($voice['avatar'] ?? null) : null,
             'colors' => $look['colors'],
             'look' => $look,
+            // How customers reach it (Setup → Chat and calls): a written chat, voice calls, or both.
+            // The chat opens first; an agent with no voice yet, or whose chat cannot be paid for now,
+            // shows only what works.
+            'channels' => [
+                'chat' => AgentChannels::chat($agent) && app(AgentChats::class)->unavailable($agent) === null,
+                'call' => AgentChannels::calls($agent) && filled($agent->live_voice),
+            ],
+            'chat' => [
+                'greeting' => trim((string) $agent->first_message) ?: trans('agents.chat.greeting', ['name' => $agent->name], $locale),
+                'max_chars' => AgentChats::maxChars(),
+            ] + (array) trans('agents.chat.card', [], $locale),
             'text' => [
                 'label' => $look['label'] ?: trans('agents.widget_label', [], $locale),
                 'title' => $look['title'] ?: $agent->business_name,
@@ -115,6 +129,12 @@ class AgentCallController extends Controller
                 'close' => trans('agents.widget_close', [], $locale),
                 // After a call, one line: "Call ended after 01:24".
                 'ended_after' => trans('agents.talk_ended_after', [], $locale),
+                // The call's time limit: "Ends in 00:29" through its last half minute, then
+                // "Call time is up", its length, and "Call again".
+                'ends_in' => trans('agents.talk_ends_in', [], $locale),
+                'ended_limit' => trans('agents.talk_ended_limit', [], $locale),
+                'lasted' => trans('agents.talk_lasted', [], $locale),
+                'again' => trans('agents.talk_again', [], $locale),
             ] + self::lineText($agent, $locale),
         ];
     }
@@ -221,6 +241,10 @@ class AgentCallController extends Controller
         if (! $agent->live_voice) {
             return $this->error('paused', 409, __('agents.error_paused'));
         }
+        // The owner chose written chat only for this agent (Setup → Chat and calls).
+        if (! AgentChannels::calls($agent)) {
+            return $this->error('paused', 409, __('agents.error_paused'));
+        }
 
         // A caller (browser) gets a few calls an hour and a day on one agent, and one network a few
         // more, so a new browser id never buys more calls. Mobile networks share addresses: hence the room.
@@ -263,6 +287,8 @@ class AgentCallController extends Controller
             // Who is calling, when the website the button is on signed its signed-in visitor (a
             // call button only: a link page is on Listen, which never tells a business who you are).
             'caller' => $channel === 'widget' ? CallerIdentity::verify($widget, $in['caller'] ?? null) : null,
+            // What the caller wrote in the chat just before pressing call: the call goes on from it.
+            'before' => $this->writtenBefore($agent, $in['chat'] ?? null),
         ]);
         if (! $result['ok'] && $result['error'] === 'lines') {
             // Every line is taken: the call button waits and tries again. Waiting is not a call, so
@@ -418,6 +444,170 @@ class AgentCallController extends Controller
         dispatch(new \App\Jobs\SummarizeAgentCall($c->id))->afterResponse();
 
         return response()->json(['ok' => true, 'seconds' => $c->billed_seconds]);
+    }
+
+    /** The chat a call follows (its id and key, from the same browser), as the call is told it. */
+    private function writtenBefore(Agent $agent, mixed $chat): ?string
+    {
+        if (! is_array($chat) || self::word($chat, 'conversation') === '' || self::word($chat, 'chat_key') === '') {
+            return null;
+        }
+        $c = app(AgentChats::class)->findByKey(self::word($chat, 'conversation'), self::word($chat, 'chat_key'));
+
+        return $c && (int) $c->agent_id === (int) $agent->id ? (AgentChats::spokenBefore($c) ?: null) : null;
+    }
+
+    /** A value a browser sent, as text: anything that is not plain text or a number is nothing. */
+    private static function word(mixed $in, string $key): string
+    {
+        $value = is_array($in) ? ($in[$key] ?? '') : '';
+
+        return is_string($value) || is_int($value) || is_float($value) ? (string) $value : '';
+    }
+
+    /**
+     * A visitor opens a written chat: from a website's button (key) or the link page (slug).
+     * The browser gets a chat key; nothing is taken from the owner's plan until a message is
+     * answered.
+     */
+    public function chatStart(Request $request, AgentChats $chats): JsonResponse
+    {
+        $in = $this->body($request);
+        $key = self::word($in, 'key');
+        $widget = $key !== ''
+            ? AgentWidget::where('public_key', $key)->first()
+            : AgentWidget::where('slug', self::word($in, 'slug'))->first();
+        $agent = $widget?->agent;
+        if (! $widget || ! $agent || ! $widget->enabled) {
+            return $this->error('not_found', 404);
+        }
+        $channel = $key !== '' ? 'chat' : 'chat_link';
+        $origin = self::askingOrigin($request);
+        if ($channel === 'chat' && ! $widget->allowsOrigin($origin)) {
+            $widget->noteRefused($origin);
+
+            return $this->error('origin', 403, __('agents.error_origin'));
+        }
+        $language = $agent->language === 'en' ? 'en' : 'ar';
+        $away = fn (): JsonResponse => $this->error('paused', 409, trans('agents.chat.away', [], $language));
+        if (! $agent->isLive() || ! AgentChannels::chat($agent)) {
+            return $away();
+        }
+
+        // A visitor (browser) gets a few chats an hour and a day on one agent, and one network a
+        // few more, as with calls; someone kept off the agent for abuse is kept off its chat too.
+        $network = (string) $request->ip();
+        $visitor = $network.'|'.substr(self::word($in, 'visitor'), 0, 64);
+        if (AgentCalls::callerBlocked($agent->id, $visitor, $network)) {
+            return $this->error('busy', 429, trans('agents.chat.busy', [], $language));
+        }
+        $perHour = max(1, (int) config('listen.agents.chats_per_visitor_hour', 6));
+        $perDay = max($perHour, (int) config('listen.agents.chats_per_visitor_day', 15));
+        $limits = [
+            'agent-chat:'.$agent->id.':'.sha1($visitor) => [$perHour, 3600],
+            'agent-chat-ip:'.$agent->id.':'.sha1($network) => [$perHour * 5, 3600],
+            'agent-chat-day:'.$agent->id.':'.sha1($visitor) => [$perDay, 86400],
+            'agent-chat-ip-day:'.$agent->id.':'.sha1($network) => [$perDay * 4, 86400],
+        ];
+        foreach ($limits as $limitKey => [$max]) {
+            if (RateLimiter::tooManyAttempts($limitKey, $max)) {
+                return $this->error('busy', 429, trans('agents.chat.busy', [], $language));
+            }
+        }
+        foreach ($limits as $limitKey => [, $decay]) {
+            RateLimiter::hit($limitKey, $decay);
+        }
+
+        $result = $chats->start($agent, $widget, [
+            'origin' => $origin,
+            'page_url' => self::word($in, 'page_url'),
+            'visitor' => $visitor,
+            'country' => strtoupper(substr((string) $request->headers->get('CF-IPCountry', ''), 0, 2)) ?: null,
+            'caller' => $channel === 'chat' ? CallerIdentity::verify($widget, $in['caller'] ?? null) : null,
+        ], $channel);
+        if (! $result['ok']) {
+            // The visitor is never told why on the owner's side (credits, plan): the chat is just
+            // not available now.
+            return $result['error'] === 'busy' ? $this->error('busy', 429, trans('agents.chat.busy', [], $language)) : $away();
+        }
+        $c = $result['conversation'];
+        // A voice call the visitor had just before, in the same card: its words are context.
+        if (is_array($in['call'] ?? null) && ($call = $this->calls->findByKey(self::word($in['call'], 'conversation'), self::word($in['call'], 'call_key')))) {
+            $chats->comesAfter($c, $call);
+        }
+
+        return response()->json([
+            'conversation' => $c->public_id,
+            'chat_key' => $result['chat_key'],
+            'api' => url('/agent-api/chats/'.$c->public_id),
+            'replies' => $result['replies'],
+            'max_chars' => AgentChats::maxChars(),
+        ]);
+    }
+
+    /** The visitor's message in, the agent's reply out (AgentChats::reply). */
+    public function chatMessage(Request $request, AgentChats $chats, string $conversation): JsonResponse
+    {
+        $in = $this->body($request);
+        $c = $chats->findByKey($conversation, self::word($in, 'chat_key'));
+        if (! $c) {
+            return $this->error('not_found', 404);
+        }
+        $language = $c->agent?->language === 'en' ? 'en' : 'ar';
+        // Someone kept off the agent for abuse is kept off a chat they already opened too, and
+        // one visitor (and one network) gets so many answers an hour and a day on one agent:
+        // far more than a person writes, far fewer than a script would take. Listen's own
+        // agents, which answer free, allow a third of it. The visitor is the one the chat was
+        // opened by (kept on it), whatever this request says.
+        $network = hash('sha256', (string) $request->ip());
+        $visitor = (string) ($c->visitor_hash ?: $network);
+        $share = $c->agent?->setting('house') ? 3 : 1;
+        $perHour = max(5, intdiv(max(1, (int) config('listen.agents.chat_replies_per_visitor_hour', 80)), $share));
+        $perDay = max($perHour, intdiv(max(1, (int) config('listen.agents.chat_replies_per_visitor_day', 250)), $share));
+        $limits = [
+            'agent-chat-replies:'.$c->agent_id.':'.$visitor => [$perHour, 3600],
+            'agent-chat-replies-ip:'.$c->agent_id.':'.$network => [$perHour * 3, 3600],
+            'agent-chat-replies-day:'.$c->agent_id.':'.$visitor => [$perDay, 86400],
+            'agent-chat-replies-ip-day:'.$c->agent_id.':'.$network => [$perDay * 3, 86400],
+        ];
+        $tooMany = Cache::has('agent-block:'.$c->agent_id.':'.$visitor) || Cache::has('agent-block:'.$c->agent_id.':'.$network);
+        foreach ($limits as $limitKey => [$max]) {
+            $tooMany = $tooMany || RateLimiter::tooManyAttempts($limitKey, $max);
+        }
+        if ($tooMany) {
+            return $this->error('busy', 429, trans('agents.chat.busy', [], $language));
+        }
+        // A voice call made from this chat's card since it opened: what was said is context too.
+        if (is_array($in['call'] ?? null) && ! isset($c->reservation['after_call'])
+            && ($call = $this->calls->findByKey(self::word($in['call'], 'conversation'), self::word($in['call'], 'call_key')))) {
+            $chats->comesAfter($c, $call);
+        }
+        $result = $chats->reply($c, self::word($in, 'id'), self::word($in, 'text'));
+        // Every time the model was asked counts, answered or not; a message sent again that
+        // already had its answer does not.
+        if (! empty($result['asked'])) {
+            foreach ($limits as $limitKey => [, $decay]) {
+                RateLimiter::hit($limitKey, $decay);
+            }
+        }
+        if (! $result['ok']) {
+            // closed / limit: this conversation is over, a new one can start. failed / busy: the
+            // same message can be sent again. Nothing was charged in either case.
+            [$status, $words] = match ($result['error']) {
+                'empty' => [422, 'agents.chat.empty'],
+                'closed', 'limit' => [410, 'agents.chat.over'],
+                'off' => [409, 'agents.chat.away'],
+                default => [503, 'agents.chat.failed'],
+            };
+
+            return $this->error($result['error'], $status, trans($words, [], $language));
+        }
+
+        return response()->json([
+            'reply' => $result['reply'],
+            'links' => $result['links'] ?? [],
+            'left' => $result['left'] ?? 0,
+        ]);
     }
 
     /** @param  array<string, mixed>  $result */

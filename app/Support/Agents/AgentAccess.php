@@ -204,6 +204,20 @@ final class AgentAccess
         return max(1, AgentCost::recommendedRate() ?? (int) config('listen.agents.credits_per_minute', 8100));
     }
 
+    /**
+     * Credits a written chat reply uses: the rate saved in Agents → Settings, else the one the
+     * plans call for (AgentCost::recommendedChatRate), else the config.
+     */
+    public static function chatCreditsPerReply(): int
+    {
+        $value = (int) self::setting('agents_chat_credits_per_reply', 0);
+        if ($value > 0) {
+            return $value;
+        }
+
+        return max(1, AgentCost::recommendedChatRate() ?? (int) config('listen.agents.chat_credits_per_reply', 60));
+    }
+
     /** Whether the admin saved a rate of their own (otherwise it follows the plans). */
     public static function rateIsSet(): bool
     {

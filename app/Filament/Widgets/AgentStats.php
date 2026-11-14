@@ -28,7 +28,7 @@ class AgentStats extends BaseWidget
 
     protected ?string $heading = 'Agents at a glance';
 
-    protected ?string $description = 'Every agent\'s calls, members\' and Listen\'s own. Minutes are talk time; credits are what members\' plans paid. Cost to us is an estimate from the tokens each call counted.';
+    protected ?string $description = 'Every agent\'s calls and written chats, members\' and Listen\'s own. Minutes are talk time; credits are what members\' plans paid. Cost to us is worked out from the tokens each call and each chat reply counted.';
 
     protected function getColumns(): int
     {
@@ -51,7 +51,19 @@ class AgentStats extends BaseWidget
     private function stats(): array
     {
         $now = now();
-        $month = fn (): Builder => AgentConversation::query()->where('started_at', '>=', $now->copy()->subDays(30));
+        // Voice calls; the written chats (AgentChats) have their own figures below.
+        $chatChannels = ['chat', 'chat_link'];
+        $month = fn (): Builder => AgentConversation::query()->where('started_at', '>=', $now->copy()->subDays(30))->whereNotIn('channel', $chatChannels);
+        $chats = AgentConversation::query()->where('started_at', '>=', $now->copy()->subDays(30))->whereIn('channel', $chatChannels)
+            ->get(['id', 'agent_id', 'started_at', 'free', 'credits', 'cost_usd', 'usage']);
+        $chatReplies = (int) $chats->sum(fn (AgentConversation $c): int => (int) ($c->usage['replies'] ?? 0));
+        $chatsToday = $chats->filter(fn (AgentConversation $c): bool => $c->started_at !== null && $c->started_at->gte($now->copy()->startOfDay()))->count();
+        $chatCredits = (int) $chats->sum('credits');
+        $chatCost = (float) $chats->sum(fn (AgentConversation $c): float => (float) $c->cost_usd);
+        $chatPaid = $chats->filter(fn (AgentConversation $c): bool => ! $c->free);
+        $worth = \App\Support\Agents\AgentCost::dollarsPerCredit();
+        $chatEarned = $worth !== null ? (int) $chatPaid->sum('credits') * $worth : null;
+        $chatPaidCost = (float) $chatPaid->sum(fn (AgentConversation $c): float => (float) $c->cost_usd);
 
         $byStatus = Agent::query()->selectRaw('status, count(*) as aggregate')->groupBy('status')->pluck('aggregate', 'status')->map(fn ($n): int => (int) $n);
         $deleted = Agent::onlyTrashed()->count();
@@ -134,10 +146,27 @@ class AgentStats extends BaseWidget
                 ->description(AgentResource::plural($houseCalls, 'call').', on Listen (worth '.number_format(AgentCalls::creditsFor($houseSeconds)).' credits)')
                 ->descriptionIcon('heroicon-m-home')
                 ->color('warning'),
-            Stat::make('Cost to us, 30 days', '$'.number_format($cost, 2))
+            Stat::make('Calls\' cost to us, 30 days', '$'.number_format($cost, 2))
                 ->description($seconds > 0 ? '$'.number_format($cost / ($seconds / 60), 4).' a minute talked' : 'No calls')
                 ->descriptionIcon('heroicon-m-currency-dollar')
                 ->color('danger'),
+            Stat::make('Written chats, 30 days', number_format($chats->count()))
+                ->description(AgentResource::plural($chatReplies, 'reply', 'replies').' · '.number_format($chatsToday).' today')
+                ->descriptionIcon('heroicon-m-chat-bubble-left-ellipsis')
+                ->color('primary'),
+            Stat::make('Chat credits, 30 days', number_format($chatCredits))
+                ->description('From members\' plans, at '.number_format(\App\Support\Agents\AgentAccess::chatCreditsPerReply()).' credits a reply or more')
+                ->descriptionIcon('heroicon-m-credit-card'),
+            Stat::make('Chats\' cost to us, 30 days', '$'.number_format($chatCost, 2))
+                ->description($chatReplies > 0 ? '$'.number_format($chatCost / $chatReplies, 5).' a reply, every model call counted' : 'No replies yet')
+                ->descriptionIcon('heroicon-m-currency-dollar')
+                ->color('danger'),
+            Stat::make('Paid chats: kept', $chatEarned !== null && $chatEarned > 0 ? (int) round(($chatEarned - $chatPaidCost) / $chatEarned * 100).'%' : '—')
+                ->description($chatEarned !== null && $chatEarned > 0
+                    ? 'Earned at least $'.number_format($chatEarned, 2).', cost $'.number_format($chatPaidCost, 2).' (members\' chats only)'
+                    : 'No paid chat yet')
+                ->descriptionIcon('heroicon-m-scale')
+                ->color($chatEarned !== null && $chatEarned > 0 && $chatEarned < $chatPaidCost ? 'danger' : 'success'),
         ];
     }
 }

@@ -19,7 +19,7 @@ class ViewAgentConversation extends ViewRecord
     {
         $call = $this->call();
 
-        return 'Call with '.($call->agent?->name ?? 'a removed agent');
+        return (AgentConversationResource::isChat($call) ? 'Chat with ' : 'Call with ').($call->agent?->name ?? 'a removed agent');
     }
 
     public function getSubheading(): string|Htmlable|null
@@ -30,7 +30,9 @@ class ViewAgentConversation extends ViewRecord
             $call->agent?->business_name,
             AgentConversationResource::CHANNELS[$call->channel] ?? $call->channel,
             $call->started_at?->format('j M Y, H:i'),
-            AgentResource::clock((int) $call->duration_seconds),
+            AgentConversationResource::isChat($call)
+                ? AgentResource::plural(AgentConversationResource::replies($call), 'reply', 'replies')
+                : AgentResource::clock((int) $call->duration_seconds),
         ]));
     }
 

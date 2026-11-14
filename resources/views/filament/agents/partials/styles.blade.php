@@ -28,6 +28,8 @@
         .dark .is-agent .lsa-bubble { background: rgba(var(--primary-400), .12); border-color: rgba(var(--primary-400), .3); }
         .dark .is-caller .lsa-bubble { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .1); }
         .lsa-bubble-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+        .lsa-used { display: flex; flex-wrap: wrap; gap: .125rem .75rem; margin: .3125rem .375rem 0; font-size: .75rem; line-height: 1.125rem; color: rgb(var(--gray-500)); font-variant-numeric: tabular-nums; }
+        .dark .lsa-used { color: rgb(var(--gray-400)); }
 
         .lsa-scroll { overflow-x: auto; }
         .lsa-table { width: 100%; border-collapse: collapse; font-size: .875rem; line-height: 1.4; color: rgb(var(--gray-950)); }

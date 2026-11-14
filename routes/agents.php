@@ -26,5 +26,8 @@ Route::post('/calls/{conversation}/agent-line', [AgentCallController::class, 'ag
 // The call's recording, in parts every 10 s (CallRecordings): an hour-long call sends 360.
 Route::post('/calls/{conversation}/recording', [AgentCallController::class, 'recording'])->where('conversation', 'cnv_[a-z0-9]{24}')->middleware('throttle:60,1,agent-recording')->name('agent-api.recording');
 Route::post('/calls/{conversation}/end', [AgentCallController::class, 'end'])->where('conversation', 'cnv_[a-z0-9]{24}')->middleware('throttle:60,1')->name('agent-api.end');
+// The written chat (AgentChats): a visitor opens one, then each message is answered.
+Route::post('/chats', [AgentCallController::class, 'chatStart'])->middleware('throttle:20,1,agent-chat-start')->name('agent-api.chat');
+Route::post('/chats/{conversation}/messages', [AgentCallController::class, 'chatMessage'])->where('conversation', 'cnv_[a-z0-9]{24}')->middleware('throttle:30,1,agent-chat-message')->name('agent-api.chat-message');
 // "Report this agent" on a link page (one report per network a day, AgentReportController).
 Route::post('/reports', [AgentReportController::class, 'store'])->middleware('throttle:10,1')->name('agent-api.report');
