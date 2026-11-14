@@ -35,7 +35,7 @@ foreach ($t()->orderByDesc('last_seen_at')->limit(25)->get() as $r) {
 }
 echo "\n== Audio generations failed per day (last 10 days) ==\n";
 foreach ($db->table('audio_generations')->where('created_at', '>=', now()->subDays(10))
-    ->selectRaw("DATE(created_at) d, SUM(status='failed') failed, SUM(status='completed') ok, COUNT(*) total")
+    ->selectRaw("DATE(created_at) d, SUM(status='failed') failed, SUM(status='done') ok, COUNT(*) total")
     ->groupBy('d')->orderBy('d')->get() as $r) {
-    echo "  {$r->d}: failed {$r->failed} / completed {$r->ok} / total {$r->total}\n";
+    echo "  {$r->d}: failed {$r->failed} / done {$r->ok} / total {$r->total}\n";
 }
