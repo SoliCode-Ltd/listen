@@ -47,7 +47,7 @@ const TEXT = {
     line: [['Answers', 'every', 'call,'], ['in', 'your', 'customers’', 'accent.']],
     tryIt: ['Try', 'it', 'on', 'your', 'website', 'today.'],
     names: ['American', 'British', 'Australian', 'Irish', 'Scottish', 'Canadian', 'Indian', 'Nigerian'],
-    saved: { title: 'Viewing saved', rows: [['Name', 'Aoife'], ['Phone', '087 123 4567', true], ['Request', 'Flat in Ranelagh, tomorrow at 11 am']] },
+    saved: { title: 'Viewing saved', rows: [['Name', 'Aoife'], ['Phone', '087 123 4567', true], ['Request', 'Ranelagh flat, tomorrow 11 am']] },
     logo: { w: 400, name: 140 },
   },
 };
