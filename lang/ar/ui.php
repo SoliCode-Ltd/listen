@@ -243,6 +243,7 @@ return [
         'yearly' => 'سنوي',
         'annual_saves' => 'الخطة السنوية توفّر 20%',
         'plan_name_free' => 'مجاني',
+        'plan_name_basic' => 'الأساسية',
         'plan_name_starter' => 'مبتدئ',
         'plan_name_creator' => 'مُبدع',
         'plan_name_pro' => 'احترافي',
