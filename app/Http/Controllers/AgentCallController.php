@@ -70,10 +70,28 @@ class AgentCallController extends Controller
 
             return response()->json(['error' => 'origin', 'message' => __('agents.error_origin')], 403);
         }
-        $this->seen($widget, $request);
-        \App\Models\AgentWidgetSite::note($widget, $origin, true, $via);
+        // A card already on a page reads its settings again now and then (so a change its owner
+        // makes shows without a reload): that is not a page load, and notes nothing.
+        if (! $request->boolean('again')) {
+            $this->seen($widget, $request);
+            \App\Models\AgentWidgetSite::note($widget, $origin, true, $via);
+        }
 
-        return response()->json($this->card($agent, $widget))->header('Cache-Control', 'public, max-age=60');
+        // Kept by the visitor's own browser for a moment only, never by anything in between: a
+        // change the owner makes is on their website on its next page load.
+        return response()->json($this->card($agent, $widget))->header('Cache-Control', 'private, max-age=10');
+    }
+
+    /** The link page's card, read again by a page already open (agent-widget.js refreshCard). */
+    public function linkCard(string $slug): JsonResponse
+    {
+        $widget = AgentWidget::where('slug', $slug)->first();
+        $agent = $widget?->agent;
+        if (! $widget || ! $agent || ! $widget->link_enabled) {
+            return response()->json(['error' => 'not_found'], 404);
+        }
+
+        return response()->json($this->card($agent, $widget))->header('Cache-Control', 'no-store');
     }
 
     /**

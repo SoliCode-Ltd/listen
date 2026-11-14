@@ -542,6 +542,13 @@ class AgentChats
     private function answer(Agent $agent, AgentConversation $conversation, array $transcript, string $text, ?AgentConversation $afterCall): array
     {
         $system = AgentInstructions::build($agent, true);
+        // The owner changed the agent while this conversation was open (new prices, a corrected
+        // fact): the model has its own earlier answers before it, and must not hold on to them.
+        $lastAnswer = collect($transcript)->last(fn ($t): bool => is_array($t) && ($t['role'] ?? '') === 'agent' && isset($t['re']));
+        if ($lastAnswer !== null && $agent->updated_at !== null && $conversation->started_at !== null
+            && $agent->updated_at->gt($conversation->started_at->copy()->addSeconds((int) ($lastAnswer['at'] ?? 0)))) {
+            $system .= "\n\n# Updated during this conversation\n".$agent->business_name.' changed its information after your last answer here. Everything above is as it stands now. Answer from it, also where it differs from what you said earlier in this conversation; when it does, say in a few words that the information was just updated.';
+        }
         $contents = $this->history($transcript, $afterCall);
         $contents[] = ['role' => 'user', 'parts' => [['text' => $text]]];
         // The call's tools without the hang-up: a chat is never ended by the agent.

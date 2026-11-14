@@ -57,6 +57,8 @@
     return send(again || 0).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {
         if (!r.ok) { var e = new Error((data && data.message) || 'error'); e.data = data; throw e; }
+        // What this page changed itself is not a change from elsewhere (see elsewhere()).
+        if (method !== 'GET' && typeof window.__agSaved === 'function') window.__agSaved();
         return data;
       });
     });
@@ -516,6 +518,8 @@
       else if (s === 'listening') agentDots(false, 4500);
       else agentDots(false);
       stage.classList.toggle('is-live', live);
+      // A test call is on: the page is not loaded again under it (elsewhere()).
+      window.__agOnCall = !!live;
       stage.classList.toggle('is-waiting', waiting);
       if (sub) sub.hidden = !waiting;
       if (pos) { pos.hidden = !waiting; posText.textContent = waiting ? waitText() : ''; }
@@ -1223,6 +1227,7 @@
         toast(T.saved);
       }).catch(function (err) { toast(err.message); });
     });
+    elsewhere();
     knowledgeFiles($('[data-ag-files]'));
     var kf = $('[data-ag-knowledge-form]');
     var kbText = $('[data-ag-kb-text]'), kbCount = $('[data-ag-kb-count]');
@@ -1409,6 +1414,72 @@
   }
 
   /*
+   * The same agent can be open in two places: this page on a computer, the app on a phone.
+   * When this page is looked at again (and every minute while it is), it asks for the agent's
+   * mark (AgentStamp). Changed elsewhere: the page shows the latest by loading again, on the
+   * tab it is on. With something typed here and not saved yet, or a test call on, nothing is
+   * taken from under the owner's hands: a line says so, with one button.
+   */
+  function elsewhere() {
+    var a = C.agent || {};
+    if (!a.stamp || !a.urls || !a.urls.stamp) return;
+    var known = a.stamp, dirty = false, asking = false, askedAt = Date.now(), saving = 0;
+    var bar = $('[data-ag-elsewhere]');
+    var main = $('.ag-main') || document.body;
+    // Typed and not saved yet. A switch or a choice saves itself at once (it is not "typed").
+    main.addEventListener('input', function (e) {
+      var t = e.target;
+      if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && !/^(checkbox|radio|range|color|file)$/.test(t.type)))) dirty = true;
+    });
+    function ask(then) {
+      return fetch(a.urls.stamp, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; }).then(function (d) { then(d && d.stamp ? String(d.stamp) : ''); }, function () { then(''); });
+    }
+    // This page saved something: the agent's mark is now what this page made it.
+    window.__agSaved = function () {
+      dirty = false;
+      saving++;
+      var mine = saving;
+      ask(function (stamp) { if (stamp && mine === saving) known = stamp; });
+    };
+    function busy() {
+      // A test call on this page, or one of its windows open over it.
+      return window.__agOnCall === true || !!document.querySelector('dialog[open]');
+    }
+    function latest() {
+      try { sessionStorage.setItem('ag_scroll', String(window.scrollY || 0)); } catch (e) {}
+      location.reload();
+    }
+    function check(force) {
+      if (asking || document.visibilityState === 'hidden' || (!force && Date.now() - askedAt < 8000)) return;
+      asking = true;
+      askedAt = Date.now();
+      var before = saving;
+      ask(function (stamp) {
+        asking = false;
+        if (!stamp || stamp === known || before !== saving) return;
+        if (!dirty && !busy()) { latest(); return; }
+        if (!bar) return;
+        bar.querySelector('span').textContent = T.changed_elsewhere || '';
+        var b = bar.querySelector('button');
+        b.textContent = T.show_latest || '';
+        b.onclick = latest;
+        bar.hidden = false;
+      });
+    }
+    // Where the page was, after it loaded again by itself.
+    try {
+      var y = parseInt(sessionStorage.getItem('ag_scroll') || '', 10);
+      sessionStorage.removeItem('ag_scroll');
+      if (y > 0) setTimeout(function () { window.scrollTo(0, y); }, 60);
+    } catch (e) {}
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') check(true); });
+    window.addEventListener('focus', function () { check(false); });
+    window.addEventListener('pageshow', function (e) { if (e.persisted) check(true); });
+    setInterval(function () { check(false); }, 60000);
+  }
+
+  /*
    * Knowledge files: drop or choose files, each uploads with its progress, is read in the
    * background (the list checks back until it is done) and shows what the agent learned.
    * Removing takes a second tap. Every name is written as text, never as HTML.
@@ -1511,6 +1582,7 @@
           var d = {};
           try { d = JSON.parse(xhr.responseText || '{}'); } catch (e) {}
           if (xhr.status === 201) {
+            if (typeof window.__agSaved === 'function') window.__agSaved();
             uploads.splice(uploads.indexOf(u), 1);
             take(d);
           } else {

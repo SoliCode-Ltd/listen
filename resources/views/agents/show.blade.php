@@ -510,6 +510,8 @@
     </div>
     </div>
     <div class="ag-toast" data-ag-toast role="status" aria-live="polite"></div>
+    {{-- Shown when this agent was changed on another device while this page has something not saved yet (agents.js). --}}
+    <div class="ag-elsewhere" data-ag-elsewhere role="status" aria-live="polite" hidden><span></span><button type="button"></button></div>
   </main>
 
   @include('components.scripts')
@@ -532,7 +534,11 @@
           'links' => route('voice-agents.links', $agent), 'link_reads' => route('voice-agents.links.reads', $agent),
           // Knowledge → Your website: without it "Read the website again" is never wired up (agents.js yourSite).
           'site' => route('voice-agents.site', $agent),
+          'stamp' => route('voice-agents.stamp', $agent),
         ],
+        // The agent as it was when this page loaded: compared when the page is looked at again,
+        // so a change made on another device (the app, another browser) shows here too.
+        'stamp' => \App\Support\Agents\AgentStamp::of($agent),
       ],
       'regions' => collect(\App\Support\ArabicDialects::ALL)->map(fn ($d) => $d['region'])->all(),
       'voices' => [$agent->language => $voices],
@@ -575,6 +581,7 @@
         'correct' => __('agents.talk_correct'), 'correct_placeholder' => __('agents.talk_correct_placeholder'),
         'correct_save' => __('agents.talk_correct_save'), 'correct_saved' => __('agents.talk_correct_saved'),
         'saved_contact' => __('agents.talk_saved_contact'), 'copied' => __('agents.live_copied'), 'saved' => __('agents.saved'), 'channels_one' => __('agents.channels.one'), 'network' => __('agents.network_error'),
+        'changed_elsewhere' => __('agents.changed_elsewhere'), 'show_latest' => __('agents.show_latest'),
         'site_remove' => __('agents.live_site_remove'), 'site_remove_short' => __('agents.live_site_remove_short'), 'site_invalid' => __('agents.live_site_invalid'), 'site_exists' => __('agents.live_site_exists'), 'site_max' => __('agents.live_site_max'),
         'links_remove' => __('agents.links_remove'), 'links_saved' => __('agents.links_saved'), 'links_finding' => __('agents.links_finding'), 'links_your_site' => __('agents.links_your_site'), 'site_again_done' => __('agents.site.again_done'), 'site_again_error' => __('agents.site.again_error'), 'links_read_only' => __('agents.links_read_only'), 'links_read_only_hint' => __('agents.links_read_only_hint'),
         'play' => __('agents.voice_play'), 'pause' => __('agents.voice_pause'), 'pick' => __('agents.voice_pick'), 'recommended' => __('agents.recommended'),

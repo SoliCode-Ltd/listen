@@ -522,6 +522,8 @@ Route::group([
             // Knowledge → Social media links: read the website again for its accounts.
             Route::post('/{agent}/links', [AgentController::class, 'findLinks'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:6,1,agent-links')->name('voice-agents.links');
             Route::get('/{agent}/links', [AgentController::class, 'linkReads'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:120,1')->name('voice-agents.links.reads');
+            // A page already open asks whether the agent was changed on another device (AgentStamp).
+            Route::get('/{agent}/stamp', [AgentController::class, 'stamp'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:120,1')->name('voice-agents.stamp');
             Route::get('/{agent}/site', [AgentController::class, 'siteState'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:120,1')->name('voice-agents.site');
             Route::post('/{agent}/site', [AgentController::class, 'siteRead'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:4,10,agent-site')->name('voice-agents.site.read');
             Route::post('/{agent}/test-call', [AgentController::class, 'testCall'])->where('agent', 'agt_[a-z0-9]{24}')->middleware('throttle:10,1,agent-test')->name('voice-agents.test-call');

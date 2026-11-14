@@ -852,6 +852,7 @@
       open = v;
       box.classList.toggle('is-open', v);
       parts.launch.setAttribute('aria-expanded', v ? 'true' : 'false');
+      if (v) refreshCard(false);
       // The chat card: straight to writing where there is a keyboard (on a phone that would open it over the card).
       if (v && chatOn) { setTimeout(function () { if (window.matchMedia && matchMedia('(pointer:fine)').matches && parts.input) parts.input.focus(); follow(true); }, 80); }
       else if (v) setTimeout(function () { parts.call && parts.call.focus(); }, 60); else if (!preview) parts.launch.focus();
@@ -1041,6 +1042,7 @@
       }
       if (s === 'idle') endedWhy = '';
       if ((s === 'listening' || s === 'speaking') && !startedAt) startedAt = Date.now();
+      if (chatOn && (s === 'listening' || s === 'speaking') && !callNoted) { callNoted = true; chatNote(chatText.call_started || ''); }
       if (s === 'busy' && before !== 'busy') showForm();
       if (s === 'sent') showSent();
       // Waiting for a line is part of the call (it can still be given up); after it, all is reset.
@@ -1066,6 +1068,9 @@
         paintState();
         timer();
       }
+      // A call that could not start (the owner switched calls off a moment ago) or has ended:
+      // the card is read again, so a button that no longer works is not left on it.
+      if ((s === 'error' || s === 'ended') && before !== s) setTimeout(function () { refreshCard(true); }, s === 'error' ? 1600 : 400);
     }
     // The call's time as it shows: counting up, or "Ends in 00:29" through its last half minute.
     function timeText() { return ending() ? String(text.ends_in).replace(':time', clock(leftNow())) : clock(elapsed()); }
@@ -1102,7 +1107,7 @@
      * The chat changes without jumps: its height moves smoothly to the new one (to its most, then
      * it scrolls), and it follows the newest line unless the caller scrolled up to read.
      */
-    var typing = null, typingOff = 0, endsLead = 30;
+    var typing = null, typingOff = 0, endsLead = 30, callNoted = false;
     function smoothly(change) {
       var box = parts.lines;
       if (!box) { change(); return; }
@@ -1534,6 +1539,8 @@
     function failed(msg, words) {
       sending = false;
       forgetWaiting(msg);
+      // The chat may have been switched off a moment ago: the card as it is now.
+      setTimeout(function () { refreshCard(true); }, 1600);
       hideTyping(0);
       if (!msg.view || !msg.view.parentNode) { msg.view = chatBubble('me', msg.text); parts.lines.appendChild(msg.view); }
       msg.view.classList.add('is-failed');
@@ -1586,8 +1593,10 @@
       hearing = null;
       clearTimeout(typingOff);
       if (parts.lines) parts.lines.__pinned = true;
-      // The chat card keeps its conversation: the call is one more part of it.
-      if (chatOn) chatNote(chatText.call_started || '');
+      // The chat card keeps its conversation: the call is one more part of it ("Call started" is
+      // written once it really is on, in setState).
+      callNoted = false;
+      if (chatOn) { /* the conversation stays */ }
       else if (parts.lines) { parts.lines.innerHTML = ''; parts.lines.hidden = look.captions === false; parts.lines.classList.remove('has-links'); }
       if (parts.barLinks) parts.barLinks.hidden = true;
       setState('connecting');
@@ -1665,6 +1674,48 @@
         },
       };
       at(t + 2500, function () { if (demo) demo.stop(); });
+    }
+
+    /*
+     * The card follows its owner's settings while the page stays open. Its owner switches calls
+     * off, changes the greeting or pauses the agent from another device: a page already open
+     * would go on showing what it loaded (a call button that answers "not taking calls"). So
+     * the card reads its settings again when it is opened, when the page is looked at again,
+     * every so often while it is open, and right after the server refused something; it is
+     * drawn again only when something really changed, and never under a call or a message on
+     * its way. The conversation and what is being typed stay.
+     */
+    var cardAt = Date.now(), cardAsking = false;
+    function cardMark(c) { var o = {}; for (var k in (c || {})) if (k !== 'assets') o[k] = c[k]; try { return JSON.stringify(o); } catch (e) { return ''; } }
+    function cardBusy() { return live() || starting || sending || stateNow === 'waiting' || stateNow === 'busy' || !!demo; }
+    function refreshCard(force) {
+      if (preview || cardAsking || !ctx.origin || (!ctx.key && !ctx.slug) || !window.fetch) return;
+      if (!force && Date.now() - cardAt < 20000) return;
+      if (cardBusy() || document.visibilityState === 'hidden') return;
+      cardAsking = true;
+      cardAt = Date.now();
+      var url = ctx.origin + (ctx.slug ? '/agent-api/links/' + encodeURIComponent(ctx.slug) : '/agent-api/widgets/' + encodeURIComponent(ctx.key) + '?again=1');
+      fetch(url, { credentials: 'omit', cache: 'no-store' }).then(function (r) {
+        if (r.status === 404) return { gone: true };
+        return r.ok ? r.json() : null;
+      }).then(function (next) {
+        cardAsking = false;
+        if (!next || cardBusy()) return;
+        // Gone, or neither a chat nor calls on offer now: no button (it comes back when they do).
+        var none = !!next.gone || (!inline && !!next.channels && next.channels.chat === false && next.channels.call === false);
+        host.style.display = none ? 'none' : '';
+        if (none || !next.text || cardMark(next) === cardMark(cfg)) return;
+        var typed = parts.input ? parts.input.value : '', had = !!(parts.input && root.activeElement === parts.input);
+        render(next);
+        if (parts.input && typed) { parts.input.value = typed; roomToWrite(); }
+        if (had && parts.input) parts.input.focus();
+      }, function () { cardAsking = false; });
+    }
+    if (!preview) {
+      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshCard(false); });
+      window.addEventListener('focus', function () { refreshCard(false); });
+      window.addEventListener('pageshow', function (e) { if (e.persisted) refreshCard(true); });
+      setInterval(function () { if (open || inline) refreshCard(false); }, 30000);
     }
 
     render(cfg);
