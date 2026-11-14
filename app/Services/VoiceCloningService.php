@@ -388,10 +388,12 @@ class VoiceCloningService
      * any other has room (GeminiKeyManager::designedVoiceCounts()), so its day
      * is kept for these.
      *
-     * A key set aside for the day throws GeminiKeysOutException, so the member
-     * is told it is a limit on our side rather than a passing one. It is still
-     * asked once every few minutes: when its limit was raised, or the quota
-     * came back early, the voices speak again at once, not at the next reset.
+     * A key set aside for the day throws GeminiKeysOutException, and so does
+     * one whose day runs out on this request: VoiceDesignService then speaks
+     * through the voice's stand-in on another key, and the member is told it
+     * is a limit on our side only when there is none. The key is still asked
+     * once every few minutes: when its limit was raised, or the quota came
+     * back early, the voices speak there again, not only at the next reset.
      *
      * @return array<string, mixed> as synthesizeWithClonedVoice()
      */
@@ -407,8 +409,9 @@ class VoiceCloningService
         try {
             $audio = $this->synthesizeClonedPieces($text, $voiceId, $style);
         } catch (\RuntimeException $e) {
-            // Asked again and still out: the same answer as when it is not asked.
-            if ($setAside && ! $e instanceof GeminiKeysOutException && $manager->isOutForToday((string) $keyName, self::MODEL)) {
+            // Its day ran out on this very request, or it was asked again and is still out:
+            // the same answer as when it is not asked.
+            if ($keyName !== null && ! $e instanceof GeminiKeysOutException && $manager->isOutForToday($keyName, self::MODEL)) {
                 throw new GeminiKeysOutException('Designed voice synthesis failed: the key that holds the voice is out for now.', 0, $e);
             }
 

@@ -49,6 +49,9 @@ class VoiceDesignTest extends TestCase
     /** @var list<array{method:string, path:string, body:array}> */
     private array $calls = [];
 
+    /** Speech keys (the key itself) the fake engine answers as out for the day. */
+    private array $keysOutOnEngine = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -540,6 +543,172 @@ class VoiceDesignTest extends TestCase
         $this->assertFalse($manager->isOutForToday('GEMINI_TTS_API_KEY', VoiceDesignService::MODEL), 'no longer set aside');
     }
 
+    public function test_a_key_whose_day_runs_out_on_this_very_request_is_told_as_a_limit_on_our_side(): void
+    {
+        $member = $this->member($this->designPlan);
+        $voice = $this->savedVoice($member);
+        // Not set aside yet: this request is the one that finds the day used up.
+        $this->fakeEngine(['speak_daily_limit' => true]);
+
+        $this->actingAs($member)->postJsonLocalizedRoute('dashboard.queue', [
+            'content' => 'Welcome aboard, crew.',
+            'target_language' => 'en',
+            'voice_key' => $voice->voiceKey(),
+            'voice_tier' => 'hd',
+        ]);
+
+        $generation = AudioGeneration::query()->latest('id')->firstOrFail();
+        $this->assertSame('failed', $generation->status);
+        $this->assertSame(GenerationMessage::stored('ui.backend.designed_voices_our_limit'), $generation->error_message);
+        $this->assertSame(0, $this->creditsUsed($member));
+    }
+
+    public function test_a_voice_whose_key_is_out_speaks_through_a_stand_in_on_another_key_until_the_reset(): void
+    {
+        $manager = $this->threeKeys();
+        $member = $this->member($this->designPlan);
+        $voice = $this->savedVoice($member);
+        $voice->forceFill(['engine_prompt' => 'A gruff old sea captain, slow and low.'])->save();
+        $this->keysOutOnEngine = ['k1'];
+        $this->fakeEngine();
+        $speak = fn () => $this->actingAs($member)->postJsonLocalizedRoute('dashboard.queue', [
+            'content' => 'Welcome aboard, crew.',
+            'target_language' => 'en',
+            'voice_key' => $voice->voiceKey(),
+            'voice_tier' => 'hd',
+        ]);
+        $spokenOn = fn (): array => array_map(
+            fn (array $call): array => [$call['key'], $call['body']['generation_config']['speech_config'][0]['voice']],
+            $this->callsTo('POST', '/interactions'),
+        );
+
+        // Its own key's day is used up: the same prompt is made into a voice on the next key, and that one speaks.
+        $speak()->assertOk();
+        $this->assertSame('done', AudioGeneration::query()->latest('id')->firstOrFail()->status);
+        $made = $this->callsTo('POST', '/voices');
+        $this->assertCount(1, $made);
+        $this->assertSame('k2', $made[0]['key']);
+        $this->assertSame('A gruff old sea captain, slow and low.', $made[0]['body']['voice']['prompted']['input']);
+        $this->assertSame([['k1', 'voice_saved'], ['k2', 'voice_t1']], $spokenOn());
+        $this->assertGreaterThan(0, $this->creditsUsed($member), 'audio that was made is charged as always');
+
+        // The member's voice is the same one: same row, same key, nothing added to the library or the plan's count.
+        $voice->refresh();
+        $this->assertSame('voice_saved', $voice->provider_voice_key);
+        $this->assertSame('GEMINI_TTS_API_KEY', $voice->key_name);
+        $this->assertSame(['GEMINI_TTS_API_KEY_2' => 'voice_t1'], VoiceDesignService::copiesOf($voice));
+        $this->assertSame(1, DesignedVoice::withTrashed()->where('user_id', $member->id)->count());
+        $this->assertSame(1, VoiceDesign::keptInTotal((int) $member->id));
+
+        // For the rest of the day it keeps to the stand-in: nothing new is made, and its own key
+        // is not asked again, even once that key lets the odd request through.
+        $this->keysOutOnEngine = [];
+        $this->travel(10)->minutes();
+        $speak()->assertOk();
+        $this->assertCount(1, $this->callsTo('POST', '/voices'));
+        $this->assertSame(['k2', 'voice_t1'], last($spokenOn()));
+
+        // After the daily reset it speaks on its own key again, as the voice the member made.
+        $this->travelTo(GeminiKeyManager::nextDailyReset()->addMinutes(5));
+        $speak()->assertOk();
+        $this->assertSame(['k1', 'voice_saved'], last($spokenOn()));
+        $this->assertFalse($manager->isOutForToday('GEMINI_TTS_API_KEY', VoiceDesignService::MODEL));
+
+        // The next time its key runs out, the stand-in it already has is used: none is made again.
+        $this->keysOutOnEngine = ['k1'];
+        $speak()->assertOk();
+        $this->assertSame('done', AudioGeneration::query()->latest('id')->firstOrFail()->status);
+        $this->assertCount(1, $this->callsTo('POST', '/voices'));
+        $this->assertSame(['k2', 'voice_t1'], last($spokenOn()));
+    }
+
+    public function test_a_stand_in_whose_key_is_out_too_passes_the_voice_on_to_the_next_key(): void
+    {
+        $this->threeKeys();
+        $member = $this->member($this->designPlan);
+        $voice = $this->savedVoice($member);
+        $voice->forceFill(['engine_prompt' => 'A gruff old sea captain, slow and low.'])->save();
+        $this->keysOutOnEngine = ['k1', 'k2'];
+        $this->fakeEngine();
+
+        $this->actingAs($member)->postJsonLocalizedRoute('dashboard.queue', [
+            'content' => 'Welcome aboard, crew.',
+            'target_language' => 'en',
+            'voice_key' => $voice->voiceKey(),
+            'voice_tier' => 'hd',
+        ])->assertOk();
+
+        $this->assertSame('done', AudioGeneration::query()->latest('id')->firstOrFail()->status);
+        $this->assertSame(['k2', 'k3'], array_column($this->callsTo('POST', '/voices'), 'key'));
+        $this->assertSame(['GEMINI_TTS_API_KEY_2', 'GEMINI_TTS_API_KEY_3'], array_keys(VoiceDesignService::copiesOf($voice->fresh())));
+    }
+
+    public function test_a_stand_in_the_engine_no_longer_has_is_forgotten_and_made_again(): void
+    {
+        $this->threeKeys();
+        $member = $this->member($this->designPlan);
+        $voice = $this->savedVoice($member);
+        $voice->forceFill([
+            'engine_prompt' => 'A gruff old sea captain, slow and low.',
+            'metadata' => ['copies' => ['GEMINI_TTS_API_KEY_2' => 'voice_gone']] + (array) $voice->metadata,
+        ])->save();
+        $this->keysOutOnEngine = ['k1'];
+        $this->fakeEngine(['voices_gone' => ['voice_gone']]);
+
+        $this->actingAs($member)->postJsonLocalizedRoute('dashboard.queue', [
+            'content' => 'Welcome aboard, crew.',
+            'target_language' => 'en',
+            'voice_key' => $voice->voiceKey(),
+            'voice_tier' => 'hd',
+        ])->assertOk();
+
+        $this->assertSame('done', AudioGeneration::query()->latest('id')->firstOrFail()->status);
+        $this->assertCount(1, $this->callsTo('POST', '/voices'));
+        $this->assertSame(['GEMINI_TTS_API_KEY_2' => 'voice_t1'], VoiceDesignService::copiesOf($voice->fresh()));
+    }
+
+    public function test_a_voice_another_server_made_or_without_its_prompt_gets_no_stand_in(): void
+    {
+        $this->threeKeys();
+        $member = $this->member($this->designPlan);
+        // Made before prompts were saved.
+        $voice = $this->savedVoice($member);
+        $this->keysOutOnEngine = ['k1'];
+        $this->fakeEngine();
+
+        $this->actingAs($member)->postJsonLocalizedRoute('dashboard.queue', [
+            'content' => 'Welcome aboard, crew.',
+            'target_language' => 'en',
+            'voice_key' => $voice->voiceKey(),
+            'voice_tier' => 'hd',
+        ]);
+
+        $generation = AudioGeneration::query()->latest('id')->firstOrFail();
+        $this->assertSame('failed', $generation->status);
+        $this->assertSame(GenerationMessage::stored('ui.backend.designed_voices_our_limit'), $generation->error_message);
+        $this->assertSame([], $this->callsTo('POST', '/voices'));
+        $this->assertSame(0, $this->creditsUsed($member));
+    }
+
+    public function test_deleting_a_voice_deletes_its_stand_ins_and_prune_leaves_them_alone_until_then(): void
+    {
+        $this->threeKeys();
+        $member = $this->member($this->designPlan);
+        $voice = $this->savedVoice($member);
+        $voice->forceFill(['metadata' => ['copies' => ['GEMINI_TTS_API_KEY_2' => 'voice_copy']] + (array) $voice->metadata])->save();
+        $here = VoiceDesignService::DISPLAY_TAG.' · '.VoiceDesignService::siteTag();
+        $this->fakeEngine(['listed' => [
+            ['id' => 'voice_copy', 'type' => 'prompted', 'display_name' => $here.' · U'.$member->id.' · copy'.$voice->id.' · 1 · '.now()->subDays(2)->utc()->format('YmdHi')],
+        ]]);
+
+        $this->artisan('voice-design:prune')->assertSuccessful();
+        $this->assertSame([], $this->callsTo('DELETE', '/voices/'));
+
+        app(VoiceDesignService::class)->purge($voice, true);
+        $deleted = collect($this->callsTo('DELETE', '/voices/'))->map(fn (array $call): array => [$call['key'], basename($call['path'])])->all();
+        $this->assertSame([['k1', 'voice_saved'], ['k2', 'voice_copy']], $deleted);
+    }
+
     public function test_a_new_design_is_made_on_the_key_that_already_holds_designed_voices(): void
     {
         config(['services.gemini_tts.api_key' => '']);
@@ -834,6 +1003,21 @@ class VoiceDesignTest extends TestCase
         ]);
     }
 
+    /** The site with three speech keys (k1, k2, k3), as on live, instead of the single test key. */
+    private function threeKeys(): GeminiKeyManager
+    {
+        config(['services.gemini_tts.api_key' => '']);
+        $manager = \Mockery::mock(GeminiKeyManager::class)->makePartial();
+        $manager->shouldReceive('getAllKeys')->andReturn([
+            ['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1],
+            ['key' => 'k2', 'name' => 'GEMINI_TTS_API_KEY_2', 'index' => 2],
+            ['key' => 'k3', 'name' => 'GEMINI_TTS_API_KEY_3', 'index' => 3],
+        ]);
+        $this->app->instance(GeminiKeyManager::class, $manager);
+
+        return $manager;
+    }
+
     private function creditsUsed(User $user): int
     {
         return (int) UsageCounter::query()->where('user_id', $user->id)->sum('total_chars');
@@ -855,8 +1039,14 @@ class VoiceDesignTest extends TestCase
         $wav = $this->wav();
         Http::fake(function (Request $request) use ($wav, $options) {
             $path = (string) parse_url($request->url(), PHP_URL_PATH);
-            $this->calls[] = ['method' => $request->method(), 'path' => $path, 'body' => $request->data()];
+            $apiKey = $request->header('x-goog-api-key')[0] ?? null;
+            $this->calls[] = ['method' => $request->method(), 'path' => $path, 'body' => $request->data(), 'key' => $apiKey];
 
+            // A voice the engine no longer has is refused the same way on both of its speaking endpoints.
+            $gone = array_filter($options['voices_gone'] ?? [], fn (string $id): bool => str_contains((string) json_encode($request->data()), $id));
+            if ($gone !== [] && (str_contains($path, ':generateContent') || str_ends_with($path, '/interactions'))) {
+                return Http::response(['error' => ['code' => 404, 'message' => 'Voice not found.', 'status' => 'NOT_FOUND']], 404);
+            }
             if (str_contains($path, ':generateContent')) {
                 return Http::response(['candidates' => [['content' => ['parts' => [['text' => self::LINE]]]]]]);
             }
@@ -868,7 +1058,7 @@ class VoiceDesignTest extends TestCase
 
                 return Http::response(['id' => 'voice_t'.$take, 'sample_audio' => ['mime_type' => 'audio/wav', 'data' => base64_encode($wav)]]);
             }
-            if (str_ends_with($path, '/interactions') && ($options['speak_daily_limit'] ?? false)) {
+            if (str_ends_with($path, '/interactions') && (($options['speak_daily_limit'] ?? false) || in_array($apiKey, $this->keysOutOnEngine, true))) {
                 return Http::response(['error' => ['code' => 429, 'message' => 'Rate limit exceeded for model gemini-3.8-flash-tts (limit: 100 requests per day on Tier 1).', 'status' => 'RESOURCE_EXHAUSTED']], 429);
             }
             if (str_ends_with($path, '/interactions')) {
