@@ -8,8 +8,11 @@ require 'vendor/autoload.php';
 $app = require 'bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-$ids = [43, 50];
 $from = 'GEMINI_TTS_API_KEY';
+// Every saved voice of the member who is stuck tonight that still sits on the key that is out.
+$ids = App\Models\DesignedVoice::query()->where('user_id', 7535)->where('status', App\Models\DesignedVoice::SAVED)
+    ->whereNotNull('provider_voice_key')->where('key_name', $from)->pluck('id')->all();
+echo 'Voices to move: ', implode(', ', $ids) ?: 'none', "\n";
 $allowed = ['GEMINI_TTS_API_KEY_2', 'GEMINI_TTS_API_KEY_3'];
 
 $model = App\Services\VoiceCloningService::MODEL;
