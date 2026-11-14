@@ -2,3 +2,6 @@
 # public/audio/agents/calls), the sound effects and the mix.
 audio/*.wav
 audio/stems/
+
+# Frames of the reference film the owner supplied: studied, never kept in the repository.
+docs/reference/*.png
