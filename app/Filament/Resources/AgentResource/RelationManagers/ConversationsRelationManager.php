@@ -37,7 +37,8 @@ class ConversationsRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('public_id')
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with([
+            // One row a visit, as in Calls (AgentVisits).
+            ->modifyQueryUsing(fn (Builder $query): Builder => \App\Support\Agents\AgentVisits::firstOnly($query)->with([
                 'widget:id,agent_id,slug,public_key',
                 'agent:id,public_id,user_id,name,business_name,settings,deleted_at',
             ]))

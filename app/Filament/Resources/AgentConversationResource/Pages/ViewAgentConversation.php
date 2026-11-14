@@ -26,7 +26,10 @@ class ViewAgentConversation extends ViewRecord
     {
         $call = $this->call();
 
+        $visit = AgentConversationResource::visit($call);
+
         return implode(' · ', array_filter([
+            $visit->count() > 1 ? 'One visit of '.$visit->count().' conversations' : null,
             $call->agent?->business_name,
             AgentConversationResource::CHANNELS[$call->channel] ?? $call->channel,
             $call->started_at?->format('j M Y, H:i'),

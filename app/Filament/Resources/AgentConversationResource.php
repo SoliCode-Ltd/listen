@@ -21,6 +21,7 @@ use App\Filament\Resources\AgentConversationResource\Pages;
 use App\Filament\Resources\Concerns\ReadOnlyResource;
 use App\Models\Agent;
 use App\Models\AgentConversation;
+use App\Support\Agents\AgentVisits;
 use App\Services\Agents\AgentCalls;
 use App\Support\Countries;
 use Filament\Forms;
@@ -176,6 +177,8 @@ class AgentConversationResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            // One row a visit: a chat and the calls made from it are read together (AgentVisits).
+            ->modifyQueryUsing(fn (Builder $query): Builder => AgentVisits::firstOnly($query))
             ->columns(self::tableColumns())
             ->defaultSort('started_at', 'desc')
             ->filters(self::tableFilters())
@@ -211,6 +214,8 @@ class AgentConversationResource extends Resource
                 ->placeholder('Account deleted')
                 ->toggleable(isToggledHiddenByDefault: true) : null,
             TextColumn::make('channel')
+                // A visit with a chat and a call shows both, in the order they happened.
+                ->state(fn (AgentConversation $record): array => self::visit($record)->pluck('channel')->unique()->values()->all())
                 ->badge()
                 ->formatStateUsing(fn (?string $state): string => self::CHANNELS[$state] ?? Str::headline((string) $state))
                 ->color(fn (?string $state): string => self::channelColor($state))
@@ -222,41 +227,44 @@ class AgentConversationResource extends Resource
                 ->searchable(['origin', 'page_url']),
             IconColumn::make('recording_bytes')
                 ->label('Recording')
-                ->state(fn (AgentConversation $record): bool => filled($record->recording_path))
+                ->state(fn (AgentConversation $record): bool => self::visit($record)->contains(fn (AgentConversation $part): bool => filled($part->recording_path)))
                 ->boolean()
                 ->trueIcon('heroicon-o-speaker-wave')
                 ->falseIcon('heroicon-o-minus')
                 ->trueColor('primary')
                 ->falseColor('gray')
-                ->tooltip(fn (AgentConversation $record): ?string => filled($record->recording_path) ? 'Recorded: play it on the call\'s page' : null),
+                ->tooltip(fn (AgentConversation $record): ?string => self::visit($record)->contains(fn (AgentConversation $part): bool => filled($part->recording_path)) ? 'Recorded: play it on the call\'s page' : null),
             TextColumn::make('country')
                 ->formatStateUsing(fn (?string $state): string => Countries::label($state))
                 ->placeholder('—')
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('status')
-                ->state(fn (AgentConversation $record): string => self::statusKey($record))
+                // Of the visit: live while any of it is, else how its last conversation stands.
+                ->state(fn (AgentConversation $record): string => self::statusKey(self::visitNow($record)))
                 ->badge()
                 ->formatStateUsing(fn (string $state): string => self::STATUS_BADGES[$state] ?? Str::headline($state))
                 ->color(fn (string $state): string => self::statusColor($state))
-                ->description(fn (AgentConversation $record): ?string => self::endReasonLabel($record->end_reason))
-                ->tooltip(fn (AgentConversation $record): ?string => self::END_REASON_HELP[$record->end_reason] ?? null)
+                ->description(fn (AgentConversation $record): ?string => self::endReasonLabel(self::visitNow($record)->end_reason))
+                ->tooltip(fn (AgentConversation $record): ?string => self::END_REASON_HELP[self::visitNow($record)->end_reason] ?? null)
                 ->sortable(),
             TextColumn::make('duration_seconds')
                 ->label('Length')
-                // A written chat has replies, not minutes.
-                ->formatStateUsing(fn ($state, AgentConversation $record): string => self::isChat($record)
-                    ? AgentResource::plural(self::replies($record), 'reply', 'replies')
-                    : AgentResource::clock($record->isLive() ? self::secondsSoFar($record) : (int) $state))
+                // A written chat has replies, not minutes; a visit with both shows both.
+                ->formatStateUsing(fn ($state, AgentConversation $record): string => self::visitLength($record))
                 ->description(fn (AgentConversation $record): string => match (true) {
+                    self::isVisit($record) => self::visit($record)->every(fn (AgentConversation $part): bool => (bool) $part->free)
+                        ? 'free' : number_format((int) self::visit($record)->sum('credits')).' credits',
                     $record->isLive() => 'so far · '.($record->free ? 'free' : number_format((int) ($record->reservation['credits'] ?? 0)).' held'),
                     $record->free => 'free',
                     default => number_format((int) $record->credits).' credits',
                 })
-                ->tooltip(fn (AgentConversation $record): string => self::isChat($record)
-                    ? ($record->free ? 'Free ('.(self::PAID_BY[self::paidBy($record)] ?? 'free').')' : number_format((int) ($record->reservation['rate'] ?? 0)).' credits a reply')
-                        .($record->cost_usd !== null ? ' · cost us $'.number_format((float) $record->cost_usd, 4) : '')
-                    : 'Billed '.number_format((int) $record->billed_seconds).' s'
-                        .($record->free ? ', free ('.(self::PAID_BY[self::paidBy($record)] ?? 'free').')' : ', '.number_format((int) $record->credits).' credits'))
+                ->tooltip(fn (AgentConversation $record): string => match (true) {
+                    self::isVisit($record) => 'One visit, '.self::visit($record)->count().' conversations: open it to read them in order',
+                    self::isChat($record) => ($record->free ? 'Free ('.(self::PAID_BY[self::paidBy($record)] ?? 'free').')' : number_format((int) ($record->reservation['rate'] ?? 0)).' credits a reply')
+                        .($record->cost_usd !== null ? ' · cost us $'.number_format((float) $record->cost_usd, 4) : ''),
+                    default => 'Billed '.number_format((int) $record->billed_seconds).' s'
+                        .($record->free ? ', free ('.(self::PAID_BY[self::paidBy($record)] ?? 'free').')' : ', '.number_format((int) $record->credits).' credits'),
+                })
                 ->sortable(),
             TextColumn::make('credits')
                 ->formatStateUsing(fn ($state): string => number_format((int) $state))
@@ -264,7 +272,8 @@ class AgentConversationResource extends Resource
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('outcome')
                 // A word rather than a placeholder, so a customer's details still show under it.
-                ->state(fn (AgentConversation $record): string => $record->outcome ?: ($record->isLive() ? 'pending' : 'none'))
+                // Of the visit: its last summary, and the details the customer left anywhere in it.
+                ->state(fn (AgentConversation $record): string => self::visit($record)->pluck('outcome')->filter()->last() ?: (self::visitNow($record)->isLive() ? 'pending' : 'none'))
                 ->badge()
                 ->formatStateUsing(fn (?string $state): string => match ($state) {
                     'none' => 'No summary',
@@ -272,8 +281,8 @@ class AgentConversationResource extends Resource
                     default => self::OUTCOMES[$state] ?? Str::headline((string) $state),
                 })
                 ->color(fn (?string $state): string => self::outcomeColor($state))
-                ->description(fn (AgentConversation $record): ?HtmlString => self::leadLine($record, short: true))
-                ->tooltip(fn (AgentConversation $record): ?string => self::leadTooltip($record))
+                ->description(fn (AgentConversation $record): ?HtmlString => self::leadLine(self::visitLead($record), short: true))
+                ->tooltip(fn (AgentConversation $record): ?string => self::leadTooltip(self::visitLead($record)))
                 ->searchable(['summary'])
                 ->toggleable(),
             TextColumn::make('page_url')
@@ -361,6 +370,14 @@ class AgentConversationResource extends Resource
     public static function infolist(Schema $schema): Schema
     {
         return $schema->components([
+            Section::make('This visit')
+                ->description('One visitor, one sitting: the chat and the calls made from the same card, in the order they happened. Each keeps its own page, with its credits, its recording and its cost.')
+                ->visible(fn (AgentConversation $record): bool => self::isVisit($record))
+                ->schema([
+                    ViewEntry::make('visit')->hiddenLabel()
+                        ->view('filament.agents.visit'),
+                ]),
+
             Section::make(fn (AgentConversation $record): string => self::isChat($record) ? 'Chat' : 'Call')
                 ->columns(4)
                 ->schema([
@@ -477,8 +494,10 @@ class AgentConversationResource extends Resource
                         ->view('filament.agents.recording'),
                 ]),
 
-            Section::make('Conversation')
-                ->description(fn (AgentConversation $record): string => self::turnsLine($record))
+            Section::make(fn (AgentConversation $record): string => self::isVisit($record) ? 'The whole visit, in order' : 'Conversation')
+                ->description(fn (AgentConversation $record): string => self::isVisit($record)
+                    ? 'Everything written and said in this visit, one conversation after the other. Under each written reply: what it used.'
+                    : self::turnsLine($record))
                 ->schema([
                     ViewEntry::make('transcript')->hiddenLabel()
                         ->view('filament.agents.transcript'),
@@ -755,7 +774,7 @@ class AgentConversationResource extends Resource
      */
     public static function holdLine(AgentConversation $call): ?array
     {
-        $hold = (array) ($call->reservation ?? []);
+        $hold = array_diff_key((array) ($call->reservation ?? []), ['visit' => 1]);
         if ($hold === []) {
             return null;
         }
@@ -770,7 +789,7 @@ class AgentConversationResource extends Resource
     /** What the end of the call gave back to the owner's plan. */
     public static function givenBackLine(AgentConversation $call): ?string
     {
-        $hold = (array) ($call->reservation ?? []);
+        $hold = array_diff_key((array) ($call->reservation ?? []), ['visit' => 1]);
         if ($call->settled_at === null || $hold === []) {
             return null;
         }
@@ -862,6 +881,62 @@ class AgentConversationResource extends Resource
     public static function isChat(AgentConversation $call): bool
     {
         return \App\Services\Agents\AgentChats::isChat($call);
+    }
+
+    /**
+     * Every conversation of the visit this one is in, in order (AgentVisits).
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, AgentConversation>
+     */
+    public static function visit(AgentConversation $call): \Illuminate\Database\Eloquent\Collection
+    {
+        return AgentVisits::parts($call);
+    }
+
+    /** Whether it is one of several conversations of one visit. */
+    public static function isVisit(AgentConversation $call): bool
+    {
+        return self::visit($call)->count() > 1;
+    }
+
+    /** The conversation that says how the visit stands now: one still on, else its last. */
+    public static function visitNow(AgentConversation $call): AgentConversation
+    {
+        $parts = self::visit($call);
+
+        return $parts->first(fn (AgentConversation $part): bool => $part->isLive())
+            ?? $parts->first(fn (AgentConversation $part): bool => $part->status === \App\Services\Agents\AgentChats::OPEN)
+            ?? $parts->last() ?? $call;
+    }
+
+    /** The conversation of the visit in which the customer left their details (the latest), else itself. */
+    public static function visitLead(AgentConversation $call): AgentConversation
+    {
+        return self::visit($call)->last(fn (AgentConversation $part): bool => ! empty($part->lead)) ?? $call;
+    }
+
+    /** "4 replies", "2:10", or for a visit with both "4 replies · 2:10": replies written, time talked. */
+    public static function visitLength(AgentConversation $call): string
+    {
+        $parts = self::visit($call);
+        $chats = $parts->filter(fn (AgentConversation $part): bool => self::isChat($part));
+        $calls = $parts->reject(fn (AgentConversation $part): bool => self::isChat($part));
+        $said = [];
+        if ($chats->isNotEmpty()) {
+            $said[] = AgentResource::plural((int) $chats->sum(fn (AgentConversation $part): int => self::replies($part)), 'reply', 'replies');
+        }
+        if ($calls->isNotEmpty()) {
+            $said[] = AgentResource::clock((int) $calls->sum(fn (AgentConversation $part): int => $part->isLive() ? self::secondsSoFar($part) : (int) $part->duration_seconds))
+                .($calls->count() > 1 ? ' in '.$calls->count().' calls' : '');
+        }
+
+        return implode(' · ', $said);
+    }
+
+    /** "Written chat" or "Voice call", as a visit's parts are named. */
+    public static function partName(AgentConversation $part): string
+    {
+        return self::isChat($part) ? 'Written chat' : ($part->channel === 'test' ? 'Owner\'s test call' : 'Voice call');
     }
 
     /** Replies a written chat has had. */

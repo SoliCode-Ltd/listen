@@ -26,6 +26,13 @@ class SettleAgentCallsCommand extends Command
         if ($settled > 0) {
             $this->info("Settled {$settled} call(s).");
         }
+        // Once: the conversations kept before visits were are joined into theirs (AgentVisits),
+        // so the admin's list reads the same for last week as for today.
+        if (! \App\Models\SiteSetting::get('agents_visits_joined')) {
+            $joined = (int) rescue(fn () => \App\Support\Agents\AgentVisits::joinPast(), 0, true);
+            \App\Models\SiteSetting::set('agents_visits_joined', now()->toIso8601String(), 'agents');
+            $this->info("Joined {$joined} conversation(s) into their visits.");
+        }
         // Written chats nobody wrote in for a while: closed, their unused credits given back.
         $closed = $chats->closeQuiet();
         if ($closed > 0) {
