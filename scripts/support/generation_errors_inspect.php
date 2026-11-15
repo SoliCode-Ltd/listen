@@ -97,6 +97,24 @@ if (method_exists(App\Services\Billing\PurchaseFollowUps::class, 'renewalFailed'
             echo '  preview ', $withDiscount ? 'with a discount' : 'warning', ': FAILS (', mb_substr($e->getMessage(), 0, 200), ")\n";
         }
     }
+    // The discount email's words in use: the new ones, or the team's own.
+    $inUse = $fu->settings();
+    $defaults = App\Services\Billing\PurchaseFollowUps::defaults();
+    foreach ($defaults as $key => $default) {
+        if (str_starts_with($key, 'renewal_offer_')) {
+            echo "  {$key}: ", $inUse[$key] === $default ? 'the new words' : 'DIFFERENT (saved by the team, or the first words)', "\n";
+        }
+    }
+    // Renewals that have a discount: can it be taken back?
+    if (method_exists(App\Models\PurchaseFollowUp::class, 'offerEmailed')) {
+        foreach (App\Models\PurchaseFollowUp::query()->where('kind', 'renewal_failed')->whereNotNull('discount_percent')->get() as $case) {
+            echo "  case #{$case->id} (member {$case->user_id}): {$case->discount_percent}% off, owes {$case->priceCents()} of {$case->amount_cents}, months ", (int) $case->discount_months,
+                ', discount given ', $case->discounted_at, ', last emailed ', $case->email_sent_at ?: 'never', ', paid ', $case->paid_at ?: 'no',
+                ' => take back: ', $case->paid_at ? 'no (paid)' : ($case->offerEmailed() ? 'no (offer emailed)' : 'YES'), "\n";
+        }
+    } else {
+        echo "  the take-back code is not on this server yet\n";
+    }
 } else {
     echo "  the new code is not on this server yet\n";
 }
