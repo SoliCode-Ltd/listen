@@ -1,0 +1,52 @@
+name: Transcribe measure
+
+# Staging only, by hand only (php artisan transcribe:measure): writes out the
+# test recordings (Listen's own samples and public-domain human readings in
+# other languages) three ways and prints what speech to text costs per audio
+# minute and the first lines of each transcript, with error rates where the
+# words are known. Saves nothing in the database and makes no sound, but it
+# sends about 70 minutes of audio three times to the text model on the Google
+# account staging shares with live: run it only when the owner has said yes.
+# The branch must be deployed to staging first ("Server deploy": inspect, then deploy).
+
+on:
+  workflow_dispatch:
+    inputs:
+      options:
+        description: "Extra options, e.g. --only=ar-eg,fr-human --modes=text or --prepare-only (nothing sent to the model)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-deploy-staging
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Run on staging over SSH
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+          OPTIONS: ${{ inputs.options }}
+        run: |
+          set -euo pipefail
+          case "$OPTIONS" in *[\;\&\|\`\$\<\>]*) echo "Options may not hold shell characters."; exit 1;; esac
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_measure
+          chmod 600 ~/.ssh/id_measure
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; \$(command -v php8.4 || command -v php) artisan transcribe:measure --full $OPTIONS"
+          ssh -i ~/.ssh/id_measure -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=30 "$SSH_USER@$SSH_HOST" "$remote"
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_measure
