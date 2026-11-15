@@ -566,7 +566,7 @@ class PurchaseFollowUpTest extends TestCase
         // Why they are written to, the day the plan ends, the lower price, and what happens if it stays unpaid.
         $until = now()->addDays(7)->translatedFormat('j F Y');
         $this->assertStringContainsString('Renew your Starter plan for $7.20 instead of $9.00', $text);
-        $this->assertStringContainsString('we could not renew your Starter plan: your bank declined the payment. Nothing was charged, and your plan stays on until '.$until.'.', $text);
+        $this->assertStringContainsString('We could not renew your Starter plan: your bank declined the payment. Nothing was charged, and your plan stays on until '.$until.'.', $text);
         $this->assertStringContainsString('we have taken 20% off this renewal: you pay $7.20 instead of $9.00.', $text);
         $this->assertStringContainsString('Press the button below to pay before '.$until.'. If the renewal is still unpaid on that day, your subscription will be cancelled, your account will move to the free plan and this offer will end.', $text);
         $this->assertStringContainsString('تعذّر تجديد باقة مبتدئ الخاصة بك: رفض البنك عملية الدفع. لم يُخصم منك أي مبلغ، وباقتك مستمرة حتى', $text);
@@ -821,7 +821,7 @@ class PurchaseFollowUpTest extends TestCase
 
         $text = $this->followUps()->emailFor($case->fresh())['text'];
 
-        $this->assertStringContainsString('we could not take the payment for your Starter plan: your bank declined it, so your paid features are paused.', $text);
+        $this->assertStringContainsString('We could not take the payment for your Starter plan: your bank declined it, so your paid features are paused.', $text);
         $this->assertStringContainsString('we have taken 20% off this payment: you pay $7.20 instead of $9.00.', $text);
         $this->assertStringContainsString('لذلك توقفت مزاياك المدفوعة مؤقتاً', $text);
         $this->assertStringNotContainsString('stays on until', $text);
@@ -848,6 +848,23 @@ class PurchaseFollowUpTest extends TestCase
         $this->assertSame('A gift for you: {discount} off', $settings['renewal_offer_subject_en']);
         // Never saved: the new words apply by themselves.
         $this->assertSame($now['renewal_offer_headline_ar'], $settings['renewal_offer_headline_ar']);
+    }
+
+    public function test_first_words_the_team_only_moved_the_line_breaks_of_get_the_new_message_too(): void
+    {
+        $migration = require database_path('migrations/2026_11_30_120100_reword_the_renewal_discount_message.php');
+        // The team put the greeting on a line of its own; the words are still the first ones.
+        SiteSetting::set('purchase_followup_renewal_offer_body_en', "Hi {name}, \n\nwe would like you to stay. We have taken {discount} off the renewal of your {plan} plan: you pay {price} instead of {old_price}.{next}\n\nPress the button below to pay the lower price and keep your plan, with every voice, dialect and feature in it.", 'purchase_followup');
+        // Words of the team's own stay.
+        SiteSetting::set('purchase_followup_renewal_offer_body_ar', 'أهلاً {name}، هذا عرض خاص لك: خصم {discount}.', 'purchase_followup');
+
+        $migration->up();
+
+        $settings = $this->followUps()->settings();
+        $this->assertSame(PurchaseFollowUps::defaults()['renewal_offer_body_en'], $settings['renewal_offer_body_en']);
+        // The greeting keeps the line of its own the team gave it.
+        $this->assertStringStartsWith("Hi {name},\n\nWe could not renew your {plan} plan", $settings['renewal_offer_body_en']);
+        $this->assertSame('أهلاً {name}، هذا عرض خاص لك: خصم {discount}.', $settings['renewal_offer_body_ar']);
     }
 
     public function test_the_discount_asks_the_payment_provider_for_exactly_these_changes(): void
