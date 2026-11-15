@@ -210,6 +210,11 @@ class SeoStudioFactsTest extends TestCase
                 $this->assertSame(0, $rgba['alpha'], "{$file} has no transparency at its edge ({$x},{$y})");
                 $this->assertTrue($rgba['blue'] > 200 && $rgba['red'] < 200 && $rgba['green'] < $rgba['red'], "{$file} is purple at its edge ({$x},{$y})");
             }
+            // No transparency anywhere, corners included: there is nothing a page, a browser or a
+            // search engine could fill with white.
+            foreach ([[0, 0], [$size - 1, 0], [0, $size - 1], [$size - 1, $size - 1]] as [$x, $y]) {
+                $this->assertSame(0, (imagecolorat($image, $x, $y) >> 24) & 0x7F, "{$file} has no transparent corner ({$x},{$y})");
+            }
             $middle = imagecolorsforindex($image, imagecolorat($image, (int) ($size / 2), (int) ($size / 2)));
             $this->assertSame([255, 255, 255], [$middle['red'], $middle['green'], $middle['blue']], "{$file} draws the white bars in the middle");
         }
