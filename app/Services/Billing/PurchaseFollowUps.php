@@ -7,6 +7,7 @@ use App\Models\Newsletter;
 use App\Models\Plan;
 use App\Models\PurchaseFollowUp;
 use App\Models\SiteSetting;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Newsletter\NewsletterRenderer;
 use App\Services\Newsletter\PaidWelcomeEmail;
@@ -14,11 +15,13 @@ use App\Services\PlanAccessService;
 use App\Support\LiveServer;
 use App\Support\StripeInvoice;
 use App\Support\TitanMailbox;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use InvalidArgumentException;
+use Laravel\Cashier\Cashier;
 use RuntimeException;
 
 /**
@@ -34,6 +37,12 @@ use RuntimeException;
  *
  * A member gets at most one of these in a week, never once they have a paid plan, and only
  * from the live site. Nothing here touches a payment: it only records and emails.
+ *
+ * A third email is for a paying member whose renewal could not be charged
+ * (renewalFailed()): the warning App\Services\Billing\RenewalGrace sends the moment it
+ * happens, in the same design, with its words edited in the same place and its case in the
+ * same list. It is a billing notice, not a follow-up: it has no switch, wait or weekly
+ * limit, and when it cannot be sent RenewalGrace sends its plain-text one instead.
  */
 class PurchaseFollowUps
 {
@@ -50,6 +59,21 @@ class PurchaseFollowUps
 
     /** How long the button in a declined payment's email keeps working. */
     public const LINK_DAYS = 30;
+
+    /** renewalFailed(): the warning went out now. */
+    public const RENEWAL_SENT = 'sent';
+
+    /** renewalFailed(): this renewal's warning went out before. */
+    public const RENEWAL_ALREADY = 'already';
+
+    /** renewalFailed(): no email for this member or server (the case says why). */
+    public const RENEWAL_SKIPPED = 'skipped';
+
+    /** renewalFailed(): it could not be sent, or recorded: the caller sends its plain one. */
+    public const RENEWAL_FAILED = 'failed';
+
+    /** A failed renewal with no invoice named is the member's open case from the last this many days. */
+    private const RENEWAL_CASE_DAYS = 45;
 
     /**
      * @return array<string, string>
@@ -86,6 +110,21 @@ class PurchaseFollowUps
             'left_cta_label_ar' => 'إكمال الاشتراك',
             'left_footer_en' => 'Not what you were looking for? Reply and tell us; we read every message.',
             'left_footer_ar' => 'لم تجد ما تبحث عنه؟ ردّ علينا وأخبرنا، فنحن نقرأ كل رسالة.',
+
+            'renewal_subject_en' => 'Payment failed - action required',
+            'renewal_subject_ar' => 'لم يكتمل الدفع - مطلوب إجراء منك',
+            'renewal_headline_en' => 'Your {plan} plan could not be renewed',
+            'renewal_headline_ar' => 'تعذّر تجديد باقة {plan}',
+            // A member who paid for the plan before: it stays on for the grace days.
+            'renewal_body_en' => "Hi {name}, we tried to renew your {plan} plan, but your bank declined the payment{reason}. Nothing was charged.\n\nYour plan stays on until {date}, with all its paid features. To keep it, press the button below and pay with a card that has enough balance, or with another card.\n\nIf it is still unpaid on {date}, your subscription will be cancelled and your account will move to the free plan.",
+            'renewal_body_ar' => "أهلاً {name}، حاولنا تجديد باقة {plan} الخاصة بك، لكن البنك رفض عملية الدفع{reason}. لم يُخصم منك أي مبلغ.\n\nباقتك مستمرة حتى {date} بكل مزاياها المدفوعة. لتحتفظ بها، اضغط الزر أدناه وادفع ببطاقة فيها رصيد كافٍ أو ببطاقة أخرى.\n\nإذا بقي المبلغ غير مدفوع حتى {date}، سيُلغى اشتراكك وينتقل حسابك إلى الباقة المجانية.",
+            // No grace (the first charge after a free trial): the paid features paused at once.
+            'renewal_paused_body_en' => "Hi {name}, we tried to take the payment for your {plan} plan, but your bank declined it{reason}, so your paid features are paused. Nothing was charged.\n\nTo get them back straight away, press the button below and pay with a card that has enough balance, or with another card.",
+            'renewal_paused_body_ar' => "أهلاً {name}، حاولنا تحصيل قيمة باقة {plan}، لكن البنك رفض عملية الدفع{reason}، لذلك توقفت مزاياك المدفوعة مؤقتاً. لم يُخصم منك أي مبلغ.\n\nلتعود مزاياك فوراً، اضغط الزر أدناه وادفع ببطاقة فيها رصيد كافٍ أو ببطاقة أخرى.",
+            'renewal_cta_label_en' => 'Pay now',
+            'renewal_cta_label_ar' => 'ادفع الآن',
+            'renewal_footer_en' => 'Need another way to pay? Just reply to this email and we will help.',
+            'renewal_footer_ar' => 'تحتاج طريقة دفع أخرى؟ ردّ على هذه الرسالة وسنساعدك.',
         ];
     }
 
@@ -125,7 +164,141 @@ class PurchaseFollowUps
 
     public function enabled(string $kind): bool
     {
-        return $this->settings()[self::prefix($kind).'_enabled'] === '1';
+        // A failed renewal's warning has no switch: a paying member is always told.
+        return $kind === PurchaseFollowUp::KIND_RENEWAL_FAILED
+            || $this->settings()[self::prefix($kind).'_enabled'] === '1';
+    }
+
+    /**
+     * A paying member's renewal could not be charged: the case is recorded and its warning
+     * sent now (RenewalGrace::warn() decides when). One case for a renewal: the same
+     * invoice failing again, or a warning tried again after it could not be sent, keeps its
+     * case, and a warning that went out is not sent twice.
+     *
+     * @return string RENEWAL_SENT, RENEWAL_ALREADY, RENEWAL_SKIPPED, or RENEWAL_FAILED when
+     *                the caller should send its plain-text warning instead
+     */
+    public function renewalFailed(User $user, Subscription $plan, ?object $invoice = null): string
+    {
+        if (! PurchaseFollowUp::ready()) {
+            return self::RENEWAL_FAILED;
+        }
+
+        $row = null;
+        try {
+            $kind = PurchaseFollowUp::KIND_RENEWAL_FAILED;
+            $invoiceId = trim((string) ($invoice->id ?? ''));
+            // A case that was paid is closed: a renewal failing after it is a new one.
+            $row = ($invoiceId !== '' ? PurchaseFollowUp::query()->where('kind', $kind)->where('stripe_invoice_id', $invoiceId)->whereNull('paid_at')->latest('id')->first() : null)
+                ?? PurchaseFollowUp::query()
+                    ->where('user_id', $user->id)
+                    ->where('kind', $kind)
+                    ->whereNull('paid_at')
+                    ->where('happened_at', '>=', now()->subDays(self::RENEWAL_CASE_DAYS))
+                    ->when($invoiceId !== '', fn ($query) => $query->whereNull('stripe_invoice_id'))
+                    ->latest('id')
+                    ->first()
+                ?? new PurchaseFollowUp(['user_id' => $user->id, 'kind' => $kind, 'happened_at' => now()]);
+            if ($row->email_status === PurchaseFollowUp::SENT) {
+                return self::RENEWAL_ALREADY;
+            }
+
+            $plan->loadMissing('plan');
+            $customerId = trim((string) ($invoice->customer ?? $user->stripe_id ?? ''));
+            $reason = Cache::pull(self::reasonKey((int) $user->id));
+            if (! is_string($reason) || $reason === '') {
+                $reason = $row->reason ?: $this->lookUpReason($customerId);
+            }
+            $row->forceFill([
+                'plan_slug' => $plan->plan?->slug ?? $row->plan_slug,
+                'billing_cycle' => self::cycleOf($invoice) ?? ($row->billing_cycle ?: 'monthly'),
+                'locale' => $row->locale ?: 'ar',
+                'reason' => is_string($reason) && $reason !== '' ? substr($reason, 0, 60) : $row->reason,
+                'stripe_invoice_id' => $invoiceId !== '' ? $invoiceId : $row->stripe_invoice_id,
+                'amount_cents' => max(0, (int) ($invoice->amount_due ?? 0)) ?: $row->amount_cents,
+                'currency' => strtolower(substr((string) ($invoice->currency ?? ''), 0, 3)) ?: $row->currency,
+                'email_due_at' => null,
+            ]);
+            $row->setRelation('user', $user);
+
+            $why = match (true) {
+                ! filter_var((string) $user->email, FILTER_VALIDATE_EMAIL) => 'No email address on the account',
+                PaidWelcomeEmail::isPhoneSignupAddress((string) $user->email) => 'Signed up with a phone number: no email address',
+                ! LiveServer::allowsCustomerActions() => 'Not the live site: only the live site emails members',
+                default => null,
+            };
+            if ($why !== null) {
+                $row->forceFill(['email_status' => PurchaseFollowUp::SKIPPED, 'email_note' => $why])->save();
+
+                return self::RENEWAL_SKIPPED;
+            }
+
+            // Saved first: the email's button names the case.
+            $row->forceFill(['email_status' => PurchaseFollowUp::FAILED, 'email_note' => 'Not sent yet'])->save();
+            $this->send($row);
+            $row->forceFill(['email_status' => PurchaseFollowUp::SENT, 'email_sent_at' => now(), 'email_note' => null])->save();
+
+            return self::RENEWAL_SENT;
+        } catch (\Throwable $e) {
+            Log::warning('A failed renewal\'s email was not sent in the email design; the plain one goes instead.', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+            rescue(function () use ($row, $e): void {
+                if ($row?->exists) {
+                    $row->forceFill(['email_status' => PurchaseFollowUp::FAILED, 'email_note' => mb_substr($e->getMessage(), 0, 160)])->save();
+                }
+            }, null, false);
+
+            return self::RENEWAL_FAILED;
+        }
+    }
+
+    /** The plain-text warning went out in place of the designed one: the case says so. */
+    public function renewalWarnedPlainly(User $user): void
+    {
+        if (! PurchaseFollowUp::ready()) {
+            return;
+        }
+
+        rescue(function () use ($user): void {
+            PurchaseFollowUp::query()
+                ->where('user_id', $user->id)
+                ->where('kind', PurchaseFollowUp::KIND_RENEWAL_FAILED)
+                ->where('email_status', PurchaseFollowUp::FAILED)
+                ->whereNull('paid_at')
+                ->latest('id')
+                ->first()
+                ?->forceFill(['email_status' => PurchaseFollowUp::SENT, 'email_sent_at' => now(), 'email_note' => 'Sent as a plain email'])
+                ->save();
+        }, null, false);
+    }
+
+    /** The member's missed renewal is paid: their open cases say so. */
+    public function renewalPaid(User $user): void
+    {
+        if (! PurchaseFollowUp::ready()) {
+            return;
+        }
+
+        rescue(function () use ($user): void {
+            $plan = app(PlanAccessService::class)->resolveActivePlanForUserId((int) $user->id);
+            PurchaseFollowUp::query()
+                ->where('user_id', $user->id)
+                ->where('kind', PurchaseFollowUp::KIND_RENEWAL_FAILED)
+                ->whereNull('paid_at')
+                ->update(['paid_at' => now(), 'paid_plan_slug' => $plan?->slug, 'updated_at' => now()]);
+        }, null, false);
+    }
+
+    /** 'yearly' or 'monthly' from the invoice's own period, or null when it does not say. */
+    private static function cycleOf(?object $invoice): ?string
+    {
+        $period = $invoice?->lines?->data[0]?->period ?? null;
+        $start = (int) ($period->start ?? 0);
+        $end = (int) ($period->end ?? 0);
+        if ($start <= 0 || $end <= $start) {
+            return null;
+        }
+
+        return ($end - $start) > 62 * 86400 ? 'yearly' : 'monthly';
     }
 
     /**
@@ -273,7 +446,7 @@ class PurchaseFollowUps
 
             $row = PurchaseFollowUp::query()
                 ->where('user_id', $user->id)
-                ->where('kind', PurchaseFollowUp::KIND_PAYMENT_FAILED)
+                ->whereIn('kind', [PurchaseFollowUp::KIND_PAYMENT_FAILED, PurchaseFollowUp::KIND_RENEWAL_FAILED])
                 ->where('happened_at', '>=', now()->subHour())
                 ->latest('id')
                 ->first();
@@ -344,6 +517,8 @@ class PurchaseFollowUps
         $open = PurchaseFollowUp::query()
             ->whereNull('paid_at')
             ->whereNotNull('user_id')
+            // A failed renewal's member has their plan all along: renewalPaid() marks those.
+            ->where('kind', '!=', PurchaseFollowUp::KIND_RENEWAL_FAILED)
             ->where('happened_at', '>=', now()->subDays(self::PAID_WITHIN_DAYS))
             ->orderBy('id')
             ->limit(1000)
@@ -466,11 +641,14 @@ class PurchaseFollowUps
     {
         $plan = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->orderBy('price_cents')->first();
         $row = new PurchaseFollowUp([
-            'kind' => $kind === PurchaseFollowUp::KIND_PAYMENT_FAILED ? PurchaseFollowUp::KIND_PAYMENT_FAILED : PurchaseFollowUp::KIND_CHECKOUT_LEFT,
+            'kind' => in_array($kind, [PurchaseFollowUp::KIND_PAYMENT_FAILED, PurchaseFollowUp::KIND_RENEWAL_FAILED], true) ? $kind : PurchaseFollowUp::KIND_CHECKOUT_LEFT,
             'plan_slug' => $plan?->slug,
             'billing_cycle' => 'monthly',
             'reason' => 'insufficient_funds',
         ]);
+        if ($kind === PurchaseFollowUp::KIND_RENEWAL_FAILED) {
+            $row->sampleKeptUntil = now()->addDays(RenewalGrace::graceDays());
+        }
         if ($user) {
             $row->setRelation('user', $user);
         }
@@ -491,10 +669,15 @@ class PurchaseFollowUps
             'bilingual_order' => ($settings['order'] ?? 'ar_en') === 'en_ar' ? 'en_ar' : 'ar_en',
         ];
 
+        // A failed renewal: the day the plan stays on until, or none (the paid features paused).
+        $keptUntil = $row->planKeptUntil();
+        $body = $row->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED && $keptUntil === null ? 'paused_body' : 'body';
+
         foreach (['en', 'ar'] as $lang) {
-            $fill = function (string $text) use ($plan, $lang, $first, $row): string {
+            $date = $keptUntil !== null ? Carbon::instance($keptUntil)->locale($lang)->translatedFormat('j F Y') : '';
+            $fill = function (string $text) use ($plan, $lang, $first, $row, $date): string {
                 $text = PaidWelcomeEmail::withPlan($text, $plan, $lang);
-                $text = str_replace('{reason}', self::reasonWords($row->reason, $lang), $text);
+                $text = str_replace(['{reason}', '{date}'], [self::reasonWords($row->reason, $lang), $date], $text);
                 // {name} is the first name; with none, the greeting closes up ("Hi, ...").
                 $text = $first !== '' ? str_replace('{name}', $first, $text) : preg_replace('/\s*\{name\}/u', '', $text);
 
@@ -502,7 +685,7 @@ class PurchaseFollowUps
             };
 
             foreach (['subject', 'headline', 'body', 'cta_label', 'footer'] as $field) {
-                $fields[$field.'_'.$lang] = $fill((string) ($settings[$prefix.'_'.$field.'_'.$lang] ?? ''));
+                $fields[$field.'_'.$lang] = $fill((string) ($settings[$prefix.'_'.($field === 'body' ? $body : $field).'_'.$lang] ?? ''));
             }
             $fields['preheader_'.$lang] = $fields['headline_'.$lang];
             $fields['cta_url_'.$lang] = $this->buttonUrl($row, $lang);
@@ -519,11 +702,23 @@ class PurchaseFollowUps
      */
     private function buttonUrl(PurchaseFollowUp $row, string $lang): string
     {
-        if ($row->exists && $row->kind === PurchaseFollowUp::KIND_PAYMENT_FAILED && trim((string) $row->stripe_invoice_id) !== '') {
+        if ($row->exists && $row->isDeclinedPayment() && trim((string) $row->stripe_invoice_id) !== '') {
             return URL::temporarySignedRoute('billing.follow-up', now()->addDays(self::LINK_DAYS), ['followUp' => $row->id, 'lang' => $lang]);
         }
 
-        return $this->checkoutUrl($row, $lang);
+        return $this->fallbackUrl($row, $lang);
+    }
+
+    /**
+     * Where a case's member goes when Stripe's page for the payment is not there to pay on:
+     * the checkout for the plan they nearly bought, or, for a renewal, their own
+     * subscription page (they have the plan: there they change the card and pay).
+     */
+    public function fallbackUrl(PurchaseFollowUp $row, string $lang): string
+    {
+        return $row->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED
+            ? rtrim((string) config('app.url', ''), '/').'/'.($lang === 'en' ? 'en' : 'ar').'/manage-subscription'
+            : $this->checkoutUrl($row, $lang);
     }
 
     /** The checkout for the case's plan and cycle; with no plan known, the plans. */
@@ -546,7 +741,7 @@ class PurchaseFollowUps
     public function paymentPageUrl(PurchaseFollowUp $row): ?string
     {
         $invoiceId = trim((string) $row->stripe_invoice_id);
-        if ($row->kind !== PurchaseFollowUp::KIND_PAYMENT_FAILED || $invoiceId === '') {
+        if (! $row->isDeclinedPayment() || $invoiceId === '') {
             return null;
         }
 
@@ -563,7 +758,7 @@ class PurchaseFollowUps
         }
 
         return rescue(function () use ($invoiceId): ?string {
-            $invoice = \Laravel\Cashier\Cashier::stripe()->invoices->retrieve($invoiceId, []);
+            $invoice = Cashier::stripe()->invoices->retrieve($invoiceId, []);
 
             return (string) ($invoice->status ?? '') === 'open' ? ((string) ($invoice->hosted_invoice_url ?? '') ?: null) : null;
         }, null, false);
@@ -592,7 +787,7 @@ class PurchaseFollowUps
         }
 
         return rescue(function () use ($customerId): ?string {
-            $payments = \Laravel\Cashier\Cashier::stripe()->paymentIntents->all(['customer' => $customerId, 'limit' => 3]);
+            $payments = Cashier::stripe()->paymentIntents->all(['customer' => $customerId, 'limit' => 3]);
             foreach ($payments->data as $payment) {
                 $error = $payment->last_payment_error ?? null;
                 $reason = trim((string) ($error->decline_code ?? $error->code ?? ''));
@@ -612,6 +807,10 @@ class PurchaseFollowUps
 
     private static function prefix(string $kind): string
     {
-        return $kind === PurchaseFollowUp::KIND_PAYMENT_FAILED ? 'failed' : 'left';
+        return match ($kind) {
+            PurchaseFollowUp::KIND_PAYMENT_FAILED => 'failed',
+            PurchaseFollowUp::KIND_RENEWAL_FAILED => 'renewal',
+            default => 'left',
+        };
     }
 }

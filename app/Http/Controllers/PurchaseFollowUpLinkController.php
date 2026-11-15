@@ -9,10 +9,11 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 /**
- * The button in the email after a declined first payment (App\Services\Billing\PurchaseFollowUps).
- * While Stripe still holds that payment open (about a day) the member goes straight to Stripe's
- * page for it and pays there; once it has closed, to the checkout for the same plan. So the
- * button works whenever the email is read. The link is signed: nothing else opens it.
+ * The button in the email after a declined payment (App\Services\Billing\PurchaseFollowUps).
+ * While Stripe still holds that payment open the member goes straight to Stripe's page for it
+ * and pays there; once it has closed, to the checkout for the same plan (a first payment) or
+ * to their own subscription page (a renewal). So the button works whenever the email is read.
+ * The link is signed: nothing else opens it.
  */
 class PurchaseFollowUpLinkController extends Controller
 {
@@ -32,6 +33,6 @@ class PurchaseFollowUpLinkController extends Controller
 
         return $payment !== null
             ? redirect()->away($payment)
-            : redirect()->to($followUps->checkoutUrl($case, $lang));
+            : redirect()->to($followUps->fallbackUrl($case, $lang));
     }
 }

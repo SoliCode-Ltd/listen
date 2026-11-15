@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Cashier;
+use Stripe\Exception\ApiErrorException;
 
 /**
  * A card renewal that could not be charged. A member who has paid for their
@@ -121,7 +122,7 @@ class RenewalGrace
      * @param  object  $stripeSubscription  their own subscription, as Stripe returns it now
      * @param  object|null  $invoice  the failed invoice, when the webhook brought it
      *
-     * @throws \Stripe\Exception\ApiErrorException when Stripe could not be read: nothing was recorded
+     * @throws ApiErrorException when Stripe could not be read: nothing was recorded
      */
     public function begin(Subscription $plan, object $stripeSubscription, ?object $invoice = null): string
     {
@@ -203,7 +204,7 @@ class RenewalGrace
      *
      * @param  array{state: ?string, period_end: ?int}|null  $rowBeforeRead  rowBeforeRead(), taken before Stripe was read
      *
-     * @throws \Stripe\Exception\ApiErrorException when Stripe could not be read: nothing was recorded
+     * @throws ApiErrorException when Stripe could not be read: nothing was recorded
      */
     public function forBillingSync(User $user, object $stripeSubscription, ?array $rowBeforeRead = null): bool
     {
@@ -239,7 +240,7 @@ class RenewalGrace
 
         $outcome = $this->begin($plan, $stripeSubscription, $invoice);
         if (! $recordedBefore) {
-            $this->warn($user, $plan);
+            $this->warn($user, $plan, $invoice);
         }
 
         return self::isPaidPlan($plan) && in_array($outcome, [self::KEPT, self::ENDED], true);
@@ -251,7 +252,7 @@ class RenewalGrace
      */
     public function settle(User $user): void
     {
-        Subscription::query()
+        $settled = Subscription::query()
             ->where('user_id', $user->id)
             ->where('billing_payment_state', 'past_due')
             ->update([
@@ -259,14 +260,23 @@ class RenewalGrace
                 'billing_grace_ends_at' => null,
                 'billing_failed_notice_sent_at' => null,
             ]);
+        if ($settled > 0) {
+            // The list of failed renewals shows it was paid.
+            app(PurchaseFollowUps::class)->renewalPaid($user);
+        }
     }
 
     /**
      * Warns the member of the missed payment, once (billing_failed_notice_sent_at
      * is set only once it was sent, so a later failure tries again). Never after
      * the grace ran out.
+     *
+     * The warning is the email edited in Newsletter → Purchase follow-ups, which
+     * also lists who got it (PurchaseFollowUps::renewalFailed()). When that one
+     * cannot be sent, the plain-text warning below goes instead: a paying member
+     * is always told.
      */
-    public function warn(User $user, Subscription $plan): void
+    public function warn(User $user, Subscription $plan, ?object $invoice = null): void
     {
         if ((string) $plan->billing_payment_state !== 'past_due' || $plan->billing_failed_notice_sent_at !== null) {
             return;
@@ -274,6 +284,17 @@ class RenewalGrace
 
         $outcome = self::outcome($plan);
         if ($outcome === self::ENDED) {
+            return;
+        }
+
+        $followUps = app(PurchaseFollowUps::class);
+        $sent = $followUps->renewalFailed($user, $plan, $invoice);
+        if (in_array($sent, [PurchaseFollowUps::RENEWAL_SENT, PurchaseFollowUps::RENEWAL_ALREADY], true)) {
+            $plan->forceFill(['billing_failed_notice_sent_at' => now()])->save();
+
+            return;
+        }
+        if ($sent === PurchaseFollowUps::RENEWAL_SKIPPED) {
             return;
         }
 
@@ -316,6 +337,7 @@ class RenewalGrace
 
         if ($this->mail->send($user, $subject, $body, $dedupeKey, 24 * 14)) {
             $plan->forceFill(['billing_failed_notice_sent_at' => now()])->save();
+            $followUps->renewalWarnedPlainly($user);
         }
     }
 
@@ -377,7 +399,7 @@ class RenewalGrace
      *
      * @return array<string, Carbon>|null
      *
-     * @throws \Stripe\Exception\ApiErrorException when an invoice could not be read
+     * @throws ApiErrorException when an invoice could not be read
      */
     private function paidPeriod(Subscription $plan, object $stripeSubscription, ?Carbon $unpaidFrom, ?object $invoice): ?array
     {
@@ -402,7 +424,7 @@ class RenewalGrace
      *
      * @return array{0: Carbon, 1: Carbon}|null
      *
-     * @throws \Stripe\Exception\ApiErrorException
+     * @throws ApiErrorException
      */
     private function lastPaidPeriod(object $stripeSubscription, Carbon $unpaidFrom): ?array
     {
@@ -464,7 +486,7 @@ class RenewalGrace
      * The subscription's latest invoice (the failed renewal while it is past
      * due), unless it is the one already at hand.
      *
-     * @throws \Stripe\Exception\ApiErrorException
+     * @throws ApiErrorException
      */
     private function latestInvoice(object $stripeSubscription, ?object $known): ?object
     {

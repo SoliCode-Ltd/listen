@@ -11,9 +11,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Newsletter → Purchase follow-ups: every member who nearly bought a plan (their first
- * payment was declined, or they opened the checkout and left), newest first, with the
- * follow-up email each got (or why none went) and whether they bought a plan afterwards.
+ * Newsletter → Purchase follow-ups: every payment that did not happen, newest first: a
+ * member who nearly bought a plan (their first payment was declined, or they opened the
+ * checkout and left) and a paying member whose renewal was declined. Each with the email
+ * it got (or why none went) and whether the member paid afterwards.
  * Read-only; the emails' words and switches are on its "Emails and settings" page.
  */
 class PurchaseFollowUpResource extends Resource
@@ -80,9 +81,12 @@ class PurchaseFollowUpResource extends Resource
                     ->label('What happened')
                     ->badge()
                     ->formatStateUsing(fn (PurchaseFollowUp $record): string => $record->what())
-                    ->color(fn (PurchaseFollowUp $record): string => $record->kind === PurchaseFollowUp::KIND_PAYMENT_FAILED ? 'danger' : 'warning')
-                    ->description(fn (PurchaseFollowUp $record): ?string => $record->kind === PurchaseFollowUp::KIND_PAYMENT_FAILED
-                        ? $record->reasonLabel()
+                    ->color(fn (PurchaseFollowUp $record): string => $record->isDeclinedPayment() ? 'danger' : 'warning')
+                    ->description(fn (PurchaseFollowUp $record): ?string => $record->isDeclinedPayment()
+                        ? collect([
+                            $record->reasonLabel(),
+                            ($until = $record->planKeptUntil()) !== null ? 'Plan stays on until '.$until->format('j M') : null,
+                        ])->filter()->implode(' · ') ?: null
                         : ((int) $record->opens > 1 ? 'Opened '.$record->opens.' times' : null)),
                 Tables\Columns\TextColumn::make('plan_slug')
                     ->label('Plan')
@@ -101,7 +105,7 @@ class PurchaseFollowUpResource extends Resource
                     })
                     ->wrap(),
                 Tables\Columns\TextColumn::make('paid_at')
-                    ->label('Bought a plan after')
+                    ->label('Paid after')
                     ->dateTime('j M Y, H:i')
                     ->placeholder('Not yet')
                     ->description(fn (PurchaseFollowUp $record): ?string => $record->paid_at ? ucwords(str_replace('_', ' ', (string) $record->paid_plan_slug)) : null)
@@ -112,7 +116,8 @@ class PurchaseFollowUpResource extends Resource
                 Tables\Filters\SelectFilter::make('kind')
                     ->label('What happened')
                     ->options([
-                        PurchaseFollowUp::KIND_PAYMENT_FAILED => 'Payment declined',
+                        PurchaseFollowUp::KIND_RENEWAL_FAILED => 'Renewal declined',
+                        PurchaseFollowUp::KIND_PAYMENT_FAILED => 'First payment declined',
                         PurchaseFollowUp::KIND_CHECKOUT_LEFT => 'Left the checkout',
                     ]),
                 Tables\Filters\SelectFilter::make('email_status')
@@ -125,7 +130,7 @@ class PurchaseFollowUpResource extends Resource
                         PurchaseFollowUp::FAILED => 'Could not be sent',
                     ]),
                 Tables\Filters\TernaryFilter::make('paid')
-                    ->label('Bought a plan after')
+                    ->label('Paid after')
                     ->queries(
                         true: fn (Builder $query): Builder => $query->whereNotNull('paid_at'),
                         false: fn (Builder $query): Builder => $query->whereNull('paid_at'),
@@ -134,7 +139,7 @@ class PurchaseFollowUpResource extends Resource
             ->recordActions([])
             ->toolbarActions([])
             ->emptyStateHeading('No purchase follow-ups yet')
-            ->emptyStateDescription('When a first payment is declined, or a member opens the checkout and leaves without paying, it shows here with its email and whether they bought a plan afterwards.');
+            ->emptyStateDescription('When a renewal or a first payment is declined, or a member opens the checkout and leaves without paying, it shows here with its email and whether they paid afterwards.');
     }
 
     public static function getPages(): array

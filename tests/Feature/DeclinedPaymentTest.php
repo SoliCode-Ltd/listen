@@ -99,7 +99,7 @@ class DeclinedPaymentTest extends TestCase
         $plan = $this->plan();
         $this->assertNotSame('past_due', $plan->billing_payment_state);
         $this->assertNull($plan->billing_grace_ends_at);
-        $this->assertNotContains('Payment failed - action required', $this->sentSubjects());
+        $this->assertNotContains('Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك', $this->sentSubjects());
         $this->assertSame('starter', app(PlanAccessService::class)->resolveActivePlanForUserId((int) $this->member->id)?->slug);
     }
 
@@ -147,7 +147,7 @@ class DeclinedPaymentTest extends TestCase
         $this->assertSame('past_due', $plan->billing_payment_state);
         $this->assertTrue($plan->billing_grace_ends_at->between(now()->addDays(7)->subMinute(), now()->addDays(7)->addMinute()));
         $this->assertNotNull($plan->billing_failed_notice_sent_at);
-        $this->assertSame(1, collect($this->sentSubjects())->filter(fn ($subject) => $subject === 'Payment failed - action required')->count());
+        $this->assertSame(1, collect($this->sentSubjects())->filter(fn ($subject) => $subject === 'Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك')->count());
     }
 
     public function test_a_late_failure_for_an_invoice_paid_since_does_not_pause_the_member_again(): void
@@ -221,6 +221,6 @@ class DeclinedPaymentTest extends TestCase
 
         $this->assertSame('manual_override', $this->plan()->billing_payment_state);
         $this->assertNull($this->plan()->billing_grace_ends_at);
-        $this->assertNotContains('Payment failed - action required', $this->sentSubjects());
+        $this->assertNotContains('Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك', $this->sentSubjects());
     }
 }

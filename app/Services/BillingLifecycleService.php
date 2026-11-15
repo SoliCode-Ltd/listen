@@ -3,9 +3,12 @@
 namespace App\Services;
 
 use App\Models\BillingSubscription;
+use App\Models\PlanChange;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\BillingLifecycleMail;
+use App\Services\Billing\PlanChangeEmails;
+use App\Services\Billing\PlanChanges;
 use App\Services\Billing\RenewalGrace;
 use App\Services\Newsletter\PlanEndReminder;
 use App\Support\LiveServer;
@@ -76,11 +79,11 @@ class BillingLifecycleService
 
                     // A lower plan booked to follow it (paid by hand, or by card from that
                     // day): the reminder says the switch, never "ends and does not renew".
-                    $change = app(\App\Services\Billing\PlanChanges::class)->scheduledFor($user);
-                    if ($change && $change->source !== \App\Models\PlanChange::SOURCE_CARD
+                    $change = app(PlanChanges::class)->scheduledFor($user);
+                    if ($change && $change->source !== PlanChange::SOURCE_CARD
                         && $subscription->current_period_end
                         && abs($change->starts_at->diffInMinutes($subscription->current_period_end, false)) <= 24 * 60) {
-                        if (app(\App\Services\Billing\PlanChangeEmails::class)->sendReminder($change, $day)) {
+                        if (app(PlanChangeEmails::class)->sendReminder($change, $day)) {
                             $subscription->forceFill([$column => now()])->save();
                             $sent++;
                         }
@@ -169,7 +172,7 @@ class BillingLifecycleService
 
         $outcome = $this->renewalGrace->begin($subscription, $stripeSubscription, $invoice);
         // Marked as sent only once it was, so a later failure tries the warning again.
-        $this->renewalGrace->warn($user, $subscription);
+        $this->renewalGrace->warn($user, $subscription, $invoice);
 
         // No grace: the paid features pause now, whichever of Stripe's events comes first.
         if ($outcome === RenewalGrace::PAUSED && RenewalGrace::isPaidPlan($subscription)) {

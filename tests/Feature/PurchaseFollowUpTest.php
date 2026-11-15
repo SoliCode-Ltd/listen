@@ -332,10 +332,10 @@ class PurchaseFollowUpTest extends TestCase
             ->assertSee('sara@example.com')
             ->assertSee('Left the checkout')
             ->assertSee('omar@example.com')
-            ->assertSee('Payment declined')
+            ->assertSee('First payment declined')
             ->assertSee('Not enough money on the card')
             ->assertSee('Sent')
-            ->assertSee('Payments declined: 1 (1 emailed, 0 bought after; email on)')
+            ->assertSee('First payments declined: 1 (1 emailed, 0 bought after; email on)')
             ->filterTable('kind', PurchaseFollowUp::KIND_PAYMENT_FAILED)
             ->assertCanSeeTableRecords(PurchaseFollowUp::query()->where('kind', PurchaseFollowUp::KIND_PAYMENT_FAILED)->get())
             ->assertCanNotSeeTableRecords(PurchaseFollowUp::query()->where('kind', PurchaseFollowUp::KIND_CHECKOUT_LEFT)->get());
@@ -354,6 +354,188 @@ class PurchaseFollowUpTest extends TestCase
 
         auth()->logout();
         $this->actingAs($this->member)->get(PurchaseFollowUpResource::getUrl('index'))->assertForbidden();
+    }
+
+    /* ------------------------------------------------------------ */
+    /*  A paying member's renewal declined */
+    /* ------------------------------------------------------------ */
+
+    public function test_a_declined_renewal_is_listed_with_its_warning_in_both_languages_and_a_button_to_pay_it(): void
+    {
+        $plan = $this->inGrace($this->member);
+        $this->followUps()->declineReason((object) ['customer' => 'cus_sara', 'last_payment_error' => (object) ['decline_code' => 'insufficient_funds']]);
+
+        // No switch to turn on: a paying member is always told, at once.
+        $this->assertSame(PurchaseFollowUps::RENEWAL_SENT, $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle')));
+
+        $case = PurchaseFollowUp::query()->sole();
+        $this->assertSame(PurchaseFollowUp::KIND_RENEWAL_FAILED, $case->kind);
+        $this->assertSame('Renewal declined', $case->what());
+        $this->assertSame(PurchaseFollowUp::SENT, $case->email_status);
+        $this->assertNotNull($case->email_sent_at);
+        $this->assertSame(['starter', 900, 'usd', 'in_r1', 'insufficient_funds'], [$case->plan_slug, $case->amount_cents, $case->currency, $case->stripe_invoice_id, $case->reason]);
+        $this->assertEquals($plan->billing_grace_ends_at, $case->planKeptUntil());
+
+        $email = $this->onlyEmail();
+        $this->assertSame(['sara@example.com'], array_map(fn ($to) => $to->getAddress(), $email->getTo()));
+        $this->assertSame('Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك', (string) $email->getSubject());
+        $text = (string) $email->getTextBody();
+        $until = now()->addDays(7);
+        $this->assertStringContainsString('Hi Sara, we tried to renew your Starter plan, but your bank declined the payment because the card did not have enough balance. Nothing was charged.', $text);
+        $this->assertStringContainsString('Your plan stays on until '.$until->format('j F Y').', with all its paid features.', $text);
+        $this->assertStringContainsString('أهلاً Sara، حاولنا تجديد باقة مبتدئ الخاصة بك، لكن البنك رفض عملية الدفع لعدم كفاية الرصيد في البطاقة.', $text);
+        $this->assertStringContainsString('باقتك مستمرة حتى '.$until->locale('ar')->translatedFormat('j F Y'), $text);
+        // The button is the member's own signed link to that renewal's payment, in each language.
+        $this->assertMatchesRegularExpression('#Pay now: https?://\S+/billing/pay/'.$case->id.'\?expires=\d+&lang=en&signature=[0-9a-f]+#', $text);
+        $this->assertMatchesRegularExpression('#ادفع الآن: https?://\S+/billing/pay/'.$case->id.'\?expires=\d+&lang=ar&signature=[0-9a-f]+#u', $text);
+        foreach (['{name}', '{plan}', '{date}', '{reason}'] as $placeholder) {
+            $this->assertStringNotContainsString($placeholder, $text.(string) $email->getHtmlBody());
+        }
+
+        // The card tried again on the same renewal: the same case, and no second email.
+        $this->assertSame(PurchaseFollowUps::RENEWAL_ALREADY, $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle')));
+        $this->assertSame(1, PurchaseFollowUp::query()->count());
+        $this->assertCount(1, $this->sentEmails());
+
+        // They have their plan all along: that is not "paid after", and no follow-up email is theirs.
+        $this->turnOn();
+        $this->travel(2)->days();
+        $this->assertSame(['paid' => 0, 'sent' => 0, 'skipped' => 0, 'failed' => 0], $this->followUps()->run());
+        $this->assertNull($case->fresh()->paid_at);
+
+        // The renewal is paid: the case says so, and the next renewal to fail is a new case with its own email.
+        $plan->forceFill(['billing_payment_state' => 'past_due'])->save();
+        app(\App\Services\Billing\RenewalGrace::class)->settle($this->member);
+        $this->assertNotNull($case->fresh()->paid_at);
+        $this->assertSame('starter', $case->fresh()->paid_plan_slug);
+        $this->travel(1)->months();
+        $plan = $this->inGrace($this->member);
+        $this->assertSame(PurchaseFollowUps::RENEWAL_SENT, $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r2', 'subscription_cycle')));
+        $this->assertSame(2, PurchaseFollowUp::query()->count());
+        $this->assertCount(2, $this->sentEmails());
+    }
+
+    public function test_a_declined_renewals_button_opens_its_payment_page_while_open_and_the_members_subscription_after(): void
+    {
+        $plan = $this->inGrace($this->member);
+        $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+        preg_match('#https?://\S+/billing/pay/\d+\?expires=\d+&lang=en&signature=[0-9a-f]+#', (string) $this->onlyEmail()->getTextBody(), $link);
+        $link = (string) ($link[0] ?? '');
+        $this->assertNotSame('', $link);
+
+        // Still unpaid: straight to that renewal's own payment page.
+        $this->invoiceIsOpenAt('https://invoice.stripe.com/i/acct_1/live_renewal');
+        $this->get($link)->assertRedirect('https://invoice.stripe.com/i/acct_1/live_renewal');
+
+        // Paid or closed since: their own subscription page, never a checkout for a plan they have.
+        $this->invoiceIsOpenAt(null);
+        $this->get($link)->assertRedirect('https://listenai.studio/en/manage-subscription');
+    }
+
+    public function test_a_renewal_with_no_grace_gets_the_paused_words_and_one_with_no_invoice_a_button_to_the_subscription(): void
+    {
+        // The first charge after a free trial: no grace days, the paid features pause at once.
+        $plan = $this->inGrace($this->member, null);
+
+        $this->assertSame(PurchaseFollowUps::RENEWAL_SENT, $this->followUps()->renewalFailed($this->member, $plan));
+
+        $text = (string) $this->onlyEmail()->getTextBody();
+        $this->assertStringContainsString('but your bank declined it, so your paid features are paused. Nothing was charged.', $text);
+        $this->assertStringContainsString('لذلك توقفت مزاياك المدفوعة مؤقتاً', $text);
+        $this->assertStringNotContainsString('stays on until', $text);
+        // No invoice was named: the button opens their subscription page.
+        $this->assertStringContainsString('Pay now: https://listenai.studio/en/manage-subscription', $text);
+        $this->assertStringContainsString('ادفع الآن: https://listenai.studio/ar/manage-subscription', $text);
+        $this->assertNull(PurchaseFollowUp::query()->sole()->planKeptUntil());
+    }
+
+    public function test_a_renewal_warning_that_cannot_go_out_in_the_design_goes_as_the_plain_email_and_the_case_says_so(): void
+    {
+        $plan = $this->inGrace($this->member);
+        // The newsletter mailbox is down.
+        $this->app->bind(PurchaseFollowUps::class, fn () => new class extends PurchaseFollowUps
+        {
+            public function send(PurchaseFollowUp $row, ?string $testTo = null): void
+            {
+                throw new \RuntimeException('The mailbox refused the password.');
+            }
+        });
+
+        app(\App\Services\Billing\RenewalGrace::class)->warn($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+
+        // The member is still told, in the plain email.
+        $email = $this->onlyEmail();
+        $this->assertSame('Payment failed - action required', (string) $email->getSubject());
+        $this->assertStringContainsString('Your plan stays on until', (string) $email->getTextBody());
+        $this->assertNotNull($plan->fresh()->billing_failed_notice_sent_at);
+        $case = PurchaseFollowUp::query()->sole();
+        $this->assertSame(PurchaseFollowUp::SENT, $case->email_status);
+        $this->assertSame('Sent as a plain email', $case->email_note);
+    }
+
+    public function test_a_declined_renewal_on_staging_or_with_no_mailbox_is_listed_and_not_emailed(): void
+    {
+        $phone = User::factory()->create(['email' => '966500000000@users.listen.local']);
+        $this->assertSame(PurchaseFollowUps::RENEWAL_SKIPPED, $this->followUps()->renewalFailed($phone, $this->inGrace($phone)));
+
+        // Staging: a copy of live members, so nothing goes out.
+        config(['listen.live_actions' => false]);
+        $plan = $this->inGrace($this->member);
+        app(\App\Services\Billing\RenewalGrace::class)->warn($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+
+        $this->assertCount(0, $this->sentEmails());
+        $this->assertNull($plan->fresh()->billing_failed_notice_sent_at);
+        $notes = PurchaseFollowUp::query()->orderBy('id')->pluck('email_note', 'email_status')->all();
+        $this->assertSame([PurchaseFollowUp::SKIPPED], array_keys($notes));
+        $this->assertSame(2, PurchaseFollowUp::query()->where('email_status', PurchaseFollowUp::SKIPPED)->count());
+        $this->assertStringContainsString('phone number', (string) PurchaseFollowUp::query()->where('user_id', $phone->id)->value('email_note'));
+        $this->assertStringContainsString('Not the live site', (string) PurchaseFollowUp::query()->where('user_id', $this->member->id)->value('email_note'));
+    }
+
+    public function test_the_admin_sees_declined_renewals_and_edits_their_email(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $admin = User::factory()->create(['is_admin' => true]);
+        $plan = $this->inGrace($this->member);
+        $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+        $this->followUps()->declineReason((object) ['customer' => 'cus_sara', 'last_payment_error' => (object) ['decline_code' => 'insufficient_funds']]);
+
+        Livewire::actingAs($admin)->test(ListPurchaseFollowUps::class)
+            ->assertCanSeeTableRecords(PurchaseFollowUp::query()->get())
+            ->assertSee('sara@example.com')
+            ->assertSee('Renewal declined')
+            ->assertSee('Not enough money on the card')
+            ->assertSee('Plan stays on until '.$plan->billing_grace_ends_at->format('j M'))
+            ->assertSee('Renewals declined: 1 (1 emailed, 0 paid after)')
+            ->filterTable('kind', PurchaseFollowUp::KIND_PAYMENT_FAILED)
+            ->assertCanNotSeeTableRecords(PurchaseFollowUp::query()->get());
+
+        Livewire::actingAs($admin)->test(PurchaseFollowUpEmails::class)
+            ->assertFormSet(['renewal_subject_en' => 'Payment failed - action required', 'renewal_cta_label_ar' => 'ادفع الآن'])
+            ->fillForm(['renewal_headline_en' => 'We could not renew {plan}', 'renewal_cta_label_en' => 'Pay the renewal'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $preview = $this->followUps()->previewHtml(PurchaseFollowUp::KIND_RENEWAL_FAILED);
+        $this->assertStringContainsString('We could not renew Starter', $preview);
+        $this->assertStringContainsString('Pay the renewal', $preview);
+        $this->assertStringContainsString('Your plan stays on until '.now()->addDays(7)->format('j F Y'), $preview);
+        $this->assertStringNotContainsString('{date}', $preview);
+    }
+
+    public function test_members_warned_before_the_list_existed_are_added_to_it_once(): void
+    {
+        $plan = $this->inGrace($this->member);
+        $plan->forceFill(['billing_failed_notice_sent_at' => now()->subHours(3)])->save();
+        $ok = $this->paidMember();
+        $migration = require database_path('migrations/2026_11_29_120000_list_renewals_already_warned.php');
+
+        $migration->up();
+        $migration->up();
+
+        $case = PurchaseFollowUp::query()->sole();
+        $this->assertSame([$this->member->id, PurchaseFollowUp::KIND_RENEWAL_FAILED, 'starter', PurchaseFollowUp::SENT], [$case->user_id, $case->kind, $case->plan_slug, $case->email_status]);
+        $this->assertEquals($plan->fresh()->billing_failed_notice_sent_at, $case->email_sent_at);
+        $this->assertSame(0, PurchaseFollowUp::query()->where('user_id', $ok->id)->count());
     }
 
     public function test_the_emails_name_no_other_company(): void
@@ -402,6 +584,23 @@ class PurchaseFollowUpTest extends TestCase
     private function invoice(string $id = 'in_1', string $reason = 'subscription_create', string $customer = 'cus_sara'): object
     {
         return (object) ['id' => $id, 'customer' => $customer, 'billing_reason' => $reason, 'amount_due' => 900, 'currency' => 'usd'];
+    }
+
+    /**
+     * The member's paid plan as RenewalGrace leaves it when a renewal is declined: behind on
+     * payment, kept on for the grace days (or, with $days null, with none).
+     */
+    private function inGrace(User $user, ?int $days = 7): Subscription
+    {
+        $this->givePaidPlan($user);
+        $plan = Subscription::query()->where('user_id', $user->id)->sole();
+        $plan->forceFill([
+            'billing_payment_state' => 'past_due',
+            'billing_grace_ends_at' => $days !== null ? now()->addDays($days) : null,
+            'billing_failed_notice_sent_at' => null,
+        ])->save();
+
+        return $plan;
     }
 
     private function paidMember(): User
