@@ -10,6 +10,7 @@ use App\Support\StudioFacts;
 use Database\Seeders\VoiceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -190,21 +191,83 @@ class SeoStudioFactsTest extends TestCase
         $this->assertSame('https://listenai.studio/storage/settings/seo/a-newer-upload.svg', (string) DB::table('site_settings')->where('key', 'seo_favicon_svg_url')->value('value'), 'an icon uploaded later stays');
         $this->assertStringContainsString('/favicon.png', SeoHelper::primaryFaviconUrl());
 
-        // The bundled icons leave a clear margin around the mark, so it never touches the words beside it.
-        foreach (['favicon.png', 'apple-touch-icon.png'] as $file) {
-            $image = imagecreatefrompng(public_path($file));
-            $size = imagesx($image);
-            $margin = (int) floor($size * 0.1);
-            foreach ([[0, 0], [$margin, $size - 1 - $margin], [$size - 1, $size - 1], [(int) ($size / 2), $margin - 1]] as [$x, $y]) {
-                $alpha = (imagecolorat($image, $x, $y) >> 24) & 0x7F;
-                $this->assertSame(127, $alpha, "{$file} is transparent at {$x},{$y}");
-            }
-            $this->assertSame(0, (imagecolorat($image, (int) ($size / 2), (int) ($size / 3)) >> 24) & 0x7F, "{$file} draws the mark in the middle");
-        }
-        $this->assertStringContainsString('<g transform="translate(16 16) scale(0.75)">', (string) file_get_contents(public_path('favicon.svg')));
     }
 
-    private function page(string $locale, string $route): \Illuminate\Testing\TestResponse
+    public function test_the_site_icons_are_purple_to_their_edges_so_a_circle_shows_no_white_ring(): void
+    {
+        // Search results and profile pictures show the icon in a circle: anything not purple at
+        // its edge (a transparent margin) shows there as a white ring around a smaller mark.
+        $files = ['favicon.png', 'apple-touch-icon.png', 'icon-512.png', 'images/brand/listen-logo-512.png', 'images/brand/listen-profile-1024.png'];
+        foreach ($files as $file) {
+            $image = imagecreatefrompng(public_path($file));
+            $size = imagesx($image);
+            $this->assertSame($size, imagesy($image), "{$file} is square");
+            $radius = $size / 2 - 1.5;
+            for ($angle = 0; $angle < 360; $angle += 5) {
+                $x = (int) round($size / 2 + $radius * cos(deg2rad($angle)));
+                $y = (int) round($size / 2 + $radius * sin(deg2rad($angle)));
+                $rgba = imagecolorsforindex($image, imagecolorat($image, $x, $y));
+                $this->assertSame(0, $rgba['alpha'], "{$file} has no transparency at its edge ({$x},{$y})");
+                $this->assertTrue($rgba['blue'] > 200 && $rgba['red'] < 200 && $rgba['green'] < $rgba['red'], "{$file} is purple at its edge ({$x},{$y})");
+            }
+            // No transparency anywhere, corners included: there is nothing a page, a browser or a
+            // search engine could fill with white.
+            foreach ([[0, 0], [$size - 1, 0], [0, $size - 1], [$size - 1, $size - 1]] as [$x, $y]) {
+                $this->assertSame(0, (imagecolorat($image, $x, $y) >> 24) & 0x7F, "{$file} has no transparent corner ({$x},{$y})");
+            }
+            $middle = imagecolorsforindex($image, imagecolorat($image, (int) ($size / 2), (int) ($size / 2)));
+            $this->assertSame([255, 255, 255], [$middle['red'], $middle['green'], $middle['blue']], "{$file} draws the white bars in the middle");
+        }
+        // Home screens on iPhone show transparency as black: that icon has none.
+        $apple = imagecreatefrompng(public_path('apple-touch-icon.png'));
+        $this->assertSame(0, (imagecolorat($apple, 0, 0) >> 24) & 0x7F, 'apple-touch-icon has no transparent corner');
+        // The SVG icon is the same picture, to its edges.
+        $svg = (string) file_get_contents(public_path('favicon.svg'));
+        $this->assertStringContainsString('<image width="192" height="192" href="data:image/jpeg;base64,', $svg);
+        $this->assertStringNotContainsString('scale(0.75)', $svg);
+    }
+
+    public function test_search_results_get_one_site_name_in_both_languages_and_never_the_address(): void
+    {
+        foreach (['ar', 'en'] as $locale) {
+            $html = (string) $this->page($locale, 'home')->getContent();
+            $site = collect($this->jsonLd($html))->firstWhere('@type', 'WebSite');
+            $this->assertSame('Listen | إسمع', $site['name'] ?? null, "{$locale}: the site's name");
+            $this->assertSame(rtrim(url('/'), '/').'/', $site['url'] ?? null, "{$locale}: on the domain's own home page");
+            $this->assertContains('إسمع', $site['alternateName']);
+            $this->assertContains('Listen', $site['alternateName']);
+            foreach ($site['alternateName'] as $name) {
+                $this->assertStringNotContainsString('.', $name, "{$locale}: the address is not given as a name");
+            }
+            $this->assertStringContainsString('<meta property="og:site_name" content="Listen | إسمع">', $html, "{$locale}: the share name matches");
+        }
+
+        // The team can set another name in the admin's settings.
+        SiteSetting::set('search_site_name', 'إسمع | Listen', 'seo');
+        $this->assertSame('إسمع | Listen', SeoHelper::searchSiteName());
+        $this->assertNotContains('إسمع | Listen', SeoHelper::searchSiteAlternateNames());
+    }
+
+    public function test_the_manifest_gives_each_icon_its_real_size_and_type_and_a_logo_for_circles(): void
+    {
+        $manifest = SeoHelper::siteWebmanifest();
+        $byFile = [];
+        foreach ($manifest['icons'] as $icon) {
+            $byFile[basename((string) parse_url($icon['src'], PHP_URL_PATH))] = $icon;
+        }
+        $this->assertSame(['any', 'image/svg+xml'], [$byFile['favicon.svg']['sizes'], $byFile['favicon.svg']['type']]);
+        $this->assertSame(['192x192', 'image/png'], [$byFile['favicon.png']['sizes'], $byFile['favicon.png']['type']]);
+        $this->assertSame(['180x180', 'image/png'], [$byFile['apple-touch-icon.png']['sizes'], $byFile['apple-touch-icon.png']['type']]);
+        $this->assertSame(['512x512', 'image/png', 'maskable'], [$byFile['icon-512.png']['sizes'], $byFile['icon-512.png']['type'], $byFile['icon-512.png']['purpose']]);
+
+        // The company's logo for search engines is the square mark, not the wide email logo.
+        app()->setLocale('en');
+        $html = (string) $this->getLocalizedRoute('home')->getContent();
+        preg_match('#<script type="application/ld\+json">(.*?)</script>#s', $html, $ld);
+        $this->assertStringContainsString('listen-logo-512.png', stripslashes($ld[1] ?? ''));
+    }
+
+    private function page(string $locale, string $route): TestResponse
     {
         app()->setLocale($locale);
 
