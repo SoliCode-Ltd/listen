@@ -167,7 +167,7 @@ class PurchaseFollowUpResource extends Resource
                     ->modalHeading(fn (PurchaseFollowUp $record): string => 'Give '.($record->user?->email ?? 'this member').' a discount on this renewal')
                     ->modalDescription(fn (PurchaseFollowUp $record): string => 'For this member only. Takes a percentage off what they owe for this renewal'
                         .($record->amount_cents ? ' ('.PurchaseFollowUps::money($record->amount_cents, $record->currency).')' : '')
-                        .': the payment itself is lowered, so its payment page shows the lower price, and when their card is tried again it is for the lower price. You can also take the same percentage off their next renewals. It cannot be taken back from here.')
+                        .': the payment itself is lowered, so its payment page shows the lower price, and when their card is tried again it is for the lower price. You can also take the same percentage off their next renewals. You can take it back from here until the offer is emailed to them.')
                     ->modalSubmitActionLabel('Give the discount')
                     ->schema([
                         TextInput::make('percent')
@@ -224,6 +224,41 @@ class PurchaseFollowUpResource extends Resource
                             return;
                         }
                         Notification::make()->title('Discount given and emailed')->body($given.' The offer went to '.$record->user?->email.'.')->success()->send();
+                    }),
+                Action::make('takeBackDiscount')
+                    ->label('Take back the discount')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->color('danger')
+                    ->visible(fn (PurchaseFollowUp $record): bool => $record->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED
+                        && $record->user !== null
+                        && $record->paid_at === null
+                        && $record->hasDiscount())
+                    ->disabled(fn (PurchaseFollowUp $record): bool => $record->offerEmailed())
+                    ->tooltip(fn (PurchaseFollowUp $record): ?string => $record->offerEmailed()
+                        ? 'The offer was emailed to this member on '.$record->email_sent_at?->format('j M, H:i').', so the lower price stays.'
+                        : null)
+                    ->requiresConfirmation()
+                    ->modalHeading(fn (PurchaseFollowUp $record): string => 'Take back the '.$record->discount_percent.'% discount from '.($record->user?->email ?? 'this member').'?')
+                    ->modalDescription(fn (PurchaseFollowUp $record): string => 'Their payment goes back to the full price'
+                        .($record->amount_cents ? ' ('.PurchaseFollowUps::money($record->amount_cents, $record->currency).' instead of '.PurchaseFollowUps::money($record->priceCents(), $record->currency).')' : '')
+                        .((int) $record->discount_months > 0 ? ', and the discount comes off their next '.$record->discount_months.' '.((int) $record->discount_months === 1 ? 'renewal' : 'renewals').' too' : '')
+                        .'. They have not been emailed the offer, so nothing was promised to them. You can give another discount afterwards.')
+                    ->modalSubmitActionLabel('Take it back')
+                    ->action(function (PurchaseFollowUp $record): void {
+                        try {
+                            $all = app(PurchaseFollowUps::class)->takeBackDiscount($record);
+                        } catch (Throwable $e) {
+                            Notification::make()->title('The discount was not taken back')->body($e->getMessage())->danger()->persistent()->send();
+
+                            return;
+                        }
+                        $owed = 'They owe the full price again'.($record->amount_cents ? ': '.PurchaseFollowUps::money($record->amount_cents, $record->currency) : '').'.';
+                        if (! $all) {
+                            Notification::make()->title('Taken back from this renewal only')->body($owed.' The discount on their next renewals could not be removed: remove it from their subscription by hand.')->warning()->persistent()->send();
+
+                            return;
+                        }
+                        Notification::make()->title('Discount taken back')->body($owed.' No email was sent.')->success()->send();
                     }),
                 Action::make('seeEmail')
                     ->label('See the email')

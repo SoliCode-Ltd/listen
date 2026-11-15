@@ -16,12 +16,14 @@ use App\Services\PlanAccessService;
 use App\Support\LiveServer;
 use App\Support\StripeInvoice;
 use App\Support\TitanMailbox;
+use Closure;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laravel\Cashier\Cashier;
 use RuntimeException;
@@ -147,16 +149,20 @@ class PurchaseFollowUps
             'renewal_footer_ar' => 'تحتاج طريقة دفع أخرى؟ ردّ على هذه الرسالة وسنساعدك.',
 
             // A declined renewal the team gave a discount to (giveDiscount()).
-            'renewal_offer_subject_en' => '{discount} off your {plan} renewal',
-            'renewal_offer_subject_ar' => 'خصم {discount} على تجديد باقة {plan}',
-            'renewal_offer_headline_en' => 'Keep your {plan} plan for {price}',
-            'renewal_offer_headline_ar' => 'احتفظ بباقة {plan} مقابل {price}',
-            'renewal_offer_body_en' => "Hi {name}, we would like you to stay. We have taken {discount} off the renewal of your {plan} plan: you pay {price} instead of {old_price}.{next}\n\nPress the button below to pay the lower price and keep your plan, with every voice, dialect and feature in it.",
-            'renewal_offer_body_ar' => "أهلاً {name}، يهمّنا أن تبقى معنا. خصمنا لك {discount} من تجديد باقة {plan}: تدفع {price} بدلاً من {old_price}.{next}\n\nاضغط الزر أدناه لتدفع السعر المخفّض وتحتفظ بباقتك بكل أصواتها ولهجاتها ومزاياها.",
-            'renewal_offer_cta_label_en' => 'Pay {price}',
-            'renewal_offer_cta_label_ar' => 'ادفع {price}',
-            'renewal_offer_footer_en' => 'Questions about your plan or the payment? Just reply to this email.',
-            'renewal_offer_footer_ar' => 'لديك سؤال عن باقتك أو عن الدفع؟ ردّ على هذه الرسالة.',
+            'renewal_offer_subject_en' => 'Your {plan} renewal was declined: pay {discount} less to keep your plan',
+            'renewal_offer_subject_ar' => 'تعذّر تجديد باقة {plan}: ادفع أقل بـ{discount} واحتفظ بها',
+            'renewal_offer_headline_en' => 'Renew your {plan} plan for {price} instead of {old_price}',
+            'renewal_offer_headline_ar' => 'جدّد باقة {plan} بـ{price} بدلاً من {old_price}',
+            // A member who paid for the plan before: it stays on for the grace days.
+            'renewal_offer_body_en' => "Hi {name}, we could not renew your {plan} plan: your bank declined the payment{reason}. Nothing was charged, and your plan stays on until {date}.\n\nTo help you keep it, we have taken {discount} off this renewal: you pay {price} instead of {old_price}.{next}\n\nPress the button below to pay before {date}. If the renewal is still unpaid on that day, your subscription will be cancelled, your account will move to the free plan and this offer will end.",
+            'renewal_offer_body_ar' => "أهلاً {name}، تعذّر تجديد باقة {plan} الخاصة بك: رفض البنك عملية الدفع{reason}. لم يُخصم منك أي مبلغ، وباقتك مستمرة حتى {date}.\n\nلنساعدك على الاحتفاظ بها، خصمنا لك {discount} من هذا التجديد: تدفع {price} بدلاً من {old_price}.{next}\n\nاضغط الزر أدناه وادفع قبل {date}. إذا بقي التجديد غير مدفوع حتى ذلك اليوم، سيُلغى اشتراكك وينتقل حسابك إلى الباقة المجانية وينتهي هذا العرض.",
+            // No grace (the first charge after a free trial): the paid features paused at once.
+            'renewal_offer_paused_body_en' => "Hi {name}, we could not take the payment for your {plan} plan: your bank declined it{reason}, so your paid features are paused. Nothing was charged.\n\nTo help you get them back, we have taken {discount} off this payment: you pay {price} instead of {old_price}.{next}\n\nPress the button below to pay, and your paid features return straight away.",
+            'renewal_offer_paused_body_ar' => "أهلاً {name}، تعذّر تحصيل قيمة باقة {plan}: رفض البنك عملية الدفع{reason}، لذلك توقفت مزاياك المدفوعة مؤقتاً. لم يُخصم منك أي مبلغ.\n\nلنساعدك على استعادتها، خصمنا لك {discount} من هذه الدفعة: تدفع {price} بدلاً من {old_price}.{next}\n\nاضغط الزر أدناه وادفع لتعود مزاياك المدفوعة فوراً.",
+            'renewal_offer_cta_label_en' => 'Pay {price} now',
+            'renewal_offer_cta_label_ar' => 'ادفع {price} الآن',
+            'renewal_offer_footer_en' => 'Need another way to pay, or have a question? Just reply to this email and we will help.',
+            'renewal_offer_footer_ar' => 'تحتاج طريقة دفع أخرى أو لديك سؤال؟ ردّ على هذه الرسالة وسنساعدك.',
         ];
     }
 
@@ -446,9 +452,35 @@ class PurchaseFollowUps
      * Both or neither: the months are added first and taken back if the payment cannot then
      * be lowered. The case keeps the discount, and its email is the offer's from now on.
      * Never on a server that is not the live site: it changes a real payment. Throws, with
-     * the reason, when it was not given.
+     * the reason, when it was not given. It can be taken back (takeBackDiscount()) until the
+     * member is emailed the offer.
      */
     public function giveDiscount(PurchaseFollowUp $row, int $percent, int $months = 0): void
+    {
+        $this->whileChangingDiscount($row, 'Not given', fn () => $this->giveDiscountNow($row, $percent, $months));
+    }
+
+    /**
+     * One change at a time to a case's discount: two presses of a button, or two people, do
+     * not give it twice or give and take back at once. The case is read again inside.
+     */
+    private function whileChangingDiscount(PurchaseFollowUp $row, string $refusal, Closure $change): void
+    {
+        $lock = Cache::lock('purchase_followup:discount:'.$row->id, 120);
+        if (! $lock->get()) {
+            throw new RuntimeException($refusal.': this renewal\'s discount is being changed right now. Look at the case again in a minute.');
+        }
+        try {
+            if ($row->exists) {
+                $row->refresh();
+            }
+            $change();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function giveDiscountNow(PurchaseFollowUp $row, int $percent, int $months): void
     {
         if (! PurchaseFollowUp::discountsReady()) {
             throw new RuntimeException('Not given: the database is not ready for discounts yet (its migration has not been run).');
@@ -505,7 +537,10 @@ class PurchaseFollowUps
             }
         }
 
-        $key = 'listen-renewal-discount-'.$row->id;
+        // A key for this try alone: Stripe answers a repeated key with its first answer, so a
+        // second try after a refusal, or a discount given again after one was taken back, needs
+        // its own. Two presses at once are stopped by the lock, not by the key.
+        $key = 'listen-renewal-discount-'.$row->id.'-'.Str::lower((string) Str::ulid());
         $couponId = $months > 0 ? $this->discountRenewals($subscriptionId, $percent, $months, $key) : null;
         try {
             $this->lowerInvoice($invoiceId, $off, $percent.'% off this renewal', $key);
@@ -528,6 +563,105 @@ class PurchaseFollowUps
             'discounted_at' => now(),
         ])->save();
         Log::info('A declined renewal was given a discount.', ['follow_up_id' => $row->id, 'user_id' => $row->user_id, 'percent' => $percent, 'off_cents' => $off, 'months' => $months]);
+    }
+
+    /**
+     * Takes a discount back while the member has not been told of it: the unpaid payment goes
+     * back to the full price, and the discount comes off their next renewals where it was put
+     * there too. Refused once the offer has been emailed to them (the price was promised),
+     * once the renewal is paid, and on a server that is not the live site. Throws, with the
+     * reason, when it was not taken back.
+     *
+     * True when all of it was taken back. False when the payment is back at the full price
+     * but the discount on the next renewals could not be removed (it needs removing by hand).
+     */
+    public function takeBackDiscount(PurchaseFollowUp $row): bool
+    {
+        $all = true;
+        $this->whileChangingDiscount($row, 'Not taken back', function () use ($row, &$all): void {
+            $all = $this->takeBackDiscountNow($row);
+        });
+
+        return $all;
+    }
+
+    private function takeBackDiscountNow(PurchaseFollowUp $row): bool
+    {
+        if (! PurchaseFollowUp::discountsReady() || ! $row->hasDiscount()) {
+            throw new RuntimeException('Not taken back: this renewal has no discount.');
+        }
+        if ($row->paid_at !== null) {
+            throw new RuntimeException('Not taken back: this renewal has been paid at the lower price.');
+        }
+        if ($row->offerEmailed()) {
+            throw new RuntimeException('Not taken back: the offer was emailed to the member on '.$row->email_sent_at->format('j M, H:i').', so the lower price stays.');
+        }
+        if (! LiveServer::allowsCustomerActions()) {
+            LiveServer::skipped('taking back a discount on a declined renewal', ['user_id' => $row->user_id]);
+
+            throw new RuntimeException('Not taken back: this is not the live site. It changes a real payment, so only the live site does it.');
+        }
+        $invoiceId = trim((string) $row->stripe_invoice_id);
+        if ($invoiceId === '') {
+            throw new RuntimeException('Not taken back: this case does not name the unpaid payment.');
+        }
+        $unpaid = $this->unpaidInvoice($invoiceId);
+        if ($unpaid === null) {
+            throw new RuntimeException('Not taken back: the payment is no longer waiting to be paid (it was paid or closed).');
+        }
+
+        $percent = (int) $row->discount_percent;
+        $off = (int) $row->discount_cents;
+        $months = (int) $row->discount_months;
+        $full = (int) $row->amount_cents;
+        try {
+            $raised = $this->raiseInvoice($invoiceId, $off);
+        } catch (\Throwable $e) {
+            Log::warning('A discount on a declined renewal could not be taken back.', ['follow_up_id' => $row->id, 'error' => $e->getMessage()]);
+
+            throw new RuntimeException('Not taken back: the payment could not be put back to the full price ('.mb_substr($e->getMessage(), 0, 200).'). Nothing was changed.', 0, $e);
+        }
+        // Not found on the payment: fine when the payment is at the full price already (it was
+        // removed by hand); otherwise something else lowered it and it is left as it is.
+        if (! $raised && $full > 0 && $unpaid['amount'] < $full) {
+            throw new RuntimeException('Not taken back: the '.self::money($off, $row->currency).' taken off this payment was not found on it, and it is still below the full price. Nothing was changed; look at the payment itself.');
+        }
+
+        $couponId = trim((string) $row->discount_coupon_id);
+        $subscriptionId = trim((string) ($unpaid['subscription'] ?? ''));
+        $monthsRemoved = $couponId === ''
+            || ($subscriptionId !== '' && rescue(fn (): bool => $this->undiscountRenewals($subscriptionId, $couponId), false, true));
+
+        $row->forceFill([
+            'amount_cents' => $full > 0 ? $full : $row->amount_cents,
+            'discount_percent' => null,
+            'discount_cents' => null,
+            'discount_months' => null,
+            'discount_coupon_id' => null,
+            'discounted_at' => null,
+        ])->save();
+        Log::info('A discount on a declined renewal was taken back.', ['follow_up_id' => $row->id, 'user_id' => $row->user_id, 'percent' => $percent, 'off_cents' => $off, 'months' => $months, 'months_removed' => $monthsRemoved]);
+
+        return $monthsRemoved;
+    }
+
+    /**
+     * Puts the unpaid payment back to the full price at Stripe: the credit note that took
+     * $offCents off it is voided, which raises what is owed by that much again. False when
+     * no such credit note is on the payment.
+     */
+    protected function raiseInvoice(string $invoiceId, int $offCents): bool
+    {
+        $stripe = Cashier::stripe();
+        foreach ($stripe->creditNotes->all(['invoice' => $invoiceId, 'limit' => 100])->data as $note) {
+            if ((string) ($note->status ?? '') === 'issued' && (int) ($note->amount ?? 0) === $offCents) {
+                $stripe->creditNotes->voidCreditNote((string) $note->id, []);
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -1094,7 +1228,7 @@ class PurchaseFollowUps
 
         // A failed renewal: the day the plan stays on until, or none (the paid features paused).
         $keptUntil = $row->planKeptUntil();
-        $body = ! $offer && $row->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED && $keptUntil === null ? 'paused_body' : 'body';
+        $body = $row->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED && $keptUntil === null ? 'paused_body' : 'body';
         $amounts = [
             '{discount}' => $offer ? $row->discount_percent.'%' : '',
             '{price}' => self::money($row->priceCents(), $row->currency),
