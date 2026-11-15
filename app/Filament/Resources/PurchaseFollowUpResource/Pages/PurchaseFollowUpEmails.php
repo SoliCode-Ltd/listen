@@ -90,7 +90,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
                     ->description('For a declined renewal you gave a discount to (the "Give a discount" button on its case in the list). From then on that member\'s email is this one, not the warning above.')
                     ->columns(2)
                     ->collapsible()
-                    ->schema($this->wordFields('renewal_offer', 'en', '{name} is the member\'s first name, {plan} their plan, {discount} the discount ("20%"), {price} what they pay now, {old_price} the full price, {date} the day the plan stays on until (empty when it has no grace days).')),
+                    ->schema($this->wordFields('renewal_offer', 'en', '{name} is the member\'s first name, {plan} their plan, {discount} the discount ("20%"), {price} what they pay now, {old_price} the full price, {date} the day the plan stays on until (empty when it has no grace days). {next} adds a sentence when the discount also covers their next renewals ("The same discount also comes off your next 3 renewals."), or nothing when it is for this renewal only; the preview shows it for 3.')),
                 Section::make('Declined renewal with a discount: العربية')
                     ->columns(2)
                     ->collapsible()

@@ -46,8 +46,10 @@ use RuntimeException;
  *
  * From the list the team can also act on one case by hand: send its email now (sendNow()),
  * or take a percentage off a declined renewal (giveDiscount()): that lowers what the member
- * owes for that one renewal, and from then on the case's email is the one with the offer's
- * words and the lower price. Giving a discount is the only thing here that touches a payment.
+ * owes for that one renewal, and, when asked, the same percentage comes off that member's
+ * next renewals for a number of months. From then on the case's email is the one with the
+ * offer's words and the lower price. Giving a discount is the only thing here that touches
+ * a payment, and it is for the one member whose case it is: nothing anyone else can use.
  */
 class PurchaseFollowUps
 {
@@ -82,6 +84,9 @@ class PurchaseFollowUps
 
     /** The most that can be taken off a declined renewal, in percent. */
     public const MAX_DISCOUNT = 90;
+
+    /** The most renewals after the declined one the same discount can cover. */
+    public const MAX_DISCOUNT_MONTHS = 12;
 
     /**
      * @return array<string, string>
@@ -139,12 +144,12 @@ class PurchaseFollowUps
             'renewal_offer_subject_ar' => 'خصم {discount} على تجديد باقة {plan}',
             'renewal_offer_headline_en' => 'Keep your {plan} plan for {price}',
             'renewal_offer_headline_ar' => 'احتفظ بباقة {plan} مقابل {price}',
-            'renewal_offer_body_en' => "Hi {name}, we would like you to stay. We have taken {discount} off the renewal of your {plan} plan: you pay {price} instead of {old_price}.\n\nPress the button below to pay the lower price and keep your plan, with every voice, dialect and feature in it.",
-            'renewal_offer_body_ar' => "أهلاً {name}، يهمّنا أن تبقى معنا. خصمنا لك {discount} من تجديد باقة {plan}: تدفع {price} بدلاً من {old_price}.\n\nاضغط الزر أدناه لتدفع السعر المخفّض وتحتفظ بباقتك بكل أصواتها ولهجاتها ومزاياها.",
+            'renewal_offer_body_en' => "Hi {name}, we would like you to stay. We have taken {discount} off the renewal of your {plan} plan: you pay {price} instead of {old_price}.{next}\n\nPress the button below to pay the lower price and keep your plan, with every voice, dialect and feature in it.",
+            'renewal_offer_body_ar' => "أهلاً {name}، يهمّنا أن تبقى معنا. خصمنا لك {discount} من تجديد باقة {plan}: تدفع {price} بدلاً من {old_price}.{next}\n\nاضغط الزر أدناه لتدفع السعر المخفّض وتحتفظ بباقتك بكل أصواتها ولهجاتها ومزاياها.",
             'renewal_offer_cta_label_en' => 'Pay {price}',
             'renewal_offer_cta_label_ar' => 'ادفع {price}',
-            'renewal_offer_footer_en' => 'The lower price is for this renewal. Questions? Just reply to this email.',
-            'renewal_offer_footer_ar' => 'السعر المخفّض خاص بهذا التجديد. لديك سؤال؟ ردّ على هذه الرسالة.',
+            'renewal_offer_footer_en' => 'Questions about your plan or the payment? Just reply to this email.',
+            'renewal_offer_footer_ar' => 'لديك سؤال عن باقتك أو عن الدفع؟ ردّ على هذه الرسالة.',
         ];
     }
 
@@ -330,13 +335,18 @@ class PurchaseFollowUps
     }
 
     /**
-     * Takes $percent off what the member owes for this declined renewal, and only this one:
-     * the unpaid payment itself is lowered, so its payment page shows the lower price and the
-     * card is tried again for the lower price. The case keeps the discount, and its email is
-     * the offer's from now on. Never on a server that is not the live site: it changes a real
-     * payment. Throws, with the reason, when it was not given; nothing is changed then.
+     * Takes $percent off what the member owes for this declined renewal: the unpaid payment
+     * itself is lowered, so its payment page shows the lower price and the card is tried
+     * again for the lower price. With $months, the same percentage also comes off that
+     * member's next $months renewals (a monthly plan only): a coupon made for this one case,
+     * put on their subscription, that nobody else can use. With 0 it is this renewal only.
+     *
+     * Both or neither: the months are added first and taken back if the payment cannot then
+     * be lowered. The case keeps the discount, and its email is the offer's from now on.
+     * Never on a server that is not the live site: it changes a real payment. Throws, with
+     * the reason, when it was not given.
      */
-    public function giveDiscount(PurchaseFollowUp $row, int $percent): void
+    public function giveDiscount(PurchaseFollowUp $row, int $percent, int $months = 0): void
     {
         if (! PurchaseFollowUp::discountsReady()) {
             throw new RuntimeException('Not given: the database is not ready for discounts yet (its migration has not been run).');
@@ -346,6 +356,9 @@ class PurchaseFollowUps
         }
         if ($percent < 1 || $percent > self::MAX_DISCOUNT) {
             throw new InvalidArgumentException('The discount must be between 1 and '.self::MAX_DISCOUNT.' percent.');
+        }
+        if ($months < 0 || $months > self::MAX_DISCOUNT_MONTHS) {
+            throw new InvalidArgumentException('The discount can cover up to '.self::MAX_DISCOUNT_MONTHS.' renewals after this one.');
         }
         if ($row->paid_at !== null) {
             throw new RuntimeException('Not given: this renewal has been paid.');
@@ -363,6 +376,7 @@ class PurchaseFollowUps
             throw new RuntimeException('Not given: this case does not name the unpaid payment, so it cannot be lowered from here.');
         }
 
+        // Everything is checked before anything is changed.
         $unpaid = $this->unpaidInvoice($invoiceId);
         if ($unpaid === null) {
             throw new RuntimeException('Not given: the payment is no longer waiting to be paid (it was paid or closed).');
@@ -371,23 +385,52 @@ class PurchaseFollowUps
         if ($off < 1 || $off >= $unpaid['amount']) {
             throw new RuntimeException('Not given: '.$percent.'% of what is owed leaves nothing to pay, or takes nothing off.');
         }
+        $subscriptionId = trim((string) ($unpaid['subscription'] ?? ''));
+        if ($months > 0) {
+            $onlyThis = ' Choose "this renewal only" to lower this payment.';
+            $subscription = $subscriptionId !== '' ? $this->subscriptionState($subscriptionId) : null;
+            if ($subscription === null || ! $subscription['open']) {
+                throw new RuntimeException('Not given: their subscription has ended, so there are no later renewals to discount.'.$onlyThis);
+            }
+            if (! $subscription['monthly']) {
+                throw new RuntimeException('Not given: later renewals can be discounted on a plan that renews every month, and this one does not.'.$onlyThis);
+            }
+            if ($subscription['discounted']) {
+                throw new RuntimeException('Not given: their subscription already has a discount running on its renewals, and a second one would be added on top of it.'.$onlyThis);
+            }
+        }
 
-        $this->lowerInvoice($invoiceId, $off, $percent.'% off this renewal', 'listen-renewal-discount-'.$row->id);
+        $key = 'listen-renewal-discount-'.$row->id;
+        $couponId = $months > 0 ? $this->discountRenewals($subscriptionId, $percent, $months, $key) : null;
+        try {
+            $this->lowerInvoice($invoiceId, $off, $percent.'% off this renewal', $key);
+        } catch (\Throwable $e) {
+            $undone = $couponId === null || rescue(fn (): bool => $this->undiscountRenewals($subscriptionId, $couponId) || true, false, false);
+            Log::warning('A discount on a declined renewal could not be given.', ['follow_up_id' => $row->id, 'months_taken_back' => $undone, 'error' => $e->getMessage()]);
+
+            throw new RuntimeException($undone
+                ? 'Not given: the payment could not be lowered ('.mb_substr($e->getMessage(), 0, 200).'). Nothing was changed.'
+                : 'The payment could not be lowered ('.mb_substr($e->getMessage(), 0, 160).'), but '.$percent.'% off their next '.$months.' renewals was added and could not be taken back: remove that discount from their subscription by hand.', 0, $e);
+        }
+
         $row->forceFill([
             'amount_cents' => $unpaid['amount'],
             'currency' => $unpaid['currency'] ?: $row->currency,
             'discount_percent' => $percent,
             'discount_cents' => $off,
+            'discount_months' => $months > 0 ? $months : null,
+            'discount_coupon_id' => $couponId,
             'discounted_at' => now(),
         ])->save();
-        Log::info('A declined renewal was given a discount.', ['follow_up_id' => $row->id, 'user_id' => $row->user_id, 'percent' => $percent, 'off_cents' => $off]);
+        Log::info('A declined renewal was given a discount.', ['follow_up_id' => $row->id, 'user_id' => $row->user_id, 'percent' => $percent, 'off_cents' => $off, 'months' => $months]);
     }
 
     /**
      * Asks Stripe what is still owed on the payment: its amount (in the currency's smallest
-     * unit) and currency while it waits to be paid, or null once it is paid or closed.
+     * unit), currency and subscription while it waits to be paid, or null once it is paid
+     * or closed.
      *
-     * @return array{amount: int, currency: string}|null
+     * @return array{amount: int, currency: string, subscription: string}|null
      */
     protected function unpaidInvoice(string $invoiceId): ?array
     {
@@ -395,8 +438,26 @@ class PurchaseFollowUps
         $owed = (int) ($invoice->amount_remaining ?? 0);
 
         return (string) ($invoice->status ?? '') === 'open' && $owed > 0
-            ? ['amount' => $owed, 'currency' => strtolower((string) ($invoice->currency ?? ''))]
+            ? ['amount' => $owed, 'currency' => strtolower((string) ($invoice->currency ?? '')), 'subscription' => StripeInvoice::subscriptionId($invoice)]
             : null;
+    }
+
+    /**
+     * Asks Stripe about the subscription: whether it is still running (not ended), whether
+     * it renews every month, and whether a discount is already on its renewals.
+     *
+     * @return array{open: bool, monthly: bool, discounted: bool}|null null when it is not there
+     */
+    protected function subscriptionState(string $subscriptionId): ?array
+    {
+        $subscription = Cashier::stripe()->subscriptions->retrieve($subscriptionId, []);
+        $recurring = $subscription->items->data[0]->price->recurring ?? null;
+
+        return [
+            'open' => in_array((string) ($subscription->status ?? ''), ['active', 'past_due', 'unpaid', 'trialing'], true),
+            'monthly' => (string) ($recurring->interval ?? '') === 'month' && (int) ($recurring->interval_count ?? 1) === 1,
+            'discounted' => ! empty($subscription->discounts) || ! empty($subscription->discount),
+        ];
     }
 
     /**
@@ -410,6 +471,68 @@ class PurchaseFollowUps
             ['invoice' => $invoiceId, 'amount' => $offCents, 'memo' => $memo],
             ['idempotency_key' => $idempotencyKey],
         );
+    }
+
+    /**
+     * Puts $percent off the subscription's next $months renewals at Stripe: a coupon made
+     * for this one case (it can be used once, here), on this one subscription. The payment
+     * already waiting is not touched by it (lowerInvoice() lowers that one). The coupon's id.
+     */
+    protected function discountRenewals(string $subscriptionId, int $percent, int $months, string $idempotencyKey): string
+    {
+        $stripe = Cashier::stripe();
+        $coupon = $stripe->coupons->create([
+            'percent_off' => $percent,
+            'duration' => 'repeating',
+            'duration_in_months' => $months,
+            'max_redemptions' => 1,
+            'name' => $percent.'% off, '.$months.' '.($months === 1 ? 'renewal' : 'renewals'),
+            'metadata' => ['listen' => 'renewal discount', 'key' => $idempotencyKey],
+        ], ['idempotency_key' => $idempotencyKey.'-coupon']);
+        $couponId = (string) $coupon->id;
+
+        try {
+            $stripe->subscriptions->update($subscriptionId, [
+                'discounts' => [['coupon' => $couponId]],
+                'proration_behavior' => 'none',
+            ], ['idempotency_key' => $idempotencyKey.'-renewals']);
+        } catch (\Throwable $e) {
+            rescue(fn () => $stripe->coupons->delete($couponId, []), null, false);
+
+            throw $e;
+        }
+
+        return $couponId;
+    }
+
+    /** Takes the renewals' discount back off the subscription, and removes its coupon. */
+    protected function undiscountRenewals(string $subscriptionId, string $couponId): bool
+    {
+        $stripe = Cashier::stripe();
+        $stripe->subscriptions->update($subscriptionId, ['discounts' => '', 'proration_behavior' => 'none']);
+        rescue(fn () => $stripe->coupons->delete($couponId, []), null, false);
+
+        return true;
+    }
+
+    /** {next}: the sentence saying the discount also covers the next renewals, or nothing. */
+    public static function nextRenewalsWords(?int $months, string $lang): string
+    {
+        $months = (int) $months;
+        if ($months <= 0) {
+            return '';
+        }
+        if ($lang === 'ar') {
+            return match (true) {
+                $months === 1 => ' ويُطبَّق الخصم نفسه على تجديدك القادم أيضاً.',
+                $months === 2 => ' ويُطبَّق الخصم نفسه على تجديدَيك القادمَين أيضاً.',
+                default => ' ويُطبَّق الخصم نفسه على تجديداتك الـ'.$months.' القادمة أيضاً.',
+            };
+        }
+
+        return $months === 1
+            ? ' The same discount also comes off your next renewal.'
+            : ' The same discount also comes off your next '.$months.' renewals.';
     }
 
     /** An amount as a member reads it: "$49.00", or "49.00 EGP" in another currency. */
@@ -774,7 +897,7 @@ class PurchaseFollowUps
 
     /**
      * A case that stands in for a real one, in previews and test sends. Never saved.
-     * $withDiscount: a declined renewal with 20% off, to show the offer's words.
+     * $withDiscount: a declined renewal with 20% off it and the next 3, to show the offer's words.
      */
     public function sample(string $kind, ?User $user = null, bool $withDiscount = false): PurchaseFollowUp
     {
@@ -792,6 +915,7 @@ class PurchaseFollowUps
             if ($withDiscount && $row->amount_cents) {
                 $row->discount_percent = 20;
                 $row->discount_cents = (int) round($row->amount_cents * 0.2);
+                $row->discount_months = 3;
             }
         }
         if ($user) {
@@ -827,10 +951,11 @@ class PurchaseFollowUps
 
         foreach (['en', 'ar'] as $lang) {
             $date = $keptUntil !== null ? Carbon::instance($keptUntil)->locale($lang)->translatedFormat('j F Y') : '';
-            $fill = function (string $text) use ($plan, $lang, $first, $row, $date, $amounts): string {
+            $next = $offer ? self::nextRenewalsWords($row->discount_months, $lang) : '';
+            $fill = function (string $text) use ($plan, $lang, $first, $row, $date, $amounts, $next): string {
                 $text = PaidWelcomeEmail::withPlan($text, $plan, $lang);
                 $text = str_replace(['{reason}', '{date}'], [self::reasonWords($row->reason, $lang), $date], $text);
-                $text = strtr($text, $amounts);
+                $text = strtr($text, $amounts + ['{next}' => $next]);
                 // {name} is the first name; with none, the greeting closes up ("Hi, ...").
                 $text = $first !== '' ? str_replace('{name}', $first, $text) : preg_replace('/\s*\{name\}/u', '', $text);
 

@@ -546,6 +546,10 @@ class PurchaseFollowUpTest extends TestCase
         $case->refresh();
         $this->assertSame([20, 180, 900, 720], [$case->discount_percent, $case->discount_cents, $case->amount_cents, $case->priceCents()]);
         $this->assertNotNull($case->discounted_at);
+        // This renewal only: nothing is put on their later renewals.
+        $this->assertSame([], $stripe->renewals);
+        $this->assertNull($case->discount_months);
+        $this->assertNull($case->discount_coupon_id);
 
         // From now on this member's email is the offer, not the warning.
         app('mailer')->getSymfonyTransport()->flush();
@@ -557,7 +561,8 @@ class PurchaseFollowUpTest extends TestCase
         $this->assertStringContainsString('خصمنا لك 20% من تجديد باقة مبتدئ: تدفع $7.20 بدلاً من $9.00.', $text);
         $this->assertMatchesRegularExpression('#Pay \$7\.20: https?://\S+/billing/pay/'.$case->id.'\?expires=\d+&lang=en&signature=[0-9a-f]+#', $text);
         $this->assertStringNotContainsString('could not be renewed', $text);
-        foreach (['{discount}', '{price}', '{old_price}', '{date}'] as $placeholder) {
+        $this->assertStringNotContainsString('next renewal', $text);
+        foreach (['{discount}', '{price}', '{old_price}', '{date}', '{next}'] as $placeholder) {
             $this->assertStringNotContainsString($placeholder, $text.(string) $email->getHtmlBody());
         }
         $this->assertSame('Sent by hand', $case->fresh()->email_note);
@@ -577,6 +582,102 @@ class PurchaseFollowUpTest extends TestCase
         $warning = (string) $this->sentEmails()->last()->getOriginalMessage()->getTextBody();
         $this->assertStringContainsString('we tried to renew your Starter plan, but your bank declined the payment', $warning);
         $this->assertStringNotContainsString('% off', $warning);
+    }
+
+    public function test_a_discount_can_also_cover_that_members_next_renewals_and_the_email_says_so(): void
+    {
+        $plan = $this->inGrace($this->member);
+        $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+        $case = PurchaseFollowUp::query()->sole();
+        $stripe = $this->stripeOwes(900);
+
+        $this->followUps()->giveDiscount($case, 20, 3);
+
+        // On their own subscription, for three renewals, and this payment lowered too.
+        $key = 'listen-renewal-discount-'.$case->id;
+        $this->assertSame([['sub_1', 20, 3, $key]], $stripe->renewals);
+        $this->assertSame([['in_r1', 180, '20% off this renewal', $key]], $stripe->lowered);
+        $this->assertSame([], $stripe->undone);
+        $case->refresh();
+        $this->assertSame([20, 180, 3, 'coupon_1'], [$case->discount_percent, $case->discount_cents, $case->discount_months, $case->discount_coupon_id]);
+
+        app('mailer')->getSymfonyTransport()->flush();
+        $this->followUps()->sendNow($case);
+        $text = (string) $this->onlyEmail()->getTextBody();
+        $this->assertStringContainsString('you pay $7.20 instead of $9.00. The same discount also comes off your next 3 renewals.', $text);
+        $this->assertStringContainsString('تدفع $7.20 بدلاً من $9.00. ويُطبَّق الخصم نفسه على تجديداتك الـ3 القادمة أيضاً.', $text);
+        $this->assertStringNotContainsString('{next}', $text);
+
+        $this->assertSame(' The same discount also comes off your next renewal.', PurchaseFollowUps::nextRenewalsWords(1, 'en'));
+        $this->assertSame(' ويُطبَّق الخصم نفسه على تجديدك القادم أيضاً.', PurchaseFollowUps::nextRenewalsWords(1, 'ar'));
+        $this->assertStringContainsString('تجديدَيك القادمَين', PurchaseFollowUps::nextRenewalsWords(2, 'ar'));
+        $this->assertSame('', PurchaseFollowUps::nextRenewalsWords(0, 'en'));
+        $this->assertSame('', PurchaseFollowUps::nextRenewalsWords(null, 'ar'));
+    }
+
+    public function test_later_renewals_are_discounted_only_where_that_is_right_and_this_renewal_can_still_be(): void
+    {
+        $plan = $this->inGrace($this->member);
+        $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+        $case = PurchaseFollowUp::query()->sole();
+        $refused = function (int $months, string $why) use ($case): void {
+            try {
+                $this->followUps()->giveDiscount($case->fresh(), 20, $months);
+                $this->fail('The discount was given: '.$why);
+            } catch (\RuntimeException|\InvalidArgumentException $e) {
+                $this->assertStringContainsString($why, $e->getMessage());
+            }
+        };
+
+        // A yearly plan, a subscription that has ended, one with a discount already on it.
+        $yearly = $this->stripeOwes(900, ['monthly' => false]);
+        $refused(3, 'renews every month');
+        $ended = $this->stripeOwes(900, ['open' => false]);
+        $refused(3, 'has ended');
+        $discounted = $this->stripeOwes(900, ['discounted' => true]);
+        $refused(3, 'already has a discount running');
+        $refused(13, 'up to 12 renewals');
+        $refused(-1, 'up to 12 renewals');
+        foreach ([$yearly, $ended, $discounted] as $stripe) {
+            $this->assertSame([[], []], [$stripe->renewals, $stripe->lowered], 'nothing was changed');
+        }
+        $this->assertFalse($case->fresh()->hasDiscount());
+
+        // This renewal only is still given on each of them.
+        $this->stripeOwes(900, ['monthly' => false, 'discounted' => true]);
+        $this->followUps()->giveDiscount($case->fresh(), 20);
+        $this->assertSame([20, null], [$case->fresh()->discount_percent, $case->fresh()->discount_months]);
+    }
+
+    public function test_a_discount_is_both_or_neither_when_the_payment_cannot_be_lowered(): void
+    {
+        $plan = $this->inGrace($this->member);
+        $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+        $case = PurchaseFollowUp::query()->sole();
+        $stripe = $this->stripeOwes(900);
+        $stripe->lowerFails = 'The invoice was paid a moment ago.';
+
+        try {
+            $this->followUps()->giveDiscount($case, 20, 3);
+            $this->fail('The discount was given.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Nothing was changed', $e->getMessage());
+            $this->assertStringContainsString('The invoice was paid a moment ago.', $e->getMessage());
+        }
+        // The months that were put on their renewals are taken back, and the case has no discount.
+        $this->assertSame([['sub_1', 'coupon_1']], $stripe->undone);
+        $this->assertFalse($case->fresh()->hasDiscount());
+        $this->assertNull($case->fresh()->discount_coupon_id);
+
+        // If even that cannot be done, the team is told exactly what is left to remove by hand.
+        $stripe->undoFails = true;
+        try {
+            $this->followUps()->giveDiscount($case->fresh(), 20, 3);
+            $this->fail('The discount was given.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('20% off their next 3 renewals was added and could not be taken back', $e->getMessage());
+        }
+        $this->assertFalse($case->fresh()->hasDiscount());
     }
 
     public function test_a_discount_is_refused_when_it_cannot_be_given_and_nothing_changes(): void
@@ -644,15 +745,16 @@ class PurchaseFollowUpTest extends TestCase
 
         // A discount, emailed at once.
         Livewire::actingAs($admin)->test(ListPurchaseFollowUps::class)
-            ->callTableAction('discount', $case, ['percent' => 25, 'email' => true])
+            ->callTableAction('discount', $case, ['percent' => 25, 'scope' => 'months', 'months' => 2, 'email' => true])
             ->assertHasNoTableActionErrors()
             ->assertNotified('Discount given and emailed')
-            ->assertSee('25% off: $6.75 instead of $9.00')
+            ->assertSee('25% off: $6.75 instead of $9.00, and off the next 2 renewals')
             ->assertTableActionHidden('discount', $case->fresh());
         $this->assertSame([['in_r1', 225, '25% off this renewal', 'listen-renewal-discount-'.$case->id]], $stripe->lowered);
+        $this->assertSame([['sub_1', 25, 2, 'listen-renewal-discount-'.$case->id]], $stripe->renewals);
         $offers = $this->sentEmails()->filter(fn ($sent): bool => str_starts_with((string) $sent->getOriginalMessage()->getSubject(), '25% off your Starter renewal'));
         $this->assertCount(1, $offers);
-        $this->assertStringContainsString('you pay $6.75 instead of $9.00', (string) $offers->first()->getOriginalMessage()->getTextBody());
+        $this->assertStringContainsString('you pay $6.75 instead of $9.00. The same discount also comes off your next 2 renewals.', (string) $offers->first()->getOriginalMessage()->getTextBody());
 
         // The offer's words are edited with the others, and previewed with a sample discount.
         Livewire::actingAs($admin)->test(PurchaseFollowUpEmails::class)
@@ -662,7 +764,7 @@ class PurchaseFollowUpTest extends TestCase
             ->assertHasNoFormErrors();
         $preview = $this->followUps()->previewHtml(PurchaseFollowUp::KIND_RENEWAL_FAILED, null, true);
         $this->assertStringContainsString('A gift: 20% off Starter', $preview);
-        $this->assertStringContainsString('you pay $7.20 instead of $9.00', $preview);
+        $this->assertStringContainsString('you pay $7.20 instead of $9.00. The same discount also comes off your next 3 renewals.', $preview);
 
         // Paid: nothing more to do on the case.
         $case->forceFill(['paid_at' => now()])->save();
@@ -727,27 +829,68 @@ class PurchaseFollowUpTest extends TestCase
 
     /**
      * Stripe for giveDiscount(): what is still owed on the payment (null once it is paid or
-     * closed), and every lowering asked of it, kept on the returned object's $lowered.
+     * closed) and the state of its subscription. Everything asked of it is kept on the
+     * returned object: $lowered (the payment), $renewals (a discount on later renewals) and
+     * $undone (one taken back). $lowerFails / $undoFails make those two calls fail.
      */
-    private function stripeOwes(?int $cents): object
+    private function stripeOwes(?int $cents, array $subscription = []): object
     {
         $stripe = new class
         {
             /** @var list<array{0: string, 1: int, 2: string, 3: string}> */
             public array $lowered = [];
+
+            /** @var list<array{0: string, 1: int, 2: int, 3: string}> */
+            public array $renewals = [];
+
+            /** @var list<array{0: string, 1: string}> */
+            public array $undone = [];
+
+            public ?string $lowerFails = null;
+
+            public bool $undoFails = false;
+
+            /** @var array{open: bool, monthly: bool, discounted: bool}|null */
+            public ?array $subscription = null;
         };
+        $stripe->subscription = $subscription + ['open' => true, 'monthly' => true, 'discounted' => false];
         $this->app->bind(PurchaseFollowUps::class, fn () => new class($cents, $stripe) extends PurchaseFollowUps
         {
             public function __construct(private ?int $owed, private object $stripe) {}
 
             protected function unpaidInvoice(string $invoiceId): ?array
             {
-                return $this->owed !== null ? ['amount' => $this->owed, 'currency' => 'usd'] : null;
+                return $this->owed !== null ? ['amount' => $this->owed, 'currency' => 'usd', 'subscription' => 'sub_1'] : null;
+            }
+
+            protected function subscriptionState(string $subscriptionId): ?array
+            {
+                return $this->stripe->subscription;
             }
 
             protected function lowerInvoice(string $invoiceId, int $offCents, string $memo, string $idempotencyKey): void
             {
+                if ($this->stripe->lowerFails !== null) {
+                    throw new \RuntimeException($this->stripe->lowerFails);
+                }
                 $this->stripe->lowered[] = [$invoiceId, $offCents, $memo, $idempotencyKey];
+            }
+
+            protected function discountRenewals(string $subscriptionId, int $percent, int $months, string $idempotencyKey): string
+            {
+                $this->stripe->renewals[] = [$subscriptionId, $percent, $months, $idempotencyKey];
+
+                return 'coupon_'.count($this->stripe->renewals);
+            }
+
+            protected function undiscountRenewals(string $subscriptionId, string $couponId): bool
+            {
+                if ($this->stripe->undoFails) {
+                    throw new \RuntimeException('The subscription could not be changed.');
+                }
+                $this->stripe->undone[] = [$subscriptionId, $couponId];
+
+                return true;
             }
         });
 

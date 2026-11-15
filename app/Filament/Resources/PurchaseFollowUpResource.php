@@ -6,10 +6,12 @@ use App\Filament\Resources\PurchaseFollowUpResource\Pages;
 use App\Models\PurchaseFollowUp;
 use App\Services\Billing\PurchaseFollowUps;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -104,6 +106,7 @@ class PurchaseFollowUpResource extends Resource
                         $record->billing_cycle === 'yearly' ? 'Yearly' : 'Monthly',
                         $record->hasDiscount()
                             ? $record->discount_percent.'% off: '.PurchaseFollowUps::money($record->priceCents(), $record->currency).' instead of '.PurchaseFollowUps::money($record->amount_cents, $record->currency)
+                                .((int) $record->discount_months > 0 ? ', and off the next '.$record->discount_months.' '.((int) $record->discount_months === 1 ? 'renewal' : 'renewals') : ', this renewal only')
                             : ($record->isDeclinedPayment() && $record->amount_cents ? PurchaseFollowUps::money($record->amount_cents, $record->currency) : null),
                     ])->filter()->implode(' · ')),
                 Tables\Columns\TextColumn::make('email_status')
@@ -161,9 +164,9 @@ class PurchaseFollowUpResource extends Resource
                         && filled($record->stripe_invoice_id)
                         && PurchaseFollowUp::discountsReady())
                     ->modalHeading(fn (PurchaseFollowUp $record): string => 'Give '.($record->user?->email ?? 'this member').' a discount on this renewal')
-                    ->modalDescription(fn (PurchaseFollowUp $record): string => 'Takes a percentage off what they owe for this one renewal'
+                    ->modalDescription(fn (PurchaseFollowUp $record): string => 'For this member only. Takes a percentage off what they owe for this renewal'
                         .($record->amount_cents ? ' ('.PurchaseFollowUps::money($record->amount_cents, $record->currency).')' : '')
-                        .'. The payment itself is lowered: its payment page shows the lower price, and when their card is tried again it is for the lower price. Later renewals are at the full price. It cannot be taken back from here.')
+                        .': the payment itself is lowered, so its payment page shows the lower price, and when their card is tried again it is for the lower price. You can also take the same percentage off their next renewals. It cannot be taken back from here.')
                     ->modalSubmitActionLabel('Give the discount')
                     ->schema([
                         TextInput::make('percent')
@@ -172,6 +175,25 @@ class PurchaseFollowUpResource extends Resource
                             ->numeric()->integer()->minValue(1)->maxValue(PurchaseFollowUps::MAX_DISCOUNT)
                             ->default(20)
                             ->required(),
+                        Radio::make('scope')
+                            ->label('It covers')
+                            ->options([
+                                'once' => 'This renewal only',
+                                'months' => 'This renewal and their next renewals',
+                            ])
+                            ->descriptions([
+                                'once' => 'Every renewal after this one is at the full price.',
+                                'months' => 'The same percentage comes off the number of renewals you set, then the full price returns by itself. For a plan that renews every month.',
+                            ])
+                            ->default('once')
+                            ->live()
+                            ->required(),
+                        TextInput::make('months')
+                            ->label('How many renewals after this one')
+                            ->numeric()->integer()->minValue(1)->maxValue(PurchaseFollowUps::MAX_DISCOUNT_MONTHS)
+                            ->default(3)
+                            ->visible(fn (Get $get): bool => $get('scope') === 'months')
+                            ->required(fn (Get $get): bool => $get('scope') === 'months'),
                         Toggle::make('email')
                             ->label('Email them the offer now')
                             ->helperText('The email with the offer\'s words and the lower price (Emails and settings → Declined renewal with a discount). Off: send it later with "Send the email now".')
@@ -180,13 +202,14 @@ class PurchaseFollowUpResource extends Resource
                     ->action(function (PurchaseFollowUp $record, array $data): void {
                         $followUps = app(PurchaseFollowUps::class);
                         try {
-                            $followUps->giveDiscount($record, (int) $data['percent']);
+                            $followUps->giveDiscount($record, (int) $data['percent'], ($data['scope'] ?? 'once') === 'months' ? (int) ($data['months'] ?? 0) : 0);
                         } catch (Throwable $e) {
                             Notification::make()->title('No discount was given')->body($e->getMessage())->danger()->persistent()->send();
 
                             return;
                         }
-                        $given = $record->discount_percent.'% off: they now owe '.PurchaseFollowUps::money($record->priceCents(), $record->currency).'.';
+                        $given = $record->discount_percent.'% off: they now owe '.PurchaseFollowUps::money($record->priceCents(), $record->currency)
+                            .((int) $record->discount_months > 0 ? ', and it also comes off their next '.$record->discount_months.' '.((int) $record->discount_months === 1 ? 'renewal' : 'renewals').'.' : ' for this renewal; later ones are at the full price.');
                         if (! ($data['email'] ?? false)) {
                             Notification::make()->title('Discount given')->body($given.' No email was sent.')->success()->send();
 
@@ -209,7 +232,8 @@ class PurchaseFollowUpResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading(fn (PurchaseFollowUp $record): string => 'Send this email to '.($record->user?->email ?? 'this member').' now?')
                     ->modalDescription(fn (PurchaseFollowUp $record): string => match (true) {
-                        $record->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED && $record->hasDiscount() => 'The email with the offer: '.$record->discount_percent.'% off, '.PurchaseFollowUps::money($record->priceCents(), $record->currency).' to pay.',
+                        $record->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED && $record->hasDiscount() => 'The email with the offer: '.$record->discount_percent.'% off, '.PurchaseFollowUps::money($record->priceCents(), $record->currency).' to pay'
+                            .((int) $record->discount_months > 0 ? ', and the same off their next '.$record->discount_months.' '.((int) $record->discount_months === 1 ? 'renewal' : 'renewals') : '').'.',
                         $record->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED => 'The warning that their renewal was declined, with the button to pay it. No discount has been given on it.',
                         $record->kind === PurchaseFollowUp::KIND_PAYMENT_FAILED => 'The email for a declined first payment, with the button to pay it.',
                         default => 'The reminder to finish the checkout they left.',

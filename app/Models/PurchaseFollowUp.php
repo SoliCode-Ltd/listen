@@ -52,6 +52,7 @@ class PurchaseFollowUp extends Model
         'amount_cents' => 'integer',
         'discount_percent' => 'integer',
         'discount_cents' => 'integer',
+        'discount_months' => 'integer',
         'discounted_at' => 'datetime',
     ];
 
