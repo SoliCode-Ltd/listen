@@ -274,10 +274,18 @@
       \App\Support\SeoEnglishPages::popular($voiceLocale, 7),
       fn ($link) => $link['slug'] !== ($currentAccent ?? null)
     ));
+    $regionLinks = array_map(
+      fn ($slug) => ['url' => route('seo.dialect-region', ['region' => $slug]), 'label' => \App\Support\SeoDialectPages::regionTitle($slug, $voiceLocale)],
+      array_values(array_filter(\App\Support\SeoDialectPages::regionSlugs(), fn ($slug) => $slug !== ($currentRegion ?? null)))
+    );
+    $featureLinks = array_map(
+      fn ($l) => ['url' => route('seo.feature', ['feature' => $l['slug']]), 'label' => $l['label']],
+      array_values(array_filter(\App\Support\SeoFeaturePages::links($voiceLocale), fn ($l) => $l['slug'] !== ($currentFeature ?? null)))
+    );
     $voiceSections = [
       [
         'title' => isset($currentDialect) ? ($isArabic ? 'لهجات عربية أخرى' : 'Other Arabic dialects') : ($isArabic ? 'تحويل النص إلى صوت باللهجات العربية' : 'Text to speech in Arabic dialects'),
-        'links' => array_map(fn ($l) => ['url' => route('seo.dialect', ['dialect' => $l['slug']]), 'label' => $l['label']], $dialectLinks),
+        'links' => array_merge($regionLinks, array_map(fn ($l) => ['url' => route('seo.dialect', ['dialect' => $l['slug']]), 'label' => $l['label']], $dialectLinks)),
         'all' => ['url' => route('seo.arabic-dialects'), 'label' => $isArabic ? 'كل اللهجات العربية' : 'All Arabic dialects'],
       ],
       [
@@ -288,6 +296,13 @@
     ];
     if (isset($currentAccent) || $page === 'english_accents') {
       $voiceSections = array_reverse($voiceSections);
+    }
+    if ($featureLinks !== []) {
+      $voiceSections[] = [
+        'title' => isset($currentFeature) ? ($isArabic ? 'ميزات أخرى في الاستوديو' : 'More studio features') : ($isArabic ? 'ميزات الاستوديو' : 'Studio features'),
+        'links' => $featureLinks,
+        'all' => ['url' => route('developers'), 'label' => $isArabic ? 'واجهة برمجية لتحويل النص إلى صوت' : 'Text to speech API'],
+      ];
     }
   @endphp
   @include('components.header')

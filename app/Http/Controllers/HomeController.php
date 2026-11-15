@@ -38,6 +38,7 @@ use App\Support\FreeAllowance;
 use App\Support\GeminiSpend;
 use App\Support\PlanPricingLines;
 use App\Support\SeoDialectPages;
+use App\Support\SeoFeaturePages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
 use App\Support\SpeakerAvatar;
@@ -597,6 +598,39 @@ class HomeController extends Controller
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
             'sample' => SeoEnglishPages::sample($accent),
             'currentAccent' => $accent,
+        ]);
+    }
+
+    public function dialectRegionPage(Request $request, string $region)
+    {
+        $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
+        $content = SeoDialectPages::regionContent($region, $locale);
+
+        return view('seo.landing-page', [
+            'page' => SeoDialectPages::regionPageKey($region),
+            'pageContent' => $content,
+            'faqItems' => $content['faqs'],
+            'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
+            'dialectGroups' => SeoDialectPages::regionGroups($region, $locale),
+            'sample' => SeoDialectPages::regionSample($region, $locale),
+            'currentRegion' => $region,
+        ]);
+    }
+
+    /** A studio feature's own page; not found while no plan on sale includes the feature. */
+    public function featurePage(Request $request, string $feature)
+    {
+        abort_unless(SeoFeaturePages::available($feature), 404);
+        $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
+        $content = SeoFeaturePages::content($feature, $locale);
+
+        return view('seo.landing-page', [
+            'page' => SeoFeaturePages::pageKey($feature),
+            'pageContent' => $content,
+            'faqItems' => $content['faqs'] ?? [],
+            'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
+            'sample' => $locale === 'ar' ? SeoDialectPages::sample('egyptian', $locale) : SeoEnglishPages::sample('american'),
+            'currentFeature' => $feature,
         ]);
     }
 

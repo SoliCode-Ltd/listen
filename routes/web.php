@@ -41,6 +41,7 @@ use App\Models\SiteSetting;
 use App\Services\PlanAccessService;
 use App\Support\AgentDiscovery;
 use App\Support\SeoDialectPages;
+use App\Support\SeoFeaturePages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
 use App\Support\VoiceCloningAccess;
@@ -303,10 +304,16 @@ Route::group([
     Route::get('/text-to-speech-arabic', [HomeController::class, 'seoLandingPage'])->defaults('page', 'text_to_speech_arabic')->name('seo.text-to-speech-arabic');
     Route::get('/text-to-speech', [HomeController::class, 'seoLandingPage'])->defaults('page', 'text_to_speech')->name('seo.text-to-speech');
     Route::get('/arabic-dialects', [HomeController::class, 'dialectHubPage'])->name('seo.arabic-dialects');
+    Route::get('/arabic-dialects/{region}', [HomeController::class, 'dialectRegionPage'])
+        ->whereIn('region', SeoDialectPages::regionSlugs())
+        ->name('seo.dialect-region');
     Route::get('/arabic-dialects/{dialect}', [HomeController::class, 'dialectPage'])
         ->whereIn('dialect', SeoDialectPages::slugs())
         ->name('seo.dialect');
     Route::get('/english-accents', [HomeController::class, 'accentHubPage'])->name('seo.english-accents');
+    Route::get('/{feature}', [HomeController::class, 'featurePage'])
+        ->whereIn('feature', SeoFeaturePages::slugs())
+        ->name('seo.feature');
     Route::get('/english-accents/{accent}', [HomeController::class, 'accentPage'])
         ->whereIn('accent', SeoEnglishPages::slugs())
         ->name('seo.accent');
