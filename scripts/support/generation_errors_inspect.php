@@ -56,9 +56,11 @@ foreach ($db->table('audio_generations')->orderByDesc('id')->limit(15)->get() as
 echo "\n== Billing grace ==\n";
 echo '  billing_grace_days setting: ', var_export(App\Models\SiteSetting::get('billing_grace_days'), true),
     ' (default ', var_export(config('listen.billing.grace_days', 7), true), ")\n";
+echo '  billing_webhook_emails setting: ', var_export(App\Models\SiteSetting::get('billing_webhook_emails'), true),
+    ' (default ', var_export(config('listen.billing.webhook_email_enabled', true), true), ")\n";
 $graceUser = $db->table('users')->where('stripe_id', 'cus_VRQbqt51XEhfMF')->value('id');
 foreach ($db->table('subscriptions')->where('user_id', $graceUser)->orderByDesc('id')->limit(2)
-    ->get(['id', 'user_id', 'plan_id', 'status', 'billing_payment_state', 'billing_grace_ends_at', 'current_period_start', 'current_period_end']) as $row) {
+    ->get(['id', 'user_id', 'plan_id', 'status', 'billing_payment_state', 'billing_grace_ends_at', 'billing_failed_notice_sent_at', 'current_period_start', 'current_period_end']) as $row) {
     echo '  ', json_encode($row), "\n";
 }
 
