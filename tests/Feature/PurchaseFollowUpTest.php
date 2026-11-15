@@ -752,6 +752,56 @@ class PurchaseFollowUpTest extends TestCase
         }
     }
 
+    public function test_the_admin_sees_the_exact_email_a_member_gets_with_its_link_before_sending(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $admin = User::factory()->create(['is_admin' => true]);
+        $plan = $this->inGrace($this->member);
+        $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+        $case = PurchaseFollowUp::query()->sole();
+        $stripe = $this->stripeOwes(900);
+        $this->followUps()->giveDiscount($case, 20, 3);
+        $case->refresh();
+        app('mailer')->getSymfonyTransport()->flush();
+
+        // What the list shows is the very email that is then sent.
+        $shown = $this->followUps()->emailFor($case);
+        $this->assertSame('20% off your Starter renewal · خصم 20% على تجديد باقة مبتدئ', $shown['subject']);
+        $this->assertStringContainsString('you pay $7.20 instead of $9.00. The same discount also comes off your next 3 renewals.', $shown['text']);
+        $this->assertMatchesRegularExpression('#^https?://\S+/billing/pay/'.$case->id.'\?expires=\d+&lang=en&signature=[0-9a-f]+$#', $shown['button_en']);
+        $this->assertMatchesRegularExpression('#^https?://\S+/billing/pay/'.$case->id.'\?expires=\d+&lang=ar&signature=[0-9a-f]+$#', $shown['button_ar']);
+        $this->assertStringContainsString(e($shown['button_en']), $shown['html']);
+        $this->followUps()->sendNow($case);
+        $sent = $this->onlyEmail();
+        $this->assertSame($shown['subject'], (string) $sent->getSubject());
+        // (The mailer ends a body with a line break of its own.)
+        $this->assertSame(trim($shown['text']), trim((string) $sent->getTextBody()));
+        $this->assertSame(trim($shown['html']), trim((string) $sent->getHtmlBody()));
+
+        // The button's link works, and the list says where it leads at this moment.
+        $this->invoiceIsOpenAt('https://invoice.stripe.com/i/acct_1/live_renewal');
+        $this->get($shown['button_en'])->assertRedirect('https://invoice.stripe.com/i/acct_1/live_renewal');
+        $this->assertSame('https://invoice.stripe.com/i/acct_1/live_renewal', $this->followUps()->buttonLeadsTo($case)['url']);
+        $this->invoiceIsOpenAt(null);
+        $this->assertSame('https://listenai.studio/en/manage-subscription', $this->followUps()->buttonLeadsTo($case)['url']);
+
+        // In the list: one click, nothing sent.
+        app('mailer')->getSymfonyTransport()->flush();
+        Livewire::actingAs($admin)->test(ListPurchaseFollowUps::class)
+            ->assertTableActionVisible('seeEmail', $case)
+            ->mountTableAction('seeEmail', $case);
+        $popup = PurchaseFollowUpResource::emailPreview($case)->toHtml();
+        $this->assertStringContainsString('sara@example.com', $popup);
+        $this->assertStringContainsString('20% off your Starter renewal', $popup);
+        $this->assertStringContainsString('20% off: $7.20 instead of $9.00, and off the next 3 renewals', $popup);
+        $this->assertStringContainsString('/billing/pay/'.$case->id.'?expires=', $popup);
+        $this->assertStringContainsString('Their own subscription page', $popup);
+        $this->assertStringContainsString('https://listenai.studio/en/manage-subscription', $popup);
+        // The email itself is in it, as its member reads it.
+        $this->assertStringContainsString('you pay $7.20 instead of $9.00', html_entity_decode($popup));
+        $this->assertCount(0, $this->sentEmails()->filter(fn ($sent): bool => str_contains((string) $sent->getOriginalMessage()->getSubject(), 'renewal')));
+    }
+
     public function test_discounts_are_off_until_the_owner_switches_them_on(): void
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));

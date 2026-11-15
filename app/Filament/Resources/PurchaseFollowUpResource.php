@@ -16,6 +16,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 use Throwable;
 
 /**
@@ -224,6 +225,17 @@ class PurchaseFollowUpResource extends Resource
                         }
                         Notification::make()->title('Discount given and emailed')->body($given.' The offer went to '.$record->user?->email.'.')->success()->send();
                     }),
+                Action::make('seeEmail')
+                    ->label('See the email')
+                    ->icon('heroicon-o-eye')
+                    ->color('gray')
+                    ->visible(fn (PurchaseFollowUp $record): bool => $record->user !== null)
+                    ->modalHeading(fn (PurchaseFollowUp $record): string => 'The email '.($record->user?->email ?? 'this member').' gets')
+                    ->modalDescription('Exactly what "Send the email now" would send to this member at this moment, with their own button link. Nothing is sent by opening this.')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close')
+                    ->modalWidth('3xl')
+                    ->modalContent(fn (PurchaseFollowUp $record): HtmlString => self::emailPreview($record)),
                 Action::make('emailNow')
                     ->label('Send the email now')
                     ->icon('heroicon-o-paper-airplane')
@@ -253,6 +265,39 @@ class PurchaseFollowUpResource extends Resource
             ->toolbarActions([])
             ->emptyStateHeading('No purchase follow-ups yet')
             ->emptyStateDescription('When a renewal or a first payment is declined, or a member opens the checkout and leaves without paying, it shows here with its email and whether they paid afterwards.');
+    }
+
+    /** The case's email as its member gets it now, with its subject and where its button goes. */
+    public static function emailPreview(PurchaseFollowUp $record): HtmlString
+    {
+        $followUps = app(PurchaseFollowUps::class);
+        try {
+            $email = $followUps->emailFor($record);
+            $leads = $followUps->buttonLeadsTo($record);
+        } catch (Throwable $e) {
+            return new HtmlString('<p style="color:#b91c1c;">The email could not be put together: '.e($e->getMessage()).'</p>');
+        }
+
+        $line = fn (string $label, string $value, ?string $url = null): string => '<tr>'
+            .'<td style="padding:4px 12px 4px 0;white-space:nowrap;vertical-align:top;font-weight:600;">'.e($label).'</td>'
+            .'<td style="padding:4px 0;word-break:break-all;">'.($url !== null
+                ? '<a href="'.e($url).'" target="_blank" rel="noopener noreferrer" style="text-decoration:underline;">'.e($value).'</a>'
+                : e($value)).'</td></tr>';
+        $facts = $line('To', (string) $record->user?->email)
+            .$line('Subject', $email['subject'])
+            .($record->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED
+                ? $line('Discount', $record->hasDiscount()
+                    ? $record->discount_percent.'% off: '.PurchaseFollowUps::money($record->priceCents(), $record->currency).' instead of '.PurchaseFollowUps::money($record->amount_cents, $record->currency)
+                        .((int) $record->discount_months > 0 ? ', and off the next '.$record->discount_months.' '.((int) $record->discount_months === 1 ? 'renewal' : 'renewals') : ', this renewal only')
+                    : 'None: this is the warning, at the full price')
+                : '')
+            .$line('Button link (English)', $email['button_en'], $email['button_en'])
+            .$line('Button link (Arabic)', $email['button_ar'], $email['button_ar'])
+            .$line('It opens now', $leads['label'])
+            .$line('', $leads['url'], $leads['url']);
+
+        return new HtmlString('<table style="font-size:13px;margin-bottom:12px;">'.$facts.'</table>'
+            .'<iframe title="The email" style="width:100%;height:60vh;border:0;border-radius:12px;background:#fff" srcdoc="'.e($email['html']).'"></iframe>');
     }
 
     public static function getPages(): array

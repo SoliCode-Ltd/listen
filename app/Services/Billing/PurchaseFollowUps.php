@@ -892,10 +892,7 @@ class PurchaseFollowUps
             throw new InvalidArgumentException('This member signed up with a phone number, so there is no email address to send to.');
         }
 
-        $newsletter = $this->asNewsletter($this->settings(), $row, (string) $user->name);
-        $renderer = app(NewsletterRenderer::class);
-        // About their own purchase, not a newsletter: no unsubscribe link, and the greeting is in the words.
-        $recipient = ['name' => (string) $user->name, 'no_greeting' => true];
+        $email = $this->emailFor($row);
 
         $fromAddress = TitanMailbox::ADDRESS;
         if (! app()->environment('testing')) {
@@ -905,9 +902,9 @@ class PurchaseFollowUps
         }
 
         $mail = new PurchaseFollowUpMail(
-            htmlBody: $renderer->html($newsletter, Newsletter::LANGUAGE_BOTH, $recipient),
-            textBody: $renderer->text($newsletter, Newsletter::LANGUAGE_BOTH, $recipient),
-            subjectLine: $renderer->subject($newsletter, Newsletter::LANGUAGE_BOTH),
+            htmlBody: $email['html'],
+            textBody: $email['text'],
+            subjectLine: $email['subject'],
             fromAddress: $fromAddress,
             fromName: TitanMailbox::fromName(),
             replyToAddress: TitanMailbox::ADDRESS,
@@ -918,6 +915,53 @@ class PurchaseFollowUps
         } catch (\Throwable $e) {
             throw new RuntimeException(TitanMailbox::explainFailure($e->getMessage()), 0, $e);
         }
+    }
+
+    /**
+     * A case's email exactly as its member gets it now: the subject, the HTML and text, and
+     * the address its button opens in each language (send() sends this very email). For the
+     * list's "See the email", so the words, the amounts and the link can be checked before
+     * anything is sent.
+     *
+     * @return array{subject: string, html: string, text: string, button_en: string, button_ar: string}
+     */
+    public function emailFor(PurchaseFollowUp $row): array
+    {
+        $name = (string) ($row->user?->name ?? '');
+        $newsletter = $this->asNewsletter($this->settings(), $row, $name);
+        $renderer = app(NewsletterRenderer::class);
+        // About their own purchase, not a newsletter: no unsubscribe link, and the greeting is in the words.
+        $recipient = ['name' => $name, 'no_greeting' => true];
+
+        return [
+            'subject' => $renderer->subject($newsletter, Newsletter::LANGUAGE_BOTH),
+            'html' => $renderer->html($newsletter, Newsletter::LANGUAGE_BOTH, $recipient),
+            'text' => $renderer->text($newsletter, Newsletter::LANGUAGE_BOTH, $recipient),
+            'button_en' => (string) $newsletter->cta_url_en,
+            'button_ar' => (string) $newsletter->cta_url_ar,
+        ];
+    }
+
+    /**
+     * Where a case's button takes the member right now, in plain words and with the address:
+     * the payment's own page while it waits to be paid (there the price after any discount
+     * shows), else the page the button falls back to.
+     *
+     * @return array{label: string, url: string}
+     */
+    public function buttonLeadsTo(PurchaseFollowUp $row, string $lang = 'en'): array
+    {
+        $payment = $row->exists ? rescue(fn () => $this->paymentPageUrl($row), null, false) : null;
+        if ($payment !== null) {
+            return ['label' => 'The payment page for this payment (it shows what is owed now)', 'url' => $payment];
+        }
+
+        return [
+            'label' => $row->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED
+                ? 'Their own subscription page (the payment is not waiting to be paid, or it is not named on this case)'
+                : 'The checkout for the plan (the payment is no longer waiting to be paid)',
+            'url' => $this->fallbackUrl($row, $lang),
+        ];
     }
 
     /**
