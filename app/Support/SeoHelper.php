@@ -352,7 +352,8 @@ class SeoHelper
                 'indexable' => false,
             ],
         ] + SeoDialectPages::pageDefinitions(self::DEFAULT_META_ROBOTS)
-          + SeoEnglishPages::pageDefinitions(self::DEFAULT_META_ROBOTS);
+          + SeoEnglishPages::pageDefinitions(self::DEFAULT_META_ROBOTS)
+          + SeoFeaturePages::pageDefinitions(self::DEFAULT_META_ROBOTS);
     }
 
     /**
@@ -927,8 +928,18 @@ class SeoHelper
             "- [All Arabic dialects]({$base}/en/arabic-dialects) · [Arabic version]({$base}/ar/arabic-dialects)",
         ], fn (?string $line): bool => $line !== null));
 
+        foreach (SeoDialectPages::regionSlugs() as $slug) {
+            $lines[] = '- [' . SeoDialectPages::regionTitle($slug, 'en') . "]({$base}/en/arabic-dialects/{$slug}) · [Arabic version]({$base}/ar/arabic-dialects/{$slug})";
+        }
+
         foreach (SeoDialectPages::PAGES as $slug => $row) {
             $lines[] = "- [{$row['en']}" . (SeoDialectPages::isFusha($slug) ? '' : ' Arabic') . " text to speech]({$base}/en/arabic-dialects/{$slug})";
+        }
+
+        $lines[] = '';
+        $lines[] = '## Studio features';
+        foreach (SeoFeaturePages::links('en') as $link) {
+            $lines[] = '- [' . $link['label'] . "]({$base}/en/{$link['slug']}): " . SeoFeaturePages::description($link['slug'], 'en') . " · [Arabic version]({$base}/ar/{$link['slug']})";
         }
 
         $lines[] = '';
@@ -1097,6 +1108,20 @@ class SeoHelper
             return $field === 'title'
                 ? SeoEnglishPages::title($accentSlug, $locale)
                 : SeoEnglishPages::description($accentSlug, $locale);
+        }
+
+        $regionSlug = SeoDialectPages::regionSlugForPageKey($page);
+        if ($regionSlug !== null && in_array($field, ['title', 'description'], true)) {
+            return $field === 'title'
+                ? SeoDialectPages::regionTitle($regionSlug, $locale)
+                : SeoDialectPages::regionDescription($regionSlug, $locale);
+        }
+
+        $featureSlug = SeoFeaturePages::slugForPageKey($page);
+        if ($featureSlug !== null && in_array($field, ['title', 'description'], true)) {
+            return $field === 'title'
+                ? SeoFeaturePages::title($featureSlug, $locale)
+                : SeoFeaturePages::description($featureSlug, $locale);
         }
 
         $translationKey = (string) ($definition["{$field}_key"] ?? '');
@@ -1514,7 +1539,7 @@ class SeoHelper
         }
 
         $trail = [['name' => $locale === 'ar' ? 'الرئيسية' : 'Home', 'url' => self::pageUrl('home', $locale)]];
-        if (SeoDialectPages::slugForPageKey($page) !== null) {
+        if (SeoDialectPages::slugForPageKey($page) !== null || SeoDialectPages::regionSlugForPageKey($page) !== null) {
             $trail[] = [
                 'name' => $locale === 'ar' ? 'اللهجات العربية' : 'Arabic dialects',
                 'url' => self::pageUrl(SeoDialectPages::HUB_PAGE, $locale),
@@ -2510,7 +2535,8 @@ HTML;
             'manage_subscription' => ['resources/views/manage-subscription.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'upgrade' => ['resources/views/upgrade.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             default => match (true) {
-                SeoDialectPages::slugForPageKey($page) !== null, $page === SeoDialectPages::HUB_PAGE => ['resources/views/seo/landing-page.blade.php', 'app/Support/SeoDialectPages.php', 'app/Support/ArabicDialects.php'],
+                SeoFeaturePages::slugForPageKey($page) !== null => ['resources/views/seo/landing-page.blade.php', 'app/Support/SeoFeaturePages.php', 'app/Support/StudioFacts.php'],
+                SeoDialectPages::slugForPageKey($page) !== null, SeoDialectPages::regionSlugForPageKey($page) !== null, $page === SeoDialectPages::HUB_PAGE => ['resources/views/seo/landing-page.blade.php', 'app/Support/SeoDialectPages.php', 'app/Support/ArabicDialects.php'],
                 SeoEnglishPages::slugForPageKey($page) !== null, $page === SeoEnglishPages::HUB_PAGE => ['resources/views/seo/landing-page.blade.php', 'app/Support/SeoEnglishPages.php', 'app/Support/EnglishAccents.php'],
                 default => [],
             },

@@ -67,7 +67,7 @@ final class SeoDialectPages
         'sudanese' => ['country' => 'SD', 'en' => 'Sudanese', 'ar' => 'السودانية',
             'about_en' => 'Sudanese Arabic is spoken with a measured rhythm and distinctive words like زول (person).',
             'about_ar' => 'اللهجة السودانية تُنطق بإيقاع متزن ومفردات مميزة مثل «زول».'],
-        'moroccan' => ['country' => 'MA', 'en' => 'Moroccan', 'ar' => 'المغربية',
+        'moroccan' => ['country' => 'MA', 'en' => 'Moroccan', 'ar' => 'المغربية', 'aka_en' => 'Darija', 'aka_ar' => 'الدارجة',
             'about_en' => 'Moroccan Darija is fast, drops short vowels and mixes in Amazigh, French and Spanish words.',
             'about_ar' => 'الدارجة المغربية سريعة الإيقاع، تُسقط الحركات القصيرة وتمزج كلمات أمازيغية وفرنسية وإسبانية.'],
         'algerian' => ['country' => 'DZ', 'en' => 'Algerian', 'ar' => 'الجزائرية',
@@ -101,6 +101,181 @@ final class SeoDialectPages
             'about_en' => 'Modern Standard Arabic (Fusha) is the formal Arabic of news, education, audiobooks and official content in every Arab country.',
             'about_ar' => 'العربية الفصحى هي لغة الأخبار والتعليم والكتب الصوتية والمحتوى الرسمي في كل الدول العربية.'],
     ];
+
+    /**
+     * Pages for a whole region, named the way people search for them: "اللهجة الخليجية",
+     * "Levantine Arabic", "Darija". Each lists the region's country pages and accents.
+     *
+     * @var array<string, array{region: string, en: string, ar: string, aka_en: string, aka_ar: string}>
+     */
+    public const REGIONS = [
+        'gulf' => ['region' => 'gulf', 'en' => 'Gulf', 'ar' => 'الخليجية', 'aka_en' => 'Khaleeji', 'aka_ar' => 'خليجي'],
+        'levantine' => ['region' => 'levant', 'en' => 'Levantine', 'ar' => 'الشامية', 'aka_en' => 'Shami', 'aka_ar' => 'شامي'],
+        'maghrebi' => ['region' => 'maghreb', 'en' => 'Maghrebi', 'ar' => 'المغاربية', 'aka_en' => 'Darija', 'aka_ar' => 'الدارجة'],
+    ];
+
+    /** @return array<int, string> */
+    public static function regionSlugs(): array
+    {
+        return array_keys(self::REGIONS);
+    }
+
+    public static function regionPageKey(string $slug): string
+    {
+        return 'dialects_'.$slug;
+    }
+
+    public static function regionSlugForPageKey(string $page): ?string
+    {
+        if (! str_starts_with($page, 'dialects_')) {
+            return null;
+        }
+        $slug = substr($page, 9);
+
+        return isset(self::REGIONS[$slug]) ? $slug : null;
+    }
+
+    /**
+     * The region's country pages, in the hub's order.
+     *
+     * @return array<int, string>
+     */
+    public static function regionCountrySlugs(string $slug): array
+    {
+        $region = self::REGIONS[$slug]['region'] ?? '';
+
+        return array_values(array_filter(self::slugs(), function (string $page) use ($region): bool {
+            $accents = self::accents($page);
+
+            return $accents !== [] && (ArabicDialects::ALL[$accents[0]['code']]['region'] ?? '') === $region;
+        }));
+    }
+
+    public static function regionAccentCount(string $slug): int
+    {
+        return array_sum(array_map(fn (string $page): int => count(self::accents($page)), self::regionCountrySlugs($slug)));
+    }
+
+    public static function regionTitle(string $slug, string $locale): string
+    {
+        $row = self::REGIONS[$slug];
+
+        if ($locale === 'ar') {
+            return $slug === 'maghrebi'
+                ? 'تحويل النص إلى صوت بالدارجة واللهجات المغاربية'
+                : 'تحويل النص إلى صوت باللهجة '.$row['ar'].' بالذكاء الاصطناعي';
+        }
+
+        return $slug === 'maghrebi'
+            ? 'Maghrebi Arabic and Darija Text to Speech'
+            : $row['en'].' Arabic ('.$row['aka_en'].') Text to Speech';
+    }
+
+    public static function regionDescription(string $slug, string $locale): string
+    {
+        $countries = self::regionCountryNames($slug, $locale);
+        $accents = self::regionAccentCount($slug);
+
+        return $locale === 'ar'
+            ? 'حوّل النص إلى صوت طبيعي '.($slug === 'maghrebi' ? 'بالدارجة واللهجات المغاربية' : 'باللهجة '.self::REGIONS[$slug]['ar']).' بالذكاء الاصطناعي: '.$accents.' لكنة من '.$countries.'، مع المشاعر وتحميل MP3.'
+            : 'Turn text into natural '.self::REGIONS[$slug]['en'].' Arabic speech with AI: '.$accents.' accents from '.$countries.', with emotions and MP3 download.';
+    }
+
+    private static function regionCountryNames(string $slug, string $locale): string
+    {
+        $names = array_map(function (string $page) use ($locale): string {
+            $country = self::PAGES[$page]['country'];
+
+            return ArabicDialects::COUNTRIES[$country][$locale === 'ar' ? 'ar' : 'en'] ?? self::PAGES[$page][$locale === 'ar' ? 'ar' : 'en'];
+        }, self::regionCountrySlugs($slug));
+        if (count($names) < 2) {
+            return implode('', $names);
+        }
+        $last = array_pop($names);
+
+        return $locale === 'ar' ? implode('، ', $names).' و'.$last : implode(', ', $names).' and '.$last;
+    }
+
+    /**
+     * The region page's words in the landing page's shape.
+     *
+     * @return array<string, mixed>
+     */
+    public static function regionContent(string $slug, string $locale): array
+    {
+        $row = self::REGIONS[$slug];
+        $countries = self::regionCountryNames($slug, $locale);
+        $accents = self::regionAccentCount($slug);
+        $count = count(self::regionCountrySlugs($slug));
+
+        if ($locale === 'ar') {
+            $dialect = $slug === 'maghrebi' ? 'الدارجة واللهجات المغاربية' : 'اللهجة '.$row['ar'];
+
+            return [
+                'eyebrow' => 'صوت '.$row['aka_ar'].' بالذكاء الاصطناعي',
+                'h1' => self::regionTitle($slug, 'ar'),
+                'intro' => 'تتكلم منصة إسمع '.$dialect.' بـ'.$accents.' لكنة من '.$countries.'. اختر البلد ثم اللكنة، واكتب نصك، فتحصل على تعليق صوتي بنطق أهل البلد وإيقاعهم، جاهز للتحميل بصيغة MP3.',
+                'faq_title' => 'الأسئلة الشائعة',
+                'faqs' => [
+                    ['question' => 'ما الدول التي تشملها '.$dialect.' في إسمع؟', 'answer' => $countries.'، بـ'.$accents.' لكنة.'],
+                    ['question' => 'هل أكتب النص بالعامية؟', 'answer' => 'للحصول على أكثر نتيجة طبيعية اكتب النص باللهجة نفسها. ويمكنك أيضاً كتابة نص فصيح واختيار اللهجة.'],
+                    ['question' => 'هل يمكن إضافة الضحك والمشاعر؟', 'answer' => 'نعم، اختر شعوراً وأسلوب أداء، واكتب الضحكة أو الهمسة داخل النص.'],
+                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يمكن للأعضاء الجدد تجربة الأصوات واللهجات مرة واحدة في العرض التجريبي.'],
+                ],
+                'cta_title' => 'اسمع نصك '.($slug === 'maghrebi' ? 'بالدارجة' : 'باللهجة '.$row['ar']),
+                'cta_body' => 'أنشئ حسابك واختر واحدة من '.$accents.' لكنة.',
+                'cta_primary' => 'أنشئ حسابك',
+            ];
+        }
+
+        return [
+            'eyebrow' => $row['en'].' Arabic AI voices',
+            'h1' => self::regionTitle($slug, 'en'),
+            'intro' => 'Listen speaks '.$row['en'].' Arabic ('.$row['aka_en'].') in '.$accents.' accents from '.$countries.'. Choose the country and the accent, write your script, and get a voiceover with local pronunciation and rhythm, ready to download as MP3.',
+            'faq_title' => 'Frequently asked questions',
+            'faqs' => [
+                ['question' => 'Which countries does '.$row['en'].' Arabic cover in Listen?', 'answer' => $countries.', in '.$accents.' accents.'],
+                ['question' => 'Should I write the script in dialect?', 'answer' => 'For the most natural result, write the script in the dialect itself. You can also write in Fusha and choose a dialect.'],
+                ['question' => 'Can I add laughs and emotions?', 'answer' => 'Yes. Choose an emotion and a performance style, and write a laugh or a whisper into the text.'],
+                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. New members can try the voices and dialects once in the demo.'],
+            ],
+            'cta_title' => 'Hear your script in '.$row['en'].' Arabic',
+            'cta_body' => 'Create your account and choose one of '.$accents.' accents from '.$count.' countries.',
+            'cta_primary' => 'Create your account',
+        ];
+    }
+
+    /**
+     * The region page's country cards (the hub's cards for that region only).
+     *
+     * @return array<int, array{region: string, items: array<int, array<string, mixed>>}>
+     */
+    public static function regionGroups(string $slug, string $locale): array
+    {
+        $pages = self::regionCountrySlugs($slug);
+        $groups = [];
+        foreach (self::hubGroups($locale) as $group) {
+            $items = array_values(array_filter($group['items'], fn (array $item): bool => in_array($item['slug'], $pages, true)));
+            if ($items !== []) {
+                $groups[] = ['region' => $group['region'], 'items' => $items];
+            }
+        }
+
+        return $groups;
+    }
+
+    /** The first sample of the region's countries that has one. */
+    public static function regionSample(string $slug, string $locale): ?array
+    {
+        foreach (self::regionCountrySlugs($slug) as $page) {
+            $sample = self::sample($page, $locale);
+            if ($sample !== null) {
+                return $sample;
+            }
+        }
+
+        return null;
+    }
 
     /**
      * @return array<int, string>
@@ -155,6 +330,21 @@ final class SeoDialectPages
             ],
         ];
 
+        foreach (self::REGIONS as $slug => $row) {
+            $definitions[self::regionPageKey($slug)] = [
+                'label' => $row['en'].' Arabic Text to Speech',
+                'title' => self::regionTitle($slug, 'en'),
+                'description' => self::regionDescription($slug, 'en'),
+                'robots' => $robots,
+                'path' => '/arabic-dialects/'.$slug,
+                'localized' => true,
+                'indexable' => true,
+                'generated' => true,
+                'sitemap_priority' => 0.85,
+                'sitemap_change_frequency' => 'weekly',
+            ];
+        }
+
         foreach (self::PAGES as $slug => $row) {
             $definitions[self::pageKey($slug)] = [
                 'label' => $row['en'].' Text to Speech',
@@ -180,12 +370,12 @@ final class SeoDialectPages
         if ($locale === 'ar') {
             return self::isFusha($slug)
                 ? 'تحويل النص إلى صوت بالعربية الفصحى بالذكاء الاصطناعي'
-                : 'تحويل النص إلى صوت باللهجة '.$row['ar'].' بالذكاء الاصطناعي';
+                : 'تحويل النص إلى صوت باللهجة '.$row['ar'].(isset($row['aka_ar']) ? ' ('.$row['aka_ar'].')' : '').' بالذكاء الاصطناعي';
         }
 
         return self::isFusha($slug)
             ? 'Modern Standard Arabic (Fusha) Text to Speech'
-            : $row['en'].' Arabic Text to Speech';
+            : $row['en'].' Arabic'.(isset($row['aka_en']) ? ' ('.$row['aka_en'].')' : '').' Text to Speech';
     }
 
     public static function description(string $slug, string $locale): string
