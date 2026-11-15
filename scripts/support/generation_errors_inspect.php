@@ -64,6 +64,43 @@ foreach ($db->table('subscriptions')->where('user_id', $graceUser)->orderByDesc(
     echo '  ', json_encode($row), "\n";
 }
 
+echo "\n== Declined-renewal email: is live ready? ==\n";
+try {
+    Illuminate\Support\Facades\Artisan::call('migrate:status', ['--pending' => true]);
+    echo "  pending migrations:\n", preg_replace('/^/m', '    ', trim(Illuminate\Support\Facades\Artisan::output()) ?: 'none'), "\n";
+} catch (Throwable $e) {
+    echo '  pending migrations: could not be read (', mb_substr($e->getMessage(), 0, 160), ")\n";
+}
+echo '  purchase_follow_ups table: ', Illuminate\Support\Facades\Schema::hasTable('purchase_follow_ups') ? 'there' : 'MISSING', "\n";
+if (Illuminate\Support\Facades\Schema::hasTable('purchase_follow_ups')) {
+    foreach ($db->table('purchase_follow_ups')->selectRaw('kind, email_status, COUNT(*) n, SUM(paid_at IS NOT NULL) paid')->groupBy('kind', 'email_status')->orderBy('kind')->get() as $r) {
+        echo "    {$r->kind} / {$r->email_status}: {$r->n} (paid after: {$r->paid})\n";
+    }
+    echo '  discount columns: ', Illuminate\Support\Facades\Schema::hasColumn('purchase_follow_ups', 'discount_percent') ? 'there' : 'not yet', "\n";
+}
+try {
+    App\Support\TitanMailbox::apply();
+    App\Support\TitanMailbox::requirePassword();
+    echo "  newsletter mailbox: ready (the designed email can be sent)\n";
+} catch (Throwable $e) {
+    echo '  newsletter mailbox: NOT ready, the plain-text warning would go instead (', mb_substr($e->getMessage(), 0, 160), ")\n";
+}
+echo '  live server emails members: ', App\Support\LiveServer::allowsCustomerActions() ? 'yes' : 'no', "\n";
+if (method_exists(App\Services\Billing\PurchaseFollowUps::class, 'renewalFailed')) {
+    $fu = app(App\Services\Billing\PurchaseFollowUps::class);
+    echo '  discounts switch: ', $fu->settings()['discounts_enabled'] === '1' ? 'ON' : 'off', "\n";
+    foreach ([false, true] as $withDiscount) {
+        try {
+            $html = $fu->previewHtml(App\Models\PurchaseFollowUp::KIND_RENEWAL_FAILED, null, $withDiscount);
+            echo '  preview ', $withDiscount ? 'with a discount' : 'warning', ': renders (', strlen($html), ' bytes', preg_match('/\{(name|plan|date|reason|discount|price|old_price|next)\}/', $html) ? ', A PLACEHOLDER IS LEFT IN IT' : ', no placeholder left', ")\n";
+        } catch (Throwable $e) {
+            echo '  preview ', $withDiscount ? 'with a discount' : 'warning', ': FAILS (', mb_substr($e->getMessage(), 0, 200), ")\n";
+        }
+    }
+} else {
+    echo "  the new code is not on this server yet\n";
+}
+
 echo "\n== Speech keys marked out (live cache) and today's key warnings in the logs ==\n";
 $km = app(App\Services\Tts\GeminiKeyManager::class);
 $model = App\Services\VoiceCloningService::MODEL;
