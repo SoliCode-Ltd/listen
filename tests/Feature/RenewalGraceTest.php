@@ -163,12 +163,13 @@ class RenewalGraceTest extends TestCase
 
         $this->paymentFailed()->assertOk();
 
-        $this->assertSame(['Payment failed - action required'], $this->sentSubjects());
+        $this->assertSame(['Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك'], $this->sentSubjects());
         $body = $this->lastBody();
-        $this->assertStringContainsString('We could not take your latest payment for Starter.', $body);
-        $this->assertStringContainsString('Your plan stays on until Oct 21, 2026, with all its paid features.', $body);
-        $this->assertStringContainsString('If it is still unpaid on Oct 21, 2026, your subscription will be canceled and your account will move to the free plan.', $body);
-        $this->assertStringContainsString('- Plan Active Until: Oct 21, 2026', $body);
+        $this->assertStringContainsString('we tried to renew your Starter plan, but your bank declined the payment. Nothing was charged.', $body);
+        $this->assertStringContainsString('Your plan stays on until 21 October 2026, with all its paid features.', $body);
+        $this->assertStringContainsString('If it is still unpaid on 21 October 2026, your subscription will be cancelled and your account will move to the free plan.', $body);
+        // In Arabic too, in the same email.
+        $this->assertStringContainsString('باقتك مستمرة حتى 21 أكتوبر 2026 بكل مزاياها المدفوعة', $body);
         $this->assertStringNotContainsString('paused', $body);
         $this->assertNotNull($this->plan()->billing_failed_notice_sent_at);
     }
@@ -185,7 +186,7 @@ class RenewalGraceTest extends TestCase
         $this->assertSame('past_due', $this->plan()->billing_payment_state);
         $this->assertEquals(Carbon::parse('2026-10-21 11:05:00'), $graceEnds);
         $this->assertKeptOnThePaidMonth(4000);
-        $this->assertSame(['Payment failed - action required'], $this->sentSubjects());
+        $this->assertSame(['Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك'], $this->sentSubjects());
 
         // Then the failed invoice, and Stripe's retries two and four days later: nothing moves.
         $this->travel(10)->minutes();
@@ -208,7 +209,7 @@ class RenewalGraceTest extends TestCase
 
         $this->paymentFailed('evt_failed')->assertOk();
         $graceEnds = $this->plan()->billing_grace_ends_at;
-        $this->assertSame(['Payment failed - action required'], $this->sentSubjects());
+        $this->assertSame(['Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك'], $this->sentSubjects());
 
         $this->travel(5)->minutes();
         $this->webhook('evt_now_past_due', 'customer.subscription.updated', $this->stripeSubscription('past_due'), ['status' => 'active'])->assertOk();
@@ -255,7 +256,7 @@ class RenewalGraceTest extends TestCase
         // The failed invoice that comes after changes nothing.
         $this->paymentFailed()->assertOk();
         $this->assertKeptOnThePaidMonth(4000);
-        $this->assertSame(['Payment failed - action required'], $this->sentSubjects());
+        $this->assertSame(['Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك'], $this->sentSubjects());
     }
 
     public function test_a_sync_that_read_stripe_just_before_the_charge_failed_never_undoes_the_grace(): void
@@ -274,7 +275,7 @@ class RenewalGraceTest extends TestCase
         $this->assertSame('past_due', $this->plan()->billing_payment_state);
         $this->assertEquals(Carbon::parse('2026-10-21 11:05:00'), $this->plan()->billing_grace_ends_at);
         $this->assertKeptOnThePaidMonth(4000);
-        $this->assertSame(['Payment failed - action required'], $this->sentSubjects());
+        $this->assertSame(['Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك'], $this->sentSubjects());
 
         // The next sync reads Stripe as it is now: nothing moves, and no second warning.
         $this->stripeHas('past_due');
@@ -418,7 +419,7 @@ class RenewalGraceTest extends TestCase
         $this->stripeHas('past_due', self::NEXT_RENEWAL, '2026-12-14 10:00:00');
         $this->paymentFailed('evt_failed_november', ['period_start' => Carbon::parse(self::RENEWS_AT)->getTimestamp(), 'period_end' => Carbon::parse(self::NEXT_RENEWAL)->getTimestamp()])->assertOk();
         $this->assertEquals(Carbon::parse('2026-11-21 11:05:00'), $this->plan()->billing_grace_ends_at);
-        $this->assertSame(['Payment failed - action required'], $this->sentSubjects());
+        $this->assertSame(['Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك'], $this->sentSubjects());
         $this->assertSame('2026-10-14 10:00', $this->creditKey());
     }
 
@@ -526,8 +527,8 @@ class RenewalGraceTest extends TestCase
         $this->assertNull($plan->billing_grace_ends_at);
         $this->assertSame('free', app(PlanAccessService::class)->resolveActivePlanForUserId((int) $member->id)?->slug);
         $this->assertSame(BillingTrial::STATUS_CHARGE_FAILED, $trial->fresh()->status);
-        $this->assertSame(['Payment failed - action required'], $this->sentSubjects());
-        $this->assertStringContainsString('We could not take your latest payment, so your paid features are paused.', $this->lastBody());
+        $this->assertSame(['Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك'], $this->sentSubjects());
+        $this->assertStringContainsString('but your bank declined it, so your paid features are paused. Nothing was charged.', $this->lastBody());
 
         // A billing sync keeps it so, and Stripe's retry warns no one again.
         $this->syncMember($member);
@@ -548,7 +549,7 @@ class RenewalGraceTest extends TestCase
         $this->assertSame('past_due', $plan->billing_payment_state);
         $this->assertNull($plan->billing_grace_ends_at);
         $this->assertSame('free', app(PlanAccessService::class)->resolveActivePlanForUserId((int) $member->id)?->slug);
-        $this->assertSame(['Payment failed - action required'], $this->sentSubjects());
+        $this->assertSame(['Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك'], $this->sentSubjects());
 
         $this->webhook('evt_trial_charge_failed', 'invoice.payment_failed', $this->trialInvoice())->assertOk();
         $this->assertSame([], $this->sentSubjects());
@@ -806,8 +807,8 @@ class RenewalGraceTest extends TestCase
         $this->travelTo(Carbon::parse('2026-10-14 11:05:00'));
         $this->stripeHas('past_due');
         $this->paymentFailed()->assertOk();
-        $this->assertSame(['Payment failed - action required'], $this->sentSubjects());
-        $this->assertStringContainsString('Your plan stays on until Oct 21, 2026', $this->lastBody());
+        $this->assertSame(['Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك'], $this->sentSubjects());
+        $this->assertStringContainsString('Your plan stays on until 21 October 2026', $this->lastBody());
 
         // Day 3 of the 7 grace days: Stripe's own retry settings gave up and it cancelled the subscription.
         $this->travelTo(Carbon::parse('2026-10-17 09:00:00'));
@@ -996,7 +997,7 @@ class RenewalGraceTest extends TestCase
         $this->assertNotSame('past_due', $plan->billing_payment_state);
         $this->assertNull($plan->billing_grace_ends_at);
         $this->assertSame('starter', $this->activePlanSlug());
-        $this->assertNotContains('Payment failed - action required', $this->sentSubjects());
+        $this->assertNotContains('Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك', $this->sentSubjects());
     }
 
     private function plan(): Subscription

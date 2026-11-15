@@ -6,7 +6,9 @@ use App\Filament\Resources\PurchaseFollowUpResource;
 use App\Models\PurchaseFollowUp;
 use App\Models\User;
 use App\Services\Billing\PurchaseFollowUps;
+use App\Services\Billing\RenewalGrace;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -15,14 +17,16 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
 use Throwable;
 
 /**
- * Newsletter → Purchase follow-ups → Emails and settings: the two emails' on/off switches,
- * how long each waits, their words in English and Arabic, a preview and a test send.
+ * Newsletter → Purchase follow-ups → Emails and settings: the two follow-up emails' on/off
+ * switches and how long each waits, the words of all three emails (those two and the
+ * warning a declined renewal gets) in English and Arabic, a preview and a test send.
  */
 class PurchaseFollowUpEmails extends Page implements HasForms
 {
@@ -39,7 +43,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
     public function mount(): void
     {
         $settings = app(PurchaseFollowUps::class)->settings();
-        foreach (['failed_enabled', 'left_enabled'] as $switch) {
+        foreach (['failed_enabled', 'left_enabled', 'discounts_enabled'] as $switch) {
             $settings[$switch] = $settings[$switch] === '1';
         }
         $this->form->fill($settings);
@@ -52,7 +56,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
         return $schema
             ->components([
                 Section::make('Sending')
-                    ->description('Both emails go out by themselves, from the live site only. A member gets at most one of them in '.PurchaseFollowUps::QUIET_DAYS.' days, and none once they have a paid plan. A member whose payment was declined gets that email, not the checkout reminder.')
+                    ->description('The two follow-up emails go out by themselves, from the live site only. A member gets at most one of them in '.PurchaseFollowUps::QUIET_DAYS.' days, and none once they have a paid plan. A member whose payment was declined gets that email, not the checkout reminder. The warning for a declined renewal (further down) has no switch or wait: it goes out the moment a paying member\'s renewal is declined, once for each renewal.')
                     ->columns(2)
                     ->schema([
                         Toggle::make('failed_enabled')
@@ -68,11 +72,33 @@ class PurchaseFollowUpEmails extends Page implements HasForms
                             ->label('Wait before the reminder (hours)')
                             ->numeric()->integer()->minValue(1)->maxValue(PurchaseFollowUps::TOO_LATE_HOURS)->required()
                             ->helperText('Recommended: 3. Opening the checkout again starts the wait again.'),
+                        Toggle::make('discounts_enabled')
+                            ->label('Allow discounts on declined renewals')
+                            ->helperText('Shows the "Give a discount" button on a declined renewal in the list: a percentage off that renewal, or off that member\'s next renewals too, for the one member you choose. Off: no discount can be given.')
+                            ->columnSpan(2),
                         Select::make('order')
                             ->label('Language order in the emails')
                             ->options(['ar_en' => 'Arabic, then English', 'en_ar' => 'English, then Arabic'])
                             ->required(),
                     ]),
+                Section::make('Declined renewal: English')
+                    ->description('For a paying member whose renewal was declined. Their plan stays on for the grace days ('.RenewalGrace::graceDays().' now, set in Billing Settings), and the button opens the payment page for that renewal.')
+                    ->columns(2)
+                    ->collapsible()
+                    ->schema($this->wordFields('renewal', 'en', '{name} is the member\'s first name, {plan} their plan, {date} the day the plan stays on until. {reason} adds the bank\'s reason when it helps ("because the card did not have enough balance"), or nothing.')),
+                Section::make('Declined renewal: العربية')
+                    ->columns(2)
+                    ->collapsible()
+                    ->schema($this->wordFields('renewal', 'ar')),
+                Section::make('Declined renewal with a discount: English')
+                    ->description('For a declined renewal you gave a discount to (the "Give a discount" button on its case in the list). From then on that member\'s email is this one, not the warning above.')
+                    ->columns(2)
+                    ->collapsible()
+                    ->schema($this->wordFields('renewal_offer', 'en', '{name} is the member\'s first name, {plan} their plan, {discount} the discount ("20%"), {price} what they pay now, {old_price} the full price, {date} the day the plan stays on until (empty when it has no grace days). {next} adds a sentence when the discount also covers their next renewals ("The same discount also comes off your next 3 renewals."), or nothing when it is for this renewal only; the preview shows it for 3.')),
+                Section::make('Declined renewal with a discount: العربية')
+                    ->columns(2)
+                    ->collapsible()
+                    ->schema($this->wordFields('renewal_offer', 'ar')),
                 Section::make('Declined payment: English')
                     ->columns(2)
                     ->collapsible()
@@ -94,19 +120,27 @@ class PurchaseFollowUpEmails extends Page implements HasForms
     }
 
     /**
-     * @return array<int, \Filament\Schemas\Components\Component|\Filament\Forms\Components\Field>
+     * @return array<int, Component|Field>
      */
     private function wordFields(string $prefix, string $lang, ?string $help = null): array
     {
         $rtl = $lang === 'ar' ? ['dir' => 'rtl'] : [];
+        $button = match ($prefix) {
+            'failed' => 'Button text (opens the payment page for that payment)',
+            'renewal', 'renewal_offer' => 'Button text (opens the payment page for that renewal)',
+            default => 'Button text (opens the checkout for their plan)',
+        };
 
-        return [
+        return array_values(array_filter([
             TextInput::make("{$prefix}_subject_{$lang}")->label('Subject')->required()->maxLength(200)->extraInputAttributes($rtl)->columnSpan(2),
             TextInput::make("{$prefix}_headline_{$lang}")->label('Headline')->maxLength(200)->helperText($help)->extraInputAttributes($rtl)->columnSpan(2),
-            Textarea::make("{$prefix}_body_{$lang}")->label('Message')->rows(6)->required()->helperText($lang === 'en' ? 'A blank line starts a new paragraph.' : null)->extraInputAttributes($rtl)->columnSpan(2),
-            TextInput::make("{$prefix}_cta_label_{$lang}")->label($lang === 'en' ? ($prefix === 'failed' ? 'Button text (opens the payment page for that payment)' : 'Button text (opens the checkout for their plan)') : 'Button text')->maxLength(80)->extraInputAttributes($rtl),
+            Textarea::make("{$prefix}_body_{$lang}")->label($prefix === 'renewal' ? 'Message (the plan stays on for the grace days)' : 'Message')->rows(6)->required()->helperText($lang === 'en' ? 'A blank line starts a new paragraph.' : null)->extraInputAttributes($rtl)->columnSpan(2),
+            $prefix === 'renewal'
+                ? Textarea::make("{$prefix}_paused_body_{$lang}")->label('Message when there are no grace days (the first charge after a free trial: the paid features pause at once)')->rows(4)->required()->helperText($lang === 'en' ? '{date} is empty here.' : null)->extraInputAttributes($rtl)->columnSpan(2)
+                : null,
+            TextInput::make("{$prefix}_cta_label_{$lang}")->label($lang === 'en' ? $button : 'Button text')->maxLength(80)->extraInputAttributes($rtl),
             TextInput::make("{$prefix}_footer_{$lang}")->label('Small print at the bottom')->maxLength(300)->extraInputAttributes($rtl),
-        ];
+        ]));
     }
 
     public function save(): void
@@ -118,7 +152,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
 
     protected function getHeaderActions(): array
     {
-        $preview = fn (string $kind, string $label): Action => Action::make('preview_'.$kind)
+        $preview = fn (string $kind, string $label, bool $withDiscount = false): Action => Action::make('preview_'.$kind.($withDiscount ? '_offer' : ''))
             ->label($label)
             ->icon('heroicon-o-eye')
             ->color('gray')
@@ -128,7 +162,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
             ->modalWidth('3xl')
             ->modalContent(fn (): HtmlString => new HtmlString(
                 '<iframe title="Email preview" style="width:100%;height:70vh;border:0;border-radius:12px;background:#fff" srcdoc="'
-                .e(app(PurchaseFollowUps::class)->previewHtml($kind, $this->previewSettings())).'"></iframe>'
+                .e(app(PurchaseFollowUps::class)->previewHtml($kind, $this->previewSettings(), $withDiscount)).'"></iframe>'
             ));
 
         return [
@@ -137,6 +171,8 @@ class PurchaseFollowUpEmails extends Page implements HasForms
                 ->icon('heroicon-o-arrow-left')
                 ->color('gray')
                 ->url(PurchaseFollowUpResource::getUrl('index')),
+            $preview(PurchaseFollowUp::KIND_RENEWAL_FAILED, 'Preview: declined renewal'),
+            $preview(PurchaseFollowUp::KIND_RENEWAL_FAILED, 'Preview: renewal with a discount', true),
             $preview(PurchaseFollowUp::KIND_PAYMENT_FAILED, 'Preview: declined payment'),
             $preview(PurchaseFollowUp::KIND_CHECKOUT_LEFT, 'Preview: checkout left'),
             Action::make('sendTest')
@@ -148,6 +184,8 @@ class PurchaseFollowUpEmails extends Page implements HasForms
                     Select::make('kind')
                         ->label('Which email')
                         ->options([
+                            PurchaseFollowUp::KIND_RENEWAL_FAILED => 'Declined renewal',
+                            'renewal_offer' => 'Declined renewal with a discount',
                             PurchaseFollowUp::KIND_PAYMENT_FAILED => 'Declined payment',
                             PurchaseFollowUp::KIND_CHECKOUT_LEFT => 'Checkout left',
                         ])
@@ -175,7 +213,9 @@ class PurchaseFollowUpEmails extends Page implements HasForms
 
         $followUps = app(PurchaseFollowUps::class);
         try {
-            $followUps->send($followUps->sample($kind, $user), $to);
+            $followUps->send($kind === 'renewal_offer'
+                ? $followUps->sample(PurchaseFollowUp::KIND_RENEWAL_FAILED, $user, true)
+                : $followUps->sample($kind, $user), $to);
         } catch (Throwable $e) {
             Notification::make()->title('The email was not sent')->body($e->getMessage())->danger()->persistent()->send();
 

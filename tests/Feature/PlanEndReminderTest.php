@@ -231,7 +231,7 @@ class PlanEndReminderTest extends TestCase
         // Stripe tries the card again, and it fails again: the warning goes out now.
         Mail::swap($mailer);
         app(BillingLifecycleService::class)->handlePaymentFailed($failed);
-        $this->assertSame(['Payment failed - action required'], array_column($this->sentMail(), 'subject'));
+        $this->assertSame(['Payment failed - action required · لم يكتمل الدفع - مطلوب إجراء منك'], array_column($this->sentMail(), 'subject'));
         $this->assertNotNull($plan->fresh()->billing_failed_notice_sent_at);
     }
 }

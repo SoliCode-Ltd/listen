@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PurchaseFollowUpResource\Pages;
 
+use App\Filament\Concerns\SimplePages;
 use App\Filament\Resources\PurchaseFollowUpResource;
 use App\Models\PurchaseFollowUp;
 use App\Services\Billing\PurchaseFollowUps;
@@ -10,9 +11,17 @@ use Filament\Resources\Pages\ListRecords;
 
 class ListPurchaseFollowUps extends ListRecords
 {
-    use \App\Filament\Concerns\SimplePages;
+    use SimplePages;
 
     protected static string $resource = PurchaseFollowUpResource::class;
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        // A declined renewal listed from before the list existed is given the payment it waits on.
+        rescue(fn () => app(PurchaseFollowUps::class)->nameUnpaidPayments(), null, false);
+    }
 
     protected function getHeaderActions(): array
     {
@@ -38,8 +47,10 @@ class ListPurchaseFollowUps extends ListRecords
         $state = fn (string $kind): string => $followUps->enabled($kind) ? 'on' : 'OFF';
         $failed = PurchaseFollowUp::KIND_PAYMENT_FAILED;
         $left = PurchaseFollowUp::KIND_CHECKOUT_LEFT;
+        $renewal = PurchaseFollowUp::KIND_RENEWAL_FAILED;
 
-        return 'Last 30 days. Payments declined: '.$count($failed).' ('.$count($failed, PurchaseFollowUp::SENT).' emailed, '.$count($failed, null, true).' bought after; email '.$state($failed).'). '
+        return 'Last 30 days. Renewals declined: '.$count($renewal).' ('.$count($renewal, PurchaseFollowUp::SENT).' emailed, '.$count($renewal, null, true).' paid after). '
+            .'First payments declined: '.$count($failed).' ('.$count($failed, PurchaseFollowUp::SENT).' emailed, '.$count($failed, null, true).' bought after; email '.$state($failed).'). '
             .'Checkouts left: '.$count($left).' ('.$count($left, PurchaseFollowUp::SENT).' emailed, '.$count($left, null, true).' bought after; email '.$state($left).').';
     }
 }
