@@ -43,6 +43,11 @@ use RuntimeException;
  * happens, in the same design, with its words edited in the same place and its case in the
  * same list. It is a billing notice, not a follow-up: it has no switch, wait or weekly
  * limit, and when it cannot be sent RenewalGrace sends its plain-text one instead.
+ *
+ * From the list the team can also act on one case by hand: send its email now (sendNow()),
+ * or take a percentage off a declined renewal (giveDiscount()): that lowers what the member
+ * owes for that one renewal, and from then on the case's email is the one with the offer's
+ * words and the lower price. Giving a discount is the only thing here that touches a payment.
  */
 class PurchaseFollowUps
 {
@@ -74,6 +79,9 @@ class PurchaseFollowUps
 
     /** A failed renewal with no invoice named is the member's open case from the last this many days. */
     private const RENEWAL_CASE_DAYS = 45;
+
+    /** The most that can be taken off a declined renewal, in percent. */
+    public const MAX_DISCOUNT = 90;
 
     /**
      * @return array<string, string>
@@ -125,6 +133,18 @@ class PurchaseFollowUps
             'renewal_cta_label_ar' => 'ادفع الآن',
             'renewal_footer_en' => 'Need another way to pay? Just reply to this email and we will help.',
             'renewal_footer_ar' => 'تحتاج طريقة دفع أخرى؟ ردّ على هذه الرسالة وسنساعدك.',
+
+            // A declined renewal the team gave a discount to (giveDiscount()).
+            'renewal_offer_subject_en' => '{discount} off your {plan} renewal',
+            'renewal_offer_subject_ar' => 'خصم {discount} على تجديد باقة {plan}',
+            'renewal_offer_headline_en' => 'Keep your {plan} plan for {price}',
+            'renewal_offer_headline_ar' => 'احتفظ بباقة {plan} مقابل {price}',
+            'renewal_offer_body_en' => "Hi {name}, we would like you to stay. We have taken {discount} off the renewal of your {plan} plan: you pay {price} instead of {old_price}.\n\nPress the button below to pay the lower price and keep your plan, with every voice, dialect and feature in it.",
+            'renewal_offer_body_ar' => "أهلاً {name}، يهمّنا أن تبقى معنا. خصمنا لك {discount} من تجديد باقة {plan}: تدفع {price} بدلاً من {old_price}.\n\nاضغط الزر أدناه لتدفع السعر المخفّض وتحتفظ بباقتك بكل أصواتها ولهجاتها ومزاياها.",
+            'renewal_offer_cta_label_en' => 'Pay {price}',
+            'renewal_offer_cta_label_ar' => 'ادفع {price}',
+            'renewal_offer_footer_en' => 'The lower price is for this renewal. Questions? Just reply to this email.',
+            'renewal_offer_footer_ar' => 'السعر المخفّض خاص بهذا التجديد. لديك سؤال؟ ردّ على هذه الرسالة.',
         ];
     }
 
@@ -286,6 +306,122 @@ class PurchaseFollowUps
                 ->whereNull('paid_at')
                 ->update(['paid_at' => now(), 'paid_plan_slug' => $plan?->slug, 'updated_at' => now()]);
         }, null, false);
+    }
+
+    /**
+     * Sends a case's email to its member now, whatever its switch, wait or state: the team
+     * asked for it from the list. A declined renewal with a discount gets the offer's words,
+     * one without gets the warning. Throws, with the reason, when it could not be sent.
+     */
+    public function sendNow(PurchaseFollowUp $row): void
+    {
+        $row->loadMissing('user');
+        $this->send($row);
+        $row->forceFill(['email_status' => PurchaseFollowUp::SENT, 'email_sent_at' => now(), 'email_note' => 'Sent by hand'])->save();
+
+        // The member has been told of the missed renewal: the automatic warning is not owed any more.
+        if ($row->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED && $row->user_id) {
+            Subscription::query()
+                ->where('user_id', $row->user_id)
+                ->where('billing_payment_state', 'past_due')
+                ->whereNull('billing_failed_notice_sent_at')
+                ->update(['billing_failed_notice_sent_at' => now()]);
+        }
+    }
+
+    /**
+     * Takes $percent off what the member owes for this declined renewal, and only this one:
+     * the unpaid payment itself is lowered, so its payment page shows the lower price and the
+     * card is tried again for the lower price. The case keeps the discount, and its email is
+     * the offer's from now on. Never on a server that is not the live site: it changes a real
+     * payment. Throws, with the reason, when it was not given; nothing is changed then.
+     */
+    public function giveDiscount(PurchaseFollowUp $row, int $percent): void
+    {
+        if (! PurchaseFollowUp::discountsReady()) {
+            throw new RuntimeException('Not given: the database is not ready for discounts yet (its migration has not been run).');
+        }
+        if ($row->kind !== PurchaseFollowUp::KIND_RENEWAL_FAILED) {
+            throw new InvalidArgumentException('A discount is for a declined renewal.');
+        }
+        if ($percent < 1 || $percent > self::MAX_DISCOUNT) {
+            throw new InvalidArgumentException('The discount must be between 1 and '.self::MAX_DISCOUNT.' percent.');
+        }
+        if ($row->paid_at !== null) {
+            throw new RuntimeException('Not given: this renewal has been paid.');
+        }
+        if ($row->hasDiscount()) {
+            throw new RuntimeException('Not given: this renewal already has '.$row->discount_percent.'% off.');
+        }
+        if (! LiveServer::allowsCustomerActions()) {
+            LiveServer::skipped('a discount on a declined renewal', ['user_id' => $row->user_id]);
+
+            throw new RuntimeException('Not given: this is not the live site. A discount changes a real payment, so only the live site gives one.');
+        }
+        $invoiceId = trim((string) $row->stripe_invoice_id);
+        if ($invoiceId === '') {
+            throw new RuntimeException('Not given: this case does not name the unpaid payment, so it cannot be lowered from here.');
+        }
+
+        $unpaid = $this->unpaidInvoice($invoiceId);
+        if ($unpaid === null) {
+            throw new RuntimeException('Not given: the payment is no longer waiting to be paid (it was paid or closed).');
+        }
+        $off = (int) round($unpaid['amount'] * $percent / 100);
+        if ($off < 1 || $off >= $unpaid['amount']) {
+            throw new RuntimeException('Not given: '.$percent.'% of what is owed leaves nothing to pay, or takes nothing off.');
+        }
+
+        $this->lowerInvoice($invoiceId, $off, $percent.'% off this renewal', 'listen-renewal-discount-'.$row->id);
+        $row->forceFill([
+            'amount_cents' => $unpaid['amount'],
+            'currency' => $unpaid['currency'] ?: $row->currency,
+            'discount_percent' => $percent,
+            'discount_cents' => $off,
+            'discounted_at' => now(),
+        ])->save();
+        Log::info('A declined renewal was given a discount.', ['follow_up_id' => $row->id, 'user_id' => $row->user_id, 'percent' => $percent, 'off_cents' => $off]);
+    }
+
+    /**
+     * Asks Stripe what is still owed on the payment: its amount (in the currency's smallest
+     * unit) and currency while it waits to be paid, or null once it is paid or closed.
+     *
+     * @return array{amount: int, currency: string}|null
+     */
+    protected function unpaidInvoice(string $invoiceId): ?array
+    {
+        $invoice = Cashier::stripe()->invoices->retrieve($invoiceId, []);
+        $owed = (int) ($invoice->amount_remaining ?? 0);
+
+        return (string) ($invoice->status ?? '') === 'open' && $owed > 0
+            ? ['amount' => $owed, 'currency' => strtolower((string) ($invoice->currency ?? ''))]
+            : null;
+    }
+
+    /**
+     * Takes $offCents off the unpaid payment at Stripe (a credit note on the open invoice:
+     * what is owed drops by that much, and nothing is refunded as nothing was paid). The
+     * key makes a second try of the same discount do nothing more.
+     */
+    protected function lowerInvoice(string $invoiceId, int $offCents, string $memo, string $idempotencyKey): void
+    {
+        Cashier::stripe()->creditNotes->create(
+            ['invoice' => $invoiceId, 'amount' => $offCents, 'memo' => $memo],
+            ['idempotency_key' => $idempotencyKey],
+        );
+    }
+
+    /** An amount as a member reads it: "$49.00", or "49.00 EGP" in another currency. */
+    public static function money(?int $cents, ?string $currency): string
+    {
+        if ($cents === null) {
+            return '';
+        }
+        $amount = number_format($cents / 100, 2, '.', ',');
+        $currency = strtolower(trim((string) $currency));
+
+        return $currency === '' || $currency === 'usd' ? '$'.$amount : $amount.' '.strtoupper($currency);
     }
 
     /** 'yearly' or 'monthly' from the invoice's own period, or null when it does not say. */
@@ -629,15 +765,18 @@ class PurchaseFollowUps
      *
      * @param  array<string, string>|null  $settings
      */
-    public function previewHtml(string $kind, ?array $settings = null): string
+    public function previewHtml(string $kind, ?array $settings = null, bool $withDiscount = false): string
     {
-        $newsletter = $this->asNewsletter($settings ?? $this->settings(), $this->sample($kind), '');
+        $newsletter = $this->asNewsletter($settings ?? $this->settings(), $this->sample($kind, null, $withDiscount), '');
 
         return app(NewsletterRenderer::class)->html($newsletter, Newsletter::LANGUAGE_BOTH, ['preview' => true, 'no_greeting' => true]);
     }
 
-    /** A case that stands in for a real one, in previews and test sends. Never saved. */
-    public function sample(string $kind, ?User $user = null): PurchaseFollowUp
+    /**
+     * A case that stands in for a real one, in previews and test sends. Never saved.
+     * $withDiscount: a declined renewal with 20% off, to show the offer's words.
+     */
+    public function sample(string $kind, ?User $user = null, bool $withDiscount = false): PurchaseFollowUp
     {
         $plan = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->orderBy('price_cents')->first();
         $row = new PurchaseFollowUp([
@@ -648,6 +787,12 @@ class PurchaseFollowUps
         ]);
         if ($kind === PurchaseFollowUp::KIND_RENEWAL_FAILED) {
             $row->sampleKeptUntil = now()->addDays(RenewalGrace::graceDays());
+            $row->amount_cents = max(0, (int) ($plan?->price_cents ?? 0)) ?: null;
+            $row->currency = 'usd';
+            if ($withDiscount && $row->amount_cents) {
+                $row->discount_percent = 20;
+                $row->discount_cents = (int) round($row->amount_cents * 0.2);
+            }
         }
         if ($user) {
             $row->setRelation('user', $user);
@@ -661,7 +806,9 @@ class PurchaseFollowUps
      */
     private function asNewsletter(array $settings, PurchaseFollowUp $row, string $memberName): Newsletter
     {
-        $prefix = self::prefix((string) $row->kind);
+        // A declined renewal the team gave a discount to has the offer's words, not the warning's.
+        $offer = $row->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED && $row->hasDiscount();
+        $prefix = $offer ? 'renewal_offer' : self::prefix((string) $row->kind);
         $plan = $row->plan_slug ? Plan::query()->where('slug', $row->plan_slug)->first() : null;
         $first = trim((string) (preg_split('/\s+/u', trim($memberName))[0] ?? ''));
         $fields = [
@@ -671,13 +818,19 @@ class PurchaseFollowUps
 
         // A failed renewal: the day the plan stays on until, or none (the paid features paused).
         $keptUntil = $row->planKeptUntil();
-        $body = $row->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED && $keptUntil === null ? 'paused_body' : 'body';
+        $body = ! $offer && $row->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED && $keptUntil === null ? 'paused_body' : 'body';
+        $amounts = [
+            '{discount}' => $offer ? $row->discount_percent.'%' : '',
+            '{price}' => self::money($row->priceCents(), $row->currency),
+            '{old_price}' => self::money($row->amount_cents, $row->currency),
+        ];
 
         foreach (['en', 'ar'] as $lang) {
             $date = $keptUntil !== null ? Carbon::instance($keptUntil)->locale($lang)->translatedFormat('j F Y') : '';
-            $fill = function (string $text) use ($plan, $lang, $first, $row, $date): string {
+            $fill = function (string $text) use ($plan, $lang, $first, $row, $date, $amounts): string {
                 $text = PaidWelcomeEmail::withPlan($text, $plan, $lang);
                 $text = str_replace(['{reason}', '{date}'], [self::reasonWords($row->reason, $lang), $date], $text);
+                $text = strtr($text, $amounts);
                 // {name} is the first name; with none, the greeting closes up ("Hi, ...").
                 $text = $first !== '' ? str_replace('{name}', $first, $text) : preg_replace('/\s*\{name\}/u', '', $text);
 

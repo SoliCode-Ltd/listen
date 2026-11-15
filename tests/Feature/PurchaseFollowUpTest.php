@@ -10,11 +10,15 @@ use App\Models\PurchaseFollowUp;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\PurchaseFollowUps;
+use App\Services\Billing\RenewalGrace;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
+use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
+use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath;
+use Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mime\Email;
 use Tests\TestCase;
@@ -405,7 +409,7 @@ class PurchaseFollowUpTest extends TestCase
 
         // The renewal is paid: the case says so, and the next renewal to fail is a new case with its own email.
         $plan->forceFill(['billing_payment_state' => 'past_due'])->save();
-        app(\App\Services\Billing\RenewalGrace::class)->settle($this->member);
+        app(RenewalGrace::class)->settle($this->member);
         $this->assertNotNull($case->fresh()->paid_at);
         $this->assertSame('starter', $case->fresh()->paid_plan_slug);
         $this->travel(1)->months();
@@ -461,7 +465,7 @@ class PurchaseFollowUpTest extends TestCase
             }
         });
 
-        app(\App\Services\Billing\RenewalGrace::class)->warn($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+        app(RenewalGrace::class)->warn($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
 
         // The member is still told, in the plain email.
         $email = $this->onlyEmail();
@@ -481,7 +485,7 @@ class PurchaseFollowUpTest extends TestCase
         // Staging: a copy of live members, so nothing goes out.
         config(['listen.live_actions' => false]);
         $plan = $this->inGrace($this->member);
-        app(\App\Services\Billing\RenewalGrace::class)->warn($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+        app(RenewalGrace::class)->warn($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
 
         $this->assertCount(0, $this->sentEmails());
         $this->assertNull($plan->fresh()->billing_failed_notice_sent_at);
@@ -522,6 +526,151 @@ class PurchaseFollowUpTest extends TestCase
         $this->assertStringNotContainsString('{date}', $preview);
     }
 
+    /* ------------------------------------------------------------ */
+    /*  By hand: a discount, and sending an email now */
+    /* ------------------------------------------------------------ */
+
+    public function test_a_discount_lowers_that_renewal_and_its_email_becomes_the_offer_with_the_lower_price(): void
+    {
+        $plan = $this->inGrace($this->member);
+        $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+        $case = PurchaseFollowUp::query()->sole();
+        $this->assertFalse($case->hasDiscount());
+        $this->assertSame(900, $case->priceCents());
+        $stripe = $this->stripeOwes(900);
+
+        $this->followUps()->giveDiscount($case, 20);
+
+        // The unpaid payment itself is lowered, once, by the discount.
+        $this->assertSame([['in_r1', 180, '20% off this renewal', 'listen-renewal-discount-'.$case->id]], $stripe->lowered);
+        $case->refresh();
+        $this->assertSame([20, 180, 900, 720], [$case->discount_percent, $case->discount_cents, $case->amount_cents, $case->priceCents()]);
+        $this->assertNotNull($case->discounted_at);
+
+        // From now on this member's email is the offer, not the warning.
+        app('mailer')->getSymfonyTransport()->flush();
+        $this->followUps()->sendNow($case);
+        $email = $this->onlyEmail();
+        $this->assertSame('20% off your Starter renewal · خصم 20% على تجديد باقة مبتدئ', (string) $email->getSubject());
+        $text = (string) $email->getTextBody();
+        $this->assertStringContainsString('We have taken 20% off the renewal of your Starter plan: you pay $7.20 instead of $9.00.', $text);
+        $this->assertStringContainsString('خصمنا لك 20% من تجديد باقة مبتدئ: تدفع $7.20 بدلاً من $9.00.', $text);
+        $this->assertMatchesRegularExpression('#Pay \$7\.20: https?://\S+/billing/pay/'.$case->id.'\?expires=\d+&lang=en&signature=[0-9a-f]+#', $text);
+        $this->assertStringNotContainsString('could not be renewed', $text);
+        foreach (['{discount}', '{price}', '{old_price}', '{date}'] as $placeholder) {
+            $this->assertStringNotContainsString($placeholder, $text.(string) $email->getHtmlBody());
+        }
+        $this->assertSame('Sent by hand', $case->fresh()->email_note);
+
+        // One discount for a renewal.
+        try {
+            $this->followUps()->giveDiscount($case->fresh(), 10);
+            $this->fail('A second discount was given.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('already has 20% off', $e->getMessage());
+        }
+        $this->assertCount(1, $stripe->lowered);
+
+        // A member with no discount still gets the warning.
+        $other = User::factory()->create(['name' => 'Omar', 'email' => 'omar@example.com', 'stripe_id' => 'cus_omar']);
+        $this->followUps()->renewalFailed($other, $this->inGrace($other), $this->invoice('in_r9', 'subscription_cycle', 'cus_omar'));
+        $warning = (string) $this->sentEmails()->last()->getOriginalMessage()->getTextBody();
+        $this->assertStringContainsString('we tried to renew your Starter plan, but your bank declined the payment', $warning);
+        $this->assertStringNotContainsString('% off', $warning);
+    }
+
+    public function test_a_discount_is_refused_when_it_cannot_be_given_and_nothing_changes(): void
+    {
+        $plan = $this->inGrace($this->member);
+        $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+        $case = PurchaseFollowUp::query()->sole();
+        $refused = function (PurchaseFollowUp $case, int $percent, string $why): void {
+            try {
+                $this->followUps()->giveDiscount($case, $percent);
+                $this->fail('The discount was given: '.$why);
+            } catch (\RuntimeException|\InvalidArgumentException $e) {
+                $this->assertStringContainsString($why, $e->getMessage());
+            }
+        };
+
+        // The payment was paid or closed at Stripe meanwhile.
+        $stripe = $this->stripeOwes(null);
+        $refused($case, 20, 'no longer waiting to be paid');
+
+        $stripe = $this->stripeOwes(900);
+        $refused($case, 0, 'between 1 and 90');
+        $refused($case, 95, 'between 1 and 90');
+
+        // Staging holds a copy of live members and live's Stripe keys: never there.
+        config(['listen.live_actions' => false]);
+        $refused($case, 20, 'not the live site');
+        config(['listen.live_actions' => true]);
+
+        // A first payment is not a renewal, and a paid renewal needs no discount.
+        $first = PurchaseFollowUp::query()->create(['user_id' => $this->member->id, 'kind' => PurchaseFollowUp::KIND_PAYMENT_FAILED, 'stripe_invoice_id' => 'in_1', 'amount_cents' => 900]);
+        $refused($first, 20, 'for a declined renewal');
+        $case->forceFill(['paid_at' => now()])->save();
+        $refused($case, 20, 'has been paid');
+
+        $this->assertSame([], $stripe->lowered);
+        $this->assertFalse($case->fresh()->hasDiscount());
+    }
+
+    public function test_the_admin_gives_a_discount_and_sends_an_email_by_hand_from_the_list(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $admin = User::factory()->create(['is_admin' => true]);
+        $plan = $this->inGrace($this->member);
+        // On staging the warning did not go out; the case is listed all the same.
+        config(['listen.live_actions' => false]);
+        app(RenewalGrace::class)->warn($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+        config(['listen.live_actions' => true]);
+        $case = PurchaseFollowUp::query()->sole();
+        $this->assertSame(PurchaseFollowUp::SKIPPED, $case->email_status);
+        $stripe = $this->stripeOwes(900);
+
+        // Sent by hand: the warning, and the automatic one is not owed any more.
+        Livewire::actingAs($admin)->test(ListPurchaseFollowUps::class)
+            ->assertTableActionVisible('emailNow', $case)
+            ->assertTableActionVisible('discount', $case)
+            ->callTableAction('emailNow', $case)
+            ->assertNotified('Email sent to sara@example.com');
+        // (An admin page's own request also lets the paid plan's welcome email go out: not this test's.)
+        $warnings = $this->sentEmails()->filter(fn ($sent): bool => str_starts_with((string) $sent->getOriginalMessage()->getSubject(), 'Payment failed'));
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString('we tried to renew your Starter plan', (string) $warnings->first()->getOriginalMessage()->getTextBody());
+        $this->assertSame(PurchaseFollowUp::SENT, $case->fresh()->email_status);
+        $this->assertNotNull($plan->fresh()->billing_failed_notice_sent_at);
+
+        // A discount, emailed at once.
+        Livewire::actingAs($admin)->test(ListPurchaseFollowUps::class)
+            ->callTableAction('discount', $case, ['percent' => 25, 'email' => true])
+            ->assertHasNoTableActionErrors()
+            ->assertNotified('Discount given and emailed')
+            ->assertSee('25% off: $6.75 instead of $9.00')
+            ->assertTableActionHidden('discount', $case->fresh());
+        $this->assertSame([['in_r1', 225, '25% off this renewal', 'listen-renewal-discount-'.$case->id]], $stripe->lowered);
+        $offers = $this->sentEmails()->filter(fn ($sent): bool => str_starts_with((string) $sent->getOriginalMessage()->getSubject(), '25% off your Starter renewal'));
+        $this->assertCount(1, $offers);
+        $this->assertStringContainsString('you pay $6.75 instead of $9.00', (string) $offers->first()->getOriginalMessage()->getTextBody());
+
+        // The offer's words are edited with the others, and previewed with a sample discount.
+        Livewire::actingAs($admin)->test(PurchaseFollowUpEmails::class)
+            ->assertFormSet(['renewal_offer_cta_label_en' => 'Pay {price}'])
+            ->fillForm(['renewal_offer_headline_en' => 'A gift: {discount} off {plan}'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $preview = $this->followUps()->previewHtml(PurchaseFollowUp::KIND_RENEWAL_FAILED, null, true);
+        $this->assertStringContainsString('A gift: 20% off Starter', $preview);
+        $this->assertStringContainsString('you pay $7.20 instead of $9.00', $preview);
+
+        // Paid: nothing more to do on the case.
+        $case->forceFill(['paid_at' => now()])->save();
+        Livewire::actingAs($admin)->test(ListPurchaseFollowUps::class)
+            ->assertTableActionHidden('emailNow', $case->fresh())
+            ->assertTableActionHidden('discount', $case->fresh());
+    }
+
     public function test_members_warned_before_the_list_existed_are_added_to_it_once(): void
     {
         $plan = $this->inGrace($this->member);
@@ -551,9 +700,9 @@ class PurchaseFollowUpTest extends TestCase
     private function openCheckout(User $user, string $query): void
     {
         $this->actingAs($user)->withoutMiddleware([
-            \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
-            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
-            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+            LocaleSessionRedirect::class,
+            LaravelLocalizationRedirectFilter::class,
+            LaravelLocalizationViewPath::class,
         ])->get($this->localizedRoute('billing.page').($query !== '' ? '?'.$query : ''))->assertOk();
     }
 
@@ -574,6 +723,35 @@ class PurchaseFollowUpTest extends TestCase
                 return $this->openAt;
             }
         });
+    }
+
+    /**
+     * Stripe for giveDiscount(): what is still owed on the payment (null once it is paid or
+     * closed), and every lowering asked of it, kept on the returned object's $lowered.
+     */
+    private function stripeOwes(?int $cents): object
+    {
+        $stripe = new class
+        {
+            /** @var list<array{0: string, 1: int, 2: string, 3: string}> */
+            public array $lowered = [];
+        };
+        $this->app->bind(PurchaseFollowUps::class, fn () => new class($cents, $stripe) extends PurchaseFollowUps
+        {
+            public function __construct(private ?int $owed, private object $stripe) {}
+
+            protected function unpaidInvoice(string $invoiceId): ?array
+            {
+                return $this->owed !== null ? ['amount' => $this->owed, 'currency' => 'usd'] : null;
+            }
+
+            protected function lowerInvoice(string $invoiceId, int $offCents, string $memo, string $idempotencyKey): void
+            {
+                $this->stripe->lowered[] = [$invoiceId, $offCents, $memo, $idempotencyKey];
+            }
+        });
+
+        return $stripe;
     }
 
     private function turnOn(): void

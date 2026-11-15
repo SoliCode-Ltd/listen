@@ -50,6 +50,9 @@ class PurchaseFollowUp extends Model
         'paid_at' => 'datetime',
         'opens' => 'integer',
         'amount_cents' => 'integer',
+        'discount_percent' => 'integer',
+        'discount_cents' => 'integer',
+        'discounted_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -61,6 +64,28 @@ class PurchaseFollowUp extends Model
     public static function ready(): bool
     {
         return once(fn (): bool => rescue(fn () => Schema::hasTable('purchase_follow_ups'), false, false));
+    }
+
+    /** The discount columns are there (their migration was run): until then no discount is given. */
+    public static function discountsReady(): bool
+    {
+        return once(fn (): bool => self::ready() && rescue(fn () => Schema::hasColumn('purchase_follow_ups', 'discount_percent'), false, false));
+    }
+
+    /** The team took something off this unpaid payment (PurchaseFollowUps::giveDiscount()). */
+    public function hasDiscount(): bool
+    {
+        return (int) $this->discount_percent > 0 && (int) $this->discount_cents > 0;
+    }
+
+    /** What the member owes for it now, after any discount; null when the amount is not known. */
+    public function priceCents(): ?int
+    {
+        if ($this->amount_cents === null) {
+            return null;
+        }
+
+        return max(0, (int) $this->amount_cents - ($this->hasDiscount() ? (int) $this->discount_cents : 0));
     }
 
     /** What happened, for the admin. */

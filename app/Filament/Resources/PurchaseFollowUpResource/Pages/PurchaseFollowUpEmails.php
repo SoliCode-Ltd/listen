@@ -86,6 +86,15 @@ class PurchaseFollowUpEmails extends Page implements HasForms
                     ->columns(2)
                     ->collapsible()
                     ->schema($this->wordFields('renewal', 'ar')),
+                Section::make('Declined renewal with a discount: English')
+                    ->description('For a declined renewal you gave a discount to (the "Give a discount" button on its case in the list). From then on that member\'s email is this one, not the warning above.')
+                    ->columns(2)
+                    ->collapsible()
+                    ->schema($this->wordFields('renewal_offer', 'en', '{name} is the member\'s first name, {plan} their plan, {discount} the discount ("20%"), {price} what they pay now, {old_price} the full price, {date} the day the plan stays on until (empty when it has no grace days).')),
+                Section::make('Declined renewal with a discount: العربية')
+                    ->columns(2)
+                    ->collapsible()
+                    ->schema($this->wordFields('renewal_offer', 'ar')),
                 Section::make('Declined payment: English')
                     ->columns(2)
                     ->collapsible()
@@ -114,7 +123,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
         $rtl = $lang === 'ar' ? ['dir' => 'rtl'] : [];
         $button = match ($prefix) {
             'failed' => 'Button text (opens the payment page for that payment)',
-            'renewal' => 'Button text (opens the payment page for that renewal)',
+            'renewal', 'renewal_offer' => 'Button text (opens the payment page for that renewal)',
             default => 'Button text (opens the checkout for their plan)',
         };
 
@@ -139,7 +148,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
 
     protected function getHeaderActions(): array
     {
-        $preview = fn (string $kind, string $label): Action => Action::make('preview_'.$kind)
+        $preview = fn (string $kind, string $label, bool $withDiscount = false): Action => Action::make('preview_'.$kind.($withDiscount ? '_offer' : ''))
             ->label($label)
             ->icon('heroicon-o-eye')
             ->color('gray')
@@ -149,7 +158,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
             ->modalWidth('3xl')
             ->modalContent(fn (): HtmlString => new HtmlString(
                 '<iframe title="Email preview" style="width:100%;height:70vh;border:0;border-radius:12px;background:#fff" srcdoc="'
-                .e(app(PurchaseFollowUps::class)->previewHtml($kind, $this->previewSettings())).'"></iframe>'
+                .e(app(PurchaseFollowUps::class)->previewHtml($kind, $this->previewSettings(), $withDiscount)).'"></iframe>'
             ));
 
         return [
@@ -159,6 +168,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
                 ->color('gray')
                 ->url(PurchaseFollowUpResource::getUrl('index')),
             $preview(PurchaseFollowUp::KIND_RENEWAL_FAILED, 'Preview: declined renewal'),
+            $preview(PurchaseFollowUp::KIND_RENEWAL_FAILED, 'Preview: renewal with a discount', true),
             $preview(PurchaseFollowUp::KIND_PAYMENT_FAILED, 'Preview: declined payment'),
             $preview(PurchaseFollowUp::KIND_CHECKOUT_LEFT, 'Preview: checkout left'),
             Action::make('sendTest')
@@ -171,6 +181,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
                         ->label('Which email')
                         ->options([
                             PurchaseFollowUp::KIND_RENEWAL_FAILED => 'Declined renewal',
+                            'renewal_offer' => 'Declined renewal with a discount',
                             PurchaseFollowUp::KIND_PAYMENT_FAILED => 'Declined payment',
                             PurchaseFollowUp::KIND_CHECKOUT_LEFT => 'Checkout left',
                         ])
@@ -198,7 +209,9 @@ class PurchaseFollowUpEmails extends Page implements HasForms
 
         $followUps = app(PurchaseFollowUps::class);
         try {
-            $followUps->send($followUps->sample($kind, $user), $to);
+            $followUps->send($kind === 'renewal_offer'
+                ? $followUps->sample(PurchaseFollowUp::KIND_RENEWAL_FAILED, $user, true)
+                : $followUps->sample($kind, $user), $to);
         } catch (Throwable $e) {
             Notification::make()->title('The email was not sent')->body($e->getMessage())->danger()->persistent()->send();
 
