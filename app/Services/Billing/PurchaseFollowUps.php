@@ -499,12 +499,13 @@ class PurchaseFollowUps
     /**
      * Takes $offCents off the unpaid payment at Stripe (a credit note on the open invoice:
      * what is owed drops by that much, and nothing is refunded as nothing was paid). The
-     * key makes a second try of the same discount do nothing more.
+     * key makes a second try of the same discount do nothing more. Stripe's own email about
+     * the credit note is not sent: the member hears of the discount in the offer's email.
      */
     protected function lowerInvoice(string $invoiceId, int $offCents, string $memo, string $idempotencyKey): void
     {
         Cashier::stripe()->creditNotes->create(
-            ['invoice' => $invoiceId, 'amount' => $offCents, 'memo' => $memo],
+            ['invoice' => $invoiceId, 'amount' => $offCents, 'memo' => $memo, 'email_type' => 'none'],
             ['idempotency_key' => $idempotencyKey],
         );
     }

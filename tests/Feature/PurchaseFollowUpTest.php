@@ -20,8 +20,10 @@ use Livewire\Livewire;
 use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
 use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath;
 use Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect;
+use Stripe\ApiRequestor;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mime\Email;
+use Tests\Support\FakeStripeHttpClient;
 use Tests\TestCase;
 
 /**
@@ -679,6 +681,75 @@ class PurchaseFollowUpTest extends TestCase
             $this->assertStringContainsString('20% off their next 3 renewals was added and could not be taken back', $e->getMessage());
         }
         $this->assertFalse($case->fresh()->hasDiscount());
+    }
+
+    public function test_the_discount_asks_the_payment_provider_for_exactly_these_changes(): void
+    {
+        // The real requests, against a stand-in for the provider's API: nothing leaves the machine.
+        config(['cashier.secret' => 'sk_test_fake']);
+        $stripe = new FakeStripeHttpClient;
+        ApiRequestor::setHttpClient($stripe);
+        try {
+            $stripe->answer('get', '/v1/invoices/in_r1', [
+                'id' => 'in_r1', 'object' => 'invoice', 'status' => 'open', 'currency' => 'usd', 'amount_due' => 900, 'amount_remaining' => 900,
+                'parent' => ['type' => 'subscription_details', 'subscription_details' => ['subscription' => 'sub_1']],
+            ]);
+            $stripe->answer('get', '/v1/subscriptions/sub_1', [
+                'id' => 'sub_1', 'object' => 'subscription', 'status' => 'past_due', 'discounts' => [],
+                'items' => ['object' => 'list', 'data' => [[
+                    'id' => 'si_1', 'object' => 'subscription_item',
+                    'price' => ['id' => 'price_1', 'object' => 'price', 'recurring' => ['interval' => 'month', 'interval_count' => 1]],
+                ]]],
+            ]);
+            $stripe->answer('post', '/v1/coupons', ['id' => 'co_1', 'object' => 'coupon']);
+            $stripe->answer('post', '/v1/subscriptions/sub_1', ['id' => 'sub_1', 'object' => 'subscription', 'status' => 'past_due']);
+            $stripe->answer('post', '/v1/credit_notes', ['id' => 'cn_1', 'object' => 'credit_note']);
+            $stripe->answer('delete', '/v1/coupons/co_1', ['id' => 'co_1', 'object' => 'coupon', 'deleted' => true]);
+            $plan = $this->inGrace($this->member);
+            $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+            $this->followUps()->save(['discounts_enabled' => true]);
+            $case = PurchaseFollowUp::query()->sole();
+            $writes = fn (): array => array_values(array_map(
+                fn (array $request): array => [$request['method'].' '.$request['path'], $request['params']],
+                array_filter($stripe->requests, fn (array $request): bool => $request['method'] !== 'get'),
+            ));
+
+            $this->followUps()->giveDiscount($case, 20, 3);
+
+            $sent = $writes();
+            $this->assertSame(['post /v1/coupons', 'post /v1/subscriptions/sub_1', 'post /v1/credit_notes'], array_column($sent, 0));
+            // A coupon for this one case: 20% for three months, usable once.
+            $this->assertSame([20, 'repeating', 3, 1], [$sent[0][1]['percent_off'], $sent[0][1]['duration'], $sent[0][1]['duration_in_months'], $sent[0][1]['max_redemptions']]);
+            // On this member's own subscription, with nothing charged or credited for the change.
+            $this->assertSame(['discounts' => [['coupon' => 'co_1']], 'proration_behavior' => 'none'], $sent[1][1]);
+            // And the unpaid payment itself lowered by 20%, without the provider's own email to the member.
+            $this->assertSame(['invoice' => 'in_r1', 'amount' => 180, 'memo' => '20% off this renewal', 'email_type' => 'none'], $sent[2][1]);
+            $this->assertSame([20, 180, 3, 'co_1'], [$case->fresh()->discount_percent, $case->fresh()->discount_cents, $case->fresh()->discount_months, $case->fresh()->discount_coupon_id]);
+
+            // The payment cannot be lowered (here: the provider refuses): the months are taken back.
+            $other = User::factory()->create(['email' => 'omar@example.com', 'stripe_id' => 'cus_omar']);
+            $this->followUps()->renewalFailed($other, $this->inGrace($other), $this->invoice('in_r2', 'subscription_cycle', 'cus_omar'));
+            $second = PurchaseFollowUp::query()->where('user_id', $other->id)->sole();
+            $stripe->answer('get', '/v1/invoices/in_r2', [
+                'id' => 'in_r2', 'object' => 'invoice', 'status' => 'open', 'currency' => 'usd', 'amount_due' => 900, 'amount_remaining' => 900,
+                'parent' => ['type' => 'subscription_details', 'subscription_details' => ['subscription' => 'sub_1']],
+            ]);
+            $stripe->answer('post', '/v1/credit_notes', ['error' => ['type' => 'invalid_request_error', 'message' => 'This invoice has a pending payment.']], 400);
+            $stripe->requests = [];
+            try {
+                $this->followUps()->giveDiscount($second, 20, 3);
+                $this->fail('The discount was given.');
+            } catch (\RuntimeException $e) {
+                $this->assertStringContainsString('This invoice has a pending payment.', $e->getMessage());
+                $this->assertStringContainsString('Nothing was changed', $e->getMessage());
+            }
+            $sent = $writes();
+            $this->assertSame(['post /v1/coupons', 'post /v1/subscriptions/sub_1', 'post /v1/credit_notes', 'post /v1/subscriptions/sub_1', 'delete /v1/coupons/co_1'], array_column($sent, 0));
+            $this->assertSame(['discounts' => '', 'proration_behavior' => 'none'], $sent[3][1]);
+            $this->assertFalse($second->fresh()->hasDiscount());
+        } finally {
+            ApiRequestor::setHttpClient(null);
+        }
     }
 
     public function test_discounts_are_off_until_the_owner_switches_them_on(): void
