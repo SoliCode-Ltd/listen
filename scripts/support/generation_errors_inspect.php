@@ -102,7 +102,7 @@ if (method_exists(App\Services\Billing\PurchaseFollowUps::class, 'renewalFailed'
     $defaults = App\Services\Billing\PurchaseFollowUps::defaults();
     foreach ($defaults as $key => $default) {
         if (str_starts_with($key, 'renewal_offer_')) {
-            echo "  {$key}: ", $inUse[$key] === $default ? 'the new words' : 'DIFFERENT (saved by the team, or the first words)', "\n";
+            echo "  {$key}: ", $inUse[$key] === $default ? 'the new words' : 'DIFFERENT (saved by the team, or the first words): '.json_encode($inUse[$key], JSON_UNESCAPED_UNICODE), "\n";
         }
     }
     // Renewals that have a discount: can it be taken back?
