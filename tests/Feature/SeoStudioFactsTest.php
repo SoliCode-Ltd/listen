@@ -207,7 +207,8 @@ class SeoStudioFactsTest extends TestCase
                 $x = (int) round($size / 2 + $radius * cos(deg2rad($angle)));
                 $y = (int) round($size / 2 + $radius * sin(deg2rad($angle)));
                 $rgba = imagecolorsforindex($image, imagecolorat($image, $x, $y));
-                $this->assertSame([0x76, 0x59, 0xFA, 0], [$rgba['red'], $rgba['green'], $rgba['blue'], $rgba['alpha']], "{$file} is purple at its edge ({$x},{$y})");
+                $this->assertSame(0, $rgba['alpha'], "{$file} has no transparency at its edge ({$x},{$y})");
+                $this->assertTrue($rgba['blue'] > 200 && $rgba['red'] < 200 && $rgba['green'] < $rgba['red'], "{$file} is purple at its edge ({$x},{$y})");
             }
             $middle = imagecolorsforindex($image, imagecolorat($image, (int) ($size / 2), (int) ($size / 2)));
             $this->assertSame([255, 255, 255], [$middle['red'], $middle['green'], $middle['blue']], "{$file} draws the white bars in the middle");
@@ -215,9 +216,31 @@ class SeoStudioFactsTest extends TestCase
         // Home screens on iPhone show transparency as black: that icon has none.
         $apple = imagecreatefrompng(public_path('apple-touch-icon.png'));
         $this->assertSame(0, (imagecolorat($apple, 0, 0) >> 24) & 0x7F, 'apple-touch-icon has no transparent corner');
+        // The SVG icon is the same picture, to its edges.
         $svg = (string) file_get_contents(public_path('favicon.svg'));
-        $this->assertStringContainsString('<rect width="128" height="128" rx="24" fill="#7659FA"/>', $svg);
+        $this->assertStringContainsString('<image width="192" height="192" href="data:image/jpeg;base64,', $svg);
         $this->assertStringNotContainsString('scale(0.75)', $svg);
+    }
+
+    public function test_search_results_get_one_site_name_in_both_languages_and_never_the_address(): void
+    {
+        foreach (['ar', 'en'] as $locale) {
+            $html = (string) $this->page($locale, 'home')->getContent();
+            $site = collect($this->jsonLd($html))->firstWhere('@type', 'WebSite');
+            $this->assertSame('Listen | إسمع', $site['name'] ?? null, "{$locale}: the site's name");
+            $this->assertSame(rtrim(url('/'), '/').'/', $site['url'] ?? null, "{$locale}: on the domain's own home page");
+            $this->assertContains('إسمع', $site['alternateName']);
+            $this->assertContains('Listen', $site['alternateName']);
+            foreach ($site['alternateName'] as $name) {
+                $this->assertStringNotContainsString('.', $name, "{$locale}: the address is not given as a name");
+            }
+            $this->assertStringContainsString('<meta property="og:site_name" content="Listen | إسمع">', $html, "{$locale}: the share name matches");
+        }
+
+        // The team can set another name in the admin's settings.
+        SiteSetting::set('search_site_name', 'إسمع | Listen', 'seo');
+        $this->assertSame('إسمع | Listen', SeoHelper::searchSiteName());
+        $this->assertNotContains('إسمع | Listen', SeoHelper::searchSiteAlternateNames());
     }
 
     public function test_the_manifest_gives_each_icon_its_real_size_and_type_and_a_logo_for_circles(): void

@@ -1296,7 +1296,8 @@ class SeoHelper
         $title = self::title($pageTitle, $page, $locale);
         $description = self::description($page, $locale);
         $image = self::shareImageUrl($locale, $page);
-        $siteName = self::siteName($locale);
+        // One name in every language, the one search results show above the address.
+        $siteName = self::searchSiteName();
         $type = (string) SiteSetting::get('og_type', 'website');
         $tags = [
             '<meta property="og:type" content="' . e($type) . '">',
@@ -1409,11 +1410,13 @@ class SeoHelper
                 'sameAs' => self::socialProfileUrls() ?: null,
             ], static fn ($value) => $value !== null && $value !== '' && $value !== []),
             [
+                // The name Google shows above the address in its results: one name for both
+                // languages, on the domain's own home page, and never the address itself.
                 '@type' => 'WebSite',
                 '@id' => $websiteId,
-                'name' => $siteName,
-                'alternateName' => $alternateNames,
-                'url' => $homeUrl,
+                'name' => self::searchSiteName(),
+                'alternateName' => self::searchSiteAlternateNames(),
+                'url' => self::domainHomeUrl(),
                 'description' => self::siteDescription($locale),
                 'inLanguage' => ['en', 'ar'],
                 'publisher' => ['@id' => $organizationId],
@@ -2071,6 +2074,34 @@ HTML;
         return self::normalizeMediaUrl((string) SiteSetting::get('seo_favicon_svg_url', ''))
             ?: self::publicAssetUrl('favicon.svg')
             ?: self::publicAssetUrl('icons/headphones.svg');
+    }
+
+    /** The site's name in search results, the same in every language: "Listen | إسمع". */
+    public static function searchSiteName(): string
+    {
+        $name = trim((string) SiteSetting::get('search_site_name', ''));
+
+        return $name !== '' ? $name : 'Listen | إسمع';
+    }
+
+    /**
+     * The other names search engines may show for the site. Not the address: listed as a name,
+     * it is what search results showed in place of one.
+     *
+     * @return list<string>
+     */
+    public static function searchSiteAlternateNames(): array
+    {
+        return array_values(array_filter(
+            array_unique(['إسمع', 'Listen', self::siteName('en')]),
+            static fn (string $name): bool => $name !== '' && $name !== self::searchSiteName() && ! str_contains($name, '.'),
+        ));
+    }
+
+    /** The domain's own home page, "https://listenai.studio/": where search engines look for the site's name. */
+    public static function domainHomeUrl(): string
+    {
+        return rtrim(url('/'), '/').'/';
     }
 
     public static function siteName(?string $locale = null): string
