@@ -45,6 +45,7 @@ use App\Support\SpeakerAvatar;
 use App\Support\SpeakerVoices;
 use App\Support\SpeechLanguages;
 use App\Support\TtsStudioConfig;
+use App\Support\VersionedAsset;
 use App\Support\VideoDubbing;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
@@ -552,8 +553,7 @@ class HomeController extends Controller
             'pageContent' => $content,
             'faqItems' => $content['faqs'] ?? [],
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
-            // English pages play an English voice, Arabic pages a Fusha one: no single dialect is favoured.
-            'sample' => $locale === 'ar' ? SeoDialectPages::sample('fusha', $locale) : SeoEnglishPages::sample('american'),
+            'samples' => $this->seoSamples($page === 'ai_voice_generator' ? 'generator' : ($page === 'text_to_speech_arabic' ? 'arabic' : 'general'), $locale),
         ]);
     }
 
@@ -568,6 +568,7 @@ class HomeController extends Controller
             'faqItems' => $content['faqs'],
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
             'dialectGroups' => SeoDialectPages::hubGroups($locale),
+            'samples' => $this->seoSamples('arabic', $locale),
         ]);
     }
 
@@ -582,7 +583,7 @@ class HomeController extends Controller
             'faqItems' => $content['faqs'],
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
             'dialectGroups' => SeoEnglishPages::hubGroups($locale),
-            'sample' => SeoEnglishPages::sample('american') ?? SeoEnglishPages::sample('british'),
+            'samples' => $this->seoSamples('english', $locale),
         ]);
     }
 
@@ -596,7 +597,7 @@ class HomeController extends Controller
             'pageContent' => $content,
             'faqItems' => $content['faqs'],
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
-            'sample' => SeoEnglishPages::sample($accent),
+            'samples' => $this->seoSamples('codes', $locale, ['language' => 'en', 'codes' => array_column(SeoEnglishPages::accents($accent), 'code')]),
             'currentAccent' => $accent,
         ]);
     }
@@ -612,7 +613,10 @@ class HomeController extends Controller
             'faqItems' => $content['faqs'],
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
             'dialectGroups' => SeoDialectPages::regionGroups($region, $locale),
-            'sample' => SeoDialectPages::regionSample($region, $locale),
+            'samples' => $this->seoSamples('codes', $locale, ['language' => 'ar', 'spread' => true, 'codes' => array_merge(...array_map(
+                fn (string $country): array => array_column(SeoDialectPages::accents($country), 'code'),
+                SeoDialectPages::regionCountrySlugs($region)
+            ))]),
             'currentRegion' => $region,
         ]);
     }
@@ -629,7 +633,11 @@ class HomeController extends Controller
             'pageContent' => $content,
             'faqItems' => $content['faqs'] ?? [],
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
-            'sample' => $locale === 'ar' ? SeoDialectPages::sample('egyptian', $locale) : SeoEnglishPages::sample('american'),
+            'samples' => $this->seoSamples(match ($feature) {
+                'two-voice-dialogue' => 'dialogue',
+                'voice-cloning' => 'cloning',
+                default => 'emotions',
+            }, $locale),
             'currentFeature' => $feature,
         ]);
     }
@@ -644,7 +652,7 @@ class HomeController extends Controller
             'pageContent' => $content,
             'faqItems' => $content['faqs'],
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
-            'sample' => SeoDialectPages::sample($dialect, $locale),
+            'samples' => $this->seoSamples('codes', $locale, ['language' => 'ar', 'codes' => array_column(SeoDialectPages::accents($dialect), 'code')]),
             'currentDialect' => $dialect,
         ]);
     }
@@ -2191,6 +2199,136 @@ class HomeController extends Controller
             'audio_url' => $this->resolveSampleAudioUrl($sample->audio_path, (string) $sample->language),
             'duration' => (int) ($sample->duration_seconds ?? 0),
         ];
+    }
+
+    /**
+     * The recordings a search landing page plays: ones about the page's own subject, taken from
+     * the samples the site already has (the showcase voices and dialogues, the voice library's
+     * previews, the designed voices and the cloned-voice example). Nothing is generated.
+     *
+     * $kind: 'codes' (a dialect, accent or region: $o['codes'], $o['language'], and
+     * $o['spread'] for one voice per country), 'arabic', 'english', 'general' (the page's
+     * language), 'generator', 'emotions', 'dialogue' or 'cloning'.
+     *
+     * @param  array<string, mixed>  $o
+     * @return array{lead: ?array<string, mixed>, more: array<int, array<string, mixed>>, title: string, note: string}
+     */
+    private function seoSamples(string $kind, string $locale, array $o = []): array
+    {
+        $isArabic = $locale === 'ar';
+        $empty = ['lead' => null, 'more' => [], 'title' => '', 'note' => ''];
+
+        try {
+            $language = match ($kind) {
+                'codes' => (string) ($o['language'] ?? 'ar'),
+                'arabic' => 'ar',
+                'english' => 'en',
+                default => $isArabic ? 'ar' : 'en',
+            };
+            $rows = VoiceSample::query()->active()
+                ->whereIn('category', ['hero', 'dialogue'])
+                ->where('language', $language)
+                ->where('provider', 'gemini')
+                ->orderByDesc('is_featured')->ordered()->get();
+            $cards = $rows->map(fn (VoiceSample $s): array => $this->showcaseCard($s, $isArabic) + ['tagged' => str_contains((string) $s->sample_text, '<')])
+                // A sample whose file is missing would play the stand-in clip: leave it out.
+                ->reject(fn (array $c): bool => in_array((string) $c['audio_url'], ['/audio/ar.mp3', '/audio/en.mp3'], true))
+                ->values();
+            $singles = $cards->where('kind', 'single')->values();
+            $dialogues = $cards->where('kind', 'dialogue')->filter(fn (array $c): bool => count($c['turns']) > 1)->values();
+            $mood = fn (array $c): array => $c + ['badge' => trans()->has('ui.samples.moods.'.$c['emotion']) ? __('ui.samples.moods.'.$c['emotion']) : ''];
+            // One voice per country, in the order given.
+            $perCountry = function ($list, int $limit) {
+                $seen = [];
+                $picked = [];
+                foreach ($list as $card) {
+                    $country = implode('-', array_slice(explode('-', strtoupper((string) $card['dialect'])), 0, 2));
+                    if (isset($seen[$country])) {
+                        continue;
+                    }
+                    $seen[$country] = true;
+                    $picked[] = $card;
+                    if (count($picked) >= $limit) {
+                        break;
+                    }
+                }
+
+                return $picked;
+            };
+
+            $picked = [];
+            $title = $isArabic ? 'استمع إلى عينات حقيقية' : 'Hear real samples';
+            $note = $isArabic ? 'كل التسجيلات من الاستوديو نفسه، دون تعديل.' : 'Every recording comes straight from the studio, unedited.';
+
+            if ($kind === 'codes') {
+                $codes = array_map('strtoupper', (array) ($o['codes'] ?? []));
+                $match = fn (array $c): bool => in_array(strtoupper((string) $c['dialect']), $codes, true);
+                $rank = fn (array $c): int => (int) array_search(strtoupper((string) $c['dialect']), $codes, true);
+                $pool = $singles->filter($match)->sortBy($rank)->values()
+                    ->concat(collect($this->samplesPreviewCards($language, $isArabic))->filter($match)->sortBy($rank)->values())
+                    ->unique('speaker')->values();
+                $picked = ! empty($o['spread'])
+                    ? $perCountry($pool, 6)
+                    : $pool->take(5)->all();
+                $picked = array_map($mood, $picked);
+                if (empty($o['spread']) && ($dialogue = $dialogues->first($match))) {
+                    array_splice($picked, min(1, count($picked)), 0, [$dialogue]);
+                    $picked = array_slice($picked, 0, 5);
+                }
+            } elseif ($kind === 'dialogue') {
+                $picked = $dialogues->take(4)->all();
+                $title = $isArabic ? 'استمع إلى حوارات بصوتين' : 'Hear two-voice dialogues';
+                $note = $isArabic ? 'كل حوار تسجيل واحد خرج من الاستوديو كما تسمعه.' : 'Each dialogue is one recording, exactly as the studio made it.';
+            } elseif ($kind === 'emotions') {
+                $seen = [];
+                foreach ($singles->sortByDesc('tagged') as $card) {
+                    if ($card['emotion'] === '' || isset($seen[$card['emotion']]) || ! trans()->has('ui.samples.moods.'.$card['emotion'])) {
+                        continue;
+                    }
+                    $seen[$card['emotion']] = true;
+                    $picked[] = $mood($card);
+                    if (count($picked) >= 7) {
+                        break;
+                    }
+                }
+                $title = $isArabic ? 'استمع إلى المشاعر' : 'Hear the emotions';
+                $note = $isArabic ? 'كل تسجيل بشعور مختلف، والنص هو ما كُتب في الاستوديو.' : 'Each recording carries a different emotion; the text is what was typed into the studio.';
+            } elseif ($kind === 'cloning') {
+                $file = 'audio/voice-cloning/examples/'.($isArabic ? 'ar' : 'en').'.mp3';
+                if (is_file(public_path($file))) {
+                    $picked[] = [
+                        'kind' => 'designed', 'key' => 'cloned-'.$locale, 'orb' => 'creator', 'language' => $isArabic ? 'ar' : 'en',
+                        'name' => $isArabic ? 'صوت مستنسخ' : 'A cloned voice',
+                        'caption' => $isArabic ? 'من تسجيل واحد لصاحب الصوت' : 'From one recording of its owner',
+                        'description' => '',
+                        'line' => (string) __('ui.voice_cloning.example_line'),
+                        'clip' => VersionedAsset::url($file),
+                    ];
+                }
+                $title = $isArabic ? 'استمع إلى صوت مستنسخ' : 'Hear a cloned voice';
+                $note = '';
+            } else {
+                $picked = array_map($mood, $perCountry($singles, $kind === 'generator' ? 2 : 4));
+                if ($dialogue = $dialogues->first()) {
+                    array_splice($picked, min(1, count($picked)), 0, [$dialogue]);
+                }
+                if ($kind === 'generator' && VoiceDesign::shownOnSite(request()->user())) {
+                    foreach (array_slice(array_values(array_filter(VoiceDesign::examples($locale), fn (array $v): bool => ! empty($v['clip']))), 0, 3) as $voice) {
+                        $picked[] = $voice + ['kind' => 'designed', 'caption' => (string) __('ui.samples.designed_from')];
+                    }
+                }
+            }
+
+            if ($picked === []) {
+                return $empty;
+            }
+
+            return ['lead' => $picked[0], 'more' => array_slice($picked, 1), 'title' => $title, 'note' => $note];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $empty;
+        }
     }
 
     private function sampleLanguageForLocale(?string $locale): string
