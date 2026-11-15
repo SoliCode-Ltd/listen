@@ -162,7 +162,7 @@ class PurchaseFollowUpResource extends Resource
                         && $record->paid_at === null
                         && ! $record->hasDiscount()
                         && filled($record->stripe_invoice_id)
-                        && PurchaseFollowUp::discountsReady())
+                        && app(PurchaseFollowUps::class)->discountsOn())
                     ->modalHeading(fn (PurchaseFollowUp $record): string => 'Give '.($record->user?->email ?? 'this member').' a discount on this renewal')
                     ->modalDescription(fn (PurchaseFollowUp $record): string => 'For this member only. Takes a percentage off what they owe for this renewal'
                         .($record->amount_cents ? ' ('.PurchaseFollowUps::money($record->amount_cents, $record->currency).')' : '')

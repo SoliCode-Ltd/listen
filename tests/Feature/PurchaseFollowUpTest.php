@@ -14,6 +14,7 @@ use App\Services\Billing\RenewalGrace;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
@@ -680,6 +681,65 @@ class PurchaseFollowUpTest extends TestCase
         $this->assertFalse($case->fresh()->hasDiscount());
     }
 
+    public function test_discounts_are_off_until_the_owner_switches_them_on(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $admin = User::factory()->create(['is_admin' => true]);
+        $plan = $this->inGrace($this->member);
+        $this->followUps()->renewalFailed($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+        $case = PurchaseFollowUp::query()->sole();
+        $stripe = $this->stripeOwes(900);
+        $this->followUps()->save(['discounts_enabled' => false]);
+
+        $this->assertFalse($this->followUps()->discountsOn());
+        Livewire::actingAs($admin)->test(ListPurchaseFollowUps::class)
+            ->assertTableActionHidden('discount', $case)
+            ->assertTableActionVisible('emailNow', $case);
+        try {
+            $this->followUps()->giveDiscount($case, 20);
+            $this->fail('A discount was given while they are switched off.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('switched off', $e->getMessage());
+        }
+        $this->assertSame([[], []], [$stripe->lowered, $stripe->renewals]);
+
+        // Switched on from the emails' settings page.
+        Livewire::actingAs($admin)->test(PurchaseFollowUpEmails::class)
+            ->assertFormSet(['discounts_enabled' => false])
+            ->fillForm(['discounts_enabled' => true])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertTrue($this->followUps()->discountsOn());
+        Livewire::actingAs($admin)->test(ListPurchaseFollowUps::class)->assertTableActionVisible('discount', $case);
+    }
+
+    public function test_two_events_for_the_same_declined_renewal_warn_the_member_once(): void
+    {
+        $plan = $this->inGrace($this->member);
+        // The other event is sending the warning this very moment.
+        $this->app->bind(PurchaseFollowUps::class, fn () => new class extends PurchaseFollowUps
+        {
+            protected const RENEWAL_LOCK_SECONDS = 0;
+        });
+        $busy = Cache::lock('purchase_followup:renewal_warning:'.$this->member->id, 60);
+        $this->assertTrue($busy->get());
+
+        app(RenewalGrace::class)->warn($this->member, $plan, $this->invoice('in_r1', 'subscription_cycle'));
+
+        // This one sends nothing, neither the designed email nor the plain one, and marks nothing.
+        $this->assertCount(0, $this->sentEmails());
+        $this->assertSame(0, PurchaseFollowUp::query()->count());
+        $this->assertNull($plan->fresh()->billing_failed_notice_sent_at);
+
+        // The first one is done (here: it never sent): the next event warns, once.
+        $busy->release();
+        app(RenewalGrace::class)->warn($this->member, $plan->fresh(), $this->invoice('in_r1', 'subscription_cycle'));
+        app(RenewalGrace::class)->warn($this->member, $plan->fresh(), $this->invoice('in_r1', 'subscription_cycle'));
+        $this->assertCount(1, $this->sentEmails());
+        $this->assertSame(1, PurchaseFollowUp::query()->count());
+        $this->assertNotNull($plan->fresh()->billing_failed_notice_sent_at);
+    }
+
     public function test_a_discount_is_refused_when_it_cannot_be_given_and_nothing_changes(): void
     {
         $plan = $this->inGrace($this->member);
@@ -854,6 +914,8 @@ class PurchaseFollowUpTest extends TestCase
             public ?array $subscription = null;
         };
         $stripe->subscription = $subscription + ['open' => true, 'monthly' => true, 'discounted' => false];
+        // The owner has switched discounts on.
+        app(PurchaseFollowUps::class)->save(['discounts_enabled' => true]);
         $this->app->bind(PurchaseFollowUps::class, fn () => new class($cents, $stripe) extends PurchaseFollowUps
         {
             public function __construct(private ?int $owed, private object $stripe) {}

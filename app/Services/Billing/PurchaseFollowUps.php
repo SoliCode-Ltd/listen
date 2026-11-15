@@ -15,6 +15,7 @@ use App\Services\PlanAccessService;
 use App\Support\LiveServer;
 use App\Support\StripeInvoice;
 use App\Support\TitanMailbox;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -82,6 +83,9 @@ class PurchaseFollowUps
     /** A failed renewal with no invoice named is the member's open case from the last this many days. */
     private const RENEWAL_CASE_DAYS = 45;
 
+    /** How long one warning waits for another that is being sent for the same member (seconds). */
+    protected const RENEWAL_LOCK_SECONDS = 45;
+
     /** The most that can be taken off a declined renewal, in percent. */
     public const MAX_DISCOUNT = 90;
 
@@ -97,6 +101,8 @@ class PurchaseFollowUps
             // Off until the owner has read the words and turned them on.
             'failed_enabled' => '0',
             'left_enabled' => '0',
+            // The "Give a discount" button on a declined renewal: off until the owner turns it on.
+            'discounts_enabled' => '0',
             // A member whose card was declined often tries another one at once: wait a little.
             'failed_after_minutes' => '30',
             'left_after_hours' => '3',
@@ -209,6 +215,27 @@ class PurchaseFollowUps
             return self::RENEWAL_FAILED;
         }
 
+        // The failed payment and the subscription falling behind reach the site as two events,
+        // often in the same second: one of them warns the member, the other waits and finds it done.
+        $lock = rescue(fn () => Cache::lock('purchase_followup:renewal_warning:'.$user->id, static::RENEWAL_LOCK_SECONDS + 75), null, false);
+        try {
+            $lock?->block(static::RENEWAL_LOCK_SECONDS);
+        } catch (LockTimeoutException) {
+            return self::RENEWAL_SKIPPED;
+        } catch (\Throwable) {
+            // A cache that cannot lock: the warning still goes.
+            $lock = null;
+        }
+
+        try {
+            return $this->warnOfRenewal($user, $plan, $invoice);
+        } finally {
+            rescue(fn () => $lock?->release(), null, false);
+        }
+    }
+
+    private function warnOfRenewal(User $user, Subscription $plan, ?object $invoice): string
+    {
         $row = null;
         try {
             $kind = PurchaseFollowUp::KIND_RENEWAL_FAILED;
@@ -334,6 +361,12 @@ class PurchaseFollowUps
         }
     }
 
+    /** The team may give discounts on declined renewals: the switch is on and the database is ready. */
+    public function discountsOn(): bool
+    {
+        return PurchaseFollowUp::discountsReady() && $this->settings()['discounts_enabled'] === '1';
+    }
+
     /**
      * Takes $percent off what the member owes for this declined renewal: the unpaid payment
      * itself is lowered, so its payment page shows the lower price and the card is tried
@@ -350,6 +383,9 @@ class PurchaseFollowUps
     {
         if (! PurchaseFollowUp::discountsReady()) {
             throw new RuntimeException('Not given: the database is not ready for discounts yet (its migration has not been run).');
+        }
+        if (! $this->discountsOn()) {
+            throw new RuntimeException('Not given: discounts on declined renewals are switched off (Emails and settings).');
         }
         if ($row->kind !== PurchaseFollowUp::KIND_RENEWAL_FAILED) {
             throw new InvalidArgumentException('A discount is for a declined renewal.');

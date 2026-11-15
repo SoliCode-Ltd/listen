@@ -43,7 +43,7 @@ class PurchaseFollowUpEmails extends Page implements HasForms
     public function mount(): void
     {
         $settings = app(PurchaseFollowUps::class)->settings();
-        foreach (['failed_enabled', 'left_enabled'] as $switch) {
+        foreach (['failed_enabled', 'left_enabled', 'discounts_enabled'] as $switch) {
             $settings[$switch] = $settings[$switch] === '1';
         }
         $this->form->fill($settings);
@@ -72,6 +72,10 @@ class PurchaseFollowUpEmails extends Page implements HasForms
                             ->label('Wait before the reminder (hours)')
                             ->numeric()->integer()->minValue(1)->maxValue(PurchaseFollowUps::TOO_LATE_HOURS)->required()
                             ->helperText('Recommended: 3. Opening the checkout again starts the wait again.'),
+                        Toggle::make('discounts_enabled')
+                            ->label('Allow discounts on declined renewals')
+                            ->helperText('Shows the "Give a discount" button on a declined renewal in the list: a percentage off that renewal, or off that member\'s next renewals too, for the one member you choose. Off: no discount can be given.')
+                            ->columnSpan(2),
                         Select::make('order')
                             ->label('Language order in the emails')
                             ->options(['ar_en' => 'Arabic, then English', 'en_ar' => 'English, then Arabic'])
