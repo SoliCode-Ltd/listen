@@ -220,6 +220,9 @@ class AgentVisitsTest extends TestCase
 
     public function test_chats_and_money_are_as_they_were_for_a_conversation_in_a_visit(): void
     {
+        // A call is charged by the second: the clock stands still, so this one, ended at once,
+        // costs nothing however slowly the test runs, and only the chat's replies are counted.
+        $this->freezeTime();
         $owner = $this->owner();
         $agent = $this->liveAgent($owner);
         $call = $this->callFrom($agent);
