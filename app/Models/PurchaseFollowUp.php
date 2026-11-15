@@ -79,6 +79,17 @@ class PurchaseFollowUp extends Model
         return (int) $this->discount_percent > 0 && (int) $this->discount_cents > 0;
     }
 
+    /**
+     * The member has been emailed since the discount was given: they were told the lower
+     * price, so it is not taken back (PurchaseFollowUps::takeBackDiscount()).
+     */
+    public function offerEmailed(): bool
+    {
+        return $this->hasDiscount()
+            && $this->email_sent_at !== null
+            && ($this->discounted_at === null || $this->email_sent_at->gte($this->discounted_at));
+    }
+
     /** What the member owes for it now, after any discount; null when the amount is not known. */
     public function priceCents(): ?int
     {

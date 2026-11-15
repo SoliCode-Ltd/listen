@@ -91,10 +91,10 @@ class PurchaseFollowUpEmails extends Page implements HasForms
                     ->collapsible()
                     ->schema($this->wordFields('renewal', 'ar')),
                 Section::make('Declined renewal with a discount: English')
-                    ->description('For a declined renewal you gave a discount to (the "Give a discount" button on its case in the list). From then on that member\'s email is this one, not the warning above.')
+                    ->description('For a declined renewal you gave a discount to (the "Give a discount" button on its case in the list). From then on that member\'s email is this one, not the warning above: it says the renewal was declined, the day the plan ends if it stays unpaid, and the lower price.')
                     ->columns(2)
                     ->collapsible()
-                    ->schema($this->wordFields('renewal_offer', 'en', '{name} is the member\'s first name, {plan} their plan, {discount} the discount ("20%"), {price} what they pay now, {old_price} the full price, {date} the day the plan stays on until (empty when it has no grace days). {next} adds a sentence when the discount also covers their next renewals ("The same discount also comes off your next 3 renewals."), or nothing when it is for this renewal only; the preview shows it for 3.')),
+                    ->schema($this->wordFields('renewal_offer', 'en', '{name} is the member\'s first name, {plan} their plan, {discount} the discount ("20%"), {price} what they pay now, {old_price} the full price, {date} the day the plan stays on until. {reason} adds the bank\'s reason when it helps ("because the card did not have enough balance"), or nothing. {next} adds a sentence when the discount also covers their next renewals ("The same discount also comes off your next 3 renewals."), or nothing when it is for this renewal only; the preview shows it for 3.')),
                 Section::make('Declined renewal with a discount: العربية')
                     ->columns(2)
                     ->collapsible()
@@ -134,8 +134,8 @@ class PurchaseFollowUpEmails extends Page implements HasForms
         return array_values(array_filter([
             TextInput::make("{$prefix}_subject_{$lang}")->label('Subject')->required()->maxLength(200)->extraInputAttributes($rtl)->columnSpan(2),
             TextInput::make("{$prefix}_headline_{$lang}")->label('Headline')->maxLength(200)->helperText($help)->extraInputAttributes($rtl)->columnSpan(2),
-            Textarea::make("{$prefix}_body_{$lang}")->label($prefix === 'renewal' ? 'Message (the plan stays on for the grace days)' : 'Message')->rows(6)->required()->helperText($lang === 'en' ? 'A blank line starts a new paragraph.' : null)->extraInputAttributes($rtl)->columnSpan(2),
-            $prefix === 'renewal'
+            Textarea::make("{$prefix}_body_{$lang}")->label(in_array($prefix, ['renewal', 'renewal_offer'], true) ? 'Message (the plan stays on for the grace days)' : 'Message')->rows(6)->required()->helperText($lang === 'en' ? 'A blank line starts a new paragraph.' : null)->extraInputAttributes($rtl)->columnSpan(2),
+            in_array($prefix, ['renewal', 'renewal_offer'], true)
                 ? Textarea::make("{$prefix}_paused_body_{$lang}")->label('Message when there are no grace days (the first charge after a free trial: the paid features pause at once)')->rows(4)->required()->helperText($lang === 'en' ? '{date} is empty here.' : null)->extraInputAttributes($rtl)->columnSpan(2)
                 : null,
             TextInput::make("{$prefix}_cta_label_{$lang}")->label($lang === 'en' ? $button : 'Button text')->maxLength(80)->extraInputAttributes($rtl),
