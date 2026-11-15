@@ -15,6 +15,14 @@ class ListPurchaseFollowUps extends ListRecords
 
     protected static string $resource = PurchaseFollowUpResource::class;
 
+    public function mount(): void
+    {
+        parent::mount();
+
+        // A declined renewal listed from before the list existed is given the payment it waits on.
+        rescue(fn () => app(PurchaseFollowUps::class)->nameUnpaidPayments(), null, false);
+    }
+
     protected function getHeaderActions(): array
     {
         return [

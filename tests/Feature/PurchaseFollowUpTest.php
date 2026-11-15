@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Filament\Resources\PurchaseFollowUpResource;
 use App\Filament\Resources\PurchaseFollowUpResource\Pages\ListPurchaseFollowUps;
 use App\Filament\Resources\PurchaseFollowUpResource\Pages\PurchaseFollowUpEmails;
+use App\Models\BillingSubscription;
 use App\Models\Plan;
 use App\Models\PurchaseFollowUp;
 use App\Models\Subscription;
@@ -968,6 +969,40 @@ class PurchaseFollowUpTest extends TestCase
         $this->assertSame([$this->member->id, PurchaseFollowUp::KIND_RENEWAL_FAILED, 'starter', PurchaseFollowUp::SENT], [$case->user_id, $case->kind, $case->plan_slug, $case->email_status]);
         $this->assertEquals($plan->fresh()->billing_failed_notice_sent_at, $case->email_sent_at);
         $this->assertSame(0, PurchaseFollowUp::query()->where('user_id', $ok->id)->count());
+    }
+
+    public function test_a_renewal_listed_from_before_the_list_is_given_its_unpaid_payment_when_the_list_opens(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $admin = User::factory()->create(['is_admin' => true]);
+        $plan = $this->inGrace($this->member);
+        $plan->forceFill(['billing_failed_notice_sent_at' => now()->subHours(3)])->save();
+        (require database_path('migrations/2026_11_29_120000_list_renewals_already_warned.php'))->up();
+        $case = PurchaseFollowUp::query()->sole();
+        $this->assertNull($case->stripe_invoice_id);
+        BillingSubscription::query()->create([
+            'user_id' => $this->member->id, 'type' => 'default', 'stripe_id' => 'sub_sara',
+            'stripe_status' => 'past_due', 'stripe_price' => 'price_starter_m', 'quantity' => 1,
+        ]);
+        // A member whose subscription is waiting on nothing (it was paid since) is left as it is.
+        $paid = User::factory()->create(['stripe_id' => 'cus_paid']);
+        $other = PurchaseFollowUp::query()->create(['user_id' => $paid->id, 'kind' => PurchaseFollowUp::KIND_RENEWAL_FAILED, 'happened_at' => now(), 'email_status' => PurchaseFollowUp::SENT]);
+        $this->app->bind(PurchaseFollowUps::class, fn () => new class extends PurchaseFollowUps
+        {
+            protected function unpaidPaymentOf(string $subscriptionId): ?array
+            {
+                return $subscriptionId === 'sub_sara' ? ['invoice' => 'in_waiting', 'amount' => 900, 'currency' => 'usd'] : null;
+            }
+        });
+
+        Livewire::actingAs($admin)->test(ListPurchaseFollowUps::class)->assertCanSeeTableRecords([$case, $other]);
+
+        $case->refresh();
+        $this->assertSame(['in_waiting', 900, 'usd'], [$case->stripe_invoice_id, $case->amount_cents, $case->currency]);
+        $this->assertNull($other->fresh()->stripe_invoice_id);
+        // Its button now opens that payment, by the member's own signed link.
+        $this->assertStringContainsString('/billing/pay/'.$case->id.'?expires=', $this->followUps()->emailFor($case)['button_en']);
+        $this->assertSame(0, $this->followUps()->nameUnpaidPayments(), 'named once');
     }
 
     public function test_the_emails_name_no_other_company(): void

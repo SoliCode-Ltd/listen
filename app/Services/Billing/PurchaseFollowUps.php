@@ -3,6 +3,7 @@
 namespace App\Services\Billing;
 
 use App\Mail\PurchaseFollowUpMail;
+use App\Models\BillingSubscription;
 use App\Models\Newsletter;
 use App\Models\Plan;
 use App\Models\PurchaseFollowUp;
@@ -301,6 +302,74 @@ class PurchaseFollowUps
 
             return self::RENEWAL_FAILED;
         }
+    }
+
+    /**
+     * Unpaid declined renewals that do not name their payment (the ones listed from before
+     * the list existed) are given it: the member's subscription is asked for the payment it
+     * is waiting on. With it, the case's button opens that payment's own page and the case
+     * can be given a discount. How many were named. Reads only; nothing is changed at Stripe.
+     */
+    public function nameUnpaidPayments(int $limit = 20): int
+    {
+        if (! PurchaseFollowUp::ready()) {
+            return 0;
+        }
+
+        $named = 0;
+        $rows = PurchaseFollowUp::query()
+            ->where('kind', PurchaseFollowUp::KIND_RENEWAL_FAILED)
+            ->whereNull('paid_at')
+            ->whereNull('stripe_invoice_id')
+            ->whereNotNull('user_id')
+            ->where('happened_at', '>=', now()->subDays(self::RENEWAL_CASE_DAYS))
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+        foreach ($rows as $row) {
+            $subscriptionId = (string) BillingSubscription::query()
+                ->where('user_id', $row->user_id)
+                ->whereIn('stripe_status', ['past_due', 'unpaid'])
+                ->latest('id')
+                ->value('stripe_id');
+            $unpaid = $subscriptionId !== '' ? rescue(fn () => $this->unpaidPaymentOf($subscriptionId), null, false) : null;
+            if ($unpaid === null) {
+                continue;
+            }
+            $row->forceFill([
+                'stripe_invoice_id' => $unpaid['invoice'],
+                'amount_cents' => $unpaid['amount'],
+                'currency' => $unpaid['currency'] ?: $row->currency,
+            ])->save();
+            $named++;
+        }
+
+        return $named;
+    }
+
+    /**
+     * Asks Stripe for the payment a subscription is waiting on: its latest invoice while that
+     * is open and something is owed on it. Null otherwise, or when Stripe is not set up.
+     *
+     * @return array{invoice: string, amount: int, currency: string}|null
+     */
+    protected function unpaidPaymentOf(string $subscriptionId): ?array
+    {
+        if (trim((string) config('services.stripe.secret', '')) === '' || app()->runningUnitTests()) {
+            return null;
+        }
+
+        $subscription = Cashier::stripe()->subscriptions->retrieve($subscriptionId, ['expand' => ['latest_invoice']]);
+        $invoice = $subscription->latest_invoice ?? null;
+        if (! is_object($invoice) || (string) ($invoice->status ?? '') !== 'open' || (int) ($invoice->amount_remaining ?? 0) <= 0) {
+            return null;
+        }
+
+        return [
+            'invoice' => (string) $invoice->id,
+            'amount' => (int) $invoice->amount_remaining,
+            'currency' => strtolower((string) ($invoice->currency ?? '')),
+        ];
     }
 
     /** The plain-text warning went out in place of the designed one: the case says so. */
@@ -957,9 +1026,11 @@ class PurchaseFollowUps
         }
 
         return [
-            'label' => $row->kind === PurchaseFollowUp::KIND_RENEWAL_FAILED
-                ? 'Their own subscription page (the payment is not waiting to be paid, or it is not named on this case)'
-                : 'The checkout for the plan (the payment is no longer waiting to be paid)',
+            'label' => match ($row->kind) {
+                PurchaseFollowUp::KIND_RENEWAL_FAILED => 'Their own subscription page (the payment is not waiting to be paid, or it is not named on this case)',
+                PurchaseFollowUp::KIND_PAYMENT_FAILED => 'The checkout for the plan (the payment is no longer waiting to be paid)',
+                default => 'The checkout for the plan they chose',
+            },
             'url' => $this->fallbackUrl($row, $lang),
         ];
     }
