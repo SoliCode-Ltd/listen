@@ -131,6 +131,12 @@ name: Server deploy
 #            dashboard in English and Arabic (scripts/support/stt_test.php). It
 #            uses the Gemini quota staging shares with live (a few requests):
 #            only when the owner has said yes. Needs mode migrate first.
+#   stt-preview: read-only (READ ONLY database session), on either site. What
+#            deploying speech to text finds and changes there: its migrations
+#            (run or to run), every plan now and after the migration (minutes,
+#            longest file, queue, files at once), whether a plan's own card
+#            text names it, the settings saved, the queue workers, and the
+#            plans' card settings as JSON (scripts/support/stt_preview.php).
 #   stt-check: staging only. The last transcripts made on staging: how loud
 #            each recording is and how much of it is voice, whether the silence
 #            check now refuses it, a short one written out again (not saved),
@@ -197,7 +203,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, stt-test, stt-check, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, stt-test, stt-check, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -537,6 +543,11 @@ jobs:
           fi
           if [ "$MODE" = owner-todo ]; then
             tool owner_todo.php | $S "$FIND; php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = stt-preview ]; then
+            tool stt_preview.php | $S "$FIND; php"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
