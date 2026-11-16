@@ -234,11 +234,16 @@
         <h2 id="trReaderTitle" data-tr-reader-title></h2>
         <p class="tr-reader-meta" data-tr-reader-meta></p>
       </header>
+      {{-- One row of matching pill buttons, each an icon and a word; the language is a menu like Download. --}}
       <div class="tr-toolbar" role="toolbar" aria-label="{{ __('transcribe.page.col_actions') }}">
-        <button type="button" class="btn" data-tr-copy>{{ __('transcribe.js.copy') }}</button>
+        <button type="button" class="tr-tool" data-tr-copy title="{{ __('transcribe.js.copy') }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></svg>
+          <span class="tr-tool-label" data-tr-copy-label>{{ __('transcribe.js.copy') }}</span>
+        </button>
         <div class="tr-menu" data-tr-menu>
-          <button type="button" class="btn tr-menu-toggle" aria-haspopup="true" aria-expanded="false" data-tr-menu-button>
-            <span>{{ __('transcribe.js.download') }}</span>
+          <button type="button" class="tr-tool tr-menu-toggle" aria-haspopup="true" aria-expanded="false" data-tr-menu-button title="{{ __('transcribe.js.download') }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14"/></svg>
+            <span class="tr-tool-label">{{ __('transcribe.js.download') }}</span>
             <svg class="tr-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="tr-menu-list" role="menu" hidden>
@@ -247,18 +252,25 @@
             @endforeach
           </div>
         </div>
-        {{-- "Show in: Original / Arabic / English ...": the label says it once, the choices are the languages. --}}
-        <label class="tr-translate">
-          <span class="tr-translate-label">{{ __('transcribe.js.translate_to') }}</span>
-          <select data-tr-translate data-vs-select aria-label="{{ __('transcribe.js.translate_to') }}">
-            <option value="">{{ __('transcribe.js.original') }}</option>
-            @foreach($trTargets as $target)
-              <option value="{{ $target['value'] }}">{{ $target['label'] }}</option>
-            @endforeach
-          </select>
-        </label>
-        <button type="button" class="btn" data-tr-studio-send>{{ __('transcribe.js.send_studio') }}</button>
-        <button type="button" class="btn btn-ghost tr-danger" data-tr-delete>{{ __('transcribe.js.delete') }}</button>
+        <div class="tr-menu" data-tr-menu>
+          <button type="button" class="tr-tool tr-menu-toggle" aria-haspopup="true" aria-expanded="false" data-tr-menu-button data-tr-language-button
+            aria-label="{{ __('transcribe.js.translate_to') }}: {{ __('transcribe.js.original') }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z"/></svg>
+            <span data-tr-language-current>{{ __('transcribe.js.original') }}</span>
+            <svg class="tr-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="tr-menu-list tr-language-list" role="menu" hidden aria-label="{{ __('transcribe.js.translate_to') }}">
+            <p class="tr-menu-head" aria-hidden="true">{{ __('transcribe.js.translate_to') }}</p>
+            <div data-tr-language-items></div>
+          </div>
+        </div>
+        <button type="button" class="tr-tool" data-tr-studio-send title="{{ __('transcribe.js.send_studio') }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M7.5 7v10M11 9v6"/><path d="M14 12h6.5M17.5 9l3 3-3 3"/></svg>
+          <span class="tr-tool-label">{{ __('transcribe.js.send_studio') }}</span>
+        </button>
+        <button type="button" class="tr-tool tr-tool-icon tr-tool-danger" data-tr-delete aria-label="{{ __('transcribe.js.delete') }}" title="{{ __('transcribe.js.delete') }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5"/></svg>
+        </button>
       </div>
       <p class="tr-note" data-tr-translate-note hidden>{{ __('transcribe.js.translate_free') }}</p>
       <div class="tr-player" data-tr-player></div>

@@ -603,15 +603,7 @@
       if (r.xhr.status !== 200) return;
       current = r.body.transcription;
       shownLanguage = '';
-      // The choices made again, without the transcript's own language (the studio's dropdown follows the select).
-      var select = $('[data-tr-translate]');
-      var original = select.options[0].textContent;
-      select.innerHTML = '';
-      select.appendChild(new Option(original, ''));
-      (c.targets || []).forEach(function (target) {
-        if (target.value !== current.language) select.appendChild(new Option(target.label, target.value));
-      });
-      select.value = '';
+      languageMenu('');
       $('[data-tr-translate-note]').hidden = true;
       render(current);
       reader.hidden = false;
@@ -765,11 +757,11 @@
     var text = (shown.paragraphs || []).map(function (p) {
       return (((current.speaker_list || []).length > 1) ? nameOf(p.speaker) + ': ' : '') + p.text;
     }).join('\n\n');
-    var button = e.currentTarget;
-    var label = button.textContent;
+    var label = $('[data-tr-copy-label]');
+    var was = label.textContent;
     (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () {
-      button.textContent = t.copied;
-      setTimeout(function () { button.textContent = label; }, 1500);
+      label.textContent = t.copied;
+      setTimeout(function () { label.textContent = was; }, 1500);
     }).catch(function () { /* nothing to copy into */ });
   });
   $$('[data-tr-export]').forEach(function (a) {
@@ -780,8 +772,25 @@
       window.location.href = url;
     });
   });
-  $('[data-tr-translate]').addEventListener('change', function (e) {
-    var target = e.target.value;
+  // "Show in": the original, or any other language (made once and kept). The transcript's own language is not offered.
+  var TICK = '<svg class="tr-tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  function languageMenu(chosen) {
+    var choices = [{ value: '', label: t.original }].concat((c.targets || []).filter(function (target) { return target.value !== current.language; }));
+    $('[data-tr-language-items]').innerHTML = choices.map(function (choice) {
+      return '<button type="button" role="menuitemradio" aria-checked="' + (choice.value === chosen ? 'true' : 'false') + '" data-tr-language="' + esc(choice.value) + '">'
+        + TICK + '<span>' + esc(choice.label) + '</span></button>';
+    }).join('');
+    var label = (choices.filter(function (choice) { return choice.value === chosen; })[0] || choices[0]).label;
+    $('[data-tr-language-current]').textContent = label;
+    $('[data-tr-language-button]').setAttribute('aria-label', t.translate_to + ': ' + label);
+  }
+  $('[data-tr-language-items]').addEventListener('click', function (e) {
+    var choice = e.target.closest('[data-tr-language]');
+    if (choice) showIn(choice.getAttribute('data-tr-language'));
+  });
+  function showIn(target) {
+    if (!current) return;
+    languageMenu(target);
     var note = $('[data-tr-translate-note]');
     if (!target) {
       shownLanguage = '';
@@ -798,7 +807,7 @@
       shown = { paragraphs: r.body.paragraphs, segments: r.body.segments };
       renderText((c.rtl || []).indexOf(target) !== -1, false);
     });
-  });
+  }
   $('[data-tr-studio-send]').addEventListener('click', function () {
     var box = document.getElementById('contentTextarea');
     if (!box || !current) return;

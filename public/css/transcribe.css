@@ -75,9 +75,55 @@ html[dir="rtl"] .tr-back svg { transform: scaleX(-1); }
 .page-card .tr-reader-head h2 { margin: 0 0 .3rem; font-size: 1.4rem; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; unicode-bidi: plaintext; text-align: start; }
 .tr-reader-meta { margin: 0; color: color-mix(in oklab, var(--text) 70%, var(--muted)); font-size: .95rem; }
 .tr-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .8rem; }
-.tr-toolbar .btn, .tr-toolbar select { min-height: 47px; }
-.tr-toolbar select { width: auto; max-width: 100%; }
-.tr-danger { color: var(--danger); }
+/* Every control of the toolbar: one pill, one height, an icon and a word. */
+.tr-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  height: 42px;
+  padding: 0 1rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: .92rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.tr-tool > svg:not(.tr-chevron) { flex: none; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); transition: color .15s ease; }
+.tr-tool .tr-chevron { width: 16px; height: 16px; margin-inline-start: -.1rem; }
+.tr-tool:hover { border-color: color-mix(in oklab, var(--line) 55%, var(--text)); background: color-mix(in oklab, var(--surface) 88%, var(--text)); }
+.tr-tool:hover > svg:not(.tr-chevron) { color: var(--text); }
+.tr-tool:focus-visible { outline: 3px solid color-mix(in oklab, var(--a) 35%, transparent); outline-offset: 2px; }
+.tr-menu.is-open > .tr-tool { border-color: var(--a); }
+.tr-tool-icon { width: 42px; padding: 0; }
+.tr-tool-danger { margin-inline-start: auto; }
+.tr-tool-danger:hover { border-color: color-mix(in oklab, var(--danger) 45%, var(--line)); background: color-mix(in oklab, var(--danger) 10%, var(--surface)); color: var(--danger); }
+.tr-tool-danger:hover > svg:not(.tr-chevron) { color: var(--danger); }
+/* Phones: one row. Copy, Download and Send to studio keep their names for screen readers and as tooltips. */
+@media (max-width: 560px) {
+  .tr-toolbar { flex-wrap: nowrap; gap: .4rem; }
+  .tr-tool { flex: none; padding: 0 .75rem; }
+  .tr-tool:has(> .tr-tool-label) { width: 42px; padding: 0; }
+  .tr-tool:has(> .tr-tool-label) .tr-chevron { display: none; }
+  .tr-menu:has(> [data-tr-language-button]) { flex: 0 1 auto; min-width: 0; }
+  .tr-tool[data-tr-language-button] { flex: 0 1 auto; max-width: 100%; }
+  .tr-tool-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .tr-tool[data-tr-language-button] { min-width: 0; }
+  .tr-tool [data-tr-language-current] { min-width: 0; overflow: hidden; text-overflow: ellipsis; max-width: 7.5rem; }
+}
+@media (max-width: 380px) {
+  .tr-toolbar { gap: .3rem; }
+  .tr-tool-icon, .tr-tool:has(> .tr-tool-label) { width: 40px; height: 40px; }
+  .tr-tool { height: 40px; padding: 0 .6rem; }
+  .tr-tool[data-tr-language-button] .tr-chevron, .tr-tool[data-tr-language-button] > svg:first-child { display: none; }
+  .tr-tool[data-tr-language-button] { padding: 0 .8rem; }
+}
 .tr-player { margin: .6rem 0 1rem; }
 .tr-player audio { width: 100%; }
 /* The site's own player, its play button large enough to press here (40px). */
@@ -191,14 +237,15 @@ html[dir="rtl"] .tr-back svg { transform: scaleX(-1); }
 .tr-menu-list hr { margin: 4px 6px; border: 0; border-top: 1px solid color-mix(in oklab, var(--line) 85%, transparent); }
 .tr-menu-list svg { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
 .tr-menu-list .is-danger svg { color: currentColor; }
-/* The studio's dropdowns in the box and the toolbar. */
+/* The studio's dropdown in the box. */
 .tr-language .vs-select { min-width: min(260px, 100%); }
-.tr-translate { display: inline-flex; align-items: center; gap: .55rem; min-width: 0; }
-.tr-translate-label { flex: none; align-self: center; margin: 0; color: var(--muted); font-size: .88rem; font-weight: 600; line-height: 1.2; white-space: nowrap; }
-.tr-translate .vs-select { min-width: 11rem; margin: 0; }
-/* As tall as the toolbar's buttons beside it. */
-.tr-translate .vs-select-button { min-height: 47px; }
-@media (prefers-reduced-motion: reduce) { .tr-menu-list { animation: none; } .tr-chevron { transition: none; } }
+/* "Show in": the languages, the one shown ticked. */
+.tr-menu-head { margin: 0; padding: .45rem .75rem .35rem; color: var(--muted); font-size: .78rem; font-weight: 700; letter-spacing: .02em; }
+.tr-language-list { min-width: 12rem; }
+.tr-language-list .tr-tick { visibility: hidden; color: var(--accent-text, var(--a)); }
+.tr-language-list [aria-checked="true"] { font-weight: 700; }
+.tr-language-list [aria-checked="true"] .tr-tick { visibility: visible; }
+@media (prefers-reduced-motion: reduce) { .tr-menu-list { animation: none; } .tr-chevron, .tr-tool, .tr-tool > svg { transition: none; } }
 
 @media (max-width: 560px) {
   .tr-panel { min-height: 240px; padding: 1.1rem; }
