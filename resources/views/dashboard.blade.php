@@ -1817,57 +1817,77 @@
       #generatedAudioWrap.output-dock { padding: .65rem .75rem .75rem; border-radius: 1rem; }
     }
 
-    /* Phones: the sections become a tab bar at the bottom of the screen. */
+    /* Phones: the sections in a row of tabs held under the header, as on the agents page: the
+       full names, the current one underlined, and the row slides sideways when they don't fit
+       (faded at the edge where more wait). */
     @media (max-width: 640px) {
       .dashboard-menu,
       html[dir="rtl"] .dashboard-menu {
-        position: fixed !important;
-        inset: auto 0 0 0;
-        z-index: 95;
+        position: sticky !important;
+        top: 65px;
+        z-index: 30;
+        min-width: 0;
         margin: 0 !important;
         padding: 0 !important;
         border: 0;
-        border-top: 1px solid var(--line);
-        background: color-mix(in oklab, var(--bg) 90%, transparent);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--line);
+        border-radius: 0;
+        background: color-mix(in srgb, var(--bg) 92%, transparent);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         transform: none !important;
         opacity: 1 !important;
       }
       .dashboard-menu-inner { position: static; }
       .dashboard-menu .dashboard-menu-list {
-        display: grid !important;
-        grid-auto-flow: column;
-        grid-auto-columns: minmax(0, 1fr);
-        gap: 0 !important;
-        padding: .3rem .25rem calc(.3rem + env(safe-area-inset-bottom));
+        display: flex !important;
+        flex-wrap: nowrap;
+        gap: .15rem !important;
+        padding: 0;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
       }
+      .dashboard-menu .dashboard-menu-list::-webkit-scrollbar { display: none; }
+      .dashboard-menu .dashboard-menu-list.tabs-more-left { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px); mask-image: linear-gradient(to right, transparent, #000 44px); }
+      .dashboard-menu .dashboard-menu-list.tabs-more-right { -webkit-mask-image: linear-gradient(to left, transparent, #000 44px); mask-image: linear-gradient(to left, transparent, #000 44px); }
+      .dashboard-menu .dashboard-menu-list.tabs-more-left.tabs-more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); }
       .dashboard-menu .dashboard-menu-link {
-        flex-direction: column;
-        justify-content: center;
-        gap: .2rem;
-        min-height: 54px;
-        padding: .3rem .15rem;
+        position: relative;
+        flex: 0 0 auto;
+        flex-direction: row;
+        align-items: center;
+        min-width: 0;
+        min-height: 50px;
+        padding: .5rem .95rem;
         border: 0;
-        border-radius: 10px;
-        background: transparent;
-        font-size: .7rem;
-        font-weight: 600;
-        text-align: center;
+        border-radius: 0;
+        background: none;
+        color: var(--muted);
+        font-size: .93rem;
+        font-weight: 700;
+        white-space: nowrap;
+        transition: color .2s ease;
       }
-      .dashboard-menu .dashboard-menu-link svg { width: 21px; height: 21px; }
-      .dashboard-menu .dashboard-menu-link.active { background: transparent; color: var(--accent-text); }
-      .dashboard-menu .dm-label { display: none; }
-      /* A longer name ("Speech to text") takes two short lines, never an ellipsis. */
-      .dashboard-menu .dm-short { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; max-width: 100%; line-height: 1.1; white-space: normal; overflow-wrap: normal; }
+      .dashboard-menu .dashboard-menu-link svg { display: none; }
+      .dashboard-menu .dashboard-menu-link::after { content: ""; position: absolute; inset-inline: .7rem; bottom: 0; height: 2px; border-radius: 2px 2px 0 0; background: transparent; transition: background .2s ease; }
+      .dashboard-menu .dashboard-menu-link.active::before { display: none; }
+      .dashboard-menu .dashboard-menu-link:hover { background: none; color: var(--text); }
+      .dashboard-menu .dashboard-menu-link.active { background: none; color: var(--text); }
+      .dashboard-menu .dashboard-menu-link.active::after { background: var(--a); }
+      .dashboard-menu .dashboard-menu-link:focus-visible { outline: 3px solid color-mix(in oklab, var(--a) 35%, transparent); outline-offset: -3px; border-radius: 10px; }
+      .dashboard-menu .dm-label { display: inline; min-width: 0; overflow: visible; overflow-wrap: normal; }
+      .dashboard-menu .dm-short { display: none; }
       .dashboard-menu-foot { display: none; }
-      .dashboard-shell { padding-bottom: calc(5.25rem + env(safe-area-inset-bottom)) !important; }
       .dashboard-menu .app-switch { display: none; }
       .dashboard-layout > .app-switch.is-top { display: block; width: 100%; margin: 0; }
-      /* Above the tab bar. */
-      #generatedAudioWrap.output-dock { bottom: calc(4.6rem + env(safe-area-inset-bottom)); }
-      /* One section at a time: it starts right under the header. */
+      /* One section at a time: it starts right under the row of tabs (and is scrolled to below it). */
       .dashboard-panel, #commandCenterSection { margin-top: 0 !important; }
+      [data-dashboard-section] { scroll-margin-top: calc(65px + 51px + .75rem); }
+    }
+    @media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+      .dashboard-menu .dashboard-menu-link, .dashboard-menu .dashboard-menu-link::after { transition: none; }
     }
   </style>
 </head>
@@ -1946,7 +1966,7 @@
           : 'generateVoiceSection';
       @endphp
       @php $appSwitch = \App\Support\Agents\AgentAccess::openTo(auth()->user()); @endphp
-      {{-- Phones: Studio | Agents at the top of the page (the menu is the tab bar at the bottom). --}}
+      {{-- Phones: Studio | Agents at the top of the page (the menu is the row of tabs under it). --}}
       @if($appSwitch)
         <x-app-switch current="studio" class="is-top" />
       @endif
@@ -3490,8 +3510,47 @@
       if (navList && navList.scrollWidth > navList.clientWidth + 1) {
         const listBox = navList.getBoundingClientRect();
         const linkBox = activeLink.getBoundingClientRect();
-        navList.scrollBy({ left: (linkBox.left + linkBox.width / 2) - (listBox.left + listBox.width / 2), behavior: 'smooth' });
+        const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        navList.scrollBy({ left: (linkBox.left + linkBox.width / 2) - (listBox.left + listBox.width / 2), behavior: calm ? 'auto' : 'smooth' });
       }
+      menuEdges();
+    }
+
+    // Phones: the row of tabs fades at whichever edge has more tabs behind it.
+    function menuEdges() {
+      const list = document.querySelector('.dashboard-menu-list');
+      if (!list) return;
+      const box = list.getBoundingClientRect();
+      let left = false, right = false;
+      Array.from(list.children).forEach(function(item) {
+        const r = item.getBoundingClientRect();
+        if (!r.width) return;
+        if (r.left < box.left - 4) left = true;
+        if (r.right > box.right + 4) right = true;
+      });
+      list.classList.toggle('tabs-more-left', left);
+      list.classList.toggle('tabs-more-right', right);
+    }
+    (function() {
+      const list = document.querySelector('.dashboard-menu-list');
+      if (!list) return;
+      let frame = 0;
+      const later = function() { if (!frame) frame = requestAnimationFrame(function() { frame = 0; menuEdges(); }); };
+      list.addEventListener('scroll', later, { passive: true });
+      window.addEventListener('resize', later);
+      window.addEventListener('load', later);
+    })();
+
+    // Phones: a section chosen from the row starts just under it, not wherever the last one was scrolled to.
+    function showSectionTop(sectionId) {
+      const menu = document.querySelector('.dashboard-menu');
+      const section = document.getElementById(sectionId);
+      if (!menu || !section || getComputedStyle(menu).position !== 'sticky') return;
+      const menuTop = parseFloat(getComputedStyle(menu).top) || 0;
+      if (menu.getBoundingClientRect().top > menuTop + 1) return; // the row isn't held yet: the section is already in view under it
+      const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const to = window.scrollY + section.getBoundingClientRect().top - menuTop - menu.offsetHeight - 12;
+      window.scrollTo({ top: Math.max(0, to), behavior: calm ? 'auto' : 'smooth' });
     }
 
     function syncSectionFromHash(scroll = false) {
@@ -4711,6 +4770,7 @@
           const targetId = String(link.getAttribute('href') || '').replace(/^#/, '');
           if (!targetId) return;
           setActiveDashboardSection(targetId);
+          showSectionTop(targetId);
           if (window.localStorage) {
             window.localStorage.setItem('dashboard_active_section', targetId);
           }
