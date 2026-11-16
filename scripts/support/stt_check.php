@@ -45,11 +45,12 @@ if (LiveServer::allowsCustomerActions() || str_contains(strtolower((string) conf
 $transcriber = app(Transcriber::class);
 $disk = Storage::disk(TranscriptionFlow::DISK);
 $ffmpeg = AudioFormats::ffmpegPath() ?: 'ffmpeg';
-$recent = Transcription::query()->whereNotNull('audio_path')->whereNull('audio_deleted_at')->latest('id')->limit(6)->get();
+// Deleted ones too (a member's delete keeps the row for the minutes): their recording may still be here.
+$recent = Transcription::withTrashed()->whereNotNull('audio_path')->whereNull('audio_deleted_at')->latest('id')->limit(6)->get();
 echo count($recent), " recent transcript(s) with their recording.\n";
 
 foreach ($recent as $t) {
-    echo "\n== {$t->code}: {$t->created_at?->utc()->toDateTimeString()} UTC, {$t->source}, ", round((float) $t->seconds, 2), " s, status {$t->status}",
+    echo "\n== {$t->code}: {$t->created_at?->utc()->toDateTimeString()} UTC, {$t->source}", $t->trashed() ? ', deleted by the member' : '', ', ', round((float) $t->seconds, 2), " s, status {$t->status}",
     $t->error_code ? " ({$t->error_code})" : '', ', language ', $t->language ?: '-', " ==\n";
     $clean = $disk->path((string) $t->audio_path);
     if (! is_file($clean)) {
@@ -83,7 +84,7 @@ foreach ($recent as $t) {
 
     // 3. Placed again in windows, for a finished transcript made before them.
     $windowed = str_contains(implode(' ', (array) $t->notes), 'window');
-    if ($t->status === Transcription::READY && ! $windowed && (array) $t->segments !== []) {
+    if ($t->status === Transcription::READY && ! $t->trashed() && ! $windowed && (array) $t->segments !== []) {
         $before = array_values((array) $t->segments);
         $new = $transcriber->retime($clean, $before);
         if ($new === null) {

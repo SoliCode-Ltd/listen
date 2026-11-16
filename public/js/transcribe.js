@@ -813,28 +813,123 @@
       shownLanguage = '';
       languageMenu('');
       $('[data-tr-translate-note]').hidden = true;
-      render(current);
+      // The editor takes the page: the rest comes back with the back arrow.
+      root.classList.add('is-reading');
       reader.hidden = false;
-      reader.focus();
-      reader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      render(current);
+      reader.focus({ preventScroll: true });
+      root.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
   function close() {
     if (audio) audio.pause();
     bar.hidden = true;
     reader.hidden = true;
+    root.classList.remove('is-reading');
     current = null;
   }
   $('[data-tr-close]').addEventListener('click', close);
   $('[data-tr-rename-open]').addEventListener('click', function () { if (current) renameItem(current); });
 
-  // The recording plays from the bar along the reader's foot: play, the time, a seek bar and the speed.
+  // ---------- The timeline: a ruler, a track for each speaker, the play head ----------
   var bar = $('[data-tr-playbar]');
-  var seekInput = $('[data-tr-pb-seek]');
+  var tlScroll = $('[data-tr-tl-scroll]');
+  var tlCanvas = $('[data-tr-tl-canvas]');
+  var tlHead = $('[data-tr-tl-head]');
+  var tlBadge = $('[data-tr-tl-badge]');
+  var tlZoom = $('[data-tr-tl-zoom]');
   var SPEEDS = [1, 1.25, 1.5, 2, 0.75];
+  var tl = { pps: 0, frame: 0, dragging: false, clips: [] };
   function lengthOfAudio() {
     var d = audio ? audio.duration : 0;
     return isFinite(d) && d > 0 ? d : (current ? Number(current.seconds) || 0 : 0);
+  }
+  // 1:05.3 under the play head: to the tenth, as an editor shows it.
+  function clockTenths(seconds) {
+    seconds = Math.max(0, seconds || 0);
+    var whole = Math.floor(seconds);
+    return clock(whole) + '.' + Math.floor((seconds - whole) * 10);
+  }
+  function speakersShown() {
+    var list = ((current && current.speaker_list) || []).map(function (s) { return s.id; });
+    (shown.segments || []).forEach(function (s) { if (list.indexOf(s.speaker) === -1) list.push(s.speaker); });
+    return list.length ? list : ['A'];
+  }
+  function buildTimeline() {
+    if (!current || bar.hidden) return;
+    var total = lengthOfAudio();
+    var view = tlScroll.clientWidth || 600;
+    if (!total) return;
+    // From the whole recording in view (0) to about 160 px for each second (100).
+    var fit = view / total;
+    var most = Math.max(fit, 160);
+    tl.pps = fit * Math.pow(most / fit, Number(tlZoom.value) / 100);
+    var width = Math.max(view, Math.round(total * tl.pps));
+    tlCanvas.style.width = width + 'px';
+    // The ruler: a label every step that leaves room for it, small marks between.
+    var steps = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
+    var step = steps.filter(function (x) { return x * tl.pps >= 70; })[0] || 3600;
+    var minor = step / 5;
+    var ruler = '';
+    for (var at = 0; at <= total + 0.001; at += minor) {
+      var major = Math.abs(at / step - Math.round(at / step)) < 0.001;
+      ruler += '<span class="tr-tl-tick' + (major ? ' is-major' : '') + '" style="left:' + (at * tl.pps).toFixed(1) + 'px">'
+        + (major && at > 0 ? '<b>' + esc(step < 1 ? clockTenths(at) : clock(Math.round(at))) + '</b>' : '') + '</span>';
+    }
+    $('[data-tr-tl-ruler]').innerHTML = ruler;
+    // A row for each speaker, each sentence a block where it is said.
+    var who = speakersShown();
+    var tracks = '';
+    var labels = '<div class="tr-tl-label tr-tl-label-head">' + esc(t.speakers) + '</div>';
+    tl.clips = [];
+    who.forEach(function (id, row) {
+      var n = speakerIndex(id) % 4;
+      labels += '<div class="tr-tl-label"><span class="tr-swatch" data-n="' + n + '" aria-hidden="true">' + esc(id) + '</span><span class="tr-tl-name" dir="auto">' + esc(nameOf(id)) + '</span></div>';
+      tracks += '<div class="tr-tl-row">';
+      (shown.segments || []).forEach(function (s, i) {
+        if (s.speaker !== id) return;
+        var left = Math.max(0, s.start * tl.pps);
+        var w = Math.max(3, (Math.max(s.end, s.start + 0.2) - s.start) * tl.pps - 2);
+        tracks += '<button type="button" class="tr-tl-clip" data-n="' + n + '" data-i="' + i + '" tabindex="-1" style="left:' + left.toFixed(1) + 'px;width:' + w.toFixed(1) + 'px" title="' + esc(clock(Math.floor(s.start)) + ' · ' + s.text) + '">'
+          + (w > 28 ? '<span dir="auto">' + esc(s.text) + '</span>' : '') + '</button>';
+      });
+      tracks += '</div>';
+    });
+    $('[data-tr-tl-tracks]').innerHTML = tracks;
+    $('[data-tr-tl-labels]').innerHTML = labels;
+    tl.clips = $$('.tr-tl-clip', tlCanvas);
+    tl.clips.forEach(function (clip) {
+      clip.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var s = shown.segments[Number(clip.getAttribute('data-i'))];
+        if (s) seek(s.start);
+      });
+    });
+    tlScroll.setAttribute('aria-valuemax', String(Math.round(total)));
+    paintHead();
+  }
+  function paintHead() {
+    if (!audio || !tl.pps) return;
+    var now = audio.currentTime || 0;
+    var x = now * tl.pps;
+    tlHead.style.transform = 'translateX(' + x.toFixed(1) + 'px)';
+    tlBadge.textContent = clockTenths(now);
+    tlScroll.setAttribute('aria-valuenow', String(Math.round(now)));
+    tlScroll.setAttribute('aria-valuetext', clock(now) + ' / ' + clock(lengthOfAudio()));
+    tl.clips.forEach(function (clip) {
+      var s = shown.segments[Number(clip.getAttribute('data-i'))];
+      clip.classList.toggle('is-now', !!s && now >= s.start - 0.05 && now < s.end + 0.15);
+    });
+    // While it plays, the head stays in view.
+    if (!audio.paused && !tl.dragging) {
+      var view = tlScroll.clientWidth;
+      if (x < tlScroll.scrollLeft + 24 || x > tlScroll.scrollLeft + view - 48) tlScroll.scrollLeft = Math.max(0, x - view * 0.25);
+    }
+  }
+  function follow() {
+    tl.frame = 0;
+    paintHead();
+    if (audio && !audio.paused && !bar.hidden) tl.frame = requestAnimationFrame(follow);
   }
   function paintBar() {
     if (!audio) return;
@@ -842,49 +937,89 @@
     var play = $('[data-tr-pb-play]');
     play.classList.toggle('is-playing', playing);
     play.setAttribute('aria-label', play.getAttribute(playing ? 'data-label-pause' : 'data-label-play'));
-    var total = lengthOfAudio();
     $('[data-tr-pb-now]').textContent = clock(audio.currentTime);
-    // The transcript's own length, as its header and the list say it.
-    $('[data-tr-pb-total]').textContent = clock(Math.round(current && Number(current.seconds) > 0 ? Number(current.seconds) : total));
-    if (!seekInput._dragging) {
-      var share = total > 0 ? Math.min(1, audio.currentTime / total) : 0;
-      seekInput.value = String(Math.round(share * 1000));
-      seekInput.style.setProperty('--p', (share * 100).toFixed(2) + '%');
-    }
-    seekInput.setAttribute('aria-valuetext', clock(audio.currentTime) + ' / ' + clock(total));
+    // The transcript's own length, as its details and the list say it.
+    $('[data-tr-pb-total]').textContent = clock(Math.round(current && Number(current.seconds) > 0 ? Number(current.seconds) : lengthOfAudio()));
+    paintHead();
+    if (playing && !tl.frame) tl.frame = requestAnimationFrame(follow);
   }
-  $('[data-tr-pb-play]').addEventListener('click', function () {
+  function togglePlay() {
     if (!audio) return;
     if (audio.paused || audio.ended) { var p = audio.play(); if (p && p.catch) p.catch(paintBar); } else { audio.pause(); }
-  });
-  seekInput.addEventListener('input', function () {
-    seekInput._dragging = true;
-    var share = Number(seekInput.value) / 1000;
-    seekInput.style.setProperty('--p', (share * 100).toFixed(2) + '%');
-    $('[data-tr-pb-now]').textContent = clock(share * lengthOfAudio());
-  });
-  seekInput.addEventListener('change', function () {
-    seekInput._dragging = false;
-    if (audio) { audio.currentTime = Number(seekInput.value) / 1000 * lengthOfAudio(); light(true); }
-  });
+  }
+  $('[data-tr-pb-play]').addEventListener('click', togglePlay);
   $('[data-tr-pb-speed]').addEventListener('click', function (e) {
     if (!audio) return;
     var next = SPEEDS[(SPEEDS.indexOf(audio.playbackRate) + 1) % SPEEDS.length] || 1;
     audio.playbackRate = next;
     e.currentTarget.textContent = (next === 1 ? '1' : String(next)) + '×';
   });
+  // A press or a drag anywhere on the timeline puts the recording there.
+  function timeAt(clientX) {
+    var r = tlCanvas.getBoundingClientRect();
+    return Math.max(0, Math.min(lengthOfAudio(), (clientX - r.left) / (tl.pps || 1)));
+  }
+  tlCanvas.addEventListener('pointerdown', function (e) {
+    if (!audio || e.button !== 0 || e.target.closest('.tr-tl-clip')) return;
+    tl.dragging = true;
+    try { tlCanvas.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
+    audio.currentTime = timeAt(e.clientX);
+    paintBar();
+  });
+  tlCanvas.addEventListener('pointermove', function (e) {
+    if (!tl.dragging || !audio) return;
+    audio.currentTime = timeAt(e.clientX);
+    paintHead();
+  });
+  ['pointerup', 'pointercancel'].forEach(function (ev) {
+    tlCanvas.addEventListener(ev, function () { if (tl.dragging) { tl.dragging = false; light(true); } });
+  });
+  tlScroll.addEventListener('keydown', function (e) {
+    if (!audio) return;
+    var to = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') to = audio.currentTime + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 1 : 5);
+    else if (e.key === 'Home') to = 0;
+    else if (e.key === 'End') to = lengthOfAudio();
+    else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePlay(); return; }
+    if (to === null) return;
+    e.preventDefault();
+    audio.currentTime = Math.max(0, Math.min(lengthOfAudio(), to));
+    paintBar();
+  });
+  // Zoom: the slider, its buttons, or a pinch (ctrl + wheel) on the timeline; the head stays where it was.
+  function zoomTo(value) {
+    tlZoom.value = String(Math.max(0, Math.min(100, value)));
+    var before = audio ? audio.currentTime * tl.pps - tlScroll.scrollLeft : 0;
+    buildTimeline();
+    if (audio) tlScroll.scrollLeft = Math.max(0, audio.currentTime * tl.pps - before);
+  }
+  tlZoom.addEventListener('input', function () { zoomTo(Number(tlZoom.value)); });
+  $$('[data-tr-tl-zoom-step]').forEach(function (b) {
+    b.addEventListener('click', function () { zoomTo(Number(tlZoom.value) + Number(b.getAttribute('data-tr-tl-zoom-step'))); });
+  });
+  tlScroll.addEventListener('wheel', function (e) {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    zoomTo(Number(tlZoom.value) + (e.deltaY < 0 ? 8 : -8));
+  }, { passive: false });
+  var tlResize = 0;
+  window.addEventListener('resize', function () {
+    clearTimeout(tlResize);
+    tlResize = setTimeout(buildTimeline, 150);
+  });
 
   function render(tr) {
     $('[data-tr-reader-title]').textContent = cleanTitle(tr.title);
-    // The length, the language and the day: once each.
-    var bits = [tr.length];
-    if (tr.language_name) bits.push(tr.language_name);
-    bits.push(tr.date);
-    $('[data-tr-reader-meta]').textContent = bits.join(' · ');
+    // Its details, each said once.
+    $('[data-tr-fact="length"]').textContent = tr.length || '—';
+    $('[data-tr-fact="language"]').textContent = tr.language_name || '—';
+    $('[data-tr-fact="date"]').textContent = tr.date || '—';
     if (audio) { audio.pause(); audio.removeAttribute('src'); audio.load(); }
     audio = $('[data-tr-audio]');
     audio.playbackRate = 1;
     $('[data-tr-pb-speed]').textContent = '1×';
+    tlZoom.value = '0';
+    tlScroll.scrollLeft = 0;
     var gone = $('[data-tr-audio-gone]');
     if (tr.audio) {
       audio.src = tr.urls.audio;
@@ -897,16 +1032,17 @@
       gone.textContent = fill(t.audio_gone, { days: c.keepDays });
       gone.hidden = false;
     }
-    paintBar();
     renderSpeakers(tr);
     shown = { paragraphs: tr.paragraphs, segments: tr.segments };
     renderText(tr.rtl, true);
+    paintBar();
   }
   (function () {
     var a = $('[data-tr-audio]');
-    ['play', 'pause', 'ended', 'loadedmetadata', 'durationchange'].forEach(function (ev) { a.addEventListener(ev, paintBar); });
-    a.addEventListener('timeupdate', function () { paintBar(); light(false); });
-    a.addEventListener('seeked', function () { light(true); });
+    ['play', 'pause', 'ended'].forEach(function (ev) { a.addEventListener(ev, paintBar); });
+    ['loadedmetadata', 'durationchange'].forEach(function (ev) { a.addEventListener(ev, function () { buildTimeline(); paintBar(); }); });
+    a.addEventListener('timeupdate', function () { if (audio && audio.paused) paintBar(); light(false); });
+    a.addEventListener('seeked', function () { paintBar(); light(true); });
   })();
   function speakerIndex(letter) {
     var list = (current && current.speaker_list) || [];
@@ -976,6 +1112,7 @@
       });
       box.appendChild(div);
     });
+    buildTimeline();
   }
   function seek(at) {
     if (!audio) return;
@@ -1001,11 +1138,16 @@
     if (!lit) return;
     lit.classList.add('is-now');
     if ((!audio.paused || jump) && !reader.hidden) {
+      var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       var r = lit.getBoundingClientRect();
-      var barTop = bar.hidden ? window.innerHeight : bar.getBoundingClientRect().top;
-      if (r.top < 120 || r.bottom > barTop - 16) {
-        var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        lit.scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
+      var doc = $('[data-tr-doc]');
+      if (doc.scrollHeight > doc.clientHeight + 4 && getComputedStyle(doc).overflowY !== 'visible') {
+        // The transcript scrolls in its own pane (a wide screen): the sentence a third of the way down it.
+        var d = doc.getBoundingClientRect();
+        if (r.top < d.top + 16 || r.bottom > d.bottom - 16) doc.scrollTo({ top: doc.scrollTop + (r.top - d.top) - doc.clientHeight / 3, behavior: calm ? 'auto' : 'smooth' });
+      } else {
+        var barTop = bar.hidden ? window.innerHeight : bar.getBoundingClientRect().top;
+        if (r.top < 120 || r.bottom > barTop - 16) lit.scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
       }
     }
   }

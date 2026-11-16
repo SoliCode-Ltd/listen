@@ -244,82 +244,115 @@
       </form>
     </div>
 
-    {{-- A transcript open: read, play, correct, translate, download --}}
-    <section class="tr-reader" data-tr-reader hidden aria-labelledby="trReaderTitle" tabindex="-1">
-      <button type="button" class="dub-link tr-back" data-tr-close>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>{{ __('transcribe.js.back') }}
-      </button>
-      <header class="tr-reader-head">
+    {{-- A transcript open, as an editor: a bar of actions, the transcript, its details, and a timeline to play and find a place --}}
+    <section class="tr-reader tr-editor" data-tr-reader hidden aria-labelledby="trReaderTitle" tabindex="-1">
+      <header class="tr-ed-bar">
+        <button type="button" class="tr-ed-back" data-tr-close aria-label="{{ __('transcribe.js.back') }}" title="{{ __('transcribe.js.back') }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+        </button>
         <div class="tr-reader-name">
           <h2 id="trReaderTitle" data-tr-reader-title dir="auto"></h2>
           <button type="button" class="tr-icon tr-rename" data-tr-rename-open aria-label="{{ __('transcribe.js.rename') }}" title="{{ __('transcribe.js.rename') }}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4z"/></svg>
           </button>
         </div>
-        <p class="tr-reader-meta" data-tr-reader-meta></p>
-      </header>
-      {{-- One row of matching pill buttons, each an icon and a word; the language is a menu like Download. --}}
-      <div class="tr-toolbar" role="toolbar" aria-label="{{ __('transcribe.page.col_actions') }}">
-        <button type="button" class="tr-tool" data-tr-copy title="{{ __('transcribe.js.copy') }}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></svg>
-          <span class="tr-tool-label" data-tr-copy-label>{{ __('transcribe.js.copy') }}</span>
-        </button>
-        <div class="tr-menu" data-tr-menu>
-          <button type="button" class="tr-tool tr-menu-toggle" aria-haspopup="true" aria-expanded="false" data-tr-menu-button title="{{ __('transcribe.js.download') }}">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14"/></svg>
-            <span class="tr-tool-label">{{ __('transcribe.js.download') }}</span>
-            <svg class="tr-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        <div class="tr-toolbar" role="toolbar" aria-label="{{ __('transcribe.page.col_actions') }}">
+          <button type="button" class="tr-tool tr-tool-icon" data-tr-copy aria-label="{{ __('transcribe.js.copy') }}" title="{{ __('transcribe.js.copy') }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></svg>
+            <span class="tr-tool-label sr-only" data-tr-copy-label>{{ __('transcribe.js.copy') }}</span>
           </button>
-          <div class="tr-menu-list" role="menu" hidden>
-            @foreach(\App\Services\Transcription\TranscriptExport::FORMATS as $format)
-              <a role="menuitem" href="#" data-tr-export="{{ $format }}"><span class="tr-format" dir="ltr">{{ strtoupper($format) }}</span><span>{{ __('transcribe.js.'.$format) }}</span></a>
-            @endforeach
-          </div>
-        </div>
-        <div class="tr-menu" data-tr-menu>
-          <button type="button" class="tr-tool tr-menu-toggle" aria-haspopup="true" aria-expanded="false" data-tr-menu-button data-tr-language-button
-            aria-label="{{ __('transcribe.js.translate_to') }}: {{ __('transcribe.js.original') }}">
-            <span class="tr-language-icon" data-tr-language-icon aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z"/></svg></span>
-            <span data-tr-language-current>{{ __('transcribe.js.original') }}</span>
-            <svg class="tr-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          <button type="button" class="tr-tool tr-tool-icon tr-tool-danger" data-tr-delete aria-label="{{ __('transcribe.js.delete') }}" title="{{ __('transcribe.js.delete') }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5"/></svg>
           </button>
-          <div class="tr-menu-list tr-language-list" role="menu" hidden aria-label="{{ __('transcribe.js.translate_to') }}">
-            <p class="tr-menu-head" aria-hidden="true">{{ __('transcribe.js.translate_to') }}</p>
-            <div class="tr-menu-search">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
-              <input type="search" data-tr-language-search placeholder="{{ __('transcribe.page.search_language') }}" aria-label="{{ __('transcribe.page.search_language') }}" autocomplete="off" spellcheck="false">
+          <span class="tr-ed-sep" aria-hidden="true"></span>
+          <button type="button" class="tr-tool" data-tr-studio-send title="{{ __('transcribe.js.send_studio') }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg>
+            <span class="tr-tool-label">{{ __('transcribe.js.send_studio') }}</span>
+          </button>
+          <div class="tr-menu" data-tr-menu>
+            <button type="button" class="tr-tool tr-menu-toggle" aria-haspopup="true" aria-expanded="false" data-tr-menu-button data-tr-language-button
+              aria-label="{{ __('transcribe.js.translate_to') }}: {{ __('transcribe.js.original') }}">
+              <span class="tr-language-icon" data-tr-language-icon aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z"/></svg></span>
+              <span class="tr-tool-label" data-tr-language-current>{{ __('transcribe.js.original') }}</span>
+              <svg class="tr-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="tr-menu-list tr-language-list" role="menu" hidden aria-label="{{ __('transcribe.js.translate_to') }}">
+              <p class="tr-menu-head" aria-hidden="true">{{ __('transcribe.js.translate_to') }}</p>
+              <div class="tr-menu-search">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+                <input type="search" data-tr-language-search placeholder="{{ __('transcribe.page.search_language') }}" aria-label="{{ __('transcribe.page.search_language') }}" autocomplete="off" spellcheck="false">
+              </div>
+              <div data-tr-language-items></div>
+              <p class="tr-menu-none" data-tr-language-none hidden>{{ __('transcribe.page.no_language') }}</p>
             </div>
-            <div data-tr-language-items></div>
-            <p class="tr-menu-none" data-tr-language-none hidden>{{ __('transcribe.page.no_language') }}</p>
+          </div>
+          <div class="tr-menu" data-tr-menu>
+            <button type="button" class="tr-tool tr-tool-primary tr-menu-toggle" aria-haspopup="true" aria-expanded="false" data-tr-menu-button title="{{ __('transcribe.js.export') }}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/></svg>
+              <span class="tr-tool-label">{{ __('transcribe.js.export') }}</span>
+              <svg class="tr-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="tr-menu-list" role="menu" hidden>
+              @foreach(\App\Services\Transcription\TranscriptExport::FORMATS as $format)
+                <a role="menuitem" href="#" data-tr-export="{{ $format }}"><span class="tr-format" dir="ltr">{{ strtoupper($format) }}</span><span>{{ __('transcribe.js.'.$format) }}</span></a>
+              @endforeach
+            </div>
           </div>
         </div>
-        <button type="button" class="tr-tool" data-tr-studio-send title="{{ __('transcribe.js.send_studio') }}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg>
-          <span class="tr-tool-label">{{ __('transcribe.js.send_studio') }}</span>
-        </button>
-        <button type="button" class="tr-tool tr-tool-icon tr-tool-danger" data-tr-delete aria-label="{{ __('transcribe.js.delete') }}" title="{{ __('transcribe.js.delete') }}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5"/></svg>
-        </button>
-      </div>
+      </header>
       <p class="tr-note tr-note-error" data-tr-translate-note role="status" hidden></p>
-      <p class="tr-note" data-tr-audio-gone hidden></p>
-      <div class="tr-speakers" data-tr-speakers hidden>
-        <strong>{{ __('transcribe.js.speakers') }}</strong>
-        <div class="tr-speaker-list" data-tr-speaker-list></div>
+      <p class="tr-note tr-ed-note" data-tr-audio-gone hidden></p>
+      <div class="tr-ed-body">
+        <div class="tr-ed-doc" data-tr-doc>
+          <div class="tr-text" data-tr-text></div>
+        </div>
+        <aside class="tr-ed-side" aria-labelledby="trDetailsTitle">
+          <h3 class="tr-ed-side-title" id="trDetailsTitle">{{ __('transcribe.js.details') }}</h3>
+          <dl class="tr-ed-facts">
+            <div><dt>{{ __('transcribe.js.length') }}</dt><dd data-tr-fact="length" dir="auto"></dd></div>
+            <div><dt>{{ __('transcribe.page.language') }}</dt><dd data-tr-fact="language"></dd></div>
+            <div><dt>{{ __('transcribe.js.created') }}</dt><dd data-tr-fact="date" dir="auto"></dd></div>
+          </dl>
+          <div class="tr-speakers" data-tr-speakers hidden>
+            <h3 class="tr-ed-side-title">{{ __('transcribe.js.speakers') }}</h3>
+            <div class="tr-speaker-list" data-tr-speaker-list></div>
+          </div>
+        </aside>
       </div>
-      <div class="tr-text" data-tr-text></div>
-      {{-- The recording, from a bar held at the foot of the screen while the transcript is read --}}
+      {{-- The recording on a timeline: one track for each speaker, a ruler, the play head; click or drag anywhere on it to go there --}}
       <audio class="initialized" data-tr-audio preload="metadata" hidden></audio>
-      <div class="tr-playbar" data-tr-playbar dir="ltr" hidden>
-        <button type="button" class="tr-pb-play" data-tr-pb-play aria-label="{{ __('transcribe.js.play') }}"
-          data-label-play="{{ __('transcribe.js.play') }}" data-label-pause="{{ __('transcribe.js.pause') }}">
-          <svg class="tr-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
-          <svg class="tr-pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
-        </button>
-        <span class="tr-pb-time" data-tr-pb-now dir="ltr">0:00</span>
-        <input type="range" class="tr-pb-seek" data-tr-pb-seek min="0" max="1000" step="1" value="0" dir="ltr" aria-label="{{ __('transcribe.js.seek') }}">
-        <span class="tr-pb-time" data-tr-pb-total dir="ltr">0:00</span>
-        <button type="button" class="tr-pb-speed" data-tr-pb-speed aria-label="{{ __('transcribe.js.speed') }}" title="{{ __('transcribe.js.speed') }}">1×</button>
+      <div class="tr-timeline" data-tr-playbar dir="ltr" hidden>
+        <div class="tr-tl-grid">
+          <div class="tr-tl-labels" data-tr-tl-labels></div>
+          <div class="tr-tl-scroll" data-tr-tl-scroll tabindex="0" role="slider" aria-label="{{ __('transcribe.js.seek') }}" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+            <div class="tr-tl-canvas" data-tr-tl-canvas>
+              <div class="tr-tl-ruler" data-tr-tl-ruler></div>
+              <div class="tr-tl-tracks" data-tr-tl-tracks></div>
+              <div class="tr-tl-head" data-tr-tl-head aria-hidden="true"><span class="tr-tl-badge" data-tr-tl-badge>0:00.0</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="tr-tl-controls">
+          <div class="tr-tl-zoom">
+            <button type="button" class="tr-tl-btn" data-tr-tl-zoom-step="-20" aria-label="{{ __('transcribe.js.zoom_out') }}" title="{{ __('transcribe.js.zoom_out') }}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4M8.5 11h5"/></svg>
+            </button>
+            <input type="range" class="tr-tl-zoom-range" data-tr-tl-zoom min="0" max="100" step="1" value="0" aria-label="{{ __('transcribe.js.zoom') }}">
+            <button type="button" class="tr-tl-btn" data-tr-tl-zoom-step="20" aria-label="{{ __('transcribe.js.zoom_in') }}" title="{{ __('transcribe.js.zoom_in') }}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4M8.5 11h5M11 8.5v5"/></svg>
+            </button>
+          </div>
+          <div class="tr-tl-transport">
+            <button type="button" class="tr-pb-speed" data-tr-pb-speed aria-label="{{ __('transcribe.js.speed') }}" title="{{ __('transcribe.js.speed') }}">1×</button>
+            <button type="button" class="tr-pb-play" data-tr-pb-play aria-label="{{ __('transcribe.js.play') }}"
+              data-label-play="{{ __('transcribe.js.play') }}" data-label-pause="{{ __('transcribe.js.pause') }}">
+              <svg class="tr-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+              <svg class="tr-pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+            </button>
+            <span class="tr-tl-time"><span data-tr-pb-now>0:00</span><span class="tr-tl-of">/</span><span data-tr-pb-total>0:00</span></span>
+          </div>
+          <div class="tr-tl-end" aria-hidden="true"></div>
+        </div>
       </div>
     </section>
 
