@@ -1,0 +1,180 @@
+/*
+ * The dashboard's Transcribe section (components/transcribe/dashboard-section.blade.php).
+ * It is built from the dubbing section's parts (css/dub-studio.css: the account,
+ * rule box, drop zone, progress, meter, go button and ledger) and the voice
+ * studio's card (css/voice-studio.css); this adds only what those have no part
+ * for: the three ways in, the link and recorder views, the transcript reader
+ * and the row menu. Colour tokens only (--surface, --surface2, --line, --text,
+ * --muted, --a, --b, --danger), so it follows light and dark themes, and
+ * logical properties throughout, so Arabic reads right to left. Every control
+ * a finger presses is at least 40px.
+ */
+.tr-section .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.tr-section [hidden] { display: none !important; }
+.tr-studio { margin-bottom: 0; }
+.tr-rule-action { margin-top: .8rem !important; }
+
+/* ---------- Three ways in ---------- */
+.tr-drop { cursor: default; }
+.tr-options { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; margin-top: .9rem; }
+.tr-option { display: inline-flex; align-items: center; gap: .45rem; min-height: 44px; padding-inline: 1.1rem; }
+.tr-option svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+
+/* A link, a recording: the same card as the drop zone */
+.tr-panel {
+  display: grid;
+  gap: .6rem;
+  align-content: center;
+  min-height: 300px;
+  padding: 1.5rem;
+  border: 1.5px dashed color-mix(in oklab, var(--a) 35%, var(--line));
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--surface2, var(--surface)) 60%, transparent);
+}
+.tr-panel input[type="url"] { width: 100%; min-height: 44px; }
+.tr-panel-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.tr-panel-actions .btn { min-height: 44px; }
+.tr-note { margin: 0; color: color-mix(in oklab, var(--text) 65%, var(--muted)); font-size: .92rem; line-height: 1.55; }
+
+.tr-recorder { justify-items: center; text-align: center; }
+.tr-recorder > strong { font-size: 1.1rem; }
+.tr-rec-btn {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--a), var(--b));
+  box-shadow: 0 12px 30px -10px color-mix(in oklab, var(--a) 70%, transparent);
+  cursor: pointer;
+  transition: transform .2s ease;
+}
+.tr-rec-btn span { width: 26px; height: 26px; border-radius: 50%; background: #fff; transition: border-radius .2s ease, width .2s ease, height .2s ease; }
+.tr-rec-btn[aria-pressed="true"] span { width: 24px; height: 24px; border-radius: 6px; }
+.tr-rec-btn[aria-pressed="true"] { animation: tr-pulse 1.6s ease-in-out infinite; }
+.tr-rec-btn:focus-visible { outline: 2px solid var(--a); outline-offset: 4px; }
+.tr-rec-time { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+@keyframes tr-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--a) 45%, transparent); } 50% { box-shadow: 0 0 0 14px transparent; } }
+@media (prefers-reduced-motion: reduce) { .tr-rec-btn[aria-pressed="true"] { animation: none; } }
+
+.tr-section .dub-chosen audio { width: 100%; }
+
+/* ---------- The box's foot: the language, and the start button ---------- */
+.tr-foot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .8rem 1rem; }
+.tr-language { display: grid; gap: .3rem; min-width: min(240px, 100%); }
+.tr-language select { min-height: 44px; }
+
+/* ---------- The transcript reader ---------- */
+.tr-reader { margin-top: 2.2rem; padding-top: 2rem; border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+.tr-reader:focus { outline: none; }
+.tr-back { display: inline-flex; align-items: center; gap: .3rem; min-height: 40px; }
+.tr-back svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+html[dir="rtl"] .tr-back svg { transform: scaleX(-1); }
+.tr-reader-head { margin: .4rem 0 1rem; }
+.page-card .tr-reader-head h2 { margin: 0 0 .3rem; font-size: 1.4rem; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
+.tr-reader-meta { margin: 0; color: color-mix(in oklab, var(--text) 70%, var(--muted)); font-size: .95rem; }
+.tr-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .8rem; }
+.tr-toolbar .btn, .tr-toolbar select { min-height: 44px; }
+.tr-toolbar select { width: auto; max-width: 100%; }
+.tr-danger { color: var(--danger); }
+.tr-player { margin: .6rem 0 1rem; }
+.tr-player audio { width: 100%; }
+
+.tr-speakers { display: grid; gap: .5rem; margin: 0 0 1rem; padding: .9rem 1rem; border-radius: 14px; background: color-mix(in oklab, var(--a) 5%, var(--surface)); border: 1px solid color-mix(in oklab, var(--a) 15%, var(--line)); }
+.tr-speaker-list { display: flex; flex-wrap: wrap; gap: .5rem; }
+.tr-speaker-list label { display: flex; align-items: center; gap: .4rem; }
+.tr-speaker-list input { width: 12rem; max-width: 100%; min-height: 40px; }
+.tr-swatch { display: inline-grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; font-size: .8rem; font-weight: 800; color: #fff; background: var(--a); }
+.tr-swatch[data-n="1"] { background: var(--b); }
+.tr-swatch[data-n="2"] { background: color-mix(in oklab, var(--a) 55%, var(--b)); }
+.tr-swatch[data-n="3"] { background: color-mix(in oklab, var(--a) 40%, var(--text)); }
+
+.tr-text { display: grid; gap: .9rem; }
+.tr-para {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: .3rem .9rem;
+  padding: .9rem 1rem;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+}
+.tr-para-head { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.tr-para-who { font-weight: 800; }
+.tr-para-time { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.tr-para-tools { display: flex; gap: .3rem; margin-inline-start: auto; }
+.tr-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.tr-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.tr-icon:hover { border-color: var(--a); color: var(--a); }
+.tr-icon:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
+.tr-para-body { grid-column: 1 / -1; font-size: 1.05rem; line-height: 1.9; overflow-wrap: anywhere; }
+.tr-s { border-radius: 6px; cursor: pointer; transition: background .15s ease; }
+.tr-s:hover { background: color-mix(in oklab, var(--a) 10%, transparent); }
+.tr-s.is-now { background: color-mix(in oklab, var(--a) 20%, transparent); }
+.tr-para textarea { grid-column: 1 / -1; width: 100%; min-height: 8rem; font-size: 1.02rem; line-height: 1.8; }
+.tr-para-edit { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .5rem; }
+.tr-para-edit .btn { min-height: 40px; }
+.tr-rtl .tr-para-body, .tr-rtl textarea { direction: rtl; text-align: right; }
+
+/* ---------- The list ---------- */
+.tr-search { position: relative; display: block; max-width: 28rem; margin: 0 0 1rem; }
+.tr-search svg { position: absolute; inset-inline-start: .85rem; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+.tr-search input { width: 100%; min-height: 44px; padding-inline-start: 2.6rem; }
+.tr-ledger td.tr-name { max-width: 22rem; overflow-wrap: anywhere; }
+.tr-ledger td.tr-name button { min-height: 40px; text-align: start; }
+.tr-row-actions { display: flex; justify-content: flex-end; gap: .3rem; }
+.tr-more { display: flex; justify-content: center; margin-top: .9rem; }
+.tr-more .btn { min-height: 44px; }
+
+.tr-menu { position: relative; }
+.tr-menu-list {
+  position: absolute;
+  z-index: 30;
+  inset-inline-end: 0;
+  top: calc(100% + .35rem);
+  display: grid;
+  min-width: 12rem;
+  padding: .35rem;
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, .45);
+}
+.tr-toolbar .tr-menu-list { inset-inline-end: auto; inset-inline-start: 0; }
+.tr-menu-list a, .tr-menu-list button {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: .45rem .7rem;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+.tr-menu-list a:hover, .tr-menu-list button:hover, .tr-menu-list a:focus-visible, .tr-menu-list button:focus-visible { background: color-mix(in oklab, var(--a) 10%, transparent); outline: none; }
+.tr-menu-list .is-danger { color: var(--danger); }
+
+@media (max-width: 560px) {
+  .tr-panel { min-height: 240px; padding: 1.1rem; }
+  .tr-para { padding: .8rem; }
+  .tr-ledger th:nth-child(3), .tr-ledger td:nth-child(3) { display: none; }
+  .tr-language { min-width: 100%; }
+  .tr-foot .dub-go-row { flex-basis: 100%; }
+  .tr-foot .dub-go { width: 100%; justify-content: center; }
+}

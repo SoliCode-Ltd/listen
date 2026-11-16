@@ -202,6 +202,40 @@ class TranscribePageTest extends TestCase
         $this->assertSame('01:02:03,450', TranscriptExport::stamp(3723.45, false));
     }
 
+    public function test_the_dashboard_shows_the_section_with_the_months_minutes_in_english_and_arabic(): void
+    {
+        $user = $this->member(120);
+        $this->actingAs($user);
+
+        $this->get(route('dashboard'))->assertOk()
+            ->assertSee('id="transcribeSection"', false)
+            ->assertSee('href="#transcribeSection"', false)
+            ->assertSee(__('transcribe.page.drop_title'))
+            ->assertSee(__('transcribe.page.rule_second_value'))
+            ->assertSee('2 h 00 min')
+            ->assertSee('css/transcribe.css', false)
+            ->assertSee('js/transcribe.js', false);
+
+        app()->setLocale('ar');
+        $this->get(route('dashboard'))->assertOk()
+            ->assertSee(__('transcribe.page.drop_title', [], 'ar'))
+            ->assertSee('2 س 00 د');
+        app()->setLocale('en');
+
+        SiteSetting::set('transcription_audience', TranscriptionSettings::AUDIENCE_OFF, TranscriptionSettings::GROUP);
+        $this->get(route('dashboard'))->assertOk()->assertDontSee('id="transcribeSection"', false)->assertDontSee('js/transcribe.js', false);
+    }
+
+    public function test_a_member_without_it_sees_the_free_try_and_the_plan_that_has_it(): void
+    {
+        $this->plan('starter', 900, 120, 30);
+        $this->actingAs($this->member(0));
+
+        $this->get(route('dashboard'))->assertOk()
+            ->assertSee(__('transcribe.page.free_text', ['length' => '1 min']))
+            ->assertSee(__('transcribe.page.get_plan', ['plan' => 'Starter']));
+    }
+
     private function transcribe(User $user, float $seconds): Transcription
     {
         return app(TranscriptionFlow::class)->start($user, $this->audio($seconds), ['title' => 'clip.mp3', 'language' => 'ar'])->fresh();

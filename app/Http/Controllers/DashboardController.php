@@ -33,6 +33,8 @@ use App\Support\PlanFeatures;
 use App\Support\PlanPricingLines;
 use App\Support\PlanUsageGuard;
 use App\Support\SpeechLanguages;
+use App\Support\Transcription\TranscriptionAccess;
+use App\Support\Transcription\TranscriptionPresenter;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageSnapshot;
 use App\Support\VideoDubbing;
@@ -182,6 +184,10 @@ class DashboardController extends Controller
         // Dub a video, in its own section (App\Support\VideoDubbing).
         $dubStudio = VideoDubbing::openTo($request->user()) ? VideoDubbing::studio($request->user(), $request) : null;
 
+        // Transcribe (speech to text), in its own section: this month's minutes for its header and box.
+        $transcribe = rescue(fn () => TranscriptionAccess::openTo($request->user())
+            ? TranscriptionPresenter::account($request->user(), app()->getLocale() === 'ar') : null, null, false);
+
         // Voice Design, in its own section; the voices kept join the studio's voice list. A plan
         // without it gets the section to try only while a plan with it is on sale.
         $voiceDesign = VoiceDesign::allows($request->user(), $activePlan) || VoiceDesign::showsUpgrade($request->user(), $activePlan)
@@ -208,6 +214,7 @@ class DashboardController extends Controller
             'voiceDesign' => $voiceDesign,
             'designedVoices' => $designedVoices,
             'dubStudio' => $dubStudio,
+            'transcribe' => $transcribe,
             'dubAccount' => $dubStudio ? VideoDubbing::account($request->user(), $dubStudio) : null,
             'verifyEmail' => $verifyEmail,
             'developerApi' => $developerApi,

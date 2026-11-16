@@ -7,8 +7,11 @@
   @if($voiceDesign ?? null)
     <link rel="stylesheet" href="{{ asset('css/voice-design.css') }}?v={{ filemtime(public_path('css/voice-design.css')) }}">
   @endif
-  @if($dubStudio ?? null)
+  @if(($dubStudio ?? null) || ($transcribe ?? null))
     <link rel="stylesheet" href="{{ asset('css/dub-studio.css') }}?v={{ filemtime(public_path('css/dub-studio.css')) }}">
+  @endif
+  @if($transcribe ?? null)
+    <link rel="stylesheet" href="{{ asset('css/transcribe.css') }}?v={{ filemtime(public_path('css/transcribe.css')) }}">
   @endif
   <style>
     /* Background orbs */
@@ -1965,6 +1968,13 @@
             <span class="dm-short">{{ __('ui.dub.nav_short') }}</span>
           </a>
           @endif
+          @if($transcribe ?? null)
+          <a class="dashboard-menu-link" href="#transcribeSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4M6.5 7v10M10 9v6"/><path d="M14 8h7M14 12h7M14 16h5"/></svg>
+            <span class="dm-label">{{ __('transcribe.page.nav') }}</span>
+            <span class="dm-short">{{ __('transcribe.page.nav_short') }}</span>
+          </a>
+          @endif
           @if($voiceDesign ?? null)
           <a class="dashboard-menu-link" href="#voiceDesignSection" data-dashboard-nav>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.7 4.6 4.8 1.7-4.8 1.7L12 16.1l-1.7-4.6-4.8-1.7 4.8-1.7z"/><path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>
@@ -2354,6 +2364,11 @@
 
     @if($dubStudio ?? null)
       <x-dub.dashboard-section :dub="$dubStudio" :account="$dubAccount" />
+    @endif
+
+    {{-- Transcribe: speech to text, with this month's minutes and every transcript. --}}
+    @if($transcribe ?? null)
+      <x-transcribe.dashboard-section :account="$transcribe" />
     @endif
 
     <section id="planDefaultsSection" class="dashboard-panel" data-dashboard-section>
@@ -6306,6 +6321,9 @@
   <script src="{{ asset('js/voice-studio-icons.js') }}?v={{ filemtime(public_path('js/voice-studio-icons.js')) }}" defer></script>
   @if($dubStudio ?? null)
     <script src="{{ asset('js/dub-studio.js') }}?v={{ filemtime(public_path('js/dub-studio.js')) }}" defer></script>
+  @endif
+  @if($transcribe ?? null)
+    <script src="{{ asset('js/transcribe.js') }}?v={{ filemtime(public_path('js/transcribe.js')) }}" defer></script>
   @endif
   @if(($voiceDesign ?? null) || ($voiceCloningVisible ?? false))
     @include('components.orb-script')
