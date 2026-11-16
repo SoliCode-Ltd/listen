@@ -77,6 +77,8 @@ $pages = [
     [null, 'voice-samples', [200]],
     [null, 'developers', [200]],
     [null, 'browsers-extension', [200]],
+    // Found once speech to text is open to everyone and on a plan on sale; "not found" until then.
+    [null, 'speech-to-text', [200, 404]],
     [$free, 'dashboard', [200]],
     // A member's pricing page reads their plan, its cycle and any lower plan booked (no Stripe).
     [$free, 'pricing', [200]],
@@ -90,6 +92,9 @@ $pages = [
     [$paid, 'dashboard/voice-cloning', [200, 302]],
     [$paid, 'browsers-extension', [200]],
     [$paid, 'browsers-extension/download', [200]],
+    // The owner's Agents pages ("not found" while Agents are closed to them).
+    [$paid, 'agents', [200, 302, 404]],
+    [$paid, 'agents/new', [200, 302, 404]],
     // The demo is for free accounts: a member with a plan is sent to the studio.
     [$paid, 'demo', [302]],
 ];
@@ -219,7 +224,7 @@ if ($admin === null) {
     $lists = ['users', 'suspicious-users', 'audio-generations', 'demo-voice-generations', 'agent-calls', 'agents',
         'usage-counters', 'subscriptions', 'video-dubs', 'contacts', 'generation-errors', 'text-items',
         'api-request-logs', 'cloned-voices', 'designed-voices', 'manual-payment-requests', 'referral-conversions',
-        'social-share-logs', 'voices', 'voice-samples', 'demo-fraud-signals'];
+        'social-share-logs', 'voices', 'voice-samples', 'demo-fraud-signals', 'transcriptions'];
     foreach ($lists as $list) {
         $open($admin, '/admin/'.$list, [200], 'admin');
     }
