@@ -143,6 +143,13 @@ name: Server deploy
 #            and a finished one made before the windowed timing placed on its
 #            recording again and saved (old and new times printed)
 #            (scripts/support/stt_check.php). Uses the Gemini quota a little.
+#   stt-queue: staging only, no speech quota. A three-hour file's first two
+#            steps timed (clean copy, waveform peaks, measuring), then four
+#            minutes of silence for a throwaway member sent through the real
+#            queue: speech to text's own workers (started by the schedule) must
+#            pick it up and refuse it as silence, minutes given back; then the
+#            member deleted as the admin does, its folder with it
+#            (scripts/support/stt_queue_check.php).
 #   dub-test: staging only. Dubs the test video with the branch's code the way
 #            a member's dub is made, with the settings of the newest dub of a
 #            video that long (input "dub" changes them: "voice=Kore
@@ -203,7 +210,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, stt-test, stt-check, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -604,6 +611,13 @@ jobs:
             [ "$TARGET" = staging ] || { echo "stt-check runs on staging only"; exit 1; }
             failed=0
             $S "$FIND; nice php" < scripts/support/stt_check.php || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
+          if [ "$MODE" = stt-queue ]; then
+            [ "$TARGET" = staging ] || { echo "stt-queue runs on staging only"; exit 1; }
+            failed=0
+            $S "$FIND; nice php" < scripts/support/stt_queue_check.php || failed=1
             rm -f ~/.ssh/id_deploy
             exit "$failed"
           fi
