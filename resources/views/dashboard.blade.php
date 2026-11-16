@@ -1858,7 +1858,8 @@
       .dashboard-menu .dashboard-menu-link svg { width: 21px; height: 21px; }
       .dashboard-menu .dashboard-menu-link.active { background: transparent; color: var(--accent-text); }
       .dashboard-menu .dm-label { display: none; }
-      .dashboard-menu .dm-short { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+      /* A longer name ("Speech to text") takes two short lines, never an ellipsis. */
+      .dashboard-menu .dm-short { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; max-width: 100%; line-height: 1.1; white-space: normal; overflow-wrap: normal; }
       .dashboard-menu-foot { display: none; }
       .dashboard-shell { padding-bottom: calc(5.25rem + env(safe-area-inset-bottom)) !important; }
       .dashboard-menu .app-switch { display: none; }

@@ -428,6 +428,12 @@
   }
 
   // ---------- The list ----------
+  var ICONS = {
+    open: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg>',
+    download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14"/></svg>',
+    rename: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4z"/></svg>',
+    remove: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5"/></svg>'
+  };
   function badge(item) {
     if (item.status === 'failed') return '<span class="dub-badge is-failed">' + esc(t.status_failed) + '</span>';
     if (item.status === 'ready') return item.free ? '<span class="dub-badge is-free">' + esc(t.status_free) + '</span>' : '<span class="dub-badge is-ready">' + esc(t.status_ready) + '</span>';
@@ -446,11 +452,12 @@
       + '<div class="tr-menu" data-tr-menu><button type="button" class="tr-icon" aria-haspopup="true" aria-expanded="false" data-tr-menu-button aria-label="' + esc(fill(t.more_actions, { name: item.title })) + '">'
       + '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></button>'
       + '<div class="tr-menu-list" role="menu" hidden>'
-      + (item.status === 'ready' ? '<button type="button" role="menuitem" data-tr-open>' + esc(t.open) + '</button>'
-        + '<a role="menuitem" href="' + esc(item.urls.export_txt) + '">' + esc(t.download) + ' · TXT</a>'
-        + '<a role="menuitem" href="' + esc(item.urls.export_srt) + '">' + esc(t.download) + ' · SRT</a>' : '')
-      + '<button type="button" role="menuitem" data-tr-rename>' + esc(t.rename) + '</button>'
-      + (item.status === 'queued' || item.status === 'processing' ? '' : '<button type="button" role="menuitem" class="is-danger" data-tr-remove>' + esc(t.delete) + '</button>')
+      + (item.status === 'ready' ? '<button type="button" role="menuitem" data-tr-open>' + ICONS.open + esc(t.open) + '</button>'
+        + '<a role="menuitem" href="' + esc(item.urls.export_txt) + '">' + ICONS.download + esc(t.txt) + '</a>'
+        + '<a role="menuitem" href="' + esc(item.urls.export_srt) + '">' + ICONS.download + esc(t.srt) + '</a>'
+        + '<a role="menuitem" href="' + esc(item.urls.export_docx) + '">' + ICONS.download + esc(t.docx) + '</a>' : '')
+      + '<button type="button" role="menuitem" data-tr-rename>' + ICONS.rename + esc(t.rename) + '</button>'
+      + (item.status === 'queued' || item.status === 'processing' ? '' : '<hr aria-hidden="true"><button type="button" role="menuitem" class="is-danger" data-tr-remove>' + ICONS.remove + esc(t.delete) + '</button>')
       + '</div></div></div></td>';
   }
   function bindRow(tr, item) {
@@ -521,24 +528,72 @@
   search.addEventListener('input', function () { clearTimeout(searchTimer); searchTimer = setTimeout(function () { load(true); }, 300); });
   moreButton.addEventListener('click', function () { load(false); });
 
-  // Menus: one open at a time, closed by a click elsewhere or Escape.
+  // Menus: one open at a time, as the studio's dropdowns behave: opened by click, Enter, Space
+  // or the down arrow; moved through with the arrows, Home and End; closed by a click
+  // elsewhere, Escape (back to its button) or Tab. One near the bottom of the screen opens upwards.
+  function menuItems(m) { return $$('a, button', $('.tr-menu-list', m)); }
+  function setMenu(m, open, focusFirst) {
+    var list = $('.tr-menu-list', m);
+    var button = $('[data-tr-menu-button]', m);
+    if (open) {
+      $$('[data-tr-menu].is-open').forEach(function (other) { if (other !== m) setMenu(other, false); });
+      list.hidden = false;
+      var room = window.innerHeight - button.getBoundingClientRect().bottom;
+      m.classList.toggle('is-up', room < list.offsetHeight + 16 && button.getBoundingClientRect().top > list.offsetHeight + 16);
+      if (focusFirst) { var first = menuItems(m)[0]; if (first) first.focus(); }
+    } else {
+      list.hidden = true;
+      m.classList.remove('is-up');
+    }
+    m.classList.toggle('is-open', open);
+    button.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
   document.addEventListener('click', function (e) {
     var button = e.target.closest && e.target.closest('[data-tr-menu-button]');
-    $$('[data-tr-menu]').forEach(function (m) {
-      var b = $('[data-tr-menu-button]', m);
-      var list = $('.tr-menu-list', m);
-      var opening = button && m.contains(button) && list.hidden;
-      list.hidden = !opening;
-      b.setAttribute('aria-expanded', opening ? 'true' : 'false');
-      if (opening) { var first = $('a, button', list); if (first) first.focus(); }
-    });
+    var inMenu = e.target.closest && e.target.closest('[data-tr-menu]');
+    if (button) {
+      var m = button.closest('[data-tr-menu]');
+      // A click (e.detail > 0) opens it as it is; Enter or Space also moves into it.
+      setMenu(m, !m.classList.contains('is-open'), e.detail === 0);
+      return;
+    }
+    // A choice in a menu closes it; a click anywhere else closes them all.
+    $$('[data-tr-menu].is-open').forEach(function (m) { if (!inMenu || m === inMenu) setMenu(m, false); });
   });
-  document.addEventListener('keydown', function (e) {
-    if (e.key !== 'Escape') return;
-    $$('[data-tr-menu]').forEach(function (m) {
-      var list = $('.tr-menu-list', m);
-      if (!list.hidden) { list.hidden = true; $('[data-tr-menu-button]', m).setAttribute('aria-expanded', 'false'); $('[data-tr-menu-button]', m).focus(); }
-    });
+  root.addEventListener('keydown', function (e) {
+    var m = e.target.closest && e.target.closest('[data-tr-menu]');
+    if (!m) return;
+    var items = menuItems(m);
+    var onButton = e.target.matches('[data-tr-menu-button]');
+    var at = items.indexOf(e.target);
+    if (onButton && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault();
+      setMenu(m, true, false);
+      (e.key === 'ArrowDown' ? items[0] : items[items.length - 1]).focus();
+    } else if (!onButton && at !== -1) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        items[(at + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+      } else if (e.key === 'Home' || e.key === 'End') {
+        e.preventDefault();
+        (e.key === 'Home' ? items[0] : items[items.length - 1]).focus();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setMenu(m, false);
+        $('[data-tr-menu-button]', m).focus();
+      } else if (e.key === 'Tab') {
+        setMenu(m, false);
+      }
+    } else if (onButton && e.key === 'Escape' && m.classList.contains('is-open')) {
+      setMenu(m, false);
+    }
+  });
+  // A new width (a phone turned) closes them; a phone's keyboard opening (only the height) does not.
+  var lastWidth = window.innerWidth;
+  window.addEventListener('resize', function () {
+    if (window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
+    $$('[data-tr-menu].is-open').forEach(function (m) { setMenu(m, false); });
   });
 
   // ---------- The reader ----------
@@ -548,7 +603,15 @@
       if (r.xhr.status !== 200) return;
       current = r.body.transcription;
       shownLanguage = '';
-      $('[data-tr-translate]').value = '';
+      // The choices made again, without the transcript's own language (the studio's dropdown follows the select).
+      var select = $('[data-tr-translate]');
+      var original = select.options[0].textContent;
+      select.innerHTML = '';
+      select.appendChild(new Option(original, ''));
+      (c.targets || []).forEach(function (target) {
+        if (target.value !== current.language) select.appendChild(new Option(t.translate + ': ' + target.label, target.value));
+      });
+      select.value = '';
       $('[data-tr-translate-note]').hidden = true;
       render(current);
       reader.hidden = false;

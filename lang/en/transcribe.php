@@ -39,9 +39,9 @@ return [
     ],
 
     'page' => [
-        'nav' => 'Transcribe',
-        'nav_short' => 'Transcribe',
-        'title' => 'Transcribe',
+        'nav' => 'Speech to text',
+        'nav_short' => 'Speech to text',
+        'title' => 'Speech to text',
         'lead' => 'Turn speech into text in any language, with who said what. Upload a file, paste a link or record.',
         'stat_left' => 'Minutes left',
         'stat_left_of' => 'of :total this month',

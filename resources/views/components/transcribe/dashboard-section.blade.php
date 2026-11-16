@@ -206,7 +206,7 @@
         <div class="vs-editor-foot dub-foot tr-foot">
           <div class="tr-language">
             <label class="vs-field-label" for="trLanguage">{{ __('transcribe.page.language') }}</label>
-            <select id="trLanguage" data-tr-language>
+            <select id="trLanguage" data-tr-language data-vs-select>
               <option value="auto">{{ __('transcribe.page.detect') }}</option>
               @foreach($trLanguages as $language)
                 <option value="{{ $language['value'] }}">{{ $language['label'] }}</option>
@@ -237,16 +237,19 @@
       <div class="tr-toolbar" role="toolbar" aria-label="{{ __('transcribe.page.col_actions') }}">
         <button type="button" class="btn" data-tr-copy>{{ __('transcribe.js.copy') }}</button>
         <div class="tr-menu" data-tr-menu>
-          <button type="button" class="btn" aria-haspopup="true" aria-expanded="false" data-tr-menu-button>{{ __('transcribe.js.download') }}</button>
+          <button type="button" class="btn tr-menu-toggle" aria-haspopup="true" aria-expanded="false" data-tr-menu-button>
+            <span>{{ __('transcribe.js.download') }}</span>
+            <svg class="tr-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
           <div class="tr-menu-list" role="menu" hidden>
             @foreach(\App\Services\Transcription\TranscriptExport::FORMATS as $format)
-              <a role="menuitem" href="#" data-tr-export="{{ $format }}">{{ __('transcribe.js.'.$format) }}</a>
+              <a role="menuitem" href="#" data-tr-export="{{ $format }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14"/></svg>{{ __('transcribe.js.'.$format) }}</a>
             @endforeach
           </div>
         </div>
         <label class="tr-translate">
           <span class="sr-only">{{ __('transcribe.js.translate_to') }}</span>
-          <select data-tr-translate aria-label="{{ __('transcribe.js.translate_to') }}">
+          <select data-tr-translate data-vs-select aria-label="{{ __('transcribe.js.translate_to') }}">
             <option value="">{{ __('transcribe.js.original') }}</option>
             @foreach($trTargets as $target)
               <option value="{{ $target['value'] }}">{{ __('transcribe.js.translate') }}: {{ $target['label'] }}</option>

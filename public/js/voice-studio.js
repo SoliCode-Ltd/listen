@@ -1633,7 +1633,10 @@
 
   function boot() {
     document.querySelectorAll('[data-vs-panel]').forEach(initPanel);
+    // Any other dropdown that asks for the studio's own (data-vs-select): Transcribe's language and translation.
+    document.querySelectorAll('select[data-vs-select]').forEach(enhanceSelect);
   }
+  window.ListenEnhanceSelect = enhanceSelect;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
   // picker: the studio's choice card and its dialog on another page (the agents' dialect):
