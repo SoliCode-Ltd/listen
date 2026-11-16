@@ -222,6 +222,9 @@ class AgentCallFlowTest extends TestCase
 
     public function test_a_call_whose_browser_went_quiet_is_charged_up_to_its_last_ping(): void
     {
+        // A call is charged by the second: the clock moves only by the travel below, so the
+        // last ping is 40 s in however slowly the test runs.
+        $this->freezeTime();
         $owner = $this->owner();
         $agent = $this->liveAgent($owner);
         $start = $this->callApi('/calls', ['key' => $agent->mainWidget()->public_key, 'visitor' => 'v-2'])->assertOk();
