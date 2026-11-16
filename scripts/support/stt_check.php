@@ -159,4 +159,31 @@ foreach ($recent as $t) {
         }
     }
 }
+// 4. A three-hour file made ready the way a transcript's first two steps do (ffmpeg only, nothing
+// sent to the model): each step must stay well inside the queue's 140 s.
+echo "\n== Preparing a three-hour file (ffmpeg only, nothing sent) ==\n";
+$tmp = sys_get_temp_dir().'/stt-long-'.bin2hex(random_bytes(4));
+@mkdir($tmp, 0700, true);
+try {
+    $ff = (string) App\Support\AudioFormats::ffmpegPath();
+    $at = microtime(true);
+    // Speech-like sound: 4 s of tone, then 0.9 s of quiet, for three hours.
+    (new Symfony\Component\Process\Process([$ff, '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=220:duration=4', '-f', 'lavfi', '-i', 'anullsrc=r=16000:cl=mono',
+        '-filter_complex', '[0:a]aformat=sample_rates=16000:channel_layouts=mono,volume=0.5[s];[1:a]atrim=0:0.9[q];[s][q]concat=n=2:v=0:a=1', $tmp.'/one.wav']))->setTimeout(120)->mustRun();
+    (new Symfony\Component\Process\Process([$ff, '-v', 'error', '-y', '-stream_loop', '2210', '-i', $tmp.'/one.wav', '-t', '10800', '-c:a', 'libmp3lame', '-b:a', '64k', $tmp.'/long.mp3']))->setTimeout(900)->mustRun();
+    printf("  test file made: %.0f MB in %.0f s\n", filesize($tmp.'/long.mp3') / 1048576, microtime(true) - $at);
+    $at = microtime(true);
+    $transcriber->clean($tmp.'/long.mp3', $tmp.'/audio.mp3');
+    printf("  step 1, the clean copy: %.0f s\n", microtime(true) - $at);
+    $at = microtime(true);
+    $state = $transcriber->prepared($tmp.'/audio.mp3', ['language' => 'auto']);
+    printf("  step 2, measured and planned: %.0f s (%.0f s long, %d pauses, %d parts)\n", microtime(true) - $at, $state['seconds'], count($state['pauses']), count($state['plan']));
+} catch (Throwable $e) {
+    echo '  could not be done: ', mb_substr($e->getMessage(), 0, 300), "\n";
+} finally {
+    foreach ((array) glob($tmp.'/*') as $f) {
+        @unlink((string) $f);
+    }
+    @rmdir($tmp);
+}
 echo "\nDone.\n";
