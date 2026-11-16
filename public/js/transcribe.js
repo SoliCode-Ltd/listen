@@ -735,7 +735,6 @@
           if (tr) tr.remove();
           if (!rows.children.length) emptyRow($('[data-tr-empty-text]').innerHTML);
         }, calm ? 0 : 240);
-        toast(t.deleted);
       }).catch(function (r) {
         if (tr) tr.classList.remove('is-leaving');
         toast(messageOf(r), 'error');
@@ -897,47 +896,48 @@
     $$('[data-tr-root] > :not(.tr-reader):not(.tr-dialog):not(.tr-toast)', document).forEach(appear);
   }
   $('[data-tr-close]').addEventListener('click', close);
+  // The name is changed where it is, as a paragraph is: a box in its place with Save and Cancel.
   function renameInline() {
     if (!current) return;
     var h = $('[data-tr-reader-title]');
-    if ($('.tr-title-input', h.parentNode)) return;
+    var wrap = h.parentNode;
+    if ($('.tr-title-edit', wrap)) return;
     var item = current;
-    var input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'tr-title-input';
-    input.maxLength = 120;
+    var box = document.createElement('div');
+    box.className = 'tr-title-edit';
+    box.innerHTML = '<input type="text" class="tr-title-input" maxlength="120" dir="auto">'
+      + '<button type="button" class="btn btn-primary">' + esc(t.save) + '</button>'
+      + '<button type="button" class="btn btn-ghost">' + esc(t.cancel) + '</button>';
+    var input = $('input', box);
     input.value = cleanTitle(item.title);
-    input.setAttribute('dir', 'auto');
     input.setAttribute('aria-label', t.rename);
     h.hidden = true;
-    h.parentNode.insertBefore(input, h.nextSibling);
+    wrap.insertBefore(box, h.nextSibling);
     input.focus();
     input.select();
-    var done = false;
-    function finish(save) {
-      if (done) return;
-      done = true;
+    function done() { box.remove(); h.hidden = false; }
+    function save() {
       var title = input.value.trim();
-      input.remove();
-      h.hidden = false;
-      if (!save || !title || title === cleanTitle(item.title)) return;
+      if (!title || title === cleanTitle(item.title)) return done();
       var before = item.title;
       item.title = title;
       h.textContent = title;
+      done();
       json('PATCH', item.urls.update, { title: title }).then(function (r) {
         if (r.xhr.status !== 200) throw r;
         updateRow(r.body.transcription);
-        toast(t.renamed);
       }).catch(function (r) {
         item.title = before;
         if (current === item) h.textContent = cleanTitle(before);
         toast(messageOf(r), 'error');
       });
     }
+    var buttons = $$('button', box);
+    buttons[0].addEventListener('click', save);
+    buttons[1].addEventListener('click', done);
     input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); finish(true); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+      if (e.key === 'Enter') { e.preventDefault(); save(); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(); }
     });
-    input.addEventListener('blur', function () { finish(true); });
   }
   $('[data-tr-rename-open]').addEventListener('click', renameInline);
   $('[data-tr-reader-title]').addEventListener('dblclick', renameInline);
@@ -960,7 +960,6 @@
   var tlCanvas = $('[data-tr-tl-canvas]');
   var tlHead = $('[data-tr-tl-head]');
   var tlBadge = $('[data-tr-tl-badge]');
-  var tlZoom = $('[data-tr-tl-zoom]');
   var SPEEDS = [1, 1.25, 1.5, 2, 0.75];
   var tl = { pps: 0, frame: 0, dragging: false, clips: [], lit: null, bars: null, colors: null };
   var waveCanvas = $('[data-tr-tl-wave]');
@@ -988,10 +987,8 @@
     var total = lengthOfAudio();
     var view = tlScroll.clientWidth || 600;
     if (!total) return;
-    // From the whole recording in view (0) to about 160 px for each second (100).
-    var fit = view / total;
-    var most = Math.max(fit, 160);
-    tl.pps = fit * Math.pow(most / fit, Number(tlZoom.value) / 100);
+    // The whole recording in view.
+    tl.pps = view / total;
     var width = Math.max(view, Math.round(total * tl.pps));
     tlCanvas.style.width = width + 'px';
     // The ruler: a label every step that leaves room for it, small marks between.
@@ -1233,22 +1230,6 @@
     audio.currentTime = Math.max(0, Math.min(lengthOfAudio(), to));
     paintBar();
   });
-  // Zoom: the slider, its buttons, or a pinch (ctrl + wheel) on the timeline; the head stays where it was.
-  function zoomTo(value) {
-    tlZoom.value = String(Math.max(0, Math.min(100, value)));
-    var before = audio ? audio.currentTime * tl.pps - tlScroll.scrollLeft : 0;
-    buildTimeline();
-    if (audio) tlScroll.scrollLeft = Math.max(0, audio.currentTime * tl.pps - before);
-  }
-  tlZoom.addEventListener('input', function () { zoomTo(Number(tlZoom.value)); });
-  $$('[data-tr-tl-zoom-step]').forEach(function (b) {
-    b.addEventListener('click', function () { zoomTo(Number(tlZoom.value) + Number(b.getAttribute('data-tr-tl-zoom-step'))); });
-  });
-  tlScroll.addEventListener('wheel', function (e) {
-    if (!e.ctrlKey && !e.metaKey) return;
-    e.preventDefault();
-    zoomTo(Number(tlZoom.value) + (e.deltaY < 0 ? 8 : -8));
-  }, { passive: false });
   var tlResize = 0;
   window.addEventListener('resize', function () {
     clearTimeout(tlResize);
@@ -1265,7 +1246,6 @@
     audio = $('[data-tr-audio]');
     audio.playbackRate = 1;
     $('[data-tr-pb-speed]').textContent = '1×';
-    tlZoom.value = '0';
     tlScroll.scrollLeft = 0;
     reader.classList.toggle('has-wave', !!(waves[tr.id] && typeof waves[tr.id] === 'object'));
     var gone = $('[data-tr-audio-gone]');
@@ -1312,7 +1292,6 @@
       if (current !== item) return;
       current.speaker_list = r.body.transcription.speaker_list;
       renderText(current.rtl && !shownLanguage, !shownLanguage);
-      toast(t.saved);
     }).catch(function (r) { toast(messageOf(r), 'error'); if (current === item) buildTimeline(); });
   }
   // The paragraphs as a document: who speaks and when (the time plays from there), the sentences
@@ -1410,7 +1389,6 @@
     buttons[0].addEventListener('click', function () {
       json('PATCH', current.urls.update, { paragraph: index, text: area.value }).then(function (r) {
         if (r.xhr.status !== 200) { toast(messageOf(r), 'error'); return; }
-        toast(t.saved);
         current = r.body.transcription;
         shown = { paragraphs: current.paragraphs, segments: current.segments };
         renderText(current.rtl, true);
@@ -1432,7 +1410,6 @@
       e.preventDefault();
       if (!current) return;
       var url = current.urls['export_' + a.getAttribute('data-tr-export')] + (shownLanguage ? '?lang=' + encodeURIComponent(shownLanguage) : '');
-      toast(fill(t.downloading, { format: a.getAttribute('data-tr-export').toUpperCase() }));
       window.location.href = url;
     });
   });

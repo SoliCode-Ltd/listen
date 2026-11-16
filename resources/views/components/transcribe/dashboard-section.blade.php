@@ -332,15 +332,7 @@
           </div>
         </div>
         <div class="tr-tl-controls">
-          <div class="tr-tl-zoom">
-            <button type="button" class="tr-tl-btn" data-tr-tl-zoom-step="-20" aria-label="{{ __('transcribe.js.zoom_out') }}" title="{{ __('transcribe.js.zoom_out') }}">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4M8.5 11h5"/></svg>
-            </button>
-            <input type="range" class="tr-tl-zoom-range" data-tr-tl-zoom min="0" max="100" step="1" value="0" aria-label="{{ __('transcribe.js.zoom') }}">
-            <button type="button" class="tr-tl-btn" data-tr-tl-zoom-step="20" aria-label="{{ __('transcribe.js.zoom_in') }}" title="{{ __('transcribe.js.zoom_in') }}">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4M8.5 11h5M11 8.5v5"/></svg>
-            </button>
-          </div>
+          <div class="tr-tl-end" aria-hidden="true"></div>
           <div class="tr-tl-transport">
             <button type="button" class="tr-pb-speed" data-tr-pb-speed aria-label="{{ __('transcribe.js.speed') }}" title="{{ __('transcribe.js.speed') }}">1×</button>
             <button type="button" class="tr-pb-play" data-tr-pb-play aria-label="{{ __('transcribe.js.play') }}"
