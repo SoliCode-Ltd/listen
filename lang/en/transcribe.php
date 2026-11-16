@@ -117,7 +117,7 @@ return [
         'download' => 'Download',
         'delete' => 'Delete',
         'delete_confirm' => 'Delete this transcript? Its minutes stay counted this month.',
-        'copy' => 'Copy text',
+        'copy' => 'Copy',
         'copied' => 'Copied',
         'send_studio' => 'Text to speech',
         'translate' => 'Translate',
