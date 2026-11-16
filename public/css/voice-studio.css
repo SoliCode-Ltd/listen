@@ -223,12 +223,6 @@ html[dir="rtl"] .vs-editor-foot { padding: .7rem 1.2rem .7rem .9rem; }
 }
 
 /* Tag groups and chips */
-  display: block;
-  margin-bottom: .35rem;
-  font-size: .8rem;
-  font-weight: 600;
-  color: var(--muted);
-}
 .vs-section-title {
   margin-top: .9rem;
   font-size: .95rem;
