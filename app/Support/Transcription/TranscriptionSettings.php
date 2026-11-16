@@ -24,33 +24,123 @@ final class TranscriptionSettings
     public const AUDIENCE_EVERYONE = 'everyone';
 
     /**
-     * Languages a member can choose, besides "Detect automatically": those
-     * measured on staging first, then those not yet measured on real speech.
+     * Every language a member can choose, besides "Detect automatically", in
+     * the order of their English names; "tested": its accuracy was measured on
+     * real speech on staging (the admin sees which).
      *
      * @var array<string, array{0: string, 1: string, 2: bool}> code => [English, Arabic, tested]
      */
     public const LANGUAGES = [
+        'af' => ['Afrikaans', 'الأفريقانية', false],
+        'am' => ['Amharic', 'الأمهرية', false],
         'ar' => ['Arabic', 'العربية', true],
-        'en' => ['English', 'الإنجليزية', true],
-        'fr' => ['French', 'الفرنسية', true],
-        'es' => ['Spanish', 'الإسبانية', true],
-        'de' => ['German', 'الألمانية', true],
-        'ur' => ['Urdu', 'الأردية', true],
-        'tr' => ['Turkish', 'التركية', false],
-        'it' => ['Italian', 'الإيطالية', false],
-        'pt' => ['Portuguese', 'البرتغالية', false],
-        'nl' => ['Dutch', 'الهولندية', false],
-        'ru' => ['Russian', 'الروسية', false],
-        'hi' => ['Hindi', 'الهندية', false],
-        'fa' => ['Persian', 'الفارسية', false],
-        'id' => ['Indonesian', 'الإندونيسية', false],
-        'ja' => ['Japanese', 'اليابانية', false],
-        'ko' => ['Korean', 'الكورية', false],
+        'hy' => ['Armenian', 'الأرمنية', false],
+        'as' => ['Assamese', 'الأسامية', false],
+        'ast' => ['Asturian', 'الأسترية', false],
+        'az' => ['Azerbaijani', 'الأذربيجانية', false],
+        'be' => ['Belarusian', 'البيلاروسية', false],
+        'bn' => ['Bengali', 'البنغالية', false],
+        'bs' => ['Bosnian', 'البوسنية', false],
+        'bg' => ['Bulgarian', 'البلغارية', false],
+        'my' => ['Burmese', 'البورمية', false],
+        'yue' => ['Cantonese', 'الكانتونية', false],
+        'ca' => ['Catalan', 'الكتالانية', false],
+        'ceb' => ['Cebuano', 'السيبوانية', false],
+        'ny' => ['Chichewa', 'الشيشيوا', false],
         'zh' => ['Chinese', 'الصينية', false],
+        'hr' => ['Croatian', 'الكرواتية', false],
+        'cs' => ['Czech', 'التشيكية', false],
+        'da' => ['Danish', 'الدنماركية', false],
+        'nl' => ['Dutch', 'الهولندية', false],
+        'en' => ['English', 'الإنجليزية', true],
+        'et' => ['Estonian', 'الإستونية', false],
+        'fil' => ['Filipino', 'الفلبينية', false],
+        'fi' => ['Finnish', 'الفنلندية', false],
+        'fr' => ['French', 'الفرنسية', true],
+        'ff' => ['Fulah', 'الفولانية', false],
+        'gl' => ['Galician', 'الجاليكية', false],
+        'lg' => ['Ganda', 'اللوغندية', false],
+        'ka' => ['Georgian', 'الجورجية', false],
+        'de' => ['German', 'الألمانية', true],
+        'el' => ['Greek', 'اليونانية', false],
+        'gu' => ['Gujarati', 'الغوجاراتية', false],
+        'ha' => ['Hausa', 'الهوسا', false],
+        'he' => ['Hebrew', 'العبرية', false],
+        'hi' => ['Hindi', 'الهندية', false],
+        'hu' => ['Hungarian', 'الهنغارية', false],
+        'is' => ['Icelandic', 'الأيسلندية', false],
+        'ig' => ['Igbo', 'الإيغبو', false],
+        'id' => ['Indonesian', 'الإندونيسية', false],
+        'ga' => ['Irish', 'الأيرلندية', false],
+        'it' => ['Italian', 'الإيطالية', false],
+        'ja' => ['Japanese', 'اليابانية', false],
+        'jv' => ['Javanese', 'الجاوية', false],
+        'kea' => ['Kabuverdianu', 'الكابوفيردية', false],
+        'kn' => ['Kannada', 'الكانادا', false],
+        'kk' => ['Kazakh', 'الكازاخية', false],
+        'km' => ['Khmer', 'الخميرية', false],
+        'ko' => ['Korean', 'الكورية', false],
+        'ku' => ['Kurdish', 'الكردية', false],
+        'ky' => ['Kyrgyz', 'القيرغيزية', false],
+        'lo' => ['Lao', 'اللاوية', false],
+        'lv' => ['Latvian', 'اللاتفية', false],
+        'ln' => ['Lingala', 'اللينغالا', false],
+        'lt' => ['Lithuanian', 'الليتوانية', false],
+        'luo' => ['Luo', 'اللوو', false],
+        'lb' => ['Luxembourgish', 'اللوكسمبورغية', false],
+        'mk' => ['Macedonian', 'المقدونية', false],
+        'ms' => ['Malay', 'الملايوية', false],
+        'ml' => ['Malayalam', 'المالايالامية', false],
+        'mt' => ['Maltese', 'المالطية', false],
+        'mi' => ['Māori', 'الماورية', false],
+        'mr' => ['Marathi', 'الماراثية', false],
+        'mn' => ['Mongolian', 'المنغولية', false],
+        'ne' => ['Nepali', 'النيبالية', false],
+        'nso' => ['Northern Sotho', 'السوتو الشمالية', false],
+        'no' => ['Norwegian', 'النرويجية', false],
+        'oc' => ['Occitan', 'الأوكسيتانية', false],
+        'or' => ['Odia', 'الأوديا', false],
+        'om' => ['Oromo', 'الأورومية', false],
+        'ps' => ['Pashto', 'البشتو', false],
+        'fa' => ['Persian', 'الفارسية', false],
+        'pl' => ['Polish', 'البولندية', false],
+        'pt' => ['Portuguese', 'البرتغالية', false],
+        'pa' => ['Punjabi', 'البنجابية', false],
+        'ro' => ['Romanian', 'الرومانية', false],
+        'ru' => ['Russian', 'الروسية', false],
+        'sr' => ['Serbian', 'الصربية', false],
+        'sn' => ['Shona', 'الشونا', false],
+        'sd' => ['Sindhi', 'السندية', false],
+        'sk' => ['Slovak', 'السلوفاكية', false],
+        'sl' => ['Slovenian', 'السلوفينية', false],
+        'so' => ['Somali', 'الصومالية', false],
+        'es' => ['Spanish', 'الإسبانية', true],
+        'sw' => ['Swahili', 'السواحلية', false],
+        'sv' => ['Swedish', 'السويدية', false],
+        'ta' => ['Tamil', 'التاميلية', false],
+        'tg' => ['Tajik', 'الطاجيكية', false],
+        'te' => ['Telugu', 'التيلوجو', false],
+        'th' => ['Thai', 'التايلاندية', false],
+        'tr' => ['Turkish', 'التركية', false],
+        'uk' => ['Ukrainian', 'الأوكرانية', false],
+        'umb' => ['Umbundu', 'الأمبوندو', false],
+        'ur' => ['Urdu', 'الأردية', true],
+        'uz' => ['Uzbek', 'الأوزبكية', false],
+        'vi' => ['Vietnamese', 'الفيتنامية', false],
+        'cy' => ['Welsh', 'الويلزية', false],
+        'wo' => ['Wolof', 'الولوفية', false],
+        'xh' => ['Xhosa', 'الخوسا', false],
+        'zu' => ['Zulu', 'الزولو', false],
     ];
 
     /** Right-to-left languages: their transcripts and exports read right to left. */
-    public const RTL = ['ar', 'ur', 'fa', 'he'];
+    public const RTL = ['ar', 'ur', 'fa', 'he', 'ps', 'sd'];
+
+    /** Spoken languages the translator does not take: they can be written out, not shown in another language. */
+    public const NOT_TRANSLATED = ['ast', 'kea', 'umb'];
+
+    /** Where the translator knows a language by another code. */
+    public const TRANSLATOR_CODES = ['fil' => 'tl', 'zh' => 'zh-CN'];
 
     public static function audience(): string
     {
@@ -114,7 +204,8 @@ final class TranscriptionSettings
     public static function languages(): array
     {
         $saved = SiteSetting::get('transcription_languages');
-        $codes = is_string($saved) && $saved !== '' ? (array) json_decode($saved, true) : array_keys(array_filter(self::LANGUAGES, fn ($l) => $l[2]));
+        // Every language unless the admin chose some (Speech to text → Settings).
+        $codes = is_string($saved) && $saved !== '' ? (array) json_decode($saved, true) : array_keys(self::LANGUAGES);
 
         return array_values(array_filter(array_keys(self::LANGUAGES), fn ($code) => in_array($code, $codes, true)));
     }

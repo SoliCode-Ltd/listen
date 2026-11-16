@@ -97,6 +97,8 @@ return [
         'col_actions' => 'Actions',
         'empty' => 'Your transcripts will appear here.',
         'no_match' => 'No transcript matches your search.',
+        'search_language' => 'Search languages',
+        'no_language' => 'No language found',
         'more' => 'Show more',
     ],
 
@@ -129,7 +131,7 @@ return [
         'delete_confirm' => 'Delete this transcript? Its minutes stay counted this month.',
         'copy' => 'Copy text',
         'copied' => 'Copied',
-        'send_studio' => 'Send to studio',
+        'send_studio' => 'Open in Text to speech',
         'translate' => 'Translate',
         'translate_to' => 'Show in',
         'original' => 'Original',

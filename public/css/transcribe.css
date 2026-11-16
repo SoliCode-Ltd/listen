@@ -241,7 +241,22 @@ html[dir="rtl"] .tr-back svg { transform: scaleX(-1); }
 .tr-language .vs-select { min-width: min(260px, 100%); }
 /* "Show in": the languages, the one shown ticked. */
 .tr-menu-head { margin: 0; padding: .45rem .75rem .35rem; color: var(--muted); font-size: .78rem; font-weight: 700; letter-spacing: .02em; }
-.tr-language-list { min-width: 12rem; }
+.tr-language-list { min-width: 15rem; max-height: 380px; padding-top: 0; }
+.tr-language-list .tr-menu-head { position: sticky; top: 0; z-index: 1; padding-top: .6rem; background: var(--surface); }
+.tr-menu-search { position: sticky; top: 1.95rem; z-index: 1; display: flex; align-items: center; gap: .5rem; margin: 0 0 4px; padding: 0 .75rem; border-bottom: 1px solid color-mix(in oklab, var(--line) 85%, transparent); background: var(--surface); }
+.tr-menu-search svg { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; color: var(--muted); }
+/* Flat inside its menu: none of the site's own field look (border, ring, the browser's clear button). */
+.tr-menu-search input[type=search], .tr-menu-search input[type=search]:focus, .tr-menu-search input[type=search]:hover {
+  flex: 1; min-width: 0; width: auto; height: 42px; margin: 0; padding: 0;
+  border: 0 !important; border-radius: 0 !important; box-shadow: none !important; outline: none !important;
+  background: none !important; color: var(--text); font: inherit; font-size: .95rem;
+  -webkit-appearance: none; appearance: none;
+}
+.tr-menu-search input[type=search]::-webkit-search-cancel-button, .tr-menu-search input[type=search]::-webkit-search-decoration { -webkit-appearance: none; display: none; }
+.tr-menu-search:focus-within svg { color: var(--text); }
+.tr-menu-search input::placeholder { color: var(--muted); }
+.tr-menu-list [data-search][hidden] { display: none; }
+.tr-menu-none { margin: 0; padding: .75rem; color: var(--muted); font-size: .92rem; }
 .tr-language-list .tr-tick { visibility: hidden; color: var(--accent-text, var(--a)); }
 .tr-language-list [aria-checked="true"] { font-weight: 700; }
 .tr-language-list [aria-checked="true"] .tr-tick { visibility: visible; }

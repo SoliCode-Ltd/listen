@@ -531,16 +531,35 @@
   // Menus: one open at a time, as the studio's dropdowns behave: opened by click, Enter, Space
   // or the down arrow; moved through with the arrows, Home and End; closed by a click
   // elsewhere, Escape (back to its button) or Tab. One near the bottom of the screen opens upwards.
-  function menuItems(m) { return $$('a, button', $('.tr-menu-list', m)); }
+  function menuItems(m) { return $$('a, button', $('.tr-menu-list', m)).filter(function (item) { return !item.hidden; }); }
+  // A menu with a search box (the languages): what is typed narrows it, by either name or code.
+  function fold(s) { return String(s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f\u064b-\u065f\u0670]/g, '').replace(/[أإآ]/g, 'ا').trim(); }
+  function filterMenu(m, query) {
+    var q = fold(query), any = false;
+    $$('[data-search]', $('.tr-menu-list', m)).forEach(function (item) {
+      var on = q === '' || fold(item.getAttribute('data-search')).indexOf(q) !== -1;
+      item.hidden = !on;
+      any = any || on;
+    });
+    var none = $('[data-tr-language-none]', m);
+    if (none) none.hidden = any;
+  }
   function setMenu(m, open, focusFirst) {
     var list = $('.tr-menu-list', m);
     var button = $('[data-tr-menu-button]', m);
     if (open) {
       $$('[data-tr-menu].is-open').forEach(function (other) { if (other !== m) setMenu(other, false); });
+      var search = $('input[type=search]', m);
+      if (search) { search.value = ''; filterMenu(m, ''); }
       list.hidden = false;
       var room = window.innerHeight - button.getBoundingClientRect().bottom;
       m.classList.toggle('is-up', room < list.offsetHeight + 16 && button.getBoundingClientRect().top > list.offsetHeight + 16);
-      if (focusFirst) { var first = menuItems(m)[0]; if (first) first.focus(); }
+      if (search) {
+        // Straight into the search box, the chosen language in view below it.
+        var chosen = $('[aria-checked="true"]', m);
+        if (chosen) chosen.scrollIntoView({ block: 'nearest' });
+        search.focus();
+      } else if (focusFirst) { var first = menuItems(m)[0]; if (first) first.focus(); }
     } else {
       list.hidden = true;
       m.classList.remove('is-up');
@@ -557,7 +576,8 @@
       setMenu(m, !m.classList.contains('is-open'), e.detail === 0);
       return;
     }
-    // A choice in a menu closes it; a click anywhere else closes them all.
+    // A choice in a menu closes it; a click anywhere else closes them all (not one in its search box or heading).
+    if (inMenu && !(e.target.closest('a, button'))) return;
     $$('[data-tr-menu].is-open').forEach(function (m) { if (!inMenu || m === inMenu) setMenu(m, false); });
   });
   root.addEventListener('keydown', function (e) {
@@ -566,6 +586,19 @@
     var items = menuItems(m);
     var onButton = e.target.matches('[data-tr-menu-button]');
     var at = items.indexOf(e.target);
+    if (e.target.matches('input[type=search]')) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        e.preventDefault();
+        if (items[0]) (e.key === 'Enter' ? items[0].click() : items[0].focus());
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setMenu(m, false);
+        $('[data-tr-menu-button]', m).focus();
+      } else if (e.key === 'Tab') {
+        setMenu(m, false);
+      }
+      return;
+    }
     if (onButton && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
       e.preventDefault();
       setMenu(m, true, false);
@@ -573,6 +606,8 @@
     } else if (!onButton && at !== -1) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
+        var search = $('input[type=search]', m);
+        if (search && at === 0 && e.key === 'ArrowUp') { search.focus(); return; }
         items[(at + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
       } else if (e.key === 'Home' || e.key === 'End') {
         e.preventDefault();
@@ -777,13 +812,14 @@
   function languageMenu(chosen) {
     var choices = [{ value: '', label: t.original }].concat((c.targets || []).filter(function (target) { return target.value !== current.language; }));
     $('[data-tr-language-items]').innerHTML = choices.map(function (choice) {
-      return '<button type="button" role="menuitemradio" aria-checked="' + (choice.value === chosen ? 'true' : 'false') + '" data-tr-language="' + esc(choice.value) + '">'
+      return '<button type="button" role="menuitemradio" aria-checked="' + (choice.value === chosen ? 'true' : 'false') + '" data-tr-language="' + esc(choice.value) + '" data-search="' + esc(choice.search || choice.label) + '">'
         + TICK + '<span>' + esc(choice.label) + '</span></button>';
     }).join('');
     var label = (choices.filter(function (choice) { return choice.value === chosen; })[0] || choices[0]).label;
     $('[data-tr-language-current]').textContent = label;
     $('[data-tr-language-button]').setAttribute('aria-label', t.translate_to + ': ' + label);
   }
+  $('[data-tr-language-search]').addEventListener('input', function (e) { filterMenu(e.target.closest('[data-tr-menu]'), e.target.value); });
   $('[data-tr-language-items]').addEventListener('click', function (e) {
     var choice = e.target.closest('[data-tr-language]');
     if (choice) showIn(choice.getAttribute('data-tr-language'));

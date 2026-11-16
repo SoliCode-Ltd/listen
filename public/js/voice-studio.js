@@ -116,6 +116,50 @@
     var items = [];
     var active = -1;
 
+    // A long list (data-vs-search="Search ..."): a search box at its top narrows it as one types,
+    // by the option's text or its data-search (other names, a code).
+    var search = null, none = null;
+    if (select.hasAttribute('data-vs-search')) {
+      wrap.classList.add('has-search');
+      search = document.createElement('input');
+      search.type = 'search';
+      search.className = 'vs-select-search';
+      search.placeholder = select.getAttribute('data-vs-search');
+      search.setAttribute('aria-label', search.placeholder);
+      search.autocomplete = 'off';
+      search.spellcheck = false;
+      none = document.createElement('div');
+      none.className = 'vs-select-none';
+      none.textContent = select.getAttribute('data-vs-none') || '';
+      none.hidden = true;
+      search.addEventListener('input', function () { narrow(search.value); });
+      search.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          setActive(step(active, e.key === 'ArrowDown' ? 1 : -1));
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (items[active] && !items[active].hidden) choose(items[active]);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          toggle(false);
+          button.focus();
+        } else if (e.key === 'Tab') {
+          toggle(false);
+        }
+      });
+    }
+    function narrow(query) {
+      var q = fold(query), first = -1;
+      items.forEach(function (item, i) {
+        var on = q === '' || fold(item.textContent + ' ' + (item.__opt.getAttribute('data-search') || '')).indexOf(q) !== -1;
+        item.hidden = !on;
+        if (on && first === -1) first = i;
+      });
+      if (none) none.hidden = first !== -1;
+      if (q !== '') setActive(first);
+    }
+
     // Speaker menus (data-speaker-avatar) show each speaker's avatar from the option's data-avatar.
     var withAvatars = select.hasAttribute('data-speaker-avatar');
     function avatarFor(opt) {
@@ -145,6 +189,7 @@
     function build() {
       list.innerHTML = '';
       items = [];
+      if (search) list.appendChild(search);
       Array.prototype.forEach.call(select.children, function (node) {
         if (node.tagName === 'OPTGROUP') {
           var head = document.createElement('div');
@@ -156,6 +201,7 @@
           addItem(node);
         }
       });
+      if (none) list.appendChild(none);
       syncLabel();
     }
     function addItem(opt) {
@@ -201,8 +247,10 @@
         var r = button.getBoundingClientRect();
         var below = window.innerHeight - r.bottom;
         wrap.classList.toggle('is-up', below < Math.min(list.scrollHeight, 320) + 16 && r.top > below);
+        if (search) { search.value = ''; narrow(''); }
         setActive(items.findIndex(function (it) { return it.__opt === select.options[select.selectedIndex]; }));
         openMenu = toggle;
+        if (search) setTimeout(function () { search.focus(); }, 0);
       } else {
         list.hidden = true;
         if (openMenu === toggle) openMenu = null;
@@ -212,7 +260,7 @@
     }
     function step(from, dir) {
       for (var i = from + dir; i >= 0 && i < items.length; i += dir) {
-        if (items[i].getAttribute('aria-disabled') !== 'true') return i;
+        if (items[i].getAttribute('aria-disabled') !== 'true' && !items[i].hidden) return i;
       }
       return from;
     }

@@ -19,14 +19,16 @@ class TranscriptionSettingsAdminTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_before_anything_is_saved_the_config_numbers_and_the_measured_languages_apply(): void
+    public function test_before_anything_is_saved_the_config_numbers_and_every_language_apply(): void
     {
         $this->assertSame(TranscriptionSettings::AUDIENCE_PREVIEW, TranscriptionSettings::audience());
         $this->assertSame(60, TranscriptionSettings::freeTrySeconds());
         $this->assertSame(50, TranscriptionSettings::freePerDay());
         $this->assertSame(3000, TranscriptionSettings::dailyMinutes());
         $this->assertSame(7, TranscriptionSettings::keepAudioDays());
-        $this->assertSame(['ar', 'en', 'fr', 'es', 'de', 'ur'], TranscriptionSettings::languages());
+        $this->assertSame(array_keys(TranscriptionSettings::LANGUAGES), TranscriptionSettings::languages(), 'every language until the admin chooses');
+        $this->assertCount(100, TranscriptionSettings::languages());
+        $this->assertSame(['ar', 'de', 'en', 'es', 'fr', 'ur'], array_values(array_intersect(['ar', 'de', 'en', 'es', 'fr', 'ur'], array_keys(array_filter(TranscriptionSettings::LANGUAGES, fn ($l) => $l[2])))));
         $this->assertFalse(TranscriptionSettings::review());
         $this->assertSame(0.0025, TranscriptionSettings::costPerMinute());
         $this->assertTrue(TranscriptionSettings::visibleTo(VoiceCloningAccess::PREVIEW_EMAIL));

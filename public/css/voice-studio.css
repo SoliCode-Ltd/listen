@@ -336,6 +336,38 @@ html[dir="rtl"] .vs-select-button { padding: 0 1rem 0 .9rem; }
 }
 .vs-select-list[hidden] { display: none; }
 .vs-select.is-up .vs-select-list { top: auto; bottom: calc(100% + 6px); animation-name: vs-select-in-up; }
+/* A long list's search box (data-vs-search), held at the top while the list scrolls under it:
+   flat inside the list, a magnifier at its start, none of the site's own field look. */
+.vs-select.has-search .vs-select-list { max-height: 360px; padding-top: 0; }
+.vs-select-list input.vs-select-search,
+.vs-select-list input.vs-select-search:focus,
+.vs-select-list input.vs-select-search:hover {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: block;
+  width: calc(100% + 12px);
+  height: 46px;
+  margin: 0 -6px 6px;
+  padding: 0 .9rem 0 2.5rem;
+  border: 0 !important;
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 85%, transparent) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4.5 4.5'/%3E%3C/svg%3E") no-repeat .9rem 50% / 16px 16px !important;
+  color: var(--text);
+  font: inherit;
+  font-size: .95rem;
+  -webkit-appearance: none;
+  appearance: none;
+}
+html[dir="rtl"] .vs-select-list input.vs-select-search { padding: 0 2.5rem 0 .9rem; background-position: calc(100% - .9rem) 50% !important; }
+.vs-select-search::placeholder { color: var(--muted); }
+.vs-select-search::-webkit-search-cancel-button, .vs-select-search::-webkit-search-decoration { -webkit-appearance: none; display: none; }
+.vs-select-option[hidden] { display: none; }
+.vs-select-none { padding: .75rem; color: var(--muted); font-size: .92rem; }
+.vs-select-none[hidden] { display: none; }
 @keyframes vs-select-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @keyframes vs-select-in-up { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .vs-select-option {

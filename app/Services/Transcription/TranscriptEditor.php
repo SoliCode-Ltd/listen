@@ -75,11 +75,11 @@ final class TranscriptEditor
         if (is_array($kept)) {
             return $kept;
         }
-        $source = (string) ($t->language ?: 'en');
+        $source = self::translatorCode((string) ($t->language ?: 'en'));
         $paragraphs = [];
         $segments = [];
         foreach ((array) $t->paragraphs as $i => $p) {
-            $text = $this->translator->maybeTranslate((string) $p['text'], $source, $language, true);
+            $text = $this->translator->maybeTranslate((string) $p['text'], $source, self::translatorCode($language), true);
             $paragraph = ['speaker' => $p['speaker'], 'text' => $text, 'start' => (float) $p['start'], 'end' => (float) $p['end']];
             $paragraphs[] = $paragraph;
             array_push($segments, ...self::spread($paragraph, $i));
@@ -108,6 +108,12 @@ final class TranscriptEditor
     /** Languages a transcript can be translated into: those members can choose, and the site's own two. */
     public static function targets(): array
     {
-        return array_values(array_unique(array_merge(['ar', 'en'], array_keys(TranscriptionSettings::LANGUAGES))));
+        return array_values(array_diff(array_keys(TranscriptionSettings::LANGUAGES), TranscriptionSettings::NOT_TRANSLATED));
+    }
+
+    /** The code the translator knows a language by (Filipino is "tl" there). */
+    public static function translatorCode(string $code): string
+    {
+        return TranscriptionSettings::TRANSLATOR_CODES[$code] ?? $code;
     }
 }

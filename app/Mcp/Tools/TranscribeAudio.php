@@ -47,7 +47,7 @@ class TranscribeAudio extends ListenTool
             'audio_url' => $schema->string()->required()
                 ->description('A public http(s) link straight to the audio or video file (not a web page that plays it).'),
             'language_code' => $schema->string()
-                ->description('The language spoken, such as "ar" or "en". Leave it out to detect it: '.implode(', ', TranscriptionSettings::languages()).'.'),
+                ->description('The language spoken, as a code such as "ar", "en" or "fr" ('.count(TranscriptionSettings::languages()).' languages). Leave it out to detect it.'),
             'title' => $schema->string()->description('A name for the transcript in the person\'s list. Defaults to the file name.'),
         ];
     }

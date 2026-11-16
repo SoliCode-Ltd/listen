@@ -8,6 +8,7 @@ use App\Services\Tts\GeminiKeyManager;
 use App\Support\ArabicDialects;
 use App\Support\AudioFormats;
 use App\Support\EnglishAccents;
+use App\Support\Transcription\TranscriptionSettings;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
@@ -823,6 +824,9 @@ final class Transcriber
         $code = strtolower(trim($code));
         if ($code === '' || $code === 'auto') {
             return '';
+        }
+        if (isset(TranscriptionSettings::LANGUAGES[$code])) {
+            return TranscriptionSettings::LANGUAGES[$code][0];
         }
         $name = class_exists(\Locale::class) ? (string) \Locale::getDisplayLanguage($code, 'en') : '';
 

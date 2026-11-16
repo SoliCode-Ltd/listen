@@ -17,10 +17,20 @@
 @props(['account'])
 @php
   $trAr = app()->getLocale() === 'ar';
-  $trLanguages = collect(\App\Support\Transcription\TranscriptionSettings::languages())
-      ->map(fn (string $code): array => ['value' => $code, 'label' => \App\Support\Transcription\TranscriptionPresenter::languageName($code, $trAr)])->values()->all();
-  $trTargets = collect(\App\Services\Transcription\TranscriptEditor::targets())
-      ->map(fn (string $code): array => ['value' => $code, 'label' => \App\Support\Transcription\TranscriptionPresenter::languageName($code, $trAr)])->values()->all();
+  // Every language, by its name in the page's language; found by either name or its code.
+  $trLanguageList = function (array $codes) use ($trAr): array {
+      $rows = array_map(function (string $code) use ($trAr): array {
+          $names = \App\Support\Transcription\TranscriptionSettings::LANGUAGES[$code] ?? [$code, $code];
+
+          return ['value' => $code, 'label' => $trAr ? $names[1] : $names[0], 'search' => $names[0].' '.$names[1].' '.$code];
+      }, $codes);
+      $collator = class_exists(\Collator::class) ? new \Collator($trAr ? 'ar' : 'en') : null;
+      usort($rows, fn (array $a, array $b): int => $collator ? $collator->compare($a['label'], $b['label']) : strcmp($a['label'], $b['label']));
+
+      return $rows;
+  };
+  $trLanguages = $trLanguageList(\App\Support\Transcription\TranscriptionSettings::languages());
+  $trTargets = $trLanguageList(\App\Services\Transcription\TranscriptEditor::targets());
   $trMaxMb = \App\Support\Transcription\TranscriptionSettings::maxUploadMb();
   $trLongest = \App\Support\Transcription\Minutes::format((int) $account['max_file_seconds'], null, false);
   $trLeftShare = $account['allowance_seconds'] > 0 ? max(0, min(100, (int) round($account['left_seconds'] / $account['allowance_seconds'] * 100))) : 0;
@@ -206,10 +216,10 @@
         <div class="vs-editor-foot dub-foot tr-foot">
           <div class="tr-language">
             <label class="vs-field-label" for="trLanguage">{{ __('transcribe.page.language') }}</label>
-            <select id="trLanguage" data-tr-language data-vs-select>
-              <option value="auto">{{ __('transcribe.page.detect') }}</option>
+            <select id="trLanguage" data-tr-language data-vs-select data-vs-search="{{ __('transcribe.page.search_language') }}" data-vs-none="{{ __('transcribe.page.no_language') }}">
+              <option value="auto" data-search="{{ __('transcribe.page.detect') }} auto">{{ __('transcribe.page.detect') }}</option>
               @foreach($trLanguages as $language)
-                <option value="{{ $language['value'] }}">{{ $language['label'] }}</option>
+                <option value="{{ $language['value'] }}" data-search="{{ $language['search'] }}">{{ $language['label'] }}</option>
               @endforeach
             </select>
           </div>
@@ -261,11 +271,16 @@
           </button>
           <div class="tr-menu-list tr-language-list" role="menu" hidden aria-label="{{ __('transcribe.js.translate_to') }}">
             <p class="tr-menu-head" aria-hidden="true">{{ __('transcribe.js.translate_to') }}</p>
+            <div class="tr-menu-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+              <input type="search" data-tr-language-search placeholder="{{ __('transcribe.page.search_language') }}" aria-label="{{ __('transcribe.page.search_language') }}" autocomplete="off" spellcheck="false">
+            </div>
             <div data-tr-language-items></div>
+            <p class="tr-menu-none" data-tr-language-none hidden>{{ __('transcribe.page.no_language') }}</p>
           </div>
         </div>
         <button type="button" class="tr-tool" data-tr-studio-send title="{{ __('transcribe.js.send_studio') }}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M7.5 7v10M11 9v6"/><path d="M14 12h6.5M17.5 9l3 3-3 3"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg>
           <span class="tr-tool-label">{{ __('transcribe.js.send_studio') }}</span>
         </button>
         <button type="button" class="tr-tool tr-tool-icon tr-tool-danger" data-tr-delete aria-label="{{ __('transcribe.js.delete') }}" title="{{ __('transcribe.js.delete') }}">

@@ -118,7 +118,10 @@ class TranscriptionSettingsPage extends Page implements HasForms
                     ->schema([
                         CheckboxList::make('transcription_languages')
                             ->label('Languages members can choose')
-                            ->options(collect(TranscriptionSettings::LANGUAGES)->mapWithKeys(fn (array $l, string $code) => [$code => $l[0].' — '.$l[1].($l[2] ? '' : ' (not yet measured)')])->all())
+                            ->options(collect(TranscriptionSettings::LANGUAGES)->mapWithKeys(fn (array $l, string $code) => [$code => $l[0].' — '.$l[1].($l[2] ? ' (measured)' : '')])->all())
+                            ->helperText('All are offered unless you untick some. "Measured": its accuracy was checked on real speech.')
+                            ->searchable()
+                            ->bulkToggleable()
                             ->columns(3)
                             ->required(),
                     ]),
