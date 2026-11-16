@@ -26,8 +26,9 @@
       width: min(1520px, calc(100% - 3rem)); margin: 0 auto; padding: 1.25rem 0 6rem;
       display: grid; grid-template-columns: 248px minmax(0, 1fr); gap: 3.5rem; align-items: start;
     }
-    /* The site's font rule skips code and .mono: they take the site's own monospace font. */
-    .docs-wrap code, .docs-wrap pre, .docs-wrap .mono, .docs-method, .docs-status, .code-tag { font-family: var(--mono); }
+    /* The site's font rule skips code and .mono: they take the site's own monospace font,
+       showing the characters themselves (no ligatures: a subtitle file's --> stays three). */
+    .docs-wrap code, .docs-wrap pre, .docs-wrap .mono, .docs-method, .docs-status, .code-tag { font-family: var(--mono); font-variant-ligatures: none; }
     .docs-main { min-width: 0; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
@@ -131,8 +132,8 @@
     .docs-play:hover { background: #ddd2ff; }
     .docs-play:active { transform: scale(.96); }
     .docs-play:focus-visible { outline: 2px solid var(--lilac); outline-offset: 3px; }
+    /* The play triangle is drawn a little right of its box's middle, so its weight sits in the circle's centre. */
     .docs-play svg { width: 16px; height: 16px; fill: currentColor; }
-    .docs-play .i-play { margin-left: 2px; }
     .docs-play .i-pause { display: none; }
     .docs-play[aria-pressed="true"] .i-play { display: none; }
     .docs-play[aria-pressed="true"] .i-pause { display: block; }
@@ -197,12 +198,13 @@
     .docs-index a { display: grid; grid-template-columns: 3.6rem auto minmax(0, 1fr); align-items: center; gap: .85rem; padding: .7rem 1rem; color: var(--text); text-decoration: none; }
     .docs-index a:hover { background: color-mix(in oklab, var(--violet) 6%, transparent); }
     .docs-index a:focus-visible { outline: 2px solid var(--violet); outline-offset: -2px; }
-    .docs-index code { padding: 0; background: none; font-size: .9rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+    /* A path breaks only before its slashes (<wbr> in the page), so on a phone it wraps whole. */
+    .docs-index code { padding: 0; background: none; font-size: .9rem; font-weight: 500; white-space: normal; overflow-wrap: break-word; }
     .docs-index-name { min-width: 0; color: var(--muted); font-size: .94rem; text-align: end; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .docs-endpoint { border-top: 1px solid var(--line-soft); }
     .docs-text .docs-endpoint-title { margin: 0 0 .8rem; font-size: 1.34rem; font-weight: 720; letter-spacing: -.015em; line-height: 1.3; }
     .docs-route { display: inline-flex; align-items: center; gap: .65rem; max-width: 100%; margin: 0 0 1.1rem; padding: .42rem .8rem .42rem .45rem; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); direction: ltr; overflow-x: auto; scrollbar-width: none; }
-    .docs-route code { padding: 0; background: none; font-size: .94rem; font-weight: 500; color: var(--text); white-space: nowrap; }
+    .docs-route code { padding: 0; background: none; font-size: .94rem; font-weight: 500; color: var(--text); white-space: normal; overflow-wrap: break-word; }
     .docs-method { display: inline-flex; justify-content: center; align-items: center; min-width: 3.4rem; padding: .22rem .4rem; border-radius: 5px; font-size: .68rem; font-weight: 700; letter-spacing: .02em; line-height: 1.2; direction: ltr; }
     .docs-method.m-post { background: color-mix(in oklab, var(--violet) 16%, transparent); color: var(--accent-text, var(--violet)); }
     .docs-method.m-get { background: color-mix(in oklab, var(--get) 16%, transparent); color: color-mix(in oklab, var(--get) 72%, var(--text)); }
@@ -328,6 +330,12 @@
       /* A phone line holds the request's headers whole; the voice's name is never cut. */
       .docs-console .code-body { font-size: .74rem; padding-inline: 1rem; }
       .docs-answer { margin-inline: 1rem; }
+      /* The whole recording fits the player (64 bars need 127 px here, 254 px on a wide screen). */
+      .docs-answer-player { gap: .6rem; }
+      .docs-play { width: 34px; height: 34px; }
+      .docs-answer-time { min-width: 0; }
+      .docs-wave-bars { gap: 1px; }
+      .docs-wave-bars i { min-width: 1px; }
       .docs-answer-about { flex-wrap: wrap; row-gap: .35rem; }
       .docs-answer-voice > span { white-space: normal; }
       .docs-part h2 { font-size: 1.75rem; }
@@ -342,7 +350,11 @@
       .docs-table th, .docs-table td { padding: .65rem .75rem; }
       .docs-errors td:nth-child(2) { white-space: normal; }
       .docs-errors code { white-space: normal; overflow-wrap: anywhere; }
-      .docs-index a { grid-template-columns: 3.4rem minmax(0, 1fr); row-gap: .15rem; }
+      /* A path that wraps keeps its method on its first line. */
+      .docs-route { align-items: baseline; }
+      .docs-index a { grid-template-columns: 3.4rem minmax(0, 1fr); row-gap: .15rem; align-items: baseline; }
+      /* In Arabic the path keeps beside its method, as its name does below it. */
+      html[dir="rtl"] .docs-index code { text-align: right; }
       .docs-index-name { grid-column: 2; text-align: start; white-space: normal; }
       .code-body { font-size: .8rem; }
     }
