@@ -4,7 +4,10 @@ namespace App\Support;
 
 use App\Models\Plan;
 use App\Services\VoiceCloningService;
+use App\Support\Agents\AgentAccess;
 use App\Support\Api\ApiPlanAccess;
+use App\Support\Transcription\TranscriptionAccess;
+use App\Support\Transcription\TranscriptionSettings;
 
 /**
  * The feature lines on a plan's pricing card, written from the plan's own
@@ -39,6 +42,9 @@ final class PlanPricingLines
         'voice_design' => ['sliders', true],
         // Shown on every plan that includes dubbing, once Video Dubbing is open to everyone.
         'video_dubbing' => ['mic', true],
+        // Shown on every plan that includes speech to text (Plans → Speech to text), with its minutes a
+        // month, once Speech to text → Settings opens it to everyone.
+        'speech_to_text' => ['type', true],
         // Shown on every plan that includes voice agents (Plans → Voice agents), once Agents are open to everyone.
         'voice_agents' => ['users', true],
         'download_formats' => ['download', true],
@@ -138,7 +144,7 @@ final class PlanPricingLines
         if ($plan->pricing_use_custom_text) {
             $custom = $plan->getLocalizedFeatures($locale);
             if ($custom !== null) {
-                return self::withoutClosed(self::withLiveValues($plan, array_values($custom), $locale));
+                return self::withSpeechToText($plan, self::withoutClosed(self::withLiveValues($plan, array_values($custom), $locale)), $locale);
             }
         }
 
@@ -175,8 +181,45 @@ final class PlanPricingLines
     }
 
     /**
+     * Speech to text on a card the admin wrote by hand: its line from the plan's own minutes is
+     * added (before the API line, or at the end) unless the hand-written text already names it,
+     * so no card has to be edited when a plan gets speech to text or its minutes change.
+     *
+     * @param  array<int, mixed>  $lines
+     * @return array<int, mixed>
+     */
+    private static function withSpeechToText(Plan $plan, array $lines, string $locale): array
+    {
+        $value = self::value($plan, 'speech_to_text', $locale);
+        if ($value === null) {
+            return $lines;
+        }
+        foreach ($lines as $line) {
+            $text = is_array($line) ? implode(' ', array_filter([$line['label'] ?? '', $line['value'] ?? '', $line['text'] ?? ''], 'is_string')) : (string) $line;
+            if (preg_match(self::SPEECH_TO_TEXT_WORDS, $text)) {
+                return $lines;
+            }
+        }
+        $line = ['label' => self::t('label_speech_to_text', $locale), 'value' => $value, 'icon' => self::LINES['speech_to_text'][0]];
+        foreach ($lines as $i => $existing) {
+            $text = is_array($existing) ? (string) ($existing['label'] ?? '') : (string) $existing;
+            if (preg_match('/\bAPI\b|واجهة (المطورين|برمجية)/u', $text)) {
+                array_splice($lines, $i, 0, [$line]);
+
+                return $lines;
+            }
+        }
+        $lines[] = $line;
+
+        return $lines;
+    }
+
+    /** Words that name speech to text in a hand-written line, in English or Arabic. */
+    private const SPEECH_TO_TEXT_WORDS = '/speech[ -]to[ -]text|transcri|تحويل الكلام إلى نص|تفريغ/iu';
+
+    /**
      * A hand-written line can carry a value written from the plan's own settings: {agents} becomes
-     * "3 agents, up to 94 call minutes" (Plans → Voice agents and the call rate), so the card follows
+     * "3 agents" (Plans → Voice agents), so the card follows
      * the settings. The line is left out where the plan has no agents or Agents are not open yet.
      *
      * @param  array<int, mixed>  $lines
@@ -214,7 +257,8 @@ final class PlanPricingLines
         $closed = array_filter([
             StudioFacts::dubbing() ? null : '\bdub|دبلج',
             VoiceDesign::audience() === VoiceDesign::AUDIENCE_EVERYONE ? null : 'voice design|design your own voices|تصميم (ال)?(صوت|أصوات)|صمّ?م أصواتك',
-            \App\Support\Agents\AgentAccess::audience() === \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE ? null : 'voice agents?|الوكلاء الصوتي|وكلاء صوتي|وكيل صوتي',
+            AgentAccess::audience() === AgentAccess::AUDIENCE_EVERYONE ? null : 'voice agents?|الوكلاء الصوتي|وكلاء صوتي|وكيل صوتي',
+            TranscriptionSettings::audience() === TranscriptionSettings::AUDIENCE_EVERYONE ? null : 'speech[ -]to[ -]text|transcri|تحويل الكلام إلى نص',
         ]);
         if ($closed === []) {
             return $lines;
@@ -335,6 +379,13 @@ final class PlanPricingLines
                     ? trans_choice('ui.pricing.lines.dubbing_videos', VideoDubbing::monthlyLimit($plan), ['seconds' => VideoDubbing::maxSeconds($plan, false)], $locale)
                     : self::t('dubbing_open', $locale, ['seconds' => VideoDubbing::maxSeconds($plan, false)]))
                 : null,
+            // The plan's own minutes a month (Plans → Speech to text), once it is open to everyone.
+            'speech_to_text' => TranscriptionAccess::planColumns()
+                && TranscriptionAccess::planIncludes($plan)
+                && TranscriptionSettings::audience() === TranscriptionSettings::AUDIENCE_EVERYONE
+                ? trans_choice('ui.pricing.lines.stt_minutes', TranscriptionAccess::monthlyMinutes($plan),
+                    ['count' => number_format(TranscriptionAccess::monthlyMinutes($plan))], self::locale($locale))
+                : null,
             'voice_agents' => self::agentsValue($plan, $locale),
             'topup' => ! $plan->isPack() && self::topupCents($plan) > 0
                 ? self::t('topup_price', $locale, ['price' => '$'.number_format(self::topupCents($plan) / 100, 0)])
@@ -373,9 +424,12 @@ final class PlanPricingLines
             'video_dubbing' => VideoDubbing::planIncludes($plan)
                 ? 'Hidden: Video Dubbing is still for the admin only (Video Dubbing → Settings).'
                 : 'Hidden: this plan does not include video dubbing.',
-            'voice_agents' => \App\Support\Agents\AgentAccess::planColumns() && \App\Support\Agents\AgentAccess::planIncludes($plan)
+            'voice_agents' => AgentAccess::planColumns() && AgentAccess::planIncludes($plan)
                 ? 'Hidden: Agents are not open to everyone yet (Agents → Settings).'
                 : 'Hidden: this plan does not include voice agents.',
+            'speech_to_text' => TranscriptionAccess::planColumns() && TranscriptionAccess::planIncludes($plan)
+                ? 'Hidden: Speech to text is not open to everyone yet (Speech to text → Settings).'
+                : 'Hidden: this plan does not include speech to text.',
             'monthly_requests' => 'Hidden: a pack has no monthly count.',
             'daily_requests' => 'Hidden: no daily limit is set (Usage Limits → Generations per day).',
             default => 'Hidden for this plan.',
@@ -399,18 +453,17 @@ final class PlanPricingLines
     }
 
     /**
-     * "3 agents, about 100 call minutes": the agents a member keeps and the call minutes the plan's
-     * credits pay for (or its own call minutes a month, when fewer). Only on a plan with agents,
-     * once Agents are open to everyone.
+     * "3 agents": the agents a member keeps (Plans → Voice agents). The call minutes are in the
+     * comparison table's own rows. Only on a plan with agents, once Agents are open to everyone.
      */
     private static function agentsValue(Plan $plan, string $locale): ?string
     {
-        if (! \App\Support\Agents\AgentAccess::planColumns() || ! \App\Support\Agents\AgentAccess::planIncludes($plan)
-            || \App\Support\Agents\AgentAccess::audience() !== \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE) {
+        if (! AgentAccess::planColumns() || ! AgentAccess::planIncludes($plan)
+            || AgentAccess::audience() !== AgentAccess::AUDIENCE_EVERYONE) {
             return null;
         }
-        $limits = \App\Support\Agents\AgentAccess::limits($plan);
-        $minutes = intdiv(max(0, (int) $plan->monthly_chars), \App\Support\Agents\AgentAccess::creditsPerMinute());
+        $limits = AgentAccess::limits($plan);
+        $minutes = intdiv(max(0, (int) $plan->monthly_chars), AgentAccess::creditsPerMinute());
         if ($limits['minutes'] > 0) {
             $minutes = min($minutes, $limits['minutes']);
         }
@@ -429,13 +482,13 @@ final class PlanPricingLines
      */
     public static function agentComparison(Plan $plan, string $locale): ?array
     {
-        if (! \App\Support\Agents\AgentAccess::planColumns() || ! \App\Support\Agents\AgentAccess::planIncludes($plan)
-            || \App\Support\Agents\AgentAccess::audience() !== \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE) {
+        if (! AgentAccess::planColumns() || ! AgentAccess::planIncludes($plan)
+            || AgentAccess::audience() !== AgentAccess::AUDIENCE_EVERYONE) {
             return null;
         }
         $locale = self::locale($locale);
-        $limits = \App\Support\Agents\AgentAccess::limits($plan);
-        $rate = \App\Support\Agents\AgentAccess::creditsPerMinute();
+        $limits = AgentAccess::limits($plan);
+        $rate = AgentAccess::creditsPerMinute();
         $minutes = intdiv(max(0, (int) $plan->monthly_chars), $rate);
         if ($limits['minutes'] > 0) {
             $minutes = min($minutes, $limits['minutes']);

@@ -121,7 +121,7 @@ html[dir="rtl"] .tr-back svg { transform: scaleX(-1); }
   .tr-toolbar { gap: .3rem; }
   .tr-tool-icon, .tr-tool:has(> .tr-tool-label) { width: 40px; height: 40px; }
   .tr-tool { height: 40px; padding: 0 .6rem; }
-  .tr-tool[data-tr-language-button] .tr-chevron, .tr-tool[data-tr-language-button] > svg:first-child { display: none; }
+  .tr-tool[data-tr-language-button] .tr-chevron, .tr-tool[data-tr-language-button] .tr-language-icon { display: none; }
   .tr-tool[data-tr-language-button] { padding: 0 .8rem; }
 }
 .tr-player { margin: .6rem 0 1rem; }
@@ -257,7 +257,15 @@ html[dir="rtl"] .tr-back svg { transform: scaleX(-1); }
 .tr-menu-search input::placeholder { color: var(--muted); }
 .tr-menu-list [data-search][hidden] { display: none; }
 .tr-menu-none { margin: 0; padding: .75rem; color: var(--muted); font-size: .92rem; }
-.tr-language-list .tr-tick { visibility: hidden; color: var(--accent-text, var(--a)); }
+.tr-language-list .tr-tick { visibility: hidden; margin-inline-start: auto; color: var(--accent-text, var(--a)); }
+/* Round flags beside the languages, as in the studio's dialect menus. */
+.tr-flag { width: 22px !important; height: 22px !important; }
+.tr-menu-list .tr-flag svg, .tr-tool .tr-flag svg { width: 14px; height: 14px; }
+.tr-flag-none { background: color-mix(in oklab, var(--a) 12%, var(--surface)); color: var(--accent-text, var(--a)); }
+.tr-flag-none svg { fill: none; stroke: currentColor; stroke-width: 1.8; }
+.tr-language-name { flex: 1; min-width: 0; }
+.tr-language-icon { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; }
+.tr-language-icon > svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
 .tr-language-list [aria-checked="true"] { font-weight: 700; }
 .tr-language-list [aria-checked="true"] .tr-tick { visibility: visible; }
 @media (prefers-reduced-motion: reduce) { .tr-menu-list { animation: none; } .tr-chevron, .tr-tool, .tr-tool > svg { transition: none; } }

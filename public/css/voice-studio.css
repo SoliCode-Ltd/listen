@@ -366,6 +366,12 @@ html[dir="rtl"] .vs-select-list input.vs-select-search { padding: 0 2.5rem 0 .9r
 .vs-select-search::placeholder { color: var(--muted); }
 .vs-select-search::-webkit-search-cancel-button, .vs-select-search::-webkit-search-decoration { -webkit-appearance: none; display: none; }
 .vs-select-option[hidden] { display: none; }
+/* Language menus (data-vs-flags): a small round flag before each name, and on the button. */
+.vs-select-name { display: inline-flex; align-items: center; gap: .65rem; min-width: 0; }
+.vs-flag.vs-select-flag { flex: none; width: 24px; height: 24px; }
+.vs-select-label:has(.vs-select-flag) { display: inline-flex; align-items: center; gap: .6rem; min-width: 0; }
+.vs-flag.vs-select-flag-none { display: inline-grid; place-items: center; background: color-mix(in oklab, var(--a) 12%, var(--surface)); color: var(--accent-text, var(--a)); }
+.vs-select-flag-none svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .vs-select-none { padding: .75rem; color: var(--muted); font-size: .92rem; }
 .vs-select-none[hidden] { display: none; }
 @keyframes vs-select-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

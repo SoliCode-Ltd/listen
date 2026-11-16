@@ -809,13 +809,22 @@
   });
   // "Show in": the original, or any other language (made once and kept). The transcript's own language is not offered.
   var TICK = '<svg class="tr-tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  var GLOBE = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z"/></svg>';
+  // The language's round flag (the studio's own flags), the globe for the original.
+  function flagHtml(choice) {
+    return choice.flag
+      ? '<span class="vs-flag tr-flag"><img src="' + esc(choice.flag) + '" alt="" width="22" height="22" loading="lazy" decoding="async"></span>'
+      : '<span class="vs-flag tr-flag tr-flag-none">' + GLOBE + '</span>';
+  }
   function languageMenu(chosen) {
     var choices = [{ value: '', label: t.original }].concat((c.targets || []).filter(function (target) { return target.value !== current.language; }));
     $('[data-tr-language-items]').innerHTML = choices.map(function (choice) {
       return '<button type="button" role="menuitemradio" aria-checked="' + (choice.value === chosen ? 'true' : 'false') + '" data-tr-language="' + esc(choice.value) + '" data-search="' + esc(choice.search || choice.label) + '">'
-        + TICK + '<span>' + esc(choice.label) + '</span></button>';
+        + flagHtml(choice) + '<span class="tr-language-name">' + esc(choice.label) + '</span>' + TICK + '</button>';
     }).join('');
-    var label = (choices.filter(function (choice) { return choice.value === chosen; })[0] || choices[0]).label;
+    var shownChoice = choices.filter(function (choice) { return choice.value === chosen; })[0] || choices[0];
+    var label = shownChoice.label;
+    $('[data-tr-language-icon]').innerHTML = shownChoice.flag ? flagHtml(shownChoice) : GLOBE;
     $('[data-tr-language-current]').textContent = label;
     $('[data-tr-language-button]').setAttribute('aria-label', t.translate_to + ': ' + label);
   }

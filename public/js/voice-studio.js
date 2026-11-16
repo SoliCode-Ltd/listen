@@ -176,10 +176,28 @@
       }
       return box;
     }
+    // Language menus (data-vs-flags) show each option's round flag (data-flag), a globe where there is none.
+    var withFlags = select.hasAttribute('data-vs-flags');
+    function flagFor(opt) {
+      var box = document.createElement('span');
+      box.className = 'vs-flag vs-select-flag';
+      box.setAttribute('aria-hidden', 'true');
+      var url = opt ? String(opt.getAttribute('data-flag') || '') : '';
+      if (url) {
+        var img = document.createElement('img');
+        img.src = url; img.alt = ''; img.width = 22; img.height = 22; img.loading = 'lazy'; img.decoding = 'async';
+        box.appendChild(img);
+      } else {
+        box.classList.add('vs-select-flag-none');
+        box.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z"/></svg>';
+      }
+      return box;
+    }
     function syncLabel() {
       var picked = select.options[select.selectedIndex];
       label.textContent = picked ? picked.textContent : '';
       if (withAvatars && picked) label.insertBefore(avatarFor(picked), label.firstChild);
+      if (withFlags && picked) label.insertBefore(flagFor(picked), label.firstChild);
       button.disabled = select.disabled || select.options.length === 0;
       items.forEach(function (item) {
         var on = item.__opt === picked;
@@ -212,6 +230,15 @@
       item.__opt = opt;
       item.textContent = opt.textContent;
       if (withAvatars) item.insertBefore(avatarFor(opt), item.firstChild);
+      if (withFlags) {
+        // The flag and the name together at the start, the tick at the end.
+        var name = document.createElement('span');
+        name.className = 'vs-select-name';
+        name.textContent = opt.textContent;
+        item.textContent = '';
+        name.insertBefore(flagFor(opt), name.firstChild);
+        item.appendChild(name);
+      }
       item.insertAdjacentHTML('beforeend', '<svg class="vs-select-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>');
       if (opt.disabled) item.setAttribute('aria-disabled', 'true');
       item.addEventListener('mousemove', function () { setActive(items.indexOf(item)); });

@@ -131,7 +131,7 @@ return [
         'delete_confirm' => 'Delete this transcript? Its minutes stay counted this month.',
         'copy' => 'Copy text',
         'copied' => 'Copied',
-        'send_studio' => 'Open in Text to speech',
+        'send_studio' => 'Text to speech',
         'translate' => 'Translate',
         'translate_to' => 'Show in',
         'original' => 'Original',

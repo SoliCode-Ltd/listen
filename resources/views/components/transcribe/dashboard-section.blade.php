@@ -22,7 +22,8 @@
       $rows = array_map(function (string $code) use ($trAr): array {
           $names = \App\Support\Transcription\TranscriptionSettings::LANGUAGES[$code] ?? [$code, $code];
 
-          return ['value' => $code, 'label' => $trAr ? $names[1] : $names[0], 'search' => $names[0].' '.$names[1].' '.$code];
+          return ['value' => $code, 'label' => $trAr ? $names[1] : $names[0], 'search' => $names[0].' '.$names[1].' '.$code,
+              'flag' => \App\Support\Transcription\TranscriptionSettings::flagUrl($code)];
       }, $codes);
       $collator = class_exists(\Collator::class) ? new \Collator($trAr ? 'ar' : 'en') : null;
       usort($rows, fn (array $a, array $b): int => $collator ? $collator->compare($a['label'], $b['label']) : strcmp($a['label'], $b['label']));
@@ -216,10 +217,10 @@
         <div class="vs-editor-foot dub-foot tr-foot">
           <div class="tr-language">
             <label class="vs-field-label" for="trLanguage">{{ __('transcribe.page.language') }}</label>
-            <select id="trLanguage" data-tr-language data-vs-select data-vs-search="{{ __('transcribe.page.search_language') }}" data-vs-none="{{ __('transcribe.page.no_language') }}">
+            <select id="trLanguage" data-tr-language data-vs-select data-vs-search="{{ __('transcribe.page.search_language') }}" data-vs-none="{{ __('transcribe.page.no_language') }}" data-vs-flags>
               <option value="auto" data-search="{{ __('transcribe.page.detect') }} auto">{{ __('transcribe.page.detect') }}</option>
               @foreach($trLanguages as $language)
-                <option value="{{ $language['value'] }}" data-search="{{ $language['search'] }}">{{ $language['label'] }}</option>
+                <option value="{{ $language['value'] }}" data-search="{{ $language['search'] }}" @if($language['flag']) data-flag="{{ $language['flag'] }}" @endif>{{ $language['label'] }}</option>
               @endforeach
             </select>
           </div>
@@ -265,7 +266,7 @@
         <div class="tr-menu" data-tr-menu>
           <button type="button" class="tr-tool tr-menu-toggle" aria-haspopup="true" aria-expanded="false" data-tr-menu-button data-tr-language-button
             aria-label="{{ __('transcribe.js.translate_to') }}: {{ __('transcribe.js.original') }}">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z"/></svg>
+            <span class="tr-language-icon" data-tr-language-icon aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z"/></svg></span>
             <span data-tr-language-current>{{ __('transcribe.js.original') }}</span>
             <svg class="tr-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
           </button>
