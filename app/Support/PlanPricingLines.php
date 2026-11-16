@@ -44,7 +44,7 @@ final class PlanPricingLines
         'video_dubbing' => ['mic', true],
         // Shown on every plan that includes speech to text (Plans → Speech to text), with its minutes,
         // once Speech to text → Settings opens it to everyone.
-        'speech_to_text' => ['type', true],
+        'speech_to_text' => ['file-text', true],
         // Shown on every plan that includes voice agents (Plans → Voice agents), once Agents are open to everyone.
         'voice_agents' => ['users', true],
         'download_formats' => ['download', true],
