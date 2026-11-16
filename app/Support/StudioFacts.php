@@ -3,6 +3,9 @@
 namespace App\Support;
 
 use App\Models\Plan;
+use App\Support\Transcription\TranscriptionAccess;
+use App\Support\Transcription\TranscriptionSettings;
+use Illuminate\Support\Collection;
 
 /**
  * What the studio can do, as the public pages, the structured data and llms.txt
@@ -190,6 +193,49 @@ final class StudioFacts
     }
 
     /**
+     * Whether speech to text is public: open to everyone (Speech to text → Settings) and on a
+     * plan on sale. Until then the pages, llms.txt, the structured data and the AI apps say
+     * nothing about it.
+     */
+    public static function speechToText(): bool
+    {
+        try {
+            return TranscriptionSettings::audience() === TranscriptionSettings::AUDIENCE_EVERYONE
+                && self::speechToTextPlans('en') !== [];
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * The plans on sale with speech to text, cheapest first: their name in the given language
+     * and their minutes a month.
+     *
+     * @return array<int, array{name: string, minutes: int}>
+     */
+    public static function speechToTextPlans(string $locale): array
+    {
+        if (! TranscriptionAccess::planColumns()) {
+            return [];
+        }
+
+        return self::onSale()
+            ->filter(fn (Plan $plan): bool => TranscriptionAccess::planIncludes($plan))
+            ->map(fn (Plan $plan): array => ['name' => self::planName($plan, $locale), 'minutes' => TranscriptionAccess::monthlyMinutes($plan)])
+            ->values()->all();
+    }
+
+    /** How many languages speech to text writes out (Speech to text → Settings). */
+    public static function speechToTextLanguages(): int
+    {
+        try {
+            return count(TranscriptionSettings::languages());
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    /**
      * Download formats: those every plan on sale has, and those only some have.
      *
      * @return array{every: array<int, string>, some: array<int, string>}
@@ -215,9 +261,9 @@ final class StudioFacts
     /**
      * The monthly plans people can buy.
      *
-     * @return \Illuminate\Support\Collection<int, Plan>
+     * @return Collection<int, Plan>
      */
-    private static function onSale(): \Illuminate\Support\Collection
+    private static function onSale(): Collection
     {
         try {
             return Plan::query()->where('is_active', true)->where('price_cents', '>', 0)

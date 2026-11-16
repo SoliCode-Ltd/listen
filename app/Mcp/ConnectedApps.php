@@ -18,7 +18,7 @@ use Laravel\Passport\Passport;
 final class ConnectedApps
 {
     /** What a connected app may do: what the MCP server's tools need, nothing more. */
-    public const SCOPES = [ApiScopes::TEXT_TO_SPEECH, ApiScopes::VOICES_READ, ApiScopes::HISTORY_READ, ApiScopes::USER_READ];
+    public const SCOPES = [ApiScopes::TEXT_TO_SPEECH, ApiScopes::VOICES_READ, ApiScopes::HISTORY_READ, ApiScopes::USER_READ, ApiScopes::SPEECH_TO_TEXT];
 
     /** The app's key for the member, made the first time it is needed. */
     public static function keyFor(User $user, string $clientId): ApiKey

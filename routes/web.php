@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminAgentRecordingController;
 use App\Http\Controllers\AdminClonedVoiceAudioController;
 use App\Http\Controllers\AdminDriveController;
 use App\Http\Controllers\AdminManualPaymentProofController;
+use App\Http\Controllers\AdminTranscriptionAudioController;
 use App\Http\Controllers\AdminVideoDubFileController;
 use App\Http\Controllers\AgentCallController;
 use App\Http\Controllers\AgentController;
@@ -25,10 +26,11 @@ use App\Http\Controllers\ManualPaymentController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\NewsletterUnsubscribeController;
 use App\Http\Controllers\PasswordResetController;
-use App\Http\Controllers\PurchaseFollowUpLinkController;
 use App\Http\Controllers\PronunciationController;
+use App\Http\Controllers\PurchaseFollowUpLinkController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\StartController;
+use App\Http\Controllers\TranscribeController;
 use App\Http\Controllers\TrialBillingController;
 use App\Http\Controllers\VideoDubController;
 use App\Http\Controllers\VoiceCloningController;
@@ -41,8 +43,8 @@ use App\Models\SiteSetting;
 use App\Services\PlanAccessService;
 use App\Support\AgentDiscovery;
 use App\Support\SeoDialectPages;
-use App\Support\SeoFeaturePages;
 use App\Support\SeoEnglishPages;
+use App\Support\SeoFeaturePages;
 use App\Support\SeoHelper;
 use App\Support\VoiceCloningAccess;
 use Carbon\Carbon;
@@ -91,6 +93,11 @@ Route::middleware('auth')->get('/admin-audio/cloned-voices/{voice}/{kind}', Admi
 Route::middleware('auth')->get('/admin-audio/agent-calls/{call}', AdminAgentRecordingController::class)
     ->where('call', 'cnv_[a-z0-9]{24}')
     ->name('admin.agent-calls.recording');
+
+// A transcript's recording, for the admin's transcript page (Speech to text → Transcripts).
+Route::middleware('auth')->get('/admin-audio/transcripts/{code}', AdminTranscriptionAudioController::class)
+    ->where('code', 'tr_[a-z0-9]{24}')
+    ->name('admin.transcripts.audio');
 
 Route::middleware('auth')->get('/admin-video/dubs/{dub}/{kind}', AdminVideoDubFileController::class)
     ->whereNumber('dub')
@@ -431,6 +438,28 @@ Route::group([
     // Each limit counts on its own (the third part names it): the pieces never use up the dub's.
     Route::middleware(['auth', 'throttle:600,1,dub-piece'])->post('/dub-my-video/upload/{id}', [VideoDubController::class, 'uploadChunk'])
         ->where('id', '[A-Za-z0-9]{40}')->name('dub.upload.chunk');
+
+    // Transcribe on the dashboard (App\Http\Controllers\TranscribeController): checking a file,
+    // sending it, starting it, and what a member does with a transcript.
+    Route::middleware(['auth', 'subscription.sync'])->prefix('dashboard/transcribe')->group(function (): void {
+        Route::post('/check', [TranscribeController::class, 'check'])->middleware('throttle:60,1,transcribe-check')->name('transcribe.check');
+        Route::post('/upload', [TranscribeController::class, 'startUpload'])->middleware('throttle:20,1,transcribe-upload')->name('transcribe.upload.start');
+        Route::post('/', [TranscribeController::class, 'store'])->middleware('throttle:20,1,transcribe-store')->name('transcribe.store');
+        Route::patch('/{code}', [TranscribeController::class, 'update'])->where('code', 'tr_[a-z0-9]{24}')->middleware('throttle:120,1,transcribe-edit')->name('transcribe.update');
+        Route::delete('/{code}', [TranscribeController::class, 'destroy'])->where('code', 'tr_[a-z0-9]{24}')->name('transcribe.destroy');
+        Route::post('/{code}/translate', [TranscribeController::class, 'translate'])->where('code', 'tr_[a-z0-9]{24}')->middleware('throttle:20,1,transcribe-translate')->name('transcribe.translate');
+    });
+    // Each piece of a file: kept light (no plan check), many a minute for a large one.
+    Route::middleware(['auth', 'throttle:600,1,transcribe-piece'])->post('/dashboard/transcribe/upload/{id}', [TranscribeController::class, 'uploadChunk'])
+        ->where('id', '[A-Za-z0-9]{40}')->name('transcribe.upload.chunk');
+    // What the page reads while it works, and the files it downloads: these skip the billing sync.
+    Route::middleware(['auth', 'throttle:240,1,transcribe-read'])->prefix('dashboard/transcribe')->group(function (): void {
+        Route::get('/', [TranscribeController::class, 'index'])->name('transcribe.index');
+        Route::get('/{code}', [TranscribeController::class, 'show'])->where('code', 'tr_[a-z0-9]{24}')->name('transcribe.show');
+        Route::get('/{code}/audio', [TranscribeController::class, 'audio'])->where('code', 'tr_[a-z0-9]{24}')->name('transcribe.audio');
+        Route::get('/{code}/peaks', [TranscribeController::class, 'peaks'])->where('code', 'tr_[a-z0-9]{24}')->name('transcribe.peaks');
+        Route::get('/{code}/export/{format}', [TranscribeController::class, 'export'])->where(['code' => 'tr_[a-z0-9]{24}', 'format' => 'txt|srt|vtt|docx'])->name('transcribe.export');
+    });
 
     Route::middleware(['auth'])->group(function () {
         Route::get('/referral/stats', [ReferralController::class, 'stats'])->name('referral.stats');

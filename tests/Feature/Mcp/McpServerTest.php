@@ -8,11 +8,13 @@ use App\Jobs\GenerateAudioJob;
 use App\Models\ApiRequestLog;
 use App\Models\AudioGeneration;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Models\TextItem;
 use App\Models\User;
 use App\Support\Api\ApiScopes;
 use App\Support\Credits;
 use App\Support\GenerationSource;
+use App\Support\Transcription\TranscriptionSettings;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -32,7 +34,7 @@ class McpServerTest extends TestCase
     use InteractsWithDeveloperApi;
     use RefreshDatabase;
 
-    private const TOOLS = ['list_voices', 'get_voice_options', 'text_to_speech', 'get_speech', 'list_speech_history', 'get_account'];
+    private const TOOLS = ['list_voices', 'get_voice_options', 'text_to_speech', 'get_speech', 'list_speech_history', 'transcribe_audio', 'get_transcription', 'list_transcriptions', 'get_account'];
 
     private Plan $plan;
 
@@ -64,7 +66,14 @@ class McpServerTest extends TestCase
             ->assertJsonMissingPath('result.capabilities.resources');
         $this->assertStringContainsString('text_to_speech', (string) $this->mcp($plain, 'initialize', ['protocolVersion' => '2025-06-18'])->json('result.instructions'));
 
+        // Speech to text's tools wait until it is public (open to everyone, on a plan on sale).
+        $speechToText = ['transcribe_audio', 'get_transcription', 'list_transcriptions'];
+        $this->assertSame(array_values(array_diff(self::TOOLS, $speechToText)), array_column($this->mcp($plain, 'tools/list')->assertOk()->json('result.tools'), 'name'));
+        $this->assertStringNotContainsString('transcribe_audio', (string) $this->mcp($plain, 'initialize', ['protocolVersion' => '2025-06-18'])->json('result.instructions'));
+        SiteSetting::set('transcription_audience', TranscriptionSettings::AUDIENCE_EVERYONE, TranscriptionSettings::GROUP);
+        $this->plan->forceFill(['transcription_enabled' => true, 'transcription_minutes_month' => 250])->save();
         $this->assertSame(self::TOOLS, array_column($this->mcp($plain, 'tools/list')->assertOk()->json('result.tools'), 'name'));
+        $this->assertStringContainsString('transcribe_audio', (string) $this->mcp($plain, 'initialize', ['protocolVersion' => '2025-06-18'])->json('result.instructions'));
 
         // A key that may only read voices sees only the voice tools, and cannot run the others.
         $voicesOnly = $this->issueKey($this->member(), [ApiScopes::VOICES_READ])['plain'];

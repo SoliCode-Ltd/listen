@@ -104,7 +104,7 @@ class RateLimitServiceProvider extends ServiceProvider
 
             $plan = $request->attributes->get('api_plan');
 
-            return in_array($request->route()?->getName(), ['v1.tts', 'v1.tts.async'], true)
+            return in_array($request->route()?->getName(), ['v1.tts', 'v1.tts.async', 'v1.transcriptions.create'], true)
                 ? Limit::perMinute(ApiPlanAccess::requestsPerMinute($plan))->by('v1-generate:'.$apiKey->user_id)
                 : Limit::perMinute(ApiPlanAccess::readsPerMinute($plan))->by('v1-read:'.$apiKey->user_id);
         });

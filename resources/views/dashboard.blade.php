@@ -7,8 +7,11 @@
   @if($voiceDesign ?? null)
     <link rel="stylesheet" href="{{ asset('css/voice-design.css') }}?v={{ filemtime(public_path('css/voice-design.css')) }}">
   @endif
-  @if($dubStudio ?? null)
+  @if(($dubStudio ?? null) || ($transcribe ?? null))
     <link rel="stylesheet" href="{{ asset('css/dub-studio.css') }}?v={{ filemtime(public_path('css/dub-studio.css')) }}">
+  @endif
+  @if($transcribe ?? null)
+    <link rel="stylesheet" href="{{ asset('css/transcribe.css') }}?v={{ filemtime(public_path('css/transcribe.css')) }}">
   @endif
   <style>
     /* Background orbs */
@@ -1709,45 +1712,45 @@
       #commandCenterSection .usage-hero { display: block; padding: 1.2rem 1.15rem 1.15rem; text-align: start; }
       #commandCenterSection .usage-ring { display: none; }
       #commandCenterSection .usage-hero-head { flex-direction: column; align-items: flex-start; gap: .5rem; }
-      #commandCenterSection .usage-hero-label { font-size: 1.02rem; line-height: 1.5; }
+      #commandCenterSection .usage-hero-label { font-size: .95rem; line-height: 1.5; }
       #commandCenterSection .usage-hero-value { justify-content: flex-start; gap: .55rem; margin: 1rem 0 0; }
-      #commandCenterSection .usage-hero-value strong { font-size: 3rem; }
-      #commandCenterSection .usage-hero-value span { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+      #commandCenterSection .usage-hero-value strong { font-size: 2.2rem; }
+      #commandCenterSection .usage-hero-value span { font-size: .9rem; font-weight: 700; color: var(--text); }
       .usage-bar { display: block; height: 8px; margin-top: 1rem; border-radius: 999px; background: color-mix(in oklab, var(--a) 13%, var(--line)); overflow: hidden; }
       .usage-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #A28FFF, #5B3FE6); transition: width .5s ease; }
       html[dir="rtl"] .usage-bar i { background: linear-gradient(270deg, #A28FFF, #5B3FE6); }
       .usage-bar.is-high i { background: #F59E0B; }
       .usage-bar.is-low i { background: #EF4444; }
-      .usage-bar-note { display: block; margin: .6rem 0 0; color: var(--muted); font-size: .92rem; line-height: 1.6; }
+      .usage-bar-note { display: block; margin: .6rem 0 0; color: var(--muted); font-size: .8rem; line-height: 1.6; }
       .usage-bar-note b { color: var(--text); font-variant-numeric: tabular-nums; }
       #commandCenterSection .usage-hero-chips { display: block; margin-top: 1.1rem; border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
-      #commandCenterSection .usage-chip { display: flex; width: 100%; min-height: 54px; gap: .6rem; padding: .6rem 0; border: 0; border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent); border-radius: 0;
-        background: none; color: var(--muted); font-size: .98rem; line-height: 1.5; }
+      #commandCenterSection .usage-chip { display: flex; width: 100%; min-height: 48px; gap: .6rem; padding: .55rem 0; border: 0; border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent); border-radius: 0;
+        background: none; color: var(--muted); font-size: .88rem; line-height: 1.5; }
       #commandCenterSection .usage-chip:last-child { border-bottom: 0; }
       #commandCenterSection .usage-chip-t { display: contents; }
       #commandCenterSection .usage-chip-k { order: 1; }
       #commandCenterSection .usage-chip-k::first-letter { text-transform: uppercase; }
       #commandCenterSection .usage-chip-v { order: 2; margin-inline-start: auto; color: var(--text); font-weight: 700; text-align: end; font-variant-numeric: tabular-nums; }
-      #commandCenterSection .usage-chip .credit-icon { order: 0; font-size: 1.15rem; }
+      #commandCenterSection .usage-chip .credit-icon { order: 0; font-size: 1.05rem; }
       #commandCenterSection .usage-chip-link { color: var(--accent-text, var(--a)); font-weight: 700; }
       #commandCenterSection .usage-chip-link svg { width: 18px; height: 18px; margin-inline-start: auto; }
-      #commandCenterSection .usage-hero-cta { display: flex; width: 100%; min-height: 50px; margin-top: .7rem; }
+      #commandCenterSection .usage-hero-cta { display: flex; width: 100%; min-height: 44px; margin-top: .7rem; font-size: .95rem; }
 
       #commandCenterSection .usage-tiles { display: block; margin-top: .9rem; padding: .2rem 1.15rem; border-radius: 16px; border: 1px solid color-mix(in oklab, var(--line) 85%, transparent); background: var(--surface); }
       #commandCenterSection .usage-tile { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .3rem .8rem; padding: .95rem 0; border: 0; border-radius: 0; background: none;
         border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
       #commandCenterSection .usage-tile:last-child { border-bottom: 0; }
-      #commandCenterSection .usage-tile-head small { font-size: .98rem; color: var(--text); }
-      #commandCenterSection .usage-tile > b { font-size: 1.35rem; text-align: end; }
+      #commandCenterSection .usage-tile-head small { font-size: .88rem; color: var(--text); }
+      #commandCenterSection .usage-tile > b { font-size: 1.15rem; text-align: end; }
       #commandCenterSection .usage-tile .meter-track, #commandCenterSection .usage-tile-foot { grid-column: 1 / -1; }
-      #commandCenterSection .usage-tile-foot { font-size: .9rem; }
+      #commandCenterSection .usage-tile-foot { font-size: .8rem; }
 
       #commandCenterSection .usage-health { display: block; padding: 1rem 1.15rem 1.05rem; }
-      #commandCenterSection .usage-health-title { display: block; font-size: 1.02rem; }
+      #commandCenterSection .usage-health-title { display: block; font-size: 1rem; }
       #commandCenterSection .usage-health-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin-top: .8rem; }
       #commandCenterSection .usage-health-item { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .45rem; min-width: 0; }
-      #commandCenterSection .usage-health-item b { order: -1; flex: 0 0 100%; font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
-      #commandCenterSection .usage-health-item small { flex: 1 1 0; min-width: 0; font-size: .9rem; line-height: 1.4; }
+      #commandCenterSection .usage-health-item b { order: -1; flex: 0 0 100%; font-size: 1.15rem; font-weight: 800; line-height: 1.1; }
+      #commandCenterSection .usage-health-item small { flex: 1 1 0; min-width: 0; font-size: .8rem; line-height: 1.4; }
     }
 
     /* ── Studio ── */
@@ -1814,58 +1817,81 @@
       #generatedAudioWrap.output-dock { padding: .65rem .75rem .75rem; border-radius: 1rem; }
     }
 
-    /* Phones: the sections become a tab bar at the bottom of the screen. */
+    /* Phones: the sections in a row of tabs held under the header, as on the agents page: the
+       full names, the current one underlined, and the row slides sideways when they don't fit
+       (faded at the edge where more wait). */
     @media (max-width: 640px) {
       .dashboard-menu,
       html[dir="rtl"] .dashboard-menu {
-        position: fixed !important;
-        inset: auto 0 0 0;
-        z-index: 95;
+        position: sticky !important;
+        top: 65px;
+        z-index: 30;
+        min-width: 0;
         margin: 0 !important;
         padding: 0 !important;
         border: 0;
-        border-top: 1px solid var(--line);
-        background: color-mix(in oklab, var(--bg) 90%, transparent);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--line);
+        border-radius: 0;
+        background: color-mix(in srgb, var(--bg) 92%, transparent);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         transform: none !important;
         opacity: 1 !important;
       }
       .dashboard-menu-inner { position: static; }
       .dashboard-menu .dashboard-menu-list {
-        display: grid !important;
-        grid-auto-flow: column;
-        grid-auto-columns: minmax(0, 1fr);
-        gap: 0 !important;
-        padding: .3rem .25rem calc(.3rem + env(safe-area-inset-bottom));
+        display: flex !important;
+        flex-wrap: nowrap;
+        gap: .15rem !important;
+        padding: 0;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
       }
+      .dashboard-menu .dashboard-menu-list::-webkit-scrollbar { display: none; }
+      .dashboard-menu .dashboard-menu-list.tabs-more-left { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px); mask-image: linear-gradient(to right, transparent, #000 44px); }
+      .dashboard-menu .dashboard-menu-list.tabs-more-right { -webkit-mask-image: linear-gradient(to left, transparent, #000 44px); mask-image: linear-gradient(to left, transparent, #000 44px); }
+      .dashboard-menu .dashboard-menu-list.tabs-more-left.tabs-more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); }
       .dashboard-menu .dashboard-menu-link {
-        flex-direction: column;
-        justify-content: center;
-        gap: .2rem;
-        min-height: 54px;
-        padding: .3rem .15rem;
+        position: relative;
+        flex: 0 0 auto;
+        flex-direction: row;
+        align-items: center;
+        min-width: 0;
+        min-height: 50px;
+        padding: .5rem .95rem;
         border: 0;
-        border-radius: 10px;
-        background: transparent;
-        font-size: .7rem;
-        font-weight: 600;
-        text-align: center;
+        border-radius: 0;
+        background: none;
+        color: var(--muted);
+        font-size: .93rem;
+        font-weight: 700;
+        white-space: nowrap;
+        transition: color .2s ease;
       }
-      .dashboard-menu .dashboard-menu-link svg { width: 21px; height: 21px; }
-      .dashboard-menu .dashboard-menu-link.active { background: transparent; color: var(--accent-text); }
-      .dashboard-menu .dm-label { display: none; }
-      .dashboard-menu .dm-short { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+      .dashboard-menu .dashboard-menu-link svg { display: none; }
+      .dashboard-menu .dashboard-menu-link::after { content: ""; position: absolute; inset-inline: .7rem; bottom: 0; height: 2px; border-radius: 2px 2px 0 0; background: transparent; transition: background .2s ease; }
+      .dashboard-menu .dashboard-menu-link.active::before { display: none; }
+      .dashboard-menu .dashboard-menu-link:hover { background: none; color: var(--text); }
+      .dashboard-menu .dashboard-menu-link.active { background: none; color: var(--text); }
+      .dashboard-menu .dashboard-menu-link.active::after { background: var(--a); }
+      .dashboard-menu .dashboard-menu-link:focus-visible { outline: 3px solid color-mix(in oklab, var(--a) 35%, transparent); outline-offset: -3px; border-radius: 10px; }
+      .dashboard-menu .dm-label { display: inline; min-width: 0; overflow: visible; overflow-wrap: normal; }
+      .dashboard-menu .dm-short { display: none; }
       .dashboard-menu-foot { display: none; }
-      .dashboard-shell { padding-bottom: calc(5.25rem + env(safe-area-inset-bottom)) !important; }
       .dashboard-menu .app-switch { display: none; }
       .dashboard-layout > .app-switch.is-top { display: block; width: 100%; margin: 0; }
-      /* Above the tab bar. */
-      #generatedAudioWrap.output-dock { bottom: calc(4.6rem + env(safe-area-inset-bottom)); }
-      /* One section at a time: it starts right under the header. */
+      /* One section at a time: it starts right under the row of tabs (and is scrolled to below it). */
       .dashboard-panel, #commandCenterSection { margin-top: 0 !important; }
+      [data-dashboard-section] { scroll-margin-top: calc(65px + 51px + .75rem); }
+    }
+    @media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+      .dashboard-menu .dashboard-menu-link, .dashboard-menu .dashboard-menu-link::after { transition: none; }
     }
   </style>
+  {{-- Phones: one type scale for the whole studio. Last, so it wins where another sheet sets a size. --}}
+  <link rel="stylesheet" href="{{ asset('css/studio-phone.css') }}?v={{ filemtime(public_path('css/studio-phone.css')) }}">
 </head>
 <body>
   @php
@@ -1942,7 +1968,7 @@
           : 'generateVoiceSection';
       @endphp
       @php $appSwitch = \App\Support\Agents\AgentAccess::openTo(auth()->user()); @endphp
-      {{-- Phones: Studio | Agents at the top of the page (the menu is the tab bar at the bottom). --}}
+      {{-- Phones: Studio | Agents at the top of the page (the menu is the row of tabs under it). --}}
       @if($appSwitch)
         <x-app-switch current="studio" class="is-top" />
       @endif
@@ -1963,6 +1989,13 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10.5l5-3v9l-5-3"/></svg>
             <span class="dm-label">{{ __('ui.dub.nav') }}</span>
             <span class="dm-short">{{ __('ui.dub.nav_short') }}</span>
+          </a>
+          @endif
+          @if($transcribe ?? null)
+          <a class="dashboard-menu-link" href="#transcribeSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4M6.5 7v10M10 9v6"/><path d="M14 8h7M14 12h7M14 16h5"/></svg>
+            <span class="dm-label">{{ __('transcribe.page.nav') }}</span>
+            <span class="dm-short">{{ __('transcribe.page.nav_short') }}</span>
           </a>
           @endif
           @if($voiceDesign ?? null)
@@ -2354,6 +2387,11 @@
 
     @if($dubStudio ?? null)
       <x-dub.dashboard-section :dub="$dubStudio" :account="$dubAccount" />
+    @endif
+
+    {{-- Speech to text, with this month's minutes and every transcript. --}}
+    @if($transcribe ?? null)
+      <x-transcribe.dashboard-section :account="$transcribe" />
     @endif
 
     <section id="planDefaultsSection" class="dashboard-panel" data-dashboard-section>
@@ -3474,8 +3512,47 @@
       if (navList && navList.scrollWidth > navList.clientWidth + 1) {
         const listBox = navList.getBoundingClientRect();
         const linkBox = activeLink.getBoundingClientRect();
-        navList.scrollBy({ left: (linkBox.left + linkBox.width / 2) - (listBox.left + listBox.width / 2), behavior: 'smooth' });
+        const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        navList.scrollBy({ left: (linkBox.left + linkBox.width / 2) - (listBox.left + listBox.width / 2), behavior: calm ? 'auto' : 'smooth' });
       }
+      menuEdges();
+    }
+
+    // Phones: the row of tabs fades at whichever edge has more tabs behind it.
+    function menuEdges() {
+      const list = document.querySelector('.dashboard-menu-list');
+      if (!list) return;
+      const box = list.getBoundingClientRect();
+      let left = false, right = false;
+      Array.from(list.children).forEach(function(item) {
+        const r = item.getBoundingClientRect();
+        if (!r.width) return;
+        if (r.left < box.left - 4) left = true;
+        if (r.right > box.right + 4) right = true;
+      });
+      list.classList.toggle('tabs-more-left', left);
+      list.classList.toggle('tabs-more-right', right);
+    }
+    (function() {
+      const list = document.querySelector('.dashboard-menu-list');
+      if (!list) return;
+      let frame = 0;
+      const later = function() { if (!frame) frame = requestAnimationFrame(function() { frame = 0; menuEdges(); }); };
+      list.addEventListener('scroll', later, { passive: true });
+      window.addEventListener('resize', later);
+      window.addEventListener('load', later);
+    })();
+
+    // Phones: a section chosen from the row starts just under it, not wherever the last one was scrolled to.
+    function showSectionTop(sectionId) {
+      const menu = document.querySelector('.dashboard-menu');
+      const section = document.getElementById(sectionId);
+      if (!menu || !section || getComputedStyle(menu).position !== 'sticky') return;
+      const menuTop = parseFloat(getComputedStyle(menu).top) || 0;
+      if (menu.getBoundingClientRect().top > menuTop + 1) return; // the row isn't held yet: the section is already in view under it
+      const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const to = window.scrollY + section.getBoundingClientRect().top - menuTop - menu.offsetHeight - 12;
+      window.scrollTo({ top: Math.max(0, to), behavior: calm ? 'auto' : 'smooth' });
     }
 
     function syncSectionFromHash(scroll = false) {
@@ -4695,6 +4772,7 @@
           const targetId = String(link.getAttribute('href') || '').replace(/^#/, '');
           if (!targetId) return;
           setActiveDashboardSection(targetId);
+          showSectionTop(targetId);
           if (window.localStorage) {
             window.localStorage.setItem('dashboard_active_section', targetId);
           }
@@ -6306,6 +6384,9 @@
   <script src="{{ asset('js/voice-studio-icons.js') }}?v={{ filemtime(public_path('js/voice-studio-icons.js')) }}" defer></script>
   @if($dubStudio ?? null)
     <script src="{{ asset('js/dub-studio.js') }}?v={{ filemtime(public_path('js/dub-studio.js')) }}" defer></script>
+  @endif
+  @if($transcribe ?? null)
+    <script src="{{ asset('js/transcribe.js') }}?v={{ filemtime(public_path('js/transcribe.js')) }}" defer></script>
   @endif
   @if(($voiceDesign ?? null) || ($voiceCloningVisible ?? false))
     @include('components.orb-script')

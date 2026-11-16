@@ -123,6 +123,33 @@ name: Server deploy
 #            fails on an error, a wrong status or text shown as its key
 #            (scripts/support/staging_page_check.php). Billing pages are left
 #            out: staging runs the live Stripe keys.
+#   stt-test: staging only. Speech to text from start to end with the branch's
+#            code, for a throwaway member made for the run and removed after it:
+#            two short recordings of the studio's voice samples written out the
+#            way the page does it, the minutes, sentences and times, every
+#            download, a translation, the developer API, the MCP tools and the
+#            dashboard in English and Arabic (scripts/support/stt_test.php). It
+#            uses the Gemini quota staging shares with live (a few requests):
+#            only when the owner has said yes. Needs mode migrate first.
+#   stt-preview: read-only (READ ONLY database session), on either site. What
+#            deploying speech to text finds and changes there: its migrations
+#            (run or to run), every plan now and after the migration (minutes,
+#            longest file, queue, files at once), whether a plan's own card
+#            text names it, the settings saved, the queue workers, and the
+#            plans' card settings as JSON (scripts/support/stt_preview.php).
+#   stt-check: staging only. The last transcripts made on staging: how loud
+#            each recording is and how much of it is voice, whether the silence
+#            check now refuses it, a short one written out again (not saved),
+#            and a finished one made before the windowed timing placed on its
+#            recording again and saved (old and new times printed)
+#            (scripts/support/stt_check.php). Uses the Gemini quota a little.
+#   stt-queue: staging only, no speech quota. A three-hour file's first two
+#            steps timed (clean copy, waveform peaks, measuring), then four
+#            minutes of silence for a throwaway member sent through the real
+#            queue: speech to text's own workers (started by the schedule) must
+#            pick it up and refuse it as silence, minutes given back; then the
+#            member deleted as the admin does, its folder with it
+#            (scripts/support/stt_queue_check.php).
 #   dub-test: staging only. Dubs the test video with the branch's code the way
 #            a member's dub is made, with the settings of the newest dub of a
 #            video that long (input "dub" changes them: "voice=Kore
@@ -183,7 +210,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -222,7 +249,7 @@ jobs:
   run:
     runs-on: ubuntu-latest
     # A test dub takes the server several minutes (separation, hearing, a voice for each line).
-    timeout-minutes: ${{ (inputs.mode == 'dub-test' || inputs.mode == 'agent-redteam') && 45 || 15 }}
+    timeout-minutes: ${{ (inputs.mode == 'dub-test' || inputs.mode == 'agent-redteam') && 45 || (inputs.mode == 'stt-test' || inputs.mode == 'stt-check') && 30 || 15 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -526,6 +553,11 @@ jobs:
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
+          if [ "$MODE" = stt-preview ]; then
+            tool stt_preview.php | $S "$FIND; php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
           if [ "$MODE" = speed-check ]; then
             printf '%s' "$MEMBER" | grep -qE '^[A-Za-z0-9._%+@-]*$' || { echo "member must be an email or a member id"; exit 1; }
             tool speed_check.php | $S "$FIND; MEMBER='$MEMBER' nice php"
@@ -574,6 +606,27 @@ jobs:
               php artisan queue:restart | tail -1 || true; echo 'INSTALLED: storage/app/bin/ffmpeg'"
             rm -f ~/.ssh/id_deploy
             exit 0
+          fi
+          if [ "$MODE" = stt-check ]; then
+            [ "$TARGET" = staging ] || { echo "stt-check runs on staging only"; exit 1; }
+            failed=0
+            $S "$FIND; nice php" < scripts/support/stt_check.php || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
+          if [ "$MODE" = stt-queue ]; then
+            [ "$TARGET" = staging ] || { echo "stt-queue runs on staging only"; exit 1; }
+            failed=0
+            $S "$FIND; nice php" < scripts/support/stt_queue_check.php || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
+          if [ "$MODE" = stt-test ]; then
+            [ "$TARGET" = staging ] || { echo "stt-test runs on staging only"; exit 1; }
+            failed=0
+            $S "$FIND; nice php" < scripts/support/stt_test.php || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
           fi
           if [ "$MODE" = dub-test ]; then
             [ "$TARGET" = staging ] || { echo "dub-test runs on staging only"; exit 1; }

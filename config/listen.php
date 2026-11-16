@@ -209,6 +209,33 @@ return [
     ],
 
     /*
+    | Speech to text (App\Services\Transcription\Transcriber).
+    | What each plan includes is set on the plan (Admin → Plans → Speech to text).
+    | These are the site's own limits and Listen's cost figures until they are
+    | saved in Admin → Speech to text → Settings (TranscriptionSettings).
+    */
+    'transcription' => [
+        // What a minute of audio costs Listen, as measured on staging in November 2026: writing out the words
+        // and speakers (about $0.0025) and placing each sentence where it is heard (about $0.005). For the
+        // admin's cost and margin figures only (Plans → Speech to text, Speech to text → Transcripts).
+        'cost_per_minute' => (float) env('LISTEN_TRANSCRIBE_COST', 0.0075),
+        // The free try in the demo: one recording up to this long, and this many for the whole site a day.
+        'free_try_seconds' => (int) env('LISTEN_TRANSCRIBE_FREE_SECONDS', 60),
+        'free_per_day' => (int) env('LISTEN_TRANSCRIBE_FREE_PER_DAY', 50),
+        // Minutes of audio the whole site may transcribe in a day (members, API and MCP together). 0: no ceiling.
+        'daily_minutes' => (int) env('LISTEN_TRANSCRIBE_DAILY_MINUTES', 3000),
+        // The largest upload, and whether each part is heard a second time with its draft (Speech to text → Settings).
+        'max_upload_mb' => (int) env('LISTEN_TRANSCRIBE_MAX_UPLOAD_MB', 500),
+        // Space this server keeps free for everything else it writes: uploads wait while it would go below.
+        'keep_free_mb' => (int) env('LISTEN_TRANSCRIBE_KEEP_FREE_MB', 5120),
+        'review' => (bool) env('LISTEN_TRANSCRIBE_REVIEW', false),
+        // Days the uploaded audio is kept (the text stays until the member deletes it).
+        'keep_audio_days' => (int) env('LISTEN_TRANSCRIBE_KEEP_AUDIO_DAYS', 7),
+        // Minutes after which a job still working is failed and its minutes given back.
+        'stuck_minutes' => (int) env('LISTEN_TRANSCRIBE_STUCK_MINUTES', 30),
+    ],
+
+    /*
     | Listen Agents: voice agents that answer a business's customers on its
     | website, its link page or a QR code (App\Support\Agents).
     |

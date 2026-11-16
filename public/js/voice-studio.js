@@ -116,6 +116,50 @@
     var items = [];
     var active = -1;
 
+    // A long list (data-vs-search="Search ..."): a search box at its top narrows it as one types,
+    // by the option's text or its data-search (other names, a code).
+    var search = null, none = null;
+    if (select.hasAttribute('data-vs-search')) {
+      wrap.classList.add('has-search');
+      search = document.createElement('input');
+      search.type = 'search';
+      search.className = 'vs-select-search';
+      search.placeholder = select.getAttribute('data-vs-search');
+      search.setAttribute('aria-label', search.placeholder);
+      search.autocomplete = 'off';
+      search.spellcheck = false;
+      none = document.createElement('div');
+      none.className = 'vs-select-none';
+      none.textContent = select.getAttribute('data-vs-none') || '';
+      none.hidden = true;
+      search.addEventListener('input', function () { narrow(search.value); });
+      search.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          setActive(step(active, e.key === 'ArrowDown' ? 1 : -1));
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (items[active] && !items[active].hidden) choose(items[active]);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          toggle(false);
+          button.focus();
+        } else if (e.key === 'Tab') {
+          toggle(false);
+        }
+      });
+    }
+    function narrow(query) {
+      var q = fold(query), first = -1;
+      items.forEach(function (item, i) {
+        var on = q === '' || fold(item.textContent + ' ' + (item.__opt.getAttribute('data-search') || '')).indexOf(q) !== -1;
+        item.hidden = !on;
+        if (on && first === -1) first = i;
+      });
+      if (none) none.hidden = first !== -1;
+      if (q !== '') setActive(first);
+    }
+
     // Speaker menus (data-speaker-avatar) show each speaker's avatar from the option's data-avatar.
     var withAvatars = select.hasAttribute('data-speaker-avatar');
     function avatarFor(opt) {
@@ -132,10 +176,33 @@
       }
       return box;
     }
+    // Language menus (data-vs-flags) show each option's round flag (data-flag), a globe where there is none.
+    var withFlags = select.hasAttribute('data-vs-flags');
+    function flagFor(opt) {
+      var box = document.createElement('span');
+      box.className = 'vs-flag vs-select-flag';
+      box.setAttribute('aria-hidden', 'true');
+      var url = opt ? String(opt.getAttribute('data-flag') || '') : '';
+      var letter = opt ? String(opt.getAttribute('data-flag-letter') || '') : '';
+      if (url) {
+        var img = document.createElement('img');
+        img.src = url; img.alt = ''; img.width = 22; img.height = 22; img.loading = 'lazy'; img.decoding = 'async';
+        box.appendChild(img);
+      } else if (letter) {
+        // A language shown by a letter of its own alphabet rather than a country's flag.
+        box.classList.add('vs-select-flag-letter');
+        box.textContent = letter;
+      } else {
+        box.classList.add('vs-select-flag-none');
+        box.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z"/></svg>';
+      }
+      return box;
+    }
     function syncLabel() {
       var picked = select.options[select.selectedIndex];
       label.textContent = picked ? picked.textContent : '';
       if (withAvatars && picked) label.insertBefore(avatarFor(picked), label.firstChild);
+      if (withFlags && picked) label.insertBefore(flagFor(picked), label.firstChild);
       button.disabled = select.disabled || select.options.length === 0;
       items.forEach(function (item) {
         var on = item.__opt === picked;
@@ -145,6 +212,7 @@
     function build() {
       list.innerHTML = '';
       items = [];
+      if (search) list.appendChild(search);
       Array.prototype.forEach.call(select.children, function (node) {
         if (node.tagName === 'OPTGROUP') {
           var head = document.createElement('div');
@@ -156,6 +224,7 @@
           addItem(node);
         }
       });
+      if (none) list.appendChild(none);
       syncLabel();
     }
     function addItem(opt) {
@@ -166,6 +235,15 @@
       item.__opt = opt;
       item.textContent = opt.textContent;
       if (withAvatars) item.insertBefore(avatarFor(opt), item.firstChild);
+      if (withFlags) {
+        // The flag and the name together at the start, the tick at the end.
+        var name = document.createElement('span');
+        name.className = 'vs-select-name';
+        name.textContent = opt.textContent;
+        item.textContent = '';
+        name.insertBefore(flagFor(opt), name.firstChild);
+        item.appendChild(name);
+      }
       item.insertAdjacentHTML('beforeend', '<svg class="vs-select-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>');
       if (opt.disabled) item.setAttribute('aria-disabled', 'true');
       item.addEventListener('mousemove', function () { setActive(items.indexOf(item)); });
@@ -201,8 +279,10 @@
         var r = button.getBoundingClientRect();
         var below = window.innerHeight - r.bottom;
         wrap.classList.toggle('is-up', below < Math.min(list.scrollHeight, 320) + 16 && r.top > below);
+        if (search) { search.value = ''; narrow(''); }
         setActive(items.findIndex(function (it) { return it.__opt === select.options[select.selectedIndex]; }));
         openMenu = toggle;
+        if (search) setTimeout(function () { search.focus(); }, 0);
       } else {
         list.hidden = true;
         if (openMenu === toggle) openMenu = null;
@@ -212,7 +292,7 @@
     }
     function step(from, dir) {
       for (var i = from + dir; i >= 0 && i < items.length; i += dir) {
-        if (items[i].getAttribute('aria-disabled') !== 'true') return i;
+        if (items[i].getAttribute('aria-disabled') !== 'true' && !items[i].hidden) return i;
       }
       return from;
     }
@@ -1633,7 +1713,10 @@
 
   function boot() {
     document.querySelectorAll('[data-vs-panel]').forEach(initPanel);
+    // Any other dropdown that asks for the studio's own (data-vs-select): speech to text's language and translation.
+    document.querySelectorAll('select[data-vs-select]').forEach(enhanceSelect);
   }
+  window.ListenEnhanceSelect = enhanceSelect;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
   // picker: the studio's choice card and its dialog on another page (the agents' dialect):

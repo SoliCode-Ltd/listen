@@ -88,6 +88,9 @@ class AgentVisitsTest extends TestCase
 
     public function test_a_call_made_from_a_chat_and_the_chat_after_a_call_are_one_visit(): void
     {
+        // A call is charged by the second: the clock stands still, so the call ended at once
+        // costs nothing however slowly the test runs, and only the chat's reply is counted.
+        $this->freezeTime();
         $agent = $this->liveAgent($this->owner());
 
         // A chat, then a call from its card: named by the browser with the chat's key, so it

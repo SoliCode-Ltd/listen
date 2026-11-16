@@ -1,8 +1,10 @@
 <?php
 
+use App\Jobs\TranscribeJob;
 use App\Models\ApiIdempotencyKey;
 use App\Models\ApiRequestLog;
 use App\Services\Api\ApiIdempotency;
+use App\Support\Agents\CallRecordings;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -10,6 +12,30 @@ use Illuminate\Support\Facades\Schedule;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+// Speech to text works on queues of its own (TranscribeJob::QUEUE…), so a long transcript never keeps
+// the studio's background voices waiting on theirs. Its three workers are started here, before every
+// other command, so none of those can hold them up. A worker stops after its time and the schedule
+// starts it again, but never while it is still running (withoutOverlapping): one still running at its
+// next start misses that start. So each stops well before it: transcribe-1 every minute, after 45 s;
+// transcribe-2 and transcribe-3 every two minutes, a minute apart, after 95 s, so one of those two is
+// always there to take a new file, even while transcribe-1 waits for its next minute. A worker
+// finishes the step it is on before it stops. Nothing to start where jobs run as they are sent.
+foreach ([
+    ['transcribe-1', '* * * * *', 45],
+    ['transcribe-2', '*/2 * * * *', 95],
+    ['transcribe-3', '1-59/2 * * * *', 95],
+] as [$worker, $starts, $seconds]) {
+    Schedule::command('queue:work', [
+        '--queue' => TranscribeJob::QUEUE_PRIORITY.','.TranscribeJob::QUEUE,
+        '--name' => $worker,
+        '--max-time' => $seconds,
+        '--sleep' => 2,
+        '--tries' => 3,
+        '--timeout' => 150,
+    ])->cron($starts)->withoutOverlapping(5)->runInBackground()
+        ->when(fn (): bool => config('queue.default') !== 'sync');
+}
 
 // Billing: a run that is still going is never started again on top of itself (two
 // syncs at once would call Stripe twice for every member). Each lock lapses after a
@@ -49,6 +75,10 @@ Schedule::command('listen:expire-stuck-generations')->everyFiveMinutes()->withou
 // and delete old server copies (App\Console\Commands\PruneVideoDubsCommand).
 Schedule::command('dubs:prune')->everyTenMinutes()->withoutOverlapping(30);
 
+// Speech to text: give back the minutes of stuck transcripts and delete uploaded audio after the
+// days set in Speech to text → Settings (App\Console\Commands\PruneTranscriptionsCommand).
+Schedule::command('transcriptions:prune')->everyTenMinutes()->withoutOverlapping(30);
+
 // Voice Design: delete the takes nobody kept, so the speech projects keep room for voices
 // (App\Console\Commands\PruneDesignedVoicesCommand).
 Schedule::command('voice-design:prune')->everyThirtyMinutes()->withoutOverlapping(20);
@@ -69,4 +99,4 @@ Schedule::command('agents:read-links')->hourly()->withoutOverlapping(30);
 // Every page of live agents' websites, for what callers ask (AgentSite): never read, or not for a week.
 Schedule::command('agents:read-websites')->hourly()->withoutOverlapping(30);
 // Listen Agents: call recordings older than CallRecordings::KEEP_DAYS days go (the call's words stay).
-Schedule::call(fn () => \App\Support\Agents\CallRecordings::prune())->name('agents:prune-recordings')->dailyAt('04:10')->withoutOverlapping(60);
+Schedule::call(fn () => CallRecordings::prune())->name('agents:prune-recordings')->dailyAt('04:10')->withoutOverlapping(60);

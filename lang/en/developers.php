@@ -17,6 +17,7 @@ return [
         'history_read' => 'Read history and audio',
         'history_write' => 'Delete history',
         'user_read' => 'Read account and usage',
+        'speech_to_text' => 'Speech to text',
     ],
 
     'keys' => [
@@ -138,6 +139,7 @@ return [
             'boolean' => 'true or false',
             'object' => 'object',
             'array' => 'list',
+            'file' => 'upload',
         ],
 
         // Lists joined into sentences (ApiDocs::listed). An item keyed by a
@@ -167,6 +169,8 @@ return [
                 'Every Arabic dialect and English accent of the studio, with delivery styles, emotions, sound tags, speed and pitch.',
                 'Usage is counted on your plan\'s credits and stops at your limit: there are no surprise bills.',
             ],
+            // Shown once speech to text is public.
+            'point_speech_to_text' => 'Speech to text: send a recording and get its text with who said what, as text, subtitles or a document (DOCX), on the plans that include it.',
             // After the dialects point, when some plan includes one of them.
             'points_features' => ':options, on the plans that include them.',
             'code_note' => 'Field names, values and messages of the API are in English, as they are part of the code.',
@@ -194,6 +198,8 @@ return [
             'step2' => 'When the app asks, sign in with Listen and allow it. An app without sign-in takes an API key instead: create one in your dashboard and put it in the `Authorization` header, as in the example.',
             'step3' => 'Ask for what you need, for example: "Read this ad in Egyptian Arabic, in a warm voice."',
             'note' => 'Every recording uses your credits, as in the studio, and is kept in your history. Links to recordings work for as many days as your plan keeps your audio history; ask the app for a new link at any time. Apps you sign in to are listed in your dashboard, under Developer API, where you can disconnect them. Signing in needs a paid plan with the premium voices.',
+            // Shown once speech to text is public.
+            'note_speech_to_text' => 'Turning a recording into text uses your speech to text minutes instead of credits: give the app a link to the file.',
             'tools_title' => 'Tools',
             'tools_body' => 'The app sees only the tools its key\'s permissions allow.',
             'tools' => [
@@ -202,7 +208,11 @@ return [
                 'text_to_speech' => 'Makes speech and gives a link to play or download it.',
                 'get_speech' => 'Checks on a recording and gives a new link to it.',
                 'list_speech_history' => 'Lists your recent recordings.',
+                'transcribe_audio' => 'Turns a recording into text, from a link to the file.',
+                'get_transcription' => 'Gives the text of a transcription, or its subtitles, in its language or translated.',
+                'list_transcriptions' => 'Lists your recent transcriptions.',
                 'get_account' => 'Shows your plan and the credits you have left.',
+                'get_account_speech_to_text' => 'Shows your plan, the credits you have left and your speech to text minutes.',
             ],
             'config_label' => 'MCP settings',
         ],
@@ -358,6 +368,22 @@ return [
                 'title' => 'Delete a history item',
                 'summary' => 'Deletes a finished generation. The credits it used are not given back.',
             ],
+            'stt_create' => [
+                'title' => 'Transcribe audio',
+                'summary' => 'Turns the speech in a recording into text, with who said what. Send the file as `multipart/form-data` in `file` (with curl: `-F "file=@episode.mp3"`), or a link to it as JSON in `url`, as below. It answers at once with `202`; check `GET /v1/transcriptions/{transcription_id}` every few seconds until `status` is `completed` or `failed`. Every second of the audio is taken from your plan\'s speech to text minutes when it starts, and given back if it fails. A file your plan cannot take is refused before anything is used, naming the plan that takes it (`upgrade_plan`).',
+            ],
+            'stt_list' => [
+                'title' => 'List transcriptions',
+                'summary' => 'Your transcriptions from the API, AI apps and your dashboard, newest first, without their words. Pass `next_cursor` as `before` to get the next page.',
+            ],
+            'stt_get' => [
+                'title' => 'Get a transcription',
+                'summary' => 'Its status and, once `completed`, the whole `text`, the `speakers`, and the `paragraphs` and `sentences` with their times in seconds.',
+            ],
+            'stt_export' => [
+                'title' => 'Download a transcription',
+                'summary' => 'As text (`txt`), subtitles (`srt`, `vtt`) or a document (`docx`). With `translate_to`, in another language: made once and kept, using no minutes. A transcription can be translated into up to 5 languages, and up to 10 new translations can be made a day.',
+            ],
             'user' => [
                 'title' => 'Get your account',
                 'summary' => 'Your name, email and the same plan and usage as below.',
@@ -398,6 +424,13 @@ return [
             'source' => '`api` (developer API) or `app` (studio and extension).',
             'status' => '`queued`, `processing`, `completed` or `failed`.',
             'history_item_id' => 'The id of the history item.',
+            'stt_file' => 'The audio or video file (MP3, WAV, M4A, OGG, FLAC, WEBM or MP4), as `multipart/form-data`. Send this or `url`.',
+            'stt_url' => 'A public link straight to the audio or video file (not a page that plays it). Send this or `file`.',
+            'stt_language' => '`auto` (default) to detect the language, or the language spoken, such as `ar` or `en`.',
+            'stt_title' => 'A name for the transcription. Defaults to the file name.',
+            'transcription_id' => 'The `transcription_id` that `POST /v1/transcriptions` returned.',
+            'stt_format' => '`txt`, `srt`, `vtt` or `docx`.',
+            'translate_to' => 'A language code, such as `en`, `ar` or `fr`, for the transcription in that language.',
         ],
 
         'headers' => [
@@ -412,6 +445,9 @@ return [
             'X-RateLimit-Limit' => 'Requests your account may send a minute, all its keys together (generations and other requests are counted separately).',
             'X-RateLimit-Remaining' => 'Requests left this minute.',
             'Retry-After' => 'Seconds to wait before trying again (on `429`).',
+            'Location' => 'The transcription, to check on it.',
+            'X-Transcription-Id' => 'The `transcription_id` of this transcription.',
+            'X-Seconds-Used' => 'Seconds taken from this month\'s speech to text minutes.',
         ],
 
         'errors' => [

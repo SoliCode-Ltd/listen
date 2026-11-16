@@ -70,9 +70,9 @@ class AgentLaunchPlansTest extends TestCase
         $rate = AgentAccess::creditsPerMinute();
         $creator = $plans['creator'];
         $line = collect(PlanPricingLines::forPlan($creator, 'en'))->firstWhere('label', 'Voice agents');
-        $this->assertSame('3 agents, up to '.number_format(intdiv(180000, $rate)).' call minutes', $line['value']);
+        $this->assertSame('3 agents', $line['value'], 'the agents only: the call minutes are in the comparison table');
         $creator->forceFill(['agents_max' => 4, 'agent_minutes_per_month' => 50])->save();
-        $this->assertSame('4 agents, up to 50 call minutes', collect(PlanPricingLines::forPlan($creator->fresh(), 'en'))->firstWhere('label', 'Voice agents')['value']);
+        $this->assertSame('4 agents', collect(PlanPricingLines::forPlan($creator->fresh(), 'en'))->firstWhere('label', 'Voice agents')['value']);
         $this->assertStringContainsString('4 وكلاء', collect(PlanPricingLines::forPlan($creator->fresh(), 'ar'))->firstWhere('label', 'الوكلاء الصوتيون')['value']);
 
         // Not while Agents are closed, and never on a plan without them.

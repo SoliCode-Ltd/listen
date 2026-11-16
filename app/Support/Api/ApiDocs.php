@@ -5,9 +5,11 @@ namespace App\Support\Api;
 use App\Models\Plan;
 use App\Services\Api\ApiIdempotency;
 use App\Services\Api\ApiSpeechService;
+use App\Services\Transcription\TranscriptExport;
 use App\Support\AudioEffects;
 use App\Support\Credits;
 use App\Support\PlanUsageGuard;
+use App\Support\StudioFacts;
 
 /**
  * The developer documentation's reference: every endpoint with its
@@ -97,6 +99,41 @@ final class ApiDocs
         if (! $offered[ApiFeatureGate::SOUND_ENVIRONMENTS]) {
             unset($historyItem['audio_effect']);
         }
+
+        // Speech to text: a short interview, two speakers, in the page's language.
+        $transcriptionId = 'tr_k3m9x2q7w1v5b8n4z6c0a2s4';
+        $sttLines = $arabic ? ['أهلًا بك في الحلقة الرابعة.', 'شكرًا على الاستضافة!'] : ['Welcome to episode four.', 'Thanks for having me!'];
+        $sttUsage = ['included_in_plan' => true, 'seconds_included' => 15000, 'seconds_used' => 427, 'seconds_left' => 14573,
+            'max_file_seconds' => 3600, 'files_at_once' => 1, 'resets_at' => '2026-11-02T00:00:00+00:00'];
+        $speakerName = static fn (string $l): string => ($arabic ? 'المتحدث ' : 'Speaker ').$l;
+        $transcription = [
+            'transcription_id' => $transcriptionId,
+            'title' => $arabic ? 'episode-ar.mp3' : 'episode.mp3',
+            'status' => 'completed',
+            'source' => 'api',
+            'language_code' => $example['language'],
+            'language_requested' => $example['language'],
+            'duration_seconds' => 6.4,
+            'seconds_used' => 7,
+            'free_try' => false,
+            'progress' => 100,
+            'speaker_count' => 2,
+            'created_at' => '2026-10-18T09:30:12+00:00',
+            'completed_at' => '2026-10-18T09:30:31+00:00',
+            'error' => null,
+            'speakers' => [['speaker_id' => 'A', 'name' => $speakerName('A')], ['speaker_id' => 'B', 'name' => $speakerName('B')]],
+            'text' => $speakerName('A').': '.$sttLines[0]."\n\n".$speakerName('B').': '.$sttLines[1],
+            'paragraphs' => [
+                ['speaker_id' => 'A', 'text' => $sttLines[0], 'start' => 0.4, 'end' => 3.1],
+                ['speaker_id' => 'B', 'text' => $sttLines[1], 'start' => 3.6, 'end' => 6.2],
+            ],
+            'sentences' => [
+                ['speaker_id' => 'A', 'text' => $sttLines[0], 'start' => 0.4, 'end' => 3.1],
+                ['speaker_id' => 'B', 'text' => $sttLines[1], 'start' => 3.6, 'end' => 6.2],
+            ],
+            'translations' => [],
+            'download_urls' => array_combine(TranscriptExport::FORMATS, array_map(fn (string $f): string => $baseUrl.'/transcriptions/'.$transcriptionId.'/export?format='.$f, TranscriptExport::FORMATS)),
+        ];
         if (! $offered[ApiFeatureGate::DIALOGUE]) {
             unset($historyItem['dialogue']);
         }
@@ -147,6 +184,7 @@ final class ApiDocs
                 'expires_at' => $isPack ? '2026-11-17T09:30:12+00:00' : null,
             ],
             'voice_seconds' => ['used' => Credits::secondsFor($creditsUsed), 'limit' => Credits::secondsFor($creditLimit)],
+            ...(StudioFacts::speechToText() ? ['speech_to_text' => $sttUsage] : []),
             'requests' => [
                 'used_this_month' => 911,
                 'monthly_limit' => $monthlyRequests > 0 ? $monthlyRequests : null,
@@ -374,6 +412,58 @@ final class ApiDocs
                 'response' => ['json', $json(['history_item_id' => $historyId, 'deleted' => true])],
             ],
             [
+                'id' => 'create-transcription',
+                'key' => 'stt_create',
+                'method' => 'POST',
+                'path' => '/v1/transcriptions',
+                'scope' => ApiScopes::SPEECH_TO_TEXT,
+                'body_params' => [
+                    $p('file', 'file', false, 'stt_file'),
+                    $p('url', 'string', false, 'stt_url'),
+                    $p('language_code', 'string', false, 'stt_language'),
+                    $p('title', 'string', false, 'stt_title'),
+                ],
+                'headers' => ['Location', 'X-Transcription-Id', 'X-Seconds-Used', 'X-Request-Id'],
+                'request' => ['POST', $baseUrl.'/transcriptions', ['url' => 'https://example.com/'.($arabic ? 'episode-ar.mp3' : 'episode.mp3'), 'language_code' => $example['language']], null],
+                'response' => ['json', $json(array_merge(array_diff_key($transcription, array_flip(['speakers', 'text', 'paragraphs', 'sentences', 'translations', 'download_urls'])),
+                    ['status' => 'queued', 'progress' => 0, 'speaker_count' => 0, 'completed_at' => null, 'usage' => $sttUsage]))],
+            ],
+            [
+                'id' => 'list-transcriptions',
+                'key' => 'stt_list',
+                'method' => 'GET',
+                'path' => '/v1/transcriptions',
+                'scope' => ApiScopes::SPEECH_TO_TEXT,
+                'query_params' => [
+                    $p('page_size', 'integer', false, 'page_size'),
+                    $p('before', 'string', false, 'before'),
+                    $p('status', 'string', false, 'status'),
+                ],
+                'request' => ['GET', $baseUrl.'/transcriptions?page_size=20', null, null],
+                'response' => ['json', $json(['transcriptions' => [array_diff_key($transcription, array_flip(['speakers', 'text', 'paragraphs', 'sentences', 'translations', 'download_urls']))], 'has_more' => false, 'next_cursor' => null])],
+            ],
+            [
+                'id' => 'get-transcription',
+                'key' => 'stt_get',
+                'method' => 'GET',
+                'path' => '/v1/transcriptions/{transcription_id}',
+                'scope' => ApiScopes::SPEECH_TO_TEXT,
+                'path_params' => [$p('transcription_id', 'string', true, 'transcription_id')],
+                'request' => ['GET', $baseUrl.'/transcriptions/'.$transcriptionId, null, null],
+                'response' => ['json', $json($transcription)],
+            ],
+            [
+                'id' => 'export-transcription',
+                'key' => 'stt_export',
+                'method' => 'GET',
+                'path' => '/v1/transcriptions/{transcription_id}/export',
+                'scope' => ApiScopes::SPEECH_TO_TEXT,
+                'path_params' => [$p('transcription_id', 'string', true, 'transcription_id')],
+                'query_params' => [$p('format', 'string', true, 'stt_format'), $p('translate_to', 'string', false, 'translate_to')],
+                'request' => ['GET', $baseUrl.'/transcriptions/'.$transcriptionId.'/export?format=srt', null, 'episode.srt'],
+                'response' => ['http', "HTTP/1.1 200 OK\nContent-Type: application/x-subrip; charset=UTF-8\nX-Transcription-Id: {$transcriptionId}\n\n1\n00:00:00,400 --> 00:00:03,100\n".$sttLines[0]."\n\n2\n00:00:03,600 --> 00:00:06,200\n".$sttLines[1]],
+            ],
+            [
                 'id' => 'get-subscription',
                 'key' => 'subscription',
                 'method' => 'GET',
@@ -458,6 +548,11 @@ final class ApiDocs
         foreach (AudioEffects::ALL as $value => $row) {
             $environments[$row[1]]['name'] ??= AudioEffects::GROUPS[$row[1]][$arabic ? 'ar' : 'en'] ?? $row[1];
             $environments[$row[1]]['items'][] = ['value' => $value, 'name' => $arabic ? $row[3] : $row[2], 'description' => $arabic ? $row[5] : $row[4]];
+        }
+
+        // Speech to text's endpoints are shown once it is public (open to everyone, on a plan on sale).
+        if (! StudioFacts::speechToText()) {
+            $endpoints = array_values(array_filter($endpoints, fn (array $e): bool => ! str_contains((string) ($e['id'] ?? ''), 'transcription')));
         }
 
         return [

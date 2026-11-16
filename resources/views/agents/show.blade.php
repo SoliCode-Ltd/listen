@@ -2,6 +2,7 @@
   {{-- The studio's dialect panel (the agent's dialect is picked as in the studio). --}}
   <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
   <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
+  <link rel="stylesheet" href="{{ asset('css/agents-phone.css') }}?v={{ filemtime(public_path('css/agents-phone.css')) }}">
 </head>
 <body>
   @include('components.header')

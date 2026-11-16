@@ -110,6 +110,12 @@ class Plan extends Model
         'agent_minutes_per_month',
         'agent_concurrent_calls',
         'agent_max_call_minutes',
+        // Speech to text (App\Support\Transcription\TranscriptionAccess)
+        'transcription_enabled',
+        'transcription_minutes_month',
+        'transcription_max_file_minutes',
+        'transcription_priority',
+        'transcription_concurrent_jobs',
     ];
 
     protected $casts = [
@@ -151,6 +157,11 @@ class Plan extends Model
         'agent_minutes_per_month' => 'integer',
         'agent_concurrent_calls' => 'integer',
         'agent_max_call_minutes' => 'integer',
+        'transcription_enabled' => 'boolean',
+        'transcription_minutes_month' => 'integer',
+        'transcription_max_file_minutes' => 'integer',
+        'transcription_priority' => 'boolean',
+        'transcription_concurrent_jobs' => 'integer',
     ];
 
     public function subscriptions(): HasMany

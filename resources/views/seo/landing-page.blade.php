@@ -53,7 +53,9 @@
       $voiceSections[] = [
         'title' => isset($currentFeature) ? ($isArabic ? 'ميزات أخرى في الاستوديو' : 'More studio features') : ($isArabic ? 'ميزات الاستوديو' : 'Studio features'),
         'links' => $featureLinks,
-        'all' => ['url' => route('developers'), 'label' => $isArabic ? 'واجهة برمجية لتحويل النص إلى صوت' : 'Text to speech API'],
+        'all' => ['url' => route('developers'), 'label' => ($currentFeature ?? null) === 'speech-to-text'
+          ? ($isArabic ? 'واجهة برمجية لتحويل الصوت إلى نص' : 'Speech to text API')
+          : ($isArabic ? 'واجهة برمجية لتحويل النص إلى صوت' : 'Text to speech API')],
       ];
     }
       $voiceSections[] = [
@@ -66,9 +68,10 @@
     }
     $samples = $samples ?? ['lead' => null, 'more' => [], 'title' => '', 'note' => ''];
     $lead = $samples['lead'];
-    $facts = $isArabic
+    // A page may bring its own figures (speech to text: languages, downloads, minutes); else the studio's.
+    $facts = $pageContent['facts'] ?? ($isArabic
       ? [[\App\Support\StudioFacts::arabicDialects(), 'لهجة عربية'], [\App\Support\StudioFacts::englishAccents(), 'لكنة إنجليزية'], [\App\Support\StudioFacts::voices(), 'صوتاً'], [\App\Support\StudioFacts::emotions(), 'شعوراً']]
-      : [[\App\Support\StudioFacts::arabicDialects(), 'Arabic dialects'], [\App\Support\StudioFacts::englishAccents(), 'English accents'], [\App\Support\StudioFacts::voices(), 'voices'], [\App\Support\StudioFacts::emotions(), 'emotions']];
+      : [[\App\Support\StudioFacts::arabicDialects(), 'Arabic dialects'], [\App\Support\StudioFacts::englishAccents(), 'English accents'], [\App\Support\StudioFacts::voices(), 'voices'], [\App\Support\StudioFacts::emotions(), 'emotions']]);
   @endphp
   @include('components.header')
 

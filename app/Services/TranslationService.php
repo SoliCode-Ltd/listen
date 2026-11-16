@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\TranslationFailedException;
 use App\Support\GeminiVocalTags;
 use App\Support\SpeechLanguages;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -60,6 +61,71 @@ class TranslationService
         Cache::put($cacheKey, $translated, now()->addDays(14));
 
         return $translated;
+    }
+
+    /**
+     * Many texts asked of the quick translator at once (a transcript's paragraphs), each usable
+     * answer kept where maybeTranslate() looks first, so the texts then come back at once instead
+     * of one request after another. A text it cannot do well is left for maybeTranslate() to do.
+     *
+     * @param  array<int, string>  $texts
+     */
+    public function prefetch(array $texts, string $sourceLanguage, string $targetLanguage): void
+    {
+        $latin = $sourceLanguage === 'en';
+        if ($sourceLanguage === $targetLanguage && ! $latin) {
+            return;
+        }
+        $todo = [];
+        foreach (array_values(array_unique(array_map('trim', $texts))) as $text) {
+            $key = 'listen:tr:v4:'.sha1($sourceLanguage.'|'.$targetLanguage.'|'.$text);
+            if ($text === '' || GeminiVocalTags::protect($text)['tags'] !== [] || (is_string(Cache::get($key)) && Cache::get($key) !== '')) {
+                continue;
+            }
+            $todo[$key] = $text;
+        }
+        if ($todo === []) {
+            return;
+        }
+        $verify = (bool) config('services.google_tts.verify_ssl', true);
+        foreach (array_chunk($todo, 8, true) as $batch) {
+            try {
+                $answers = Http::pool(function ($pool) use ($batch, $latin, $sourceLanguage, $targetLanguage, $verify): array {
+                    $sent = [];
+                    foreach ($batch as $key => $text) {
+                        $sent[] = $pool->as($key)->timeout(8)->withOptions(['verify' => $verify])->get('https://translate.googleapis.com/translate_a/single', [
+                            'client' => 'gtx', 'sl' => $latin ? 'auto' : $sourceLanguage, 'tl' => $targetLanguage, 'dt' => 't', 'q' => $text,
+                        ]);
+                    }
+
+                    return $sent;
+                });
+            } catch (\Throwable) {
+                return;
+            }
+            foreach ($batch as $key => $text) {
+                $response = $answers[$key] ?? null;
+                if (! $response instanceof Response || ! $response->ok()) {
+                    continue;
+                }
+                $json = $response->json();
+                if (! is_array($json) || ! is_array($json[0] ?? null)) {
+                    continue;
+                }
+                $detected = is_string($json[2] ?? null) ? strtolower(explode('-', $json[2])[0]) : null;
+                $parts = [];
+                foreach ($json[0] as $segment) {
+                    if (is_array($segment) && is_string($segment[0] ?? null)) {
+                        $parts[] = $segment[0];
+                    }
+                }
+                $translated = trim(implode('', $parts));
+                if ($detected === $targetLanguage || ! $this->usable($translated, [], $targetLanguage)) {
+                    continue;
+                }
+                Cache::put($key, $translated, now()->addDays(14));
+            }
+        }
     }
 
     /**

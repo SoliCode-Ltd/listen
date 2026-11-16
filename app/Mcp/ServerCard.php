@@ -3,6 +3,7 @@
 namespace App\Mcp;
 
 use App\Mcp\Servers\ListenServer;
+use App\Support\StudioFacts;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Laravel\Mcp\Enums\ProtocolVersion;
@@ -28,7 +29,7 @@ final class ServerCard
             'name' => self::name(),
             'version' => ListenServer::VERSION,
             'title' => ListenServer::NAME,
-            'description' => 'Arabic and English text to speech with studio voices, Arabic dialects and accents.',
+            'description' => 'Arabic and English text to speech in studio voices and dialects'.(StudioFacts::speechToText() ? ', and speech to text.' : '.'),
             'websiteUrl' => url('/en/developers').'#mcp',
             'icons' => [['src' => url('/favicon.png'), 'mimeType' => 'image/png', 'sizes' => ['192x192']]],
             'remotes' => [[

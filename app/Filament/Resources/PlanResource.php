@@ -42,6 +42,7 @@ use App\Filament\Resources\PlanResource\Pages\CreatePlan;
 use App\Filament\Resources\PlanResource\Pages\ViewPlan;
 use App\Filament\Resources\PlanResource\Pages\EditPlan;
 use App\Support\Agents\AgentCost;
+use App\Support\Transcription\TranscriptionAccess;
 use Illuminate\Support\Str;
 use App\Filament\Resources\PlanResource\Pages;
 use App\Models\Plan;
@@ -611,6 +612,48 @@ class PlanResource extends Resource
                             ->columnSpan(2)
                             ->visible(fn (Get $get): bool => (bool) $get('agents_enabled')),
                     ]),
+                Section::make('Speech to text')
+                    ->description('Members on this plan turn recordings into text: on the page, through the API (where the plan has API access) and through the MCP server. Every plan that includes it gets the same transcript: paragraphs with who said them, every download (text, Word, subtitles) and translation. Minutes come from this plan only: there are no packs or top-ups. A member whose minutes run out, or whose file is longer than the plan takes, is shown the next plan up that fits. The site\'s own limits (who sees it, the free try, the daily ceiling, how long audio is kept, the languages) are in Speech to text → Settings.')
+                    ->columns(2)
+                    ->visible(fn (): bool => TranscriptionAccess::planColumns())
+                    ->schema([
+                        Toggle::make('transcription_enabled')
+                            ->label('Include speech to text')
+                            ->helperText('Off: this plan\'s members see the plan that includes it instead. Their transcripts stay; nothing is deleted.')
+                            ->default(false)
+                            ->live()
+                            ->columnSpan(2),
+                        TextInput::make('transcription_minutes_month')
+                            ->label('Minutes of audio a month')
+                            ->numeric()->integer()->minValue(0)->maxValue(100000)->default(0)->required()
+                            ->suffix('minutes')
+                            ->live(onBlur: true)
+                            ->helperText('Starts again with the member\'s billing month, the same day as their voice credits.')
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                        TextInput::make('transcription_max_file_minutes')
+                            ->label('Longest file')
+                            ->numeric()->integer()->minValue(1)->maxValue(600)->default(30)->required()
+                            ->suffix('minutes')
+                            ->helperText('A longer file is turned away before anything is used, with the plan that takes it.')
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                        TextInput::make('transcription_concurrent_jobs')
+                            ->label('Files working at once')
+                            ->numeric()->integer()->minValue(1)->maxValue(10)->default(1)->required()
+                            ->suffix('files')
+                            ->helperText('For one member, on the page, the API and MCP together.')
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                        Toggle::make('transcription_priority')
+                            ->label('Priority queue')
+                            ->helperText('Its files are worked on before those of plans without it.')
+                            ->default(false)
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                        Placeholder::make('transcription_cost')
+                            ->label('What it costs Listen')
+                            ->content(fn (Get $get): HtmlString => self::transcriptionEconomics($get))
+                            ->columnSpan(2)
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                    ]),
+
                 Section::make('Pricing page')
                     ->description('The lines under the price on this plan\'s card. They are written for you in English and Arabic from this plan\'s settings above, so changing a setting updates the card by itself. Tick the ones to show.')
                     ->schema([
@@ -992,6 +1035,26 @@ class PlanResource extends Resource
             sprintf('A call minute costs Listen about <b>%s</b> on a typical call (3 minutes, an agent with notes): <b>%s</b> margin; about <b>%s</b> on a heavy one (10 minutes, every note and file slot full): <b>%s</b> margin.',
                 $money($typical), $margin($typical), $money($heavy), $margin($heavy)),
             sprintf('If every minute is used: about %s to %s a month for calls.', $money($minutes * $typical), $money($minutes * $heavy)),
+        ];
+
+        return new HtmlString('<div style="display:grid;gap:.35rem;font-size:.875rem;line-height:1.5">'.implode('', array_map(fn ($l) => '<p>'.$l.'</p>', $lines)).'</div>');
+    }
+
+    /** What the plan's transcription minutes cost Listen at full use, against its price (and its offer price). */
+    private static function transcriptionEconomics(Get $get): HtmlString
+    {
+        $minutes = max(0, (int) $get('transcription_minutes_month'));
+        $perMinute = TranscriptionAccess::costPerMinute();
+        $price = max(0.0, (float) ($get('price_dollars') ?? 0));
+        $discount = max(0, min(100, (int) ($get('discount_percentage') ?? 0)));
+        $full = $minutes * $perMinute;
+        $money = fn (float $v): string => '$'.number_format($v, $v < 1 ? 3 : 2);
+        $share = fn (float $of): string => $of > 0 ? number_format($full / $of * 100, 1).'%' : '—';
+
+        $lines = [
+            sprintf('A minute of audio costs Listen about <b>%s</b> (Speech to text → Settings).', $money($perMinute)),
+            sprintf('If every minute is used: about <b>%s</b> a month, <b>%s</b> of the %s price%s.', $money($full), $share($price), $money($price),
+                $discount > 0 ? sprintf(', <b>%s</b> of the offer price (%s, %d%% off)', $share($price * (100 - $discount) / 100), $money($price * (100 - $discount) / 100), $discount) : ''),
         ];
 
         return new HtmlString('<div style="display:grid;gap:.35rem;font-size:.875rem;line-height:1.5">'.implode('', array_map(fn ($l) => '<p>'.$l.'</p>', $lines)).'</div>');
