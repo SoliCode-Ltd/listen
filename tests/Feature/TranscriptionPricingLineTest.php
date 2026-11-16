@@ -41,14 +41,14 @@ class TranscriptionPricingLineTest extends TestCase
         $this->open();
         $plan = $this->plan(250);
 
-        $this->assertSame('250 minutes a month', self::line(PlanPricingLines::forPlan($plan, 'en'), 'Speech to text'));
-        $this->assertSame('250 دقيقة شهريًا', self::line(PlanPricingLines::forPlan($plan, 'ar'), 'تحويل الكلام إلى نص'));
-        $this->assertSame('250 minutes a month', self::line(PlanPricingLines::forComparison($plan, 'en'), 'Speech to text'));
+        $this->assertSame('250 minutes', self::line(PlanPricingLines::forPlan($plan, 'en'), 'Speech to text'));
+        $this->assertSame('250 دقيقة', self::line(PlanPricingLines::forPlan($plan, 'ar'), 'تحويل الكلام إلى نص'));
+        $this->assertSame('250 minutes', self::line(PlanPricingLines::forComparison($plan, 'en'), 'Speech to text'));
 
         // A change on the plan shows at once.
         $plan->forceFill(['transcription_minutes_month' => 500])->save();
-        $this->assertSame('500 minutes a month', self::line(PlanPricingLines::forPlan($plan->fresh(), 'en'), 'Speech to text'));
-        $this->assertSame('5 دقائق شهريًا', trans_choice('ui.pricing.lines.stt_minutes', 5, ['count' => 5], 'ar'));
+        $this->assertSame('500 minutes', self::line(PlanPricingLines::forPlan($plan->fresh(), 'en'), 'Speech to text'));
+        $this->assertSame('5 دقائق', trans_choice('ui.pricing.lines.stt_minutes', 5, ['count' => 5], 'ar'));
     }
 
     public function test_not_on_a_plan_without_it_and_not_before_it_is_open_to_everyone(): void

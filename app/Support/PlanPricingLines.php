@@ -42,8 +42,8 @@ final class PlanPricingLines
         'voice_design' => ['sliders', true],
         // Shown on every plan that includes dubbing, once Video Dubbing is open to everyone.
         'video_dubbing' => ['mic', true],
-        // Shown on every plan that includes speech to text (Plans → Speech to text), with its minutes a
-        // month, once Speech to text → Settings opens it to everyone.
+        // Shown on every plan that includes speech to text (Plans → Speech to text), with its minutes,
+        // once Speech to text → Settings opens it to everyone.
         'speech_to_text' => ['type', true],
         // Shown on every plan that includes voice agents (Plans → Voice agents), once Agents are open to everyone.
         'voice_agents' => ['users', true],
@@ -379,7 +379,7 @@ final class PlanPricingLines
                     ? trans_choice('ui.pricing.lines.dubbing_videos', VideoDubbing::monthlyLimit($plan), ['seconds' => VideoDubbing::maxSeconds($plan, false)], $locale)
                     : self::t('dubbing_open', $locale, ['seconds' => VideoDubbing::maxSeconds($plan, false)]))
                 : null,
-            // The plan's own minutes a month (Plans → Speech to text), once it is open to everyone.
+            // The plan's own minutes (Plans → Speech to text), once it is open to everyone.
             'speech_to_text' => TranscriptionAccess::planColumns()
                 && TranscriptionAccess::planIncludes($plan)
                 && TranscriptionSettings::audience() === TranscriptionSettings::AUDIENCE_EVERYONE

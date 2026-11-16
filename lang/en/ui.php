@@ -444,7 +444,7 @@ return [
             'dubbing_videos' => ':count video a month, up to :seconds s each|:count videos a month, up to :seconds s each',
             'dubbing_open' => 'Up to :seconds s a video, from your voice time',
             'agents_value' => '{1} 1 agent|[2,*] :count agents',
-            'stt_minutes' => '{1} 1 minute a month|[2,*] :count minutes a month',
+            'stt_minutes' => '{1} 1 minute|[2,*] :count minutes',
             'topup_price' => ':price per 1M credits',
         ],
     ],
