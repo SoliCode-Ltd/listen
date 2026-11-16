@@ -215,8 +215,9 @@ return [
     | saved in Admin → Speech to text → Settings (TranscriptionSettings).
     */
     'transcription' => [
-        // What a minute of audio costs Listen, as measured on staging in November 2026 (transcribe:measure):
-        // the words and speakers only ($0.0022), with the dialect guide in the question. For the admin's figures only.
+        // What a minute of audio costs Listen, as measured on staging in November 2026: writing out the words
+        // and speakers (about $0.0025) and placing each sentence where it is heard (about $0.005). For the
+        // admin's cost and margin figures only (Plans → Speech to text, Speech to text → Transcripts).
         'cost_per_minute' => (float) env('LISTEN_TRANSCRIBE_COST', 0.0075),
         // The free try in the demo: one recording up to this long, and this many for the whole site a day.
         'free_try_seconds' => (int) env('LISTEN_TRANSCRIBE_FREE_SECONDS', 60),
