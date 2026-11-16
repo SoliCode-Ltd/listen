@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Support\AgentDiscovery;
+use App\Support\Api\ApiScopes;
 use App\Support\HtmlToMarkdown;
 use App\Support\SeoHelper;
+use App\Support\Transcription\TranscriptionSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
@@ -192,9 +195,14 @@ class AgentReadyTest extends TestCase
         $this->assertMatchesRegularExpression('/^# .*auth\.md/m', $markdown);
         $this->assertStringContainsString('an agent cannot create a Listen account for itself', $markdown);
         $this->assertStringContainsString('X-Listen-Api-Key', $markdown);
-        foreach (\App\Support\Api\ApiScopes::all() as $scope) {
+        // Every permission, speech to text's once it is public (open to everyone, on a plan on sale).
+        foreach (array_diff(ApiScopes::all(), [ApiScopes::SPEECH_TO_TEXT]) as $scope) {
             $this->assertStringContainsString('`'.$scope.'`', $markdown);
         }
+        $this->assertStringNotContainsString('`speech_to_text`', $markdown);
+        SiteSetting::set('transcription_audience', TranscriptionSettings::AUDIENCE_EVERYONE, TranscriptionSettings::GROUP);
+        Plan::factory()->create(['slug' => 'pro', 'price_cents' => 4900, 'transcription_enabled' => true, 'transcription_minutes_month' => 500]);
+        $this->assertStringContainsString('`speech_to_text`', $this->get('/auth.md')->getContent());
         // The MCP server takes the same key, or "Sign in with Listen", whose documents it names and serves.
         $this->assertStringContainsString('## MCP server', $markdown);
         $this->assertStringContainsString('`'.url('/mcp').'`', $markdown);
