@@ -144,7 +144,8 @@ class TranscribeController extends Controller
         $query = Transcription::query()->where('user_id', $user->id)->latest('id');
         if ($q !== '') {
             $like = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $q).'%';
-            $query->where(fn ($w) => $w->where('title', 'like', $like)->orWhere('paragraphs', 'like', $like));
+            $query->where(fn ($w) => $w->where('title', 'like', $like)
+                ->orWhere(Transcription::hasSearchText() ? 'search_text' : 'paragraphs', 'like', $like));
         }
         $page = $query->paginate(20);
 

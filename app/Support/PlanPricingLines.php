@@ -462,13 +462,10 @@ final class PlanPricingLines
             || AgentAccess::audience() !== AgentAccess::AUDIENCE_EVERYONE) {
             return null;
         }
-        $limits = AgentAccess::limits($plan);
-        $minutes = intdiv(max(0, (int) $plan->monthly_chars), AgentAccess::creditsPerMinute());
-        if ($limits['minutes'] > 0) {
-            $minutes = min($minutes, $limits['minutes']);
-        }
+        // The number of agents only, as the owner asked ("3 agents", not their call minutes).
+        $agents = AgentAccess::limits($plan)['agents'];
 
-        return trans_choice('ui.pricing.lines.agents_value', $limits['agents'], ['count' => $limits['agents'], 'minutes' => number_format($minutes)], self::locale($locale));
+        return trans_choice('ui.pricing.lines.agents_value', $agents, ['count' => $agents], self::locale($locale));
     }
 
     /**

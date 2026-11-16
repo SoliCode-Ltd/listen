@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -67,13 +68,31 @@ class Transcription extends Model
         'finished_at' => 'datetime',
     ];
 
-    protected $hidden = ['work'];
+    protected $hidden = ['work', 'search_text'];
 
     protected static function booted(): void
     {
         static::creating(function (self $t): void {
             $t->code = $t->code ?: 'tr_'.Str::lower(Str::random(24));
         });
+        // The words as plain text for the member's search, whenever the paragraphs change.
+        static::saving(function (self $t): void {
+            if ($t->isDirty('paragraphs') && self::hasSearchText()) {
+                $t->search_text = implode("\n", array_map(fn ($p) => is_array($p) ? (string) ($p['text'] ?? '') : '', (array) ($t->paragraphs ?? [])));
+            }
+        });
+    }
+
+    /**
+     * Whether the search column is there yet (a site whose files are new but whose migration has
+     * not run). Only a yes is remembered: a queue worker started before the migration finds the
+     * column as soon as it is added.
+     */
+    public static function hasSearchText(): bool
+    {
+        static $has = false;
+
+        return $has = $has || Schema::hasColumn((new self)->getTable(), 'search_text');
     }
 
     /** Saved as UTF-8 (not \u escapes): Arabic words can be searched, and take half the room. */

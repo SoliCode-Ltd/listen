@@ -175,12 +175,43 @@ final class Transcriber
      */
     public function prepare(string $file, string $clean, array $o = []): array
     {
-        $ffmpeg = self::ffmpeg();
-        $this->normalise($ffmpeg, $file, $clean);
-        $seconds = $this->duration($ffmpeg, $clean);
-        $pauses = $this->pauses($ffmpeg, $clean);
-        $loudest = $this->loudest($ffmpeg, $clean);
-        $heard = self::mergePauses($pauses, self::softPausesFrom($this->levels($ffmpeg, $clean), self::LEVEL_FRAME));
+        $this->clean($file, $clean);
+
+        return $this->prepared($clean, $o);
+    }
+
+    /**
+     * Any audio (or a video's sound) made the 16 kHz mono MP3 the model hears, written whole or
+     * not at all (a run stopped halfway leaves no half file). The first step of a transcript.
+     */
+    public function clean(string $file, string $clean): void
+    {
+        $part = $clean.'.part.mp3';
+        try {
+            $this->normalise(self::ffmpeg(), $file, $part);
+            if (! @rename($part, $clean)) {
+                throw new \RuntimeException('The audio could not be read: the clean copy was not saved.');
+            }
+        } finally {
+            @unlink($part);
+        }
+    }
+
+    /**
+     * The clean audio measured (one reading: its length, pauses, loudest moment and levels) and
+     * its parts planned. The second step of a transcript, so a three-hour file takes two short
+     * queue runs rather than one long one.
+     *
+     * @param  array<string, mixed>  $o  language, dialect, review, thinking
+     * @return array<string, mixed>
+     */
+    public function prepared(string $clean, array $o = []): array
+    {
+        $m = $this->measure(self::ffmpeg(), $clean);
+        $seconds = $m['seconds'];
+        $pauses = $m['pauses'];
+        $loudest = $m['loudest'];
+        $heard = self::mergePauses($pauses, self::softPausesFrom($m['levels'], self::LEVEL_FRAME));
         $language = strtolower(trim((string) ($o['language'] ?? 'auto'))) ?: 'auto';
 
         return [
@@ -299,33 +330,43 @@ final class Transcriber
     /** The length of an audio or video file in seconds, read quickly from its header (0 when it cannot be read). */
     public static function lengthOf(string $file): float
     {
-        $p = new Process([self::ffmpeg(), '-hide_banner', '-i', $file]);
-        $p->setTimeout(60)->run();
-        if (preg_match('/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/', $p->getErrorOutput(), $m) === 1) {
-            $seconds = (int) $m[1] * 3600 + (int) $m[2] * 60 + (float) $m[3];
-            if ($seconds > 0) {
-                return $seconds;
-            }
-        }
-
-        // A recording made in the browser (WebM, Ogg) is written as it is made, so its header has no
-        // length ("Duration: N/A"): it is read to its end to find it, as the browser does to play it.
-        $p = new Process([self::ffmpeg(), '-hide_banner', '-nostats', '-i', $file, '-vn', '-f', 'null', '-progress', 'pipe:1', '-']);
-        $p->setTimeout(300)->run();
-        if (preg_match_all('/out_time_us=(\d+)/', $p->getOutput(), $all) && $all[1] !== []) {
-            return max(0.0, (int) end($all[1]) / 1_000_000);
-        }
-
-        return 0.0;
+        return self::probe($file)['seconds'];
     }
 
     /** Whether the file has a sound track ffmpeg can read. */
     public static function hasAudio(string $file): bool
     {
+        return self::probe($file)['audio'];
+    }
+
+    /**
+     * Whether the file has a sound track, and its length in seconds, from one look at it: the
+     * length its header gives. A recording made in the browser (WebM, Ogg) is written as it is
+     * made, so its header has no length ("Duration: N/A"): it is then read to its end to find it,
+     * as the browser does to play it. The job measures the audio again once decoded
+     * (TranscriptionFlow::settleLength()), so a header that is wrong costs nobody anything.
+     *
+     * @return array{audio: bool, seconds: float}
+     */
+    public static function probe(string $file): array
+    {
         $p = new Process([self::ffmpeg(), '-hide_banner', '-i', $file]);
         $p->setTimeout(60)->run();
+        $log = $p->getErrorOutput();
+        if (preg_match('/Stream #\S+.*: Audio:/', $log) !== 1) {
+            return ['audio' => false, 'seconds' => 0.0];
+        }
+        if (preg_match('/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/', $log, $m) === 1) {
+            $seconds = (int) $m[1] * 3600 + (int) $m[2] * 60 + (float) $m[3];
+            if ($seconds > 0) {
+                return ['audio' => true, 'seconds' => $seconds];
+            }
+        }
+        $p = new Process([self::ffmpeg(), '-hide_banner', '-nostats', '-i', $file, '-vn', '-f', 'null', '-progress', 'pipe:1', '-']);
+        $p->setTimeout(300)->run();
+        $seconds = preg_match_all('/out_time_us=(\d+)/', $p->getOutput(), $all) && $all[1] !== [] ? max(0.0, (int) end($all[1]) / 1_000_000) : 0.0;
 
-        return preg_match('/Stream #\S+.*: Audio:/', $p->getErrorOutput()) === 1;
+        return ['audio' => true, 'seconds' => $seconds];
     }
 
     private static function ffmpeg(): string
@@ -1596,6 +1637,54 @@ final class Transcriber
         if (! $p->isSuccessful()) {
             throw new \RuntimeException('The audio could not be cut: '.mb_substr(trim($p->getErrorOutput()), 0, 300));
         }
+    }
+
+    /**
+     * The recording measured in one reading of it: its length, its pauses (as pauses() finds
+     * them), its loudest moment (loudest()) and its level every LEVEL_FRAME seconds (levels()).
+     * One pass instead of four: a three-hour file is measured in about a minute. Should this
+     * ffmpeg not take the combined filter, the four passes are made as before.
+     *
+     * @return array{seconds: float, pauses: array<int, array{0: float, 1: float}>, loudest: float, levels: array<int, float>}
+     */
+    public function measure(string $ffmpeg, string $file): array
+    {
+        $levelsFile = (string) tempnam(sys_get_temp_dir(), 'listen-levels-');
+        try {
+            // The levels go to a file named inside the filter, so its path must need no escaping there.
+            if ($levelsFile !== '' && preg_match('#^[A-Za-z0-9_./-]+$#', $levelsFile) === 1) {
+                $graph = '[0:a]asplit=2[a][b];'
+                    .'[a]silencedetect=noise='.self::PAUSE_DB.'dB:d='.self::PAUSE_SECONDS.',volumedetect[heard];'
+                    .'[b]aresample=8000,asetnsamples=n='.(int) round(8000 * self::LEVEL_FRAME).':p=0,astats=metadata=1:reset=1,'
+                    .'ametadata=print:key=lavfi.astats.Overall.RMS_level:file='.$levelsFile.'[levels]';
+                $p = new Process([$ffmpeg, '-hide_banner', '-nostats', '-progress', 'pipe:1', '-i', $file, '-filter_complex', $graph,
+                    '-map', '[heard]', '-f', 'null', '-', '-map', '[levels]', '-f', 'null', '-']);
+                $p->setTimeout(600)->run();
+                $log = $p->getErrorOutput();
+                if ($p->isSuccessful() && preg_match_all('/out_time_us=(\d+)/', $p->getOutput(), $times) && $times[1] !== []
+                    && preg_match('/max_volume:\s*(-?inf|-?[\d.]+) dB/', $log, $max) === 1) {
+                    preg_match_all('/RMS_level=(-?inf|-?[\d.]+)/', (string) @file_get_contents($levelsFile), $levels);
+
+                    return [
+                        'seconds' => max(0.0, (int) end($times[1]) / 1_000_000),
+                        'pauses' => self::readPauses($log),
+                        'loudest' => str_contains($max[1], 'inf') ? -120.0 : (float) $max[1],
+                        'levels' => array_map(fn ($v) => str_contains($v, 'inf') ? -120.0 : max(-120.0, (float) $v), $levels[1] ?? []),
+                    ];
+                }
+            }
+        } finally {
+            if ($levelsFile !== '') {
+                @unlink($levelsFile);
+            }
+        }
+
+        return [
+            'seconds' => $this->duration($ffmpeg, $file),
+            'pauses' => $this->pauses($ffmpeg, $file),
+            'loudest' => $this->loudest($ffmpeg, $file),
+            'levels' => $this->levels($ffmpeg, $file),
+        ];
     }
 
     /** Seconds of audio, as ffmpeg reads them. */

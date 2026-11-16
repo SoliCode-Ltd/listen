@@ -237,6 +237,29 @@ class TranscribePageTest extends TestCase
             ->assertSee(__('transcribe.page.get_plan', ['plan' => 'Starter']));
     }
 
+    /** The search reads the words said (and the title), never the stored fields: "end" or a time does not match every transcript, "and/or" is found. */
+    public function test_the_search_finds_words_said_not_stored_fields(): void
+    {
+        $user = $this->member(minutes: 120);
+        $this->actingAs($user);
+        $make = fn (string $title, array $texts) => Transcription::query()->create(['user_id' => $user->id, 'title' => $title, 'source' => 'upload',
+            'status' => Transcription::READY, 'seconds' => 12, 'charged_seconds' => 12, 'language_requested' => 'auto', 'finished_at' => now(),
+            'period_ym' => TranscriptionAccess::balance($user)['period'],
+            'paragraphs' => array_map(fn ($t, $i) => ['speaker' => 'A', 'text' => $t, 'start' => $i * 4.0, 'end' => $i * 4.0 + 3.5], $texts, array_keys($texts))]);
+        $make('Team call', ['We can meet on Monday and/or Tuesday.']);
+        $make('مكالمة', ['هلا والله، شلونكم؟', 'كل شي تمام.']);
+
+        $found = fn (string $q) => array_column($this->getJson(route('transcribe.index', ['q' => $q]))->assertOk()->json('items'), 'title');
+
+        $this->assertSame([], $found('end'), 'a field name');
+        $this->assertSame([], $found('speaker'));
+        $this->assertSame([], $found('3.5'), 'a time');
+        $this->assertSame(['Team call'], $found('and/or'));
+        $this->assertSame(['مكالمة'], $found('شلونكم'));
+        $this->assertSame(['Team call'], $found('team'), 'the title');
+        $this->assertCount(2, $found(''));
+    }
+
     private function transcribe(User $user, float $seconds): Transcription
     {
         return app(TranscriptionFlow::class)->start($user, $this->audio($seconds), ['title' => 'clip.mp3', 'language' => 'ar'])->fresh();

@@ -95,7 +95,7 @@ class AgentDiscovery
             ],
             'entries' => [
                 $entry('api', 'text-to-speech', 'Listen text to speech API', 'application/vnd.oai.openapi+json', url('/v1/openapi.json'),
-                    'Arabic and English text to speech over HTTP: voices, Arabic dialects, English accents, emotions, styles and two-voice dialogue; and speech to text with who said what, as text, subtitles or a Word file. Needs an API key from a Listen account.',
+                    'Arabic and English text to speech over HTTP: voices, Arabic dialects, English accents, emotions, styles and two-voice dialogue; and speech to text with who said what, as text, subtitles or a document (DOCX). Needs an API key from a Listen account.',
                     ['turn Arabic text into speech in the Egyptian dialect', 'make an English voiceover with a British accent', 'list Arabic voices and dialects', 'generate a two-voice dialogue as audio', 'transcribe an Arabic podcast episode with its speakers']),
                 ...(self::mcpAvailable() ? [
                     $entry('mcp', 'listen', 'Listen MCP server', 'application/mcp-server-card+json', url('/mcp/server-card'),

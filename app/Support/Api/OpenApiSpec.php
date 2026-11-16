@@ -349,7 +349,7 @@ final class OpenApiSpec
                     'tags' => ['Speech to text'],
                     'operationId' => 'exportTranscription',
                     'summary' => 'Download a transcription',
-                    'description' => 'As text (txt), subtitles (srt, vtt) or a Word file (docx). With translate_to, in another language: made once and kept, using no minutes. Requires the speech_to_text permission.',
+                    'description' => 'As text (txt), subtitles (srt, vtt) or a document (docx). With translate_to, in another language: made once and kept, using no minutes. Requires the speech_to_text permission.',
                     'parameters' => [
                         $transcriptionIdParam,
                         ['name' => 'format', 'in' => 'query', 'required' => true, 'schema' => ['type' => 'string', 'enum' => TranscriptExport::FORMATS]],

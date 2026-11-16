@@ -168,7 +168,7 @@ return [
             'points' => [
                 'Every Arabic dialect and English accent of the studio, with delivery styles, emotions, sound tags, speed and pitch.',
                 'Usage is counted on your plan\'s credits and stops at your limit: there are no surprise bills.',
-                'Speech to text: send a recording and get its text with who said what, as text, subtitles or a Word file, on the plans that include it.',
+                'Speech to text: send a recording and get its text with who said what, as text, subtitles or a document (DOCX), on the plans that include it.',
             ],
             // After the dialects point, when some plan includes one of them.
             'points_features' => ':options, on the plans that include them.',
@@ -378,7 +378,7 @@ return [
             ],
             'stt_export' => [
                 'title' => 'Download a transcription',
-                'summary' => 'As text (`txt`), subtitles (`srt`, `vtt`) or a Word file (`docx`). With `translate_to`, in another language: made once and kept, using no minutes.',
+                'summary' => 'As text (`txt`), subtitles (`srt`, `vtt`) or a document (`docx`). With `translate_to`, in another language: made once and kept, using no minutes.',
             ],
             'user' => [
                 'title' => 'Get your account',

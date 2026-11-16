@@ -52,25 +52,29 @@ final class TranscriptionFlow
         if (filesize($path) > $mb * 1024 * 1024) {
             throw new TranscriptionRefused('too_big', __('transcribe.refused.too_big', ['mb' => $mb]), 413);
         }
-        if (! Transcriber::hasAudio($path)) {
+        $probe = Transcriber::probe($path);
+        if (! $probe['audio']) {
             throw new TranscriptionRefused('no_audio', __('transcribe.refused.no_audio'));
         }
-        $seconds = Transcriber::lengthOf($path);
+        $seconds = $probe['seconds'];
         if ($seconds < 0.5) {
             throw new TranscriptionRefused('too_short', __('transcribe.refused.too_short'));
         }
         $charge = TranscriptionAccess::chargeFor($seconds);
         $plan = TranscriptionAccess::planOf($user);
-        $free = $this->checks($user, $plan, $charge, (string) ($meta['source'] ?? 'upload'), $arabic);
+        $source = (string) ($meta['source'] ?? 'upload');
+        $this->checks($user, $plan, $charge, $source, $arabic);
 
         $language = strtolower(trim((string) ($meta['language'] ?? 'auto'))) ?: 'auto';
         if ($language !== 'auto' && ! array_key_exists($language, TranscriptionSettings::LANGUAGES)) {
             $language = 'auto';
         }
 
-        // Held under a lock on the member, so two files at once cannot both take the last minutes.
-        $transcription = DB::transaction(function () use ($user, $plan, $charge, $free, $seconds, $language, $meta, $arabic): Transcription {
+        // Every rule checked again under a lock on the member, so files sent at the same moment
+        // cannot together take the last minutes, a second free try, or more files at once.
+        $transcription = DB::transaction(function () use ($user, $plan, $charge, $source, $seconds, $language, $meta, $arabic): Transcription {
             User::query()->whereKey($user->id)->lockForUpdate()->first();
+            $free = $this->checks($user, $plan, $charge, $source, $arabic);
             $balance = TranscriptionAccess::balance($user);
             if (! $free) {
                 self::assertFits($balance, $plan, $charge, $arabic);
@@ -94,14 +98,16 @@ final class TranscriptionFlow
         });
 
         $folder = self::folder($transcription);
-        $source = $folder.'/source.'.(strtolower(pathinfo((string) ($meta['file_name'] ?? $path), PATHINFO_EXTENSION)) ?: 'audio');
+        // The name's ending only (letters and digits): it comes from the member or a link.
+        $ext = strtolower(pathinfo((string) ($meta['file_name'] ?? $path), PATHINFO_EXTENSION));
+        $kept = $folder.'/source.'.(preg_match('/^[a-z0-9]{1,8}$/', $ext) === 1 ? $ext : 'audio');
         Storage::disk(self::DISK)->makeDirectory($folder);
-        if (! @rename($path, Storage::disk(self::DISK)->path($source)) && ! @copy($path, Storage::disk(self::DISK)->path($source))) {
+        if (! @rename($path, Storage::disk(self::DISK)->path($kept)) && ! @copy($path, Storage::disk(self::DISK)->path($kept))) {
             $this->fail($transcription, 'unreadable', __('transcribe.failed.unreadable'));
             throw new TranscriptionRefused('no_audio', __('transcribe.refused.no_audio'));
         }
         @unlink($path);
-        $transcription->forceFill(['audio_path' => $source])->save();
+        $transcription->forceFill(['audio_path' => $kept])->save();
 
         TranscribeJob::queueFor($transcription);
         // A short file is worked through as soon as the answer has gone back, in this process,
@@ -281,6 +287,56 @@ final class TranscriptionFlow
 
             return true;
         });
+    }
+
+    /**
+     * The length the job measures once the audio is decoded (Transcriber::prepared()) is what the
+     * transcript uses. A file whose header said a different length than it holds (beyond 2 s or
+     * 2%, more than any file's own rounding) is checked again with its real length: the plan's
+     * longest file and the month's minutes, or the free try's length. When it fits, its length
+     * and the seconds it uses become the real ones (shown and used stay the same); when it does
+     * not, it is failed and nothing is used. Returns whether the transcript carries on.
+     */
+    public function settleLength(Transcription $transcription, float $measured): bool
+    {
+        $held = (float) $transcription->seconds;
+        if ($measured <= 0 || abs($measured - $held) <= max(2.0, 0.02 * $held)) {
+            return true;
+        }
+        $refused = DB::transaction(function () use ($transcription, $measured, $held): ?string {
+            User::query()->whereKey($transcription->user_id)->lockForUpdate()->first();
+            $t = Transcription::withTrashed()->whereKey($transcription->id)->lockForUpdate()->first();
+            if (! $t || ! $t->isWorking() || ! $t->user) {
+                return 'gone';
+            }
+            $charge = TranscriptionAccess::chargeFor($measured);
+            $plan = TranscriptionAccess::planOf($t->user);
+            if ($t->is_free) {
+                $fits = $charge <= TranscriptionSettings::freeTrySeconds();
+            } else {
+                $others = (int) Transcription::withTrashed()->where('user_id', $t->user_id)->where('is_free', false)
+                    ->where('period_ym', $t->period_ym)->where('status', '!=', Transcription::FAILED)->whereKeyNot($t->id)->sum('charged_seconds');
+                $fits = $charge <= TranscriptionAccess::maxFileMinutes($plan) * 60
+                    && $charge <= TranscriptionAccess::monthlyMinutes($plan) * 60 - $others;
+            }
+            if (! $fits) {
+                return Minutes::format($charge);
+            }
+            $notes = (array) ($t->notes ?? []);
+            $notes[] = sprintf('length: the file said %.1f s, it holds %.1f s; uses %d s', $held, $measured, $charge);
+            $t->forceFill(['seconds' => round($measured, 2), 'charged_seconds' => $charge, 'notes' => $notes])->save();
+            $transcription->setRawAttributes($t->getAttributes(), true);
+
+            return null;
+        });
+        if ($refused === null) {
+            return true;
+        }
+        if ($refused !== 'gone') {
+            $this->fail($transcription, 'longer', __('transcribe.failed.longer', ['length' => $refused]));
+        }
+
+        return false;
     }
 
     /** Where a transcript's audio is kept, on the private disk. */

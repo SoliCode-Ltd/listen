@@ -19,8 +19,10 @@ use App\Support\Transcription\TranscriptionPresenter;
 use App\Support\Transcription\TranscriptionSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
@@ -292,6 +294,87 @@ class TranscriptionFlowTest extends TestCase
 
         $this->expectException(TranscriptionRefused::class);
         app(TranscriptionFlow::class)->start($user, $file, ['title' => 'notes.txt']);
+    }
+
+    /**
+     * What a transcript uses is the length the audio really has once decoded: a file whose header
+     * said less (or more) is charged what it holds when that fits, and stopped with nothing used
+     * when it does not; a file's ordinary rounding (under 2 s) changes nothing.
+     */
+    public function test_a_file_longer_than_its_header_said_uses_its_real_length_or_is_stopped(): void
+    {
+        $flow = app(TranscriptionFlow::class);
+        $user = $this->member(minutes: 3, fileMinutes: 2);
+        $held = fn (float $seconds) => Transcription::query()->create(['user_id' => $user->id, 'title' => 'Call', 'source' => 'upload',
+            'status' => Transcription::QUEUED, 'seconds' => $seconds, 'charged_seconds' => TranscriptionAccess::chargeFor($seconds),
+            'period_ym' => TranscriptionAccess::balance($user)['period'], 'language_requested' => 'auto']);
+
+        $rounding = $held(20.0);
+        $this->assertTrue($flow->settleLength($rounding, 21.4));
+        $this->assertSame(20, $rounding->fresh()->charged_seconds, 'a second or so of rounding changes nothing');
+
+        $longer = $held(20.0);
+        $this->assertTrue($flow->settleLength($longer, 95.6));
+        $this->assertSame(96, $longer->fresh()->charged_seconds, 'it uses the length it really has');
+        $this->assertSame(95.6, $longer->fresh()->seconds, 'and shows it');
+
+        $tooLong = $held(20.0);
+        $this->assertFalse($flow->settleLength($tooLong, 3 * 3600.0), 'three hours behind a header that said 20 s');
+        $tooLong->refresh();
+        $this->assertSame(Transcription::FAILED, $tooLong->status);
+        $this->assertSame('longer', $tooLong->error_code);
+        $this->assertSame(0, $tooLong->charged_seconds, 'nothing used');
+
+        // 20 s and 96 s (above) are held of the 180 s: 110 s is within the longest file (120 s), not within the 64 s left.
+        $over = $held(20.0);
+        $this->assertFalse($flow->settleLength($over, 110.0), 'within the longest file, but more than the minutes left');
+        $this->assertSame(Transcription::FAILED, $over->fresh()->status);
+        $this->assertSame(116, TranscriptionAccess::balance($user)['used']);
+    }
+
+    /** A transcript stopped while a step worked on it (the stuck check, the admin) is never brought back by that step's save. */
+    public function test_a_step_does_not_bring_back_a_transcript_stopped_meanwhile(): void
+    {
+        $user = $this->member(minutes: 120);
+        $t = Transcription::query()->create(['user_id' => $user->id, 'title' => 'Call', 'source' => 'upload', 'status' => Transcription::QUEUED,
+            'seconds' => 30, 'charged_seconds' => 30, 'period_ym' => TranscriptionAccess::balance($user)['period'], 'language_requested' => 'auto']);
+        $stale = Transcription::query()->find($t->id);
+        app(TranscriptionFlow::class)->fail($t, 'stuck', __('transcribe.failed.stuck'));
+
+        $save = new \ReflectionMethod(TranscribeJob::class, 'saveIfWorking');
+        $this->assertFalse($save->invoke(null, $stale, ['status' => Transcription::PROCESSING, 'parts' => 3]));
+
+        $t->refresh();
+        $this->assertSame(Transcription::FAILED, $t->status);
+        $this->assertSame(0, $t->charged_seconds);
+        $this->assertSame(0, TranscriptionAccess::balance($user)['used']);
+    }
+
+    /** A step started again and again without ever finishing (a worker stopped on it each time) fails the transcript, its minutes given back. */
+    public function test_a_step_that_never_finishes_fails_after_a_few_starts(): void
+    {
+        Queue::fake();
+        $user = $this->member(minutes: 120);
+        $t = app(TranscriptionFlow::class)->start($user, $this->audio(5.0), ['title' => 'Call', 'file_name' => 'call.mp3']);
+        Cache::put('transcribe-step:'.$t->id.':clean', TranscribeJob::STEP_TRIES, now()->addHour());
+
+        (new TranscribeJob($t->id))->handle(app(Transcriber::class), app(TranscriptionFlow::class));
+
+        $t->refresh();
+        $this->assertSame(Transcription::FAILED, $t->status);
+        $this->assertSame(0, $t->charged_seconds);
+    }
+
+    /** The file's name comes from the member or a link: only its ending's letters and digits are used for the stored file. */
+    public function test_a_strange_file_name_is_kept_safely(): void
+    {
+        $this->answers('هلا والله');
+        $user = $this->member(minutes: 120);
+
+        $t = app(TranscriptionFlow::class)->start($user, $this->audio(3.0), ['title' => 'x', 'file_name' => "a.mp3\0.php"]);
+
+        $this->assertSame(Transcription::READY, $t->fresh()->status);
+        $this->assertStringEndsWith('/audio.mp3', (string) $t->fresh()->audio_path);
     }
 
     private function member(int $minutes, int $fileMinutes = 30): User

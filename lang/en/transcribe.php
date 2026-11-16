@@ -37,6 +37,7 @@ return [
         'stuck' => 'This took too long and was stopped. Nothing was taken from your minutes.',
         'no_speech' => 'We could not hear anyone speaking in this recording. Check your microphone and try again. Nothing was taken from your minutes.',
         'default' => 'Something went wrong. Nothing was taken from your minutes.',
+        'longer' => 'This recording is :length long, longer than its file said, and more than your plan allows for it. Nothing was taken from your minutes.',
     ],
 
     'page' => [
@@ -133,7 +134,7 @@ return [
         'txt' => 'Plain text',
         'srt' => 'For video editors',
         'vtt' => 'For web players',
-        'docx' => 'Word document',
+        'docx' => 'Formatted document',
         'used' => ':time used',
         'network' => 'The connection was lost. Check it and try again.',
         'mic_denied' => 'Allow the microphone in your browser to record.',
