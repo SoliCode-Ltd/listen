@@ -403,9 +403,9 @@ class ApiReadEndpointsTest extends TestCase
 
         $served = collect(Route::getRoutes()->getRoutes())
             ->filter(fn ($route): bool => str_starts_with($route->uri(), 'v1/') && $route->uri() !== 'v1/openapi.json');
-        $this->assertCount(12, $served);
+        $this->assertCount(16, $served);
         foreach ($served as $route) {
-            $path = strtr(substr($route->uri(), 2), ['{voiceId}' => '{voice_id}', '{historyItemId}' => '{history_item_id}']);
+            $path = strtr(substr($route->uri(), 2), ['{voiceId}' => '{voice_id}', '{historyItemId}' => '{history_item_id}', '{transcriptionId}' => '{transcription_id}']);
             $method = strtolower(collect($route->methods())->reject(fn (string $m): bool => $m === 'HEAD')->first());
             $this->assertArrayHasKey($path, $spec['paths'], "{$path} is described");
             $this->assertArrayHasKey($method, $spec['paths'][$path], "{$method} {$path} is described");

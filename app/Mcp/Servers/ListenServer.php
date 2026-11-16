@@ -4,17 +4,20 @@ namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\GetAccount;
 use App\Mcp\Tools\GetSpeech;
+use App\Mcp\Tools\GetTranscription;
 use App\Mcp\Tools\GetVoiceOptions;
 use App\Mcp\Tools\ListSpeechHistory;
+use App\Mcp\Tools\ListTranscriptions;
 use App\Mcp\Tools\ListVoices;
 use App\Mcp\Tools\TextToSpeech;
+use App\Mcp\Tools\TranscribeAudio;
 use App\Support\Credits;
 use Laravel\Mcp\Schema\Icon;
 use Laravel\Mcp\Server;
 
 /**
- * Listen's MCP server at https://<site>/mcp: AI assistants make speech for a
- * member with their API key, through the developer API's own controllers
+ * Listen's MCP server at https://<site>/mcp: AI assistants make speech, and
+ * turn speech into text, for a member with their API key, through the developer API's own controllers
  * (the same voices, checks, credits and limits). Described for discovery by
  * App\Mcp\ServerCard.
  */
@@ -38,6 +41,9 @@ class ListenServer extends Server
         TextToSpeech::class,
         GetSpeech::class,
         ListSpeechHistory::class,
+        TranscribeAudio::class,
+        GetTranscription::class,
+        ListTranscriptions::class,
         GetAccount::class,
     ];
 
@@ -57,6 +63,11 @@ class ListenServer extends Server
             4. A long text may still be in progress: call get_speech with its history_item_id until it is completed.
 
             Every recording uses the person's Listen credits ({$perSecond} credits per second of audio), the same balance as the web studio. Make only the speech the person asked for, and check get_account before a long or repeated job.
+
+            Listen also turns speech into text (speech to text), with who said what:
+            1. Call transcribe_audio with a public link to the audio or video file. It answers at once with a transcription_id.
+            2. Call get_transcription with that id until its status is completed (a minute for a short file, a few minutes for a long one). Ask for format "srt" or "vtt" for subtitles, or translate_to for another language.
+            Speech to text uses the person's speech to text minutes (every second of the file), set by their plan and separate from the credits; get_account shows what is left.
             MD;
     }
 

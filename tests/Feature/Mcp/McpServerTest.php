@@ -32,7 +32,7 @@ class McpServerTest extends TestCase
     use InteractsWithDeveloperApi;
     use RefreshDatabase;
 
-    private const TOOLS = ['list_voices', 'get_voice_options', 'text_to_speech', 'get_speech', 'list_speech_history', 'get_account'];
+    private const TOOLS = ['list_voices', 'get_voice_options', 'text_to_speech', 'get_speech', 'list_speech_history', 'transcribe_audio', 'get_transcription', 'list_transcriptions', 'get_account'];
 
     private Plan $plan;
 

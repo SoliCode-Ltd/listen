@@ -61,6 +61,8 @@ class TranscriptionController extends Controller
         Storage::disk(TranscriptionFlow::DISK)->makeDirectory(TranscribeController::UPLOADS);
         $path = null;
         try {
+            // The plan and files at once first, so a link is never fetched for a member who cannot use it.
+            $this->flow->check($user, 0.0, $source);
             $file = $request->file('file');
             if ($file instanceof UploadedFile) {
                 if (! $file->isValid()) {

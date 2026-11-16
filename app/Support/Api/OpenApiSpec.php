@@ -5,8 +5,11 @@ namespace App\Support\Api;
 use App\Models\SiteSetting;
 use App\Services\Api\ApiIdempotency;
 use App\Services\Api\ApiSpeechService;
+use App\Services\Transcription\TranscriptExport;
 use App\Support\AudioEffects;
 use App\Support\SpeechLanguages;
+use App\Support\Transcription\TranscriptionApi;
+use App\Support\Transcription\TranscriptionSettings;
 
 /**
  * The OpenAPI 3.1 description of the developer API, served at
@@ -35,8 +38,8 @@ final class OpenApiSpec
             'info' => [
                 'title' => 'Listen API',
                 'version' => self::VERSION,
-                'summary' => 'Arabic and English text to speech: '.ApiDocs::series(['studio voices', 'Arabic dialects', 'English accents', 'emotions', ...$extras], false).'.',
-                'description' => 'Turn text into natural Arabic and English speech with one model, '.ApiModels::PREMIUM.', and every option of the studio. The dashboard, the browser extension and the API share one balance: generations are charged to your plan\'s credits exactly as in the dashboard (15 credits per second of audio) and stop at your plan\'s limit, with no overage. Options a plan does not include are refused with 403 feature_not_in_plan, naming the plans that include them. Full guide: '.url('/developers'),
+                'summary' => 'Arabic and English text to speech: '.ApiDocs::series(['studio voices', 'Arabic dialects', 'English accents', 'emotions', ...$extras], false).'; and speech to text, with who said what.',
+                'description' => 'Turn text into natural Arabic and English speech with one model, '.ApiModels::PREMIUM.', and every option of the studio. The dashboard, the browser extension and the API share one balance: generations are charged to your plan\'s credits exactly as in the dashboard (15 credits per second of audio) and stop at your plan\'s limit, with no overage. Options a plan does not include are refused with 403 feature_not_in_plan, naming the plans that include them. Speech to text (/transcriptions) turns audio into text with its speakers and times, in the background, and uses the plan\'s speech to text minutes (every second of the audio), not credits. Full guide: '.url('/developers'),
                 'contact' => ['name' => 'Listen support', 'email' => trim((string) SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio', 'url' => url('/contact-us')],
                 'termsOfService' => url('/terms-of-service'),
             ],
@@ -46,6 +49,7 @@ final class OpenApiSpec
                 ['name' => 'Text to speech', 'description' => 'Generate speech from text.'],
                 ['name' => 'Voices', 'description' => 'Voices, models and delivery options.'],
                 ['name' => 'History', 'description' => 'Past generations and their audio.'],
+                ['name' => 'Speech to text', 'description' => 'Turn audio into text, with who said what.'],
                 ['name' => 'User', 'description' => 'Your account, plan and usage.'],
             ],
             'paths' => self::paths(),
@@ -82,6 +86,10 @@ final class OpenApiSpec
         $historyIdParam = [
             'name' => 'history_item_id', 'in' => 'path', 'required' => true,
             'schema' => ['type' => 'integer', 'minimum' => 1],
+        ];
+        $transcriptionIdParam = [
+            'name' => 'transcription_id', 'in' => 'path', 'required' => true,
+            'schema' => ['type' => 'string', 'pattern' => '^tr_[a-z0-9]{24}$'],
         ];
         $formatParam = [
             'name' => 'output_format', 'in' => 'query', 'required' => false,
@@ -272,6 +280,92 @@ final class OpenApiSpec
                             'content' => ['audio/mpeg' => ['schema' => ['type' => 'string', 'format' => 'binary']]],
                         ],
                     ] + self::errorResponses(['401', '403', '404', '409', '410', '429']),
+                ],
+            ],
+            '/transcriptions' => [
+                'post' => [
+                    'tags' => ['Speech to text'],
+                    'operationId' => 'createTranscription',
+                    'summary' => 'Transcribe audio',
+                    'description' => 'Send an audio or video file as multipart/form-data (file), or a link to one as JSON (url). Answers at once with 202 and the transcription; poll GET /transcriptions/{transcription_id} until status is completed or failed. Every second of the audio is taken from the month\'s speech to text minutes when it starts and given back if it fails. Refusals name the plan that would take the file (upgrade_plan). Requires the speech_to_text permission.',
+                    'requestBody' => [
+                        'required' => true,
+                        'content' => [
+                            'multipart/form-data' => ['schema' => ['$ref' => '#/components/schemas/TranscriptionUpload']],
+                            'application/json' => ['schema' => ['$ref' => '#/components/schemas/TranscriptionLink']],
+                        ],
+                    ],
+                    'responses' => [
+                        '202' => [
+                            'description' => 'Started. Location points to the transcription.',
+                            'headers' => [
+                                'Location' => self::header('string', 'The transcription to poll.'),
+                                'X-Transcription-Id' => self::header('string', 'The transcription_id.'),
+                                'X-Seconds-Used' => self::header('integer', 'Seconds taken from the month\'s speech to text minutes.'),
+                            ],
+                            'content' => ['application/json' => ['schema' => ['allOf' => [
+                                ['$ref' => '#/components/schemas/Transcription'],
+                                ['type' => 'object', 'properties' => ['usage' => ['$ref' => '#/components/schemas/SpeechToTextUsage']]],
+                            ]]]],
+                        ],
+                    ] + self::errorResponses(['401', '402', '403', '413', '422', '429', '503']),
+                ],
+                'get' => [
+                    'tags' => ['Speech to text'],
+                    'operationId' => 'listTranscriptions',
+                    'summary' => 'List transcriptions',
+                    'description' => 'Your transcriptions from the API, AI apps and the dashboard, newest first, without their words. Requires the speech_to_text permission.',
+                    'parameters' => [
+                        ['name' => 'page_size', 'in' => 'query', 'schema' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100, 'default' => 30]],
+                        ['name' => 'before', 'in' => 'query', 'description' => 'Cursor: next_cursor from the previous page.', 'schema' => ['type' => 'string']],
+                        ['name' => 'status', 'in' => 'query', 'schema' => ['type' => 'string', 'enum' => TranscriptionApi::STATUSES]],
+                    ],
+                    'responses' => [
+                        '200' => self::json('A page of transcriptions.', [
+                            'type' => 'object',
+                            'properties' => [
+                                'transcriptions' => ['type' => 'array', 'items' => ['$ref' => '#/components/schemas/Transcription']],
+                                'has_more' => ['type' => 'boolean'],
+                                'next_cursor' => ['type' => ['string', 'null']],
+                            ],
+                        ]),
+                    ] + self::errorResponses(['401', '403', '422', '429']),
+                ],
+            ],
+            '/transcriptions/{transcription_id}' => [
+                'get' => [
+                    'tags' => ['Speech to text'],
+                    'operationId' => 'getTranscription',
+                    'summary' => 'Get a transcription',
+                    'description' => 'Its status and, once completed, the whole text, the speakers, and the paragraphs and sentences with their times in seconds. Requires the speech_to_text permission.',
+                    'parameters' => [$transcriptionIdParam],
+                    'responses' => [
+                        '200' => self::json('The transcription.', ['$ref' => '#/components/schemas/TranscriptionDetail']),
+                    ] + self::errorResponses(['401', '403', '404', '429']),
+                ],
+            ],
+            '/transcriptions/{transcription_id}/export' => [
+                'get' => [
+                    'tags' => ['Speech to text'],
+                    'operationId' => 'exportTranscription',
+                    'summary' => 'Download a transcription',
+                    'description' => 'As text (txt), subtitles (srt, vtt) or a Word file (docx). With translate_to, in another language: made once and kept, using no minutes. Requires the speech_to_text permission.',
+                    'parameters' => [
+                        $transcriptionIdParam,
+                        ['name' => 'format', 'in' => 'query', 'required' => true, 'schema' => ['type' => 'string', 'enum' => TranscriptExport::FORMATS]],
+                        ['name' => 'translate_to', 'in' => 'query', 'description' => 'A language code, such as en, ar or fr.', 'schema' => ['type' => 'string']],
+                    ],
+                    'responses' => [
+                        '200' => [
+                            'description' => 'The file.',
+                            'content' => [
+                                'text/plain' => ['schema' => ['type' => 'string']],
+                                'application/x-subrip' => ['schema' => ['type' => 'string']],
+                                'text/vtt' => ['schema' => ['type' => 'string']],
+                                'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => ['schema' => ['type' => 'string', 'format' => 'binary']],
+                            ],
+                        ],
+                    ] + self::errorResponses(['401', '403', '404', '409', '422', '429', '502']),
                 ],
             ],
             '/user' => [
@@ -491,6 +585,7 @@ final class OpenApiSpec
                             ],
                         ],
                         'voice_seconds' => ['type' => 'object'],
+                        'speech_to_text' => ['$ref' => '#/components/schemas/SpeechToTextUsage'],
                         'requests' => [
                             'type' => 'object',
                             'properties' => [
@@ -516,6 +611,81 @@ final class OpenApiSpec
                             ],
                         ],
                         'api_key' => ['type' => 'object'],
+                    ],
+                ],
+                'TranscriptionUpload' => [
+                    'type' => 'object',
+                    'required' => ['file'],
+                    'properties' => [
+                        'file' => ['type' => 'string', 'format' => 'binary', 'description' => 'MP3, WAV, M4A, OGG, FLAC, WEBM or MP4.'],
+                        'language_code' => ['type' => 'string', 'default' => 'auto', 'description' => 'The language spoken, or auto to detect it.', 'enum' => ['auto', ...TranscriptionSettings::languages()]],
+                        'title' => ['type' => 'string', 'maxLength' => 200, 'description' => 'Defaults to the file name.'],
+                    ],
+                ],
+                'TranscriptionLink' => [
+                    'type' => 'object',
+                    'required' => ['url'],
+                    'properties' => [
+                        'url' => ['type' => 'string', 'format' => 'uri', 'description' => 'A public link straight to the audio or video file.'],
+                        'language_code' => ['type' => 'string', 'default' => 'auto', 'enum' => ['auto', ...TranscriptionSettings::languages()]],
+                        'title' => ['type' => 'string', 'maxLength' => 200],
+                    ],
+                ],
+                'Transcription' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'transcription_id' => ['type' => 'string', 'example' => 'tr_k3m9x2q7w1v5b8n4z6c0a2s4'],
+                        'title' => ['type' => 'string'],
+                        'status' => ['type' => 'string', 'enum' => TranscriptionApi::STATUSES],
+                        'source' => ['type' => 'string', 'enum' => ['upload', 'record', 'url', 'api', 'mcp'], 'description' => 'upload, record and url: made on the dashboard.'],
+                        'language_code' => $nullableString,
+                        'language_requested' => ['type' => 'string'],
+                        'duration_seconds' => ['type' => 'number'],
+                        'seconds_used' => ['type' => 'integer', 'description' => 'Taken from the month\'s minutes: every second of the audio; 0 for one that failed.'],
+                        'free_try' => ['type' => 'boolean'],
+                        'progress' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100],
+                        'speaker_count' => ['type' => 'integer'],
+                        'created_at' => ['type' => 'string', 'format' => 'date-time'],
+                        'completed_at' => ['type' => ['string', 'null'], 'format' => 'date-time'],
+                        'error' => ['type' => ['object', 'null'], 'properties' => ['code' => ['type' => 'string'], 'message' => ['type' => 'string']]],
+                    ],
+                ],
+                'TranscriptionDetail' => [
+                    'allOf' => [
+                        ['$ref' => '#/components/schemas/Transcription'],
+                        [
+                            'type' => 'object',
+                            'properties' => [
+                                'speakers' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => ['speaker_id' => ['type' => 'string'], 'name' => ['type' => 'string']]]],
+                                'text' => ['type' => ['string', 'null'], 'description' => 'The whole text, with the speakers\' names when there are several.'],
+                                'paragraphs' => ['type' => 'array', 'items' => ['$ref' => '#/components/schemas/TranscriptPiece']],
+                                'sentences' => ['type' => 'array', 'items' => ['$ref' => '#/components/schemas/TranscriptPiece']],
+                                'translations' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Languages it has been translated to.'],
+                                'download_urls' => ['type' => ['object', 'null'], 'additionalProperties' => ['type' => 'string']],
+                            ],
+                        ],
+                    ],
+                ],
+                'TranscriptPiece' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'speaker_id' => ['type' => 'string'],
+                        'text' => ['type' => 'string'],
+                        'start' => ['type' => ['number', 'null'], 'description' => 'Seconds from the start of the audio.'],
+                        'end' => ['type' => ['number', 'null']],
+                    ],
+                ],
+                'SpeechToTextUsage' => [
+                    'type' => 'object',
+                    'description' => 'The month\'s speech to text minutes, in seconds. They start again with the billing month.',
+                    'properties' => [
+                        'included_in_plan' => ['type' => 'boolean'],
+                        'seconds_included' => ['type' => 'integer'],
+                        'seconds_used' => ['type' => 'integer'],
+                        'seconds_left' => ['type' => 'integer'],
+                        'max_file_seconds' => ['type' => 'integer'],
+                        'files_at_once' => ['type' => 'integer'],
+                        'resets_at' => ['type' => 'string', 'format' => 'date-time'],
                     ],
                 ],
                 'Error' => [
@@ -571,11 +741,12 @@ final class OpenApiSpec
         $descriptions = [
             '400' => 'The body is not valid JSON, or the Idempotency-Key is too long.',
             '401' => 'Missing or invalid API key.',
-            '402' => 'Not enough credits on the plan or on the key\'s monthly limit, or the plan\'s monthly request limit is reached.',
+            '402' => 'Not enough credits on the plan or on the key\'s monthly limit, the plan\'s monthly request limit is reached, or not enough speech to text minutes left this month (minutes_exceeded).',
             '403' => 'Your plan or key does not allow this: the API is not in your plan or starts after the first payment, the key lacks a permission, or an option is not in your plan (feature_not_in_plan, with the plans that include it).',
             '404' => 'Not found.',
             '409' => 'Not possible yet: the item is still being made, or a request with the same Idempotency-Key is still running.',
             '410' => 'The audio is no longer stored.',
+            '413' => 'The file is larger than the upload limit.',
             '422' => 'A parameter is not valid, or the Idempotency-Key was used for a different request.',
             '429' => 'Rate, concurrency, background-queue or daily limit reached, for the whole account; see Retry-After.',
             '502' => 'The generation failed; no credits were charged.',

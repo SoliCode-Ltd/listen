@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Mcp\McpCaller;
 use App\Support\Api\ApiScopes;
+use App\Support\Transcription\Minutes;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -20,7 +21,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
  */
 #[Name('get_account')]
 #[Title('Get account')]
-#[Description('Show the person\'s Listen plan, how many credits are left and when they renew, and the longest text one request can take. Check it before a long or repeated job.')]
+#[Description('Show the person\'s Listen plan, how many credits are left and when they renew, the longest text one request can take, and the speech to text minutes left this month. Check it before a long or repeated job.')]
 #[IsReadOnly]
 #[IsIdempotent]
 #[IsOpenWorld(false)]
@@ -45,8 +46,20 @@ class GetAccount extends ListenTool
             'Each second of audio uses '.(int) $credits['credits_per_second'].' credits.',
             $keyLimit !== null ? 'This connection may use '.number_format((int) $keyLimit).' credits a month; '.number_format((int) $account['api_key']['credits_used_this_month']).' used so far.' : null,
             'Longest text per request: '.number_format((int) $account['limits']['max_characters_per_async_request']).' characters.',
+            self::speechToText((array) ($account['speech_to_text'] ?? [])),
         ]);
 
         return Response::make([Response::text(implode("\n", $lines))])->withStructuredContent($account);
+    }
+
+    /** @param  array<string, mixed>  $minutes  the speech_to_text block of the account */
+    private static function speechToText(array $minutes): string
+    {
+        if (! ($minutes['included_in_plan'] ?? false)) {
+            return 'Speech to text: not included in this plan.';
+        }
+
+        return 'Speech to text: '.Minutes::format((int) $minutes['seconds_left'], 'en', false).' left of '.Minutes::format((int) $minutes['seconds_included'], 'en', false)
+            .' this month, renewing on '.substr((string) $minutes['resets_at'], 0, 10).'; files up to '.Minutes::format((int) $minutes['max_file_seconds'], 'en', false).' each.';
     }
 }

@@ -28,7 +28,7 @@ final class ServerCard
             'name' => self::name(),
             'version' => ListenServer::VERSION,
             'title' => ListenServer::NAME,
-            'description' => 'Arabic and English text to speech with studio voices, Arabic dialects and accents.',
+            'description' => 'Arabic and English text to speech in studio voices and dialects, and speech to text.',
             'websiteUrl' => url('/en/developers').'#mcp',
             'icons' => [['src' => url('/favicon.png'), 'mimeType' => 'image/png', 'sizes' => ['192x192']]],
             'remotes' => [[
