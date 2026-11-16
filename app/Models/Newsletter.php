@@ -40,6 +40,7 @@ class Newsletter extends Model
         'status',
         'audience',
         'plan_id',
+        'plan_ids',
         'custom_emails',
         'exclude_blocked',
         'exclude_unsubscribed',
@@ -85,6 +86,7 @@ class Newsletter extends Model
         'exclude_already_sent' => 'boolean',
         'skip_phone_accounts' => 'boolean',
         'exclude_admins' => 'boolean',
+        'plan_ids' => 'array',
         'highlights_en' => 'array',
         'highlights_ar' => 'array',
         'last_test_sent_at' => 'datetime',
@@ -134,6 +136,26 @@ class Newsletter extends Model
         SiteSetting::set(self::RESEND_FROM_SETTING.$this->getKey(), now()->toIso8601String(), 'newsletter');
     }
 
+    /**
+     * The plans a "Chosen plans" newsletter goes to: those picked, or the one plan of a
+     * newsletter written before several could be picked.
+     *
+     * @return list<int>
+     */
+    public function chosenPlanIds(): array
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($this->plan_ids ?? [])),
+            fn (int $id): bool => $id > 0
+        )));
+
+        if ($ids === [] && (int) $this->plan_id > 0) {
+            $ids = [(int) $this->plan_id];
+        }
+
+        return $ids;
+    }
+
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);
@@ -168,6 +190,7 @@ class Newsletter extends Model
             'status' => self::STATUS_DRAFT,
             'audience' => self::AUDIENCE_FREE,
             'plan_id' => null,
+            'plan_ids' => null,
             'custom_emails' => null,
             'exclude_blocked' => true,
             'exclude_unsubscribed' => true,

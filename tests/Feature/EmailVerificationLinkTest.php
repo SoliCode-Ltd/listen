@@ -69,7 +69,7 @@ class EmailVerificationLinkTest extends TestCase
         $this->assertSame('member@example.com', $email->getTo()[0]->getAddress());
         $this->assertSame('Confirm your email for Listen', $email->getSubject());
         $body = rtrim((string) $email->getTextBody());
-        $this->assertStringStartsWith("Confirm your email\n\nHello Sara,\n\nThanks for signing up to Listen. Press the button below to confirm your email address and finish setting up your account.\n\n", $body);
+        $this->assertStringStartsWith("Confirm your email\n\nHi Sara,\n\nThanks for signing up to Listen. Press the button below to confirm your email address and finish setting up your account.\n\n", $body);
         $this->assertStringContainsString('The link works for 3 days. If it has run out, sign in and send yourself a new one from the demo page.', $body);
         $this->assertStringContainsString("If you didn't sign up to Listen, you can ignore this email.", $body);
         $this->assertStringContainsString("\n\nConfirm my email: ".$this->linkIn($email)."\n\n", $body);

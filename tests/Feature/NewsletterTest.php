@@ -146,6 +146,60 @@ class NewsletterTest extends TestCase
         ], $customEmails);
     }
 
+    public function test_chosen_plans_reach_everyone_on_any_of_them_and_no_one_else(): void
+    {
+        $pro = Plan::factory()->paid()->create(['slug' => 'nl-pro', 'name' => 'Pro', 'price_cents' => 2900]);
+        $basic = Plan::factory()->paid()->create(['slug' => 'nl-basic', 'name' => 'Basic', 'price_cents' => 500]);
+        foreach (['on-starter@example.com' => $this->paidPlan, 'on-pro@example.com' => $pro, 'on-basic@example.com' => $basic] as $email => $plan) {
+            app(PlanAccessService::class)->assignPlan(User::factory()->create(['email' => $email]), $plan);
+        }
+        User::factory()->create(['email' => 'on-nothing@example.com']);
+
+        $two = Newsletter::query()->create(array_merge(Newsletter::defaultAttributes(), [
+            'audience' => Newsletter::AUDIENCE_PLAN,
+            'plan_ids' => [$this->paidPlan->id, $pro->id],
+        ]));
+        $this->assertSame(['on-pro@example.com', 'on-starter@example.com'], $this->audienceEmails($two));
+
+        // A newsletter written for one plan, before several could be chosen, keeps reaching it.
+        $old = Newsletter::query()->create(array_merge(Newsletter::defaultAttributes(), [
+            'audience' => Newsletter::AUDIENCE_PLAN,
+            'plan_id' => $basic->id,
+        ]));
+        $this->assertSame(['on-basic@example.com'], $this->audienceEmails($old));
+
+        // The admin saves the plans picked, and the first of them as the newsletter's plan.
+        $saved = NewsletterResource::cleanAttributes(['audience' => Newsletter::AUDIENCE_PLAN, 'plan_ids' => [(string) $pro->id, (string) $basic->id, '']]);
+        $this->assertSame([$pro->id, $basic->id], $saved['plan_ids']);
+        $this->assertSame($pro->id, $saved['plan_id']);
+    }
+
+    public function test_each_person_is_greeted_by_name_and_told_their_own_plan(): void
+    {
+        $this->paidPlan->forceFill(['transcription_enabled' => true, 'transcription_minutes_month' => 250])->save();
+        $member = User::factory()->create(['name' => 'Lina Nasser', 'email' => 'lina-plan@example.com']);
+        app(PlanAccessService::class)->assignPlan($member, $this->paidPlan);
+        $newsletter = new Newsletter(array_merge(Newsletter::defaultAttributes(), [
+            'language' => Newsletter::LANGUAGE_EN,
+            'intro_en' => 'Your {plan} plan includes {stt_minutes} minutes a month.',
+            'body_en' => "## What you can do\n- **Upload** a file\n- **Record** in your browser\n\nThanks, {name}.",
+            'highlights_en' => [],
+        ]));
+
+        $html = app(NewsletterRenderer::class)->html($newsletter, Newsletter::LANGUAGE_EN, ['name' => 'Lina Nasser', 'email' => 'lina-plan@example.com', 'user_id' => $member->id]);
+        $this->assertStringContainsString('Hi Lina,', $html);
+        $this->assertStringContainsString('Your Starter plan includes 250 minutes a month.', $html);
+        $this->assertMatchesRegularExpression('#<h2[^>]*>What you can do</h2>#', $html);
+        $this->assertStringContainsString('font-weight:600;color:#16161D;">Upload</strong> a file', $html);
+        $this->assertStringNotContainsString('##', $html);
+
+        $text = app(NewsletterRenderer::class)->text($newsletter, Newsletter::LANGUAGE_EN, ['name' => 'Lina Nasser', 'email' => 'lina-plan@example.com', 'user_id' => $member->id], true);
+        $this->assertStringContainsString("What you can do\n\n- Upload a file\n- Record in your browser\n\nThanks, Lina.", $text);
+
+        // Without a name, the greeting still reads.
+        $this->assertStringContainsString('Hi there,', app(NewsletterRenderer::class)->html($newsletter, Newsletter::LANGUAGE_EN, ['email' => 'x@example.com']));
+    }
+
     public function test_example_send_goes_only_to_the_typed_address(): void
     {
         Mail::fake();
@@ -201,7 +255,7 @@ class NewsletterTest extends TestCase
         $this->assertSame(0, $result['failed']);
         Mail::assertSent(NewsletterMail::class, function (NewsletterMail $mail): bool {
             return $mail->hasTo('lina@example.com')
-                && str_contains($mail->htmlBody, 'Hello Lina,')
+                && str_contains($mail->htmlBody, 'Hi Lina,')
                 && str_contains($mail->htmlBody, 'newsletter/unsubscribe');
         });
         // The paid member only gets their own welcome email, not this newsletter.
@@ -375,7 +429,7 @@ class NewsletterTest extends TestCase
         $this->assertStringContainsString('<!--[if mso]>', $html);
         $this->assertStringNotContainsString('Segoe UI', $html);
         $this->assertStringNotContainsString('Tahoma', $html);
-        $this->assertStringContainsString('Hello Sam,', $html);
+        $this->assertStringContainsString('Hi Sam,', $html);
         $this->assertStringContainsString('email-logo-en.png', $html);
         $this->assertStringContainsString('text-align:center', $html);
         $this->assertDoesNotMatchRegularExpression('/<table[^>]*\salign="/', $html);
