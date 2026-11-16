@@ -55,7 +55,7 @@
       'i18n' => __('transcribe.js'),
       // The list's column names, said beside each value when the list shows as cards on a phone.
       'columns' => ['date' => __('transcribe.page.col_date'), 'language' => __('transcribe.page.col_language'), 'length' => __('transcribe.page.col_length'),
-          'used' => __('transcribe.page.col_used'), 'status' => __('transcribe.page.col_status')],
+          'status' => __('transcribe.page.col_status')],
       'csrf' => csrf_token(),
   ];
 @endphp
@@ -339,7 +339,6 @@
               <th>{{ __('transcribe.page.col_name') }}</th>
               <th>{{ __('transcribe.page.col_language') }}</th>
               <th>{{ __('transcribe.page.col_length') }}</th>
-              <th>{{ __('transcribe.page.col_used') }}</th>
               <th>{{ __('transcribe.page.col_status') }}</th>
               <th><span class="sr-only">{{ __('transcribe.page.col_actions') }}</span></th>
             </tr>

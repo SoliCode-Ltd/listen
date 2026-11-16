@@ -2,19 +2,24 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\TranscribeJob;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\Transcription;
 use App\Models\User;
+use App\Services\Transcription\Transcriber;
 use App\Services\Transcription\TranscriptionFlow;
 use App\Services\Transcription\TranscriptionRefused;
 use App\Services\Tts\GeminiKeyManager;
 use App\Support\AudioFormats;
+use App\Support\Transcription\Minutes;
 use App\Support\Transcription\TranscriptionAccess;
+use App\Support\Transcription\TranscriptionPresenter;
 use App\Support\Transcription\TranscriptionSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
@@ -53,12 +58,18 @@ class TranscriptionFlowTest extends TestCase
 
         $t->refresh();
         $this->assertSame(Transcription::READY, $t->status);
-        $this->assertSame(13, $t->charged_seconds, 'every second, a part second as a whole one');
+        $this->assertSame(12, $t->charged_seconds, 'its length to the nearest second');
         $this->assertSame(TranscriptionAccess::chargeFor(12.4), $t->charged_seconds);
+        // What it uses is what its length shows, to the second, for any length.
+        foreach ([0.6, 12.4, 12.5, 101.6, 102.49, 3599.5] as $seconds) {
+            $this->assertSame(Minutes::format(max(1, (int) round($seconds))), Minutes::format(TranscriptionAccess::chargeFor($seconds)), "{$seconds} s");
+        }
+        $shown = TranscriptionPresenter::summary($t, false, false);
+        $this->assertSame($shown['length'], $shown['used'], 'the length and the minutes used read the same');
         $balance = TranscriptionAccess::balance($user);
         $this->assertSame(7200, $balance['allowance']);
-        $this->assertSame(13, $balance['used']);
-        $this->assertSame(7187, $balance['left']);
+        $this->assertSame(12, $balance['used']);
+        $this->assertSame(7188, $balance['left']);
         $this->assertSame('هلا والله، شلونكم؟', $t->paragraphs[0]['text']);
         $this->assertSame('ar', $t->language);
         $this->assertNull($t->work);
@@ -216,6 +227,61 @@ class TranscriptionFlowTest extends TestCase
         $this->assertSame(Transcription::FAILED, $t->fresh()->status);
         $this->assertSame('stuck', $t->fresh()->error_code);
         $this->assertSame(0, TranscriptionAccess::balance($user)['used']);
+    }
+
+    /** Silence, or a microphone that did not pick up: never sent to the model (it can make up a sentence nobody said), and nothing used. */
+    public function test_a_recording_with_no_voice_is_not_sent_to_the_model_and_uses_nothing(): void
+    {
+        Http::fake();
+        $user = $this->member(minutes: 120);
+        $silence = sys_get_temp_dir().'/tr-flow-silence-'.bin2hex(random_bytes(4)).'.mp3';
+        (new Process([AudioFormats::ffmpegPath(), '-v', 'error', '-y', '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.002:duration=15', '-c:a', 'libmp3lame', $silence]))->mustRun();
+
+        $t = app(TranscriptionFlow::class)->start($user, $silence, ['title' => 'Recording', 'source' => 'record']);
+
+        $t->refresh();
+        $this->assertSame(Transcription::FAILED, $t->status);
+        $this->assertSame('no_speech', $t->error_code);
+        $this->assertStringContainsString('microphone', (string) $t->error);
+        $this->assertSame(0, TranscriptionAccess::balance($user)['used']);
+        Http::assertNothingSent();
+    }
+
+    /** An answer with no words in it is not a transcript: it fails, and nothing is used. */
+    public function test_an_answer_with_no_words_uses_nothing(): void
+    {
+        $this->answers('[inaudible]');
+        $user = $this->member(minutes: 120);
+
+        $t = app(TranscriptionFlow::class)->start($user, $this->audio(6), ['title' => 'Recording']);
+
+        $t->refresh();
+        $this->assertSame(Transcription::FAILED, $t->status);
+        $this->assertSame('no_speech', $t->error_code);
+        $this->assertSame(0, TranscriptionAccess::balance($user)['used']);
+    }
+
+    /** A short file does not wait for a queue worker: it is worked through once the answer has gone; the queued copy then finds it done. */
+    public function test_a_short_file_is_worked_through_at_once(): void
+    {
+        config(['queue.default' => 'database']);
+        $this->answers('هلا والله، شلونكم؟');
+        $user = $this->member(minutes: 120);
+
+        $t = app(TranscriptionFlow::class)->start($user, $this->audio(8), ['title' => 'voice note.m4a', 'language' => 'ar']);
+        $this->assertSame(Transcription::QUEUED, $t->fresh()->status, 'the answer goes back before the work');
+        $this->assertSame(1, DB::table('jobs')->count(), 'the queued copy, as the safety net');
+
+        $this->app->terminate();
+
+        $t->refresh();
+        $this->assertSame(Transcription::READY, $t->status);
+        $this->assertSame('هلا والله، شلونكم؟', $t->paragraphs[0]['text']);
+        $used = TranscriptionAccess::balance($user)['used'];
+        // The queued copy, when a worker reaches it, changes nothing.
+        (new TranscribeJob($t->id))->handle(app(Transcriber::class), app(TranscriptionFlow::class));
+        $this->assertSame(Transcription::READY, $t->fresh()->status);
+        $this->assertSame($used, TranscriptionAccess::balance($user)['used']);
     }
 
     public function test_a_file_without_sound_is_refused(): void

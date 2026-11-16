@@ -103,13 +103,13 @@ final class TranscriptionAccess
     }
 
     /**
-     * What a file of $seconds uses: every second of audio, a part second as a
-     * whole one. The tenth of a second an MP3 or AAC encoder adds as silence
-     * at the start (a 20 s recording reads 20.04 s) is not counted.
+     * What a file of $seconds uses: its length to the nearest second, exactly
+     * as its length is shown (TranscriptionPresenter: a file shown as 1:42 uses
+     * 1 min 42 s, never a second more); at least one second.
      */
     public static function chargeFor(float $seconds): int
     {
-        return max(1, (int) ceil($seconds - 0.1));
+        return max(1, (int) round($seconds));
     }
 
     /** Whether the member can still have the free try: once, and while the site's free tries for today last. */

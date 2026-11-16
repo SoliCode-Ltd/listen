@@ -35,6 +35,7 @@ return [
         'unreadable' => 'We could not read the sound in this file.',
         'not_written' => 'We could not write out this recording. Nothing was taken from your minutes.',
         'stuck' => 'This took too long and was stopped. Nothing was taken from your minutes.',
+        'no_speech' => 'We could not hear anyone speaking in this recording. Check your microphone and try again. Nothing was taken from your minutes.',
         'default' => 'Something went wrong. Nothing was taken from your minutes.',
     ],
 
@@ -80,7 +81,6 @@ return [
         'col_name' => 'Name',
         'col_language' => 'Language',
         'col_length' => 'Length',
-        'col_used' => 'Minutes used',
         'col_status' => 'Status',
         'col_actions' => 'Actions',
         'empty' => 'Your transcripts will appear here.',
@@ -138,7 +138,6 @@ return [
         'vtt' => 'For web players',
         'docx' => 'Word document',
         'used' => ':time used',
-        'used_none' => '0 s',
         'network' => 'The connection was lost. Check it and try again.',
         'mic_denied' => 'Allow the microphone in your browser to record.',
         'mic_none' => 'No microphone was found on this device.',

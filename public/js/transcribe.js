@@ -160,8 +160,23 @@
     $('[data-tr-bar-fill]').style.width = prog.shown.toFixed(2) + '%';
     $('[data-tr-bar]').setAttribute('aria-valuenow', String(p));
   }
+  function markSteps() {
+    var at = order.indexOf(prog.phase);
+    $$('[data-tr-step]').forEach(function (li) {
+      var i = order.indexOf(li.getAttribute('data-tr-step'));
+      li.classList.toggle('is-done', i < at);
+      li.classList.toggle('is-on', i === at);
+    });
+  }
   function progressTick() {
     prog.frame = 0;
+    // Getting ready takes a moment: then the bar moves on to writing out, whether or not the
+    // server has said so yet, so it never waits in one place.
+    if (prog.phase === 'prepare' && (Date.now() - prog.since) / 1000 > 3) {
+      prog.phase = 'listen';
+      prog.since = Date.now();
+      markSteps();
+    }
     var r = RANGES[prog.phase];
     if (r && (prog.phase === 'prepare' || prog.phase === 'listen')) {
       var waited = (Date.now() - prog.since) / 1000;
@@ -181,12 +196,7 @@
     if (step !== prog.phase && (RANGES[step] || [0])[0] >= (RANGES[prog.phase] || [0])[0]) { prog.phase = step; prog.since = Date.now(); }
     prog.target = Math.min(100, Math.max(prog.target, r[0] + (r[1] - r[0]) * Math.max(0, Math.min(100, percent)) / 100));
     if (!prog.frame) prog.frame = requestAnimationFrame(progressTick);
-    var at = order.indexOf(prog.phase);
-    $$('[data-tr-step]').forEach(function (li) {
-      var i = order.indexOf(li.getAttribute('data-tr-step'));
-      li.classList.toggle('is-done', i < at);
-      li.classList.toggle('is-on', i === at);
-    });
+    markSteps();
   }
 
   // ---------- Choosing a file ----------
@@ -613,13 +623,12 @@
     return '<span class="dub-badge is-working">' + esc(t.status_working) + '</span>';
   }
   function rowHtml(item) {
-    var used = item.status === 'failed' ? t.used_none : (item.status === 'ready' || item.used_seconds > 0 ? item.used : '—');
     var L = c.columns || {};
     return '<td class="num" data-label="' + esc(L.date) + '">' + esc(item.date) + '</td>'
       + '<td class="tr-name"><button type="button" class="dub-link" data-tr-open dir="auto">' + esc(cleanTitle(item.title)) + '</button></td>'
       + '<td data-label="' + esc(L.language) + '">' + esc(item.language_name || '—') + '</td>'
-      + '<td class="num" data-label="' + esc(L.length) + '"><span dir="ltr">' + esc(clock(Math.round(item.seconds || 0))) + '</span></td>'
-      + '<td class="num" data-label="' + esc(L.used) + '">' + esc(used) + '</td>'
+      // One length: what the file is and what it used are the same seconds.
+      + '<td class="num" data-label="' + esc(L.length) + '">' + esc(item.length || '—') + '</td>'
       + '<td data-label="' + esc(L.status) + '">' + badge(item) + '</td>'
       + '<td class="tr-actions-cell">'
       + (item.status === 'queued' || item.status === 'processing' ? ''
@@ -835,8 +844,8 @@
     play.setAttribute('aria-label', play.getAttribute(playing ? 'data-label-pause' : 'data-label-play'));
     var total = lengthOfAudio();
     $('[data-tr-pb-now]').textContent = clock(audio.currentTime);
-    // Rounded as the length above it is, so both say the same.
-    $('[data-tr-pb-total]').textContent = clock(Math.round(total));
+    // The transcript's own length, as its header and the list say it.
+    $('[data-tr-pb-total]').textContent = clock(Math.round(current && Number(current.seconds) > 0 ? Number(current.seconds) : total));
     if (!seekInput._dragging) {
       var share = total > 0 ? Math.min(1, audio.currentTime / total) : 0;
       seekInput.value = String(Math.round(share * 1000));

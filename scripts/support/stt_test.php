@@ -45,6 +45,7 @@ use App\Support\Api\ApiPlanAccess;
 use App\Support\AudioFormats;
 use App\Support\LiveServer;
 use App\Support\Transcription\TranscriptionAccess;
+use App\Support\Transcription\TranscriptionPresenter;
 use App\Support\Transcription\TranscriptionSettings;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Http\Kernel as HttpKernel;
@@ -308,6 +309,65 @@ try {
         $check($again['at'] === $translated['at'], 'the translation is kept, not made again');
         $exported = (string) app(TranscriptExport::class)->export($t->fresh(), 'srt', $to)['body'];
         $check(str_contains($exported, mb_substr(trim((string) $translated['segments'][0]['text']), 0, 12)), "SRT in {$to}");
+    }
+
+    // ------------------------------------------------------------ in time over a long recording
+    // Six voices one after the other with a short breath between them, over a constant noise
+    // bed (so no silence helps): each voice's first sentence must start where that voice does.
+    echo "\n== ar: a long recording with no silence, in time ==\n";
+    $voices = [];
+    foreach ($clips as $clip) {
+        if (str_starts_with(strtolower($clip['dialect']), 'ar') && count($voices) < 6) {
+            $voices[] = $clip;
+        }
+    }
+    $inputs = [];
+    $filter = '';
+    $joined = '';
+    $voiceStarts = [];
+    $at = 0.0;
+    foreach ($voices as $k => $clip) {
+        $path = public_path($clip['file']);
+        $inputs = array_merge($inputs, ['-i', $path]);
+        $filter .= "[{$k}:a]aresample=24000,aformat=channel_layouts=mono[v{$k}];anullsrc=r=24000:cl=mono,atrim=0:0.4[g{$k}];";
+        $joined .= "[v{$k}][g{$k}]";
+        // Where the voice is first heard in its own clip.
+        $quiet = new Process([$ffmpeg, '-hide_banner', '-i', $path, '-af', 'silencedetect=noise=-35dB:d=0.05', '-f', 'null', '-']);
+        $quiet->setTimeout(60)->run();
+        $pauses = Transcriber::readPauses($quiet->getErrorOutput());
+        $onset = ($pauses[0][0] ?? 1.0) <= 0.01 ? (float) $pauses[0][1] : 0.0;
+        $voiceStarts[] = round($at + $onset, 2);
+        $at += Transcriber::lengthOf($path) + 0.4;
+    }
+    $long = $work.'/arabic-six-voices.mp3';
+    $run([$ffmpeg, '-v', 'error', '-y', ...$inputs, '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.04:sample_rate=24000',
+        '-filter_complex', $filter.$joined.'concat=n='.(2 * count($voices)).':v=0:a=1[speech];[speech]['.count($voices).':a]amix=inputs=2:duration=first:normalize=0[o]',
+        '-map', '[o]', '-c:a', 'libmp3lame', '-b:a', '64k', $long]);
+    $started = microtime(true);
+    $copy = $work.'/upload-long.mp3';
+    copy($long, $copy);
+    $t = $flow->start($member, $copy, ['title' => 'six voices', 'file_name' => 'six-voices.mp3', 'source' => 'upload', 'language' => 'auto']);
+    $t->refresh();
+    printf("  %.1f s of audio, %d voices, written out in %.1f s, cost \$%.5f\n", (float) $t->seconds, count($voices), microtime(true) - $started, (float) $t->cost_usd);
+    $check($t->status === Transcription::READY, "it is ready (status {$t->status})");
+    if ($t->status === Transcription::READY) {
+        echo '    ', implode(' | ', array_filter((array) $t->notes, fn ($n) => str_starts_with((string) $n, 'times'))), "\n";
+        $segments = array_values((array) $t->segments);
+        $worst = 0.0;
+        foreach (array_slice($voiceStarts, 1) as $k => $truth) {
+            $nearest = null;
+            foreach ($segments as $s) {
+                if ($nearest === null || abs((float) $s['start'] - $truth) < abs((float) $nearest['start'] - $truth)) {
+                    $nearest = $s;
+                }
+            }
+            $off = abs((float) $nearest['start'] - $truth);
+            $worst = max($worst, $off);
+            printf("    voice %d heard from %5.1f s: sentence at %5.1f s (%+.1f) %s\n", $k + 2, $truth, (float) $nearest['start'], (float) $nearest['start'] - $truth, mb_substr((string) $nearest['text'], 0, 50));
+        }
+        $check($worst <= 0.8, sprintf('in time with the voice over %.0f s with no silence: every voice\'s first sentence within %.1f s of where it starts', (float) $t->seconds, $worst));
+        $shown = TranscriptionPresenter::summary($t, false, false);
+        $check($shown['length'] === $shown['used'], "the length and the minutes used read the same: {$shown['length']}");
     }
 
     // ------------------------------------------------------------ the developer API

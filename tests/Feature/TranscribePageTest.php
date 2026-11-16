@@ -63,24 +63,24 @@ class TranscribePageTest extends TestCase
         $this->actingAs($user);
 
         $this->postJson(route('transcribe.check'), ['seconds' => 12.43])->assertOk()
-            ->assertJson(['seconds' => 13, 'left' => 7200, 'remain' => 7187, 'free' => false]);
+            ->assertJson(['seconds' => 12, 'left' => 7200, 'remain' => 7188, 'free' => false]);
 
         $bytes = (string) file_get_contents($this->audio(12.4));
         $start = $this->postJson(route('transcribe.upload.start'), ['name' => 'voice note.mp3', 'size' => strlen($bytes)])->assertCreated();
         $this->call('POST', $start->json('chunk_url'), [], [], [], ['HTTP_X_UPLOAD_OFFSET' => '0', 'CONTENT_TYPE' => 'application/octet-stream', 'HTTP_ACCEPT' => 'application/json'], $bytes)
             ->assertOk()->assertJson(['received' => strlen($bytes)]);
         $store = $this->postJson(route('transcribe.store'), ['upload_id' => $start->json('id'), 'language' => 'ar'])->assertStatus(202);
-        $this->assertSame(13, $store->json('account.used_seconds'), 'the header shows the minutes used at once');
+        $this->assertSame(12, $store->json('account.used_seconds'), 'the header shows the minutes used at once');
 
         $code = $store->json('transcription.id');
         $show = $this->getJson(route('transcribe.show', $code))->assertOk();
         $show->assertJsonPath('transcription.status', 'ready')
             ->assertJsonPath('transcription.title', 'voice note.mp3')
-            ->assertJsonPath('transcription.used', '13 s')
+            ->assertJsonPath('transcription.used', '12 s')
             ->assertJsonPath('transcription.rtl', true)
             ->assertJsonPath('transcription.speakers', 2)
             ->assertJsonPath('transcription.speaker_list.0.name', 'Speaker A')
-            ->assertJsonPath('account.left_seconds', 7187);
+            ->assertJsonPath('account.left_seconds', 7188);
         $this->assertStringContainsString("Speaker A: مرحبا خديجة، شو صار؟\n\nSpeaker B: كل شي جاهز تقريباً.", $show->json('transcription.text'));
         $this->get(route('transcribe.audio', $code))->assertOk()->assertHeader('Content-Type', 'audio/mpeg');
 

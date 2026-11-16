@@ -351,6 +351,102 @@ class TranscriberTest extends TestCase
         $this->assertNull(Transcriber::placeOnStarts($sentences, [3.3, 6.5], $speech, 0.0, 14.0));
     }
 
+    /** A part is timed in windows of about 30 s, cut on pauses, end to end; with no pause (music under the voice), every 30 s. */
+    public function test_a_part_is_timed_in_short_windows_cut_on_pauses(): void
+    {
+        $this->assertSame([[0.0, 40.0]], Transcriber::timingWindows([], 0.0, 40.0), 'short: one window');
+
+        $windows = Transcriber::timingWindows([[12.0, 12.4], [29.0, 29.8], [33.0, 33.2], [61.5, 62.5]], 0.0, 100.0);
+        $this->assertSame([[0.0, 29.4], [29.4, 62.0], [62.0, 100.0]], $windows, 'on the pause nearest 30 s, a longer one first');
+
+        $none = Transcriber::timingWindows([], 10.0, 130.0);
+        $this->assertSame([[10.0, 40.0], [40.0, 70.0], [70.0, 100.0], [100.0, 130.0]], $none);
+        foreach ([$windows, $none] as $list) {
+            foreach ($list as $i => [$start, $end]) {
+                $this->assertLessThanOrEqual(42.0, $end - $start);
+                if ($i > 0) {
+                    $this->assertSame($list[$i - 1][1], $start, 'end to end');
+                }
+            }
+        }
+    }
+
+    /** A longer recording is timed window by window, all asked at once, each on its own clock; a start in the middle of speech comes from the window that heard it. */
+    public function test_a_longer_recording_is_timed_window_by_window(): void
+    {
+        if (! AudioFormats::ffmpegPath()) {
+            $this->markTestSkipped('ffmpeg is not available.');
+        }
+        // Voice 0-20 s, a pause, voice 21-45 s, a pause, voice 46-70 s.
+        $file = sys_get_temp_dir().'/transcriber-windows-'.getmypid().'.wav';
+        (new Process([AudioFormats::ffmpegPath(), '-v', 'error', '-y',
+            '-f', 'lavfi', '-i', 'sine=frequency=300:duration=20', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono:d=1',
+            '-f', 'lavfi', '-i', 'sine=frequency=300:duration=24', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono:d=1',
+            '-f', 'lavfi', '-i', 'sine=frequency=300:duration=24',
+            '-filter_complex', '[0:a]aformat=sample_rates=44100:channel_layouts=mono[a];[2:a]aformat=sample_rates=44100:channel_layouts=mono[c];[4:a]aformat=sample_rates=44100:channel_layouts=mono[e];[a][1:a][c][3:a][e]concat=n=5:v=0:a=1',
+            $file]))->mustRun();
+        $this->fakeKeys();
+        $timing = [];
+        Http::fake(function ($request) use (&$timing) {
+            $prompt = (string) data_get($request->data(), 'contents.0.parts.1.text');
+            if (! str_contains($prompt, 'cut from a longer recording')) {
+                return $this->answer(['language' => 'en', 'speakers' => [['id' => 'A', 'voice' => 'male'], ['id' => 'B', 'voice' => 'female']], 'paragraphs' => [
+                    ['speaker' => 'A', 'text' => 'Welcome to the shop. We have laptops, printers and screens for every desk.'],
+                    ['speaker' => 'B', 'text' => 'Thank you, I am looking for a quiet keyboard.'],
+                    ['speaker' => 'B', 'text' => 'And a mouse for gaming, please.'],
+                ]]);
+            }
+            preg_match('/This audio is ([\d.]+) seconds long/', $prompt, $m);
+            $timing[] = $m[1];
+
+            // Each window answers on its own clock: 0-20.5 s, 20.5-45.5 s, 45.5-70 s.
+            return $this->answer(['sentences' => match ($m[1]) {
+                '21.5' => [['n' => 1, 'start' => 0.0], ['n' => 2, 'start' => 10.0]],
+                '26.0' => [['n' => 3, 'start' => 0.6]],
+                default => [['n' => 4, 'start' => 0.4]],
+            }]);
+        });
+
+        try {
+            $out = app(Transcriber::class)->transcribe($file, ['language' => 'en']);
+        } finally {
+            @unlink($file);
+        }
+
+        sort($timing);
+        $this->assertSame(['21.5', '24.5', '26.0'], $timing, 'three windows, cut in the two pauses');
+        $this->assertSame(['Welcome to the shop.', 'We have laptops, printers and screens for every desk.', 'Thank you, I am looking for a quiet keyboard.', 'And a mouse for gaming, please.'], array_column($out['segments'], 'text'));
+        $starts = array_column($out['segments'], 'start');
+        $this->assertEqualsWithDelta(0.0, $starts[0], 0.1);
+        $this->assertEqualsWithDelta(10.0, $starts[1], 0.05, 'in the middle of the speech: as the window heard it');
+        $this->assertEqualsWithDelta(21.0, $starts[2], 0.15, 'moved onto where the speech begins after the pause');
+        $this->assertEqualsWithDelta(46.0, $starts[3], 0.15);
+        $this->assertStringContainsString('times: 3 windows, 3 answered, 4 of 4 sentences heard', implode(' | ', $out['notes']));
+    }
+
+    /** The windows' answers make one start for each sentence: the earlier window's when two claim one, none out of order, the rest by length. */
+    public function test_the_windows_answers_make_one_start_for_each_sentence(): void
+    {
+        $sentences = array_map(fn ($t) => ['text' => $t], ['One two three.', 'Four five six.', 'Seven eight nine ten eleven.', 'Twelve.', 'Thirteen fourteen.']);
+
+        // Sentence 3 (index 2) begins at the cut: the first window hears it at 29.6, the second at 30.0.
+        $claims = [
+            ['i' => 0, 'at' => 0.5, 'window' => 0], ['i' => 1, 'at' => 12.0, 'window' => 0], ['i' => 2, 'at' => 29.6, 'window' => 0],
+            ['i' => 2, 'at' => 30.0, 'window' => 1], ['i' => 3, 'at' => 41.0, 'window' => 1], ['i' => 4, 'at' => 50.0, 'window' => 1],
+        ];
+        $this->assertSame([0.5, 12.0, 29.6, 41.0, 50.0], Transcriber::startsFromClaims($claims, $sentences, 0.0, 60.0));
+
+        // A claim out of order is dropped, and the sentence without a time goes between its neighbours by length.
+        $wrong = [['i' => 0, 'at' => 0.5, 'window' => 0], ['i' => 1, 'at' => 44.0, 'window' => 0], ['i' => 2, 'at' => 20.0, 'window' => 0],
+            ['i' => 3, 'at' => 41.0, 'window' => 1], ['i' => 4, 'at' => 50.0, 'window' => 1]];
+        $starts = Transcriber::startsFromClaims($wrong, $sentences, 0.0, 60.0);
+        $this->assertSame([0.5, 20.0, 41.0, 50.0], [$starts[0], $starts[2], $starts[3], $starts[4]]);
+        $this->assertSame(round(0.5 + 19.5 * 14 / 28, 2), $starts[1], 'between 0.5 and 20.0, after a sentence as long as itself');
+
+        // Too few timed: none.
+        $this->assertNull(Transcriber::startsFromClaims([['i' => 0, 'at' => 1.0, 'window' => 0]], $sentences, 0.0, 60.0));
+    }
+
     /** A browser recording has no length in its header ("Duration: N/A"): it is read to its end, never taken as 0 s. */
     public function test_a_browser_recording_without_a_length_in_its_header_is_measured(): void
     {

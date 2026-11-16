@@ -12,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -47,9 +48,69 @@ class TranscribeJob implements ShouldQueue
 
     public function handle(Transcriber $transcriber, TranscriptionFlow $flow): void
     {
+        // One runner at a time on a transcript: while a short one is being worked through right
+        // after its upload (runNow()), the queued copy comes back a little later (not as a try).
+        $lock = Cache::lock(self::lockName($this->transcriptionId), $this->timeout + 30);
+        if (! $lock->get()) {
+            $t = Transcription::withTrashed()->find($this->transcriptionId);
+            if ($t && $t->isWorking() && config('queue.default') !== 'sync') {
+                static::dispatch($t->id)->onQueue($t->priority ? 'high' : 'default')->delay(now()->addSeconds(10));
+            }
+
+            return;
+        }
+        try {
+            $more = $this->stepOnce($transcriber, $flow);
+        } finally {
+            $lock->release();
+        }
+        // Queued once the lock is let go (on a queue that runs at once, the next step starts here).
+        $t = $more ? Transcription::withTrashed()->find($this->transcriptionId) : null;
+        if ($t) {
+            static::queueFor($t);
+        }
+    }
+
+    /**
+     * A short file worked through at once, step after step in this process (called once the
+     * member's page has its answer), so it never waits for a queue worker. The queued job stays
+     * as the safety net: it finds the transcript done, or carries on from the last step saved.
+     */
+    public static function runNow(int $transcriptionId): void
+    {
+        @set_time_limit(200);
+        $until = microtime(true) + 150;
+        $job = new static($transcriptionId);
+        while (microtime(true) < $until) {
+            $lock = Cache::lock(self::lockName($transcriptionId), $job->timeout + 30);
+            if (! $lock->get()) {
+                return;
+            }
+            try {
+                if (! $job->stepOnce(app(Transcriber::class), app(TranscriptionFlow::class))) {
+                    return;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Speech to text: left to the queue.', ['transcription' => $transcriptionId, 'error' => mb_substr($e->getMessage(), 0, 300)]);
+
+                return;
+            } finally {
+                $lock->release();
+            }
+        }
+    }
+
+    private static function lockName(int $id): string
+    {
+        return 'transcribe-run:'.$id;
+    }
+
+    /** One step done and saved; whether another is left. */
+    private function stepOnce(Transcriber $transcriber, TranscriptionFlow $flow): bool
+    {
         $t = Transcription::withTrashed()->find($this->transcriptionId);
         if (! $t || ! $t->isWorking()) {
-            return;
+            return false;
         }
         $disk = Storage::disk(TranscriptionFlow::DISK);
         $folder = TranscriptionFlow::folder($t);
@@ -61,7 +122,7 @@ class TranscribeJob implements ShouldQueue
                 if ($source === '' || ! $disk->exists($source)) {
                     $flow->fail($t, 'unreadable', __('transcribe.failed.unreadable'));
 
-                    return;
+                    return false;
                 }
                 $state = $transcriber->prepare($disk->path($source), $clean, [
                     'language' => $t->language_requested, 'dialect' => (string) $t->dialect, 'review' => TranscriptionSettings::review(),
@@ -69,30 +130,45 @@ class TranscribeJob implements ShouldQueue
                 if ($source !== $folder.'/audio.mp3') {
                     $disk->delete($source);
                 }
+                // Silence, a hum, or a microphone that did not pick up: not sent to the model, which
+                // can make up a sentence nobody said; nothing is used.
+                if (Transcriber::heardNothing($state)) {
+                    $t->forceFill(['audio_path' => $folder.'/audio.mp3'])->save();
+                    $flow->fail($t, 'no_speech', __('transcribe.failed.no_speech'));
+
+                    return false;
+                }
                 $t->forceFill(['status' => Transcription::PROCESSING, 'started_at' => $t->started_at ?? now(), 'work' => $state,
                     'parts' => count($state['plan']), 'parts_done' => 0, 'audio_path' => $folder.'/audio.mp3'])->save();
-                static::queueFor($t);
 
-                return;
+                return true;
             }
 
             $state = $t->work;
             $more = $transcriber->step($clean, $state);
             $t->forceFill(['work' => $state, 'parts_done' => (int) $state['n'], 'requests' => (int) $state['run']['requests'], 'usage' => $state['run']['usage']])->save();
             if ($more) {
-                static::queueFor($t);
-
-                return;
+                return true;
             }
-            $flow->finish($t, Transcriber::result($state));
+            $result = Transcriber::result($state);
+            if (Transcriber::nothingWritten($result)) {
+                $flow->fail($t, 'no_speech', __('transcribe.failed.no_speech'));
+
+                return false;
+            }
+            $flow->finish($t, $result);
+
+            return false;
         } catch (SpeechNotWrittenOut $e) {
             Log::warning('Speech to text: not written out.', ['transcription' => $t->id, 'finish' => $e->finish]);
             $flow->fail($t, 'not_written', __('transcribe.failed.not_written'));
+
+            return false;
         } catch (\RuntimeException $e) {
             if (str_contains($e->getMessage(), 'could not be read') || str_contains($e->getMessage(), 'ffmpeg')) {
                 $flow->fail($t, 'unreadable', __('transcribe.failed.unreadable'));
 
-                return;
+                return false;
             }
             throw $e;
         }

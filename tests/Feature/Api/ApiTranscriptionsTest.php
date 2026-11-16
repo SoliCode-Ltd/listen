@@ -71,12 +71,12 @@ class ApiTranscriptionsTest extends TestCase
 
         $made = $this->upload($plain, $this->audio(6.2), ['language_code' => 'en', 'title' => 'Episode 4'])
             ->assertStatus(202)
-            ->assertHeader('X-Seconds-Used', '7')
+            ->assertHeader('X-Seconds-Used', '6')
             ->json();
         $this->assertMatchesRegularExpression('/^tr_[a-z0-9]{24}$/', $made['transcription_id']);
         $this->assertSame(url('/v1/transcriptions/'.$made['transcription_id']), $this->lastLocation);
-        $this->assertSame(['Episode 4', 'api', 'en', 7, false], [$made['title'], $made['source'], $made['language_requested'], $made['seconds_used'], $made['free_try']]);
-        $this->assertSame(['included_in_plan' => true, 'seconds_included' => 7200, 'seconds_used' => 7, 'seconds_left' => 7193], array_slice($made['usage'], 0, 4));
+        $this->assertSame(['Episode 4', 'api', 'en', 6, false], [$made['title'], $made['source'], $made['language_requested'], $made['seconds_used'], $made['free_try']]);
+        $this->assertSame(['included_in_plan' => true, 'seconds_included' => 7200, 'seconds_used' => 6, 'seconds_left' => 7194], array_slice($made['usage'], 0, 4));
         $this->assertSame($key->id, Transcription::query()->where('code', $made['transcription_id'])->value('api_key_id'));
 
         $item = $this->apiGet($plain, '/transcriptions/'.$made['transcription_id'])->assertOk()->json();
@@ -98,7 +98,7 @@ class ApiTranscriptionsTest extends TestCase
         $this->assertStringContainsString('attachment;', (string) $docx->headers->get('Content-Disposition'));
 
         // The account endpoint shows the same minutes.
-        $this->assertSame(7193, $this->apiGet($plain, '/user/subscription')->assertOk()->json('speech_to_text.seconds_left'));
+        $this->assertSame(7194, $this->apiGet($plain, '/user/subscription')->assertOk()->json('speech_to_text.seconds_left'));
     }
 
     public function test_a_link_is_fetched_and_written_out(): void

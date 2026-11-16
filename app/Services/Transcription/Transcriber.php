@@ -9,6 +9,8 @@ use App\Support\ArabicDialects;
 use App\Support\AudioFormats;
 use App\Support\EnglishAccents;
 use App\Support\Transcription\TranscriptionSettings;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
@@ -26,11 +28,14 @@ use Symfony\Component\Process\Process;
  * without the words heard twice (withoutRepeat()).
  *
  * The model writes only the words and who says them, never times: asked for
- * times, it drifts over a long recording (measured on staging, November
- * 2026), and it costs more. Each sentence is placed on the speech found in
- * the sound itself instead (placeOnSpeech()): spread over the stretches of
- * speech by its length, each end drawn to the nearest pause, so the times
- * cannot drift. That is what the player follows, and the subtitles (SRT, VTT).
+ * times over a long stretch, it drifts (measured on staging, November 2026).
+ * The times come after, in short windows (timingWindows(), about 30 s, cut on
+ * pauses), each heard on its own with the sentences near it: in so little
+ * audio the start it hears for a sentence is close, and no error carries on
+ * to the next window. The starts are then moved onto where speech begins in
+ * the sound itself (placeOnStarts()). Where they cannot be had, the sentences
+ * are spread over the speech by their length instead (placeOnSpeech()). That
+ * is what the player follows, and the subtitles (SRT, VTT).
  *
  * What makes the words accurate, each measured on staging (transcribe:measure):
  *  - Arabic is written in the speaker's own dialect, as said: never rewritten
@@ -69,6 +74,25 @@ final class Transcriber
 
     /** How far (seconds of speech) a sentence's end worked out from its length may be from the pause it is matched to. */
     public const MATCH_SECONDS = 6.0;
+
+    /** The audio timed in one request: about this many seconds, cut on a pause between the two limits. */
+    public const TIMING_WINDOW = 30.0;
+
+    private const TIMING_WINDOW_MIN = 18.0;
+
+    private const TIMING_WINDOW_MAX = 42.0;
+
+    /** Timing requests sent at once. */
+    private const TIMING_AT_ONCE = 5;
+
+    /**
+     * Below these a recording holds no voice to write out, and is not sent to the model at all
+     * (on silence or a hum it can make up a sentence nobody said): less sound than this above
+     * the pause level, or nothing in it louder than this.
+     */
+    public const LEAST_SPEECH_SECONDS = 0.4;
+
+    public const QUIETEST_VOICE_DB = -42.0;
 
     /** A sentence longer than this many letters is cut at a comma (a subtitle line, a click to play). */
     private const LONG_SENTENCE = 160;
@@ -109,6 +133,38 @@ final class Transcriber
     }
 
     /**
+     * A finished transcript's sentences placed on its recording again (the words kept as they
+     * are), timed in windows as a new transcript is: for one made before that timing. The new
+     * sentences with their times, and what it used; null when they could not be timed.
+     *
+     * @param  string  $clean  the transcript's own audio (16 kHz mono MP3)
+     * @param  array<int, array<string, mixed>>  $segments  its sentences, in order
+     * @return array{segments: array<int, array<string, mixed>>, usage: array<string, int>, requests: int, notes: array<int, string>}|null
+     */
+    public function retime(string $clean, array $segments): ?array
+    {
+        $ffmpeg = self::ffmpeg();
+        $seconds = $this->duration($ffmpeg, $clean);
+        $pauses = $this->pauses($ffmpeg, $clean);
+        $speech = self::speechIn($pauses, 0.0, $seconds);
+        $sentences = array_map(fn ($s) => ['speaker' => (string) ($s['speaker'] ?? 'A'), 'text' => (string) ($s['text'] ?? ''), 'paragraph' => (int) ($s['paragraph'] ?? 0)], array_values($segments));
+        $run = ['usage' => ['input_tokens' => 0, 'audio_tokens' => 0, 'output_tokens' => 0, 'thinking_tokens' => 0], 'requests' => 0, 'notes' => []];
+        $tmp = sys_get_temp_dir().'/listen-retime-'.bin2hex(random_bytes(6));
+        @mkdir($tmp, 0700, true);
+        try {
+            $starts = $this->alignStarts($ffmpeg, $clean, $tmp, 0.0, $seconds, $sentences, $pauses, $speech, $run);
+            $placed = $starts !== null ? self::placeOnStarts($sentences, $starts, $speech, 0.0, $seconds) : null;
+        } finally {
+            foreach ((array) glob($tmp.'/*') as $f) {
+                @unlink((string) $f);
+            }
+            @rmdir($tmp);
+        }
+
+        return $placed === null ? null : ['segments' => $placed, 'usage' => $run['usage'], 'requests' => $run['requests'], 'notes' => $run['notes']];
+    }
+
+    /**
      * The recording made ready to hear: written to $clean (16 kHz mono MP3,
      * what the model hears and the member plays back), measured, its pauses
      * found and its parts planned. The state returned is plain data (it can
@@ -123,6 +179,7 @@ final class Transcriber
         $this->normalise($ffmpeg, $file, $clean);
         $seconds = $this->duration($ffmpeg, $clean);
         $pauses = $this->pauses($ffmpeg, $clean);
+        $loudest = $this->loudest($ffmpeg, $clean);
         $language = strtolower(trim((string) ($o['language'] ?? 'auto'))) ?: 'auto';
 
         return [
@@ -130,6 +187,8 @@ final class Transcriber
             'asked' => $language,
             'seconds' => round($seconds, 2),
             'pauses' => $pauses,
+            'speech_seconds' => round(self::speechSeconds($pauses, 0.0, $seconds), 2),
+            'loudest_db' => round($loudest, 1),
             'plan' => self::chunkPlan($pauses, $seconds),
             'n' => 0,
             'run' => ['usage' => ['input_tokens' => 0, 'audio_tokens' => 0, 'output_tokens' => 0, 'thinking_tokens' => 0],
@@ -169,7 +228,7 @@ final class Transcriber
             $speech = self::speechIn($state['pauses'], $from, $to);
             // Each sentence where it is heard to start (the words are not asked again, only the times);
             // shared out over the speech by its length when that answer does not hold together.
-            $starts = $this->alignStarts(self::ffmpeg(), $clean, $tmp, $from, $to, $sentences, $state['run']);
+            $starts = $this->alignStarts(self::ffmpeg(), $clean, $tmp, $from, $to, $sentences, (array) $state['pauses'], $speech, $state['run']);
             $onStarts = $starts !== null ? self::placeOnStarts($sentences, $starts, $speech, $from, $to) : null;
             $placed = $onStarts ?? self::placeOnSpeech($sentences, $speech, $from, $to);
             if ($onStarts !== null) {
@@ -466,59 +525,209 @@ final class Transcriber
     }
 
     /**
-     * When each sentence starts, heard by the model in the part's own audio: it is given the
-     * sentences already written (numbered, in order) and answers with times only, so the words
-     * cannot change or repeat. Seconds on the recording's clock, one for each sentence, or null
-     * when there is no usable answer (the caller then shares the sentences out by their length).
+     * When each sentence starts, heard by the model in short windows of the part's audio
+     * (timingWindows()): each window is sent with the sentences that may fall in it (where
+     * their length would put them, give or take a wide margin), numbered as in the part, and
+     * answers with the times of those that begin inside it. The words are not asked again, so
+     * they cannot change. The windows are asked at once; their answers are put together by
+     * startsFromClaims(). Seconds on the recording's clock, one for each sentence, or null when
+     * too few could be timed (the caller then shares the sentences out by their length).
      *
      * @param  array<int, array<string, mixed>>  $sentences  with 'text'
+     * @param  array<int, array{0: float, 1: float}>  $pauses
+     * @param  array<int, array{0: float, 1: float}>  $speech  where speech is heard in the part (speechIn())
      * @param  array<string, mixed>  $run  the run's counters, changed in place
      * @return array<int, float>|null
      */
-    private function alignStarts(string $ffmpeg, string $clean, string $tmp, float $from, float $to, array $sentences, array &$run): ?array
+    private function alignStarts(string $ffmpeg, string $clean, string $tmp, float $from, float $to, array $sentences, array $pauses, array $speech, array &$run): ?array
     {
-        if ($sentences === [] || $to - $from < 1.0) {
+        $sentences = array_values($sentences);
+        if (count($sentences) < 2 || $to - $from < 1.0) {
             return null;
         }
-        if (count($sentences) === 1) {
-            return null;
-        }
-        $audio = $tmp.'/align-'.(int) ($from * 100).'.mp3';
-        $lines = [];
-        foreach (array_values($sentences) as $i => $sentence) {
-            $lines[] = ($i + 1).'. '.trim((string) $sentence['text']);
-        }
-        $prompt = 'This audio is '.number_format($to - $from, 1, '.', '')." seconds long. These are the sentences spoken in it, in order:\n\n"
-            .implode("\n", $lines)
-            ."\n\nFor every sentence, give the time in seconds from the start of this audio (with one decimal) at which its first word begins to be spoken. "
-            .'The sentences are in order, so the times go up. Music, noise or silence before a sentence is not part of it. Answer for every number.';
-        try {
-            $this->cut($ffmpeg, $clean, $from, $to - $from, $audio);
-            $answer = $this->askModel([
-                ['inline_data' => ['mime_type' => 'audio/mpeg', 'data' => base64_encode((string) file_get_contents($audio))]],
-                ['text' => $prompt],
-            ], 'low', self::alignSchema());
-        } catch (\Throwable $e) {
-            $run['notes'][] = 'times: '.mb_substr($e->getMessage(), 0, 120);
+        // Where each sentence would start if the speech were shared out by length: only to choose
+        // which sentences each window is shown (the margin is wide, as that guess can be well off).
+        $rough = array_column(self::placeOnSpeech($sentences, $speech, $from, $to), 'start');
+        $margin = 25.0 + 0.1 * ($to - $from);
+        $windows = self::timingWindows($pauses, $from, $to);
+        $asks = [];
+        $shown = [];
+        foreach ($windows as $w => [$start, $end]) {
+            $length = $end - $start;
+            $heard = min($to, $end + 1.0) - $start;
+            $lines = [];
+            $shown[$w] = [];
+            foreach ($sentences as $i => $sentence) {
+                $at = (float) ($rough[$i] ?? $from);
+                if (count($windows) === 1 || ($at >= $start - $margin && $at <= $end + $margin)) {
+                    $shown[$w][] = $i;
+                    $lines[] = ($i + 1).'. '.trim((string) $sentence['text']);
+                }
+            }
+            if ($lines === []) {
+                continue;
+            }
+            $audio = $tmp.'/time-'.$w.'.mp3';
+            try {
+                $this->cut($ffmpeg, $clean, $start, $heard, $audio);
+            } catch (\Throwable $e) {
+                $run['notes'][] = 'times: '.mb_substr($e->getMessage(), 0, 120);
 
-            return null;
-        } finally {
+                continue;
+            }
+            $prompt = 'This audio is '.number_format($heard, 1, '.', '').' seconds long, cut from a longer recording. '
+                ."These are sentences of its transcript from around this point, numbered, in the order they are spoken; some of them are spoken before or after this audio:\n\n"
+                .implode("\n", $lines)
+                ."\n\nFor each of these sentences whose first word is spoken in this audio before "
+                .number_format($length, 1, '.', '').' seconds, give that time in seconds from the start of this audio, with one decimal. '
+                .'Leave out every sentence that is not heard beginning in that time: those spoken before or after it, and a sentence already under way when the audio opens. '
+                .'Music, noise or silence before a sentence is not part of it.';
+            $asks[$w] = [['inline_data' => ['mime_type' => 'audio/mpeg', 'data' => base64_encode((string) file_get_contents($audio))]], ['text' => $prompt]];
             @unlink($audio);
         }
-        $run['requests']++;
-        foreach ($answer['usage'] as $key => $tokens) {
-            $run['usage'][$key] = ($run['usage'][$key] ?? 0) + $tokens;
+        if ($asks === []) {
+            return null;
         }
-        $starts = [];
-        foreach ((array) ($answer['data']['sentences'] ?? []) as $row) {
-            if (is_array($row) && is_numeric($row['n'] ?? null) && is_numeric($row['start'] ?? null)) {
-                $starts[(int) $row['n'] - 1] = $from + (float) $row['start'];
+        $claims = [];
+        $answered = 0;
+        foreach ($this->askModelMany($asks, 'low', self::alignSchema()) as $w => $answer) {
+            if ($answer === null) {
+                continue;
+            }
+            $answered++;
+            $run['requests']++;
+            foreach ($answer['usage'] as $key => $tokens) {
+                $run['usage'][$key] = ($run['usage'][$key] ?? 0) + $tokens;
+            }
+            [$start, $end] = $windows[$w];
+            foreach ((array) ($answer['data']['sentences'] ?? []) as $row) {
+                $i = is_array($row) && is_numeric($row['n'] ?? null) ? (int) $row['n'] - 1 : -1;
+                $at = is_array($row) && is_numeric($row['start'] ?? null) ? (float) $row['start'] : -1.0;
+                // Only a sentence it was shown, beginning inside its own stretch.
+                if (in_array($i, $shown[$w], true) && $at >= 0 && $at <= $end - $start + 0.3) {
+                    $claims[] = ['i' => $i, 'at' => $start + $at, 'window' => $w];
+                }
             }
         }
-        if (count($starts) !== count($sentences)) {
-            $run['notes'][] = 'times: '.count($starts).' of '.count($sentences).' sentences';
+        $starts = self::startsFromClaims($claims, $sentences, $from, $to);
+        $timed = count(array_unique(array_column($claims, 'i')));
+        $run['notes'][] = 'times: '.count($windows).' window'.(count($windows) === 1 ? '' : 's').', '.$answered.' answered, '.$timed.' of '.count($sentences).' sentences heard';
 
+        return $starts;
+    }
+
+    /**
+     * The windows a part is timed in: about TIMING_WINDOW seconds each, cut in the pause
+     * nearest that (a longer pause preferred) between TIMING_WINDOW_MIN and TIMING_WINDOW_MAX,
+     * or at TIMING_WINDOW when there is none (music under the voice); end to end, from $from to $to.
+     *
+     * @param  array<int, array{0: float, 1: float}>  $pauses
+     * @return array<int, array{0: float, 1: float}>
+     */
+    public static function timingWindows(array $pauses, float $from, float $to): array
+    {
+        $windows = [];
+        $at = $from;
+        while ($to - $at > self::TIMING_WINDOW_MAX) {
+            $cut = null;
+            $best = INF;
+            foreach ($pauses as [$start, $end]) {
+                $middle = ($start + $end) / 2;
+                if ($middle < $at + self::TIMING_WINDOW_MIN || $middle > $at + self::TIMING_WINDOW_MAX || $middle >= $to - 5.0) {
+                    continue;
+                }
+                $score = abs($middle - ($at + self::TIMING_WINDOW)) - 4.0 * min(1.0, $end - $start);
+                if ($score < $best) {
+                    $best = $score;
+                    $cut = $middle;
+                }
+            }
+            $cut ??= $at + self::TIMING_WINDOW;
+            $windows[] = [round($at, 2), round($cut, 2)];
+            $at = $cut;
+        }
+        $windows[] = [round($at, 2), round($to, 2)];
+
+        return $windows;
+    }
+
+    /**
+     * The windows' answers put together: one start for each sentence, in order. A sentence
+     * claimed by two windows (it begins near the cut) keeps the earlier window's time (the
+     * later one may hear it already under way); claims out of order are dropped (the longest
+     * run in order is kept); a sentence left without a time is placed between the sentences
+     * either side of it, by its length. Null when fewer than half were timed.
+     *
+     * @param  array<int, array{i: int, at: float, window: int}>  $claims
+     * @param  array<int, array<string, mixed>>  $sentences  with 'text'
+     * @return array<int, float>|null
+     */
+    public static function startsFromClaims(array $claims, array $sentences, float $from, float $to): ?array
+    {
+        $sentences = array_values($sentences);
+        $n = count($sentences);
+        if ($n === 0) {
             return null;
+        }
+        usort($claims, fn ($a, $b) => [$a['window'], $a['at']] <=> [$b['window'], $b['at']]);
+        $time = [];
+        foreach ($claims as $c) {
+            $time[$c['i']] ??= (float) $c['at'];
+        }
+        ksort($time);
+        // The longest run of sentences whose times go up with them.
+        $keys = array_keys($time);
+        $length = [];
+        $before = [];
+        foreach ($keys as $a => $i) {
+            $length[$a] = 1;
+            $before[$a] = -1;
+            for ($b = 0; $b < $a; $b++) {
+                if ($time[$keys[$b]] <= $time[$i] + 0.05 && $length[$a] < $length[$b] + 1) {
+                    $length[$a] = $length[$b] + 1;
+                    $before[$a] = $b;
+                }
+            }
+        }
+        $kept = [];
+        if ($keys !== []) {
+            $a = (int) array_search(max($length), $length, true);
+            for (; $a >= 0; $a = $before[$a]) {
+                $kept[$keys[$a]] = $time[$keys[$a]];
+            }
+        }
+        if (count($kept) * 2 < $n) {
+            return null;
+        }
+        // The rest between their neighbours, by length.
+        $size = array_map(fn ($s) => max(1, mb_strlen(trim((string) ($s['text'] ?? '')))), $sentences);
+        $starts = [];
+        $i = 0;
+        while ($i < $n) {
+            if (isset($kept[$i])) {
+                $starts[$i] = $kept[$i];
+                $i++;
+
+                continue;
+            }
+            $j = $i;
+            while ($j < $n && ! isset($kept[$j])) {
+                $j++;
+            }
+            // Sentences $i..$j-1 have no time: they share the span from the one before (or the
+            // part's start) to the one after (or the part's end) with the one before, by length.
+            $left = $i > 0 ? $starts[$i - 1] : $from;
+            $right = $j < $n ? $kept[$j] : $to;
+            $first = $i > 0 ? $i - 1 : $i;
+            $total = array_sum(array_slice($size, $first, $j - $first));
+            $run = 0;
+            for ($k = $first; $k < $j; $k++) {
+                if ($k >= $i) {
+                    $starts[$k] = round($left + ($right - $left) * $run / max(1, $total), 2);
+                }
+                $run += $size[$k];
+            }
+            $i = $j;
         }
         ksort($starts);
 
@@ -834,6 +1043,38 @@ final class Transcriber
         return max(0.0, $to - $from - $quiet);
     }
 
+    /** Whether a recording made ready (prepare()) holds no voice: too little sound, or none loud enough. */
+    public static function heardNothing(array $state): bool
+    {
+        return (float) ($state['speech_seconds'] ?? self::LEAST_SPEECH_SECONDS) < self::LEAST_SPEECH_SECONDS
+            || (float) ($state['loudest_db'] ?? 0.0) < self::QUIETEST_VOICE_DB;
+    }
+
+    /** Whether a finished transcript (result()) holds no word at all: nothing, or only [inaudible]. */
+    public static function nothingWritten(array $result): bool
+    {
+        foreach ((array) ($result['paragraphs'] ?? []) as $p) {
+            $text = str_ireplace('[inaudible]', '', (string) ($p['text'] ?? ''));
+            if (preg_match('/[\p{L}\p{N}]/u', $text) === 1) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** The loudest moment of a recording in dB (0 at full scale; -120 for digital silence). */
+    public function loudest(string $ffmpeg, string $file): float
+    {
+        $p = new Process([$ffmpeg, '-hide_banner', '-nostats', '-i', $file, '-af', 'volumedetect', '-f', 'null', '-']);
+        $p->setTimeout(300)->run();
+        if (preg_match('/max_volume:\s*(-?inf|-?[\d.]+) dB/', $p->getErrorOutput(), $m) !== 1) {
+            return 0.0;
+        }
+
+        return str_contains($m[1], 'inf') ? -120.0 : (float) $m[1];
+    }
+
     /**
      * The answer's shape, so the model keeps to it: the language, the voices
      * (described, so later parts keep their letters), and the paragraphs with
@@ -1027,13 +1268,8 @@ final class Transcriber
      */
     private function askModel(array $parts, string $thinking, array $schema = []): array
     {
-        $base = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
-        $body = [
-            'contents' => [['role' => 'user', 'parts' => $parts]],
-            'generationConfig' => ['responseMimeType' => 'application/json', 'temperature' => 0]
-                + ($schema !== [] ? ['responseSchema' => $schema] : [])
-                + ($thinking !== '' ? ['thinkingConfig' => ['thinkingLevel' => $thinking]] : []),
-        ];
+        $base = self::endpoint();
+        $body = self::requestBody($parts, $thinking, $schema);
         $last = 'no key';
         foreach (VideoDubber::MODELS as $model) {
             foreach ($this->keys->keysInOrder($model) as $key) {
@@ -1057,22 +1293,103 @@ final class Transcriber
 
                     continue;
                 }
-                $raw = '';
-                foreach ((array) $response->json('candidates.0.content.parts', []) as $piece) {
-                    $raw .= is_array($piece) && empty($piece['thought']) ? (string) ($piece['text'] ?? '') : '';
-                }
-                $raw = trim((string) preg_replace('/^```(?:json)?|```$/m', '', $raw));
-                $data = json_decode($raw, true);
-                if (! is_array($data) && preg_match('/\{.*\}/s', $raw, $m) === 1) {
-                    $data = json_decode($m[0], true);
-                }
 
-                return ['data' => is_array($data) ? $data : null, 'raw' => mb_substr($raw, 0, 400), 'usage' => VideoDubber::usage((array) $response->json('usageMetadata')), 'model' => $model,
-                    'finish' => (string) ($response->json('candidates.0.finishReason') ?? $response->json('promptFeedback.blockReason') ?? '')];
+                return self::answerFrom($response, $model);
             }
         }
 
         throw new \RuntimeException('The speech could not be written out ('.$last.').');
+    }
+
+    /**
+     * Several requests to the text model at once (TIMING_AT_ONCE at a time), on the first model
+     * and its first key; any that does not come back is asked again on its own (askModel(): the
+     * other keys and models in turn). Its answer for each, by the same key, or null when none came.
+     *
+     * @param  array<int|string, array<int, array<string, mixed>>>  $asks  the parts of each request
+     * @param  array<string, mixed>  $schema
+     * @return array<int|string, array{data: ?array<string, mixed>, raw: string, usage: array<string, int>, model: string, finish: string}|null>
+     */
+    private function askModelMany(array $asks, string $thinking, array $schema = []): array
+    {
+        $answers = [];
+        $model = VideoDubber::MODELS[0] ?? null;
+        $key = $model !== null ? ($this->keys->keysInOrder($model)[0] ?? null) : null;
+        if ($key !== null) {
+            $url = self::endpoint().'/models/'.$model.':generateContent';
+            foreach (array_chunk(array_keys($asks), self::TIMING_AT_ONCE) as $batch) {
+                try {
+                    $responses = Http::pool(function (Pool $pool) use ($batch, $asks, $thinking, $schema, $key, $url): array {
+                        $sent = [];
+                        foreach ($batch as $name) {
+                            $sent[] = $pool->as((string) $name)->timeout(120)->withHeaders(['x-goog-api-key' => $key['key']])
+                                ->post($url, self::requestBody($asks[$name], $thinking, $schema));
+                        }
+
+                        return $sent;
+                    });
+                } catch (\Throwable) {
+                    $responses = [];
+                }
+                foreach ($batch as $name) {
+                    $response = $responses[(string) $name] ?? null;
+                    if ($response instanceof Response) {
+                        $this->keys->recordUsage($key['name']);
+                        if ($response->ok()) {
+                            $answers[$name] = self::answerFrom($response, $model);
+                        }
+                    }
+                }
+            }
+        }
+        foreach ($asks as $name => $parts) {
+            if (! array_key_exists($name, $answers)) {
+                try {
+                    $answers[$name] = $this->askModel($parts, $thinking, $schema);
+                } catch (\Throwable) {
+                    $answers[$name] = null;
+                }
+            }
+        }
+
+        return array_replace(array_fill_keys(array_keys($asks), null), $answers);
+    }
+
+    private static function endpoint(): string
+    {
+        return rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $parts
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>
+     */
+    private static function requestBody(array $parts, string $thinking, array $schema = []): array
+    {
+        return [
+            'contents' => [['role' => 'user', 'parts' => $parts]],
+            'generationConfig' => ['responseMimeType' => 'application/json', 'temperature' => 0]
+                + ($schema !== [] ? ['responseSchema' => $schema] : [])
+                + ($thinking !== '' ? ['thinkingConfig' => ['thinkingLevel' => $thinking]] : []),
+        ];
+    }
+
+    /** @return array{data: ?array<string, mixed>, raw: string, usage: array<string, int>, model: string, finish: string} */
+    private static function answerFrom(Response $response, string $model): array
+    {
+        $raw = '';
+        foreach ((array) $response->json('candidates.0.content.parts', []) as $piece) {
+            $raw .= is_array($piece) && empty($piece['thought']) ? (string) ($piece['text'] ?? '') : '';
+        }
+        $raw = trim((string) preg_replace('/^```(?:json)?|```$/m', '', $raw));
+        $data = json_decode($raw, true);
+        if (! is_array($data) && preg_match('/\{.*\}/s', $raw, $m) === 1) {
+            $data = json_decode($m[0], true);
+        }
+
+        return ['data' => is_array($data) ? $data : null, 'raw' => mb_substr($raw, 0, 400), 'usage' => VideoDubber::usage((array) $response->json('usageMetadata')), 'model' => $model,
+            'finish' => (string) ($response->json('candidates.0.finishReason') ?? $response->json('promptFeedback.blockReason') ?? '')];
     }
 
     /** Any audio (or a video's sound) as 16 kHz mono MP3: what the model hears, small to send. */

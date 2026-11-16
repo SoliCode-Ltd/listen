@@ -27,6 +27,9 @@ final class TranscriptionFlow
 {
     public const DISK = 'local';
 
+    /** A file up to this long is worked through at once, without waiting for a queue worker. */
+    public const RIGHT_AWAY_SECONDS = 180.0;
+
     /**
      * $meta: title, source (upload, record, url, api, mcp, demo), source_url,
      * language ('auto' or a code), dialect, api_key_id. The file at $path is
@@ -101,6 +104,12 @@ final class TranscriptionFlow
         $transcription->forceFill(['audio_path' => $source])->save();
 
         TranscribeJob::queueFor($transcription);
+        // A short file is worked through as soon as the answer has gone back, in this process,
+        // so it is not kept waiting for a queue worker (the queued job is its safety net).
+        if ((float) $transcription->seconds <= self::RIGHT_AWAY_SECONDS && config('queue.default') !== 'sync') {
+            $id = $transcription->id;
+            app()->terminating(fn () => TranscribeJob::runNow($id));
+        }
 
         return $transcription;
     }
