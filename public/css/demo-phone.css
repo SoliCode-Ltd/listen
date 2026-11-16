@@ -1,0 +1,69 @@
+/*
+ * Phones: the demo (/demo) on the studio's type scale (public/css/studio-phone.css), the one
+ * the Agents pages use too (public/css/agents-phone.css):
+ *
+ *   page title             1.4rem
+ *   heading                1.15rem      card title      1rem
+ *   text                   .9rem        list text       .88rem
+ *   labels                 .85rem       notes           .8rem
+ *   figures                1rem
+ *   main action            .95rem on a 44px button     other buttons .88rem
+ *
+ * Where the demo shows a part of the studio (the voice picker, the tags guide, Voice Design),
+ * it takes the size the studio gives that part on a phone, so the two read the same. The
+ * agent pane is inside .ag, so agents-phone.css (loaded with it) sizes its buttons and notes;
+ * the demo's own agent parts are below. Text fields keep their own sizes (16px, so phones do
+ * not zoom into them). Loaded last on the demo, and every rule starts at the demo's own
+ * blocks, so these win where both set a size.
+ */
+@media (max-width: 640px) {
+  /* ---------- The top of the page ---------- */
+  .studio-hero h1 { font-size: 1.4rem; line-height: 1.3; }
+  .studio-hero p { font-size: .9rem; line-height: 1.6; }
+  .studio-hero .studio-badge { font-size: .8rem; }
+
+  /* The switch between text to speech, Voice Design and the voice agent: the studio's card titles. */
+  .studio-workspace .studio-mode-text strong { font-size: .92rem; line-height: 1.4; }
+
+  /* ---------- Text to speech: as in the studio ---------- */
+  .studio-workspace .vs-pane-title,
+  .studio-workspace .vs-panel-head strong { font-size: 1rem; line-height: 1.4; }
+  .studio-workspace .vs-guide summary { font-size: .92rem; }
+  .studio-workspace .vs-guide li { font-size: .88rem; line-height: 1.65; }
+  .studio-workspace .vs-select-button,
+  .studio-workspace .vs-select-label,
+  .studio-workspace .vs-voice-jump-text strong { font-size: .92rem; }
+  .studio-workspace .vs-voice-name { font-size: .88rem; }
+  .studio-workspace .sample-chip { font-size: .88rem; }
+  .studio-workspace .sample-human-note,
+  .studio-workspace .sample-human-note strong,
+  .studio-workspace .sample-human-note span { font-size: .9rem; line-height: 1.6; }
+
+  /* The demo's allowance: a label, its figure and a note. */
+  .studio-workspace .quota-panel .q-label { font-size: .85rem; }
+  .studio-workspace .quota-panel .q-value { font-size: 1rem; }
+  .studio-workspace .quota-note { font-size: .8rem; line-height: 1.55; }
+
+  /* The main action. */
+  .studio-workspace .btn-generate { min-height: 44px; font-size: .95rem; }
+  .studio-workspace .btn-generate span { font-size: inherit; }
+
+  /* ---------- Voice Design: as in the studio ---------- */
+  .studio-workspace .vd-summary-row dd,
+  .studio-workspace .vd-tips-pop strong { font-size: .88rem; }
+  .studio-workspace .vd-actions .btn-primary { min-height: 44px; font-size: .95rem; font-weight: 700; }
+  .studio-workspace .vd-actions .btn-primary span { font-size: inherit; }
+
+  /* ---------- The voice agent: on the Agents pages' scale ---------- */
+  .demo-agent .demo-agent-head h2 { font-size: 1.15rem; line-height: 1.35; }
+  .demo-agent .demo-agent-head p { font-size: .9rem; line-height: 1.6; }
+  .demo-agent .demo-agent-picks legend,
+  .demo-agent .demo-agent-try p { font-size: .85rem; }
+  .demo-agent .demo-agent-pick-text b,
+  .demo-agent .demo-agent-biz { font-size: 1rem; line-height: 1.4; }
+  .demo-agent .demo-agent-pick-text small,
+  .demo-agent .demo-agent-left small { font-size: .8rem; }
+  .demo-agent .demo-agent-try li { font-size: .88rem; }
+  .demo-agent .demo-agent-left,
+  .demo-agent .demo-agent-left b { font-size: .9rem; }
+}

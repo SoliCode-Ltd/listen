@@ -14,7 +14,10 @@
   @if($demoAgent ?? null)
     <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/demo-agent.css') }}?v={{ filemtime(public_path('css/demo-agent.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/agents-phone.css') }}?v={{ filemtime(public_path('css/agents-phone.css')) }}">
   @endif
+  {{-- Phones: the studio's type scale, last so it wins (css/demo-phone.css). --}}
+  <link rel="stylesheet" href="{{ asset('css/demo-phone.css') }}?v={{ filemtime(public_path('css/demo-phone.css')) }}">
   <script>
     (() => {
       const saved = localStorage.getItem('listen_theme');
