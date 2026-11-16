@@ -337,7 +337,7 @@ final class TranscriptionSettings
     /** What a minute of audio costs Listen, for the admin's cost and margin figures. */
     public static function costPerMinute(): float
     {
-        $default = (float) config('listen.transcription.cost_per_minute', 0.0045);
+        $default = (float) config('listen.transcription.cost_per_minute', 0.0075);
         $value = (float) SiteSetting::get('transcription_cost_per_minute', $default);
 
         return $value > 0 ? $value : $default;

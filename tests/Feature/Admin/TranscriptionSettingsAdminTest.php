@@ -30,7 +30,7 @@ class TranscriptionSettingsAdminTest extends TestCase
         $this->assertCount(100, TranscriptionSettings::languages());
         $this->assertSame(['ar', 'de', 'en', 'es', 'fr', 'ur'], array_values(array_intersect(['ar', 'de', 'en', 'es', 'fr', 'ur'], array_keys(array_filter(TranscriptionSettings::LANGUAGES, fn ($l) => $l[2])))));
         $this->assertFalse(TranscriptionSettings::review());
-        $this->assertSame(0.0045, TranscriptionSettings::costPerMinute());
+        $this->assertSame(0.0075, TranscriptionSettings::costPerMinute());
         $this->assertTrue(TranscriptionSettings::visibleTo(VoiceCloningAccess::PREVIEW_EMAIL));
         $this->assertFalse(TranscriptionSettings::visibleTo('someone@example.com'));
     }

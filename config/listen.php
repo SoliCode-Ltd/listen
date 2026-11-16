@@ -217,7 +217,7 @@ return [
     'transcription' => [
         // What a minute of audio costs Listen, as measured on staging in November 2026 (transcribe:measure):
         // the words and speakers only ($0.0022), with the dialect guide in the question. For the admin's figures only.
-        'cost_per_minute' => (float) env('LISTEN_TRANSCRIBE_COST', 0.0045),
+        'cost_per_minute' => (float) env('LISTEN_TRANSCRIBE_COST', 0.0075),
         // The free try in the demo: one recording up to this long, and this many for the whole site a day.
         'free_try_seconds' => (int) env('LISTEN_TRANSCRIBE_FREE_SECONDS', 60),
         'free_per_day' => (int) env('LISTEN_TRANSCRIBE_FREE_PER_DAY', 50),

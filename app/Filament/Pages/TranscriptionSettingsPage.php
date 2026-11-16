@@ -135,7 +135,7 @@ class TranscriptionSettingsPage extends Page implements HasForms
                         TextInput::make('transcription_cost_per_minute')
                             ->label('Cost to Listen a minute of audio')
                             ->numeric()->minValue(0.0001)->maxValue(1)->step(0.0001)->prefix('$')->required()
-                            ->helperText('About $0.0045: $0.0025 measured on staging for writing out, plus about $0.002 for placing each sentence on the audio (twice the writing-out part with the second check on). Update it from the Google bill. For the admin\'s cost and margin figures only.'),
+                            ->helperText('About $0.0075: measured on staging for writing out (about $0.0025) plus placing each sentence where it is heard, window by window (about $0.005). More with the second check on. Update it from the Google bill. For the admin\'s cost and margin figures only.'),
                     ]),
             ])
             ->statePath('data');
