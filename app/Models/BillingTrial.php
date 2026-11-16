@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Services\Billing\CharPackService;
+use App\Services\Newsletter\PaidWelcomeEmail;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Log;
 
 class BillingTrial extends Model
 {
@@ -82,12 +85,12 @@ class BillingTrial extends Model
             }
             try {
                 $user = User::query()->find($trial->user_id);
-                $welcome = app(\App\Services\Newsletter\PaidWelcomeEmail::class);
+                $welcome = app(PaidWelcomeEmail::class);
                 if ($user && $welcome->isPaidMember($user)) {
                     $welcome->queueWelcome($user);
                 }
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Paid welcome email check failed on trial payment.', [
+                Log::warning('Paid welcome email check failed on trial payment.', [
                     'trial_id' => $trial->id,
                     'exception' => $e->getMessage(),
                 ]);
@@ -106,10 +109,10 @@ class BillingTrial extends Model
                     ->latest('id')
                     ->first();
                 if ($subscription) {
-                    app(\App\Services\Billing\CharPackService::class)->moveLeftoverToPlan($subscription);
+                    app(CharPackService::class)->moveLeftoverToPlan($subscription);
                 }
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Moving pack characters after the trial was paid failed.', [
+                Log::warning('Moving pack characters after the trial was paid failed.', [
                     'trial_id' => $trial->id,
                     'exception' => $e->getMessage(),
                 ]);

@@ -8,14 +8,15 @@ use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
 use App\Models\DesignedVoice;
 use App\Models\Plan;
-use App\Models\TtsLog;
 use App\Models\TextItem;
+use App\Models\TtsLog;
 use App\Models\UsageCounter;
 use App\Services\Api\ApiUsageMeter;
-use App\Services\GenerationErrorRecorder;
 use App\Services\Billing\CharPackService;
 use App\Services\Billing\MemberUsageMeter;
+use App\Services\GenerationErrorRecorder;
 use App\Services\PlanAccessService;
+use App\Services\Push\AppPush;
 use App\Services\TranslationService;
 use App\Services\Tts\GeminiKeysOutException;
 use App\Services\Tts\PremiumVoiceUnavailableException;
@@ -32,9 +33,9 @@ use App\Support\GenerationMessage;
 use App\Support\Pronunciations;
 use App\Support\SpeechText;
 use App\Support\UsageEstimator;
+use App\Support\VoiceCatalog;
 use App\Support\VoiceCloningAccess;
 use App\Support\VoiceDesign;
-use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -90,6 +91,7 @@ class GenerateAudioJob implements ShouldQueue
     ];
 
     public int $tries = 3;
+
     public int $timeout = 150;
 
     /** Time a voice made after the reply may take: the stuck-generation sweep fails one still running after 30 minutes anyway. */
@@ -98,9 +100,7 @@ class GenerateAudioJob implements ShouldQueue
     /** Memory a voice made after the reply may use: the longest texts are close to an hour of audio. */
     private const AFTER_RESPONSE_MEMORY = '1024M';
 
-    public function __construct(public int $audioGenerationId)
-    {
-    }
+    public function __construct(public int $audioGenerationId) {}
 
     /**
      * Texts this long are made after the reply (listen.audio.force_async_chars;
@@ -439,7 +439,7 @@ class GenerateAudioJob implements ShouldQueue
             }
 
             // The Listen app: "your voice is ready" for one that took a while. It never throws.
-            app(\App\Services\Push\AppPush::class)->voiceReady($generation);
+            app(AppPush::class)->voiceReady($generation);
         } catch (\Throwable $e) {
             $spend->stop();
             // A try that failed was still billed for the requests Google answered.

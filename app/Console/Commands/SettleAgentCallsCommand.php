@@ -2,7 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Models\SiteSetting;
 use App\Services\Agents\AgentCalls;
+use App\Services\Agents\AgentChats;
+use App\Support\Agents\AgentAccess;
+use App\Support\Agents\AgentVisits;
 use Illuminate\Console\Command;
 
 /**
@@ -16,10 +20,10 @@ class SettleAgentCallsCommand extends Command
 
     protected $description = 'Settle agent calls that went quiet';
 
-    public function handle(AgentCalls $calls, \App\Services\Agents\AgentChats $chats): int
+    public function handle(AgentCalls $calls, AgentChats $chats): int
     {
         // Nothing to settle before the agents tables exist (a deploy just ahead of its migration).
-        if (! \App\Support\Agents\AgentAccess::tablesReady()) {
+        if (! AgentAccess::tablesReady()) {
             return self::SUCCESS;
         }
         $settled = $calls->settleStale();
@@ -28,9 +32,9 @@ class SettleAgentCallsCommand extends Command
         }
         // Once: the conversations kept before visits were are joined into theirs (AgentVisits),
         // so the admin's list reads the same for last week as for today.
-        if (! \App\Models\SiteSetting::get('agents_visits_joined')) {
-            $joined = (int) rescue(fn () => \App\Support\Agents\AgentVisits::joinPast(), 0, true);
-            \App\Models\SiteSetting::set('agents_visits_joined', now()->toIso8601String(), 'agents');
+        if (! SiteSetting::get('agents_visits_joined')) {
+            $joined = (int) rescue(fn () => AgentVisits::joinPast(), 0, true);
+            SiteSetting::set('agents_visits_joined', now()->toIso8601String(), 'agents');
             $this->info("Joined {$joined} conversation(s) into their visits.");
         }
         // Written chats nobody wrote in for a while: closed, their unused credits given back.

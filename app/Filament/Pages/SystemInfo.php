@@ -7,9 +7,9 @@ use Filament\Pages\Page;
 
 class SystemInfo extends Page
 {
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-server-stack';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-server-stack';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'System';
+    protected static string|\UnitEnum|null $navigationGroup = 'System';
 
     protected static ?int $navigationSort = 4;
 
@@ -32,8 +32,8 @@ class SystemInfo extends Page
             ],
             'database' => [
                 'Driver' => config('database.default'),
-                'Database' => config('database.connections.' . config('database.default') . '.database'),
-                'Host' => config('database.connections.' . config('database.default') . '.host', 'N/A'),
+                'Database' => config('database.connections.'.config('database.default').'.database'),
+                'Host' => config('database.connections.'.config('database.default').'.host', 'N/A'),
             ],
             'infrastructure' => [
                 'Queue Connection' => config('queue.default'),

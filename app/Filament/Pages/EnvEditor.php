@@ -2,32 +2,31 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Utilities\Get;
+use App\Support\EnvFile;
 use Filament\Actions\Action;
-use Throwable;
-use Filament\Forms;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use App\Support\EnvFile;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Throwable;
 
 class EnvEditor extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-document-magnifying-glass';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-magnifying-glass';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'System';
+    protected static string|\UnitEnum|null $navigationGroup = 'System';
 
     protected static ?int $navigationSort = 3;
 
@@ -52,7 +51,7 @@ class EnvEditor extends Page implements HasForms
     public function mount(): void
     {
         // Only admins can access the env editor
-        if (!auth()->user()?->is_admin) {
+        if (! auth()->user()?->is_admin) {
             abort(403, 'Only admins can access the environment editor.');
         }
 
@@ -111,11 +110,12 @@ class EnvEditor extends Page implements HasForms
 
     public function save(): void
     {
-        if (!auth()->user()?->is_admin) {
+        if (! auth()->user()?->is_admin) {
             Notification::make()
                 ->title('Only admins can edit environment variables')
                 ->danger()
                 ->send();
+
             return;
         }
 
@@ -244,7 +244,7 @@ class EnvEditor extends Page implements HasForms
     protected function parseEnv(): array
     {
         $envPath = $this->envPath();
-        if (!File::exists($envPath)) {
+        if (! File::exists($envPath)) {
             return [];
         }
 
@@ -285,6 +285,7 @@ class EnvEditor extends Page implements HasForms
                 return true;
             }
         }
+
         return false;
     }
 }

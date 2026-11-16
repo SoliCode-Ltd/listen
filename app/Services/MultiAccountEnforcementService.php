@@ -17,17 +17,18 @@ class MultiAccountEnforcementService
     public const BLOCK_REASON_EN = 'Your account has been suspended because multiple accounts were created on the same device.';
 
     public const BLOCK_REASON_AR = 'تم تعليق حسابك بسبب إنشاء حسابات متعددة على نفس الجهاز.';
+
     public const EVASION_REASON_EN = 'Your account has been suspended because it was created after another account on this device was suspended.';
 
     public const EVASION_REASON_AR = 'تم تعليق حسابك لأنه أُنشئ بعد إيقاف حساب آخر على نفس الجهاز.';
 
     public const BLOCK_REASON_EN_SETTING_KEY = 'multi_account_block_reason_en';
+
     public const BLOCK_REASON_AR_SETTING_KEY = 'multi_account_block_reason_ar';
 
     public function __construct(
         private readonly BlockedUserService $blockedUserService,
-    ) {
-    }
+    ) {}
 
     /**
      * Check if the given user exceeds the max linked-account limit and

@@ -2,38 +2,36 @@
 
 namespace App\Filament\Resources;
 
-use Illuminate\Auth\Access\Response as AccessResponse;
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Actions\ViewAction;
-use Filament\Actions\Action;
+use App\Filament\Resources\BillingTrialResource\Pages;
 use App\Filament\Resources\BillingTrialResource\Pages\ListBillingTrials;
 use App\Filament\Resources\BillingTrialResource\Pages\ViewBillingTrial;
-use App\Filament\Resources\BillingTrialResource\Pages;
 use App\Filament\Widgets\TrialOutcomeStats;
 use App\Models\BillingTrial;
 use App\Services\Billing\TrialSubscriptionService;
+use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
-use Filament\Forms;
-use Illuminate\Database\Eloquent\Model;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Illuminate\Database\Eloquent\Model;
 
 class BillingTrialResource extends Resource
 {
     protected static ?string $model = BillingTrial::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-clock';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clock';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
+    protected static string|\UnitEnum|null $navigationGroup = 'Billing';
 
     protected static ?string $navigationLabel = 'Trials';
 

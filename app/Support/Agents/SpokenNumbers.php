@@ -84,7 +84,9 @@ final class SpokenNumbers
                 preg_match_all('/(?:(double|triple)\s+)?\b(zero|oh|one|two|three|four|five|six|seven|eight|nine)\b/i', $group, $parts, PREG_SET_ORDER);
                 foreach ($parts as $p) {
                     $d = self::EN[strtolower($p[2])];
-                    $digits .= str_repeat($d, match (strtolower($p[1] ?? '')) { 'double' => 2, 'triple' => 3, default => 1 });
+                    $digits .= str_repeat($d, match (strtolower($p[1] ?? '')) {
+                        'double' => 2, 'triple' => 3, default => 1
+                    });
                 }
                 $out[] = $digits;
             }

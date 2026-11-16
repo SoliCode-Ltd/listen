@@ -41,14 +41,9 @@ final class TranscriptionAccess
         return self::planIncludes($plan) ? max(1, (int) $plan->transcription_concurrent_jobs) : 0;
     }
 
-    /**
-     * What a minute of audio costs Listen on this plan when every transcript
-     * uses the most the plan allows (timings or speakers cost more than plain text).
-     */
-    public static function costPerMinute(?Plan $plan): float
+    /** What a minute of audio costs Listen (the same transcript on every plan). */
+    public static function costPerMinute(): float
     {
-        $timed = $plan !== null && ((bool) $plan->transcription_timestamps || (bool) $plan->transcription_speakers);
-
-        return TranscriptionSettings::costPerMinute($timed ? 'timed' : 'plain');
+        return TranscriptionSettings::costPerMinute();
     }
 }

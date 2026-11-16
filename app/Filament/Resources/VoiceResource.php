@@ -2,38 +2,35 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\TagsInput;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Actions\ViewAction;
-use Filament\Actions\EditAction;
+use App\Filament\Resources\VoiceResource\Pages\CreateVoice;
+use App\Filament\Resources\VoiceResource\Pages\EditVoice;
+use App\Filament\Resources\VoiceResource\Pages\ListVoices;
+use App\Filament\Resources\VoiceResource\Pages\ViewVoice;
+use App\Models\Voice;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
-use App\Filament\Resources\VoiceResource\Pages\ListVoices;
-use App\Filament\Resources\VoiceResource\Pages\CreateVoice;
-use App\Filament\Resources\VoiceResource\Pages\ViewVoice;
-use App\Filament\Resources\VoiceResource\Pages\EditVoice;
-use App\Filament\Resources\VoiceResource\Pages;
-use App\Models\Voice;
-use Filament\Forms;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class VoiceResource extends Resource
 {
     protected static ?string $model = Voice::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-speaker-wave';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-speaker-wave';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Content';
+    protected static string|\UnitEnum|null $navigationGroup = 'Content';
 
     protected static ?int $navigationSort = 3;
 

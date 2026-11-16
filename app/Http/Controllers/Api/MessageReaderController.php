@@ -5,28 +5,32 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
+use App\Models\ClonedVoice;
+use App\Models\Plan;
 use App\Models\User;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\Api\ApiSpeechService;
 use App\Services\AudioGenerationRecorder;
 use App\Services\Billing\MemberUsageMeter;
-use App\Services\BlockedUserService;
 use App\Services\BillingSyncService;
+use App\Services\BlockedUserService;
 use App\Services\PlanAccessService;
-use App\Models\ClonedVoice;
+use App\Services\ProfanityFilter;
 use App\Support\AudioFormats;
 use App\Support\AudioUrl;
 use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\DialogueSpeakers;
+use App\Support\GeminiVocalTags;
 use App\Support\GenerationMessage;
 use App\Support\PlanUsageGuard;
-use App\Support\VoiceCloningAccess;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\UsageSnapshot;
 use App\Support\VoiceCatalog;
+use App\Support\VoiceCloningAccess;
 use App\Support\VoiceTier;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -151,8 +155,8 @@ class MessageReaderController extends Controller
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
-            'content' => ['nullable', 'string', 'max:50000', 'required_without:text', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
-            'text' => ['nullable', 'string', 'max:50000', 'required_without:content', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
+            'content' => ['nullable', 'string', 'max:50000', 'required_without:text', new DoesNotContainProfanity(app(ProfanityFilter::class))],
+            'text' => ['nullable', 'string', 'max:50000', 'required_without:content', new DoesNotContainProfanity(app(ProfanityFilter::class))],
             'target_language' => ['required', 'in:ar,en'],
             'voice_key' => ['nullable', 'string', 'max:60'],
             'voice_name' => ['nullable', 'string', 'max:120'],
@@ -209,7 +213,7 @@ class MessageReaderController extends Controller
 
         $text = trim((string) ($validated['content'] ?? $validated['text'] ?? ''));
         // Moods and sounds go with words: a script of tags alone has nothing to speak.
-        if (! \App\Support\GeminiVocalTags::hasWords($text)) {
+        if (! GeminiVocalTags::hasWords($text)) {
             throw ValidationException::withMessages(['content' => __('ui.backend.dashboard_text_needs_words')]);
         }
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
@@ -354,7 +358,7 @@ class MessageReaderController extends Controller
      *
      * @param  array{chars:int,words:int,seconds:int,minutes:int,credits:int}  $estimate
      */
-    private function queueReply(User $user, ?\App\Models\Plan $quotaPlan, AudioGeneration $job, array $estimate): \Illuminate\Http\JsonResponse
+    private function queueReply(User $user, ?Plan $quotaPlan, AudioGeneration $job, array $estimate): JsonResponse
     {
         $isFailed = $job->status === 'failed';
         $counter = CreditPeriod::counter((int) $user->id);
@@ -531,7 +535,7 @@ class MessageReaderController extends Controller
      * @param  array{dialect:mixed,emotion:mixed,performance_style:mixed,style_prompt:mixed,speed:mixed,pitch:mixed}  $options
      * @return array{dialect:?string,emotion:string,performance_style:?string,style_prompt:?string,speed:float,pitch:float}
      */
-    private function sanitizeStudioOptionsForTier(string $tier, array $options, ?\App\Models\Plan $plan = null): array
+    private function sanitizeStudioOptionsForTier(string $tier, array $options, ?Plan $plan = null): array
     {
         $normalizedTier = VoiceTier::normalize($tier);
 
@@ -576,7 +580,7 @@ class MessageReaderController extends Controller
     }
 
     /** The plan's text limit per voice, never above what the request validation accepts. */
-    private static function maxCharsPerRequest(?\App\Models\Plan $plan): int
+    private static function maxCharsPerRequest(?Plan $plan): int
     {
         return min(PlanUsageGuard::maxCharsPerRequest($plan), 50000);
     }
@@ -595,7 +599,7 @@ class MessageReaderController extends Controller
      *
      * @return array<int, array{key:string, label:string}>
      */
-    private function clonedVoicesFor(User $user, ?\App\Models\Plan $plan): array
+    private function clonedVoicesFor(User $user, ?Plan $plan): array
     {
         if (! VoiceCloningAccess::allows($user, $plan)) {
             return [];
@@ -606,7 +610,7 @@ class MessageReaderController extends Controller
             ->values()->all();
     }
 
-    private function clonedVoiceName(User $user, ?\App\Models\Plan $plan, string $voiceKey): string
+    private function clonedVoiceName(User $user, ?Plan $plan, string $voiceKey): string
     {
         if (! VoiceCloningAccess::allows($user, $plan)) {
             throw ValidationException::withMessages(['voice_key' => __('ui.backend.dashboard_speaker_not_available')]);

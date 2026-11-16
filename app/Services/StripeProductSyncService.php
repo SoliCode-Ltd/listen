@@ -39,7 +39,8 @@ class StripeProductSyncService
     public function isConfigured(): bool
     {
         $secret = trim((string) config('services.stripe.secret', ''));
-        return $secret !== '' && !str_starts_with($secret, 'sk_test_xxx');
+
+        return $secret !== '' && ! str_starts_with($secret, 'sk_test_xxx');
     }
 
     /**
@@ -50,6 +51,7 @@ class StripeProductSyncService
         if ($this->stripe === null) {
             $this->stripe = new StripeClient(config('services.stripe.secret'));
         }
+
         return $this->stripe;
     }
 
@@ -58,12 +60,11 @@ class StripeProductSyncService
      * Off the live site nothing is changed in Stripe: the result is not a
      * success and says "skipped" (skipped => true).
      *
-     * @param Plan $plan
      * @return array{success: bool, message: string, skipped?: bool, product_id?: string, price_monthly?: string, price_yearly?: string}
      */
     public function syncPlan(Plan $plan): array
     {
-        if (!$this->isConfigured()) {
+        if (! $this->isConfigured()) {
             return [
                 'success' => false,
                 'message' => 'Stripe is not configured. Set STRIPE_SECRET in .env.',
@@ -150,7 +151,7 @@ class StripeProductSyncService
 
             return [
                 'success' => false,
-                'message' => 'Stripe API error: ' . $e->getMessage(),
+                'message' => 'Stripe API error: '.$e->getMessage(),
             ];
         }
     }
@@ -166,7 +167,7 @@ class StripeProductSyncService
         ];
 
         // If product exists, update it
-        if (!empty($plan->stripe_product_id)) {
+        if (! empty($plan->stripe_product_id)) {
             try {
                 $stripe->products->update($plan->stripe_product_id, [
                     'name' => $this->productName($plan),
@@ -175,6 +176,7 @@ class StripeProductSyncService
                     'metadata' => $metadata,
                     'active' => $plan->is_active,
                 ]);
+
                 return $plan->stripe_product_id;
             } catch (ApiErrorException $e) {
                 // Product might not exist, create new
@@ -200,6 +202,7 @@ class StripeProductSyncService
                 'metadata' => $metadata,
                 'active' => $plan->is_active,
             ]);
+
             return $productId;
         }
 
@@ -222,7 +225,7 @@ class StripeProductSyncService
     {
         $name = trim((string) $plan->name);
 
-        return str_starts_with(strtolower($name), 'listen') ? $name : 'Listen ' . $name;
+        return str_starts_with(strtolower($name), 'listen') ? $name : 'Listen '.$name;
     }
 
     /**
@@ -249,7 +252,7 @@ class StripeProductSyncService
         ];
 
         // Check if existing price matches
-        if (!empty($existingPriceId)) {
+        if (! empty($existingPriceId)) {
             try {
                 $existingPrice = $stripe->prices->retrieve($existingPriceId);
                 if ($existingPrice->unit_amount === $priceCents && $existingPrice->active) {
@@ -316,13 +319,14 @@ class StripeProductSyncService
                     ]);
                 }
             }
+
             return null;
         }
 
         $duration = $plan->stripeCouponDuration();
         $couponData = $duration + [
             'percent_off' => (float) $plan->discount_percentage,
-            'name' => $plan->name . ' - ' . $plan->discount_percentage . '% Off',
+            'name' => $plan->name.' - '.$plan->discount_percentage.'% Off',
             'metadata' => [
                 'listen_plan_slug' => $plan->slug,
                 'listen_plan_id' => (string) $plan->id,
@@ -354,13 +358,14 @@ class StripeProductSyncService
 
         // Create new coupon
         // A first-payment coupon keeps the original id; other durations get their own.
-        $couponData['id'] = 'listen_' . $plan->slug . '_discount_' . $plan->discount_percentage . match ($duration['duration']) {
-            'repeating' => '_m' . $duration['duration_in_months'],
+        $couponData['id'] = 'listen_'.$plan->slug.'_discount_'.$plan->discount_percentage.match ($duration['duration']) {
+            'repeating' => '_m'.$duration['duration_in_months'],
             'forever' => '_forever',
             default => '',
         };
         try {
             $coupon = $stripe->coupons->create($couponData);
+
             return $coupon->id;
         } catch (ApiErrorException $e) {
             // Coupon with this ID may already exist, try retrieving it
@@ -368,12 +373,14 @@ class StripeProductSyncService
                 try {
                     $stripe->coupons->delete($couponData['id']);
                     $coupon = $stripe->coupons->create($couponData);
+
                     return $coupon->id;
                 } catch (ApiErrorException $innerE) {
                     Log::error('Failed to recreate Stripe coupon', [
                         'plan_slug' => $plan->slug,
                         'error' => $innerE->getMessage(),
                     ]);
+
                     return null;
                 }
             }
@@ -381,6 +388,7 @@ class StripeProductSyncService
                 'plan_slug' => $plan->slug,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -405,7 +413,7 @@ class StripeProductSyncService
         $features = [];
 
         if ($plan->monthly_chars > 0) {
-            $features[] = number_format($plan->monthly_chars) . ' characters/month';
+            $features[] = number_format($plan->monthly_chars).' characters/month';
         }
 
         if ($plan->voice_tier === 'hd') {
@@ -459,15 +467,14 @@ class StripeProductSyncService
     /**
      * Get the price ID for a plan and billing cycle.
      *
-     * @param Plan $plan
-     * @param string $cycle 'monthly' or 'yearly'
-     * @return string|null
+     * @param  string  $cycle  'monthly' or 'yearly'
      */
     public function getPriceId(Plan $plan, string $cycle): ?string
     {
         if ($cycle === 'yearly') {
             return $plan->stripe_price_yearly;
         }
+
         return $plan->stripe_price_monthly;
     }
 }

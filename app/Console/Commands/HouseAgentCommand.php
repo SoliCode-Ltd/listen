@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Agent;
+use App\Models\AgentWidget;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Support\Agents\AgentVoices;
@@ -85,7 +86,7 @@ class HouseAgentCommand extends Command
             $widget->forceFill([
                 // Opposite the WhatsApp button, and only on Listen's own website.
                 'appearance' => array_merge($widget->appearance ?? [], ['position' => 'start']),
-                'allowed_origins' => array_values(array_filter([\App\Models\AgentWidget::normalizeOrigin(url('/'))])),
+                'allowed_origins' => array_values(array_filter([AgentWidget::normalizeOrigin(url('/'))])),
                 'enabled' => true,
                 'link_enabled' => true,
             ])->save();

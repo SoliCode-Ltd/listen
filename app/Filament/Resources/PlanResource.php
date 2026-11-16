@@ -21,7 +21,6 @@ use App\Support\DiscountTerms;
 use App\Support\PlanCostEstimate;
 use App\Support\PlanPricingLines;
 use App\Support\Transcription\TranscriptionAccess;
-use App\Support\Transcription\TranscriptionSettings;
 use App\Support\VoiceDesign;
 use Carbon\Carbon;
 use Exception;
@@ -617,7 +616,7 @@ class PlanResource extends Resource
                             ->visible(fn (Get $get): bool => (bool) $get('agents_enabled')),
                     ]),
                 Section::make('Transcribe (speech to text)')
-                    ->description('Members on this plan turn recordings into text: on the page, through the API (where the plan has API access) and through the MCP server. Minutes come from this plan only: there are no packs or top-ups. A member whose minutes run out, or whose file is longer than the plan takes, is shown the next plan up that fits. The site\'s own limits (who sees it, the free try, the daily ceiling, how long audio is kept, the languages) are in Transcribe → Settings.')
+                    ->description('Members on this plan turn recordings into text: on the page, through the API (where the plan has API access) and through the MCP server. Every plan that includes it gets the same transcript: paragraphs with who said them, every download (text, Word, subtitles) and translation. Minutes come from this plan only: there are no packs or top-ups. A member whose minutes run out, or whose file is longer than the plan takes, is shown the next plan up that fits. The site\'s own limits (who sees it, the free try, the daily ceiling, how long audio is kept, the languages) are in Transcribe → Settings.')
                     ->columns(2)
                     ->visible(fn (): bool => TranscriptionAccess::planColumns())
                     ->schema([
@@ -649,21 +648,6 @@ class PlanResource extends Resource
                         Toggle::make('transcription_priority')
                             ->label('Priority queue')
                             ->helperText('Its files are worked on before those of plans without it.')
-                            ->default(false)
-                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
-                        Toggle::make('transcription_timestamps')
-                            ->label('Timings, and SRT/VTT subtitles')
-                            ->default(false)
-                            ->live()
-                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
-                        Toggle::make('transcription_speakers')
-                            ->label('Speaker names')
-                            ->default(false)
-                            ->live()
-                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
-                        Toggle::make('transcription_translate')
-                            ->label('Translate the transcript')
-                            ->helperText('Costs the member no minutes.')
                             ->default(false)
                             ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
                         Placeholder::make('transcription_cost')
@@ -1063,8 +1047,7 @@ class PlanResource extends Resource
     private static function transcriptionEconomics(Get $get): HtmlString
     {
         $minutes = max(0, (int) $get('transcription_minutes_month'));
-        $timed = (bool) $get('transcription_timestamps') || (bool) $get('transcription_speakers');
-        $perMinute = TranscriptionSettings::costPerMinute($timed ? 'timed' : 'plain');
+        $perMinute = TranscriptionAccess::costPerMinute();
         $price = max(0.0, (float) ($get('price_dollars') ?? 0));
         $discount = max(0, min(100, (int) ($get('discount_percentage') ?? 0)));
         $full = $minutes * $perMinute;
@@ -1072,7 +1055,7 @@ class PlanResource extends Resource
         $share = fn (float $of): string => $of > 0 ? number_format($full / $of * 100, 1).'%' : '—';
 
         $lines = [
-            sprintf('A minute of audio costs Listen about <b>%s</b> %s (Transcribe → Settings).', $money($perMinute), $timed ? 'with timings or speaker names' : 'as plain text'),
+            sprintf('A minute of audio costs Listen about <b>%s</b> (Transcribe → Settings).', $money($perMinute)),
             sprintf('If every minute is used: about <b>%s</b> a month, <b>%s</b> of the %s price%s.', $money($full), $share($price), $money($price),
                 $discount > 0 ? sprintf(', <b>%s</b> of the offer price (%s, %d%% off)', $share($price * (100 - $discount) / 100), $money($price * (100 - $discount) / 100), $discount) : ''),
         ];

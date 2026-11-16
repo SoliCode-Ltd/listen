@@ -2,9 +2,8 @@
 
 namespace App\Filament\Resources\TextItemResource\Pages;
 
-use Filament\Actions\EditAction;
 use App\Filament\Resources\TextItemResource;
-use Filament\Actions;
+use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewTextItem extends ViewRecord

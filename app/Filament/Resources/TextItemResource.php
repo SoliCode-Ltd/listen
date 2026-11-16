@@ -2,26 +2,23 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Textarea;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\ViewAction;
-use Filament\Actions\EditAction;
+use App\Filament\Resources\TextItemResource\Pages\CreateTextItem;
+use App\Filament\Resources\TextItemResource\Pages\EditTextItem;
+use App\Filament\Resources\TextItemResource\Pages\ListTextItems;
+use App\Filament\Resources\TextItemResource\Pages\ViewTextItem;
+use App\Models\TextItem;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
-use App\Filament\Resources\TextItemResource\Pages\ListTextItems;
-use App\Filament\Resources\TextItemResource\Pages\CreateTextItem;
-use App\Filament\Resources\TextItemResource\Pages\ViewTextItem;
-use App\Filament\Resources\TextItemResource\Pages\EditTextItem;
-use App\Filament\Resources\TextItemResource\Pages;
-use App\Models\TextItem;
-use Filament\Forms;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -31,9 +28,9 @@ class TextItemResource extends Resource
 {
     protected static ?string $model = TextItem::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-document-text';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Content';
+    protected static string|\UnitEnum|null $navigationGroup = 'Content';
 
     protected static ?int $navigationSort = 4;
 

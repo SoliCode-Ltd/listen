@@ -3,8 +3,6 @@
 namespace App\Filament\Pages;
 
 use App\Services\Tts\GeminiKeyManager;
-use Filament\Actions\Action;
-use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
@@ -14,9 +12,9 @@ class GeminiKeys extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-key';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'System';
+    protected static string|\UnitEnum|null $navigationGroup = 'System';
 
     protected static ?int $navigationSort = 4;
 
@@ -28,7 +26,7 @@ class GeminiKeys extends Page implements HasForms
 
     public function mount(): void
     {
-        if (!auth()->user()?->is_admin) {
+        if (! auth()->user()?->is_admin) {
             abort(403, 'Only admins can access this page.');
         }
     }
@@ -47,12 +45,13 @@ class GeminiKeys extends Page implements HasForms
     public function addKey(): void
     {
         $key = trim($this->newApiKey);
-        
+
         if (empty($key)) {
             Notification::make()
                 ->title('Please enter an API key')
                 ->warning()
                 ->send();
+
             return;
         }
 
@@ -64,6 +63,7 @@ class GeminiKeys extends Page implements HasForms
                 ->body($check['message'])
                 ->danger()
                 ->send();
+
             return;
         }
 
@@ -85,7 +85,7 @@ class GeminiKeys extends Page implements HasForms
     public function removeKey(string $keyName): void
     {
         $manager = app(GeminiKeyManager::class);
-        
+
         // Don't allow removing the last key
         $keys = $manager->getAllKeys();
         if (count($keys) <= 1) {
@@ -94,6 +94,7 @@ class GeminiKeys extends Page implements HasForms
                 ->body('You must have at least one API key configured.')
                 ->danger()
                 ->send();
+
             return;
         }
 
@@ -128,6 +129,7 @@ class GeminiKeys extends Page implements HasForms
         if ($limit <= 0) {
             return 0;
         }
+
         return min(100, (int) round(($used / $limit) * 100));
     }
 
@@ -142,6 +144,7 @@ class GeminiKeys extends Page implements HasForms
         if ($percentage >= 70) {
             return 'warning';
         }
+
         return 'success';
     }
 }

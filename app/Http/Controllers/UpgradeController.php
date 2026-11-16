@@ -12,8 +12,7 @@ class UpgradeController extends Controller
 {
     public function __construct(
         private readonly PlanAccessService $planAccessService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {

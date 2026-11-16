@@ -55,7 +55,8 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
 
         try {
             $credentials = $this->loadGoogleCredentials();
-            return !empty($credentials['client_email']) && !empty($credentials['private_key']);
+
+            return ! empty($credentials['client_email']) && ! empty($credentials['private_key']);
         } catch (\Throwable) {
             return false;
         }
@@ -103,7 +104,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
         }
 
         // Chirp voices (chirp, chirp3, chirp2) don't support pitch parameters
-        $supportsProsodicParams = !$this->isChirpVoice($voiceName);
+        $supportsProsodicParams = ! $this->isChirpVoice($voiceName);
         $audioConfig = [
             'audioEncoding' => $encoding,
             'speakingRate' => max(0.25, min(4.0, $speed)),
@@ -276,7 +277,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
         $packaged = ['path' => $joined['path'], 'extension' => 'wav'];
         try {
             $packaged = ShareableAudio::packageFile($joined['path'], $joined['pieces']);
-            $filename = 'audio/' . now()->format('Ymd_His') . '_' . Str::random(12) . '.' . $packaged['extension'];
+            $filename = 'audio/'.now()->format('Ymd_His').'_'.Str::random(12).'.'.$packaged['extension'];
             ShareableAudio::store($packaged['path'], $filename);
 
             return $filename;
@@ -297,10 +298,10 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             $binary .= $piece;
         }
 
-        $filename = 'audio/' . now()->format('Ymd_His') . '_' . Str::random(12) . '.mp3';
+        $filename = 'audio/'.now()->format('Ymd_His').'_'.Str::random(12).'.mp3';
         $disk = Storage::disk('public');
 
-        if (!$disk->exists('audio')) {
+        if (! $disk->exists('audio')) {
             $disk->makeDirectory('audio');
         }
 
@@ -381,7 +382,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
         if ($apiKey !== '') {
             // Header, not ?key=, so the key never shows up in cURL errors and logs.
             $response = $this->sendWithSslFallback(
-                fn(bool $verify) => Http::timeout($timeout)
+                fn (bool $verify) => Http::timeout($timeout)
                     ->withOptions(['verify' => $verify])
                     ->withHeaders(['X-Goog-Api-Key' => $apiKey])
                     ->post($endpoint, $payload),
@@ -390,7 +391,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             );
         } else {
             $response = $this->sendWithSslFallback(
-                fn(bool $verify) => Http::timeout($timeout)
+                fn (bool $verify) => Http::timeout($timeout)
                     ->withOptions(['verify' => $verify])
                     ->withToken($this->getGoogleAccessToken())
                     ->post($endpoint, $payload),
@@ -399,13 +400,13 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             );
         }
 
-        if (!$response->ok()) {
-            throw new \RuntimeException('Speech request failed: ' . $response->body());
+        if (! $response->ok()) {
+            throw new \RuntimeException('Speech request failed: '.$response->body());
         }
 
         $json = $response->json();
         $audioContent = is_array($json) ? ($json['audioContent'] ?? null) : null;
-        if (!is_string($audioContent) || $audioContent === '') {
+        if (! is_string($audioContent) || $audioContent === '') {
             throw new \RuntimeException('Speech service returned empty audio payload.');
         }
 
@@ -639,7 +640,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             throw new \RuntimeException('Missing speech service credentials.');
         }
 
-        $cacheKey = 'listen:google_tts_token:' . sha1($clientEmail);
+        $cacheKey = 'listen:google_tts_token:'.sha1($clientEmail);
 
         return Cache::remember($cacheKey, now()->addMinutes(50), function () use ($clientEmail, $privateKey) {
             $tokenUri = (string) config('services.google_tts.token_uri', 'https://oauth2.googleapis.com/token');
@@ -659,17 +660,17 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
                 'iat' => $now,
             ], JSON_THROW_ON_ERROR));
 
-            $unsigned = $header . '.' . $claims;
+            $unsigned = $header.'.'.$claims;
             $signature = '';
             $ok = openssl_sign($unsigned, $signature, $privateKey, OPENSSL_ALGO_SHA256);
-            if (!$ok) {
+            if (! $ok) {
                 throw new \RuntimeException('Unable to sign OAuth JWT assertion.');
             }
 
-            $assertion = $unsigned . '.' . $this->base64UrlEncode($signature);
+            $assertion = $unsigned.'.'.$this->base64UrlEncode($signature);
 
             $response = $this->sendWithSslFallback(
-                fn(bool $verify) => Http::asForm()
+                fn (bool $verify) => Http::asForm()
                     ->timeout(15)
                     ->withOptions(['verify' => $verify])
                     ->post($tokenUri, [
@@ -680,12 +681,12 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
                 'OAuth token request',
             );
 
-            if (!$response->ok()) {
-                throw new \RuntimeException('Failed fetching OAuth token: ' . $response->body());
+            if (! $response->ok()) {
+                throw new \RuntimeException('Failed fetching OAuth token: '.$response->body());
             }
 
             $token = $response->json('access_token');
-            if (!is_string($token) || $token === '') {
+            if (! is_string($token) || $token === '') {
                 throw new \RuntimeException('OAuth token response missing access_token.');
             }
 
@@ -725,11 +726,11 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
         try {
             return $sender($verifySsl);
         } catch (\Throwable $e) {
-            if (!$this->shouldRetryWithoutSsl($e, $verifySsl)) {
+            if (! $this->shouldRetryWithoutSsl($e, $verifySsl)) {
                 throw $e;
             }
 
-            Log::warning($context . ' failed SSL verification on local environment; retrying once without verification.');
+            Log::warning($context.' failed SSL verification on local environment; retrying once without verification.');
 
             return $sender(false);
         }
@@ -737,7 +738,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
 
     private function shouldRetryWithoutSsl(\Throwable $e, bool $verifySsl): bool
     {
-        if (!$verifySsl || !app()->environment('local')) {
+        if (! $verifySsl || ! app()->environment('local')) {
             return false;
         }
 

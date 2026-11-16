@@ -4,30 +4,33 @@ namespace App\Http\Controllers;
 
 use App\Jobs\ReviewAgent;
 use App\Models\Agent;
-use App\Models\AgentWidget;
 use App\Models\AgentContact;
 use App\Models\AgentConversation;
 use App\Models\AgentSource;
+use App\Models\AgentWidget;
 use App\Services\Agents\AgentCalls;
 use App\Services\Agents\AgentChats;
 use App\Services\Agents\AgentReview;
 use App\Services\Agents\AgentWriter;
-use App\Support\Agents\AgentAccess;
-use App\Support\Agents\AgentChannels;
-use App\Support\Agents\AgentBalance;
-use App\Support\Agents\AgentLinkReads;
-use App\Support\Agents\AgentSite;
-use App\Support\Agents\AgentLinks;
-use App\Support\Agents\AgentPersona;
 use App\Services\Agents\SiteReader;
 use App\Services\Agents\WordPressPlugin;
+use App\Support\Agents\AgentAccess;
+use App\Support\Agents\AgentBalance;
+use App\Support\Agents\AgentChannels;
+use App\Support\Agents\AgentInstructions;
+use App\Support\Agents\AgentLinkReads;
+use App\Support\Agents\AgentLinks;
+use App\Support\Agents\AgentPersona;
+use App\Support\Agents\AgentSite;
+use App\Support\Agents\AgentStamp;
 use App\Support\Agents\AgentVoices;
 use App\Support\ArabicDialects;
 use App\Support\CreditPeriod;
+use App\Support\EnglishAccents;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -177,7 +180,7 @@ class AgentController extends Controller
             'first_message' => ['sometimes', 'nullable', 'string', 'max:400'],
             'knowledge' => ['sometimes', 'nullable', 'string', 'max:40000'],
             // Knowledge → Latest updates: the newest information, ahead of every other fact.
-            'updates' => ['sometimes', 'nullable', 'string', 'max:'.\App\Support\Agents\AgentInstructions::MAX_UPDATES_CHARS],
+            'updates' => ['sometimes', 'nullable', 'string', 'max:'.AgentInstructions::MAX_UPDATES_CHARS],
             // Knowledge → Social media links: the business's own accounts and website pages (AgentLinks).
             'links' => ['sometimes', 'nullable', 'array', 'max:'.AgentLinks::MAX],
             'links.*' => ['nullable', 'string', 'max:500'],
@@ -224,7 +227,7 @@ class AgentController extends Controller
         ]);
 
         if (array_key_exists('dialect', $data)) {
-            $known = $agent->language === 'en' ? \App\Support\EnglishAccents::ALL : ArabicDialects::ALL;
+            $known = $agent->language === 'en' ? EnglishAccents::ALL : ArabicDialects::ALL;
             if (! isset($known[$data['dialect']])) {
                 return response()->json(['message' => __('agents.error_dialect')], 422);
             }
@@ -351,7 +354,7 @@ class AgentController extends Controller
         $widget = $agent->mainWidget();
         if (array_key_exists('allowed_origins', $data)) {
             $origins = array_values(array_unique(array_filter(array_map(
-                fn ($o) => \App\Models\AgentWidget::normalizeOrigin($o),
+                fn ($o) => AgentWidget::normalizeOrigin($o),
                 preg_split('/[\s,]+/', (string) $data['allowed_origins']) ?: [],
             ))));
             $widget->allowed_origins = array_slice($origins, 0, 10);
@@ -498,7 +501,7 @@ class AgentController extends Controller
         // Any Arabic dialect for an Arabic agent, any English accent for an English one.
         $dialect = $data['language'] === 'ar'
             ? (isset(ArabicDialects::ALL[$data['dialect'] ?? '']) ? $data['dialect'] : 'ar-XA-WH')
-            : (isset(\App\Support\EnglishAccents::ALL[$data['dialect'] ?? '']) ? $data['dialect'] : 'en-US');
+            : (isset(EnglishAccents::ALL[$data['dialect'] ?? '']) ? $data['dialect'] : 'en-US');
 
         return [
             'business_name' => trim($data['business_name']),
@@ -568,7 +571,7 @@ class AgentController extends Controller
             return '';
         }
 
-        return __('agents.updates_at', ['date' => \Illuminate\Support\Carbon::parse($at)->locale(app()->getLocale())->translatedFormat('j F Y')]);
+        return __('agents.updates_at', ['date' => Carbon::parse($at)->locale(app()->getLocale())->translatedFormat('j F Y')]);
     }
 
     /**
@@ -635,7 +638,7 @@ class AgentController extends Controller
     {
         $this->own($request, $agent);
 
-        return response()->json(['stamp' => \App\Support\Agents\AgentStamp::of($agent)])->header('Cache-Control', 'no-store');
+        return response()->json(['stamp' => AgentStamp::of($agent)])->header('Cache-Control', 'no-store');
     }
 
     private function reviewAgain(Agent $agent): void

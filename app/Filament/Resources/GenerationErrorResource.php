@@ -2,32 +2,30 @@
 
 namespace App\Filament\Resources;
 
-use Illuminate\Auth\Access\Response as AccessResponse;
-use Throwable;
-use Filament\Schemas\Components\Section;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\ViewAction;
-use Filament\Actions\Action;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\BulkAction;
-use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\GenerationErrorResource\Pages;
 use App\Filament\Resources\GenerationErrorResource\Pages\ListGenerationErrors;
 use App\Filament\Resources\GenerationErrorResource\Pages\ViewGenerationError;
-use App\Filament\Resources\GenerationErrorResource\Pages;
 use App\Models\GenerationError;
 use App\Support\GenerationChoiceLabels;
-use Filament\Infolists\Components;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\ViewAction;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response as AccessResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 /**
  * Every failure members hit while generating audio (dashboard, extension,
@@ -37,9 +35,9 @@ class GenerationErrorResource extends Resource
 {
     protected static ?string $model = GenerationError::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-exclamation-triangle';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-exclamation-triangle';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Content';
+    protected static string|\UnitEnum|null $navigationGroup = 'Content';
 
     protected static ?int $navigationSort = 4;
 

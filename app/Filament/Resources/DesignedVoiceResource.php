@@ -2,24 +2,23 @@
 
 namespace App\Filament\Resources;
 
-use Illuminate\Auth\Access\Response as AccessResponse;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ViewColumn;
-use Filament\Tables\Columns\ToggleColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Actions\Action;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\BulkAction;
-use App\Filament\Resources\DesignedVoiceResource\Pages\ListDesignedVoices;
 use App\Filament\Resources\DesignedVoiceResource\Pages;
+use App\Filament\Resources\DesignedVoiceResource\Pages\ListDesignedVoices;
 use App\Models\DesignedVoice;
 use App\Services\VoiceDesignService;
 use App\Support\AudioUrl;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Columns\ViewColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response as AccessResponse;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -31,9 +30,9 @@ class DesignedVoiceResource extends Resource
 {
     protected static ?string $model = DesignedVoice::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-sparkles';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-sparkles';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Voice Design';
+    protected static string|\UnitEnum|null $navigationGroup = 'Voice Design';
 
     protected static ?int $navigationSort = 1;
 

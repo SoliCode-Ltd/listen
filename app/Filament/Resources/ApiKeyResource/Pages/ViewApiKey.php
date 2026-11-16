@@ -2,10 +2,9 @@
 
 namespace App\Filament\Resources\ApiKeyResource\Pages;
 
-use Filament\Actions\Action;
 use App\Filament\Resources\ApiKeyResource;
 use App\Models\ApiKey;
-use Filament\Actions;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Contracts\Support\Htmlable;

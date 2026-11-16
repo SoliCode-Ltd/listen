@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -40,7 +42,7 @@ class ClonedVoice extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function user(): BelongsTo
@@ -49,7 +51,7 @@ class ClonedVoice extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Status helpers                                                     */
+    /*  Status helpers */
     /* ------------------------------------------------------------------ */
 
     public function isReady(): bool
@@ -71,7 +73,7 @@ class ClonedVoice extends Model
      * When the current attempt began. A retry or a new consent sentence
      * starts a new attempt, so progress is not measured from creation.
      */
-    public function attemptStartedAt(): ?\Carbon\CarbonInterface
+    public function attemptStartedAt(): ?CarbonInterface
     {
         $started = $this->created_at;
         foreach (['retried_at', 'consent_replaced_at'] as $key) {
@@ -80,7 +82,7 @@ class ClonedVoice extends Model
                 continue;
             }
             try {
-                $at = \Carbon\Carbon::parse($value);
+                $at = Carbon::parse($value);
             } catch (\Throwable) {
                 continue;
             }
@@ -93,7 +95,7 @@ class ClonedVoice extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeReady($query)

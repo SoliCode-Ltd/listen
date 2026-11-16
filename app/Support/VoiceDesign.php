@@ -6,6 +6,8 @@ use App\Models\DesignedVoice;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
+use App\Support\InApp\InApp;
+use Illuminate\Support\Carbon;
 use Throwable;
 
 /**
@@ -130,7 +132,7 @@ final class VoiceDesign
     public static function showsUpgrade(?User $user, ?Plan $plan): bool
     {
         // Inside the Listen app nothing is sold: a feature that is not on the plan is not shown.
-        if (\App\Support\InApp\InApp::hidesPlans()) {
+        if (InApp::hidesPlans()) {
             return false;
         }
 
@@ -424,12 +426,12 @@ final class VoiceDesign
         $line = $lines[0]['seconds'] >= $lines[1]['seconds'] ? $lines[0] : $lines[1];
         $lineSeconds = $line['seconds'];
         $perTake = $lineSeconds + self::SAMPLE_SECONDS_ASSUMED;
-        $usd = function (int $seconds, int $tokensPerSecond, ?\Illuminate\Support\Carbon $on = null): float {
+        $usd = function (int $seconds, int $tokensPerSecond, ?Carbon $on = null): float {
             $price = PlanCostEstimate::geminiPrices($on);
 
             return round($seconds * $tokensPerSecond / 1_000_000 * $price['audio'], 4);
         };
-        $later = \Illuminate\Support\Carbon::create(2027, 1, 1);
+        $later = Carbon::create(2027, 1, 1);
 
         return [
             'takes' => $takes,

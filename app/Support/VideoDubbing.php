@@ -10,7 +10,9 @@ use App\Models\Voice;
 use App\Services\DemoLinkedAccounts;
 use App\Services\DemoSamePerson;
 use App\Services\PlanAccessService;
+use App\Support\InApp\InApp;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -56,7 +58,7 @@ final class VideoDubbing
     {
         // Inside the Listen app nothing is sold, so the free dub that leads to a plan is not
         // offered there: dubbing shows for members whose plan includes it.
-        if (\App\Support\InApp\InApp::hidesPlans()
+        if (InApp::hidesPlans()
             && ! ($user && self::planIncludes(app(PlanAccessService::class)->resolveAccessPlanForUserId((int) $user->id)))) {
             return false;
         }
@@ -321,7 +323,7 @@ final class VideoDubbing
      * Drive (DriveArchive); the member no longer sees it. $planDays: the
      * member's plan's keepDays(), when the caller has it already.
      */
-    public static function availableUntil(VideoDub $dub, ?int $planDays = null): ?\Illuminate\Support\Carbon
+    public static function availableUntil(VideoDub $dub, ?int $planDays = null): ?Carbon
     {
         $made = $dub->created_at ?? now();
         if (! is_array($dub->reservation) || $dub->status !== VideoDub::READY) {

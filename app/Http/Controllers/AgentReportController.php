@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AgentWidget;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
@@ -54,7 +55,7 @@ class AgentReportController extends Controller
         ]]), -50);
         $settings['reports'] = $reports;
         // Three reports in a day: marked for the team, whatever the check before going live said.
-        $today = collect($reports)->filter(fn ($r) => now()->subDay()->lt(\Illuminate\Support\Carbon::parse($r['at'] ?? now())))->count();
+        $today = collect($reports)->filter(fn ($r) => now()->subDay()->lt(Carbon::parse($r['at'] ?? now())))->count();
         if ($today >= 3 && ($settings['review']['verdict'] ?? null) !== 'block') {
             $settings['review'] = array_merge((array) ($settings['review'] ?? []), [
                 'verdict' => 'review',

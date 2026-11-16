@@ -8,9 +8,15 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\KeptCredits;
 use App\Services\Billing\RenewalGrace;
 use App\Services\Billing\TrialEligibilityService;
+use App\Services\Referral\ReferralQualificationService;
+use App\Support\FreeAllowance;
 use App\Support\VoiceTier;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class PlanAccessService
 {
@@ -68,7 +74,7 @@ class PlanAccessService
 
         if (! $this->userHasUnpaidTrialWindow($userId)) {
             if ($activePlan && (int) $activePlan->price_cents <= 0
-                && ! \App\Support\FreeAllowance::freePlanGivesMonthlyChars()) {
+                && ! FreeAllowance::freePlanGivesMonthlyChars()) {
                 $quota = $activePlan->replicate();
                 $quota->monthly_chars = 0;
                 $quota->allow_overage = false;
@@ -78,7 +84,7 @@ class PlanAccessService
             }
 
             // Credits the member kept when an admin lowered their plan's (KeptCredits).
-            return $activePlan ? app(\App\Services\Billing\KeptCredits::class)->applyTo($activePlan, $userId) : null;
+            return $activePlan ? app(KeptCredits::class)->applyTo($activePlan, $userId) : null;
         }
 
         $openTrial = $this->unpaidTrialWindowQuery($userId)
@@ -107,9 +113,9 @@ class PlanAccessService
      * renewal invoice is actually charged, so a trial that has not been paid keeps
      * its cap for a short while after trial_ends_at.
      *
-     * @return \Illuminate\Database\Eloquent\Builder<BillingTrial>
+     * @return Builder<BillingTrial>
      */
-    private function unpaidTrialWindowQuery(int $userId): \Illuminate\Database\Eloquent\Builder
+    private function unpaidTrialWindowQuery(int $userId): Builder
     {
         return BillingTrial::query()
             ->where('user_id', $userId)
@@ -133,9 +139,9 @@ class PlanAccessService
      * standard voices). A card plan whose renewal payment failed counts until
      * its grace days run out (RenewalGrace), with the dates of the period paid.
      *
-     * @return \Illuminate\Database\Eloquent\Builder<Subscription>
+     * @return Builder<Subscription>
      */
-    private function activeSubscriptions(int $userId): \Illuminate\Database\Eloquent\Builder
+    private function activeSubscriptions(int $userId): Builder
     {
         return Subscription::query()
             ->where('user_id', $userId)
@@ -190,10 +196,10 @@ class PlanAccessService
         $isFirstPaid = false;
         if ((int) $plan->price_cents > 0 && ! $this->userHasUnpaidTrialWindow((int) $user->id)) {
             try {
-                $isFirstPaid = app(\App\Services\Referral\ReferralQualificationService::class)
+                $isFirstPaid = app(ReferralQualificationService::class)
                     ->isFirstPaidPlanTransition($user, $plan);
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Referral: first-paid detection failed.', [
+                Log::warning('Referral: first-paid detection failed.', [
                     'user_id' => $user->id,
                     'plan_id' => $plan->id,
                     'exception' => $e->getMessage(),
@@ -220,7 +226,7 @@ class PlanAccessService
                 && (int) $subscription->plan_id === (int) $plan->id
                 && (string) $subscription->status === $status
                 && $subscription->current_period_start !== null
-                && $subscription->current_period_end?->getTimestamp() === \Illuminate\Support\Carbon::instance($periodEnd)->getTimestamp();
+                && $subscription->current_period_end?->getTimestamp() === Carbon::instance($periodEnd)->getTimestamp();
 
             $startsAt = $samePeriod ? $subscription->current_period_start : $periodStart;
             $subscription->update([
@@ -228,15 +234,15 @@ class PlanAccessService
                 'status' => $status,
                 'current_period_start' => $startsAt,
                 'current_period_end' => $periodEnd,
-            ] + app(\App\Services\Billing\KeptCredits::class)->onPlanChange($subscription, $plan, $startsAt));
+            ] + app(KeptCredits::class)->onPlanChange($subscription, $plan, $startsAt));
         }
 
         if ($isFirstPaid) {
             try {
-                app(\App\Services\Referral\ReferralQualificationService::class)
+                app(ReferralQualificationService::class)
                     ->evaluate($user, 'paid_plan');
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Referral qualification evaluation failed on paid-plan assignment.', [
+                Log::warning('Referral qualification evaluation failed on paid-plan assignment.', [
                     'user_id' => $user->id,
                     'plan_id' => $plan->id,
                     'exception' => $e->getMessage(),

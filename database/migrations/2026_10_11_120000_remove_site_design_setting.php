@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * The switchable New theme was removed, so its "site_design" setting has nothing to control.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         DB::table('site_settings')->where('key', 'site_design')->delete();

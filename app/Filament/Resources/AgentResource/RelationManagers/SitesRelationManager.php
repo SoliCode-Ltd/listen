@@ -2,19 +2,17 @@
 
 namespace App\Filament\Resources\AgentResource\RelationManagers;
 
-use Filament\Tables\Columns\TextColumn;
-use Filament\Support\Enums\FontWeight;
-use Illuminate\Support\Str;
-use Filament\Tables\Filters\TernaryFilter;
 use App\Filament\Resources\AgentConversationResource;
 use App\Filament\Resources\AgentResource;
 use App\Models\AgentConversation;
 use App\Models\AgentWidgetSite;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
+use Filament\Support\Enums\FontWeight;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 /**
  * Every website the agent's call button loaded on (AgentWidgetSite): where it shows (allowed)
@@ -27,7 +25,7 @@ class SitesRelationManager extends RelationManager
 
     protected static ?string $title = 'Websites';
 
-    protected static string | \BackedEnum | null $icon = 'heroicon-o-globe-alt';
+    protected static string|\BackedEnum|null $icon = 'heroicon-o-globe-alt';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

@@ -11,8 +11,11 @@ class DemoRewardTransaction extends Model
     use HasFactory;
 
     public const KIND_GRANT = 'grant';
+
     public const KIND_CONSUME = 'consume';
+
     public const KIND_REVOKE = 'revoke';
+
     public const KIND_ADJUSTMENT = 'adjustment';
 
     protected $fillable = [

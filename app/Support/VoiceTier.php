@@ -5,6 +5,7 @@ namespace App\Support;
 class VoiceTier
 {
     public const STANDARD = 'standard';
+
     public const HD = 'hd';
 
     /**

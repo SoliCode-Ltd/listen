@@ -2,28 +2,27 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Placeholder;
-use Throwable;
 use App\Models\SiteSetting;
 use App\Support\TitanMailbox;
 use Filament\Actions\Action;
-use Filament\Forms;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 class NewsletterMailbox extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-inbox';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-inbox';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Newsletter';
+    protected static string|\UnitEnum|null $navigationGroup = 'Newsletter';
 
     protected static ?string $navigationLabel = 'Mailbox';
 

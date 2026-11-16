@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\Billing\AdsPurchases;
 use App\Services\Billing\CharPackService;
 use App\Services\Billing\PaymentLedger;
+use App\Services\Billing\PlanChangeEmails;
 use App\Services\Billing\PlanChanges;
 use App\Support\CreditPeriod;
 use DomainException;
@@ -81,7 +82,7 @@ class ManualPaymentService
         // the payment is approved and when the plan starts.
         $waiting = PlanChange::query()->scheduled()->where('manual_payment_request_id', $approved->id)->first();
         if ($waiting) {
-            rescue(fn () => app(\App\Services\Billing\PlanChangeEmails::class)->queueBooked($waiting));
+            rescue(fn () => app(PlanChangeEmails::class)->queueBooked($waiting));
         }
 
         return $approved;

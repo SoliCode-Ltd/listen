@@ -19,16 +19,16 @@ interface TtsProviderInterface
     /**
      * Synthesize text into audio.
      *
-     * @param  string  $text           The text to speak.
-     * @param  string  $targetLanguage Language code (e.g. 'ar', 'en').
-     * @param  array   $voiceConfig    Provider-specific voice configuration:
-     *                                  - voice_name: string (provider voice ID)
-     *                                  - gender: string (MALE|FEMALE|NEUTRAL)
-     *                                  - speed: float (0.25–4.0, default 1.0)
-     *                                  - pitch: float (-20.0–20.0, default 0.0)
-     *                                  - style: string|null (emotion/style hint)
-     *                                  - dialect: string|null (country/dialect code)
-     *                                  - speakers: array|null (for dialogue mode)
+     * @param  string  $text  The text to speak.
+     * @param  string  $targetLanguage  Language code (e.g. 'ar', 'en').
+     * @param  array  $voiceConfig  Provider-specific voice configuration:
+     *                              - voice_name: string (provider voice ID)
+     *                              - gender: string (MALE|FEMALE|NEUTRAL)
+     *                              - speed: float (0.25–4.0, default 1.0)
+     *                              - pitch: float (-20.0–20.0, default 0.0)
+     *                              - style: string|null (emotion/style hint)
+     *                              - dialect: string|null (country/dialect code)
+     *                              - speakers: array|null (for dialogue mode)
      * @return array{
      *     audio_path: string,
      *     duration_seconds: int|null,

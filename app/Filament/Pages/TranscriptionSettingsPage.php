@@ -56,8 +56,7 @@ class TranscriptionSettingsPage extends Page implements HasForms
             'transcription_stuck_minutes' => TranscriptionSettings::stuckMinutes(),
             'transcription_languages' => TranscriptionSettings::languages(),
             'transcription_review' => TranscriptionSettings::review(),
-            'transcription_cost_plain' => TranscriptionSettings::costPerMinute('plain'),
-            'transcription_cost_timed' => TranscriptionSettings::costPerMinute('timed'),
+            'transcription_cost_per_minute' => TranscriptionSettings::costPerMinute(),
         ]);
     }
 
@@ -66,7 +65,7 @@ class TranscriptionSettingsPage extends Page implements HasForms
         return $schema
             ->components([
                 Section::make('Transcribe')
-                    ->description('Members upload or record audio and get its text, with timings, subtitles and speaker names by plan. Which plans include it, and their minutes a month, are set on each plan (Plans → Transcribe).')
+                    ->description('Members upload, record or link audio and get its text: paragraphs with who said them, edited in place, played back sentence by sentence, downloaded as text, Word or subtitles, and translated. Which plans include it, and their minutes a month, are set on each plan (Plans → Transcribe).')
                     ->schema([
                         Radio::make('transcription_audience')
                             ->label('Who can see it')
@@ -130,14 +129,10 @@ class TranscriptionSettingsPage extends Page implements HasForms
                             ->label('Check every transcript a second time')
                             ->helperText('Each part is heard again with its first transcript, to correct it. More accurate on hard dialects, and about twice the cost a minute. Members are charged the same minutes either way.')
                             ->columnSpan(2),
-                        TextInput::make('transcription_cost_plain')
-                            ->label('Cost to Listen a minute: plain text')
+                        TextInput::make('transcription_cost_per_minute')
+                            ->label('Cost to Listen a minute of audio')
                             ->numeric()->minValue(0.0001)->maxValue(1)->step(0.0001)->prefix('$')->required()
-                            ->helperText('Measured on staging: $0.0022. For the admin\'s cost and margin figures only.'),
-                        TextInput::make('transcription_cost_timed')
-                            ->label('Cost to Listen a minute: with timings or speakers')
-                            ->numeric()->minValue(0.0001)->maxValue(1)->step(0.0001)->prefix('$')->required()
-                            ->helperText('Measured on staging: $0.0042 with the dialect guide. Update it from the Google bill.'),
+                            ->helperText('Measured on staging: about $0.0025 (twice that with the second check on). Update it from the Google bill. For the admin\'s cost and margin figures only.'),
                     ]),
             ])
             ->statePath('data');
@@ -158,9 +153,7 @@ class TranscriptionSettingsPage extends Page implements HasForms
         $languages = array_values(array_intersect(array_keys(TranscriptionSettings::LANGUAGES), (array) ($s['transcription_languages'] ?? [])));
         SiteSetting::set('transcription_languages', json_encode($languages !== [] ? $languages : ['ar', 'en']), $group);
         SiteSetting::set('transcription_review', ! empty($s['transcription_review']) ? '1' : '0', $group);
-        foreach (['plain', 'timed'] as $kind) {
-            SiteSetting::set('transcription_cost_'.$kind, (string) max(0.0001, min(1.0, (float) ($s['transcription_cost_'.$kind] ?? 0))), $group);
-        }
+        SiteSetting::set('transcription_cost_per_minute', (string) max(0.0001, min(1.0, (float) ($s['transcription_cost_per_minute'] ?? 0))), $group);
         SiteSetting::flushGroupCache($group);
 
         Notification::make()->title('Transcribe settings saved.')->success()->send();

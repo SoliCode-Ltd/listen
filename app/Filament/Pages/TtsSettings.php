@@ -2,42 +2,42 @@
 
 namespace App\Filament\Pages;
 
-use App\Support\SpeechText;
-use App\Support\Pronunciations;
-use App\Services\Tts\GeminiKeyManager;
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Placeholder;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
-use Filament\Forms\Components\Repeater;
-use Filament\Schemas\Components\Actions;
-use Filament\Actions\Action;
-use Filament\Forms\Components\Textarea;
 use App\Models\SiteSetting;
 use App\Models\Voice;
+use App\Services\Tts\GeminiKeyManager;
 use App\Support\GeminiTtsModel;
+use App\Support\Pronunciations;
+use App\Support\SpeechText;
 use App\Support\StandardVoiceEngine;
 use App\Support\TtsStudioConfig;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
-use Filament\Forms;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
 
 class TtsSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-speaker-wave';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-speaker-wave';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'System';
+    protected static string|\UnitEnum|null $navigationGroup = 'System';
 
     protected static ?int $navigationSort = 2;
 
@@ -351,7 +351,7 @@ class TtsSettings extends Page implements HasForms
     }
 
     /**
-     * @return array<int, \Filament\Schemas\Components\Component>
+     * @return array<int, Component>
      */
     private function catalogRowSchema(): array
     {
@@ -373,7 +373,7 @@ class TtsSettings extends Page implements HasForms
     }
 
     /**
-     * @return array<int, \Filament\Schemas\Components\Component>
+     * @return array<int, Component>
      */
     private function styleCatalogRowSchema(): array
     {
@@ -393,7 +393,7 @@ class TtsSettings extends Page implements HasForms
     }
 
     /**
-     * @return array<int, \Filament\Schemas\Components\Component>
+     * @return array<int, Component>
      */
     private function emotionCatalogRowSchema(): array
     {

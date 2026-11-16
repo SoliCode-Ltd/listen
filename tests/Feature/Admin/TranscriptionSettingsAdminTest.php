@@ -28,7 +28,7 @@ class TranscriptionSettingsAdminTest extends TestCase
         $this->assertSame(7, TranscriptionSettings::keepAudioDays());
         $this->assertSame(['ar', 'en', 'fr', 'es', 'de', 'ur'], TranscriptionSettings::languages());
         $this->assertFalse(TranscriptionSettings::review());
-        $this->assertSame(0.0042, TranscriptionSettings::costPerMinute('timed'));
+        $this->assertSame(0.0025, TranscriptionSettings::costPerMinute());
         $this->assertTrue(TranscriptionSettings::visibleTo(VoiceCloningAccess::PREVIEW_EMAIL));
         $this->assertFalse(TranscriptionSettings::visibleTo('someone@example.com'));
     }
@@ -50,8 +50,7 @@ class TranscriptionSettingsAdminTest extends TestCase
                 'transcription_stuck_minutes' => 40,
                 'transcription_languages' => ['en', 'ar', 'tr'],
                 'transcription_review' => true,
-                'transcription_cost_plain' => 0.0025,
-                'transcription_cost_timed' => 0.004,
+                'transcription_cost_per_minute' => 0.003,
             ])
             ->call('save')
             ->assertHasNoFormErrors();
@@ -65,8 +64,7 @@ class TranscriptionSettingsAdminTest extends TestCase
         $this->assertSame(40, TranscriptionSettings::stuckMinutes());
         $this->assertSame(['ar', 'en', 'tr'], TranscriptionSettings::languages(), 'in the list\'s own order');
         $this->assertTrue(TranscriptionSettings::review());
-        $this->assertSame(0.0025, TranscriptionSettings::costPerMinute('plain'));
-        $this->assertSame(0.004, TranscriptionSettings::costPerMinute('timed'));
+        $this->assertSame(0.003, TranscriptionSettings::costPerMinute());
     }
 
     public function test_off_hides_it_from_everyone(): void

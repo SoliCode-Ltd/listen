@@ -2,11 +2,11 @@
 
 namespace App\Filament\Widgets;
 
-use Throwable;
 use App\Models\VideoDub;
 use App\Support\VideoDubbing;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Throwable;
 
 /**
  * Dub my video at a glance, above the list of dubs (Video Dubbing → Dubs):

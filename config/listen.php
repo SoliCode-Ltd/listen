@@ -215,13 +215,9 @@ return [
     | saved in Admin → Transcribe → Settings (TranscriptionSettings).
     */
     'transcription' => [
-        // What a minute of audio costs Listen, as measured on staging on 16 November 2026
-        // (transcribe:measure): plain text, and with timings or speaker names (0.0041-0.0044 with the dialect guide, measured
-        // on the 25 Arabic country files). For the admin's figures only.
-        'cost_per_minute' => [
-            'plain' => (float) env('LISTEN_TRANSCRIBE_COST_PLAIN', 0.0022),
-            'timed' => (float) env('LISTEN_TRANSCRIBE_COST_TIMED', 0.0042),
-        ],
+        // What a minute of audio costs Listen, as measured on staging in November 2026 (transcribe:measure):
+        // the words and speakers only ($0.0022), with the dialect guide in the question. For the admin's figures only.
+        'cost_per_minute' => (float) env('LISTEN_TRANSCRIBE_COST', 0.0025),
         // The free try in the demo: one recording up to this long, and this many for the whole site a day.
         'free_try_seconds' => (int) env('LISTEN_TRANSCRIBE_FREE_SECONDS', 60),
         'free_per_day' => (int) env('LISTEN_TRANSCRIBE_FREE_PER_DAY', 50),

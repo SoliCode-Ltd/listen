@@ -2,9 +2,8 @@
 
 namespace App\Filament\Resources\AudioGenerationResource\Pages;
 
-use Filament\Actions\EditAction;
 use App\Filament\Resources\AudioGenerationResource;
-use Filament\Actions;
+use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewAudioGeneration extends ViewRecord

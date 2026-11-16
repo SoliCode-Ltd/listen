@@ -115,9 +115,6 @@ class Plan extends Model
         'transcription_enabled',
         'transcription_minutes_month',
         'transcription_max_file_minutes',
-        'transcription_timestamps',
-        'transcription_speakers',
-        'transcription_translate',
         'transcription_priority',
         'transcription_concurrent_jobs',
     ];
@@ -164,9 +161,6 @@ class Plan extends Model
         'transcription_enabled' => 'boolean',
         'transcription_minutes_month' => 'integer',
         'transcription_max_file_minutes' => 'integer',
-        'transcription_timestamps' => 'boolean',
-        'transcription_speakers' => 'boolean',
-        'transcription_translate' => 'boolean',
         'transcription_priority' => 'boolean',
         'transcription_concurrent_jobs' => 'integer',
     ];

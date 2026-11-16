@@ -2,29 +2,10 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Select;
-use App\Models\User;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Placeholder;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\ViewAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\Action;
-use App\Services\Newsletter\PaidWelcomeEmail;
-use Throwable;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions;
 use App\Filament\Resources\SubscriptionResource\Pages\CreateSubscription;
-use App\Filament\Resources\SubscriptionResource\Pages\ViewSubscription;
 use App\Filament\Resources\SubscriptionResource\Pages\EditSubscription;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use InvalidArgumentException;
-use App\Filament\Resources\SubscriptionResource\Pages;
+use App\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions;
+use App\Filament\Resources\SubscriptionResource\Pages\ViewSubscription;
 use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
 use App\Models\CharGift;
@@ -32,25 +13,42 @@ use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
+use App\Models\User;
 use App\Services\Billing\CharGiftService;
+use App\Services\Newsletter\PaidWelcomeEmail;
 use App\Support\Countries;
 use App\Support\CreditPeriod;
-use Filament\Forms;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Throwable;
 
 class SubscriptionResource extends Resource
 {
     protected static ?string $model = Subscription::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-credit-card';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
+    protected static string|\UnitEnum|null $navigationGroup = 'Billing';
 
     protected static ?int $navigationSort = 2;
 
@@ -174,30 +172,30 @@ class SubscriptionResource extends Resource
                                 $rows = $counters->map(function (UsageCounter $c) use ($currentYm): string {
                                     $isCurrent = $c->period_ym === $currentYm;
                                     $label = $isCurrent
-                                        ? e($c->monthLabel()) . ' <span style="background:#22c55e;color:#fff;padding:1px 8px;border-radius:9999px;font-size:11px;margin-left:6px;">Current</span>'
+                                        ? e($c->monthLabel()).' <span style="background:#22c55e;color:#fff;padding:1px 8px;border-radius:9999px;font-size:11px;margin-left:6px;">Current</span>'
                                         : e($c->monthLabel());
                                     $bg = $isCurrent ? 'background:rgba(34,197,94,0.06);' : '';
 
-                                    return '<tr style="' . $bg . '">'
-                                        . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);">' . $label . '</td>'
-                                        . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((float) $c->total_chars) . '</td>'
-                                        . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . ((int) $c->bonus_chars > 0 ? '+' . number_format((int) $c->bonus_chars) : '—') . '</td>'
-                                        . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((int) $c->total_seconds / 60, 1) . '</td>'
-                                        . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((int) $c->total_requests) . '</td>'
-                                        . '</tr>';
+                                    return '<tr style="'.$bg.'">'
+                                        .'<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);">'.$label.'</td>'
+                                        .'<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">'.number_format((float) $c->total_chars).'</td>'
+                                        .'<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">'.((int) $c->bonus_chars > 0 ? '+'.number_format((int) $c->bonus_chars) : '—').'</td>'
+                                        .'<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">'.number_format((int) $c->total_seconds / 60, 1).'</td>'
+                                        .'<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">'.number_format((int) $c->total_requests).'</td>'
+                                        .'</tr>';
                                 })->implode('');
 
                                 $html = '<div style="overflow-x:auto;">'
-                                    . '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
-                                    . '<thead><tr style="background:rgba(0,0,0,0.03);font-weight:600;">'
-                                    . '<th style="padding:8px 12px;text-align:left;">Period</th>'
-                                    . '<th style="padding:8px 12px;text-align:right;">Characters</th>'
-                                    . '<th style="padding:8px 12px;text-align:right;">Gifted</th>'
-                                    . '<th style="padding:8px 12px;text-align:right;">Minutes</th>'
-                                    . '<th style="padding:8px 12px;text-align:right;">Requests</th>'
-                                    . '</tr></thead>'
-                                    . '<tbody>' . $rows . '</tbody>'
-                                    . '</table></div>';
+                                    .'<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+                                    .'<thead><tr style="background:rgba(0,0,0,0.03);font-weight:600;">'
+                                    .'<th style="padding:8px 12px;text-align:left;">Period</th>'
+                                    .'<th style="padding:8px 12px;text-align:right;">Characters</th>'
+                                    .'<th style="padding:8px 12px;text-align:right;">Gifted</th>'
+                                    .'<th style="padding:8px 12px;text-align:right;">Minutes</th>'
+                                    .'<th style="padding:8px 12px;text-align:right;">Requests</th>'
+                                    .'</tr></thead>'
+                                    .'<tbody>'.$rows.'</tbody>'
+                                    .'</table></div>';
 
                                 return new HtmlString($html);
                             }),
@@ -418,7 +416,7 @@ class SubscriptionResource extends Resource
     }
 
     /**
-     * @return array<int, \Filament\Schemas\Components\Component>
+     * @return array<int, Component>
      */
     public static function giftFormSchema(): array
     {

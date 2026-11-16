@@ -20,6 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
 class CaptureReferralVisit
 {
     public const COOKIE_NAME = 'listen_ref_code';
+
     public const COOKIE_TTL_MIN = 60 * 24 * 45; // 45 days
 
     public function __construct(private readonly ReferralService $referralService) {}

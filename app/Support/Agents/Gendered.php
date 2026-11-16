@@ -2,6 +2,8 @@
 
 namespace App\Support\Agents;
 
+use Illuminate\Support\Facades\Lang;
+
 /**
  * Arabic words that follow the agent's voice: "سارة تتحدث", "جاهزة متى شئت" for a woman's
  * voice. A line with a woman's form has a twin key ending in _female in the language file.
@@ -29,6 +31,6 @@ final class Gendered
     /** One line in the voice's form: agents.talk_hint, or agents.talk_hint_female for a woman's voice. */
     public static function line(string $key, bool $female, array $replace = []): string
     {
-        return (string) __($female && \Illuminate\Support\Facades\Lang::has($key.'_female') ? $key.'_female' : $key, $replace);
+        return (string) __($female && Lang::has($key.'_female') ? $key.'_female' : $key, $replace);
     }
 }

@@ -14,7 +14,7 @@ use Tests\TestCase;
 /**
  * Each plan's speech to text ("Transcribe") is set on the plan, in the admin's
  * Plans page: whether it is included, the minutes a month, the longest file,
- * timings, speaker names, translation, the priority queue and files at once.
+ * the priority queue and files at once. The transcript is the same on every plan.
  */
 class TranscriptionPlanSettingsTest extends TestCase
 {
@@ -38,14 +38,10 @@ class TranscriptionPlanSettingsTest extends TestCase
 
         $starter = $plans['starter']->fresh();
         $this->assertSame(30, TranscriptionAccess::maxFileMinutes($starter));
-        $this->assertTrue($starter->transcription_timestamps);
-        $this->assertFalse($starter->transcription_speakers);
-        $this->assertFalse($starter->transcription_translate);
         $this->assertSame(1, TranscriptionAccess::concurrentJobs($starter));
 
         $creator = $plans['creator']->fresh();
-        $this->assertTrue($creator->transcription_speakers);
-        $this->assertTrue($creator->transcription_translate);
+        $this->assertSame(60, TranscriptionAccess::maxFileMinutes($creator));
         $this->assertFalse($creator->transcription_priority);
 
         $max = $plans['studio_max']->fresh();
@@ -71,9 +67,6 @@ class TranscriptionPlanSettingsTest extends TestCase
                 'transcription_max_file_minutes' => 90,
                 'transcription_concurrent_jobs' => 3,
                 'transcription_priority' => true,
-                'transcription_timestamps' => true,
-                'transcription_speakers' => true,
-                'transcription_translate' => false,
             ])
             ->assertSee('If every minute is used')
             ->call('save')
@@ -85,8 +78,6 @@ class TranscriptionPlanSettingsTest extends TestCase
         $this->assertSame(90, $plan->transcription_max_file_minutes);
         $this->assertSame(3, $plan->transcription_concurrent_jobs);
         $this->assertTrue($plan->transcription_priority);
-        $this->assertTrue($plan->transcription_speakers);
-        $this->assertFalse($plan->transcription_translate);
-        $this->assertEqualsWithDelta(0.0042, TranscriptionAccess::costPerMinute($plan), 1e-9, 'timings cost the timed rate');
+        $this->assertEqualsWithDelta(0.0025, TranscriptionAccess::costPerMinute(), 1e-9);
     }
 }

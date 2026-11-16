@@ -20,8 +20,7 @@ class SyncSubscriptionStatus
         private readonly BillingSyncService $billingSyncService,
         private readonly PlanAccessService $planAccessService,
         private readonly DemoHistoryImporter $demoHistoryImporter,
-    ) {
-    }
+    ) {}
 
     public function handle(Request $request, Closure $next): Response
     {

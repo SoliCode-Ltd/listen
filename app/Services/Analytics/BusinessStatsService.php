@@ -5,6 +5,8 @@ namespace App\Services\Analytics;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\Billing\StripePricePlans;
+use App\Support\Countries;
+use App\Support\TtsStudioConfig;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -785,8 +787,8 @@ class BusinessStatsService
             foreach ($members as $code => $n) {
                 $rows[] = [
                     'code' => $code === '' ? null : strtoupper($code),
-                    'country' => \App\Support\Countries::name($code),
-                    'region' => \App\Support\Countries::region($code),
+                    'country' => Countries::name($code),
+                    'region' => Countries::region($code),
                     'members' => (int) $n,
                     'active_30d' => (int) ($active[$code] ?? 0),
                     'paying' => (int) ($paying[$code] ?? 0),
@@ -796,7 +798,7 @@ class BusinessStatsService
             $data['countries'] = $rows;
             $data['with_country'] = collect($rows)->whereNotNull('code')->sum('members');
             $data['country_count'] = collect($rows)->whereNotNull('code')->count();
-            $data['arab_world_members'] = collect($rows)->filter(fn ($r) => \App\Support\Countries::isArabWorld($r['code']))->sum('members');
+            $data['arab_world_members'] = collect($rows)->filter(fn ($r) => Countries::isArabWorld($r['code']))->sum('members');
 
             $regions = [];
             foreach ($rows as $row) {
@@ -807,7 +809,7 @@ class BusinessStatsService
                 $r['paying'] += $row['paying'];
                 unset($r);
             }
-            $data['regions'] = collect($regions)->sortBy(fn ($r) => [$r['region'] === \App\Support\Countries::UNKNOWN, -$r['members']])->values()->all();
+            $data['regions'] = collect($regions)->sortBy(fn ($r) => [$r['region'] === Countries::UNKNOWN, -$r['members']])->values()->all();
         }
 
         // Personal webmail or a work / school domain, from the domain only.
@@ -826,7 +828,7 @@ class BusinessStatsService
         $data['email_types'] = $emailTypes;
 
         if ($this->hasColumn('audio_generations', 'dialect')) {
-            $labels = collect(\App\Support\TtsStudioConfig::dialectCatalogForLanguage('ar'))
+            $labels = collect(TtsStudioConfig::dialectCatalogForLanguage('ar'))
                 ->mapWithKeys(fn (array $row) => [strtolower((string) $row['value']) => (string) $row['label']]);
             $data['dialects'] = collect($this->pairs(
                 $this->memberGenerations()

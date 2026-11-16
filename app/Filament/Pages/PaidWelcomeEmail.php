@@ -2,24 +2,23 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Textarea;
-use Throwable;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Newsletter\PaidWelcomeEmail as WelcomeEmail;
 use Filament\Actions\Action;
-use Filament\Forms;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
+use Throwable;
 
 /**
  * Newsletter → Paid welcome email: the words of the email new paid members get,
@@ -29,9 +28,9 @@ class PaidWelcomeEmail extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-sparkles';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-sparkles';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Newsletter';
+    protected static string|\UnitEnum|null $navigationGroup = 'Newsletter';
 
     protected static ?string $navigationLabel = 'Paid welcome email';
 

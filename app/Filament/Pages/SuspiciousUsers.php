@@ -2,13 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\BulkAction;
 use App\Filament\Resources\UserResource;
 use App\Models\DemoVoiceGeneration;
 use App\Models\User;
@@ -19,13 +12,19 @@ use App\Services\MultiAccountEnforcementService;
 use App\Services\UserDeletionService;
 use App\Support\DemoAllowance;
 use App\Support\PaidMember;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkAction;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -44,9 +43,9 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
     use InteractsWithForms;
     use InteractsWithTable;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shield-exclamation';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shield-exclamation';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Demo';
+    protected static string|\UnitEnum|null $navigationGroup = 'Demo';
 
     protected static ?int $navigationSort = 10;
 

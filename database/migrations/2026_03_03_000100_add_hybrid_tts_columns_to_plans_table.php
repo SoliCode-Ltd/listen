@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -12,7 +13,8 @@ use Illuminate\Support\Facades\Schema;
  *
  * Safe for zero-downtime deployment: all columns are nullable or have defaults.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::table('plans', function (Blueprint $table) {
@@ -34,15 +36,15 @@ return new class extends Migration {
         });
 
         // Set dialogue_enabled for highest plan
-        \Illuminate\Support\Facades\DB::table('plans')
+        DB::table('plans')
             ->where('slug', 'pro')
             ->update(['dialogue_enabled' => true, 'quality_tier' => 'studio']);
 
-        \Illuminate\Support\Facades\DB::table('plans')
+        DB::table('plans')
             ->where('slug', 'creator')
             ->update(['quality_tier' => 'wavenet']);
 
-        \Illuminate\Support\Facades\DB::table('plans')
+        DB::table('plans')
             ->where('slug', 'free')
             ->update(['quality_tier' => 'standard']);
     }

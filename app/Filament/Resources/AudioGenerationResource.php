@@ -2,27 +2,10 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Textarea;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Actions\Action;
-use Filament\Actions\ViewAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Resources\AudioGenerationResource\Pages\ListAudioGenerations;
 use App\Filament\Resources\AudioGenerationResource\Pages\CreateAudioGeneration;
-use App\Filament\Resources\AudioGenerationResource\Pages\ViewAudioGeneration;
 use App\Filament\Resources\AudioGenerationResource\Pages\EditAudioGeneration;
-use App\Filament\Resources\AudioGenerationResource\Pages;
+use App\Filament\Resources\AudioGenerationResource\Pages\ListAudioGenerations;
+use App\Filament\Resources\AudioGenerationResource\Pages\ViewAudioGeneration;
 use App\Models\AudioGeneration;
 use App\Models\GenerationError;
 use App\Models\TtsLog;
@@ -31,10 +14,24 @@ use App\Support\AudioUrl;
 use App\Support\GenerationChoiceLabels;
 use App\Support\GenerationSource;
 use App\Support\VoiceTier;
-use Filament\Forms;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
@@ -43,9 +40,9 @@ class AudioGenerationResource extends Resource
 {
     protected static ?string $model = AudioGeneration::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-musical-note';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-musical-note';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Content';
+    protected static string|\UnitEnum|null $navigationGroup = 'Content';
 
     protected static ?int $navigationSort = 5;
 
@@ -410,11 +407,11 @@ class AudioGenerationResource extends Resource
             return 'N/A';
         }
 
-        $relativePath = 'storage/' . ltrim($record->audio_path, '/');
+        $relativePath = 'storage/'.ltrim($record->audio_path, '/');
         $request = request();
 
         if ($request) {
-            return $request->getSchemeAndHttpHost() . '/' . ltrim($relativePath, '/');
+            return $request->getSchemeAndHttpHost().'/'.ltrim($relativePath, '/');
         }
 
         return url($relativePath);

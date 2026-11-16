@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Plan;
 use App\Services\VoiceCloningService;
+use App\Support\Agents\AgentAccess;
 use App\Support\Api\ApiPlanAccess;
 
 /**
@@ -214,7 +215,7 @@ final class PlanPricingLines
         $closed = array_filter([
             StudioFacts::dubbing() ? null : '\bdub|دبلج',
             VoiceDesign::audience() === VoiceDesign::AUDIENCE_EVERYONE ? null : 'voice design|design your own voices|تصميم (ال)?(صوت|أصوات)|صمّ?م أصواتك',
-            \App\Support\Agents\AgentAccess::audience() === \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE ? null : 'voice agents?|الوكلاء الصوتي|وكلاء صوتي|وكيل صوتي',
+            AgentAccess::audience() === AgentAccess::AUDIENCE_EVERYONE ? null : 'voice agents?|الوكلاء الصوتي|وكلاء صوتي|وكيل صوتي',
         ]);
         if ($closed === []) {
             return $lines;
@@ -373,7 +374,7 @@ final class PlanPricingLines
             'video_dubbing' => VideoDubbing::planIncludes($plan)
                 ? 'Hidden: Video Dubbing is still for the admin only (Video Dubbing → Settings).'
                 : 'Hidden: this plan does not include video dubbing.',
-            'voice_agents' => \App\Support\Agents\AgentAccess::planColumns() && \App\Support\Agents\AgentAccess::planIncludes($plan)
+            'voice_agents' => AgentAccess::planColumns() && AgentAccess::planIncludes($plan)
                 ? 'Hidden: Agents are not open to everyone yet (Agents → Settings).'
                 : 'Hidden: this plan does not include voice agents.',
             'monthly_requests' => 'Hidden: a pack has no monthly count.',
@@ -405,12 +406,12 @@ final class PlanPricingLines
      */
     private static function agentsValue(Plan $plan, string $locale): ?string
     {
-        if (! \App\Support\Agents\AgentAccess::planColumns() || ! \App\Support\Agents\AgentAccess::planIncludes($plan)
-            || \App\Support\Agents\AgentAccess::audience() !== \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE) {
+        if (! AgentAccess::planColumns() || ! AgentAccess::planIncludes($plan)
+            || AgentAccess::audience() !== AgentAccess::AUDIENCE_EVERYONE) {
             return null;
         }
-        $limits = \App\Support\Agents\AgentAccess::limits($plan);
-        $minutes = intdiv(max(0, (int) $plan->monthly_chars), \App\Support\Agents\AgentAccess::creditsPerMinute());
+        $limits = AgentAccess::limits($plan);
+        $minutes = intdiv(max(0, (int) $plan->monthly_chars), AgentAccess::creditsPerMinute());
         if ($limits['minutes'] > 0) {
             $minutes = min($minutes, $limits['minutes']);
         }
@@ -429,13 +430,13 @@ final class PlanPricingLines
      */
     public static function agentComparison(Plan $plan, string $locale): ?array
     {
-        if (! \App\Support\Agents\AgentAccess::planColumns() || ! \App\Support\Agents\AgentAccess::planIncludes($plan)
-            || \App\Support\Agents\AgentAccess::audience() !== \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE) {
+        if (! AgentAccess::planColumns() || ! AgentAccess::planIncludes($plan)
+            || AgentAccess::audience() !== AgentAccess::AUDIENCE_EVERYONE) {
             return null;
         }
         $locale = self::locale($locale);
-        $limits = \App\Support\Agents\AgentAccess::limits($plan);
-        $rate = \App\Support\Agents\AgentAccess::creditsPerMinute();
+        $limits = AgentAccess::limits($plan);
+        $rate = AgentAccess::creditsPerMinute();
         $minutes = intdiv(max(0, (int) $plan->monthly_chars), $rate);
         if ($limits['minutes'] > 0) {
             $minutes = min($minutes, $limits['minutes']);

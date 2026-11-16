@@ -6,8 +6,11 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration
 {
     private const OLD_REASON_EN = 'Your account has been suspended because multiple accounts were created from the same network. Each person is allowed one account only.';
+
     private const NEW_REASON_EN = 'Your account has been suspended because multiple accounts were created from the same network.';
+
     private const OLD_REASON_AR = 'تم تعليق حسابك بسبب إنشاء حسابات متعددة من نفس الشبكة. يُسمح لكل شخص بحساب واحد فقط.';
+
     private const NEW_REASON_AR = 'تم تعليق حسابك بسبب إنشاء حسابات متعددة من نفس الشبكة.';
 
     public function up(): void

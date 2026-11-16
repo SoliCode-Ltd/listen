@@ -31,8 +31,8 @@ final class SpeechJoin
      * @param  bool  $trimJoins  cut each piece's own quiet at a join, so the pause is the whole pause
      *                           between the last word of one piece and the first of the next
      * @return array{path: string, mime_type: string, pieces: array<int, array{0: int, 1: int, 2: int}>}
-     *         the temp file (the caller removes it) and, for a WAV, where each piece sits in it:
-     *         its first frame, the frame after its last one, and its part
+     *                                                                                                   the temp file (the caller removes it) and, for a WAV, where each piece sits in it:
+     *                                                                                                   its first frame, the frame after its last one, and its part
      */
     public static function toFile(iterable $pieces, array $pauses = [], array $groups = [], float $pause = self::PAUSE, bool $trimJoins = false): array
     {

@@ -6,6 +6,7 @@ use App\Jobs\SummarizeAgentCall;
 use App\Models\Agent;
 use App\Models\AgentConversation;
 use App\Models\AgentWidget;
+use App\Models\UsageCounter;
 use App\Services\Billing\MemberUsageMeter;
 use App\Services\PlanAccessService;
 use App\Support\Agents\AgentAccess;
@@ -417,7 +418,7 @@ class AgentChats
                         $now = (array) ($c->reservation ?? []);
                         // One chat is one request on the member's account, however many replies it has.
                         if ((int) ($now['replies'] ?? 0) > 0 && ! $held['billed_to_pack']) {
-                            \App\Models\UsageCounter::query()->where('user_id', $userId)->where('period_ym', $held['period'])
+                            UsageCounter::query()->where('user_id', $userId)->where('period_ym', $held['period'])
                                 ->where('total_requests', '>', 0)->decrement('total_requests');
                         }
                         // Where the latest reply's credits came from (the month, the plan or a

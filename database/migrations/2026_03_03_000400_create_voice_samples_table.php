@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Schema;
  * Manageable from admin (CRUD + ordering + featured flags).
  * Supports multiple countries/dialects and emotions.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('voice_samples', function (Blueprint $table) {

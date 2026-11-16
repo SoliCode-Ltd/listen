@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Contact;
 use App\Models\SiteSetting;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -18,7 +18,7 @@ class ContactController extends Controller
     public function submit(Request $request)
     {
         $enabled = SiteSetting::get('contact_form_enabled', true);
-        if (!$enabled) {
+        if (! $enabled) {
             if ($request->expectsJson()) {
                 return response()->json([
                     'ok' => false,
@@ -45,17 +45,17 @@ class ContactController extends Controller
             ?: trim((string) config('mail.from.address', ''));
         $recipientName = trim((string) SiteSetting::get(
             'contact_submission_name',
-            config('app.name', 'Listen') . ' Contact'
+            config('app.name', 'Listen').' Contact'
         ));
 
         if ($recipientEmail !== '') {
-            $subject = '[Contact Us] ' . $validated['subject'];
+            $subject = '[Contact Us] '.$validated['subject'];
             $bodyLines = [
                 'You received a new contact form submission.',
                 '',
-                'Name: ' . $validated['name'],
-                'Email: ' . $validated['email'],
-                'Subject: ' . $validated['subject'],
+                'Name: '.$validated['name'],
+                'Email: '.$validated['email'],
+                'Subject: '.$validated['subject'],
                 '',
                 'Message:',
                 $validated['message'],

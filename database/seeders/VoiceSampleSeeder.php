@@ -10,7 +10,7 @@ class VoiceSampleSeeder extends Seeder
     public function run(): void
     {
         /** @var array<int, array<string, mixed>> $records */
-        $records = require __DIR__ . '/data/voice_samples.php';
+        $records = require __DIR__.'/data/voice_samples.php';
 
         foreach ($records as $record) {
             $record['show_in_hero'] = $record['show_in_hero'] ?? (bool) ($record['is_featured'] ?? false);

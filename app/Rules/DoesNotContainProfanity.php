@@ -12,8 +12,7 @@ class DoesNotContainProfanity implements ValidationRule
     public function __construct(
         private readonly ProfanityFilter $profanityFilter,
         private readonly string $messageKey = 'ui.backend.generation_text_prohibited',
-    ) {
-    }
+    ) {}
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {

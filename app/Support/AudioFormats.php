@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Plan;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
@@ -105,7 +106,7 @@ class AudioFormats
      */
     private static function serverEncoders(): array
     {
-        return once(fn (): array => \Illuminate\Support\Facades\Cache::remember('audio_formats.encoders', now()->addDay(), function (): array {
+        return once(fn (): array => Cache::remember('audio_formats.encoders', now()->addDay(), function (): array {
             try {
                 $process = new Process([self::ffmpeg(), '-hide_banner', '-encoders']);
                 $process->setTimeout(10);
@@ -185,6 +186,6 @@ class AudioFormats
         // puts a copy on hosts that have none. The usual system folders are
         // named too: web PHP (PHP-FPM) often runs with an empty PATH, so a
         // server ffmpeg the command line finds would otherwise be missed.
-        return (new ExecutableFinder())->find('ffmpeg', null, [storage_path('app/bin'), '/usr/bin', '/usr/local/bin', '/bin']);
+        return (new ExecutableFinder)->find('ffmpeg', null, [storage_path('app/bin'), '/usr/bin', '/usr/local/bin', '/bin']);
     }
 }

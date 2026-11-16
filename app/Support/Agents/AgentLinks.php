@@ -3,6 +3,7 @@
 namespace App\Support\Agents;
 
 use App\Models\Agent;
+use App\Models\AgentSource;
 use App\Services\Agents\SiteReader;
 use Illuminate\Support\Str;
 
@@ -533,7 +534,7 @@ final class AgentLinks
         $look = array_values(array_unique(array_filter($look, fn ($w) => mb_strlen($w) >= 3)));
         $best = null;
         $score = 0;
-        foreach ($agent->sources()->where('kind', \App\Models\AgentSource::PAGE)->whereNotNull('url')->get(['title', 'url']) as $page) {
+        foreach ($agent->sources()->where('kind', AgentSource::PAGE)->whereNotNull('url')->get(['title', 'url']) as $page) {
             $clean = self::clean((string) $page->url, $agent->website_url);
             if ($clean === null || $clean['network'] !== 'website') {
                 continue;

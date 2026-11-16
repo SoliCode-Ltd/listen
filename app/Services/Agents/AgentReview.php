@@ -5,6 +5,7 @@ namespace App\Services\Agents;
 use App\Models\Agent;
 use App\Models\AgentSource;
 use App\Support\Agents\AgentAccess;
+use App\Support\Agents\AgentLinks;
 use Illuminate\Support\Str;
 
 /**
@@ -53,7 +54,7 @@ class AgentReview
             'Facts it answers from (start): '.Str::limit(trim((string) $agent->knowledge), 5000, ' …'),
             trim((string) $agent->setting('updates', '')) !== '' ? 'Latest updates from the owner: '.Str::limit(trim((string) $agent->setting('updates')), 2000, ' …') : null,
             $files !== '' ? 'Files it learned from: '.$files : null,
-            ($links = \App\Support\Agents\AgentLinks::of($agent)) !== [] ? 'Links it writes in the chat when asked: '.implode(' | ', array_column($links, 'url')) : null,
+            ($links = AgentLinks::of($agent)) !== [] ? 'Links it writes in the chat when asked: '.implode(' | ', array_column($links, 'url')) : null,
         ])));
     }
 

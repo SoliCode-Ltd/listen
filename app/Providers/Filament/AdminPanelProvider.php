@@ -14,6 +14,7 @@ use Filament\PanelProvider;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Support\Colors\Color;
 use Filament\Tables\Table;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -59,7 +60,7 @@ class AdminPanelProvider extends PanelProvider
 
     public static function packagesReady(): bool
     {
-        return class_exists(\Filament\Schemas\Schema::class);
+        return class_exists(Schema::class);
     }
 
     /**
@@ -86,7 +87,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->brandName(config('app.name', 'Listen') . ' Admin')
+            ->brandName(config('app.name', 'Listen').' Admin')
             // Filament's stylesheet with the admin's own pages' classes (resources/css/filament/admin/theme.css),
             // at an address that changes with its content (themeVersion()).
             ->theme(asset('css/filament/admin/theme.css').'?v='.self::themeVersion())

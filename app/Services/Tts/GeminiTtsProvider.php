@@ -3,20 +3,21 @@
 namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
+use App\Models\Voice;
 use App\Services\VoiceCloningService;
 use App\Support\ArabicDialects;
-use App\Support\SpeechLanguages;
 use App\Support\EnglishAccents;
 use App\Support\GeminiSpend;
 use App\Support\GeminiTtsModel;
-use App\Support\SpeakerVoices;
 use App\Support\GeminiVocalTags;
 use App\Support\JoinPauses;
 use App\Support\PaceAndPitch;
 use App\Support\PieceCheck;
 use App\Support\Pronunciations;
 use App\Support\ShareableAudio;
+use App\Support\SpeakerVoices;
 use App\Support\SpeechJoin;
+use App\Support\SpeechLanguages;
 use App\Support\TextChunker;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
@@ -37,7 +38,6 @@ use Illuminate\Support\Str;
  */
 class GeminiTtsProvider implements TtsProviderInterface
 {
-
     /**
      * Current API key info (managed by GeminiKeyManager).
      */
@@ -59,6 +59,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         if ($this->keyManager === null) {
             $this->keyManager = app(GeminiKeyManager::class);
         }
+
         return $this->keyManager;
     }
 
@@ -297,38 +298,38 @@ class GeminiTtsProvider implements TtsProviderInterface
 
     /** Performance style prompts for Arabic synthesis */
     private const ARABIC_STYLE_HINTS = [
-        'neutral'        => 'Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone. Maintain natural Arabic speech rhythm and pacing.',
-        'warm'           => 'Speak this Arabic text with genuine heartfelt warmth, like a trusted friend sharing something meaningful. Let your smile come through your voice with rich, inviting tones.',
-        'sad'            => 'Read this Arabic text with deep, aching sadness. Let your voice tremble slightly with raw emotion. Slow down and let sorrow fill the pauses. Almost whisper the most painful words.',
-        'excited'        => 'Read this Arabic text BURSTING with infectious, high-energy excitement! Raise your voice with genuine enthusiasm on key words. Let your passion overflow and make the listener feel the thrill!',
-        'formal'         => 'Deliver this Arabic text with impeccable formality and authoritative gravitas, like an official government spokesperson. Every syllable precise, measured, and commanding respect.',
-        'storytelling'   => 'Narrate this Arabic text like a master storyteller captivating an audience around a fire. Use dramatic pauses, vary your pace, whisper the tense moments, and build suspense with every sentence.',
-        'ad_style'       => 'Deliver this Arabic text as a high-energy, persuasive TV ad voiceover. PUNCH each selling point with explosive enthusiasm. Create urgency and make listeners want to act NOW!',
-        'news'           => 'You are an urgent Arabic news anchor on live television. Deliver with sharp, commanding authority and rapid intensity. Deep, resonant voice with zero warmth \xe2\x80\x94 pure broadcast professionalism and urgency. Punch each headline hard.',
-        'calm'           => 'Speak this Arabic text with serene, zen-like tranquility, like a meditation guide. Ultra-slow, barely above a whisper. Let peaceful stillness fill the gaps between phrases. Soothing and deeply relaxing.',
-        'angry'          => 'Read this Arabic text with fierce, simmering anger and passionate intensity. Let righteous fury sharpen each word. Build tension with restrained power. RAISE your voice on the strongest points.',
-        'educational'    => 'You are an enthusiastic Arabic professor BURSTING with passion for teaching. Speak with clear structure and infectious energy. Emphasize key concepts. Make learning feel like the most thrilling adventure.',
-        'commercial'     => 'You are SHOUTING a flash-sale Arabic commercial! EXPLOSIVE energy, wild enthusiasm! Rush through words like the deal expires in seconds. Maximum hype, maximum urgency, maximum volume!',
-        'promo'          => 'Deliver this Arabic text as a powerful, cinematic promotional piece. Build from a firm opening to a thundering crescendo. Each word polished and impactful. Make the audience feel they MUST act.',
-        'podcast'        => 'You are a witty, charismatic Arabic podcast host. Natural, conversational, playfully engaging the audience. Quick pace with comedic timing and strategic pauses. Build intrigue like sharing a juicy secret.',
-        'assistant'      => 'You are an upbeat, cheerful Arabic AI assistant overflowing with eagerness to help. Bubbly, warm, and genuinely enthusiastic. Quick, friendly delivery with a permanent beaming smile in your voice.',
-        'narrative'      => 'Narrate this Arabic text like an epic audiobook. Use dramatic expression \xe2\x80\x94 whisper for tension, raise your voice for revelations. Paint vivid images with every word. Make the listener hang on each sentence.',
-        'comedic'        => 'Deliver this Arabic text with sharp wit, mischievous humor, and perfect comedic timing. Add playful sarcasm and cheeky pauses. Sound like you are trying not to laugh at your own cleverness.',
-        'corporate'      => 'Speak this Arabic text with stern, polished corporate authority. Formal, no-nonsense delivery. Deep, commanding tone that inspires absolute trust. Each word lands with boardroom gravitas.',
+        'neutral' => 'Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone. Maintain natural Arabic speech rhythm and pacing.',
+        'warm' => 'Speak this Arabic text with genuine heartfelt warmth, like a trusted friend sharing something meaningful. Let your smile come through your voice with rich, inviting tones.',
+        'sad' => 'Read this Arabic text with deep, aching sadness. Let your voice tremble slightly with raw emotion. Slow down and let sorrow fill the pauses. Almost whisper the most painful words.',
+        'excited' => 'Read this Arabic text BURSTING with infectious, high-energy excitement! Raise your voice with genuine enthusiasm on key words. Let your passion overflow and make the listener feel the thrill!',
+        'formal' => 'Deliver this Arabic text with impeccable formality and authoritative gravitas, like an official government spokesperson. Every syllable precise, measured, and commanding respect.',
+        'storytelling' => 'Narrate this Arabic text like a master storyteller captivating an audience around a fire. Use dramatic pauses, vary your pace, whisper the tense moments, and build suspense with every sentence.',
+        'ad_style' => 'Deliver this Arabic text as a high-energy, persuasive TV ad voiceover. PUNCH each selling point with explosive enthusiasm. Create urgency and make listeners want to act NOW!',
+        'news' => 'You are an urgent Arabic news anchor on live television. Deliver with sharp, commanding authority and rapid intensity. Deep, resonant voice with zero warmth \xe2\x80\x94 pure broadcast professionalism and urgency. Punch each headline hard.',
+        'calm' => 'Speak this Arabic text with serene, zen-like tranquility, like a meditation guide. Ultra-slow, barely above a whisper. Let peaceful stillness fill the gaps between phrases. Soothing and deeply relaxing.',
+        'angry' => 'Read this Arabic text with fierce, simmering anger and passionate intensity. Let righteous fury sharpen each word. Build tension with restrained power. RAISE your voice on the strongest points.',
+        'educational' => 'You are an enthusiastic Arabic professor BURSTING with passion for teaching. Speak with clear structure and infectious energy. Emphasize key concepts. Make learning feel like the most thrilling adventure.',
+        'commercial' => 'You are SHOUTING a flash-sale Arabic commercial! EXPLOSIVE energy, wild enthusiasm! Rush through words like the deal expires in seconds. Maximum hype, maximum urgency, maximum volume!',
+        'promo' => 'Deliver this Arabic text as a powerful, cinematic promotional piece. Build from a firm opening to a thundering crescendo. Each word polished and impactful. Make the audience feel they MUST act.',
+        'podcast' => 'You are a witty, charismatic Arabic podcast host. Natural, conversational, playfully engaging the audience. Quick pace with comedic timing and strategic pauses. Build intrigue like sharing a juicy secret.',
+        'assistant' => 'You are an upbeat, cheerful Arabic AI assistant overflowing with eagerness to help. Bubbly, warm, and genuinely enthusiastic. Quick, friendly delivery with a permanent beaming smile in your voice.',
+        'narrative' => 'Narrate this Arabic text like an epic audiobook. Use dramatic expression \xe2\x80\x94 whisper for tension, raise your voice for revelations. Paint vivid images with every word. Make the listener hang on each sentence.',
+        'comedic' => 'Deliver this Arabic text with sharp wit, mischievous humor, and perfect comedic timing. Add playful sarcasm and cheeky pauses. Sound like you are trying not to laugh at your own cleverness.',
+        'corporate' => 'Speak this Arabic text with stern, polished corporate authority. Formal, no-nonsense delivery. Deep, commanding tone that inspires absolute trust. Each word lands with boardroom gravitas.',
         'conversational' => 'Speak this Arabic text naturally and spontaneously, like chatting with a close friend over coffee. Relaxed, genuine, with natural laughter moments and real human warmth bleeding through.',
-        'inspirational'  => 'You are a FIERY Arabic motivational speaker at a packed stadium. Start intense and build to a SHOUTING crescendo. Voice cracking with raw passion. Commanding, relentless, like addressing an army before battle!',
-        'cinematic'      => 'Deliver this Arabic text with sweeping cinematic grandeur and emotional depth. Speak with thunderous majesty, extremely slow and dramatic. Let every word resonate like a historical revelation.',
-        'documentary'    => 'Narrate this Arabic text like an epic documentary. Speak with deep, authoritative gravitas and sweeping grandeur. Measured pace with dramatic weight behind every phrase. Paint the scene with your voice.',
+        'inspirational' => 'You are a FIERY Arabic motivational speaker at a packed stadium. Start intense and build to a SHOUTING crescendo. Voice cracking with raw passion. Commanding, relentless, like addressing an army before battle!',
+        'cinematic' => 'Deliver this Arabic text with sweeping cinematic grandeur and emotional depth. Speak with thunderous majesty, extremely slow and dramatic. Let every word resonate like a historical revelation.',
+        'documentary' => 'Narrate this Arabic text like an epic documentary. Speak with deep, authoritative gravitas and sweeping grandeur. Measured pace with dramatic weight behind every phrase. Paint the scene with your voice.',
         'sports_commentator' => 'You are an ELECTRIC Arabic sports commentator during the most intense football match! EXPLODE with energy on every play! Build tension, SCREAM the goals with raw passion! Let your voice crack with excitement! GOOOOOAL!',
-        'meditation'     => 'Speak this Arabic text with profound serenity and inner peace, like a spiritual guide leading a meditation. Ultra-slow, gentle, hypnotic rhythm. Let each word float softly. Create deep tranquility and mindfulness.',
-        'audiobook'      => 'Narrate this Arabic text as a professional audiobook narrator. Clear, engaging, with subtle emotional coloring. Vary pace for drama, maintain clarity, and bring characters to life with distinct vocal textures.',
+        'meditation' => 'Speak this Arabic text with profound serenity and inner peace, like a spiritual guide leading a meditation. Ultra-slow, gentle, hypnotic rhythm. Let each word float softly. Create deep tranquility and mindfulness.',
+        'audiobook' => 'Narrate this Arabic text as a professional audiobook narrator. Clear, engaging, with subtle emotional coloring. Vary pace for drama, maintain clarity, and bring characters to life with distinct vocal textures.',
         'children_story' => 'Read this Arabic text like a beloved storyteller enchanting young children. Warm, playful, with wonder in your voice. Use animated expressions, fun sound effects hints, and make every moment magical and exciting!',
-        'radio_host'     => 'You are a charismatic Arabic radio host between songs. Smooth, warm, effortlessly cool delivery. Quick wit, playful energy, and that signature radio sparkle that keeps listeners tuned in.',
-        'hopeful'        => 'Speak this Arabic text with genuine hope and optimism shining through. Let your voice lift with possibility and promise. Bright, uplifting tones that inspire belief in better days ahead.',
-        'serious'        => 'Deliver this Arabic text with grave seriousness and weight. Deep, measured tones that convey the importance of every word. No lightness — pure gravity and significance.',
-        'playful'        => 'Read this Arabic text with infectious playfulness and lighthearted joy. Bouncy, fun delivery with a mischievous twinkle. Make listeners smile with your delightful, carefree energy.',
-        'mysterious'     => 'Speak this Arabic text with an air of mystery and intrigue. Low, hushed tones that hint at secrets. Slow, deliberate pacing that builds suspense and keeps listeners on edge.',
-        'confident'      => 'Deliver this Arabic text with unwavering confidence and authority. Strong, assured tones that command attention. Speak like someone who knows exactly what they are talking about.',
+        'radio_host' => 'You are a charismatic Arabic radio host between songs. Smooth, warm, effortlessly cool delivery. Quick wit, playful energy, and that signature radio sparkle that keeps listeners tuned in.',
+        'hopeful' => 'Speak this Arabic text with genuine hope and optimism shining through. Let your voice lift with possibility and promise. Bright, uplifting tones that inspire belief in better days ahead.',
+        'serious' => 'Deliver this Arabic text with grave seriousness and weight. Deep, measured tones that convey the importance of every word. No lightness — pure gravity and significance.',
+        'playful' => 'Read this Arabic text with infectious playfulness and lighthearted joy. Bouncy, fun delivery with a mischievous twinkle. Make listeners smile with your delightful, carefree energy.',
+        'mysterious' => 'Speak this Arabic text with an air of mystery and intrigue. Low, hushed tones that hint at secrets. Slow, deliberate pacing that builds suspense and keeps listeners on edge.',
+        'confident' => 'Deliver this Arabic text with unwavering confidence and authority. Strong, assured tones that command attention. Speak like someone who knows exactly what they are talking about.',
         'movie_trailer' => 'Deliver this Arabic text like an epic movie-trailer voiceover: deep, resonant, with dramatic pauses between lines and every phrase landing with weight.',
         'poetry' => 'Recite this Arabic text like a poet performing on stage: musical rhythm, deliberate pauses at line breaks, and rich emotional emphasis on key images.',
         'bedtime_story' => 'Read this Arabic text like a parent telling a bedtime story: soft, slow, soothing, and warm, growing gentler toward the end.',
@@ -371,6 +372,7 @@ class GeminiTtsProvider implements TtsProviderInterface
      * Get an available API key via GeminiKeyManager.
      *
      * @return array{key: string, name: string, index: int}
+     *
      * @throws GeminiKeysOutException if no keys available
      */
     private function getAvailableKey(): array
@@ -381,6 +383,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             throw new GeminiKeysOutException('All Gemini API keys exhausted. Please add more keys or wait for rate limits to reset.');
         }
         $this->currentKeyInfo = $keyInfo;
+
         return $keyInfo;
     }
 
@@ -413,6 +416,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         $this->currentKeyInfo = $keyInfo;
+
         return true;
     }
 
@@ -430,7 +434,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         $guardrail = app(TtsCostGuardrail::class);
         $guardrail->assertCanSynthesize($this->name(), $charCount);
 
-        if (!$this->isAvailable()) {
+        if (! $this->isAvailable()) {
             throw new \RuntimeException('Gemini TTS API key is not configured.');
         }
 
@@ -692,7 +696,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             $startedAt = microtime(true);
             $responses = Http::pool(function (Pool $pool) use ($batch, $endpoint, $timeout, $verifySsl, $keyOf, $sinks) {
                 foreach ($batch as $index => $payload) {
-                    $pool->as('part' . $index)
+                    $pool->as('part'.$index)
                         ->timeout($timeout)
                         ->withOptions(['verify' => $verifySsl] + ($sinks[$index] !== null ? ['sink' => $sinks[$index]] : []))
                         ->withHeaders([
@@ -707,8 +711,8 @@ class GeminiTtsProvider implements TtsProviderInterface
                 foreach ($batch as $index => $payload) {
                     $keyInfo = $keyOf[$index];
                     // Each reply is let go once its audio is out.
-                    $response = $responses['part' . $index] ?? null;
-                    unset($responses['part' . $index]);
+                    $response = $responses['part'.$index] ?? null;
+                    unset($responses['part'.$index]);
                     $error = $response instanceof \Throwable ? $response->getMessage() : null;
                     $part = null;
 
@@ -727,7 +731,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                             continue;
                         }
                     } elseif ($response instanceof Response) {
-                        $error = 'HTTP ' . $response->status() . ': ' . mb_substr($response->body(), 0, 200);
+                        $error = 'HTTP '.$response->status().': '.mb_substr($response->body(), 0, 200);
                     }
 
                     $elapsed = microtime(true) - $startedAt;
@@ -740,7 +744,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                     // Only the key was at fault: the piece is sent on another key, whatever the time.
                     $keyAtFault = $response instanceof Response && $this->setKeyAside($response, $keyInfo, $endpoint);
                     if (! $keyAtFault && $elapsed >= $retryBudgetSeconds) {
-                        throw new TransientGeminiException('Gemini TTS piece ' . ($index + 1) . ' of ' . count($payloads) . ' failed: ' . mb_substr((string) $error, 0, 200));
+                        throw new TransientGeminiException('Gemini TTS piece '.($index + 1).' of '.count($payloads).' failed: '.mb_substr((string) $error, 0, 200));
                     }
 
                     $response = null;
@@ -1396,7 +1400,7 @@ class GeminiTtsProvider implements TtsProviderInterface
 
             try {
                 $response = $this->sendWithSslFallback(
-                    fn(bool $verify) => Http::timeout($timeout)
+                    fn (bool $verify) => Http::timeout($timeout)
                         ->withOptions(['verify' => $verify])
                         ->withHeaders([
                             'Content-Type' => 'application/json',
@@ -1412,7 +1416,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                     'endpoint' => $endpoint,
                     'key' => $keyInfo['name'],
                 ]);
-                throw new \RuntimeException('Gemini TTS API call failed: ' . $e->getMessage(), 0, $e);
+                throw new \RuntimeException('Gemini TTS API call failed: '.$e->getMessage(), 0, $e);
             }
 
             // A used-up daily quota stays skipped until Google resets it.
@@ -1456,16 +1460,17 @@ class GeminiTtsProvider implements TtsProviderInterface
                 ]);
 
                 $tried[] = $keyInfo['name'];
-                if (!$this->rotateToNextKey($tried)) {
+                if (! $this->rotateToNextKey($tried)) {
                     break; // No more keys available
                 }
+
                 continue;
             }
 
             // Every key answered with a limit that lasts: the member is told the
             // limit is ours, not that the voices are busy for a minute.
             if ($keysOut === $maxAttempts) {
-                throw new GeminiKeysOutException('Every Gemini TTS API key is out (HTTP ' . $response->status() . '): ' . mb_substr($response->body(), 0, 200));
+                throw new GeminiKeysOutException('Every Gemini TTS API key is out (HTTP '.$response->status().'): '.mb_substr($response->body(), 0, 200));
             }
 
             if ($response->serverError()) {
@@ -1474,20 +1479,20 @@ class GeminiTtsProvider implements TtsProviderInterface
                     'body' => mb_substr($response->body(), 0, 500),
                     'key' => $keyInfo['name'],
                 ]);
-                throw new TransientGeminiException('Gemini TTS request failed (HTTP ' . $response->status() . '): ' . mb_substr($response->body(), 0, 200));
+                throw new TransientGeminiException('Gemini TTS request failed (HTTP '.$response->status().'): '.mb_substr($response->body(), 0, 200));
             }
 
-            if (!$response->ok()) {
+            if (! $response->ok()) {
                 Log::error('Gemini TTS API returned error', [
                     'status' => $response->status(),
                     'body' => mb_substr($response->body(), 0, 500),
                     'key' => $keyInfo['name'],
                 ]);
-                throw new \RuntimeException('Gemini TTS request failed (HTTP ' . $response->status() . '): ' . mb_substr($response->body(), 0, 200));
+                throw new \RuntimeException('Gemini TTS request failed (HTTP '.$response->status().'): '.mb_substr($response->body(), 0, 200));
             }
 
             $json = $response->json();
-            if (!is_array($json)) {
+            if (! is_array($json)) {
                 throw new \RuntimeException('Gemini TTS returned invalid JSON response.');
             }
 
@@ -1508,17 +1513,17 @@ class GeminiTtsProvider implements TtsProviderInterface
     {
         $blockReason = $response['promptFeedback']['blockReason'] ?? null;
         if (is_string($blockReason) && $blockReason !== '') {
-            throw new GeminiTextRefusedException('Gemini TTS blocked the prompt: ' . $blockReason);
+            throw new GeminiTextRefusedException('Gemini TTS blocked the prompt: '.$blockReason);
         }
 
         $candidates = $response['candidates'] ?? [];
-        if (!is_array($candidates) || empty($candidates)) {
+        if (! is_array($candidates) || empty($candidates)) {
             throw new TransientGeminiException('Gemini TTS response contains no candidates.');
         }
 
         $finishReason = (string) ($candidates[0]['finishReason'] ?? '');
         if (in_array($finishReason, ['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII'], true)) {
-            throw new GeminiTextRefusedException('Gemini TTS refused the text (finishReason ' . $finishReason . ').');
+            throw new GeminiTextRefusedException('Gemini TTS refused the text (finishReason '.$finishReason.').');
         }
 
         // Stopped at the output limit: the audio ends mid-sentence. It is asked
@@ -1528,8 +1533,8 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         $parts = $candidates[0]['content']['parts'] ?? [];
-        if (!is_array($parts)) {
-            throw new TransientGeminiException('Gemini TTS response contains no parts (finishReason ' . ($finishReason ?: 'none') . ').');
+        if (! is_array($parts)) {
+            throw new TransientGeminiException('Gemini TTS response contains no parts (finishReason '.($finishReason ?: 'none').').');
         }
 
         foreach ($parts as $part) {
@@ -1548,7 +1553,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             }
         }
 
-        throw new TransientGeminiException('Gemini TTS response contains no audio data (finishReason ' . ($finishReason ?: 'none') . ').');
+        throw new TransientGeminiException('Gemini TTS response contains no audio data (finishReason '.($finishReason ?: 'none').').');
     }
 
     /**
@@ -1571,7 +1576,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         $packaged = ['path' => $joined['path'], 'extension' => 'wav'];
         try {
             $packaged = ShareableAudio::packageFile($joined['path'], $joined['pieces']);
-            $filename = 'audio/' . now()->format('Ymd_His') . '_listen.studio_' . Str::random(12) . '.' . $packaged['extension'];
+            $filename = 'audio/'.now()->format('Ymd_His').'_listen.studio_'.Str::random(12).'.'.$packaged['extension'];
             ShareableAudio::store($packaged['path'], $filename);
 
             return $filename;
@@ -1673,7 +1678,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         if (SpeechLanguages::premiumOnly(strtolower(trim($targetLanguage)))) {
             // The language travels in the style text as well (the newer model takes no language code).
             $name = SpeechLanguages::englishName($targetLanguage);
-            $prompt .= " Speak in {$name} (".SpeechLanguages::nativeName($targetLanguage)."), with natural native pronunciation and rhythm. Read the transcript exactly as written; do not translate it or switch to another language.";
+            $prompt .= " Speak in {$name} (".SpeechLanguages::nativeName($targetLanguage).'), with natural native pronunciation and rhythm. Read the transcript exactly as written; do not translate it or switch to another language.';
         } elseif (! $isArabic) {
             $accentName = match ($dialectCode) {
                 'EN-US' => 'American English',
@@ -1801,38 +1806,38 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         return match ($style) {
-            'neutral'        => '',
-            'warm'           => 'Speak with genuine heartfelt warmth, like a trusted friend sharing something meaningful. Let your smile come through your voice with rich, inviting tones.',
-            'sad'            => 'Read with deep, aching sadness and raw vulnerability. Let your voice tremble slightly with emotion. Slow down and let sorrow fill the pauses between phrases.',
-            'excited'        => 'Read BURSTING with infectious, high-energy excitement! Raise your voice with genuine enthusiasm on key words. Let your passion overflow!',
-            'formal'         => 'Deliver with impeccable formality and authoritative gravitas, like an official spokesperson. Every syllable precise, measured, and commanding absolute respect.',
-            'storytelling'   => 'Narrate like a master storyteller captivating an audience. Use dramatic pauses, vary your pace, whisper the tense moments, and build suspense with every sentence.',
-            'ad_style'       => 'Deliver as a high-energy, persuasive TV ad voiceover! PUNCH each selling point with explosive enthusiasm. Create urgency and make listeners want to act NOW!',
-            'news'           => 'You are an urgent breaking-news anchor on live television. Deliver with sharp, commanding authority and rapid intensity. Deep voice, zero warmth — pure broadcast professionalism.',
-            'calm'           => 'Speak with serene, zen-like tranquility, like a meditation guide. Ultra-slow, barely above a whisper. Let peaceful stillness fill the gaps. Soothing and deeply relaxing.',
-            'angry'          => 'Read with fierce, simmering anger and passionate intensity. Let righteous fury sharpen each word. Build tension with restrained power that could explode at any moment.',
-            'educational'    => 'You are an enthusiastic professor BURSTING with passion for teaching. Clear, structured delivery with infectious energy. Emphasize key concepts. Make learning thrilling.',
-            'commercial'     => 'You are SHOUTING a flash-sale commercial! EXPLOSIVE energy and wild enthusiasm! Rush through words like the deal expires NOW. Maximum hype, maximum urgency!',
-            'promo'          => 'Deliver as a powerful, cinematic promotional piece. Build from a firm opening to a thundering crescendo. Each word polished and impactful. Make the audience feel compelled to act.',
-            'podcast'        => 'You are a witty, charismatic podcast host. Natural, conversational, playfully engaging the audience. Quick pace with comedic timing and strategic pauses. Build intrigue like sharing a secret.',
-            'assistant'      => 'You are an upbeat, cheerful AI assistant overflowing with eagerness to help. Bubbly, warm, genuinely enthusiastic. Quick, friendly delivery with a permanent beaming smile in your voice.',
-            'narrative'      => 'Narrate like an epic audiobook. Use dramatic expression — whisper for tension, raise your voice for revelations. Paint vivid images with every word. Make listeners hang on each sentence.',
-            'comedic'        => 'Deliver with sharp wit, mischievous humor, and perfect comedic timing. Add playful sarcasm and cheeky pauses. Sound like you are trying not to laugh at your own cleverness.',
-            'corporate'      => 'Speak with stern, polished corporate authority. Formal, no-nonsense delivery. Deep, commanding tone that inspires absolute trust. Each word lands like a gavel in the boardroom.',
+            'neutral' => '',
+            'warm' => 'Speak with genuine heartfelt warmth, like a trusted friend sharing something meaningful. Let your smile come through your voice with rich, inviting tones.',
+            'sad' => 'Read with deep, aching sadness and raw vulnerability. Let your voice tremble slightly with emotion. Slow down and let sorrow fill the pauses between phrases.',
+            'excited' => 'Read BURSTING with infectious, high-energy excitement! Raise your voice with genuine enthusiasm on key words. Let your passion overflow!',
+            'formal' => 'Deliver with impeccable formality and authoritative gravitas, like an official spokesperson. Every syllable precise, measured, and commanding absolute respect.',
+            'storytelling' => 'Narrate like a master storyteller captivating an audience. Use dramatic pauses, vary your pace, whisper the tense moments, and build suspense with every sentence.',
+            'ad_style' => 'Deliver as a high-energy, persuasive TV ad voiceover! PUNCH each selling point with explosive enthusiasm. Create urgency and make listeners want to act NOW!',
+            'news' => 'You are an urgent breaking-news anchor on live television. Deliver with sharp, commanding authority and rapid intensity. Deep voice, zero warmth — pure broadcast professionalism.',
+            'calm' => 'Speak with serene, zen-like tranquility, like a meditation guide. Ultra-slow, barely above a whisper. Let peaceful stillness fill the gaps. Soothing and deeply relaxing.',
+            'angry' => 'Read with fierce, simmering anger and passionate intensity. Let righteous fury sharpen each word. Build tension with restrained power that could explode at any moment.',
+            'educational' => 'You are an enthusiastic professor BURSTING with passion for teaching. Clear, structured delivery with infectious energy. Emphasize key concepts. Make learning thrilling.',
+            'commercial' => 'You are SHOUTING a flash-sale commercial! EXPLOSIVE energy and wild enthusiasm! Rush through words like the deal expires NOW. Maximum hype, maximum urgency!',
+            'promo' => 'Deliver as a powerful, cinematic promotional piece. Build from a firm opening to a thundering crescendo. Each word polished and impactful. Make the audience feel compelled to act.',
+            'podcast' => 'You are a witty, charismatic podcast host. Natural, conversational, playfully engaging the audience. Quick pace with comedic timing and strategic pauses. Build intrigue like sharing a secret.',
+            'assistant' => 'You are an upbeat, cheerful AI assistant overflowing with eagerness to help. Bubbly, warm, genuinely enthusiastic. Quick, friendly delivery with a permanent beaming smile in your voice.',
+            'narrative' => 'Narrate like an epic audiobook. Use dramatic expression — whisper for tension, raise your voice for revelations. Paint vivid images with every word. Make listeners hang on each sentence.',
+            'comedic' => 'Deliver with sharp wit, mischievous humor, and perfect comedic timing. Add playful sarcasm and cheeky pauses. Sound like you are trying not to laugh at your own cleverness.',
+            'corporate' => 'Speak with stern, polished corporate authority. Formal, no-nonsense delivery. Deep, commanding tone that inspires absolute trust. Each word lands like a gavel in the boardroom.',
             'conversational' => 'Speak naturally and spontaneously, like chatting with a close friend over coffee. Relaxed, genuine, with natural laughter moments and real human warmth.',
-            'inspirational'  => 'You are a FIERY motivational speaker at a packed stadium! Start intense and build to a SHOUTING crescendo. Voice cracking with raw passion. Commanding and relentless!',
-            'cinematic'      => 'Deliver with sweeping cinematic grandeur and emotional depth. Speak with thunderous majesty, extremely slow and dramatic. Let every word resonate like a revelation.',
-            'documentary'    => 'Narrate like an epic documentary with deep, authoritative gravitas and sweeping grandeur. Measured pace with dramatic weight behind every phrase. Paint the scene with your voice.',
+            'inspirational' => 'You are a FIERY motivational speaker at a packed stadium! Start intense and build to a SHOUTING crescendo. Voice cracking with raw passion. Commanding and relentless!',
+            'cinematic' => 'Deliver with sweeping cinematic grandeur and emotional depth. Speak with thunderous majesty, extremely slow and dramatic. Let every word resonate like a revelation.',
+            'documentary' => 'Narrate like an epic documentary with deep, authoritative gravitas and sweeping grandeur. Measured pace with dramatic weight behind every phrase. Paint the scene with your voice.',
             'sports_commentator' => 'You are an ELECTRIC sports commentator during the most intense football match! EXPLODE with energy on every play! Build tension, SCREAM the goals with raw passion! Let your voice crack with excitement! GOOOOOAL!',
-            'meditation'     => 'Speak with profound serenity and inner peace, like a spiritual guide leading a meditation. Ultra-slow, gentle, hypnotic rhythm. Let each word float softly. Create deep tranquility and mindfulness.',
-            'audiobook'      => 'Narrate as a professional audiobook narrator. Clear, engaging, with subtle emotional coloring. Vary pace for drama, maintain clarity, and bring characters to life with distinct vocal textures.',
+            'meditation' => 'Speak with profound serenity and inner peace, like a spiritual guide leading a meditation. Ultra-slow, gentle, hypnotic rhythm. Let each word float softly. Create deep tranquility and mindfulness.',
+            'audiobook' => 'Narrate as a professional audiobook narrator. Clear, engaging, with subtle emotional coloring. Vary pace for drama, maintain clarity, and bring characters to life with distinct vocal textures.',
             'children_story' => 'Read like a beloved storyteller enchanting young children. Warm, playful, with wonder in your voice. Use animated expressions, fun sound effects hints, and make every moment magical and exciting!',
-            'radio_host'     => 'You are a charismatic radio host between songs. Smooth, warm, effortlessly cool delivery. Quick wit, playful energy, and that signature radio sparkle that keeps listeners tuned in.',
-            'hopeful'        => 'Speak with genuine hope and optimism shining through. Let your voice lift with possibility and promise. Bright, uplifting tones that inspire belief in better days ahead.',
-            'serious'        => 'Deliver with grave seriousness and weight. Deep, measured tones that convey the importance of every word. No lightness — pure gravity and significance.',
-            'playful'        => 'Read with infectious playfulness and lighthearted joy. Bouncy, fun delivery with a mischievous twinkle. Make listeners smile with your delightful, carefree energy.',
-            'mysterious'     => 'Speak with an air of mystery and intrigue. Low, hushed tones that hint at secrets. Slow, deliberate pacing that builds suspense and keeps listeners on edge.',
-            'confident'      => 'Deliver with unwavering confidence and authority. Strong, assured tones that command attention. Speak like someone who knows exactly what they are talking about.',
+            'radio_host' => 'You are a charismatic radio host between songs. Smooth, warm, effortlessly cool delivery. Quick wit, playful energy, and that signature radio sparkle that keeps listeners tuned in.',
+            'hopeful' => 'Speak with genuine hope and optimism shining through. Let your voice lift with possibility and promise. Bright, uplifting tones that inspire belief in better days ahead.',
+            'serious' => 'Deliver with grave seriousness and weight. Deep, measured tones that convey the importance of every word. No lightness — pure gravity and significance.',
+            'playful' => 'Read with infectious playfulness and lighthearted joy. Bouncy, fun delivery with a mischievous twinkle. Make listeners smile with your delightful, carefree energy.',
+            'mysterious' => 'Speak with an air of mystery and intrigue. Low, hushed tones that hint at secrets. Slow, deliberate pacing that builds suspense and keeps listeners on edge.',
+            'confident' => 'Deliver with unwavering confidence and authority. Strong, assured tones that command attention. Speak like someone who knows exactly what they are talking about.',
             'movie_trailer' => 'Deliver like an epic movie-trailer voiceover: deep, resonant, with dramatic pauses between lines and every phrase landing with weight.',
             'poetry' => 'Recite like a poet performing on stage: musical rhythm, deliberate pauses at line breaks, and rich emotional emphasis on key images.',
             'bedtime_story' => 'Read like a parent telling a bedtime story: soft, slow, soothing, and warm, growing gentler toward the end.',
@@ -1854,7 +1859,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             'cartoon' => 'Perform like an animated cartoon character: bright, bouncy and exaggerated, with playful pitch jumps and lots of energy.',
             'announcer' => 'Speak like a public announcement at an airport or station: clear, calm, evenly paced and polite, with every name and number distinct.',
             'interview' => 'Speak like someone being interviewed: natural, thoughtful and articulate, answering with conversational pauses.',
-            default          => 'Performance style: '.str_replace(['_', '-'], ' ', $style).'. Keep this style clear and consistent throughout.',
+            default => 'Performance style: '.str_replace(['_', '-'], ' ', $style).'. Keep this style clear and consistent throughout.',
         };
     }
 
@@ -1916,7 +1921,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         // 4. Look up internal_voice_id/display_name from DB.
         if ($resolved === '' && $voiceName !== '') {
             $lowerVoiceName = strtolower($voiceName);
-            $voiceRow = \App\Models\Voice::query()
+            $voiceRow = Voice::query()
                 ->where('provider', 'gemini')
                 ->where('is_active', true)
                 ->where(function ($q) use ($voiceName, $lowerVoiceName) {
@@ -2005,12 +2010,14 @@ class GeminiTtsProvider implements TtsProviderInterface
     private function normalizeGender(mixed $gender): string
     {
         $normalized = strtolower(trim((string) $gender));
+
         return in_array($normalized, ['male', 'female'], true) ? $normalized : '';
     }
 
     private function voiceMatchesGender(string $voiceName, string $gender): bool
     {
         $voiceGender = self::VOICE_GENDER_MAP[$voiceName] ?? null;
+
         return $voiceGender === null || $voiceGender === $gender;
     }
 
@@ -2074,17 +2081,16 @@ class GeminiTtsProvider implements TtsProviderInterface
         return max(3, (int) ceil($wordEstimate / 2.6));
     }
 
-
     private function sendWithSslFallback(callable $sender, bool $verifySsl, string $context)
     {
         try {
             return $sender($verifySsl);
         } catch (\Throwable $e) {
-            if (!$this->shouldRetryWithoutSsl($e, $verifySsl)) {
+            if (! $this->shouldRetryWithoutSsl($e, $verifySsl)) {
                 throw $e;
             }
 
-            Log::warning($context . ' failed SSL verification on local environment; retrying once without verification.');
+            Log::warning($context.' failed SSL verification on local environment; retrying once without verification.');
 
             return $sender(false);
         }
@@ -2092,7 +2098,7 @@ class GeminiTtsProvider implements TtsProviderInterface
 
     private function shouldRetryWithoutSsl(\Throwable $e, bool $verifySsl): bool
     {
-        if (!$verifySsl || !app()->environment('local')) {
+        if (! $verifySsl || ! app()->environment('local')) {
             return false;
         }
 

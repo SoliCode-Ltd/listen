@@ -2,35 +2,36 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Actions\ViewAction;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Tables\Filters\Filter;
-use Filament\Forms\Components\DatePicker;
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\ViewEntry;
-use App\Support\Agents\CallRecordings;
+use App\Filament\Resources\AgentConversationResource\Pages;
 use App\Filament\Resources\AgentConversationResource\Pages\ListAgentConversations;
 use App\Filament\Resources\AgentConversationResource\Pages\ViewAgentConversation;
-use Filament\Tables\Filters\BaseFilter;
-use App\Filament\Resources\AgentConversationResource\Pages;
 use App\Filament\Resources\Concerns\ReadOnlyResource;
 use App\Models\Agent;
 use App\Models\AgentConversation;
-use App\Support\Agents\AgentVisits;
 use App\Services\Agents\AgentCalls;
+use App\Services\Agents\AgentChats;
+use App\Support\Agents\AgentCost;
+use App\Support\Agents\AgentVisits;
+use App\Support\Agents\CallRecordings;
 use App\Support\Countries;
-use Filament\Forms;
-use Filament\Infolists;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\BaseFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
@@ -48,9 +49,9 @@ class AgentConversationResource extends Resource
 
     protected static ?string $model = AgentConversation::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-phone';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-phone';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Agents';
+    protected static string|\UnitEnum|null $navigationGroup = 'Agents';
 
     protected static ?int $navigationSort = 2;
 
@@ -72,7 +73,7 @@ class AgentConversationResource extends Resource
     ];
 
     public const STATUSES = [
-        \App\Services\Agents\AgentChats::OPEN => 'Chat open',
+        AgentChats::OPEN => 'Chat open',
         AgentConversation::LIVE => 'Live',
         AgentConversation::ENDED => 'Ended',
         AgentConversation::FAILED => 'Failed',
@@ -82,7 +83,7 @@ class AgentConversationResource extends Resource
     public const STATUS_BADGES = [
         'live' => 'Live now',
         'quiet' => 'Live, gone quiet',
-        \App\Services\Agents\AgentChats::OPEN => 'Chat open',
+        AgentChats::OPEN => 'Chat open',
         AgentConversation::ENDED => 'Ended',
         AgentConversation::FAILED => 'Failed',
     ];
@@ -550,7 +551,7 @@ class AgentConversationResource extends Resource
                         ->state(fn (AgentConversation $record): ?string => $record->settled_at?->toDayDateTimeString())
                         ->placeholder('Not yet: the chat is still open'),
                     TextEntry::make('chat_worth')->label('Earned, at the least')
-                        ->state(fn (AgentConversation $record): ?string => ! $record->free && ($worth = \App\Support\Agents\AgentCost::dollarsPerCredit()) !== null
+                        ->state(fn (AgentConversation $record): ?string => ! $record->free && ($worth = AgentCost::dollarsPerCredit()) !== null
                             ? '$'.number_format((int) $record->credits * $worth, 5) : null)
                         ->helperText('What its credits are worth on the plan whose credits cost least')
                         ->placeholder('—'),
@@ -880,15 +881,15 @@ class AgentConversationResource extends Resource
 
     public static function isChat(AgentConversation $call): bool
     {
-        return \App\Services\Agents\AgentChats::isChat($call);
+        return AgentChats::isChat($call);
     }
 
     /**
      * Every conversation of the visit this one is in, in order (AgentVisits).
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, AgentConversation>
+     * @return Collection<int, AgentConversation>
      */
-    public static function visit(AgentConversation $call): \Illuminate\Database\Eloquent\Collection
+    public static function visit(AgentConversation $call): Collection
     {
         return AgentVisits::parts($call);
     }
@@ -905,7 +906,7 @@ class AgentConversationResource extends Resource
         $parts = self::visit($call);
 
         return $parts->first(fn (AgentConversation $part): bool => $part->isLive())
-            ?? $parts->first(fn (AgentConversation $part): bool => $part->status === \App\Services\Agents\AgentChats::OPEN)
+            ?? $parts->first(fn (AgentConversation $part): bool => $part->status === AgentChats::OPEN)
             ?? $parts->last() ?? $call;
     }
 
@@ -964,7 +965,7 @@ class AgentConversationResource extends Resource
     /** "$0.0123 (62%)": what a paid chat earned at the least, less what it cost us. */
     public static function chatMargin(AgentConversation $call): ?string
     {
-        $worth = \App\Support\Agents\AgentCost::dollarsPerCredit();
+        $worth = AgentCost::dollarsPerCredit();
         if ($call->free || $worth === null || (int) $call->credits < 1) {
             return null;
         }

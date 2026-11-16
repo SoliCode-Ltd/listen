@@ -2,9 +2,8 @@
 
 namespace App\Filament\Resources\BlockedGenerationResource\Pages;
 
-use Filament\Actions\DeleteAction;
 use App\Filament\Resources\BlockedGenerationResource;
-use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewBlockedGeneration extends ViewRecord

@@ -2,45 +2,42 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\KeyValue;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\BadgeColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\ViewAction;
-use Filament\Actions\Action;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use App\Filament\Resources\ReferralConversionResource\Pages\ListReferralConversions;
 use App\Filament\Resources\ReferralConversionResource\Pages\ViewReferralConversion;
-use Throwable;
-use Illuminate\Support\Facades\Log;
-use App\Filament\Resources\ReferralConversionResource\Pages;
 use App\Models\DemoRewardTransaction;
 use App\Models\ReferralConversion;
 use App\Models\UserReferralProfile;
 use App\Services\Referral\DemoRewardLedgerService;
 use App\Services\Referral\ReferralQualificationService;
 use App\Services\Referral\ReferralService;
-use Filament\Forms;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\KeyValue;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ReferralConversionResource extends Resource
 {
     protected static ?string $model = ReferralConversion::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-users';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-users';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Referrals';
+    protected static string|\UnitEnum|null $navigationGroup = 'Referrals';
 
     protected static ?int $navigationSort = 2;
 
@@ -175,7 +172,9 @@ class ReferralConversionResource extends Resource
                     ->action(function (ReferralConversion $record, array $data) {
                         $service = app(ReferralQualificationService::class);
                         $reviewer = auth()->user();
-                        if (! $reviewer) return;
+                        if (! $reviewer) {
+                            return;
+                        }
                         $service->manuallyApprove($record, $reviewer, $data['notes'] ?? null);
                         Notification::make()
                             ->title('Conversion approved and reward granted.')
@@ -200,7 +199,9 @@ class ReferralConversionResource extends Resource
                     ->action(function (ReferralConversion $record, array $data) {
                         $service = app(ReferralQualificationService::class);
                         $reviewer = auth()->user();
-                        if (! $reviewer) return;
+                        if (! $reviewer) {
+                            return;
+                        }
                         $service->manuallyReject($record, $reviewer, $data['notes'] ?? null, $data['reason'] ?? null);
                         Notification::make()
                             ->title('Conversion rejected.')

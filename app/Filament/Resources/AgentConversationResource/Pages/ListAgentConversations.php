@@ -3,12 +3,13 @@
 namespace App\Filament\Resources\AgentConversationResource\Pages;
 
 use App\Filament\Concerns\SimplePages;
-use Filament\Schemas\Components\Tabs\Tab;
 use App\Filament\Resources\AgentConversationResource;
 use App\Filament\Resources\AgentResource;
 use App\Models\AgentConversation;
+use App\Services\Agents\AgentChats;
 use App\Support\Agents\AgentVisits;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Schemas\Components\Tabs\Tab;
 use Illuminate\Database\Eloquent\Builder;
 
 class ListAgentConversations extends ListRecords
@@ -30,7 +31,7 @@ class ListAgentConversations extends ListRecords
             'chats' => Tab::make('Written chats')
                 ->icon('heroicon-m-chat-bubble-left-ellipsis')
                 ->modifyQueryUsing(fn (Builder $query): Builder => AgentVisits::withAny($query, fn (Builder $part) => $part->whereIn('channel', ['chat', 'chat_link'])))
-                ->badge(fn (): ?int => ($count = AgentConversation::query()->where('status', \App\Services\Agents\AgentChats::OPEN)->count()) > 0 ? $count : null)
+                ->badge(fn (): ?int => ($count = AgentConversation::query()->where('status', AgentChats::OPEN)->count()) > 0 ? $count : null)
                 ->badgeColor('success'),
             'voice' => Tab::make('Voice calls')
                 ->icon('heroicon-m-phone')

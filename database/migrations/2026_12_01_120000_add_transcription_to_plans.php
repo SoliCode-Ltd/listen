@@ -8,9 +8,10 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Speech to text ("Transcribe"), set on each plan (Admin → Plans → Transcribe):
  * whether the plan includes it, the minutes of audio a month (from the plan
- * only: there are no packs or top-ups), the longest file, what a transcript
- * may have (timings with SRT/VTT, speaker names, translation), whether its
- * jobs go first in the queue, and how many run at once for one member.
+ * only: there are no packs or top-ups), the longest file, whether its jobs go
+ * first in the queue, and how many run at once for one member. Every plan
+ * that includes it gets the same transcript (paragraphs with their speakers,
+ * every download, translation): plans differ only in these.
  *
  * The plans start as the owner set them (16 November 2026): no transcription
  * on Free and Basic; Starter 120 minutes a month, Creator 250, Pro 500, Studio
@@ -19,17 +20,16 @@ use Illuminate\Support\Facades\Schema;
  */
 return new class extends Migration
 {
-    /** @var array<string, array{minutes: int, file: int, timestamps: bool, speakers: bool, translate: bool, priority: bool, concurrent: int}> */
+    /** @var array<string, array{minutes: int, file: int, priority: bool, concurrent: int}> */
     private const PLANS = [
-        'starter' => ['minutes' => 120, 'file' => 30, 'timestamps' => true, 'speakers' => false, 'translate' => false, 'priority' => false, 'concurrent' => 1],
-        'creator' => ['minutes' => 250, 'file' => 60, 'timestamps' => true, 'speakers' => true, 'translate' => true, 'priority' => false, 'concurrent' => 1],
-        'pro' => ['minutes' => 500, 'file' => 120, 'timestamps' => true, 'speakers' => true, 'translate' => true, 'priority' => true, 'concurrent' => 2],
-        'studio_max' => ['minutes' => 1000, 'file' => 180, 'timestamps' => true, 'speakers' => true, 'translate' => true, 'priority' => true, 'concurrent' => 2],
+        'starter' => ['minutes' => 120, 'file' => 30, 'priority' => false, 'concurrent' => 1],
+        'creator' => ['minutes' => 250, 'file' => 60, 'priority' => false, 'concurrent' => 1],
+        'pro' => ['minutes' => 500, 'file' => 120, 'priority' => true, 'concurrent' => 2],
+        'studio_max' => ['minutes' => 1000, 'file' => 180, 'priority' => true, 'concurrent' => 2],
     ];
 
     private const COLUMNS = [
-        'transcription_enabled', 'transcription_minutes_month', 'transcription_max_file_minutes', 'transcription_timestamps',
-        'transcription_speakers', 'transcription_translate', 'transcription_priority', 'transcription_concurrent_jobs',
+        'transcription_enabled', 'transcription_minutes_month', 'transcription_max_file_minutes', 'transcription_priority', 'transcription_concurrent_jobs',
     ];
 
     public function up(): void
@@ -47,10 +47,8 @@ return new class extends Migration
             if (! Schema::hasColumn('plans', 'transcription_max_file_minutes')) {
                 $table->unsignedSmallInteger('transcription_max_file_minutes')->default(0);
             }
-            foreach (['transcription_timestamps', 'transcription_speakers', 'transcription_translate', 'transcription_priority'] as $flag) {
-                if (! Schema::hasColumn('plans', $flag)) {
-                    $table->boolean($flag)->default(false);
-                }
+            if (! Schema::hasColumn('plans', 'transcription_priority')) {
+                $table->boolean('transcription_priority')->default(false);
             }
             if (! Schema::hasColumn('plans', 'transcription_concurrent_jobs')) {
                 $table->unsignedSmallInteger('transcription_concurrent_jobs')->default(1);
@@ -62,9 +60,6 @@ return new class extends Migration
                 'transcription_enabled' => true,
                 'transcription_minutes_month' => $p['minutes'],
                 'transcription_max_file_minutes' => $p['file'],
-                'transcription_timestamps' => $p['timestamps'],
-                'transcription_speakers' => $p['speakers'],
-                'transcription_translate' => $p['translate'],
                 'transcription_priority' => $p['priority'],
                 'transcription_concurrent_jobs' => $p['concurrent'],
             ]);

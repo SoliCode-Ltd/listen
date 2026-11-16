@@ -119,12 +119,11 @@ final class TranscriptionSettings
         return array_values(array_filter(array_keys(self::LANGUAGES), fn ($code) => in_array($code, $codes, true)));
     }
 
-    /** What a minute of audio costs Listen: 'plain' text, or 'timed' (timings or speaker names). */
-    public static function costPerMinute(string $kind): float
+    /** What a minute of audio costs Listen, for the admin's cost and margin figures. */
+    public static function costPerMinute(): float
     {
-        $kind = $kind === 'plain' ? 'plain' : 'timed';
-        $default = (float) config('listen.transcription.cost_per_minute.'.$kind, $kind === 'plain' ? 0.0022 : 0.0042);
-        $value = (float) SiteSetting::get('transcription_cost_'.$kind, $default);
+        $default = (float) config('listen.transcription.cost_per_minute', 0.0025);
+        $value = (float) SiteSetting::get('transcription_cost_per_minute', $default);
 
         return $value > 0 ? $value : $default;
     }

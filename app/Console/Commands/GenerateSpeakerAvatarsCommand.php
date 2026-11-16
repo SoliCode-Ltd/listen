@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Voice;
+use App\Support\ArabicDialects;
+use App\Support\EnglishAccents;
 use App\Support\SpeakerAvatar;
 use Illuminate\Console\Command;
 use Illuminate\Http\Client\ConnectionException;
@@ -271,8 +273,8 @@ class GenerateSpeakerAvatarsCommand extends Command
             foreach ($speakers as $speaker) {
                 $dialect = (string) ($speaker['dialect'] ?? $sample['dialect']);
                 $region = $language === 'ar'
-                    ? (str_starts_with($dialect, 'ar-SD') ? 'sudan' : (\App\Support\ArabicDialects::ALL[$dialect]['region'] ?? null))
-                    : strtolower((string) \App\Support\EnglishAccents::countryOf($dialect));
+                    ? (str_starts_with($dialect, 'ar-SD') ? 'sudan' : (ArabicDialects::ALL[$dialect]['region'] ?? null))
+                    : strtolower((string) EnglishAccents::countryOf($dialect));
                 if ($region) {
                     $regions[$language.':'.$speaker['name']] ??= $region;
                 }

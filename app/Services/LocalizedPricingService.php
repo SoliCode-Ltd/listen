@@ -940,6 +940,7 @@ class LocalizedPricingService
                 if ($this->isLocalIp($candidate)) {
                     continue;
                 }
+
                 return $candidate;
             }
         }
@@ -952,6 +953,7 @@ class LocalizedPricingService
                     if ($this->isLocalIp($ip)) {
                         continue;
                     }
+
                     return $ip;
                 }
             }

@@ -11,21 +11,38 @@ use App\Console\Commands\SyncBillingSubscriptionsCommand;
 use App\Console\Commands\SyncStripePlansCommand;
 use App\Console\Commands\ValidateVoiceCatalogCommand;
 use App\Contracts\TtsProviderInterface;
+use App\Mcp\SignInWithListen;
+use App\Models\AppDevice;
 use App\Models\BillingSubscription;
 use App\Models\BillingSubscriptionItem;
 use App\Models\ClonedVoice;
 use App\Models\SiteSetting;
 use App\Policies\ClonedVoicePolicy;
+use App\Services\Billing\CashierStripeCardUpdateGateway;
+use App\Services\Billing\CashierStripePackGateway;
 use App\Services\Billing\CashierStripeTrialGateway;
+use App\Services\Billing\StripeCardUpdateGateway;
+use App\Services\Billing\StripePackGateway;
 use App\Services\Billing\StripeTrialGateway;
+use App\Services\DemoSamePerson;
+use App\Services\Geo\UserCountryRecorder;
 use App\Services\Tts\ArabicVoiceMapper;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Services\Tts\GoogleCloudTtsProvider;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
+use App\Support\GeminiSpend;
+use App\Support\InApp\InApp;
 use App\Support\TitanMailbox;
+use Filament\Tables\Table;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Cashier\Cashier;
@@ -41,10 +58,10 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         Cashier::ignoreRoutes();
-        \App\Mcp\SignInWithListen::register();
+        SignInWithListen::register();
         $this->app->bind(StripeTrialGateway::class, CashierStripeTrialGateway::class);
-        $this->app->bind(\App\Services\Billing\StripePackGateway::class, \App\Services\Billing\CashierStripePackGateway::class);
-        $this->app->bind(\App\Services\Billing\StripeCardUpdateGateway::class, \App\Services\Billing\CashierStripeCardUpdateGateway::class);
+        $this->app->bind(StripePackGateway::class, CashierStripePackGateway::class);
+        $this->app->bind(StripeCardUpdateGateway::class, CashierStripeCardUpdateGateway::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -60,7 +77,7 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // One for each request, so a demo request works out who is the same person once.
-        $this->app->scoped(\App\Services\DemoSamePerson::class);
+        $this->app->scoped(DemoSamePerson::class);
 
         // Register TTS providers as singletons
         $this->app->singleton(GoogleCloudTtsProvider::class);
@@ -75,9 +92,10 @@ class AppServiceProvider extends ServiceProvider
 
         // Inject routing service into TtsService (backward compatible)
         $this->app->singleton(TtsService::class, function ($app) {
-            $service = new TtsService();
+            $service = new TtsService;
             $service->setRoutingService($app->make(TtsRoutingService::class));
             $service->setArabicMapper($app->make(ArabicVoiceMapper::class));
+
             return $service;
         });
 
@@ -90,39 +108,39 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, \App\Services\Geo\UserCountryRecorder::class);
+        Event::listen(Login::class, UserCountryRecorder::class);
 
         // The Listen app (App\Support\InApp\InApp): @inapp ... @else ... @endinapp in the pages,
         // and signing out on a phone stops that phone's notifications.
-        \Illuminate\Support\Facades\Blade::if('inapp', fn (): bool => \App\Support\InApp\InApp::hidesPlans());
+        Blade::if('inapp', fn (): bool => InApp::hidesPlans());
         // Inside the app every link the site makes to a purchase page is the neutral plan page's
         // link instead, wherever it is made (a page, a script's settings, a JSON reply), so no
         // page has to remember. Browsers get the links as they always were.
         URL::formatPathUsing(function (string $path, $route = null): string {
-            if ($route === null || ! \App\Support\InApp\InApp::sellsRoute((string) $route->getName()) || ! \App\Support\InApp\InApp::hidesPlans()) {
+            if ($route === null || ! InApp::sellsRoute((string) $route->getName()) || ! InApp::hidesPlans()) {
                 return $path;
             }
 
-            return \App\Support\InApp\InApp::planPath($path);
+            return InApp::planPath($path);
         });
-        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Logout::class, function (): void {
+        Event::listen(Logout::class, function (): void {
             $deviceId = request()->hasSession() ? (int) request()->session()->get('app_device_id', 0) : 0;
             if ($deviceId > 0) {
-                \App\Models\AppDevice::query()->whereKey($deviceId)->delete();
+                AppDevice::query()->whereKey($deviceId)->delete();
             }
         });
 
         // Every Gemini reply's token counts, for what each voice really cost (App\Support\GeminiSpend).
-        \Illuminate\Support\Facades\Http::globalMiddleware(\App\Support\GeminiSpend::middleware());
+        Http::globalMiddleware(GeminiSpend::middleware());
 
         // "Sign in with Listen" for AI apps on the MCP server.
-        \App\Mcp\SignInWithListen::configure();
+        SignInWithListen::configure();
 
         // No "All" in admin tables: 5,000 audio rows on one page is ~160 MB of
         // HTML and runs PHP out of memory. A saved "All" choice is dropped by
         // Filament because it is no longer an option.
-        \Filament\Tables\Table::configureUsing(
-            fn (\Filament\Tables\Table $table) => $table->paginationPageOptions([10, 25, 50, 100]),
+        Table::configureUsing(
+            fn (Table $table) => $table->paginationPageOptions([10, 25, 50, 100]),
         );
 
         if (! $this->app->environment('testing')) {
@@ -182,7 +200,7 @@ class AppServiceProvider extends ServiceProvider
                         }
 
                         try {
-                            \Illuminate\Support\Facades\Artisan::call('listen:sync-extension');
+                            Artisan::call('listen:sync-extension');
                         } catch (\Throwable $e) {
                             // Never block the command that is actually running.
                         }

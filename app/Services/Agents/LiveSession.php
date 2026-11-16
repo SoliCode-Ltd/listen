@@ -3,8 +3,10 @@
 namespace App\Services\Agents;
 
 use App\Models\Agent;
+use App\Support\Agents\AgentCost;
 use App\Support\Agents\AgentInstructions;
 use App\Support\Agents\AgentLinks;
+use App\Support\Agents\AgentLookup;
 
 /**
  * The live call setup of an agent, sent to Gemini inside its short-lived key
@@ -36,7 +38,7 @@ final class LiveSession
         // besides the instructions is bounded: past it, the oldest turns drop out (to half of it),
         // and a long call costs about the same each minute (App\Support\Agents\AgentCost).
         $keep = max(2000, (int) config('listen.agents.history_tokens', 8000));
-        $base = \App\Support\Agents\AgentCost::tokensIn($instructions);
+        $base = AgentCost::tokensIn($instructions);
 
         return [
             'model' => 'models/'.GeminiClient::LIVE_MODEL,
@@ -104,7 +106,7 @@ final class LiveSession
         }
 
         // Every page of its website, for what the summary in its instructions does not say.
-        if ($agent && \App\Support\Agents\AgentLookup::available($agent)) {
+        if ($agent && AgentLookup::available($agent)) {
             $tools[] = [
                 'name' => 'look_up',
                 'description' => 'Search all the pages and PDF files of the business\'s website for what the caller asked when your instructions do not answer it (a person\'s name or role, a fee, a date, an event, a service, a rule). Use it before saying you do not have the information.',

@@ -2,14 +2,13 @@
 
 namespace App\Filament\Resources\AgentResource\Pages;
 
-use Filament\Actions\Action;
-use Filament\Forms\Components\Textarea;
-use Filament\Notifications\Notification;
-use App\Support\Agents\AgentPurge;
 use App\Filament\Resources\AgentResource;
 use App\Models\Agent;
 use App\Models\AgentWidget;
-use Filament\Actions;
+use App\Support\Agents\AgentPurge;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Contracts\Support\Htmlable;
 

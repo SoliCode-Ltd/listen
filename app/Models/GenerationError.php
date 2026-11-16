@@ -13,14 +13,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class GenerationError extends Model
 {
     public const SOURCE_DASHBOARD = 'dashboard';
+
     public const SOURCE_EXTENSION = 'extension';
+
     public const SOURCE_DEMO = 'demo';
+
     public const SOURCE_VOICE_CLONING = 'voice_cloning';
+
     public const SOURCE_FALLBACK = 'fallback';
+
     public const SOURCE_API = 'api';
+
     public const SOURCE_MCP = 'mcp'; // an AI app, through the MCP server
 
     public const SEVERITY_ERROR = 'error';
+
     public const SEVERITY_WARNING = 'warning';
 
     protected $fillable = [

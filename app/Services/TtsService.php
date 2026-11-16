@@ -7,6 +7,7 @@ use App\Services\Tts\ArabicVoiceMapper;
 use App\Services\Tts\TtsRoutingService;
 use App\Support\ArabicDialects;
 use App\Support\GeminiTtsModel;
+use App\Support\GeminiVocalTags;
 use App\Support\PaceAndPitch;
 use App\Support\StandardVoiceEngine;
 use App\Support\TtsStudioConfig;
@@ -21,6 +22,7 @@ use Illuminate\Support\Str;
 class TtsService
 {
     private ?TtsRoutingService $routingService = null;
+
     private ?ArabicVoiceMapper $arabicMapper = null;
 
     /**
@@ -85,22 +87,21 @@ class TtsService
      * Uses quality-aware provider selection (HD never falls back to a
      * standard voice), Arabic voice mapping, and telemetry logging.
      *
-     * @param  string     $text           Text to synthesize
-     * @param  string     $targetLanguage Language code
-     * @param  array      $options        Extended options:
-     *                                     - voice_name: string
-     *                                     - tier: string
-     *                                     - dialect: string (e.g. 'ar-SA')
-     *                                     - emotion: string (e.g. 'warm')
-     *                                     - gender: string
-     *                                     - speed: float
-     *                                     - pitch: float
-     *                                     - speakers: array (dialogue mode)
-     *                                     - fresh_take: bool (never answer from the
-     *                                       saved copy of an identical earlier take)
-     * @param  Plan|null  $plan           User's active plan
-     * @param  int|null   $userId         User ID for telemetry
-     * @return array
+     * @param  string  $text  Text to synthesize
+     * @param  string  $targetLanguage  Language code
+     * @param  array  $options  Extended options:
+     *                          - voice_name: string
+     *                          - tier: string
+     *                          - dialect: string (e.g. 'ar-SA')
+     *                          - emotion: string (e.g. 'warm')
+     *                          - gender: string
+     *                          - speed: float
+     *                          - pitch: float
+     *                          - speakers: array (dialogue mode)
+     *                          - fresh_take: bool (never answer from the
+     *                          saved copy of an identical earlier take)
+     * @param  Plan|null  $plan  User's active plan
+     * @param  int|null  $userId  User ID for telemetry
      */
     public function synthesizeAdvanced(
         string $text,
@@ -115,7 +116,7 @@ class TtsService
         }
 
         // If routing service not available, fall back to legacy
-        if (!$this->routingService) {
+        if (! $this->routingService) {
             return $this->synthesize(
                 $text,
                 $targetLanguage,
@@ -243,7 +244,7 @@ class TtsService
             }
 
             // A mood or delivery tag in a dialogue now directs its own turn, not every line.
-            if ($provider === 'gemini' && \App\Support\GeminiVocalTags::prepare($text)['cues'] !== []) {
+            if ($provider === 'gemini' && GeminiVocalTags::prepare($text)['cues'] !== []) {
                 $parts[] = 'cues:own-turn';
             }
         }

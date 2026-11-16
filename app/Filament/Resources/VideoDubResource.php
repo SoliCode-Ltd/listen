@@ -2,33 +2,31 @@
 
 namespace App\Filament\Resources;
 
-use Illuminate\Auth\Access\Response as AccessResponse;
-use App\Support\VoiceFlag;
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\ViewEntry;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Actions\ViewAction;
-use Filament\Actions\Action;
-use Filament\Actions\BulkAction;
-use Illuminate\Database\Eloquent\Collection;
-use App\Filament\Widgets\VideoDubStats;
+use App\Filament\Resources\VideoDubResource\Pages;
 use App\Filament\Resources\VideoDubResource\Pages\ListVideoDubs;
 use App\Filament\Resources\VideoDubResource\Pages\ViewVideoDub;
-use App\Filament\Resources\VideoDubResource\Pages;
+use App\Filament\Widgets\VideoDubStats;
 use App\Models\VideoDub;
 use App\Models\Voice;
 use App\Services\Dubbing\VideoDubRunner;
 use App\Support\VideoDubbing;
-use Filament\Infolists;
+use App\Support\VoiceFlag;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Actions\ViewAction;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response as AccessResponse;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -40,9 +38,9 @@ class VideoDubResource extends Resource
 {
     protected static ?string $model = VideoDub::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-film';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-film';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Video Dubbing';
+    protected static string|\UnitEnum|null $navigationGroup = 'Video Dubbing';
 
     protected static ?int $navigationSort = 1;
 
