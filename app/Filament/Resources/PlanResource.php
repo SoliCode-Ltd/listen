@@ -2,67 +2,66 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Select;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\DateTimePicker;
-use Carbon\Carbon;
-use Filament\Schemas\Components\Utilities\Set;
-use App\Support\Credits;
-use App\Support\PlanCostEstimate;
-use Filament\Forms\Components\Radio;
-use App\Services\Billing\KeptCredits;
-use App\Services\Api\ApiSpeechService;
-use Filament\Forms\Components\CheckboxList;
-use App\Support\AudioFormats;
-use App\Services\Api\ApiConcurrency;
-use App\Support\VoiceDesign;
-use App\Support\Agents\AgentAccess;
-use Filament\Schemas\Components\Grid;
-use Filament\Forms\Components\Repeater;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\ViewAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\Action;
-use Exception;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\BulkAction;
-use Illuminate\Database\Eloquent\Collection;
-use App\Filament\Resources\PlanResource\Pages\ListPlans;
-use App\Filament\Resources\PlanResource\Pages\CreatePlan;
-use App\Filament\Resources\PlanResource\Pages\ViewPlan;
-use App\Filament\Resources\PlanResource\Pages\EditPlan;
-use App\Support\Agents\AgentCost;
-use Illuminate\Support\Str;
 use App\Filament\Resources\PlanResource\Pages;
+use App\Filament\Resources\PlanResource\Pages\CreatePlan;
+use App\Filament\Resources\PlanResource\Pages\EditPlan;
+use App\Filament\Resources\PlanResource\Pages\ListPlans;
+use App\Filament\Resources\PlanResource\Pages\ViewPlan;
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Services\Api\ApiConcurrency;
+use App\Services\Api\ApiSpeechService;
+use App\Services\Billing\KeptCredits;
 use App\Services\StripeProductSyncService;
+use App\Support\Agents\AgentAccess;
+use App\Support\Agents\AgentCost;
+use App\Support\AudioFormats;
+use App\Support\Credits;
 use App\Support\DiscountTerms;
+use App\Support\PlanCostEstimate;
 use App\Support\PlanPricingLines;
-use Filament\Forms;
+use App\Support\Transcription\TranscriptionAccess;
+use App\Support\VoiceDesign;
+use Carbon\Carbon;
+use Exception;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 
 class PlanResource extends Resource
 {
     protected static ?string $model = Plan::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-clipboard-document-list';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
+    protected static string|\UnitEnum|null $navigationGroup = 'Billing';
 
     protected static ?int $navigationSort = 1;
 
@@ -177,15 +176,18 @@ class PlanResource extends Resource
                                     $component->state('0.00');
                                 }
                             })
-                            ->helperText(fn () => 'Yearly price is auto-calculated at ' . SiteSetting::yearlyDiscountPercent() . '% discount (configurable in Billing Settings)'),
+                            ->helperText(fn () => 'Yearly price is auto-calculated at '.SiteSetting::yearlyDiscountPercent().'% discount (configurable in Billing Settings)'),
                         Placeholder::make('yearly_preview')
                             ->label('Yearly Price Preview')
                             ->content(function (?Plan $record) {
-                                if (!$record || $record->price_cents <= 0) return 'Free';
+                                if (! $record || $record->price_cents <= 0) {
+                                    return 'Free';
+                                }
                                 $multiplier = SiteSetting::yearlyDiscountMultiplier();
                                 $percent = SiteSetting::yearlyDiscountPercent();
                                 $yearlyDollars = round(($record->price_cents / 100) * 12 * $multiplier, 2);
-                                return '$' . number_format($yearlyDollars, 2) . '/year ($' . number_format($yearlyDollars / 12, 2) . '/mo) — ' . $percent . '% off';
+
+                                return '$'.number_format($yearlyDollars, 2).'/year ($'.number_format($yearlyDollars / 12, 2).'/mo) — '.$percent.'% off';
                             }),
                     ]),
                 Section::make('Discount / Promotion')
@@ -238,17 +240,19 @@ class PlanResource extends Resource
                             ->content(function (Get $get, ?Plan $record) {
                                 $priceDollars = (float) ($get('price_dollars') ?? ($record ? $record->price_cents / 100 : 0));
                                 $discount = (int) ($get('discount_percentage') ?? 0);
-                                if ($priceDollars <= 0 || $discount <= 0) return 'N/A';
+                                if ($priceDollars <= 0 || $discount <= 0) {
+                                    return 'N/A';
+                                }
                                 $discounted = round($priceDollars * (1 - $discount / 100), 2);
                                 $endsAt = $get('discount_ends_at');
-                                $endLabel = $endsAt ? 'Offer until ' . Carbon::parse($endsAt)->format('M j, Y g:i A') : 'Offer has no end date';
+                                $endLabel = $endsAt ? 'Offer until '.Carbon::parse($endsAt)->format('M j, Y g:i A') : 'Offer has no end date';
                                 $preview = new Plan([
                                     'discount_duration' => $get('discount_duration'),
                                     'discount_duration_months' => $get('discount_duration_months'),
                                 ]);
-                                $terms = DiscountTerms::line($preview, 'monthly', $discount, '$' . number_format($priceDollars, 2));
+                                $terms = DiscountTerms::line($preview, 'monthly', $discount, '$'.number_format($priceDollars, 2));
 
-                                return '$' . number_format($priceDollars, 2) . ' → $' . number_format($discounted, 2) . '/mo. ' . $endLabel . '. Monthly buyers read: "' . str_replace(["\u{2066}", "\u{2069}"], '', $terms) . '"';
+                                return '$'.number_format($priceDollars, 2).' → $'.number_format($discounted, 2).'/mo. '.$endLabel.'. Monthly buyers read: "'.str_replace(["\u{2066}", "\u{2069}"], '', $terms).'"';
                             }),
                     ]),
                 Section::make('Voice & Quality')
@@ -611,6 +615,63 @@ class PlanResource extends Resource
                             ->columnSpan(2)
                             ->visible(fn (Get $get): bool => (bool) $get('agents_enabled')),
                     ]),
+                Section::make('Transcribe (speech to text)')
+                    ->description('Members on this plan turn recordings into text: on the page, through the API (where the plan has API access) and through the MCP server. Minutes come from this plan only: there are no packs or top-ups. A member whose minutes run out, or whose file is longer than the plan takes, is shown the next plan up that fits. The site\'s own limits (the free try, the daily ceiling, how long audio is kept) are in config/listen.php under "transcription".')
+                    ->columns(2)
+                    ->visible(fn (): bool => TranscriptionAccess::planColumns())
+                    ->schema([
+                        Toggle::make('transcription_enabled')
+                            ->label('Include Transcribe')
+                            ->helperText('Off: this plan\'s members see the plan that includes it instead. Their transcripts stay; nothing is deleted.')
+                            ->default(false)
+                            ->live()
+                            ->columnSpan(2),
+                        TextInput::make('transcription_minutes_month')
+                            ->label('Minutes of audio a month')
+                            ->numeric()->integer()->minValue(0)->maxValue(100000)->default(0)->required()
+                            ->suffix('minutes')
+                            ->live(onBlur: true)
+                            ->helperText('Starts again with the member\'s billing month, the same day as their voice credits.')
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                        TextInput::make('transcription_max_file_minutes')
+                            ->label('Longest file')
+                            ->numeric()->integer()->minValue(1)->maxValue(600)->default(30)->required()
+                            ->suffix('minutes')
+                            ->helperText('A longer file is turned away before anything is used, with the plan that takes it.')
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                        TextInput::make('transcription_concurrent_jobs')
+                            ->label('Files working at once')
+                            ->numeric()->integer()->minValue(1)->maxValue(10)->default(1)->required()
+                            ->suffix('files')
+                            ->helperText('For one member, on the page, the API and MCP together.')
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                        Toggle::make('transcription_priority')
+                            ->label('Priority queue')
+                            ->helperText('Its files are worked on before those of plans without it.')
+                            ->default(false)
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                        Toggle::make('transcription_timestamps')
+                            ->label('Timings, and SRT/VTT subtitles')
+                            ->default(false)
+                            ->live()
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                        Toggle::make('transcription_speakers')
+                            ->label('Speaker names')
+                            ->default(false)
+                            ->live()
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                        Toggle::make('transcription_translate')
+                            ->label('Translate the transcript')
+                            ->helperText('Costs the member no minutes.')
+                            ->default(false)
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                        Placeholder::make('transcription_cost')
+                            ->label('What it costs Listen')
+                            ->content(fn (Get $get): HtmlString => self::transcriptionEconomics($get))
+                            ->columnSpan(2)
+                            ->visible(fn (Get $get): bool => (bool) $get('transcription_enabled')),
+                    ]),
+
                 Section::make('Pricing page')
                     ->description('The lines under the price on this plan\'s card. They are written for you in English and Arabic from this plan\'s settings above, so changing a setting updates the card by itself. Tick the ones to show.')
                     ->schema([
@@ -755,7 +816,7 @@ class PlanResource extends Resource
                     ->color('gray'),
                 TextColumn::make('price_cents')
                     ->label('Monthly')
-                    ->formatStateUsing(fn (int $state) => $state <= 0 ? 'Free' : '$' . number_format($state / 100, 2))
+                    ->formatStateUsing(fn (int $state) => $state <= 0 ? 'Free' : '$'.number_format($state / 100, 2))
                     ->sortable(),
                 TextColumn::make('voice_tier')
                     ->label('Voice Tier')
@@ -804,8 +865,8 @@ class PlanResource extends Resource
                 TextColumn::make('discount_percentage')
                     ->label('Discount')
                     ->formatStateUsing(fn (?int $state, Plan $record) => $record->hasActiveDiscount()
-                        ? $state . '%'
-                        : ($state ? $state . '% (expired)' : '—'))
+                        ? $state.'%'
+                        : ($state ? $state.'% (expired)' : '—'))
                     ->color(fn (Plan $record) => $record->hasActiveDiscount() ? 'success' : 'gray')
                     ->badge()
                     ->toggleable(isToggledHiddenByDefault: false),
@@ -861,7 +922,7 @@ class PlanResource extends Resource
                     ->trueColor('success')
                     ->falseColor('danger')
                     ->tooltip(fn (Plan $record): string => $record->hasStripeConfig()
-                        ? 'Product ID: ' . ($record->stripe_product_id ?? '-')
+                        ? 'Product ID: '.($record->stripe_product_id ?? '-')
                         : 'Not synced to Stripe'),
                 TextColumn::make('stripe_price_monthly')
                     ->label('Stripe monthly price')
@@ -992,6 +1053,28 @@ class PlanResource extends Resource
             sprintf('A call minute costs Listen about <b>%s</b> on a typical call (3 minutes, an agent with notes): <b>%s</b> margin; about <b>%s</b> on a heavy one (10 minutes, every note and file slot full): <b>%s</b> margin.',
                 $money($typical), $margin($typical), $money($heavy), $margin($heavy)),
             sprintf('If every minute is used: about %s to %s a month for calls.', $money($minutes * $typical), $money($minutes * $heavy)),
+        ];
+
+        return new HtmlString('<div style="display:grid;gap:.35rem;font-size:.875rem;line-height:1.5">'.implode('', array_map(fn ($l) => '<p>'.$l.'</p>', $lines)).'</div>');
+    }
+
+    /** What the plan's transcription minutes cost Listen at full use, against its price (and its offer price). */
+    private static function transcriptionEconomics(Get $get): HtmlString
+    {
+        $minutes = max(0, (int) $get('transcription_minutes_month'));
+        $timed = (bool) $get('transcription_timestamps') || (bool) $get('transcription_speakers');
+        $costs = (array) config('listen.transcription.cost_per_minute', []);
+        $perMinute = (float) ($costs[$timed ? 'timed' : 'plain'] ?? 0);
+        $price = max(0.0, (float) ($get('price_dollars') ?? 0));
+        $discount = max(0, min(100, (int) ($get('discount_percentage') ?? 0)));
+        $full = $minutes * $perMinute;
+        $money = fn (float $v): string => '$'.number_format($v, $v < 1 ? 3 : 2);
+        $share = fn (float $of): string => $of > 0 ? number_format($full / $of * 100, 1).'%' : '—';
+
+        $lines = [
+            sprintf('A minute of audio costs Listen about <b>%s</b> %s (measured on staging).', $money($perMinute), $timed ? 'with timings or speaker names' : 'as plain text'),
+            sprintf('If every minute is used: about <b>%s</b> a month, <b>%s</b> of the %s price%s.', $money($full), $share($price), $money($price),
+                $discount > 0 ? sprintf(', <b>%s</b> of the offer price (%s, %d%% off)', $share($price * (100 - $discount) / 100), $money($price * (100 - $discount) / 100), $discount) : ''),
         ];
 
         return new HtmlString('<div style="display:grid;gap:.35rem;font-size:.875rem;line-height:1.5">'.implode('', array_map(fn ($l) => '<p>'.$l.'</p>', $lines)).'</div>');
@@ -1176,7 +1259,6 @@ class PlanResource extends Resource
     /**
      * Repeater lines as a plain list, in their order, for saving.
      *
-     * @param  mixed  $items
      * @return array<int, array{label?: string, value?: string, icon?: string}>
      */
     public static function normalizeRepeaterItems(mixed $items): array

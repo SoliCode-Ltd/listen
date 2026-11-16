@@ -209,6 +209,29 @@ return [
     ],
 
     /*
+    | Speech to text ("Transcribe", App\Services\Transcription\Transcriber).
+    | What each plan includes is set on the plan (Admin → Plans → Transcribe);
+    | these are the site's own limits and Listen's cost figures.
+    */
+    'transcription' => [
+        // What a minute of audio costs Listen, as measured on staging on 16 November 2026
+        // (transcribe:measure): plain text, and with timings or speaker names. For the admin's figures only.
+        'cost_per_minute' => [
+            'plain' => (float) env('LISTEN_TRANSCRIBE_COST_PLAIN', 0.0022),
+            'timed' => (float) env('LISTEN_TRANSCRIBE_COST_TIMED', 0.0033),
+        ],
+        // The free try in the demo: one recording up to this long, and this many for the whole site a day.
+        'free_try_seconds' => (int) env('LISTEN_TRANSCRIBE_FREE_SECONDS', 60),
+        'free_per_day' => (int) env('LISTEN_TRANSCRIBE_FREE_PER_DAY', 50),
+        // Minutes of audio the whole site may transcribe in a day (members, API and MCP together). 0: no ceiling.
+        'daily_minutes' => (int) env('LISTEN_TRANSCRIBE_DAILY_MINUTES', 3000),
+        // Days the uploaded audio is kept (the text stays until the member deletes it).
+        'keep_audio_days' => (int) env('LISTEN_TRANSCRIBE_KEEP_AUDIO_DAYS', 7),
+        // Minutes after which a job still working is failed and its minutes given back.
+        'stuck_minutes' => (int) env('LISTEN_TRANSCRIBE_STUCK_MINUTES', 30),
+    ],
+
+    /*
     | Listen Agents: voice agents that answer a business's customers on its
     | website, its link page or a QR code (App\Support\Agents).
     |
