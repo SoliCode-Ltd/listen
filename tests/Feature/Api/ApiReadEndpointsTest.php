@@ -9,6 +9,7 @@ use App\Services\Tts\TtsRoutingService;
 use App\Support\Api\ApiModels;
 use App\Support\Api\OpenApiSpec;
 use App\Support\Credits;
+use App\Support\Transcription\TranscriptionSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
@@ -392,6 +393,12 @@ class ApiReadEndpointsTest extends TestCase
      */
     public function test_openapi_json_describes_every_endpoint_without_a_key(): void
     {
+        // Until speech to text is public (open to everyone, on a plan on sale) its paths are left out.
+        $this->apiPlan(['slug' => 'starter', 'transcription_enabled' => true, 'transcription_minutes_month' => 120]);
+        $this->assertSame([], array_values(array_filter(array_keys($this->get('/v1/openapi.json')->assertOk()->json('paths')), fn (string $path): bool => str_starts_with($path, '/transcriptions'))));
+        $this->assertStringNotContainsString('/transcriptions', (string) $this->get('/v1/openapi.json')->json('info.description'));
+        SiteSetting::set('transcription_audience', TranscriptionSettings::AUDIENCE_EVERYONE, TranscriptionSettings::GROUP);
+
         $response = $this->get('/v1/openapi.json')->assertOk();
 
         $response->assertHeader('Access-Control-Allow-Origin', '*');

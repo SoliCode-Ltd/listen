@@ -9,6 +9,7 @@ use App\Services\Transcription\TranscriptExport;
 use App\Support\AudioEffects;
 use App\Support\Credits;
 use App\Support\PlanUsageGuard;
+use App\Support\StudioFacts;
 
 /**
  * The developer documentation's reference: every endpoint with its
@@ -183,7 +184,7 @@ final class ApiDocs
                 'expires_at' => $isPack ? '2026-11-17T09:30:12+00:00' : null,
             ],
             'voice_seconds' => ['used' => Credits::secondsFor($creditsUsed), 'limit' => Credits::secondsFor($creditLimit)],
-            'speech_to_text' => $sttUsage,
+            ...(StudioFacts::speechToText() ? ['speech_to_text' => $sttUsage] : []),
             'requests' => [
                 'used_this_month' => 911,
                 'monthly_limit' => $monthlyRequests > 0 ? $monthlyRequests : null,
@@ -547,6 +548,11 @@ final class ApiDocs
         foreach (AudioEffects::ALL as $value => $row) {
             $environments[$row[1]]['name'] ??= AudioEffects::GROUPS[$row[1]][$arabic ? 'ar' : 'en'] ?? $row[1];
             $environments[$row[1]]['items'][] = ['value' => $value, 'name' => $arabic ? $row[3] : $row[2], 'description' => $arabic ? $row[5] : $row[4]];
+        }
+
+        // Speech to text's endpoints are shown once it is public (open to everyone, on a plan on sale).
+        if (! StudioFacts::speechToText()) {
+            $endpoints = array_values(array_filter($endpoints, fn (array $e): bool => ! str_contains((string) ($e['id'] ?? ''), 'transcription')));
         }
 
         return [

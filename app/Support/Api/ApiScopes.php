@@ -2,6 +2,10 @@
 
 namespace App\Support\Api;
 
+use App\Models\User;
+use App\Support\StudioFacts;
+use App\Support\Transcription\TranscriptionAccess;
+
 /**
  * Permissions an API key can hold. A key with no list holds them all.
  */
@@ -33,6 +37,21 @@ final class ApiScopes
             self::USER_READ,
             self::SPEECH_TO_TEXT,
         ];
+    }
+
+    /**
+     * The permissions to show: speech to text's once it is public (StudioFacts::speechToText()),
+     * or, for a member choosing a key's permissions, once they can see speech to text.
+     *
+     * @return array<int, string>
+     */
+    public static function offered(?User $member = null): array
+    {
+        $speechToText = $member !== null
+            ? TranscriptionAccess::openTo($member)
+            : StudioFacts::speechToText();
+
+        return $speechToText ? self::all() : array_values(array_diff(self::all(), [self::SPEECH_TO_TEXT]));
     }
 
     /**

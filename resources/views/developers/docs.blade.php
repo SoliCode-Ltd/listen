@@ -9,6 +9,8 @@
     $tx = fn (string $text) => \App\Support\Api\ApiDocs::richText($text);
     $plain = fn (string $key) => __('developers.docs.'.$key);
     $arabic = app()->getLocale() === 'ar';
+    // Speech to text is described once it is public (open to everyone, on a plan on sale).
+    $speechToTextPublic = \App\Support\StudioFacts::speechToText();
     // Options no plan includes are left out of the page (ApiFeatureGate::offered).
     $offered = $docs['offered'];
     $listed = fn (string $list) => \App\Support\Api\ApiDocs::listed($list, $offered, $arabic);
@@ -139,6 +141,9 @@
                 <li>{!! $tx(__('developers.docs.intro.points_features', ['options' => \Illuminate\Support\Str::ucfirst($introFeatures)])) !!}</li>
               @endif
             @endforeach
+            @if($speechToTextPublic)
+              <li>{!! $tx(__('developers.docs.intro.point_speech_to_text')) !!}</li>
+            @endif
           </ul>
           <p class="docs-note">{{ $plain('intro.code_note') }}</p>
         </div>
@@ -170,7 +175,7 @@
             <h4>{{ $plain('auth.scopes_title') }}</h4>
             <p>{!! $t('auth.scopes_body') !!}</p>
             <dl class="docs-params">
-              @foreach(\App\Support\Api\ApiScopes::all() as $scope)
+              @foreach(\App\Support\Api\ApiScopes::offered() as $scope)
                 <div class="docs-param"><dt><code dir="ltr">{{ $scope }}</code></dt><dd>{{ __('developers.scopes.'.$scope) }}</dd></div>
               @endforeach
             </dl>
@@ -192,12 +197,12 @@
               <li>{!! $t('mcp.step2') !!}</li>
               <li>{!! $t('mcp.step3') !!}</li>
             </ol>
-            <p class="docs-note">{!! $t('mcp.note') !!}</p>
+            <p class="docs-note">{!! $t('mcp.note') !!}@if($speechToTextPublic) {!! $t('mcp.note_speech_to_text') !!}@endif</p>
             <h4>{{ $plain('mcp.tools_title') }}</h4>
             <p>{{ $plain('mcp.tools_body') }}</p>
             <dl class="docs-params">
               @foreach(\App\Mcp\Servers\ListenServer::toolNames() as $tool)
-                <div class="docs-param"><dt><code dir="ltr">{{ $tool }}</code></dt><dd>{{ __('developers.docs.mcp.tools.'.$tool) }}</dd></div>
+                <div class="docs-param"><dt><code dir="ltr">{{ $tool }}</code></dt><dd>{{ __('developers.docs.mcp.tools.'.($tool === 'get_account' && $speechToTextPublic ? 'get_account_speech_to_text' : $tool)) }}</dd></div>
               @endforeach
             </dl>
           </div>

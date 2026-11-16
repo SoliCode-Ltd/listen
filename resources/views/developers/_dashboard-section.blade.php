@@ -29,7 +29,7 @@
   $keyErrors = $errors->getBag('apiKeys');
   $activeKeys = $api['active_keys'];
   $maxKeys = \App\Models\ApiKey::MAX_ACTIVE_PER_USER;
-  $scopes = \App\Support\Api\ApiScopes::all();
+  $scopes = \App\Support\Api\ApiScopes::offered(auth()->user());
   $openCreate = $isOk && ($activeKeys->isEmpty() || $keyErrors->any() || old('scopes') !== null);
 @endphp
 <style>

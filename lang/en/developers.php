@@ -168,8 +168,9 @@ return [
             'points' => [
                 'Every Arabic dialect and English accent of the studio, with delivery styles, emotions, sound tags, speed and pitch.',
                 'Usage is counted on your plan\'s credits and stops at your limit: there are no surprise bills.',
-                'Speech to text: send a recording and get its text with who said what, as text, subtitles or a document (DOCX), on the plans that include it.',
             ],
+            // Shown once speech to text is public.
+            'point_speech_to_text' => 'Speech to text: send a recording and get its text with who said what, as text, subtitles or a document (DOCX), on the plans that include it.',
             // After the dialects point, when some plan includes one of them.
             'points_features' => ':options, on the plans that include them.',
             'code_note' => 'Field names, values and messages of the API are in English, as they are part of the code.',
@@ -196,7 +197,9 @@ return [
             'step1' => 'In the app\'s MCP settings, add a server that connects over HTTP, with this address.',
             'step2' => 'When the app asks, sign in with Listen and allow it. An app without sign-in takes an API key instead: create one in your dashboard and put it in the `Authorization` header, as in the example.',
             'step3' => 'Ask for what you need, for example: "Read this ad in Egyptian Arabic, in a warm voice."',
-            'note' => 'Every recording uses your credits, as in the studio, and is kept in your history. Links to recordings work for as many days as your plan keeps your audio history; ask the app for a new link at any time. Apps you sign in to are listed in your dashboard, under Developer API, where you can disconnect them. Signing in needs a paid plan with the premium voices. Turning a recording into text uses your speech to text minutes instead of credits: give the app a link to the file.',
+            'note' => 'Every recording uses your credits, as in the studio, and is kept in your history. Links to recordings work for as many days as your plan keeps your audio history; ask the app for a new link at any time. Apps you sign in to are listed in your dashboard, under Developer API, where you can disconnect them. Signing in needs a paid plan with the premium voices.',
+            // Shown once speech to text is public.
+            'note_speech_to_text' => 'Turning a recording into text uses your speech to text minutes instead of credits: give the app a link to the file.',
             'tools_title' => 'Tools',
             'tools_body' => 'The app sees only the tools its key\'s permissions allow.',
             'tools' => [
@@ -208,7 +211,8 @@ return [
                 'transcribe_audio' => 'Turns a recording into text, from a link to the file.',
                 'get_transcription' => 'Gives the text of a transcription, or its subtitles, in its language or translated.',
                 'list_transcriptions' => 'Lists your recent transcriptions.',
-                'get_account' => 'Shows your plan, the credits you have left and your speech to text minutes.',
+                'get_account' => 'Shows your plan and the credits you have left.',
+                'get_account_speech_to_text' => 'Shows your plan, the credits you have left and your speech to text minutes.',
             ],
             'config_label' => 'MCP settings',
         ],

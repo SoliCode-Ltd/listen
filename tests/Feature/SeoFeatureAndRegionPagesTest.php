@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Support\SeoDialectPages;
 use App\Support\SeoFeaturePages;
 use App\Support\SeoHelper;
 use App\Support\StudioFacts;
+use App\Support\Transcription\TranscriptionSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Testing\TestResponse;
@@ -113,7 +115,9 @@ class SeoFeatureAndRegionPagesTest extends TestCase
     public function test_the_new_pages_name_no_other_company_and_promise_nothing_free(): void
     {
         Plan::factory()->create(['slug' => 'studio', 'name_en' => 'Studio', 'price_cents' => 4999,
-            'dialogue_enabled' => true, 'voice_cloning_enabled' => true, 'voice_cloning_max_voices' => 10]);
+            'dialogue_enabled' => true, 'voice_cloning_enabled' => true, 'voice_cloning_max_voices' => 10,
+            'transcription_enabled' => true, 'transcription_minutes_month' => 1000]);
+        SiteSetting::set('transcription_audience', TranscriptionSettings::AUDIENCE_EVERYONE, TranscriptionSettings::GROUP);
         $pages = array_merge(
             array_map(fn (string $slug): array => ['seo.feature', ['feature' => $slug]], SeoFeaturePages::slugs()),
             array_map(fn (string $slug): array => ['seo.dialect-region', ['region' => $slug]], SeoDialectPages::regionSlugs()),
@@ -127,6 +131,50 @@ class SeoFeatureAndRegionPagesTest extends TestCase
             }
         }
         $this->assertNotSame('', SeoHelper::title('', SeoFeaturePages::pageKey('voice-cloning'), 'ar'));
+    }
+
+    /**
+     * Speech to text is told to search engines and AI tools only once it is public: open to
+     * everyone (Speech to text → Settings) and on a plan on sale. Until then its page is not
+     * found and the sitemap, llms.txt, the API description and the assistant tools say nothing.
+     */
+    public function test_speech_to_text_is_announced_only_once_it_is_public(): void
+    {
+        Plan::factory()->create(['slug' => 'pro', 'name_en' => 'Pro', 'name_ar' => 'احترافي', 'price_cents' => 4900,
+            'transcription_enabled' => true, 'transcription_minutes_month' => 500, 'transcription_max_file_minutes' => 120]);
+        $announced = function (): array {
+            Cache::forget(SeoHelper::SITEMAP_CACHE);
+            $llms = (string) $this->get('/llms.txt')->getContent();
+
+            return [
+                'page' => $this->page('en', 'seo.feature', ['feature' => 'speech-to-text'])->status(),
+                'sitemap' => str_contains((string) $this->get('/sitemap.xml')->getContent(), '/en/speech-to-text<'),
+                'llms' => str_contains($llms, '/en/speech-to-text') || str_contains(strtolower($llms), 'speech to text'),
+                'openapi' => array_key_exists('/transcriptions', (array) $this->get('/v1/openapi.json')->json('paths')),
+            ];
+        };
+
+        // Shown to the admin only (the default): nothing is announced.
+        $this->assertSame(['page' => 404, 'sitemap' => false, 'llms' => false, 'openapi' => false], $announced());
+
+        // Open to everyone but on no plan on sale: still nothing.
+        SiteSetting::set('transcription_audience', TranscriptionSettings::AUDIENCE_EVERYONE, TranscriptionSettings::GROUP);
+        Plan::query()->update(['is_active' => false]);
+        $this->assertSame(['page' => 404, 'sitemap' => false, 'llms' => false, 'openapi' => false], $announced());
+
+        // Public: the page, the sitemap, llms.txt and the API description all say it.
+        Plan::query()->update(['is_active' => true]);
+        $this->assertSame(['page' => 200, 'sitemap' => true, 'llms' => true, 'openapi' => true], $announced());
+
+        $page = (string) $this->page('en', 'seo.feature', ['feature' => 'speech-to-text'])->getContent();
+        $this->assertStringContainsString('500 minutes', $page);
+        $this->assertStringContainsString('"FAQPage"', $page);
+        $this->assertStringContainsString('hreflang="ar"', $page);
+        $llms = (string) $this->get('/llms.txt')->getContent();
+        $this->assertStringContainsString('/en/speech-to-text', $llms);
+        $this->assertStringContainsString('Pro', $llms);
+        $arabic = (string) $this->page('ar', 'seo.feature', ['feature' => 'speech-to-text'])->assertOk()->getContent();
+        $this->assertStringContainsString('تحويل الصوت إلى نص', $arabic);
     }
 
     public function test_the_basic_plan_is_described_by_its_use_not_as_light_use(): void

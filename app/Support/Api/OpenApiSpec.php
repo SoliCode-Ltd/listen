@@ -8,6 +8,7 @@ use App\Services\Api\ApiSpeechService;
 use App\Services\Transcription\TranscriptExport;
 use App\Support\AudioEffects;
 use App\Support\SpeechLanguages;
+use App\Support\StudioFacts;
 use App\Support\Transcription\TranscriptionApi;
 use App\Support\Transcription\TranscriptionSettings;
 
@@ -39,7 +40,7 @@ final class OpenApiSpec
                 'title' => 'Listen API',
                 'version' => self::VERSION,
                 'summary' => 'Arabic and English text to speech: '.ApiDocs::series(['studio voices', 'Arabic dialects', 'English accents', 'emotions', ...$extras], false).'; and speech to text, with who said what.',
-                'description' => 'Turn text into natural Arabic and English speech with one model, '.ApiModels::PREMIUM.', and every option of the studio. The dashboard, the browser extension and the API share one balance: generations are charged to your plan\'s credits exactly as in the dashboard (15 credits per second of audio) and stop at your plan\'s limit, with no overage. Options a plan does not include are refused with 403 feature_not_in_plan, naming the plans that include them. Speech to text (/transcriptions) turns audio into text with its speakers and times, in the background, and uses the plan\'s speech to text minutes (every second of the audio), not credits. Full guide: '.url('/developers'),
+                'description' => 'Turn text into natural Arabic and English speech with one model, '.ApiModels::PREMIUM.', and every option of the studio. The dashboard, the browser extension and the API share one balance: generations are charged to your plan\'s credits exactly as in the dashboard (15 credits per second of audio) and stop at your plan\'s limit, with no overage. Options a plan does not include are refused with 403 feature_not_in_plan, naming the plans that include them.'.(StudioFacts::speechToText() ? ' Speech to text (/transcriptions) turns audio into text with its speakers and times, in the background, and uses the plan\'s speech to text minutes (every second of the audio), not credits.' : '').' Full guide: '.url('/developers'),
                 'contact' => ['name' => 'Listen support', 'email' => trim((string) SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio', 'url' => url('/contact-us')],
                 'termsOfService' => url('/terms-of-service'),
             ],
@@ -61,6 +62,20 @@ final class OpenApiSpec
                 unset($spec['components']['schemas']['TextToSpeechRequest']['properties'][ApiFeatureGate::FIELDS[$feature]]);
             }
         }
+        // Speech to text is described once it is public (open to everyone, on a plan on sale).
+        if (! StudioFacts::speechToText()) {
+            $spec['info']['summary'] = str_replace('; and speech to text, with who said what.', '.', $spec['info']['summary']);
+            $spec['tags'] = array_values(array_filter($spec['tags'], static fn (array $tag): bool => $tag['name'] !== 'Speech to text'));
+            foreach (['TranscriptionUpload', 'TranscriptionLink', 'Transcription', 'TranscriptionDetail', 'TranscriptPiece', 'SpeechToTextUsage'] as $schema) {
+                unset($spec['components']['schemas'][$schema]);
+            }
+            unset($spec['components']['schemas']['Subscription']['properties']['speech_to_text']);
+            array_walk_recursive($spec, static function (mixed &$value, string|int $key): void {
+                if ($key === 'description' && is_string($value)) {
+                    $value = str_replace(' For speech to text: not enough minutes left this month (minutes_exceeded).', '', $value);
+                }
+            });
+        }
         if (! $offered[ApiFeatureGate::CLONED_VOICES]) {
             $spec['paths']['/voices']['get']['description'] = 'The studio voices. Requires the voices_read permission.';
             array_walk_recursive($spec['paths'], static function (mixed &$value, string|int $key): void {
@@ -76,7 +91,18 @@ final class OpenApiSpec
     /**
      * @return array<string, mixed>
      */
+    /** The paths, speech to text's once it is public (StudioFacts::speechToText()). */
     private static function paths(): array
+    {
+        $paths = self::allPaths();
+        if (! StudioFacts::speechToText()) {
+            $paths = array_filter($paths, fn (string $path): bool => ! str_starts_with($path, '/transcriptions'), ARRAY_FILTER_USE_KEY);
+        }
+
+        return $paths;
+    }
+
+    private static function allPaths(): array
     {
         $voiceIdParam = [
             'name' => 'voice_id', 'in' => 'path', 'required' => true,

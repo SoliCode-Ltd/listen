@@ -2,8 +2,10 @@
 
 namespace App\Support;
 
+use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Support\Agents\AgentAccess;
+use App\Support\Agents\HouseAgent;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -289,10 +291,10 @@ class SeoHelper
                 // Its own picture when the page is shared (1200x630, in the page's language).
                 'share_image' => 'images/og/listen-voice-agents-{locale}.png',
                 // In search results while Agents are open to everyone (Agents → Settings).
-                'robots' => \App\Support\Agents\AgentAccess::audience() === \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE ? self::DEFAULT_META_ROBOTS : 'noindex,nofollow,noarchive,nosnippet',
+                'robots' => AgentAccess::audience() === AgentAccess::AUDIENCE_EVERYONE ? self::DEFAULT_META_ROBOTS : 'noindex,nofollow,noarchive,nosnippet',
                 'path' => '/voice-agents',
                 'localized' => true,
-                'indexable' => \App\Support\Agents\AgentAccess::audience() === \App\Support\Agents\AgentAccess::AUDIENCE_EVERYONE,
+                'indexable' => AgentAccess::audience() === AgentAccess::AUDIENCE_EVERYONE,
                 'sitemap_priority' => 0.8,
                 'sitemap_change_frequency' => 'monthly',
             ],
@@ -693,12 +695,12 @@ class SeoHelper
             $priority = max(0.0, min(1.0, $priority));
 
             $frequency = strtolower((string) ($parts[2] ?? 'weekly'));
-            if (!in_array($frequency, self::ALLOWED_CHANGE_FREQUENCIES, true)) {
+            if (! in_array($frequency, self::ALLOWED_CHANGE_FREQUENCIES, true)) {
                 $frequency = 'weekly';
             }
 
-            if (!Str::startsWith($path, ['http://', 'https://'])) {
-                $path = '/' . ltrim($path, '/');
+            if (! Str::startsWith($path, ['http://', 'https://'])) {
+                $path = '/'.ltrim($path, '/');
             }
 
             if (! self::isSitemapEntryAllowed($path)) {
@@ -836,19 +838,19 @@ class SeoHelper
     {
         // /livewire covers Livewire's own addresses, which carry a code since Livewire 4 (/livewire-4aeeedbb/...).
         $private = ['Disallow: /admin', 'Disallow: /livewire'];
-        $agents = static fn (array $names): array => array_map(static fn (string $name): string => 'User-agent: ' . $name, $names);
+        $agents = static fn (array $names): array => array_map(static fn (string $name): string => 'User-agent: '.$name, $names);
 
         return implode("\n", [
             '# Search engines and AI assistants may read and quote these pages.',
             '# They may not be used to train AI models.',
             'User-agent: *',
-            'Content-Signal: ' . self::CONTENT_SIGNAL,
+            'Content-Signal: '.self::CONTENT_SIGNAL,
             'Allow: /',
             ...$private,
             '',
             '# AI search and assistants, answering people.',
             ...$agents(self::AI_ANSWER_CRAWLERS),
-            'Content-Signal: ' . self::CONTENT_SIGNAL,
+            'Content-Signal: '.self::CONTENT_SIGNAL,
             'Allow: /',
             ...$private,
             '',
@@ -856,8 +858,8 @@ class SeoHelper
             ...$agents(self::AI_TRAINING_CRAWLERS),
             'Disallow: /',
             '',
-            'Agentmap: ' . url('/.well-known/ai-catalog.json'),
-            'Sitemap: ' . url('/sitemap.xml'),
+            'Agentmap: '.url('/.well-known/ai-catalog.json'),
+            'Sitemap: '.url('/sitemap.xml'),
         ]);
     }
 
@@ -871,39 +873,43 @@ class SeoHelper
 
         $dialoguePlans = StudioFacts::dialoguePlans('en');
         $cloning = StudioFacts::cloningRange();
+        $speechToText = StudioFacts::speechToText();
+        $sttPlans = $speechToText ? StudioFacts::speechToTextPlans('en') : [];
         $formats = StudioFacts::downloadFormats();
-        $downloads = $formats['every'] === [] ? '' : ' (' . implode(', ', $formats['every']) . ($formats['some'] !== [] ? ', with ' . implode(', ', $formats['some']) . ' on higher plans' : '') . ')';
+        $downloads = $formats['every'] === [] ? '' : ' ('.implode(', ', $formats['every']).($formats['some'] !== [] ? ', with '.implode(', ', $formats['some']).' on higher plans' : '').')';
         $voices = StudioFacts::voices();
-        $library = $voices > 0 ? $voices . ' voices (' . StudioFacts::arabicVoices() . ' Arabic and ' . StudioFacts::englishVoices() . ' English)' : '';
+        $library = $voices > 0 ? $voices.' voices ('.StudioFacts::arabicVoices().' Arabic and '.StudioFacts::englishVoices().' English)' : '';
 
         $lines = array_values(array_filter([
             "# {$siteName}",
             '',
-            '> Listen (Arabic: إسمع, also written منصة إسمع) is a professional AI voice studio for Arabic and English at ' . $base . ', made by SoliCode Ltd. '
-                . 'Listen is a member of NVIDIA Inception, NVIDIA\'s program for startups building AI solutions. '
-                . ($library !== '' ? 'Its library has ' . $library . '. ' : '')
-                . ($cloning !== null ? 'Members can clone their own voice and have it speak the dialect they choose. ' : '')
-                . (StudioFacts::dubbing() ? 'It also dubs videos into an Arabic dialect or English accent. ' : '')
-                . (self::voiceAgentsPublic() ? 'It also makes AI voice agents for businesses, which answer callers out loud in their Arabic dialect or English accent on a website, a link or a QR code. ' : '')
-                . 'It speaks '
-                . StudioFacts::arabicDialects() . ' spoken Arabic dialects from ' . StudioFacts::arabicCountries() . ' countries, Modern Standard Arabic in ' . StudioFacts::fushaStyles() . ' styles and '
-                . StudioFacts::englishAccents() . ' English accents: more than ' . StudioFacts::roundedDown(StudioFacts::dialectsAndAccents()) . ' dialects and accents, on every plan. '
-                . 'Every line can be directed with ' . StudioFacts::emotions() . ' emotions, ' . StudioFacts::styles() . ' performance styles and tags written inside the text.',
+            '> Listen (Arabic: إسمع, also written منصة إسمع) is a professional AI voice studio for Arabic and English at '.$base.', made by SoliCode Ltd. '
+                .'Listen is a member of NVIDIA Inception, NVIDIA\'s program for startups building AI solutions. '
+                .($library !== '' ? 'Its library has '.$library.'. ' : '')
+                .($cloning !== null ? 'Members can clone their own voice and have it speak the dialect they choose. ' : '')
+                .(StudioFacts::dubbing() ? 'It also dubs videos into an Arabic dialect or English accent. ' : '')
+                .($speechToText ? 'It also turns speech into text: recordings and videos written out with who said what, in '.StudioFacts::speechToTextLanguages().' languages including Arabic dialects. ' : '')
+                .(self::voiceAgentsPublic() ? 'It also makes AI voice agents for businesses, which answer callers out loud in their Arabic dialect or English accent on a website, a link or a QR code. ' : '')
+                .'It speaks '
+                .StudioFacts::arabicDialects().' spoken Arabic dialects from '.StudioFacts::arabicCountries().' countries, Modern Standard Arabic in '.StudioFacts::fushaStyles().' styles and '
+                .StudioFacts::englishAccents().' English accents: more than '.StudioFacts::roundedDown(StudioFacts::dialectsAndAccents()).' dialects and accents, on every plan. '
+                .'Every line can be directed with '.StudioFacts::emotions().' emotions, '.StudioFacts::styles().' performance styles and tags written inside the text.',
             '',
             '## What the studio does',
-            $library !== '' ? '- Voices: a library of ' . $library . ', men\'s and women\'s voices of different ages.' : null,
-            '- Dialects and accents: Gulf, Levantine, Egyptian, Sudanese, Iraqi, Yemeni and Maghrebi Arabic dialects spoken in their own words, Modern Standard Arabic, and English accents from ' . StudioFacts::englishCountries() . ' countries.',
-            '- Emotions and performance styles: ' . StudioFacts::emotions() . ' emotions and ' . StudioFacts::styles() . ' styles for a whole script (ads, trailers, audiobooks, bedtime stories, news, lessons and more).',
-            '- Delivery tags inside the text: [excited], [whispering], [sad] and ' . (StudioFacts::deliveryTags() - 3) . ' more change the delivery from where they are written.',
-            '- Live sounds inside the text: <laugh>, <sigh>, <short pause> and ' . (StudioFacts::soundTags() - 3) . ' more are performed where they are written. Tags can be written in English or Arabic.',
-            $dialoguePlans !== [] ? '- Two-voice dialogue: one recording with two speakers, each in their own voice and dialect (on ' . StudioFacts::planList($dialoguePlans, 'en') . ').' : null,
-            $cloning !== null ? '- Voice cloning: clone a voice from a short recording, with the speaker\'s consent, and have it speak any dialect (' . ($cloning[0] === $cloning[1] ? $cloning[1] : $cloning[0] . ' to ' . $cloning[1]) . ' voices, depending on the plan).' : null,
+            $library !== '' ? '- Voices: a library of '.$library.', men\'s and women\'s voices of different ages.' : null,
+            '- Dialects and accents: Gulf, Levantine, Egyptian, Sudanese, Iraqi, Yemeni and Maghrebi Arabic dialects spoken in their own words, Modern Standard Arabic, and English accents from '.StudioFacts::englishCountries().' countries.',
+            '- Emotions and performance styles: '.StudioFacts::emotions().' emotions and '.StudioFacts::styles().' styles for a whole script (ads, trailers, audiobooks, bedtime stories, news, lessons and more).',
+            '- Delivery tags inside the text: [excited], [whispering], [sad] and '.(StudioFacts::deliveryTags() - 3).' more change the delivery from where they are written.',
+            '- Live sounds inside the text: <laugh>, <sigh>, <short pause> and '.(StudioFacts::soundTags() - 3).' more are performed where they are written. Tags can be written in English or Arabic.',
+            $dialoguePlans !== [] ? '- Two-voice dialogue: one recording with two speakers, each in their own voice and dialect (on '.StudioFacts::planList($dialoguePlans, 'en').').' : null,
+            $cloning !== null ? '- Voice cloning: clone a voice from a short recording, with the speaker\'s consent, and have it speak any dialect ('.($cloning[0] === $cloning[1] ? $cloning[1] : $cloning[0].' to '.$cloning[1]).' voices, depending on the plan).' : null,
             StudioFacts::dubbing() ? "- Video dubbing: upload a short video and every line is re-voiced in the Arabic dialect or English accent you choose, on time with the picture; the music and sound effects stay. The first video is free with a small Listen mark; plans with dubbing download it without the mark ({$base}/en/dub-my-video)." : null,
-            '- Sound environments: ' . StudioFacts::environments() . ' places, devices and creative spaces, plus a studio polish for the voice.',
+            $speechToText ? '- Speech to text: upload audio or video, paste a link or record in the browser, and every word is written out with its speaker and time, in '.StudioFacts::speechToTextLanguages().' languages including Arabic dialects; an editor plays the audio in time with the text; translate it; download TXT, SRT, VTT or DOCX. It uses the plan\'s speech to text minutes ('.implode(', ', array_map(fn (array $p): string => $p['name'].' '.number_format($p['minutes']), $sttPlans)).' minutes a month), every second of the audio, not credits'.(Transcription\TranscriptionSettings::freeTrySeconds() > 0 ? '; members on other plans can try it with one short recording' : '')." ({$base}/en/speech-to-text)." : null,
+            '- Sound environments: '.StudioFacts::environments().' places, devices and creative spaces, plus a studio polish for the voice.',
             '- Speed and pitch control, and translation before speech.',
             '- Long scripts are read in parts and joined into one recording.',
-            '- History: every voice is kept with its settings, to play again, reuse or download' . $downloads . '.',
-            "- API for developers: the same voices, dialects, emotions and tags from your own app ({$base}/en/developers).",
+            '- History: every voice is kept with its settings, to play again, reuse or download'.$downloads.'.',
+            '- API for developers: the same voices, dialects, emotions and tags from your own app'.($speechToText ? ', and speech to text' : '')." ({$base}/en/developers).",
             "- Chrome extension: reads selected text on any web page aloud ({$base}/en/browsers-extension).",
             self::voiceAgentsPublic() ? "- Voice agents for businesses: an AI voice agent that answers callers in their dialect, day and night (see Voice agents below, {$base}/en/voice-agents)." : null,
             "- Plans are monthly; every plan has all the dialects and accents; new members can try the voices once in the demo ({$base}/en/pricing).",
@@ -918,7 +924,8 @@ class SeoHelper
             "- [AI voice generator]({$base}/en/ai-voice-generator)",
             "- [Voice samples]({$base}/en/voice-samples): samples of English accents, moods, conversations and sound environments, ready to play; the Arabic page ({$base}/ar/voice-samples) has samples of Arabic dialects",
             "- [Pricing]({$base}/en/pricing): monthly plans; new members can try the voices once in the demo first",
-            "- [Developers]({$base}/en/developers): the text to speech API and its documentation",
+            "- [Developers]({$base}/en/developers): ".($speechToText ? 'the text to speech and speech to text APIs and their documentation' : 'the text to speech API and its documentation'),
+            $speechToText ? "- [Speech to text]({$base}/en/speech-to-text): recordings and videos into text with speakers, times, translation and subtitles · [Arabic version]({$base}/ar/speech-to-text)" : null,
             "- [Chrome extension]({$base}/en/browsers-extension): reads selected text on any web page",
             StudioFacts::dubbing() ? "- [Dub my video]({$base}/en/dub-my-video): a video dubbed into the Arabic dialect or English accent you choose · [Arabic version]({$base}/ar/dub-my-video)" : null,
             self::voiceAgentsPublic() ? "- [Voice agents]({$base}/en/voice-agents): AI voice agents that answer a business's callers in their dialect, on its website, a link or a QR code · [Arabic version]({$base}/ar/voice-agents)" : null,
@@ -929,24 +936,24 @@ class SeoHelper
         ], fn (?string $line): bool => $line !== null));
 
         foreach (SeoDialectPages::regionSlugs() as $slug) {
-            $lines[] = '- [' . SeoDialectPages::regionTitle($slug, 'en') . "]({$base}/en/arabic-dialects/{$slug}) · [Arabic version]({$base}/ar/arabic-dialects/{$slug})";
+            $lines[] = '- ['.SeoDialectPages::regionTitle($slug, 'en')."]({$base}/en/arabic-dialects/{$slug}) · [Arabic version]({$base}/ar/arabic-dialects/{$slug})";
         }
 
         foreach (SeoDialectPages::PAGES as $slug => $row) {
-            $lines[] = "- [{$row['en']}" . (SeoDialectPages::isFusha($slug) ? '' : ' Arabic') . " text to speech]({$base}/en/arabic-dialects/{$slug})";
+            $lines[] = "- [{$row['en']}".(SeoDialectPages::isFusha($slug) ? '' : ' Arabic')." text to speech]({$base}/en/arabic-dialects/{$slug})";
         }
 
         $lines[] = '';
         $lines[] = '## Studio features';
         foreach (SeoFeaturePages::links('en') as $link) {
-            $lines[] = '- [' . $link['label'] . "]({$base}/en/{$link['slug']}): " . SeoFeaturePages::description($link['slug'], 'en') . " · [Arabic version]({$base}/ar/{$link['slug']})";
+            $lines[] = '- ['.$link['label']."]({$base}/en/{$link['slug']}): ".SeoFeaturePages::description($link['slug'], 'en')." · [Arabic version]({$base}/ar/{$link['slug']})";
         }
 
         $lines[] = '';
         $lines[] = '## English accents';
         $lines[] = "- [All English accents]({$base}/en/english-accents) · [Arabic version]({$base}/ar/english-accents)";
         foreach (SeoEnglishPages::PAGES as $slug => $row) {
-            $lines[] = '- [' . SeoEnglishPages::title($slug, 'en') . "]({$base}/en/english-accents/{$slug})";
+            $lines[] = '- ['.SeoEnglishPages::title($slug, 'en')."]({$base}/en/english-accents/{$slug})";
         }
 
         return implode("\n", array_merge($lines, [
@@ -981,29 +988,29 @@ class SeoHelper
             '',
             '## Voice agents',
             "Listen voice agents ({$base}/en/voice-agents) answer a business's callers out loud, in the caller's Arabic dialect or English accent, "
-                . "on the business's website, its own link or a QR code, day and night. A business sets one up in about two minutes, without a developer: "
-                . 'it tells the agent about the business (pasting its website or writing its prices and hours), picks a voice, talks to the agent in a test call, and puts it live.',
+                ."on the business's website, its own link or a QR code, day and night. A business sets one up in about two minutes, without a developer: "
+                .'it tells the agent about the business (pasting its website or writing its prices and hours), picks a voice, talks to the agent in a test call, and puts it live.',
         ];
         foreach (self::voiceAgentFeatures('en') as $feature) {
-            $lines[] = '- ' . $feature . '.';
+            $lines[] = '- '.$feature.'.';
         }
-        $lines[] = '- Callers always know it is an AI assistant' . (AgentAccess::reviewOn() ? ', every agent is checked before it answers anyone,' : '') . ' and callers can report an agent in a tap.';
-        $lines[] = '- Price: calls use the plan\'s credits, the same credits as voice-overs: one call minute uses ' . number_format(AgentAccess::creditsPerMinute()) . ' credits. The owner always sees the minutes left, and can set the most minutes a day for each agent.';
+        $lines[] = '- Callers always know it is an AI assistant'.(AgentAccess::reviewOn() ? ', every agent is checked before it answers anyone,' : '').' and callers can report an agent in a tap.';
+        $lines[] = '- Price: calls use the plan\'s credits, the same credits as voice-overs: one call minute uses '.number_format(AgentAccess::creditsPerMinute()).' credits. The owner always sees the minutes left, and can set the most minutes a day for each agent.';
         $free = AgentAccess::freeTestSeconds();
         if ($free > 0) {
-            $lines[] = '- Free test calls: every account gets ' . ($free % 60 === 0 ? ($free / 60) . ' minute' . ($free === 60 ? '' : 's') : $free . ' seconds') . ' of test calls free, to build and try one agent before choosing a plan.';
+            $lines[] = '- Free test calls: every account gets '.($free % 60 === 0 ? ($free / 60).' minute'.($free === 60 ? '' : 's') : $free.' seconds').' of test calls free, to build and try one agent before choosing a plan.';
         }
         $plans = AgentAccess::plansOnSale('en');
         if ($plans !== []) {
             $lines[] = "- Plans with voice agents ({$base}/en/pricing):";
             foreach ($plans as $plan) {
-                $lines[] = '  - ' . $plan['name'] . ', ' . self::monthlyPrice($plan['price_cents']) . ' a month: up to ' . number_format($plan['minutes']) . ' call minutes a month, '
-                    . $plan['agents'] . ($plan['agents'] === 1 ? ' agent, ' : ' agents, ')
-                    . $plan['concurrent'] . ($plan['concurrent'] === 1 ? ' call at a time, ' : ' calls at the same time, ')
-                    . 'calls up to ' . $plan['longest'] . ($plan['longest'] === 1 ? ' minute' : ' minutes') . ' long';
+                $lines[] = '  - '.$plan['name'].', '.self::monthlyPrice($plan['price_cents']).' a month: up to '.number_format($plan['minutes']).' call minutes a month, '
+                    .$plan['agents'].($plan['agents'] === 1 ? ' agent, ' : ' agents, ')
+                    .$plan['concurrent'].($plan['concurrent'] === 1 ? ' call at a time, ' : ' calls at the same time, ')
+                    .'calls up to '.$plan['longest'].($plan['longest'] === 1 ? ' minute' : ' minutes').' long';
             }
         }
-        if (rescue(fn () => \App\Support\Agents\HouseAgent::for('en'), null, false) !== null) {
+        if (rescue(fn () => HouseAgent::for('en'), null, false) !== null) {
             $lines[] = '- Try it: a live call with Listen\'s own agent is on the voice agents page (allow the microphone when asked).';
         }
 
@@ -1016,7 +1023,7 @@ class SeoHelper
         $currency = strtoupper((string) config('cashier.currency', 'usd'));
         $amount = $cents % 100 === 0 ? number_format(intdiv($cents, 100)) : number_format($cents / 100, 2);
 
-        return $currency === 'USD' ? '$' . $amount : $amount . ' ' . $currency;
+        return $currency === 'USD' ? '$'.$amount : $amount.' '.$currency;
     }
 
     /**
@@ -1264,7 +1271,7 @@ class SeoHelper
         $base = rtrim((string) SiteSetting::get('canonical_url', config('app.url')), '/');
         $normalizedPath = self::normalizePath($path, $locale);
 
-        return $normalizedPath === '/' ? $base . $normalizedPath : $base . rtrim($normalizedPath, '/');
+        return $normalizedPath === '/' ? $base.$normalizedPath : $base.rtrim($normalizedPath, '/');
     }
 
     public static function currentCanonicalUrl(?string $locale = null): string
@@ -1306,7 +1313,7 @@ class SeoHelper
         $tags = [];
 
         foreach (self::hreflangMap($page) as $locale => $url) {
-            $tags[] = '<link rel="alternate" hreflang="' . e($locale) . '" href="' . e($url) . '">';
+            $tags[] = '<link rel="alternate" hreflang="'.e($locale).'" href="'.e($url).'">';
         }
 
         return implode("\n", $tags);
@@ -1325,12 +1332,12 @@ class SeoHelper
         $siteName = self::searchSiteName();
         $type = (string) SiteSetting::get('og_type', 'website');
         $tags = [
-            '<meta property="og:type" content="' . e($type) . '">',
-            '<meta property="og:site_name" content="' . e($siteName) . '">',
-            '<meta property="og:locale" content="' . e(self::ogLocale($locale)) . '">',
-            '<meta property="og:title" content="' . e($title) . '">',
-            '<meta property="og:description" content="' . e($description) . '">',
-            '<meta property="og:url" content="' . e(self::currentCanonicalUrl($locale)) . '">',
+            '<meta property="og:type" content="'.e($type).'">',
+            '<meta property="og:site_name" content="'.e($siteName).'">',
+            '<meta property="og:locale" content="'.e(self::ogLocale($locale)).'">',
+            '<meta property="og:title" content="'.e($title).'">',
+            '<meta property="og:description" content="'.e($description).'">',
+            '<meta property="og:url" content="'.e(self::currentCanonicalUrl($locale)).'">',
         ];
 
         foreach (self::supportedLocales() as $alternateLocale) {
@@ -1338,12 +1345,12 @@ class SeoHelper
                 continue;
             }
 
-            $tags[] = '<meta property="og:locale:alternate" content="' . e(self::ogLocale($alternateLocale)) . '">';
+            $tags[] = '<meta property="og:locale:alternate" content="'.e(self::ogLocale($alternateLocale)).'">';
         }
 
         if ($image !== '') {
-            $tags[] = '<meta property="og:image" content="' . e($image) . '">';
-            $tags[] = '<meta property="og:image:alt" content="' . e($title) . '">';
+            $tags[] = '<meta property="og:image" content="'.e($image).'">';
+            $tags[] = '<meta property="og:image:alt" content="'.e($title).'">';
             if (self::pageShareImage($page, $locale) !== '' || self::usesDefaultShareImage()) {
                 $tags[] = '<meta property="og:image:width" content="1200">';
                 $tags[] = '<meta property="og:image:height" content="630">';
@@ -1366,22 +1373,22 @@ class SeoHelper
         $creator = trim((string) SiteSetting::get('twitter_creator', ''));
         $image = self::shareImageUrl($locale, $page);
         $tags = [
-            '<meta name="twitter:card" content="' . e($cardType) . '">',
-            '<meta name="twitter:title" content="' . e($title) . '">',
-            '<meta name="twitter:description" content="' . e($description) . '">',
-            '<meta name="twitter:url" content="' . e(self::currentCanonicalUrl($locale)) . '">',
+            '<meta name="twitter:card" content="'.e($cardType).'">',
+            '<meta name="twitter:title" content="'.e($title).'">',
+            '<meta name="twitter:description" content="'.e($description).'">',
+            '<meta name="twitter:url" content="'.e(self::currentCanonicalUrl($locale)).'">',
         ];
 
         if ($handle !== '') {
-            $tags[] = '<meta name="twitter:site" content="@' . e(ltrim($handle, '@')) . '">';
+            $tags[] = '<meta name="twitter:site" content="@'.e(ltrim($handle, '@')).'">';
         }
 
         if ($creator !== '') {
-            $tags[] = '<meta name="twitter:creator" content="@' . e(ltrim($creator, '@')) . '">';
+            $tags[] = '<meta name="twitter:creator" content="@'.e(ltrim($creator, '@')).'">';
         }
 
         if ($image !== '') {
-            $tags[] = '<meta name="twitter:image" content="' . e($image) . '">';
+            $tags[] = '<meta name="twitter:image" content="'.e($image).'">';
         }
 
         return implode("\n", $tags);
@@ -1402,14 +1409,14 @@ class SeoHelper
         $siteName = self::siteName($locale);
         $description = self::description($page, $locale);
         $url = self::currentCanonicalUrl($locale);
-        $homeUrl = self::canonicalUrl('/' . self::defaultHreflangLocale(), self::defaultHreflangLocale());
+        $homeUrl = self::canonicalUrl('/'.self::defaultHreflangLocale(), self::defaultHreflangLocale());
         // A square mark, purple to its edges: search engines show the company's logo in a circle.
         $logo = self::publicAssetUrl('images/brand/listen-logo-512.png')
             ?: self::normalizeMediaUrl((string) SiteSetting::get('logo_url', ''))
             ?: self::publicAssetUrl('images/email-logo-en.png');
-        $organizationId = $homeUrl . '#organization';
-        $websiteId = $homeUrl . '#website';
-        $appId = $homeUrl . '#app';
+        $organizationId = $homeUrl.'#organization';
+        $websiteId = $homeUrl.'#website';
+        $appId = $homeUrl.'#app';
         // Its own names and its address: "Listen" alone is shared with unrelated apps.
         $names = array_values(array_unique(array_filter([self::siteName('en'), 'Listen', 'ListenAI Studio', 'listenai.studio', 'إسمع', 'منصة إسمع'])));
         $alternateNames = array_values(array_filter($names, static fn (string $name): bool => $name !== $siteName));
@@ -1450,7 +1457,7 @@ class SeoHelper
 
         $webPage = [
             '@type' => 'WebPage',
-            '@id' => $url . '#webpage',
+            '@id' => $url.'#webpage',
             'name' => self::title($pageTitle, $page, $locale),
             'url' => $url,
             'description' => $description,
@@ -1465,7 +1472,7 @@ class SeoHelper
             $graph[] = self::softwareApplicationNode($appId, $organizationId, $homeUrl, $locale);
             // The voice agents page is about the agents, a product of the studio's own.
             if ($page === 'agents_landing') {
-                $agentsId = $homeUrl . '#voice-agents';
+                $agentsId = $homeUrl.'#voice-agents';
                 $webPage['about'] = ['@id' => $agentsId];
                 $webPage['mainEntity'] = ['@id' => $agentsId];
                 $graph[] = self::voiceAgentNode($agentsId, $appId, $organizationId, $locale);
@@ -1519,10 +1526,10 @@ class SeoHelper
             }
         }
 
-        return '<script type="application/ld+json">' . json_encode([
+        return '<script type="application/ld+json">'.json_encode([
             '@context' => 'https://schema.org',
             '@graph' => $graph,
-        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE).'</script>';
     }
 
     /**
@@ -1711,7 +1718,7 @@ class SeoHelper
     {
         try {
             // Paid monthly plans only: a $0 plan is the demo account, and a one-off pack is not a plan.
-            $prices = \App\Models\Plan::query()->where('is_active', true)->where('price_cents', '>', 0)
+            $prices = Plan::query()->where('is_active', true)->where('price_cents', '>', 0)
                 ->where(fn ($query) => $query->whereNull('kind')->orWhere('kind', 'subscription'))
                 ->pluck('price_cents')->map(fn ($cents) => (int) $cents)->all();
         } catch (\Throwable) {
@@ -1767,6 +1774,11 @@ class SeoHelper
         }
         if (StudioFacts::dubbing()) {
             $list[] = $ar ? 'دبلجة الفيديو إلى اللهجة العربية أو اللكنة الإنجليزية التي تختارها، مع بقاء الموسيقى والمؤثرات' : 'Video dubbing into the Arabic dialect or English accent you choose, keeping the music and sound effects';
+        }
+        if (StudioFacts::speechToText()) {
+            $list[] = $ar
+                ? 'تحويل الصوت إلى نص بـ'.StudioFacts::speechToTextLanguages().' لغة منها العربية بلهجاتها، مع المتحدثين والأوقات والترجمة والترجمات المرئية'
+                : 'Speech to text in '.StudioFacts::speechToTextLanguages().' languages including Arabic dialects, with speakers, times, translation and subtitles';
         }
         if (self::voiceAgentsPublic()) {
             $list[] = $ar ? 'وكلاء صوتيون بالذكاء الاصطناعي يردون على عملاء نشاطك بلهجتهم، في موقعك أو عبر رابط أو رمز استجابة سريعة' : 'AI voice agents that answer a business\'s callers in their dialect, on its website, a link or a QR code';
@@ -1893,7 +1905,7 @@ class SeoHelper
                 continue;
             }
 
-            $tags[] = '<meta name="' . e($metaName) . '" content="' . e($value) . '">';
+            $tags[] = '<meta name="'.e($metaName).'" content="'.e($value).'">';
         }
 
         return implode("\n", $tags);
@@ -1902,12 +1914,12 @@ class SeoHelper
     public static function llmsDiscoveryTag(): string
     {
         // The ARD catalog of what agents can use here (App\Support\AgentDiscovery).
-        $catalog = '<link rel="ai-catalog" href="' . e(url('/.well-known/ai-catalog.json')) . '">';
+        $catalog = '<link rel="ai-catalog" href="'.e(url('/.well-known/ai-catalog.json')).'">';
         if (! self::llmsTxtEnabled()) {
             return $catalog;
         }
 
-        return '<link rel="alternate" type="text/plain" title="LLMs" href="' . e(url('/llms.txt')) . '">' . "\n" . $catalog;
+        return '<link rel="alternate" type="text/plain" title="LLMs" href="'.e(url('/llms.txt')).'">'."\n".$catalog;
     }
 
     public static function faviconMetaTags(): string
@@ -1927,26 +1939,26 @@ class SeoHelper
 
         $tags = [];
         if ($svg !== '') {
-            $tags[] = '<link rel="icon" type="image/svg+xml" sizes="any" href="' . e($svg) . '">';
+            $tags[] = '<link rel="icon" type="image/svg+xml" sizes="any" href="'.e($svg).'">';
         }
         if ($icon !== '' && $icon !== $svg) {
-            $tags[] = '<link rel="icon" href="' . e($icon) . '">';
+            $tags[] = '<link rel="icon" href="'.e($icon).'">';
             if (! str_ends_with(strtolower(parse_url($icon, PHP_URL_PATH) ?? ''), '.svg')) {
-                $tags[] = '<link rel="shortcut icon" href="' . e($icon) . '">';
+                $tags[] = '<link rel="shortcut icon" href="'.e($icon).'">';
             }
         }
         if ($appleTouch !== '') {
-            $tags[] = '<link rel="apple-touch-icon" href="' . e($appleTouch) . '">';
+            $tags[] = '<link rel="apple-touch-icon" href="'.e($appleTouch).'">';
         }
         if ($manifest !== '') {
-            $tags[] = '<link rel="manifest" href="' . e($manifest) . '">';
+            $tags[] = '<link rel="manifest" href="'.e($manifest).'">';
         }
         $tags[] = '<meta name="msapplication-config" content="none">';
         if ($themeColor !== '') {
-            $tags[] = '<meta name="theme-color" content="' . e($themeColor) . '">';
+            $tags[] = '<meta name="theme-color" content="'.e($themeColor).'">';
         }
         if ($tileColor !== '') {
-            $tags[] = '<meta name="msapplication-TileColor" content="' . e($tileColor) . '">';
+            $tags[] = '<meta name="msapplication-TileColor" content="'.e($tileColor).'">';
         }
 
         return implode("\n", $tags);
@@ -1955,6 +1967,7 @@ class SeoHelper
     public static function defaultTheme(): string
     {
         $theme = SiteSetting::get('default_theme', 'dark');
+
         return match ($theme) {
             'light' => 'light',
             'dark' => 'dark',
@@ -1965,6 +1978,7 @@ class SeoHelper
     public static function themeClass(): string
     {
         $theme = SiteSetting::get('default_theme', 'system');
+
         return match ($theme) {
             'dark' => 'dark',
             'light' => '',
@@ -2077,7 +2091,7 @@ HTML;
             'background_color' => trim((string) SiteSetting::get('seo_favicon_tile_color', '#0f172a')),
             'display' => 'standalone',
             'lang' => self::currentLocale(),
-            'start_url' => '/' . self::defaultHreflangLocale(),
+            'start_url' => '/'.self::defaultHreflangLocale(),
         ];
     }
 
@@ -2209,9 +2223,9 @@ HTML;
     public static function currentLocalizedPath(?string $locale = null): string
     {
         $locale = self::normalizeLocale($locale);
-        $requestPath = '/' . ltrim((string) request()->path(), '/');
+        $requestPath = '/'.ltrim((string) request()->path(), '/');
         if ($requestPath === '/' || $requestPath === '/index.php') {
-            return '/' . $locale;
+            return '/'.$locale;
         }
 
         return self::normalizePath($requestPath, $locale);
@@ -2219,7 +2233,7 @@ HTML;
 
     public static function resolveCurrentPageKey(): string
     {
-        $strippedPath = self::stripLocaleFromPath('/' . ltrim((string) request()->path(), '/'));
+        $strippedPath = self::stripLocaleFromPath('/'.ltrim((string) request()->path(), '/'));
 
         foreach (self::pageDefinitions() as $page => $definition) {
             $pagePath = (string) ($definition['path'] ?? '');
@@ -2288,17 +2302,17 @@ HTML;
         $locale = self::normalizeLocale($locale);
         $path = trim($path);
         if ($path === '') {
-            return '/' . $locale;
+            return '/'.$locale;
         }
 
         if (Str::startsWith($path, ['http://', 'https://'])) {
             return $path;
         }
 
-        $path = '/' . ltrim($path, '/');
+        $path = '/'.ltrim($path, '/');
         $stripped = self::stripLocaleFromPath($path);
 
-        return $stripped === '/' ? '/' . $locale : '/' . $locale . $stripped;
+        return $stripped === '/' ? '/'.$locale : '/'.$locale.$stripped;
     }
 
     private static function isSitemapEntryAllowed(string $path): bool
@@ -2316,6 +2330,7 @@ HTML;
             // Only enforce private-path filtering for this primary domain.
             if ($entryHost !== '' && $canonicalHost !== '' && $entryHost === $canonicalHost) {
                 $entryPath = (string) parse_url($path, PHP_URL_PATH);
+
                 return ! self::isExcludedSitemapPath($entryPath);
             }
 
@@ -2327,16 +2342,16 @@ HTML;
 
     private static function isExcludedSitemapPath(string $path): bool
     {
-        $path = '/' . ltrim(trim($path), '/');
+        $path = '/'.ltrim(trim($path), '/');
         $stripped = self::stripLocaleFromPath($path);
 
         foreach (self::sitemapExcludedPaths() as $excluded) {
-            $excluded = self::stripLocaleFromPath('/' . ltrim($excluded, '/'));
+            $excluded = self::stripLocaleFromPath('/'.ltrim($excluded, '/'));
             if ($excluded === '/') {
                 continue;
             }
 
-            if ($stripped === $excluded || Str::startsWith($stripped, rtrim($excluded, '/') . '/')) {
+            if ($stripped === $excluded || Str::startsWith($stripped, rtrim($excluded, '/').'/')) {
                 return true;
             }
         }
@@ -2362,7 +2377,7 @@ HTML;
                 continue;
             }
 
-            $items[] = '/' . ltrim($line, '/');
+            $items[] = '/'.ltrim($line, '/');
         }
 
         return array_values(array_unique($items));
@@ -2377,7 +2392,7 @@ HTML;
 
         $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
         $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-        $path = '/' . ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $path = '/'.ltrim((string) parse_url($url, PHP_URL_PATH), '/');
         $path = $path === '/' ? '/' : rtrim($path, '/');
 
         if ($host === '') {
@@ -2388,11 +2403,11 @@ HTML;
             $scheme = 'https';
         }
 
-        return $scheme . '://' . $host . $path;
+        return $scheme.'://'.$host.$path;
     }
 
     /**
-     * @param array<string, mixed> $definition
+     * @param  array<string, mixed>  $definition
      */
     private static function sitemapPriorityForPage(string $page, array $definition): float
     {
@@ -2407,7 +2422,7 @@ HTML;
     }
 
     /**
-     * @param array<string, mixed> $definition
+     * @param  array<string, mixed>  $definition
      */
     private static function sitemapChangeFrequencyForPage(string $page, array $definition): string
     {
@@ -2426,14 +2441,14 @@ HTML;
 
     private static function stripLocaleFromPath(string $path): string
     {
-        $path = '/' . ltrim($path, '/');
+        $path = '/'.ltrim($path, '/');
         $segments = array_values(array_filter(explode('/', trim($path, '/')), static fn ($value) => $value !== ''));
 
         if ($segments !== [] && in_array($segments[0], self::supportedLocales(), true)) {
             array_shift($segments);
         }
 
-        return $segments === [] ? '/' : '/' . implode('/', $segments);
+        return $segments === [] ? '/' : '/'.implode('/', $segments);
     }
 
     private static function localizedOverride(string $baseKey, string $locale, bool $requireArabic = false): string
@@ -2594,7 +2609,7 @@ HTML;
         if (is_file($publicFile)) {
             $separator = str_contains($url, '?') ? '&' : '?';
 
-            return $url . $separator . 'v=' . filemtime($publicFile);
+            return $url.$separator.'v='.filemtime($publicFile);
         }
 
         $storageCandidate = ltrim($path, '/');
@@ -2605,7 +2620,7 @@ HTML;
         if ($storageCandidate !== '' && Storage::disk('public')->exists($storageCandidate)) {
             $separator = str_contains($url, '?') ? '&' : '?';
 
-            return $url . $separator . 'v=' . filemtime(Storage::disk('public')->path($storageCandidate));
+            return $url.$separator.'v='.filemtime(Storage::disk('public')->path($storageCandidate));
         }
 
         return $url;

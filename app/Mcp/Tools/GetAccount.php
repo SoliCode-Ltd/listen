@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Mcp\McpCaller;
 use App\Support\Api\ApiScopes;
+use App\Support\StudioFacts;
 use App\Support\Transcription\Minutes;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -46,7 +47,7 @@ class GetAccount extends ListenTool
             'Each second of audio uses '.(int) $credits['credits_per_second'].' credits.',
             $keyLimit !== null ? 'This connection may use '.number_format((int) $keyLimit).' credits a month; '.number_format((int) $account['api_key']['credits_used_this_month']).' used so far.' : null,
             'Longest text per request: '.number_format((int) $account['limits']['max_characters_per_async_request']).' characters.',
-            self::speechToText((array) ($account['speech_to_text'] ?? [])),
+            StudioFacts::speechToText() ? self::speechToText((array) ($account['speech_to_text'] ?? [])) : null,
         ]);
 
         return Response::make([Response::text(implode("\n", $lines))])->withStructuredContent($account);

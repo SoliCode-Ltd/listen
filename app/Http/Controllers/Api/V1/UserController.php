@@ -13,6 +13,7 @@ use App\Support\Api\ApiPlanAccess;
 use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\PlanUsageGuard;
+use App\Support\Transcription\TranscriptionAccess;
 use App\Support\Transcription\TranscriptionApi;
 use App\Support\UsageSnapshot;
 use Illuminate\Http\JsonResponse;
@@ -74,7 +75,7 @@ class UserController extends Controller
         $graceEndsAt = $period['grace_ends_at'] ?? null;
         $resetsAt = $graceEndsAt ?? $period['ends_at'];
 
-        return [
+        $body = [
             'plan' => [
                 'slug' => (string) ($plan?->slug ?? 'free'),
                 // The name members see (Admin → Plans → English name), as in the docs and the dashboard.
@@ -138,5 +139,11 @@ class UserController extends Controller
                 'requests_this_month' => $apiKey->requestsMade($period['key']),
             ],
         ];
+        // Speech to text's minutes, once the member can see speech to text (Speech to text → Settings).
+        if (! TranscriptionAccess::openTo($user)) {
+            unset($body['speech_to_text']);
+        }
+
+        return $body;
     }
 }

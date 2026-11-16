@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Support\Transcription\TranscriptionSettings;
+
 /**
  * One page per studio feature that people (and AI assistants) search for by name:
  * emotions, laughs and whispers written into the text; two voices in one recording;
@@ -15,6 +17,7 @@ final class SeoFeaturePages
         'text-to-speech-with-emotions' => ['en' => 'Emotions, laughs and whispers', 'ar' => 'المشاعر والضحك والهمس'],
         'two-voice-dialogue' => ['en' => 'Two-voice dialogue', 'ar' => 'حوار بصوتين'],
         'voice-cloning' => ['en' => 'Voice cloning', 'ar' => 'استنساخ الصوت'],
+        'speech-to-text' => ['en' => 'Speech to text', 'ar' => 'تحويل الصوت إلى نص'],
     ];
 
     /**
@@ -34,6 +37,7 @@ final class SeoFeaturePages
             'text-to-speech-with-emotions' => StudioFacts::emotions() > 0 && StudioFacts::soundTags() > 0,
             'two-voice-dialogue' => StudioFacts::dialoguePlans('en') !== [],
             'voice-cloning' => StudioFacts::cloning(),
+            'speech-to-text' => StudioFacts::speechToText(),
             default => false,
         };
     }
@@ -94,6 +98,9 @@ final class SeoFeaturePages
             'voice-cloning' => $ar
                 ? 'استنساخ الصوت بالذكاء الاصطناعي باللهجات العربية'
                 : 'AI Voice Cloning in Arabic Dialects and English',
+            'speech-to-text' => $ar
+                ? 'تحويل الصوت إلى نص بالعربية ولهجاتها والإنجليزية'
+                : 'Speech to Text for Arabic Dialects and English',
             default => '',
         };
     }
@@ -112,6 +119,9 @@ final class SeoFeaturePages
             'voice-cloning' => $ar
                 ? 'سجّل صوتك مرة واحدة واستخدمه في كل ما تكتبه، باللهجة العربية التي تختارها أو بالإنجليزية.'
                 : 'Record your voice once and use it for anything you write, in the Arabic dialect you choose or in English.',
+            'speech-to-text' => $ar
+                ? 'حوّل الصوت والفيديو إلى نص مع من قال كل جملة، بـ'.StudioFacts::speechToTextLanguages().' لغة منها العربية بلهجاتها. عدّله وترجمه ونزّله ترجمة مرئية أو مستنداً.'
+                : 'Turn audio and video into text with who said what, in '.StudioFacts::speechToTextLanguages().' languages including Arabic dialects. Edit, translate and download it as subtitles or a document.',
             default => '',
         };
     }
@@ -135,6 +145,7 @@ final class SeoFeaturePages
             'text-to-speech-with-emotions' => self::emotionsContent($ar),
             'two-voice-dialogue' => self::dialogueContent($ar),
             'voice-cloning' => self::cloningContent($ar),
+            'speech-to-text' => self::speechToTextContent($ar),
             default => [],
         };
     }
@@ -286,6 +297,96 @@ final class SeoFeaturePages
             ],
             'cta_title' => 'Write your dialogue and hear it in two voices',
             'cta_body' => 'Create your account and give each speaker a voice and a dialect.',
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private static function speechToTextContent(bool $ar): array
+    {
+        $locale = $ar ? 'ar' : 'en';
+        $languages = StudioFacts::speechToTextLanguages();
+        $plans = StudioFacts::speechToTextPlans($locale);
+        $names = StudioFacts::planList(array_column($plans, 'name'), $locale);
+        // "120 minutes" / «120 دقيقة», the pricing cards' own words.
+        $inMinutes = fn (int $count): string => trans_choice('ui.pricing.lines.stt_minutes', $count, ['count' => number_format($count)], $locale);
+        $minutes = implode($ar ? '، ' : ', ', array_map(fn (array $p): string => $p['name'].' '.$inMinutes($p['minutes']), $plans));
+        $free = TranscriptionSettings::freeTrySeconds();
+        $freeLength = $free % 60 === 0 ? $inMinutes(intdiv($free, 60)) : $free.($ar ? ' ثانية' : ' seconds');
+        $mb = TranscriptionSettings::maxUploadMb();
+        $files = 'MP3, WAV, M4A, OGG, FLAC, WEBM, MP4';
+        $top = $plans === [] ? null : array_reduce($plans, fn (?array $carry, array $p): array => $carry === null || $p['minutes'] > $carry['minutes'] ? $p : $carry);
+        // The hero's figures: this feature's own, not the voice studio's.
+        $facts = array_values(array_filter([
+            [$languages, $ar ? 'لغة' : 'languages'],
+            [4, $ar ? 'صيغ تنزيل' : 'download formats'],
+            $top !== null ? [number_format($top['minutes']), $ar ? 'دقيقة شهرياً في '.$top['name'] : 'minutes a month on '.$top['name']] : null,
+            [$mb, $ar ? 'ميغابايت للملف' : 'MB a file'],
+        ]));
+
+        if ($ar) {
+            return [
+                'facts' => $facts,
+                'intro' => 'ارفع تسجيلاً أو الصق رابطاً أو سجّل من متصفحك، فتكتب منصة إسمع كل كلمة مع من قالها ومتى. اقرأ النص في محرر يشغّل الصوت مع الكلمات، وصحّح كلمة، وسمِّ المتحدثين، وترجمه، ثم نزّله نصاً أو ترجمة مرئية أو مستنداً.',
+                'highlights_title' => 'ما الذي تحصل عليه',
+                'highlights_intro' => 'من رفع الملف إلى النص الجاهز، في صفحة واحدة.',
+                'highlights' => [
+                    ['title' => 'من قال ماذا', 'body' => 'لكل متحدث اسمه ولونه، ولكل جملة وقتها، فتجد أي لحظة في التسجيل بسهولة.'],
+                    ['title' => $languages.' لغة منها العربية بلهجاتها', 'body' => 'الخليجية والمصرية والشامية والمغاربية وغيرها، والفصحى والإنجليزية. تُكتشف اللغة تلقائياً أو تختارها قبل البدء.'],
+                    ['title' => 'النص مع الصوت', 'body' => 'شغّل التسجيل فتضيء الجملة التي تُقال الآن، واضغط أي جملة أو أي نقطة في الخط الزمني لتنتقل إليها.'],
+                    ['title' => 'ترجمات مرئية ومستندات', 'body' => 'نزّل النص TXT أو ترجمة مرئية SRT وVTT أو مستنداً منسّقاً DOCX، بلغته الأصلية أو مترجماً.'],
+                ],
+                'use_cases_title' => 'أين تستخدمه',
+                'use_cases_intro' => 'كلما احتجت إلى ما قيل مكتوباً.',
+                'use_cases' => [
+                    ['title' => 'البودكاست والمقابلات', 'body' => 'نص كل حلقة مع اسم كل ضيف، جاهز للنشر أو الاقتباس.'],
+                    ['title' => 'ترجمة الفيديو', 'body' => 'ترجمات مرئية SRT وVTT متزامنة مع الصوت، لمقاطع يوتيوب والريلز والدورات.'],
+                    ['title' => 'الاجتماعات والمكالمات', 'body' => 'محضر بمن قال ماذا، تبحث فيه لاحقاً.'],
+                    ['title' => 'الدروس والمحاضرات', 'body' => 'نسخة مكتوبة من الدرس يقرؤها الطلاب ويبحثون فيها.'],
+                ],
+                'faqs' => array_values(array_filter([
+                    ['question' => 'ما اللغات التي يكتبها؟', 'answer' => $languages.' لغة، منها العربية بلهجاتها والفصحى والإنجليزية. يكتشف اللغة بنفسه، أو تختارها أنت.'],
+                    ['question' => 'كيف تُحسب الدقائق؟', 'answer' => 'يستخدم الملف مدته بالضبط، إلى الثانية: تسجيل مدته 1:42 يستخدم دقيقة و42 ثانية. والملف الذي يفشل أو لا كلام فيه لا يستخدم شيئاً.'],
+                    $plans !== [] ? ['question' => 'أي الباقات تشمله؟', 'answer' => 'يتوفر تحويل الصوت إلى نص في '.$names.'، بدقائق كل شهر: '.$minutes.'.'] : null,
+                    $free > 0 ? ['question' => 'هل يمكنني تجربته أولاً؟', 'answer' => 'نعم. إن لم تشمله باقتك، يمكنك تجربته بتسجيل واحد مدته حتى '.$freeLength.'.'] : null,
+                    ['question' => 'ما الملفات التي يمكنني رفعها؟', 'answer' => 'ملفات الصوت والفيديو مثل '.$files.'، حتى '.$mb.' ميغابايت، وتحدد كل باقة أطول ملف فيها. ويمكنك أيضاً لصق رابط أو التسجيل من المتصفح.'],
+                    ['question' => 'هل يمكنني ترجمة النص؟', 'answer' => 'نعم. اعرضه بلغة أخرى في المحرر ونزّل الترجمة، ولا تستخدم الترجمة أي دقائق.'],
+                    ['question' => 'هل يعمل من تطبيقي؟', 'answer' => 'نعم، عبر واجهة المطورين للباقات التي تشملها، ومن تطبيقات الذكاء الاصطناعي عبر خادم MCP.'],
+                ])),
+                'cta_title' => 'حوّل تسجيلك القادم إلى نص',
+                'cta_body' => 'أنشئ حسابك وارفع تسجيلاً أو الصق رابطاً أو سجّل واحداً الآن.',
+            ];
+        }
+
+        return [
+            'facts' => $facts,
+            'intro' => 'Upload a recording, paste a link or record in your browser, and Listen writes out every word with who said it and when. Read it in an editor that plays the audio along with the words, correct a word, name the speakers, translate it, and download it as text, subtitles or a document.',
+            'highlights_title' => 'What you get',
+            'highlights_intro' => 'From the upload to the finished text, on one page.',
+            'highlights' => [
+                ['title' => 'Who said what', 'body' => 'Each speaker gets a name and a colour, and every sentence its time, so any moment in the recording is easy to find.'],
+                ['title' => $languages.' languages, Arabic dialects included', 'body' => 'Gulf, Egyptian, Levantine, Maghrebi and more, Modern Standard Arabic and English. The language is found by itself, or you choose it before you start.'],
+                ['title' => 'The text with the audio', 'body' => 'Press play and the sentence being said lights up; click any sentence or any point on the timeline to go there.'],
+                ['title' => 'Subtitles and documents', 'body' => 'Download TXT, SRT or VTT subtitles, or a formatted DOCX document, in the original language or translated.'],
+            ],
+            'use_cases_title' => 'Where it is used',
+            'use_cases_intro' => 'Whenever you need what was said in writing.',
+            'use_cases' => [
+                ['title' => 'Podcasts and interviews', 'body' => 'A transcript of every episode with each guest named, ready to publish or quote.'],
+                ['title' => 'Video subtitles', 'body' => 'SRT and VTT subtitles timed to the voice, for YouTube, Reels and courses.'],
+                ['title' => 'Meetings and calls', 'body' => 'Notes of who said what, to search later.'],
+                ['title' => 'Lessons and lectures', 'body' => 'A written version of the lesson for students to read and search.'],
+            ],
+            'faqs' => array_values(array_filter([
+                ['question' => 'Which languages does it write out?', 'answer' => $languages.' languages, including Arabic in its dialects, Modern Standard Arabic and English. It finds the language by itself, or you choose it.'],
+                ['question' => 'How are the minutes counted?', 'answer' => 'A file uses exactly its length, to the second: a 1:42 recording uses 1 minute 42 seconds. A file that fails, or has no speech in it, uses nothing.'],
+                $plans !== [] ? ['question' => 'Which plans include it?', 'answer' => 'Speech to text is included in '.$names.', with minutes every month: '.$minutes.'.'] : null,
+                $free > 0 ? ['question' => 'Can I try it first?', 'answer' => 'Yes. If your plan does not include it, you can try it with one recording of up to '.$freeLength.'.'] : null,
+                ['question' => 'Which files can I upload?', 'answer' => 'Audio and video files such as '.$files.', up to '.$mb.' MB; each plan sets its longest file. You can also paste a link or record in your browser.'],
+                ['question' => 'Can I translate the transcript?', 'answer' => 'Yes. Show it in another language in the editor and download the translation; translating uses no minutes.'],
+                ['question' => 'Does it work from my own app?', 'answer' => 'Yes, through the developer API on the plans that include it, and from AI apps through the MCP server.'],
+            ])),
+            'cta_title' => 'Turn your next recording into text',
+            'cta_body' => 'Create your account and upload a recording, paste a link or record one now.',
         ];
     }
 
