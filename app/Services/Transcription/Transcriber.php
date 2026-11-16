@@ -29,7 +29,7 @@ use Symfony\Component\Process\Process;
  *
  * The model writes only the words and who says them, never times: asked for
  * times over a long stretch, it drifts (measured on staging, November 2026).
- * The times come after, in short windows (timingWindows(), about 24 s, cut on
+ * The times come after, in short windows (timingWindows(), about 30 s, cut on
  * pauses), each heard on its own with the sentences near it: in so little
  * audio the start it hears for a sentence is close, and no error carries on
  * to the next window. The starts are then moved onto where speech begins in
@@ -76,11 +76,11 @@ final class Transcriber
     public const MATCH_SECONDS = 6.0;
 
     /** The audio timed in one request: about this many seconds, cut on a pause between the two limits. */
-    public const TIMING_WINDOW = 24.0;
+    public const TIMING_WINDOW = 30.0;
 
-    private const TIMING_WINDOW_MIN = 14.0;
+    private const TIMING_WINDOW_MIN = 18.0;
 
-    private const TIMING_WINDOW_MAX = 32.0;
+    private const TIMING_WINDOW_MAX = 42.0;
 
     /** Timing requests sent at once. */
     private const TIMING_AT_ONCE = 5;
@@ -180,13 +180,14 @@ final class Transcriber
         $seconds = $this->duration($ffmpeg, $clean);
         $pauses = $this->pauses($ffmpeg, $clean);
         $loudest = $this->loudest($ffmpeg, $clean);
+        $heard = self::mergePauses($pauses, self::softPausesFrom($this->levels($ffmpeg, $clean), self::LEVEL_FRAME));
         $language = strtolower(trim((string) ($o['language'] ?? 'auto'))) ?: 'auto';
 
         return [
             'ask' => ['language' => $language, 'dialect' => trim((string) ($o['dialect'] ?? '')), 'review' => (bool) ($o['review'] ?? false), 'thinking' => (string) ($o['thinking'] ?? 'low')],
             'asked' => $language,
             'seconds' => round($seconds, 2),
-            'pauses' => $pauses,
+            'pauses' => $heard,
             'speech_seconds' => round(self::speechSeconds($pauses, 0.0, $seconds), 2),
             'loudest_db' => round($loudest, 1),
             'plan' => self::chunkPlan($pauses, $seconds),
@@ -784,20 +785,8 @@ final class Transcriber
         if ($back > max(1, intdiv($n, 5)) || ($n > 2 && $same >= intdiv($n, 2))) {
             return null;
         }
-        // Onto the start of speech nearby, still in order.
-        foreach ($times as $i => $start) {
-            $best = null;
-            foreach ($speech as [$begin]) {
-                if (abs($begin - $start) <= 0.6 && ($best === null || abs($begin - $start) < abs($best - $start))) {
-                    $best = (float) $begin;
-                }
-            }
-            $low = $i > 0 ? $times[$i - 1] : $from;
-            $high = $i + 1 < $n ? $times[$i + 1] : $to;
-            if ($best !== null && $best >= $low && $best <= $high) {
-                $times[$i] = $best;
-            }
-        }
+        // Onto where speech begins after a pause, all together and in order (snapToOnsets()).
+        $times = self::snapToOnsets($times, array_map(fn ($sp) => (float) $sp[0], $speech));
         $placed = [];
         foreach ($sentences as $i => $sentence) {
             $start = $times[$i];
@@ -1061,6 +1050,204 @@ final class Transcriber
         }
 
         return true;
+    }
+
+    /** Seconds in each loudness reading (levels()). */
+    public const LEVEL_FRAME = 0.05;
+
+    /** How loud a recording is every LEVEL_FRAME seconds, in dB (-120 for silence). @return array<int, float> */
+    public function levels(string $ffmpeg, string $file): array
+    {
+        $p = new Process([$ffmpeg, '-hide_banner', '-nostats', '-i', $file, '-af',
+            'aresample=8000,asetnsamples=n='.(int) round(8000 * self::LEVEL_FRAME).':p=0,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=-', '-f', 'null', '-']);
+        $p->setTimeout(600)->run();
+        preg_match_all('/RMS_level=(-?inf|-?[\d.]+)/', $p->getOutput(), $m);
+
+        return array_map(fn ($v) => str_contains($v, 'inf') ? -120.0 : max(-120.0, (float) $v), $m[1] ?? []);
+    }
+
+    /**
+     * Pauses heard against the recording's own background (music or noise under the voice), where
+     * the fixed level of pauses() finds none. The voice's own level is the middle reading; what is
+     * clearly quieter than it (12 dB) is the background, when there is enough of it (2% of the
+     * recording) to measure; a pause is then a stretch of at least 0.2 s within 6 dB of the
+     * background and well under the voice. Nothing when the background is quiet (pauses() has those).
+     *
+     * @param  array<int, float>  $levels  dB every $frame seconds
+     * @return array<int, array{0: float, 1: float}>
+     */
+    public static function softPausesFrom(array $levels, float $frame): array
+    {
+        $n = count($levels);
+        if ($n < 20) {
+            return [];
+        }
+        $sorted = $levels;
+        sort($sorted);
+        $voice = $sorted[intdiv($n, 2)];
+        $quiet = array_values(array_filter($sorted, fn ($db) => $db < $voice - 12.0));
+        if (count($quiet) < max(4, (int) ceil($n * 0.02))) {
+            return [];
+        }
+        $background = $quiet[intdiv(count($quiet), 2)];
+        $limit = min($background + 6.0, $voice - 8.0);
+        if ($limit < self::PAUSE_DB - 3) {
+            return [];
+        }
+        $pauses = [];
+        $from = null;
+        foreach (array_merge($levels, [0.0]) as $i => $db) {
+            if ($db <= $limit) {
+                $from ??= $i;
+
+                continue;
+            }
+            if ($from !== null && ($i - $from) * $frame >= 0.2) {
+                $pauses[] = [round($from * $frame, 2), round($i * $frame, 2)];
+            }
+            $from = null;
+        }
+
+        return $pauses;
+    }
+
+    /**
+     * Two lists of pauses as one, in order, overlapping ones joined.
+     *
+     * @param  array<int, array{0: float, 1: float}>  $a
+     * @param  array<int, array{0: float, 1: float}>  $b
+     * @return array<int, array{0: float, 1: float}>
+     */
+    public static function mergePauses(array $a, array $b): array
+    {
+        $all = array_merge($a, $b);
+        usort($all, fn ($x, $y) => $x[0] <=> $y[0]);
+        $out = [];
+        foreach ($all as [$start, $end]) {
+            $last = count($out) - 1;
+            if ($last >= 0 && $start <= $out[$last][1]) {
+                $out[$last][1] = max($out[$last][1], (float) $end);
+            } else {
+                $out[] = [(float) $start, (float) $end];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Sentence starts moved onto where speech begins after a pause, all at once: each start may
+     * take one such moment up to $reach seconds away, no two the same, in order, and a start left
+     * where it was heard costs $miss. So a start heard up to about a second off goes onto the pause
+     * it belongs to, while one said without a pause before it keeps the time it was heard at.
+     *
+     * @param  array<int, float>  $times  heard starts, in order
+     * @param  array<int, float>  $onsets  where speech begins again, in order
+     * @return array<int, float>
+     */
+    public static function snapToOnsets(array $times, array $onsets, float $miss = 1.0, float $reach = 1.5): array
+    {
+        $times = array_values($times);
+        sort($onsets);
+        $n = count($times);
+        $k = count($onsets);
+        if ($n === 0 || $k === 0) {
+            return $times;
+        }
+        // cost[i][j]: the least for the first i starts using the first j onsets; how: 0 an onset passed over, 1 a start kept, 2 matched.
+        $cost = array_fill(0, $n + 1, array_fill(0, $k + 1, 0.0));
+        $how = array_fill(0, $n + 1, array_fill(0, $k + 1, 0));
+        for ($i = 1; $i <= $n; $i++) {
+            $cost[$i][0] = $i * $miss;
+            $how[$i][0] = 1;
+            for ($j = 1; $j <= $k; $j++) {
+                $best = $cost[$i][$j - 1];
+                $way = 0;
+                if ($cost[$i - 1][$j] + $miss < $best) {
+                    $best = $cost[$i - 1][$j] + $miss;
+                    $way = 1;
+                }
+                $d = abs($times[$i - 1] - $onsets[$j - 1]);
+                if ($d <= $reach && $cost[$i - 1][$j - 1] + $d < $best) {
+                    $best = $cost[$i - 1][$j - 1] + $d;
+                    $way = 2;
+                }
+                $cost[$i][$j] = $best;
+                $how[$i][$j] = $way;
+            }
+        }
+        $out = $times;
+        for ($i = $n, $j = $k; $i > 0;) {
+            $way = $how[$i][$j];
+            if ($way === 2) {
+                $out[$i - 1] = (float) $onsets[$j - 1];
+                $i--;
+                $j--;
+            } elseif ($way === 1 || $j === 0) {
+                $i--;
+            } else {
+                $j--;
+            }
+        }
+        // Still in order.
+        for ($i = 1; $i < $n; $i++) {
+            $out[$i] = max($out[$i], $out[$i - 1]);
+        }
+
+        return array_map(fn ($v) => round($v, 2), $out);
+    }
+
+    /**
+     * Paragraphs of a transcript in another language, by the text model: a few paragraphs to a
+     * request, all the requests at once, each answer held to the same number of paragraphs. One
+     * translation for each, or null where a request did not come back whole.
+     *
+     * @param  array<int, string>  $texts
+     * @return array<int, ?string>
+     */
+    public function translateTexts(array $texts, string $from, string $to): array
+    {
+        $texts = array_values($texts);
+        $out = array_fill(0, count($texts), null);
+        $groups = [];
+        $group = [];
+        $size = 0;
+        foreach ($texts as $i => $text) {
+            if ($group !== [] && ($size + mb_strlen($text) > 2500 || count($group) >= 12)) {
+                $groups[] = $group;
+                $group = [];
+                $size = 0;
+            }
+            $group[$i] = $text;
+            $size += mb_strlen($text);
+        }
+        if ($group !== []) {
+            $groups[] = $group;
+        }
+        $fromName = self::languageName($from) ?: $from;
+        $toName = self::languageName($to) ?: $to;
+        $asks = [];
+        foreach ($groups as $g => $group) {
+            $lines = [];
+            foreach (array_values($group) as $n => $text) {
+                $lines[] = ($n + 1).'. '.$text;
+            }
+            $asks[$g] = [['text' => "Translate each of these numbered paragraphs of a spoken transcript from {$fromName} into {$toName}. "
+                .'Keep the meaning and the way each person speaks, natural for a native reader; keep names, brands and numbers as they are. '
+                .'Return JSON {"paragraphs": [...]} with exactly '.count($group)." strings, one for each paragraph, in the same order.\n\n".implode("\n", $lines)]];
+        }
+        $schema = ['type' => 'OBJECT', 'properties' => ['paragraphs' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']]], 'required' => ['paragraphs']];
+        foreach ($this->askModelMany($asks, 'low', $schema) as $g => $answer) {
+            $got = array_values((array) ($answer['data']['paragraphs'] ?? []));
+            if ($answer === null || count($got) !== count($groups[$g])) {
+                continue;
+            }
+            foreach (array_keys($groups[$g]) as $n => $i) {
+                $out[$i] = is_string($got[$n]) && trim($got[$n]) !== '' ? trim($got[$n]) : null;
+            }
+        }
+
+        return $out;
     }
 
     /** The loudest moment of a recording in dB (0 at full scale; -120 for digital silence). */

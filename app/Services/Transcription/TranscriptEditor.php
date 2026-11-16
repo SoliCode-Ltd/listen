@@ -5,6 +5,7 @@ namespace App\Services\Transcription;
 use App\Models\Transcription;
 use App\Services\TranslationService;
 use App\Support\Transcription\TranscriptionSettings;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * What a member does with a finished transcript, none of it using minutes:
@@ -15,7 +16,13 @@ use App\Support\Transcription\TranscriptionSettings;
  */
 final class TranscriptEditor
 {
-    public function __construct(private TranslationService $translator) {}
+    public function __construct(private TranslationService $translator, private Transcriber $transcriber) {}
+
+    /** Where a translation is kept (as TranslationService keeps one). */
+    private static function keptKey(string $source, string $target, string $text): string
+    {
+        return 'listen:tr:v4:'.sha1($source.'|'.$target.'|'.trim($text));
+    }
 
     public function rename(Transcription $t, string $title): void
     {
@@ -76,12 +83,24 @@ final class TranscriptEditor
             return $kept;
         }
         $source = self::translatorCode((string) ($t->language ?: 'en'));
-        // Every paragraph asked at once; the loop below then finds them ready.
-        $this->translator->prefetch(array_map(fn ($p) => (string) ($p['text'] ?? ''), (array) $t->paragraphs), $source, self::translatorCode($language));
+        // Every paragraph asked at once of the quick translator; what it could not do, of the text
+        // model in a few requests sent together; anything still missing the careful way, one by one.
+        $texts = array_map(fn ($p) => trim((string) ($p['text'] ?? '')), array_values((array) $t->paragraphs));
+        $target = self::translatorCode($language);
+        $this->translator->prefetch($texts, $source, $target);
+        $missing = array_filter($texts, fn ($x) => $x !== '' && ! is_string(Cache::get(self::keptKey($source, $target, $x))));
+        if ($missing !== []) {
+            $done = $this->transcriber->translateTexts(array_values($missing), (string) ($t->language ?: 'en'), $language);
+            foreach (array_values($missing) as $n => $text) {
+                if (is_string($done[$n] ?? null)) {
+                    Cache::put(self::keptKey($source, $target, $text), $done[$n], now()->addDays(14));
+                }
+            }
+        }
         $paragraphs = [];
         $segments = [];
         foreach ((array) $t->paragraphs as $i => $p) {
-            $text = $this->translator->maybeTranslate((string) $p['text'], $source, self::translatorCode($language), true);
+            $text = $this->translator->maybeTranslate((string) $p['text'], $source, $target, true);
             $paragraph = ['speaker' => $p['speaker'], 'text' => $text, 'start' => (float) $p['start'], 'end' => (float) $p['end']];
             $paragraphs[] = $paragraph;
             array_push($segments, ...self::spread($paragraph, $i));

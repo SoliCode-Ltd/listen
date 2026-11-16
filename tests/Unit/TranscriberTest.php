@@ -354,16 +354,16 @@ class TranscriberTest extends TestCase
     /** A part is timed in windows of about 30 s, cut on pauses, end to end; with no pause (music under the voice), every 30 s. */
     public function test_a_part_is_timed_in_short_windows_cut_on_pauses(): void
     {
-        $this->assertSame([[0.0, 30.0]], Transcriber::timingWindows([], 0.0, 30.0), 'short: one window');
+        $this->assertSame([[0.0, 40.0]], Transcriber::timingWindows([], 0.0, 40.0), 'short: one window');
 
-        $windows = Transcriber::timingWindows([[12.0, 12.4], [23.0, 23.8], [27.0, 27.2], [49.5, 50.5]], 0.0, 80.0);
-        $this->assertSame([[0.0, 23.4], [23.4, 50.0], [50.0, 80.0]], $windows, 'on the pause nearest 24 s, a longer one first');
+        $windows = Transcriber::timingWindows([[12.0, 12.4], [29.0, 29.8], [33.0, 33.2], [61.5, 62.5]], 0.0, 100.0);
+        $this->assertSame([[0.0, 29.4], [29.4, 62.0], [62.0, 100.0]], $windows, 'on the pause nearest 30 s, a longer one first');
 
-        $none = Transcriber::timingWindows([], 10.0, 106.0);
-        $this->assertSame([[10.0, 34.0], [34.0, 58.0], [58.0, 82.0], [82.0, 106.0]], $none);
+        $none = Transcriber::timingWindows([], 10.0, 130.0);
+        $this->assertSame([[10.0, 40.0], [40.0, 70.0], [70.0, 100.0], [100.0, 130.0]], $none);
         foreach ([$windows, $none] as $list) {
             foreach ($list as $i => [$start, $end]) {
-                $this->assertLessThanOrEqual(32.0, $end - $start);
+                $this->assertLessThanOrEqual(42.0, $end - $start);
                 if ($i > 0) {
                     $this->assertSame($list[$i - 1][1], $start, 'end to end');
                 }
@@ -422,6 +422,42 @@ class TranscriberTest extends TestCase
         $this->assertEqualsWithDelta(21.0, $starts[2], 0.15, 'moved onto where the speech begins after the pause');
         $this->assertEqualsWithDelta(46.0, $starts[3], 0.15);
         $this->assertStringContainsString('times: 3 windows, 3 answered, 4 of 4 sentences heard', implode(' | ', $out['notes']));
+    }
+
+    /** Starts heard up to about a second off go onto the pause they belong to, together and in order; one said without a pause keeps its time. */
+    public function test_starts_are_fitted_to_the_pauses_together(): void
+    {
+        $this->assertSame([10.0, 12.1, 13.2], Transcriber::snapToOnsets([10.1, 12.1, 13.5], [10.0, 13.2]));
+        $this->assertSame([29.9], Transcriber::snapToOnsets([29.0], [27.0, 29.9]), 'heard 0.9 s early: onto its own pause');
+        $this->assertSame([12.1], Transcriber::snapToOnsets([12.1], [13.6]), 'nothing within reach: kept');
+        // Two starts never take one pause, and the order holds.
+        $this->assertSame([5.0, 5.6], Transcriber::snapToOnsets([5.1, 5.6], [5.0]));
+        $this->assertSame([3.2, 3.2], Transcriber::snapToOnsets([3.2, 2.9], [3.0]), 'never going back');
+    }
+
+    /** Under a music or noise bed, pauses are found against the recording's own quietest moments. */
+    public function test_pauses_are_found_under_a_noise_bed(): void
+    {
+        // 50 ms readings: voice at -20 dB, a 0.4 s breath at -44 dB (the bed), voice again, a 0.1 s dip.
+        $levels = array_merge(array_fill(0, 30, -20.0), array_fill(0, 8, -44.0), array_fill(0, 30, -21.0), array_fill(0, 2, -43.0), array_fill(0, 30, -20.0));
+        $this->assertSame([[1.5, 1.9]], Transcriber::softPausesFrom($levels, 0.05), 'the breath, not the short dip');
+        // A quiet recording: the fixed level finds its pauses, so none here.
+        $this->assertSame([], Transcriber::softPausesFrom(array_merge(array_fill(0, 30, -20.0), array_fill(0, 10, -80.0)), 0.05));
+        $this->assertSame([[0.0, 1.5], [2.0, 3.0]], Transcriber::mergePauses([[0.0, 1.0], [2.0, 2.5]], [[0.8, 1.5], [2.4, 3.0]]));
+
+        if (! AudioFormats::ffmpegPath()) {
+            return;
+        }
+        $file = sys_get_temp_dir().'/transcriber-bed-'.getmypid().'.wav';
+        (new Process([AudioFormats::ffmpegPath(), '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=300:duration=2', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono:d=0.5',
+            '-f', 'lavfi', '-i', 'sine=frequency=300:duration=2', '-filter_complex',
+            '[0:a]aformat=sample_rates=44100:channel_layouts=mono[a];[2:a]aformat=sample_rates=44100:channel_layouts=mono[c];[a][1:a][c]concat=n=3:v=0:a=1[s];anoisesrc=color=pink:amplitude=0.12:sample_rate=44100,atrim=0:4.5[n];[s][n]amix=inputs=2:duration=first:normalize=0[o]',
+            '-map', '[o]', $file]))->mustRun();
+        $found = Transcriber::softPausesFrom(app(Transcriber::class)->levels(AudioFormats::ffmpegPath(), $file), Transcriber::LEVEL_FRAME);
+        @unlink($file);
+        $this->assertCount(1, $found);
+        $this->assertEqualsWithDelta(2.0, $found[0][0], 0.1);
+        $this->assertEqualsWithDelta(2.5, $found[0][1], 0.1);
     }
 
     /** The windows' answers make one start for each sentence: the earlier window's when two claim one, none out of order, the rest by length. */

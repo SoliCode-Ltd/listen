@@ -1479,10 +1479,12 @@
     languageMenu(target);
     button.classList.add('is-busy');
     button.setAttribute('aria-busy', 'true');
+    reader.classList.add('is-translating');
     var asked = current.id;
     json('POST', current.urls.translate, { language: target }).then(function (r) {
       button.classList.remove('is-busy');
       button.removeAttribute('aria-busy');
+      reader.classList.remove('is-translating');
       if (!current || current.id !== asked) return;
       if (r.xhr.status !== 200) {
         languageMenu(before);
@@ -1496,6 +1498,7 @@
     }).catch(function () {
       button.classList.remove('is-busy');
       button.removeAttribute('aria-busy');
+      reader.classList.remove('is-translating');
       languageMenu(before);
       note.textContent = t.network;
       note.hidden = false;
