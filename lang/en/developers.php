@@ -139,7 +139,7 @@ return [
             'boolean' => 'true or false',
             'object' => 'object',
             'array' => 'list',
-            'file' => 'file',
+            'file' => 'upload',
         ],
 
         // Lists joined into sentences (ApiDocs::listed). An item keyed by a
