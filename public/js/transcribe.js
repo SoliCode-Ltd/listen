@@ -108,15 +108,57 @@
     return body.message || t.upload_failed;
   }
   function wait(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
+  var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // What an action did, said for a moment at the foot of the screen (and to screen readers).
+  var toastBox = $('[data-tr-toast]');
+  var toastTimer = 0;
+  function toast(text, kind) {
+    if (!toastBox || !text) return;
+    toastBox.textContent = text;
+    toastBox.classList.toggle('is-error', kind === 'error');
+    toastBox.classList.remove('is-on');
+    void toastBox.offsetWidth;
+    toastBox.classList.add('is-on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastBox.classList.remove('is-on'); }, kind === 'error' ? 4200 : 2400);
+  }
+  // Asked in the site's own dialog before a transcript is deleted; a press outside it is No.
+  var confirmBox = $('[data-tr-confirm]');
+  if (confirmBox) {
+    confirmBox.addEventListener('click', function (e) { if (e.target === confirmBox) confirmBox.close('cancel'); });
+  }
+  function confirmDelete() {
+    return new Promise(function (resolve) {
+      if (!confirmBox || typeof confirmBox.showModal !== 'function') { resolve(window.confirm(t.delete_title)); return; }
+      confirmBox.returnValue = '';
+      confirmBox.addEventListener('close', function done() {
+        confirmBox.removeEventListener('close', done);
+        resolve(confirmBox.returnValue === 'ok');
+      });
+      confirmBox.showModal();
+    });
+  }
 
   // ---------- The box's views ----------
   // The chosen file is a card inside the add box ("chosen"), with the ways to add another below it.
   function show(name) {
     var view = name === 'chosen' ? 'drop' : name;
-    $$('[data-tr-view]').forEach(function (v) { v.hidden = v.getAttribute('data-tr-view') !== view; });
+    $$('[data-tr-view]').forEach(function (v) {
+      var was = v.hidden;
+      v.hidden = v.getAttribute('data-tr-view') !== view;
+      if (was && !v.hidden) appear(v);
+    });
     drop.classList.toggle('has-file', name === 'chosen');
     $('[data-tr-studio]').classList.toggle('is-working', name === 'working');
     if (name !== 'chosen') stopPreview();
+  }
+  // A part that comes into view fades up into place (once; not with reduced motion).
+  function appear(el) {
+    if (calm || !el) return;
+    el.classList.remove('tr-appear');
+    void el.offsetWidth;
+    el.classList.add('tr-appear');
   }
   function showError(text) {
     errorBox.textContent = text || '';
@@ -571,6 +613,7 @@
     if (following[item.id]) return;
     following[item.id] = true;
     var tries = 0;
+    var since = Date.now();
     function poll() {
       json('GET', item.urls.show).then(function (r) {
         if (r.xhr.status !== 200) throw r;
@@ -579,7 +622,8 @@
         if (r.body.account) syncAccount(r.body.account);
         if (tr.status === 'queued' || tr.status === 'processing') {
           if (inBox) working(tr.progress < 15 ? 'prepare' : 'listen', tr.progress, t.working, t.working_note);
-          return setTimeout(poll, 2500);
+          // Asked often at first (a short file is done in seconds), then less.
+          return setTimeout(poll, Date.now() - since < 20000 ? 1200 : 2500);
         }
         delete following[item.id];
         if (inBox && tr.status === 'ready') {
@@ -595,7 +639,7 @@
         setTimeout(poll, tries > 20 ? 15000 : 6000);
       });
     }
-    setTimeout(poll, 1500);
+    setTimeout(poll, inBox ? 700 : 1500);
   }
 
   // ---------- The account at the top ----------
@@ -673,28 +717,29 @@
     var tr = document.createElement('tr');
     bindRow(tr, item);
     rows.insertBefore(tr, rows.firstChild);
+    if (!calm) tr.classList.add('is-new');
   }
   function updateRow(item) {
     var tr = rows.querySelector('[data-tr-row="' + item.id + '"]');
     if (tr) bindRow(tr, item);
   }
-  function renameItem(item) {
-    var title = window.prompt(t.rename_prompt, item.title);
-    if (!title || !title.trim()) return;
-    json('PATCH', item.urls.update, { title: title.trim() }).then(function (r) {
-      if (r.xhr.status !== 200) return;
-      updateRow(r.body.transcription);
-      if (current && current.id === item.id) { current.title = r.body.transcription.title; $('[data-tr-reader-title]').textContent = cleanTitle(current.title); }
-    });
-  }
   function removeItem(item) {
-    if (!window.confirm(t.delete_confirm)) return;
-    json('DELETE', item.urls.delete).then(function (r) {
-      if (r.xhr.status !== 200) return;
+    confirmDelete().then(function (yes) {
+      if (!yes) return;
       var tr = rows.querySelector('[data-tr-row="' + item.id + '"]');
-      if (tr) tr.remove();
       if (current && current.id === item.id) close();
-      if (!rows.children.length) emptyRow($('[data-tr-empty-text]').innerHTML);
+      if (tr) tr.classList.add('is-leaving');
+      json('DELETE', item.urls.delete).then(function (r) {
+        if (r.xhr.status !== 200) throw r;
+        setTimeout(function () {
+          if (tr) tr.remove();
+          if (!rows.children.length) emptyRow($('[data-tr-empty-text]').innerHTML);
+        }, calm ? 0 : 240);
+        toast(t.deleted);
+      }).catch(function (r) {
+        if (tr) tr.classList.remove('is-leaving');
+        toast(messageOf(r), 'error');
+      });
     });
   }
   var searchTimer = null;
@@ -806,30 +851,108 @@
 
   // ---------- The reader ----------
   var audio = null;
+  var opening = '';
   function open(item) {
+    // The editor takes the page at once, its text drawn in while it loads; the rest comes back with the back arrow.
+    opening = item.id;
+    if (audio) audio.pause();
+    current = null;
+    root.classList.add('is-reading');
+    reader.hidden = false;
+    reader.classList.add('is-loading');
+    bar.hidden = true;
+    $('[data-tr-translate-note]').hidden = true;
+    $('[data-tr-audio-gone]').hidden = true;
+    $('[data-tr-reader-title]').textContent = cleanTitle(item.title);
+    ['length', 'language', 'date'].forEach(function (k) { $('[data-tr-fact="' + k + '"]').textContent = k === 'length' ? (item.length || '') : k === 'date' ? (item.date || '') : (item.language_name || ''); });
+    var ghost = '';
+    for (var i = 0; i < 4; i++) ghost += '<div class="tr-skel" aria-hidden="true"><span class="tr-skel-head"></span><span class="tr-skel-line"></span><span class="tr-skel-line is-short"></span></div>';
+    $('[data-tr-text]').innerHTML = ghost;
+    appear(reader);
+    reader.focus({ preventScroll: true });
+    root.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
     json('GET', item.urls.show).then(function (r) {
-      if (r.xhr.status !== 200) return;
+      if (opening !== item.id) return;
+      if (r.xhr.status !== 200) throw r;
       current = r.body.transcription;
       shownLanguage = '';
       languageMenu('');
-      $('[data-tr-translate-note]').hidden = true;
-      // The editor takes the page: the rest comes back with the back arrow.
-      root.classList.add('is-reading');
-      reader.hidden = false;
+      reader.classList.remove('is-loading');
       render(current);
-      reader.focus({ preventScroll: true });
-      root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      loadWave(current);
+    }).catch(function (r) {
+      if (opening !== item.id) return;
+      close();
+      toast(messageOf(r), 'error');
     });
   }
   function close() {
+    opening = '';
     if (audio) audio.pause();
     bar.hidden = true;
     reader.hidden = true;
+    reader.classList.remove('is-loading');
     root.classList.remove('is-reading');
     current = null;
+    $$('[data-tr-root] > :not(.tr-reader):not(.tr-dialog):not(.tr-toast)', document).forEach(appear);
   }
   $('[data-tr-close]').addEventListener('click', close);
-  $('[data-tr-rename-open]').addEventListener('click', function () { if (current) renameItem(current); });
+  function renameInline() {
+    if (!current) return;
+    var h = $('[data-tr-reader-title]');
+    if ($('.tr-title-input', h.parentNode)) return;
+    var item = current;
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'tr-title-input';
+    input.maxLength = 120;
+    input.value = cleanTitle(item.title);
+    input.setAttribute('dir', 'auto');
+    input.setAttribute('aria-label', t.rename);
+    h.hidden = true;
+    h.parentNode.insertBefore(input, h.nextSibling);
+    input.focus();
+    input.select();
+    var done = false;
+    function finish(save) {
+      if (done) return;
+      done = true;
+      var title = input.value.trim();
+      input.remove();
+      h.hidden = false;
+      if (!save || !title || title === cleanTitle(item.title)) return;
+      var before = item.title;
+      item.title = title;
+      h.textContent = title;
+      json('PATCH', item.urls.update, { title: title }).then(function (r) {
+        if (r.xhr.status !== 200) throw r;
+        updateRow(r.body.transcription);
+        toast(t.renamed);
+      }).catch(function (r) {
+        item.title = before;
+        if (current === item) h.textContent = cleanTitle(before);
+        toast(messageOf(r), 'error');
+      });
+    }
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+    });
+    input.addEventListener('blur', function () { finish(true); });
+  }
+  $('[data-tr-rename-open]').addEventListener('click', renameInline);
+  $('[data-tr-reader-title]').addEventListener('dblclick', renameInline);
+  // The keyboard while the editor is open: space plays and pauses, the arrows move 5 s (1 s with shift).
+  document.addEventListener('keydown', function (e) {
+    if (reader.hidden || !audio || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+    var el = e.target;
+    if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.closest('dialog,[role="menu"],[role="slider"]'))) return;
+    if (e.key === ' ' && !(el && el.closest('button,a'))) { e.preventDefault(); togglePlay(); return; }
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(el && el.closest('button,a'))) {
+      e.preventDefault();
+      audio.currentTime = Math.max(0, Math.min(lengthOfAudio(), audio.currentTime + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 1 : 5)));
+      paintBar();
+    }
+  });
 
   // ---------- The timeline: a ruler, a track for each speaker, the play head ----------
   var bar = $('[data-tr-playbar]');
@@ -839,7 +962,12 @@
   var tlBadge = $('[data-tr-tl-badge]');
   var tlZoom = $('[data-tr-tl-zoom]');
   var SPEEDS = [1, 1.25, 1.5, 2, 0.75];
-  var tl = { pps: 0, frame: 0, dragging: false, clips: [] };
+  var tl = { pps: 0, frame: 0, dragging: false, clips: [], lit: null, bars: null, colors: null };
+  var waveCanvas = $('[data-tr-tl-wave]');
+  var hoverLine = $('[data-tr-tl-hover]');
+  var waves = {};
+  var WAVE_BAR = 2;
+  var WAVE_STEP = 3;
   function lengthOfAudio() {
     var d = audio ? audio.duration : 0;
     return isFinite(d) && d > 0 ? d : (current ? Number(current.seconds) || 0 : 0);
@@ -877,59 +1005,178 @@
         + (major && at > 0 ? '<b>' + esc(step < 1 ? clockTenths(at) : clock(Math.round(at))) + '</b>' : '') + '</span>';
     }
     $('[data-tr-tl-ruler]').innerHTML = ruler;
-    // A row for each speaker, each sentence a block where it is said.
+    // A row for each speaker, each sentence a block where it is said (its words are in the text above).
+    // One speaker: no names column. Several: each name, in its colour, renamed right there.
     var who = speakersShown();
+    var several = who.length > 1;
+    reader.classList.toggle('is-solo', !several);
     var tracks = '';
-    var labels = '<div class="tr-tl-label tr-tl-label-head">' + esc(t.speakers) + '</div>';
-    tl.clips = [];
-    who.forEach(function (id, row) {
+    var labels = '<div class="tr-tl-label tr-tl-label-head">' + esc(t.speakers) + '</div>'
+      + '<div class="tr-tl-label tr-tl-label-wave" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 11v2"/></svg></div>';
+    var segs = shown.segments || [];
+    who.forEach(function (id) {
       var n = speakerIndex(id) % 4;
-      labels += '<div class="tr-tl-label"><span class="tr-swatch" data-n="' + n + '" aria-hidden="true">' + esc(id) + '</span><span class="tr-tl-name" dir="auto">' + esc(nameOf(id)) + '</span></div>';
+      labels += '<div class="tr-tl-label"><span class="tr-swatch" data-n="' + n + '" aria-hidden="true">' + esc(id) + '</span>'
+        + '<input type="text" class="tr-tl-name" data-tr-speaker="' + esc(id) + '" maxlength="60" dir="auto" value="' + esc(nameOf(id)) + '" aria-label="' + esc(fill(t.speaker_name, { speaker: nameOf(id) })) + '"></div>';
       tracks += '<div class="tr-tl-row">';
-      (shown.segments || []).forEach(function (s, i) {
-        if (s.speaker !== id) return;
-        var left = Math.max(0, s.start * tl.pps);
-        var w = Math.max(3, (Math.max(s.end, s.start + 0.2) - s.start) * tl.pps - 2);
-        tracks += '<button type="button" class="tr-tl-clip" data-n="' + n + '" data-i="' + i + '" tabindex="-1" style="left:' + left.toFixed(1) + 'px;width:' + w.toFixed(1) + 'px" title="' + esc(clock(Math.floor(s.start)) + ' · ' + s.text) + '">'
-          + (w > 28 ? '<span dir="auto">' + esc(s.text) + '</span>' : '') + '</button>';
+      segs.forEach(function (seg, i) {
+        if (seg.speaker !== id) return;
+        var left = Math.max(0, seg.start * tl.pps);
+        var w = Math.max(3, (Math.max(seg.end, seg.start + 0.2) - seg.start) * tl.pps - 2);
+        tracks += '<button type="button" class="tr-tl-clip" data-n="' + n + '" data-i="' + i + '" tabindex="-1" style="left:' + left.toFixed(1) + 'px;width:' + w.toFixed(1) + 'px" aria-label="' + esc(clock(Math.floor(seg.start))) + '"></button>';
       });
       tracks += '</div>';
     });
     $('[data-tr-tl-tracks]').innerHTML = tracks;
     $('[data-tr-tl-labels]').innerHTML = labels;
     tl.clips = $$('.tr-tl-clip', tlCanvas);
+    tl.byIndex = [];
     tl.clips.forEach(function (clip) {
+      tl.byIndex[Number(clip.getAttribute('data-i'))] = clip;
       clip.addEventListener('click', function (e) {
         e.stopPropagation();
-        var s = shown.segments[Number(clip.getAttribute('data-i'))];
-        if (s) seek(s.start);
+        var seg = segs[Number(clip.getAttribute('data-i'))];
+        if (seg) seek(seg.start);
       });
     });
+    tl.starts = segs.map(function (x) { return Number(x.start); });
+    tl.ends = segs.map(function (x) { return Number(x.end); });
+    $$('[data-tr-speaker]', $('[data-tr-tl-labels]')).forEach(function (input) {
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } else if (e.key === 'Escape') { input.value = nameOf(input.getAttribute('data-tr-speaker')); input.blur(); } });
+      input.addEventListener('change', function () { renameSpeaker(input.getAttribute('data-tr-speaker'), input.value); });
+    });
     tlScroll.setAttribute('aria-valuemax', String(Math.round(total)));
+    tl.lit = null;
+    waveBars();
     paintHead();
   }
+  // ---------- The waveform ----------
+  // The recording decoded once, at a low rate (enough to draw it), into a peak for every 10 ms.
+  function loadWave(tr) {
+    if (!tr || !tr.audio || waves[tr.id] || !window.fetch || !(window.OfflineAudioContext || window.webkitOfflineAudioContext) || Number(tr.seconds) > 1800) return;
+    var id = tr.id;
+    waves[id] = 'loading';
+    fetch(tr.urls.audio, { credentials: 'same-origin' }).then(function (r) {
+      if (!r.ok) throw new Error('audio');
+      return r.arrayBuffer();
+    }).then(function (buf) {
+      var Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      var rate = 8000;
+      var ctx = new Ctx(1, Math.max(rate, Math.ceil((Number(tr.seconds) || 1) * rate)), rate);
+      return new Promise(function (ok, no) { var p = ctx.decodeAudioData(buf, ok, no); if (p && p.then) p.then(ok, no); });
+    }).then(function (sound) {
+      var data = sound.getChannelData(0);
+      var per = 100;
+      var step = Math.max(1, Math.floor(sound.sampleRate / per));
+      var n = Math.ceil(data.length / step);
+      var peaks = new Float32Array(n);
+      var top = 0;
+      for (var i = 0; i < n; i++) {
+        var m = 0;
+        for (var j = i * step, e = Math.min(data.length, j + step); j < e; j++) { var v = data[j] < 0 ? -data[j] : data[j]; if (v > m) m = v; }
+        peaks[i] = m;
+        if (m > top) top = m;
+      }
+      // Quiet speech kept visible beside loud: each peak against the loudest, eased.
+      for (i = 0; i < n; i++) peaks[i] = top > 0 ? Math.sqrt(peaks[i] / top) : 0;
+      waves[id] = { peaks: peaks, per: n / Math.max(0.001, data.length / sound.sampleRate) };
+      if (current && current.id === id) { waveBars(); drawWave(); }
+    }).catch(function () { waves[id] = 'none'; });
+  }
+  // A bar for every few pixels of the whole timeline at this zoom: worked out once, drawn as it scrolls.
+  function waveBars() {
+    var w = current && waves[current.id];
+    tl.bars = null;
+    if (!w || typeof w !== 'object' || !tl.pps) { drawWave(); return; }
+    var width = Math.round(lengthOfAudio() * tl.pps);
+    var count = Math.ceil(width / WAVE_STEP);
+    var bars = new Float32Array(count);
+    for (var b = 0; b < count; b++) {
+      var i0 = Math.floor((b * WAVE_STEP / tl.pps) * w.per);
+      var i1 = Math.max(i0 + 1, Math.ceil(((b * WAVE_STEP + WAVE_BAR) / tl.pps) * w.per));
+      var m = 0;
+      for (var i = i0; i < i1 && i < w.peaks.length; i++) if (w.peaks[i] > m) m = w.peaks[i];
+      bars[b] = m;
+    }
+    tl.bars = bars;
+    var style = getComputedStyle(waveCanvas);
+    tl.colors = { base: style.getPropertyValue('--wave').trim() || '#888', lit: style.getPropertyValue('--wave-lit').trim() || '#7c5cff' };
+    reader.classList.add('has-wave');
+    drawWave();
+  }
+  function drawWave() {
+    if (!waveCanvas) return;
+    var view = tlScroll.clientWidth;
+    var h = waveCanvas.parentNode.clientHeight || 44;
+    var ratio = Math.min(2, window.devicePixelRatio || 1);
+    if (waveCanvas.width !== Math.round(view * ratio) || waveCanvas.height !== Math.round(h * ratio)) {
+      waveCanvas.width = Math.round(view * ratio);
+      waveCanvas.height = Math.round(h * ratio);
+      waveCanvas.style.width = view + 'px';
+      waveCanvas.style.height = h + 'px';
+    }
+    var g = waveCanvas.getContext('2d');
+    g.setTransform(ratio, 0, 0, ratio, 0, 0);
+    g.clearRect(0, 0, view, h);
+    if (!tl.bars) return;
+    var left = tlScroll.scrollLeft;
+    var played = (audio ? audio.currentTime : 0) * tl.pps - left;
+    var first = Math.floor(left / WAVE_STEP);
+    var last = Math.min(tl.bars.length, Math.ceil((left + view) / WAVE_STEP));
+    for (var pass = 0; pass < 2; pass++) {
+      g.fillStyle = pass ? tl.colors.lit : tl.colors.base;
+      g.beginPath();
+      for (var b = first; b < last; b++) {
+        var x = b * WAVE_STEP - left;
+        if ((x + WAVE_BAR <= played) !== !!pass) continue;
+        var bh = Math.max(2, tl.bars[b] * (h - 10));
+        g.rect(x, (h - bh) / 2, WAVE_BAR, bh);
+      }
+      g.fill();
+    }
+  }
+  tlScroll.addEventListener('scroll', function () { if (!tl.frame) drawWave(); }, { passive: true });
+  // Where a press would go: a thin line and its time, under the pointer (not on touch screens).
+  tlCanvas.addEventListener('pointermove', function (e) {
+    if (e.pointerType === 'touch' || tl.dragging || !tl.pps) return;
+    var r = tlCanvas.getBoundingClientRect();
+    var x = Math.max(0, e.clientX - r.left);
+    hoverLine.hidden = false;
+    hoverLine.style.transform = 'translateX(' + x.toFixed(1) + 'px)';
+    $('[data-tr-tl-hover-time]').textContent = clockTenths(x / tl.pps);
+  });
+  tlCanvas.addEventListener('pointerleave', function () { hoverLine.hidden = true; });
   function paintHead() {
     if (!audio || !tl.pps) return;
     var now = audio.currentTime || 0;
     var x = now * tl.pps;
     tlHead.style.transform = 'translateX(' + x.toFixed(1) + 'px)';
     tlBadge.textContent = clockTenths(now);
+    // The time stays whole at either end of the timeline.
+    var bw = tlBadge.offsetWidth || 48;
+    var edge = Math.max(0, Math.min((parseFloat(tlCanvas.style.width) || tlScroll.clientWidth) - bw, x - bw / 2));
+    tlBadge.style.transform = 'translateX(' + (edge - x).toFixed(1) + 'px)';
     tlScroll.setAttribute('aria-valuenow', String(Math.round(now)));
     tlScroll.setAttribute('aria-valuetext', clock(now) + ' / ' + clock(lengthOfAudio()));
-    tl.clips.forEach(function (clip) {
-      var s = shown.segments[Number(clip.getAttribute('data-i'))];
-      clip.classList.toggle('is-now', !!s && now >= s.start - 0.05 && now < s.end + 0.15);
-    });
+    var heard = heardAt(tl.starts, tl.ends, now);
+    var hit = heard >= 0 ? tl.byIndex[heard] || null : null;
+    if (hit !== tl.lit) {
+      if (tl.lit) tl.lit.classList.remove('is-now');
+      if (hit) hit.classList.add('is-now');
+      tl.lit = hit;
+    }
     // While it plays, the head stays in view.
     if (!audio.paused && !tl.dragging) {
       var view = tlScroll.clientWidth;
       if (x < tlScroll.scrollLeft + 24 || x > tlScroll.scrollLeft + view - 48) tlScroll.scrollLeft = Math.max(0, x - view * 0.25);
     }
+    drawWave();
   }
-  function follow() {
+  function followHead() {
     tl.frame = 0;
     paintHead();
-    if (audio && !audio.paused && !bar.hidden) tl.frame = requestAnimationFrame(follow);
+    light(false);
+    if (audio && !audio.paused && !bar.hidden) tl.frame = requestAnimationFrame(followHead);
   }
   function paintBar() {
     if (!audio) return;
@@ -941,7 +1188,7 @@
     // The transcript's own length, as its details and the list say it.
     $('[data-tr-pb-total]').textContent = clock(Math.round(current && Number(current.seconds) > 0 ? Number(current.seconds) : lengthOfAudio()));
     paintHead();
-    if (playing && !tl.frame) tl.frame = requestAnimationFrame(follow);
+    if (playing && !tl.frame) tl.frame = requestAnimationFrame(followHead);
   }
   function togglePlay() {
     if (!audio) return;
@@ -1020,6 +1267,7 @@
     $('[data-tr-pb-speed]').textContent = '1×';
     tlZoom.value = '0';
     tlScroll.scrollLeft = 0;
+    reader.classList.toggle('has-wave', !!(waves[tr.id] && typeof waves[tr.id] === 'object'));
     var gone = $('[data-tr-audio-gone]');
     if (tr.audio) {
       audio.src = tr.urls.audio;
@@ -1032,7 +1280,6 @@
       gone.textContent = fill(t.audio_gone, { days: c.keepDays });
       gone.hidden = false;
     }
-    renderSpeakers(tr);
     shown = { paragraphs: tr.paragraphs, segments: tr.segments };
     renderText(tr.rtl, true);
     paintBar();
@@ -1054,31 +1301,19 @@
     for (var i = 0; i < list.length; i++) if (list[i].id === letter) return list[i].name;
     return letter;
   }
-  function renderSpeakers(tr) {
-    var box = $('[data-tr-speakers]');
-    var list = $('[data-tr-speaker-list]');
-    list.innerHTML = '';
-    box.hidden = (tr.speaker_list || []).length < 2;
-    (tr.speaker_list || []).forEach(function (s, i) {
-      var label = document.createElement('label');
-      label.innerHTML = '<span class="tr-swatch" data-n="' + (i % 4) + '" aria-hidden="true">' + esc(s.id) + '</span>'
-        + '<input type="text" maxlength="60" dir="auto" value="' + esc(s.name) + '" aria-label="' + esc(fill(t.speaker_name, { speaker: s.name })) + '">';
-      var input = $('input', label);
-      // Browsers that cannot size a box to its text: as many letters wide as the name.
-      var fit = function () { input.size = Math.max(4, Math.min(28, input.value.length + 1)); };
-      fit();
-      input.addEventListener('input', fit);
-      input.addEventListener('change', function () {
-        var names = {};
-        names[s.id] = input.value;
-        json('PATCH', current.urls.update, { speakers: names }).then(function (r) {
-          if (r.xhr.status !== 200) return;
-          current.speaker_list = r.body.transcription.speaker_list;
-          renderText(current.rtl && !shownLanguage, !shownLanguage);
-        });
-      });
-      list.appendChild(label);
-    });
+  // A speaker's name changed on the timeline: saved, then shown everywhere it is said.
+  function renameSpeaker(id, name) {
+    if (!current) return;
+    var names = {};
+    names[id] = String(name || '').trim();
+    var item = current;
+    json('PATCH', item.urls.update, { speakers: names }).then(function (r) {
+      if (r.xhr.status !== 200) throw r;
+      if (current !== item) return;
+      current.speaker_list = r.body.transcription.speaker_list;
+      renderText(current.rtl && !shownLanguage, !shownLanguage);
+      toast(t.saved);
+    }).catch(function (r) { toast(messageOf(r), 'error'); if (current === item) buildTimeline(); });
   }
   // The paragraphs as a document: who speaks and when (the time plays from there), the sentences
   // to click, and a pencil to correct one (in the original only).
@@ -1112,6 +1347,8 @@
       });
       box.appendChild(div);
     });
+    var spans = $$('.tr-s', box);
+    spanTimes = { spans: spans, starts: spans.map(function (x) { return parseFloat(x.getAttribute('data-start')); }), ends: spans.map(function (x) { return parseFloat(x.getAttribute('data-end')); }) };
     buildTimeline();
   }
   function seek(at) {
@@ -1121,17 +1358,22 @@
     if (p && p.catch) p.catch(function () { /* the browser waits for a gesture */ });
   }
   var lit = null;
+  var spanTimes = { spans: [], starts: [], ends: [] };
+  // Which sentence is heard at a moment: the last one to have begun, while it lasts (and through a
+  // short breath after it), so a sentence lights the moment it starts, never one late.
+  function heardAt(starts, ends, now) {
+    var found = -1;
+    for (var i = 0; i < starts.length; i++) {
+      if (starts[i] > now + 0.04) break;
+      if (now < ends[i] + 0.35) found = i;
+    }
+    return found;
+  }
   // The sentence being heard is lit, and brought into view when it leaves it while playing.
   function light(jump) {
     if (!audio) return;
-    var now = audio.currentTime;
-    var spans = $$('.tr-s', $('[data-tr-text]'));
-    var found = null;
-    for (var i = 0; i < spans.length; i++) {
-      var s = parseFloat(spans[i].getAttribute('data-start'));
-      var e = parseFloat(spans[i].getAttribute('data-end'));
-      if (now >= s - 0.05 && now < e + 0.15) { found = spans[i]; break; }
-    }
+    var i = heardAt(spanTimes.starts, spanTimes.ends, audio.currentTime);
+    var found = i >= 0 ? spanTimes.spans[i] : null;
     if (found === lit) return;
     if (lit) lit.classList.remove('is-now');
     lit = found;
@@ -1167,7 +1409,8 @@
     buttons[1].addEventListener('click', function () { area.remove(); actions.remove(); body.hidden = false; });
     buttons[0].addEventListener('click', function () {
       json('PATCH', current.urls.update, { paragraph: index, text: area.value }).then(function (r) {
-        if (r.xhr.status !== 200) return;
+        if (r.xhr.status !== 200) { toast(messageOf(r), 'error'); return; }
+        toast(t.saved);
         current = r.body.transcription;
         shown = { paragraphs: current.paragraphs, segments: current.segments };
         renderText(current.rtl, true);
@@ -1180,18 +1423,16 @@
     var text = (shown.paragraphs || []).map(function (p) {
       return (((current.speaker_list || []).length > 1) ? nameOf(p.speaker) + ': ' : '') + p.text;
     }).join('\n\n');
-    var label = $('[data-tr-copy-label]');
-    var was = label.textContent;
     (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () {
-      label.textContent = t.copied;
-      setTimeout(function () { label.textContent = was; }, 1500);
-    }).catch(function () { /* nothing to copy into */ });
+      toast(t.copied);
+    }).catch(function () { toast(t.copy_failed, 'error'); });
   });
   $$('[data-tr-export]').forEach(function (a) {
     a.addEventListener('click', function (e) {
       e.preventDefault();
       if (!current) return;
       var url = current.urls['export_' + a.getAttribute('data-tr-export')] + (shownLanguage ? '?lang=' + encodeURIComponent(shownLanguage) : '');
+      toast(fill(t.downloading, { format: a.getAttribute('data-tr-export').toUpperCase() }));
       window.location.href = url;
     });
   });

@@ -250,11 +250,19 @@
         <button type="button" class="tr-ed-back" data-tr-close aria-label="{{ __('transcribe.js.back') }}" title="{{ __('transcribe.js.back') }}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
         </button>
-        <div class="tr-reader-name">
-          <h2 id="trReaderTitle" data-tr-reader-title dir="auto"></h2>
-          <button type="button" class="tr-icon tr-rename" data-tr-rename-open aria-label="{{ __('transcribe.js.rename') }}" title="{{ __('transcribe.js.rename') }}">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4z"/></svg>
-          </button>
+        <div class="tr-ed-heading">
+          <div class="tr-reader-name">
+            <h2 id="trReaderTitle" data-tr-reader-title dir="auto"></h2>
+            <button type="button" class="tr-icon tr-rename" data-tr-rename-open aria-label="{{ __('transcribe.js.rename') }}" title="{{ __('transcribe.js.rename') }}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4z"/></svg>
+            </button>
+          </div>
+          {{-- Its length, language and day, each once, small under its name --}}
+          <p class="tr-ed-facts">
+            <span title="{{ __('transcribe.js.length') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span class="sr-only">{{ __('transcribe.js.length') }}: </span><span data-tr-fact="length" dir="auto"></span></span>
+            <span title="{{ __('transcribe.page.language') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z"/></svg><span class="sr-only">{{ __('transcribe.page.language') }}: </span><span data-tr-fact="language"></span></span>
+            <span title="{{ __('transcribe.js.created') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" rx="2.5"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg><span class="sr-only">{{ __('transcribe.js.created') }}: </span><span data-tr-fact="date" dir="auto"></span></span>
+          </p>
         </div>
         <div class="tr-toolbar" role="toolbar" aria-label="{{ __('transcribe.page.col_actions') }}">
           <button type="button" class="tr-tool tr-tool-icon" data-tr-copy aria-label="{{ __('transcribe.js.copy') }}" title="{{ __('transcribe.js.copy') }}">
@@ -306,18 +314,6 @@
         <div class="tr-ed-doc" data-tr-doc>
           <div class="tr-text" data-tr-text></div>
         </div>
-        <aside class="tr-ed-side" aria-labelledby="trDetailsTitle">
-          <h3 class="tr-ed-side-title" id="trDetailsTitle">{{ __('transcribe.js.details') }}</h3>
-          <dl class="tr-ed-facts">
-            <div><dt>{{ __('transcribe.js.length') }}</dt><dd data-tr-fact="length" dir="auto"></dd></div>
-            <div><dt>{{ __('transcribe.page.language') }}</dt><dd data-tr-fact="language"></dd></div>
-            <div><dt>{{ __('transcribe.js.created') }}</dt><dd data-tr-fact="date" dir="auto"></dd></div>
-          </dl>
-          <div class="tr-speakers" data-tr-speakers hidden>
-            <h3 class="tr-ed-side-title">{{ __('transcribe.js.speakers') }}</h3>
-            <div class="tr-speaker-list" data-tr-speaker-list></div>
-          </div>
-        </aside>
       </div>
       {{-- The recording on a timeline: one track for each speaker, a ruler, the play head; click or drag anywhere on it to go there --}}
       <audio class="initialized" data-tr-audio preload="metadata" hidden></audio>
@@ -327,7 +323,10 @@
           <div class="tr-tl-scroll" data-tr-tl-scroll tabindex="0" role="slider" aria-label="{{ __('transcribe.js.seek') }}" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
             <div class="tr-tl-canvas" data-tr-tl-canvas>
               <div class="tr-tl-ruler" data-tr-tl-ruler></div>
+              {{-- The sound itself, drawn as it is heard; the part played so far is lit --}}
+              <div class="tr-tl-wave" aria-hidden="true"><canvas data-tr-tl-wave></canvas></div>
               <div class="tr-tl-tracks" data-tr-tl-tracks></div>
+              <div class="tr-tl-hover" data-tr-tl-hover aria-hidden="true" hidden><span data-tr-tl-hover-time>0:00</span></div>
               <div class="tr-tl-head" data-tr-tl-head aria-hidden="true"><span class="tr-tl-badge" data-tr-tl-badge>0:00.0</span></div>
             </div>
           </div>
@@ -385,6 +384,21 @@
       <template data-tr-empty-text>{{ __('transcribe.page.empty') }}</template>
       <template data-tr-no-match>{{ __('transcribe.page.no_match') }}</template>
     </section>
+
+    {{-- Asked before a transcript is deleted: the site's own dialog, never the browser's --}}
+    <dialog class="tr-dialog" data-tr-confirm aria-labelledby="trConfirmTitle" aria-describedby="trConfirmText">
+      <form method="dialog" class="tr-dialog-card">
+        <span class="tr-dialog-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5"/></svg></span>
+        <h3 id="trConfirmTitle">{{ __('transcribe.js.delete_title') }}</h3>
+        <p id="trConfirmText">{{ __('transcribe.js.delete_text') }}</p>
+        <div class="tr-dialog-actions">
+          <button type="submit" value="cancel" class="tr-dialog-btn" autofocus>{{ __('transcribe.js.cancel') }}</button>
+          <button type="submit" value="ok" class="tr-dialog-btn is-danger">{{ __('transcribe.js.delete') }}</button>
+        </div>
+      </form>
+    </dialog>
+    {{-- What an action did, said for a moment at the foot of the screen --}}
+    <div class="tr-toast" data-tr-toast role="status" aria-live="polite"></div>
 
     <script type="application/json" data-tr-config>@json($trConfig, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG)</script>
   </article>

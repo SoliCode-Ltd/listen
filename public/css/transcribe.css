@@ -398,7 +398,7 @@ button.tr-para-time:hover, button.tr-para-time:focus-visible { background: color
 }
 
 /* ---------- A transcript open: an editor, with its bar, the text, its details and a timeline ---------- */
-.tr-section.is-reading > :not(.tr-reader) { display: none !important; }
+.tr-section.is-reading > :not(.tr-reader):not(.tr-dialog):not(.tr-toast) { display: none !important; }
 .tr-section.is-reading .tr-reader { margin-top: 0; }
 .tr-section { scroll-margin-top: 96px; }
 .tr-editor { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); overflow: hidden; box-shadow: 0 24px 60px -40px rgba(15, 12, 40, .45); }
@@ -427,24 +427,9 @@ html[dir="rtl"] .tr-ed-back svg { transform: scaleX(-1); }
 .tr-ed-note { margin: .8rem 1.2rem 0; }
 .tr-editor > .tr-note-error { margin: .8rem 1.2rem 0; }
 
-.tr-ed-body { display: grid; grid-template-columns: minmax(0, 1fr) 272px; flex: 1 1 auto; min-height: 0; }
+.tr-ed-body { display: grid; grid-template-columns: minmax(0, 1fr); flex: 1 1 auto; min-height: 0; }
 .tr-ed-doc { min-height: 0; overflow-y: auto; padding: .6rem clamp(1rem, 3vw, 2.4rem) 2rem; scrollbar-width: thin; }
 .tr-ed-doc .tr-text { max-width: 820px; margin: 0 auto; }
-.tr-ed-side { min-height: 0; overflow-y: auto; padding: 1.15rem 1.1rem; border-inline-start: 1px solid var(--line); background: color-mix(in oklab, var(--surface) 97%, var(--text)); scrollbar-width: thin; }
-.page-card .tr-ed-side-title { margin: 0 0 .5rem; color: var(--muted); font-size: .78rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
-html[dir="rtl"] .page-card .tr-ed-side-title { letter-spacing: 0; font-size: .85rem; }
-.tr-ed-facts { display: grid; margin: 0 0 1.5rem; }
-.tr-ed-facts > div { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: .6rem 0; border-bottom: 1px solid color-mix(in oklab, var(--line) 70%, transparent); }
-.tr-ed-facts dt { color: var(--muted); font-size: .88rem; }
-.tr-ed-facts dd { margin: 0; color: var(--text); font-size: .9rem; font-weight: 600; text-align: end; font-variant-numeric: tabular-nums; }
-.tr-ed-side .tr-speakers { display: block; margin: 0; padding: 0; border: 0; }
-.tr-ed-side .tr-speaker-list { display: grid; gap: .45rem; }
-.tr-ed-side .tr-speaker-list label { padding: 4px; border-radius: 12px; }
-.tr-ed-side .tr-speaker-list input { flex: 1 1 auto; width: 100%; max-width: none; field-sizing: fixed; min-height: 34px; border-radius: 8px; }
-/* A name in either script lines up with the page, next to its colour. */
-.tr-ed-side .tr-speaker-list input { text-align: left; }
-html[dir="rtl"] .tr-ed-side .tr-speaker-list input { text-align: right; }
-.tr-ed-side .tr-swatch { flex-basis: 28px; width: 28px; height: 28px; font-size: .75rem; }
 
 /* The timeline: always left to right, as time runs on any player. */
 .tr-timeline { flex: none; border-top: 1px solid var(--line); background: var(--surface); }
@@ -463,12 +448,11 @@ html[dir="rtl"] .tr-ed-side .tr-speaker-list input { text-align: right; }
 .tr-tl-tick.is-major { height: 10px; background: color-mix(in oklab, var(--text) 45%, transparent); }
 .tr-tl-tick b { position: absolute; bottom: 12px; left: 0; transform: translateX(-50%); color: var(--muted); font-size: .7rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tr-tl-row { position: relative; height: 40px; border-bottom: 1px solid color-mix(in oklab, var(--line) 55%, transparent); }
-.tr-tl-clip { --sp: var(--sp0); position: absolute; top: 7px; height: 26px; margin: 0; padding: 0 .45rem; border: 0; border-left: 3px solid var(--sp); border-radius: 6px; background: color-mix(in oklab, var(--sp) 16%, var(--surface)); color: var(--text); font: inherit; font-size: .74rem; font-weight: 500; line-height: 26px; text-align: left; overflow: hidden; cursor: pointer; transition: background-color .15s ease; }
-.tr-tl-clip span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tr-tl-clip:hover { background: color-mix(in oklab, var(--sp) 28%, var(--surface)); }
-.tr-tl-clip.is-now { background: color-mix(in oklab, var(--sp) 34%, var(--surface)); box-shadow: inset 0 0 0 1.5px var(--sp); }
+.tr-tl-clip { --sp: var(--sp0); position: absolute; top: 13px; height: 14px; margin: 0; padding: 0; border: 0; border-radius: 5px; background: color-mix(in oklab, var(--sp) 30%, var(--surface)); cursor: pointer; transition: background-color .15s ease, box-shadow .15s ease; }
+.tr-tl-clip:hover { background: color-mix(in oklab, var(--sp) 55%, var(--surface)); }
+.tr-tl-clip.is-now { background: var(--sp); box-shadow: 0 0 0 3px color-mix(in oklab, var(--sp) 25%, transparent); }
 .tr-tl-head { position: absolute; top: 0; bottom: 0; left: 0; z-index: 3; width: 2px; margin-left: -1px; background: var(--text); pointer-events: none; will-change: transform; }
-.tr-tl-badge { position: absolute; top: 5px; left: 50%; padding: 2px 7px; border-radius: 6px; background: var(--text); color: var(--surface); font-size: .7rem; font-weight: 700; line-height: 1.3; font-variant-numeric: tabular-nums; white-space: nowrap; transform: translateX(-50%); }
+.tr-tl-badge { position: absolute; top: 5px; left: 0; padding: 2px 7px; border-radius: 6px; background: var(--text); color: var(--surface); font-size: .7rem; font-weight: 700; line-height: 1.3; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tr-tl-controls { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1rem; padding: .55rem .9rem; border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent); }
 .tr-tl-zoom { display: flex; align-items: center; gap: .3rem; }
 .tr-tl-btn { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 9px; background: none; color: var(--muted); cursor: pointer; }
@@ -492,15 +476,6 @@ html[dir="rtl"] .tr-ed-side .tr-speaker-list input { text-align: right; }
 /* Narrower screens: the details above the text, the page scrolls as one, the timeline held at the foot. */
 @media (max-width: 899px) {
   .tr-ed-body { display: flex; flex-direction: column; }
-  .tr-ed-side { order: -1; padding: .8rem 1rem; border-inline-start: 0; border-bottom: 1px solid var(--line); }
-  .tr-ed-side > .tr-ed-side-title { display: none; }
-  .tr-ed-facts { grid-template-columns: repeat(3, minmax(0, auto)); justify-content: start; gap: 0 1.6rem; margin: 0 0 .8rem; }
-  .tr-ed-facts > div { flex-direction: column; align-items: flex-start; gap: .1rem; padding: 0; border: 0; }
-  .tr-ed-facts dd { text-align: start; }
-  .tr-ed-side .tr-speakers > .tr-ed-side-title { display: none; }
-  .tr-ed-side .tr-speaker-list { display: flex; flex-wrap: wrap; }
-  .tr-ed-side .tr-speaker-list label { border-radius: 999px; }
-  .tr-ed-side .tr-speaker-list input { width: auto; field-sizing: content; max-width: 12rem; border-radius: 999px; }
   .tr-ed-doc { overflow: visible; padding: .4rem 1rem 1.2rem; }
   .tr-timeline { position: sticky; bottom: 0; z-index: 20; box-shadow: 0 -12px 30px -24px rgba(0, 0, 0, .6); }
 }
@@ -518,4 +493,93 @@ html[dir="rtl"] .tr-ed-side .tr-speaker-list input { text-align: right; }
   .tr-tl-zoom-range, .tr-tl-end { display: none !important; }
   .tr-tl-transport { justify-content: flex-end; gap: .6rem; }
   .tr-tl-time { min-width: 0; }
+}
+
+/* ---------- Motion and feedback: a part that appears fades up; nothing moves with reduced motion ---------- */
+@keyframes tr-appear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.tr-appear { animation: tr-appear .26s cubic-bezier(.2, .7, .2, 1) both; }
+
+/* The editor while its transcript loads: the text drawn in as soft bars. */
+.tr-skel { display: grid; gap: .7rem; padding: 1.2rem 0; border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent); }
+.tr-skel span { display: block; height: 12px; border-radius: 6px; background: linear-gradient(90deg, color-mix(in oklab, var(--text) 7%, transparent) 0%, color-mix(in oklab, var(--text) 13%, transparent) 50%, color-mix(in oklab, var(--text) 7%, transparent) 100%); background-size: 200% 100%; animation: tr-shimmer 1.3s linear infinite; }
+.tr-skel .tr-skel-head { width: 9rem; height: 26px; border-radius: 999px; }
+.tr-skel .tr-skel-line.is-short { width: 62%; }
+@keyframes tr-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.tr-editor.is-loading .tr-toolbar { opacity: .55; pointer-events: none; }
+
+/* The list: a new transcript comes in lit, a deleted one fades out of its place. */
+@keyframes tr-row-new { from { background-color: color-mix(in oklab, var(--a) 16%, transparent); } to { background-color: transparent; } }
+.tr-ledger tr.is-new > td { animation: tr-row-new 1.6s ease-out both; }
+.tr-ledger tr.is-leaving { opacity: 0; transform: translateX(10px); transition: opacity .22s ease, transform .22s ease; }
+html[dir="rtl"] .tr-ledger tr.is-leaving { transform: translateX(-10px); }
+
+/* The title renamed where it is. */
+.tr-title-input { flex: 1 1 auto; min-width: 0; height: 36px; margin: 0; padding: 0 .6rem; border: 1px solid var(--a) !important; border-radius: 9px; background: var(--surface) !important; color: var(--text); font: inherit; font-size: 1.05rem; font-weight: 700; box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 22%, transparent) !important; }
+.tr-reader-name:has(.tr-title-input) .tr-rename { display: none; }
+.page-card .tr-ed-bar h2 { cursor: text; }
+
+/* Every control answers a press. */
+.tr-tool:active, .tr-tl-btn:active, .tr-pb-speed:active, .tr-ed-back:active { transform: scale(.96); }
+.tr-pb-play:active { transform: scale(.94); }
+.tr-tool, .tr-tl-btn, .tr-pb-speed, .tr-ed-back { transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .1s ease; }
+
+/* A notice at the foot of the screen. */
+.tr-toast { position: fixed; inset-inline: 0; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 60; width: max-content; max-width: calc(100vw - 32px); margin: 0 auto; padding: .7rem 1.15rem; border-radius: 12px; background: var(--text); color: var(--surface); font-size: .92rem; font-weight: 600; line-height: 1.4; box-shadow: 0 16px 40px -18px rgba(0, 0, 0, .55); opacity: 0; transform: translateY(10px) scale(.98); pointer-events: none; transition: opacity .2s ease, transform .26s cubic-bezier(.2, .7, .2, 1); }
+.tr-toast.is-on { opacity: 1; transform: none; }
+.tr-toast.is-error { background: var(--danger); color: #fff; }
+@media (max-width: 899px) { .tr-section.is-reading .tr-toast { bottom: calc(176px + env(safe-area-inset-bottom)); } }
+
+/* Asked before a delete: the site's own dialog. */
+.tr-dialog { width: min(420px, calc(100vw - 32px)); margin: auto; padding: 0; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--text); box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .6); }
+.tr-dialog::backdrop { background: rgba(10, 8, 24, .45); backdrop-filter: blur(3px); }
+.tr-dialog[open] { animation: tr-dialog-in .22s cubic-bezier(.2, .7, .2, 1); }
+@keyframes tr-dialog-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+.tr-dialog-card { display: grid; gap: .55rem; padding: 1.5rem 1.5rem 1.25rem; }
+.tr-dialog-icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: .3rem; border-radius: 12px; background: color-mix(in oklab, var(--danger) 12%, var(--surface)); color: var(--danger); }
+.tr-dialog-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.page-card .tr-dialog h3 { margin: 0; font-size: 1.12rem; font-weight: 800; }
+.tr-dialog p { margin: 0; color: color-mix(in oklab, var(--text) 70%, var(--muted)); font-size: .95rem; line-height: 1.55; }
+.tr-dialog-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .9rem; }
+.tr-dialog-btn { min-width: 96px; height: 42px; padding: 0 1.1rem; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--text); font: inherit; font-size: .95rem; font-weight: 700; cursor: pointer; transition: background-color .15s ease, transform .1s ease; }
+.tr-dialog-btn:hover { background: color-mix(in oklab, var(--surface) 88%, var(--text)); }
+.tr-dialog-btn:active { transform: scale(.97); }
+.tr-dialog-btn.is-danger { border-color: transparent; background: var(--danger); color: #fff; }
+.tr-dialog-btn.is-danger:hover { background: color-mix(in oklab, var(--danger) 88%, #000); }
+.tr-dialog-btn:focus-visible { outline: 3px solid color-mix(in oklab, var(--a) 40%, transparent); outline-offset: 2px; }
+
+/* The waveform row of the timeline, and the line under the pointer. */
+.tr-tl-wave { --wave: color-mix(in oklab, var(--text) 26%, transparent); --wave-lit: var(--a); position: relative; height: 44px; border-bottom: 1px solid color-mix(in oklab, var(--line) 55%, transparent); }
+.tr-tl-wave canvas { position: sticky; left: 0; display: block; }
+.tr-editor:not(.has-wave) .tr-tl-wave, .tr-editor:not(.has-wave) .tr-tl-label-wave { display: none; }
+.tr-tl-label-wave { height: 44px; color: var(--muted); }
+.tr-tl-label-wave svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.tr-tl-hover { position: absolute; top: 0; bottom: 0; left: 0; z-index: 2; width: 1px; background: color-mix(in oklab, var(--text) 40%, transparent); pointer-events: none; }
+.tr-tl-hover[hidden] { display: none; }
+.tr-tl-hover span { position: absolute; top: 7px; left: 6px; padding: 1px 6px; border-radius: 5px; background: color-mix(in oklab, var(--surface) 80%, var(--text)); color: var(--text); font-size: .68rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tr-appear, .tr-ledger tr.is-new > td, .tr-dialog[open] { animation: none; }
+  .tr-skel span { animation: none; }
+  .tr-toast, .tr-ledger tr.is-leaving { transition: none; }
+}
+
+/* ---------- The editor without a side panel: its facts under the name, names on the timeline ---------- */
+.tr-ed-heading { display: grid; gap: .15rem; flex: 1 1 auto; min-width: 0; }
+.tr-ed-heading .tr-reader-name { flex: none; }
+.page-card .tr-ed-facts { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem 1rem; margin: 0; color: var(--muted); font-size: .82rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.tr-ed-facts > span { display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
+.tr-ed-facts svg { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
+.tr-ed-facts [data-tr-fact]:empty { display: none; }
+.tr-ed-facts > span:has([data-tr-fact]:empty) { display: none; }
+/* One speaker: the timeline has no names column. */
+.tr-editor.is-solo .tr-tl-grid { grid-template-columns: minmax(0, 1fr); }
+.tr-editor.is-solo .tr-tl-labels { display: none; }
+/* A name, renamed where it is: plain until pointed at or chosen. */
+.tr-tl-label input.tr-tl-name { flex: 1 1 auto; width: 100%; min-width: 0; height: 30px; min-height: 0; margin: 0; padding: 0 .4rem; border: 1px solid transparent !important; border-radius: 7px; background: transparent !important; box-shadow: none !important; color: var(--text); font: inherit; font-size: .86rem; font-weight: 600; text-overflow: ellipsis; }
+.tr-tl-label input.tr-tl-name { text-align: left; }
+.tr-tl-label input.tr-tl-name:hover { border-color: var(--line) !important; }
+.tr-tl-label input.tr-tl-name:focus { border-color: var(--a) !important; background: var(--surface) !important; outline: none; }
+@media (max-width: 640px) {
+  .tr-ed-heading { flex-basis: calc(100% - 50px); }
+  .tr-tl-label input.tr-tl-name { display: none; }
 }

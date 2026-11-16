@@ -76,6 +76,8 @@ final class TranscriptEditor
             return $kept;
         }
         $source = self::translatorCode((string) ($t->language ?: 'en'));
+        // Every paragraph asked at once; the loop below then finds them ready.
+        $this->translator->prefetch(array_map(fn ($p) => (string) ($p['text'] ?? ''), (array) $t->paragraphs), $source, self::translatorCode($language));
         $paragraphs = [];
         $segments = [];
         foreach ((array) $t->paragraphs as $i => $p) {

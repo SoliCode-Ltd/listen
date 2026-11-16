@@ -354,16 +354,16 @@ class TranscriberTest extends TestCase
     /** A part is timed in windows of about 30 s, cut on pauses, end to end; with no pause (music under the voice), every 30 s. */
     public function test_a_part_is_timed_in_short_windows_cut_on_pauses(): void
     {
-        $this->assertSame([[0.0, 40.0]], Transcriber::timingWindows([], 0.0, 40.0), 'short: one window');
+        $this->assertSame([[0.0, 30.0]], Transcriber::timingWindows([], 0.0, 30.0), 'short: one window');
 
-        $windows = Transcriber::timingWindows([[12.0, 12.4], [29.0, 29.8], [33.0, 33.2], [61.5, 62.5]], 0.0, 100.0);
-        $this->assertSame([[0.0, 29.4], [29.4, 62.0], [62.0, 100.0]], $windows, 'on the pause nearest 30 s, a longer one first');
+        $windows = Transcriber::timingWindows([[12.0, 12.4], [23.0, 23.8], [27.0, 27.2], [49.5, 50.5]], 0.0, 80.0);
+        $this->assertSame([[0.0, 23.4], [23.4, 50.0], [50.0, 80.0]], $windows, 'on the pause nearest 24 s, a longer one first');
 
-        $none = Transcriber::timingWindows([], 10.0, 130.0);
-        $this->assertSame([[10.0, 40.0], [40.0, 70.0], [70.0, 100.0], [100.0, 130.0]], $none);
+        $none = Transcriber::timingWindows([], 10.0, 106.0);
+        $this->assertSame([[10.0, 34.0], [34.0, 58.0], [58.0, 82.0], [82.0, 106.0]], $none);
         foreach ([$windows, $none] as $list) {
             foreach ($list as $i => [$start, $end]) {
-                $this->assertLessThanOrEqual(42.0, $end - $start);
+                $this->assertLessThanOrEqual(32.0, $end - $start);
                 if ($i > 0) {
                     $this->assertSame($list[$i - 1][1], $start, 'end to end');
                 }

@@ -116,6 +116,7 @@ class TranscribePageTest extends TestCase
         $this->assertSame([0, 0, 1], array_column($segments, 'paragraph'), 'the corrected paragraph cut into its sentences again');
 
         $translator = \Mockery::mock(TranslationService::class);
+        $translator->shouldReceive('prefetch')->once();
         $translator->shouldReceive('maybeTranslate')->andReturnUsing(fn (string $text) => 'EN: '.mb_substr($text, 0, 10));
         $this->app->instance(TranslationService::class, $translator);
         $this->postJson(route('transcribe.translate', $t->code), ['language' => 'en'])->assertOk()->assertJsonPath('paragraphs.1.text', 'EN: تمام.');

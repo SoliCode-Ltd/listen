@@ -40,6 +40,7 @@ use App\Services\Transcription\Transcriber;
 use App\Services\Transcription\TranscriptEditor;
 use App\Services\Transcription\TranscriptExport;
 use App\Services\Transcription\TranscriptionFlow;
+use App\Services\TranslationService;
 use App\Services\Tts\GeminiKeyManager;
 use App\Support\Api\ApiPlanAccess;
 use App\Support\AudioFormats;
@@ -303,7 +304,15 @@ try {
         }
 
         $to = $language === 'ar' ? 'en' : 'ar';
+        // How fast, and whether the quick translator answered (else the slower model did).
+        $texts = array_map(fn ($p) => (string) $p['text'], (array) $t->paragraphs);
+        $began = microtime(true);
+        app(TranslationService::class)->prefetch($texts, TranscriptEditor::translatorCode((string) $t->language), TranscriptEditor::translatorCode($to));
+        $quick = count(array_filter($texts, fn ($x) => is_string(Cache::get('listen:tr:v4:'.sha1(TranscriptEditor::translatorCode((string) $t->language).'|'.TranscriptEditor::translatorCode($to).'|'.trim($x))))));
+        printf("    the quick translator answered %d of %d paragraphs in %.1f s\n", $quick, count($texts), microtime(true) - $began);
+        $began = microtime(true);
         $translated = app(TranscriptEditor::class)->translate($t, $to);
+        printf("    translated in %.1f s\n", microtime(true) - $began);
         $check(count($translated['paragraphs']) === count((array) $t->paragraphs) && trim((string) ($translated['paragraphs'][0]['text'] ?? '')) !== '', "translated to {$to}: ".mb_substr((string) ($translated['paragraphs'][0]['text'] ?? ''), 0, 80));
         $again = app(TranscriptEditor::class)->translate($t->fresh(), $to);
         $check($again['at'] === $translated['at'], 'the translation is kept, not made again');

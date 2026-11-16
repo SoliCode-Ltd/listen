@@ -29,7 +29,7 @@ use Symfony\Component\Process\Process;
  *
  * The model writes only the words and who says them, never times: asked for
  * times over a long stretch, it drifts (measured on staging, November 2026).
- * The times come after, in short windows (timingWindows(), about 30 s, cut on
+ * The times come after, in short windows (timingWindows(), about 24 s, cut on
  * pauses), each heard on its own with the sentences near it: in so little
  * audio the start it hears for a sentence is close, and no error carries on
  * to the next window. The starts are then moved onto where speech begins in
@@ -76,11 +76,11 @@ final class Transcriber
     public const MATCH_SECONDS = 6.0;
 
     /** The audio timed in one request: about this many seconds, cut on a pause between the two limits. */
-    public const TIMING_WINDOW = 30.0;
+    public const TIMING_WINDOW = 24.0;
 
-    private const TIMING_WINDOW_MIN = 18.0;
+    private const TIMING_WINDOW_MIN = 14.0;
 
-    private const TIMING_WINDOW_MAX = 42.0;
+    private const TIMING_WINDOW_MAX = 32.0;
 
     /** Timing requests sent at once. */
     private const TIMING_AT_ONCE = 5;

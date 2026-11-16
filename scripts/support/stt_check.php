@@ -27,6 +27,8 @@ use App\Services\Transcription\TranscriptionFlow;
 use App\Support\AudioFormats;
 use App\Support\LiveServer;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 
@@ -60,20 +62,20 @@ foreach (Transcription::withTrashed()->latest('id')->limit(6)->get() as $t) {
 echo "\n== The queue ==\n";
 echo '  connection: ', config('queue.default'), '; cache: ', config('cache.default'), "\n";
 try {
-    $lock = Illuminate\Support\Facades\Cache::lock('stt-check-lock', 10);
+    $lock = Cache::lock('stt-check-lock', 10);
     echo '  a cache lock: ', $lock->get() ? 'works' : 'could not be taken', "\n";
     $lock->release();
 } catch (Throwable $e) {
     echo '  a cache lock: FAILS: ', mb_substr($e->getMessage(), 0, 200), "\n";
 }
 try {
-    $waiting = Illuminate\Support\Facades\DB::table('jobs')->where('payload', 'like', '%TranscribeJob%')->get(['queue', 'attempts', 'available_at', 'reserved_at']);
+    $waiting = DB::table('jobs')->where('payload', 'like', '%TranscribeJob%')->get(['queue', 'attempts', 'available_at', 'reserved_at']);
     echo '  speech to text jobs waiting: ', count($waiting), "\n";
     foreach ($waiting as $j) {
         printf("    queue %s, tries %d, due %s, taken %s\n", $j->queue, $j->attempts, date('H:i:s', (int) $j->available_at), $j->reserved_at ? date('H:i:s', (int) $j->reserved_at) : 'no');
     }
-    echo '  all jobs waiting: ', Illuminate\Support\Facades\DB::table('jobs')->count(), "\n";
-    foreach (Illuminate\Support\Facades\DB::table('failed_jobs')->where('payload', 'like', '%TranscribeJob%')->latest('id')->limit(3)->get(['failed_at', 'exception']) as $f) {
+    echo '  all jobs waiting: ', DB::table('jobs')->count(), "\n";
+    foreach (DB::table('failed_jobs')->where('payload', 'like', '%TranscribeJob%')->latest('id')->limit(3)->get(['failed_at', 'exception']) as $f) {
         echo '  failed ', $f->failed_at, ': ', mb_substr(strtok((string) $f->exception, "\n"), 0, 300), "\n";
     }
 } catch (Throwable $e) {
@@ -130,8 +132,8 @@ foreach ($recent as $t) {
     }
 
     // 3. Placed again in windows, for a finished transcript made before them.
-    $windowed = str_contains(implode(' ', (array) $t->notes), 'window');
-    if ($t->status === Transcription::READY && ! $t->trashed() && ! $windowed && (array) $t->segments !== []) {
+    // Timed again with the code as it is now (its words kept), for a finished one up to 10 minutes.
+    if ($t->status === Transcription::READY && ! $t->trashed() && (float) $t->seconds <= 600 && (array) $t->segments !== []) {
         $before = array_values((array) $t->segments);
         $new = $transcriber->retime($clean, $before);
         if ($new === null) {

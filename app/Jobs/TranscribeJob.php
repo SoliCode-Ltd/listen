@@ -81,6 +81,7 @@ class TranscribeJob implements ShouldQueue
         @set_time_limit(200);
         $until = microtime(true) + 150;
         $job = new static($transcriptionId);
+        $slips = 0;
         while (microtime(true) < $until) {
             $lock = Cache::lock(self::lockName($transcriptionId), $job->timeout + 30);
             if (! $lock->get()) {
@@ -91,6 +92,14 @@ class TranscribeJob implements ShouldQueue
                     return;
                 }
             } catch (\Throwable $e) {
+                // A model that did not answer this once is asked again here after a breath; a second
+                // slip leaves it to the queue, which tries again later.
+                if (++$slips < 2) {
+                    $lock->release();
+                    sleep(2);
+
+                    continue;
+                }
                 Log::warning('Speech to text: left to the queue.', ['transcription' => $transcriptionId, 'error' => mb_substr($e->getMessage(), 0, 300)]);
 
                 return;

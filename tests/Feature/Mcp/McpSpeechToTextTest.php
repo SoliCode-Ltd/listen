@@ -85,7 +85,9 @@ class McpSpeechToTextTest extends TestCase
         $srt = (string) $this->callTool($plain, 'get_transcription', ['transcription_id' => $id, 'format' => 'srt'])->json('result.content.0.text');
         $this->assertMatchesRegularExpression('/\d\d:\d\d:\d\d,\d{3} --> \d\d:\d\d:\d\d,\d{3}/', $srt);
 
-        $this->mock(TranslationService::class)->shouldReceive('maybeTranslate')->andReturnUsing(fn (string $text) => '[fr] '.$text);
+        $translator = $this->mock(TranslationService::class);
+        $translator->shouldReceive('prefetch');
+        $translator->shouldReceive('maybeTranslate')->andReturnUsing(fn (string $text) => '[fr] '.$text);
         $french = (string) $this->callTool($plain, 'get_transcription', ['transcription_id' => $id, 'translate_to' => 'fr'])->json('result.content.0.text');
         $this->assertStringContainsString('[fr] Good morning, everyone.', $french);
         $this->assertStringContainsString('Translated to fr.', $french);
