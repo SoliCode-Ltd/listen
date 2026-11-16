@@ -196,6 +196,12 @@ name: Server deploy
 #            Admin → Plans → Save does: the price, then new Stripe monthly and
 #            yearly prices (the old ones archived; members on them keep them).
 #            Live only, and only when the owner has said yes.
+#   newsletter-draft: read-only. The speech to text announcement for paid
+#            members, with the site's own figures (plans, minutes, languages),
+#            who it would reach as counts, and the whole email as text
+#            (scripts/support/newsletter_draft.php). newsletter-draft-save
+#            saves it in Admin -> Newsletter as a draft. Neither sends anything:
+#            the owner sends it from the admin.
 # New migrations and composer.lock changes are reported, not run (see migrate and composer).
 # The "Run over SSH" script must stay under GitHub's 21,000-character limit for one
 # step (tests/Feature/ServerDeployWorkflowTest.php): longer remote work goes in
@@ -210,7 +216,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -692,6 +698,12 @@ jobs:
             if [ "$MODE" = plan-price-apply ] && [ "$TARGET" != live ]; then echo "plan-price-apply runs on live only (the site that makes Stripe prices)"; exit 1; fi
             failed=0
             tool plan_price.php | $S "$FIND; PLAN_PRICE='$PLAN_PRICE' APPLY=$([ "$MODE" = plan-price-apply ] && echo 1 || echo 0) php" || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
+          if [ "$MODE" = newsletter-draft ] || [ "$MODE" = newsletter-draft-save ]; then
+            failed=0
+            tool newsletter_draft.php | $S "$FIND; NL_APPLY=$([ "$MODE" = newsletter-draft-save ] && echo 1 || echo 0) php" || failed=1
             rm -f ~/.ssh/id_deploy
             exit "$failed"
           fi
