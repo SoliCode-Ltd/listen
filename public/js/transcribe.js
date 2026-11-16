@@ -1,5 +1,5 @@
 /*
- * Transcribe on the dashboard (components/transcribe/dashboard-section.blade.php).
+ * Speech to text on the dashboard (components/transcribe/dashboard-section.blade.php).
  *
  * The box: a file dropped, uploaded or recorded (its length read here and
  * checked with the server at once: what it will use, what is left, what will

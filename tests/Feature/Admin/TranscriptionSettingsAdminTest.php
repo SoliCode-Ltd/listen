@@ -12,7 +12,7 @@ use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
- * Admin → Transcribe → Settings: the site's own limits for speech to text,
+ * Admin → Speech to text → Settings: the site's own limits for speech to text,
  * each falling back to config/listen.php until saved.
  */
 class TranscriptionSettingsAdminTest extends TestCase
@@ -39,7 +39,7 @@ class TranscriptionSettingsAdminTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
         Livewire::test(TranscriptionSettingsPage::class)
-            ->assertSee('Transcribe Settings')
+            ->assertSee('Speech to text settings')
             ->fillForm([
                 'transcription_audience' => TranscriptionSettings::AUDIENCE_EVERYONE,
                 'transcription_free_try_seconds' => 45,

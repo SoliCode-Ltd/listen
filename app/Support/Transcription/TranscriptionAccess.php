@@ -12,8 +12,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Who may use speech to text ("Transcribe"), and how much: what each plan
- * includes, as set on the plan (Admin → Plans → Transcribe), and the
+ * Who may use speech to text, and how much: what each plan
+ * includes, as set on the plan (Admin → Plans → Speech to text), and the
  * member's minutes this billing month. The minutes come from the plan only:
  * there are no packs, top-ups or pay-as-you-go for transcription. They are
  * counted by the second of audio and start again with the member's billing
@@ -56,7 +56,7 @@ final class TranscriptionAccess
         return TranscriptionSettings::costPerMinute();
     }
 
-    /** Whether this person sees Transcribe at all (Transcribe → Settings: who can see it). */
+    /** Whether this person sees speech to text at all (Speech to text → Settings: who can see it). */
     public static function openTo(?User $user): bool
     {
         if ($user === null || ! TranscriptionSettings::visibleTo((string) $user->email)) {
@@ -152,7 +152,7 @@ final class TranscriptionAccess
 
     /**
      * The plan to move up to: the cheapest plan on sale above the member's
-     * own that includes Transcribe and fits a file of $fileSeconds with
+     * own that includes speech to text and fits a file of $fileSeconds with
      * $needSeconds this month (0: any). Null when none fits.
      */
     public static function nextPlanThatFits(?Plan $current, int $needSeconds = 0, int $fileSeconds = 0): ?Plan

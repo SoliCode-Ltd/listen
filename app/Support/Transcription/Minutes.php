@@ -4,7 +4,7 @@ namespace App\Support\Transcription;
 
 /**
  * A length of audio in the words the page uses: "2 min 10 s", "45 s",
- * "1 h 05 min" (Arabic: "2 د 10 ث"). Transcribe counts by the second. The
+ * "1 h 05 min" (Arabic: "2 د 10 ث"). Speech to text counts by the second. The
  * month's minutes are said in minutes only, as the studio says its own
  * ("239 min of 250 min"): $hours false.
  */

@@ -49,8 +49,8 @@ Schedule::command('listen:expire-stuck-generations')->everyFiveMinutes()->withou
 // and delete old server copies (App\Console\Commands\PruneVideoDubsCommand).
 Schedule::command('dubs:prune')->everyTenMinutes()->withoutOverlapping(30);
 
-// Transcribe: give back the minutes of stuck transcripts and delete uploaded audio after the
-// days set in Transcribe → Settings (App\Console\Commands\PruneTranscriptionsCommand).
+// Speech to text: give back the minutes of stuck transcripts and delete uploaded audio after the
+// days set in Speech to text → Settings (App\Console\Commands\PruneTranscriptionsCommand).
 Schedule::command('transcriptions:prune')->everyTenMinutes()->withoutOverlapping(30);
 
 // Voice Design: delete the takes nobody kept, so the speech projects keep room for voices

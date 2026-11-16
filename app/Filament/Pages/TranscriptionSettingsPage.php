@@ -17,12 +17,12 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 /**
- * The site's own settings for speech to text ("Transcribe",
+ * The site's own settings for speech to text (
  * App\Support\Transcription\TranscriptionSettings): who sees it, the free try,
  * the daily ceiling for the whole site, uploads and how long their audio is
  * kept, the languages members can choose, the second listening, and Listen's
  * cost figures. What each plan includes (minutes a month, longest file,
- * timings, speakers, translation) is set on each plan (Plans → Transcribe).
+ * timings, speakers, translation) is set on each plan (Plans → Speech to text).
  */
 class TranscriptionSettingsPage extends Page implements HasForms
 {
@@ -30,13 +30,13 @@ class TranscriptionSettingsPage extends Page implements HasForms
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Transcribe';
+    protected static string|\UnitEnum|null $navigationGroup = 'Speech to text';
 
     protected static ?int $navigationSort = 2;
 
     protected static ?string $navigationLabel = 'Settings';
 
-    protected static ?string $title = 'Transcribe Settings';
+    protected static ?string $title = 'Speech to text settings';
 
     protected static ?string $slug = 'transcription-settings';
 
@@ -64,8 +64,8 @@ class TranscriptionSettingsPage extends Page implements HasForms
     {
         return $schema
             ->components([
-                Section::make('Transcribe')
-                    ->description('Members upload, record or link audio and get its text: paragraphs with who said them, edited in place, played back sentence by sentence, downloaded as text, Word or subtitles, and translated. Which plans include it, and their minutes a month, are set on each plan (Plans → Transcribe).')
+                Section::make('Speech to text')
+                    ->description('Members upload, record or link audio and get its text: paragraphs with who said them, edited in place, played back sentence by sentence, downloaded as text, Word or subtitles, and translated. Which plans include it, and their minutes a month, are set on each plan (Plans → Speech to text).')
                     ->schema([
                         Radio::make('transcription_audience')
                             ->label('Who can see it')
@@ -87,7 +87,7 @@ class TranscriptionSettingsPage extends Page implements HasForms
                         TextInput::make('transcription_free_try_seconds')
                             ->label('Free try: longest recording')
                             ->numeric()->integer()->minValue(0)->maxValue(300)->suffix('seconds')->required()
-                            ->helperText('One recording, for members whose plan has no Transcribe. 0: no free try.'),
+                            ->helperText('One recording, for members whose plan has no speech to text. 0: no free try.'),
                         TextInput::make('transcription_free_per_day')
                             ->label('Free tries a day, for the whole site')
                             ->numeric()->integer()->minValue(0)->maxValue(100000)->suffix('tries')->required()
@@ -156,6 +156,6 @@ class TranscriptionSettingsPage extends Page implements HasForms
         SiteSetting::set('transcription_cost_per_minute', (string) max(0.0001, min(1.0, (float) ($s['transcription_cost_per_minute'] ?? 0))), $group);
         SiteSetting::flushGroupCache($group);
 
-        Notification::make()->title('Transcribe settings saved.')->success()->send();
+        Notification::make()->title('Speech to text settings saved.')->success()->send();
     }
 }

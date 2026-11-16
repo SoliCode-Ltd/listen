@@ -1,5 +1,5 @@
 {{--
-  The dashboard's "Transcribe" section (speech to text), built from the
+  The dashboard's "Speech to text" section, built from the
   studio's own parts (the dubbing section's account, rule box, drop zone,
   progress, meter, go button and ledger: css/dub-studio.css) so it reads as
   one more studio tool; css/transcribe.css adds only what those have no

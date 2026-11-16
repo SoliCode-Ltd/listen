@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 /**
- * One transcript ("Transcribe"): see the transcriptions migration. The
+ * One transcript: see the transcriptions migration. The
  * seconds it used of the member's month (charged_seconds) are held when it
  * starts and given back when it fails (App\Services\Transcription\TranscriptionFlow).
  *

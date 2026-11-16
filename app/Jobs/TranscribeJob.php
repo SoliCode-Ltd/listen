@@ -86,7 +86,7 @@ class TranscribeJob implements ShouldQueue
             }
             $flow->finish($t, Transcriber::result($state));
         } catch (SpeechNotWrittenOut $e) {
-            Log::warning('Transcribe: not written out.', ['transcription' => $t->id, 'finish' => $e->finish]);
+            Log::warning('Speech to text: not written out.', ['transcription' => $t->id, 'finish' => $e->finish]);
             $flow->fail($t, 'not_written', __('transcribe.failed.not_written'));
         } catch (\RuntimeException $e) {
             if (str_contains($e->getMessage(), 'could not be read') || str_contains($e->getMessage(), 'ffmpeg')) {
@@ -103,7 +103,7 @@ class TranscribeJob implements ShouldQueue
     {
         $t = Transcription::withTrashed()->find($this->transcriptionId);
         if ($t) {
-            Log::error('Transcribe: failed.', ['transcription' => $t->id, 'error' => $e?->getMessage()]);
+            Log::error('Speech to text: failed.', ['transcription' => $t->id, 'error' => $e?->getMessage()]);
             app(TranscriptionFlow::class)->fail($t, 'default', __('transcribe.failed.default'));
         }
     }

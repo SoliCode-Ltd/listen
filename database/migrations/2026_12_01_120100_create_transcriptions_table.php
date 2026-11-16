@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * A member's transcripts ("Transcribe", App\Models\Transcription): the audio
+ * A member's transcripts (App\Models\Transcription): the audio
  * (kept for TranscriptionSettings::keepAudioDays()), its text as paragraphs
  * with the speaker of each and every sentence on the recording's clock, the
  * seconds it used of the month's minutes (held when it starts, given back

@@ -2367,7 +2367,7 @@
       <x-dub.dashboard-section :dub="$dubStudio" :account="$dubAccount" />
     @endif
 
-    {{-- Transcribe: speech to text, with this month's minutes and every transcript. --}}
+    {{-- Speech to text, with this month's minutes and every transcript. --}}
     @if($transcribe ?? null)
       <x-transcribe.dashboard-section :account="$transcribe" />
     @endif

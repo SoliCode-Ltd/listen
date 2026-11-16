@@ -1,5 +1,5 @@
 /*
- * The dashboard's Transcribe section (components/transcribe/dashboard-section.blade.php).
+ * The dashboard's Speech to text section (components/transcribe/dashboard-section.blade.php).
  * It is built from the dubbing section's parts (css/dub-studio.css: the account,
  * rule box, drop zone, progress, meter, go button and ledger) and the voice
  * studio's card (css/voice-studio.css); this adds only what those have no part

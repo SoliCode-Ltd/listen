@@ -6,8 +6,8 @@ use App\Models\SiteSetting;
 use App\Support\VoiceCloningAccess;
 
 /**
- * The site's own settings for speech to text ("Transcribe"), set in Admin →
- * Transcribe → Settings (App\Filament\Pages\TranscriptionSettingsPage): who
+ * The site's own settings for speech to text, set in Admin →
+ * Speech to text → Settings (App\Filament\Pages\TranscriptionSettingsPage): who
  * sees it, the free try, the site's daily ceiling, how long uploads are kept,
  * the languages members can choose, the second listening, and Listen's cost
  * figures. Each falls back to config/listen.php "transcription" until saved.
@@ -59,7 +59,7 @@ final class TranscriptionSettings
         return in_array($value, [self::AUDIENCE_OFF, self::AUDIENCE_PREVIEW, self::AUDIENCE_EVERYONE], true) ? $value : self::AUDIENCE_PREVIEW;
     }
 
-    /** Whether this person may see Transcribe at all (before launch: the admin email only). */
+    /** Whether this person may see speech to text at all (before launch: the admin email only). */
     public static function visibleTo(?string $email): bool
     {
         return match (self::audience()) {

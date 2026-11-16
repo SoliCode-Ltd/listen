@@ -9,8 +9,8 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Transcribe's housekeeping, every ten minutes: a transcript still working
- * after Transcribe → Settings' "stopped after" minutes (no step saved in that
+ * Speech to text's housekeeping, every ten minutes: a transcript still working
+ * after Speech to text → Settings' "stopped after" minutes (no step saved in that
  * time) is failed and its minutes given back; uploaded audio older than the
  * days set there is deleted (the text stays until the member deletes it);
  * uploads never finished are deleted after six hours.

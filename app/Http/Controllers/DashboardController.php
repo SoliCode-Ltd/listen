@@ -184,7 +184,7 @@ class DashboardController extends Controller
         // Dub a video, in its own section (App\Support\VideoDubbing).
         $dubStudio = VideoDubbing::openTo($request->user()) ? VideoDubbing::studio($request->user(), $request) : null;
 
-        // Transcribe (speech to text), in its own section: this month's minutes for its header and box.
+        // Speech to text, in its own section: this month's minutes for its header and box.
         $transcribe = rescue(fn () => TranscriptionAccess::openTo($request->user())
             ? TranscriptionPresenter::account($request->user(), app()->getLocale() === 'ar') : null, null, false);
 

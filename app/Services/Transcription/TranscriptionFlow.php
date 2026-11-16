@@ -192,7 +192,7 @@ final class TranscriptionFlow
             return false;
         }
 
-        // No Transcribe on the plan: the free try, on the page only (the API and MCP need a plan with it).
+        // No speech to text on the plan: the free try, on the page only (the API and MCP need a plan with it).
         $next = TranscriptionAccess::nextPlanThatFits($plan, $charge, $charge);
         $upgrade = TranscriptionAccess::upgrade($next, $arabic);
         $name = $next ? self::planName($next, $arabic) : '';

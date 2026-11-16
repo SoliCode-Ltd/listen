@@ -612,13 +612,13 @@ class PlanResource extends Resource
                             ->columnSpan(2)
                             ->visible(fn (Get $get): bool => (bool) $get('agents_enabled')),
                     ]),
-                Section::make('Transcribe (speech to text)')
-                    ->description('Members on this plan turn recordings into text: on the page, through the API (where the plan has API access) and through the MCP server. Every plan that includes it gets the same transcript: paragraphs with who said them, every download (text, Word, subtitles) and translation. Minutes come from this plan only: there are no packs or top-ups. A member whose minutes run out, or whose file is longer than the plan takes, is shown the next plan up that fits. The site\'s own limits (who sees it, the free try, the daily ceiling, how long audio is kept, the languages) are in Transcribe → Settings.')
+                Section::make('Speech to text')
+                    ->description('Members on this plan turn recordings into text: on the page, through the API (where the plan has API access) and through the MCP server. Every plan that includes it gets the same transcript: paragraphs with who said them, every download (text, Word, subtitles) and translation. Minutes come from this plan only: there are no packs or top-ups. A member whose minutes run out, or whose file is longer than the plan takes, is shown the next plan up that fits. The site\'s own limits (who sees it, the free try, the daily ceiling, how long audio is kept, the languages) are in Speech to text → Settings.')
                     ->columns(2)
                     ->visible(fn (): bool => TranscriptionAccess::planColumns())
                     ->schema([
                         Toggle::make('transcription_enabled')
-                            ->label('Include Transcribe')
+                            ->label('Include speech to text')
                             ->helperText('Off: this plan\'s members see the plan that includes it instead. Their transcripts stay; nothing is deleted.')
                             ->default(false)
                             ->live()
@@ -1052,7 +1052,7 @@ class PlanResource extends Resource
         $share = fn (float $of): string => $of > 0 ? number_format($full / $of * 100, 1).'%' : '—';
 
         $lines = [
-            sprintf('A minute of audio costs Listen about <b>%s</b> (Transcribe → Settings).', $money($perMinute)),
+            sprintf('A minute of audio costs Listen about <b>%s</b> (Speech to text → Settings).', $money($perMinute)),
             sprintf('If every minute is used: about <b>%s</b> a month, <b>%s</b> of the %s price%s.', $money($full), $share($price), $money($price),
                 $discount > 0 ? sprintf(', <b>%s</b> of the offer price (%s, %d%% off)', $share($price * (100 - $discount) / 100), $money($price * (100 - $discount) / 100), $discount) : ''),
         ];

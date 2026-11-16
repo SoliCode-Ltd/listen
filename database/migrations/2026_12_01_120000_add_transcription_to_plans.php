@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Speech to text ("Transcribe"), set on each plan (Admin → Plans → Transcribe):
+ * Speech to text, set on each plan (Admin → Plans → Speech to text):
  * whether the plan includes it, the minutes of audio a month (from the plan
  * only: there are no packs or top-ups), the longest file, whether its jobs go
  * first in the queue, and how many run at once for one member. Every plan

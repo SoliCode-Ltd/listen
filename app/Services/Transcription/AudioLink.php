@@ -38,7 +38,7 @@ final class AudioLink
             }
             $received = 0;
             try {
-                $response = Http::withHeaders(['User-Agent' => 'ListenTranscribe/1.0 (+https://listenai.studio)', 'Accept' => 'audio/*,video/*;q=0.9,*/*;q=0.5'])
+                $response = Http::withHeaders(['User-Agent' => 'ListenSpeechToText/1.0 (+https://listenai.studio)', 'Accept' => 'audio/*,video/*;q=0.9,*/*;q=0.5'])
                     ->withOptions(['sink' => $to, 'progress' => function ($total, $done) use ($maxBytes): void {
                         if ($total > $maxBytes || $done > $maxBytes) {
                             throw new \OverflowException('too big');

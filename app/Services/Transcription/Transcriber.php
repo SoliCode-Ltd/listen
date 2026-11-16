@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 
 /**
- * Speech to text ("Transcribe"): what is said in a recording, word for word,
+ * Speech to text: what is said in a recording, word for word,
  * in the language and the words the speaker uses, as paragraphs with the
  * speaker of each, and every sentence placed on the recording's own clock.
  *
@@ -611,7 +611,7 @@ final class Transcriber
                 continue;
             }
             $notes[] = 'no answer to read ('.($answer['finish'] ?: 'no finish reason').'): '.mb_substr(preg_replace('/\s+/u', ' ', $answer['raw']) ?? '', 0, 160);
-            Log::warning('Transcribe: the text model gave no answer to read.', ['finish' => $answer['finish'], 'model' => $answer['model'], 'careful' => $careful]);
+            Log::warning('Speech to text: the text model gave no answer to read.', ['finish' => $answer['finish'], 'model' => $answer['model'], 'careful' => $careful]);
             $careful = $careful || $answer['finish'] === 'RECITATION';
         }
         if ($best === null) {

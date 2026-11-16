@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Transcribe (speech to text): the page, and the messages the page, the API
+ * Speech to text: the page, and the messages the page, the API
  * and MCP give. Arabic twin: lang/ar/transcribe.php.
  */
 return [
@@ -13,22 +13,22 @@ return [
     ],
 
     'refused' => [
-        'not_open' => 'Transcribe is not available on your account yet.',
+        'not_open' => 'Speech to text is not available on your account yet.',
         'no_audio' => 'We could not find any sound in this file. Try an MP3, WAV, M4A, OGG, FLAC, WEBM or MP4 file.',
         'too_big' => 'This file is larger than :mb MB.',
-        'not_in_plan' => 'Your plan does not include Transcribe. The :plan plan includes it.',
-        'not_in_any_plan' => 'Your plan does not include Transcribe.',
+        'not_in_plan' => 'Your plan does not include speech to text. The :plan plan includes it.',
+        'not_in_any_plan' => 'Your plan does not include speech to text.',
         'too_long_plan' => 'This file is :length long and your plan takes files up to :max. The :plan plan takes it.',
         'too_long_any' => 'This file is :length long and your plan takes files up to :max. Split it into shorter files.',
         'not_enough' => 'This file needs :need and you have :left left this month. Your minutes start again on :date. The :plan plan has more.',
         'not_enough_any' => 'This file needs :need and you have :left left this month. Your minutes start again on :date.',
-        'free_used' => 'You have used your free try. The :plan plan includes Transcribe.',
+        'free_used' => 'You have used your free try. The :plan plan includes speech to text.',
         'free_too_long' => 'The free try takes recordings up to :max, and this one is :length. The :plan plan takes longer files.',
         'free_day_full' => 'Today\'s free tries are all taken. Try again tomorrow, or choose a plan.',
-        'busy' => '{1} You already have a file being transcribed. Wait for it to finish.|[2,*] You already have :n files being transcribed. Wait for one to finish.',
-        'site_busy' => 'Transcribe is very busy today. Please try again tomorrow.',
+        'busy' => '{1} You already have a file being converted to text. Wait for it to finish.|[2,*] You already have :n files being converted to text. Wait for one to finish.',
+        'site_busy' => 'Speech to text is very busy today. Please try again tomorrow.',
         'bad_link' => 'We could not get audio from this link. Use a direct link to an audio or video file.',
-        'too_short' => 'This recording is too short to transcribe.',
+        'too_short' => 'This recording is too short to convert to text.',
     ],
 
     'failed' => [
@@ -55,16 +55,16 @@ return [
         'rule_second' => 'By the second',
         'rule_second_value' => 'A 2 min 10 s file uses 2 min 10 s.',
         'rule_held' => 'Only when it works',
-        'rule_held_value' => 'Minutes are held while a file is transcribed and given back if it fails.',
+        'rule_held_value' => 'Minutes are held while a file is converted and given back if it fails.',
         'rule_free' => 'Nothing extra',
         'rule_free_value' => 'Editing, translating and downloading again use no minutes.',
-        'upgrade_title' => 'Transcribe comes with our plans',
+        'upgrade_title' => 'Speech to text comes with our plans',
         'free_text' => 'Try it free with one recording up to :length. Plans include minutes every month.',
         'used_text' => 'You have used your free try. Plans include minutes every month.',
-        'plan_text' => 'Your plan does not include Transcribe. Plans with it include minutes every month.',
+        'plan_text' => 'Your plan does not include speech to text. Plans with it include minutes every month.',
         'see_plans' => 'See plans',
         'get_plan' => 'Get :plan',
-        'drop_title' => 'Add audio to transcribe',
+        'drop_title' => 'Add audio to convert to text',
         'drop_text' => 'Drop a file here, or choose one of the options below',
         'upload' => 'Upload',
         'link' => 'Link',
@@ -106,8 +106,8 @@ return [
         'left' => 'You have :time left this month.',
         'remain' => ':time will remain.',
         'free_try' => 'This is your free try: it uses no minutes.',
-        'start' => 'Transcribe · :time',
-        'start_plain' => 'Transcribe',
+        'start' => 'Convert to text · :time',
+        'start_plain' => 'Convert to text',
         'step_upload' => 'Sending',
         'step_prepare' => 'Getting ready',
         'step_listen' => 'Writing out',

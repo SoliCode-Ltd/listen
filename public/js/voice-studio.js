@@ -1633,7 +1633,7 @@
 
   function boot() {
     document.querySelectorAll('[data-vs-panel]').forEach(initPanel);
-    // Any other dropdown that asks for the studio's own (data-vs-select): Transcribe's language and translation.
+    // Any other dropdown that asks for the studio's own (data-vs-select): speech to text's language and translation.
     document.querySelectorAll('select[data-vs-select]').forEach(enhanceSelect);
   }
   window.ListenEnhanceSelect = enhanceSelect;
