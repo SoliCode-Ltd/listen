@@ -8,8 +8,14 @@ name: Transcribe measure
 # sends about 70 minutes of audio three times to the text model on the Google
 # account staging shares with live: run it only when the owner has said yes.
 # The branch must be deployed to staging first ("Server deploy": inspect, then deploy).
+# A push of this file on the transcription branch runs it with no options (a run by
+# hand needs the file on main first); it waits for any deploy to staging to finish.
 
 on:
+  push:
+    branches: [solicode/nice-faraday-sg5yi0]
+    paths:
+      - .github/workflows/transcribe-measure.yml
   workflow_dispatch:
     inputs:
       options:
@@ -34,7 +40,7 @@ jobs:
           SSH_USER: ${{ secrets.STAGING_SSH_USER }}
           SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
           APP_PATH: ${{ secrets.STAGING_APP_PATH }}
-          OPTIONS: ${{ inputs.options }}
+          OPTIONS: ${{ inputs.options || '' }}
         run: |
           set -euo pipefail
           case "$OPTIONS" in *[\;\&\|\`\$\<\>]*) echo "Options may not hold shell characters."; exit 1;; esac
