@@ -21,6 +21,7 @@ use App\Support\DiscountTerms;
 use App\Support\PlanCostEstimate;
 use App\Support\PlanPricingLines;
 use App\Support\Transcription\TranscriptionAccess;
+use App\Support\Transcription\TranscriptionSettings;
 use App\Support\VoiceDesign;
 use Carbon\Carbon;
 use Exception;
@@ -616,7 +617,7 @@ class PlanResource extends Resource
                             ->visible(fn (Get $get): bool => (bool) $get('agents_enabled')),
                     ]),
                 Section::make('Transcribe (speech to text)')
-                    ->description('Members on this plan turn recordings into text: on the page, through the API (where the plan has API access) and through the MCP server. Minutes come from this plan only: there are no packs or top-ups. A member whose minutes run out, or whose file is longer than the plan takes, is shown the next plan up that fits. The site\'s own limits (the free try, the daily ceiling, how long audio is kept) are in config/listen.php under "transcription".')
+                    ->description('Members on this plan turn recordings into text: on the page, through the API (where the plan has API access) and through the MCP server. Minutes come from this plan only: there are no packs or top-ups. A member whose minutes run out, or whose file is longer than the plan takes, is shown the next plan up that fits. The site\'s own limits (who sees it, the free try, the daily ceiling, how long audio is kept, the languages) are in Transcribe → Settings.')
                     ->columns(2)
                     ->visible(fn (): bool => TranscriptionAccess::planColumns())
                     ->schema([
@@ -1063,8 +1064,7 @@ class PlanResource extends Resource
     {
         $minutes = max(0, (int) $get('transcription_minutes_month'));
         $timed = (bool) $get('transcription_timestamps') || (bool) $get('transcription_speakers');
-        $costs = (array) config('listen.transcription.cost_per_minute', []);
-        $perMinute = (float) ($costs[$timed ? 'timed' : 'plain'] ?? 0);
+        $perMinute = TranscriptionSettings::costPerMinute($timed ? 'timed' : 'plain');
         $price = max(0.0, (float) ($get('price_dollars') ?? 0));
         $discount = max(0, min(100, (int) ($get('discount_percentage') ?? 0)));
         $full = $minutes * $perMinute;
@@ -1072,7 +1072,7 @@ class PlanResource extends Resource
         $share = fn (float $of): string => $of > 0 ? number_format($full / $of * 100, 1).'%' : '—';
 
         $lines = [
-            sprintf('A minute of audio costs Listen about <b>%s</b> %s (measured on staging).', $money($perMinute), $timed ? 'with timings or speaker names' : 'as plain text'),
+            sprintf('A minute of audio costs Listen about <b>%s</b> %s (Transcribe → Settings).', $money($perMinute), $timed ? 'with timings or speaker names' : 'as plain text'),
             sprintf('If every minute is used: about <b>%s</b> a month, <b>%s</b> of the %s price%s.', $money($full), $share($price), $money($price),
                 $discount > 0 ? sprintf(', <b>%s</b> of the offer price (%s, %d%% off)', $share($price * (100 - $discount) / 100), $money($price * (100 - $discount) / 100), $discount) : ''),
         ];

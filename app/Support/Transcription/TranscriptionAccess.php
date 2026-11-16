@@ -47,9 +47,8 @@ final class TranscriptionAccess
      */
     public static function costPerMinute(?Plan $plan): float
     {
-        $costs = (array) config('listen.transcription.cost_per_minute', []);
         $timed = $plan !== null && ((bool) $plan->transcription_timestamps || (bool) $plan->transcription_speakers);
 
-        return (float) ($costs[$timed ? 'timed' : 'plain'] ?? 0);
+        return TranscriptionSettings::costPerMinute($timed ? 'timed' : 'plain');
     }
 }

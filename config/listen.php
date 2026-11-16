@@ -210,8 +210,9 @@ return [
 
     /*
     | Speech to text ("Transcribe", App\Services\Transcription\Transcriber).
-    | What each plan includes is set on the plan (Admin → Plans → Transcribe);
-    | these are the site's own limits and Listen's cost figures.
+    | What each plan includes is set on the plan (Admin → Plans → Transcribe).
+    | These are the site's own limits and Listen's cost figures until they are
+    | saved in Admin → Transcribe → Settings (TranscriptionSettings).
     */
     'transcription' => [
         // What a minute of audio costs Listen, as measured on staging on 16 November 2026
@@ -225,6 +226,9 @@ return [
         'free_per_day' => (int) env('LISTEN_TRANSCRIBE_FREE_PER_DAY', 50),
         // Minutes of audio the whole site may transcribe in a day (members, API and MCP together). 0: no ceiling.
         'daily_minutes' => (int) env('LISTEN_TRANSCRIBE_DAILY_MINUTES', 3000),
+        // The largest upload, and whether each part is heard a second time with its draft (Transcribe → Settings).
+        'max_upload_mb' => (int) env('LISTEN_TRANSCRIBE_MAX_UPLOAD_MB', 500),
+        'review' => (bool) env('LISTEN_TRANSCRIBE_REVIEW', false),
         // Days the uploaded audio is kept (the text stays until the member deletes it).
         'keep_audio_days' => (int) env('LISTEN_TRANSCRIBE_KEEP_AUDIO_DAYS', 7),
         // Minutes after which a job still working is failed and its minutes given back.
