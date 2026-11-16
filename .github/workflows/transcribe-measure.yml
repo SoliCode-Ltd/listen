@@ -10,6 +10,7 @@ name: Transcribe measure
 # The branch must be deployed to staging first ("Server deploy": inspect, then deploy).
 # A push of this file on the transcription branch runs it with no options (a run by
 # hand needs the file on main first); it waits for any deploy to staging to finish.
+# Runs: 16 Nov 2026 (first measurement), 16 Nov 2026 (again, with the reader fixed).
 
 on:
   push:
