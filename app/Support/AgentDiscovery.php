@@ -95,12 +95,12 @@ class AgentDiscovery
             ],
             'entries' => [
                 $entry('api', 'text-to-speech', 'Listen text to speech API', 'application/vnd.oai.openapi+json', url('/v1/openapi.json'),
-                    'Arabic and English text to speech over HTTP: voices, Arabic dialects, English accents, emotions, styles and two-voice dialogue. Needs an API key from a Listen account.',
-                    ['turn Arabic text into speech in the Egyptian dialect', 'make an English voiceover with a British accent', 'list Arabic voices and dialects', 'generate a two-voice dialogue as audio']),
+                    'Arabic and English text to speech over HTTP: voices, Arabic dialects, English accents, emotions, styles and two-voice dialogue; and speech to text with who said what, as text, subtitles or a Word file. Needs an API key from a Listen account.',
+                    ['turn Arabic text into speech in the Egyptian dialect', 'make an English voiceover with a British accent', 'list Arabic voices and dialects', 'generate a two-voice dialogue as audio', 'transcribe an Arabic podcast episode with its speakers']),
                 ...(self::mcpAvailable() ? [
                     $entry('mcp', 'listen', 'Listen MCP server', 'application/mcp-server-card+json', url('/mcp/server-card'),
-                        'An MCP server for AI apps: list voices and dialects, make Arabic or English speech and get a link to play it. Sign in with Listen, or use a Listen API key.',
-                        ['make an Arabic voiceover from this script', 'read this text aloud in the Saudi dialect', 'how many Listen credits do I have left']),
+                        'An MCP server for AI apps: list voices and dialects, make Arabic or English speech and get a link to play it, and turn a recording into text. Sign in with Listen, or use a Listen API key.',
+                        ['make an Arabic voiceover from this script', 'read this text aloud in the Saudi dialect', 'how many Listen credits do I have left', 'transcribe this recording and give me subtitles']),
                 ] : []),
                 $entry('skill', self::SKILL, 'Listen text to speech skill', 'text/markdown', url('/.well-known/agent-skills/'.self::SKILL.'/SKILL.md'),
                     self::skillDescription(),
@@ -284,6 +284,20 @@ Up to {$async} characters: make it in the background.
 
 For a longer text, split it at paragraph ends and join the files.
 
+## Speech to text
+
+On plans that include it (the key needs the `speech_to_text` permission), a recording becomes text with who said what. It uses the plan's speech to text minutes, every second of the audio, not credits; `GET /v1/user/subscription` shows them under `speech_to_text`.
+
+```bash
+curl -s -X POST {$base}/transcriptions \
+  -H "X-Listen-Api-Key: \$LISTEN_API_KEY" \
+  -F "file=@episode.mp3" -F "language_code=ar"
+```
+
+1. Send the file as `file` (multipart), or a link to it as JSON `{"url": "https://..."}`. `language_code` is `auto` by default. It answers at once (202) with a `transcription_id`.
+2. Poll `GET /v1/transcriptions/{transcription_id}` every few seconds until `status` is `completed` (then read `text`, `speakers`, `paragraphs` and `sentences` with their times) or `failed` (nothing used).
+3. Download it with `GET /v1/transcriptions/{transcription_id}/export?format=srt` (`txt`, `srt`, `vtt` or `docx`); add `translate_to=en` for another language.
+
 ## Dialogue
 
 On plans that include it, up to {$dialogue} characters: start each line with a speaker's name and a colon, and give each speaker a voice.
@@ -297,7 +311,7 @@ On plans that include it, up to {$dialogue} characters: start each line with a s
 Errors are JSON: `{"error": {"type": "...", "code": "...", "message": "...", "param": null, "request_id": "..."}}`.
 
 - 401: the key is missing, wrong or revoked.
-- 402: not enough credits, or the plan's monthly request limit is reached. Tell the person; they can upgrade or wait for the next period.
+- 402: not enough credits, or the plan's monthly request limit is reached (for speech to text: `minutes_exceeded`). Tell the person; they can upgrade or wait for the next period.
 - 403 `feature_not_in_plan`: the option needs another plan, and the message names the plans that include it. Leave the option out or tell the person.
 - 422: a field is not valid; `param` names it.
 - 429: too many requests or background jobs at once. Wait as long as `Retry-After` says, then try again.
