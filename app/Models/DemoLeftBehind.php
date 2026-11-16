@@ -18,6 +18,7 @@ class DemoLeftBehind extends Model
         'demo_chars',
         'design_used',
         'free_dub_used',
+        'free_stt_used',
         'free_call_seconds',
         'deleted_by',
     ];
@@ -27,6 +28,7 @@ class DemoLeftBehind extends Model
         'demo_chars' => 'integer',
         'design_used' => 'boolean',
         'free_dub_used' => 'boolean',
+        'free_stt_used' => 'boolean',
         'free_call_seconds' => 'integer',
     ];
 

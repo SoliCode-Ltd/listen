@@ -52,6 +52,8 @@ use App\Support\SpeechText;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VersionedAsset;
+use App\Support\Transcription\TranscriptionAccess;
+use App\Support\Transcription\TranscriptionPresenter;
 use App\Support\VideoDubbing;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceDesign;
@@ -737,6 +739,9 @@ class HomeController extends Controller
             // A Voice agent: a live call with a sample business's agent, from the free test seconds
             // (App\Support\Agents\DemoAgent).
             'demoAgent' => DemoAgent::openTo($member) ? DemoAgent::studio($member, app()->getLocale()) : null,
+            // Speech to text, once it is public: the free try, one for each person (App\Support\Transcription\TranscriptionAccess).
+            'transcribe' => rescue(fn () => TranscriptionAccess::openTo($member)
+                ? TranscriptionPresenter::account($member, app()->getLocale() === 'ar') : null, null, false),
         ]);
 
         return $this->attachDemoDeviceCookie($request, $response);

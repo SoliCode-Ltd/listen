@@ -177,6 +177,8 @@ class TranscriptionSafetyTest extends TestCase
 
     public function test_unfinished_uploads_bytes_a_day_and_the_disk_have_limits(): void
     {
+        // At midday, so the minutes it moves on never take it into the next day's count.
+        $this->travelTo(now()->setTime(12, 0));
         $user = $this->member(60);
         $this->actingAs($user);
         $start = fn (int $size = 4000) => $this->postJson(route('transcribe.upload.start'), ['name' => 'talk.mp3', 'size' => $size, 'seconds' => 3]);

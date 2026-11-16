@@ -9,8 +9,9 @@
  *   figures                1rem
  *   main action            .95rem on a 44px button     other buttons .88rem
  *
- * Where the demo shows a part of the studio (the voice picker, the tags guide, Voice Design),
- * it takes the size the studio gives that part on a phone, so the two read the same. The
+ * Where the demo shows a part of the studio (the voice picker, the tags guide, Voice Design,
+ * speech to text), it takes the size the studio gives that part on a phone, so the two read
+ * the same. The
  * agent pane is inside .ag, so agents-phone.css (loaded with it) sizes its buttons and notes;
  * the demo's own agent parts are below. Text fields keep their own sizes (16px, so phones do
  * not zoom into them). Loaded last on the demo, and every rule starts at the demo's own
@@ -22,8 +23,7 @@
   .studio-hero p { font-size: .9rem; line-height: 1.6; }
   .studio-hero .studio-badge { font-size: .8rem; }
 
-  /* The switch between text to speech, Voice Design and the voice agent: the studio's card titles. */
-  .studio-workspace .studio-mode-text strong { font-size: .92rem; line-height: 1.4; }
+  /* The tabs above (css/studio-modes.css) size themselves on a phone. */
 
   /* ---------- Text to speech: as in the studio ---------- */
   .studio-workspace .vs-pane-title,
@@ -53,6 +53,21 @@
   .studio-workspace .vd-tips-pop strong { font-size: .88rem; }
   .studio-workspace .vd-actions .btn-primary { min-height: 44px; font-size: .95rem; font-weight: 700; }
   .studio-workspace .vd-actions .btn-primary span { font-size: inherit; }
+
+  /* ---------- Speech to text: as in the studio (css/studio-phone.css) ---------- */
+  .tr-embed .tr-section h2,
+  .tr-embed .tr-section .tr-embed-title { font-size: 1.15rem; line-height: 1.35; }
+  .tr-embed .dub-section-lead { font-size: .9rem; line-height: 1.6; }
+  .tr-embed .dub-rule-title { font-size: .95rem; }
+  .tr-embed .dub-rule p { font-size: .86rem; line-height: 1.6; }
+  .tr-embed .btn { font-size: .88rem; }
+  .tr-embed .dub-go { height: 44px; min-height: 44px; font-size: .95rem; font-weight: 700; }
+  .tr-embed .dub-go span { font-size: inherit; }
+  .tr-embed .dub-studio .dub-drop-art { width: 52px; height: 52px; border-radius: 15px; margin-bottom: .55rem; }
+  .tr-embed .dub-studio .dub-drop-art svg { width: 28px; height: 28px; }
+  .tr-embed .dub-drop-title { font-size: 1.05rem; font-weight: 700; }
+  .tr-embed .dub-drop-or { font-size: .88rem; }
+  .tr-embed .dub-drop-limits span { font-size: .74rem; padding: .3rem .6rem; }
 
   /* ---------- The voice agent: on the Agents pages' scale ---------- */
   .demo-agent .demo-agent-head h2 { font-size: 1.15rem; line-height: 1.35; }

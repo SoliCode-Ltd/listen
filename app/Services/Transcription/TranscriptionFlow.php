@@ -7,9 +7,12 @@ use App\Jobs\TranscribeJob;
 use App\Models\Plan;
 use App\Models\Transcription;
 use App\Models\User;
+use App\Services\DemoFraudService;
+use App\Support\EmailVerification;
 use App\Support\Transcription\Minutes;
 use App\Support\Transcription\TranscriptionAccess;
 use App\Support\Transcription\TranscriptionSettings;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -40,8 +43,9 @@ final class TranscriptionFlow
      *
      * @throws TranscriptionRefused
      */
-    public function start(User $user, string $path, array $meta): Transcription
+    public function start(User $user, string $path, array $meta, ?Request $request = null): Transcription
     {
+        $request ??= request();
         $arabic = app()->getLocale() === 'ar';
         if (! TranscriptionAccess::openTo($user)) {
             throw new TranscriptionRefused('not_open', __('transcribe.refused.not_open'), 403);
@@ -64,7 +68,7 @@ final class TranscriptionFlow
         $charge = TranscriptionAccess::chargeFor($seconds);
         $plan = TranscriptionAccess::planOf($user);
         $source = (string) ($meta['source'] ?? 'upload');
-        $this->checks($user, $plan, $charge, $source, $arabic);
+        $this->checks($user, $plan, $charge, $source, $arabic, $request);
 
         $language = strtolower(trim((string) ($meta['language'] ?? 'auto'))) ?: 'auto';
         if ($language !== 'auto' && ! array_key_exists($language, TranscriptionSettings::LANGUAGES)) {
@@ -73,9 +77,9 @@ final class TranscriptionFlow
 
         // Every rule checked again under a lock on the member, so files sent at the same moment
         // cannot together take the last minutes, a second free try, or more files at once.
-        $transcription = DB::transaction(function () use ($user, $plan, $charge, $source, $seconds, $language, $meta, $arabic): Transcription {
+        $transcription = DB::transaction(function () use ($user, $plan, $charge, $source, $seconds, $language, $meta, $arabic, $request): Transcription {
             User::query()->whereKey($user->id)->lockForUpdate()->first();
-            $free = $this->checks($user, $plan, $charge, $source, $arabic);
+            $free = $this->checks($user, $plan, $charge, $source, $arabic, $request);
             $balance = TranscriptionAccess::balance($user);
             if (! $free) {
                 self::assertFits($balance, $plan, $charge, $arabic);
@@ -92,6 +96,8 @@ final class TranscriptionFlow
                 'status' => Transcription::QUEUED,
                 'charged_seconds' => $charge,
                 'is_free' => $free,
+                // Where a free try was asked from, so a new account there gets no second one.
+                ...($free ? TranscriptionAccess::freeTryMarks($request) : []),
                 'period_ym' => $balance['period'],
                 'priority' => ! $free && (bool) ($plan?->transcription_priority ?? false),
                 'api_key_id' => $meta['api_key_id'] ?? null,
@@ -133,15 +139,16 @@ final class TranscriptionFlow
      *
      * @throws TranscriptionRefused
      */
-    public function check(User $user, float $seconds, string $source = 'upload'): array
+    public function check(User $user, float $seconds, string $source = 'upload', ?Request $request = null): array
     {
+        $request ??= request();
         $arabic = app()->getLocale() === 'ar';
         if (! TranscriptionAccess::openTo($user)) {
             throw new TranscriptionRefused('not_open', __('transcribe.refused.not_open'), 403);
         }
         $charge = TranscriptionAccess::chargeFor($seconds);
         $plan = TranscriptionAccess::planOf($user);
-        $free = $this->checks($user, $plan, $charge, $source, $arabic);
+        $free = $this->checks($user, $plan, $charge, $source, $arabic, $request);
         $balance = TranscriptionAccess::balance($user);
         if (! $free) {
             self::assertFits($balance, $plan, $charge, $arabic);
@@ -157,9 +164,9 @@ final class TranscriptionFlow
      *
      * @throws TranscriptionRefused
      */
-    private function checks(User $user, ?Plan $plan, int $charge, string $source, bool $arabic): bool
+    private function checks(User $user, ?Plan $plan, int $charge, string $source, bool $arabic, Request $request): bool
     {
-        $free = $this->checkPlan($user, $plan, $charge, $source, $arabic);
+        $free = $this->checkPlan($user, $plan, $charge, $source, $arabic, $request);
         $working = TranscriptionAccess::working($user);
         if ($working >= TranscriptionAccess::concurrentJobs($plan)) {
             throw new TranscriptionRefused('busy', trans_choice('transcribe.refused.busy', $working, ['n' => $working]), 429);
@@ -196,7 +203,7 @@ final class TranscriptionFlow
      *
      * @throws TranscriptionRefused
      */
-    private function checkPlan(User $user, ?Plan $plan, int $charge, string $source, bool $arabic): bool
+    private function checkPlan(User $user, ?Plan $plan, int $charge, string $source, bool $arabic, Request $request): bool
     {
         if (TranscriptionAccess::planIncludes($plan)) {
             $max = TranscriptionAccess::maxFileMinutes($plan) * 60;
@@ -217,7 +224,15 @@ final class TranscriptionFlow
         if (in_array($source, ['api', 'mcp'], true) || TranscriptionSettings::freeTrySeconds() <= 0) {
             throw new TranscriptionRefused('not_in_plan', __($next ? 'transcribe.refused.not_in_plan' : 'transcribe.refused.not_in_any_plan', ['plan' => $name]), 403, $upgrade);
         }
-        if (! TranscriptionAccess::freeTryLeft($user)) {
+        // One free try for each person, as the demo counts them: from a confirmed email, not an
+        // automated browser, nor one an admin blocked (App\Services\DemoFraudService).
+        if (EmailVerification::requiredForFreeUse($user)) {
+            throw new TranscriptionRefused('verify_email', __('transcribe.refused.verify_email', ['email' => (string) $user->email]), 403);
+        }
+        if (rescue(fn () => app(DemoFraudService::class)->demoBlockReason($request), null, false) !== null) {
+            throw new TranscriptionRefused('free_blocked', __('transcribe.refused.free_blocked'), 403, $upgrade);
+        }
+        if (! TranscriptionAccess::freeTryLeft($user, $request)) {
             if (TranscriptionAccess::freeDayFull()) {
                 throw new TranscriptionRefused('free_day_full', __('transcribe.refused.free_day_full'), 429, $upgrade);
             }

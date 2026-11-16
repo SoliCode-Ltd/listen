@@ -1,11 +1,11 @@
 {{--
-  Text to speech, Voice Design, Dub a video or a Voice agent, above the studio in the demo:
-  whichever are open ($design, $dub, $agent). It sets data-studio on the closest
+  Text to speech, Voice Design, Speech to text, Dub a video or a Voice agent, above the studio in
+  the demo: whichever are open ($design, $stt, $dub, $agent). It sets data-studio on the closest
   [data-studio-host]; what belongs to modes carries data-studio-pane with their names (CSS in
-  css/studio-modes.css, behaviour in js/studio-modes.js). #voice-design, #dub or #voice-agent in
-  the address opens that side.
+  css/studio-modes.css, behaviour in js/studio-modes.js). #voice-design, #speech-to-text, #dub or
+  #voice-agent in the address opens that side.
 --}}
-@props(['design' => false, 'dub' => false, 'agent' => false])
+@props(['design' => false, 'dub' => false, 'stt' => false, 'agent' => false])
 <div class="studio-modes" role="tablist" aria-label="{{ __('ui.dub.modes_label') }}" data-studio-switch>
   <button type="button" role="tab" class="studio-mode" data-studio-tab="tts" aria-selected="true">
     <span class="studio-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><path d="M17 14v6M20 15.5v3M14 16v2"/></svg></span>
@@ -20,6 +20,15 @@
     <span class="studio-mode-text">
       <strong>{{ __('voice_design.demo_tab') }}</strong>
       <small>{{ __('voice_design.demo_tab_hint') }}</small>
+    </span>
+  </button>
+  @endif
+  @if($stt)
+  <button type="button" role="tab" class="studio-mode" data-studio-tab="stt" aria-selected="false">
+    <span class="studio-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 10v4M9 7v10M13 9v6"/><path d="M16.5 8.5h4M16.5 12h4M16.5 15.5h2.5"/></svg></span>
+    <span class="studio-mode-text">
+      <strong>{{ __('transcribe.demo.tab') }}</strong>
+      <small>{{ __('transcribe.demo.tab_hint') }}</small>
     </span>
   </button>
   @endif

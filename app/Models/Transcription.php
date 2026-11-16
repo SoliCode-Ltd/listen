@@ -43,7 +43,7 @@ class Transcription extends Model
 
     protected $fillable = [
         'user_id', 'code', 'title', 'source', 'source_url', 'audio_path', 'audio_deleted_at', 'seconds', 'language_requested', 'language', 'dialect',
-        'status', 'parts', 'parts_done', 'work', 'paragraphs', 'segments', 'speaker_names', 'translations', 'charged_seconds', 'is_free', 'period_ym',
+        'status', 'parts', 'parts_done', 'work', 'paragraphs', 'segments', 'speaker_names', 'translations', 'charged_seconds', 'is_free', 'browser', 'device', 'period_ym',
         'priority', 'api_key_id', 'requests', 'usage', 'cost_usd', 'model', 'notes', 'error_code', 'error', 'started_at', 'finished_at',
     ];
 

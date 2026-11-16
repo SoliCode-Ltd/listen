@@ -14,7 +14,8 @@
 
   Driven by js/transcribe.js. $account: TranscriptionPresenter::account().
 --}}
-@props(['account'])
+{{-- $embed: inside the demo (demo.blade.php), as the Speech to text tab's pane, not a dashboard section. --}}
+@props(['account', 'embed' => false])
 @php
   $trAr = app()->getLocale() === 'ar';
   // Every language, by its name in the page's language; found by either name or its code.
@@ -59,9 +60,17 @@
       'csrf' => csrf_token(),
   ];
 @endphp
+@if($embed)
+<div class="tr-embed" data-studio-pane="stt">
+@else
 <section id="transcribeSection" class="dashboard-panel" data-dashboard-section>
+@endif
   <article class="page-card reveal dub-section tr-section" data-tr-root>
-    <h1><span class="grad-text">{{ __('transcribe.page.title') }}</span></h1>
+    @if($embed)
+      <h2 class="tr-embed-title">{{ __('transcribe.page.title') }}</h2>
+    @else
+      <h1><span class="grad-text">{{ __('transcribe.page.title') }}</span></h1>
+    @endif
     <p class="dub-section-lead">{{ __('transcribe.page.lead') }}</p>
 
     @if($account['included'])
@@ -394,4 +403,8 @@
 
     <script type="application/json" data-tr-config>@json($trConfig, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG)</script>
   </article>
+@if($embed)
+</div>
+@else
 </section>
+@endif

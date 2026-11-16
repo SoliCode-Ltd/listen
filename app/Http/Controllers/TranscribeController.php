@@ -56,7 +56,7 @@ class TranscribeController extends Controller
         $user = $this->member($request);
         $data = $request->validate(['seconds' => ['required', 'numeric', 'min:0.1', 'max:86400'], 'source' => ['nullable', 'string', Rule::in(['upload', 'record', 'url'])]]);
 
-        return $this->guard(fn () => response()->json($this->flow->check($user, (float) $data['seconds'], (string) ($data['source'] ?? 'upload'))));
+        return $this->guard(fn () => response()->json($this->flow->check($user, (float) $data['seconds'], (string) ($data['source'] ?? 'upload'), $request)));
     }
 
     public function startUpload(Request $request): JsonResponse
@@ -78,7 +78,7 @@ class TranscribeController extends Controller
             // the site's day and the month's minutes, for the length the page measured (one second when
             // the browser could not tell: the length is measured again when it starts).
             $seconds = (float) $request->input('seconds', 0);
-            $this->flow->check($user, $seconds > 0 ? $seconds : 1.0, (string) ($request->input('source') ?: 'upload'));
+            $this->flow->check($user, $seconds > 0 ? $seconds : 1.0, (string) ($request->input('source') ?: 'upload'), $request);
             $size = (int) $request->input('size');
             $this->roomForUpload($user, $size);
 
@@ -185,7 +185,7 @@ class TranscribeController extends Controller
                 $meta = ['title' => (string) ($data['title'] ?? '') ?: $name, 'file_name' => $name, 'source' => 'url', 'source_url' => (string) $data['url']];
             }
             try {
-                $t = $this->flow->start($user, $path, $meta + ['language' => $language]);
+                $t = $this->flow->start($user, $path, $meta + ['language' => $language], $request);
             } finally {
                 @unlink($path);
             }

@@ -1542,11 +1542,18 @@
     });
   }
   $('[data-tr-studio-send]').addEventListener('click', function () {
-    var box = document.getElementById('contentTextarea');
+    // The dashboard's studio, or the demo's own text box beside it (its Text to speech tab).
+    var demoTab = document.querySelector('[data-studio-tab="tts"]');
+    var box = document.getElementById('contentTextarea') || (demoTab ? document.getElementById('text') : null);
     if (!box || !current) return;
     box.value = (shown.paragraphs || []).map(function (p) { return p.text; }).join('\n\n');
     box.dispatchEvent(new Event('input', { bubbles: true }));
-    window.location.hash = '#generateVoiceSection';
+    if (demoTab) {
+      demoTab.click();
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      window.location.hash = '#generateVoiceSection';
+    }
     setTimeout(function () { box.focus(); }, 300);
   });
   $('[data-tr-delete]').addEventListener('click', function () { if (current) removeItem(current); });

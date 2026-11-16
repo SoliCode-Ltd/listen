@@ -7,6 +7,7 @@ use App\Models\DemoLeftBehind;
 use App\Models\DemoLeftBehindSignal;
 use App\Models\DemoVoiceGeneration;
 use App\Models\MemberDevice;
+use App\Models\Transcription;
 use App\Models\User;
 use App\Models\VideoDub;
 use App\Support\Agents\HouseAgent;
@@ -20,7 +21,8 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Who counts as one person for everything free: the text demo, the demo's
- * Voice Design try, the free video dub and the free voice-agent call time.
+ * Voice Design try, the free video dub, the free voice-agent call time and
+ * speech to text's free try.
  * Each of them asks here, so none is a way round the others.
  *
  * One person is the member and every account linked to them:
@@ -119,6 +121,12 @@ final class DemoSamePerson
         return $this->leftBehind($user, $request)->contains('free_dub_used', true);
     }
 
+    /** Whether one of this person's deleted accounts had had speech to text's free try. */
+    public function leftBehindFreeStt(User $user, ?Request $request = null): bool
+    {
+        return $this->leftBehind($user, $request)->contains('free_stt_used', true);
+    }
+
     /**
      * The demo fingerprint of a request: the one the demo page sends, else the
      * browser cookie, else the network address and browser together.
@@ -164,7 +172,9 @@ final class DemoSamePerson
         $dub = rescue(fn () => VideoDub::query()->where('user_id', $userId)->where('is_free', true)
             ->whereNotIn('status', VideoDub::GIVEN_BACK)->exists(), false, false);
         $seconds = rescue(fn () => $this->ownFreeCallSeconds($userId), 0, false);
-        if ($chars <= 0 && ! $design && ! $dub && $seconds <= 0) {
+        $stt = rescue(fn () => Transcription::withTrashed()->where('user_id', $userId)->where('is_free', true)
+            ->where('status', '!=', Transcription::FAILED)->exists(), false, false);
+        if ($chars <= 0 && ! $design && ! $dub && ! $stt && $seconds <= 0) {
             return null;
         }
 
@@ -193,13 +203,15 @@ final class DemoSamePerson
             $add(DemoLeftBehindSignal::FINGERPRINT, (string) $fingerprint);
         }
 
-        return DB::transaction(function () use ($userId, $made, $chars, $design, $dub, $seconds, $admin, $signals): DemoLeftBehind {
+        return DB::transaction(function () use ($userId, $made, $chars, $design, $dub, $stt, $seconds, $admin, $signals): DemoLeftBehind {
             $left = DemoLeftBehind::query()->create([
                 'former_user_id' => $userId,
                 'account_created_at' => $made,
                 'demo_chars' => $chars,
                 'design_used' => $design,
                 'free_dub_used' => $dub,
+                // Before the migration that adds it, the column is not there to fill.
+                ...(Schema::hasColumn('demo_left_behind', 'free_stt_used') ? ['free_stt_used' => $stt] : []),
                 'free_call_seconds' => $seconds,
                 'deleted_by' => $admin?->id,
             ]);

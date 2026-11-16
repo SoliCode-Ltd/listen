@@ -1,12 +1,16 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.demo_title'), 'page' => 'demo'])
   <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
   <link rel="stylesheet" href="{{ asset('css/demo-studio.css') }}?v={{ filemtime(public_path('css/demo-studio.css')) }}">
-  @php $demoModes = ($dubStudio ?? null) || ($voiceDesign ?? null) || ($demoAgent ?? null); @endphp
+  @php $demoModes = ($dubStudio ?? null) || ($voiceDesign ?? null) || ($transcribe ?? null) || ($demoAgent ?? null); @endphp
   @if($demoModes)
     <link rel="stylesheet" href="{{ asset('css/studio-modes.css') }}?v={{ filemtime(public_path('css/studio-modes.css')) }}">
   @endif
-  @if($dubStudio ?? null)
+  {{-- Speech to text is built from the dubbing studio's parts (css/dub-studio.css). --}}
+  @if(($dubStudio ?? null) || ($transcribe ?? null))
     <link rel="stylesheet" href="{{ asset('css/dub-studio.css') }}?v={{ filemtime(public_path('css/dub-studio.css')) }}">
+  @endif
+  @if($transcribe ?? null)
+    <link rel="stylesheet" href="{{ asset('css/transcribe.css') }}?v={{ filemtime(public_path('css/transcribe.css')) }}">
   @endif
   @if($voiceDesign ?? null)
     <link rel="stylesheet" href="{{ asset('css/voice-design.css') }}?v={{ filemtime(public_path('css/voice-design.css')) }}">
@@ -62,7 +66,7 @@
     <section class="studio-workspace" @if($demoModes) data-studio-host data-studio="tts" @endif>
       {{-- Text to speech, Voice Design or Dub a video: a script, a voice of your own words, or a video. --}}
       @if($demoModes)
-        <x-dub.mode-switch :design="(bool) ($voiceDesign ?? null)" :dub="(bool) ($dubStudio ?? null)" :agent="(bool) ($demoAgent ?? null)" />
+        <x-dub.mode-switch :design="(bool) ($voiceDesign ?? null)" :stt="(bool) ($transcribe ?? null)" :dub="(bool) ($dubStudio ?? null)" :agent="(bool) ($demoAgent ?? null)" />
       @endif
       {{-- An email sign-up confirms its address first: what to do, with a button for a new link. --}}
       @include('components.verify-email-notice', ['verifyEmail' => $verifyEmail ?? null, 'verifyEmailTitle' => __('ui.verify_email.notice_title')])
@@ -302,6 +306,12 @@
         <div class="demo-voice-design" data-studio-pane="design">
           <x-voice-design.studio :studio="$voiceDesign" />
         </div>
+      @endif
+
+      {{-- Speech to text: the studio's own, with its free try, one for each person
+           (components/transcribe/dashboard-section.blade.php; App\Support\Transcription\TranscriptionAccess). --}}
+      @if($transcribe ?? null)
+        <x-transcribe.dashboard-section :account="$transcribe" :embed="true" />
       @endif
 
       {{-- The free dub: the same studio around a video (components/dub/studio.blade.php). --}}
@@ -1573,6 +1583,9 @@
   @endif
   @if($dubStudio ?? null)
     <script src="{{ asset('js/dub-studio.js') }}?v={{ filemtime(public_path('js/dub-studio.js')) }}" defer></script>
+  @endif
+  @if($transcribe ?? null)
+    <script src="{{ asset('js/transcribe.js') }}?v={{ filemtime(public_path('js/transcribe.js')) }}" defer></script>
   @endif
   @if(($voiceDesign ?? null) || ($demoAgent ?? null))
     @include('components.orb-script')
