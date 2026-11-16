@@ -1,6 +1,7 @@
 @include('components.page-head', ['pageTitle' => __('agents.title'), 'page' => 'agents'])
   <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
   <link rel="stylesheet" href="{{ asset('css/usage.css') }}?v={{ filemtime(public_path('css/usage.css')) }}">
+  <link rel="stylesheet" href="{{ asset('css/agents-phone.css') }}?v={{ filemtime(public_path('css/agents-phone.css')) }}">
 </head>
 <body>
   @include('components.header')

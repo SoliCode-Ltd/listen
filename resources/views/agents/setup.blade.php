@@ -4,6 +4,7 @@
   <link rel="stylesheet" href="{{ asset('css/agents.css') }}?v={{ filemtime(public_path('css/agents.css')) }}">
   {{-- From one step to a step that needs the page drawn again (publishing an agent made here): a cross-fade. --}}
   <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>
+  <link rel="stylesheet" href="{{ asset('css/agents-phone.css') }}?v={{ filemtime(public_path('css/agents-phone.css')) }}">
 </head>
 <body>
   @include('components.header')
