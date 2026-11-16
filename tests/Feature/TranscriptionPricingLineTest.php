@@ -42,7 +42,7 @@ class TranscriptionPricingLineTest extends TestCase
         $plan = $this->plan(250);
 
         $this->assertSame('250 minutes', self::line(PlanPricingLines::forPlan($plan, 'en'), 'Speech to text'));
-        $this->assertSame('250 دقيقة', self::line(PlanPricingLines::forPlan($plan, 'ar'), 'تحويل الكلام إلى نص'));
+        $this->assertSame('250 دقيقة', self::line(PlanPricingLines::forPlan($plan, 'ar'), 'تحويل الصوت إلى نص'));
         $this->assertSame('250 minutes', self::line(PlanPricingLines::forComparison($plan, 'en'), 'Speech to text'));
 
         // A change on the plan shows at once.
@@ -74,7 +74,7 @@ class TranscriptionPricingLineTest extends TestCase
 
         $en = PlanPricingLines::forPlan($plan, 'en');
         $this->assertSame(['Voice quality', 'Speech to text', 'Developer API'], array_column($en, 'label'), 'before the API line');
-        $this->assertSame(['جودة الصوت', 'تحويل الكلام إلى نص'], array_column(PlanPricingLines::forPlan($plan, 'ar'), 'label'), 'at the end');
+        $this->assertSame(['جودة الصوت', 'تحويل الصوت إلى نص'], array_column(PlanPricingLines::forPlan($plan, 'ar'), 'label'), 'at the end');
 
         // Text that already names it is left as written.
         $plan->forceFill(['features_en' => [['label' => 'Speech to text', 'value' => '2 hours', 'icon' => 'type']]])->save();

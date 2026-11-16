@@ -374,7 +374,7 @@ try {
             }
             $check($status === 200 && $section !== '', "{$label}, {$locale}: the section is there ({$status})");
             $check(! preg_match('/transcribe\.(page|js|refused|failed)\./', $html), "{$label}, {$locale}: no text shown as its key");
-            $nav = $locale === 'ar' ? 'تحويل الكلام إلى نص' : 'Speech to text';
+            $nav = $locale === 'ar' ? 'تحويل الصوت إلى نص' : 'Speech to text';
             $check(str_contains($html, $nav), "{$label}, {$locale}: the menu says \"{$nav}\"");
             $words = preg_split('/\s+/u', mb_strtolower($text)) ?: [];
             $twice = [];

@@ -418,7 +418,7 @@ return [
             'label_voice_cloning' => 'استنساخ الأصوات',
             'label_video_dubbing' => 'دبلجة الفيديو',
             'label_voice_agents' => 'الوكلاء الصوتيون',
-            'label_speech_to_text' => 'تحويل الكلام إلى نص',
+            'label_speech_to_text' => 'تحويل الصوت إلى نص',
             'label_voice_design' => 'تصميم الأصوات',
             'label_download_formats' => 'صيغ التحميل',
             'label_demo' => 'الصوت المتميز للتجربة',

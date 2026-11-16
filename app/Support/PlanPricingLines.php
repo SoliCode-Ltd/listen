@@ -215,7 +215,7 @@ final class PlanPricingLines
     }
 
     /** Words that name speech to text in a hand-written line, in English or Arabic. */
-    private const SPEECH_TO_TEXT_WORDS = '/speech[ -]to[ -]text|transcri|تحويل الكلام إلى نص|تفريغ/iu';
+    private const SPEECH_TO_TEXT_WORDS = '/speech[ -]to[ -]text|transcri|تحويل (الكلام|الصوت) إلى نص|تفريغ/iu';
 
     /**
      * A hand-written line can carry a value written from the plan's own settings: {agents} becomes
@@ -258,7 +258,7 @@ final class PlanPricingLines
             StudioFacts::dubbing() ? null : '\bdub|دبلج',
             VoiceDesign::audience() === VoiceDesign::AUDIENCE_EVERYONE ? null : 'voice design|design your own voices|تصميم (ال)?(صوت|أصوات)|صمّ?م أصواتك',
             AgentAccess::audience() === AgentAccess::AUDIENCE_EVERYONE ? null : 'voice agents?|الوكلاء الصوتي|وكلاء صوتي|وكيل صوتي',
-            TranscriptionSettings::audience() === TranscriptionSettings::AUDIENCE_EVERYONE ? null : 'speech[ -]to[ -]text|transcri|تحويل الكلام إلى نص',
+            TranscriptionSettings::audience() === TranscriptionSettings::AUDIENCE_EVERYONE ? null : 'speech[ -]to[ -]text|transcri|تحويل (الكلام|الصوت) إلى نص',
         ]);
         if ($closed === []) {
             return $lines;
