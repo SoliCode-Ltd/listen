@@ -78,6 +78,9 @@ final class Transcriber
     /** The audio timed in one request: about this many seconds, cut on a pause between the two limits. */
     public const TIMING_WINDOW = 30.0;
 
+    /** Seconds either side of a cut heard again to settle a sentence two windows disagree about. */
+    private const SETTLE_AROUND = 8.0;
+
     private const TIMING_WINDOW_MIN = 18.0;
 
     private const TIMING_WINDOW_MAX = 42.0;
@@ -651,11 +654,127 @@ final class Transcriber
                 }
             }
         }
+        // Two windows that disagree about a sentence beginning near the cut between them (the earlier
+        // one heard only its first moment, the later one may hear it already under way): a short window
+        // around the cut, hearing the sentence whole, is asked about it alone and settles it.
+        $disputed = self::disputedAtCuts($claims, $windows);
+        $settled = [];
+        if ($disputed !== []) {
+            $asks = [];
+            $opens = [];
+            foreach ($disputed as $i => $cut) {
+                $start = max($from, $cut - self::SETTLE_AROUND);
+                $heard = min($to, $cut + self::SETTLE_AROUND) - $start;
+                $lines = [];
+                foreach ([$i - 1, $i, $i + 1] as $k) {
+                    if (isset($sentences[$k])) {
+                        $lines[] = ($k + 1).'. '.trim((string) $sentences[$k]['text']);
+                    }
+                }
+                $audio = $tmp.'/settle-'.$i.'.mp3';
+                try {
+                    $this->cut($ffmpeg, $clean, $start, $heard, $audio);
+                } catch (\Throwable) {
+                    continue;
+                }
+                $prompt = 'This audio is '.number_format($heard, 1, '.', '').' seconds long, cut from a longer recording. '
+                    ."These are sentences of its transcript from around this point, numbered, in the order they are spoken:\n\n"
+                    .implode("\n", $lines)
+                    ."\n\nFor each of these sentences whose first word is spoken in this audio, give that time in seconds from the start of this audio, with one decimal. "
+                    .'Leave out a sentence already under way when the audio opens, and one not heard beginning. Music, noise or silence before a sentence is not part of it.';
+                $asks[$i] = [['inline_data' => ['mime_type' => 'audio/mpeg', 'data' => base64_encode((string) file_get_contents($audio))]], ['text' => $prompt]];
+                $opens[$i] = [$start, $heard];
+                @unlink($audio);
+            }
+            foreach ($asks === [] ? [] : $this->askModelMany($asks, 'low', self::alignSchema()) as $i => $answer) {
+                if ($answer === null) {
+                    continue;
+                }
+                $run['requests']++;
+                foreach ($answer['usage'] as $key => $tokens) {
+                    $run['usage'][$key] = ($run['usage'][$key] ?? 0) + $tokens;
+                }
+                [$start, $heard] = $opens[$i];
+                foreach ((array) ($answer['data']['sentences'] ?? []) as $row) {
+                    $n = is_array($row) && is_numeric($row['n'] ?? null) ? (int) $row['n'] - 1 : -1;
+                    $at = is_array($row) && is_numeric($row['start'] ?? null) ? (float) $row['start'] : -1.0;
+                    if ($n === (int) $i && $at >= 0 && $at <= $heard) {
+                        $settled[(int) $i] = round($start + $at, 2);
+                    }
+                }
+            }
+            $claims = self::withSettled($claims, $settled);
+        }
         $starts = self::startsFromClaims($claims, $sentences, $from, $to);
         $timed = count(array_unique(array_column($claims, 'i')));
-        $run['notes'][] = 'times: '.count($windows).' window'.(count($windows) === 1 ? '' : 's').', '.$answered.' answered, '.$timed.' of '.count($sentences).' sentences heard';
+        $run['notes'][] = 'times: '.count($windows).' window'.(count($windows) === 1 ? '' : 's').', '.$answered.' answered, '.$timed.' of '.count($sentences).' sentences heard'
+            .($disputed !== [] ? ', '.count($settled).' of '.count($disputed).' settled at a cut' : '');
 
         return $starts;
+    }
+
+    /**
+     * Sentences two neighbouring windows both time, more than half a second apart, with one of
+     * the two times within a few seconds of the cut between them: the earlier window heard only
+     * the sentence's first moment, or the later one heard it already under way.
+     *
+     * @param  array<int, array{i: int, at: float, window: int}>  $claims
+     * @param  array<int, array{0: float, 1: float}>  $windows
+     * @return array<int, float> sentence => the cut it begins near
+     */
+    public static function disputedAtCuts(array $claims, array $windows): array
+    {
+        $by = [];
+        foreach ($claims as $c) {
+            $by[(int) $c['i']][(int) $c['window']] ??= (float) $c['at'];
+        }
+        $disputed = [];
+        foreach ($by as $i => $times) {
+            foreach ($times as $w => $at) {
+                if (! isset($times[$w + 1], $windows[$w])) {
+                    continue;
+                }
+                $cut = (float) $windows[$w][1];
+                $next = $times[$w + 1];
+                if (abs($at - $next) > 0.5 && min(abs($at - $cut), abs($next - $cut)) <= 3.0) {
+                    $disputed[$i] = $cut;
+                }
+            }
+        }
+        ksort($disputed);
+
+        return $disputed;
+    }
+
+    /**
+     * The claims with each settled sentence's windows' times replaced by its settled time (kept in
+     * the earlier window's place, so the order holds).
+     *
+     * @param  array<int, array{i: int, at: float, window: int}>  $claims
+     * @param  array<int, float>  $settled
+     * @return array<int, array{i: int, at: float, window: int}>
+     */
+    public static function withSettled(array $claims, array $settled): array
+    {
+        if ($settled === []) {
+            return $claims;
+        }
+        $first = [];
+        $kept = [];
+        foreach ($claims as $c) {
+            $i = (int) $c['i'];
+            if (array_key_exists($i, $settled)) {
+                $first[$i] = min($first[$i] ?? PHP_INT_MAX, (int) $c['window']);
+
+                continue;
+            }
+            $kept[] = $c;
+        }
+        foreach ($settled as $i => $at) {
+            $kept[] = ['i' => (int) $i, 'at' => (float) $at, 'window' => $first[$i] ?? 0];
+        }
+
+        return $kept;
     }
 
     /**

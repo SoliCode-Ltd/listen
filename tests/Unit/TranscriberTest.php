@@ -424,6 +424,59 @@ class TranscriberTest extends TestCase
         $this->assertStringContainsString('times: 3 windows, 3 answered, 4 of 4 sentences heard', implode(' | ', $out['notes']));
     }
 
+    /**
+     * A new voice just after the cut between two windows (on staging: at 29.9 s, timed 28.7 s by
+     * the window that heard only its first moment): the short window around the cut is asked,
+     * and its answer is the sentence's start.
+     */
+    public function test_a_voice_beginning_just_after_a_cut_is_settled_by_a_window_around_it(): void
+    {
+        if (! AudioFormats::ffmpegPath()) {
+            $this->markTestSkipped('ffmpeg is not available.');
+        }
+        // One voice 0-29.5 s, a 0.4 s pause, the other voice 29.9-60 s.
+        $file = sys_get_temp_dir().'/transcriber-settle-'.getmypid().'.wav';
+        (new Process([AudioFormats::ffmpegPath(), '-v', 'error', '-y',
+            '-f', 'lavfi', '-i', 'sine=frequency=300:duration=29.5', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono:d=0.4',
+            '-f', 'lavfi', '-i', 'sine=frequency=500:duration=30.1',
+            '-filter_complex', '[0:a]aformat=sample_rates=44100:channel_layouts=mono[a];[2:a]aformat=sample_rates=44100:channel_layouts=mono[c];[a][1:a][c]concat=n=3:v=0:a=1',
+            $file]))->mustRun();
+        $this->fakeKeys();
+        $asked = [];
+        Http::fake(function ($request) use (&$asked) {
+            $prompt = (string) data_get($request->data(), 'contents.0.parts.1.text');
+            if (! str_contains($prompt, 'cut from a longer recording')) {
+                return $this->answer(['language' => 'en', 'speakers' => [['id' => 'A', 'voice' => 'male'], ['id' => 'B', 'voice' => 'female']], 'paragraphs' => [
+                    ['speaker' => 'A', 'text' => 'Good morning and welcome to the show. Today we talk about the city.'],
+                    ['speaker' => 'B', 'text' => 'Thank you for having me here today. It is a pleasure to be on the show.'],
+                ]]);
+            }
+            preg_match('/This audio is ([\d.]+) seconds long/', $prompt, $m);
+            $asked[] = $m[1];
+
+            return $this->answer(['sentences' => match (true) {
+                // The first window (0-29.7 s, heard to 30.7 s): the new voice 1.2 s early.
+                $m[1] === '30.7' => [['n' => 1, 'start' => 0.0], ['n' => 2, 'start' => 15.0], ['n' => 3, 'start' => 28.7]],
+                // Around the cut (21.7-37.7 s): heard whole, at 29.9 s.
+                $m[1] === '16.0' => [['n' => 3, 'start' => 8.2], ['n' => 4, 'start' => 10.0]],
+                // The second window (29.7-60 s): at 29.9 s.
+                default => [['n' => 3, 'start' => 0.2], ['n' => 4, 'start' => 15.3]],
+            }]);
+        });
+
+        try {
+            $out = app(Transcriber::class)->transcribe($file, ['language' => 'en']);
+        } finally {
+            @unlink($file);
+        }
+
+        $this->assertContains('16.0', $asked, 'the window around the cut was asked');
+        $this->assertCount(3, $asked, 'two windows, then one around the cut');
+        $this->assertSame('Thank you for having me here today.', $out['segments'][2]['text']);
+        $this->assertEqualsWithDelta(29.9, $out['segments'][2]['start'], 0.15, 'where the new voice begins, not 1.2 s before');
+        $this->assertStringContainsString('1 of 1 settled at a cut', implode(' | ', $out['notes']));
+    }
+
     /** Starts heard up to about a second off go onto the pause they belong to, together and in order; one said without a pause keeps its time. */
     public function test_starts_are_fitted_to_the_pauses_together(): void
     {
@@ -481,6 +534,37 @@ class TranscriberTest extends TestCase
 
         // Too few timed: none.
         $this->assertNull(Transcriber::startsFromClaims([['i' => 0, 'at' => 1.0, 'window' => 0]], $sentences, 0.0, 60.0));
+    }
+
+    /**
+     * Two windows more than half a second apart about a sentence beginning near their cut (on
+     * staging: a new voice at 29.9 s, timed 28.7 s by the window that heard only its first moment)
+     * are disputed; the short window around the cut settles it, in the earlier window's place.
+     */
+    public function test_a_sentence_the_windows_disagree_about_at_the_cut_is_settled(): void
+    {
+        $windows = [[0.0, 29.6], [29.6, 60.5]];
+        $claims = [
+            ['i' => 6, 'at' => 26.2, 'window' => 0], ['i' => 7, 'at' => 28.7, 'window' => 0],
+            ['i' => 7, 'at' => 29.9, 'window' => 1], ['i' => 8, 'at' => 33.4, 'window' => 1],
+            // Close enough at the cut: not disputed.
+            ['i' => 5, 'at' => 21.0, 'window' => 0], ['i' => 5, 'at' => 21.3, 'window' => 1],
+        ];
+        $this->assertSame([7 => 29.6], Transcriber::disputedAtCuts($claims, $windows));
+
+        // Far from any cut, two windows apart: not this rule's to settle.
+        $this->assertSame([], Transcriber::disputedAtCuts([['i' => 1, 'at' => 5.0, 'window' => 0], ['i' => 1, 'at' => 40.0, 'window' => 1]], $windows));
+
+        $after = Transcriber::withSettled($claims, [7 => 29.9]);
+        $sevens = array_values(array_filter($after, fn ($c) => $c['i'] === 7));
+        $this->assertSame([['i' => 7, 'at' => 29.9, 'window' => 0]], $sevens, 'one time, the settled one, in the earlier window\'s place');
+        $this->assertCount(count($claims) - 1, $after);
+        $this->assertSame($claims, Transcriber::withSettled($claims, []), 'nothing settled: the claims as they were');
+
+        $sentences = array_map(fn ($n) => ['text' => 'Sentence number '.$n.' here.'], range(0, 9));
+        $rest = array_map(fn ($i) => ['i' => $i, 'at' => [0.4, 4.1, 8.0, 12.2, 16.5, 0, 0, 0, 0, 44.0][$i], 'window' => $i < 5 ? 0 : 1], [0, 1, 2, 3, 4, 9]);
+        $starts = Transcriber::startsFromClaims(array_merge($after, $rest), $sentences, 0.0, 60.5);
+        $this->assertSame(29.9, $starts[7]);
     }
 
     /** A browser recording has no length in its header ("Duration: N/A"): it is read to its end, never taken as 0 s. */
