@@ -4,6 +4,8 @@
  * For the "Server deploy" workflow's stt-queue mode, on STAGING only. It uses no
  * speech quota: nothing is sent to the model.
  *
+ *  0. Speech to text's workers watched for two minutes, through the schedule's
+ *     own record of each: the longest stretch with none running to take a file.
  *  1. A three-hour file made ready the way a transcript's first two steps do it,
  *     timed: the clean copy, its waveform's peaks and the measuring. Each step
  *     must stay well inside the 140 s a queue step may take.
@@ -30,6 +32,7 @@ use App\Services\UserDeletionService;
 use App\Support\AudioFormats;
 use App\Support\LiveServer;
 use App\Support\Transcription\TranscriptionSettings;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -59,6 +62,39 @@ $check = function (bool $ok, string $what) use (&$failed): void {
 $tmp = sys_get_temp_dir().'/stt-queue-'.bin2hex(random_bytes(4));
 @mkdir($tmp, 0700, true);
 $transcriber = app(Transcriber::class);
+
+// ---------------------------------------------------------------- 0. the workers, watched
+echo "\n== Speech to text's workers, watched for two minutes ==\n";
+// The schedule's own record of each worker of this site (held from its start to its finish), so
+// another site's workers on the same server are never counted.
+$workers = array_values(array_filter(app(Schedule::class)->events(), fn ($e): bool => str_contains((string) $e->command, 'queue:work')
+    && str_contains((string) $e->command, TranscribeJob::QUEUE_PRIORITY.','.TranscribeJob::QUEUE)));
+if ($workers === []) {
+    $check(false, 'speech to text\'s workers are in the schedule');
+} else {
+    $looks = 0;
+    $none = 0;
+    $stretch = 0;
+    $longest = 0;
+    $running = [];
+    $until = microtime(true) + 130;
+    while (microtime(true) < $until) {
+        $on = array_values(array_filter($workers, fn ($e): bool => $e->mutex->exists($e)));
+        $looks++;
+        foreach ($on as $e) {
+            $running[preg_match('/--name[= ]\'?([\w-]+)/', (string) $e->command, $m) ? $m[1] : '?'] = true;
+        }
+        $stretch = $on === [] ? $stretch + 1 : 0;
+        $none += $on === [] ? 1 : 0;
+        $longest = max($longest, $stretch);
+        sleep(1);
+    }
+    ksort($running);
+    printf("  %d workers in the schedule (%s); %d looks a second apart: one running in %d, none in %d, the longest stretch with none %d s\n",
+        count($workers), implode(', ', array_map(fn ($e) => $e->expression, $workers)), $looks, $looks - $none, $none, $longest);
+    printf("  seen running: %s\n", $running === [] ? 'none' : implode(', ', array_keys($running)));
+    $check($longest <= 10, 'a worker is there to take a new file nearly all the time');
+}
 
 // ---------------------------------------------------------------- 1. a three-hour file
 echo "\n== A three-hour file made ready (ffmpeg only, nothing sent) ==\n";
@@ -132,7 +168,7 @@ if (! $plan) {
         }
         printf("  picked up after %s s, clean copy after %s s, finished after %s s: %s (%s)\n",
             $seen['picked'] ?? '-', $seen['clean'] ?? '-', $seen['done'] ?? '-', $t->status, $t->error_code ?? '-');
-        $check(isset($seen['picked']) && $seen['picked'] <= 75, 'a worker picked it up within a minute or so');
+        $check(isset($seen['picked']) && $seen['picked'] <= 15, 'a worker picked it up within seconds');
         $check(($seen['peaks'] ?? false) === true, 'its waveform\'s peaks were made with the clean copy');
         $check($t->status === Transcription::FAILED && $t->error_code === 'no_speech', 'silence is refused as no speech');
         $check($t->usedSeconds() === 0, 'and uses none of the minutes');

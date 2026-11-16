@@ -22,8 +22,12 @@ use App\Services\UserDeletionService;
 use App\Support\AudioFormats;
 use App\Support\Transcription\TranscriptionAccess;
 use App\Support\Transcription\TranscriptionSettings;
+use Cron\CronExpression;
 use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -313,6 +317,44 @@ class TranscriptionSafetyTest extends TestCase
 
         Artisan::call('schedule:list');
         $this->assertSame(3, substr_count(Artisan::output(), "queue:work --queue='transcribe-high,transcribe'"));
+    }
+
+    public function test_a_worker_is_always_there_to_take_a_new_file(): void
+    {
+        $events = array_values(app(Schedule::class)->events());
+        $workers = array_values(array_filter($events, fn (Event $e): bool => str_contains((string) $e->command, 'queue:work')
+            && str_contains((string) $e->command, TranscribeJob::QUEUE_PRIORITY.','.TranscribeJob::QUEUE)));
+        $this->assertCount(3, $workers);
+        $commands = fn (array $list): array => array_map(fn (Event $e): string => (string) $e->command, $list);
+        $this->assertSame($commands($workers), $commands(array_slice($events, 0, 3)), 'started before every other command, so none can hold them up');
+
+        // Ten minutes, by the second: when some worker is looking for work, if each stops after its
+        // --max-time and takes up to 3 s to start.
+        $from = Carbon::parse('2026-11-16 10:00:00', 'UTC');
+        $looking = array_fill(0, 600, false);
+        foreach ($workers as $event) {
+            $this->assertTrue($event->runInBackground, 'started in the background');
+            $this->assertTrue($event->withoutOverlapping, 'never twice at once');
+            $this->assertSame(1, preg_match('/--max-time=(\d+)/', (string) $event->command, $m));
+            $seconds = (int) $m[1];
+            $starts = [];
+            for ($minute = 0; $minute < 10; $minute++) {
+                if ((new CronExpression($event->expression))->isDue($from->copy()->addMinutes($minute), 'UTC')) {
+                    $starts[] = $minute * 60;
+                }
+            }
+            $this->assertGreaterThanOrEqual(2, count($starts));
+            // It stops (plus time to start up, its last look and its finish) before its next start,
+            // or that start is missed while it still runs, and the queue waits for the one after.
+            $this->assertLessThanOrEqual($starts[1] - $starts[0] - 15, $seconds, $event->command.' stops well before its next start');
+            foreach ($starts as $start) {
+                for ($s = $start + 3; $s < min(600, $start + $seconds); $s++) {
+                    $looking[$s] = true;
+                }
+            }
+        }
+        $missing = array_keys(array_filter(array_slice($looking, 3, 597, true), fn (bool $on): bool => ! $on));
+        $this->assertSame([], $missing, 'no second without a worker looking for work');
     }
 
     public function test_short_files_worked_through_right_away_are_a_few_at_a_time(): void
