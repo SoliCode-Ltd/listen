@@ -118,6 +118,7 @@ return [
         'search' => 'Search the docs',
         'no_results' => 'Nothing matches your search.',
         'on_this_page' => 'Contents',
+        'close' => 'Close',
         'copy' => 'Copy',
         'copied' => 'Copied',
         'request' => 'Request',
@@ -156,8 +157,25 @@ return [
             'start' => 'Getting started',
             'guides' => 'Guides',
             'reference' => 'API reference',
-            'more' => 'More',
+            'more' => 'Errors, limits and support',
         ],
+        // One line under each part's name, where it begins on the page.
+        'parts' => [
+            'start' => 'Make your first request, keep your key safe, and see what each plan allows.',
+            'guides' => 'Get the voice, length and format you want, and retry without paying twice.',
+            'reference' => 'Every endpoint, grouped by what it works on.',
+            'more' => 'What an error looks like, how often you can call, and where to get help.',
+        ],
+        // The API reference, by what each endpoint works on (ApiDocs::RESOURCES).
+        'resources' => [
+            'speech' => ['title' => 'Text to speech', 'body' => 'Turn text into audio, straight away or in the background.'],
+            'voices' => ['title' => 'Voices and models', 'body' => 'The voices you can use, the options they take, and the model behind them.'],
+            'history' => ['title' => 'History', 'body' => 'What you have made in the API, the studio and the extension: find it, download its audio again, or delete it.'],
+            'transcriptions' => ['title' => 'Speech to text', 'body' => 'Turn a recording into text, with who said what and when.'],
+            'account' => ['title' => 'Account', 'body' => 'Your plan, what you have used this month, and your limits.'],
+            'other' => ['title' => 'More endpoints', 'body' => ''],
+        ],
+        'in_this_resource' => 'Endpoints',
 
         'intro' => [
             'title' => 'Introduction',

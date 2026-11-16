@@ -14,11 +14,14 @@ use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiPlanAccess;
 use App\Support\Api\ApiScopes;
 use App\Support\Api\ApiVoiceCatalog;
+use App\Support\Api\SampleWaveform;
+use App\Support\AudioDuration;
 use App\Support\AudioUrl;
 use App\Support\PlanUsageGuard;
 use App\Support\VoiceTier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -77,7 +80,7 @@ class DeveloperController extends Controller
      * American voice on the English page, so each page reads in its own
      * language; and a second voice of the other gender for the dialogue.
      *
-     * @return array{0: array<string, mixed>, 1: array{voice_id:string, name:string}, 2: array{voice_id:string, body:array<string, mixed>, audio_url:?string}|null}
+     * @return array{0: array<string, mixed>, 1: array{voice_id:string, name:string}, 2: array{voice_id:string, body:array<string, mixed>, audio_url:?string, seconds:?int, bytes:?int, bars:list<int>}|null}
      */
     private function sampleVoices(string $locale): array
     {
@@ -100,10 +103,20 @@ class DeveloperController extends Controller
         // The request is shown only for the voice it was made with, and plays only when its recording is here.
         $hero = null;
         if ($sample !== null && $voice !== null && ($voice['_internal_name'] ?? null) === $sample['voice']) {
+            $file = public_path($sample['audio']);
+            $found = is_file($file);
             $hero = [
                 'voice_id' => (string) $voice['voice_id'],
                 'body' => $sample['body'],
-                'audio_url' => is_file(public_path($sample['audio'])) ? url((string) AudioUrl::fromPath($sample['audio'])) : null,
+                'audio_url' => $found ? url((string) AudioUrl::fromPath($sample['audio'])) : null,
+                // Its answer's headers read from the recording itself, rounded as the API rounds it
+                // (AudioDuration::wholeSeconds), once for each version of the file.
+                'seconds' => $found ? Cache::rememberForever('docs-sample-seconds:'.md5($file.'|'.filemtime($file)),
+                    fn (): ?int => AudioDuration::wholeSeconds(AudioDuration::seconds((string) file_get_contents($file)))) : null,
+                'bytes' => $found ? (int) filesize($file) : null,
+                // Its own waveform ([] when it cannot be read: then a plain one is drawn).
+                'bars' => $found ? Cache::rememberForever('docs-sample-bars:'.md5($file.'|'.filemtime($file)),
+                    fn (): array => SampleWaveform::bars($file, 64) ?? []) : [],
             ];
         }
 

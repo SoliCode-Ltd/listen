@@ -10,6 +10,7 @@ use App\Support\AudioEffects;
 use App\Support\Credits;
 use App\Support\PlanUsageGuard;
 use App\Support\StudioFacts;
+use App\Support\UsageEstimator;
 
 /**
  * The developer documentation's reference: every endpoint with its
@@ -20,6 +21,49 @@ use App\Support\StudioFacts;
  */
 final class ApiDocs
 {
+    /**
+     * The API reference by what each endpoint works on, in reading order
+     * (developers.docs.resources.* names and describes each one).
+     */
+    public const RESOURCES = [
+        'speech' => ['tts', 'tts_async'],
+        'voices' => ['voices_list', 'voices_get', 'options', 'models'],
+        'history' => ['history_list', 'history_get', 'history_audio', 'history_delete'],
+        'transcriptions' => ['stt_create', 'stt_list', 'stt_get', 'stt_export'],
+        'account' => ['subscription', 'user'],
+    ];
+
+    /**
+     * The built endpoints grouped by resource, in the order of RESOURCES: a
+     * resource with none of its endpoints on the page (speech to text before
+     * it is public) is left out, and an endpoint of no resource ends the list.
+     *
+     * @param  list<array<string, mixed>>  $endpoints  build()['endpoints']
+     * @return list<array{key: string, id: string, endpoints: list<array<string, mixed>>}>
+     */
+    public static function resources(array $endpoints): array
+    {
+        $byKey = [];
+        foreach ($endpoints as $endpoint) {
+            $byKey[(string) $endpoint['key']] = $endpoint;
+        }
+        $groups = [];
+        foreach (self::RESOURCES as $resource => $keys) {
+            $members = array_values(array_filter(array_map(fn (string $key): ?array => $byKey[$key] ?? null, $keys)));
+            foreach ($keys as $key) {
+                unset($byKey[$key]);
+            }
+            if ($members !== []) {
+                $groups[] = ['key' => $resource, 'id' => 'api-'.$resource, 'endpoints' => $members];
+            }
+        }
+        if ($byKey !== []) {
+            $groups[] = ['key' => 'other', 'id' => 'api-other', 'endpoints' => array_values($byKey)];
+        }
+
+        return $groups;
+    }
+
     /**
      * @param  array{voice_id:string, name:string, name_ar?:string, language:string, gender?:?string}  $voice  the voice of the examples
      * @param  array{voice_id:string, name:string}|null  $partner  a second voice of the same language, for the dialogue example
@@ -41,6 +85,10 @@ final class ApiDocs
             $example['dialect'] = (string) ($hero['body']['dialect'] ?? $example['dialect']);
         }
         $historyId = 4821;
+        // The sentence the examples read: the recording's own length and credits when it is known
+        // (as the API rounds it), so the whole page agrees with the request at the top.
+        $sampleSeconds = max(1, (int) ($hero['seconds'] ?? 3));
+        $sampleCredits = Credits::forSeconds($sampleSeconds);
         $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | ($arabic ? JSON_UNESCAPED_UNICODE : 0);
         $json = static fn (array $value): string => (string) preg_replace_callback(
             '/^((?: {4})+)/m',
@@ -89,8 +137,8 @@ final class ApiDocs
             'title' => $example['title'],
             'text' => $example['text'],
             'character_count' => mb_strlen($example['text']),
-            'credits_used' => 45,
-            'duration_seconds' => 3,
+            'credits_used' => $sampleCredits,
+            'duration_seconds' => $sampleSeconds,
             'audio_url' => $baseUrl.'/history/'.$historyId.'/audio',
             'error' => null,
             'created_at' => '2026-10-18T09:30:12+00:00',
@@ -249,7 +297,7 @@ final class ApiDocs
             'X-Character-Count: '.mb_strlen($example['text']),
             'X-Credits-Used: '.$credits,
             'X-Credits-Remaining: 1317660',
-            'X-Audio-Duration-Seconds: 3',
+            'X-Audio-Duration-Seconds: '.$sampleSeconds,
             'X-Output-Format: mp3',
             'X-Request-Id: req_8f2kq0x7m3c9w1v5b6n4z2a1',
             'X-RateLimit-Limit: '.$rpm,
@@ -296,7 +344,7 @@ final class ApiDocs
                 ],
                 'headers' => ['X-History-Item-Id', 'X-Character-Count', 'X-Credits-Used', 'X-Credits-Remaining', 'X-Audio-Duration-Seconds', 'X-Output-Format', 'Idempotent-Replayed', 'X-Request-Id'],
                 'request' => ['POST', $baseUrl.'/text-to-speech/'.$voiceId.'?output_format=mp3', $ttsBody, 'speech.mp3'],
-                'response' => ['http', $audioResponse(45)],
+                'response' => ['http', $audioResponse($sampleCredits)],
             ],
             [
                 'id' => 'text-to-speech-async',
@@ -308,7 +356,7 @@ final class ApiDocs
                 'header_params' => [$p(ApiIdempotency::HEADER, 'string', false, 'idempotency_key')],
                 'body_params' => [$p('text', 'string', true, 'text'), $p('title', 'string', false, 'title'), $p('*', 'string', false, 'same_body')],
                 'request' => ['POST', $baseUrl.'/text-to-speech/'.$voiceId.'/async', ['text' => $example['text'], 'dialect' => $example['dialect'], 'title' => $example['title']], null],
-                'response' => ['json', $json(['status' => 'queued', 'credits_used' => 45, 'duration_seconds' => null, 'audio_url' => null] + $historyItem)],
+                'response' => ['json', $json(['status' => 'queued', 'credits_used' => $sampleCredits, 'duration_seconds' => null, 'audio_url' => null] + $historyItem)],
             ],
             [
                 'id' => 'list-voices',
@@ -561,6 +609,9 @@ final class ApiDocs
             'endpoints' => $endpoints,
             // The request at the top, exactly as its recording was made.
             'hero' => CodeHighlighter::html(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.($hero['voice_id'] ?? $voiceId).'?output_format=mp3', $hero['body'] ?? $ttsBody, 'speech.mp3')['curl'], 'bash'),
+            // And the headers its answer came with (the audio itself is the player beside them): the
+            // recording's own length, size and credits where it is known, else those of the reference.
+            'hero_response' => CodeHighlighter::html(self::heroHeaders($hero, $example['text'], $historyId, $audioResponse($sampleCredits)), 'http'),
             'dialogue' => self::highlighted(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId, $dialogueBody, 'dialogue.mp3')),
             'environment_sample' => self::highlighted(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId, ['text' => $example['text'], 'dialect' => $example['dialect'], 'audio_effect' => 'phone'], 'call.mp3')),
             'environments' => array_values($environments),
@@ -615,6 +666,33 @@ final class ApiDocs
      *
      * @param  array<string, bool>  $offered  ApiFeatureGate::offered()
      */
+    /**
+     * The status line and headers of the answer to the request at the top of the page, without
+     * its body. From the recording itself when its length is known, as the API would send them:
+     * the length rounded to whole seconds, its credits, its size and the billable characters.
+     *
+     * @param  array{seconds?: ?int, bytes?: ?int}|null  $hero
+     */
+    private static function heroHeaders(?array $hero, string $text, int $historyId, string $reference): string
+    {
+        $seconds = $hero['seconds'] ?? null;
+        if ($seconds === null) {
+            // The reference answer's lines up to the blank one before its body.
+            return implode("\n", array_slice(explode("\n", $reference), 0, (int) array_search('', explode("\n", $reference), true)));
+        }
+
+        return implode("\n", array_filter([
+            'HTTP/1.1 200 OK',
+            'Content-Type: audio/mpeg',
+            ($hero['bytes'] ?? null) ? 'Content-Length: '.$hero['bytes'] : null,
+            'X-History-Item-Id: '.$historyId,
+            'X-Output-Format: mp3',
+            'X-Character-Count: '.UsageEstimator::billableChars($text),
+            'X-Credits-Used: '.Credits::forSeconds($seconds),
+            'X-Audio-Duration-Seconds: '.$seconds,
+        ]));
+    }
+
     public static function listed(string $list, array $offered, bool $arabic): string
     {
         $items = [];
