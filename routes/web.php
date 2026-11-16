@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminAgentRecordingController;
 use App\Http\Controllers\AdminClonedVoiceAudioController;
 use App\Http\Controllers\AdminDriveController;
 use App\Http\Controllers\AdminManualPaymentProofController;
+use App\Http\Controllers\AdminTranscriptionAudioController;
 use App\Http\Controllers\AdminVideoDubFileController;
 use App\Http\Controllers\AgentCallController;
 use App\Http\Controllers\AgentController;
@@ -92,6 +93,11 @@ Route::middleware('auth')->get('/admin-audio/cloned-voices/{voice}/{kind}', Admi
 Route::middleware('auth')->get('/admin-audio/agent-calls/{call}', AdminAgentRecordingController::class)
     ->where('call', 'cnv_[a-z0-9]{24}')
     ->name('admin.agent-calls.recording');
+
+// A transcript's recording, for the admin's transcript page (Speech to text → Transcripts).
+Route::middleware('auth')->get('/admin-audio/transcripts/{code}', AdminTranscriptionAudioController::class)
+    ->where('code', 'tr_[a-z0-9]{24}')
+    ->name('admin.transcripts.audio');
 
 Route::middleware('auth')->get('/admin-video/dubs/{dub}/{kind}', AdminVideoDubFileController::class)
     ->whereNumber('dub')
