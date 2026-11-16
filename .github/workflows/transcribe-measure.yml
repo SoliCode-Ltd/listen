@@ -33,7 +33,7 @@ concurrency:
 jobs:
   measure:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - name: Run on staging over SSH
         env:
@@ -41,7 +41,8 @@ jobs:
           SSH_USER: ${{ secrets.STAGING_SSH_USER }}
           SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
           APP_PATH: ${{ secrets.STAGING_APP_PATH }}
-          OPTIONS: ${{ inputs.options || '' }}
+          # A push runs these (the owner said yes to the Arabic dialects, 16 Nov 2026).
+          OPTIONS: ${{ inputs.options || '--set=dialects --only=dia-ar-* --variants=auto,lang,lang+dialect,lang+dialect+review,lang+think' }}
         run: |
           set -euo pipefail
           case "$OPTIONS" in *[\;\&\|\`\$\<\>]*) echo "Options may not hold shell characters."; exit 1;; esac
@@ -51,6 +52,7 @@ jobs:
           printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_measure
           chmod 600 ~/.ssh/id_measure
           ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          case "$OPTIONS" in *'*'*) OPTIONS="$(printf '%s' "$OPTIONS" | sed "s/--only=\\([^ ]*\\)/--only='\\1'/")";; esac
           remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; \$(command -v php8.4 || command -v php) artisan transcribe:measure --full $OPTIONS"
           ssh -i ~/.ssh/id_measure -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=30 "$SSH_USER@$SSH_HOST" "$remote"
 
