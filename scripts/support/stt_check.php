@@ -42,6 +42,53 @@ if (LiveServer::allowsCustomerActions() || str_contains(strtolower((string) conf
     exit(1);
 }
 
+// ---------------------------------------------------------------- what is working, waiting or stuck (read only)
+echo "\n== The last transcripts, whatever their state ==\n";
+foreach (Transcription::withTrashed()->latest('id')->limit(6)->get() as $t) {
+    printf("  %s  %s UTC  %s  %.1f s  status %s%s  started %s  finished %s  parts %d/%d  work %s%s\n",
+        $t->code, $t->created_at?->utc()->format('H:i:s'), $t->source, (float) $t->seconds, $t->status, $t->error_code ? " ({$t->error_code})" : '',
+        $t->started_at?->utc()->format('H:i:s') ?? '-', $t->finished_at?->utc()->format('H:i:s') ?? '-', (int) $t->parts_done, (int) $t->parts,
+        $t->work === null ? 'none' : 'saved', $t->trashed() ? ', deleted' : '');
+    $notes = array_slice((array) $t->notes, -3);
+    if ($notes !== []) {
+        echo '      notes: ', implode(' | ', $notes), "\n";
+    }
+    if ($t->work !== null && isset($t->work['speech_seconds'])) {
+        printf("      voice %.1f s, loudest %.1f dB\n", (float) $t->work['speech_seconds'], (float) ($t->work['loudest_db'] ?? 0));
+    }
+}
+echo "\n== The queue ==\n";
+echo '  connection: ', config('queue.default'), '; cache: ', config('cache.default'), "\n";
+try {
+    $lock = Illuminate\Support\Facades\Cache::lock('stt-check-lock', 10);
+    echo '  a cache lock: ', $lock->get() ? 'works' : 'could not be taken', "\n";
+    $lock->release();
+} catch (Throwable $e) {
+    echo '  a cache lock: FAILS: ', mb_substr($e->getMessage(), 0, 200), "\n";
+}
+try {
+    $waiting = Illuminate\Support\Facades\DB::table('jobs')->where('payload', 'like', '%TranscribeJob%')->get(['queue', 'attempts', 'available_at', 'reserved_at']);
+    echo '  speech to text jobs waiting: ', count($waiting), "\n";
+    foreach ($waiting as $j) {
+        printf("    queue %s, tries %d, due %s, taken %s\n", $j->queue, $j->attempts, date('H:i:s', (int) $j->available_at), $j->reserved_at ? date('H:i:s', (int) $j->reserved_at) : 'no');
+    }
+    echo '  all jobs waiting: ', Illuminate\Support\Facades\DB::table('jobs')->count(), "\n";
+    foreach (Illuminate\Support\Facades\DB::table('failed_jobs')->where('payload', 'like', '%TranscribeJob%')->latest('id')->limit(3)->get(['failed_at', 'exception']) as $f) {
+        echo '  failed ', $f->failed_at, ': ', mb_substr(strtok((string) $f->exception, "\n"), 0, 300), "\n";
+    }
+} catch (Throwable $e) {
+    echo '  the jobs table could not be read: ', mb_substr($e->getMessage(), 0, 160), "\n";
+}
+$log = storage_path('logs/laravel.log');
+if (is_file($log)) {
+    $tail = array_slice(file($log, FILE_IGNORE_NEW_LINES) ?: [], -4000);
+    $lines = array_values(array_filter($tail, fn ($l) => str_contains($l, 'Speech to text') || str_contains($l, 'TranscribeJob') || str_contains($l, 'Transcri')));
+    echo "\n== The log: speech to text lines, last 12 ==\n";
+    foreach (array_slice($lines, -12) as $l) {
+        echo '  ', mb_substr($l, 0, 400), "\n";
+    }
+}
+
 $transcriber = app(Transcriber::class);
 $disk = Storage::disk(TranscriptionFlow::DISK);
 $ffmpeg = AudioFormats::ffmpegPath() ?: 'ffmpeg';
