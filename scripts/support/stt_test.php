@@ -105,16 +105,28 @@ if (! $ffmpeg) {
 
 /** A voice sample of the studio, as a file here. */
 $sample = function (string $language, ?string $gender = null, array $not = []): ?array {
-    $voices = Voice::query()->where('is_active', true)->where('language', $language)->whereNotNull('preview_audio_path')
-        ->when($gender, fn ($q) => $q->where('gender', $gender))->whereNotIn('id', $not)->orderBy('id')->get();
+    $voices = Voice::query()->where('is_active', true)->where('language', $language)
+        ->when($gender, fn ($q) => $q->whereRaw('LOWER(gender) = ?', [strtolower($gender)]))->whereNotIn('id', $not)->orderBy('id')->get();
     foreach ($voices as $voice) {
-        $stored = ltrim((string) $voice->preview_audio_path, '/');
-        foreach ([public_path($stored), Storage::disk('public')->path($stored), public_path('storage/'.$stored)] as $path) {
+        $stored = ltrim((string) parse_url((string) $voice->preview_audio_path, PHP_URL_PATH), '/');
+        // Where the studio keeps a voice's sample: its own path (public or the public disk), or the
+        // published copy by id that the developer docs link to (media/voice-previews/voice_<id>.mp3).
+        $places = array_filter([
+            $stored !== '' ? public_path($stored) : null,
+            $stored !== '' ? Storage::disk('public')->path($stored) : null,
+            $stored !== '' ? public_path('storage/'.$stored) : null,
+            public_path('media/voice-previews/voice_'.$voice->id.'.mp3'),
+        ]);
+        foreach ($places as $path) {
             if (is_file($path) && filesize($path) > 1000) {
-                return ['id' => $voice->id, 'name' => $voice->display_name, 'path' => $path, 'url' => str_starts_with($path, public_path()) ? url(substr($path, strlen(public_path()))) : null];
+                $url = str_starts_with($path, public_path().'/') ? url(substr($path, strlen(public_path()))) : null;
+
+                return ['id' => $voice->id, 'name' => $voice->display_name, 'path' => $path, 'url' => $url];
             }
         }
     }
+    echo "  no sample for {$language}".($gender ? " {$gender}" : '').': '.$voices->count().' active voices, e.g. '.json_encode($voices->first()?->only(['id', 'gender', 'preview_audio_path'])).', '
+        .count(glob(public_path('media/voice-previews/*.mp3')) ?: [])." files in media/voice-previews\n";
 
     return null;
 };
