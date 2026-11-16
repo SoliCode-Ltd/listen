@@ -176,4 +176,65 @@ class TranscriberTest extends TestCase
         $this->assertNull($byLabel['fr-human']['reference']);
         $this->assertGreaterThanOrEqual(4, count(array_filter($byLabel, fn ($r) => ! in_array($r['language'], ['ar', 'en', 'auto'], true))));
     }
+
+    public function test_times_written_as_a_clock_are_read_as_seconds(): void
+    {
+        $this->assertSame(75.4, Transcriber::seconds('1:15.4'));
+        $this->assertSame(3675.0, Transcriber::seconds('1:01:15'));
+        $this->assertSame(12.5, Transcriber::seconds('12.5'));
+        $this->assertNull(Transcriber::seconds('soon'));
+        $read = Transcriber::read([['start' => '0:01.0', 'end' => '0:03,5', 'text' => 'Hi']], true, false);
+        $this->assertSame([['start' => 1.0, 'end' => 3.5, 'speaker' => null, 'text' => 'Hi']], $read['segments']);
+        $this->assertSame('Whole text', Transcriber::read(['transcript' => 'Whole text'], false, false)['text']);
+    }
+
+    public function test_far_too_few_words_for_the_speech_is_noticed(): void
+    {
+        $this->assertTrue(Transcriber::tooShort(4, 280.0));
+        $this->assertFalse(Transcriber::tooShort(500, 280.0));
+        $this->assertFalse(Transcriber::tooShort(2, 10.0), 'a short part may hold few words');
+        $this->assertSame(4, Transcriber::wordCount('Hello there, عايزة أقولك'));
+        $this->assertSame(85.0, Transcriber::speechSeconds([[10.0, 20.0], [95.0, 110.0]], 0.0, 100.0));
+    }
+
+    public function test_a_short_or_unreadable_answer_is_asked_for_again_and_the_fuller_one_kept(): void
+    {
+        if (! AudioFormats::ffmpegPath()) {
+            $this->markTestSkipped('ffmpeg is not available.');
+        }
+        $file = sys_get_temp_dir().'/transcriber-retry-'.getmypid().'.wav';
+        // 40 seconds of steady tone: no pauses, so all of it counts as speech.
+        (new Process([AudioFormats::ffmpegPath(), '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=300:duration=40', $file]))->run();
+        $this->mock(GeminiKeyManager::class, function ($mock): void {
+            $mock->shouldReceive('keysInOrder')->andReturn([['name' => 'GEMINI_TTS_API_KEY', 'key' => 'test-key']]);
+            $mock->shouldReceive('recordUsage');
+        });
+        $answer = fn (string $json) => Http::response(['candidates' => [['content' => ['parts' => [['text' => $json]]], 'finishReason' => 'STOP']],
+            'usageMetadata' => ['promptTokenCount' => 100, 'candidatesTokenCount' => 10]]);
+        $full = implode(' ', array_fill(0, 60, 'word'));
+        Http::fake(['*' => Http::sequence()
+            ->pushResponse($answer('not json at all'))
+            ->pushResponse($answer('{"language":"en","paragraphs":["which she was capable."]}'))
+            // The second recording: short first, whole when asked again.
+            ->pushResponse($answer('{"language":"en","paragraphs":["which she was capable."]}'))
+            ->pushResponse($answer('{"language":"en","paragraphs":["'.$full.'"]}'))]);
+
+        $short = app(Transcriber::class)->transcribe($file, ['language' => 'en']);
+        $this->assertSame('which she was capable.', $short['text'], 'two tries at most: the unreadable one, then the short one');
+        $this->assertSame(2, $short['requests']);
+        $this->assertStringContainsString('no answer to read', $short['notes'][0]);
+        $this->assertStringContainsString('still only 4 words', $short['notes'][1]);
+
+        try {
+            $out = app(Transcriber::class)->transcribe($file, ['language' => 'en']);
+        } finally {
+            @unlink($file);
+        }
+
+        $this->assertSame($full, $out['text']);
+        $this->assertSame(2, $out['requests']);
+        $this->assertStringContainsString('only 4 words', $out['notes'][0]);
+        Http::assertSent(fn ($request) => data_get($request->data(), 'generationConfig.responseSchema.properties.paragraphs.type') === 'ARRAY'
+            && str_contains((string) data_get($request->data(), 'contents.0.parts.1.text'), 'not only its opening'));
+    }
 }

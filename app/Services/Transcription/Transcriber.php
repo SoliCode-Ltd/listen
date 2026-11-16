@@ -52,7 +52,7 @@ final class Transcriber
      * progress (fn (int $done, int $parts)).
      *
      * @param  array<string, mixed>  $o
-     * @return array{text: string, segments: array<int, array{start: float, end: float, speaker: ?string, text: string}>, language: string, seconds: float, parts: int, requests: int, recited: bool, usage: array<string, int>, model: string, finish: array<int, string>, timings: bool, speakers: bool}
+     * @return array{text: string, segments: array<int, array{start: float, end: float, speaker: ?string, text: string}>, language: string, seconds: float, parts: int, requests: int, recited: bool, usage: array<string, int>, model: string, finish: array<int, string>, notes: array<int, string>, timings: bool, speakers: bool}
      */
     public function transcribe(string $file, array $o = []): array
     {
@@ -71,7 +71,8 @@ final class Transcriber
             $clean = $tmp.'/clean.mp3';
             $this->normalise($ffmpeg, $file, $clean);
             $seconds = $this->duration($ffmpeg, $clean);
-            $plan = self::chunkPlan($this->pauses($ffmpeg, $clean), $seconds);
+            $pauses = $this->pauses($ffmpeg, $clean);
+            $plan = self::chunkPlan($pauses, $seconds);
 
             $usage = ['input_tokens' => 0, 'audio_tokens' => 0, 'output_tokens' => 0, 'thinking_tokens' => 0];
             $finish = [];
@@ -80,10 +81,15 @@ final class Transcriber
             $recited = false;
             $detected = [];
             $pieces = [];
+            $notes = [];
             foreach ($plan as $n => $part) {
                 $audio = $tmp.'/part-'.$n.'.mp3';
                 $this->cut($ffmpeg, $clean, $part['from'], $part['to'] - $part['from'], $audio);
-                $heard = $this->hear((string) file_get_contents($audio), $part['to'] - $part['from'], $language, $timings, $speakers, count($plan) > 1, (string) ($o['thinking'] ?? 'low'));
+                $speech = self::speechSeconds($pauses, $part['from'], $part['to']);
+                $heard = $this->hear((string) file_get_contents($audio), $part['to'] - $part['from'], $speech, $language, $timings, $speakers, count($plan) > 1, (string) ($o['thinking'] ?? 'low'));
+                foreach ($heard['notes'] as $note) {
+                    $notes[] = 'part '.($n + 1).': '.$note;
+                }
                 foreach ($heard['usage'] as $key => $tokens) {
                     $usage[$key] = ($usage[$key] ?? 0) + $tokens;
                 }
@@ -119,6 +125,7 @@ final class Transcriber
             'usage' => $usage,
             'model' => $model,
             'finish' => $finish,
+            'notes' => $notes,
             'timings' => $timings,
             'speakers' => $speakers,
         ];
@@ -250,54 +257,130 @@ final class Transcriber
     }
 
     /**
-     * One part heard by the model, asked once more with quotations shortened
-     * when it would not answer (RECITATION). Times are from the part's start.
+     * One part heard by the model. It is asked once more when its answer
+     * cannot be read or it would not answer (RECITATION: then with only the
+     * first words of each quotation written), and when it wrote far fewer
+     * words than the part's speech holds (it now and then writes only the
+     * opening of a part): the fuller answer is kept. Times are from the
+     * part's start; $speech: seconds of it that are not pauses.
      *
-     * @return array{text: string, segments: array<int, array<string, mixed>>, language: string, usage: array<string, int>, model: string, finish: array<int, string>, requests: int, recited: bool}
+     * @return array{text: string, segments: array<int, array<string, mixed>>, language: string, usage: array<string, int>, model: string, finish: array<int, string>, requests: int, recited: bool, notes: array<int, string>}
      */
-    private function hear(string $audio, float $length, string $language, bool $timings, bool $speakers, bool $part, string $thinking): array
+    private function hear(string $audio, float $length, float $speech, string $language, bool $timings, bool $speakers, bool $part, string $thinking): array
     {
         $usage = [];
         $finish = [];
+        $notes = [];
         $requests = 0;
-        foreach ([false, true] as $careful) {
+        $best = null;
+        $careful = false;
+        $whole = false;
+        for ($try = 0; $try < 2; $try++) {
             $answer = $this->askModel([['inline_data' => ['mime_type' => 'audio/mpeg', 'data' => base64_encode($audio)]],
-                ['text' => self::prompt($language, $timings, $speakers, $part, $careful)]], $thinking);
+                ['text' => self::prompt($language, $timings, $speakers, $part, $careful, $whole ? $speech : 0.0)]], $thinking, self::schema($timings, $speakers));
             $requests++;
             $finish[] = $answer['finish'];
             foreach ($answer['usage'] as $key => $tokens) {
                 $usage[$key] = ($usage[$key] ?? 0) + $tokens;
             }
-            if ($answer['data'] !== null) {
-                $heard = self::read($answer['data'], $timings, $speakers);
+            $heard = $answer['data'] !== null ? self::read($answer['data'], $timings, $speakers) : null;
+            if ($heard !== null) {
                 // The model's times now and then come as minutes and seconds past the first minute.
                 $heard['segments'] = $timings ? VideoDubber::inSeconds($heard['segments'], $length) : [];
+                $heard['words'] = self::wordCount($timings ? implode(' ', array_column($heard['segments'], 'text')) : $heard['text']);
+                $heard['recited'] = $careful;
+                if ($best === null || $heard['words'] > $best['words']) {
+                    $best = $heard;
+                }
+                if (! self::tooShort($heard['words'], $speech) || $try === 1) {
+                    break;
+                }
+                $notes[] = sprintf('only %d words for %.0f s of speech (%s): asked again', $heard['words'], $speech, $answer['finish'] ?: 'no finish reason');
+                $whole = true;
 
-                return $heard + ['usage' => $usage, 'model' => $answer['model'], 'finish' => $finish, 'requests' => $requests, 'recited' => $careful];
+                continue;
             }
+            $notes[] = 'no answer to read ('.($answer['finish'] ?: 'no finish reason').'): '.mb_substr(preg_replace('/\s+/u', ' ', $answer['raw']) ?? '', 0, 160);
             Log::warning('Transcribe: the text model gave no answer to read.', ['finish' => $answer['finish'], 'model' => $answer['model'], 'careful' => $careful]);
+            $careful = $careful || $answer['finish'] === 'RECITATION';
+        }
+        if ($best === null) {
+            throw new SpeechNotWrittenOut($finish);
+        }
+        if (self::tooShort($best['words'], $speech)) {
+            $notes[] = sprintf('still only %d words for %.0f s of speech', $best['words'], $speech);
+        }
+        unset($best['words']);
+
+        return $best + ['usage' => $usage, 'model' => $answer['model'], 'finish' => $finish, 'requests' => $requests, 'notes' => $notes];
+    }
+
+    /** Far fewer words than the speech holds: under 0.6 a second of speech (people say 2 to 3), over 20 seconds of it. */
+    public static function tooShort(int $words, float $speech): bool
+    {
+        return $speech >= 20 && $words < 0.6 * $speech;
+    }
+
+    /** Words in a text; in a script written without spaces (Chinese, Japanese, Thai), every two letters count as one. */
+    public static function wordCount(string $text): int
+    {
+        $dense = preg_match_all('/[\p{Han}\p{Hiragana}\p{Katakana}\p{Thai}]/u', $text);
+        $words = preg_match_all('/[\p{L}\p{N}\p{M}\']+/u', (string) preg_replace('/[\p{Han}\p{Hiragana}\p{Katakana}\p{Thai}]/u', ' ', $text));
+
+        return (int) $words + intdiv((int) $dense, 2);
+    }
+
+    /**
+     * Seconds between $from and $to that are not pauses.
+     *
+     * @param  array<int, array{0: float, 1: float}>  $pauses
+     */
+    public static function speechSeconds(array $pauses, float $from, float $to): float
+    {
+        $quiet = 0.0;
+        foreach ($pauses as [$start, $end]) {
+            $quiet += max(0.0, min($end, $to) - max($start, $from));
         }
 
-        throw new SpeechNotWrittenOut($finish);
+        return max(0.0, $to - $from - $quiet);
+    }
+
+    /**
+     * The answer's shape, so the model keeps to it.
+     *
+     * @return array<string, mixed>
+     */
+    public static function schema(bool $timings, bool $speakers): array
+    {
+        if (! $timings) {
+            return ['type' => 'OBJECT', 'properties' => ['language' => ['type' => 'STRING'], 'paragraphs' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']]],
+                'required' => ['language', 'paragraphs'], 'propertyOrdering' => ['language', 'paragraphs']];
+        }
+        $segment = ['start' => ['type' => 'NUMBER'], 'end' => ['type' => 'NUMBER']] + ($speakers ? ['speaker' => ['type' => 'STRING']] : []) + ['text' => ['type' => 'STRING']];
+
+        return ['type' => 'OBJECT', 'properties' => ['language' => ['type' => 'STRING'], 'segments' => ['type' => 'ARRAY', 'items' => [
+            'type' => 'OBJECT', 'properties' => $segment, 'required' => array_keys($segment), 'propertyOrdering' => array_keys($segment)]]],
+            'required' => ['language', 'segments'], 'propertyOrdering' => ['language', 'segments']];
     }
 
     /**
      * What the model is asked. $careful: a well-known text recited is written
      * only by its first words (the model will not copy one out in full).
      */
-    public static function prompt(string $language, bool $timings, bool $speakers, bool $part, bool $careful = false): string
+    public static function prompt(string $language, bool $timings, bool $speakers, bool $part, bool $careful = false, float $speech = 0.0): string
     {
         $named = $language === 'auto' ? '' : self::languageName($language);
         $p = "You are a professional transcriber. Write out exactly what is said in this audio, every word, as it is spoken.\n"
-            .($part ? "This audio is one part cut out of a longer recording: it may start or end in the middle of a word; write only the words you can hear in it.\n" : '')
+            .($part ? "This audio is one part cut out of a longer recording: it may start or end in the middle of a word. Write every word from its first second to its last.\n" : '')
+            .($speech > 0 ? sprintf("This audio holds about %d seconds of speech: write all of it, not only its opening.\n", (int) round($speech)) : '')
             .($named !== ''
                 ? "The audio is in {$named}. Write it in {$named}, in that language's own script. Words the speaker says in another language are written in that language.\n"
                 : "Find the language spoken and write it in that language's own script. Words the speaker says in another language are written in that language.\n")
             ."Never translate, correct, polish, sum up or leave out anything. Keep the speaker's own words, dialect, slang and grammar. "
             .'Arabic is written exactly in the dialect spoken (Egyptian, Gulf, Levantine, Maghrebi, ...), the way its speakers write it in messages: '
-            .'never rewrite it into Modern Standard Arabic and never add diacritics the speaker did not say. '
+            .'never rewrite it into Modern Standard Arabic, keep dialect words in their dialect spelling (Egyptian أوي, دلوقتي, هـ before a verb for the future; Gulf وايد, دحين), and never add diacritics the speaker did not say. '
             .'Leave out pure hesitation sounds (um, uh, ehh) and false starts of one syllable; keep every real word. '
-            .'Write numbers as digits when said as numbers. Add normal punctuation. Where a word cannot be made out, write [inaudible]. '
+            .'Write numbers as digits when said as numbers, and a phone number said digit by digit as one number (01012345678). Add normal punctuation. Where a word cannot be made out, write [inaudible]. '
             .'Do not describe music or noises.'."\n"
             .($careful
                 ? "Where the speaker recites a well-known text (a verse of the Quran, a prayer, a poem, song lyrics), write only its first three words followed by \"…\".\n"
@@ -327,12 +410,18 @@ final class Transcriber
      */
     public static function read(array $data, bool $timings, bool $speakers): array
     {
+        if (array_is_list($data)) {
+            $data = $timings ? ['segments' => $data] : ['paragraphs' => $data];
+        }
         $language = strtolower(substr(preg_replace('/[^a-zA-Z-]/', '', (string) (is_scalar($data['language'] ?? null) ? $data['language'] : '')) ?? '', 0, 8));
         $language = explode('-', $language)[0];
         if (! $timings) {
-            $paragraphs = array_values(array_filter(array_map(fn ($p) => is_scalar($p) ? trim((string) $p) : '', (array) ($data['paragraphs'] ?? [])), 'strlen'));
-            if ($paragraphs === [] && is_scalar($data['text'] ?? null)) {
-                $paragraphs = [trim((string) $data['text'])];
+            $paragraphs = array_values(array_filter(array_map(fn ($p) => is_scalar($p) ? trim((string) $p) : (is_array($p) && is_scalar($p['text'] ?? null) ? trim((string) $p['text']) : ''),
+                (array) ($data['paragraphs'] ?? $data['segments'] ?? [])), 'strlen'));
+            foreach (['text', 'transcript'] as $key) {
+                if ($paragraphs === [] && is_scalar($data[$key] ?? null)) {
+                    $paragraphs = [trim((string) $data[$key])];
+                }
             }
 
             return ['text' => implode("\n\n", $paragraphs), 'segments' => [], 'language' => $language];
@@ -341,16 +430,30 @@ final class Transcriber
         $segments = [];
         foreach ((array) ($data['segments'] ?? []) as $s) {
             $text = is_array($s) && is_scalar($s['text'] ?? null) ? trim((string) $s['text']) : '';
-            if ($text === '' || ! is_numeric($s['start'] ?? null)) {
+            $start = is_array($s) ? self::seconds($s['start'] ?? null) : null;
+            if ($text === '' || $start === null) {
                 continue;
             }
-            $start = max(0.0, (float) $s['start']);
+            $end = self::seconds($s['end'] ?? null) ?? $start;
             $speaker = $speakers ? (mb_substr(trim(is_scalar($s['speaker'] ?? null) ? (string) $s['speaker'] : ''), 0, 8) ?: 'A') : null;
-            $segments[] = ['start' => $start, 'end' => max($start, is_numeric($s['end'] ?? null) ? (float) $s['end'] : $start), 'speaker' => $speaker, 'text' => $text];
+            $segments[] = ['start' => max(0.0, $start), 'end' => max($start, $end), 'speaker' => $speaker, 'text' => $text];
         }
         usort($segments, fn ($a, $b) => $a['start'] <=> $b['start']);
 
         return ['text' => '', 'segments' => $segments, 'language' => $language];
+    }
+
+    /** A time as seconds: a number, or "1:15.4" / "0:01:15.4" written as a clock; null when it is neither. */
+    public static function seconds(mixed $t): ?float
+    {
+        if (is_int($t) || is_float($t) || (is_string($t) && is_numeric(trim($t)))) {
+            return (float) $t;
+        }
+        if (is_string($t) && preg_match('/^\s*(?:(\d+):)?(\d+):(\d+(?:[.,]\d+)?)\s*s?\s*$/', $t, $m) === 1) {
+            return (int) $m[1] * 3600 + (int) $m[2] * 60 + (float) str_replace(',', '.', $m[3]);
+        }
+
+        return null;
     }
 
     /** A language's English name from its code (fr → French), or '' when unknown. */
@@ -388,22 +491,27 @@ final class Transcriber
      * what it used, which model gave it and why it stopped.
      *
      * @param  array<int, array<string, mixed>>  $parts
-     * @return array{data: ?array<string, mixed>, usage: array<string, int>, model: string, finish: string}
+     * @return array{data: ?array<string, mixed>, raw: string, usage: array<string, int>, model: string, finish: string}
      */
-    private function askModel(array $parts, string $thinking): array
+    private function askModel(array $parts, string $thinking, array $schema = []): array
     {
         $base = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
         $body = [
             'contents' => [['role' => 'user', 'parts' => $parts]],
             'generationConfig' => ['responseMimeType' => 'application/json', 'temperature' => 0]
+                + ($schema !== [] ? ['responseSchema' => $schema] : [])
                 + ($thinking !== '' ? ['thinkingConfig' => ['thinkingLevel' => $thinking]] : []),
         ];
         $last = 'no key';
         foreach (VideoDubber::MODELS as $model) {
             foreach ($this->keys->keysInOrder($model) as $key) {
                 $response = Http::timeout(240)->withHeaders(['x-goog-api-key' => $key['key']])->post($base.'/models/'.$model.':generateContent', $body);
-                if ($response->status() === 400 && str_contains(strtolower($response->body()), 'thinking')) {
-                    unset($body['generationConfig']['thinkingConfig']);
+                // A model that does not take that thinking level, or the answer's shape, is asked again without it.
+                foreach (['thinking' => 'thinkingConfig', 'schema' => 'responseSchema'] as $word => $setting) {
+                    if ($response->status() !== 400 || ! str_contains(strtolower($response->body()), $word) || ! isset($body['generationConfig'][$setting])) {
+                        continue;
+                    }
+                    unset($body['generationConfig'][$setting]);
                     $response = Http::timeout(240)->withHeaders(['x-goog-api-key' => $key['key']])->post($base.'/models/'.$model.':generateContent', $body);
                 }
                 $this->keys->recordUsage($key['name']);
@@ -427,7 +535,7 @@ final class Transcriber
                     $data = json_decode($m[0], true);
                 }
 
-                return ['data' => is_array($data) ? $data : null, 'usage' => VideoDubber::usage((array) $response->json('usageMetadata')), 'model' => $model,
+                return ['data' => is_array($data) ? $data : null, 'raw' => mb_substr($raw, 0, 400), 'usage' => VideoDubber::usage((array) $response->json('usageMetadata')), 'model' => $model,
                     'finish' => (string) ($response->json('candidates.0.finishReason') ?? $response->json('promptFeedback.blockReason') ?? '')];
             }
         }

@@ -122,10 +122,13 @@ class TranscribeMeasureCommand extends Command
                     $out['language'] ?: '?', $speakers !== null ? '  speakers '.$speakers : '', $out['recited'] ? '  RECITATION: quotations shortened' : '',
                     $out['model'] !== '' ? '  ['.$out['model'].']' : ''));
                 $this->line('      '.self::firstLines($out, 320));
+                foreach ($out['notes'] as $note) {
+                    $this->line('      note: '.$note);
+                }
                 $results[] = ['label' => $r['label'], 'language' => $r['language'], 'kind' => $r['kind'], 'mode' => $mode, 'seconds' => $out['seconds'],
                     'parts' => $out['parts'], 'requests' => $out['requests'], 'usage' => $u, 'cost' => round($cost, 6), 'cost_per_minute' => round($cost / $minutes, 6),
                     'errors' => $errors, 'detected' => $out['language'], 'speakers' => $speakers, 'recited' => $out['recited'], 'model' => $out['model'],
-                    'finish' => $out['finish'], 'text' => $out['text'], 'segments' => $out['segments']];
+                    'finish' => $out['finish'], 'notes' => $out['notes'], 'text' => $out['text'], 'segments' => $out['segments']];
             }
         }
 
