@@ -75,6 +75,9 @@ final class Transcriber
     public function __construct(private GeminiKeyManager $keys) {}
 
     /**
+     * The whole recording at once (for the measure, and short files): prepare(),
+     * every step(), then result().
+     *
      * $o: language ('auto' or a code such as 'ar', 'fr'), dialect (an
      * ArabicDialects or EnglishAccents code, optional), review (bool),
      * thinking ('low', 'high', 'minimal', ''), progress (fn (int $done, int $parts)).
@@ -84,55 +87,16 @@ final class Transcriber
      */
     public function transcribe(string $file, array $o = []): array
     {
-        $ffmpeg = AudioFormats::ffmpegPath();
-        if (! $ffmpeg) {
-            throw new \RuntimeException('ffmpeg is not available.');
-        }
-        $ask = [
-            'language' => strtolower(trim((string) ($o['language'] ?? 'auto'))) ?: 'auto',
-            'dialect' => trim((string) ($o['dialect'] ?? '')),
-            'review' => (bool) ($o['review'] ?? false),
-            'thinking' => (string) ($o['thinking'] ?? 'low'),
-        ];
-        $asked = $ask['language'];
-        $progress = $o['progress'] ?? static function (): void {};
-
         $tmp = sys_get_temp_dir().'/listen-transcribe-'.bin2hex(random_bytes(6));
         @mkdir($tmp, 0700, true);
-        $run = ['usage' => ['input_tokens' => 0, 'audio_tokens' => 0, 'output_tokens' => 0, 'thinking_tokens' => 0],
-            'finish' => [], 'model' => '', 'requests' => 0, 'recited' => false, 'detected' => [], 'notes' => [], 'voices' => []];
-        $paragraphs = [];
-        $segments = [];
+        $progress = $o['progress'] ?? static function (): void {};
         try {
             $clean = $tmp.'/clean.mp3';
-            $this->normalise($ffmpeg, $file, $clean);
-            $seconds = $this->duration($ffmpeg, $clean);
-            $pauses = $this->pauses($ffmpeg, $clean);
-            $plan = self::chunkPlan($pauses, $seconds);
-
-            $before = '';
-            foreach ($plan as $n => $part) {
-                $heard = $this->hearStretch($ffmpeg, $clean, $tmp, $part, $pauses, $ask + ['part' => count($plan) > 1], $run, 'part '.($n + 1));
-                // Detected once, then given: the rest of the recording is heard in the language found.
-                if ($ask['language'] === 'auto' && $heard['language'] !== '' && self::languageName($heard['language']) !== '') {
-                    $ask['language'] = $heard['language'];
-                }
-                $mine = self::withoutRepeatedStart($before, $heard['paragraphs']);
-                $from = $n === 0 ? 0.0 : (float) $part['keep_from'];
-                $to = $n === count($plan) - 1 ? $seconds : min($seconds, (float) $part['keep_to'] + self::OVERLAP);
-                $placed = self::placeOnSpeech(self::sentences($mine, count($paragraphs)), self::speechIn($pauses, $from, $to), $from, $to);
-                // In order: a part never starts before the one before it ended.
-                $floor = $segments !== [] ? (float) end($segments)['end'] : 0.0;
-                foreach ($placed as $s) {
-                    $s['start'] = max($s['start'], $floor);
-                    $s['end'] = max($s['end'], $s['start']);
-                    $floor = $s['end'];
-                    $segments[] = $s;
-                }
-                array_push($paragraphs, ...array_map(fn ($p) => ['speaker' => $p['speaker'], 'text' => $p['text']], $mine));
-                $before = trim($before.' '.implode(' ', array_column($mine, 'text')));
-                $progress($n + 1, count($plan));
+            $state = $this->prepare($file, $clean, $o);
+            while ($this->step($clean, $state)) {
+                $progress($state['n'], count($state['plan']));
             }
+            $progress($state['n'], count($state['plan']));
         } finally {
             foreach ((array) glob($tmp.'/*') as $f) {
                 @unlink((string) $f);
@@ -140,29 +104,153 @@ final class Transcriber
             @rmdir($tmp);
         }
 
+        return self::result($state);
+    }
+
+    /**
+     * The recording made ready to hear: written to $clean (16 kHz mono MP3,
+     * what the model hears and the member plays back), measured, its pauses
+     * found and its parts planned. The state returned is plain data (it can
+     * be saved between steps, so a long file is heard one part per queue job).
+     *
+     * @param  array<string, mixed>  $o  language, dialect, review, thinking
+     * @return array<string, mixed>
+     */
+    public function prepare(string $file, string $clean, array $o = []): array
+    {
+        $ffmpeg = self::ffmpeg();
+        $this->normalise($ffmpeg, $file, $clean);
+        $seconds = $this->duration($ffmpeg, $clean);
+        $pauses = $this->pauses($ffmpeg, $clean);
+        $language = strtolower(trim((string) ($o['language'] ?? 'auto'))) ?: 'auto';
+
+        return [
+            'ask' => ['language' => $language, 'dialect' => trim((string) ($o['dialect'] ?? '')), 'review' => (bool) ($o['review'] ?? false), 'thinking' => (string) ($o['thinking'] ?? 'low')],
+            'asked' => $language,
+            'seconds' => round($seconds, 2),
+            'pauses' => $pauses,
+            'plan' => self::chunkPlan($pauses, $seconds),
+            'n' => 0,
+            'run' => ['usage' => ['input_tokens' => 0, 'audio_tokens' => 0, 'output_tokens' => 0, 'thinking_tokens' => 0],
+                'finish' => [], 'model' => '', 'requests' => 0, 'recited' => false, 'detected' => [], 'notes' => [], 'voices' => []],
+            'paragraphs' => [],
+            'segments' => [],
+            'before' => '',
+        ];
+    }
+
+    /**
+     * The next part heard and its sentences placed on the recording's clock.
+     * Returns whether parts are left.
+     *
+     * @param  array<string, mixed>  $state  from prepare(), changed in place
+     */
+    public function step(string $clean, array &$state): bool
+    {
+        $plan = $state['plan'];
+        $n = (int) $state['n'];
+        if ($n >= count($plan)) {
+            return false;
+        }
+        $part = $plan[$n];
+        $tmp = sys_get_temp_dir().'/listen-transcribe-'.bin2hex(random_bytes(6));
+        @mkdir($tmp, 0700, true);
+        try {
+            $heard = $this->hearStretch(self::ffmpeg(), $clean, $tmp, $part, $state['pauses'], $state['ask'] + ['part' => count($plan) > 1], $state['run'], 'part '.($n + 1));
+        } finally {
+            foreach ((array) glob($tmp.'/*') as $f) {
+                @unlink((string) $f);
+            }
+            @rmdir($tmp);
+        }
+        // Detected once, then given: the rest of the recording is heard in the language found.
+        if ($state['ask']['language'] === 'auto' && $heard['language'] !== '' && self::languageName($heard['language']) !== '') {
+            $state['ask']['language'] = $heard['language'];
+        }
+        $mine = self::withoutRepeatedStart((string) $state['before'], $heard['paragraphs']);
+        $from = $n === 0 ? 0.0 : (float) $part['keep_from'];
+        $to = $n === count($plan) - 1 ? (float) $state['seconds'] : min((float) $state['seconds'], (float) $part['keep_to'] + self::OVERLAP);
+        $placed = self::placeOnSpeech(self::sentences($mine, count($state['paragraphs'])), self::speechIn($state['pauses'], $from, $to), $from, $to);
+        // In order: a part never starts before the one before it ended.
+        $floor = $state['segments'] !== [] ? (float) end($state['segments'])['end'] : 0.0;
+        foreach ($placed as $s) {
+            $s['start'] = max($s['start'], $floor);
+            $s['end'] = max($s['end'], $s['start']);
+            $floor = $s['end'];
+            $state['segments'][] = $s;
+        }
+        array_push($state['paragraphs'], ...array_map(fn ($p) => ['speaker' => $p['speaker'], 'text' => $p['text']], $mine));
+        $state['before'] = mb_substr(trim($state['before'].' '.implode(' ', array_column($mine, 'text'))), -2000);
+        $state['n'] = $n + 1;
+
+        return $state['n'] < count($plan);
+    }
+
+    /**
+     * The finished transcript from the state after its last step.
+     *
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed> as transcribe() returns
+     */
+    public static function result(array $state): array
+    {
+        $paragraphs = $state['paragraphs'];
+        $segments = $state['segments'];
         foreach ($paragraphs as $i => $p) {
             $own = array_values(array_filter($segments, fn ($s) => $s['paragraph'] === $i));
             $paragraphs[$i] += ['start' => $own !== [] ? $own[0]['start'] : 0.0, 'end' => $own !== [] ? end($own)['end'] : 0.0];
         }
         $speakers = count(array_unique(array_column($paragraphs, 'speaker')));
-        arsort($run['detected']);
+        $detected = (array) $state['run']['detected'];
+        arsort($detected);
 
         return [
             'text' => self::textOf($paragraphs, $speakers > 1),
             'paragraphs' => $paragraphs,
             'segments' => $segments,
             'speakers' => $speakers,
-            'voices' => array_values($run['voices']),
-            'language' => $asked !== 'auto' ? $asked : (string) (array_key_first($run['detected']) ?? ''),
-            'seconds' => round($seconds, 2),
-            'parts' => count($plan),
-            'requests' => $run['requests'],
-            'recited' => $run['recited'],
-            'usage' => $run['usage'],
-            'model' => $run['model'],
-            'finish' => $run['finish'],
-            'notes' => $run['notes'],
+            'voices' => array_values((array) $state['run']['voices']),
+            'language' => $state['asked'] !== 'auto' ? (string) $state['asked'] : (string) (array_key_first($detected) ?? ''),
+            'seconds' => (float) $state['seconds'],
+            'parts' => count($state['plan']),
+            'requests' => (int) $state['run']['requests'],
+            'recited' => (bool) $state['run']['recited'],
+            'usage' => $state['run']['usage'],
+            'model' => (string) $state['run']['model'],
+            'finish' => $state['run']['finish'],
+            'notes' => $state['run']['notes'],
         ];
+    }
+
+    /** The length of an audio or video file in seconds, read quickly from its header (0 when it cannot be read). */
+    public static function lengthOf(string $file): float
+    {
+        $p = new Process([self::ffmpeg(), '-hide_banner', '-i', $file]);
+        $p->setTimeout(60)->run();
+        if (preg_match('/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/', $p->getErrorOutput(), $m) === 1) {
+            return (int) $m[1] * 3600 + (int) $m[2] * 60 + (float) $m[3];
+        }
+
+        return 0.0;
+    }
+
+    /** Whether the file has a sound track ffmpeg can read. */
+    public static function hasAudio(string $file): bool
+    {
+        $p = new Process([self::ffmpeg(), '-hide_banner', '-i', $file]);
+        $p->setTimeout(60)->run();
+
+        return preg_match('/Stream #\S+.*: Audio:/', $p->getErrorOutput()) === 1;
+    }
+
+    private static function ffmpeg(): string
+    {
+        $ffmpeg = AudioFormats::ffmpegPath();
+        if (! $ffmpeg) {
+            throw new \RuntimeException('ffmpeg is not available.');
+        }
+
+        return $ffmpeg;
     }
 
     /**

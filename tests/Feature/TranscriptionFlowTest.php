@@ -1,0 +1,264 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Plan;
+use App\Models\SiteSetting;
+use App\Models\Subscription;
+use App\Models\Transcription;
+use App\Models\User;
+use App\Services\Transcription\TranscriptionFlow;
+use App\Services\Transcription\TranscriptionRefused;
+use App\Services\Tts\GeminiKeyManager;
+use App\Support\AudioFormats;
+use App\Support\Transcription\TranscriptionAccess;
+use App\Support\Transcription\TranscriptionSettings;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Process;
+use Tests\TestCase;
+
+/**
+ * Transcribe's minutes: held when a file starts, what it uses when it is
+ * done, given back when it fails, counted by the second, from the plan only,
+ * starting again with the billing month; the free try; and every rule
+ * checked before anything is used, naming the plan that fits.
+ */
+class TranscriptionFlowTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        if (! AudioFormats::ffmpegPath()) {
+            $this->markTestSkipped('ffmpeg is not available.');
+        }
+        Storage::fake('local');
+        SiteSetting::set('transcription_audience', TranscriptionSettings::AUDIENCE_EVERYONE, TranscriptionSettings::GROUP);
+        $keys = \Mockery::mock(GeminiKeyManager::class);
+        $keys->shouldReceive('keysInOrder')->andReturn([['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1]]);
+        $keys->shouldReceive('recordUsage');
+        $this->app->instance(GeminiKeyManager::class, $keys);
+    }
+
+    public function test_the_seconds_shown_before_it_starts_are_the_seconds_it_uses(): void
+    {
+        $this->answers('هلا والله، شلونكم؟');
+        $user = $this->member(minutes: 120);
+
+        $t = app(TranscriptionFlow::class)->start($user, $this->audio(12.4), ['title' => 'voice note.m4a', 'language' => 'ar']);
+
+        $t->refresh();
+        $this->assertSame(Transcription::READY, $t->status);
+        $this->assertSame(13, $t->charged_seconds, 'every second, a part second as a whole one');
+        $this->assertSame(TranscriptionAccess::chargeFor(12.4), $t->charged_seconds);
+        $balance = TranscriptionAccess::balance($user);
+        $this->assertSame(7200, $balance['allowance']);
+        $this->assertSame(13, $balance['used']);
+        $this->assertSame(7187, $balance['left']);
+        $this->assertSame('هلا والله، شلونكم؟', $t->paragraphs[0]['text']);
+        $this->assertSame('ar', $t->language);
+        $this->assertNull($t->work);
+        $this->assertGreaterThan(0, $t->cost_usd);
+        $this->assertFileExists(Storage::disk('local')->path(TranscriptionFlow::folder($t).'/audio.mp3'), 'the cleaned audio stays to play back');
+    }
+
+    public function test_a_file_that_cannot_be_written_out_uses_nothing(): void
+    {
+        // The model will not answer, however asked.
+        Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => '']]], 'finishReason' => 'RECITATION']]])]);
+        $user = $this->member(minutes: 120);
+
+        $t = app(TranscriptionFlow::class)->start($user, $this->audio(5), ['title' => 'quran.mp3']);
+
+        $t->refresh();
+        $this->assertSame(Transcription::FAILED, $t->status);
+        $this->assertSame('not_written', $t->error_code);
+        $this->assertSame(0, $t->usedSeconds());
+        $this->assertSame(0, TranscriptionAccess::balance($user)['used']);
+        $this->assertStringContainsString('5 s held, given back', implode(' ', $t->notes));
+        // Given back once: failing it again changes nothing.
+        $this->assertFalse(app(TranscriptionFlow::class)->fail($t, 'stuck', 'x'));
+    }
+
+    public function test_not_enough_minutes_is_refused_before_anything_is_used_with_the_plan_that_has_more(): void
+    {
+        $this->answers('Hello.');
+        $user = $this->member(minutes: 1);
+        $this->plan('pro', 4900, 500, 120);
+        app(TranscriptionFlow::class)->start($user, $this->audio(40), ['title' => 'first']);
+
+        try {
+            app(TranscriptionFlow::class)->start($user, $this->audio(30), ['title' => 'second']);
+            $this->fail('refused');
+        } catch (TranscriptionRefused $e) {
+            $this->assertSame('not_enough', $e->reason);
+            $this->assertSame(402, $e->status);
+            $this->assertSame('pro', $e->upgrade['slug']);
+            $this->assertStringContainsString('This file needs 30 s and you have 20 s left this month', $e->getMessage());
+            $this->assertSame(['seconds_needed' => 30, 'seconds_left' => 20], array_intersect_key($e->toArray(), ['seconds_needed' => 1, 'seconds_left' => 1]));
+        }
+        $this->assertSame(1, Transcription::query()->count(), 'nothing made, nothing held');
+    }
+
+    public function test_a_file_longer_than_the_plan_takes_names_the_plan_that_takes_it(): void
+    {
+        $user = $this->member(minutes: 120, fileMinutes: 1);
+        $this->plan('creator', 2200, 250, 60);
+
+        try {
+            app(TranscriptionFlow::class)->start($user, $this->audio(75), ['title' => 'long']);
+            $this->fail('refused');
+        } catch (TranscriptionRefused $e) {
+            $this->assertSame('too_long', $e->reason);
+            $this->assertSame('creator', $e->upgrade['slug']);
+            $this->assertStringContainsString('This file is 1 min 15 s long and your plan takes files up to 1 min', $e->getMessage());
+        }
+    }
+
+    public function test_the_minutes_start_again_with_the_billing_month_and_a_deleted_transcript_still_counts(): void
+    {
+        $this->answers('Hello there.');
+        $user = $this->member(minutes: 120);
+        $t = app(TranscriptionFlow::class)->start($user, $this->audio(20), ['title' => 'a']);
+        $t->delete();
+        $this->assertSame(20, TranscriptionAccess::balance($user)['used'], 'deleting a transcript does not win its minutes back');
+
+        $this->travelTo(now()->addMonthNoOverflow()->startOfMonth()->addDays(2));
+        Subscription::query()->where('user_id', $user->id)->update(['current_period_start' => now()->startOfMonth(), 'current_period_end' => now()->endOfMonth()]);
+        $this->assertSame(0, TranscriptionAccess::balance($user)['used']);
+        $this->assertSame(7200, TranscriptionAccess::balance($user)['left']);
+    }
+
+    public function test_the_free_try_is_one_short_recording_with_a_daily_cap_for_the_site(): void
+    {
+        $this->answers('Hi.');
+        $this->plan('starter', 900, 120, 30);
+        $user = $this->member(minutes: 0);
+
+        try {
+            app(TranscriptionFlow::class)->start($user, $this->audio(70), ['title' => 'long try']);
+            $this->fail('refused');
+        } catch (TranscriptionRefused $e) {
+            $this->assertSame('free_too_long', $e->reason);
+            $this->assertSame('starter', $e->upgrade['slug']);
+        }
+        $t = app(TranscriptionFlow::class)->start($user, $this->audio(8), ['title' => 'try']);
+        $this->assertTrue($t->fresh()->is_free);
+        $this->assertSame(0, TranscriptionAccess::balance($user)['used']);
+
+        try {
+            app(TranscriptionFlow::class)->start($user, $this->audio(8), ['title' => 'again']);
+            $this->fail('refused');
+        } catch (TranscriptionRefused $e) {
+            $this->assertSame('free_used', $e->reason);
+        }
+
+        SiteSetting::set('transcription_free_per_day', 1, TranscriptionSettings::GROUP);
+        try {
+            app(TranscriptionFlow::class)->start($this->member(minutes: 0), $this->audio(8), ['title' => 'other member']);
+            $this->fail('refused');
+        } catch (TranscriptionRefused $e) {
+            $this->assertSame('free_day_full', $e->reason);
+        }
+
+        // The API and MCP need a plan with Transcribe: no free try there.
+        try {
+            app(TranscriptionFlow::class)->start($this->member(minutes: 0), $this->audio(8), ['title' => 'api', 'source' => 'api']);
+            $this->fail('refused');
+        } catch (TranscriptionRefused $e) {
+            $this->assertSame('not_in_plan', $e->reason);
+        }
+    }
+
+    public function test_files_at_once_the_site_ceiling_and_who_sees_it(): void
+    {
+        $user = $this->member(minutes: 120);
+        Transcription::query()->create(['user_id' => $user->id, 'title' => 'working', 'status' => Transcription::PROCESSING, 'charged_seconds' => 10, 'period_ym' => 'x']);
+        try {
+            app(TranscriptionFlow::class)->start($user, $this->audio(5), ['title' => 'b']);
+            $this->fail('refused');
+        } catch (TranscriptionRefused $e) {
+            $this->assertSame('busy', $e->reason);
+            $this->assertSame(429, $e->status);
+        }
+
+        SiteSetting::set('transcription_daily_minutes', 1, TranscriptionSettings::GROUP);
+        try {
+            app(TranscriptionFlow::class)->start($this->member(minutes: 120), $this->audio(55), ['title' => 'c']);
+            $this->fail('refused');
+        } catch (TranscriptionRefused $e) {
+            $this->assertSame('site_busy', $e->reason);
+        }
+
+        SiteSetting::set('transcription_audience', TranscriptionSettings::AUDIENCE_OFF, TranscriptionSettings::GROUP);
+        try {
+            app(TranscriptionFlow::class)->start($this->member(minutes: 120), $this->audio(5), ['title' => 'd']);
+            $this->fail('refused');
+        } catch (TranscriptionRefused $e) {
+            $this->assertSame('not_open', $e->reason);
+        }
+    }
+
+    public function test_a_stuck_transcript_is_failed_and_its_minutes_given_back(): void
+    {
+        $user = $this->member(minutes: 120);
+        $t = Transcription::query()->create(['user_id' => $user->id, 'title' => 'stuck', 'status' => Transcription::PROCESSING, 'charged_seconds' => 90,
+            'period_ym' => TranscriptionAccess::balance($user)['period']]);
+        $this->assertSame(90, TranscriptionAccess::balance($user)['used']);
+
+        $this->travel(TranscriptionSettings::stuckMinutes() + 1)->minutes();
+        Artisan::call('transcriptions:prune');
+
+        $this->assertSame(Transcription::FAILED, $t->fresh()->status);
+        $this->assertSame('stuck', $t->fresh()->error_code);
+        $this->assertSame(0, TranscriptionAccess::balance($user)['used']);
+    }
+
+    public function test_a_file_without_sound_is_refused(): void
+    {
+        $user = $this->member(minutes: 120);
+        $file = tempnam(sys_get_temp_dir(), 'nosound');
+        file_put_contents($file, 'not audio at all');
+
+        $this->expectException(TranscriptionRefused::class);
+        app(TranscriptionFlow::class)->start($user, $file, ['title' => 'notes.txt']);
+    }
+
+    private function member(int $minutes, int $fileMinutes = 30): User
+    {
+        $plan = $this->plan('member-'.bin2hex(random_bytes(3)), $minutes > 0 ? 900 : 0, $minutes, $fileMinutes);
+        $user = User::factory()->create(['email_verified_at' => now(), 'subscription_status_checked_at' => now()]);
+        Subscription::query()->create(['user_id' => $user->id, 'plan_id' => $plan->id, 'status' => 'active',
+            'current_period_start' => now()->startOfMonth(), 'current_period_end' => now()->endOfMonth()]);
+
+        return $user;
+    }
+
+    private function plan(string $slug, int $price, int $minutes, int $fileMinutes): Plan
+    {
+        return Plan::factory()->create(['slug' => $slug, 'price_cents' => $price, 'monthly_chars' => 100000, 'monthly_requests' => 100,
+            'transcription_enabled' => $minutes > 0, 'transcription_minutes_month' => $minutes, 'transcription_max_file_minutes' => $fileMinutes,
+            'transcription_concurrent_jobs' => 1]);
+    }
+
+    /** A recording of tone, $seconds long, in a file of its own. */
+    private function audio(float $seconds): string
+    {
+        $file = sys_get_temp_dir().'/tr-flow-'.bin2hex(random_bytes(4)).'.mp3';
+        (new Process([AudioFormats::ffmpegPath(), '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=300:duration='.$seconds, '-c:a', 'libmp3lame', $file]))->mustRun();
+
+        return $file;
+    }
+
+    private function answers(string $text): void
+    {
+        Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['language' => 'ar', 'speakers' => [['id' => 'A', 'voice' => 'calm']],
+            'paragraphs' => [['speaker' => 'A', 'text' => $text]]], JSON_UNESCAPED_UNICODE)]]], 'finishReason' => 'STOP']],
+            'usageMetadata' => ['promptTokenCount' => 900, 'candidatesTokenCount' => 30,
+                'promptTokensDetails' => [['modality' => 'AUDIO', 'tokenCount' => 300], ['modality' => 'TEXT', 'tokenCount' => 600]]]])]);
+    }
+}
