@@ -1,8 +1,9 @@
 {{--
   A code panel. Either $samples (language => highlighted HTML, shown as tabs
   kept in step across the page) or $single (one highlighted block) with
-  $label. Code, and the names of the code languages, read the same on every
-  page, left to right.
+  $label (and an optional $tag beside it, such as the code's language). Code,
+  and the names of the code languages, read the same on every page, left to
+  right.
 --}}
 @php($panelId = 'code-'.\Illuminate\Support\Str::random(8))
 <div class="code-panel" data-code-panel>
@@ -14,7 +15,7 @@
         @endforeach
       </div>
     @else
-      <span class="code-label" @if(!empty($codeLabel)) data-code @endif>{{ $label ?? '' }}</span>
+      <span class="code-label" @if(!empty($codeLabel)) data-code @endif>{{ $label ?? '' }}@isset($tag)<span class="code-tag mono" data-code>{{ $tag }}</span>@endisset</span>
     @endisset
     <button type="button" class="code-copy" data-copy data-copy-label="{{ __('developers.docs.copy') }}" data-copied-label="{{ __('developers.docs.copied') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>{{ __('developers.docs.copy') }}</span></button>
   </div>
