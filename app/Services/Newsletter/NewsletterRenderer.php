@@ -3,11 +3,17 @@
 namespace App\Services\Newsletter;
 
 use App\Models\Newsletter;
+use App\Models\Plan;
+use App\Models\User;
 use App\Support\SiteFont;
+use App\Support\Transcription\TranscriptionAccess;
 use Illuminate\Support\Facades\URL;
 
 class NewsletterRenderer
 {
+    /** The person's plan, read once for both languages of one email. @var array<string, Plan|null> */
+    private array $plans = [];
+
     /**
      * The emails' font: the website's own (Admin → Site Settings, App\Support\SiteFont), in
      * both languages, so an email reads like the site. Arial where a mail app loads no web
@@ -69,7 +75,7 @@ class NewsletterRenderer
             $blocks[] = trim(implode("\n\n", array_filter([
                 $section['headline'],
                 $section['greeting'],
-                implode("\n\n", $section['paragraphs_text']),
+                implode("\n\n", array_map(fn (array $block): string => $block['text'], $section['blocks'])),
                 $section['highlights'] === [] ? '' : implode("\n", array_map(
                     fn (string $line): string => '- '.$line,
                     $section['highlights']
@@ -163,10 +169,11 @@ class NewsletterRenderer
     private function section(Newsletter $newsletter, string $lang, array $recipient): array
     {
         $name = $this->nameFor($lang, $recipient);
+        $fill = $this->fillFor($newsletter, $lang, $recipient, $name);
         $arabic = $lang === 'ar';
         $intro = (string) ($arabic ? $newsletter->intro_ar : $newsletter->intro_en);
         $body = (string) ($arabic ? $newsletter->body_ar : $newsletter->body_en);
-        $paragraphsText = $this->paragraphs($intro."\n\n".$body, $name);
+        $paragraphsText = $this->paragraphs($intro."\n\n".$body, $fill);
 
         return [
             'lang' => $lang,
@@ -174,25 +181,88 @@ class NewsletterRenderer
             'align' => $arabic ? 'right' : 'left',
             'font' => self::fontStack(),
             'adjust' => self::sizeAdjust($lang),
-            'preheader' => $this->personalize((string) ($arabic ? $newsletter->preheader_ar : $newsletter->preheader_en), $name),
-            'eyebrow' => $this->personalize((string) ($arabic ? $newsletter->eyebrow_ar : $newsletter->eyebrow_en), $name),
-            'headline' => $this->personalize((string) ($arabic ? $newsletter->headline_ar : $newsletter->headline_en), $name),
-            // The paid welcome email has no "Hello …," line; its headline greets.
+            'preheader' => $this->personalize((string) ($arabic ? $newsletter->preheader_ar : $newsletter->preheader_en), $fill),
+            'eyebrow' => $this->personalize((string) ($arabic ? $newsletter->eyebrow_ar : $newsletter->eyebrow_en), $fill),
+            'headline' => $this->personalize((string) ($arabic ? $newsletter->headline_ar : $newsletter->headline_en), $fill),
+            // "Hi Sara," with the person's first name ("Hi there," without one). The paid welcome
+            // email has no greeting line; its headline greets.
             'greeting' => ! empty($recipient['no_greeting']) ? '' : ($arabic
                 ? ('مرحباً'.($name !== '' ? ' '.$name : '').'،')
-                : ('Hello'.($name !== '' ? ' '.$name : '').',')),
-            'paragraphs' => array_map(
-                fn (string $paragraph): string => nl2br(e($paragraph), false),
-                $paragraphsText
-            ),
-            'paragraphs_text' => $paragraphsText,
+                : ('Hi '.($name !== '' ? $name : 'there').',')),
+            'blocks' => array_merge(...array_map(fn (string $paragraph): array => $this->blocks($paragraph), $paragraphsText ?: [''])),
             'highlights' => $this->highlightLines(
                 $arabic ? $newsletter->highlights_ar : $newsletter->highlights_en,
-                $name
+                $fill
             ),
-            'cta_label' => $this->personalize((string) ($arabic ? $newsletter->cta_label_ar : $newsletter->cta_label_en), $name),
+            'cta_label' => $this->personalize((string) ($arabic ? $newsletter->cta_label_ar : $newsletter->cta_label_en), $fill),
             'cta_url' => $this->safeUrl((string) ($arabic ? $newsletter->cta_url_ar : $newsletter->cta_url_en)),
-            'footer' => $this->personalize((string) ($arabic ? $newsletter->footer_ar : $newsletter->footer_en), $name),
+            'footer' => $this->personalize((string) ($arabic ? $newsletter->footer_ar : $newsletter->footer_en), $fill),
+        ];
+    }
+
+    /**
+     * One paragraph of the opening or body, as written in the admin: a line starting "## " is
+     * a subheading (the lines after it a paragraph), lines that all start "- " a list, any
+     * other a paragraph. **Words** between two pairs of stars are bold.
+     *
+     * @return list<array{type: string, html: string, items: list<string>, text: string}>
+     */
+    private function blocks(string $paragraph): array
+    {
+        if (trim($paragraph) === '') {
+            return [];
+        }
+        $lines = preg_split("/\r\n|\n|\r/", $paragraph) ?: [];
+        $bold = fn (string $text): string => preg_replace('/\*\*(.+?)\*\*/u', '<strong style="font-weight:600;color:#16161D;">$1</strong>', e($text)) ?? e($text);
+        $plain = fn (string $text): string => preg_replace('/\*\*(.+?)\*\*/u', '$1', $text) ?? $text;
+
+        if (str_starts_with($lines[0] ?? '', '## ')) {
+            $heading = trim(substr((string) array_shift($lines), 3));
+            $rest = trim(implode("\n", $lines));
+
+            return [['type' => 'heading', 'html' => e($plain($heading)), 'items' => [], 'text' => $plain($heading)], ...$this->blocks($rest)];
+        }
+
+        if ($lines !== [] && array_filter($lines, fn (string $line): bool => ! preg_match('/^\s*-\s+/', $line)) === []) {
+            $items = array_map(fn (string $line): string => trim((string) preg_replace('/^\s*-\s+/', '', $line)), $lines);
+
+            return [['type' => 'list', 'html' => '', 'items' => array_map($bold, $items),
+                'text' => implode("\n", array_map(fn (string $item): string => '- '.$plain($item), $items))]];
+        }
+
+        return [['type' => 'paragraph', 'html' => nl2br($bold($paragraph), false), 'items' => [], 'text' => $plain($paragraph)]];
+    }
+
+    /**
+     * What {name}, {plan} and {stt_minutes} become for this person: their first name, their
+     * plan's name in this language and its speech to text minutes a month. A preview, or an
+     * address with no plan, reads the first plan the newsletter goes to.
+     *
+     * @return array<string, string>
+     */
+    private function fillFor(Newsletter $newsletter, string $lang, array $recipient, string $name): array
+    {
+        $userId = (int) ($recipient['user_id'] ?? 0);
+        $key = spl_object_id($newsletter).'|'.$userId;
+        if (! array_key_exists($key, $this->plans)) {
+            $plan = null;
+            try {
+                $user = $userId > 0 ? User::query()->find($userId) : null;
+                $plan = $user ? TranscriptionAccess::planOf($user) : null;
+                if ($plan === null && $newsletter->audience === Newsletter::AUDIENCE_PLAN && ($first = $newsletter->chosenPlanIds()[0] ?? null)) {
+                    $plan = Plan::query()->find($first);
+                }
+            } catch (\Throwable) {
+                $plan = null;
+            }
+            $this->plans = [$key => $plan];
+        }
+        $plan = $this->plans[$key];
+
+        return [
+            '{name}' => $name,
+            '{plan}' => $plan ? ((string) ($plan->getLocalizedName($lang) ?: $plan->name)) : ($lang === 'ar' ? 'إسمع' : 'Listen'),
+            '{stt_minutes}' => $plan ? number_format(TranscriptionAccess::monthlyMinutes($plan)) : '',
         ];
     }
 
@@ -215,9 +285,9 @@ class NewsletterRenderer
     /**
      * @return list<string>
      */
-    private function paragraphs(string $text, string $name): array
+    private function paragraphs(string $text, array $fill): array
     {
-        $text = trim($this->personalize($text, $name));
+        $text = trim($this->personalize($text, $fill));
         if ($text === '') {
             return [];
         }
@@ -249,7 +319,7 @@ class NewsletterRenderer
     /**
      * @return list<string>
      */
-    private function highlightLines(mixed $highlights, string $name): array
+    private function highlightLines(mixed $highlights, array $fill): array
     {
         if (! is_array($highlights)) {
             return [];
@@ -258,7 +328,7 @@ class NewsletterRenderer
         $lines = [];
         foreach ($highlights as $item) {
             $text = is_array($item) ? (string) ($item['text'] ?? '') : (string) $item;
-            $text = trim($this->personalize($text, $name));
+            $text = trim($this->personalize($text, $fill));
             if ($text !== '') {
                 $lines[] = $text;
             }
@@ -288,9 +358,10 @@ class NewsletterRenderer
         return $parts[0] ?? $name;
     }
 
-    private function personalize(string $text, string $name): string
+    /** @param  array<string, string>  $fill */
+    private function personalize(string $text, array $fill): string
     {
-        $replaced = str_replace('{name}', $name, $text);
+        $replaced = strtr($text, $fill);
 
         return preg_replace('/[ \t]{2,}/', ' ', $replaced) ?? $replaced;
     }

@@ -75,7 +75,7 @@ class PasswordResetTest extends TestCase
         $this->assertSame('sara@example.com', $email->getTo()[0]->getAddress());
         $this->assertSame('Reset your Listen password', $email->getSubject());
         $body = rtrim((string) $email->getTextBody());
-        $this->assertStringStartsWith("Reset your password\n\nHello Sara,\n\nWe received a request to reset the password of your Listen account. Press the button below to choose a new one.\n\n", $body);
+        $this->assertStringStartsWith("Reset your password\n\nHi Sara,\n\nWe received a request to reset the password of your Listen account. Press the button below to choose a new one.\n\n", $body);
         $this->assertStringContainsString('The link works for 60 minutes and can be used once.', $body);
         $this->assertStringContainsString("If you didn't ask for this, you can ignore this email. Your password stays the same.", $body);
         $this->assertStringContainsString("\n\nChoose a new password: ".$this->linkIn($email)."\n\n", $body);

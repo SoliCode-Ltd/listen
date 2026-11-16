@@ -60,8 +60,24 @@
                                 @if ($section['greeting'] !== '')
                                     <p style="margin:0 0 14px 0;font-family:{{ $section['font'] }};font-size:16px;line-height:1.5;font-weight:600;color:#16161D;text-align:{{ $section['align'] }};">{{ $section['greeting'] }}</p>
                                 @endif
-                                @foreach ($section['paragraphs'] as $paragraph)
-                                    <p style="margin:0 0 14px 0;font-family:{{ $section['font'] }};font-size:16px;line-height:1.7;color:#3F3F4A;text-align:{{ $section['align'] }};">{!! $paragraph !!}</p>
+                                {{-- The opening and body: paragraphs, "## " subheadings and "- " lists (NewsletterRenderer::blocks). --}}
+                                @foreach ($section['blocks'] as $block)
+                                    @if ($block['type'] === 'heading')
+                                        <h2 style="display:block;margin:28px 0 10px 0;font-family:{{ $section['font'] }};font-size:19px;line-height:1.35;font-weight:600;letter-spacing:-0.01em;color:#0B0B0F;text-align:{{ $section['align'] }};">{!! $block['html'] !!}</h2>
+                                    @elseif ($block['type'] === 'list')
+                                        <table role="presentation" dir="{{ $section['dir'] }}" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:2px 0 16px 0;">
+                                            @foreach ($block['items'] as $item)
+                                                <tr>
+                                                    <td width="20" valign="top" style="width:20px;padding:10px 0 0 0;">
+                                                        <div style="width:7px;height:7px;border-radius:4px;background:#7659FA;font-size:0;line-height:0;">&nbsp;</div>
+                                                    </td>
+                                                    <td valign="top" dir="{{ $section['dir'] }}" style="padding:0 0 10px 0;font-family:{{ $section['font'] }};font-size:16px;line-height:1.65;color:#3F3F4A;text-align:{{ $section['align'] }};">{!! $item !!}</td>
+                                                </tr>
+                                            @endforeach
+                                        </table>
+                                    @else
+                                        <p style="margin:0 0 14px 0;font-family:{{ $section['font'] }};font-size:16px;line-height:1.7;color:#3F3F4A;text-align:{{ $section['align'] }};">{!! $block['html'] !!}</p>
+                                    @endif
                                 @endforeach
                                 @if ($section['highlights'] !== [])
                                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:18px 0 4px 0;">

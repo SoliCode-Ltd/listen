@@ -290,11 +290,11 @@ class NewsletterAudience
         if ($audience === Newsletter::AUDIENCE_PAID) {
             $query->whereIn('id', $this->paidUserIdsQuery());
         } elseif ($audience === Newsletter::AUDIENCE_PLAN) {
-            $planId = (int) $newsletter->plan_id;
-            if ($planId <= 0) {
+            $planIds = $newsletter->chosenPlanIds();
+            if ($planIds === []) {
                 $query->whereRaw('1 = 0');
             } else {
-                $query->whereIn('id', $this->userIdsOnPlanQuery($planId));
+                $query->whereIn('id', $this->userIdsOnPlansQuery($planIds));
             }
         } elseif ($audience === Newsletter::AUDIENCE_ALL) {
             // Every registered account that passed the filters above.
@@ -315,12 +315,13 @@ class NewsletterAudience
             ->whereHas('plan', fn (Builder $plan) => $plan->where('price_cents', '>', 0));
     }
 
-    private function userIdsOnPlanQuery(int $planId): Builder
+    /** @param  list<int>  $planIds */
+    private function userIdsOnPlansQuery(array $planIds): Builder
     {
         return Subscription::query()
             ->select('subscriptions.user_id')
             ->whereIn('subscriptions.id', $this->latestActiveSubscriptionIdsQuery())
-            ->where('subscriptions.plan_id', $planId);
+            ->whereIn('subscriptions.plan_id', $planIds);
     }
 
     private function latestActiveSubscriptionIdsQuery(): Builder

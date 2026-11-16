@@ -132,22 +132,24 @@ class NewsletterResource extends Resource
                             Newsletter::AUDIENCE_FREE => 'Free registered users',
                             Newsletter::AUDIENCE_PAID => 'Paid subscribers',
                             Newsletter::AUDIENCE_ALL => 'Every registered user',
-                            Newsletter::AUDIENCE_PLAN => 'One plan',
+                            Newsletter::AUDIENCE_PLAN => 'Chosen plans',
                             Newsletter::AUDIENCE_CUSTOM => 'Only the addresses I list',
                         ])
                         ->descriptions([
                             Newsletter::AUDIENCE_FREE => 'Accounts with no active paid plan, including people who never picked a plan.',
                             Newsletter::AUDIENCE_PAID => 'Accounts on an active paid or trial plan.',
                             Newsletter::AUDIENCE_ALL => 'Every registered account with a real email address.',
-                            Newsletter::AUDIENCE_PLAN => 'Accounts whose current plan is the one you pick.',
+                            Newsletter::AUDIENCE_PLAN => 'Accounts whose current plan is one of the plans you pick. Pick as many as you like.',
                             Newsletter::AUDIENCE_CUSTOM => 'Ignores free and paid. Sends only to the addresses below.',
                         ])
                         ->default(Newsletter::AUDIENCE_FREE)
                         ->live()
                         ->required()
                         ->columnSpanFull(),
-                    Select::make('plan_id')
-                        ->label('Plan')
+                    Select::make('plan_ids')
+                        ->label('Plans')
+                        ->multiple()
+                        ->helperText('Everyone whose current plan is any of these.')
                         ->options(fn (): array => Plan::query()
                             ->orderBy('price_cents')
                             ->get()
@@ -294,13 +296,13 @@ class NewsletterResource extends Resource
                 ->label('Opening')
                 ->rows(3)
                 ->default($defaults['intro_'.$locale])
-                ->helperText('Write {name} to insert the person’s first name. A greeting is added above this.')
+                ->helperText('A greeting with the person’s first name ("Hi Sara,") is added above this. {name}, {plan} and {stt_minutes} are filled in for each person: their first name, their plan, and its speech to text minutes a month.')
                 ->columnSpanFull(),
             Textarea::make('body_'.$locale)
                 ->label('Body')
                 ->rows(5)
                 ->default($defaults['body_'.$locale])
-                ->helperText('Leave a blank line between paragraphs.')
+                ->helperText('Leave a blank line between paragraphs. Start a line with "## " for a subheading, and lines with "- " for a list. Put **two stars** around words to make them bold. {name}, {plan} and {stt_minutes} work here too.')
                 ->columnSpanFull(),
             Repeater::make('highlights_'.$locale)
                 ->label('Highlights')
@@ -352,7 +354,7 @@ class NewsletterResource extends Resource
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         Newsletter::AUDIENCE_PAID => 'Paid',
                         Newsletter::AUDIENCE_ALL => 'Everyone',
-                        Newsletter::AUDIENCE_PLAN => 'One plan',
+                        Newsletter::AUDIENCE_PLAN => 'Chosen plans',
                         Newsletter::AUDIENCE_CUSTOM => 'Address list',
                         default => 'Free users',
                     }),
@@ -388,7 +390,7 @@ class NewsletterResource extends Resource
                         Newsletter::AUDIENCE_FREE => 'Free users',
                         Newsletter::AUDIENCE_PAID => 'Paid',
                         Newsletter::AUDIENCE_ALL => 'Everyone',
-                        Newsletter::AUDIENCE_PLAN => 'One plan',
+                        Newsletter::AUDIENCE_PLAN => 'Chosen plans',
                         Newsletter::AUDIENCE_CUSTOM => 'Address list',
                     ]),
             ])
@@ -420,10 +422,17 @@ class NewsletterResource extends Resource
     {
         unset($data['preview_locale'], $data['delivery_summary']);
 
-        foreach (['plan_id', 'reply_to', 'from_name', 'from_address', 'custom_emails', 'internal_notes'] as $field) {
+        foreach (['plan_ids', 'reply_to', 'from_name', 'from_address', 'custom_emails', 'internal_notes'] as $field) {
             if (array_key_exists($field, $data) && blank($data[$field])) {
                 $data[$field] = null;
             }
+        }
+
+        // The chosen plans, and the first of them as plan_id, which older code reads.
+        if (array_key_exists('plan_ids', $data)) {
+            $ids = array_values(array_unique(array_filter(array_map('intval', (array) ($data['plan_ids'] ?? [])), fn (int $id): bool => $id > 0)));
+            $data['plan_ids'] = $ids === [] ? null : $ids;
+            $data['plan_id'] = $ids[0] ?? null;
         }
 
         return Arr::only($data, (new Newsletter)->getFillable());
