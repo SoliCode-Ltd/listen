@@ -323,6 +323,34 @@ class TranscriberTest extends TestCase
     }
 
     /** A test recording of steady tone: $seconds long, or two $seconds tones with $gap seconds of silence between. */
+    /**
+     * The times heard for each sentence's start put the sentences on the clock, each start on
+     * the speech that begins nearby and each end where its speech ends; times that do not hold
+     * together are refused, so the sentences are shared out by their length instead.
+     */
+    public function test_sentences_go_where_they_are_heard_to_start(): void
+    {
+        $sentences = [
+            ['speaker' => 'A', 'text' => 'Welcome to the shop.', 'paragraph' => 0],
+            ['speaker' => 'A', 'text' => 'We have laptops and printers.', 'paragraph' => 0],
+            ['speaker' => 'B', 'text' => 'Thank you.', 'paragraph' => 1],
+        ];
+        // Music until 3.0 s, then speech with pauses at 6.1-6.8 and 11.2-12.0.
+        $speech = [[3.0, 6.1], [6.8, 11.2], [12.0, 13.5]];
+
+        $placed = Transcriber::placeOnStarts($sentences, [3.3, 6.5, 12.2], $speech, 0.0, 14.0);
+        $this->assertSame([[3.0, 6.1], [6.8, 11.2], [12.0, 13.5]], array_map(fn ($s) => [$s['start'], $s['end']], $placed));
+        $this->assertSame('We have laptops and printers.', $placed[1]['text']);
+
+        // A time far from any speech start is kept as heard.
+        $this->assertSame(9.0, Transcriber::placeOnStarts($sentences, [3.3, 9.0, 12.2], $speech, 0.0, 14.0)[1]['start']);
+        // Out of the audio, mostly going back, all the same, or missing one: refused.
+        $this->assertNull(Transcriber::placeOnStarts($sentences, [3.3, 6.5, 30.0], $speech, 0.0, 14.0));
+        $this->assertNull(Transcriber::placeOnStarts($sentences, [9.0, 5.0, 2.0], $speech, 0.0, 14.0));
+        $this->assertNull(Transcriber::placeOnStarts($sentences, [4.0, 4.0, 4.0], $speech, 0.0, 14.0));
+        $this->assertNull(Transcriber::placeOnStarts($sentences, [3.3, 6.5], $speech, 0.0, 14.0));
+    }
+
     /** A browser recording has no length in its header ("Duration: N/A"): it is read to its end, never taken as 0 s. */
     public function test_a_browser_recording_without_a_length_in_its_header_is_measured(): void
     {

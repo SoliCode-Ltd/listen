@@ -211,7 +211,7 @@ class TranscribePageTest extends TestCase
             ->assertSee('id="transcribeSection"', false)
             ->assertSee('href="#transcribeSection"', false)
             ->assertSee(__('transcribe.page.drop_title'))
-            ->assertSee(__('transcribe.page.rule_second_value'))
+            ->assertSee(__('transcribe.page.stat_left'))
             ->assertSee('120 min')
             ->assertSee('css/transcribe.css', false)
             ->assertSee('js/transcribe.js', false);

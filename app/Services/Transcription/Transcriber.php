@@ -156,22 +156,33 @@ final class Transcriber
         $part = $plan[$n];
         $tmp = sys_get_temp_dir().'/listen-transcribe-'.bin2hex(random_bytes(6));
         @mkdir($tmp, 0700, true);
+        $from = $n === 0 ? 0.0 : (float) $part['keep_from'];
+        $to = $n === count($plan) - 1 ? (float) $state['seconds'] : min((float) $state['seconds'], (float) $part['keep_to'] + self::OVERLAP);
         try {
             $heard = $this->hearStretch(self::ffmpeg(), $clean, $tmp, $part, $state['pauses'], $state['ask'] + ['part' => count($plan) > 1], $state['run'], 'part '.($n + 1));
+            // Detected once, then given: the rest of the recording is heard in the language found.
+            if ($state['ask']['language'] === 'auto' && $heard['language'] !== '' && self::languageName($heard['language']) !== '') {
+                $state['ask']['language'] = $heard['language'];
+            }
+            $mine = self::withoutRepeatedStart((string) $state['before'], $heard['paragraphs']);
+            $sentences = self::sentences($mine, count($state['paragraphs']));
+            $speech = self::speechIn($state['pauses'], $from, $to);
+            // Each sentence where it is heard to start (the words are not asked again, only the times);
+            // shared out over the speech by its length when that answer does not hold together.
+            $starts = $this->alignStarts(self::ffmpeg(), $clean, $tmp, $from, $to, $sentences, $state['run']);
+            $onStarts = $starts !== null ? self::placeOnStarts($sentences, $starts, $speech, $from, $to) : null;
+            $placed = $onStarts ?? self::placeOnSpeech($sentences, $speech, $from, $to);
+            if ($onStarts !== null) {
+                $state['run']['aligned'] = ($state['run']['aligned'] ?? 0) + 1;
+            } elseif ($starts !== null) {
+                $state['run']['notes'][] = 'times: part '.($n + 1).' did not hold together, shared out over the speech';
+            }
         } finally {
             foreach ((array) glob($tmp.'/*') as $f) {
                 @unlink((string) $f);
             }
             @rmdir($tmp);
         }
-        // Detected once, then given: the rest of the recording is heard in the language found.
-        if ($state['ask']['language'] === 'auto' && $heard['language'] !== '' && self::languageName($heard['language']) !== '') {
-            $state['ask']['language'] = $heard['language'];
-        }
-        $mine = self::withoutRepeatedStart((string) $state['before'], $heard['paragraphs']);
-        $from = $n === 0 ? 0.0 : (float) $part['keep_from'];
-        $to = $n === count($plan) - 1 ? (float) $state['seconds'] : min((float) $state['seconds'], (float) $part['keep_to'] + self::OVERLAP);
-        $placed = self::placeOnSpeech(self::sentences($mine, count($state['paragraphs'])), self::speechIn($state['pauses'], $from, $to), $from, $to);
         // In order: a part never starts before the one before it ended.
         $floor = $state['segments'] !== [] ? (float) end($state['segments'])['end'] : 0.0;
         foreach ($placed as $s) {
@@ -214,6 +225,8 @@ final class Transcriber
             'language' => $state['asked'] !== 'auto' ? (string) $state['asked'] : (string) (array_key_first($detected) ?? ''),
             'seconds' => (float) $state['seconds'],
             'parts' => count($state['plan']),
+            // Parts whose sentences were placed where they are heard to start (the rest: shared out over the speech).
+            'aligned' => (int) ($state['run']['aligned'] ?? 0),
             'requests' => (int) $state['run']['requests'],
             'recited' => (bool) $state['run']['recited'],
             'usage' => $state['run']['usage'],
@@ -450,6 +463,148 @@ final class Transcriber
         }
 
         return $speech !== [] ? $speech : [[round($from, 2), round($to, 2)]];
+    }
+
+    /**
+     * When each sentence starts, heard by the model in the part's own audio: it is given the
+     * sentences already written (numbered, in order) and answers with times only, so the words
+     * cannot change or repeat. Seconds on the recording's clock, one for each sentence, or null
+     * when there is no usable answer (the caller then shares the sentences out by their length).
+     *
+     * @param  array<int, array<string, mixed>>  $sentences  with 'text'
+     * @param  array<string, mixed>  $run  the run's counters, changed in place
+     * @return array<int, float>|null
+     */
+    private function alignStarts(string $ffmpeg, string $clean, string $tmp, float $from, float $to, array $sentences, array &$run): ?array
+    {
+        if ($sentences === [] || $to - $from < 1.0) {
+            return null;
+        }
+        if (count($sentences) === 1) {
+            return null;
+        }
+        $audio = $tmp.'/align-'.(int) ($from * 100).'.mp3';
+        $lines = [];
+        foreach (array_values($sentences) as $i => $sentence) {
+            $lines[] = ($i + 1).'. '.trim((string) $sentence['text']);
+        }
+        $prompt = 'This audio is '.number_format($to - $from, 1, '.', '')." seconds long. These are the sentences spoken in it, in order:\n\n"
+            .implode("\n", $lines)
+            ."\n\nFor every sentence, give the time in seconds from the start of this audio (with one decimal) at which its first word begins to be spoken. "
+            .'The sentences are in order, so the times go up. Music, noise or silence before a sentence is not part of it. Answer for every number.';
+        try {
+            $this->cut($ffmpeg, $clean, $from, $to - $from, $audio);
+            $answer = $this->askModel([
+                ['inline_data' => ['mime_type' => 'audio/mpeg', 'data' => base64_encode((string) file_get_contents($audio))]],
+                ['text' => $prompt],
+            ], 'low', self::alignSchema());
+        } catch (\Throwable $e) {
+            $run['notes'][] = 'times: '.mb_substr($e->getMessage(), 0, 120);
+
+            return null;
+        } finally {
+            @unlink($audio);
+        }
+        $run['requests']++;
+        foreach ($answer['usage'] as $key => $tokens) {
+            $run['usage'][$key] = ($run['usage'][$key] ?? 0) + $tokens;
+        }
+        $starts = [];
+        foreach ((array) ($answer['data']['sentences'] ?? []) as $row) {
+            if (is_array($row) && is_numeric($row['n'] ?? null) && is_numeric($row['start'] ?? null)) {
+                $starts[(int) $row['n'] - 1] = $from + (float) $row['start'];
+            }
+        }
+        if (count($starts) !== count($sentences)) {
+            $run['notes'][] = 'times: '.count($starts).' of '.count($sentences).' sentences';
+
+            return null;
+        }
+        ksort($starts);
+
+        return array_values($starts);
+    }
+
+    /** @return array<string, mixed> the shape of the times answer */
+    public static function alignSchema(): array
+    {
+        $row = ['type' => 'OBJECT', 'properties' => ['n' => ['type' => 'INTEGER'], 'start' => ['type' => 'NUMBER']], 'required' => ['n', 'start'], 'propertyOrdering' => ['n', 'start']];
+
+        return ['type' => 'OBJECT', 'properties' => ['sentences' => ['type' => 'ARRAY', 'items' => $row]], 'required' => ['sentences']];
+    }
+
+    /**
+     * The sentences on the clock from the times heard for their starts: each start moved onto
+     * where speech begins when one is within 0.6 s (the times heard are close, the pauses exact),
+     * and each sentence ending where its speech ends before the next one starts. Null when the
+     * times do not hold together (outside the audio, many going back, or most the same), so the
+     * caller places them by their length instead.
+     *
+     * @param  array<int, array<string, mixed>>  $sentences
+     * @param  array<int, float>  $starts  seconds on the recording's clock, one for each sentence
+     * @param  array<int, array{0: float, 1: float}>  $speech  where speech is heard (speechIn())
+     * @return array<int, array<string, mixed>>|null
+     */
+    public static function placeOnStarts(array $sentences, array $starts, array $speech, float $from, float $to): ?array
+    {
+        $sentences = array_values($sentences);
+        $starts = array_values($starts);
+        $n = count($sentences);
+        if ($n === 0 || count($starts) !== $n) {
+            return null;
+        }
+        $times = [];
+        $back = 0;
+        $same = 0;
+        $prev = $from;
+        foreach ($starts as $i => $start) {
+            $start = (float) $start;
+            if ($start < $from - 1.5 || $start > $to + 1.5) {
+                return null;
+            }
+            if ($i > 0 && $start < $prev - 0.3) {
+                $back++;
+            }
+            if ($i > 0 && abs($start - $prev) < 0.05) {
+                $same++;
+            }
+            $start = min(max($start, $prev, $from), $to);
+            $times[] = $start;
+            $prev = $start;
+        }
+        if ($back > max(1, intdiv($n, 5)) || ($n > 2 && $same >= intdiv($n, 2))) {
+            return null;
+        }
+        // Onto the start of speech nearby, still in order.
+        foreach ($times as $i => $start) {
+            $best = null;
+            foreach ($speech as [$begin]) {
+                if (abs($begin - $start) <= 0.6 && ($best === null || abs($begin - $start) < abs($best - $start))) {
+                    $best = (float) $begin;
+                }
+            }
+            $low = $i > 0 ? $times[$i - 1] : $from;
+            $high = $i + 1 < $n ? $times[$i + 1] : $to;
+            if ($best !== null && $best >= $low && $best <= $high) {
+                $times[$i] = $best;
+            }
+        }
+        $placed = [];
+        foreach ($sentences as $i => $sentence) {
+            $start = $times[$i];
+            $next = $i + 1 < $n ? $times[$i + 1] : $to;
+            // Where its speech ends before the next sentence starts (the pause between them is neither's).
+            $end = $next;
+            foreach ($speech as [$begin, $stop]) {
+                if ($stop > $start + 0.2 && $stop <= $next - 0.05) {
+                    $end = (float) $stop;
+                }
+            }
+            $end = $i + 1 < $n ? min(max($end, $start + 0.2), $next) : max($end, $start + 0.2);
+            $placed[] = $sentence + ['start' => round($start, 2), 'end' => round(min($end, max($to, $start + 0.2)), 2)];
+        }
+
+        return $placed;
     }
 
     /**

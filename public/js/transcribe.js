@@ -60,6 +60,10 @@
     var h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60;
     return (h > 0 ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s;
   }
+  // A file's name as a title: without its extension ("Interview.mp3" reads "Interview").
+  function cleanTitle(s) {
+    return String(s || '').replace(/\.(mp3|wav|m4a|ogg|oga|opus|flac|webm|mp4|m4v|mov|aac|wma|amr)$/i, '');
+  }
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; });
   }
@@ -111,6 +115,7 @@
     var view = name === 'chosen' ? 'drop' : name;
     $$('[data-tr-view]').forEach(function (v) { v.hidden = v.getAttribute('data-tr-view') !== view; });
     drop.classList.toggle('has-file', name === 'chosen');
+    $('[data-tr-studio]').classList.toggle('is-working', name === 'working');
     if (name !== 'chosen') stopPreview();
   }
   function showError(text) {
@@ -140,16 +145,43 @@
     ready(false);
     show('drop');
   }
+  // One bar for the whole way, that only moves forward: sending fills its first part, getting ready
+  // the next, writing out the rest (creeping on while the server works, as long as such a file
+  // usually takes), and it eases to each new point instead of jumping.
+  var RANGES = { upload: [0, 30], prepare: [30, 40], listen: [40, 97], done: [100, 100] };
+  var order = ['upload', 'prepare', 'listen', 'done'];
+  var prog = { shown: 0, target: 0, phase: '', since: 0, expect: 10, frame: 0 };
+  function progressReset(seconds) {
+    prog = { shown: 0, target: 0, phase: '', since: 0, expect: Math.max(8, (seconds || 30) * 0.45 + 6), frame: prog.frame };
+  }
+  function paintProgress() {
+    var p = Math.floor(prog.shown);
+    $('[data-tr-percent]').textContent = p + '%';
+    $('[data-tr-bar-fill]').style.width = prog.shown.toFixed(2) + '%';
+    $('[data-tr-bar]').setAttribute('aria-valuenow', String(p));
+  }
+  function progressTick() {
+    prog.frame = 0;
+    var r = RANGES[prog.phase];
+    if (r && (prog.phase === 'prepare' || prog.phase === 'listen')) {
+      var waited = (Date.now() - prog.since) / 1000;
+      var share = 1 - Math.exp(-waited / (prog.phase === 'prepare' ? 4 : prog.expect / 2));
+      prog.target = Math.max(prog.target, r[0] + (r[1] - r[0]) * share * 0.98);
+    }
+    var gap = prog.target - prog.shown;
+    prog.shown = gap < 0.05 ? prog.target : prog.shown + gap * 0.07;
+    paintProgress();
+    if (!$('[data-tr-view="working"]').hidden) prog.frame = requestAnimationFrame(progressTick);
+  }
   function working(step, percent, title, note) {
     show('working');
     $('[data-tr-working-title]').textContent = title || '';
     $('[data-tr-working-note]').textContent = note || '';
-    var p = Math.max(0, Math.min(100, Math.round(percent)));
-    $('[data-tr-percent]').textContent = p + '%';
-    $('[data-tr-bar-fill]').style.width = p + '%';
-    $('[data-tr-bar]').setAttribute('aria-valuenow', String(p));
-    var order = ['upload', 'prepare', 'listen', 'done'];
-    var at = order.indexOf(step);
+    var r = RANGES[step] || [0, 100];
+    if (step !== prog.phase && (RANGES[step] || [0])[0] >= (RANGES[prog.phase] || [0])[0]) { prog.phase = step; prog.since = Date.now(); }
+    prog.target = Math.min(100, Math.max(prog.target, r[0] + (r[1] - r[0]) * Math.max(0, Math.min(100, percent)) / 100));
+    if (!prog.frame) prog.frame = requestAnimationFrame(progressTick);
+    var at = order.indexOf(prog.phase);
     $$('[data-tr-step]').forEach(function (li) {
       var i = order.indexOf(li.getAttribute('data-tr-step'));
       li.classList.toggle('is-done', i < at);
@@ -498,6 +530,7 @@
   function startLink() {
     busy = true;
     showError('');
+    progressReset(0);
     working('upload', 3, t.fetching, '');
     json('POST', c.urls.store, { url: chosen.url, language: language.value }).then(started).catch(failed);
   }
@@ -509,6 +542,7 @@
     ready(false);
     showError('');
     var file = chosen.file;
+    progressReset(chosen.seconds);
     working('upload', 0, t.sending, '');
     var start = new FormData();
     start.set('name', file.name);
@@ -538,10 +572,13 @@
           return setTimeout(poll, 2500);
         }
         delete following[item.id];
-        if (inBox) {
+        if (inBox && tr.status === 'ready') {
+          // The bar fills, then the transcript opens.
+          working('done', 100, t.working, t.working_note);
+          setTimeout(function () { reset(); open(tr); }, 700);
+        } else if (inBox) {
           reset();
-          if (tr.status === 'ready') open(tr);
-          else showError(tr.error);
+          showError(tr.error);
         }
       }).catch(function () {
         tries += 1;
@@ -579,22 +616,15 @@
     var used = item.status === 'failed' ? t.used_none : (item.status === 'ready' || item.used_seconds > 0 ? item.used : '—');
     var L = c.columns || {};
     return '<td class="num" data-label="' + esc(L.date) + '">' + esc(item.date) + '</td>'
-      + '<td class="tr-name"><button type="button" class="dub-link" data-tr-open dir="auto">' + esc(item.title) + '</button></td>'
+      + '<td class="tr-name"><button type="button" class="dub-link" data-tr-open dir="auto">' + esc(cleanTitle(item.title)) + '</button></td>'
       + '<td data-label="' + esc(L.language) + '">' + esc(item.language_name || '—') + '</td>'
       + '<td class="num" data-label="' + esc(L.length) + '"><span dir="ltr">' + esc(clock(item.seconds)) + '</span></td>'
       + '<td class="num" data-label="' + esc(L.used) + '">' + esc(used) + '</td>'
       + '<td data-label="' + esc(L.status) + '">' + badge(item) + '</td>'
-      + '<td class="tr-actions-cell"><div class="tr-row-actions">'
-      + '<div class="tr-menu" data-tr-menu><button type="button" class="tr-icon" aria-haspopup="true" aria-expanded="false" data-tr-menu-button aria-label="' + esc(fill(t.more_actions, { name: item.title })) + '">'
-      + '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></button>'
-      + '<div class="tr-menu-list" role="menu" hidden>'
-      + (item.status === 'ready' ? '<button type="button" role="menuitem" data-tr-open>' + ICONS.open + esc(t.open) + '</button>'
-        + '<a role="menuitem" href="' + esc(item.urls.export_txt) + '">' + ICONS.download + esc(t.txt) + '</a>'
-        + '<a role="menuitem" href="' + esc(item.urls.export_srt) + '">' + ICONS.download + esc(t.srt) + '</a>'
-        + '<a role="menuitem" href="' + esc(item.urls.export_docx) + '">' + ICONS.download + esc(t.docx) + '</a>' : '')
-      + '<button type="button" role="menuitem" data-tr-rename>' + ICONS.rename + esc(t.rename) + '</button>'
-      + (item.status === 'queued' || item.status === 'processing' ? '' : '<hr aria-hidden="true"><button type="button" role="menuitem" class="is-danger" data-tr-remove>' + ICONS.remove + esc(t.delete) + '</button>')
-      + '</div></div></div></td>';
+      + '<td class="tr-actions-cell">'
+      + (item.status === 'queued' || item.status === 'processing' ? ''
+        : '<button type="button" class="tr-icon tr-row-delete" data-tr-remove aria-label="' + esc(fill(t.delete_named, { name: cleanTitle(item.title) })) + '" title="' + esc(t.delete) + '">' + ICONS.remove + '</button>')
+      + '</td>';
   }
   function bindRow(tr, item) {
     tr._item = item;
@@ -603,8 +633,6 @@
     $$('[data-tr-open]', tr).forEach(function (b) {
       b.addEventListener('click', function () { if (tr._item.status === 'ready') open(tr._item); else if (tr._item.status === 'failed') showError(tr._item.error); });
     });
-    var rename = $('[data-tr-rename]', tr);
-    if (rename) rename.addEventListener('click', function () { renameItem(tr._item); });
     var remove = $('[data-tr-remove]', tr);
     if (remove) remove.addEventListener('click', function () { removeItem(tr._item); });
   }
@@ -647,7 +675,7 @@
     json('PATCH', item.urls.update, { title: title.trim() }).then(function (r) {
       if (r.xhr.status !== 200) return;
       updateRow(r.body.transcription);
-      if (current && current.id === item.id) { current.title = r.body.transcription.title; $('[data-tr-reader-title]').textContent = current.title; }
+      if (current && current.id === item.id) { current.title = r.body.transcription.title; $('[data-tr-reader-title]').textContent = cleanTitle(current.title); }
     });
   }
   function removeItem(item) {
@@ -784,37 +812,93 @@
   }
   function close() {
     if (audio) audio.pause();
+    bar.hidden = true;
     reader.hidden = true;
     current = null;
   }
   $('[data-tr-close]').addEventListener('click', close);
+  $('[data-tr-rename-open]').addEventListener('click', function () { if (current) renameItem(current); });
+
+  // The recording plays from the bar along the reader's foot: play, the time, a seek bar and the speed.
+  var bar = $('[data-tr-playbar]');
+  var seekInput = $('[data-tr-pb-seek]');
+  var SPEEDS = [1, 1.25, 1.5, 2, 0.75];
+  function lengthOfAudio() {
+    var d = audio ? audio.duration : 0;
+    return isFinite(d) && d > 0 ? d : (current ? Number(current.seconds) || 0 : 0);
+  }
+  function paintBar() {
+    if (!audio) return;
+    var playing = !audio.paused && !audio.ended;
+    var play = $('[data-tr-pb-play]');
+    play.classList.toggle('is-playing', playing);
+    play.setAttribute('aria-label', play.getAttribute(playing ? 'data-label-pause' : 'data-label-play'));
+    var total = lengthOfAudio();
+    $('[data-tr-pb-now]').textContent = clock(audio.currentTime);
+    // Rounded as the length above it is, so both say the same.
+    $('[data-tr-pb-total]').textContent = clock(Math.round(total));
+    if (!seekInput._dragging) {
+      var share = total > 0 ? Math.min(1, audio.currentTime / total) : 0;
+      seekInput.value = String(Math.round(share * 1000));
+      seekInput.style.setProperty('--p', (share * 100).toFixed(2) + '%');
+    }
+    seekInput.setAttribute('aria-valuetext', clock(audio.currentTime) + ' / ' + clock(total));
+  }
+  $('[data-tr-pb-play]').addEventListener('click', function () {
+    if (!audio) return;
+    if (audio.paused || audio.ended) { var p = audio.play(); if (p && p.catch) p.catch(paintBar); } else { audio.pause(); }
+  });
+  seekInput.addEventListener('input', function () {
+    seekInput._dragging = true;
+    var share = Number(seekInput.value) / 1000;
+    seekInput.style.setProperty('--p', (share * 100).toFixed(2) + '%');
+    $('[data-tr-pb-now]').textContent = clock(share * lengthOfAudio());
+  });
+  seekInput.addEventListener('change', function () {
+    seekInput._dragging = false;
+    if (audio) { audio.currentTime = Number(seekInput.value) / 1000 * lengthOfAudio(); light(true); }
+  });
+  $('[data-tr-pb-speed]').addEventListener('click', function (e) {
+    if (!audio) return;
+    var next = SPEEDS[(SPEEDS.indexOf(audio.playbackRate) + 1) % SPEEDS.length] || 1;
+    audio.playbackRate = next;
+    e.currentTarget.textContent = (next === 1 ? '1' : String(next)) + '×';
+  });
 
   function render(tr) {
-    $('[data-tr-reader-title]').textContent = tr.title;
-    var bits = [tr.length, fill(t.used, { time: tr.free ? t.status_free : tr.used })];
+    $('[data-tr-reader-title]').textContent = cleanTitle(tr.title);
+    // The length, the language and the day: once each.
+    var bits = [tr.length];
     if (tr.language_name) bits.push(tr.language_name);
     bits.push(tr.date);
     $('[data-tr-reader-meta]').textContent = bits.join(' · ');
-    // The recording, in the site's own player, while it is kept.
-    var player = $('[data-tr-player]');
-    player.innerHTML = '';
-    audio = null;
+    if (audio) { audio.pause(); audio.removeAttribute('src'); audio.load(); }
+    audio = $('[data-tr-audio]');
+    audio.playbackRate = 1;
+    $('[data-tr-pb-speed]').textContent = '1×';
+    var gone = $('[data-tr-audio-gone]');
     if (tr.audio) {
-      audio = document.createElement('audio');
-      audio.controls = true;
-      audio.preload = 'metadata';
       audio.src = tr.urls.audio;
-      audio.setAttribute('data-download-disabled', '1');
-      player.appendChild(audio);
-      if (typeof window.initCustomAudioPlayers === 'function') window.initCustomAudioPlayers();
-      audio.addEventListener('timeupdate', light);
+      bar.hidden = false;
+      gone.hidden = true;
     } else {
-      player.innerHTML = '<p class="tr-note">' + esc(fill(t.audio_gone, { days: c.keepDays })) + '</p>';
+      audio.removeAttribute('src');
+      audio = null;
+      bar.hidden = true;
+      gone.textContent = fill(t.audio_gone, { days: c.keepDays });
+      gone.hidden = false;
     }
+    paintBar();
     renderSpeakers(tr);
     shown = { paragraphs: tr.paragraphs, segments: tr.segments };
     renderText(tr.rtl, true);
   }
+  (function () {
+    var a = $('[data-tr-audio]');
+    ['play', 'pause', 'ended', 'loadedmetadata', 'durationchange'].forEach(function (ev) { a.addEventListener(ev, paintBar); });
+    a.addEventListener('timeupdate', function () { paintBar(); light(false); });
+    a.addEventListener('seeked', function () { light(true); });
+  })();
   function speakerIndex(letter) {
     var list = (current && current.speaker_list) || [];
     for (var i = 0; i < list.length; i++) if (list[i].id === letter) return i;
@@ -835,6 +919,10 @@
       label.innerHTML = '<span class="tr-swatch" data-n="' + (i % 4) + '" aria-hidden="true">' + esc(s.id) + '</span>'
         + '<input type="text" maxlength="60" dir="auto" value="' + esc(s.name) + '" aria-label="' + esc(fill(t.speaker_name, { speaker: s.name })) + '">';
       var input = $('input', label);
+      // Browsers that cannot size a box to its text: as many letters wide as the name.
+      var fit = function () { input.size = Math.max(4, Math.min(28, input.value.length + 1)); };
+      fit();
+      input.addEventListener('input', fit);
       input.addEventListener('change', function () {
         var names = {};
         names[s.id] = input.value;
@@ -847,11 +935,15 @@
       list.appendChild(label);
     });
   }
-  // The paragraphs, each sentence a span to click; editable in the original only.
+  // The paragraphs as a document: who speaks and when (the time plays from there), the sentences
+  // to click, and a pencil to correct one (in the original only).
   function renderText(rtl, editable) {
     var box = $('[data-tr-text]');
     box.innerHTML = '';
+    lit = null;
     box.classList.toggle('tr-rtl', !!rtl);
+    // The page laid out the way its language reads: who speaks, when, and what on the same side.
+    box.setAttribute('dir', rtl ? 'rtl' : 'ltr');
     var several = ((current && current.speaker_list) || []).length > 1;
     (shown.paragraphs || []).forEach(function (p, i) {
       var div = document.createElement('div');
@@ -862,11 +954,10 @@
       }).join(' ') : esc(p.text);
       div.innerHTML = '<div class="tr-para-head">'
         + (several ? '<span class="tr-swatch" data-n="' + (speakerIndex(p.speaker) % 4) + '" aria-hidden="true">' + esc(p.speaker) + '</span><span class="tr-para-who">' + esc(nameOf(p.speaker)) + '</span>' : '')
-        + '<span class="tr-para-time" dir="ltr">' + esc(clock(p.start || 0)) + '</span>'
-        + '<span class="tr-para-tools">'
-        + (audio ? '<button type="button" class="tr-icon" data-tr-play aria-label="' + esc(t.play_from) + '"><svg viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></button>' : '')
-        + (editable ? '<button type="button" class="tr-icon" data-tr-edit aria-label="' + esc(t.edit) + '"><svg viewBox="0 0 24 24"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4z"/></svg></button>' : '')
-        + '</span></div><div class="tr-para-body" dir="auto">' + body + '</div>';
+        + (audio ? '<button type="button" class="tr-para-time" data-tr-play dir="ltr" aria-label="' + esc(t.play_from) + ' ' + esc(clock(p.start || 0)) + '">' + esc(clock(p.start || 0)) + '</button>'
+          : '<span class="tr-para-time" dir="ltr">' + esc(clock(p.start || 0)) + '</span>')
+        + (editable ? '<button type="button" class="tr-icon tr-para-edit-btn" data-tr-edit aria-label="' + esc(t.edit) + '" title="' + esc(t.edit) + '"><svg viewBox="0 0 24 24"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4z"/></svg></button>' : '')
+        + '</div><div class="tr-para-body" dir="auto">' + body + '</div>';
       var play = $('[data-tr-play]', div);
       if (play) play.addEventListener('click', function () { seek(p.start || 0); });
       var edit = $('[data-tr-edit]', div);
@@ -884,7 +975,8 @@
     if (p && p.catch) p.catch(function () { /* the browser waits for a gesture */ });
   }
   var lit = null;
-  function light() {
+  // The sentence being heard is lit, and brought into view when it leaves it while playing.
+  function light(jump) {
     if (!audio) return;
     var now = audio.currentTime;
     var spans = $$('.tr-s', $('[data-tr-text]'));
@@ -892,12 +984,21 @@
     for (var i = 0; i < spans.length; i++) {
       var s = parseFloat(spans[i].getAttribute('data-start'));
       var e = parseFloat(spans[i].getAttribute('data-end'));
-      if (now >= s && now < e + 0.15) { found = spans[i]; break; }
+      if (now >= s - 0.05 && now < e + 0.15) { found = spans[i]; break; }
     }
     if (found === lit) return;
     if (lit) lit.classList.remove('is-now');
     lit = found;
-    if (lit) lit.classList.add('is-now');
+    if (!lit) return;
+    lit.classList.add('is-now');
+    if ((!audio.paused || jump) && !reader.hidden) {
+      var r = lit.getBoundingClientRect();
+      var barTop = bar.hidden ? window.innerHeight : bar.getBoundingClientRect().top;
+      if (r.top < 120 || r.bottom > barTop - 16) {
+        var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        lit.scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
+      }
+    }
   }
   function editParagraph(div, index, p) {
     var body = $('.tr-para-body', div);
@@ -970,24 +1071,42 @@
     var choice = e.target.closest('[data-tr-language]');
     if (choice) showIn(choice.getAttribute('data-tr-language'));
   });
+  // Another language: the button turns while it is made, then shows it; nothing is left on the page after.
   function showIn(target) {
     if (!current) return;
-    languageMenu(target);
     var note = $('[data-tr-translate-note]');
+    var button = $('[data-tr-language-button]');
+    note.hidden = true;
     if (!target) {
       shownLanguage = '';
-      note.hidden = true;
+      languageMenu('');
       shown = { paragraphs: current.paragraphs, segments: current.segments };
       return renderText(current.rtl, true);
     }
-    note.hidden = false;
-    note.textContent = t.translating;
+    var before = shownLanguage;
+    languageMenu(target);
+    button.classList.add('is-busy');
+    button.setAttribute('aria-busy', 'true');
+    var asked = current.id;
     json('POST', current.urls.translate, { language: target }).then(function (r) {
-      if (r.xhr.status !== 200) { note.textContent = (r.body && r.body.message) || t.network; return; }
+      button.classList.remove('is-busy');
+      button.removeAttribute('aria-busy');
+      if (!current || current.id !== asked) return;
+      if (r.xhr.status !== 200) {
+        languageMenu(before);
+        note.textContent = (r.body && r.body.message) || t.network;
+        note.hidden = false;
+        return;
+      }
       shownLanguage = target;
-      note.textContent = t.translate_free;
       shown = { paragraphs: r.body.paragraphs, segments: r.body.segments };
       renderText((c.rtl || []).indexOf(target) !== -1, false);
+    }).catch(function () {
+      button.classList.remove('is-busy');
+      button.removeAttribute('aria-busy');
+      languageMenu(before);
+      note.textContent = t.network;
+      note.hidden = false;
     });
   }
   $('[data-tr-studio-send]').addEventListener('click', function () {

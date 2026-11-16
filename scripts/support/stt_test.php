@@ -27,16 +27,21 @@
  *   ssh user@host 'cd ~/public_html && php' < scripts/support/stt_test.php
  */
 
-use App\Http\Controllers\Api\V1\TranscriptionController;
+use App\Console\Commands\TranscribeMeasureCommand;
+use App\Http\Controllers\DashboardController;
 use App\Models\ApiKey;
+use App\Models\ApiRequestLog;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\Transcription;
 use App\Models\User;
 use App\Models\Voice;
+use App\Services\Transcription\Transcriber;
 use App\Services\Transcription\TranscriptEditor;
 use App\Services\Transcription\TranscriptExport;
 use App\Services\Transcription\TranscriptionFlow;
+use App\Services\Tts\GeminiKeyManager;
+use App\Support\Api\ApiPlanAccess;
 use App\Support\AudioFormats;
 use App\Support\LiveServer;
 use App\Support\Transcription\TranscriptionAccess;
@@ -47,7 +52,12 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\ViewErrorBag;
+use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Process\Process;
 
 require 'vendor/autoload.php';
@@ -70,20 +80,20 @@ Cache::put('site_setting.transcription_audience', TranscriptionSettings::AUDIENC
 // STT_DRY=1, on a developer's machine only (never on the servers): the model's and the
 // translator's answers are made up, to try the rest of this script without a key.
 if (getenv('STT_DRY') === '1' && ! str_contains((string) config('app.url'), 'staging')) {
-    $app->instance(\App\Services\Tts\GeminiKeyManager::class, new class extends \App\Services\Tts\GeminiKeyManager
+    $app->instance(GeminiKeyManager::class, new class extends GeminiKeyManager
     {
         public function getAllKeys(): array
         {
             return [['key' => 'dry', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1]];
         }
     });
-    \Illuminate\Support\Facades\Http::fake([
-        'generativelanguage.googleapis.com/*' => \Illuminate\Support\Facades\Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode([
+    Http::fake([
+        'generativelanguage.googleapis.com/*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode([
             'language' => 'ar', 'speakers' => [['id' => 'A', 'voice' => 'female'], ['id' => 'B', 'voice' => 'male']],
             'paragraphs' => [['speaker' => 'A', 'text' => 'أهلًا وسهلًا بكم.'], ['speaker' => 'B', 'text' => 'شكرًا لكم، يسعدني أن أكون هنا.']],
         ], JSON_UNESCAPED_UNICODE)]]], 'finishReason' => 'STOP']], 'usageMetadata' => ['promptTokenCount' => 900, 'candidatesTokenCount' => 30]]),
-        'translate.googleapis.com/*' => \Illuminate\Support\Facades\Http::response([[['Hello and welcome.', 'x', null, null, 10]], null, 'ar']),
-        '*' => \Illuminate\Support\Facades\Http::response('', 404),
+        'translate.googleapis.com/*' => Http::response([[['Hello and welcome.', 'x', null, null, 10]], null, 'ar']),
+        '*' => Http::response('', 404),
     ]);
     echo "DRY RUN: made-up answers.\n";
 }
@@ -104,7 +114,7 @@ if (! $ffmpeg) {
 }
 
 /** The homepage's voice samples (public/audio/voice-previews), with the words each one says. */
-$clips = \App\Console\Commands\TranscribeMeasureCommand::clipCatalog();
+$clips = TranscribeMeasureCommand::clipCatalog();
 $sample = function (string $prefix, array $not = []) use ($clips): ?array {
     foreach ($clips as $clip) {
         if (str_starts_with(strtolower($clip['dialect']), $prefix) && ! in_array($clip['slug'], $not, true)) {
@@ -151,12 +161,12 @@ $run([$ffmpeg, '-v', 'error', '-y', '-i', $arA['path'], '-i', $arB['path'], '-fi
     '-map', '[o]', '-c:a', 'libmp3lame', '-b:a', '64k', $dialogue]);
 $english = $work.'/english.mp3';
 copy($en['path'], $english);
-echo '  Arabic: ', $arA['name'], ' then ', $arB['name'], "; English: ", $en['name'], "\n";
+echo '  Arabic: ', $arA['name'], ' then ', $arB['name'], '; English: ', $en['name'], "\n";
 
 // ---------------------------------------------------------------- the member
 // The cheapest plan with speech to text whose members the API serves.
 $plan = Plan::query()->where('transcription_enabled', true)->where('transcription_minutes_month', '>', 0)->orderBy('price_cents')->get()
-    ->first(fn (Plan $p): bool => \App\Support\Api\ApiPlanAccess::enabled($p));
+    ->first(fn (Plan $p): bool => ApiPlanAccess::enabled($p));
 if (! $plan) {
     echo "No plan includes both speech to text and the API.\n";
     exit(1);
@@ -227,6 +237,28 @@ try {
         }
         $check($segments !== [] && $inOrder, count($segments).' sentences, in order, none ending before it starts');
         $check($inside, 'every sentence inside the audio');
+        echo '    ', implode(' | ', array_filter((array) $t->notes, fn ($n) => str_starts_with((string) $n, 'times'))), "\n";
+        if ($language === 'ar') {
+            // In time with the voice: the second voice starts one second after the first ends, and
+            // its first sentence is lit then, not a sentence early or late.
+            $secondStarts = Transcriber::lengthOf($arA['path']) + 1.0;
+            $first = $segments[0]['speaker'] ?? '';
+            $switch = null;
+            foreach ($segments as $i => $s) {
+                if ($s['speaker'] !== $first) {
+                    $switch = $i;
+                    break;
+                }
+            }
+            if ($switch === null) {
+                $check(false, 'in time with the voice: no second speaker to time');
+            } else {
+                $at = (float) $segments[$switch]['start'];
+                $endBefore = (float) $segments[$switch - 1]['end'];
+                $check(abs($at - $secondStarts) <= 0.8 && $endBefore <= $at + 0.05,
+                    sprintf('in time with the voice: the second voice is heard from %.1f s, its first sentence starts at %.1f s (the one before ends at %.1f s)', $secondStarts, $at, $endBefore));
+            }
+        }
         $norm = fn (string $s): string => mb_strtolower(trim(preg_replace('/[\p{P}\s]+/u', ' ', $s) ?? ''));
         $texts = array_map(fn ($s) => $norm((string) $s['text']), $segments);
         $check(count($texts) === count(array_unique($texts)), 'no sentence twice');
@@ -341,17 +373,17 @@ try {
         foreach (['en', 'ar'] as $locale) {
             // The dashboard as its controller renders it for this member, in this language.
             app()->setLocale($locale);
-            \Mcamara\LaravelLocalization\Facades\LaravelLocalization::setLocale($locale);
+            LaravelLocalization::setLocale($locale);
             $request = Request::create(url('/'.$locale.'/dashboard'), 'GET');
             $request->setLaravelSession(app('session')->driver());
             $request->setUserResolver(fn () => $who);
             $app->instance('request', $request);
             Auth::guard('web')->setUser($who);
-            \Illuminate\Support\Facades\View::share('errors', new \Illuminate\Support\ViewErrorBag);
+            View::share('errors', new ViewErrorBag);
             try {
-                $view = app(\App\Http\Controllers\DashboardController::class)->index($request);
-                $html = $view instanceof \Illuminate\Contracts\View\View ? $view->render() : (string) ($view->getContent() ?? '');
-                $status = $view instanceof \Symfony\Component\HttpFoundation\Response ? $view->getStatusCode() : 200;
+                $view = app(DashboardController::class)->index($request);
+                $html = $view instanceof Illuminate\Contracts\View\View ? $view->render() : (string) ($view->getContent() ?? '');
+                $status = $view instanceof Response ? $view->getStatusCode() : 200;
             } finally {
                 Auth::guard('web')->logout();
                 app()->setLocale('en');
@@ -385,10 +417,10 @@ try {
             }
             $check($twice === [], "{$label}, {$locale}: no word twice in a row".($twice ? ': '.implode(', ', array_unique($twice)) : ''));
             $root = $locale === 'ar' ? 'ترجم' : 'translat';
-            echo "        \"{$root}\" ", substr_count(mb_strtolower($text), $root), " times; the text: ", mb_substr($text, 0, 1600), "\n";
+            echo "        \"{$root}\" ", substr_count(mb_strtolower($text), $root), ' times; the text: ', mb_substr($text, 0, 1600), "\n";
         }
     }
-} catch (\Throwable $e) {
+} catch (Throwable $e) {
     $check(false, 'stopped: '.get_class($e).': '.$e->getMessage().' at '.basename($e->getFile()).':'.$e->getLine());
 } finally {
     echo "\n== Clean up ==\n";
@@ -398,11 +430,11 @@ try {
             $t->forceDelete();
         }
         try {
-            \App\Models\ApiRequestLog::query()->where('user_id', $who->id)->delete();
+            ApiRequestLog::query()->where('user_id', $who->id)->delete();
             ApiKey::query()->where('user_id', $who->id)->delete();
             Subscription::query()->where('user_id', $who->id)->delete();
             method_exists($who, 'forceDelete') ? $who->forceDelete() : $who->delete();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $check(false, "removing member {$who->id}: ".$e->getMessage());
         }
     }
@@ -410,7 +442,7 @@ try {
         @unlink($file);
     }
     echo '  The throwaway members, their transcripts, keys and files are gone: ',
-        User::query()->whereIn('email', ["stt-test-{$stamp}@example.invalid", "stt-test-free-{$stamp}@example.invalid"])->count() === 0 ? 'yes' : 'NO', "\n";
+    User::query()->whereIn('email', ["stt-test-{$stamp}@example.invalid", "stt-test-free-{$stamp}@example.invalid"])->count() === 0 ? 'yes' : 'NO', "\n";
 }
 
 echo "\n", $failures === [] ? 'ALL CHECKS PASSED' : count($failures).' CHECK(S) FAILED:'."\n  - ".implode("\n  - ", $failures), "\n";

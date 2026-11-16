@@ -78,6 +78,6 @@ class TranscriptionPlanSettingsTest extends TestCase
         $this->assertSame(90, $plan->transcription_max_file_minutes);
         $this->assertSame(3, $plan->transcription_concurrent_jobs);
         $this->assertTrue($plan->transcription_priority);
-        $this->assertEqualsWithDelta(0.0025, TranscriptionAccess::costPerMinute(), 1e-9);
+        $this->assertEqualsWithDelta(0.0045, TranscriptionAccess::costPerMinute(), 1e-9);
     }
 }

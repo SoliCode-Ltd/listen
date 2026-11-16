@@ -143,18 +143,27 @@
 
 /* ---------- The box's foot: the language, and the start button ---------- */
 .tr-foot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .8rem 1rem; }
+/* The button stands level with the language list beside it: the same height, the same foot line. */
+.vs-editor-foot.tr-foot { align-items: flex-end; }
+.tr-foot .dub-go-row { align-self: flex-end; }
+.tr-foot .dub-go { box-sizing: border-box; height: 46px; min-height: 46px; padding-block: 0; line-height: 1; }
+.tr-foot .dub-go svg { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.dub-studio.is-working .tr-foot { display: none; }
 .tr-language { display: grid; gap: .3rem; min-width: min(240px, 100%); }
 .tr-language select { min-height: 44px; }
 
 /* ---------- The transcript reader ---------- */
-.tr-reader { margin-top: 2.2rem; padding-top: 2rem; border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+.tr-reader { margin-top: 2.2rem; padding-top: 1.6rem; border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
 .tr-reader:focus { outline: none; }
 .tr-back { display: inline-flex; align-items: center; gap: .3rem; min-height: 40px; }
 .tr-back svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 html[dir="rtl"] .tr-back svg { transform: scaleX(-1); }
-.tr-reader-head { margin: .4rem 0 1rem; }
-.page-card .tr-reader-head h2 { margin: 0 0 .3rem; font-size: 1.4rem; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; unicode-bidi: plaintext; text-align: start; }
-.tr-reader-meta { margin: 0; color: color-mix(in oklab, var(--text) 70%, var(--muted)); font-size: .95rem; }
+.tr-reader-head { display: grid; gap: .35rem; margin: .5rem 0 1.1rem; }
+.tr-reader-name { display: flex; align-items: center; gap: .35rem; min-width: 0; }
+.page-card .tr-reader-head h2 { margin: 0; font-size: 1.5rem; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; unicode-bidi: plaintext; text-align: start; }
+.tr-reader-meta { margin: 0; color: color-mix(in oklab, var(--text) 62%, var(--muted)); font-size: .95rem; font-variant-numeric: tabular-nums; }
+.tr-icon.tr-rename { width: 36px; height: 36px; border-color: transparent; background: none; color: var(--muted); }
+.tr-icon.tr-rename:hover { color: var(--text); background: color-mix(in oklab, var(--surface) 85%, var(--text)); border-color: transparent; }
 .tr-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .8rem; }
 /* Every control of the toolbar: one pill, one height, an icon and a word. */
 .tr-tool {
@@ -205,34 +214,28 @@ html[dir="rtl"] .tr-back svg { transform: scaleX(-1); }
   .tr-tool[data-tr-language-button] .tr-chevron, .tr-tool[data-tr-language-button] .tr-language-icon { display: none; }
   .tr-tool[data-tr-language-button] { padding: 0 .8rem; }
 }
-.tr-player { margin: .6rem 0 1rem; }
-.tr-player audio { width: 100%; }
-/* The site's own player, its play button large enough to press here (40px). */
-.tr-player .custom-audio-play { width: 40px; height: 40px; }
-
-.tr-speakers { display: grid; gap: .5rem; margin: 0 0 1rem; padding: .9rem 1rem; border-radius: 14px; background: color-mix(in oklab, var(--a) 5%, var(--surface)); border: 1px solid color-mix(in oklab, var(--a) 15%, var(--line)); }
+/* ---------- The transcript, read as a document ---------- */
+.tr-speakers { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; margin: 0 0 .4rem; padding: 0 0 1rem; border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+.tr-speakers > strong { color: var(--muted); font-size: .85rem; font-weight: 700; }
 .tr-speaker-list { display: flex; flex-wrap: wrap; gap: .5rem; }
-.tr-speaker-list label { display: flex; align-items: center; gap: .4rem; }
-.tr-speaker-list input { width: 12rem; max-width: 100%; min-height: 40px; }
-.tr-swatch { display: inline-grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; font-size: .8rem; font-weight: 800; color: #fff; background: var(--a); }
+.tr-speaker-list label { display: flex; align-items: center; gap: .45rem; padding: 3px 4px 3px 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+html[dir="rtl"] .tr-speaker-list label { padding: 3px 3px 3px 4px; }
+/* Each name as wide as it is, so the chip hugs it. */
+.tr-speaker-list input { width: auto; field-sizing: content; min-width: 4ch; max-width: 14rem; min-height: 36px; padding: 0 .6rem; border: 0; border-radius: 999px; background: none; font-weight: 600; }
+.tr-speaker-list input:focus { outline: 2px solid color-mix(in oklab, var(--a) 40%, transparent); }
+.tr-swatch { display: inline-grid; place-items: center; flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%; font-size: .8rem; font-weight: 800; color: #fff; background: var(--a); }
 .tr-swatch[data-n="1"] { background: var(--b); }
 .tr-swatch[data-n="2"] { background: color-mix(in oklab, var(--a) 55%, var(--b)); }
 .tr-swatch[data-n="3"] { background: color-mix(in oklab, var(--a) 40%, var(--text)); }
 
-.tr-text { display: grid; gap: .9rem; }
-.tr-para {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: .3rem .9rem;
-  padding: .9rem 1rem;
-  border-radius: 14px;
-  background: var(--surface);
-  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
-}
-.tr-para-head { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
-.tr-para-who { font-weight: 800; }
-.tr-para-time { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
-.tr-para-tools { display: flex; gap: .3rem; margin-inline-start: auto; }
+.tr-text { display: block; max-width: 980px; }
+.tr-para { position: relative; padding: 1.15rem 0; border-bottom: 1px solid color-mix(in oklab, var(--line) 65%, transparent); }
+.tr-para:last-child { border-bottom: 0; }
+.tr-para-head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-height: 36px; margin-bottom: .35rem; }
+.tr-para-who { font-weight: 700; color: var(--text); }
+.tr-para-time { display: inline-flex; align-items: center; min-height: 30px; padding: 0 .55rem; border: 0; border-radius: 999px; background: color-mix(in oklab, var(--text) 6%, transparent); color: var(--muted); font: inherit; font-size: .8rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+button.tr-para-time { cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+button.tr-para-time:hover, button.tr-para-time:focus-visible { background: color-mix(in oklab, var(--a) 14%, transparent); color: var(--accent-text, var(--a)); outline: none; }
 .tr-icon {
   display: grid;
   place-items: center;
@@ -244,18 +247,64 @@ html[dir="rtl"] .tr-back svg { transform: scaleX(-1); }
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background-color .15s ease, opacity .15s ease;
 }
 .tr-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .tr-icon:hover { border-color: var(--a); color: var(--a); }
 .tr-icon:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
-.tr-para-body { grid-column: 1 / -1; font-size: 1.05rem; line-height: 1.9; overflow-wrap: anywhere; }
-.tr-s { border-radius: 6px; cursor: pointer; transition: background .15s ease; }
-.tr-s:hover { background: color-mix(in oklab, var(--a) 10%, transparent); }
-.tr-s.is-now { background: color-mix(in oklab, var(--a) 20%, transparent); }
-.tr-para textarea { grid-column: 1 / -1; width: 100%; min-height: 8rem; font-size: 1.02rem; line-height: 1.8; }
-.tr-para-edit { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .5rem; }
+/* The pencil shows on the paragraph under the pointer (always on touch screens). */
+.tr-para-edit-btn { width: 36px; height: 36px; margin-inline-start: auto; border-color: transparent; background: none; color: var(--muted); opacity: 0; }
+.tr-para:hover .tr-para-edit-btn, .tr-para:focus-within .tr-para-edit-btn { opacity: 1; }
+@media (hover: none) { .tr-para-edit-btn { opacity: .75; } }
+.tr-para-body { font-size: 1.06rem; line-height: 2; color: var(--text); overflow-wrap: anywhere; }
+.tr-s { padding: 2px 1px; border-radius: 6px; cursor: pointer; transition: background-color .2s ease, color .2s ease; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.tr-s:hover { background: color-mix(in oklab, var(--a) 9%, transparent); }
+.tr-s.is-now { background: color-mix(in oklab, var(--a) 22%, transparent); color: var(--text); }
+.tr-para textarea { width: 100%; min-height: 8rem; margin-top: .3rem; font-size: 1.02rem; line-height: 1.8; }
+.tr-para-edit { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }
 .tr-para-edit .btn { min-height: 40px; }
 .tr-rtl .tr-para-body, .tr-rtl textarea { direction: rtl; text-align: right; }
+.tr-note-error { color: var(--danger); font-weight: 600; }
+
+/* ---------- The player, held at the foot of the screen while the transcript is read ---------- */
+.tr-playbar {
+  position: sticky;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  max-width: 980px;
+  margin-top: 1.4rem;
+  padding: .55rem .9rem .55rem .55rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, .55);
+}
+.tr-playbar[hidden] { display: none; }
+.tr-pb-play { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: linear-gradient(135deg, var(--a), var(--b, var(--a))); color: #fff; cursor: pointer; box-shadow: 0 8px 18px -10px color-mix(in oklab, var(--a) 80%, transparent); }
+.tr-pb-play svg { width: 18px; height: 18px; fill: currentColor; }
+.tr-pb-play .tr-pause-icon, .tr-pb-play.is-playing .tr-play-icon { display: none; }
+.tr-pb-play.is-playing .tr-pause-icon { display: block; }
+.tr-pb-play:focus-visible, .tr-pb-speed:focus-visible { outline: 3px solid color-mix(in oklab, var(--a) 40%, transparent); outline-offset: 2px; }
+.tr-pb-time { flex: none; min-width: 2.6rem; color: var(--muted); font-size: .85rem; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; }
+.tr-playbar input[type="range"].tr-pb-seek { flex: 1; width: auto; min-width: 0; height: 24px; min-height: 0; margin: 0; padding: 0; border: 0 !important; border-radius: 0; background: transparent !important; box-shadow: none !important; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.tr-pb-seek::-webkit-slider-runnable-track { height: 6px; border-radius: 99px; background: linear-gradient(to right, var(--a) var(--p, 0%), color-mix(in oklab, var(--text) 14%, transparent) var(--p, 0%)); }
+.tr-pb-seek::-moz-range-track { height: 6px; border-radius: 99px; background: color-mix(in oklab, var(--text) 14%, transparent); }
+.tr-pb-seek::-moz-range-progress { height: 6px; border-radius: 99px; background: var(--a); }
+.tr-pb-seek::-webkit-slider-thumb { width: 16px; height: 16px; margin-top: -5px; border: 3px solid var(--a); border-radius: 50%; background: #fff; -webkit-appearance: none; appearance: none; box-shadow: 0 2px 6px rgba(0, 0, 0, .25); }
+.tr-pb-seek::-moz-range-thumb { width: 12px; height: 12px; border: 3px solid var(--a); border-radius: 50%; background: #fff; }
+.tr-pb-seek:focus-visible { outline: none; }
+.tr-pb-seek:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px color-mix(in oklab, var(--a) 30%, transparent); }
+.tr-pb-speed { flex: none; min-width: 52px; height: 40px; padding: 0 .7rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: .85rem; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; }
+.tr-pb-speed:hover { border-color: color-mix(in oklab, var(--line) 55%, var(--text)); }
+
+/* While a translation is made, the language button turns. */
+.tr-tool.is-busy .tr-language-icon { border: 2px solid currentColor; border-inline-end-color: transparent; border-radius: 50%; color: var(--a); animation: tr-spin .8s linear infinite; }
+.tr-tool.is-busy .tr-language-icon > * { display: none; }
+@keyframes tr-spin { to { transform: rotate(360deg); } }
+.tr-section .dub-bar span { transition: none; }
 
 /* ---------- The list ---------- */
 .tr-search { position: relative; display: block; max-width: 28rem; margin: 0 0 1rem; }
@@ -263,7 +312,9 @@ html[dir="rtl"] .tr-back svg { transform: scaleX(-1); }
 .tr-search input { width: 100%; min-height: 44px; padding-inline-start: 2.6rem; }
 .tr-ledger td.tr-name { min-width: 12rem; max-width: 22rem; overflow-wrap: break-word; }
 .tr-ledger td.tr-name button { min-height: 40px; text-align: start; }
-.tr-row-actions { display: flex; justify-content: flex-end; gap: .3rem; }
+.tr-ledger td.tr-actions-cell { width: 1%; text-align: end; }
+.tr-icon.tr-row-delete { display: inline-grid; border-color: transparent; background: none; color: var(--muted); }
+.tr-icon.tr-row-delete:hover { border-color: color-mix(in oklab, var(--danger) 40%, var(--line)); background: color-mix(in oklab, var(--danger) 8%, transparent); color: var(--danger); }
 .tr-more { display: flex; justify-content: center; margin-top: .9rem; }
 .tr-more .btn { min-height: 44px; }
 
@@ -318,6 +369,8 @@ html[dir="rtl"] .tr-back svg { transform: scaleX(-1); }
 .tr-menu-list hr { margin: 4px 6px; border: 0; border-top: 1px solid color-mix(in oklab, var(--line) 85%, transparent); }
 .tr-menu-list svg { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
 .tr-menu-list .is-danger svg { color: currentColor; }
+/* A download's format, as a badge: each line says what it is once. */
+.tr-format { flex: none; display: inline-grid; place-items: center; min-width: 3.3rem; height: 26px; padding: 0 .45rem; border-radius: 7px; background: color-mix(in oklab, var(--a) 12%, transparent); color: var(--accent-text, var(--a)); font-size: .74rem; font-weight: 800; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
 /* The studio's dropdown in the box. */
 .tr-language .vs-select { min-width: min(260px, 100%); }
 /* "Show in": the languages, the one shown ticked. */
@@ -350,11 +403,13 @@ html[dir="rtl"] .tr-back svg { transform: scaleX(-1); }
 .tr-language-icon > svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
 .tr-language-list [aria-checked="true"] { font-weight: 700; }
 .tr-language-list [aria-checked="true"] .tr-tick { visibility: visible; }
-@media (prefers-reduced-motion: reduce) { .tr-menu-list { animation: none; } .tr-chevron, .tr-tool, .tr-tool > svg { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .tr-menu-list { animation: none; } .tr-chevron, .tr-tool, .tr-tool > svg, .tr-s, .tr-icon { transition: none; } .tr-tool.is-busy .tr-language-icon { animation-duration: 2s; } }
 
 @media (max-width: 560px) {
   .tr-panel { min-height: 240px; padding: 1.1rem; }
-  .tr-para { padding: .8rem; }
+  .tr-para { padding: 1rem 0; }
+  .tr-playbar { gap: .5rem; }
+  .tr-pb-time { min-width: 2.3rem; font-size: .8rem; }
   /* The list as cards: every column of a transcript shown, each with its name. */
   .tr-ledger .dub-ledger-wrap { overflow: visible; border: 0; background: none; }
   .tr-ledger thead { display: none; }

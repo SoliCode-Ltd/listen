@@ -100,17 +100,6 @@
           <div class="dub-stat-note">{{ __('transcribe.page.stat_longest_note') }}</div>
         </div>
       </div>
-      <div class="dub-rule">
-        <strong class="dub-rule-title">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-          {{ __('transcribe.page.rule_title') }}
-        </strong>
-        <ul>
-          <li><b>{{ __('transcribe.page.rule_second') }}</b><span>{{ __('transcribe.page.rule_second_value') }}</span></li>
-          <li><b>{{ __('transcribe.page.rule_held') }}</b><span>{{ __('transcribe.page.rule_held_value') }}</span></li>
-          <li><b>{{ __('transcribe.page.rule_free') }}</b><span>{{ __('transcribe.page.rule_free_value') }}</span></li>
-        </ul>
-      </div>
     @else
       <div class="dub-rule">
         <strong class="dub-rule-title">
@@ -261,7 +250,12 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>{{ __('transcribe.js.back') }}
       </button>
       <header class="tr-reader-head">
-        <h2 id="trReaderTitle" data-tr-reader-title></h2>
+        <div class="tr-reader-name">
+          <h2 id="trReaderTitle" data-tr-reader-title dir="auto"></h2>
+          <button type="button" class="tr-icon tr-rename" data-tr-rename-open aria-label="{{ __('transcribe.js.rename') }}" title="{{ __('transcribe.js.rename') }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4z"/></svg>
+          </button>
+        </div>
         <p class="tr-reader-meta" data-tr-reader-meta></p>
       </header>
       {{-- One row of matching pill buttons, each an icon and a word; the language is a menu like Download. --}}
@@ -278,7 +272,7 @@
           </button>
           <div class="tr-menu-list" role="menu" hidden>
             @foreach(\App\Services\Transcription\TranscriptExport::FORMATS as $format)
-              <a role="menuitem" href="#" data-tr-export="{{ $format }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14"/></svg>{{ __('transcribe.js.'.$format) }}</a>
+              <a role="menuitem" href="#" data-tr-export="{{ $format }}"><span class="tr-format" dir="ltr">{{ strtoupper($format) }}</span><span>{{ __('transcribe.js.'.$format) }}</span></a>
             @endforeach
           </div>
         </div>
@@ -307,13 +301,26 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5"/></svg>
         </button>
       </div>
-      <p class="tr-note" data-tr-translate-note hidden>{{ __('transcribe.js.translate_free') }}</p>
-      <div class="tr-player" data-tr-player></div>
+      <p class="tr-note tr-note-error" data-tr-translate-note role="status" hidden></p>
+      <p class="tr-note" data-tr-audio-gone hidden></p>
       <div class="tr-speakers" data-tr-speakers hidden>
         <strong>{{ __('transcribe.js.speakers') }}</strong>
         <div class="tr-speaker-list" data-tr-speaker-list></div>
       </div>
       <div class="tr-text" data-tr-text></div>
+      {{-- The recording, from a bar held at the foot of the screen while the transcript is read --}}
+      <audio class="initialized" data-tr-audio preload="metadata" hidden></audio>
+      <div class="tr-playbar" data-tr-playbar dir="ltr" hidden>
+        <button type="button" class="tr-pb-play" data-tr-pb-play aria-label="{{ __('transcribe.js.play') }}"
+          data-label-play="{{ __('transcribe.js.play') }}" data-label-pause="{{ __('transcribe.js.pause') }}">
+          <svg class="tr-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+          <svg class="tr-pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+        </button>
+        <span class="tr-pb-time" data-tr-pb-now dir="ltr">0:00</span>
+        <input type="range" class="tr-pb-seek" data-tr-pb-seek min="0" max="1000" step="1" value="0" dir="ltr" aria-label="{{ __('transcribe.js.seek') }}">
+        <span class="tr-pb-time" data-tr-pb-total dir="ltr">0:00</span>
+        <button type="button" class="tr-pb-speed" data-tr-pb-speed aria-label="{{ __('transcribe.js.speed') }}" title="{{ __('transcribe.js.speed') }}">1×</button>
+      </div>
     </section>
 
     {{-- Every transcript, with the minutes it used --}}
