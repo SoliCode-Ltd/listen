@@ -400,6 +400,8 @@ button.tr-para-time:hover, button.tr-para-time:focus-visible { background: color
 /* ---------- A transcript open: an editor, with its bar, the text, its details and a timeline ---------- */
 .tr-section.is-reading > :not(.tr-reader):not(.tr-dialog):not(.tr-toast) { display: none !important; }
 .tr-section.is-reading .tr-reader { margin-top: 0; }
+/* The editor is the card while it is open: one frame, no band of empty space around it. */
+.page-card.tr-section.is-reading { padding: 0; border: 0; background: transparent; box-shadow: none; }
 .tr-section { scroll-margin-top: 96px; }
 .tr-editor { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); overflow: hidden; box-shadow: 0 24px 60px -40px rgba(15, 12, 40, .45); }
 @media (min-width: 900px) { .tr-editor { height: clamp(560px, calc(100vh - 140px), 1000px); } }
