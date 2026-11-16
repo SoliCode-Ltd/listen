@@ -103,39 +103,43 @@ if (! $ffmpeg) {
     exit(1);
 }
 
-/** A voice sample of the studio, as a file here. */
-$sample = function (string $language, ?string $gender = null, array $not = []): ?array {
-    $voices = Voice::query()->where('is_active', true)->where('language', $language)
-        ->when($gender, fn ($q) => $q->whereRaw('LOWER(gender) = ?', [strtolower($gender)]))->whereNotIn('id', $not)->orderBy('id')->get();
-    foreach ($voices as $voice) {
-        $stored = ltrim((string) parse_url((string) $voice->preview_audio_path, PHP_URL_PATH), '/');
-        // Where the studio keeps a voice's sample: its own path (public or the public disk), or the
-        // published copy by id that the developer docs link to (media/voice-previews/voice_<id>.mp3).
-        $places = array_filter([
-            $stored !== '' ? public_path($stored) : null,
-            $stored !== '' ? Storage::disk('public')->path($stored) : null,
-            $stored !== '' ? public_path('storage/'.$stored) : null,
-            public_path('media/voice-previews/voice_'.$voice->id.'.mp3'),
-        ]);
-        foreach ($places as $path) {
-            if (is_file($path) && filesize($path) > 1000) {
-                $url = str_starts_with($path, public_path().'/') ? url(substr($path, strlen(public_path()))) : null;
-
-                return ['id' => $voice->id, 'name' => $voice->display_name, 'path' => $path, 'url' => $url];
-            }
+/** The homepage's voice samples (public/audio/voice-previews), with the words each one says. */
+$clips = \App\Console\Commands\TranscribeMeasureCommand::clipCatalog();
+$sample = function (string $prefix, array $not = []) use ($clips): ?array {
+    foreach ($clips as $clip) {
+        if (str_starts_with(strtolower($clip['dialect']), $prefix) && ! in_array($clip['slug'], $not, true)) {
+            return ['name' => $clip['slug'].' ('.$clip['dialect'].')', 'slug' => $clip['slug'], 'path' => public_path($clip['file']), 'url' => url($clip['file']), 'said' => $clip['said']];
         }
     }
-    echo "  no sample for {$language}".($gender ? " {$gender}" : '').': '.$voices->count().' active voices, e.g. '.json_encode($voices->first()?->only(['id', 'gender', 'preview_audio_path'])).', '
-        .count(glob(public_path('media/voice-previews/*.mp3')) ?: [])." files in media/voice-previews\n";
+    echo "  no sample for {$prefix}: ".count($clips)." samples here\n";
 
     return null;
+};
+/** How close the words written out are to the words said, 0 to 100 (by letters, as the measuring tool counts). */
+$likeness = function (string $heard, string $said): float {
+    $norm = fn (string $t): string => trim(preg_replace('/\s+/u', ' ', preg_replace('/[^\p{L}\p{N}\s]/u', '', mb_strtolower($t)) ?? '') ?? '');
+    $a = mb_str_split($norm($heard));
+    $b = mb_str_split($norm($said));
+    if ($b === []) {
+        return 0.0;
+    }
+    $prev = range(0, count($b));
+    foreach ($a as $i => $ca) {
+        $cur = [$i + 1];
+        foreach ($b as $j => $cb) {
+            $cur[] = min($prev[$j + 1] + 1, $cur[$j] + 1, $prev[$j] + ($ca === $cb ? 0 : 1));
+        }
+        $prev = $cur;
+    }
+
+    return max(0.0, 100.0 * (1 - end($prev) / count($b)));
 };
 $run = function (array $command): void {
     (new Process($command))->setTimeout(120)->mustRun();
 };
 echo "\n== The recordings ==\n";
-$arA = $sample('ar', 'female');
-$arB = $sample('ar', 'male');
+$arA = $sample('ar');
+$arB = $arA ? $sample('ar', [$arA['slug']]) : null;
 $en = $sample('en');
 if (! $arA || ! $arB || ! $en) {
     echo "Could not find the voice samples (Arabic female, Arabic male, English).\n";
@@ -226,6 +230,10 @@ try {
         $norm = fn (string $s): string => mb_strtolower(trim(preg_replace('/[\p{P}\s]+/u', ' ', $s) ?? ''));
         $texts = array_map(fn ($s) => $norm((string) $s['text']), $segments);
         $check(count($texts) === count(array_unique($texts)), 'no sentence twice');
+        $said = $language === 'ar' ? $arA['said'].' '.$arB['said'] : $en['said'];
+        $close = $likeness(implode(' ', array_column((array) $t->paragraphs, 'text')), $said);
+        echo '    said: ', preg_replace('/\s+/u', ' ', $said), "\n";
+        $check($close >= 85.0, sprintf('the words match what was said: %.1f%% alike', $close));
         $words = preg_split('/\s+/u', $norm(implode(' ', array_column((array) $t->paragraphs, 'text')))) ?: [];
         $twice = [];
         for ($i = 1; $i < count($words); $i++) {
