@@ -24,6 +24,8 @@
     $dash = '<span class="docs-no"><span class="sr-only">'.e($plain('plans.not_included')).'</span></span>';
     // A heading's own link, shown when the pointer is over it.
     $anchor = fn (string $id) => '<a class="docs-anchor" href="#'.$id.'" aria-hidden="true" tabindex="-1">#</a>';
+    // An endpoint's path may break only before its slashes, so a long one wraps on a phone, never cut.
+    $route = fn (string $path) => preg_replace('~(?<=.)/~', '<wbr>/', e($path));
     // The API reference by what each endpoint works on (ApiDocs::RESOURCES).
     $resources = \App\Support\Api\ApiDocs::resources($docs['endpoints']);
     $nav = [
@@ -475,7 +477,7 @@
               <li>
                 <a href="#{{ $endpoint['id'] }}">
                   <span class="docs-method mono m-{{ strtolower($endpoint['method']) }}" data-code>{{ $endpoint['method'] }}</span>
-                  <code dir="ltr">{{ $endpoint['path'] }}</code>
+                  <code dir="ltr">{!! $route($endpoint['path']) !!}</code>
                   <span class="docs-index-name">{{ $plain('endpoints.'.$endpoint['key'].'.title') }}</span>
                 </a>
               </li>
@@ -490,7 +492,7 @@
                 <h4 class="docs-endpoint-title">{{ $plain('endpoints.'.$endpoint['key'].'.title') }}{!! $anchor($endpoint['id']) !!}</h4>
                 <div class="docs-route" data-code>
                   <span class="docs-method mono m-{{ strtolower($endpoint['method']) }}">{{ $endpoint['method'] }}</span>
-                  <code>{{ $endpoint['path'] }}</code>
+                  <code>{!! $route($endpoint['path']) !!}</code>
                 </div>
                 <p>{!! $t('endpoints.'.$endpoint['key'].'.'.($endpoint['summary'] ?? 'summary'), [], $endpoint['summary_replace'] ?? []) !!}</p>
                 <p class="docs-meta">{{ $plain('permission') }}: <code dir="ltr">{{ $endpoint['scope'] }}</code></p>

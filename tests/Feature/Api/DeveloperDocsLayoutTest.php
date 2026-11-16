@@ -61,6 +61,16 @@ class DeveloperDocsLayoutTest extends TestCase
         }
     }
 
+    public function test_a_long_path_breaks_only_before_its_slashes(): void
+    {
+        $html = (string) $this->docs('en')->getContent();
+
+        // In its resource's index and on the endpoint itself: a phone wraps it there, never cuts it.
+        $this->assertSame(2, substr_count($html, '<code dir="ltr">/v1<wbr>/history<wbr>/{history_item_id}<wbr>/audio</code>')
+            + substr_count($html, '<code>/v1<wbr>/history<wbr>/{history_item_id}<wbr>/audio</code>'));
+        $this->assertStringNotContainsString('<wbr>/v1', $html, 'never before its first slash');
+    }
+
     public function test_a_resource_with_no_endpoint_on_the_page_is_left_out(): void
     {
         $endpoints = [
