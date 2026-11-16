@@ -17,6 +17,7 @@ return [
         'history_read' => 'Read history and audio',
         'history_write' => 'Delete history',
         'user_read' => 'Read account and usage',
+        'speech_to_text' => 'Speech to text',
     ],
 
     'keys' => [

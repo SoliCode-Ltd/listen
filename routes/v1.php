@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\HistoryController;
 use App\Http\Controllers\Api\V1\ModelController;
 use App\Http\Controllers\Api\V1\OpenApiController;
 use App\Http\Controllers\Api\V1\TextToSpeechController;
+use App\Http\Controllers\Api\V1\TranscriptionController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\VoiceController;
 use App\Support\Api\ApiScopes;
@@ -42,6 +43,14 @@ Route::middleware(['api.key', 'throttle:public-api'])->group(function (): void {
     });
     Route::delete('/history/{historyItemId}', [HistoryController::class, 'destroy'])
         ->middleware('api.scope:'.ApiScopes::HISTORY_WRITE)->name('v1.history.destroy');
+
+    // Speech to text: audio in, its words out, written in the background (poll the transcription).
+    Route::middleware('api.scope:'.ApiScopes::SPEECH_TO_TEXT)->group(function (): void {
+        Route::post('/transcriptions', [TranscriptionController::class, 'create'])->name('v1.transcriptions.create');
+        Route::get('/transcriptions', [TranscriptionController::class, 'index'])->name('v1.transcriptions');
+        Route::get('/transcriptions/{transcriptionId}', [TranscriptionController::class, 'show'])->name('v1.transcriptions.show');
+        Route::get('/transcriptions/{transcriptionId}/export', [TranscriptionController::class, 'export'])->name('v1.transcriptions.export');
+    });
 
     Route::middleware('api.scope:'.ApiScopes::USER_READ)->group(function (): void {
         Route::get('/user', [UserController::class, 'show'])->name('v1.user');

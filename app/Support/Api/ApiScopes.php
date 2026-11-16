@@ -17,6 +17,9 @@ final class ApiScopes
 
     public const USER_READ = 'user_read';
 
+    /** Speech to text: send audio and read its transcripts (/v1/transcriptions). */
+    public const SPEECH_TO_TEXT = 'speech_to_text';
+
     /**
      * @return array<int, string>
      */
@@ -28,6 +31,7 @@ final class ApiScopes
             self::HISTORY_READ,
             self::HISTORY_WRITE,
             self::USER_READ,
+            self::SPEECH_TO_TEXT,
         ];
     }
 

@@ -13,6 +13,7 @@ use App\Support\Api\ApiPlanAccess;
 use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\PlanUsageGuard;
+use App\Support\Transcription\TranscriptionApi;
 use App\Support\UsageSnapshot;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -107,6 +108,8 @@ class UserController extends Controller
                 'used' => (int) $usage['seconds_used'],
                 'limit' => Credits::secondsFor((int) $usage['plan_chars']),
             ],
+            // Speech to text has minutes of its own, set on the plan (not credits).
+            'speech_to_text' => TranscriptionApi::usage($user),
             'requests' => [
                 'used_this_month' => (int) $usage['total_requests'],
                 'monthly_limit' => $usage['plan_requests'],
