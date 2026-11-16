@@ -58,17 +58,7 @@ final class TranscriptionFlow
         }
         $charge = TranscriptionAccess::chargeFor($seconds);
         $plan = TranscriptionAccess::planOf($user);
-        $free = $this->checkPlan($user, $plan, $charge, (string) ($meta['source'] ?? 'upload'), $arabic);
-
-        $working = TranscriptionAccess::working($user);
-        $atOnce = TranscriptionAccess::concurrentJobs($plan);
-        if ($working >= $atOnce) {
-            throw new TranscriptionRefused('busy', trans_choice('transcribe.refused.busy', $working, ['n' => $working]), 429);
-        }
-        $siteLeft = TranscriptionAccess::siteSecondsLeftToday();
-        if ($siteLeft !== null && $siteLeft < $charge) {
-            throw new TranscriptionRefused('site_busy', __('transcribe.refused.site_busy'), 503);
-        }
+        $free = $this->checks($user, $plan, $charge, (string) ($meta['source'] ?? 'upload'), $arabic);
 
         $language = strtolower(trim((string) ($meta['language'] ?? 'auto'))) ?: 'auto';
         if ($language !== 'auto' && ! array_key_exists($language, TranscriptionSettings::LANGUAGES)) {
@@ -79,12 +69,8 @@ final class TranscriptionFlow
         $transcription = DB::transaction(function () use ($user, $plan, $charge, $free, $seconds, $language, $meta, $arabic): Transcription {
             User::query()->whereKey($user->id)->lockForUpdate()->first();
             $balance = TranscriptionAccess::balance($user);
-            if (! $free && $balance['left'] < $charge) {
-                $next = TranscriptionAccess::nextPlanThatFits($plan, $balance['used'] + $charge, $charge);
-                $words = ['need' => Minutes::format($charge), 'left' => Minutes::format($balance['left']),
-                    'date' => $balance['resets_at']->locale($arabic ? 'ar' : 'en')->isoFormat('D MMMM'), 'plan' => $next ? self::planName($next, $arabic) : ''];
-                throw new TranscriptionRefused('not_enough', __($next ? 'transcribe.refused.not_enough' : 'transcribe.refused.not_enough_any', $words), 402,
-                    TranscriptionAccess::upgrade($next, $arabic), ['seconds_needed' => $charge, 'seconds_left' => $balance['left']]);
+            if (! $free) {
+                self::assertFits($balance, $plan, $charge, $arabic);
             }
 
             return Transcription::create([
@@ -117,6 +103,74 @@ final class TranscriptionFlow
         TranscribeJob::queueFor($transcription);
 
         return $transcription;
+    }
+
+    /**
+     * What a file of $seconds would use, checked against every rule before it
+     * is sent (the page asks as soon as a file is chosen): the seconds it
+     * uses, the member's seconds left and what would remain, and whether it
+     * is the free try. Nothing is held.
+     *
+     * @return array{seconds: int, left: int, remain: int, free: bool, resets_at: string}
+     *
+     * @throws TranscriptionRefused
+     */
+    public function check(User $user, float $seconds, string $source = 'upload'): array
+    {
+        $arabic = app()->getLocale() === 'ar';
+        if (! TranscriptionAccess::openTo($user)) {
+            throw new TranscriptionRefused('not_open', __('transcribe.refused.not_open'), 403);
+        }
+        $charge = TranscriptionAccess::chargeFor($seconds);
+        $plan = TranscriptionAccess::planOf($user);
+        $free = $this->checks($user, $plan, $charge, $source, $arabic);
+        $balance = TranscriptionAccess::balance($user);
+        if (! $free) {
+            self::assertFits($balance, $plan, $charge, $arabic);
+        }
+
+        return ['seconds' => $charge, 'left' => $balance['left'], 'remain' => $free ? $balance['left'] : $balance['left'] - $charge,
+            'free' => $free, 'resets_at' => $balance['resets_at']->toIso8601String()];
+    }
+
+    /**
+     * The rules a file meets before anything is used: the plan (or the free
+     * try), files at once, the site's day. Returns true for the free try.
+     *
+     * @throws TranscriptionRefused
+     */
+    private function checks(User $user, ?Plan $plan, int $charge, string $source, bool $arabic): bool
+    {
+        $free = $this->checkPlan($user, $plan, $charge, $source, $arabic);
+        $working = TranscriptionAccess::working($user);
+        if ($working >= TranscriptionAccess::concurrentJobs($plan)) {
+            throw new TranscriptionRefused('busy', trans_choice('transcribe.refused.busy', $working, ['n' => $working]), 429);
+        }
+        $siteLeft = TranscriptionAccess::siteSecondsLeftToday();
+        if ($siteLeft !== null && $siteLeft < $charge) {
+            throw new TranscriptionRefused('site_busy', __('transcribe.refused.site_busy'), 503);
+        }
+
+        return $free;
+    }
+
+    /**
+     * Enough of the month's minutes left for the file, or the refusal naming the plan with more.
+     *
+     * @param  array<string, mixed>  $balance  TranscriptionAccess::balance()
+     *
+     * @throws TranscriptionRefused
+     */
+    private static function assertFits(array $balance, ?Plan $plan, int $charge, bool $arabic): void
+    {
+        if ($balance['left'] >= $charge) {
+            return;
+        }
+        $next = TranscriptionAccess::nextPlanThatFits($plan, $balance['used'] + $charge, $charge);
+        $words = ['need' => Minutes::format($charge), 'left' => Minutes::format($balance['left']),
+            'date' => $balance['resets_at']->locale($arabic ? 'ar' : 'en')->isoFormat('D MMMM'), 'plan' => $next ? self::planName($next, $arabic) : ''];
+        throw new TranscriptionRefused('not_enough', __($next ? 'transcribe.refused.not_enough' : 'transcribe.refused.not_enough_any', $words), 402,
+            TranscriptionAccess::upgrade($next, $arabic), ['seconds_needed' => $charge, 'seconds_left' => $balance['left']]);
     }
 
     /**

@@ -30,6 +30,7 @@ use App\Http\Controllers\PronunciationController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\StartController;
 use App\Http\Controllers\TrialBillingController;
+use App\Http\Controllers\TranscribeController;
 use App\Http\Controllers\VideoDubController;
 use App\Http\Controllers\VoiceCloningController;
 use App\Http\Controllers\VoiceDesignController;
@@ -431,6 +432,27 @@ Route::group([
     // Each limit counts on its own (the third part names it): the pieces never use up the dub's.
     Route::middleware(['auth', 'throttle:600,1,dub-piece'])->post('/dub-my-video/upload/{id}', [VideoDubController::class, 'uploadChunk'])
         ->where('id', '[A-Za-z0-9]{40}')->name('dub.upload.chunk');
+
+    // Transcribe on the dashboard (App\Http\Controllers\TranscribeController): checking a file,
+    // sending it, starting it, and what a member does with a transcript.
+    Route::middleware(['auth', 'subscription.sync'])->prefix('dashboard/transcribe')->group(function (): void {
+        Route::post('/check', [TranscribeController::class, 'check'])->middleware('throttle:60,1,transcribe-check')->name('transcribe.check');
+        Route::post('/upload', [TranscribeController::class, 'startUpload'])->middleware('throttle:20,1,transcribe-upload')->name('transcribe.upload.start');
+        Route::post('/', [TranscribeController::class, 'store'])->middleware('throttle:20,1,transcribe-store')->name('transcribe.store');
+        Route::patch('/{code}', [TranscribeController::class, 'update'])->where('code', 'tr_[a-z0-9]{24}')->middleware('throttle:120,1,transcribe-edit')->name('transcribe.update');
+        Route::delete('/{code}', [TranscribeController::class, 'destroy'])->where('code', 'tr_[a-z0-9]{24}')->name('transcribe.destroy');
+        Route::post('/{code}/translate', [TranscribeController::class, 'translate'])->where('code', 'tr_[a-z0-9]{24}')->middleware('throttle:20,1,transcribe-translate')->name('transcribe.translate');
+    });
+    // Each piece of a file: kept light (no plan check), many a minute for a large one.
+    Route::middleware(['auth', 'throttle:600,1,transcribe-piece'])->post('/dashboard/transcribe/upload/{id}', [TranscribeController::class, 'uploadChunk'])
+        ->where('id', '[A-Za-z0-9]{40}')->name('transcribe.upload.chunk');
+    // What the page reads while it works, and the files it downloads: these skip the billing sync.
+    Route::middleware(['auth', 'throttle:240,1,transcribe-read'])->prefix('dashboard/transcribe')->group(function (): void {
+        Route::get('/', [TranscribeController::class, 'index'])->name('transcribe.index');
+        Route::get('/{code}', [TranscribeController::class, 'show'])->where('code', 'tr_[a-z0-9]{24}')->name('transcribe.show');
+        Route::get('/{code}/audio', [TranscribeController::class, 'audio'])->where('code', 'tr_[a-z0-9]{24}')->name('transcribe.audio');
+        Route::get('/{code}/export/{format}', [TranscribeController::class, 'export'])->where(['code' => 'tr_[a-z0-9]{24}', 'format' => 'txt|srt|vtt|docx'])->name('transcribe.export');
+    });
 
     Route::middleware(['auth'])->group(function () {
         Route::get('/referral/stats', [ReferralController::class, 'stats'])->name('referral.stats');

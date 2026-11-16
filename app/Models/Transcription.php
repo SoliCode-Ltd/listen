@@ -76,6 +76,12 @@ class Transcription extends Model
         });
     }
 
+    /** Saved as UTF-8 (not \u escapes): Arabic words can be searched, and take half the room. */
+    protected function asJson($value, $flags = 0)
+    {
+        return parent::asJson($value, $flags | JSON_UNESCAPED_UNICODE);
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
