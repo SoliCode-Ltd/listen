@@ -1712,45 +1712,45 @@
       #commandCenterSection .usage-hero { display: block; padding: 1.2rem 1.15rem 1.15rem; text-align: start; }
       #commandCenterSection .usage-ring { display: none; }
       #commandCenterSection .usage-hero-head { flex-direction: column; align-items: flex-start; gap: .5rem; }
-      #commandCenterSection .usage-hero-label { font-size: 1.02rem; line-height: 1.5; }
+      #commandCenterSection .usage-hero-label { font-size: .95rem; line-height: 1.5; }
       #commandCenterSection .usage-hero-value { justify-content: flex-start; gap: .55rem; margin: 1rem 0 0; }
-      #commandCenterSection .usage-hero-value strong { font-size: 3rem; }
-      #commandCenterSection .usage-hero-value span { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+      #commandCenterSection .usage-hero-value strong { font-size: 2.2rem; }
+      #commandCenterSection .usage-hero-value span { font-size: .9rem; font-weight: 700; color: var(--text); }
       .usage-bar { display: block; height: 8px; margin-top: 1rem; border-radius: 999px; background: color-mix(in oklab, var(--a) 13%, var(--line)); overflow: hidden; }
       .usage-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #A28FFF, #5B3FE6); transition: width .5s ease; }
       html[dir="rtl"] .usage-bar i { background: linear-gradient(270deg, #A28FFF, #5B3FE6); }
       .usage-bar.is-high i { background: #F59E0B; }
       .usage-bar.is-low i { background: #EF4444; }
-      .usage-bar-note { display: block; margin: .6rem 0 0; color: var(--muted); font-size: .92rem; line-height: 1.6; }
+      .usage-bar-note { display: block; margin: .6rem 0 0; color: var(--muted); font-size: .8rem; line-height: 1.6; }
       .usage-bar-note b { color: var(--text); font-variant-numeric: tabular-nums; }
       #commandCenterSection .usage-hero-chips { display: block; margin-top: 1.1rem; border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
-      #commandCenterSection .usage-chip { display: flex; width: 100%; min-height: 54px; gap: .6rem; padding: .6rem 0; border: 0; border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent); border-radius: 0;
-        background: none; color: var(--muted); font-size: .98rem; line-height: 1.5; }
+      #commandCenterSection .usage-chip { display: flex; width: 100%; min-height: 48px; gap: .6rem; padding: .55rem 0; border: 0; border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent); border-radius: 0;
+        background: none; color: var(--muted); font-size: .88rem; line-height: 1.5; }
       #commandCenterSection .usage-chip:last-child { border-bottom: 0; }
       #commandCenterSection .usage-chip-t { display: contents; }
       #commandCenterSection .usage-chip-k { order: 1; }
       #commandCenterSection .usage-chip-k::first-letter { text-transform: uppercase; }
       #commandCenterSection .usage-chip-v { order: 2; margin-inline-start: auto; color: var(--text); font-weight: 700; text-align: end; font-variant-numeric: tabular-nums; }
-      #commandCenterSection .usage-chip .credit-icon { order: 0; font-size: 1.15rem; }
+      #commandCenterSection .usage-chip .credit-icon { order: 0; font-size: 1.05rem; }
       #commandCenterSection .usage-chip-link { color: var(--accent-text, var(--a)); font-weight: 700; }
       #commandCenterSection .usage-chip-link svg { width: 18px; height: 18px; margin-inline-start: auto; }
-      #commandCenterSection .usage-hero-cta { display: flex; width: 100%; min-height: 50px; margin-top: .7rem; }
+      #commandCenterSection .usage-hero-cta { display: flex; width: 100%; min-height: 44px; margin-top: .7rem; font-size: .95rem; }
 
       #commandCenterSection .usage-tiles { display: block; margin-top: .9rem; padding: .2rem 1.15rem; border-radius: 16px; border: 1px solid color-mix(in oklab, var(--line) 85%, transparent); background: var(--surface); }
       #commandCenterSection .usage-tile { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .3rem .8rem; padding: .95rem 0; border: 0; border-radius: 0; background: none;
         border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
       #commandCenterSection .usage-tile:last-child { border-bottom: 0; }
-      #commandCenterSection .usage-tile-head small { font-size: .98rem; color: var(--text); }
-      #commandCenterSection .usage-tile > b { font-size: 1.35rem; text-align: end; }
+      #commandCenterSection .usage-tile-head small { font-size: .88rem; color: var(--text); }
+      #commandCenterSection .usage-tile > b { font-size: 1.15rem; text-align: end; }
       #commandCenterSection .usage-tile .meter-track, #commandCenterSection .usage-tile-foot { grid-column: 1 / -1; }
-      #commandCenterSection .usage-tile-foot { font-size: .9rem; }
+      #commandCenterSection .usage-tile-foot { font-size: .8rem; }
 
       #commandCenterSection .usage-health { display: block; padding: 1rem 1.15rem 1.05rem; }
-      #commandCenterSection .usage-health-title { display: block; font-size: 1.02rem; }
+      #commandCenterSection .usage-health-title { display: block; font-size: 1rem; }
       #commandCenterSection .usage-health-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin-top: .8rem; }
       #commandCenterSection .usage-health-item { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .45rem; min-width: 0; }
-      #commandCenterSection .usage-health-item b { order: -1; flex: 0 0 100%; font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
-      #commandCenterSection .usage-health-item small { flex: 1 1 0; min-width: 0; font-size: .9rem; line-height: 1.4; }
+      #commandCenterSection .usage-health-item b { order: -1; flex: 0 0 100%; font-size: 1.15rem; font-weight: 800; line-height: 1.1; }
+      #commandCenterSection .usage-health-item small { flex: 1 1 0; min-width: 0; font-size: .8rem; line-height: 1.4; }
     }
 
     /* ── Studio ── */
@@ -1890,6 +1890,8 @@
       .dashboard-menu .dashboard-menu-link, .dashboard-menu .dashboard-menu-link::after { transition: none; }
     }
   </style>
+  {{-- Phones: one type scale for the whole studio. Last, so it wins where another sheet sets a size. --}}
+  <link rel="stylesheet" href="{{ asset('css/studio-phone.css') }}?v={{ filemtime(public_path('css/studio-phone.css')) }}">
 </head>
 <body>
   @php
