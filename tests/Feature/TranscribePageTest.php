@@ -212,14 +212,14 @@ class TranscribePageTest extends TestCase
             ->assertSee('href="#transcribeSection"', false)
             ->assertSee(__('transcribe.page.drop_title'))
             ->assertSee(__('transcribe.page.rule_second_value'))
-            ->assertSee('2 h 00 min')
+            ->assertSee('120 min')
             ->assertSee('css/transcribe.css', false)
             ->assertSee('js/transcribe.js', false);
 
         app()->setLocale('ar');
         $this->get(route('dashboard'))->assertOk()
             ->assertSee(__('transcribe.page.drop_title', [], 'ar'))
-            ->assertSee('2 س 00 د');
+            ->assertSee('120 د');
         app()->setLocale('en');
 
         SiteSetting::set('transcription_audience', TranscriptionSettings::AUDIENCE_OFF, TranscriptionSettings::GROUP);

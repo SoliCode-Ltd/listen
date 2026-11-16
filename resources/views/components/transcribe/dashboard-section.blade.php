@@ -22,7 +22,7 @@
   $trTargets = collect(\App\Services\Transcription\TranscriptEditor::targets())
       ->map(fn (string $code): array => ['value' => $code, 'label' => \App\Support\Transcription\TranscriptionPresenter::languageName($code, $trAr)])->values()->all();
   $trMaxMb = \App\Support\Transcription\TranscriptionSettings::maxUploadMb();
-  $trLongest = \App\Support\Transcription\Minutes::format((int) $account['max_file_seconds']);
+  $trLongest = \App\Support\Transcription\Minutes::format((int) $account['max_file_seconds'], null, false);
   $trLeftShare = $account['allowance_seconds'] > 0 ? max(0, min(100, (int) round($account['left_seconds'] / $account['allowance_seconds'] * 100))) : 0;
   $trConfig = [
       'account' => $account,
@@ -41,6 +41,9 @@
           'csrf' => route('dashboard.csrf-token'),
       ],
       'i18n' => __('transcribe.js'),
+      // The list's column names, said beside each value when the list shows as cards on a phone.
+      'columns' => ['date' => __('transcribe.page.col_date'), 'language' => __('transcribe.page.col_language'), 'length' => __('transcribe.page.col_length'),
+          'used' => __('transcribe.page.col_used'), 'status' => __('transcribe.page.col_status')],
       'csrf' => csrf_token(),
   ];
 @endphp
@@ -228,7 +231,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>{{ __('transcribe.js.back') }}
       </button>
       <header class="tr-reader-head">
-        <h2 id="trReaderTitle" data-tr-reader-title dir="auto"></h2>
+        <h2 id="trReaderTitle" data-tr-reader-title></h2>
         <p class="tr-reader-meta" data-tr-reader-meta></p>
       </header>
       <div class="tr-toolbar" role="toolbar" aria-label="{{ __('transcribe.page.col_actions') }}">

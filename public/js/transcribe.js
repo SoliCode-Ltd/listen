@@ -47,9 +47,10 @@
   function fill(text, words) {
     return String(text || '').replace(/:(\w+)/g, function (m, k) { return words && words[k] !== undefined ? words[k] : m; });
   }
-  function time(seconds) {
+  // A length in the page's words; the month's minutes in minutes only ($minutesOnly), as the header says them.
+  function time(seconds, minutesOnly) {
     seconds = Math.max(0, Math.round(seconds));
-    var h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60;
+    var h = minutesOnly ? 0 : Math.floor(seconds / 3600), m = minutesOnly ? Math.floor(seconds / 60) : Math.floor((seconds % 3600) / 60), s = seconds % 60;
     if (h > 0) return fill(t.hours_minutes, { h: h, m: (m < 10 ? '0' : '') + m });
     if (m > 0) return s > 0 ? fill(t.minutes_seconds, { m: m, s: s }) : fill(t.minutes, { m: m });
     return fill(t.seconds, { s: s });
@@ -211,7 +212,7 @@
       if (e.free) {
         setMeter([fill(t.will_use, { time: time(e.seconds) }), t.free_try]);
       } else {
-        setMeter([fill(t.will_use, { time: time(e.seconds) }), fill(t.left, { time: time(e.left) }) + ' ' + fill(t.remain, { time: time(e.remain) })]);
+        setMeter([fill(t.will_use, { time: time(e.seconds) }), fill(t.left, { time: time(e.left, true) }) + ' ' + fill(t.remain, { time: time(e.remain, true) })]);
       }
       ready(true, fill(t.start, { time: time(e.seconds) }));
     }).catch(function (r) { setMeter([]); showError(messageOf(r)); });
@@ -434,13 +435,14 @@
   }
   function rowHtml(item) {
     var used = item.status === 'failed' ? t.used_none : (item.status === 'ready' || item.used_seconds > 0 ? item.used : '—');
-    return '<td class="num">' + esc(item.date) + '</td>'
+    var L = c.columns || {};
+    return '<td class="num" data-label="' + esc(L.date) + '">' + esc(item.date) + '</td>'
       + '<td class="tr-name"><button type="button" class="dub-link" data-tr-open dir="auto">' + esc(item.title) + '</button></td>'
-      + '<td>' + esc(item.language_name || '—') + '</td>'
-      + '<td class="num"><span dir="ltr">' + esc(clock(item.seconds)) + '</span></td>'
-      + '<td class="num">' + esc(used) + '</td>'
-      + '<td>' + badge(item) + '</td>'
-      + '<td><div class="tr-row-actions">'
+      + '<td data-label="' + esc(L.language) + '">' + esc(item.language_name || '—') + '</td>'
+      + '<td class="num" data-label="' + esc(L.length) + '"><span dir="ltr">' + esc(clock(item.seconds)) + '</span></td>'
+      + '<td class="num" data-label="' + esc(L.used) + '">' + esc(used) + '</td>'
+      + '<td data-label="' + esc(L.status) + '">' + badge(item) + '</td>'
+      + '<td class="tr-actions-cell"><div class="tr-row-actions">'
       + '<div class="tr-menu" data-tr-menu><button type="button" class="tr-icon" aria-haspopup="true" aria-expanded="false" data-tr-menu-button aria-label="' + esc(fill(t.more_actions, { name: item.title })) + '">'
       + '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></button>'
       + '<div class="tr-menu-list" role="menu" hidden>'
