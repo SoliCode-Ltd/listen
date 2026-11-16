@@ -54,7 +54,7 @@ class TranscribeMeasureCommand extends Command
     protected $signature = 'transcribe:measure
         {--set=default : Which recordings: default, dialects, languages, or several (comma separated), or all}
         {--variants=auto : For the dialects and languages sets: the ways to ask, compared (auto, lang, +dialect, +review, +think)}
-        {--only= : Only these recordings, by label (comma separated)}
+        {--only= : Only these recordings, by label (comma separated; dia-ar-* for every label starting so)}
         {--modes=text,timed,speakers : For the default set: ways to write each one out}
         {--file=* : An extra recording: "label|language|path or URL|longest seconds" (language "auto" to detect)}
         {--language=given : For the default set: given (tell the model each recording\'s language) or auto}
@@ -103,7 +103,9 @@ class TranscribeMeasureCommand extends Command
             $this->extraRecordings());
         $only = array_filter(array_map('trim', explode(',', (string) $this->option('only'))));
         if ($only !== []) {
-            $recordings = array_values(array_filter($recordings, fn (array $r) => in_array($r['label'], $only, true)));
+            // A label ending in * is a prefix (dia-ar-*: every Arabic country file).
+            $recordings = array_values(array_filter($recordings, fn (array $r) => array_filter($only,
+                fn (string $o) => str_ends_with($o, '*') ? str_starts_with($r['label'], rtrim($o, '*')) : $r['label'] === $o) !== []));
         }
         $prices = (array) config('listen.dubbing.prices', []);
         $this->line(sprintf('Run %s: %d recording(s) from %s; default set %s, others as %s; thinking %s. Prices a million tokens: audio in $%.2f, text in $%.2f, out $%.2f.',
