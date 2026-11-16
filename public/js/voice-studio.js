@@ -183,10 +183,15 @@
       box.className = 'vs-flag vs-select-flag';
       box.setAttribute('aria-hidden', 'true');
       var url = opt ? String(opt.getAttribute('data-flag') || '') : '';
+      var letter = opt ? String(opt.getAttribute('data-flag-letter') || '') : '';
       if (url) {
         var img = document.createElement('img');
         img.src = url; img.alt = ''; img.width = 22; img.height = 22; img.loading = 'lazy'; img.decoding = 'async';
         box.appendChild(img);
+      } else if (letter) {
+        // A language shown by a letter of its own alphabet rather than a country's flag.
+        box.classList.add('vs-select-flag-letter');
+        box.textContent = letter;
       } else {
         box.classList.add('vs-select-flag-none');
         box.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z"/></svg>';

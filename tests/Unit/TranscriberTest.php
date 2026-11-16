@@ -323,6 +323,25 @@ class TranscriberTest extends TestCase
     }
 
     /** A test recording of steady tone: $seconds long, or two $seconds tones with $gap seconds of silence between. */
+    /** A browser recording has no length in its header ("Duration: N/A"): it is read to its end, never taken as 0 s. */
+    public function test_a_browser_recording_without_a_length_in_its_header_is_measured(): void
+    {
+        $ffmpeg = AudioFormats::ffmpegPath();
+        if (! $ffmpeg) {
+            $this->markTestSkipped('ffmpeg is not available.');
+        }
+        $file = sys_get_temp_dir().'/rec-'.bin2hex(random_bytes(4)).'.webm';
+        // Written to a pipe, as a browser writes it while recording: the header cannot hold the length.
+        Process::fromShellCommandline('"$FF" -v error -f lavfi -i sine=frequency=300:duration=7.5 -c:a libopus -f webm - > "$OUT"')
+            ->setTimeout(60)->mustRun(null, ['FF' => $ffmpeg, 'OUT' => $file]);
+        $header = new Process([$ffmpeg, '-hide_banner', '-i', $file]);
+        $header->run();
+        $this->assertStringContainsString('Duration: N/A', $header->getErrorOutput(), 'the case a browser makes');
+
+        $this->assertEqualsWithDelta(7.5, Transcriber::lengthOf($file), 0.1);
+        @unlink($file);
+    }
+
     private function tone(string $name, string $seconds, ?string $gap = null): string
     {
         if (! AudioFormats::ffmpegPath()) {

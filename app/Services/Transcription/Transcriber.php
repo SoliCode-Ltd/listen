@@ -229,7 +229,18 @@ final class Transcriber
         $p = new Process([self::ffmpeg(), '-hide_banner', '-i', $file]);
         $p->setTimeout(60)->run();
         if (preg_match('/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/', $p->getErrorOutput(), $m) === 1) {
-            return (int) $m[1] * 3600 + (int) $m[2] * 60 + (float) $m[3];
+            $seconds = (int) $m[1] * 3600 + (int) $m[2] * 60 + (float) $m[3];
+            if ($seconds > 0) {
+                return $seconds;
+            }
+        }
+
+        // A recording made in the browser (WebM, Ogg) is written as it is made, so its header has no
+        // length ("Duration: N/A"): it is read to its end to find it, as the browser does to play it.
+        $p = new Process([self::ffmpeg(), '-hide_banner', '-nostats', '-i', $file, '-vn', '-f', 'null', '-progress', 'pipe:1', '-']);
+        $p->setTimeout(300)->run();
+        if (preg_match_all('/out_time_us=(\d+)/', $p->getOutput(), $all) && $all[1] !== []) {
+            return max(0.0, (int) end($all[1]) / 1_000_000);
         }
 
         return 0.0;

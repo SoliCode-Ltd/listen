@@ -106,8 +106,12 @@
   function wait(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
 
   // ---------- The box's views ----------
+  // The chosen file is a card inside the add box ("chosen"), with the ways to add another below it.
   function show(name) {
-    $$('[data-tr-view]').forEach(function (v) { v.hidden = v.getAttribute('data-tr-view') !== name; });
+    var view = name === 'chosen' ? 'drop' : name;
+    $$('[data-tr-view]').forEach(function (v) { v.hidden = v.getAttribute('data-tr-view') !== view; });
+    drop.classList.toggle('has-file', name === 'chosen');
+    if (name !== 'chosen') stopPreview();
   }
   function showError(text) {
     errorBox.textContent = text || '';
@@ -175,16 +179,62 @@
       a.src = URL.createObjectURL(file);
     });
   }
+  function whenMade(d) {
+    try {
+      return new Intl.DateTimeFormat(document.documentElement.lang || 'en', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(d);
+    } catch (e) { return d.toLocaleString(); }
+  }
+  // A recording plays from its card: the button over it, the time in its corner, a thin bar along its foot.
+  var playButton = $('[data-tr-preview-play]');
+  function previewLength() {
+    var d = preview.duration;
+    return chosen && chosen.seconds > 0 ? chosen.seconds : (isFinite(d) && d > 0 ? d : 0);
+  }
+  function paintPreview() {
+    if (!playButton) return;
+    var playing = !preview.paused && !preview.ended;
+    var length = previewLength();
+    playButton.classList.toggle('is-playing', playing);
+    playButton.setAttribute('aria-label', playButton.getAttribute(playing ? 'data-label-pause' : 'data-label-play'));
+    $('[data-tr-preview-bar]').style.width = length > 0 ? Math.min(100, preview.currentTime / length * 100) + '%' : '0%';
+    $('[data-tr-file-length]').textContent = length > 0 ? clock(playing || preview.currentTime > 0 ? preview.currentTime : length) : '';
+  }
+  function stopPreview() {
+    if (!preview.paused) preview.pause();
+    if (preview.currentTime) { try { preview.currentTime = 0; } catch (e) { /* not loaded yet */ } }
+    paintPreview();
+  }
+  playButton.addEventListener('click', function () {
+    if (preview.paused || preview.ended) {
+      if (preview.ended) preview.currentTime = 0;
+      var p = preview.play();
+      if (p && p.catch) p.catch(function () { paintPreview(); });
+    } else {
+      preview.pause();
+    }
+  });
+  ['play', 'pause', 'timeupdate', 'ended'].forEach(function (ev) { preview.addEventListener(ev, paintPreview); });
+  preview.addEventListener('ended', function () { preview.currentTime = 0; paintPreview(); });
   function choose(file, source) {
     showError('');
     if (!file) return;
     if (!extensionOk(file.name)) return showError(t.not_audio);
     if (file.size > c.maxMb * 1024 * 1024) return showError(fill(t.too_big, { mb: c.maxMb }));
-    chosen = { file: file, name: file.name, source: source, seconds: 0 };
+    // A recording is named for when it was made ("Recording 16 Nov, 07:25"); a file keeps its own name.
+    var title = source === 'record' ? fill(t.recording_name, { date: whenMade(new Date()) }) : file.name;
+    chosen = { file: file, name: file.name, title: title, source: source, seconds: 0 };
+    stopPreview();
     if (preview.src) URL.revokeObjectURL(preview.src);
     preview.src = URL.createObjectURL(file);
-    $('[data-tr-file-name]').textContent = file.name;
+    var name = $('[data-tr-file-name]');
+    name.textContent = title;
+    name.title = title;
     $('[data-tr-file-length]').textContent = '';
+    // Only a recording plays here (to hear it before it is sent); a file shows its note.
+    var recorded = source === 'record';
+    // As an attribute: an SVG icon has no "hidden" property of its own.
+    $$('[data-tr-file-icon]').forEach(function (icon) { icon.toggleAttribute('hidden', icon.getAttribute('data-tr-file-icon') !== (recorded ? 'record' : 'upload')); });
+    playButton.disabled = !recorded;
     show('chosen');
     setMeter([t.checking]);
     ready(false);
@@ -192,6 +242,7 @@
       if (!chosen || chosen.file !== file) return;
       chosen.seconds = seconds;
       $('[data-tr-file-length]').textContent = seconds > 0 ? clock(seconds) : '';
+      paintPreview();
       if (seconds <= 0) {
         // The browser could not tell: the server measures it before anything is used.
         setMeter([]);
@@ -260,14 +311,13 @@
   linkInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); useLink(); } });
 
   // ---------- Recording ----------
-  var rec = { recorder: null, stream: null, chunks: [], started: 0, timer: null };
-  var recButton = $('[data-tr-rec]');
-  $('[data-tr-go-record]').addEventListener('click', function () {
-    showError('');
-    show('record');
-    $('[data-tr-rec-time]').textContent = '00:00';
-    recButton.focus();
-  });
+  // It starts as soon as Record is pressed: pause and resume, stop to use it, close to throw it away.
+  // The bar shows the voice as it comes in; it stops by itself at the plan's longest file.
+  var rec = { recorder: null, stream: null, chunks: [], elapsed: 0, since: 0, timer: null, audio: null, analyser: null, levels: [], frame: 0, discard: false };
+  var recStop = $('[data-tr-rec]');
+  var recPause = $('[data-tr-rec-pause]');
+  var recView = $('[data-tr-view="record"]');
+  var wave = $('[data-tr-rec-wave]');
   function mime() {
     var types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
     for (var i = 0; i < types.length; i++) {
@@ -275,23 +325,84 @@
     }
     return '';
   }
+  function recSeconds() { return rec.elapsed + (rec.since ? (Date.now() - rec.since) / 1000 : 0); }
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+  function paintClock() {
+    var s = Math.floor(recSeconds());
+    $('[data-tr-rec-time]').textContent = two(Math.floor(s / 60)) + ':' + two(s % 60);
+  }
+  // The voice as it comes in: a row of dots, those already spoken drawn as bars as tall as the voice was loud.
+  function paintWave() {
+    if (!wave) return;
+    var ratio = window.devicePixelRatio || 1;
+    var w = wave.clientWidth, h = wave.clientHeight;
+    if (!w || !h) return;
+    if (wave.width !== Math.round(w * ratio)) { wave.width = Math.round(w * ratio); wave.height = Math.round(h * ratio); }
+    var g = wave.getContext('2d');
+    g.setTransform(ratio, 0, 0, ratio, 0, 0);
+    g.clearRect(0, 0, w, h);
+    var css = getComputedStyle(recView);
+    var on = css.getPropertyValue('--tr-wave-on').trim() || '#7659FA';
+    var off = css.getPropertyValue('--tr-wave-off').trim() || 'rgba(128,128,128,.35)';
+    var step = 6, count = Math.floor(w / step), start = Math.max(0, rec.levels.length - count);
+    var rtl = document.documentElement.dir === 'rtl';
+    for (var i = 0; i < count; i++) {
+      var level = rec.levels[start + i];
+      var x = (rtl ? w - (i * step + 3) : i * step + 3);
+      if (level === undefined) {
+        g.fillStyle = off;
+        g.beginPath(); g.arc(x, h / 2, 1.2, 0, Math.PI * 2); g.fill();
+      } else {
+        var bar = Math.max(2.4, Math.min(h, level * h * 1.6));
+        g.fillStyle = on;
+        g.fillRect(x - 1.2, (h - bar) / 2, 2.4, bar);
+      }
+    }
+  }
+  function listen() {
+    if (!rec.analyser) return;
+    var data = new Uint8Array(rec.analyser.fftSize);
+    var last = 0;
+    var tick = function (now) {
+      rec.frame = requestAnimationFrame(tick);
+      if (now - last < 90) return;
+      last = now;
+      if (rec.recorder && rec.recorder.state === 'recording') {
+        rec.analyser.getByteTimeDomainData(data);
+        var sum = 0;
+        for (var i = 0; i < data.length; i++) { var v = (data[i] - 128) / 128; sum += v * v; }
+        rec.levels.push(Math.sqrt(sum / data.length));
+      }
+      paintWave();
+    };
+    rec.frame = requestAnimationFrame(tick);
+  }
+  function setPaused(paused) {
+    recView.classList.toggle('is-paused', paused);
+    recPause.setAttribute('aria-label', recPause.getAttribute(paused ? 'data-label-resume' : 'data-label-pause'));
+    $('[data-tr-rec-state]').textContent = paused ? t.paused : t.recording;
+  }
   function stopRecording(discard) {
     if (rec.timer) { clearInterval(rec.timer); rec.timer = null; }
-    if (rec.recorder && rec.recorder.state !== 'inactive') {
-      rec.discard = !!discard;
-      rec.recorder.stop();
-    }
-    recButton.setAttribute('aria-pressed', 'false');
-    recButton.setAttribute('aria-label', recButton.getAttribute('data-label-start'));
+    if (rec.frame) { cancelAnimationFrame(rec.frame); rec.frame = 0; }
+    if (rec.since) { rec.elapsed += (Date.now() - rec.since) / 1000; rec.since = 0; }
+    rec.discard = !!discard;
+    if (rec.recorder && rec.recorder.state !== 'inactive') rec.recorder.stop();
+    else if (rec.stream) rec.stream.getTracks().forEach(function (tr) { tr.stop(); });
+    if (rec.audio && rec.audio.close) { rec.audio.close(); }
+    rec.audio = null;
+    rec.analyser = null;
   }
-  recButton.addEventListener('click', function () {
-    if (rec.recorder && rec.recorder.state === 'recording') return stopRecording(false);
+  function startRecording() {
+    showError('');
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) return showError(t.mic_none);
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
       var type = mime();
       rec.stream = stream;
       rec.chunks = [];
+      rec.levels = [];
       rec.discard = false;
+      rec.elapsed = 0;
       rec.recorder = type ? new MediaRecorder(stream, { mimeType: type }) : new MediaRecorder(stream);
       rec.recorder.ondataavailable = function (e) { if (e.data && e.data.size) rec.chunks.push(e.data); };
       rec.recorder.onstop = function () {
@@ -300,23 +411,48 @@
         var kind = (rec.recorder.mimeType || type || 'audio/webm').split(';')[0];
         var ext = kind.indexOf('mp4') !== -1 ? 'm4a' : (kind.indexOf('ogg') !== -1 ? 'ogg' : 'webm');
         var d = new Date();
-        var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-        var name = 'Recording ' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + '.' + pad(d.getMinutes()) + '.' + ext;
-        var file = new File(rec.chunks, name, { type: kind });
-        choose(file, 'record');
+        var name = 'Recording ' + d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) + ' ' + two(d.getHours()) + '.' + two(d.getMinutes()) + '.' + ext;
+        choose(new File(rec.chunks, name, { type: kind }), 'record');
       };
+      try {
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        rec.audio = new Ctx();
+        rec.analyser = rec.audio.createAnalyser();
+        rec.analyser.fftSize = 1024;
+        rec.audio.createMediaStreamSource(stream).connect(rec.analyser);
+      } catch (e) { rec.analyser = null; }
       rec.recorder.start(250);
-      rec.started = Date.now();
-      recButton.setAttribute('aria-pressed', 'true');
-      recButton.setAttribute('aria-label', recButton.getAttribute('data-label-stop'));
+      rec.since = Date.now();
+      setPaused(false);
+      show('record');
+      paintClock();
+      listen();
+      var longest = Number((c.account || {}).max_file_seconds || 0);
       rec.timer = setInterval(function () {
-        var s = Math.floor((Date.now() - rec.started) / 1000);
-        $('[data-tr-rec-time]').textContent = (Math.floor(s / 60) < 10 ? '0' : '') + Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
+        paintClock();
+        if (longest > 0 && recSeconds() >= longest) stopRecording(false);
       }, 250);
+      recStop.focus();
     }).catch(function (e) {
+      show('drop');
       showError(e && e.name === 'NotFoundError' ? t.mic_none : t.mic_denied);
     });
+  }
+  $$('[data-tr-go-record]').forEach(function (b) { b.addEventListener('click', function () { stopPreview(); startRecording(); }); });
+  recStop.addEventListener('click', function () { stopRecording(false); });
+  recPause.addEventListener('click', function () {
+    if (!rec.recorder) return;
+    if (rec.recorder.state === 'recording') {
+      rec.recorder.pause();
+      if (rec.since) { rec.elapsed += (Date.now() - rec.since) / 1000; rec.since = 0; }
+      setPaused(true);
+    } else if (rec.recorder.state === 'paused') {
+      rec.recorder.resume();
+      rec.since = Date.now();
+      setPaused(false);
+    }
   });
+  window.addEventListener('resize', paintWave);
 
   // ---------- Sending and following ----------
   function sendPieces(file, upload) {
@@ -381,7 +517,7 @@
       if (r.xhr.status !== 201) return Promise.reject(r);
       return sendPieces(file, r.body).then(function () {
         working('prepare', 2, t.working, t.working_note);
-        return json('POST', c.urls.store, { upload_id: r.body.id, language: language.value, source: chosen.source, title: file.name });
+        return json('POST', c.urls.store, { upload_id: r.body.id, language: language.value, source: chosen.source, title: chosen.title || file.name });
       });
     }).then(started).catch(failed);
   });
@@ -812,9 +948,10 @@
   var GLOBE = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z"/></svg>';
   // The language's round flag (the studio's own flags), the globe for the original.
   function flagHtml(choice) {
-    return choice.flag
-      ? '<span class="vs-flag tr-flag"><img src="' + esc(choice.flag) + '" alt="" width="22" height="22" loading="lazy" decoding="async"></span>'
-      : '<span class="vs-flag tr-flag tr-flag-none">' + GLOBE + '</span>';
+    if (choice.flag) return '<span class="vs-flag tr-flag"><img src="' + esc(choice.flag) + '" alt="" width="22" height="22" loading="lazy" decoding="async"></span>';
+    // A language shown by a letter of its own alphabet rather than a country's flag.
+    if (choice.badge) return '<span class="vs-flag tr-flag tr-flag-letter" lang="' + esc(choice.value) + '">' + esc(choice.badge) + '</span>';
+    return '<span class="vs-flag tr-flag tr-flag-none">' + GLOBE + '</span>';
   }
   function languageMenu(chosen) {
     var choices = [{ value: '', label: t.original }].concat((c.targets || []).filter(function (target) { return target.value !== current.language; }));
@@ -824,7 +961,7 @@
     }).join('');
     var shownChoice = choices.filter(function (choice) { return choice.value === chosen; })[0] || choices[0];
     var label = shownChoice.label;
-    $('[data-tr-language-icon]').innerHTML = shownChoice.flag ? flagHtml(shownChoice) : GLOBE;
+    $('[data-tr-language-icon]').innerHTML = shownChoice.flag || shownChoice.badge ? flagHtml(shownChoice) : GLOBE;
     $('[data-tr-language-current]').textContent = label;
     $('[data-tr-language-button]').setAttribute('aria-label', t.translate_to + ': ' + label);
   }

@@ -23,7 +23,8 @@
           $names = \App\Support\Transcription\TranscriptionSettings::LANGUAGES[$code] ?? [$code, $code];
 
           return ['value' => $code, 'label' => $trAr ? $names[1] : $names[0], 'search' => $names[0].' '.$names[1].' '.$code,
-              'flag' => \App\Support\Transcription\TranscriptionSettings::flagUrl($code)];
+              'flag' => \App\Support\Transcription\TranscriptionSettings::flagUrl($code),
+              'badge' => \App\Support\Transcription\TranscriptionSettings::BADGES[$code] ?? null];
       }, $codes);
       $collator = class_exists(\Collator::class) ? new \Collator($trAr ? 'ar' : 'en') : null;
       usort($rows, fn (array $a, array $b): int => $collator ? $collator->compare($a['label'], $b['label']) : strcmp($a['label'], $b['label']));
@@ -136,6 +137,24 @@
             </span>
             <span class="dub-drop-title">{{ __('transcribe.page.drop_title') }}</span>
             <span class="dub-drop-or">{{ __('transcribe.page.drop_text') }}</span>
+            {{-- The file chosen, as a card: its length in the corner, its name below; a recording plays from it --}}
+            <span class="tr-tile" data-tr-tile>
+              <button type="button" class="tr-tile-art" data-tr-preview-play disabled
+                aria-label="{{ __('transcribe.js.play_recording') }}" data-label-play="{{ __('transcribe.js.play_recording') }}" data-label-pause="{{ __('transcribe.js.pause_recording') }}">
+                <svg class="tr-tile-icon" data-tr-file-icon="upload" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l11-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>
+                <span class="tr-tile-play" data-tr-file-icon="record" aria-hidden="true" hidden>
+                  <svg class="tr-play-icon" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+                  <svg class="tr-pause-icon" viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+                </span>
+                <span class="tr-tile-time" data-tr-file-length dir="ltr"></span>
+                <span class="tr-tile-bar" aria-hidden="true"><span data-tr-preview-bar></span></span>
+              </button>
+              <span class="tr-tile-name" data-tr-file-name dir="auto"></span>
+              <button type="button" class="tr-tile-remove" data-tr-change aria-label="{{ __('transcribe.js.remove_file') }}" title="{{ __('transcribe.js.remove_file') }}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
+            </span>
+            <audio class="initialized" data-tr-preview preload="metadata" hidden></audio>
             <span class="tr-options">
               <button type="button" class="btn tr-option" data-tr-upload>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
@@ -168,25 +187,25 @@
             </div>
           </div>
 
-          {{-- Recording --}}
-          <div class="tr-panel tr-recorder" data-tr-view="record" hidden>
-            <strong>{{ __('transcribe.page.record_title') }}</strong>
-            <button type="button" class="tr-rec-btn" data-tr-rec aria-pressed="false" aria-label="{{ __('transcribe.page.record_start') }}"
-              data-label-start="{{ __('transcribe.page.record_start') }}" data-label-stop="{{ __('transcribe.page.record_stop') }}"><span aria-hidden="true"></span></button>
-            <span class="tr-rec-time" data-tr-rec-time dir="ltr">00:00</span>
-            <p class="tr-note">{{ __('transcribe.page.record_hint') }}</p>
-            <div class="tr-panel-actions">
-              <button type="button" class="btn btn-ghost" data-tr-back>{{ __('transcribe.page.cancel') }}</button>
+          {{-- Recording: it starts at once; pause, stop, or close to throw it away --}}
+          <div class="tr-recorder" data-tr-view="record" hidden>
+            <button type="button" class="tr-rec-close" data-tr-back aria-label="{{ __('transcribe.page.cancel') }}" title="{{ __('transcribe.page.cancel') }}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+            <div class="tr-rec-controls">
+              <button type="button" class="tr-rec-pause" data-tr-rec-pause aria-label="{{ __('transcribe.js.pause') }}"
+                data-label-pause="{{ __('transcribe.js.pause') }}" data-label-resume="{{ __('transcribe.js.resume') }}">
+                <svg class="tr-pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+                <svg class="tr-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+              </button>
+              <button type="button" class="tr-rec-stop" data-tr-rec aria-label="{{ __('transcribe.page.record_stop') }}" title="{{ __('transcribe.page.record_stop') }}">
+                <span aria-hidden="true"></span>
+              </button>
             </div>
-          </div>
-
-          {{-- A file (or a recording) chosen, its length known --}}
-          <div class="dub-chosen" data-tr-view="chosen" hidden>
-            <audio data-tr-preview controls preload="metadata" data-download-disabled="1"></audio>
-            <div class="dub-file-row">
-              <span class="dub-file-name" data-tr-file-name dir="auto"></span>
-              <span class="dub-file-length" data-tr-file-length dir="ltr"></span>
-              <button type="button" class="dub-link" data-tr-change>{{ __('transcribe.page.change') }}</button>
+            <div class="tr-rec-bar">
+              <span class="tr-rec-state"><span class="tr-rec-dot" aria-hidden="true"></span><span data-tr-rec-state>{{ __('transcribe.js.recording') }}</span></span>
+              <canvas class="tr-rec-wave" data-tr-rec-wave aria-hidden="true"></canvas>
+              <span class="tr-rec-time" data-tr-rec-time dir="ltr">00:00</span>
             </div>
           </div>
 
@@ -220,7 +239,7 @@
             <select id="trLanguage" data-tr-language data-vs-select data-vs-search="{{ __('transcribe.page.search_language') }}" data-vs-none="{{ __('transcribe.page.no_language') }}" data-vs-flags>
               <option value="auto" data-search="{{ __('transcribe.page.detect') }} auto">{{ __('transcribe.page.detect') }}</option>
               @foreach($trLanguages as $language)
-                <option value="{{ $language['value'] }}" data-search="{{ $language['search'] }}" @if($language['flag']) data-flag="{{ $language['flag'] }}" @endif>{{ $language['label'] }}</option>
+                <option value="{{ $language['value'] }}" data-search="{{ $language['search'] }}" @if($language['flag']) data-flag="{{ $language['flag'] }}" @elseif($language['badge']) data-flag-letter="{{ $language['badge'] }}" @endif>{{ $language['label'] }}</option>
               @endforeach
             </select>
           </div>

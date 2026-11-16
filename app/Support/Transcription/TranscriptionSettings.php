@@ -175,7 +175,6 @@ final class TranscriptionSettings
         'el' => 'gr',
         'gu' => 'in',
         'ha' => 'ng',
-        'he' => 'il',
         'hi' => 'in',
         'hu' => 'hu',
         'is' => 'is',
@@ -242,6 +241,13 @@ final class TranscriptionSettings
         'xh' => 'za',
         'zu' => 'za',
     ];
+
+    /**
+     * Languages shown with a letter of their own alphabet instead of a country's flag.
+     *
+     * @var array<string, string>
+     */
+    public const BADGES = ['he' => 'א'];
 
     /** The flag of a language, as a web address (null when it has none). */
     public static function flagUrl(string $code): ?string
