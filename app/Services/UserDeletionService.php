@@ -5,11 +5,14 @@ namespace App\Services;
 use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
 use App\Models\DemoVoiceGeneration;
+use App\Models\Transcription;
 use App\Models\User;
+use App\Services\Transcription\TranscriptionFlow;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Deleting an account from the admin. Stripe keeps charging a card
@@ -76,6 +79,13 @@ class UserDeletionService
         $voices = $user->clonedVoices()->withTrashed()->get();
         foreach ($voices as $voice) {
             $this->voiceCloning->purge($voice);
+        }
+
+        // Speech to text: each transcript's recording and files (their rows go with the account).
+        if (Schema::hasTable('transcriptions')) {
+            $disk = Storage::disk(TranscriptionFlow::DISK);
+            Transcription::withTrashed()->where('user_id', $user->id)->get(['id', 'code', 'created_at'])
+                ->each(fn (Transcription $t) => $disk->deleteDirectory(TranscriptionFlow::folder($t)));
         }
 
         if ($withDemoHistory) {

@@ -218,14 +218,53 @@ class ApiTranscriptionsTest extends TestCase
         $this->assertSame(['code' => 'not_written', 'message' => 'We could not write out this recording. Nothing was taken from your minutes.'], $item['error']);
     }
 
+    /**
+     * A playlist lists other files on the server by their path, and ffmpeg would read them and have
+     * their sound written out for the sender. Sent as a file (named .m3u8) or as a link, it is refused
+     * as having no sound, and nothing is used.
+     */
+    public function test_a_playlist_sent_as_a_file_or_a_link_is_never_read_as_one(): void
+    {
+        $user = $this->sttMember(minutes: 60);
+        ['plain' => $plain] = $this->issueKey($user);
+        $other = $this->audio(4);
+        $playlist = sys_get_temp_dir().'/api-stt-'.bin2hex(random_bytes(4)).'.m3u8';
+        $lines = "#EXTM3U\n#EXT-X-TARGETDURATION:5\n#EXT-X-VERSION:3\n#EXTINF:4.0,\n{$other}\n#EXT-X-ENDLIST\n";
+        file_put_contents($playlist, $lines);
+
+        $this->assertApiError($this->upload($plain, $playlist, [], 'other.m3u8'), 422, 'no_audio_found', 'invalid_request_error', 'file');
+
+        AudioLink::$resolver = fn (string $host) => $host === 'cdn.example.org' ? '93.184.216.34' : null;
+        Http::fake(['cdn.example.org/*' => Http::response($lines, 200, ['Content-Type' => 'audio/x-mpegurl'])]);
+        $this->assertApiError($this->apiPost($plain, '/transcriptions', ['url' => 'https://cdn.example.org/live/other.m3u8']), 422, 'no_audio_found', 'invalid_request_error', 'file');
+
+        $this->assertSame(0, Transcription::query()->count());
+        $this->assertSame(0, TranscriptionAccess::balance($user)['used']);
+    }
+
+    /** A new translation within the limits; beyond them, a clear 429 (kept ones still download, free). */
+    public function test_translations_through_the_api_have_their_limits(): void
+    {
+        $user = $this->sttMember(minutes: 60);
+        ['plain' => $plain] = $this->issueKey($user);
+        $five = array_fill_keys(['fr', 'de', 'es', 'it', 'tr'], ['paragraphs' => [['speaker' => 'A', 'text' => 'x', 'start' => 0.4, 'end' => 1.6]],
+            'segments' => [['speaker' => 'A', 'text' => 'x', 'paragraph' => 0, 'start' => 0.4, 'end' => 1.6]], 'at' => now()->toIso8601String()]);
+        $t = $this->stored($user, ['translations' => $five]);
+
+        $this->apiGet($plain, '/transcriptions/'.$t->code.'/export?format=txt&translate_to=fr')->assertOk();
+        $response = $this->apiGet($plain, '/transcriptions/'.$t->code.'/export?format=txt&translate_to=ar');
+        $this->assertApiError($response, 429, 'translation_limit', 'rate_limit_error');
+        $this->assertStringContainsString('5 languages', $response->json('error.message'));
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private ?string $lastLocation = null;
 
     /** @param  array<string, mixed>  $fields */
-    private function upload(string $plain, string $path, array $fields = []): TestResponse
+    private function upload(string $plain, string $path, array $fields = [], string $name = 'episode.mp3'): TestResponse
     {
-        $file = new UploadedFile($path, 'episode.mp3', 'audio/mpeg', null, true);
+        $file = new UploadedFile($path, $name, 'audio/mpeg', null, true);
         $response = $this->post('/v1/transcriptions', $fields + ['file' => $file], ['X-Listen-Api-Key' => $plain, 'Accept' => 'application/json']);
         $this->lastLocation = $response->headers->get('Location');
 

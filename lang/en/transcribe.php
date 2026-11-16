@@ -29,6 +29,15 @@ return [
         'site_busy' => 'Speech to text is very busy today. Please try again tomorrow.',
         'bad_link' => 'We could not get audio from this link. Use a direct link to an audio or video file.',
         'too_short' => 'This recording is too short to hear any words. Record a little longer.',
+        'slow_link' => 'The file at this link downloads too slowly. Download it and upload the file instead.',
+        'link_busy' => 'Another of your links is still being fetched. Try again when it finishes.',
+        'links_busy' => 'Many links are being fetched right now. Try again in a minute.',
+        'uploads_busy' => 'You already have files being uploaded. Wait for them to finish, or try again in a few minutes.',
+        'upload_day_full' => 'You have uploaded a lot today. You can upload more tomorrow.',
+        'uploads_paused' => 'Uploads are paused for a moment. Try again in a few minutes.',
+        'translations_each' => 'This transcript is already in :n languages, the most one can have.',
+        'translations_day' => 'You have made the :n translations a day allows. You can translate more tomorrow.',
+        'translations_letters' => 'Today\'s translations have reached their length limit. You can translate more tomorrow.',
     ],
 
     'failed' => [

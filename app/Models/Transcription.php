@@ -70,6 +70,16 @@ class Transcription extends Model
 
     protected $hidden = ['work', 'search_text'];
 
+    /**
+     * The columns a list of transcripts needs (TranscriptionPresenter::summary(), TranscriptionApi::item()):
+     * not the sentences, translations, search text, usage or notes, which can be large and only one
+     * transcript at a time shows. The paragraphs count its speakers; the work is set only while working.
+     */
+    public const LISTED = ['id', 'user_id', 'code', 'title', 'source', 'source_url', 'audio_path', 'audio_deleted_at', 'seconds',
+        'language_requested', 'language', 'dialect', 'status', 'parts', 'parts_done', 'work', 'paragraphs', 'speaker_names',
+        'charged_seconds', 'is_free', 'period_ym', 'priority', 'api_key_id', 'requests', 'cost_usd', 'model', 'error_code', 'error',
+        'started_at', 'finished_at', 'created_at', 'updated_at', 'deleted_at'];
+
     protected static function booted(): void
     {
         static::creating(function (self $t): void {

@@ -382,7 +382,7 @@ return [
             ],
             'stt_export' => [
                 'title' => 'Download a transcription',
-                'summary' => 'As text (`txt`), subtitles (`srt`, `vtt`) or a document (`docx`). With `translate_to`, in another language: made once and kept, using no minutes.',
+                'summary' => 'As text (`txt`), subtitles (`srt`, `vtt`) or a document (`docx`). With `translate_to`, in another language: made once and kept, using no minutes. A transcription can be translated into up to 5 languages, and up to 10 new translations can be made a day.',
             ],
             'user' => [
                 'title' => 'Get your account',

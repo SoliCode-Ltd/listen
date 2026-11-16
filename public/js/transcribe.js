@@ -632,6 +632,8 @@
     var start = new FormData();
     start.set('name', file.name);
     start.set('size', String(file.size));
+    start.set('seconds', String(chosen.seconds > 0 ? chosen.seconds : 0));
+    start.set('source', chosen.source === 'record' ? 'record' : 'upload');
     request('POST', c.urls.upload, start, {}).then(function (r) {
       if (r.xhr.status !== 201) return Promise.reject(r);
       return sendPieces(file, r.body).then(function () {
@@ -1085,12 +1087,34 @@
     paintHead();
   }
   // ---------- The waveform ----------
-  // The recording decoded once, at a low rate (enough to draw it), into a peak for every 10 ms.
+  // The waveform: a peak for every 10 ms, made once by the server with the transcript (a byte each);
+  // for a transcript made before that, the recording decoded here at a low rate, as before.
   function loadWave(tr) {
-    if (!tr || !tr.audio || waves[tr.id] || !window.fetch || !(window.OfflineAudioContext || window.webkitOfflineAudioContext) || Number(tr.seconds) > 1800) return;
+    if (!tr || !tr.audio || waves[tr.id] || !window.fetch) return;
     var id = tr.id;
     waves[id] = 'loading';
-    fetch(tr.urls.audio, { credentials: 'same-origin' }).then(function (r) {
+    var made = tr.urls && tr.urls.peaks ? fetch(tr.urls.peaks, { credentials: 'same-origin' }).then(function (r) {
+      if (!r.ok) throw new Error('peaks');
+      return r.arrayBuffer();
+    }).then(function (buf) {
+      var bytes = new Uint8Array(buf);
+      if (!bytes.length) throw new Error('peaks');
+      var top = 0;
+      for (var i = 0; i < bytes.length; i++) if (bytes[i] > top) top = bytes[i];
+      var peaks = new Float32Array(bytes.length);
+      // Quiet speech kept visible beside loud: each peak against the loudest, eased.
+      for (i = 0; i < bytes.length; i++) peaks[i] = top > 0 ? Math.sqrt(bytes[i] / top) : 0;
+      return { peaks: peaks, per: 100 };
+    }) : Promise.reject(new Error('peaks'));
+    made.catch(function () { return decodeWave(tr); }).then(function (wave) {
+      waves[id] = wave;
+      if (current && current.id === id) { waveBars(); drawWave(); }
+    }).catch(function () { waves[id] = 'none'; });
+  }
+  // The recording decoded once, at a low rate (enough to draw it), into a peak for every 10 ms.
+  function decodeWave(tr) {
+    if (!(window.OfflineAudioContext || window.webkitOfflineAudioContext) || Number(tr.seconds) > 1800) return Promise.reject(new Error('wave'));
+    return fetch(tr.urls.audio, { credentials: 'same-origin' }).then(function (r) {
       if (!r.ok) throw new Error('audio');
       return r.arrayBuffer();
     }).then(function (buf) {
@@ -1113,9 +1137,8 @@
       }
       // Quiet speech kept visible beside loud: each peak against the loudest, eased.
       for (i = 0; i < n; i++) peaks[i] = top > 0 ? Math.sqrt(peaks[i] / top) : 0;
-      waves[id] = { peaks: peaks, per: n / Math.max(0.001, data.length / sound.sampleRate) };
-      if (current && current.id === id) { waveBars(); drawWave(); }
-    }).catch(function () { waves[id] = 'none'; });
+      return { peaks: peaks, per: n / Math.max(0.001, data.length / sound.sampleRate) };
+    });
   }
   // A bar for every few pixels of the whole timeline at this zoom: worked out once, drawn as it scrolls.
   function waveBars() {

@@ -2,6 +2,7 @@
 
 namespace App\Services\Transcription;
 
+use App\Http\Controllers\TranscribeController;
 use App\Jobs\TranscribeJob;
 use App\Models\Plan;
 use App\Models\Transcription;
@@ -98,9 +99,11 @@ final class TranscriptionFlow
         });
 
         $folder = self::folder($transcription);
-        // The name's ending only (letters and digits): it comes from the member or a link.
+        // The name's ending (from the member or a link) only when it is one the page takes: it
+        // helps ffmpeg tell a few formats apart. Any other, a playlist's .m3u8 among them, is never
+        // kept: the content decides (Transcriber::INPUT_FORMATS).
         $ext = strtolower(pathinfo((string) ($meta['file_name'] ?? $path), PATHINFO_EXTENSION));
-        $kept = $folder.'/source.'.(preg_match('/^[a-z0-9]{1,8}$/', $ext) === 1 ? $ext : 'audio');
+        $kept = $folder.'/source.'.(in_array($ext, TranscribeController::EXTENSIONS, true) ? $ext : 'media');
         Storage::disk(self::DISK)->makeDirectory($folder);
         if (! @rename($path, Storage::disk(self::DISK)->path($kept)) && ! @copy($path, Storage::disk(self::DISK)->path($kept))) {
             $this->fail($transcription, 'unreadable', __('transcribe.failed.unreadable'));
@@ -339,14 +342,45 @@ final class TranscriptionFlow
         return false;
     }
 
+    /**
+     * Deleted by its member: its words and recording go at once, as the page says; what it used
+     * stays counted in its month (its length, minutes and cost are kept).
+     */
+    public function forget(Transcription $transcription): void
+    {
+        $this->forgetWords($transcription);
+        $transcription->delete();
+    }
+
+    /**
+     * A transcript's words, sentences, translations, speaker names, link and recording removed;
+     * its row stays for the month's minutes and the admin's figures. Notes that quote the model's
+     * answer go too.
+     */
+    public function forgetWords(Transcription $transcription): void
+    {
+        Storage::disk(self::DISK)->deleteDirectory(self::folder($transcription));
+        $transcription->forceFill([
+            'paragraphs' => null,
+            'segments' => null,
+            'translations' => null,
+            'speaker_names' => null,
+            'source_url' => null,
+            'notes' => array_values(array_filter((array) ($transcription->notes ?? []), fn ($note): bool => ! str_starts_with((string) $note, 'no answer to read'))),
+            'audio_path' => null,
+            'audio_deleted_at' => $transcription->audio_deleted_at ?? now(),
+        ])->save();
+    }
+
     /** Where a transcript's audio is kept, on the private disk. */
     public static function folder(Transcription $transcription): string
     {
         return 'transcriptions/'.$transcription->created_at->format('Ymd').'/'.$transcription->code;
     }
 
+    /** The plan's name as the pricing page shows it in the page's language. */
     private static function planName(Plan $plan, bool $arabic): string
     {
-        return $arabic ? ((string) ($plan->name_ar ?? '') ?: (string) $plan->name) : (string) $plan->name;
+        return trim($plan->getLocalizedName($arabic ? 'ar' : 'en')) ?: (string) $plan->name;
     }
 }

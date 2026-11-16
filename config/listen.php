@@ -226,6 +226,8 @@ return [
         'daily_minutes' => (int) env('LISTEN_TRANSCRIBE_DAILY_MINUTES', 3000),
         // The largest upload, and whether each part is heard a second time with its draft (Speech to text → Settings).
         'max_upload_mb' => (int) env('LISTEN_TRANSCRIBE_MAX_UPLOAD_MB', 500),
+        // Space this server keeps free for everything else it writes: uploads wait while it would go below.
+        'keep_free_mb' => (int) env('LISTEN_TRANSCRIBE_KEEP_FREE_MB', 5120),
         'review' => (bool) env('LISTEN_TRANSCRIBE_REVIEW', false),
         // Days the uploaded audio is kept (the text stays until the member deletes it).
         'keep_audio_days' => (int) env('LISTEN_TRANSCRIBE_KEEP_AUDIO_DAYS', 7),

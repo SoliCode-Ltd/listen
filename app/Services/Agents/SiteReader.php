@@ -649,7 +649,14 @@ class SiteReader
     /** A public internet address: not private, reserved, shared (100.64/10), link-local or loopback. */
     public static function isPublicIp(string $ip): bool
     {
-        return (bool) filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE | FILTER_FLAG_GLOBAL_RANGE);
+        if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE | FILTER_FLAG_GLOBAL_RANGE)) {
+            return false;
+        }
+        // NAT64 (64:ff9b::/96, and 64:ff9b:1::/48 for local use) carries an IPv4 address inside,
+        // 127.0.0.1 or a private one among them, on networks that translate it.
+        $bytes = @inet_pton($ip);
+
+        return ! (is_string($bytes) && strlen($bytes) === 16 && str_starts_with($bytes, "\x00\x64\xff\x9b"));
     }
 
     /** The address $host is read from, or null when it may not be read. */

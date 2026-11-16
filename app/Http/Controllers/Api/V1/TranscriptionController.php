@@ -69,14 +69,16 @@ class TranscriptionController extends Controller
                     throw ApiError::invalid('file_not_received', 'The file did not arrive whole. Send it again as multipart/form-data in the "file" field.', 'file');
                 }
                 $name = self::fileName((string) $file->getClientOriginalName());
+                // Saved under an ending the page takes, or none of the client's: a playlist named .m3u8
+                // is never opened as one (Transcriber::INPUT_FORMATS reads plain audio and video only).
                 $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-                $path = Storage::disk(TranscriptionFlow::DISK)->path(TranscribeController::UPLOADS.'/'.Str::random(40).'.'.($extension !== '' ? $extension : 'audio'));
+                $path = Storage::disk(TranscriptionFlow::DISK)->path(TranscribeController::UPLOADS.'/'.Str::random(40).'.'.(in_array($extension, TranscribeController::EXTENSIONS, true) ? $extension : 'part'));
                 $file->move(dirname($path), basename($path));
                 $meta += ['title' => (string) ($data['title'] ?? '') ?: $name, 'file_name' => $name];
             } else {
                 $url = trim((string) $data['url']);
                 $path = Storage::disk(TranscriptionFlow::DISK)->path(TranscribeController::UPLOADS.'/'.Str::random(40).'.link');
-                $name = $this->links->fetch($url, $path, TranscriptionSettings::maxUploadMb() * 1024 * 1024);
+                $name = $this->links->fetch($url, $path, TranscriptionSettings::maxUploadMb() * 1024 * 1024, (int) $user->id);
                 $meta += ['title' => (string) ($data['title'] ?? '') ?: $name, 'file_name' => $name, 'source_url' => $url];
             }
 
@@ -107,7 +109,7 @@ class TranscriptionController extends Controller
         ]);
         $pageSize = (int) ($filters['page_size'] ?? 30);
 
-        $query = $this->mine($request)->orderByDesc('id');
+        $query = $this->mine($request)->select(Transcription::LISTED)->orderByDesc('id');
         if (isset($filters['before'])) {
             $before = $this->mine($request)->where('code', (string) $filters['before'])->value('id');
             if ($before === null) {
@@ -151,6 +153,8 @@ class TranscriptionController extends Controller
         if ($language !== null && ! isset(($t->translations ?? [])[$language])) {
             try {
                 $editor->translate($t, $language);
+            } catch (TranscriptionRefused $e) {
+                throw TranscriptionApi::error($e);
             } catch (\Throwable $e) {
                 report($e);
                 throw new ApiError(502, ApiError::TYPE_API, 'translation_failed', 'The translation could not be made. Please try again. No minutes were used.', 'translate_to');

@@ -195,7 +195,8 @@ final class TranscriptionAccess
         }
 
         return [
-            'plan' => $arabic ? ((string) ($plan->name_ar ?? '') ?: (string) $plan->name) : (string) $plan->name,
+            // As the pricing page names it.
+            'plan' => trim($plan->getLocalizedName($arabic ? 'ar' : 'en')) ?: (string) $plan->name,
             'slug' => (string) $plan->slug,
             'url' => rescue(fn () => route('billing.page', ['plan' => $plan->slug]), route('pricing'), false),
         ];

@@ -100,7 +100,56 @@ final class Transcriber
     /** A sentence longer than this many letters is cut at a comma (a subtitle line, a click to play). */
     private const LONG_SENTENCE = 160;
 
+    /** The longest one request to the model may take (a step's own time may allow less). */
+    private const REQUEST_SECONDS = 105;
+
+    /** With less than this left of a step's time, no request is started: the step is tried again later. */
+    private const LEAST_SECONDS = 20;
+
+    /** When the step being worked must be done (microtime), set by TranscribeJob; null for work in a web request. */
+    private ?float $deadline = null;
+
     public function __construct(private GeminiKeyManager $keys) {}
+
+    /** The time the step now being worked must end by (null: none, as in a web request). */
+    public function until(?float $deadline): void
+    {
+        $this->deadline = $deadline;
+    }
+
+    /**
+     * How long the next request may take: up to $longest, within what is left of the step's time.
+     *
+     * @throws StepOutOfTime when too little is left to start one
+     */
+    private function requestSeconds(int $longest = self::REQUEST_SECONDS): int
+    {
+        if ($this->deadline === null) {
+            return $longest;
+        }
+        $left = (int) floor($this->deadline - microtime(true)) - 5;
+        if ($left < self::LEAST_SECONDS) {
+            throw new StepOutOfTime('Too little of this step\'s time is left to ask the model.');
+        }
+
+        return min($longest, $left);
+    }
+
+    /** A key the model refused for the day (its quota, its spending cap, or a bad key) is used last until then, as the studio does. */
+    private function markKey(array $key, string $model, Response $response): void
+    {
+        $name = (string) ($key['name'] ?? '');
+        if ($name === '') {
+            return;
+        }
+        $body = (string) $response->body();
+        if (GeminiKeyManager::isKeyProblem($response->status(), $body) || GeminiKeyManager::isDailyQuotaError($response->status(), $body)) {
+            $this->keys->markOutForToday($name, $model);
+        }
+        if (GeminiKeyManager::isSpendingCapError($response->status(), $body)) {
+            $this->keys->markOutForSpendingCap($name);
+        }
+    }
 
     /**
      * The whole recording at once (for the measure, and short files): prepare(),
@@ -353,7 +402,7 @@ final class Transcriber
      */
     public static function probe(string $file): array
     {
-        $p = new Process([self::ffmpeg(), '-hide_banner', '-i', $file]);
+        $p = new Process([self::ffmpeg(), '-hide_banner', ...self::input($file)]);
         $p->setTimeout(60)->run();
         $log = $p->getErrorOutput();
         if (preg_match('/Stream #\S+.*: Audio:/', $log) !== 1) {
@@ -365,11 +414,86 @@ final class Transcriber
                 return ['audio' => true, 'seconds' => $seconds];
             }
         }
-        $p = new Process([self::ffmpeg(), '-hide_banner', '-nostats', '-i', $file, '-vn', '-f', 'null', '-progress', 'pipe:1', '-']);
+        $p = new Process([self::ffmpeg(), '-hide_banner', '-nostats', ...self::input($file), '-vn', '-f', 'null', '-progress', 'pipe:1', '-']);
         $p->setTimeout(300)->run();
         $seconds = preg_match_all('/out_time_us=(\d+)/', $p->getOutput(), $all) && $all[1] !== [] ? max(0.0, (int) end($all[1]) / 1_000_000) : 0.0;
 
         return ['audio' => true, 'seconds' => $seconds];
+    }
+
+    /** The waveform the page draws, kept beside the clean copy: the loudest moment of every 10 ms, a byte each. */
+    public const PEAKS_FILE = 'peaks.u8';
+
+    public const PEAKS_PER_SECOND = 100;
+
+    /**
+     * The clean copy's waveform, as the page used to work it out from the whole recording: at
+     * 8 kHz, the loudest sample of every 10 ms (80 samples), as a byte (255 the loudest a sample
+     * can be). Read from ffmpeg as it decodes, so a three-hour file never sits in memory.
+     */
+    public static function peaks(string $clean, string $out): void
+    {
+        $per = 8000 / self::PEAKS_PER_SECOND;
+        $bytes = $per * 2;
+        $process = proc_open([self::ffmpeg(), '-v', 'error', '-nostdin', '-i', $clean, '-vn', '-ac', '1', '-ar', '8000', '-f', 's16le', 'pipe:1'],
+            [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+        if (! is_resource($process)) {
+            throw new \RuntimeException('The waveform could not be drawn: ffmpeg did not start.');
+        }
+        $peaks = '';
+        $carry = '';
+        $started = microtime(true);
+        $peak = static function (array $samples): string {
+            return chr(min(255, intdiv(max(max($samples), -min($samples)) * 255 + 16383, 32767)));
+        };
+        while (! feof($pipes[1])) {
+            if (microtime(true) - $started > 300) {
+                proc_terminate($process);
+                throw new \RuntimeException('The waveform could not be drawn in time.');
+            }
+            $data = fread($pipes[1], 1 << 20);
+            if ($data === false) {
+                break;
+            }
+            $chunk = $carry.$data;
+            $whole = intdiv(strlen($chunk), $bytes) * $bytes;
+            $carry = substr($chunk, $whole);
+            if ($whole === 0) {
+                continue;
+            }
+            $samples = unpack('s*', substr($chunk, 0, $whole));
+            for ($i = 0, $n = count($samples); $i < $n; $i += $per) {
+                $peaks .= $peak(array_slice($samples, $i, $per));
+            }
+        }
+        fclose($pipes[1]);
+        if (strlen($carry) >= 2) {
+            $peaks .= $peak(unpack('s*', substr($carry, 0, intdiv(strlen($carry), 2) * 2)));
+        }
+        if (proc_close($process) !== 0 || $peaks === '') {
+            throw new \RuntimeException('The waveform could not be drawn.');
+        }
+        if (@file_put_contents($out.'.part', $peaks) !== strlen($peaks) || ! @rename($out.'.part', $out)) {
+            @unlink($out.'.part');
+            throw new \RuntimeException('The waveform could not be saved.');
+        }
+    }
+
+    /**
+     * The containers a member's file may be read as: plain audio and video only. ffmpeg would
+     * otherwise also open a playlist (a file or link named .m3u8), which lists other files on
+     * this server by their path and has them read, and its sound written out for the sender.
+     */
+    public const INPUT_FORMATS = 'mp3,wav,w64,mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,ogg,flac,aac,amr,amrnb,amrwb,asf,mpegts,mpeg,avi,flv,aiff,caf,au,ac3,eac3,loas,wv';
+
+    /**
+     * ffmpeg's arguments to read a member's file: one of INPUT_FORMATS, from the disk only.
+     *
+     * @return list<string>
+     */
+    public static function input(string $file): array
+    {
+        return ['-format_whitelist', self::INPUT_FORMATS, '-protocol_whitelist', 'file', '-i', $file];
     }
 
     private static function ffmpeg(): string
@@ -1120,7 +1244,15 @@ final class Transcriber
         };
         $words = fn (array $heard): int => self::wordCount(implode(' ', array_column($heard['paragraphs'], 'text')));
         for ($try = 0; $try < 2; $try++) {
-            $answer = $take(['careful' => $careful, 'speech' => $whole ? $speech : 0.0]);
+            try {
+                $answer = $take(['careful' => $careful, 'speech' => $whole ? $speech : 0.0]);
+            } catch (StepOutOfTime $e) {
+                if ($best === null) {
+                    throw $e;
+                }
+                $notes[] = 'no time left in this step to ask again: the answer so far kept';
+                break;
+            }
             $heard = $answer['data'] !== null ? self::read($answer['data']) : null;
             if ($heard !== null) {
                 $heard['recited'] = $careful;
@@ -1149,13 +1281,17 @@ final class Transcriber
         // A second listening with the draft: kept only when it drops nothing.
         if (($ask['review'] ?? false) && $words($best) > 0) {
             $draft = json_encode(['language' => $best['language'], 'speakers' => $best['voices'], 'paragraphs' => $best['paragraphs']], JSON_UNESCAPED_UNICODE);
-            $answer = $take(['careful' => $best['recited'], 'draft' => $draft]);
-            $checked = $answer['data'] !== null ? self::read($answer['data']) : null;
-            if ($checked !== null && $words($checked) >= 0.9 * $words($best)) {
-                $notes[] = sprintf('checked again: %d words, was %d', $words($checked), $words($best));
-                $best = $checked + ['recited' => $best['recited']];
-            } else {
-                $notes[] = 'checked again: the check dropped words, the first answer kept';
+            try {
+                $answer = $take(['careful' => $best['recited'], 'draft' => $draft]);
+                $checked = $answer['data'] !== null ? self::read($answer['data']) : null;
+                if ($checked !== null && $words($checked) >= 0.9 * $words($best)) {
+                    $notes[] = sprintf('checked again: %d words, was %d', $words($checked), $words($best));
+                    $best = $checked + ['recited' => $best['recited']];
+                } else {
+                    $notes[] = 'checked again: the check dropped words, the first answer kept';
+                }
+            } catch (StepOutOfTime) {
+                $notes[] = 'no time left in this step to check again: the first answer kept';
             }
         }
 
@@ -1620,14 +1756,14 @@ final class Transcriber
         $last = 'no key';
         foreach (VideoDubber::MODELS as $model) {
             foreach ($this->keys->keysInOrder($model) as $key) {
-                $response = Http::timeout(240)->withHeaders(['x-goog-api-key' => $key['key']])->post($base.'/models/'.$model.':generateContent', $body);
+                $response = Http::timeout($this->requestSeconds())->withHeaders(['x-goog-api-key' => $key['key']])->post($base.'/models/'.$model.':generateContent', $body);
                 // A model that does not take that thinking level, or the answer's shape, is asked again without it.
                 foreach (['thinking' => 'thinkingConfig', 'schema' => 'responseSchema'] as $word => $setting) {
                     if ($response->status() !== 400 || ! str_contains(strtolower($response->body()), $word) || ! isset($body['generationConfig'][$setting])) {
                         continue;
                     }
                     unset($body['generationConfig'][$setting]);
-                    $response = Http::timeout(240)->withHeaders(['x-goog-api-key' => $key['key']])->post($base.'/models/'.$model.':generateContent', $body);
+                    $response = Http::timeout($this->requestSeconds())->withHeaders(['x-goog-api-key' => $key['key']])->post($base.'/models/'.$model.':generateContent', $body);
                 }
                 $this->keys->recordUsage($key['name']);
                 if ($response->status() === 404) {
@@ -1636,6 +1772,7 @@ final class Transcriber
                     continue 2;
                 }
                 if (! $response->ok()) {
+                    $this->markKey($key, $model, $response);
                     $last = 'HTTP '.$response->status();
 
                     continue;
@@ -1661,15 +1798,22 @@ final class Transcriber
     {
         $answers = [];
         $model = VideoDubber::MODELS[0] ?? null;
-        $key = $model !== null ? ($this->keys->keysInOrder($model)[0] ?? null) : null;
-        if ($key !== null) {
-            $url = self::endpoint().'/models/'.$model.':generateContent';
-            foreach (array_chunk(array_keys($asks), self::TIMING_AT_ONCE) as $batch) {
+        $url = self::endpoint().'/models/'.$model.':generateContent';
+        // All of them on the first key together, then those that did not come back on the second,
+        // while the step has time for it; what is left unanswered is placed by its length instead.
+        foreach ($model !== null ? array_slice($this->keys->keysInOrder($model), 0, 2) : [] as $key) {
+            $missing = array_values(array_filter(array_keys($asks), fn ($name): bool => ! array_key_exists($name, $answers)));
+            foreach (array_chunk($missing, self::TIMING_AT_ONCE) as $batch) {
                 try {
-                    $responses = Http::pool(function (Pool $pool) use ($batch, $asks, $thinking, $schema, $key, $url): array {
+                    $timeout = $this->requestSeconds(120);
+                } catch (StepOutOfTime) {
+                    break 2;
+                }
+                try {
+                    $responses = Http::pool(function (Pool $pool) use ($batch, $asks, $thinking, $schema, $key, $url, $timeout): array {
                         $sent = [];
                         foreach ($batch as $name) {
-                            $sent[] = $pool->as((string) $name)->timeout(120)->withHeaders(['x-goog-api-key' => $key['key']])
+                            $sent[] = $pool->as((string) $name)->timeout($timeout)->withHeaders(['x-goog-api-key' => $key['key']])
                                 ->post($url, self::requestBody($asks[$name], $thinking, $schema));
                         }
 
@@ -1684,15 +1828,20 @@ final class Transcriber
                         $this->keys->recordUsage($key['name']);
                         if ($response->ok()) {
                             $answers[$name] = self::answerFrom($response, $model);
+                        } else {
+                            $this->markKey($key, (string) $model, $response);
                         }
                     }
                 }
             }
         }
+        // Any still missing, on its own: the other keys and models in turn, while there is time.
         foreach ($asks as $name => $parts) {
             if (! array_key_exists($name, $answers)) {
                 try {
                     $answers[$name] = $this->askModel($parts, $thinking, $schema);
+                } catch (StepOutOfTime) {
+                    break;
                 } catch (\Throwable) {
                     $answers[$name] = null;
                 }
@@ -1742,7 +1891,7 @@ final class Transcriber
     /** Any audio (or a video's sound) as 16 kHz mono MP3: what the model hears, small to send. */
     private function normalise(string $ffmpeg, string $in, string $out): void
     {
-        $p = new Process([$ffmpeg, '-v', 'error', '-y', '-i', $in, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'libmp3lame', '-b:a', '48k', $out]);
+        $p = new Process([$ffmpeg, '-v', 'error', '-y', ...self::input($in), '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'libmp3lame', '-b:a', '48k', $out]);
         $p->setTimeout(600)->run();
         if (! $p->isSuccessful() || ! is_file($out) || filesize($out) === 0) {
             throw new \RuntimeException('The audio could not be read: '.mb_substr(trim($p->getErrorOutput()), 0, 300));

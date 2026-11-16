@@ -4,10 +4,12 @@ namespace App\Jobs;
 
 use App\Models\Transcription;
 use App\Services\Dubbing\SpeechNotWrittenOut;
+use App\Services\Transcription\StepOutOfTime;
 use App\Services\Transcription\Transcriber;
 use App\Services\Transcription\TranscriptionFlow;
 use App\Support\Transcription\TranscriptionSettings;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -40,12 +42,26 @@ class TranscribeJob implements ShouldQueue
     /** @var array<int, int> */
     public array $backoff = [15, 45];
 
+    /**
+     * Speech to text's own queues, worked by its own workers (routes/console.php), so a long
+     * transcript never keeps the studio's background voices waiting on the shared queues.
+     */
+    public const QUEUE = 'transcribe';
+
+    public const QUEUE_PRIORITY = 'transcribe-high';
+
+    /** How long one step may run, inside the queue's $timeout for it: room is left to save it. */
+    public const STEP_SECONDS = 115;
+
+    /** Short files worked through right away (runNow()) at the same time on this server: each keeps a web worker. */
+    public const RIGHT_AWAY_AT_ONCE = 4;
+
     public function __construct(public int $transcriptionId) {}
 
     /** The next step on the queue its plan gives it (priority first). */
     public static function queueFor(Transcription $transcription): void
     {
-        static::dispatch($transcription->id)->onQueue($transcription->priority ? 'high' : 'default');
+        static::dispatch($transcription->id)->onQueue($transcription->priority ? self::QUEUE_PRIORITY : self::QUEUE);
     }
 
     public function handle(Transcriber $transcriber, TranscriptionFlow $flow): void
@@ -56,7 +72,7 @@ class TranscribeJob implements ShouldQueue
         if (! $lock->get()) {
             $t = Transcription::withTrashed()->find($this->transcriptionId);
             if ($t && $t->isWorking() && config('queue.default') !== 'sync') {
-                static::dispatch($t->id)->onQueue($t->priority ? 'high' : 'default')->delay(now()->addSeconds(10));
+                static::dispatch($t->id)->onQueue($t->priority ? self::QUEUE_PRIORITY : self::QUEUE)->delay(now()->addSeconds(10));
             }
 
             return;
@@ -80,38 +96,61 @@ class TranscribeJob implements ShouldQueue
      */
     public static function runNow(int $transcriptionId): void
     {
-        // A web request has a time limit: give it room for this. A command has none, so none is set.
-        if ((int) ini_get('max_execution_time') > 0) {
-            @set_time_limit(200);
+        // A few at once on this server, each in the web worker that took the file; the rest wait
+        // for the queue, which is their safety net anyway.
+        $slot = self::rightAwaySlot();
+        if ($slot === null) {
+            return;
         }
-        $until = microtime(true) + 150;
-        $job = new static($transcriptionId);
-        $slips = 0;
-        while (microtime(true) < $until) {
-            $lock = Cache::lock(self::lockName($transcriptionId), $job->timeout + 30);
-            if (! $lock->get()) {
-                return;
+        try {
+            // A web request has a time limit: give it room for this. A command has none, so none is set.
+            if ((int) ini_get('max_execution_time') > 0) {
+                @set_time_limit(200);
             }
-            try {
-                if (! $job->stepOnce(app(Transcriber::class), app(TranscriptionFlow::class))) {
+            $until = microtime(true) + 150;
+            $job = new static($transcriptionId);
+            $slips = 0;
+            while (microtime(true) < $until) {
+                $lock = Cache::lock(self::lockName($transcriptionId), $job->timeout + 30);
+                if (! $lock->get()) {
                     return;
                 }
-            } catch (\Throwable $e) {
-                // A model that did not answer this once is asked again here after a breath; a second
-                // slip leaves it to the queue, which tries again later.
-                if (++$slips < 2) {
+                try {
+                    if (! $job->stepOnce(app(Transcriber::class), app(TranscriptionFlow::class), $until + 10)) {
+                        return;
+                    }
+                } catch (\Throwable $e) {
+                    // A model that did not answer this once is asked again here after a breath; a second
+                    // slip leaves it to the queue, which tries again later.
+                    if (++$slips < 2 && ! $e instanceof StepOutOfTime) {
+                        $lock->release();
+                        sleep(2);
+
+                        continue;
+                    }
+                    Log::warning('Speech to text: left to the queue.', ['transcription' => $transcriptionId, 'error' => mb_substr($e->getMessage(), 0, 300)]);
+
+                    return;
+                } finally {
                     $lock->release();
-                    sleep(2);
-
-                    continue;
                 }
-                Log::warning('Speech to text: left to the queue.', ['transcription' => $transcriptionId, 'error' => mb_substr($e->getMessage(), 0, 300)]);
+            }
+        } finally {
+            $slot->release();
+        }
+    }
 
-                return;
-            } finally {
-                $lock->release();
+    /** A free place among the RIGHT_AWAY_AT_ONCE right-away runs, or null when all are taken. */
+    private static function rightAwaySlot(): ?Lock
+    {
+        for ($i = 1; $i <= self::RIGHT_AWAY_AT_ONCE; $i++) {
+            $lock = Cache::lock('transcribe-right-away:'.$i, 300);
+            if ($lock->get()) {
+                return $lock;
             }
         }
+
+        return null;
     }
 
     private static function lockName(int $id): string
@@ -122,8 +161,18 @@ class TranscribeJob implements ShouldQueue
     /** How many times one step may be started (by the queue, its retries, or runNow()) before the transcript is failed. */
     public const STEP_TRIES = 5;
 
-    /** One step done and saved; whether another is left. */
-    private function stepOnce(Transcriber $transcriber, TranscriptionFlow $flow): bool
+    /** One step done and saved, within its own time ($until: when runNow() ends, if sooner); whether another is left. */
+    private function stepOnce(Transcriber $transcriber, TranscriptionFlow $flow, ?float $until = null): bool
+    {
+        $transcriber->until(min($until ?? INF, microtime(true) + self::STEP_SECONDS));
+        try {
+            return $this->stepWithin($transcriber, $flow);
+        } finally {
+            $transcriber->until(null);
+        }
+    }
+
+    private function stepWithin(Transcriber $transcriber, TranscriptionFlow $flow): bool
     {
         $t = Transcription::withTrashed()->find($this->transcriptionId);
         if (! $t || ! $t->isWorking()) {
@@ -154,6 +203,12 @@ class TranscribeJob implements ShouldQueue
                     return false;
                 }
                 $transcriber->clean($disk->path($source), $clean);
+                try {
+                    Transcriber::peaks($clean, $disk->path($folder.'/'.Transcriber::PEAKS_FILE));
+                } catch (\Throwable $e) {
+                    // The page then draws the waveform from the recording itself, as before.
+                    Log::info('Speech to text: no waveform peaks made.', ['transcription' => $t->id, 'error' => mb_substr($e->getMessage(), 0, 200)]);
+                }
                 if (! self::saveIfWorking($t, ['audio_path' => $folder.'/audio.mp3', 'started_at' => $t->started_at ?? now()])) {
                     return false;
                 }

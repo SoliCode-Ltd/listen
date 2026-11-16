@@ -16,6 +16,14 @@ use Illuminate\Support\Facades\Cache;
  */
 final class TranscriptEditor
 {
+    /** Languages one transcript may be translated into. */
+    public const LANGUAGES_EACH = 5;
+
+    /** New translations one member may have made in a day, and their letters together. */
+    public const NEW_A_DAY = 10;
+
+    public const LETTERS_A_DAY = 500_000;
+
     public function __construct(private TranslationService $translator, private Transcriber $transcriber) {}
 
     /** Where a translation is kept (as TranslationService keeps one). */
@@ -82,6 +90,19 @@ final class TranscriptEditor
         if (is_array($kept)) {
             return $kept;
         }
+        // A new one: within what one transcript, and one member in a day, may have made. They cost the
+        // site's translator (and, for what it cannot do, the speech model) and nothing of the minutes.
+        $letters = array_sum(array_map(fn ($p): int => mb_strlen((string) ($p['text'] ?? '')), (array) $t->paragraphs));
+        [$madeKey, $lettersKey] = self::dayKeys((int) $t->user_id);
+        if (count((array) ($t->translations ?? [])) >= self::LANGUAGES_EACH) {
+            throw new TranscriptionRefused('translation_limit', __('transcribe.refused.translations_each', ['n' => self::LANGUAGES_EACH]), 429);
+        }
+        if ((int) Cache::get($madeKey, 0) >= self::NEW_A_DAY) {
+            throw new TranscriptionRefused('translation_limit', __('transcribe.refused.translations_day', ['n' => self::NEW_A_DAY]), 429);
+        }
+        if ((int) Cache::get($lettersKey, 0) + $letters > self::LETTERS_A_DAY) {
+            throw new TranscriptionRefused('translation_limit', __('transcribe.refused.translations_letters'), 429);
+        }
         $source = self::translatorCode((string) ($t->language ?: 'en'));
         // Every paragraph asked at once of the quick translator; what it could not do, of the text
         // model in a few requests sent together; anything still missing the careful way, one by one.
@@ -107,8 +128,24 @@ final class TranscriptEditor
         }
         $translation = ['paragraphs' => $paragraphs, 'segments' => $segments, 'at' => now()->toIso8601String()];
         $t->forceFill(['translations' => array_merge((array) ($t->translations ?? []), [$language => $translation])])->save();
+        foreach ([$madeKey => 1, $lettersKey => $letters] as $key => $add) {
+            Cache::add($key, 0, now()->addDays(2));
+            Cache::increment($key, $add);
+        }
 
         return $translation;
+    }
+
+    /**
+     * Where today's new translations of a member are counted, and their letters.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private static function dayKeys(int $userId): array
+    {
+        $day = now()->format('Ymd');
+
+        return ['transcribe-translations:'.$userId.':'.$day, 'transcribe-translated-letters:'.$userId.':'.$day];
     }
 
     /**

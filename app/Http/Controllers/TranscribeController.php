@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Transcription;
 use App\Models\User;
 use App\Services\Transcription\AudioLink;
+use App\Services\Transcription\Transcriber;
 use App\Services\Transcription\TranscriptEditor;
 use App\Services\Transcription\TranscriptExport;
 use App\Services\Transcription\TranscriptionFlow;
@@ -39,6 +40,14 @@ class TranscribeController extends Controller
     /** The files a member can choose (the box says the same). */
     public const EXTENSIONS = ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'flac', 'webm', 'mp4', 'mov', 'm4v', '3gp', 'amr', 'wma'];
 
+    /** Unfinished uploads a member may have at once: one counts while a piece of it came in the last UPLOAD_IDLE_MINUTES. */
+    public const UPLOADS_AT_ONCE = 3;
+
+    public const UPLOAD_IDLE_MINUTES = 15;
+
+    /** What a member may start uploading in a day: ten of the largest files. */
+    public const UPLOAD_BYTES_A_DAY = 5 * 1024 * 1024 * 1024;
+
     public function __construct(private TranscriptionFlow $flow) {}
 
     /** What a file of this length would use, and whether it can start: asked as soon as a file is chosen. */
@@ -57,18 +66,69 @@ class TranscribeController extends Controller
         $request->validate([
             'name' => ['required', 'string', 'max:255', 'regex:/\.('.implode('|', self::EXTENSIONS).')$/i'],
             'size' => ['required', 'integer', 'min:1', 'max:'.($mb * 1024 * 1024)],
+            'seconds' => ['nullable', 'numeric', 'min:0', 'max:86400'],
+            'source' => ['nullable', 'string', Rule::in(['upload', 'record'])],
         ], [
             'name.regex' => __('transcribe.refused.no_audio'),
             'size.max' => __('transcribe.refused.too_big', ['mb' => $mb]),
         ]);
 
-        $id = Str::random(40);
-        $upload = ['id' => $id, 'user_id' => (int) $user->id, 'name' => mb_substr((string) $request->input('name'), 0, 200),
-            'size' => (int) $request->input('size'), 'path' => self::UPLOADS.'/'.$id.'.part'];
-        Storage::disk('local')->put($upload['path'], '');
-        Cache::put('transcribe-upload:'.$id, $upload, now()->addHours(3));
+        return $this->guard(function () use ($request, $user): JsonResponse {
+            // The rules of starting it, before a byte is sent: the plan or the free try, files at once,
+            // the site's day and the month's minutes, for the length the page measured (one second when
+            // the browser could not tell: the length is measured again when it starts).
+            $seconds = (float) $request->input('seconds', 0);
+            $this->flow->check($user, $seconds > 0 ? $seconds : 1.0, (string) ($request->input('source') ?: 'upload'));
+            $size = (int) $request->input('size');
+            $this->roomForUpload($user, $size);
 
-        return response()->json(['id' => $id, 'chunk_bytes' => VideoDubbing::chunkBytes(), 'chunk_url' => route('transcribe.upload.chunk', ['id' => $id])], 201);
+            $id = Str::random(40);
+            $upload = ['id' => $id, 'user_id' => (int) $user->id, 'name' => mb_substr((string) $request->input('name'), 0, 200),
+                'size' => $size, 'path' => self::UPLOADS.'/'.$id.'.part', 'touched' => now()->getTimestamp()];
+            Storage::disk('local')->put($upload['path'], '');
+            Cache::put('transcribe-upload:'.$id, $upload, now()->addHours(3));
+            Cache::put('transcribe-uploads-of:'.$user->id, [...$this->openUploads($user), $id], now()->addHours(3));
+
+            return response()->json(['id' => $id, 'chunk_bytes' => VideoDubbing::chunkBytes(), 'chunk_url' => route('transcribe.upload.chunk', ['id' => $id])], 201);
+        });
+    }
+
+    /**
+     * Room for one more upload of $size bytes: space on this server (with room to spare for all the
+     * site writes), fewer than UPLOADS_AT_ONCE unfinished uploads, and the member's bytes for today.
+     *
+     * @throws TranscriptionRefused
+     */
+    private function roomForUpload(User $user, int $size): void
+    {
+        $free = @disk_free_space(Storage::disk('local')->path(''));
+        if (is_float($free) && $free < $size + max(0, (int) config('listen.transcription.keep_free_mb', 5120)) * 1024 * 1024) {
+            throw new TranscriptionRefused('uploads_paused', __('transcribe.refused.uploads_paused'), 503);
+        }
+        if (count($this->openUploads($user)) >= self::UPLOADS_AT_ONCE) {
+            throw new TranscriptionRefused('uploads_busy', __('transcribe.refused.uploads_busy'), 429);
+        }
+        $day = 'transcribe-upload-bytes:'.$user->id.':'.now()->format('Ymd');
+        if ((int) Cache::get($day, 0) + $size > self::UPLOAD_BYTES_A_DAY) {
+            throw new TranscriptionRefused('upload_day_full', __('transcribe.refused.upload_day_full'), 429);
+        }
+        Cache::add($day, 0, now()->addDays(2));
+        Cache::increment($day, $size);
+    }
+
+    /**
+     * The member's uploads not finished yet that a piece came to in the last UPLOAD_IDLE_MINUTES
+     * (one left behind stops counting then; a finished one is gone from the cache).
+     *
+     * @return list<string>
+     */
+    private function openUploads(User $user): array
+    {
+        return array_values(array_filter((array) Cache::get('transcribe-uploads-of:'.$user->id, []), function ($id): bool {
+            $upload = Cache::get('transcribe-upload:'.$id);
+
+            return is_array($upload) && (int) ($upload['touched'] ?? 0) >= now()->getTimestamp() - self::UPLOAD_IDLE_MINUTES * 60;
+        }));
     }
 
     /** One piece of a file, at the place X-Upload-Offset says; a piece sent again is not added twice. */
@@ -90,6 +150,7 @@ class TranscribeController extends Controller
             stream_copy_to_stream($in, $out, min(VideoDubbing::chunkBytes() + 1024 * 1024, $upload['size'] - $received));
             fclose($out);
             clearstatcache(true, $path);
+            Cache::put('transcribe-upload:'.$upload['id'], array_merge($upload, ['touched' => now()->getTimestamp()]), now()->addHours(3));
 
             return response()->json(['received' => (int) filesize($path)]);
         });
@@ -120,7 +181,7 @@ class TranscribeController extends Controller
             } else {
                 $path = Storage::disk('local')->path(self::UPLOADS.'/'.Str::random(40).'.link');
                 Storage::disk('local')->makeDirectory(self::UPLOADS);
-                $name = $links->fetch((string) $data['url'], $path, TranscriptionSettings::maxUploadMb() * 1024 * 1024);
+                $name = $links->fetch((string) $data['url'], $path, TranscriptionSettings::maxUploadMb() * 1024 * 1024, (int) $user->id);
                 $meta = ['title' => (string) ($data['title'] ?? '') ?: $name, 'file_name' => $name, 'source' => 'url', 'source_url' => (string) $data['url']];
             }
             try {
@@ -141,7 +202,7 @@ class TranscribeController extends Controller
     {
         $user = $this->member($request);
         $q = trim((string) $request->query('q', ''));
-        $query = Transcription::query()->where('user_id', $user->id)->latest('id');
+        $query = Transcription::query()->select(Transcription::LISTED)->where('user_id', $user->id)->latest('id');
         if ($q !== '') {
             $like = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $q).'%';
             $query->where(fn ($w) => $w->where('title', 'like', $like)
@@ -169,9 +230,22 @@ class TranscribeController extends Controller
     {
         $t = $this->own($request, $code);
         $disk = Storage::disk(TranscriptionFlow::DISK);
-        abort_unless($t->audio_deleted_at === null && $t->audio_path && $disk->exists($t->audio_path) && ! $t->isWorking(), 404);
+        // Only the clean copy the model heard: never a member's original, which a transcript that
+        // failed before its clean copy was made still points at.
+        abort_unless(TranscriptionPresenter::hasAudio($t) && $disk->exists((string) $t->audio_path) && ! $t->isWorking(), 404);
 
-        return response()->file($disk->path($t->audio_path), ['Content-Type' => 'audio/mpeg', 'Cache-Control' => 'private, max-age=3600']);
+        return response()->file($disk->path((string) $t->audio_path), ['Content-Type' => 'audio/mpeg', 'Cache-Control' => 'private, max-age=3600', 'X-Content-Type-Options' => 'nosniff']);
+    }
+
+    /** The waveform's peaks, a byte for every 10 ms (made with the clean copy), for the page to draw without the audio. */
+    public function peaks(Request $request, string $code): Response
+    {
+        $t = $this->own($request, $code);
+        $disk = Storage::disk(TranscriptionFlow::DISK);
+        $path = TranscriptionFlow::folder($t).'/'.Transcriber::PEAKS_FILE;
+        abort_unless(TranscriptionPresenter::hasAudio($t) && ! $t->isWorking() && $disk->exists($path), 404);
+
+        return response()->file($disk->path($path), ['Content-Type' => 'application/octet-stream', 'Cache-Control' => 'private, max-age=86400', 'X-Content-Type-Options' => 'nosniff']);
     }
 
     /** A new title, speaker names, or a corrected paragraph. */
@@ -194,8 +268,13 @@ class TranscribeController extends Controller
         if (isset($data['paragraph']) && $t->status === Transcription::READY) {
             $editor->correct($t, (int) $data['paragraph'], (string) $data['text']);
         }
+        $t = $t->fresh();
 
-        return response()->json(['transcription' => TranscriptionPresenter::full($t->fresh(), $this->arabic())]);
+        // What changed only: a new title or speaker name needs the summary and the speakers; a corrected
+        // paragraph, the whole transcript (its sentences are placed again).
+        return response()->json(['transcription' => isset($data['paragraph'])
+            ? TranscriptionPresenter::full($t, $this->arabic())
+            : TranscriptionPresenter::summary($t, $this->arabic()) + ['speaker_list' => TranscriptionPresenter::speakerList($t, $this->arabic())]]);
     }
 
     /** Deleted from the member's list (it stays counted in its month); its audio goes at the next clean-up. */
@@ -203,7 +282,7 @@ class TranscribeController extends Controller
     {
         $t = $this->own($request, $code);
         abort_if($t->isWorking(), 409);
-        $t->delete();
+        $this->flow->forget($t);
 
         return response()->json(['deleted' => true]);
     }
@@ -229,6 +308,8 @@ class TranscribeController extends Controller
         $data = $request->validate(['language' => ['required', 'string', Rule::in(TranscriptEditor::targets())]]);
         try {
             $translation = $editor->translate($t, (string) $data['language']);
+        } catch (TranscriptionRefused $e) {
+            return response()->json($e->toArray(), $e->status);
         } catch (\Throwable $e) {
             report($e);
 

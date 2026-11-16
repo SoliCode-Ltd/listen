@@ -40,7 +40,7 @@ final class TranscriptionPresenter
             'progress' => $t->isWorking() ? (int) min(95, round(100 * $done / $steps)) : 100,
             'speakers' => $t->status === Transcription::READY ? $t->speakerCount() : 0,
             'error' => $t->status === Transcription::FAILED ? ((string) $t->error ?: __('transcribe.failed.default', [], $locale)) : null,
-            'audio' => $t->audio_deleted_at === null && $t->audio_path !== null,
+            'audio' => self::hasAudio($t),
         ] + ($links ? ['urls' => self::urls($t)] : []);
     }
 
@@ -50,12 +50,30 @@ final class TranscriptionPresenter
      *
      * @return array<string, mixed>
      */
+    /** Whether the transcript has its clean copy to play (the job's audio.mp3, until it is deleted). */
+    public static function hasAudio(Transcription $t): bool
+    {
+        return $t->audio_deleted_at === null && str_ends_with((string) $t->audio_path, '/audio.mp3');
+    }
+
+    /**
+     * Each speaker: its letter, its name (the member's own, or "Speaker A") and whether the member named it.
+     *
+     * @return list<array{id: string, name: string, named: bool}>
+     */
+    public static function speakerList(Transcription $t, bool $arabic): array
+    {
+        $letters = array_values(array_unique(array_column((array) $t->paragraphs, 'speaker')));
+
+        return array_map(fn ($l) => ['id' => $l, 'name' => $t->speakerName($l, $arabic), 'named' => isset(($t->speaker_names ?? [])[$l])], $letters);
+    }
+
     public static function full(Transcription $t, bool $arabic, bool $links = true): array
     {
         $letters = array_values(array_unique(array_column((array) $t->paragraphs, 'speaker')));
 
         return self::summary($t, $arabic, $links) + [
-            'speaker_list' => array_map(fn ($l) => ['id' => $l, 'name' => $t->speakerName($l, $arabic), 'named' => isset(($t->speaker_names ?? [])[$l])], $letters),
+            'speaker_list' => self::speakerList($t, $arabic),
             'paragraphs' => array_values((array) $t->paragraphs),
             'segments' => array_values((array) $t->segments),
             'text' => TranscriptExport::text((array) $t->paragraphs, count($letters) > 1 ? fn ($l) => $t->speakerName($l, $arabic) : null),
@@ -72,6 +90,7 @@ final class TranscriptionPresenter
             'delete' => route('transcribe.destroy', $t),
             'translate' => route('transcribe.translate', $t),
             'audio' => route('transcribe.audio', $t),
+            'peaks' => route('transcribe.peaks', $t),
         ];
         foreach (TranscriptExport::FORMATS as $format) {
             $urls['export_'.$format] = route('transcribe.export', [$t, $format]);

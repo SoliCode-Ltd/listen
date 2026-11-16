@@ -5,6 +5,7 @@ namespace App\Support\Api;
 use App\Models\SiteSetting;
 use App\Services\Api\ApiIdempotency;
 use App\Services\Api\ApiSpeechService;
+use App\Services\Transcription\TranscriptEditor;
 use App\Services\Transcription\TranscriptExport;
 use App\Support\AudioEffects;
 use App\Support\SpeechLanguages;
@@ -375,7 +376,7 @@ final class OpenApiSpec
                     'tags' => ['Speech to text'],
                     'operationId' => 'exportTranscription',
                     'summary' => 'Download a transcription',
-                    'description' => 'As text (txt), subtitles (srt, vtt) or a document (docx). With translate_to, in another language: made once and kept, using no minutes. Requires the speech_to_text permission.',
+                    'description' => 'As text (txt), subtitles (srt, vtt) or a document (docx). With translate_to, in another language: made once and kept, using no minutes. A transcription can be translated into up to '.TranscriptEditor::LANGUAGES_EACH.' languages, and up to '.TranscriptEditor::NEW_A_DAY.' new translations can be made a day (429 translation_limit). Requires the speech_to_text permission.',
                     'parameters' => [
                         $transcriptionIdParam,
                         ['name' => 'format', 'in' => 'query', 'required' => true, 'schema' => ['type' => 'string', 'enum' => TranscriptExport::FORMATS]],

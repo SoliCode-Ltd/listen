@@ -1,8 +1,10 @@
 <?php
 
+use App\Jobs\TranscribeJob;
 use App\Models\ApiIdempotencyKey;
 use App\Models\ApiRequestLog;
 use App\Services\Api\ApiIdempotency;
+use App\Support\Agents\CallRecordings;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -53,6 +55,22 @@ Schedule::command('dubs:prune')->everyTenMinutes()->withoutOverlapping(30);
 // days set in Speech to text → Settings (App\Console\Commands\PruneTranscriptionsCommand).
 Schedule::command('transcriptions:prune')->everyTenMinutes()->withoutOverlapping(30);
 
+// Speech to text works on queues of its own (TranscribeJob::QUEUE…), so a long transcript never keeps
+// the studio's background voices waiting on theirs. Its workers are started here, three at most at a
+// time, each for under a minute (then the next minute's takes over); a step is never cut short, since
+// a worker finishes the one it is on. Nothing to start where jobs run as they are sent.
+foreach (['transcribe-1', 'transcribe-2', 'transcribe-3'] as $worker) {
+    Schedule::command('queue:work', [
+        '--queue' => TranscribeJob::QUEUE_PRIORITY.','.TranscribeJob::QUEUE,
+        '--name' => $worker,
+        '--max-time' => 55,
+        '--sleep' => 2,
+        '--tries' => 3,
+        '--timeout' => 150,
+    ])->everyMinute()->withoutOverlapping(5)->runInBackground()
+        ->when(fn (): bool => config('queue.default') !== 'sync');
+}
+
 // Voice Design: delete the takes nobody kept, so the speech projects keep room for voices
 // (App\Console\Commands\PruneDesignedVoicesCommand).
 Schedule::command('voice-design:prune')->everyThirtyMinutes()->withoutOverlapping(20);
@@ -73,4 +91,4 @@ Schedule::command('agents:read-links')->hourly()->withoutOverlapping(30);
 // Every page of live agents' websites, for what callers ask (AgentSite): never read, or not for a week.
 Schedule::command('agents:read-websites')->hourly()->withoutOverlapping(30);
 // Listen Agents: call recordings older than CallRecordings::KEEP_DAYS days go (the call's words stay).
-Schedule::call(fn () => \App\Support\Agents\CallRecordings::prune())->name('agents:prune-recordings')->dailyAt('04:10')->withoutOverlapping(60);
+Schedule::call(fn () => CallRecordings::prune())->name('agents:prune-recordings')->dailyAt('04:10')->withoutOverlapping(60);
