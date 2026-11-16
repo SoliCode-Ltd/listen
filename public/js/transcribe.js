@@ -112,6 +112,8 @@
 
   // What an action did, said for a moment at the foot of the screen (and to screen readers).
   var toastBox = $('[data-tr-toast]');
+  // On the page itself, so no part of the studio can hold it out of sight.
+  if (toastBox) document.body.appendChild(toastBox);
   var toastTimer = 0;
   function toast(text, kind) {
     if (!toastBox || !text) return;
@@ -153,12 +155,35 @@
     $('[data-tr-studio]').classList.toggle('is-working', name === 'working');
     if (name !== 'chosen') stopPreview();
   }
+  // A part brought into view when it is not (on a phone, the progress above the button pressed).
+  function bringIntoView(el) {
+    if (!el) return;
+    requestAnimationFrame(function () {
+      // Below whatever stays at the top of the screen (the site's bar and, on a phone, the studio's tabs).
+      var clear = 16;
+      $$('header, nav, [class*="tabs"], [class*="sticky"]', document).forEach(function (bar) {
+        var st = getComputedStyle(bar);
+        if (st.position !== 'sticky' && st.position !== 'fixed') return;
+        var b = bar.getBoundingClientRect();
+        if (b.top <= 1 && b.bottom > 0 && b.bottom < window.innerHeight / 2) clear = Math.max(clear, b.bottom + 12);
+      });
+      var r = el.getBoundingClientRect();
+      if (r.top >= clear && r.bottom <= window.innerHeight - 16) return;
+      window.scrollTo({ top: Math.max(0, window.scrollY + r.top - clear), behavior: calm ? 'auto' : 'smooth' });
+    });
+  }
   // A part that comes into view fades up into place (once; not with reduced motion).
   function appear(el) {
     if (calm || !el) return;
     el.classList.remove('tr-appear');
     void el.offsetWidth;
     el.classList.add('tr-appear');
+    // Taken off once played: a transform left behind would hold the phone's menu sheets inside the part.
+    el.addEventListener('animationend', function off(e) {
+      if (e.target !== el) return;
+      el.classList.remove('tr-appear');
+      el.removeEventListener('animationend', off);
+    });
   }
   function showError(text) {
     errorBox.textContent = text || '';
@@ -172,6 +197,12 @@
       p.textContent = line;
       meter.appendChild(p);
     });
+  }
+  // What a file will use, as figures side by side: its length, what is left now, and after it.
+  function setUsage(figures, note) {
+    meter.innerHTML = '<div class="tr-usage">' + figures.map(function (f) {
+      return '<div class="tr-usage-item' + (f.main ? ' is-main' : '') + '"><span>' + esc(f.label) + '</span><strong dir="auto">' + esc(f.value) + '</strong></div>';
+    }).join('') + '</div>' + (note ? '<p class="tr-usage-note">' + esc(note) + '</p>' : '');
   }
   function ready(on, label) {
     submit.disabled = !on || busy;
@@ -345,11 +376,11 @@
       }
       var e = r.body;
       if (e.free) {
-        setMeter([fill(t.will_use, { time: time(e.seconds) }), t.free_try]);
+        setUsage([{ label: t.use_file, value: time(e.seconds), main: true }], t.free_try);
       } else {
-        setMeter([fill(t.will_use, { time: time(e.seconds) }), fill(t.left, { time: time(e.left, true) }) + ' ' + fill(t.remain, { time: time(e.remain, true) })]);
+        setUsage([{ label: t.use_file, value: time(e.seconds), main: true }, { label: t.use_left, value: time(e.left, true) }, { label: t.use_after, value: time(e.remain, true) }]);
       }
-      ready(true, fill(t.start, { time: time(e.seconds) }));
+      ready(true);
     }).catch(function (r) { setMeter([]); showError(messageOf(r)); });
   }
   // A refusal: its words, and the plan that fits as a link.
@@ -584,6 +615,7 @@
     showError('');
     progressReset(0);
     working('upload', 3, t.fetching, '');
+    bringIntoView($('[data-tr-view="working"]'));
     json('POST', c.urls.store, { url: chosen.url, language: language.value }).then(started).catch(failed);
   }
   form.addEventListener('submit', function (e) {
@@ -596,6 +628,7 @@
     var file = chosen.file;
     progressReset(chosen.seconds);
     working('upload', 0, t.sending, '');
+    bringIntoView($('[data-tr-view="working"]'));
     var start = new FormData();
     start.set('name', file.name);
     start.set('size', String(file.size));
@@ -793,6 +826,8 @@
       setMenu(m, !m.classList.contains('is-open'), e.detail === 0);
       return;
     }
+    // On a phone a menu is a sheet over the page: a tap on the page around it closes it.
+    if (inMenu && e.target === inMenu) { setMenu(inMenu, false); return; }
     // A choice in a menu closes it; a click anywhere else closes them all (not one in its search box or heading).
     if (inMenu && !(e.target.closest('a, button'))) return;
     $$('[data-tr-menu].is-open').forEach(function (m) { if (!inMenu || m === inMenu) setMenu(m, false); });
@@ -857,6 +892,7 @@
     if (audio) audio.pause();
     current = null;
     root.classList.add('is-reading');
+    document.body.classList.add('tr-is-reading');
     reader.hidden = false;
     reader.classList.add('is-loading');
     bar.hidden = true;
@@ -892,6 +928,7 @@
     reader.hidden = true;
     reader.classList.remove('is-loading');
     root.classList.remove('is-reading');
+    document.body.classList.remove('tr-is-reading');
     current = null;
     $$('[data-tr-root] > :not(.tr-reader):not(.tr-dialog):not(.tr-toast)', document).forEach(appear);
   }

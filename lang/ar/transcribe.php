@@ -92,11 +92,10 @@ return [
 
     'js' => [
         'checking' => 'جارٍ فحص الملف…',
-        'will_use' => 'سيستخدم :time',
-        'left' => 'المتبقي لك هذا الشهر :time.',
-        'remain' => 'سيبقى :time.',
         'free_try' => 'هذه تجربتك المجانية: لا تستخدم دقائق.',
-        'start' => 'حوّل إلى نص · :time',
+        'use_file' => 'هذا الملف',
+        'use_left' => 'المتبقي الآن',
+        'use_after' => 'المتبقي بعده',
         'start_plain' => 'حوّل إلى نص',
         'step_upload' => 'الإرسال',
         'step_prepare' => 'التجهيز',

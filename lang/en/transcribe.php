@@ -92,11 +92,10 @@ return [
 
     'js' => [
         'checking' => 'Checking the file…',
-        'will_use' => 'This will use :time',
-        'left' => 'You have :time left this month.',
-        'remain' => ':time will remain.',
         'free_try' => 'This is your free try: it uses no minutes.',
-        'start' => 'Convert to text · :time',
+        'use_file' => 'This file',
+        'use_left' => 'Left now',
+        'use_after' => 'Left after it',
         'start_plain' => 'Convert to text',
         'step_upload' => 'Sending',
         'step_prepare' => 'Getting ready',

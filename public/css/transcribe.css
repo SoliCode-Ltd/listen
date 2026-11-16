@@ -401,7 +401,7 @@ button.tr-para-time:hover, button.tr-para-time:focus-visible { background: color
 .tr-section.is-reading > :not(.tr-reader):not(.tr-dialog):not(.tr-toast) { display: none !important; }
 .tr-section.is-reading .tr-reader { margin-top: 0; }
 /* The editor is the card while it is open: one frame, no band of empty space around it. */
-.page-card.tr-section.is-reading { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.page-card.tr-section.is-reading { padding: 0; border: 0; background: transparent; box-shadow: none; transform: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 .tr-section { scroll-margin-top: 96px; }
 .tr-editor { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); overflow: hidden; box-shadow: 0 24px 60px -40px rgba(15, 12, 40, .45); }
 @media (min-width: 900px) { .tr-editor { height: clamp(560px, calc(100vh - 140px), 1000px); } }
@@ -509,7 +509,7 @@ html[dir="rtl"] .tr-ed-back svg { transform: scaleX(-1); }
 
 /* The list: a new transcript comes in lit, a deleted one fades out of its place. */
 @keyframes tr-row-new { from { background-color: color-mix(in oklab, var(--a) 16%, transparent); } to { background-color: transparent; } }
-.tr-ledger tr.is-new > td { animation: tr-row-new 1.6s ease-out both; }
+.tr-ledger tr.is-new { animation: tr-row-new 1.6s ease-out both; }
 .tr-ledger tr.is-leaving { opacity: 0; transform: translateX(10px); transition: opacity .22s ease, transform .22s ease; }
 html[dir="rtl"] .tr-ledger tr.is-leaving { transform: translateX(-10px); }
 
@@ -527,7 +527,7 @@ html[dir="rtl"] .tr-ledger tr.is-leaving { transform: translateX(-10px); }
 .tr-toast { position: fixed; inset-inline: 0; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 60; width: max-content; max-width: calc(100vw - 32px); margin: 0 auto; padding: .7rem 1.15rem; border-radius: 12px; background: var(--text); color: var(--surface); font-size: .92rem; font-weight: 600; line-height: 1.4; box-shadow: 0 16px 40px -18px rgba(0, 0, 0, .55); opacity: 0; transform: translateY(10px) scale(.98); pointer-events: none; transition: opacity .2s ease, transform .26s cubic-bezier(.2, .7, .2, 1); }
 .tr-toast.is-on { opacity: 1; transform: none; }
 .tr-toast.is-error { background: var(--danger); color: #fff; }
-@media (max-width: 899px) { .tr-section.is-reading .tr-toast { bottom: calc(176px + env(safe-area-inset-bottom)); } }
+@media (max-width: 899px) { body.tr-is-reading .tr-toast { bottom: calc(176px + env(safe-area-inset-bottom)); } }
 
 /* Asked before a delete: the site's own dialog. */
 .tr-dialog { width: min(420px, calc(100vw - 32px)); margin: auto; padding: 0; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--text); box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .6); }
@@ -558,7 +558,7 @@ html[dir="rtl"] .tr-ledger tr.is-leaving { transform: translateX(-10px); }
 .tr-tl-hover span { position: absolute; top: 7px; left: 6px; padding: 1px 6px; border-radius: 5px; background: color-mix(in oklab, var(--surface) 80%, var(--text)); color: var(--text); font-size: .68rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tr-appear, .tr-ledger tr.is-new > td, .tr-dialog[open] { animation: none; }
+  .tr-appear, .tr-ledger tr.is-new, .tr-dialog[open] { animation: none; }
   .tr-skel span { animation: none; }
   .tr-toast, .tr-ledger tr.is-leaving { transition: none; }
 }
@@ -593,3 +593,58 @@ html[dir="rtl"] .tr-ledger tr.is-leaving { transform: translateX(-10px); }
 .tr-title-edit .btn { min-height: 36px; padding: 0 .9rem; }
 .tr-reader-name:has(.tr-title-edit) .tr-rename { display: none; }
 @media (max-width: 640px) { .tr-tl-controls { grid-template-columns: 1fr; } .tr-tl-transport { justify-content: center; } }
+
+/* ---------- What a file will use: three figures side by side ---------- */
+.tr-section .dub-meter:has(.tr-usage) { padding: .85rem 1rem; }
+.tr-usage { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
+.tr-usage-item { display: grid; gap: .15rem; min-width: 0; }
+.tr-usage-item + .tr-usage-item { padding-inline-start: .8rem; border-inline-start: 1px solid color-mix(in oklab, var(--line) 85%, transparent); }
+.tr-usage-item span { color: var(--muted); font-size: .78rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tr-usage-item strong { color: var(--text); font-size: .98rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tr-usage-item.is-main strong { color: var(--accent-text, var(--a)); }
+.tr-usage:has(.tr-usage-item:only-child) { grid-template-columns: auto; }
+.tr-usage-note { margin: .5rem 0 0; color: color-mix(in oklab, var(--text) 65%, var(--muted)); font-size: .86rem; }
+
+/* ---------- Phones: calmer sizes for the headings, the figures and the buttons ---------- */
+@media (max-width: 640px) {
+  .page-card.tr-section > h1 { font-size: 1.4rem; line-height: 1.3; }
+  .tr-section .dub-section-lead { font-size: .9rem; line-height: 1.6; }
+  .tr-section .dub-account { gap: .6rem; }
+  .tr-section .dub-stat { padding: .8rem .85rem; gap: .35rem; border-radius: 14px; }
+  .tr-section .dub-stat-head { gap: .45rem; }
+  .tr-section .dub-stat-icon { flex-basis: 26px; width: 26px; height: 26px; border-radius: 8px; }
+  .tr-section .dub-stat-icon svg { width: 15px; height: 15px; }
+  .tr-section .dub-stat-label { font-size: .8rem; font-weight: 600; }
+  .tr-section .dub-stat-value { font-size: 1.15rem; font-weight: 700; }
+  .tr-section .dub-stat-note { font-size: .76rem; }
+  .tr-section .dub-stat-bar { height: 5px; }
+  .tr-section .dub-studio .dub-drop-art { width: 52px; height: 52px; border-radius: 15px; margin-bottom: .55rem; }
+  .tr-section .dub-studio .dub-drop-art svg { width: 28px; height: 28px; }
+  .tr-section .dub-drop-title { font-size: 1.05rem; font-weight: 700; }
+  .tr-section .dub-drop-or { font-size: .88rem; }
+  /* Upload, link and record side by side on one row, sharing the width evenly. */
+  .tr-section .tr-drop { padding-inline: .75rem; }
+  .tr-section .tr-options { flex-wrap: nowrap; gap: .4rem; width: 100%; max-width: 360px; margin-inline: auto; }
+  .tr-section .btn.tr-option { flex: 1 1 auto; min-width: 0; justify-content: center; gap: .3rem; height: 36px; min-height: 36px; padding: 0 .65rem; font-size: .8rem; font-weight: 600; white-space: nowrap; }
+  .tr-section .tr-option svg { flex: none; width: 14px; height: 14px; }
+  .tr-section .dub-drop-limits span { font-size: .74rem; padding: .3rem .6rem; }
+  .tr-section .tr-language .vs-field-label { font-size: .85rem; }
+  .tr-section .tr-language .vs-select-button { min-height: 44px; font-size: .92rem; }
+  .tr-section .tr-foot .dub-go { height: 44px; min-height: 44px; font-size: .95rem; font-weight: 700; }
+  .page-card.tr-section .tr-ledger h2 { font-size: 1.15rem; }
+  .tr-usage { gap: .45rem; }
+  .tr-usage-item + .tr-usage-item { padding-inline-start: .55rem; }
+  .tr-usage-item span { font-size: .72rem; }
+  .tr-usage-item strong { font-size: .88rem; }
+}
+
+/* Phones: the editor's menus (the language it is shown in, downloads) open as a sheet from the foot of
+   the screen, the whole width, over the page dimmed, so none is ever cut at the side. */
+@media (max-width: 640px) {
+  .tr-ed-bar .tr-menu.is-open::before { content: ""; position: fixed; inset: 0; z-index: 65; background: rgba(10, 8, 24, .42); animation: tr-fade-in .18s ease both; }
+  .tr-ed-bar .tr-menu .tr-menu-list, .tr-ed-bar .tr-menu.is-up .tr-menu-list { position: fixed; inset: auto 10px calc(10px + env(safe-area-inset-bottom)) 10px; z-index: 70; width: auto; min-width: 0; max-height: min(70vh, 560px); padding: 8px; border-radius: 18px; box-shadow: 0 -10px 40px -12px rgba(0, 0, 0, .45); animation: tr-sheet-in .24s cubic-bezier(.2, .7, .2, 1) both; }
+  .tr-ed-bar .tr-menu-list a, .tr-ed-bar .tr-menu-list button { min-height: 46px; }
+}
+@keyframes tr-sheet-in { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes tr-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .tr-ed-bar .tr-menu .tr-menu-list, .tr-ed-bar .tr-menu.is-open::before { animation: none; } }
