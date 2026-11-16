@@ -84,7 +84,10 @@ foreach ($plans as $plan) {
     printf("    after the migration: %s\n", $after === null
         ? ($columns && $plan->transcription_enabled ? 'unchanged (the migration does not touch this slug)' : 'not included (its members get the one free try instead: see the settings)')
         : sprintf('%d min a month, files up to %d min, %s, %d at once', $after['minutes'], $after['file'], $after['priority'] ? 'priority queue' : 'standard queue', $after['concurrent']));
-    if ($plan->pricing_use_custom_text) {
+    $included = $after !== null || ($columns && (bool) $plan->transcription_enabled);
+    if (! $included) {
+        echo "    pricing card: no speech to text line (the plan does not include it)\n";
+    } elseif ($plan->pricing_use_custom_text) {
         foreach (['en' => 'features_en', 'ar' => 'features_ar'] as $locale => $column) {
             $lines = array_values((array) ($plan->{$column} ?? []));
             $names = array_filter($lines, fn ($l) => preg_match(STT_WORDS, $lineText($l)) === 1);
@@ -123,6 +126,19 @@ foreach (array_slice($workers, 0, 6) as $w) {
 }
 printf("  PHP: upload_max_filesize %s, post_max_size %s, memory_limit %s, max_execution_time %s\n",
     ini_get('upload_max_filesize'), ini_get('post_max_size'), ini_get('memory_limit'), ini_get('max_execution_time'));
+$cron = array_values(array_filter(array_map('trim', explode("\n", (string) @shell_exec('crontab -l 2>/dev/null'))), fn ($l) => $l !== '' && $l[0] !== '#' && preg_match('/artisan|queue/', $l) === 1));
+echo '  cron lines that start Laravel: ', $cron === [] ? 'none in this user\'s crontab' : count($cron), "\n";
+foreach (array_slice($cron, 0, 6) as $c) {
+    echo '    ', $short(preg_replace('#/home/[^ ]+/#', '…/', $c)), "\n";
+}
+if (Schema::hasTable('jobs')) {
+    $waiting = DB::table('jobs')->selectRaw('queue, count(*) as n, min(available_at) as oldest')->groupBy('queue')->get();
+    echo '  jobs waiting: ', $waiting->isEmpty() ? 'none' : $waiting->map(fn ($q) => $q->queue.' '.$q->n.' (oldest '.max(0, time() - (int) $q->oldest).' s)')->implode(', '), "\n";
+}
+if (Schema::hasTable('failed_jobs')) {
+    $failed = DB::table('failed_jobs')->where('failed_at', '>=', now()->subDays(7))->selectRaw('queue, count(*) as n')->groupBy('queue')->get();
+    echo '  jobs failed in 7 days: ', $failed->isEmpty() ? 'none' : $failed->map(fn ($q) => $q->queue.' '.$q->n)->implode(', '), "\n";
+}
 $free = @disk_free_space(storage_path('app'));
 echo '  free disk for storage/app: ', $free ? number_format($free / 1073741824, 1).' GB' : '?', "\n";
 
