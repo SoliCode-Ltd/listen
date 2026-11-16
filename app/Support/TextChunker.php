@@ -39,7 +39,6 @@ class TextChunker
         foreach (self::cut($text, '/((?<=[.!?؟؛…]|[.!?؟؛…]["\'»”’)\]])\s+|\s*\n\s*)/u', ' ') as [$gap, $sentence]) {
             if ($measure($sentence) <= $max) {
                 $pieces[] = [$gap, $sentence];
-
                 continue;
             }
             // A long sentence breaks at its commas before its spaces, so the
@@ -47,7 +46,6 @@ class TextChunker
             foreach (self::cut($sentence, '/((?<=[،,:;]|[،,:;]["\'»”’)\]])\s+)/u', $gap) as [$gap, $clause]) {
                 if ($measure($clause) <= $max) {
                     $pieces[] = [$gap, $clause];
-
                     continue;
                 }
                 foreach (self::cut($clause, '/(\s+)/u', $gap) as [$gap, $word]) {
@@ -135,7 +133,6 @@ class TextChunker
             $candidate = $current['pieces'] === 0 ? $piece : $current['text'].$gap.$piece;
             if ($measure($candidate) <= $limit) {
                 $current = ['text' => $candidate, 'pieces' => $current['pieces'] + 1, 'gap' => $current['pieces'] === 0 ? $gap : $current['gap']];
-
                 continue;
             }
             $chunks[] = $current;

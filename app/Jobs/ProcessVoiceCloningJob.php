@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Models\ClonedVoice;
 use App\Services\GenerationErrorRecorder;
-use App\Services\Push\AppPush;
 use App\Services\VoiceCloningService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -25,7 +24,6 @@ class ProcessVoiceCloningJob implements ShouldQueue
     use Queueable;
 
     public int $tries = 2;
-
     public int $timeout = 420;
 
     public function __construct(
@@ -94,7 +92,7 @@ class ProcessVoiceCloningJob implements ShouldQueue
                 ]),
             ]);
 
-            app(AppPush::class)->clonedVoiceReady($clonedVoice);
+            app(\App\Services\Push\AppPush::class)->clonedVoiceReady($clonedVoice);
 
             Log::info('Voice cloning succeeded.', [
                 'cloned_voice_id' => $clonedVoice->id,
@@ -136,13 +134,11 @@ class ProcessVoiceCloningJob implements ShouldQueue
                 "Audio sample must be between {$minDuration} and {$maxDuration} seconds.",
                 'duration',
             );
-
             return false;
         }
 
         if (! $clonedVoice->consent_confirmed || ! filled($clonedVoice->consent_audio_path)) {
             $this->markFailed($clonedVoice, 'A separate spoken consent recording is required.', 'consent');
-
             return false;
         }
 

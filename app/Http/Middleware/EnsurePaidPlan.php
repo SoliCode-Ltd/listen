@@ -41,7 +41,7 @@ class EnsurePaidPlan
                 ], 403);
             }
 
-            return redirect()->to(route('dashboard').'#voiceCloningSection')
+            return redirect()->to(route('dashboard') . '#voiceCloningSection')
                 ->with('upgrade_required', true);
         }
 

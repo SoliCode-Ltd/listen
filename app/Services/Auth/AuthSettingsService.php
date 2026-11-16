@@ -9,33 +9,19 @@ class AuthSettingsService
     public const GROUP = 'authentication';
 
     public const KEY_EMAIL_ENABLED = 'auth_email_enabled';
-
     public const KEY_GOOGLE_ENABLED = 'auth_google_enabled';
-
     public const KEY_PHONE_ENABLED = 'auth_phone_enabled';
-
     public const KEY_FIREBASE_PHONE_ENABLED = 'firebase_phone_enabled';
-
     public const KEY_FIREBASE_GOOGLE_ENABLED = 'firebase_google_enabled';
-
     public const KEY_FIREBASE_API_KEY = 'firebase_api_key';
-
     public const KEY_FIREBASE_AUTH_DOMAIN = 'firebase_auth_domain';
-
     public const KEY_FIREBASE_PROJECT_ID = 'firebase_project_id';
-
     public const KEY_FIREBASE_APP_ID = 'firebase_app_id';
-
     public const KEY_FIREBASE_MESSAGING_SENDER_ID = 'firebase_messaging_sender_id';
-
     public const KEY_FIREBASE_STORAGE_BUCKET = 'firebase_storage_bucket';
-
     public const KEY_FIREBASE_MEASUREMENT_ID = 'firebase_measurement_id';
-
     public const KEY_FIREBASE_RECAPTCHA_MODE = 'firebase_recaptcha_mode';
-
     public const KEY_FIREBASE_RECAPTCHA_SITE_KEY = 'firebase_recaptcha_site_key';
-
     public const KEY_FIREBASE_PHONE_TESTING_MODE = 'firebase_phone_testing_mode';
 
     public function emailEnabled(): bool

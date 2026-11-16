@@ -10,8 +10,7 @@ use Illuminate\Support\Facades\Schema;
  * are on that plan, and/or for the period they are in (until it renews), and
  * when they left the plan, in case they come back to it soon.
  */
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::table('subscriptions', function (Blueprint $table) {

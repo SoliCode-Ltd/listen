@@ -5,7 +5,6 @@ namespace App\Support\Agents;
 use App\Models\Voice;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Support\ArabicDialects;
-use App\Support\EnglishAccents;
 use App\Support\SpeakerAvatar;
 use App\Support\SpeakerVoices;
 use App\Support\VoiceCatalog;
@@ -65,7 +64,7 @@ final class AgentVoices
     public static function suggested(array $voices, ?string $dialect, int $limit = 6): array
     {
         // An Arabic dialect's region, or an English accent's country.
-        $groupOf = fn (?string $d) => ArabicDialects::ALL[$d ?? '']['region'] ?? (EnglishAccents::ALL[$d ?? '']['country'] ?? null);
+        $groupOf = fn (?string $d) => ArabicDialects::ALL[$d ?? '']['region'] ?? (\App\Support\EnglishAccents::ALL[$d ?? '']['country'] ?? null);
         $region = $groupOf($dialect);
         $score = function (array $v) use ($dialect, $region, $groupOf): int {
             if ($dialect !== null && $v['dialect'] === $dialect) {

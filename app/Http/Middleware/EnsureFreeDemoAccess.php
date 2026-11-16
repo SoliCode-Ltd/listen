@@ -11,7 +11,8 @@ class EnsureFreeDemoAccess
 {
     public function __construct(
         private readonly PlanAccessService $planAccessService,
-    ) {}
+    ) {
+    }
 
     public function handle(Request $request, Closure $next): Response
     {

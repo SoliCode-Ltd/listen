@@ -5,7 +5,6 @@ namespace App\Support;
 use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
 use App\Models\DesignedVoice;
-use Illuminate\Support\Str;
 
 /**
  * Turns what a generation stored (codes like ar-EG, promo, cloned_12) into
@@ -140,7 +139,7 @@ final class GenerationChoiceLabels
             $lines[] = 'Pitch: '.(float) $generation->pitch;
         }
         if (filled($generation->style_prompt)) {
-            $lines[] = 'Direction: '.Str::limit(trim((string) $generation->style_prompt), 80);
+            $lines[] = 'Direction: '.\Illuminate\Support\Str::limit(trim((string) $generation->style_prompt), 80);
         }
         $effect = (string) (($generation->settings_snapshot ?? [])['audio_effect'] ?? '');
         if ($effect !== '') {

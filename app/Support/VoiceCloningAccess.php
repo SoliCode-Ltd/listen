@@ -6,7 +6,6 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\VoiceCloningService;
-use App\Support\InApp\InApp;
 
 /**
  * Who may open the voice cloning studio.
@@ -82,7 +81,7 @@ class VoiceCloningAccess
         }
 
         // Inside the Listen app nothing is sold: a feature that is not on the plan is not shown.
-        if (InApp::hidesPlans()) {
+        if (\App\Support\InApp\InApp::hidesPlans()) {
             return false;
         }
 

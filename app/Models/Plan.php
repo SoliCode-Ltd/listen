@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Services\Billing\StripePricePlans;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -187,7 +186,7 @@ class Plan extends Model
     /**
      * Monthly plans only: what members can subscribe to, trial, or be moved to.
      *
-     * @param  Builder<Plan>  $query
+     * @param  \Illuminate\Database\Eloquent\Builder<Plan>  $query
      */
     public function scopeSubscriptionPlans($query)
     {
@@ -195,7 +194,7 @@ class Plan extends Model
     }
 
     /**
-     * @param  Builder<Plan>  $query
+     * @param  \Illuminate\Database\Eloquent\Builder<Plan>  $query
      */
     public function scopePacks($query)
     {
@@ -211,7 +210,8 @@ class Plan extends Model
     /**
      * Get the Stripe price ID for the given billing cycle.
      *
-     * @param  string  $cycle  'monthly' or 'yearly'
+     * @param string $cycle 'monthly' or 'yearly'
+     * @return string|null
      */
     public function getStripePriceId(string $cycle): ?string
     {
@@ -225,7 +225,7 @@ class Plan extends Model
      */
     public function hasStripeConfig(): bool
     {
-        return ! empty($this->stripe_price_monthly) || ! empty($this->stripe_price_yearly);
+        return !empty($this->stripe_price_monthly) || !empty($this->stripe_price_yearly);
     }
 
     /**
@@ -238,7 +238,7 @@ class Plan extends Model
 
         // Try locale-specific field (admin-configured)
         $field = "name_{$locale}";
-        if (! empty($this->$field)) {
+        if (!empty($this->$field)) {
             return $this->$field;
         }
 
@@ -263,7 +263,7 @@ class Plan extends Model
 
         // Try locale-specific field (admin-configured)
         $field = "description_{$locale}";
-        if (! empty($this->$field)) {
+        if (!empty($this->$field)) {
             return $this->$field;
         }
 
@@ -290,7 +290,7 @@ class Plan extends Model
         $field = "features_{$locale}";
         $features = $this->$field;
 
-        if (is_array($features) && ! empty($features)) {
+        if (is_array($features) && !empty($features)) {
             return $features;
         }
 
@@ -306,8 +306,7 @@ class Plan extends Model
         $locale = $locale ?? app()->getLocale();
 
         $field = "button_text_{$locale}";
-
-        return ! empty($this->$field) ? $this->$field : null;
+        return !empty($this->$field) ? $this->$field : null;
     }
 
     /**

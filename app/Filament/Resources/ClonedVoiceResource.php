@@ -2,35 +2,37 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ClonedVoiceResource\Pages;
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\BulkAction;
+use Filament\Actions\Action;
 use App\Filament\Resources\ClonedVoiceResource\Pages\ListClonedVoices;
 use App\Filament\Resources\ClonedVoiceResource\Pages\ViewClonedVoice;
+use App\Filament\Resources\ClonedVoiceResource\Pages;
 use App\Jobs\ProcessVoiceCloningJob;
 use App\Models\ClonedVoice;
 use App\Services\VoiceCloningService;
-use Filament\Actions\Action;
-use Filament\Actions\BulkAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\ViewAction;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\ViewEntry;
+use Filament\Infolists;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Auth\Access\Response as AccessResponse;
 use Illuminate\Database\Eloquent\Collection;
 
 class ClonedVoiceResource extends Resource
 {
     protected static ?string $model = ClonedVoice::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-microphone';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-microphone';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Voice Cloning';
+    protected static string | \UnitEnum | null $navigationGroup = 'Voice Cloning';
 
     protected static ?int $navigationSort = 1;
 

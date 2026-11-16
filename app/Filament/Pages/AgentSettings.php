@@ -2,23 +2,23 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Placeholder;
 use App\Models\SiteSetting;
 use App\Support\Agents\AgentAccess;
 use App\Support\Agents\AgentCost;
 use App\Support\Credits;
 use App\Support\VoiceCloningAccess;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
+use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Schema;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\HtmlString;
 
 /**
@@ -32,9 +32,9 @@ class AgentSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-adjustments-horizontal';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Agents';
+    protected static string | \UnitEnum | null $navigationGroup = 'Agents';
 
     protected static ?int $navigationSort = 9;
 
@@ -227,8 +227,8 @@ class AgentSettings extends Page implements HasForms
         $perDollar = AgentCost::creditsPerDollar();
         $then = $next && $perDollar
             ? sprintf(' The model\'s price list changes them on %s to $%s in and $%s out: from that day a reply costs more, and this number follows by itself to about %s.',
-                Carbon::parse($next['from'])->format('j F Y'), $money($next['in']), $money($next['out']),
-                number_format((int) (ceil(AgentCost::perReply(AgentCost::TYPICAL['instructions'], Carbon::parse($next['from'], 'UTC')) * $perDollar / 5) * 5)))
+                \Illuminate\Support\Carbon::parse($next['from'])->format('j F Y'), $money($next['in']), $money($next['out']),
+                number_format((int) (ceil(AgentCost::perReply(AgentCost::TYPICAL['instructions'], \Illuminate\Support\Carbon::parse($next['from'], 'UTC')) * $perDollar / 5) * 5)))
             : '';
 
         return sprintf('Leave it empty and it follows the plans: now %s, the fewest credits that keep %d%% on a typical agent on every plan. An agent with a great deal to know uses more, since every reply reads all of it; a number set here is never used below what an agent\'s own cost needs. The cost is worked out from the text model\'s published prices ($%s in and $%s out per million tokens).%s %s',

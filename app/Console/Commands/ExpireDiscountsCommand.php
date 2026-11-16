@@ -24,7 +24,6 @@ class ExpireDiscountsCommand extends Command
 
         if ($expiredPlans->isEmpty()) {
             $this->info('No expired discounts found.');
-
             return self::SUCCESS;
         }
 
@@ -62,7 +61,6 @@ class ExpireDiscountsCommand extends Command
         }
 
         $this->info("Expired {$expiredPlans->count()} discount(s).");
-
         return self::SUCCESS;
     }
 }

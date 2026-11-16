@@ -12,8 +12,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * Safe for zero-downtime deployment: all columns are nullable.
  */
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::table('audio_generations', function (Blueprint $table) {

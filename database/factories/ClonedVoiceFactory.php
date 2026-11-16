@@ -14,9 +14,9 @@ class ClonedVoiceFactory extends Factory
     {
         return [
             'user_id' => User::factory(),
-            'name' => $this->faker->words(2, true).' Voice',
+            'name' => $this->faker->words(2, true) . ' Voice',
             'source_type' => $this->faker->randomElement(['upload', 'recording']),
-            'source_audio_path' => 'voice-cloning/test/'.$this->faker->uuid().'.wav',
+            'source_audio_path' => 'voice-cloning/test/' . $this->faker->uuid() . '.wav',
             'source_audio_duration_seconds' => $this->faker->numberBetween(10, 30),
             'language_code' => $this->faker->randomElement(['ar-XA', 'en-US']),
             'provider' => 'google_cloud_chirp3',
@@ -29,7 +29,7 @@ class ClonedVoiceFactory extends Factory
     {
         return $this->state(fn () => [
             'status' => 'ready',
-            'provider_voice_key' => 'test_cloning_key_'.$this->faker->uuid(),
+            'provider_voice_key' => 'test_cloning_key_' . $this->faker->uuid(),
         ]);
     }
 

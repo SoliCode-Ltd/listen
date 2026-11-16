@@ -2,16 +2,15 @@
 
 namespace App\Models;
 
-use App\Services\Api\ApiIdempotency;
-use App\Support\AudioFiles;
-use App\Support\TtsStudioConfig;
-use App\Support\VoiceCatalog;
-use App\Support\VoiceTier;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
+use App\Support\AudioFiles;
+use App\Support\TtsStudioConfig;
+use App\Support\VoiceCatalog;
+use App\Support\VoiceTier;
 
 class AudioGeneration extends Model
 {
@@ -109,7 +108,7 @@ class AudioGeneration extends Model
     protected static function booted(): void
     {
         // A developer API retry with the key that made it must not make (and charge) it again.
-        static::deleting(fn (AudioGeneration $generation) => ApiIdempotency::markResultDeleted($generation));
+        static::deleting(fn (AudioGeneration $generation) => \App\Services\Api\ApiIdempotency::markResultDeleted($generation));
     }
 
     public function textItem(): BelongsTo

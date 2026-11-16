@@ -2,15 +2,17 @@
 
 namespace App\Filament\Resources\ContactResource\Pages;
 
-use App\Filament\Resources\ContactResource;
-use App\Models\SiteSetting;
 use Filament\Actions\Action;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
-use Filament\Notifications\Notification;
-use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\TextInput;
+use App\Filament\Resources\ContactResource;
+use App\Models\SiteSetting;
+use Filament\Actions;
+use Filament\Forms;
+use Filament\Notifications\Notification;
+use Filament\Resources\Pages\ListRecords;
 
 class ListContacts extends ListRecords
 {
@@ -32,7 +34,7 @@ class ListContacts extends ListRecords
                     ),
                     'contact_submission_name' => (string) SiteSetting::get(
                         'contact_submission_name',
-                        config('app.name', 'Listen').' Contact'
+                        config('app.name', 'Listen') . ' Contact'
                     ),
                 ])
                 ->schema([

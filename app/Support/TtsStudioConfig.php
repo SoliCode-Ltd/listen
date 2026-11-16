@@ -383,7 +383,6 @@ class TtsStudioConfig
                     'instruction_en' => '',
                     'instruction_ar' => '',
                 ];
-
                 continue;
             }
 
@@ -537,7 +536,7 @@ class TtsStudioConfig
     }
 
     /**
-     * @param  array<string, mixed>  $row
+     * @param array<string, mixed> $row
      */
     private static function resolveInstruction(array $row, ?string $language = null): string
     {

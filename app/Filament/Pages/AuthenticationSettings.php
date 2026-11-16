@@ -2,29 +2,30 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\SiteSetting;
-use App\Services\Auth\AuthSettingsService;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
+use App\Models\SiteSetting;
+use App\Services\Auth\AuthSettingsService;
+use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Schema;
 use Illuminate\Validation\ValidationException;
 
 class AuthenticationSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shield-check';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shield-check';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'System';
+    protected static string | \UnitEnum | null $navigationGroup = 'System';
 
     protected static ?int $navigationSort = 4;
 
@@ -183,7 +184,7 @@ class AuthenticationSettings extends Page implements HasForms
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param array<string, mixed> $data
      */
     private function validateBeforeSave(array $data, AuthSettingsService $authSettings): void
     {
@@ -248,7 +249,7 @@ class AuthenticationSettings extends Page implements HasForms
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param array<string, mixed> $data
      */
     private function firebaseConfigCompleteFromInput(array $data): bool
     {

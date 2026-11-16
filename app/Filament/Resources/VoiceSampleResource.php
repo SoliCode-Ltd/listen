@@ -2,35 +2,38 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\VoiceSampleResource\Pages\CreateVoiceSample;
-use App\Filament\Resources\VoiceSampleResource\Pages\EditVoiceSample;
-use App\Filament\Resources\VoiceSampleResource\Pages\ListVoiceSamples;
-use App\Models\VoiceSample;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Forms\Components\KeyValue;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
-use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\KeyValue;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\VoiceSampleResource\Pages\ListVoiceSamples;
+use App\Filament\Resources\VoiceSampleResource\Pages\CreateVoiceSample;
+use App\Filament\Resources\VoiceSampleResource\Pages\EditVoiceSample;
+use App\Filament\Resources\VoiceSampleResource\Pages;
+use App\Models\VoiceSample;
+use Filament\Forms;
+use Filament\Resources\Resource;
+use Filament\Tables;
 use Filament\Tables\Table;
 
 class VoiceSampleResource extends Resource
 {
     protected static ?string $model = VoiceSample::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-play-circle';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-play-circle';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Content';
+    protected static string | \UnitEnum | null $navigationGroup = 'Content';
 
     protected static ?int $navigationSort = 8;
 

@@ -3,11 +3,11 @@
 namespace App\Filament\Resources\AgentResource\RelationManagers;
 
 use App\Filament\Concerns\SimplePages;
+use Filament\Actions\Action;
 use App\Filament\Resources\AgentConversationResource;
 use App\Models\AgentConversation;
-use App\Support\Agents\AgentVisits;
-use Filament\Actions\Action;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -21,7 +21,7 @@ class ConversationsRelationManager extends RelationManager
 
     protected static ?string $title = 'Calls';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-phone';
+    protected static string | \BackedEnum | null $icon = 'heroicon-o-phone';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
@@ -38,7 +38,7 @@ class ConversationsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('public_id')
             // One row a visit, as in Calls (AgentVisits).
-            ->modifyQueryUsing(fn (Builder $query): Builder => AgentVisits::firstOnly($query)->with([
+            ->modifyQueryUsing(fn (Builder $query): Builder => \App\Support\Agents\AgentVisits::firstOnly($query)->with([
                 'widget:id,agent_id,slug,public_key',
                 'agent:id,public_id,user_id,name,business_name,settings,deleted_at',
             ]))

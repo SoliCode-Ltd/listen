@@ -2,11 +2,8 @@
 
 namespace App\Support\Agents;
 
-use App\Models\Agent;
 use App\Models\AgentConversation;
 use App\Models\Plan;
-use App\Support\Credits;
-use Illuminate\Support\Carbon;
 
 /**
  * What a call minute costs Listen on the live voice, and what each plan earns
@@ -95,7 +92,7 @@ final class AgentCost
     }
 
     /** Tokens of an agent's instructions, as its calls are set up (cached for the request). */
-    public static function instructionTokens(Agent $agent): int
+    public static function instructionTokens(\App\Models\Agent $agent): int
     {
         return once(fn (): int => self::tokensIn(AgentInstructions::build($agent)));
     }
@@ -104,7 +101,7 @@ final class AgentCost
      * Credits a call minute of this agent uses for a call this long: the site's rate, or more for
      * an agent with a great deal to know on a long call, so that no call earns less than MARGIN.
      */
-    public static function rateFor(Agent $agent, int $seconds): int
+    public static function rateFor(\App\Models\Agent $agent, int $seconds): int
     {
         $base = AgentAccess::creditsPerMinute();
         $perDollar = self::creditsPerDollar();
@@ -129,7 +126,7 @@ final class AgentCost
             return null;
         }
 
-        return max(Credits::PER_MINUTE, (int) (ceil(self::typical() * $perDollar / 100) * 100));
+        return max(\App\Support\Credits::PER_MINUTE, (int) (ceil(self::typical() * $perDollar / 100) * 100));
     }
 
     public static function typical(): float
@@ -167,7 +164,7 @@ final class AgentCost
         $in = (float) ($price['in'] ?? 0.75);
         $out = (float) ($price['out'] ?? 3.75);
         $cached = (float) ($price['cached'] ?? $in / 10);
-        $day = Carbon::instance($on ?? now())->utc()->toDateString();
+        $day = \Illuminate\Support\Carbon::instance($on ?? now())->utc()->toDateString();
         $changes = array_values(array_filter((array) config('listen.agents.chat_price_changes', []), fn ($c): bool => is_array($c) && isset($c['from'])));
         usort($changes, fn (array $a, array $b): int => strcmp((string) $a['from'], (string) $b['from']));
         foreach ($changes as $change) {
@@ -184,12 +181,12 @@ final class AgentCost
     /** The next dated change of the text model's prices, if one is announced: ['from' => '2027-01-01', 'in' => …]. */
     public static function nextChatPriceChange(?\DateTimeInterface $on = null): ?array
     {
-        $day = Carbon::instance($on ?? now())->utc()->toDateString();
+        $day = \Illuminate\Support\Carbon::instance($on ?? now())->utc()->toDateString();
         $next = collect((array) config('listen.agents.chat_price_changes', []))
             ->filter(fn ($c): bool => is_array($c) && isset($c['from']) && (string) $c['from'] > $day)
             ->sortBy('from')->first();
 
-        return $next ? ['from' => (string) $next['from']] + self::chatPrices(Carbon::parse((string) $next['from'], 'UTC')) : null;
+        return $next ? ['from' => (string) $next['from']] + self::chatPrices(\Illuminate\Support\Carbon::parse((string) $next['from'], 'UTC')) : null;
     }
 
     /** Dollars one written reply is expected to cost, for instructions this big. */
@@ -224,7 +221,7 @@ final class AgentCost
     }
 
     /** Tokens of an agent's instructions for a written chat (cached for the request). */
-    public static function chatInstructionTokens(Agent $agent): int
+    public static function chatInstructionTokens(\App\Models\Agent $agent): int
     {
         return once(fn (): int => self::tokensIn(AgentInstructions::build($agent, true)));
     }
@@ -245,7 +242,7 @@ final class AgentCost
      * great deal to know (every reply reads all of it), so that no reply earns less than MARGIN.
      * One fixed number per agent, so its owner always knows what a reply costs.
      */
-    public static function chatRateFor(Agent $agent): int
+    public static function chatRateFor(\App\Models\Agent $agent): int
     {
         $base = AgentAccess::chatCreditsPerReply();
         $perDollar = self::creditsPerDollar();

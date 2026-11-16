@@ -24,7 +24,6 @@ class SyncArabicTranslationsCommand extends Command
         $file = trim((string) $this->option('file'));
         if ($file === '') {
             $this->error('Option --file cannot be empty.');
-
             return self::FAILURE;
         }
 
@@ -33,14 +32,12 @@ class SyncArabicTranslationsCommand extends Command
 
         if (! is_file($enPath)) {
             $this->error("English translation file not found: {$enPath}");
-
             return self::FAILURE;
         }
 
         $en = require $enPath;
         if (! is_array($en)) {
             $this->error("English file must return an array: {$enPath}");
-
             return self::FAILURE;
         }
 
@@ -56,7 +53,6 @@ class SyncArabicTranslationsCommand extends Command
 
         if ($missing === []) {
             $this->info('No missing Arabic keys. Everything is in sync.');
-
             return self::SUCCESS;
         }
 
@@ -70,7 +66,6 @@ class SyncArabicTranslationsCommand extends Command
             $source = (string) data_get($en, $path, '');
             if ($source === '') {
                 $this->warn("Skipped empty source for key: {$path}");
-
                 continue;
             }
 
@@ -78,7 +73,6 @@ class SyncArabicTranslationsCommand extends Command
             if ($translated === null) {
                 $failedCount++;
                 $this->warn("Failed to translate key: {$path}");
-
                 continue;
             }
 
@@ -93,7 +87,6 @@ class SyncArabicTranslationsCommand extends Command
 
         if ($this->option('dry-run')) {
             $this->info("Dry run complete. translated={$translatedCount}, failed={$failedCount}, total_missing=".count($missing));
-
             return $failedCount > 0 ? self::FAILURE : self::SUCCESS;
         }
 
@@ -124,7 +117,6 @@ class SyncArabicTranslationsCommand extends Command
             if (is_array($value)) {
                 $arNested = is_array($arValue) ? $arValue : [];
                 $missing = array_merge($missing, $this->collectMissingLeafPaths($value, $arNested, $path));
-
                 continue;
             }
 
@@ -181,7 +173,6 @@ class SyncArabicTranslationsCommand extends Command
                 $placeholder = "__TOKEN_{$index}__";
                 $tokenMap[$placeholder] = $match[0];
                 $index++;
-
                 return $placeholder;
             }, $text) ?? $text;
         }
@@ -220,7 +211,6 @@ class SyncArabicTranslationsCommand extends Command
             }
 
             $joined = trim(implode('', $parts));
-
             return $joined === '' ? null : $joined;
         } catch (\Throwable) {
             return null;
@@ -240,7 +230,6 @@ class SyncArabicTranslationsCommand extends Command
     private function buildPhpArrayFile(array $data): string
     {
         $export = $this->exportArray($data, 0);
-
         return "<?php\n\nreturn {$export};\n";
     }
 
@@ -255,7 +244,7 @@ class SyncArabicTranslationsCommand extends Command
 
         $indent = str_repeat('    ', $indentLevel);
         $nextIndent = str_repeat('    ', $indentLevel + 1);
-        $lines = ['['];
+        $lines = ["["];
 
         foreach ($array as $key => $value) {
             $encodedKey = "'".$this->escapeString((string) $key)."'";
@@ -275,15 +264,14 @@ class SyncArabicTranslationsCommand extends Command
         }
 
         $lines[] = "{$indent}]";
-
         return implode("\n", $lines);
     }
 
     private function escapeString(string $value): string
     {
         return str_replace(
-            ['\\', "'", "\r", "\n", "\t"],
-            ['\\\\', "\\'", '\\r', '\\n', '\\t'],
+            ["\\", "'", "\r", "\n", "\t"],
+            ["\\\\", "\\'", "\\r", "\\n", "\\t"],
             $value
         );
     }

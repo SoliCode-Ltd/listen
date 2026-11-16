@@ -7,4 +7,6 @@ namespace App\Services\Tts;
  * safety): the same text gets the same answer, so it is not sent again and
  * the member is asked to change the wording rather than to wait.
  */
-class GeminiTextRefusedException extends \RuntimeException {}
+class GeminiTextRefusedException extends \RuntimeException
+{
+}

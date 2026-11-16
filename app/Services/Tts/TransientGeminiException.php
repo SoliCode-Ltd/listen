@@ -6,4 +6,6 @@ namespace App\Services\Tts;
  * A Gemini reply that is worth sending again: a 5xx, or a reply that
  * finished without audio. Rate limits and bad requests are not transient.
  */
-class TransientGeminiException extends \RuntimeException {}
+class TransientGeminiException extends \RuntimeException
+{
+}

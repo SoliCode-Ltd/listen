@@ -2,6 +2,13 @@
 
 namespace App\Filament\Resources\NewsletterResource\Pages;
 
+use Filament\Actions\Action;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Throwable;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Checkbox;
+use Filament\Actions\DeleteAction;
 use App\Filament\Resources\NewsletterResource;
 use App\Filament\Resources\NewsletterResource\Pages\Concerns\PreviewsNewsletter;
 use App\Models\Newsletter;
@@ -9,16 +16,11 @@ use App\Services\Newsletter\NewsletterAudience;
 use App\Services\Newsletter\NewsletterPace;
 use App\Services\Newsletter\NewsletterSender;
 use App\Support\TitanMailbox;
-use Filament\Actions\Action;
-use Filament\Actions\DeleteAction;
-use Filament\Forms\Components\Checkbox;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
+use Filament\Actions;
+use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\HtmlString;
-use Throwable;
 
 class EditNewsletter extends EditRecord
 {

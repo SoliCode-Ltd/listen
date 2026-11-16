@@ -15,7 +15,6 @@ use App\Support\PlanPricingLines;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Laravel\Cashier\Cashier;
-use Stripe\Exception\InvalidRequestException;
 
 /**
  * Upgrades now, downgrades at renewal.
@@ -349,7 +348,7 @@ final class PlanChanges
                     $stripe->subscriptionSchedules->cancel((string) $schedule->id, []);
                 }
             }
-        } catch (InvalidRequestException $exception) {
+        } catch (\Stripe\Exception\InvalidRequestException $exception) {
             // Stripe no longer has it: there is nothing left to let go.
             if ((string) $exception->getStripeCode() !== 'resource_missing') {
                 throw $exception;
@@ -421,7 +420,7 @@ final class PlanChanges
             // when the one it is booked on has really ended (its schedule ends with it).
             try {
                 $stripeSubscription = Cashier::stripe()->subscriptions->retrieve($stripeId, []);
-            } catch (InvalidRequestException $exception) {
+            } catch (\Stripe\Exception\InvalidRequestException $exception) {
                 if ((string) $exception->getStripeCode() === 'resource_missing') {
                     $this->markCancelled($change, 'subscription_ended');
                 }

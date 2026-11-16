@@ -5,20 +5,15 @@ namespace App\Http\Controllers;
 use App\Exceptions\SubscriptionStillLiveException;
 use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
-use App\Models\ManualPaymentRequest;
 use App\Models\Plan;
 use App\Models\PlanChange;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
-use App\Services\Billing\AdsPurchases;
 use App\Services\Billing\CardDecline;
-use App\Services\Billing\PlanChangeEmails;
 use App\Services\Billing\PlanChanges;
-use App\Services\Billing\PurchaseFollowUps;
 use App\Services\Billing\RenewalGrace;
 use App\Services\Billing\SavedPaymentMethodRecorder;
-use App\Services\Billing\StripeCardUpdateGateway;
 use App\Services\Billing\StripePricePlans;
 use App\Services\Billing\TrialEligibilityService;
 use App\Services\Billing\TrialOutcomeService;
@@ -28,11 +23,8 @@ use App\Services\DemoHistoryImporter;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Services\StripeWebhookEmailService;
-use App\Support\Credits;
 use App\Support\DiscountTerms;
-use App\Support\PlanUsageGuard;
 use App\Support\VoiceTier;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -88,7 +80,7 @@ class BillingController extends Controller
         if (! $prefetched && in_array($selectedPlan, $validPlanSlugs, true) && (! $activePlan || (int) $activePlan->price_cents <= 0)) {
             $chosenPlan = Plan::query()->where('slug', $selectedPlan)->first();
             if ($chosenPlan) {
-                app(PurchaseFollowUps::class)->checkoutOpened($user, $chosenPlan, (string) $request->query('billing_cycle', 'monthly'), $locale);
+                app(\App\Services\Billing\PurchaseFollowUps::class)->checkoutOpened($user, $chosenPlan, (string) $request->query('billing_cycle', 'monthly'), $locale);
             }
         }
         $scheduled = $this->planChanges->scheduledFor($user);
@@ -335,9 +327,9 @@ class BillingController extends Controller
                 $next = ['amount' => $upcoming['total'], 'date' => $upcoming['date'] ?? null, 'discount' => $upcoming['discount'] ?? null, 'manual' => false];
             }
         } elseif ($manual && ! empty($manual['plan_slug'])) {
-            $payments = ManualPaymentRequest::query()
+            $payments = \App\Models\ManualPaymentRequest::query()
                 ->where('user_id', $user->id)
-                ->where('status', ManualPaymentRequest::STATUS_APPROVED)
+                ->where('status', \App\Models\ManualPaymentRequest::STATUS_APPROVED)
                 ->orderBy('id')
                 ->get();
             $first = $payments->first();
@@ -403,9 +395,9 @@ class BillingController extends Controller
     private function manualSubscriptionState(User $user): ?array
     {
         $local = Subscription::query()->where('user_id', $user->id)->latest('id')->with('plan')->first();
-        $pending = ManualPaymentRequest::query()
+        $pending = \App\Models\ManualPaymentRequest::query()
             ->where('user_id', $user->id)
-            ->where('status', ManualPaymentRequest::STATUS_PENDING)
+            ->where('status', \App\Models\ManualPaymentRequest::STATUS_PENDING)
             ->whereNotNull('submitted_at')
             ->latest('id')
             ->with('plan')
@@ -420,11 +412,11 @@ class BillingController extends Controller
         $end = $local->current_period_end;
         $expired = (string) $local->status !== 'active' || ($end !== null && $end->isPast());
         // Given by the Listen team: nothing was paid for this plan, by hand or by card.
-        $granted = ! ManualPaymentRequest::query()
-            ->where('user_id', $user->id)
-            ->where('plan_id', $local->plan_id)
-            ->where('status', ManualPaymentRequest::STATUS_APPROVED)
-            ->exists()
+        $granted = ! \App\Models\ManualPaymentRequest::query()
+                ->where('user_id', $user->id)
+                ->where('plan_id', $local->plan_id)
+                ->where('status', \App\Models\ManualPaymentRequest::STATUS_APPROVED)
+                ->exists()
             && ! BillingSubscription::query()
                 ->where('user_id', $user->id)
                 ->whereNotIn('stripe_status', ['canceled', 'incomplete_expired'])
@@ -451,9 +443,9 @@ class BillingController extends Controller
      */
     private function manualPaymentReceipts(User $user, string $locale): array
     {
-        return ManualPaymentRequest::query()
+        return \App\Models\ManualPaymentRequest::query()
             ->where('user_id', $user->id)
-            ->where('status', ManualPaymentRequest::STATUS_APPROVED)
+            ->where('status', \App\Models\ManualPaymentRequest::STATUS_APPROVED)
             ->latest('id')
             ->limit(24)
             ->with('plan')
@@ -485,7 +477,7 @@ class BillingController extends Controller
 
         $user = $request->user();
         // The Google Ads click, for when Stripe says the invoice is paid (AdsPurchases).
-        app(AdsPurchases::class)->rememberClick($user, $request);
+        app(\App\Services\Billing\AdsPurchases::class)->rememberClick($user, $request);
 
         $validated = $request->validate([
             'plan' => ['required', 'string', 'max:50'],
@@ -782,7 +774,7 @@ class BillingController extends Controller
      * Step 1 of replacing the card: a SetupIntent the page confirms with the
      * bank (3D Secure when asked). Nothing changes until the bank approves.
      */
-    public function paymentMethodIntent(Request $request, StripeCardUpdateGateway $stripe)
+    public function paymentMethodIntent(Request $request, \App\Services\Billing\StripeCardUpdateGateway $stripe)
     {
         if (! $this->isStripeReady()) {
             return response()->json(['ok' => false, 'message' => __('ui.backend.billing_not_configured')], 422);
@@ -805,7 +797,7 @@ class BillingController extends Controller
      * A card the bank refused never gets here, and the old card keeps renewing.
      * A member behind on payment is charged right away with the new card.
      */
-    public function updatePaymentMethod(Request $request, StripeCardUpdateGateway $stripe)
+    public function updatePaymentMethod(Request $request, \App\Services\Billing\StripeCardUpdateGateway $stripe)
     {
         if (! $this->isStripeReady()) {
             return response()->json([
@@ -1049,7 +1041,7 @@ class BillingController extends Controller
      * card leaves the subscription exactly as it was.
      * Returns null when paid, or the response to send when it was not.
      */
-    private function changePlanAndCharge(User $user, BillingSubscription $subscription, string $priceId, ?string $couponId, ?int $prorationDate, bool &$charged): ?JsonResponse
+    private function changePlanAndCharge(User $user, BillingSubscription $subscription, string $priceId, ?string $couponId, ?int $prorationDate, bool &$charged): ?\Illuminate\Http\JsonResponse
     {
         $stripeId = (string) $subscription->stripe_id;
         $stripe = Cashier::stripe();
@@ -1138,7 +1130,7 @@ class BillingController extends Controller
      * the renewal, and the lower plan starts there (PlanChanges). A cancellation
      * waiting for that day is undone: the plan now goes on, at the lower price.
      */
-    private function scheduleDowngrade(User $user, BillingSubscription $subscription, ?Plan $fromPlan, Plan $plan, string $cycle, string $priceId, string $paymentMethod): JsonResponse
+    private function scheduleDowngrade(User $user, BillingSubscription $subscription, ?Plan $fromPlan, Plan $plan, string $cycle, string $priceId, string $paymentMethod): \Illuminate\Http\JsonResponse
     {
         $resumed = false;
         if ($subscription->onGracePeriod()) {
@@ -1203,7 +1195,7 @@ class BillingController extends Controller
     {
         rescue(function () use ($change): void {
             $this->planChanges->rememberTerms($change, $this->localizedPricingService->resolveCountryContext(request()));
-            app(PlanChangeEmails::class)->queueBooked($change);
+            app(\App\Services\Billing\PlanChangeEmails::class)->queueBooked($change);
         });
     }
 
@@ -1212,7 +1204,7 @@ class BillingController extends Controller
      * charged and the trial ends on the same day; its first payment is the lower
      * plan's full price (a move down has no offer).
      */
-    private function moveTrialDown(User $user, BillingSubscription $subscription, Plan $plan, string $cycle, string $priceId, string $paymentMethod): JsonResponse
+    private function moveTrialDown(User $user, BillingSubscription $subscription, Plan $plan, string $cycle, string $priceId, string $paymentMethod): \Illuminate\Http\JsonResponse
     {
         $resumed = false;
         if ($subscription->onGracePeriod()) {
@@ -1273,7 +1265,7 @@ class BillingController extends Controller
      * it starts the day the current plan ends, and the card is charged then. The card
      * is kept on the account for that day.
      */
-    private function scheduleCardStart(User $user, ?Plan $fromPlan, Plan $plan, string $cycle, string $priceId, Carbon $startsAt, string $paymentMethod): JsonResponse
+    private function scheduleCardStart(User $user, ?Plan $fromPlan, Plan $plan, string $cycle, string $priceId, Carbon $startsAt, string $paymentMethod): \Illuminate\Http\JsonResponse
     {
         $this->ensureStripeCustomer($user);
         if ($paymentMethod !== '') {
@@ -1306,7 +1298,7 @@ class BillingController extends Controller
      * what to do in their language; the kind (CardDecline) lets the page offer
      * the next step, such as another way to pay or a smaller amount.
      */
-    private function declined(string $kind, ?string $after = null): JsonResponse
+    private function declined(string $kind, ?string $after = null): \Illuminate\Http\JsonResponse
     {
         return response()->json([
             'ok' => false,
@@ -1792,7 +1784,6 @@ class BillingController extends Controller
                 $slug = (string) $plan->slug;
                 $monthlyPriceId = $this->resolveStripePriceId($slug, 'monthly');
                 $yearlyPriceId = $this->resolveStripePriceId($slug, 'yearly');
-
                 return $monthlyPriceId !== '' || $yearlyPriceId !== '';
             })
             ->map(function (Plan $plan) use ($stripeReady, $countryContext, $locale, $withoutOffer) {
@@ -1901,7 +1892,8 @@ class BillingController extends Controller
         string $cycle,
         array $countryContext,
         string $locale,
-    ): array {
+    ): array
+    {
         $chargeCurrency = 'USD';
         $interval = $cycle === 'yearly' ? 'year' : 'month';
         $intervalCount = 1;
@@ -2345,7 +2337,7 @@ class BillingController extends Controller
                                 ? __('ui.pricing.yearly')
                                 : __('ui.pricing.monthly');
 
-                            return $localizedName.' — '.$cycleLabel;
+                            return $localizedName . ' — ' . $cycleLabel;
                         }
                     }
                 }
@@ -2504,8 +2496,8 @@ class BillingController extends Controller
             ]);
         }
 
-        $credits = PlanUsageGuard::planChars($quota);
-        $minutes = Credits::minutesFor($credits);
+        $credits = \App\Support\PlanUsageGuard::planChars($quota);
+        $minutes = \App\Support\Credits::minutesFor($credits);
         $minuteCap = (int) ($quota?->monthly_minutes ?? 0);
         if ((bool) ($quota?->getAttribute('enforce_trial_minute_cap') ?? false) && $minuteCap > 0) {
             $minutes = min($minutes, $minuteCap);
@@ -2515,7 +2507,7 @@ class BillingController extends Controller
             'plan' => $planName,
             'quota' => $quota ? ($quota->getLocalizedName($locale) ?: (string) $quota->name) : '',
             'credits' => number_format($credits),
-            'per_request' => number_format(PlanUsageGuard::maxCharsPerRequest($quota)),
+            'per_request' => number_format(\App\Support\PlanUsageGuard::maxCharsPerRequest($quota)),
             'minutes' => number_format($minutes),
         ]);
     }

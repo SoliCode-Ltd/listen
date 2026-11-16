@@ -2,26 +2,27 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ApiRequestLogResource\Pages;
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\IconEntry;
 use App\Filament\Resources\ApiRequestLogResource\Pages\ListApiRequestLogs;
 use App\Filament\Resources\ApiRequestLogResource\Pages\ViewApiRequestLog;
+use Filament\Tables\Filters\BaseFilter;
+use App\Filament\Resources\ApiRequestLogResource\Pages;
 use App\Mcp\Servers\ListenServer;
 use App\Models\ApiRequestLog;
 use App\Support\Api\ApiKeyStatus;
 use App\Support\PlanUsageGuard;
-use Filament\Infolists\Components\IconEntry;
-use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 use Filament\Tables;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\BaseFilter;
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Auth\Access\Response as AccessResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Routing\Route;
@@ -36,9 +37,9 @@ class ApiRequestLogResource extends Resource
 {
     protected static ?string $model = ApiRequestLog::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-signal';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-signal';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'System';
+    protected static string | \UnitEnum | null $navigationGroup = 'System';
 
     protected static ?string $navigationLabel = 'API requests';
 

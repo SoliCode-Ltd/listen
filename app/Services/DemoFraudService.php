@@ -11,9 +11,7 @@ use Illuminate\Support\Facades\Cache;
 class DemoFraudService
 {
     private const EMPTY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
-
     private const STRONG_IDENTITY_TYPES = ['canvas', 'webgl', 'audio'];
-
     private const STRONG_LINK_GROUP_PREFIX = 'sg:';
 
     // Signals that prove a script is driving the browser.
@@ -72,32 +70,32 @@ class DemoFraudService
         // Build identities
 
         // 1. Primary browser fingerprint (most stable)
-        if (! empty($clientFingerprints['primary'])) {
-            $identities['fp'] = 'fp:'.hash('sha256', $clientFingerprints['primary']);
+        if (!empty($clientFingerprints['primary'])) {
+            $identities['fp'] = 'fp:' . hash('sha256', $clientFingerprints['primary']);
             $fingerprints['primary'] = $clientFingerprints['primary'];
         }
 
         // 2. Canvas fingerprint (very stable, survives incognito)
-        if (! empty($clientFingerprints['canvas'])) {
-            $identities['canvas'] = 'cv:'.hash('sha256', $clientFingerprints['canvas']);
+        if (!empty($clientFingerprints['canvas'])) {
+            $identities['canvas'] = 'cv:' . hash('sha256', $clientFingerprints['canvas']);
             $fingerprints['canvas'] = $clientFingerprints['canvas'];
         }
 
         // 3. WebGL fingerprint (GPU-based, very stable)
-        if (! empty($clientFingerprints['webgl'])) {
-            $identities['webgl'] = 'gl:'.hash('sha256', $clientFingerprints['webgl']);
+        if (!empty($clientFingerprints['webgl'])) {
+            $identities['webgl'] = 'gl:' . hash('sha256', $clientFingerprints['webgl']);
             $fingerprints['webgl'] = $clientFingerprints['webgl'];
         }
 
         // 4. Audio fingerprint (survives most spoofing)
-        if (! empty($clientFingerprints['audio'])) {
-            $identities['audio'] = 'au:'.hash('sha256', $clientFingerprints['audio']);
+        if (!empty($clientFingerprints['audio'])) {
+            $identities['audio'] = 'au:' . hash('sha256', $clientFingerprints['audio']);
             $fingerprints['audio'] = $clientFingerprints['audio'];
         }
 
         // 5. Fonts fingerprint
-        if (! empty($clientFingerprints['fonts'])) {
-            $identities['fonts'] = 'ft:'.hash('sha256', $clientFingerprints['fonts']);
+        if (!empty($clientFingerprints['fonts'])) {
+            $identities['fonts'] = 'ft:' . hash('sha256', $clientFingerprints['fonts']);
             $fingerprints['fonts'] = $clientFingerprints['fonts'];
         }
 
@@ -112,16 +110,16 @@ class DemoFraudService
             $clientFingerprints['hardware'] ?? '',
             $clientFingerprints['timezone'] ?? '',
         ]);
-        $identities['dv'] = 'dv:'.hash('sha256', $deviceSignature);
+        $identities['dv'] = 'dv:' . hash('sha256', $deviceSignature);
         $fingerprints['device'] = $deviceSignature;
 
         // 7. UA-only identity (less reliable but still useful)
         $uaSignature = implode('|', [$ua, $acceptLanguage, $secChUa, $secChUaPlatform, $secChUaMobile]);
-        $identities['ua'] = 'ua:'.hash('sha256', $uaSignature);
+        $identities['ua'] = 'ua:' . hash('sha256', $uaSignature);
 
         // 8. IP identity (least reliable, can change)
         if ($ip !== '') {
-            $identities['ip'] = 'ip:'.hash('sha256', $ip);
+            $identities['ip'] = 'ip:' . hash('sha256', $ip);
             $fingerprints['ip'] = $ip;
         }
 
@@ -285,7 +283,7 @@ class DemoFraudService
         }
 
         // 3. Check WebDriver property reported by client
-        if (! empty($fingerprints['webdriver']) && $fingerprints['webdriver'] === 'true') {
+        if (!empty($fingerprints['webdriver']) && $fingerprints['webdriver'] === 'true') {
             $signals[] = [
                 'type' => 'webdriver_detected',
                 'data' => [],
@@ -314,7 +312,7 @@ class DemoFraudService
 
         // 6. IP pattern analysis (VPN/datacenter detection via DNS/ASN)
         $ipAnalysis = $this->analyzeIpAddress($ip);
-        if (! empty($ipAnalysis['signals'])) {
+        if (!empty($ipAnalysis['signals'])) {
             $signals = array_merge($signals, $ipAnalysis['signals']);
         }
 
@@ -336,7 +334,7 @@ class DemoFraudService
         }
 
         // Check cache first
-        $cacheKey = 'ip_analysis:'.hash('sha256', $ip);
+        $cacheKey = 'ip_analysis:' . hash('sha256', $ip);
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return $cached;
@@ -371,15 +369,15 @@ class DemoFraudService
         }
 
         $ipHash = hash('sha256', $ip);
-        $rateKey = 'demo:fp_rate:'.$ipHash;
-        $windowKey = 'demo:fp_set:'.$ipHash;
+        $rateKey = 'demo:fp_rate:' . $ipHash;
+        $windowKey = 'demo:fp_set:' . $ipHash;
 
         $recentCount = (int) Cache::get($rateKey, 0);
         $recentFingerprints = Cache::get($windowKey, []);
 
         // Check if this is a new fingerprint from this IP
         $currentFp = $fingerprints['canvas'] ?? $fingerprints['webgl'] ?? $fingerprints['primary'] ?? '';
-        $isNewFp = $currentFp !== '' && ! in_array($currentFp, $recentFingerprints, true);
+        $isNewFp = $currentFp !== '' && !in_array($currentFp, $recentFingerprints, true);
 
         if ($isNewFp) {
             // More than 5 different fingerprints from same IP in 1 hour is suspicious
@@ -424,7 +422,7 @@ class DemoFraudService
                     ->where('created_at', '>', $now->copy()->subHour())
                     ->exists();
 
-                if (! $existing) {
+                if (!$existing) {
                     DemoFraudSignal::create([
                         'identity_hash' => $identity,
                         'signal_type' => $signal['type'],

@@ -2,31 +2,34 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\DemoIdentityLinkResource\Pages\ListDemoIdentityLinks;
-use App\Models\DemoIdentityLink;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\ViewAction;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
-use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\DemoIdentityLinkResource\Pages\ListDemoIdentityLinks;
+use App\Filament\Resources\DemoIdentityLinkResource\Pages;
+use App\Models\DemoIdentityLink;
+use Filament\Forms;
+use Filament\Resources\Resource;
+use Filament\Tables;
 use Filament\Tables\Table;
 
 class DemoIdentityLinkResource extends Resource
 {
     protected static ?string $model = DemoIdentityLink::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-link';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-link';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Demo Tracking';
+    protected static string | \UnitEnum | null $navigationGroup = 'Demo Tracking';
 
     protected static ?int $navigationSort = 2;
 

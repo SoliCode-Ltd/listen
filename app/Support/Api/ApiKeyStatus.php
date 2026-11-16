@@ -8,7 +8,6 @@ use App\Models\Plan;
 use App\Services\PlanAccessService;
 use App\Support\CreditPeriod;
 use App\Support\PlanUsageGuard;
-use Illuminate\Support\Carbon;
 
 /**
  * Where one API key stands, for the admin (System → API keys): its credits this period against
@@ -24,7 +23,7 @@ final class ApiKeyStatus
     public const KEY_LIMIT = 'key_credit_limit_exceeded';
 
     /**
-     * @return array{period: array{key: string, starts_at: Carbon, ends_at: Carbon}, credits: int, requests: int, key_limit: ?int,
+     * @return array{period: array{key: string, starts_at: \Illuminate\Support\Carbon, ends_at: \Illuminate\Support\Carbon}, credits: int, requests: int, key_limit: ?int,
      *   plan: ?Plan, daily_limit: int, today: int, today_key: int, refused_today: int, key_refused: int, last_refused_at: ?string}
      */
     public static function of(ApiKey $key): array

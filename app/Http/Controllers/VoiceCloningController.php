@@ -7,9 +7,7 @@ use App\Models\ClonedVoice;
 use App\Services\PlanAccessService;
 use App\Services\VoiceCloningService;
 use App\Support\VoiceCloningAccess;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -29,7 +27,7 @@ class VoiceCloningController extends Controller
         $plan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
 
         if (VoiceCloningAccess::allows($user, $plan) || VoiceCloningAccess::showsUpgrade($user, $plan)) {
-            return redirect()->to(route('dashboard').'#voiceCloningSection');
+            return redirect()->to(route('dashboard') . '#voiceCloningSection');
         }
 
         return redirect()->route('dashboard');
@@ -87,7 +85,7 @@ class VoiceCloningController extends Controller
                 'file',
                 "max:{$maxSizeKb}",
                 function (string $attribute, mixed $value, \Closure $fail) use ($allowedExtValues, $allowedMimes): void {
-                    if (! $value instanceof UploadedFile) {
+                    if (! $value instanceof \Illuminate\Http\UploadedFile) {
                         return;
                     }
 
@@ -111,7 +109,7 @@ class VoiceCloningController extends Controller
                 'file',
                 "max:{$maxSizeKb}",
                 function (string $attribute, mixed $value, \Closure $fail) use ($allowedExtValues, $allowedMimes): void {
-                    if (! $value instanceof UploadedFile) {
+                    if (! $value instanceof \Illuminate\Http\UploadedFile) {
                         return;
                     }
 
@@ -160,12 +158,12 @@ class VoiceCloningController extends Controller
         // Store the audio file securely (private disk, not public)
         $file = $request->file('audio_file');
         $ext = $this->storedExtension($file);
-        $filename = "voice-cloning/{$userId}/".Str::uuid().".{$ext}";
+        $filename = "voice-cloning/{$userId}/" . Str::uuid() . ".{$ext}";
         Storage::disk('local')->put($filename, file_get_contents($file->getRealPath()));
 
         $consentFile = $request->file('consent_audio');
         $consentExt = $this->storedExtension($consentFile);
-        $consentFilename = "voice-cloning/{$userId}/".Str::uuid()."-consent.{$consentExt}";
+        $consentFilename = "voice-cloning/{$userId}/" . Str::uuid() . "-consent.{$consentExt}";
         Storage::disk('local')->put($consentFilename, file_get_contents($consentFile->getRealPath()));
 
         $clonedVoice = ClonedVoice::create([
@@ -295,7 +293,7 @@ class VoiceCloningController extends Controller
                 'file',
                 "max:{$maxSizeKb}",
                 function (string $attribute, mixed $value, \Closure $fail) use ($allowedExtValues, $allowedMimes): void {
-                    if (! $value instanceof UploadedFile) {
+                    if (! $value instanceof \Illuminate\Http\UploadedFile) {
                         return;
                     }
                     $extAllowed = in_array(strtolower((string) $value->getClientOriginalExtension()), $allowedExtValues, true)
@@ -457,7 +455,7 @@ class VoiceCloningController extends Controller
             ]);
         }
 
-        return redirect()->to(route('dashboard').'#voiceCloningSection')
+        return redirect()->to(route('dashboard') . '#voiceCloningSection')
             ->with('success', __('ui.voice_cloning.deleted_success'));
     }
 
@@ -485,7 +483,7 @@ class VoiceCloningController extends Controller
      * The browser sends WAV. Anything else keeps a known audio extension so a
      * crafted file name never decides what lands on disk.
      */
-    private function storedExtension(UploadedFile $file): string
+    private function storedExtension(\Illuminate\Http\UploadedFile $file): string
     {
         $allowed = VoiceCloningService::allowedExtensions();
         foreach ([$file->getClientOriginalExtension(), $file->guessExtension()] as $candidate) {
@@ -506,7 +504,7 @@ class VoiceCloningController extends Controller
         return VoiceCloningAccess::allows($user, $plan);
     }
 
-    private function jsonError(string $message, int $status = 422): JsonResponse
+    private function jsonError(string $message, int $status = 422): \Illuminate\Http\JsonResponse
     {
         return response()->json(['success' => false, 'error' => $message], $status);
     }

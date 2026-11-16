@@ -5,7 +5,6 @@ namespace App\Support;
 use App\Models\Plan;
 use App\Models\User;
 use App\Models\UserFeatureGrant;
-use App\Support\InApp\InApp;
 use Throwable;
 
 /**
@@ -119,8 +118,8 @@ final class PlanFeatures
         }
 
         // Inside the Listen app nothing is sold, so there is nothing to offer: the option stays hidden.
-        if (InApp::hidesPlans()) {
-            return ['url' => InApp::planUrl(), 'plan' => null, 'none' => true];
+        if (\App\Support\InApp\InApp::hidesPlans()) {
+            return ['url' => \App\Support\InApp\InApp::planUrl(), 'plan' => null, 'none' => true];
         }
 
         $plan = self::cheapestWith($feature);

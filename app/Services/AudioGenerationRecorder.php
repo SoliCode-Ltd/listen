@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\AudioGeneration;
 use App\Models\TextItem;
-use App\Support\AudioEffects;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +14,8 @@ class AudioGenerationRecorder
     public function __construct(
         private readonly ProfanityFilter $profanityFilter,
         private readonly BlockedGenerationLogger $blockedGenerationLogger,
-    ) {}
+    ) {
+    }
 
     /**
      * @param  array<string, mixed>  $textItemAttributes
@@ -87,7 +87,7 @@ class AudioGenerationRecorder
             // Standard voices keep no studio settings, only a sound environment when the plan has them.
             $effect = $attributes['audio_effect'] ?? null;
 
-            return AudioEffects::isValid($effect) ? ['audio_effect' => $effect] : null;
+            return \App\Support\AudioEffects::isValid($effect) ? ['audio_effect' => $effect] : null;
         }
 
         $voiceMeta = VoiceCatalog::voiceMeta($voiceName);
@@ -111,7 +111,7 @@ class AudioGenerationRecorder
             'pitch' => array_key_exists('pitch', $attributes) ? (float) $attributes['pitch'] : null,
             'is_dialogue' => (bool) ($attributes['is_dialogue'] ?? false),
             'dialogue_speakers' => $dialogueSpeakers,
-            'audio_effect' => AudioEffects::isValid($attributes['audio_effect'] ?? null) ? $attributes['audio_effect'] : null,
+            'audio_effect' => \App\Support\AudioEffects::isValid($attributes['audio_effect'] ?? null) ? $attributes['audio_effect'] : null,
         ], static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
 
         return $snapshot === [] ? null : $snapshot;

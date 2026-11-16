@@ -2,29 +2,32 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\DemoFraudSignalResource\Pages\ListDemoFraudSignals;
-use App\Models\DemoFraudSignal;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\KeyValue;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\ViewAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\ViewAction;
-use Filament\Forms\Components\KeyValue;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
+use App\Filament\Resources\DemoFraudSignalResource\Pages\ListDemoFraudSignals;
+use App\Filament\Resources\DemoFraudSignalResource\Pages;
+use App\Models\DemoFraudSignal;
+use Filament\Forms;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
-use Filament\Tables\Columns\BadgeColumn;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables;
 use Filament\Tables\Table;
 
 class DemoFraudSignalResource extends Resource
 {
     protected static ?string $model = DemoFraudSignal::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shield-exclamation';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shield-exclamation';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Demo Tracking';
+    protected static string | \UnitEnum | null $navigationGroup = 'Demo Tracking';
 
     protected static ?int $navigationSort = 3;
 

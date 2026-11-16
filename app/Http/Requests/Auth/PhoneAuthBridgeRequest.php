@@ -22,3 +22,4 @@ class PhoneAuthBridgeRequest extends FormRequest
         ];
     }
 }
+

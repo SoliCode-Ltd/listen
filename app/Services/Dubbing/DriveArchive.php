@@ -5,7 +5,6 @@ namespace App\Services\Dubbing;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Models\VideoDub;
-use App\Support\VoiceFlag;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
@@ -254,7 +253,7 @@ class DriveArchive
     public static function fileName(VideoDub $dub): string
     {
         $original = pathinfo((string) $dub->original_name, PATHINFO_FILENAME) ?: 'video';
-        $dialect = VoiceFlag::label((string) $dub->dialect, false);
+        $dialect = \App\Support\VoiceFlag::label((string) $dub->dialect, false);
         $name = $dub->created_at?->format('Y-m-d H.i').' · '.$original.' · '.$dialect;
 
         return mb_substr(preg_replace('/[\\\\\/:*?"<>|]+/', ' ', $name), 0, 180).'.mp4';

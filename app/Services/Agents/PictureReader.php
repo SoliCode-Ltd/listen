@@ -3,7 +3,6 @@
 namespace App\Services\Agents;
 
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 
 /**
  * The words inside a website's pictures, for a page whose words are in a picture: a medical
@@ -119,7 +118,7 @@ class PictureReader
             return '';
         }
         $reply = trim(preg_replace('/^```[a-z]*\s*|\s*```$/i', '', trim($reply)) ?? $reply);
-        $words = $reply === '' || strtoupper($reply) === 'NONE' ? '' : Str::limit($reply, self::PDF_CHARS, '');
+        $words = $reply === '' || strtoupper($reply) === 'NONE' ? '' : \Illuminate\Support\Str::limit($reply, self::PDF_CHARS, '');
         Cache::put($key, $words, now()->addDays(self::KEEP_DAYS));
 
         return $words;

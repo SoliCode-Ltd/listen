@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\UsageCounterResource\Pages;
 
+use Filament\Actions\Action;
 use App\Filament\Resources\UsageCounterResource;
 use App\Filament\Resources\UserResource;
 use App\Filament\Widgets\MonthlyUsageBreakdown;
@@ -11,7 +12,7 @@ use App\Models\AudioGeneration;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Analytics\UsageInsights;
-use Filament\Actions\Action;
+use Filament\Actions;
 use Filament\Pages\Concerns\ExposesTableToWidgets;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Support\Carbon;

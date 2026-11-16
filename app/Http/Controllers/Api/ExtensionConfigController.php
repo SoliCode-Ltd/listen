@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\SiteSetting;
-use App\Support\ExtensionVersion;
 use Illuminate\Http\JsonResponse;
 
 class ExtensionConfigController extends Controller
@@ -26,7 +25,7 @@ class ExtensionConfigController extends Controller
             'config' => [
                 'apiBase' => $apiBase,
                 'brandName' => SiteSetting::get('extension_chrome_name', config('app.name', 'Listen')),
-                'version' => ExtensionVersion::current(),
+                'version' => \App\Support\ExtensionVersion::current(),
                 'defaultLanguage' => SiteSetting::get('extension_default_language', 'ar'),
                 'defaultTranslate' => SiteSetting::get('extension_default_translate', '1') === '1',
             ],

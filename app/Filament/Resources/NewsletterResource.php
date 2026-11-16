@@ -2,45 +2,47 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Select;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Illuminate\Support\HtmlString;
+use Filament\Forms\Components\Repeater;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\EditAction;
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\NewsletterResource\Pages\ListNewsletters;
 use App\Filament\Resources\NewsletterResource\Pages\CreateNewsletter;
 use App\Filament\Resources\NewsletterResource\Pages\EditNewsletter;
-use App\Filament\Resources\NewsletterResource\Pages\ListNewsletters;
+use App\Filament\Resources\NewsletterResource\Pages;
 use App\Filament\Resources\NewsletterResource\RelationManagers\DeliveriesRelationManager;
 use App\Models\Newsletter;
 use App\Models\Plan;
 use App\Services\Newsletter\NewsletterPace;
-use Filament\Actions\Action;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
+use Filament\Forms;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Component;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Schema;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Arr;
-use Illuminate\Support\HtmlString;
 
 class NewsletterResource extends Resource
 {
     protected static ?string $model = Newsletter::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-envelope';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-envelope';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Newsletter';
+    protected static string | \UnitEnum | null $navigationGroup = 'Newsletter';
 
     protected static ?string $navigationLabel = 'Newsletter';
 
@@ -58,7 +60,7 @@ class NewsletterResource extends Resource
     }
 
     /**
-     * @return array<int, Component>
+     * @return array<int, \Filament\Schemas\Components\Component>
      */
     public static function formSchema(): array
     {
@@ -255,7 +257,7 @@ class NewsletterResource extends Resource
     }
 
     /**
-     * @return array<int, Component>
+     * @return array<int, \Filament\Schemas\Components\Component>
      */
     private static function copyFields(string $locale): array
     {

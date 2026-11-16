@@ -16,7 +16,7 @@ class ContactsRelationManager extends RelationManager
 
     protected static ?string $title = 'Customers';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-identification';
+    protected static string | \BackedEnum | null $icon = 'heroicon-o-identification';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

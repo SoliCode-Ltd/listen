@@ -11,8 +11,7 @@ use Illuminate\Support\Facades\DB;
  * The lines, their order and what they promise stay as the admin wrote them;
  * a card that left out commercial use gets that line, as on the other cards.
  */
-return new class extends Migration
-{
+return new class extends Migration {
     /** Old label => the table's label. */
     private const LABELS = [
         'en' => [

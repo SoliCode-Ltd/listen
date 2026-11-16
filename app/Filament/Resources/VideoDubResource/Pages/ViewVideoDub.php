@@ -2,9 +2,10 @@
 
 namespace App\Filament\Resources\VideoDubResource\Pages;
 
+use Filament\Actions\Action;
 use App\Filament\Resources\VideoDubResource;
 use App\Models\VideoDub;
-use Filament\Actions\Action;
+use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewVideoDub extends ViewRecord

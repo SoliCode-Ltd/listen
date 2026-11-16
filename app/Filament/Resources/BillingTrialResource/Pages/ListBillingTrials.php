@@ -21,7 +21,7 @@ class ListBillingTrials extends ListRecords
                 ->color('gray')
                 ->tooltip('Paid trials from the last 90 days that came from a Google Ads click. Upload in Google Ads → Goals → Uploads.')
                 ->action(fn () => response()->streamDownload(
-                    fn () => print (app(TrialAdsConversionExport::class)->csv()),
+                    fn () => print(app(TrialAdsConversionExport::class)->csv()),
                     'google-ads-trial-conversions-'.now()->format('Y-m-d').'.csv',
                     ['Content-Type' => 'text/csv']
                 )),

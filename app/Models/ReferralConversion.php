@@ -2,24 +2,18 @@
 
 namespace App\Models;
 
-use App\Services\Referral\DemoRewardLedgerService;
-use App\Services\Referral\ReferralService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Log;
 
 class ReferralConversion extends Model
 {
     use HasFactory;
 
     public const STATUS_PENDING = 'pending';
-
     public const STATUS_APPROVED = 'approved';
-
     public const STATUS_REJECTED = 'rejected';
-
     public const STATUS_FLAGGED = 'flagged';
 
     public const STATUSES = [
@@ -107,18 +101,18 @@ class ReferralConversion extends Model
                     return;
                 }
 
-                app(DemoRewardLedgerService::class)
+                app(\App\Services\Referral\DemoRewardLedgerService::class)
                     ->revoke($referrer, $netOutstanding, null, 'conversion_deleted');
 
                 $referrerProfile = UserReferralProfile::query()
                     ->where('user_id', $referrer->id)
                     ->first();
                 if ($referrerProfile) {
-                    app(ReferralService::class)
+                    app(\App\Services\Referral\ReferralService::class)
                         ->recomputeProfileCounters($referrerProfile);
                 }
             } catch (\Throwable $e) {
-                Log::warning('Failed to revoke reward on conversion delete.', [
+                \Illuminate\Support\Facades\Log::warning('Failed to revoke reward on conversion delete.', [
                     'conversion_id' => $conversion->id,
                     'exception' => $e->getMessage(),
                 ]);

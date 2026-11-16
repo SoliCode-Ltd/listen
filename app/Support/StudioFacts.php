@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Models\Plan;
-use Illuminate\Support\Collection;
 
 /**
  * What the studio can do, as the public pages, the structured data and llms.txt
@@ -216,9 +215,9 @@ final class StudioFacts
     /**
      * The monthly plans people can buy.
      *
-     * @return Collection<int, Plan>
+     * @return \Illuminate\Support\Collection<int, Plan>
      */
-    private static function onSale(): Collection
+    private static function onSale(): \Illuminate\Support\Collection
     {
         try {
             return Plan::query()->where('is_active', true)->where('price_cents', '>', 0)

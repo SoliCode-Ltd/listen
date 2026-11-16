@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Plan;
 use App\Models\User;
 use App\Models\VideoDub;
 use App\Services\Billing\MemberUsageMeter;
@@ -17,8 +16,8 @@ use App\Support\TtsStudioConfig;
 use App\Support\VideoDubbing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -315,7 +314,7 @@ class VideoDubController extends Controller
     }
 
     /** One dub at a time, then the free dub's rules or the plan's month. */
-    private function assertMayStart(User $user, Request $request, ?Plan $plan, bool $free): void
+    private function assertMayStart(User $user, Request $request, ?\App\Models\Plan $plan, bool $free): void
     {
         if (VideoDub::query()->where('user_id', $user->id)->whereIn('status', [VideoDub::QUEUED, VideoDub::PROCESSING])->exists()) {
             throw ValidationException::withMessages(['video' => __('ui.dub.one_at_a_time')]);
@@ -352,7 +351,7 @@ class VideoDubController extends Controller
     }
 
     /** The plan's videos a month, when it has a number. */
-    private function assertWithinMonth(User $user, ?Plan $plan): void
+    private function assertWithinMonth(User $user, ?\App\Models\Plan $plan): void
     {
         $limit = VideoDubbing::monthlyLimit($plan);
         if ($limit > 0 && VideoDubbing::dubsThisMonth((int) $user->id) >= $limit) {

@@ -2,9 +2,19 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\UsageCounterResource\Pages;
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Tables\Columns\TextColumn;
+use App\Support\Credits;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Actions\ViewAction;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
 use App\Filament\Resources\UsageCounterResource\Pages\ListUsageCounters;
 use App\Filament\Resources\UsageCounterResource\Pages\ViewUsageCounter;
+use App\Filament\Resources\UsageCounterResource\Pages;
 use App\Models\CharGift;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -13,19 +23,12 @@ use App\Models\User;
 use App\Services\Analytics\UsageInsights;
 use App\Services\Billing\RenewalGrace;
 use App\Services\PlanAccessService;
-use App\Support\Credits;
 use App\Support\PlanUsageGuard;
-use Filament\Actions\ViewAction;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\ViewEntry;
+use Filament\Forms;
+use Filament\Infolists;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Auth\Access\Response as AccessResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
@@ -39,9 +42,9 @@ class UsageCounterResource extends Resource
 {
     protected static ?string $model = UsageCounter::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-chart-bar';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-chart-bar';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Billing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
 
     protected static ?int $navigationSort = 3;
 

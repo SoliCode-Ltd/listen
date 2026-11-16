@@ -2,12 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\Analytics\BusinessStatsService;
-use App\Services\Billing\AdsPurchases;
 use App\Services\Billing\CharPackCardPayment;
-use App\Services\Billing\PaymentLedger;
-use App\Services\Billing\PlanChanges;
-use App\Services\Billing\PurchaseFollowUps;
 use App\Services\Billing\TrialOutcomeService;
 use App\Services\BillingLifecycleService;
 use App\Services\StripeWebhookEmailService;
@@ -24,7 +19,8 @@ class StripeWebhookController extends Controller
         BillingLifecycleService $billingLifecycleService,
         StripeWebhookEmailService $stripeWebhookEmailService,
         TrialOutcomeService $trialOutcomeService,
-    ) {
+    )
+    {
         $payload = $request->getContent();
         $signature = (string) $request->header('Stripe-Signature', '');
         $secret = trim((string) config('services.stripe.webhook_secret', ''));
@@ -105,20 +101,20 @@ class StripeWebhookController extends Controller
             // A first payment the bank declined: noted for its follow-up email, with the bank's reason
             // when Stripe sends it (Newsletter → Purchase follow-ups). Renewals have their own path above.
             if ($type === 'invoice.payment_failed') {
-                app(PurchaseFollowUps::class)->paymentFailed($event->data->object);
+                app(\App\Services\Billing\PurchaseFollowUps::class)->paymentFailed($event->data->object);
             } elseif ($type === 'payment_intent.payment_failed' || $type === 'charge.failed') {
-                app(PurchaseFollowUps::class)->declineReason($event->data->object);
+                app(\App\Services\Billing\PurchaseFollowUps::class)->declineReason($event->data->object);
             }
 
             $trialOutcomeService->handleStripeEvent($event);
-            app(AdsPurchases::class)->handleStripeEvent($event);
+            app(\App\Services\Billing\AdsPurchases::class)->handleStripeEvent($event);
             // How the member paid, for Billing → Payments and the dashboard.
-            app(PaymentLedger::class)->handleStripeEvent($event);
+            app(\App\Services\Billing\PaymentLedger::class)->handleStripeEvent($event);
             $stripeWebhookEmailService->sendForEvent($event);
 
             // A subscription or a payment changed: the dashboard's income figures are read again.
             if (str_starts_with($type, 'customer.subscription.') || str_starts_with($type, 'invoice.') || $type === 'charge.refunded') {
-                app(BusinessStatsService::class)->forget();
+                app(\App\Services\Analytics\BusinessStatsService::class)->forget();
             }
         } catch (\Throwable $exception) {
             if ($handlingCacheKey !== null) {
@@ -145,7 +141,7 @@ class StripeWebhookController extends Controller
 
     private function scheduleEnded(object $schedule, BillingLifecycleService $billingLifecycleService, string $customerId): void
     {
-        app(PlanChanges::class)->scheduleEnded($schedule);
+        app(\App\Services\Billing\PlanChanges::class)->scheduleEnded($schedule);
         if ($customerId !== '') {
             $billingLifecycleService->syncUserByStripeCustomerId($customerId);
         }

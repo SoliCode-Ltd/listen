@@ -2,36 +2,39 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\DemoGuestUsageResource\Pages\ListDemoGuestUsages;
-use App\Filament\Resources\DemoGuestUsageResource\Pages\ViewDemoGuestUsage;
-use App\Models\DemoGuestUsage;
-use App\Models\DemoIdentityLink;
-use Filament\Actions\Action;
-use Filament\Actions\BulkAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\ViewAction;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\KeyValue;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\KeyValue;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\BulkAction;
+use App\Filament\Resources\DemoGuestUsageResource\Pages\ListDemoGuestUsages;
+use App\Filament\Resources\DemoGuestUsageResource\Pages\ViewDemoGuestUsage;
+use App\Filament\Resources\DemoGuestUsageResource\Pages;
+use App\Models\DemoGuestUsage;
+use App\Models\DemoIdentityLink;
+use Filament\Forms;
+use Filament\Resources\Resource;
+use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Notifications\Notification;
 
 class DemoGuestUsageResource extends Resource
 {
     protected static ?string $model = DemoGuestUsage::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user-group';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-user-group';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Demo Tracking';
+    protected static string | \UnitEnum | null $navigationGroup = 'Demo Tracking';
 
     protected static ?int $navigationSort = 1;
 

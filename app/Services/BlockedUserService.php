@@ -12,9 +12,7 @@ use Illuminate\Support\Str;
 class BlockedUserService
 {
     private const SUPPORT_EMAIL = 'help@listenai.studio';
-
     public const DEFAULT_REASON_AR = 'تكرار إدخال عبارات مسيئة أو محظورة';
-
     public const DEFAULT_REASON_EN = 'Repeated submission of abusive or prohibited language';
 
     public function isBlocked(?User $user): bool

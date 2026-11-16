@@ -34,7 +34,6 @@ class ValidateVoiceCatalogCommand extends Command
 
             if ($voiceId === '' || $display === '') {
                 $errors[] = 'Voice catalog contains empty display name or internal id.';
-
                 continue;
             }
 
@@ -100,7 +99,6 @@ class ValidateVoiceCatalogCommand extends Command
         }
 
         $this->info('Voice catalog validation passed.');
-
         return self::SUCCESS;
     }
 }

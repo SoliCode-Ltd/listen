@@ -2,22 +2,25 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\BlockedGenerationResource\Pages\ListBlockedGenerations;
-use App\Filament\Resources\BlockedGenerationResource\Pages\ViewBlockedGeneration;
-use App\Models\BlockedGeneration;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\ViewAction;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
-use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\BlockedGenerationResource\Pages\ListBlockedGenerations;
+use App\Filament\Resources\BlockedGenerationResource\Pages\ViewBlockedGeneration;
+use App\Filament\Resources\BlockedGenerationResource\Pages;
+use App\Models\BlockedGeneration;
+use Filament\Forms;
+use Filament\Resources\Resource;
+use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
@@ -26,9 +29,9 @@ class BlockedGenerationResource extends Resource
 {
     protected static ?string $model = BlockedGeneration::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shield-exclamation';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shield-exclamation';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Content';
+    protected static string | \UnitEnum | null $navigationGroup = 'Content';
 
     protected static ?int $navigationSort = 5;
 

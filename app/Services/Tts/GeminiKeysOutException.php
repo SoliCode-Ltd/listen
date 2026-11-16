@@ -8,4 +8,6 @@ namespace App\Services\Tts;
  * on our side, so it is not sent again and the member is not told to wait
  * a minute.
  */
-class GeminiKeysOutException extends \RuntimeException {}
+class GeminiKeysOutException extends \RuntimeException
+{
+}

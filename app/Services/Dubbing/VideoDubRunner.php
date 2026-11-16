@@ -5,7 +5,7 @@ namespace App\Services\Dubbing;
 use App\Jobs\GenerateAudioJob;
 use App\Models\VideoDub;
 use App\Services\Billing\MemberUsageMeter;
-use App\Services\Push\AppPush;
+use App\Support\VideoDubbing;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -80,11 +80,11 @@ class VideoDubRunner
                 'report' => $report,
             ]);
             // The Listen app: "your dubbed video is ready". It never throws.
-            app(AppPush::class)->dubReady($dub);
+            app(\App\Services\Push\AppPush::class)->dubReady($dub);
         } catch (\Throwable $e) {
             Log::warning('A video dub failed.', ['video_dub_id' => $dub->id, 'error' => $e->getMessage()]);
             if ($this->fail($dub->id, self::messageFor($e))) {
-                app(AppPush::class)->dubFailed($dub);
+                app(\App\Services\Push\AppPush::class)->dubFailed($dub);
                 // What it had done up to there, and why it stopped, for the admin's page.
                 $dub->forceFill(['report' => $this->dubber->lastReport ?: ['error' => mb_substr($e->getMessage(), 0, 300)]])->save();
             }

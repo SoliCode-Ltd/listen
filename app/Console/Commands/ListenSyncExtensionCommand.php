@@ -30,7 +30,6 @@ class ListenSyncExtensionCommand extends Command
         $appUrl = config('app.url');
         if (! $appUrl) {
             $this->error('APP_URL is not set in the environment.');
-
             return self::FAILURE;
         }
 
@@ -42,7 +41,6 @@ class ListenSyncExtensionCommand extends Command
 
         if (! File::exists($configFile)) {
             $this->error("Extension config file not found at: {$configFile}");
-
             return self::FAILURE;
         }
 

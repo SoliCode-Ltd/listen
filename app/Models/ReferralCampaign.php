@@ -11,11 +11,8 @@ class ReferralCampaign extends Model
     use HasFactory;
 
     public const QUALIFICATION_PAID_PLAN = 'paid_plan';
-
     public const QUALIFICATION_SIGNUP = 'signup';
-
     public const QUALIFICATION_EMAIL_VERIFIED = 'email_verified';
-
     public const QUALIFICATION_FIRST_DEMO = 'first_demo_generation';
 
     public const QUALIFICATION_OPTIONS = [

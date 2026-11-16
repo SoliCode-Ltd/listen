@@ -41,3 +41,4 @@ if (! function_exists(__NAMESPACE__.'\\tmpfile')) {
         return $handle;
     }
 }
+

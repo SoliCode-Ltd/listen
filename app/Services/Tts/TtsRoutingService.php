@@ -23,13 +23,10 @@ use Illuminate\Support\Facades\Log;
 class TtsRoutingService
 {
     public const MODE_LEGACY = 'legacy';
-
     public const MODE_GOOGLE = 'google';
-
     public const MODE_HYBRID = 'hybrid';
 
     private GoogleCloudTtsProvider $googleProvider;
-
     private GeminiTtsProvider $geminiProvider;
 
     public function __construct(
@@ -43,12 +40,12 @@ class TtsRoutingService
     /**
      * Synthesize text using the appropriate provider based on routing policy.
      *
-     * @param  string  $text  Text to synthesize
-     * @param  string  $targetLanguage  Language code
-     * @param  array  $voiceConfig  Voice configuration
-     * @param  Plan|null  $plan  User's active plan
-     * @param  int|null  $userId  User ID for telemetry
-     * @return array Standard TTS result array
+     * @param  string     $text           Text to synthesize
+     * @param  string     $targetLanguage Language code
+     * @param  array      $voiceConfig    Voice configuration
+     * @param  Plan|null  $plan           User's active plan
+     * @param  int|null   $userId         User ID for telemetry
+     * @return array                      Standard TTS result array
      */
     public function synthesize(
         string $text,
@@ -173,7 +170,6 @@ class TtsRoutingService
         if ($this->geminiProvider->isAvailable()) {
             $providers[] = $this->geminiProvider;
         }
-
         return $providers;
     }
 

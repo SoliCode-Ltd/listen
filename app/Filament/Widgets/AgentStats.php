@@ -2,17 +2,15 @@
 
 namespace App\Filament\Widgets;
 
+use Throwable;
 use App\Filament\Resources\AgentConversationResource;
 use App\Filament\Resources\AgentResource;
 use App\Models\Agent;
 use App\Models\AgentConversation;
 use App\Services\Agents\AgentCalls;
-use App\Support\Agents\AgentAccess;
-use App\Support\Agents\AgentCost;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Database\Eloquent\Builder;
-use Throwable;
 
 /**
  * Agents at a glance, above the list of agents (Agents → Agents): how many
@@ -63,7 +61,7 @@ class AgentStats extends BaseWidget
         $chatCredits = (int) $chats->sum('credits');
         $chatCost = (float) $chats->sum(fn (AgentConversation $c): float => (float) $c->cost_usd);
         $chatPaid = $chats->filter(fn (AgentConversation $c): bool => ! $c->free);
-        $worth = AgentCost::dollarsPerCredit();
+        $worth = \App\Support\Agents\AgentCost::dollarsPerCredit();
         $chatEarned = $worth !== null ? (int) $chatPaid->sum('credits') * $worth : null;
         $chatPaidCost = (float) $chatPaid->sum(fn (AgentConversation $c): float => (float) $c->cost_usd);
 
@@ -157,7 +155,7 @@ class AgentStats extends BaseWidget
                 ->descriptionIcon('heroicon-m-chat-bubble-left-ellipsis')
                 ->color('primary'),
             Stat::make('Chat credits, 30 days', number_format($chatCredits))
-                ->description('From members\' plans, at '.number_format(AgentAccess::chatCreditsPerReply()).' credits a reply or more')
+                ->description('From members\' plans, at '.number_format(\App\Support\Agents\AgentAccess::chatCreditsPerReply()).' credits a reply or more')
                 ->descriptionIcon('heroicon-m-credit-card'),
             Stat::make('Chats\' cost to us, 30 days', '$'.number_format($chatCost, 2))
                 ->description($chatReplies > 0 ? '$'.number_format($chatCost / $chatReplies, 5).' a reply, every model call counted' : 'No replies yet')

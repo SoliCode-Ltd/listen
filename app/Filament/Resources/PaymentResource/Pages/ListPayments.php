@@ -2,12 +2,12 @@
 
 namespace App\Filament\Resources\PaymentResource\Pages;
 
+use Throwable;
 use App\Filament\Resources\PaymentResource;
 use App\Services\Billing\PaymentLedger;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Throwable;
 
 class ListPayments extends ListRecords
 {

@@ -11,7 +11,8 @@ class EnsureAuthMethodEnabled
 {
     public function __construct(
         private readonly AuthSettingsService $authSettings,
-    ) {}
+    ) {
+    }
 
     public function handle(Request $request, Closure $next, string $method): Response
     {
@@ -46,3 +47,4 @@ class EnsureAuthMethodEnabled
         };
     }
 }
+

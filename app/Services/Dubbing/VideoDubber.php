@@ -1146,7 +1146,7 @@ final class VideoDubber
      *
      * @param  array<int, float>  $levels  the take's loudness, dB every 10 ms
      * @param  array<int, float>  $weights  seconds each part's words need, in order
-     * @return array<int, array{0: float, 1: float}>|null the pauses it is cut at (from, to: seconds into the take)
+     * @return array<int, array{0: float, 1: float}>|null  the pauses it is cut at (from, to: seconds into the take)
      */
     public static function cuts(array $levels, array $weights, int $fps = 100): ?array
     {
@@ -1257,7 +1257,7 @@ final class VideoDubber
      *
      * @param  array<int, array{0: float, 1: float}>  $pauses  the take's (takePauses())
      * @param  array<int, array{0: float, 1: float}>  $phrases  the speaker's phrases inside the sentence, in order
-     * @return array<int, array{take: array{0: float, 1: float}, at: array{0: float, 1: float}}>|null each piece: from-to in the take, and the speaker's from-to
+     * @return array<int, array{take: array{0: float, 1: float}, at: array{0: float, 1: float}}>|null  each piece: from-to in the take, and the speaker's from-to
      */
     public static function splitTake(array $pauses, float $takeSeconds, array $phrases): ?array
     {
@@ -1608,10 +1608,10 @@ final class VideoDubber
         $target = self::target($language, $dialect);
         $emotions = implode(', ', TtsStudioConfig::emotionValues());
         $tags = implode(', ', array_map(fn (string $tag): string => '<'.$tag.'>', self::SOUND_TAGS));
-        $people = 'Tell the people apart: give each a letter (A, B, ...), say whether they sound male or female, and describe how they speak for a voice actor '
-            .'in at most 10 words of English: pace, energy and manner only, not age or gender (for example "slow and calm, documentary narrator"). '
+        $people = "Tell the people apart: give each a letter (A, B, ...), say whether they sound male or female, and describe how they speak for a voice actor "
+            ."in at most 10 words of English: pace, energy and manner only, not age or gender (for example \"slow and calm, documentary narrator\"). "
             ."One person is one letter all through, also across music, pauses or a change of mood; give a new letter only when a clearly different person speaks.\n";
-        $manner = 'say how it is spoken, as a director would brief a voice actor: "emotion" is the one word from this list '
+        $manner = "say how it is spoken, as a director would brief a voice actor: \"emotion\" is the one word from this list "
             ."that fits best: {$emotions}; \"delivery\" is a short direction in English (energy, pace, loudness, attitude), at most 15 words, "
             ."for example \"bright and fast, smiling, building to a big finish\".\n";
         $faithful = 'Leave nothing out and never sum anything up. Quotations are dubbed too (verses of the Quran, sayings of the Prophet, prayers, poems and songs), '
@@ -1637,8 +1637,8 @@ final class VideoDubber
                 .'Return only JSON, with every phrase from 1 to '.count($phrases).' in order: {"background": "music", "speakers": [{"id": "A", "gender": "male", "voice": "..."}], '
                 .'"phrases": [{"n": 1, "speaker": "A", "emotion": "excited", "delivery": "...", "original": "...", "dubbed": "..."}]}.';
         } else {
-            $prompt .= '1. Split what is said into segments at natural sentence or phrase boundaries, each 2 to 10 seconds long and spoken by one person, '
-                .'with its start and end in seconds from the start of the audio, as plain seconds also past the first minute (75.4, never 1:15.4 or 115.4). Cover everything that is said, from the first word to the very last one '
+            $prompt .= "1. Split what is said into segments at natural sentence or phrase boundaries, each 2 to 10 seconds long and spoken by one person, "
+                ."with its start and end in seconds from the start of the audio, as plain seconds also past the first minute (75.4, never 1:15.4 or 115.4). Cover everything that is said, from the first word to the very last one "
                 ."at the end of the audio: never leave out, merge away or sum up any part, and give each segment every word spoken in it.\n"
                 .'2. '.$people
                 .'3. For each segment '.$manner

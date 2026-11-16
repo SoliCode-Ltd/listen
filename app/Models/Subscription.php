@@ -2,16 +2,9 @@
 
 namespace App\Models;
 
-use App\Services\Billing\CharPackService;
-use App\Services\Newsletter\PaidWelcomeEmail;
-use App\Services\PlanAccessService;
-use App\Services\Referral\ReferralQualificationService;
-use App\Support\CreditPeriod;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Log;
 
 class Subscription extends Model
 {
@@ -64,9 +57,9 @@ class Subscription extends Model
         // Before the row is written, so nothing sees the new period without them.
         static::saving(function (Subscription $subscription): void {
             try {
-                CreditPeriod::carryOverPlanChange($subscription);
+                \App\Support\CreditPeriod::carryOverPlanChange($subscription);
             } catch (\Throwable $e) {
-                Log::warning('Carrying credits over a plan change failed.', [
+                \Illuminate\Support\Facades\Log::warning('Carrying credits over a plan change failed.', [
                     'subscription_id' => $subscription->id,
                     'user_id' => $subscription->user_id,
                     'exception' => $e->getMessage(),
@@ -95,14 +88,14 @@ class Subscription extends Model
                     return;
                 }
 
-                if (app(PlanAccessService::class)->userHasUnpaidTrialWindow((int) $user->id)) {
+                if (app(\App\Services\PlanAccessService::class)->userHasUnpaidTrialWindow((int) $user->id)) {
                     return;
                 }
 
-                app(ReferralQualificationService::class)
+                app(\App\Services\Referral\ReferralQualificationService::class)
                     ->evaluate($user, 'paid_plan');
             } catch (\Throwable $e) {
-                Log::warning('Referral qualification evaluation failed on subscription save.', [
+                \Illuminate\Support\Facades\Log::warning('Referral qualification evaluation failed on subscription save.', [
                     'subscription_id' => $subscription->id,
                     'user_id' => $subscription->user_id,
                     'exception' => $e->getMessage(),
@@ -127,7 +120,7 @@ class Subscription extends Model
                 if (! $plan || (int) $plan->price_cents <= 0 || ! $user) {
                     return;
                 }
-                if (app(PlanAccessService::class)->userHasUnpaidTrialWindow((int) $user->id)) {
+                if (app(\App\Services\PlanAccessService::class)->userHasUnpaidTrialWindow((int) $user->id)) {
                     return;
                 }
                 // A move down from a dearer paid plan (a downgrade at the renewal, for one)
@@ -136,15 +129,15 @@ class Subscription extends Model
                 $endedBefore = $subscription->getOriginal('current_period_end');
                 if (! $subscription->wasRecentlyCreated && $subscription->wasChanged('plan_id')
                     && (string) $subscription->getOriginal('status') === 'active'
-                    && ($endedBefore === null || Carbon::parse($endedBefore)->gte(now()->subDays(2)))) {
+                    && ($endedBefore === null || \Illuminate\Support\Carbon::parse($endedBefore)->gte(now()->subDays(2)))) {
                     $before = Plan::query()->find((int) $subscription->getOriginal('plan_id'));
                     if ($before && (int) $before->price_cents > (int) $plan->price_cents) {
                         return;
                     }
                 }
-                app(PaidWelcomeEmail::class)->queueWelcome($user);
+                app(\App\Services\Newsletter\PaidWelcomeEmail::class)->queueWelcome($user);
             } catch (\Throwable $e) {
-                Log::warning('Paid welcome email check failed on subscription save.', [
+                \Illuminate\Support\Facades\Log::warning('Paid welcome email check failed on subscription save.', [
                     'subscription_id' => $subscription->id,
                     'exception' => $e->getMessage(),
                 ]);
@@ -166,12 +159,12 @@ class Subscription extends Model
                 if (! $plan || $plan->isPack() || (int) $plan->price_cents <= 0) {
                     return;
                 }
-                if (app(PlanAccessService::class)->userHasUnpaidTrialWindow((int) $subscription->user_id)) {
+                if (app(\App\Services\PlanAccessService::class)->userHasUnpaidTrialWindow((int) $subscription->user_id)) {
                     return;
                 }
-                app(CharPackService::class)->moveLeftoverToPlan($subscription);
+                app(\App\Services\Billing\CharPackService::class)->moveLeftoverToPlan($subscription);
             } catch (\Throwable $e) {
-                Log::warning('Moving pack characters to the new plan failed.', [
+                \Illuminate\Support\Facades\Log::warning('Moving pack characters to the new plan failed.', [
                     'subscription_id' => $subscription->id,
                     'exception' => $e->getMessage(),
                 ]);

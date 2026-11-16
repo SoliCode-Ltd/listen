@@ -8,8 +8,7 @@ use Illuminate\Support\Facades\Schema;
  * Add premium voice minutes allowance and recent voices retention
  * columns to the plans table for the new 5-tier pricing model.
  */
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::table('plans', function (Blueprint $table) {

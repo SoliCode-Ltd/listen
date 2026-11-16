@@ -2,8 +2,9 @@
 
 namespace App\Filament\Resources\NewsletterResource\Pages;
 
-use App\Filament\Resources\NewsletterResource;
 use Filament\Actions\CreateAction;
+use App\Filament\Resources\NewsletterResource;
+use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
 class ListNewsletters extends ListRecords

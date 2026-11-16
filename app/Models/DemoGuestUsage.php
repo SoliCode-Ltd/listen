@@ -27,3 +27,4 @@ class DemoGuestUsage extends Model
         'last_seen_at' => 'datetime',
     ];
 }
+

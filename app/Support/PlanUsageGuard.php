@@ -5,7 +5,6 @@ namespace App\Support;
 use App\Models\AudioGeneration;
 use App\Models\Plan;
 use App\Models\UsageCounter;
-use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class PlanUsageGuard
@@ -64,7 +63,7 @@ class PlanUsageGuard
     }
 
     /** Midnight of the members' current day, in the app's time zone (as stored). */
-    public static function startOfMemberDay(): Carbon
+    public static function startOfMemberDay(): \Illuminate\Support\Carbon
     {
         $zone = (string) config('listen.billing.daily_limit_timezone', 'Africa/Cairo');
         try {

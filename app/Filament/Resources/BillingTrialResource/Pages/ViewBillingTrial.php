@@ -2,8 +2,9 @@
 
 namespace App\Filament\Resources\BillingTrialResource\Pages;
 
-use App\Filament\Resources\BillingTrialResource;
 use Filament\Actions\Action;
+use App\Filament\Resources\BillingTrialResource;
+use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewBillingTrial extends ViewRecord

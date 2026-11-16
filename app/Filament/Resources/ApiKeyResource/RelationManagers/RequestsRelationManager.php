@@ -3,9 +3,9 @@
 namespace App\Filament\Resources\ApiKeyResource\RelationManagers;
 
 use App\Filament\Concerns\SimplePages;
+use App\Support\Api\ApiKeyStatus;
 use App\Filament\Resources\ApiRequestLogResource;
 use App\Models\ApiRequestLog;
-use App\Support\Api\ApiKeyStatus;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,7 +24,7 @@ class RequestsRelationManager extends RelationManager
 
     protected static ?string $title = 'Requests';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-signal';
+    protected static string | \BackedEnum | null $icon = 'heroicon-o-signal';
 
     public function isReadOnly(): bool
     {

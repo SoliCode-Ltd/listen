@@ -12,8 +12,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * Used for admin analytics and cost monitoring.
  */
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('tts_logs', function (Blueprint $table) {

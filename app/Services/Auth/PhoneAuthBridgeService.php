@@ -13,7 +13,8 @@ class PhoneAuthBridgeService
     public function __construct(
         private readonly FirebaseTokenVerifier $firebaseTokenVerifier,
         private readonly PlanAccessService $planAccessService,
-    ) {}
+    ) {
+    }
 
     /**
      * Resolve a Laravel user from a verified Firebase phone identity.

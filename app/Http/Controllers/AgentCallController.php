@@ -2,23 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\SummarizeAgentCall;
 use App\Models\Agent;
 use App\Models\AgentConversation;
 use App\Models\AgentWidget;
-use App\Models\AgentWidgetSite;
 use App\Services\Agents\AgentCalls;
 use App\Services\Agents\AgentChats;
 use App\Services\Agents\GeminiClient;
 use App\Support\Agents\AgentAccess;
 use App\Support\Agents\AgentChannels;
-use App\Support\Agents\AgentInstructions;
 use App\Support\Agents\AgentVisits;
 use App\Support\Agents\AgentVoices;
 use App\Support\Agents\CallBackground;
 use App\Support\Agents\CallerIdentity;
-use App\Support\Agents\CallRecordings;
-use App\Support\Agents\Gendered;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -71,7 +66,7 @@ class AgentCallController extends Controller
         $via = in_array($via, ['wordpress', 'shopify', 'wix', 'laravel'], true) ? $via : null;
         if (! $widget->allowsOrigin($origin)) {
             $widget->noteRefused($origin);
-            AgentWidgetSite::note($widget, $origin, false, $via);
+            \App\Models\AgentWidgetSite::note($widget, $origin, false, $via);
 
             return response()->json(['error' => 'origin', 'message' => __('agents.error_origin')], 403);
         }
@@ -79,7 +74,7 @@ class AgentCallController extends Controller
         // makes shows without a reload): that is not a page load, and notes nothing.
         if (! $request->boolean('again')) {
             $this->seen($widget, $request);
-            AgentWidgetSite::note($widget, $origin, true, $via);
+            \App\Models\AgentWidgetSite::note($widget, $origin, true, $via);
         }
 
         // Kept by the visitor's own browser for a moment only, never by anything in between: a
@@ -185,7 +180,7 @@ class AgentCallController extends Controller
     /** @return array<string, string> the call's states, with the speaking line in the voice's gender */
     private function states(Agent $agent, ?array $voice, string $locale): array
     {
-        return Gendered::lines((array) trans('agents.talk_states', ['name' => $agent->name], $locale), ($voice['gender'] ?? null) === 'female');
+        return \App\Support\Agents\Gendered::lines((array) trans('agents.talk_states', ['name' => $agent->name], $locale), ($voice['gender'] ?? null) === 'female');
     }
 
     /**
@@ -298,7 +293,7 @@ class AgentCallController extends Controller
         // Listen's own agent: never more than a handful of calls at once. A member's agents share
         // their plan's calls at once (AgentCalls::start), so one busy agent can use them all. A call
         // that stopped reporting still counts until it could have ended on its own.
-        $longest = AgentAccess::MAX_CALL_MINUTES * 60 + 30;
+        $longest = \App\Support\Agents\AgentAccess::MAX_CALL_MINUTES * 60 + 30;
         if ($agent->setting('house') && $agent->conversations()->where('status', 'live')->where('started_at', '>', now()->subSeconds($longest))->count() >= 8) {
             return $this->error('busy', 429, __('agents.error_busy'));
         }
@@ -327,7 +322,7 @@ class AgentCallController extends Controller
                 'message' => trans('agents.lines.waiting', [], $agent->language === 'en' ? 'en' : 'ar'),
                 'position' => $result['position'],
                 'retry_after' => $result['retry_after'],
-                // 202: the caller is in line (not an error the business's website should log).
+            // 202: the caller is in line (not an error the business's website should log).
             ], 202);
         }
         if (! $result['ok']) {
@@ -447,14 +442,14 @@ class AgentCallController extends Controller
             return $this->error('not_found', 404);
         }
         $audio = (string) ($in['audio'] ?? '');
-        $bytes = $audio !== '' && strlen($audio) <= (int) ceil(CallRecordings::MAX_PART_BYTES * 4 / 3) + 8 ? base64_decode($audio, true) : false;
+        $bytes = $audio !== '' && strlen($audio) <= (int) ceil(\App\Support\Agents\CallRecordings::MAX_PART_BYTES * 4 / 3) + 8 ? base64_decode($audio, true) : false;
         if ($bytes === false) {
             return response()->json(['result' => 'bad'], 422);
         }
-        $result = CallRecordings::add($c, max(0, (int) ($in['part'] ?? 0)), $bytes, (string) ($in['type'] ?? ''));
+        $result = \App\Support\Agents\CallRecordings::add($c, max(0, (int) ($in['part'] ?? 0)), $bytes, (string) ($in['type'] ?? ''));
         // The last part: the file is packed whole, after the answer (the caller's page may be closing).
         if ($result === 'kept' && ! empty($in['last'])) {
-            dispatch(fn () => CallRecordings::finish($c->fresh()))->afterResponse();
+            dispatch(fn () => \App\Support\Agents\CallRecordings::finish($c->fresh()))->afterResponse();
         }
 
         return response()->json(['result' => $result], in_array($result, ['kept', 'again', 'off'], true) ? 200 : 422);
@@ -469,7 +464,7 @@ class AgentCallController extends Controller
         }
         $usage = $in['usage'] ?? null;
         $c = $this->calls->end($c, (array) ($in['turns'] ?? []), is_array($usage) ? $usage : null, (string) ($in['reason'] ?? 'done'));
-        dispatch(new SummarizeAgentCall($c->id))->afterResponse();
+        dispatch(new \App\Jobs\SummarizeAgentCall($c->id))->afterResponse();
 
         return response()->json(['ok' => true, 'seconds' => $c->billed_seconds]);
     }
@@ -663,10 +658,10 @@ class AgentCallController extends Controller
             // An Arabic agent's line that comes out in Latin letters is written in Arabic ones (agent-line).
             'arabic_lines' => $agent->language !== 'en',
             // The call's sound is recorded in the browser and sent in parts (CallRecordings, recording).
-            'record' => CallRecordings::enabled(),
+            'record' => \App\Support\Agents\CallRecordings::enabled(),
             // The language it speaks, as the model is told it: a line in another language is stopped
             // as it starts and the agent is asked to say it again in this one (agent-call.js).
-            'speaks' => AgentInstructions::speaks($agent),
+            'speaks' => \App\Support\Agents\AgentInstructions::speaks($agent),
             'api' => url('/agent-api/calls/'.$c->public_id),
             'agent' => ['name' => $agent->name, 'language' => $agent->language],
             // What the caller hears behind the agent's voice (Design → Call sound): a quiet office

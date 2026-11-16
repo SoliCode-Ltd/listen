@@ -2,33 +2,36 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ApiKeyResource\Pages;
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\Action;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Illuminate\Support\Carbon;
+use Filament\Infolists\Components\RepeatableEntry;
+use App\Filament\Resources\ApiKeyResource\RelationManagers\RequestsRelationManager;
 use App\Filament\Resources\ApiKeyResource\Pages\ListApiKeys;
 use App\Filament\Resources\ApiKeyResource\Pages\ViewApiKey;
-use App\Filament\Resources\ApiKeyResource\RelationManagers\RequestsRelationManager;
+use Throwable;
+use App\Filament\Resources\ApiKeyResource\Pages;
+use App\Filament\Resources\ApiKeyResource\RelationManagers;
 use App\Models\ApiKey;
 use App\Models\ApiKeyUsage;
 use App\Models\ApiRequestLog;
 use App\Support\Api\ApiKeyStatus;
 use App\Support\PlanUsageGuard;
-use Filament\Actions\Action;
-use Filament\Actions\ViewAction;
-use Filament\Infolists\Components\RepeatableEntry;
-use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Auth\Access\Response as AccessResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
-use Throwable;
 
 /**
  * Every developer API key members have made: its credits this period against its own limit (a
@@ -40,9 +43,9 @@ class ApiKeyResource extends Resource
 {
     protected static ?string $model = ApiKey::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-key';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'System';
+    protected static string | \UnitEnum | null $navigationGroup = 'System';
 
     protected static ?string $navigationLabel = 'API keys';
 

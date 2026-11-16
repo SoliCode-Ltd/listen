@@ -2,19 +2,21 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Forms\Components\DatePicker;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Actions\Action;
 use App\Filament\Resources\AgentContactResource\Pages\ListAgentContacts;
+use App\Filament\Resources\AgentContactResource\Pages;
 use App\Filament\Resources\Concerns\ReadOnlyResource;
 use App\Models\AgentContact;
 use App\Models\User;
-use Filament\Actions\Action;
-use Filament\Forms\Components\DatePicker;
+use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -32,9 +34,9 @@ class AgentContactResource extends Resource
 
     protected static ?string $model = AgentContact::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-identification';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-identification';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Agents';
+    protected static string | \UnitEnum | null $navigationGroup = 'Agents';
 
     protected static ?int $navigationSort = 3;
 

@@ -3,9 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\AgentConversation;
-use App\Services\Agents\AgentChats;
 use App\Services\Agents\GeminiClient;
-use App\Support\Agents\AgentCost;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
@@ -34,7 +32,7 @@ class SummarizeAgentCall implements ShouldQueue
         $lines = array_map(fn ($t) => ($t['role'] === 'agent' ? 'Agent' : 'Caller').': '.$t['text'], $c->transcript);
         $language = $c->agent?->language === 'en' ? 'English' : 'Arabic';
         // A written chat is summed up as one (the lines the links made are not words).
-        $chat = AgentChats::isChat($c);
+        $chat = \App\Services\Agents\AgentChats::isChat($c);
         if ($chat) {
             $lines = array_map(fn ($t) => ($t['role'] === 'agent' ? 'Assistant' : 'Customer').': '.$t['text'],
                 array_values(array_filter($c->transcript, fn ($t) => ($t['kind'] ?? '') !== 'links')));
@@ -65,9 +63,9 @@ class SummarizeAgentCall implements ShouldQueue
         // with the chat's own, so the chat's cost is everything it made the model do.
         if ($chat && is_array($gemini->lastUsage)) {
             $used = $gemini->lastUsage;
-            $cost = AgentCost::replyCost($used['in'], $used['out'], $used['cached']);
+            $cost = \App\Support\Agents\AgentCost::replyCost($used['in'], $used['out'], $used['cached']);
             $fill['usage'] = ['summary' => ['in' => $used['in'], 'out' => $used['out'], 'cached' => $used['cached'], 'cost' => $cost, 'model' => $used['model']]] + (array) ($c->usage ?? []);
-            $fill['cost_usd'] = AgentChats::costOf((array) $c->transcript, $fill['usage']);
+            $fill['cost_usd'] = \App\Services\Agents\AgentChats::costOf((array) $c->transcript, $fill['usage']);
         }
         $c->forceFill($fill)->save();
     }

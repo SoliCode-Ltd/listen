@@ -2,36 +2,37 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Placeholder;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Select;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Textarea;
+use Throwable;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\Billing\TrialEligibilityService;
 use App\Services\StripeProductSyncService;
-use Filament\Forms\Components\CheckboxList;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
+use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
-use Filament\Schemas\Schema;
-use Throwable;
 
 class BillingSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-credit-card';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Billing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
 
     protected static ?int $navigationSort = 3;
 
@@ -117,7 +118,6 @@ class BillingSettings extends Page implements HasForms
                                 $plans = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->get();
                                 $synced = $plans->filter(fn ($p) => $p->hasStripeConfig())->count();
                                 $total = $plans->count();
-
                                 return "{$synced} / {$total} plans synced to Stripe";
                             }),
                     ]),
@@ -140,7 +140,6 @@ class BillingSettings extends Page implements HasForms
                             ->content(function (Get $get): string {
                                 $percent = max(0, min(99, (int) ($get('yearly_discount_percentage') ?? 20)));
                                 $multiplier = round(1 - ($percent / 100), 2);
-
                                 return "Monthly price x 12 x {$multiplier} = yearly price ({$percent}% off)";
                             }),
                         Toggle::make('require_saved_payment_method')

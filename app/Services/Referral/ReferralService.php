@@ -16,7 +16,6 @@ use Illuminate\Support\Str;
 class ReferralService
 {
     public const VISIT_COOKIE = 'listen_ref_visit';
-
     public const VISIT_COOKIE_TTL_MIN = 60 * 24 * 45; // 45 days cap; campaign window may be shorter
 
     public function __construct(

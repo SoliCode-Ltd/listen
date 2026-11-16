@@ -2,24 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Middleware\CaptureReferralVisit;
 use App\Http\Requests\Auth\PhoneAuthBridgeRequest;
 use App\Models\Plan;
 use App\Models\User;
 use App\Rules\NotDisposableEmail;
+use App\Services\BlockedUserService;
+use App\Services\MultiAccountEnforcementService;
 use App\Services\Auth\AuthSettingsService;
 use App\Services\Auth\EmailVerificationMailer;
 use App\Services\Auth\PhoneAuthBridgeService;
-use App\Services\BlockedUserService;
-use App\Services\MultiAccountEnforcementService;
 use App\Services\PlanAccessService;
-use App\Services\Referral\ReferralQualificationService;
 use App\Services\Referral\ReferralService;
+use App\Http\Middleware\CaptureReferralVisit;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -38,7 +36,8 @@ class AuthController extends Controller
         private readonly MultiAccountEnforcementService $multiAccountEnforcement,
         private readonly ReferralService $referralService,
         private readonly EmailVerificationMailer $emailVerificationMailer,
-    ) {}
+    ) {
+    }
 
     private function bindReferralFromRequest(Request $request, User $user): void
     {
@@ -53,9 +52,9 @@ class AuthController extends Controller
             $this->referralService->attachReferrerOnRegister($user, $code, $request);
             // A campaign that rewards the sign-up itself decides it now (the abuse guard
             // can hold it for review); other steps are decided when they happen.
-            app(ReferralQualificationService::class)->evaluate($user, 'signup');
-            Cookie::queue(
-                Cookie::forget(CaptureReferralVisit::COOKIE_NAME)
+            app(\App\Services\Referral\ReferralQualificationService::class)->evaluate($user, 'signup');
+            \Illuminate\Support\Facades\Cookie::queue(
+                \Illuminate\Support\Facades\Cookie::forget(CaptureReferralVisit::COOKIE_NAME)
             );
         } catch (\Throwable $e) {
             Log::warning('Failed to bind referral on registration.', [
@@ -568,7 +567,6 @@ class AuthController extends Controller
 
     /**
      * @template T of \Symfony\Component\HttpFoundation\Response
-     *
      * @param  T  $response
      * @return T
      */

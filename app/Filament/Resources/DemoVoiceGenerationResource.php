@@ -2,41 +2,43 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Textarea;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
 use App\Filament\Resources\DemoVoiceGenerationResource\Pages\ListDemoVoiceGenerations;
 use App\Filament\Resources\DemoVoiceGenerationResource\Pages\ViewDemoVoiceGeneration;
+use App\Filament\Resources\DemoVoiceGenerationResource\Pages;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Services\PlanAccessService;
 use App\Support\AudioUrl;
 use App\Support\GenerationChoiceLabels;
-use Filament\Actions\Action;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\ViewAction;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
+use Filament\Forms;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables;
 use Filament\Tables\Table;
 
 class DemoVoiceGenerationResource extends Resource
 {
     protected static ?string $model = DemoVoiceGeneration::class;
-
     /** @var array<int, array{label:string,is_paid:bool}> */
     private static array $planBadgeByUserId = [];
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-speaker-wave';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-speaker-wave';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Demo';
+    protected static string | \UnitEnum | null $navigationGroup = 'Demo';
 
     protected static ?int $navigationSort = 4;
 
@@ -293,11 +295,11 @@ class DemoVoiceGenerationResource extends Resource
             return 'N/A';
         }
 
-        $relativePath = 'storage/'.ltrim($record->audio_path, '/');
+        $relativePath = 'storage/' . ltrim($record->audio_path, '/');
         $request = request();
 
         if ($request) {
-            return $request->getSchemeAndHttpHost().'/'.ltrim($relativePath, '/');
+            return $request->getSchemeAndHttpHost() . '/' . ltrim($relativePath, '/');
         }
 
         return url($relativePath);

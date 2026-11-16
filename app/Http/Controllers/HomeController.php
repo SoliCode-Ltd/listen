@@ -11,7 +11,6 @@ use App\Models\VoiceSample;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\Auth\EmailVerificationMailer;
 use App\Services\Billing\CharPackService;
-use App\Services\Billing\PlanChanges;
 use App\Services\Billing\TrialEligibilityService;
 use App\Services\DemoFraudService;
 use App\Services\DemoLinkedAccounts;
@@ -26,36 +25,33 @@ use App\Services\TranslationService;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
 use App\Services\VoiceDesignService;
-use App\Support\Agents\DemoAgent;
 use App\Support\AudioDuration;
 use App\Support\AudioEffects;
+use App\Support\HeroCast;
+use App\Support\LongFormSamples;
 use App\Support\AudioUrl;
 use App\Support\DemoAllowance;
-use App\Support\DemoOffer;
 use App\Support\DialogueSpeakers;
 use App\Support\DiscountTerms;
 use App\Support\EmailVerification;
 use App\Support\FreeAllowance;
 use App\Support\GeminiSpend;
-use App\Support\GeminiVocalTags;
-use App\Support\HeroCast;
-use App\Support\LongFormSamples;
 use App\Support\PlanPricingLines;
 use App\Support\SeoDialectPages;
-use App\Support\SeoEnglishPages;
 use App\Support\SeoFeaturePages;
+use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
 use App\Support\SpeakerAvatar;
 use App\Support\SpeakerVoices;
 use App\Support\SpeechLanguages;
-use App\Support\SpeechText;
 use App\Support\TtsStudioConfig;
-use App\Support\UsageEstimator;
 use App\Support\VersionedAsset;
 use App\Support\VideoDubbing;
+use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
-use App\Support\VoiceDesign;
 use App\Support\VoiceFlag;
+use App\Support\VoiceCloningAccess;
+use App\Support\VoiceDesign;
 use App\Support\VoicePreviews;
 use App\Support\VoiceTier;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -487,7 +483,7 @@ class HomeController extends Controller
             $activePlanSlug = (string) ($activePlan?->slug ?? 'free');
             // The member's own plan offers the cycle they don't have; a lower plan already
             // booked for the renewal says when it starts (App\Services\Billing\PlanChanges).
-            $planChanges = app(PlanChanges::class);
+            $planChanges = app(\App\Services\Billing\PlanChanges::class);
             if ($activePlan && (int) $activePlan->price_cents > 0 && ! $activePlan->isPack()) {
                 $activeCycle = $planChanges->currentCycle($request->user());
             }
@@ -723,7 +719,7 @@ class HomeController extends Controller
             'trialAllowanceChars' => $this->demoCharAllowance($request),
             'upgradePlanSlug' => $upgradePlanSlug,
             // Under a voice the demo has just made: the plan offer running now, if any.
-            'demoOffer' => DemoOffer::current(),
+            'demoOffer' => \App\Support\DemoOffer::current(),
             // Dub a video, beside the text studio: the free dub (App\Support\VideoDubbing).
             'dubStudio' => VideoDubbing::openTo($member) ? VideoDubbing::studio($member, $request) : null,
             // Voice Design, beside it too: one take from the demo's characters (App\Support\VoiceDesign).
@@ -733,7 +729,7 @@ class HomeController extends Controller
                 : null,
             // A Voice agent: a live call with a sample business's agent, from the free test seconds
             // (App\Support\Agents\DemoAgent).
-            'demoAgent' => DemoAgent::openTo($member) ? DemoAgent::studio($member, app()->getLocale()) : null,
+            'demoAgent' => \App\Support\Agents\DemoAgent::openTo($member) ? \App\Support\Agents\DemoAgent::studio($member, app()->getLocale()) : null,
         ]);
 
         return $this->attachDemoDeviceCookie($request, $response);
@@ -803,7 +799,7 @@ class HomeController extends Controller
 
             $text = trim($validated['text']);
             // Moods and sounds go with words: a script of tags alone has nothing to speak.
-            if (! GeminiVocalTags::hasWords($text)) {
+            if (! \App\Support\GeminiVocalTags::hasWords($text)) {
                 throw ValidationException::withMessages(['text' => __('ui.backend.dashboard_text_needs_words')]);
             }
             $sourceLanguage = SpeechLanguages::detect($text);
@@ -926,7 +922,7 @@ class HomeController extends Controller
 
         $text = trim($validated['text']);
         // Moods and sounds go with words: a script of tags alone has nothing to speak.
-        if (! GeminiVocalTags::hasWords($text)) {
+        if (! \App\Support\GeminiVocalTags::hasWords($text)) {
             throw ValidationException::withMessages(['text' => __('ui.backend.dashboard_text_needs_words')]);
         }
         $sourceLanguage = SpeechLanguages::detect($text);
@@ -986,7 +982,7 @@ class HomeController extends Controller
                 );
             }
             // As in the studio: abbreviations written out and the member's own pronunciations.
-            $forVoice = SpeechText::forVoice(
+            $forVoice = \App\Support\SpeechText::forVoice(
                 $textForSpeech,
                 $validated['target_language'],
                 (int) $request->user()->id,

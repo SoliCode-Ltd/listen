@@ -7,7 +7,6 @@ use App\Models\ManualPaymentRequest;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
-use App\Services\Billing\PlanChanges;
 use App\Services\Billing\RenewalGrace;
 use App\Services\Billing\StripePricePlans;
 use Illuminate\Support\Carbon;
@@ -83,7 +82,7 @@ class BillingSyncService
             return;
         }
 
-        $planChanges = app(PlanChanges::class);
+        $planChanges = app(\App\Services\Billing\PlanChanges::class);
         // Lower plans whose day has come take over first: one paid by hand, and a card plan
         // booked to follow a plan paid by hand (Stripe started it: it is read below).
         rescue(fn () => $planChanges->applyDue((int) $user->id));

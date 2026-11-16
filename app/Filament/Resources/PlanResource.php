@@ -2,66 +2,68 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\PlanResource\Pages;
-use App\Filament\Resources\PlanResource\Pages\CreatePlan;
-use App\Filament\Resources\PlanResource\Pages\EditPlan;
-use App\Filament\Resources\PlanResource\Pages\ListPlans;
-use App\Filament\Resources\PlanResource\Pages\ViewPlan;
-use App\Models\Plan;
-use App\Models\SiteSetting;
-use App\Services\Api\ApiConcurrency;
-use App\Services\Api\ApiSpeechService;
-use App\Services\Billing\KeptCredits;
-use App\Services\StripeProductSyncService;
-use App\Support\Agents\AgentAccess;
-use App\Support\Agents\AgentCost;
-use App\Support\AudioFormats;
-use App\Support\Credits;
-use App\Support\DiscountTerms;
-use App\Support\PlanCostEstimate;
-use App\Support\PlanPricingLines;
-use App\Support\Transcription\TranscriptionAccess;
-use App\Support\VoiceDesign;
-use Carbon\Carbon;
-use Exception;
-use Filament\Actions\Action;
-use Filament\Actions\BulkAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Forms\Components\CheckboxList;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Select;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\DateTimePicker;
+use Carbon\Carbon;
+use Filament\Schemas\Components\Utilities\Set;
+use App\Support\Credits;
+use App\Support\PlanCostEstimate;
+use Filament\Forms\Components\Radio;
+use App\Services\Billing\KeptCredits;
+use App\Services\Api\ApiSpeechService;
+use Filament\Forms\Components\CheckboxList;
+use App\Support\AudioFormats;
+use App\Services\Api\ApiConcurrency;
+use App\Support\VoiceDesign;
+use App\Support\Agents\AgentAccess;
+use Filament\Schemas\Components\Grid;
+use Filament\Forms\Components\Repeater;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\Action;
+use Exception;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\BulkAction;
+use Illuminate\Database\Eloquent\Collection;
+use App\Filament\Resources\PlanResource\Pages\ListPlans;
+use App\Filament\Resources\PlanResource\Pages\CreatePlan;
+use App\Filament\Resources\PlanResource\Pages\ViewPlan;
+use App\Filament\Resources\PlanResource\Pages\EditPlan;
+use App\Support\Agents\AgentCost;
+use App\Support\Transcription\TranscriptionAccess;
+use Illuminate\Support\Str;
+use App\Filament\Resources\PlanResource\Pages;
+use App\Models\Plan;
+use App\Models\SiteSetting;
+use App\Services\StripeProductSyncService;
+use App\Support\DiscountTerms;
+use App\Support\PlanPricingLines;
+use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
-use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Str;
 
 class PlanResource extends Resource
 {
     protected static ?string $model = Plan::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-list';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Billing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
 
     protected static ?int $navigationSort = 1;
 
@@ -176,18 +178,15 @@ class PlanResource extends Resource
                                     $component->state('0.00');
                                 }
                             })
-                            ->helperText(fn () => 'Yearly price is auto-calculated at '.SiteSetting::yearlyDiscountPercent().'% discount (configurable in Billing Settings)'),
+                            ->helperText(fn () => 'Yearly price is auto-calculated at ' . SiteSetting::yearlyDiscountPercent() . '% discount (configurable in Billing Settings)'),
                         Placeholder::make('yearly_preview')
                             ->label('Yearly Price Preview')
                             ->content(function (?Plan $record) {
-                                if (! $record || $record->price_cents <= 0) {
-                                    return 'Free';
-                                }
+                                if (!$record || $record->price_cents <= 0) return 'Free';
                                 $multiplier = SiteSetting::yearlyDiscountMultiplier();
                                 $percent = SiteSetting::yearlyDiscountPercent();
                                 $yearlyDollars = round(($record->price_cents / 100) * 12 * $multiplier, 2);
-
-                                return '$'.number_format($yearlyDollars, 2).'/year ($'.number_format($yearlyDollars / 12, 2).'/mo) — '.$percent.'% off';
+                                return '$' . number_format($yearlyDollars, 2) . '/year ($' . number_format($yearlyDollars / 12, 2) . '/mo) — ' . $percent . '% off';
                             }),
                     ]),
                 Section::make('Discount / Promotion')
@@ -240,19 +239,17 @@ class PlanResource extends Resource
                             ->content(function (Get $get, ?Plan $record) {
                                 $priceDollars = (float) ($get('price_dollars') ?? ($record ? $record->price_cents / 100 : 0));
                                 $discount = (int) ($get('discount_percentage') ?? 0);
-                                if ($priceDollars <= 0 || $discount <= 0) {
-                                    return 'N/A';
-                                }
+                                if ($priceDollars <= 0 || $discount <= 0) return 'N/A';
                                 $discounted = round($priceDollars * (1 - $discount / 100), 2);
                                 $endsAt = $get('discount_ends_at');
-                                $endLabel = $endsAt ? 'Offer until '.Carbon::parse($endsAt)->format('M j, Y g:i A') : 'Offer has no end date';
+                                $endLabel = $endsAt ? 'Offer until ' . Carbon::parse($endsAt)->format('M j, Y g:i A') : 'Offer has no end date';
                                 $preview = new Plan([
                                     'discount_duration' => $get('discount_duration'),
                                     'discount_duration_months' => $get('discount_duration_months'),
                                 ]);
-                                $terms = DiscountTerms::line($preview, 'monthly', $discount, '$'.number_format($priceDollars, 2));
+                                $terms = DiscountTerms::line($preview, 'monthly', $discount, '$' . number_format($priceDollars, 2));
 
-                                return '$'.number_format($priceDollars, 2).' → $'.number_format($discounted, 2).'/mo. '.$endLabel.'. Monthly buyers read: "'.str_replace(["\u{2066}", "\u{2069}"], '', $terms).'"';
+                                return '$' . number_format($priceDollars, 2) . ' → $' . number_format($discounted, 2) . '/mo. ' . $endLabel . '. Monthly buyers read: "' . str_replace(["\u{2066}", "\u{2069}"], '', $terms) . '"';
                             }),
                     ]),
                 Section::make('Voice & Quality')
@@ -801,7 +798,7 @@ class PlanResource extends Resource
                     ->color('gray'),
                 TextColumn::make('price_cents')
                     ->label('Monthly')
-                    ->formatStateUsing(fn (int $state) => $state <= 0 ? 'Free' : '$'.number_format($state / 100, 2))
+                    ->formatStateUsing(fn (int $state) => $state <= 0 ? 'Free' : '$' . number_format($state / 100, 2))
                     ->sortable(),
                 TextColumn::make('voice_tier')
                     ->label('Voice Tier')
@@ -850,8 +847,8 @@ class PlanResource extends Resource
                 TextColumn::make('discount_percentage')
                     ->label('Discount')
                     ->formatStateUsing(fn (?int $state, Plan $record) => $record->hasActiveDiscount()
-                        ? $state.'%'
-                        : ($state ? $state.'% (expired)' : '—'))
+                        ? $state . '%'
+                        : ($state ? $state . '% (expired)' : '—'))
                     ->color(fn (Plan $record) => $record->hasActiveDiscount() ? 'success' : 'gray')
                     ->badge()
                     ->toggleable(isToggledHiddenByDefault: false),
@@ -907,7 +904,7 @@ class PlanResource extends Resource
                     ->trueColor('success')
                     ->falseColor('danger')
                     ->tooltip(fn (Plan $record): string => $record->hasStripeConfig()
-                        ? 'Product ID: '.($record->stripe_product_id ?? '-')
+                        ? 'Product ID: ' . ($record->stripe_product_id ?? '-')
                         : 'Not synced to Stripe'),
                 TextColumn::make('stripe_price_monthly')
                     ->label('Stripe monthly price')
@@ -1242,6 +1239,7 @@ class PlanResource extends Resource
     /**
      * Repeater lines as a plain list, in their order, for saving.
      *
+     * @param  mixed  $items
      * @return array<int, array{label?: string, value?: string, icon?: string}>
      */
     public static function normalizeRepeaterItems(mixed $items): array

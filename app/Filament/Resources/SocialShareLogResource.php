@@ -2,27 +2,28 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\SocialShareLogResource\Pages;
-use App\Filament\Resources\SocialShareLogResource\Pages\ListSocialShareLogs;
-use App\Models\SocialShareLog;
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\ViewAction;
+use App\Filament\Resources\SocialShareLogResource\Pages\ListSocialShareLogs;
+use App\Filament\Resources\SocialShareLogResource\Pages;
+use App\Models\SocialShareLog;
 use Filament\Resources\Resource;
-use Filament\Tables\Columns\BadgeColumn;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Auth\Access\Response as AccessResponse;
 
 class SocialShareLogResource extends Resource
 {
     protected static ?string $model = SocialShareLog::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-share';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-share';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Referrals';
+    protected static string | \UnitEnum | null $navigationGroup = 'Referrals';
 
     protected static ?int $navigationSort = 3;
 
@@ -117,18 +118,19 @@ class SocialShareLogResource extends Resource
 
         $q = rawurlencode($link);
         // For Google site: queries we want the URL inside quotes for an exact match.
-        $googleSite = fn (string $domain): string => 'https://www.google.com/search?q='.rawurlencode('site:'.$domain.' "'.$link.'"');
+        $googleSite = fn (string $domain): string =>
+            'https://www.google.com/search?q='.rawurlencode('site:'.$domain.' "'.$link.'"');
 
         return match ($record->platform) {
-            'facebook' => 'https://www.facebook.com/search/posts/?q='.$q,
-            'twitter' => 'https://x.com/search?q='.$q.'&src=typed_query&f=live',
-            'linkedin' => 'https://www.linkedin.com/search/results/content/?keywords='.$q,
+            'facebook'  => 'https://www.facebook.com/search/posts/?q='.$q,
+            'twitter'   => 'https://x.com/search?q='.$q.'&src=typed_query&f=live',
+            'linkedin'  => 'https://www.linkedin.com/search/results/content/?keywords='.$q,
             // Telegram & Instagram don't expose URL search — fall back to Google
             // `site:` which surfaces public posts indexed by the search engine.
-            'telegram' => $googleSite('t.me'),
+            'telegram'  => $googleSite('t.me'),
             'instagram' => $googleSite('instagram.com'),
             // copy_link / whatsapp = private destinations, untrackable.
-            default => null,
+            default     => null,
         };
     }
 }

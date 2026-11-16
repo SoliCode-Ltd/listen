@@ -4,10 +4,7 @@ namespace App\Support\Agents;
 
 use App\Models\AgentConversation;
 use App\Models\SiteSetting;
-use App\Support\AudioFormats;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\Process\Process;
 
 /**
  * Each call's recording: the caller and the agent together, as the caller's browser heard them.
@@ -45,7 +42,7 @@ final class CallRecordings
     /** The recording columns exist (not in the minute between a deploy and its migration). */
     public static function ready(): bool
     {
-        return once(fn (): bool => rescue(fn (): bool => Schema::hasColumn('agent_conversations', 'recording_path'), false, false));
+        return once(fn (): bool => rescue(fn (): bool => \Illuminate\Support\Facades\Schema::hasColumn('agent_conversations', 'recording_path'), false, false));
     }
 
     /** "audio/webm" for "audio/webm;codecs=opus"; null for anything else. */
@@ -119,7 +116,7 @@ final class CallRecordings
     public static function finish(AgentConversation $call): bool
     {
         $file = self::file($call);
-        $ffmpeg = AudioFormats::ffmpegPath();
+        $ffmpeg = \App\Support\AudioFormats::ffmpegPath();
         if ($file === null || $ffmpeg === null) {
             return false;
         }
@@ -134,7 +131,7 @@ final class CallRecordings
         }
         $tmp = $file.'.packing';
         try {
-            $process = new Process(array_merge([$ffmpeg, '-v', 'error', '-y', '-i', $file, '-c', 'copy'], $format, [$tmp]));
+            $process = new \Symfony\Component\Process\Process(array_merge([$ffmpeg, '-v', 'error', '-y', '-i', $file, '-c', 'copy'], $format, [$tmp]));
             $process->setTimeout(60);
             $process->run();
             if (! $process->isSuccessful() || ! is_file($tmp) || filesize($tmp) < 64) {

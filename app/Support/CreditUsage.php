@@ -7,7 +7,6 @@ use App\Models\AudioGeneration;
 use App\Models\User;
 use App\Models\VideoDub;
 use App\Services\PlanAccessService;
-use App\Support\Agents\AgentAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -44,7 +43,7 @@ final class CreditUsage
             ->latest('id')->limit(500)
             ->get(AudioGeneration::memberNewestColumns(['id', 'text_item_id', 'api_key_id', 'billable_chars', 'duration_seconds', 'created_at', 'is_dialogue']));
         // No calls before the agents tables exist (a deploy just ahead of its migration).
-        $calls = AgentAccess::tablesReady() ? AgentConversation::query()->with('agent:id,name')
+        $calls = \App\Support\Agents\AgentAccess::tablesReady() ? AgentConversation::query()->with('agent:id,name')
             ->where('user_id', $id)->where('free', false)->whereNotNull('settled_at')->where('started_at', '>=', $from)
             ->latest('id')->limit(500)
             ->get(['id', 'agent_id', 'channel', 'credits', 'billed_seconds', 'started_at', 'usage']) : collect();

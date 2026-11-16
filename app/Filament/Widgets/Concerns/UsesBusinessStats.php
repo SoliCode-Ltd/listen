@@ -2,9 +2,9 @@
 
 namespace App\Filament\Widgets\Concerns;
 
+use Illuminate\Support\Carbon;
 use App\Services\Analytics\BusinessStatsService;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
-use Illuminate\Support\Carbon;
 
 /**
  * Shared access to the cached business statistics snapshot, honouring the

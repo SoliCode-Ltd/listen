@@ -2,17 +2,18 @@
 
 namespace App\Services\Auth;
 
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\ConnectionException;
 use RuntimeException;
 
 class FirebaseTokenVerifier
 {
     public function __construct(
         private readonly AuthSettingsService $authSettings,
-    ) {}
+    ) {
+    }
 
     /**
      * Verify a Firebase ID token and return normalized identity info.

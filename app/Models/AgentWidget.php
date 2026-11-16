@@ -2,11 +2,8 @@
 
 namespace App\Models;
 
-use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /**
@@ -239,16 +236,16 @@ class AgentWidget extends Model
      * The last website that tried to load the call button and was not on the list, for the owner
      * to allow in one tap (Go live → Security).
      *
-     * @return array{origin: string, at: Carbon}|null
+     * @return array{origin: string, at: \Illuminate\Support\Carbon}|null
      */
     public function lastRefused(): ?array
     {
-        $refused = Cache::get('agent-widget-refused:'.$this->id);
+        $refused = \Illuminate\Support\Facades\Cache::get('agent-widget-refused:'.$this->id);
         if (! is_array($refused) || empty($refused['origin']) || $this->allowsOrigin($refused['origin'])) {
             return null;
         }
 
-        return ['origin' => (string) $refused['origin'], 'at' => Carbon::parse($refused['at'] ?? now())];
+        return ['origin' => (string) $refused['origin'], 'at' => \Illuminate\Support\Carbon::parse($refused['at'] ?? now())];
     }
 
     public function noteRefused(?string $origin): void
@@ -258,17 +255,17 @@ class AgentWidget extends Model
             return;
         }
         $key = 'agent-widget-refused:'.$this->id;
-        $last = Cache::get($key);
-        if (is_array($last) && ($last['origin'] ?? null) === $origin && now()->diffInMinutes(Carbon::parse($last['at'] ?? now()), true) < 10) {
+        $last = \Illuminate\Support\Facades\Cache::get($key);
+        if (is_array($last) && ($last['origin'] ?? null) === $origin && now()->diffInMinutes(\Illuminate\Support\Carbon::parse($last['at'] ?? now()), true) < 10) {
             return;
         }
-        Cache::put($key, ['origin' => $origin, 'at' => now()->toIso8601String()], now()->addDays(14));
+        \Illuminate\Support\Facades\Cache::put($key, ['origin' => $origin, 'at' => now()->toIso8601String()], now()->addDays(14));
     }
 
     /** When the call button was last seen on a website, in words: "3 minutes ago", or "just now". */
     public function seenAgo(): ?string
     {
-        return $this->last_seen_at?->diffForHumans(['options' => CarbonInterface::JUST_NOW]);
+        return $this->last_seen_at?->diffForHumans(['options' => \Carbon\CarbonInterface::JUST_NOW]);
     }
 
     public static function normalizeOrigin(?string $value): ?string

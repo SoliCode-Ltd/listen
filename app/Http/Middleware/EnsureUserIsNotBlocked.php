@@ -12,7 +12,8 @@ class EnsureUserIsNotBlocked
 {
     public function __construct(
         private readonly BlockedUserService $blockedUserService,
-    ) {}
+    ) {
+    }
 
     public function handle(Request $request, Closure $next): Response
     {

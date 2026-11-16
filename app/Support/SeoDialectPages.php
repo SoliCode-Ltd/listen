@@ -699,7 +699,7 @@ final class SeoDialectPages
         }
 
         try {
-            return Cache::remember('seo_dialect_sample:'.$slug.':'.$locale, 600, function () use ($codes): ?array {
+            return Cache::remember('seo_dialect_sample:'.$slug.':'.$locale, 600, function () use ($codes, $locale): ?array {
                 $samples = VoiceSample::query()
                     ->active()
                     ->where('category', 'hero')

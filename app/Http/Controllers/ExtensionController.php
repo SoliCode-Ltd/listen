@@ -3,11 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\SiteSetting;
-use App\Support\ExtensionVersion;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use ZipArchive;
@@ -66,6 +64,7 @@ class ExtensionController extends Controller
             'howToUseStep4' => $this->localizedSetting('extension_how_to_use_step_4', 'ui.extension.use_step_4'),
             'howToUseStep5' => $this->localizedSetting('extension_how_to_use_step_5', 'ui.extension.use_step_5'),
 
+
             // Download & announcement
             'downloadEnabled' => SiteSetting::get('extension_download_enabled', '1') === '1',
             'chromeZipButtonText' => $this->localizedSetting('extension_chrome_zip_button_text', 'ui.extension.zip_button'),
@@ -76,6 +75,7 @@ class ExtensionController extends Controller
             'announcementType' => SiteSetting::get('extension_announcement_type', 'info'),
         ]);
     }
+
 
     public function regenerateApiKey(Request $request)
     {
@@ -190,7 +190,7 @@ class ExtensionController extends Controller
                 if ($description !== '' && $description !== 'Listen to selected text on any page using your Listen account.') {
                     $manifest['description'] = $description;
                 }
-                $manifest['version'] = ExtensionVersion::current();
+                $manifest['version'] = \App\Support\ExtensionVersion::current();
                 File::put($manifestPath, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
             }
         }
@@ -199,8 +199,8 @@ class ExtensionController extends Controller
         $iconSizes = [16, 32, 48, 128];
         foreach ($iconSizes as $size) {
             $uploadedPath = trim((string) SiteSetting::get("extension_icon_{$size}", ''));
-            if ($uploadedPath !== '' && Storage::disk('public')->exists($uploadedPath)) {
-                $source = Storage::disk('public')->path($uploadedPath);
+            if ($uploadedPath !== '' && \Illuminate\Support\Facades\Storage::disk('public')->exists($uploadedPath)) {
+                $source = \Illuminate\Support\Facades\Storage::disk('public')->path($uploadedPath);
                 $target = $buildDir."/icon-{$size}.png";
                 if (is_file($source)) {
                     copy($source, $target);
@@ -221,7 +221,7 @@ class ExtensionController extends Controller
         $sourceRoot = rtrim(str_replace('\\', '/', $sourceRoot), '/');
         $rootFolder = trim(str_replace('\\', '/', $rootFolder), '/');
 
-        $zip = new ZipArchive;
+        $zip = new ZipArchive();
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             throw new \RuntimeException('Unable to build extension package.');
         }

@@ -2,14 +2,31 @@
 
 namespace App\Filament\Resources;
 
+use Illuminate\Auth\Access\Response as AccessResponse;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkAction;
+use Illuminate\Support\Collection;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
+use App\Http\Controllers\AgentReportController;
+use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Actions\Action;
+use App\Filament\Resources\AgentResource\RelationManagers\SitesRelationManager;
+use App\Filament\Resources\AgentResource\RelationManagers\ConversationsRelationManager;
+use App\Filament\Resources\AgentResource\RelationManagers\ContactsRelationManager;
 use App\Filament\Resources\AgentResource\Pages\ListAgents;
 use App\Filament\Resources\AgentResource\Pages\ViewAgent;
-use App\Filament\Resources\AgentResource\RelationManagers\ContactsRelationManager;
-use App\Filament\Resources\AgentResource\RelationManagers\ConversationsRelationManager;
-use App\Filament\Resources\AgentResource\RelationManagers\SitesRelationManager;
+use App\Filament\Resources\AgentResource\Pages;
+use App\Filament\Resources\AgentResource\RelationManagers;
 use App\Filament\Resources\Concerns\ReadOnlyResource;
 use App\Filament\Widgets\AgentStats;
-use App\Http\Controllers\AgentReportController;
 use App\Models\Agent;
 use App\Models\AgentContact;
 use App\Models\AgentConversation;
@@ -22,29 +39,16 @@ use App\Support\Agents\AgentPurge;
 use App\Support\Agents\HouseAgent;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
-use Filament\Actions\Action;
-use Filament\Actions\BulkAction;
-use Filament\Actions\ViewAction;
-use Filament\Infolists\Components\IconEntry;
-use Filament\Infolists\Components\RepeatableEntry;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\ViewEntry;
+use Filament\Infolists;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Auth\Access\Response as AccessResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
@@ -64,9 +68,9 @@ class AgentResource extends Resource
 
     protected static ?string $model = Agent::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-chat-bubble-left-right';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-chat-bubble-left-right';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Agents';
+    protected static string | \UnitEnum | null $navigationGroup = 'Agents';
 
     protected static ?int $navigationSort = 1;
 

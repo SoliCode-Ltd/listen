@@ -2,25 +2,28 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\NewsletterSuppressionResource\Pages\CreateNewsletterSuppression;
-use App\Filament\Resources\NewsletterSuppressionResource\Pages\ListNewsletterSuppressions;
-use App\Models\NewsletterSuppression;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Forms\Components\TextInput;
-use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\NewsletterSuppressionResource\Pages\ListNewsletterSuppressions;
+use App\Filament\Resources\NewsletterSuppressionResource\Pages\CreateNewsletterSuppression;
+use App\Filament\Resources\NewsletterSuppressionResource\Pages;
+use App\Models\NewsletterSuppression;
+use Filament\Forms;
+use Filament\Resources\Resource;
+use Filament\Tables;
 use Filament\Tables\Table;
 
 class NewsletterSuppressionResource extends Resource
 {
     protected static ?string $model = NewsletterSuppression::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-no-symbol';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-no-symbol';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Newsletter';
+    protected static string | \UnitEnum | null $navigationGroup = 'Newsletter';
 
     protected static ?string $navigationLabel = 'Unsubscribes';
 

@@ -2,31 +2,31 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Placeholder;
+use Filament\Schemas\Components\Fieldset;
 use App\Models\SiteSetting;
 use App\Support\SeoHelper;
 use App\Support\SeoSettingDefaults;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
+use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Schemas\Components\Component;
-use Filament\Schemas\Components\Fieldset;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 
 class SeoSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-magnifying-glass';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-magnifying-glass';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'System';
+    protected static string | \UnitEnum | null $navigationGroup = 'System';
 
     protected static ?int $navigationSort = 2;
 
@@ -373,7 +373,7 @@ class SeoSettings extends Page implements HasForms
     }
 
     /**
-     * @return array<int, Component>
+     * @return array<int, \Filament\Schemas\Components\Component>
      */
     private function perPageSeoSchema(): array
     {
@@ -449,7 +449,7 @@ class SeoSettings extends Page implements HasForms
     }
 
     /**
-     * @return array<int, Component>
+     * @return array<int, \Filament\Schemas\Components\Component>
      */
     private function landingPageSchema(): array
     {

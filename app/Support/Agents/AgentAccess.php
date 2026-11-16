@@ -6,7 +6,6 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\PlanAccessService;
-use App\Support\InApp\InApp;
 use App\Support\VoiceCloningAccess;
 use Illuminate\Support\Facades\Schema;
 
@@ -169,8 +168,8 @@ final class AgentAccess
     public static function upgrade(bool $arabic): array
     {
         // Inside the Listen app nothing is sold: there is no plan to offer.
-        if (InApp::hidesPlans()) {
-            return ['url' => InApp::planUrl(), 'plan' => null, 'none' => true];
+        if (\App\Support\InApp\InApp::hidesPlans()) {
+            return ['url' => \App\Support\InApp\InApp::planUrl(), 'plan' => null, 'none' => true];
         }
 
         $plan = self::cheapestPlan();

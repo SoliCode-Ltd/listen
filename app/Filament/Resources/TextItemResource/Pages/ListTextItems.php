@@ -2,8 +2,9 @@
 
 namespace App\Filament\Resources\TextItemResource\Pages;
 
-use App\Filament\Resources\TextItemResource;
 use Filament\Actions\CreateAction;
+use App\Filament\Resources\TextItemResource;
+use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
 class ListTextItems extends ListRecords

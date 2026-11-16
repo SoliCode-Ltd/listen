@@ -2,17 +2,18 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\CharPackPurchaseResource\Pages;
-use App\Filament\Resources\CharPackPurchaseResource\Pages\ListCharPackPurchases;
-use App\Models\CharPackPurchase;
-use App\Services\Billing\CharPackService;
-use Filament\Actions\Action;
-use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
+use Illuminate\Auth\Access\Response as AccessResponse;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\Action;
+use App\Filament\Resources\CharPackPurchaseResource\Pages\ListCharPackPurchases;
+use App\Filament\Resources\CharPackPurchaseResource\Pages;
+use App\Models\CharPackPurchase;
+use App\Services\Billing\CharPackService;
+use Filament\Notifications\Notification;
+use Filament\Resources\Resource;
+use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Auth\Access\Response as AccessResponse;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -22,9 +23,9 @@ class CharPackPurchaseResource extends Resource
 {
     protected static ?string $model = CharPackPurchase::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shopping-bag';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shopping-bag';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Billing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
 
     protected static ?string $navigationLabel = 'Pack purchases';
 

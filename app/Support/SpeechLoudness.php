@@ -132,7 +132,7 @@ final class SpeechLoudness
      * block each 100 ms) and, for a short take, the true peak of every 100 ms.
      *
      * @return array{blocks: array<int, array{0: float, 1: float}>, peaks: array<int, array{0: float, 1: float}>}|null
-     *                                                                                                                 [start in seconds, level], [start in seconds, peak dBTP]
+     *         [start in seconds, level], [start in seconds, peak dBTP]
      */
     private static function measure(string $ffmpeg, string $path, bool $peaks, float $timeout): ?array
     {

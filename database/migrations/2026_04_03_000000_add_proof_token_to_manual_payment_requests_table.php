@@ -1,13 +1,11 @@
 <?php
 
-use App\Models\ManualPaymentRequest;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::table('manual_payment_requests', function (Blueprint $table) {
@@ -15,7 +13,7 @@ return new class extends Migration
         });
 
         // Backfill existing rows with a random token
-        foreach (ManualPaymentRequest::whereNull('proof_token')->cursor() as $request) {
+        foreach (\App\Models\ManualPaymentRequest::whereNull('proof_token')->cursor() as $request) {
             $request->forceFill(['proof_token' => Str::uuid()->toString()])->saveQuietly();
         }
     }
