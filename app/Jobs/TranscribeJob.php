@@ -80,7 +80,10 @@ class TranscribeJob implements ShouldQueue
      */
     public static function runNow(int $transcriptionId): void
     {
-        @set_time_limit(200);
+        // A web request has a time limit: give it room for this. A command has none, so none is set.
+        if ((int) ini_get('max_execution_time') > 0) {
+            @set_time_limit(200);
+        }
         $until = microtime(true) + 150;
         $job = new static($transcriptionId);
         $slips = 0;

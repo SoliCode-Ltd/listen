@@ -56,8 +56,10 @@ class TextToSpeechController extends Controller
                 // Never cut a paid generation short: it finishes (and is charged or
                 // given back) even if the client stops waiting.
                 ignore_user_abort(true);
-                if (function_exists('set_time_limit')) {
-                    @set_time_limit(max(300, (int) ini_get('max_execution_time')));
+                // At least 5 minutes from now; a command (no limit, 0) keeps having none.
+                $limit = (int) ini_get('max_execution_time');
+                if ($limit > 0 && function_exists('set_time_limit')) {
+                    @set_time_limit(max(300, $limit));
                 }
                 $generation = $this->speech->generate($user, $apiKey, $plan, $quotaPlan, $spec, false,
                     $idempotency !== null ? fn (AudioGeneration $made) => $this->idempotency->attach($idempotency, $userId, $made) : null);
