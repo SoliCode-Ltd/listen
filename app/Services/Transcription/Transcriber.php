@@ -48,11 +48,19 @@ use Symfony\Component\Process\Process;
  */
 final class Transcriber
 {
-    /** The longest part heard in one request, in seconds. */
+    /** The longest part heard in one request, in seconds, and the earliest pause it is cut on: plain text. */
     public const MAX_PART = 300.0;
 
-    /** A part is cut on a pause no earlier than this into it. */
     private const MIN_PART = 200.0;
+
+    /**
+     * The same for a timed transcript: shorter, because the model's times
+     * drift over a long part (measured: after a minute or two its sentences
+     * sat at the wrong times, so speech looked left out and sentences were dropped).
+     */
+    public const MAX_TIMED_PART = 90.0;
+
+    private const MIN_TIMED_PART = 45.0;
 
     /** Seconds of the neighbouring parts heard around each part. */
     public const OVERLAP = 2.0;
@@ -107,7 +115,7 @@ final class Transcriber
             $this->normalise($ffmpeg, $file, $clean);
             $seconds = $this->duration($ffmpeg, $clean);
             $pauses = $this->pauses($ffmpeg, $clean);
-            $plan = self::chunkPlan($pauses, $seconds);
+            $plan = $timings ? self::chunkPlan($pauses, $seconds, self::MAX_TIMED_PART, self::MIN_TIMED_PART) : self::chunkPlan($pauses, $seconds);
 
             $pieces = [];
             foreach ($plan as $n => $part) {
@@ -126,7 +134,8 @@ final class Transcriber
                     foreach ($heard['segments'] as $s) {
                         $start = round($s['start'] + max(0.0, $from - 0.6), 2);
                         $end = round($s['end'] + max(0.0, $from - 0.6), 2);
-                        if (($start + $end) / 2 >= $from - 0.3 && ($start + $end) / 2 <= $to + 0.3 && ! self::covered($segments, $start, $end)) {
+                        if (($start + $end) / 2 >= $from - 0.3 && ($start + $end) / 2 <= $to + 0.3 && ! self::covered($segments, $start, $end)
+                            && ! self::alreadyWritten($segments, $s['text'], $start)) {
                             $segments[] = ['start' => $start, 'end' => max($start, $end), 'speaker' => $s['speaker'] ?? null, 'text' => $s['text']];
                             $found++;
                         }
@@ -344,6 +353,37 @@ final class Transcriber
         return $kept;
     }
 
+    /**
+     * Whether the words of a segment heard again are already in the transcript
+     * near $at (within a minute): the first answer had them, at times a moment
+     * off, so the stretch only looked left out.
+     */
+    public static function alreadyWritten(array $segments, string $text, float $at): bool
+    {
+        $grams = fn (string $t): array => self::trigrams($t);
+        $new = $grams($text);
+        if ($new === []) {
+            return self::wordCount($text) <= 2;
+        }
+        $near = implode(' ', array_column(array_filter($segments, fn ($s) => abs((float) $s['start'] - $at) <= 60), 'text'));
+        $have = array_flip($grams($near));
+        $found = count(array_filter($new, fn ($g) => isset($have[$g])));
+
+        return $found >= 0.5 * count($new);
+    }
+
+    /** @return array<int, string> word triples, spelled one way */
+    private static function trigrams(string $text): array
+    {
+        $words = preg_split('/\s+/u', trim(mb_strtolower((string) preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', strtr($text, ['أ' => 'ا', 'إ' => 'ا', 'آ' => 'ا', 'ة' => 'ه', 'ى' => 'ي'])))), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $grams = [];
+        for ($i = 0; $i + 2 < count($words); $i++) {
+            $grams[] = $words[$i].' '.$words[$i + 1].' '.$words[$i + 2];
+        }
+
+        return $grams;
+    }
+
     /** Whether most of $start-$end is already covered by a segment. */
     private static function covered(array $segments, float $start, float $end): bool
     {
@@ -491,11 +531,38 @@ final class Transcriber
     private function readPart(array $data, array $ask, float $length): array
     {
         $heard = self::read($data, $ask['timings'], $ask['speakers']);
-        // The model's times now and then come as minutes and seconds past the first minute.
-        $heard['segments'] = $ask['timings'] ? VideoDubber::inSeconds($heard['segments'], $length) : [];
+        $heard['segments'] = $ask['timings'] ? self::fitTimes($heard['segments'], $length) : [];
         $heard['words'] = self::wordCount($ask['timings'] ? implode(' ', array_column($heard['segments'], 'text')) : $heard['text']);
 
         return $heard;
+    }
+
+    /**
+     * The model's times made to fit the part: written as minutes and seconds
+     * past the first minute (75 as 115) they are read as such (VideoDubber::inSeconds());
+     * running past the part's end (they drift) they are drawn back in step
+     * rather than the last sentences being dropped.
+     *
+     * @param  array<int, array{start: float, end: float}>  $segments
+     * @return array<int, array<string, mixed>>
+     */
+    public static function fitTimes(array $segments, float $length): array
+    {
+        if ($segments === []) {
+            return [];
+        }
+        $last = max(array_map(fn ($s) => max((float) $s['start'], (float) $s['end']), $segments));
+        $clocked = VideoDubber::inSeconds($segments, $length);
+        if (count($clocked) === count($segments) || $last <= $length + 0.5) {
+            return $clocked;
+        }
+        $scale = $length / $last;
+        foreach ($segments as $i => $s) {
+            $segments[$i]['start'] = round((float) $s['start'] * $scale, 2);
+            $segments[$i]['end'] = round(max((float) $s['start'], (float) $s['end']) * $scale, 2);
+        }
+
+        return $segments;
     }
 
     /** Far fewer words than the speech holds: under 0.6 a second of speech (people say 2 to 3), over 20 seconds of it. */
@@ -631,7 +698,9 @@ final class Transcriber
             .'Levantine: شو، هيك، هلّق، هلأ، كتير، بدّي، منيح، ليش، هاد، هيدا، إشي، تبعي؛ '
             .'Iraqi: شكو، ماكو، أكو، هواية، هسّه، كلش، شلونك، گ where ق is said as g؛ '
             .'Yemeni: ذلحين، أشتي، كيفك، زلط؛ Sudanese: زول، داير، شنو، ياخ، كدي؛ '
-            .'Maghrebi: بزاف، واش، دابا، ديال، كيفاش، مزيان، والو، شحال، برشا، توا، باهي، ياسر، نتا، نتي، French words in Latin letters as said (normal, ça va). '
+            .'Maghrebi: بزاف، واش، دابا، ديال، كيفاش، مزيان، والو، شحال، برشا، توا، باهي، ياسر، نتا، نتي، ف joined to the next word for "in" (فالدار، فمراكش, never في الدار), '
+            .'كا/تا before a verb (كنمشي، تانسمعهم)، گاع، ذرك/درك؛ '
+            .'a French or English word said inside an Arabic sentence is written in Arabic letters as it sounds (نورمال، ديجا، صافا، لوطوروت، الكليما), never in Latin letters. '
             .'Write ة, ى and أ/إ the usual way, and never add diacritics the speaker did not say.'."\n";
     }
 

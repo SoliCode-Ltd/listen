@@ -351,14 +351,40 @@ class TranscriberTest extends TestCase
         $this->assertNotContains('ar', $languages);
 
         $r = ['clips' => [['slug' => 'one', 'dialect' => 'ar-EG', 'said' => 'أنا عايزة أقولك'], ['slug' => 'two', 'dialect' => 'ar-EG-SA', 'said' => 'يا ولدي اسمع']]];
-        $scores = TranscribeMeasureCommand::clipScores($r, [[0.0, 3.0], [5.5, 9.0]], [
-            ['start' => 0.1, 'end' => 2.9, 'text' => 'أنا عايزة أقولك'],
-            ['start' => 5.6, 'end' => 8.8, 'text' => 'يا ولدي'],
+        // The times are wrong (all in the first clip's stretch): the words still find their clip.
+        $scores = TranscribeMeasureCommand::clipScores($r, [
+            ['start' => 0.1, 'end' => 1.0, 'text' => 'أنا عايزة أقولك'],
+            ['start' => 1.0, 'end' => 2.0, 'text' => 'يا ولدي'],
         ]);
         $this->assertSame([0.0, 0.3333], array_column($scores, 'wer'));
+        $this->assertSame('يا ولدي', $scores[1]['heard']);
 
         $this->assertSame(['language' => 'auto'], TranscribeMeasureCommand::variant('auto', ['language' => 'ar', 'dialect' => 'ar-EG']));
         $this->assertSame(['language' => 'ar', 'dialect' => 'ar-EG', 'review' => true, 'thinking' => 'high'],
             TranscribeMeasureCommand::variant('lang+dialect+review+think', ['language' => 'ar', 'dialect' => 'ar-EG']));
+    }
+
+    public function test_drifted_times_are_drawn_back_in_and_words_already_written_are_not_added_again(): void
+    {
+        // A 90 s part whose times run on to 100 s: scaled back, nothing dropped.
+        $fitted = Transcriber::fitTimes([['start' => 10.0, 'end' => 20.0, 'text' => 'a'], ['start' => 90.0, 'end' => 100.0, 'text' => 'b']], 90.0);
+        $this->assertCount(2, $fitted);
+        $this->assertSame(90.0, $fitted[1]['end']);
+        $this->assertSame(81.0, $fitted[1]['start']);
+        // Written as a clock past the first minute (1:15 as 115): read as 75 s.
+        $this->assertSame(75.0, Transcriber::fitTimes([['start' => 115.0, 'end' => 118.0, 'text' => 'c']], 90.0)[0]['start']);
+
+        $segments = [['start' => 40.0, 'end' => 48.0, 'text' => 'هلا والله يا ولد، وش علومك؟ هقيت إنك نسيت البر']];
+        $this->assertTrue(Transcriber::alreadyWritten($segments, 'هلا والله يا ولد وش علومك', 62.0));
+        $this->assertFalse(Transcriber::alreadyWritten($segments, 'تعال الليلة نشب النار ونسولف تحت النجوم', 62.0));
+        $this->assertFalse(Transcriber::alreadyWritten($segments, 'هلا والله يا ولد وش علومك', 200.0), 'only near where it was heard');
+    }
+
+    public function test_a_timed_transcript_is_heard_in_short_parts(): void
+    {
+        $plan = Transcriber::chunkPlan([], 200.0, Transcriber::MAX_TIMED_PART, 45.0);
+        $this->assertCount(3, $plan);
+        $this->assertStringContainsString('ف joined to the next word', Transcriber::dialectGuide());
+        $this->assertStringContainsString('never in Latin letters', Transcriber::dialectGuide());
     }
 }

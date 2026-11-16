@@ -150,7 +150,7 @@ class TranscribeMeasureCommand extends Command
                 $cost = Transcriber::cost($out['usage'], $prices);
                 $u = $out['usage'];
                 $errors = $r['reference'] !== null ? self::errorRates($r['reference'], $out['text']) : null;
-                $clips = $windows !== [] && $out['segments'] !== [] ? self::clipScores($r, $windows, $out['segments']) : [];
+                $clips = $r['clips'] !== [] && $out['segments'] !== [] ? self::clipScores($r, $out['segments']) : [];
                 $speakers = $way['mode'] === 'speakers' ? count(array_unique(array_filter(array_column($out['segments'], 'speaker')))) : null;
                 $this->line(sprintf('  %-22s %5.2f min  %d part(s) %d req  in %6d (audio %6d) out %5d think %5d  $%.4f = $%.4f/min  %4.0fs%s  lang %s%s%s',
                     $way['name'], $minutes, $out['parts'], $out['requests'], $u['input_tokens'], $u['audio_tokens'], $u['output_tokens'], $u['thinking_tokens'],
@@ -212,27 +212,61 @@ class TranscribeMeasureCommand extends Command
     }
 
     /**
-     * Each clip of a joined file scored on its own: the segments whose middle
-     * falls in its stretch (with half the gap on each side) against its words.
+     * Each clip of a joined file scored on its own: the transcript's words
+     * lined up with the clips' words (an edit-distance alignment, so the
+     * model's times, which drift, do not matter), each clip taking the words
+     * lined up with its own.
      *
-     * @param  array<int, array{0: float, 1: float}>  $windows
-     * @param  array<int, array{start: float, end: float, text: string}>  $segments
+     * @param  array<int, array{text: string}>  $segments
      * @return array<int, array{slug: string, dialect: string, wer: float, cer: float, words: int, said: string, heard: string}>
      */
-    public static function clipScores(array $r, array $windows, array $segments): array
+    public static function clipScores(array $r, array $segments): array
     {
-        $scores = [];
+        $ref = [];
+        $owner = [];
         foreach ($r['clips'] as $i => $clip) {
-            if (! isset($windows[$i]) || $clip['said'] === '') {
+            foreach (self::words($clip['said']) as $w) {
+                $ref[] = $w;
+                $owner[] = $i;
+            }
+        }
+        $hyp = self::words(implode(' ', array_column($segments, 'text')));
+        $n = count($ref);
+        $m = count($hyp);
+        if ($n === 0) {
+            return [];
+        }
+        // Edit distance with the way back.
+        $d = [range(0, $m)];
+        for ($i = 1; $i <= $n; $i++) {
+            $d[$i] = [$i];
+            for ($j = 1; $j <= $m; $j++) {
+                $d[$i][$j] = min($d[$i - 1][$j] + 1, $d[$i][$j - 1] + 1, $d[$i - 1][$j - 1] + ($ref[$i - 1] === $hyp[$j - 1] ? 0 : 1));
+            }
+        }
+        $heard = array_fill(0, count($r['clips']), []);
+        $i = $n;
+        $j = $m;
+        while ($i > 0 || $j > 0) {
+            if ($i > 0 && $j > 0 && $d[$i][$j] === $d[$i - 1][$j - 1] + ($ref[$i - 1] === $hyp[$j - 1] ? 0 : 1)) {
+                array_unshift($heard[$owner[$i - 1]], $hyp[$j - 1]);
+                $i--;
+                $j--;
+            } elseif ($j > 0 && ($i === 0 || $d[$i][$j] === $d[$i][$j - 1] + 1)) {
+                // A word not in the clips: it goes with the clip it sits in.
+                array_unshift($heard[$owner[max(0, $i - 1)]], $hyp[$j - 1]);
+                $j--;
+            } else {
+                $i--;
+            }
+        }
+        $scores = [];
+        foreach ($r['clips'] as $k => $clip) {
+            if ($clip['said'] === '') {
                 continue;
             }
-            [$from, $to] = $windows[$i];
-            $heard = implode(' ', array_column(array_filter($segments, function ($s) use ($from, $to): bool {
-                $middle = ((float) $s['start'] + (float) $s['end']) / 2;
-
-                return $middle >= $from - self::CLIP_GAP / 2 && $middle < $to + self::CLIP_GAP / 2;
-            }), 'text'));
-            $scores[] = ['slug' => $clip['slug'], 'dialect' => $clip['dialect']] + self::errorRates($clip['said'], $heard) + ['said' => $clip['said'], 'heard' => $heard];
+            $text = implode(' ', $heard[$k]);
+            $scores[] = ['slug' => $clip['slug'], 'dialect' => $clip['dialect']] + self::errorRates($clip['said'], $text) + ['said' => $clip['said'], 'heard' => $text];
         }
 
         return $scores;
