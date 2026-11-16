@@ -247,12 +247,13 @@
             @endforeach
           </div>
         </div>
+        {{-- "Show in: Original / Arabic / English ...": the label says it once, the choices are the languages. --}}
         <label class="tr-translate">
-          <span class="sr-only">{{ __('transcribe.js.translate_to') }}</span>
+          <span class="tr-translate-label">{{ __('transcribe.js.translate_to') }}</span>
           <select data-tr-translate data-vs-select aria-label="{{ __('transcribe.js.translate_to') }}">
             <option value="">{{ __('transcribe.js.original') }}</option>
             @foreach($trTargets as $target)
-              <option value="{{ $target['value'] }}">{{ __('transcribe.js.translate') }}: {{ $target['label'] }}</option>
+              <option value="{{ $target['value'] }}">{{ $target['label'] }}</option>
             @endforeach
           </select>
         </label>

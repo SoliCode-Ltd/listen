@@ -609,7 +609,7 @@
       select.innerHTML = '';
       select.appendChild(new Option(original, ''));
       (c.targets || []).forEach(function (target) {
-        if (target.value !== current.language) select.appendChild(new Option(t.translate + ': ' + target.label, target.value));
+        if (target.value !== current.language) select.appendChild(new Option(target.label, target.value));
       });
       select.value = '';
       $('[data-tr-translate-note]').hidden = true;

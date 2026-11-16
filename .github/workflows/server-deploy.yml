@@ -123,6 +123,14 @@ name: Server deploy
 #            fails on an error, a wrong status or text shown as its key
 #            (scripts/support/staging_page_check.php). Billing pages are left
 #            out: staging runs the live Stripe keys.
+#   stt-test: staging only. Speech to text from start to end with the branch's
+#            code, for a throwaway member made for the run and removed after it:
+#            two short recordings of the studio's voice samples written out the
+#            way the page does it, the minutes, sentences and times, every
+#            download, a translation, the developer API, the MCP tools and the
+#            dashboard in English and Arabic (scripts/support/stt_test.php). It
+#            uses the Gemini quota staging shares with live (a few requests):
+#            only when the owner has said yes. Needs mode migrate first.
 #   dub-test: staging only. Dubs the test video with the branch's code the way
 #            a member's dub is made, with the settings of the newest dub of a
 #            video that long (input "dub" changes them: "voice=Kore
@@ -183,7 +191,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, stt-test, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -222,7 +230,7 @@ jobs:
   run:
     runs-on: ubuntu-latest
     # A test dub takes the server several minutes (separation, hearing, a voice for each line).
-    timeout-minutes: ${{ (inputs.mode == 'dub-test' || inputs.mode == 'agent-redteam') && 45 || 15 }}
+    timeout-minutes: ${{ (inputs.mode == 'dub-test' || inputs.mode == 'agent-redteam') && 45 || inputs.mode == 'stt-test' && 30 || 15 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -574,6 +582,13 @@ jobs:
               php artisan queue:restart | tail -1 || true; echo 'INSTALLED: storage/app/bin/ffmpeg'"
             rm -f ~/.ssh/id_deploy
             exit 0
+          fi
+          if [ "$MODE" = stt-test ]; then
+            [ "$TARGET" = staging ] || { echo "stt-test runs on staging only"; exit 1; }
+            failed=0
+            $S "$FIND; nice php" < scripts/support/stt_test.php || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
           fi
           if [ "$MODE" = dub-test ]; then
             [ "$TARGET" = staging ] || { echo "dub-test runs on staging only"; exit 1; }
