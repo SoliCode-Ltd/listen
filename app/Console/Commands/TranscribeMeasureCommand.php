@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\Transcription\Transcriber;
+use App\Support\ArabicDialects;
 use App\Support\AudioFormats;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
@@ -10,45 +11,66 @@ use Symfony\Component\Process\Process;
 
 /**
  * Measures what speech to text ("Transcribe") costs and how well it hears,
- * on STAGING, before the feature is built around it: it writes out real
- * recordings with App\Services\Transcription\Transcriber (the dubbing's text
- * model and keys) three ways (plain text; with timings; with timings and
- * speaker letters) and prints, for each, the model's tokens, US dollars per
- * audio minute at the dubbing's prices (listen.dubbing.prices), and the
- * first lines of what it wrote, so the owner can judge accuracy.
+ * on STAGING: it writes out test recordings with
+ * App\Services\Transcription\Transcriber (the dubbing's text model and keys)
+ * and prints, for each, the model's tokens, US dollars per audio minute at
+ * the dubbing's prices (listen.dubbing.prices), the first lines of what it
+ * wrote, and the word and character error rates where the words are known.
  *
- * For Listen's own recordings (the homepage samples, the long reads, the
- * dialogues, the environment samples, the agent call clips) the words said
- * are known: it also prints the word and character error rates against
- * them. Those voices are clean studio speech, so they flatter accuracy; the
- * public-domain human readings (LibriVox, downloaded from archive.org) are
- * the fairer test, and the only recordings in other languages.
+ * Three sets (--set):
+ *  - default: 14 recordings (Listen's own samples, and public-domain human
+ *    readings from LibriVox on archive.org in Arabic, English, French,
+ *    Spanish, German and Urdu) written out three ways: plain text, with
+ *    timings, with timings and speaker letters.
+ *  - dialects: every Arabic dialect and English accent the site has, from
+ *    the voice library's previews and the homepage samples (whose lines are
+ *    known): one file per country (Arabic) or accent group (English), its
+ *    clips 2.5 s apart, timed, so each clip is scored on its own too.
+ *  - languages: the previews spoken natively in other languages (French,
+ *    Spanish, German, Italian, Portuguese, Dutch, Turkish, Russian, Hindi,
+ *    Japanese, Korean, Chinese).
+ * The dialects and languages sets are written out once for each --variants
+ * entry, to compare what makes it more accurate: "auto" (the language
+ * detected, as the page's default), "lang" (the language given), and with
+ * "+dialect" (the dialect or accent named), "+review" (each part heard again
+ * with its draft) or "+think" (the model thinks longer), e.g. lang+dialect+review.
+ *
+ * Listen's own voices are clean studio speech, so they flatter accuracy;
+ * the human readings are the fairer test.
  *
  * Read-only: it saves nothing in the database and makes no sound. It only
  * sends the recordings to the text model, on the Google account staging
- * shares with live (about 70 minutes of audio, 3 ways: some 80 requests),
- * so it runs by hand only, when the owner has said yes. It refuses to run
- * on the live site. The full report (every transcript) is written to
- * storage/app/transcribe-measure/<run>/report.json.
+ * shares with live, so it runs by hand only, when the owner has said yes. It
+ * refuses to run on the live site. The full report (every transcript) is
+ * written to storage/app/transcribe-measure/<run>/report.json.
  *
  *   php artisan transcribe:measure
+ *   php artisan transcribe:measure --set=dialects,languages --variants=auto,lang+dialect,lang+dialect+review
  *   php artisan transcribe:measure --only=ar-eg,fr-human --modes=text
  *   php artisan transcribe:measure --file="tr-human|tr|https://example.org/turkish.mp3|300"
  */
 class TranscribeMeasureCommand extends Command
 {
     protected $signature = 'transcribe:measure
+        {--set=default : Which recordings: default, dialects, languages, or several (comma separated), or all}
+        {--variants=auto : For the dialects and languages sets: the ways to ask, compared (auto, lang, +dialect, +review, +think)}
         {--only= : Only these recordings, by label (comma separated)}
-        {--modes=text,timed,speakers : Ways to write each one out}
+        {--modes=text,timed,speakers : For the default set: ways to write each one out}
         {--file=* : An extra recording: "label|language|path or URL|longest seconds" (language "auto" to detect)}
-        {--language=given : given: tell the model each recording\'s language; auto: let it detect every one}
-        {--thinking=low : How much the model thinks first (low, minimal, or empty for its own)}
+        {--language=given : For the default set: given (tell the model each recording\'s language) or auto}
+        {--thinking=low : How much the model thinks first (low, minimal, or empty for its own); +think asks for high}
         {--full : Print every plain-text transcript in full at the end}
         {--prepare-only : Only make and time the test files: nothing is sent to the model}';
 
     protected $description = 'Write out test recordings and measure what speech to text costs and how accurate it is (staging only).';
 
     private const ARCHIVE = 'https://archive.org/download/';
+
+    /** Seconds of silence between the clips of a dialect file. */
+    private const CLIP_GAP = 2.5;
+
+    /** English accent groups of their own; every other accent is in "en-world". */
+    private const ENGLISH_GROUPS = ['en-US', 'en-GB', 'en-IE', 'en-AU', 'en-NZ', 'en-CA', 'en-ZA', 'en-IN'];
 
     public function handle(Transcriber $transcriber): int
     {
@@ -69,19 +91,29 @@ class TranscribeMeasureCommand extends Command
         $dir = storage_path('app/transcribe-measure/'.$run);
         @mkdir($dir, 0755, true);
         $modes = array_values(array_intersect(array_map('trim', explode(',', (string) $this->option('modes'))), ['text', 'timed', 'speakers']));
+        $variants = array_values(array_filter(array_map('trim', explode(',', (string) $this->option('variants')))));
+        $sets = array_map('trim', explode(',', strtolower((string) $this->option('set'))));
+        if (in_array('all', $sets, true)) {
+            $sets = ['default', 'dialects', 'languages'];
+        }
+        $recordings = array_merge(
+            in_array('default', $sets, true) ? self::recordings() : [],
+            in_array('dialects', $sets, true) ? self::dialectRecordings() : [],
+            in_array('languages', $sets, true) ? self::languageRecordings() : [],
+            $this->extraRecordings());
         $only = array_filter(array_map('trim', explode(',', (string) $this->option('only'))));
-        $recordings = array_merge(self::recordings(), $this->extraRecordings());
         if ($only !== []) {
             $recordings = array_values(array_filter($recordings, fn (array $r) => in_array($r['label'], $only, true)));
         }
         $prices = (array) config('listen.dubbing.prices', []);
-        $this->line(sprintf('Run %s: %d recording(s) x %d way(s), thinking %s. Prices a million tokens: audio in $%.2f, text in $%.2f, out $%.2f.',
-            $run, count($recordings), count($modes), $this->option('thinking') ?: 'default', $prices['audio_in'] ?? 0, $prices['text_in'] ?? 0, $prices['text_out'] ?? 0));
+        $this->line(sprintf('Run %s: %d recording(s) from %s; default set %s, others as %s; thinking %s. Prices a million tokens: audio in $%.2f, text in $%.2f, out $%.2f.',
+            $run, count($recordings), implode(', ', $sets), implode('/', $modes), implode(' | ', $variants), $this->option('thinking') ?: 'default',
+            $prices['audio_in'] ?? 0, $prices['text_in'] ?? 0, $prices['text_out'] ?? 0));
 
         $results = [];
         foreach ($recordings as $r) {
             try {
-                $file = $this->prepare($ffmpeg, $r, $dir);
+                [$file, $windows] = $this->prepare($ffmpeg, $r, $dir, $transcriber);
             } catch (\Throwable $e) {
                 $this->warn(sprintf('%-18s could not be prepared: %s', $r['label'], mb_substr($e->getMessage(), 0, 200)));
                 $results[] = ['label' => $r['label'], 'error' => $e->getMessage()];
@@ -89,24 +121,26 @@ class TranscribeMeasureCommand extends Command
                 continue;
             }
             $this->newLine();
-            $this->line(sprintf('■ %s (%s, %s) — %s', $r['label'], $r['language'], $r['kind'], $r['about']));
+            $this->line(sprintf('■ %s (%s%s, %s) — %s', $r['label'], $r['language'], $r['dialect'] !== '' ? ' '.$r['dialect'] : '', $r['kind'], $r['about']));
             if ($this->option('prepare-only')) {
-                $this->line(sprintf('  ready: %.2f min, %d KB, words known: %s', $transcriber->duration($ffmpeg, $file) / 60, filesize($file) / 1024,
+                $this->line(sprintf('  ready: %.2f min, %d clip(s), %d KB, words known: %s', $transcriber->duration($ffmpeg, $file) / 60, count($r['parts']), filesize($file) / 1024,
                     $r['reference'] !== null ? count(self::words($r['reference'])) : 'no'));
                 $results[] = ['label' => $r['label'], 'prepared' => true];
 
                 continue;
             }
-            foreach ($modes as $mode) {
+            $ways = $r['set'] === 'default'
+                ? array_map(fn ($m) => ['name' => $m, 'mode' => $m, 'ask' => ['language' => $this->option('language') === 'auto' ? 'auto' : $r['language']]], $modes)
+                : array_map(fn ($v) => ['name' => $v, 'mode' => 'timed', 'ask' => self::variant($v, $r)], $variants);
+            foreach ($ways as $way) {
                 $t = microtime(true);
                 try {
-                    $out = $transcriber->transcribe($file, [
-                        'language' => $this->option('language') === 'auto' ? 'auto' : $r['language'],
-                        'timings' => $mode !== 'text', 'speakers' => $mode === 'speakers', 'thinking' => (string) $this->option('thinking'),
+                    $out = $transcriber->transcribe($file, $way['ask'] + [
+                        'timings' => $way['mode'] !== 'text', 'speakers' => $way['mode'] === 'speakers', 'thinking' => (string) $this->option('thinking'),
                     ]);
                 } catch (\Throwable $e) {
-                    $this->warn(sprintf('  %-9s FAILED: %s', $mode, mb_substr($e->getMessage(), 0, 300)));
-                    $results[] = ['label' => $r['label'], 'mode' => $mode, 'error' => $e->getMessage()];
+                    $this->warn(sprintf('  %-22s FAILED: %s', $way['name'], mb_substr($e->getMessage(), 0, 300)));
+                    $results[] = ['label' => $r['label'], 'way' => $way['name'], 'error' => $e->getMessage()];
 
                     continue;
                 }
@@ -114,25 +148,26 @@ class TranscribeMeasureCommand extends Command
                 $cost = Transcriber::cost($out['usage'], $prices);
                 $u = $out['usage'];
                 $errors = $r['reference'] !== null ? self::errorRates($r['reference'], $out['text']) : null;
-                $speakers = $mode === 'speakers' ? count(array_unique(array_filter(array_column($out['segments'], 'speaker')))) : null;
-                $this->line(sprintf('  %-9s %5.2f min  %d part(s) %d req  in %6d (audio %6d) out %5d think %5d  $%.4f = $%.4f/min  %4.0fs%s  lang %s%s%s%s',
-                    $mode, $minutes, $out['parts'], $out['requests'], $u['input_tokens'], $u['audio_tokens'], $u['output_tokens'], $u['thinking_tokens'],
+                $clips = $windows !== [] && $out['segments'] !== [] ? self::clipScores($r, $windows, $out['segments']) : [];
+                $speakers = $way['mode'] === 'speakers' ? count(array_unique(array_filter(array_column($out['segments'], 'speaker')))) : null;
+                $this->line(sprintf('  %-22s %5.2f min  %d part(s) %d req  in %6d (audio %6d) out %5d think %5d  $%.4f = $%.4f/min  %4.0fs%s  lang %s%s%s',
+                    $way['name'], $minutes, $out['parts'], $out['requests'], $u['input_tokens'], $u['audio_tokens'], $u['output_tokens'], $u['thinking_tokens'],
                     $cost, $cost / $minutes, microtime(true) - $t,
                     $errors !== null ? sprintf('  WER %4.1f%% CER %4.1f%%', $errors['wer'] * 100, $errors['cer'] * 100) : '',
-                    $out['language'] ?: '?', $speakers !== null ? '  speakers '.$speakers : '', $out['recited'] ? '  RECITATION: quotations shortened' : '',
-                    $out['model'] !== '' ? '  ['.$out['model'].']' : ''));
+                    $out['language'] ?: '?', $speakers !== null ? '  speakers '.$speakers : '', $out['recited'] ? '  RECITATION: quotations shortened' : ''));
                 $this->line('      '.self::firstLines($out, 320));
                 foreach ($out['notes'] as $note) {
                     $this->line('      note: '.$note);
                 }
-                $results[] = ['label' => $r['label'], 'language' => $r['language'], 'kind' => $r['kind'], 'mode' => $mode, 'seconds' => $out['seconds'],
-                    'parts' => $out['parts'], 'requests' => $out['requests'], 'usage' => $u, 'cost' => round($cost, 6), 'cost_per_minute' => round($cost / $minutes, 6),
-                    'errors' => $errors, 'detected' => $out['language'], 'speakers' => $speakers, 'recited' => $out['recited'], 'model' => $out['model'],
-                    'finish' => $out['finish'], 'notes' => $out['notes'], 'text' => $out['text'], 'segments' => $out['segments']];
+                $results[] = ['label' => $r['label'], 'set' => $r['set'], 'language' => $r['language'], 'dialect' => $r['dialect'], 'kind' => $r['kind'],
+                    'way' => $way['name'], 'mode' => $way['mode'], 'seconds' => $out['seconds'], 'parts' => $out['parts'], 'requests' => $out['requests'], 'usage' => $u,
+                    'cost' => round($cost, 6), 'cost_per_minute' => round($cost / $minutes, 6), 'errors' => $errors, 'clips' => $clips, 'detected' => $out['language'],
+                    'speakers' => $speakers, 'recited' => $out['recited'], 'model' => $out['model'], 'finish' => $out['finish'], 'notes' => $out['notes'],
+                    'text' => $out['text'], 'segments' => $out['segments']];
             }
         }
 
-        $this->summary($results, $modes);
+        $this->summary($results);
         if ($this->option('full')) {
             $this->newLine();
             $this->line('Full transcripts (plain text):');
@@ -151,37 +186,123 @@ class TranscribeMeasureCommand extends Command
         return array_filter($results, fn ($r) => ! isset($r['error'])) === [] ? self::FAILURE : self::SUCCESS;
     }
 
-    /** @param  array<int, array<string, mixed>>  $results */
-    private function summary(array $results, array $modes): void
+    /**
+     * What a --variants entry asks: "auto" or "lang" first, then any of
+     * "+dialect", "+review", "+think".
+     *
+     * @return array<string, mixed>
+     */
+    public static function variant(string $name, array $r): array
     {
-        $done = array_values(array_filter($results, fn ($r) => ! isset($r['error']) && isset($r['mode'])));
+        $bits = array_map('trim', explode('+', strtolower($name)));
+        $ask = ['language' => in_array('auto', $bits, true) ? 'auto' : $r['language']];
+        if (in_array('dialect', $bits, true) && $r['dialect'] !== '') {
+            $ask['dialect'] = $r['dialect'];
+        }
+        if (in_array('review', $bits, true)) {
+            $ask['review'] = true;
+        }
+        if (in_array('think', $bits, true)) {
+            $ask['thinking'] = 'high';
+        }
+
+        return $ask;
+    }
+
+    /**
+     * Each clip of a joined file scored on its own: the segments whose middle
+     * falls in its stretch (with half the gap on each side) against its words.
+     *
+     * @param  array<int, array{0: float, 1: float}>  $windows
+     * @param  array<int, array{start: float, end: float, text: string}>  $segments
+     * @return array<int, array{slug: string, dialect: string, wer: float, cer: float, words: int, said: string, heard: string}>
+     */
+    public static function clipScores(array $r, array $windows, array $segments): array
+    {
+        $scores = [];
+        foreach ($r['clips'] as $i => $clip) {
+            if (! isset($windows[$i]) || $clip['said'] === '') {
+                continue;
+            }
+            [$from, $to] = $windows[$i];
+            $heard = implode(' ', array_column(array_filter($segments, function ($s) use ($from, $to): bool {
+                $middle = ((float) $s['start'] + (float) $s['end']) / 2;
+
+                return $middle >= $from - self::CLIP_GAP / 2 && $middle < $to + self::CLIP_GAP / 2;
+            }), 'text'));
+            $scores[] = ['slug' => $clip['slug'], 'dialect' => $clip['dialect']] + self::errorRates($clip['said'], $heard) + ['said' => $clip['said'], 'heard' => $heard];
+        }
+
+        return $scores;
+    }
+
+    /** @param  array<int, array<string, mixed>>  $results */
+    private function summary(array $results): void
+    {
+        $done = array_values(array_filter($results, fn ($r) => ! isset($r['error']) && isset($r['way'])));
         if ($done === []) {
             return;
         }
         $this->newLine();
-        $this->line('Per audio minute, all recordings together (the planning figure is $0.005; above $0.008 the allowances are cut by a third):');
-        foreach ($modes as $mode) {
-            $rows = array_values(array_filter($done, fn ($r) => $r['mode'] === $mode));
-            if ($rows === []) {
-                continue;
-            }
+        $this->line('Per audio minute, by way of asking (the planning figure is $0.005; above $0.008 the allowances are cut by a third):');
+        foreach (array_unique(array_column($done, 'way')) as $way) {
+            $rows = array_values(array_filter($done, fn ($r) => $r['way'] === $way));
             $minutes = array_sum(array_column($rows, 'seconds')) / 60;
             $sum = fn (string $key) => array_sum(array_map(fn ($r) => (int) $r['usage'][$key], $rows));
             $per = array_column($rows, 'cost_per_minute');
-            $this->line(sprintf('  %-9s $%.4f/min (cheapest $%.4f, dearest $%.4f) over %.1f min; tokens a minute: audio %d, other in %d, out %d, thinking %d',
-                $mode, array_sum(array_column($rows, 'cost')) / $minutes, min($per), max($per), $minutes,
-                $sum('audio_tokens') / $minutes, ($sum('input_tokens') - $sum('audio_tokens')) / $minutes, $sum('output_tokens') / $minutes, $sum('thinking_tokens') / $minutes));
+            $this->line(sprintf('  %-24s $%.4f/min (cheapest $%.4f, dearest $%.4f) over %.1f min; tokens a minute: audio %d, other in %d, out %d, thinking %d; %d request(s)',
+                $way, array_sum(array_column($rows, 'cost')) / $minutes, min($per), max($per), $minutes,
+                $sum('audio_tokens') / $minutes, ($sum('input_tokens') - $sum('audio_tokens')) / $minutes, $sum('output_tokens') / $minutes, $sum('thinking_tokens') / $minutes,
+                array_sum(array_column($rows, 'requests'))));
         }
+
         $this->newLine();
-        $this->line('Accuracy where the words are known (plain text; lower is better):');
-        foreach ($done as $r) {
-            if ($r['mode'] === ($modes[0] ?? 'text') && $r['errors'] !== null) {
-                $this->line(sprintf('  %-18s %-3s WER %5.1f%%  CER %5.1f%%', $r['label'], $r['language'], $r['errors']['wer'] * 100, $r['errors']['cer'] * 100));
+        $this->line('Accuracy where the words are known, WER / CER (lower is better):');
+        $ways = array_values(array_unique(array_column($done, 'way')));
+        $this->line(sprintf('  %-20s %s', '', implode('', array_map(fn ($w) => str_pad(mb_substr($w, 0, 21), 22), $ways))));
+        $labels = array_values(array_unique(array_column(array_filter($done, fn ($r) => $r['errors'] !== null), 'label')));
+        $totals = [];
+        foreach ($labels as $label) {
+            $cells = [];
+            foreach ($ways as $way) {
+                $row = current(array_filter($done, fn ($r) => $r['label'] === $label && $r['way'] === $way && $r['errors'] !== null));
+                if ($row) {
+                    $cells[] = str_pad(sprintf('%5.1f%% / %4.1f%%', $row['errors']['wer'] * 100, $row['errors']['cer'] * 100), 22);
+                    if ($row['set'] === 'dialects') {
+                        $totals[$way]['errors'] = ($totals[$way]['errors'] ?? 0) + $row['errors']['wer'] * $row['errors']['words'];
+                        $totals[$way]['words'] = ($totals[$way]['words'] ?? 0) + $row['errors']['words'];
+                    }
+                } else {
+                    $cells[] = str_pad('-', 22);
+                }
+            }
+            $this->line(sprintf('  %-20s %s', mb_substr($label, 0, 20), implode('', $cells)));
+        }
+        if ($totals !== []) {
+            $this->line(sprintf('  %-20s %s', 'all dialects (WER)', implode('', array_map(fn ($w) => str_pad(isset($totals[$w]) ? sprintf('%5.1f%%', 100 * $totals[$w]['errors'] / max(1, $totals[$w]['words'])) : '-', 22), $ways))));
+            asort($totals);
+            $best = (string) array_key_first(array_map(fn ($t) => $t['errors'] / max(1, $t['words']), $totals) + []);
+            $byRate = array_map(fn ($t) => $t['errors'] / max(1, $t['words']), $totals);
+            asort($byRate);
+            $best = (string) array_key_first($byRate);
+            $clips = [];
+            foreach ($done as $r) {
+                if ($r['way'] === $best) {
+                    array_push($clips, ...$r['clips']);
+                }
+            }
+            usort($clips, fn ($a, $b) => $b['wer'] <=> $a['wer']);
+            $this->newLine();
+            $this->line(sprintf('The clips heard worst with "%s" (%d clips scored):', $best, count($clips)));
+            foreach (array_slice($clips, 0, 25) as $c) {
+                $this->line(sprintf('  %-10s %-16s WER %5.1f%% CER %5.1f%%', $c['dialect'], $c['slug'], $c['wer'] * 100, $c['cer'] * 100));
+                $this->line('      said:  '.mb_substr((string) preg_replace('/\s+/u', ' ', $c['said']), 0, 200));
+                $this->line('      heard: '.mb_substr((string) preg_replace('/\s+/u', ' ', $c['heard']), 0, 200));
             }
         }
         $failed = array_filter($results, fn ($r) => isset($r['error']));
         if ($failed !== []) {
-            $this->line('Failed: '.implode(', ', array_unique(array_map(fn ($r) => $r['label'].(isset($r['mode']) ? ' ('.$r['mode'].')' : ''), $failed))));
+            $this->line('Failed: '.implode(', ', array_unique(array_map(fn ($r) => $r['label'].(isset($r['way']) ? ' ('.$r['way'].')' : ''), $failed))));
         }
     }
 
@@ -258,9 +379,13 @@ class TranscribeMeasureCommand extends Command
 
     /**
      * The recording as one local file: its parts downloaded or found on the
-     * site, joined, cut to its longest length, and noise laid over it where asked.
+     * site, joined (with the set's gap of silence after each), cut to its
+     * longest length, and noise laid over it where asked; with where each
+     * part starts and ends in it.
+     *
+     * @return array{0: string, 1: array<int, array{0: float, 1: float}>}
      */
-    private function prepare(string $ffmpeg, array $r, string $dir): string
+    private function prepare(string $ffmpeg, array $r, string $dir, Transcriber $transcriber): array
     {
         $inputs = [];
         foreach ($r['parts'] as $k => $part) {
@@ -279,6 +404,16 @@ class TranscribeMeasureCommand extends Command
                 $inputs[] = $path;
             }
         }
+        $gap = (float) ($r['gap'] ?? 0);
+        $windows = [];
+        if ($gap > 0) {
+            $at = 0.0;
+            foreach ($inputs as $in) {
+                $length = $transcriber->duration($ffmpeg, $in);
+                $windows[] = [round($at, 2), round($at + $length, 2)];
+                $at += $length + $gap;
+            }
+        }
         $out = $dir.'/'.$r['label'].'.mp3';
         $cmd = [$ffmpeg, '-v', 'error', '-y'];
         foreach ($inputs as $in) {
@@ -287,7 +422,7 @@ class TranscribeMeasureCommand extends Command
         }
         $joined = '';
         foreach (array_keys($inputs) as $i) {
-            $joined .= '['.$i.':a]aformat=sample_rates=44100:channel_layouts=mono['.'a'.$i.'];';
+            $joined .= '['.$i.':a]aformat=sample_rates=44100:channel_layouts=mono'.($gap > 0 ? ',apad=pad_dur='.$gap : '').'[a'.$i.'];';
         }
         $joined .= implode('', array_map(fn ($i) => '[a'.$i.']', array_keys($inputs))).'concat=n='.count($inputs).':v=0:a=1[speech]';
         if ($r['noise']) {
@@ -313,7 +448,7 @@ class TranscribeMeasureCommand extends Command
             }
         }
 
-        return $out;
+        return [$out, $windows];
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -365,6 +500,94 @@ class TranscribeMeasureCommand extends Command
     }
 
     /**
+     * Every Arabic dialect and English accent the site has, from the voice
+     * library's previews and the homepage samples: one file per Arabic
+     * country (Fusha as one) and per English accent group, its clips
+     * CLIP_GAP apart, each with its dialect and words.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function dialectRecordings(): array
+    {
+        $groups = [];
+        foreach (self::clipCatalog() as $clip) {
+            if (! preg_match('/^(ar|en)-([A-Z]{2})/', $clip['dialect'], $m) || ($m[1] === 'en' && in_array($clip['dialect'], self::NATIVE_ONLY, true))) {
+                continue;
+            }
+            $key = $m[1] === 'ar' ? 'ar-'.$m[2] : (in_array('en-'.$m[2], self::ENGLISH_GROUPS, true) ? 'en-'.$m[2] : 'en-world');
+            $groups[$key][] = $clip;
+        }
+        ksort($groups);
+        $recordings = [];
+        foreach ($groups as $key => $clips) {
+            $arabic = str_starts_with($key, 'ar');
+            $hint = $key === 'en-world' ? '' : ($arabic && ArabicDialects::prompt($key) === null ? (string) ($clips[0]['dialect'] ?? '') : $key);
+            $names = array_values(array_unique(array_column($clips, 'dialect')));
+            $recordings[] = array_replace(self::recording('dia-'.$key, $arabic ? 'ar' : 'en', 'listen', count($clips).' clip(s): '.implode(', ', $names),
+                array_column($clips, 'file'), 0, implode("\n", array_column($clips, 'said'))), ['set' => 'dialects', 'dialect' => $hint, 'clips' => $clips, 'gap' => self::CLIP_GAP]);
+        }
+
+        return $recordings;
+    }
+
+    /** Previews in another language, spoken natively: the languages set, not an English accent. */
+    private const NATIVE_ONLY = ['fr-FR', 'fr-CA', 'es-ES', 'es-MX', 'de-DE', 'it-IT', 'pt-BR', 'pt-PT', 'nl-NL', 'tr-TR', 'ru-RU', 'hi-IN', 'ja-JP', 'ko-KR', 'zh-CN'];
+
+    /**
+     * The previews spoken natively in other languages: one file per language.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function languageRecordings(): array
+    {
+        $groups = [];
+        foreach (self::clipCatalog() as $clip) {
+            if (preg_match('/^([a-z]{2})-/', $clip['dialect'], $m) && ! in_array($m[1], ['ar', 'en'], true)) {
+                $groups[$m[1]][] = $clip;
+            }
+        }
+        ksort($groups);
+        $recordings = [];
+        foreach ($groups as $language => $clips) {
+            $recordings[] = array_replace(self::recording('lang-'.$language, $language, 'listen', count($clips).' clip(s): '.implode(', ', array_column($clips, 'dialect')),
+                array_column($clips, 'file'), 0, implode("\n", array_column($clips, 'said'))), ['set' => 'languages', 'dialect' => '', 'clips' => $clips, 'gap' => self::CLIP_GAP]);
+        }
+
+        return $recordings;
+    }
+
+    /**
+     * Single-voice clips whose words are known: the voice library previews
+     * and the homepage's single-voice samples (with their sign-off).
+     *
+     * @return array<int, array{slug: string, dialect: string, file: string, said: string}>
+     */
+    public static function clipCatalog(): array
+    {
+        $clips = [];
+        $data = database_path('seeders/data/');
+        if (is_file($data.'voice_previews.php')) {
+            foreach ((array) ((require $data.'voice_previews.php')['previews'] ?? []) as $p) {
+                $file = 'audio/voice-previews/'.($p['slug'] ?? '').'.mp3';
+                if (isset($p['slug'], $p['dialect'], $p['text']) && is_file(public_path($file))) {
+                    $clips[] = ['slug' => (string) $p['slug'], 'dialect' => (string) $p['dialect'], 'file' => $file, 'said' => (string) $p['text']];
+                }
+            }
+        }
+        $known = self::knownWords();
+        if (is_file($data.'showcase_samples.php')) {
+            foreach ((array) ((require $data.'showcase_samples.php')['samples'] ?? []) as $s) {
+                $file = 'audio/showcase/'.($s['slug'] ?? '').'.mp3';
+                if (($s['kind'] ?? '') === 'single' && isset($s['dialect'], $known[$s['slug']]) && is_file(public_path($file))) {
+                    $clips[] = ['slug' => (string) $s['slug'], 'dialect' => (string) $s['dialect'], 'file' => $file, 'said' => $known[$s['slug']]];
+                }
+            }
+        }
+
+        return $clips;
+    }
+
+    /**
      * @param  array<int, string>  $parts  paths under public/ or URLs
      * @param  string|null|false  $reference  the words said (false: look them up from the parts)
      */
@@ -379,7 +602,7 @@ class TranscribeMeasureCommand extends Command
             $reference = $said !== [] && ! in_array(null, $said, true) ? implode("\n", $said) : null;
         }
 
-        return compact('label', 'language', 'kind', 'about', 'parts', 'max', 'reference', 'noise');
+        return compact('label', 'language', 'kind', 'about', 'parts', 'max', 'reference', 'noise') + ['set' => 'default', 'dialect' => '', 'clips' => [], 'gap' => 0];
     }
 
     /**

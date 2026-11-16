@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Console\Commands\TranscribeMeasureCommand;
 use App\Services\Transcription\Transcriber;
 use App\Services\Tts\GeminiKeyManager;
+use App\Support\ArabicDialects;
 use App\Support\AudioFormats;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\Process\Process;
@@ -73,7 +74,7 @@ class TranscriberTest extends TestCase
     public function test_the_answer_is_read_safely(): void
     {
         $plain = Transcriber::read(['language' => 'AR-eg', 'paragraphs' => ['أهلاً بيك', '', 42, ['x']]], false, false);
-        $this->assertSame(['text' => "أهلاً بيك\n\n42", 'segments' => [], 'language' => 'ar'], $plain);
+        $this->assertSame(['text' => "أهلاً بيك\n\n42", 'segments' => [], 'language' => 'ar', 'voices' => []], $plain);
 
         $timed = Transcriber::read(['language' => 'fr', 'segments' => [
             ['start' => 5, 'end' => 3, 'text' => 'Bonjour', 'speaker' => 'B'],
@@ -89,17 +90,28 @@ class TranscriberTest extends TestCase
 
     public function test_the_prompt_keeps_the_dialect_and_asks_only_for_what_the_mode_needs(): void
     {
-        $plain = Transcriber::prompt('ar', false, false, false);
+        $plain = Transcriber::prompt(['language' => 'ar']);
         $this->assertStringContainsString('The audio is in Arabic', $plain);
         $this->assertStringContainsString('never rewrite it into Modern Standard Arabic', $plain);
+        $this->assertStringContainsString('أوي (never قوي)', $plain);
         $this->assertStringContainsString('"paragraphs"', $plain);
         $this->assertStringNotContainsString('"start"', $plain);
+        $this->assertStringNotContainsString('Gulf: وايد', Transcriber::prompt(['language' => 'fr']), 'the Arabic guide only where Arabic may be spoken');
 
-        $speakers = Transcriber::prompt('auto', true, true, true);
+        $speakers = Transcriber::prompt(['language' => 'auto', 'timings' => true, 'speakers' => true, 'part' => true,
+            'known' => [['id' => 'A', 'voice' => 'deep male, slow'], ['id' => 'B', 'voice' => 'bright female']]]);
         $this->assertStringContainsString('Find the language spoken', $speakers);
         $this->assertStringContainsString('"speaker": "A"', $speakers);
         $this->assertStringContainsString('one part cut out of a longer recording', $speakers);
-        $this->assertStringContainsString('first three words', Transcriber::prompt('ar', true, false, false, true));
+        $this->assertStringContainsString('A: deep male, slow; B: bright female', $speakers);
+        $this->assertStringContainsString('One person reading or talking alone is A all through', $speakers);
+        $this->assertStringContainsString('first three words', Transcriber::prompt(['language' => 'ar', 'timings' => true, 'careful' => true]));
+
+        $egyptian = Transcriber::prompt(['language' => 'ar', 'dialect' => 'ar-EG', 'timings' => true]);
+        $this->assertStringContainsString('The speaker speaks', $egyptian);
+        $this->assertStringContainsString((string) ArabicDialects::markers('ar-EG'), $egyptian);
+        $this->assertStringContainsString('Scottish', Transcriber::prompt(['language' => 'en', 'dialect' => 'en-GB-SC']));
+        $this->assertStringContainsString('Here is a first transcript', Transcriber::prompt(['language' => 'ar', 'draft' => '{"segments":[]}']));
         $this->assertSame('French', Transcriber::languageName('fr'));
         $this->assertSame('', Transcriber::languageName('auto'));
     }
@@ -236,5 +248,117 @@ class TranscriberTest extends TestCase
         $this->assertStringContainsString('only 4 words', $out['notes'][0]);
         Http::assertSent(fn ($request) => data_get($request->data(), 'generationConfig.responseSchema.properties.paragraphs.type') === 'ARRAY'
             && str_contains((string) data_get($request->data(), 'contents.0.parts.1.text'), 'not only its opening'));
+    }
+
+    public function test_speech_no_segment_covers_is_found(): void
+    {
+        // Speech from 0 to 60 s with pauses at 20-21 and 40-41; segments cover 0-19 and 41-60.
+        $segments = [['start' => 0.2, 'end' => 19.6], ['start' => 41.3, 'end' => 59.8]];
+        $this->assertSame([[21.0, 40.0]], Transcriber::unheard($segments, [[20.0, 21.0], [40.0, 41.0]], 60.0));
+        $this->assertSame([], Transcriber::unheard([['start' => 0.0, 'end' => 60.0]], [], 60.0));
+        $this->assertSame([], Transcriber::unheard([['start' => 0.0, 'end' => 28.6], ['start' => 31.0, 'end' => 60.0]], [], 60.0),
+            'a gap shorter than 2.5 s is a moment off, not a lost sentence');
+    }
+
+    public function test_a_stretch_left_out_of_a_timed_transcript_is_heard_again(): void
+    {
+        if (! AudioFormats::ffmpegPath()) {
+            $this->markTestSkipped('ffmpeg is not available.');
+        }
+        $file = sys_get_temp_dir().'/transcriber-gap-'.getmypid().'.wav';
+        (new Process([AudioFormats::ffmpegPath(), '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=300:duration=30', $file]))->run();
+        $this->mock(GeminiKeyManager::class, function ($mock): void {
+            $mock->shouldReceive('keysInOrder')->andReturn([['name' => 'GEMINI_TTS_API_KEY', 'key' => 'test-key']]);
+            $mock->shouldReceive('recordUsage');
+        });
+        $answer = fn (array $data) => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode($data, JSON_UNESCAPED_UNICODE)]]], 'finishReason' => 'STOP']],
+            'usageMetadata' => ['promptTokenCount' => 100, 'candidatesTokenCount' => 10]]);
+        $words = fn (int $n) => implode(' ', array_fill(0, $n, 'كلام'));
+        Http::fake(['*' => Http::sequence()
+            // The whole recording: the model leaves out 10-20 s.
+            ->pushResponse($answer(['language' => 'ar', 'speakers' => [['id' => 'A', 'voice' => 'deep male']], 'segments' => [
+                ['start' => 0.0, 'end' => 10.0, 'speaker' => 'A', 'text' => $words(25)],
+                ['start' => 20.0, 'end' => 30.0, 'speaker' => 'A', 'text' => $words(25)],
+            ]]))
+            // 10.5-19.5 s heard again (cut from 9.9 s on), with the voices known.
+            ->pushResponse($answer(['language' => 'ar', 'speakers' => [['id' => 'A', 'voice' => 'deep male']], 'segments' => [
+                ['start' => 1.5, 'end' => 10.0, 'speaker' => 'A', 'text' => 'الجملة اللي راحت'],
+            ]]))]);
+
+        try {
+            $out = app(Transcriber::class)->transcribe($file, ['language' => 'ar', 'speakers' => true]);
+        } finally {
+            @unlink($file);
+        }
+
+        $this->assertSame(['A', 'A', 'A'], array_column($out['segments'], 'speaker'));
+        $this->assertSame('الجملة اللي راحت', $out['segments'][1]['text']);
+        $this->assertEqualsWithDelta(11.4, $out['segments'][1]['start'], 0.05);
+        $this->assertSame(2, $out['requests']);
+        $this->assertStringContainsString('had no words: heard again, 1 segment(s) found', implode(' ', $out['notes']));
+        $this->assertSame([['id' => 'A', 'voice' => 'deep male']], $out['voices']);
+        Http::assertSent(fn ($request) => str_contains((string) data_get($request->data(), 'contents.0.parts.1.text'), 'Voices heard earlier in this recording: A: deep male'));
+    }
+
+    public function test_a_check_that_drops_words_is_not_kept(): void
+    {
+        if (! AudioFormats::ffmpegPath()) {
+            $this->markTestSkipped('ffmpeg is not available.');
+        }
+        $file = sys_get_temp_dir().'/transcriber-review-'.getmypid().'.wav';
+        (new Process([AudioFormats::ffmpegPath(), '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=300:duration=8', $file]))->run();
+        $this->mock(GeminiKeyManager::class, function ($mock): void {
+            $mock->shouldReceive('keysInOrder')->andReturn([['name' => 'GEMINI_TTS_API_KEY', 'key' => 'test-key']]);
+            $mock->shouldReceive('recordUsage');
+        });
+        $answer = fn (string $text) => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['language' => 'ar', 'paragraphs' => [$text]], JSON_UNESCAPED_UNICODE)]]], 'finishReason' => 'STOP']],
+            'usageMetadata' => ['promptTokenCount' => 100, 'candidatesTokenCount' => 10]]);
+        Http::fake(['*' => Http::sequence()
+            ->pushResponse($answer('بص بقى أنا عايزة أقولك حاجة مهمة قوي'))
+            ->pushResponse($answer('بص بقى أنا عايزة أقولك حاجة مهمة أوي'))
+            ->pushResponse($answer('بص بقى أنا عايزة أقولك حاجة مهمة قوي'))
+            ->pushResponse($answer('بص'))]);
+
+        try {
+            $fixed = app(Transcriber::class)->transcribe($file, ['language' => 'ar', 'review' => true]);
+            $kept = app(Transcriber::class)->transcribe($file, ['language' => 'ar', 'review' => true]);
+        } finally {
+            @unlink($file);
+        }
+
+        $this->assertSame('بص بقى أنا عايزة أقولك حاجة مهمة أوي', $fixed['text']);
+        $this->assertSame(2, $fixed['requests']);
+        $this->assertSame('بص بقى أنا عايزة أقولك حاجة مهمة قوي', $kept['text']);
+        $this->assertStringContainsString('the first answer kept', implode(' ', $kept['notes']));
+    }
+
+    public function test_every_dialect_is_measured_in_a_file_of_its_own_country_with_each_clip_scored(): void
+    {
+        $byLabel = [];
+        foreach (TranscribeMeasureCommand::dialectRecordings() as $r) {
+            $byLabel[$r['label']] = $r;
+        }
+        foreach (['dia-ar-EG', 'dia-ar-SA', 'dia-ar-MA', 'dia-ar-IQ', 'dia-ar-LB', 'dia-ar-XA', 'dia-en-GB', 'dia-en-world'] as $label) {
+            $this->assertArrayHasKey($label, $byLabel);
+            $this->assertCount(count($byLabel[$label]['parts']), $byLabel[$label]['clips']);
+        }
+        $this->assertSame('ar-EG', $byLabel['dia-ar-EG']['dialect']);
+        $this->assertSame('', $byLabel['dia-en-world']['dialect']);
+        $this->assertGreaterThanOrEqual(140, count(array_unique(array_merge(...array_values(array_map(fn ($r) => array_column($r['clips'], 'dialect'),
+            array_filter($byLabel, fn ($r) => $r['language'] === 'ar')))))), 'about every Arabic variety the site has');
+        $languages = array_column(TranscribeMeasureCommand::languageRecordings(), 'language');
+        $this->assertContains('tr', $languages);
+        $this->assertNotContains('ar', $languages);
+
+        $r = ['clips' => [['slug' => 'one', 'dialect' => 'ar-EG', 'said' => 'أنا عايزة أقولك'], ['slug' => 'two', 'dialect' => 'ar-EG-SA', 'said' => 'يا ولدي اسمع']]];
+        $scores = TranscribeMeasureCommand::clipScores($r, [[0.0, 3.0], [5.5, 9.0]], [
+            ['start' => 0.1, 'end' => 2.9, 'text' => 'أنا عايزة أقولك'],
+            ['start' => 5.6, 'end' => 8.8, 'text' => 'يا ولدي'],
+        ]);
+        $this->assertSame([0.0, 0.3333], array_column($scores, 'wer'));
+
+        $this->assertSame(['language' => 'auto'], TranscribeMeasureCommand::variant('auto', ['language' => 'ar', 'dialect' => 'ar-EG']));
+        $this->assertSame(['language' => 'ar', 'dialect' => 'ar-EG', 'review' => true, 'thinking' => 'high'],
+            TranscribeMeasureCommand::variant('lang+dialect+review+think', ['language' => 'ar', 'dialect' => 'ar-EG']));
     }
 }

@@ -5,7 +5,9 @@ namespace App\Services\Transcription;
 use App\Services\Dubbing\SpeechNotWrittenOut;
 use App\Services\Dubbing\VideoDubber;
 use App\Services\Tts\GeminiKeyManager;
+use App\Support\ArabicDialects;
 use App\Support\AudioFormats;
+use App\Support\EnglishAccents;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
@@ -22,11 +24,27 @@ use Symfony\Component\Process\Process;
  * (OVERLAP) so no word at a cut is lost, and the parts are put back together
  * without the words heard twice (stitch(), stitchText()).
  *
- * Arabic is written in the speaker's own dialect, as said: never rewritten
- * into Modern Standard Arabic. A well-known text the speaker recites (a verse,
- * a poem, a song) the model may refuse to copy out (finish RECITATION, see
- * SpeechNotWrittenOut): the part is then asked for once more with only the
- * first words of each quotation written, and the result says so ('recited').
+ * What makes it accurate, each measured on staging (transcribe:measure):
+ *  - Arabic is written in the speaker's own dialect, as said: never rewritten
+ *    into Modern Standard Arabic, with the dialect words of every region kept
+ *    in their own spelling (dialectGuide()); where the member names the
+ *    dialect or accent, the site's own notes on it are given too
+ *    (ArabicDialects::markers()).
+ *  - The model is held to the answer's shape (schema()), and a part that
+ *    comes back unreadable, or with far fewer words than its speech holds,
+ *    is asked for again (hear()).
+ *  - In a timed transcript, any stretch of speech no segment covers is cut
+ *    out and heard again on its own (unheard()): a long part, or a part in a
+ *    second language, now and then loses a sentence.
+ *  - Speaker letters stay the same from part to part: each part is told
+ *    the voices heard so far.
+ *  - With 'review', each part is heard a second time with its draft, to
+ *    correct it; the correction is kept only when it drops nothing.
+ *
+ * A well-known text the speaker recites (a verse, a poem, a song) the model
+ * may refuse to copy out (finish RECITATION, see SpeechNotWrittenOut): the
+ * part is then asked for once more with only the first words of each
+ * quotation written, and the result says so ('recited').
  */
 final class Transcriber
 {
@@ -44,15 +62,24 @@ final class Transcriber
 
     private const PAUSE_DB = -35;
 
+    /** Speech this long that no timed segment covers is heard again; at most this many stretches, this share of the recording. */
+    public const UNHEARD_SECONDS = 2.5;
+
+    private const MAX_UNHEARD = 8;
+
+    private const MAX_UNHEARD_SHARE = 0.4;
+
     public function __construct(private GeminiKeyManager $keys) {}
 
     /**
-     * $o: language ('auto' or a code such as 'ar', 'fr'), timings (bool),
-     * speakers (bool, implies timings), thinking ('low', 'minimal', ''),
-     * progress (fn (int $done, int $parts)).
+     * $o: language ('auto' or a code such as 'ar', 'fr'), dialect (an
+     * ArabicDialects or EnglishAccents code, optional), timings (bool),
+     * speakers (bool, implies timings), review (bool), fill (bool, default
+     * true: hear again the speech a timed transcript left out), thinking
+     * ('low', 'medium', 'minimal', ''), progress (fn (int $done, int $parts)).
      *
      * @param  array<string, mixed>  $o
-     * @return array{text: string, segments: array<int, array{start: float, end: float, speaker: ?string, text: string}>, language: string, seconds: float, parts: int, requests: int, recited: bool, usage: array<string, int>, model: string, finish: array<int, string>, notes: array<int, string>, timings: bool, speakers: bool}
+     * @return array{text: string, segments: array<int, array{start: float, end: float, speaker: ?string, text: string}>, language: string, seconds: float, parts: int, requests: int, recited: bool, usage: array<string, int>, model: string, finish: array<int, string>, notes: array<int, string>, timings: bool, speakers: bool, voices: array<int, array{id: string, voice: string}>}
      */
     public function transcribe(string $file, array $o = []): array
     {
@@ -62,11 +89,19 @@ final class Transcriber
         }
         $speakers = (bool) ($o['speakers'] ?? false);
         $timings = $speakers || (bool) ($o['timings'] ?? false);
-        $language = strtolower(trim((string) ($o['language'] ?? 'auto'))) ?: 'auto';
+        $ask = [
+            'language' => strtolower(trim((string) ($o['language'] ?? 'auto'))) ?: 'auto',
+            'dialect' => trim((string) ($o['dialect'] ?? '')),
+            'timings' => $timings, 'speakers' => $speakers,
+            'review' => (bool) ($o['review'] ?? false),
+            'thinking' => (string) ($o['thinking'] ?? 'low'),
+        ];
         $progress = $o['progress'] ?? static function (): void {};
 
         $tmp = sys_get_temp_dir().'/listen-transcribe-'.bin2hex(random_bytes(6));
         @mkdir($tmp, 0700, true);
+        $run = ['usage' => ['input_tokens' => 0, 'audio_tokens' => 0, 'output_tokens' => 0, 'thinking_tokens' => 0],
+            'finish' => [], 'model' => '', 'requests' => 0, 'recited' => false, 'detected' => [], 'notes' => [], 'voices' => []];
         try {
             $clean = $tmp.'/clean.mp3';
             $this->normalise($ffmpeg, $file, $clean);
@@ -74,34 +109,31 @@ final class Transcriber
             $pauses = $this->pauses($ffmpeg, $clean);
             $plan = self::chunkPlan($pauses, $seconds);
 
-            $usage = ['input_tokens' => 0, 'audio_tokens' => 0, 'output_tokens' => 0, 'thinking_tokens' => 0];
-            $finish = [];
-            $model = '';
-            $requests = 0;
-            $recited = false;
-            $detected = [];
             $pieces = [];
-            $notes = [];
             foreach ($plan as $n => $part) {
-                $audio = $tmp.'/part-'.$n.'.mp3';
-                $this->cut($ffmpeg, $clean, $part['from'], $part['to'] - $part['from'], $audio);
-                $speech = self::speechSeconds($pauses, $part['from'], $part['to']);
-                $heard = $this->hear((string) file_get_contents($audio), $part['to'] - $part['from'], $speech, $language, $timings, $speakers, count($plan) > 1, (string) ($o['thinking'] ?? 'low'));
-                foreach ($heard['notes'] as $note) {
-                    $notes[] = 'part '.($n + 1).': '.$note;
-                }
-                foreach ($heard['usage'] as $key => $tokens) {
-                    $usage[$key] = ($usage[$key] ?? 0) + $tokens;
-                }
-                $finish = array_merge($finish, $heard['finish']);
-                $model = $heard['model'];
-                $requests += $heard['requests'];
-                $recited = $recited || $heard['recited'];
-                if ($heard['language'] !== '') {
-                    $detected[$heard['language']] = ($detected[$heard['language']] ?? 0) + ($part['to'] - $part['from']);
-                }
+                $heard = $this->hearStretch($ffmpeg, $clean, $tmp, $part['from'], $part['to'], $pauses, $ask + ['part' => count($plan) > 1], $run, 'part '.($n + 1));
                 $pieces[] = $part + $heard;
                 $progress($n + 1, count($plan));
+            }
+            $segments = $timings ? self::stitch($pieces) : [];
+
+            // Speech no segment covers: heard again on its own, and its segments put in their place.
+            if ($timings && ($o['fill'] ?? true)) {
+                foreach (self::unheard($segments, $pauses, $seconds) as [$from, $to]) {
+                    $heard = $this->hearStretch($ffmpeg, $clean, $tmp, max(0.0, $from - 0.6), min($seconds, $to + 0.6), $pauses,
+                        $ask + ['part' => true, 'review' => false], $run, sprintf('%s-%s left out', self::clock($from), self::clock($to)));
+                    $found = 0;
+                    foreach ($heard['segments'] as $s) {
+                        $start = round($s['start'] + max(0.0, $from - 0.6), 2);
+                        $end = round($s['end'] + max(0.0, $from - 0.6), 2);
+                        if (($start + $end) / 2 >= $from - 0.3 && ($start + $end) / 2 <= $to + 0.3 && ! self::covered($segments, $start, $end)) {
+                            $segments[] = ['start' => $start, 'end' => max($start, $end), 'speaker' => $s['speaker'] ?? null, 'text' => $s['text']];
+                            $found++;
+                        }
+                    }
+                    $run['notes'][] = sprintf('%s-%s had no words: heard again, %d segment(s) found', self::clock($from), self::clock($to), $found);
+                }
+                usort($segments, fn ($a, $b) => $a['start'] <=> $b['start']);
             }
         } finally {
             foreach ((array) glob($tmp.'/*') as $f) {
@@ -110,25 +142,59 @@ final class Transcriber
             @rmdir($tmp);
         }
 
-        arsort($detected);
-        $segments = $timings ? self::stitch($pieces) : [];
-        $text = $timings ? self::textOf($segments, $speakers) : self::stitchText($pieces);
+        arsort($run['detected']);
 
         return [
-            'text' => $text,
+            'text' => $timings ? self::textOf($segments, $speakers) : self::stitchText($pieces),
             'segments' => $segments,
-            'language' => $language !== 'auto' ? $language : (string) (array_key_first($detected) ?? ''),
+            'language' => $ask['language'] !== 'auto' ? $ask['language'] : (string) (array_key_first($run['detected']) ?? ''),
             'seconds' => round($seconds, 2),
             'parts' => count($plan),
-            'requests' => $requests,
-            'recited' => $recited,
-            'usage' => $usage,
-            'model' => $model,
-            'finish' => $finish,
-            'notes' => $notes,
+            'requests' => $run['requests'],
+            'recited' => $run['recited'],
+            'usage' => $run['usage'],
+            'model' => $run['model'],
+            'finish' => $run['finish'],
+            'notes' => $run['notes'],
             'timings' => $timings,
             'speakers' => $speakers,
+            'voices' => array_values($run['voices']),
         ];
+    }
+
+    /**
+     * One stretch of the recording ($from-$to) cut out and heard, with what
+     * it used added to $run; times are from the stretch's start.
+     *
+     * @param  array<int, array{0: float, 1: float}>  $pauses
+     * @param  array<string, mixed>  $ask
+     * @param  array<string, mixed>  $run
+     * @return array<string, mixed>
+     */
+    private function hearStretch(string $ffmpeg, string $clean, string $tmp, float $from, float $to, array $pauses, array $ask, array &$run, string $label): array
+    {
+        $audio = $tmp.'/part-'.$run['requests'].'-'.(int) ($from * 100).'.mp3';
+        $this->cut($ffmpeg, $clean, $from, $to - $from, $audio);
+        $heard = $this->hear((string) file_get_contents($audio), $to - $from, self::speechSeconds($pauses, $from, $to), $ask + ['known' => array_values($run['voices'])]);
+        @unlink($audio);
+        foreach ($heard['usage'] as $key => $tokens) {
+            $run['usage'][$key] = ($run['usage'][$key] ?? 0) + $tokens;
+        }
+        $run['finish'] = array_merge($run['finish'], $heard['finish']);
+        $run['model'] = $heard['model'];
+        $run['requests'] += $heard['requests'];
+        $run['recited'] = $run['recited'] || $heard['recited'];
+        if ($heard['language'] !== '') {
+            $run['detected'][$heard['language']] = ($run['detected'][$heard['language']] ?? 0) + ($to - $from);
+        }
+        foreach ($heard['voices'] as $voice) {
+            $run['voices'][$voice['id']] ??= $voice;
+        }
+        foreach ($heard['notes'] as $note) {
+            $run['notes'][] = $label.': '.$note;
+        }
+
+        return $heard;
     }
 
     /**
@@ -193,7 +259,7 @@ final class Transcriber
                 $start = round((float) $s['start'] + (float) $piece['from'], 2);
                 $end = round((float) $s['end'] + (float) $piece['from'], 2);
                 $middle = ($start + $end) / 2;
-                $inside = $middle >= (float) $piece['keep_from'] && ($middle < (float) $piece['keep_to'] || $i === $last);
+                $inside = ($middle >= (float) $piece['keep_from'] || $i === 0) && ($middle < (float) $piece['keep_to'] || $i === $last);
                 if ($inside) {
                     $all[] = ['start' => $start, 'end' => max($start, $end), 'speaker' => $s['speaker'] ?? null, 'text' => (string) $s['text']];
                 }
@@ -202,6 +268,93 @@ final class Transcriber
         usort($all, fn ($a, $b) => $a['start'] <=> $b['start']);
 
         return $all;
+    }
+
+    /**
+     * Stretches of speech (the recording less its pauses) that no segment
+     * covers, at least UNHEARD_SECONDS long, nearby ones joined: at most
+     * MAX_UNHEARD of them and MAX_UNHEARD_SHARE of the recording, longest first.
+     *
+     * @param  array<int, array{start: float, end: float}>  $segments
+     * @param  array<int, array{0: float, 1: float}>  $pauses
+     * @return array<int, array{0: float, 1: float}>
+     */
+    public static function unheard(array $segments, array $pauses, float $seconds): array
+    {
+        // Speech: between the pauses.
+        $speech = [];
+        $at = 0.0;
+        usort($pauses, fn ($a, $b) => $a[0] <=> $b[0]);
+        foreach ($pauses as [$start, $end]) {
+            if ($start > $at) {
+                $speech[] = [$at, min($start, $seconds)];
+            }
+            $at = max($at, $end);
+        }
+        if ($at < $seconds) {
+            $speech[] = [$at, $seconds];
+        }
+        // Less what the segments cover (with a little room: their times are a moment off).
+        $left = [];
+        foreach ($speech as [$from, $to]) {
+            $pieces = [[$from, $to]];
+            foreach ($segments as $s) {
+                $cs = (float) $s['start'] - 0.5;
+                $ce = (float) $s['end'] + 0.5;
+                $next = [];
+                foreach ($pieces as [$a, $b]) {
+                    if ($ce <= $a || $cs >= $b) {
+                        $next[] = [$a, $b];
+
+                        continue;
+                    }
+                    if ($cs > $a) {
+                        $next[] = [$a, $cs];
+                    }
+                    if ($ce < $b) {
+                        $next[] = [$ce, $b];
+                    }
+                }
+                $pieces = $next;
+            }
+            array_push($left, ...$pieces);
+        }
+        // Joined across short pauses, and only the long ones.
+        $joined = [];
+        foreach ($left as [$a, $b]) {
+            if ($joined !== [] && $a - $joined[count($joined) - 1][1] < 1.0) {
+                $joined[count($joined) - 1][1] = $b;
+            } else {
+                $joined[] = [$a, $b];
+            }
+        }
+        $long = array_values(array_filter($joined, fn ($p) => $p[1] - $p[0] >= self::UNHEARD_SECONDS));
+        usort($long, fn ($x, $y) => ($y[1] - $y[0]) <=> ($x[1] - $x[0]));
+        $kept = [];
+        $total = 0.0;
+        foreach ($long as $p) {
+            if (count($kept) >= self::MAX_UNHEARD || $total + $p[1] - $p[0] > self::MAX_UNHEARD_SHARE * $seconds) {
+                break;
+            }
+            $kept[] = [round($p[0], 2), round($p[1], 2)];
+            $total += $p[1] - $p[0];
+        }
+        usort($kept, fn ($x, $y) => $x[0] <=> $y[0]);
+
+        return $kept;
+    }
+
+    /** Whether most of $start-$end is already covered by a segment. */
+    private static function covered(array $segments, float $start, float $end): bool
+    {
+        foreach ($segments as $s) {
+            $overlap = min($end, (float) $s['end']) - max($start, (float) $s['start']);
+            if ($overlap > 0.5 * max(0.1, $end - $start)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -261,12 +414,14 @@ final class Transcriber
      * cannot be read or it would not answer (RECITATION: then with only the
      * first words of each quotation written), and when it wrote far fewer
      * words than the part's speech holds (it now and then writes only the
-     * opening of a part): the fuller answer is kept. Times are from the
+     * opening of a part): the fuller answer is kept. With 'review' the part
+     * is heard once more with that answer, to correct it. Times are from the
      * part's start; $speech: seconds of it that are not pauses.
      *
-     * @return array{text: string, segments: array<int, array<string, mixed>>, language: string, usage: array<string, int>, model: string, finish: array<int, string>, requests: int, recited: bool, notes: array<int, string>}
+     * @param  array<string, mixed>  $ask  language, dialect, timings, speakers, part, review, thinking, known
+     * @return array{text: string, segments: array<int, array<string, mixed>>, language: string, voices: array<int, array{id: string, voice: string}>, usage: array<string, int>, model: string, finish: array<int, string>, requests: int, recited: bool, notes: array<int, string>}
      */
-    private function hear(string $audio, float $length, float $speech, string $language, bool $timings, bool $speakers, bool $part, string $thinking): array
+    private function hear(string $audio, float $length, float $speech, array $ask): array
     {
         $usage = [];
         $finish = [];
@@ -275,19 +430,22 @@ final class Transcriber
         $best = null;
         $careful = false;
         $whole = false;
-        for ($try = 0; $try < 2; $try++) {
-            $answer = $this->askModel([['inline_data' => ['mime_type' => 'audio/mpeg', 'data' => base64_encode($audio)]],
-                ['text' => self::prompt($language, $timings, $speakers, $part, $careful, $whole ? $speech : 0.0)]], $thinking, self::schema($timings, $speakers));
+        $sound = ['inline_data' => ['mime_type' => 'audio/mpeg', 'data' => base64_encode($audio)]];
+        $schema = self::schema($ask['timings'], $ask['speakers']);
+        $take = function (array $prompt) use ($sound, $schema, $ask, &$usage, &$finish, &$requests): array {
+            $answer = $this->askModel([$sound, ['text' => self::prompt($prompt + $ask)]], (string) $ask['thinking'], $schema);
             $requests++;
             $finish[] = $answer['finish'];
             foreach ($answer['usage'] as $key => $tokens) {
                 $usage[$key] = ($usage[$key] ?? 0) + $tokens;
             }
-            $heard = $answer['data'] !== null ? self::read($answer['data'], $timings, $speakers) : null;
+
+            return $answer;
+        };
+        for ($try = 0; $try < 2; $try++) {
+            $answer = $take(['careful' => $careful, 'speech' => $whole ? $speech : 0.0]);
+            $heard = $answer['data'] !== null ? $this->readPart($answer['data'], $ask, $length) : null;
             if ($heard !== null) {
-                // The model's times now and then come as minutes and seconds past the first minute.
-                $heard['segments'] = $timings ? VideoDubber::inSeconds($heard['segments'], $length) : [];
-                $heard['words'] = self::wordCount($timings ? implode(' ', array_column($heard['segments'], 'text')) : $heard['text']);
                 $heard['recited'] = $careful;
                 if ($best === null || $heard['words'] > $best['words']) {
                     $best = $heard;
@@ -310,9 +468,34 @@ final class Transcriber
         if (self::tooShort($best['words'], $speech)) {
             $notes[] = sprintf('still only %d words for %.0f s of speech', $best['words'], $speech);
         }
+
+        // A second listening with the draft: kept only when it drops nothing.
+        if (($ask['review'] ?? false) && $best['words'] > 0) {
+            $draft = $ask['timings'] ? ['language' => $best['language'], 'segments' => $best['segments']] + ($ask['speakers'] ? ['speakers' => $best['voices']] : [])
+                : ['language' => $best['language'], 'paragraphs' => preg_split('/\n\n+/u', $best['text']) ?: []];
+            $answer = $take(['careful' => $best['recited'], 'draft' => json_encode($draft, JSON_UNESCAPED_UNICODE)]);
+            $checked = $answer['data'] !== null ? $this->readPart($answer['data'], $ask, $length) : null;
+            if ($checked !== null && $checked['words'] >= 0.9 * $best['words']) {
+                $notes[] = sprintf('checked again: %d words, was %d', $checked['words'], $best['words']);
+                $best = $checked + ['recited' => $best['recited']];
+            } else {
+                $notes[] = 'checked again: the check dropped words, the first answer kept';
+            }
+        }
         unset($best['words']);
 
         return $best + ['usage' => $usage, 'model' => $answer['model'], 'finish' => $finish, 'requests' => $requests, 'notes' => $notes];
+    }
+
+    /** @return array<string, mixed> */
+    private function readPart(array $data, array $ask, float $length): array
+    {
+        $heard = self::read($data, $ask['timings'], $ask['speakers']);
+        // The model's times now and then come as minutes and seconds past the first minute.
+        $heard['segments'] = $ask['timings'] ? VideoDubber::inSeconds($heard['segments'], $length) : [];
+        $heard['words'] = self::wordCount($ask['timings'] ? implode(' ', array_column($heard['segments'], 'text')) : $heard['text']);
+
+        return $heard;
     }
 
     /** Far fewer words than the speech holds: under 0.6 a second of speech (people say 2 to 3), over 20 seconds of it. */
@@ -325,7 +508,7 @@ final class Transcriber
     public static function wordCount(string $text): int
     {
         $dense = preg_match_all('/[\p{Han}\p{Hiragana}\p{Katakana}\p{Thai}]/u', $text);
-        $words = preg_match_all('/[\p{L}\p{N}\p{M}\']+/u', (string) preg_replace('/[\p{Han}\p{Hiragana}\p{Katakana}\p{Thai}]/u', ' ', $text));
+        $words = preg_match_all("/[\\p{L}\\p{N}\\p{M}']+/u", (string) preg_replace('/[\p{Han}\p{Hiragana}\p{Katakana}\p{Thai}]/u', ' ', $text));
 
         return (int) $words + intdiv((int) $dense, 2);
     }
@@ -357,34 +540,57 @@ final class Transcriber
                 'required' => ['language', 'paragraphs'], 'propertyOrdering' => ['language', 'paragraphs']];
         }
         $segment = ['start' => ['type' => 'NUMBER'], 'end' => ['type' => 'NUMBER']] + ($speakers ? ['speaker' => ['type' => 'STRING']] : []) + ['text' => ['type' => 'STRING']];
+        $properties = ['language' => ['type' => 'STRING']]
+            + ($speakers ? ['speakers' => ['type' => 'ARRAY', 'items' => ['type' => 'OBJECT', 'properties' => ['id' => ['type' => 'STRING'], 'voice' => ['type' => 'STRING']],
+                'required' => ['id', 'voice'], 'propertyOrdering' => ['id', 'voice']]]] : [])
+            + ['segments' => ['type' => 'ARRAY', 'items' => ['type' => 'OBJECT', 'properties' => $segment, 'required' => array_keys($segment), 'propertyOrdering' => array_keys($segment)]]];
 
-        return ['type' => 'OBJECT', 'properties' => ['language' => ['type' => 'STRING'], 'segments' => ['type' => 'ARRAY', 'items' => [
-            'type' => 'OBJECT', 'properties' => $segment, 'required' => array_keys($segment), 'propertyOrdering' => array_keys($segment)]]],
-            'required' => ['language', 'segments'], 'propertyOrdering' => ['language', 'segments']];
+        return ['type' => 'OBJECT', 'properties' => $properties, 'required' => array_keys($properties), 'propertyOrdering' => array_keys($properties)];
     }
 
     /**
-     * What the model is asked. $careful: a well-known text recited is written
-     * only by its first words (the model will not copy one out in full).
+     * What the model is asked. $c: language, dialect, timings, speakers, part
+     * (a part of a longer recording), careful (a well-known text recited is
+     * written only by its first words: the model will not copy one out in
+     * full), speech (seconds of speech, said when an answer came back too
+     * short), known (voices heard in earlier parts), draft (an answer to check).
+     *
+     * @param  array<string, mixed>  $c
      */
-    public static function prompt(string $language, bool $timings, bool $speakers, bool $part, bool $careful = false, float $speech = 0.0): string
+    public static function prompt(array $c): string
     {
+        $language = (string) ($c['language'] ?? 'auto');
+        $timings = (bool) ($c['timings'] ?? false);
+        $speakers = (bool) ($c['speakers'] ?? false);
         $named = $language === 'auto' ? '' : self::languageName($language);
+        $variety = self::varietyNote((string) ($c['dialect'] ?? ''));
+        $arabic = in_array($language, ['ar', 'auto'], true);
+        $draft = (string) ($c['draft'] ?? '');
+
         $p = "You are a professional transcriber. Write out exactly what is said in this audio, every word, as it is spoken.\n"
-            .($part ? "This audio is one part cut out of a longer recording: it may start or end in the middle of a word. Write every word from its first second to its last.\n" : '')
-            .($speech > 0 ? sprintf("This audio holds about %d seconds of speech: write all of it, not only its opening.\n", (int) round($speech)) : '')
+            .(($c['part'] ?? false) ? "This audio is one part cut out of a longer recording: it may start or end in the middle of a word. Write every word from its first second to its last.\n" : '')
+            .(($c['speech'] ?? 0) > 0 ? sprintf("This audio holds about %d seconds of speech: write all of it, not only its opening.\n", (int) round((float) $c['speech'])) : '')
             .($named !== ''
                 ? "The audio is in {$named}. Write it in {$named}, in that language's own script. Words the speaker says in another language are written in that language.\n"
-                : "Find the language spoken and write it in that language's own script. Words the speaker says in another language are written in that language.\n")
-            ."Never translate, correct, polish, sum up or leave out anything. Keep the speaker's own words, dialect, slang and grammar. "
-            .'Arabic is written exactly in the dialect spoken (Egyptian, Gulf, Levantine, Maghrebi, ...), the way its speakers write it in messages: '
-            .'never rewrite it into Modern Standard Arabic, keep dialect words in their dialect spelling (Egyptian أوي, دلوقتي, هـ before a verb for the future; Gulf وايد, دحين), and never add diacritics the speaker did not say. '
-            .'Leave out pure hesitation sounds (um, uh, ehh) and false starts of one syllable; keep every real word. '
-            .'Write numbers as digits when said as numbers, and a phone number said digit by digit as one number (01012345678). Add normal punctuation. Where a word cannot be made out, write [inaudible]. '
-            .'Do not describe music or noises.'."\n"
-            .($careful
+                : "Find the language spoken and write it in that language's own script.\n")
+            ."The recording may move from one language to another: write every part, each in its own language and script; never leave a part out because it is in another language.\n"
+            .$variety
+            .'Write what you hear, not what you expect: never translate, correct, polish, sum up or leave out anything, and never add a word the speaker did not say. '
+            ."Keep the speaker's own words, dialect, slang and grammar.\n"
+            .($arabic ? self::dialectGuide() : '')
+            .'Leave out pure hesitation sounds (um, uh, ehh, اممم) and false starts of one syllable; keep every real word, also repeated ones. '
+            .'Write numbers as digits when said as numbers, and a phone number said digit by digit as one number (01012345678). Add normal punctuation. '
+            .'Where a word cannot be made out, write [inaudible]. Do not describe music or noises.'."\n"
+            .(($c['careful'] ?? false)
                 ? "Where the speaker recites a well-known text (a verse of the Quran, a prayer, a poem, song lyrics), write only its first three words followed by \"…\".\n"
                 : "Quotations (verses of the Quran, prayers, poems, songs) are written as heard too.\n");
+
+        if ($draft !== '') {
+            $p .= "Here is a first transcript of this audio:\n{$draft}\n"
+                .'Listen to the whole audio again, from start to end, and return it corrected in the same JSON: fix every misheard word, add anything missing, '
+                .'remove anything that was not said, put back any dialect word that was written in its Standard form, and fix the times'
+                .($speakers ? ' and the speaker letters' : '').' where they are wrong. Keep everything that is right as it is.'."\n";
+        }
 
         if (! $timings) {
             return $p.'Split the text into paragraphs where the topic or the speaker changes. '
@@ -392,13 +598,66 @@ final class Transcriber
                 .'If nothing is spoken, return {"language": "", "paragraphs": []}.';
         }
 
+        $known = array_filter((array) ($c['known'] ?? []), fn ($v) => is_array($v) && ($v['id'] ?? '') !== '');
+
         return $p.'Split what is said into segments at sentence or phrase boundaries, each 2 to 15 seconds long'
             .($speakers ? ' and spoken by one person' : '')
             .', with its start and end in seconds from the start of this audio, as plain seconds also past the first minute (75.4, never 1:15.4 or 115.4). '
-            .'Cover everything that is said, from the first word to the last.'
-            .($speakers ? ' Tell the speakers apart: give each a letter (A, B, ...) in the order they first speak; one person keeps one letter all through.' : '')
-            .' Return only JSON: {"language": "<ISO 639-1 code of the main language spoken>", "segments": [{"start": 0.0, "end": 3.2'
-            .($speakers ? ', "speaker": "A"' : '').', "text": "..."}]}. If nothing is spoken, return {"language": "", "segments": []}.';
+            .'Cover everything that is said, from the first word to the last; a pause in the speech is never the end of it.'
+            .($speakers
+                ? ' Tell the speakers apart by their voices: give each a letter (A, B, ...) in the order they first speak, and in "speakers" describe each voice in a few words '
+                    .'(gender, pitch, manner) so it can be told apart later. One person keeps one letter all through; give a new letter only when a clearly different voice speaks. '
+                    .'One person reading or talking alone is A all through.'
+                    .($known !== [] ? ' Voices heard earlier in this recording: '.implode('; ', array_map(fn ($v) => $v['id'].': '.$v['voice'], $known))
+                        .'. Give the same letter to the same voice here; a voice not among them gets the next letter.' : '')
+                : '')
+            .' Return only JSON: {"language": "<ISO 639-1 code of the main language spoken>", '.($speakers ? '"speakers": [{"id": "A", "voice": "..."}], ' : '')
+            .'"segments": [{"start": 0.0, "end": 3.2'.($speakers ? ', "speaker": "A"' : '').', "text": "..."}]}. '
+            .'If nothing is spoken, return {"language": "", '.($speakers ? '"speakers": [], ' : '').'"segments": []}.';
+    }
+
+    /**
+     * How the words of each spoken Arabic are written, so the model keeps them
+     * as said: the commonest dialect words, which it otherwise "corrects".
+     */
+    public static function dialectGuide(): string
+    {
+        return 'Arabic is written exactly in the dialect spoken (Gulf, Egyptian, Levantine, Iraqi, Yemeni, Sudanese, Maghrebi, ...), the way its own speakers write it in messages: '
+            .'never rewrite it into Modern Standard Arabic, never put a Standard word in place of the dialect word said, and never add Standard words that were not said (أن، قد، سوف، إنّ). '
+            .'Keep each dialect word in its own spelling, for example: '
+            .'Egyptian: ده، دي، دول، عايز، عايزة، دلوقتي، أوي (never قوي)، إزاي، إيه، فين، مش، كده، بقى، هـ before a verb for the future (هيروح، هتعمل)، النهارده، بكرة، لسه؛ '
+            .'Upper Egypt: يجول/يگول as said، دلوك؛ '
+            .'Gulf: وايد، شلون، شنو، وش، إيش، الحين، دحين، أبي، أبغى، مب، مو، زين، ريّال، ياي، چذي where ك is said as ch؛ '
+            .'Levantine: شو، هيك، هلّق، هلأ، كتير، بدّي، منيح، ليش، هاد، هيدا، إشي، تبعي؛ '
+            .'Iraqi: شكو، ماكو، أكو، هواية، هسّه، كلش، شلونك، گ where ق is said as g؛ '
+            .'Yemeni: ذلحين، أشتي، كيفك، زلط؛ Sudanese: زول، داير، شنو، ياخ، كدي؛ '
+            .'Maghrebi: بزاف، واش، دابا، ديال، كيفاش، مزيان، والو، شحال، برشا، توا، باهي، ياسر، نتا، نتي، French words in Latin letters as said (normal, ça va). '
+            .'Write ة, ى and أ/إ the usual way, and never add diacritics the speaker did not say.'."\n";
+    }
+
+    /** What the site knows of a chosen dialect or accent: its name and how it sounds and is written. */
+    public static function varietyNote(string $code): string
+    {
+        if ($code === '') {
+            return '';
+        }
+        if (str_starts_with(strtolower($code), 'ar')) {
+            $name = ArabicDialects::prompt($code);
+            $markers = ArabicDialects::markers($code);
+            if ($name === null) {
+                return '';
+            }
+
+            return "The speaker speaks {$name}".($markers ? ": {$markers}" : '.')
+                ."\nWrite their words with that dialect's usual spelling; where ق is said as g or as a glottal stop it is still written ق (or گ where that is how people there write it).\n";
+        }
+        if (str_starts_with(strtolower($code), 'en')) {
+            $name = EnglishAccents::prompt($code);
+
+            return $name !== null ? "The speaker has this accent: {$name}. Write standard spelling for the words said, and keep local words and grammar as said.\n" : '';
+        }
+
+        return '';
     }
 
     /**
@@ -406,7 +665,7 @@ final class Transcriber
      * start, an end not before it, words, and a speaker letter where asked.
      *
      * @param  array<string, mixed>  $data
-     * @return array{text: string, segments: array<int, array{start: float, end: float, speaker: ?string, text: string}>, language: string}
+     * @return array{text: string, segments: array<int, array{start: float, end: float, speaker: ?string, text: string}>, language: string, voices: array<int, array{id: string, voice: string}>}
      */
     public static function read(array $data, bool $timings, bool $speakers): array
     {
@@ -415,6 +674,13 @@ final class Transcriber
         }
         $language = strtolower(substr(preg_replace('/[^a-zA-Z-]/', '', (string) (is_scalar($data['language'] ?? null) ? $data['language'] : '')) ?? '', 0, 8));
         $language = explode('-', $language)[0];
+        $voices = [];
+        foreach ((array) ($data['speakers'] ?? []) as $v) {
+            $id = is_array($v) && is_scalar($v['id'] ?? null) ? mb_substr(trim((string) $v['id']), 0, 8) : '';
+            if ($speakers && $id !== '') {
+                $voices[] = ['id' => $id, 'voice' => mb_substr(trim(is_scalar($v['voice'] ?? null) ? (string) $v['voice'] : ''), 0, 120)];
+            }
+        }
         if (! $timings) {
             $paragraphs = array_values(array_filter(array_map(fn ($p) => is_scalar($p) ? trim((string) $p) : (is_array($p) && is_scalar($p['text'] ?? null) ? trim((string) $p['text']) : ''),
                 (array) ($data['paragraphs'] ?? $data['segments'] ?? [])), 'strlen'));
@@ -424,7 +690,7 @@ final class Transcriber
                 }
             }
 
-            return ['text' => implode("\n\n", $paragraphs), 'segments' => [], 'language' => $language];
+            return ['text' => implode("\n\n", $paragraphs), 'segments' => [], 'language' => $language, 'voices' => []];
         }
 
         $segments = [];
@@ -440,7 +706,7 @@ final class Transcriber
         }
         usort($segments, fn ($a, $b) => $a['start'] <=> $b['start']);
 
-        return ['text' => '', 'segments' => $segments, 'language' => $language];
+        return ['text' => '', 'segments' => $segments, 'language' => $language, 'voices' => $voices];
     }
 
     /** A time as seconds: a number, or "1:15.4" / "0:01:15.4" written as a clock; null when it is neither. */
@@ -454,6 +720,11 @@ final class Transcriber
         }
 
         return null;
+    }
+
+    private static function clock(float $t): string
+    {
+        return sprintf('%d:%02d', intdiv((int) $t, 60), (int) $t % 60);
     }
 
     /** A language's English name from its code (fr → French), or '' when unknown. */
@@ -488,9 +759,10 @@ final class Transcriber
     /**
      * One request to the text model, the models tried in turn and each one's
      * keys (as VideoDubber does): its answer as JSON (null when there is none),
-     * what it used, which model gave it and why it stopped.
+     * the raw answer, what it used, which model gave it and why it stopped.
      *
      * @param  array<int, array<string, mixed>>  $parts
+     * @param  array<string, mixed>  $schema
      * @return array{data: ?array<string, mixed>, raw: string, usage: array<string, int>, model: string, finish: string}
      */
     private function askModel(array $parts, string $thinking, array $schema = []): array
