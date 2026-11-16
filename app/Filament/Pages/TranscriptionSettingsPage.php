@@ -137,7 +137,7 @@ class TranscriptionSettingsPage extends Page implements HasForms
                         TextInput::make('transcription_cost_timed')
                             ->label('Cost to Listen a minute: with timings or speakers')
                             ->numeric()->minValue(0.0001)->maxValue(1)->step(0.0001)->prefix('$')->required()
-                            ->helperText('Measured on staging: $0.0033. Update it from the Google bill.'),
+                            ->helperText('Measured on staging: $0.0042 with the dialect guide. Update it from the Google bill.'),
                     ]),
             ])
             ->statePath('data');

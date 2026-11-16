@@ -28,7 +28,7 @@ class TranscriptionSettingsAdminTest extends TestCase
         $this->assertSame(7, TranscriptionSettings::keepAudioDays());
         $this->assertSame(['ar', 'en', 'fr', 'es', 'de', 'ur'], TranscriptionSettings::languages());
         $this->assertFalse(TranscriptionSettings::review());
-        $this->assertSame(0.0033, TranscriptionSettings::costPerMinute('timed'));
+        $this->assertSame(0.0042, TranscriptionSettings::costPerMinute('timed'));
         $this->assertTrue(TranscriptionSettings::visibleTo(VoiceCloningAccess::PREVIEW_EMAIL));
         $this->assertFalse(TranscriptionSettings::visibleTo('someone@example.com'));
     }

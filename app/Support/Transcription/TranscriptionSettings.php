@@ -123,7 +123,7 @@ final class TranscriptionSettings
     public static function costPerMinute(string $kind): float
     {
         $kind = $kind === 'plain' ? 'plain' : 'timed';
-        $default = (float) config('listen.transcription.cost_per_minute.'.$kind, $kind === 'plain' ? 0.0022 : 0.0033);
+        $default = (float) config('listen.transcription.cost_per_minute.'.$kind, $kind === 'plain' ? 0.0022 : 0.0042);
         $value = (float) SiteSetting::get('transcription_cost_'.$kind, $default);
 
         return $value > 0 ? $value : $default;

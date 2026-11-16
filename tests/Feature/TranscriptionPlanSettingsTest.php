@@ -87,6 +87,6 @@ class TranscriptionPlanSettingsTest extends TestCase
         $this->assertTrue($plan->transcription_priority);
         $this->assertTrue($plan->transcription_speakers);
         $this->assertFalse($plan->transcription_translate);
-        $this->assertEqualsWithDelta(0.0033, TranscriptionAccess::costPerMinute($plan), 1e-9, 'timings cost the timed rate');
+        $this->assertEqualsWithDelta(0.0042, TranscriptionAccess::costPerMinute($plan), 1e-9, 'timings cost the timed rate');
     }
 }
