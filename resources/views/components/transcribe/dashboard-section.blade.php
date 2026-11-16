@@ -326,7 +326,6 @@
     {{-- Every transcript, with the minutes it used --}}
     <section class="dub-ledger tr-ledger" aria-labelledby="trLedgerTitle" data-tr-ledger>
       <h2 id="trLedgerTitle">{{ __('transcribe.page.history_title') }}</h2>
-      <p>{{ __('transcribe.page.history_text') }}</p>
       <label class="tr-search">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>
         <span class="sr-only">{{ __('transcribe.page.search') }}</span>

@@ -75,7 +75,6 @@ return [
         'detect' => 'Detect automatically',
         'change' => 'Choose another',
         'history_title' => 'Your transcripts',
-        'history_text' => 'Each one shows the minutes it used. One that failed used none.',
         'search' => 'Search transcripts',
         'col_date' => 'Date',
         'col_name' => 'Name',

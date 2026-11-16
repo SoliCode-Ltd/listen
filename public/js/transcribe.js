@@ -618,7 +618,7 @@
     return '<td class="num" data-label="' + esc(L.date) + '">' + esc(item.date) + '</td>'
       + '<td class="tr-name"><button type="button" class="dub-link" data-tr-open dir="auto">' + esc(cleanTitle(item.title)) + '</button></td>'
       + '<td data-label="' + esc(L.language) + '">' + esc(item.language_name || '—') + '</td>'
-      + '<td class="num" data-label="' + esc(L.length) + '"><span dir="ltr">' + esc(clock(item.seconds)) + '</span></td>'
+      + '<td class="num" data-label="' + esc(L.length) + '"><span dir="ltr">' + esc(clock(Math.round(item.seconds || 0))) + '</span></td>'
       + '<td class="num" data-label="' + esc(L.used) + '">' + esc(used) + '</td>'
       + '<td data-label="' + esc(L.status) + '">' + badge(item) + '</td>'
       + '<td class="tr-actions-cell">'
