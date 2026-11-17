@@ -44,6 +44,10 @@ return [
     ],
 
     'signin' => [
+        // "Sign in with Apple" in the iPhone app; the button itself is Apple's own picture.
+        'apple_failed' => 'We couldn\'t sign you in with Apple. Please try again.',
+        'apple_continue' => 'Continue with Apple',
+        'apple_sign_up' => 'Sign up with Apple',
         'done_title' => 'You\'re signed in',
         'done_text' => 'Signed in as :email. Go back to the app to continue.',
         'done_button' => 'Back to the app',

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Rules\NotDisposableEmail;
 use App\Services\BlockedUserService;
 use App\Services\MultiAccountEnforcementService;
+use App\Services\Auth\AppleSignIn;
 use App\Services\Auth\AuthSettingsService;
 use App\Services\Auth\EmailVerificationMailer;
 use App\Services\Auth\PhoneAuthBridgeService;
@@ -15,6 +16,7 @@ use App\Services\PlanAccessService;
 use App\Services\Referral\ReferralService;
 use App\Http\Middleware\CaptureReferralVisit;
 use GuzzleHttp\Client as GuzzleClient;
+use App\Support\InApp\InApp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -445,6 +447,109 @@ class AuthController extends Controller
         return $this->attachDeviceCookie($request, response()->json([
             'ok' => true,
             'redirect' => $intended,
+        ]));
+    }
+
+    /**
+     * "Sign in with Apple" in the iPhone app: the phone signed the member in and
+     * the page passes on Apple's signed token (App\Services\Auth\AppleSignIn).
+     * The same steps as the other sign-ins from there on.
+     */
+    public function appleAuthenticate(Request $request, AppleSignIn $apple)
+    {
+        // Offered inside the iPhone app only, and only where it is switched on.
+        if (! InApp::onIphone($request) || ! InApp::offersSocialSignIn($request)) {
+            return response()->json(['ok' => false, 'message' => __('app.signin.apple_failed')], 403);
+        }
+
+        $data = $request->validate([
+            'identity_token' => ['required', 'string', 'max:8192'],
+            'authorization_code' => ['nullable', 'string', 'max:2048'],
+            'given_name' => ['nullable', 'string', 'max:80'],
+            'family_name' => ['nullable', 'string', 'max:80'],
+        ]);
+
+        try {
+            // The nonce is good for one sign-in.
+            $claims = $apple->verify($data['identity_token'], (string) $request->session()->pull(AppleSignIn::NONCE_SESSION, ''));
+        } catch (\Throwable $exception) {
+            Log::warning('Sign in with Apple failed.', ['message' => $exception->getMessage(), 'ip' => $request->ip()]);
+
+            return response()->json(['ok' => false, 'message' => __('app.signin.apple_failed')], 422);
+        }
+
+        $deviceId = $this->deviceIdFromRequest($request);
+        $user = User::query()->where('apple_id', $claims['sub'])->first();
+
+        // Joining this Apple identity to an account that already has the address needs Apple
+        // to say it verified the address (it does, for its own and its relay addresses).
+        if (! $user && $claims['email'] !== null && $claims['email_verified']) {
+            $user = User::query()->where('email', $claims['email'])->first();
+        }
+
+        if (! $user) {
+            if ($claims['email'] === null || ! $claims['email_verified'] || User::query()->where('email', $claims['email'])->exists()) {
+                return response()->json(['ok' => false, 'message' => __('ui.backend.auth_social_no_email')], 422);
+            }
+            // Apple gives the name once, on the first sign-in, and only through the phone.
+            $name = trim(($data['given_name'] ?? '').' '.($data['family_name'] ?? '')) ?: __('ui.backend.auth_social_default_name');
+            $user = User::create([
+                'name' => $name,
+                'email' => $claims['email'],
+                'password' => Hash::make(Str::password(32)),
+                'email_verified_at' => now(),
+                'registration_ip' => $request->ip(),
+                'registration_device_id' => $deviceId,
+                'last_seen_device_id' => $deviceId,
+            ]);
+            $justCreated = true;
+        } else {
+            $justCreated = false;
+        }
+
+        $user->forceFill([
+            'apple_id' => $user->apple_id ?: $claims['sub'],
+            'email_verified_at' => $user->email_verified_at ?? now(),
+        ])->save();
+
+        $this->attachFreePlanIfMissing($user);
+        if ($justCreated) {
+            $this->bindReferralFromRequest($request, $user);
+        }
+
+        if ($this->blockedUserService->isBlocked($user)) {
+            return response()->json([
+                'ok' => false,
+                'message' => $this->blockedUserService->messageFor($user),
+                'blocked_notice' => $this->blockedUserService->noticePayload($user),
+            ], 403);
+        }
+
+        $this->stampLoginIp($user, $request);
+
+        $user->refresh();
+        $this->multiAccountEnforcement->enforceAfterAuth($user);
+
+        if ($user->isBlocked()) {
+            return response()->json([
+                'ok' => false,
+                'message' => $this->blockedUserService->messageFor($user),
+                'blocked_notice' => $this->blockedUserService->noticePayload($user),
+            ], 403);
+        }
+
+        // Kept so that deleting the account can tell Apple to forget the link (MemberAccountDeletion).
+        $refreshToken = $apple->refreshTokenFor((string) ($data['authorization_code'] ?? ''));
+        if ($refreshToken !== null) {
+            $user->forceFill(['apple_refresh_token' => $refreshToken])->save();
+        }
+
+        Auth::login($user, true);
+        $request->session()->regenerate();
+
+        return $this->attachDeviceCookie($request, response()->json([
+            'ok' => true,
+            'redirect' => $this->landingAfterSignIn($request, $user),
         ]));
     }
 

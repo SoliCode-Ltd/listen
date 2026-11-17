@@ -119,27 +119,44 @@ class InAppIphoneTest extends InAppModeTest
         $this->assertStringEndsWith('/app/plan', (string) $unnamed()->get('/billing')->assertRedirect()->headers->get('Location'));
     }
 
-    public function test_the_iphone_app_signs_in_with_email_until_it_can_offer_apples_sign_in_too(): void
+    public function test_the_iphone_app_offers_apples_sign_in_beside_googles_or_neither(): void
     {
         $this->seedPlansWithEverythingOpen();
         config(['services.google.client_id' => 'id', 'services.google.client_secret' => 'secret']);
 
-        foreach (['login', 'register'] as $route) {
+        // Apple's guideline 4.8: where another company's sign-in is offered, Apple's is offered beside it.
+        foreach (['login' => 'continue', 'register' => 'sign-up'] as $route => $kind) {
             foreach (['en', 'ar'] as $locale) {
                 $page = $this->inApp(null, $locale)->page($route)->assertOk();
-                $page->assertDontSee('data-app-signin', false)
-                    ->assertDontSee('firebaseGoogleSignInBtn', false)
-                    ->assertDontSee(route('auth.social.redirect'), false)
-                    ->assertSee('name="email"', false)
-                    ->assertSee('name="password"', false);
-                $this->assertStringNotContainsStringIgnoringCase('google', $this->visibleText($page->getContent()), "$route ($locale)");
+                $page->assertSee('data-app-signin', false)
+                    ->assertSee('data-app-signin-apple', false)
+                    // Apple's own button picture, in the page's language, for a light and a dark page.
+                    ->assertSee('images/partners/apple-'.$kind.'-'.$locale.'-black.png', false)
+                    ->assertSee('images/partners/apple-'.$kind.'-'.$locale.'-white.png', false)
+                    ->assertSee('name="email"', false);
+                $this->assertFileExists(public_path('images/partners/apple-'.$kind.'-'.$locale.'-black.png'));
+                $this->assertFileExists(public_path('images/partners/apple-'.$kind.'-'.$locale.'-white.png'));
             }
         }
 
-        // The Android app keeps its button, and so does the iPhone app once the setting says both are offered.
-        $this->as(null, 'en', self::APP_UA)->page('login')->assertOk()->assertSee('data-app-signin', false);
+        // Switched off, the iPhone app has neither button: email only.
+        config(['services.ios_app.social_sign_in' => false]);
+        foreach (['login', 'register'] as $route) {
+            $page = $this->inApp(null)->page($route)->assertOk();
+            $page->assertDontSee('data-app-signin', false)
+                ->assertDontSee('firebaseGoogleSignInBtn', false)
+                ->assertDontSee(route('auth.social.redirect'), false)
+                ->assertSee('name="email"', false)
+                ->assertSee('name="password"', false);
+            $this->assertStringNotContainsStringIgnoringCase('google', $this->visibleText($page->getContent()), $route);
+        }
+
+        // Apple's button is the iPhone app's alone: never in the Android app, a browser, or the sign-in sheet.
         config(['services.ios_app.social_sign_in' => true]);
-        $this->inApp(null)->page('login')->assertOk()->assertSee('data-app-signin', false);
+        foreach ([self::APP_UA, self::BROWSER_UA, self::IPHONE_BROWSER_UA] as $userAgent) {
+            $this->as(null, 'en', $userAgent)->page('login')->assertOk()->assertDontSee('data-app-signin-apple', false)->assertDontSee('apple-continue', false);
+        }
+        $this->as(null, 'en', self::APP_UA)->page('login')->assertOk()->assertSee('data-app-signin', false);
     }
 
     public function test_the_sign_in_sheet_the_iphone_app_opens_follows_the_iphone_rules(): void

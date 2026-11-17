@@ -366,6 +366,10 @@ Route::group([
         Route::post('/auth/firebase-google/verify', [AuthController::class, 'firebaseGoogleAuthenticate'])
             ->middleware(['auth.method:firebase_google', 'throttle:auth-bridge'])
             ->name('auth.firebase-google.verify');
+        // "Sign in with Apple", from the iPhone app (AuthController::appleAuthenticate).
+        Route::post('/auth/apple/verify', [AuthController::class, 'appleAuthenticate'])
+            ->middleware('throttle:auth-bridge')
+            ->name('auth.apple.verify');
     });
 
     // "Forgot your password?" on the sign-in page: ask for the link (a few an hour), then the
