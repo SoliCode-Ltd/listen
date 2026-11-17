@@ -1,5 +1,6 @@
 #if canImport(UIKit)
 import XCTest
+import AuthenticationServices
 @testable import App
 
 /// What the app promises Apple and the site, checked on every build: the settings a
@@ -144,6 +145,21 @@ final class NativeRulesTests: XCTestCase {
         } else {
             XCTFail("a good request was refused")
         }
+    }
+
+    func testClosingApplesSheetIsNotAFailure() {
+        XCTAssertEqual("cancelled", AppleSignIn.failure(from: ASAuthorizationError(.canceled)).code)
+        XCTAssertEqual("apple_failed", AppleSignIn.failure(from: ASAuthorizationError(.failed)).code)
+        XCTAssertEqual("apple_failed", AppleSignIn.failure(from: NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)).code)
+    }
+
+    func testThePageCanAskForEverythingTheBridgePromises() {
+        // mobile/BRIDGE.md: the same names as the Android app's, plus Apple's sign-in.
+        let names = Set(ListenShellPlugin().pluginMethods.compactMap { $0.name as String? })
+        XCTAssertEqual([
+            "getInfo", "mediaUpdate", "mediaStop", "saveAudio", "shareAudio", "ensureMic", "ensureNotifications",
+            "signIn", "signInWithApple", "setPullToRefresh", "setBackHandler", "minimize", "openExternal", "setTheme"
+        ], names)
     }
 
     func testLeavingAPageEarlyIsNotAFailure() {

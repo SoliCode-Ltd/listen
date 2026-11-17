@@ -329,6 +329,7 @@ The page script gets `LISTEN_APP.platform === 'ios'`.
 | `shareAudio` | The share sheet. Resolves once it is open. |
 | `ensureMic` / `ensureNotifications` | The phone's own question the first time; after a refusal, a dialog offering the phone's Settings (then `{ granted: false }`). There is no "explain first, then ask again" step: an iPhone asks once. |
 | `signIn` | The phone's sign-in sheet over the app (not the browser app), opened at `/app/signin/start?...&platform=ios`. The rest of the exchange (section 4) is the same. Rejects with `no_browser` if the sheet cannot open. |
+| `signInWithApple({ nonce })` | **iPhone only.** The phone's "Sign in with Apple" sheet. `nonce` is the site's one-time value (`LISTEN_APP.apple.nonce`); Apple signs it into the token. → `{ identityToken: string, authorizationCode?: string, givenName?: string, familyName?: string }` (the name only on a person's first sign-in). The page posts these to `LISTEN_APP.apple.url`, where the site checks the token. Rejects with code `cancelled` when the sheet is closed, `apple_failed` otherwise. |
 | `setBackHandler`, `minimize`, `backPressed` | No back button on an iPhone: the calls resolve and do nothing, and `backPressed` is never sent. A swipe from the screen's edge goes back a page. |
 | `setPullToRefresh`, `setTheme`, `openExternal` | As on Android. |
 | `PushNotifications` `registration` | `{ value }` is Apple's token (64 hexadecimal characters), not a Firebase one. The site sends to iPhones through Apple's service directly; there is no Firebase in the iPhone app. |

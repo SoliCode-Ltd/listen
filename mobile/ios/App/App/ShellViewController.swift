@@ -58,6 +58,7 @@ final class ShellViewController: UIViewController {
         refresh.addTarget(self, action: #selector(refreshPulled), for: .valueChanged)
         applyTheme()
         showWave()
+        ShellViewController.note("launched \(AppConfig.userAgentSuffix) \(AppConfig.urls.origin) lang=\(AppConfig.deviceLang) dark=\(dark)")
 
         // Opened by a link, a notification or a shortcut: that page instead of the first one.
         if let first = AppRouter.shared.takeWaiting() {
@@ -76,6 +77,7 @@ final class ShellViewController: UIViewController {
 
     func load(_ url: URL) {
         guard AppConfig.urls.isAppUrl(url) else { return }
+        ShellViewController.note("load \(url.absoluteString)")
         _ = webView?.load(URLRequest(url: url))
     }
 
@@ -84,16 +86,19 @@ final class ShellViewController: UIViewController {
     func pageStarted() {
         // Everything a page switched on belongs to that page.
         setPullToRefresh(false)
+        ShellViewController.note("started \(webView?.url?.absoluteString ?? "-")")
     }
 
     func pageFinished() {
+        ShellViewController.note("finished \(webView?.url?.absoluteString ?? "-")")
         refresh.endRefreshing()
         failedUrl = nil
         hideOffline()
         hideWave()
     }
 
-    func pageFailed(_ url: URL?) {
+    func pageFailed(_ url: URL?, reason: String = "") {
+        ShellViewController.note("failed \(url?.absoluteString ?? "-") \(reason)")
         refresh.endRefreshing()
         failedUrl = url.flatMap { AppConfig.urls.isAppUrl($0) ? $0 : nil } ?? failedUrl
         showOffline()
@@ -250,6 +255,26 @@ final class ShellViewController: UIViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + ShellViewController.refreshSpinnerMax) { [weak self] in
             self?.refresh.endRefreshing()
         }
+    }
+
+    // MARK: - A record for the build machine
+
+    /// Debug builds only: what happened to each page, written where the simulator run on the
+    /// build machine can read it (ci/simulator-shots.sh). A released app writes nothing.
+    static func note(_ line: String) {
+        #if DEBUG
+        guard let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let file = folder.appendingPathComponent("listen-debug.log")
+        let text = String(format: "%.1f ", Date().timeIntervalSince1970) + line + "\n"
+        guard let data = text.data(using: .utf8) else { return }
+        if let handle = try? FileHandle(forWritingTo: file) {
+            handle.seekToEndOfFile()
+            handle.write(data)
+            handle.closeFile()
+        } else {
+            try? data.write(to: file)
+        }
+        #endif
     }
 
     // MARK: - Files

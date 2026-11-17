@@ -26,6 +26,7 @@ public class ListenShellPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "ensureMic", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "ensureNotifications", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "signIn", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "signInWithApple", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setPullToRefresh", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setBackHandler", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "minimize", returnType: CAPPluginReturnPromise),
@@ -206,6 +207,26 @@ public class ListenShellPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve()
             } else {
                 call.reject("The sign-in sheet could not be opened", "no_browser")
+            }
+        }
+    }
+
+    /// iPhone only: "Sign in with Apple". Resolves with Apple's signed token for the page to
+    /// pass to the site; rejects with the code "cancelled" when the sheet is closed.
+    @objc func signInWithApple(_ call: CAPPluginCall) {
+        let nonce = call.getString("nonce") ?? ""
+        DispatchQueue.main.async {
+            AppleSignIn.shared.start(nonce: nonce, in: self.bridge?.viewController?.view.window) { result in
+                switch result {
+                case .success(let answer):
+                    var data: [String: Any] = ["identityToken": answer.identityToken]
+                    if let code = answer.authorizationCode { data["authorizationCode"] = code }
+                    if let name = answer.givenName { data["givenName"] = name }
+                    if let name = answer.familyName { data["familyName"] = name }
+                    call.resolve(data)
+                case .failure(let failure):
+                    call.reject(failure.message, failure.code)
+                }
             }
         }
     }

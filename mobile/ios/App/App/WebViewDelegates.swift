@@ -106,9 +106,13 @@ final class WebViewDelegates: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     private func report(_ error: Error) {
-        guard WebViewDelegates.isRealFailure(error) else { return }
-        let failed = (error as NSError).userInfo[NSURLErrorFailingURLErrorKey] as? URL
-        shell?.pageFailed(failed)
+        let error = error as NSError
+        guard WebViewDelegates.isRealFailure(error) else {
+            ShellViewController.note("left early \(error.domain) \(error.code)")
+            return
+        }
+        let failed = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
+        shell?.pageFailed(failed, reason: "\(error.domain) \(error.code) \(error.localizedDescription)")
     }
 
     /// A page that was left for another one before it came, or a file that was saved
