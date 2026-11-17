@@ -294,10 +294,17 @@
       a.src = URL.createObjectURL(file);
     });
   }
+  // A date and time in the member's own time zone, as "16 Nov, 23:41" (the server's dates are in UTC):
+  // a recording's name and every transcript's date read the same clock and the same way.
   function whenMade(d) {
+    var arabic = (document.documentElement.lang || '').indexOf('ar') === 0;
     try {
-      return new Intl.DateTimeFormat(document.documentElement.lang || 'en', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(d);
+      return new Intl.DateTimeFormat(arabic ? 'ar-u-nu-latn' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
     } catch (e) { return d.toLocaleString(); }
+  }
+  function madeOn(item) {
+    var d = item && item.created_at ? new Date(item.created_at) : null;
+    return d && !isNaN(d.getTime()) ? whenMade(d) : ((item && item.date) || '');
   }
   // A recording plays from its card: the button over it, the time in its corner, a thin bar along its foot.
   var playButton = $('[data-tr-preview-play]');
@@ -703,7 +710,7 @@
   }
   function rowHtml(item) {
     var L = c.columns || {};
-    return '<td class="num" data-label="' + esc(L.date) + '">' + esc(item.date) + '</td>'
+    return '<td class="num" data-label="' + esc(L.date) + '">' + esc(madeOn(item)) + '</td>'
       + '<td class="tr-name"><button type="button" class="dub-link" data-tr-open dir="auto">' + esc(cleanTitle(item.title)) + '</button></td>'
       + '<td data-label="' + esc(L.language) + '">' + esc(item.language_name || '—') + '</td>'
       // One length: what the file is and what it used are the same seconds.
@@ -901,7 +908,7 @@
     $('[data-tr-translate-note]').hidden = true;
     $('[data-tr-audio-gone]').hidden = true;
     $('[data-tr-reader-title]').textContent = cleanTitle(item.title);
-    ['length', 'language', 'date'].forEach(function (k) { $('[data-tr-fact="' + k + '"]').textContent = k === 'length' ? (item.length || '') : k === 'date' ? (item.date || '') : (item.language_name || ''); });
+    ['length', 'language', 'date'].forEach(function (k) { $('[data-tr-fact="' + k + '"]').textContent = k === 'length' ? (item.length || '') : k === 'date' ? madeOn(item) : (item.language_name || ''); });
     var ghost = '';
     for (var i = 0; i < 4; i++) ghost += '<div class="tr-skel" aria-hidden="true"><span class="tr-skel-head"></span><span class="tr-skel-line"></span><span class="tr-skel-line is-short"></span></div>';
     $('[data-tr-text]').innerHTML = ghost;
@@ -1301,7 +1308,7 @@
     // Its details, each said once.
     $('[data-tr-fact="length"]').textContent = tr.length || '—';
     $('[data-tr-fact="language"]').textContent = tr.language_name || '—';
-    $('[data-tr-fact="date"]').textContent = tr.date || '—';
+    $('[data-tr-fact="date"]').textContent = madeOn(tr) || '—';
     if (audio) { audio.pause(); audio.removeAttribute('src'); audio.load(); }
     audio = $('[data-tr-audio]');
     audio.playbackRate = 1;
