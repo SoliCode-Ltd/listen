@@ -92,6 +92,8 @@ return [
     'footer' => [
         'tagline' => 'تحويل نص إلى كلام مدعوم بالذكاء الاصطناعي بمستوى متميز. أصوات طبيعية لكل مشروع.',
         'inception_badge' => 'NVIDIA Inception Program',
+        'play_badge' => 'احصل عليه من Google Play',
+        'play_trademark' => 'Google Play وشعار Google Play علامتان تجاريتان لشركة Google LLC.',
         'product' => 'المنتج',
         'solutions' => 'الحلول',
         'demo' => 'جرّب الآن',

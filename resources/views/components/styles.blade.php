@@ -972,6 +972,25 @@ html[data-theme="light"] .app-footer {
   width: auto;
 }
 
+/* Google Play's badge under it. The file carries its own clear space (a quarter of the badge's
+   height on every side), so the picture is 66px tall for a badge of 44px, and is pulled to the
+   start edge by that space. Never recoloured or cropped. */
+.footer-store {
+  display: inline-block;
+  margin-top: .45rem;
+  margin-inline-start: -11px;
+  line-height: 0;
+}
+.footer-store img {
+  display: block;
+  height: 66px;
+  width: auto;
+}
+.footer-trademark {
+  margin-top: .3rem !important;
+  font-size: .75rem;
+}
+
 .footer-links {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

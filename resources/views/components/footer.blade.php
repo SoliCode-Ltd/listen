@@ -71,6 +71,11 @@
         <p class="footer-tagline">{{ __('ui.footer.tagline') }}</p>
         {{-- NVIDIA's badge, unchanged (see CLAUDE.md: the one other company the site names). --}}
         <img class="footer-inception" src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.footer.inception_badge') }}" width="147" height="54" loading="lazy" decoding="async">
+        {{-- Google Play's own badge, unchanged and in the page's language, leading to the app's page on the store
+             (see CLAUDE.md: the second name the owner approved). Its clear space is part of the file. --}}
+        <a class="footer-store" href="{{ config('services.android_app.store_url') }}" target="_blank" rel="noopener">
+          <img src="{{ \App\Support\VersionedAsset::url('images/partners/google-play-badge-'.($currentLocale === 'ar' ? 'ar' : 'en').'.png') }}" alt="{{ __('ui.footer.play_badge') }}" width="171" height="66" loading="lazy" decoding="async">
+        </a>
       </div>
 
       <div class="footer-links">
@@ -104,6 +109,8 @@
     <div class="footer-bottom {{ $hasSocialLinks ? '' : 'single' }}">
       <div class="footer-copyright">
         <p>{{ __('ui.footer.copyright', ['year' => $currentYear, 'name' => $brandName]) }}</p>
+        {{-- The line Google asks for beside its badge. --}}
+        <p class="footer-trademark">{{ __('ui.footer.play_trademark') }}</p>
       </div>
       @if($hasSocialLinks)
         <div class="footer-social">

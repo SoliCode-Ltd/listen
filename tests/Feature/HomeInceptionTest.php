@@ -43,6 +43,27 @@ class HomeInceptionTest extends TestCase
         }
     }
 
+    public function test_the_footer_leads_to_the_app_on_google_play_with_googles_own_badge(): void
+    {
+        $store = 'https://play.google.com/store/apps/details?id=studio.listenai.app';
+        foreach (['en' => 'Get it on Google Play', 'ar' => 'احصل عليه من Google Play'] as $locale => $alt) {
+            app()->setLocale($locale);
+            $this->getLocalizedRoute('pricing')->assertOk()
+                // The badge in the page's language, leading to the app's page on the store.
+                ->assertSee('<a class="footer-store" href="'.$store.'" target="_blank" rel="noopener">', false)
+                ->assertSee('images/partners/google-play-badge-'.$locale.'.png', false)
+                ->assertSee('alt="'.$alt.'"', false)
+                // The line Google asks for beside its badge.
+                ->assertSee('class="footer-trademark"', false)
+                ->assertSee('Google LLC');
+        }
+        // Google's files as it publishes them: 646 by 250, clear space included.
+        foreach (['en', 'ar'] as $locale) {
+            [$width, $height] = getimagesize(public_path('images/partners/google-play-badge-'.$locale.'.png'));
+            $this->assertSame([646, 250], [$width, $height]);
+        }
+    }
+
     public function test_the_badge_is_nvidias_own_file_framed_to_its_outline(): void
     {
         $svg = (string) file_get_contents(public_path('images/partners/nvidia-inception.svg'));
