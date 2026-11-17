@@ -25,6 +25,8 @@ return [
         'free_used' => 'You have used your free try. The :plan plan includes speech to text.',
         'free_too_long' => 'The free try takes recordings up to :max, and this one is :length. The :plan plan takes longer files.',
         'free_day_full' => 'Today\'s free tries are all taken. Try again tomorrow, or choose a plan.',
+        'verify_email' => 'Your free try is waiting: open the link we sent to :email to confirm it is you.',
+        'free_blocked' => 'The free try is not available from this browser.',
         'busy' => '{1} You already have a file being converted to text. Wait for it to finish.|[2,*] You already have :n files being converted to text. Wait for one to finish.',
         'site_busy' => 'Speech to text is very busy today. Please try again tomorrow.',
         'bad_link' => 'We could not get audio from this link. Use a direct link to an audio or video file.',
@@ -176,5 +178,11 @@ return [
         'minutes_seconds' => ':m min :s s',
         'minutes' => ':m min',
         'seconds' => ':s s',
+    ],
+
+    // The demo's tab (resources/views/components/dub/mode-switch.blade.php).
+    'demo' => [
+        'tab' => 'Speech to text',
+        'tab_hint' => 'Turn a recording into text',
     ],
 ];

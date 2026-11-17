@@ -5,10 +5,13 @@ namespace App\Support\Transcription;
 use App\Models\Plan;
 use App\Models\Transcription;
 use App\Models\User;
+use App\Services\DemoLinkedAccounts;
+use App\Services\DemoSamePerson;
 use App\Services\PlanAccessService;
 use App\Support\CreditPeriod;
 use App\Support\InApp\InApp;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -112,15 +115,65 @@ final class TranscriptionAccess
         return max(1, (int) round($seconds));
     }
 
-    /** Whether the member can still have the free try: once, and while the site's free tries for today last. */
-    public static function freeTryLeft(User $user): bool
+    /** Whether the member can still have the free try: once for each person, and while the site's free tries for today last. */
+    public static function freeTryLeft(User $user, ?Request $request = null): bool
     {
         if (TranscriptionSettings::freeTrySeconds() <= 0) {
             return false;
         }
-        $used = Transcription::withTrashed()->where('user_id', $user->id)->where('is_free', true)->where('status', '!=', Transcription::FAILED)->exists();
 
-        return ! $used && ! self::freeDayFull();
+        return ! self::freeTryUsed($user, $request ?? request()) && ! self::freeDayFull();
+    }
+
+    /**
+     * Whether this person has had the free try, as the demo counts one person
+     * (App\Services\DemoSamePerson): this account, every account linked to it, this
+     * browser or device, and their deleted accounts. A failed one does not count.
+     */
+    public static function freeTryUsed(User $user, Request $request): bool
+    {
+        $ids = rescue(fn () => app(DemoSamePerson::class)->ids($user, $request), [(int) $user->id], false);
+        if (rescue(fn () => app(DemoSamePerson::class)->leftBehindFreeStt($user, $request), false, false)) {
+            return true;
+        }
+        $browser = DemoLinkedAccounts::browserFrom($request);
+        $device = DemoLinkedAccounts::deviceFrom($request)['signal'] ?? null;
+        $marked = self::marksFreeTries();
+
+        return Transcription::withTrashed()
+            ->where('is_free', true)
+            ->where('status', '!=', Transcription::FAILED)
+            ->where(function ($q) use ($ids, $user, $browser, $device, $marked): void {
+                $q->whereIn('user_id', array_values(array_unique([...$ids, (int) $user->id])));
+                if ($marked && $browser !== null) {
+                    $q->orWhere('browser', $browser);
+                }
+                if ($marked && $device !== null) {
+                    $q->orWhere('device', $device);
+                }
+            })
+            ->exists();
+    }
+
+    /**
+     * What a free try keeps of where it was asked from (its browser cookie and device),
+     * so a new account there gets no second one.
+     *
+     * @return array{browser?: string|null, device?: string|null}
+     */
+    public static function freeTryMarks(Request $request): array
+    {
+        if (! self::marksFreeTries()) {
+            return [];
+        }
+
+        return ['browser' => DemoLinkedAccounts::browserFrom($request), 'device' => DemoLinkedAccounts::deviceFrom($request)['signal'] ?? null];
+    }
+
+    /** False until the migration that keeps a free try's browser and device has run. */
+    private static function marksFreeTries(): bool
+    {
+        return once(fn (): bool => rescue(fn () => Schema::hasColumn('transcriptions', 'browser'), false, false));
     }
 
     public static function freeDayFull(): bool

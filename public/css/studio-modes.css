@@ -57,14 +57,31 @@
 /* Only what belongs to the chosen mode shows. */
 [data-studio-host][data-studio="tts"] [data-studio-pane]:not([data-studio-pane~="tts"]),
 [data-studio-host][data-studio="design"] [data-studio-pane]:not([data-studio-pane~="design"]),
+[data-studio-host][data-studio="stt"] [data-studio-pane]:not([data-studio-pane~="stt"]),
 [data-studio-host][data-studio="dub"] [data-studio-pane]:not([data-studio-pane~="dub"]),
 [data-studio-host][data-studio="agent"] [data-studio-pane]:not([data-studio-pane~="agent"]) { display: none !important; }
 
-@media (max-width: 560px) {
-  .studio-mode { padding: .6rem .65rem; gap: .55rem; flex-direction: column; text-align: center; }
-  .studio-mode-text small { display: none; }
+/*
+ * Narrower screens: two columns of tiles, never squeezed into one row. Each tile keeps its icon,
+ * its name on one line and its hint; the chosen one is raised, ringed and its icon filled. With an
+ * odd number of tabs the last takes the full width, so the grid has no gap.
+ */
+@media (max-width: 899px) {
+  .studio-modes { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; padding: .4rem; }
+  .studio-mode { padding: .75rem .8rem; border: 1px solid transparent; }
+  .studio-mode[aria-selected="true"] { border-color: color-mix(in oklab, var(--a) 42%, transparent); }
+  .studio-mode:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
-@media (max-width: 380px) {
-  .studio-mode-icon { flex-basis: 32px; width: 32px; height: 32px; }
-  .studio-mode-text strong { font-size: .92rem; }
+@media (max-width: 640px) {
+  .studio-modes { border-radius: 16px; }
+  .studio-mode { flex-direction: column; align-items: flex-start; gap: .55rem; padding: .8rem .8rem .85rem; border-radius: 12px; }
+  .studio-mode:not([aria-selected="true"]) { background: color-mix(in oklab, var(--surface) 55%, transparent); }
+  .studio-mode-icon { flex-basis: 34px; width: 34px; height: 34px; border-radius: 10px; }
+  .studio-mode-icon svg { width: 18px; height: 18px; }
+  .studio-mode-text { gap: .15rem; }
+  .studio-mode-text strong { font-size: .92rem; line-height: 1.35; }
+  /* No word left alone on a hint's last line. */
+  .studio-mode-text small { display: block; font-size: .78rem; line-height: 1.45; overflow-wrap: normal; text-wrap: pretty; }
+  /* The full-width last tile reads as a row: icon beside its words. */
+  .studio-mode:last-child:nth-child(odd) { flex-direction: row; align-items: center; gap: .7rem; }
 }
