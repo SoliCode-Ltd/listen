@@ -6,6 +6,7 @@ use App\Models\Agent;
 use App\Models\AppDevice;
 use App\Support\InApp\InApp;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 /**
  * The site as the Listen iPhone app shows it. Every test of the Android app
@@ -62,11 +63,14 @@ class InAppIphoneTest extends InAppModeTest
         $this->assertTrue(InApp::hidesPlans($iphone));
         $this->assertFalse(InApp::buysOnWeb($iphone));
 
-        foreach (['pricing', 'billing.page', 'manage-subscription.page'] as $route) {
-            $response = $this->inApp($member)->page($route);
+        // Asked for by their own addresses (inside the app the site's links to them already lead to the account page).
+        foreach (['pricing', 'billing.page', 'billing.pack', 'manage-subscription.page', 'pack.start', 'trial.start'] as $route) {
+            $response = $this->inApp($member)->get('/'.ltrim(Route::getRoutes()->getByName($route)->uri(), '/'));
             $response->assertRedirect();
-            $this->assertStringEndsWith('/app/plan', (string) $response->headers->get('Location'), $route);
+            $this->assertStringEndsWith('/app/plan', (string) parse_url((string) $response->headers->get('Location'), PHP_URL_PATH), $route);
         }
+        // A request that would pay is refused.
+        $this->inApp($member)->post('/billing/subscribe', ['plan' => 'creator'])->assertStatus(403)->assertJson(['ok' => false, 'message' => __('app.not_sold_here')]);
         // Nothing hands over to the browser to pay.
         $account = (string) $this->inApp($member)->page('app.plan')->assertOk()->getContent();
         $this->assertStringNotContainsString('/app/continue', $account);
