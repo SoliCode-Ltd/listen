@@ -8,6 +8,7 @@ use App\Services\Auth\AuthSettingsService;
 use App\Services\BlockedUserService;
 use App\Services\PlanAccessService;
 use App\Support\CreditPeriod;
+use App\Support\InApp\AiConsent;
 use App\Support\InApp\InApp;
 use App\Support\UsageSnapshot;
 use Illuminate\Http\JsonResponse;
@@ -37,6 +38,9 @@ class AppShellController extends Controller
 
     /** Places the app can start at by name (/app/start?to=voices), and the page each one is. */
     private const START_PLACES = ['voices' => 'samples', 'agents' => 'voice-agents.index'];
+
+    /** Session key: the page a member was on the way to when the iPhone app asked for their agreement. */
+    public const CONSENT_INTENDED = 'app_consent.intended';
 
     private const SIGN_IN_CHALLENGE = 'app_signin.challenge';
 
@@ -85,6 +89,46 @@ class AppShellController extends Controller
             'studioUrl' => $this->memberHome($user, app()->getLocale()),
             'renewsOn' => InApp::renewsOn((int) $user->id),
         ]);
+    }
+
+    /**
+     * The iPhone app's question before a member's first voice: what is sent to the AI
+     * provider, to whom, and for what (App\Support\InApp\AiConsent). Later, the same page
+     * says when they agreed and lets them take it back.
+     */
+    public function consent(Request $request): View|RedirectResponse
+    {
+        // The question belongs to the iPhone app; anywhere else there is nothing to ask.
+        if (! InApp::onIphone($request)) {
+            return redirect()->to($this->memberHome($request->user(), app()->getLocale()));
+        }
+
+        $agreedAt = $request->user()->getAttribute(AiConsent::COLUMN);
+
+        return view('app.consent', [
+            'agreedOn' => $agreedAt ? \Illuminate\Support\Carbon::parse($agreedAt)->locale(app()->getLocale())->translatedFormat('j F Y') : null,
+        ]);
+    }
+
+    public function consentAgree(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        AiConsent::give($user);
+
+        $to = (string) $request->session()->pull(self::CONSENT_INTENDED, '');
+        // Only a page of this site: a path, never an address.
+        if (preg_match('#^/(?![/\\\\])[^\s\\\\]*$#', $to) !== 1) {
+            $to = '';
+        }
+
+        return redirect()->to($to !== '' ? url($to) : $this->memberHome($user, app()->getLocale()));
+    }
+
+    public function consentWithdraw(Request $request): RedirectResponse
+    {
+        AiConsent::withdraw($request->user());
+
+        return redirect()->route('app.consent');
     }
 
     /**

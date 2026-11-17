@@ -25,6 +25,13 @@ These are the owner's standing instructions. Follow them in every session.
   badge files, unchanged, in the page's language (`public/images/partners/`).
   The badge only: no trademark sentence beside it (the owner had it removed),
   and nowhere else on the site.
+  A third exception the owner approved (17 November 2026), for the iPhone app
+  only: the page that asks a member, before their first voice, whether their
+  text and voice may be sent to the AI provider names that provider (Google:
+  Gemini and Google Cloud), because Apple requires that people are told who
+  receives their data. That one page inside the iPhone app
+  (`resources/views/app/consent.blade.php`, `lang/*/app.php` → `consent`), and
+  nowhere else on the site or in the Android app.
 
 ## Email
 - Never send email. Draft it only, and let the owner send it.

@@ -50,6 +50,33 @@ return [
         'done_hint' => 'If nothing happens, tap the button.',
     ],
 
+    // The iPhone app's question before a member's first voice (App\Support\InApp\AiConsent).
+    // This is the one place where the speech provider is named: Apple asks that the person is
+    // told who receives their data, and the owner approved it for this page of the iPhone app only.
+    'consent' => [
+        'title' => 'Before you make your first voice',
+        'lead' => 'Listen makes your audio with AI from another company. Here is what is sent, and to whom.',
+        'what_heading' => 'What is sent',
+        'what' => [
+            'The text you write to turn into speech',
+            'The recordings you make for voice cloning, and what you say when you talk to a voice agent',
+            'A video you upload to be dubbed, or a recording you upload to be written out as text',
+        ],
+        'who_heading' => 'Who receives it',
+        'who' => 'Google, through its AI services (Gemini and Google Cloud). They process it to make your audio and send the result back to Listen.',
+        'why_heading' => 'What it is used for',
+        'why' => 'To make what you asked for, and nothing else. What you make stays in your history until you delete it.',
+        'more' => 'Read the privacy policy',
+        'agree' => 'Agree and continue',
+        'not_now' => 'Not now',
+        'needed' => 'Please agree to how your text and voice are processed before using this.',
+        'agreed_on' => 'You agreed on :date.',
+        'withdraw' => 'Withdraw my agreement',
+        'withdraw_note' => 'You can withdraw at any time. The studio, voices and agents then stay closed in this app until you agree again.',
+        'row' => 'How your text and voice are processed',
+        'back' => 'Back to my account',
+    ],
+
     'push' => [
         'voice_ready_title' => 'Your voice is ready',
         'voice_ready_body' => 'Tap to listen to it or download it.',

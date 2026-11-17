@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Controllers\AppShellController;
+use App\Support\InApp\AiConsent;
 use App\Support\InApp\InApp;
 use App\Support\InApp\InAppWording;
 use Closure;
@@ -41,6 +42,16 @@ class InAppMode
 
         $route = (string) $request->route()?->getName();
         $reads = in_array($request->method(), ['GET', 'HEAD'], true) && ! $request->expectsJson();
+
+        // The iPhone app asks before a member's text or voice is sent to the AI provider (AiConsent).
+        if (AiConsent::stands($request)) {
+            if (! $reads) {
+                return response()->json(['ok' => false, 'message' => __('app.consent.needed'), 'consent_url' => route('app.consent')], 403);
+            }
+            $request->session()->put(AppShellController::CONSENT_INTENDED, '/'.ltrim($request->getRequestUri(), '/'));
+
+            return redirect()->route('app.consent');
+        }
 
         if (InApp::hidesPlans($request)) {
             InAppWording::apply();
