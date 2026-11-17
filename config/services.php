@@ -51,6 +51,21 @@ return [
         'voice_min_seconds' => (int) env('FCM_VOICE_MIN_SECONDS', 20),
     ],
 
+    // Notifications to iPhones, sent straight to Apple's push service (App\Services\Push\ApnsSender),
+    // and the file that lets links to the site open in the iPhone app
+    // (/.well-known/apple-app-site-association). All from the Apple developer account:
+    // the team id, and a key made under Keys with "Apple Push Notifications service" ticked.
+    'apns' => [
+        'team_id' => env('APNS_TEAM_ID', ''),
+        'key_id' => env('APNS_KEY_ID', ''),
+        // The key file's content (.p8): as base64 on one line, or the path of the file on the server.
+        'private_key' => env('APNS_PRIVATE_KEY', ''),
+        'private_key_path' => env('APNS_PRIVATE_KEY_PATH', ''),
+        'bundle_id' => env('IOS_APP_BUNDLE_ID', 'studio.listenai.app'),
+        // Apple's test service: only for an app run straight from Xcode. TestFlight and the store use the live one.
+        'sandbox' => (bool) env('APNS_SANDBOX', false),
+    ],
+
     // The Listen Android app (mobile/): its package and the SHA-256 fingerprints of the keys
     // that sign it (comma separated), served at /.well-known/assetlinks.json so that links to
     // the site open in the app.

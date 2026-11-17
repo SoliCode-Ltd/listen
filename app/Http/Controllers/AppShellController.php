@@ -311,6 +311,31 @@ class AppShellController extends Controller
         return response()->json($statements, 200, ['Cache-Control' => 'public, max-age=3600'], JSON_UNESCAPED_SLASHES);
     }
 
+    /**
+     * Apple's version of the same: which iPhone app may open the site's links, and which links.
+     * The same pages as the Android app opens (mobile/BRIDGE.md). Names no app until the team id is set.
+     */
+    public function appleAppSiteAssociation(): Response
+    {
+        $team = strtoupper(trim((string) config('services.apns.team_id', '')));
+        $bundle = trim((string) config('services.apns.bundle_id', ''));
+        $details = [];
+
+        if (preg_match('/^[A-Z0-9]{10}$/', $team) === 1 && preg_match('/^[A-Za-z0-9.\-]{3,155}$/', $bundle) === 1) {
+            $components = [['/' => '/app/start']];
+            foreach (['ar', 'en'] as $locale) {
+                foreach (['dashboard', 'demo', 'agents', 'dub-my-video'] as $section) {
+                    $components[] = ['/' => "/{$locale}/{$section}*"];
+                }
+                $components[] = ['/' => "/{$locale}/email/verify/*"];
+                $components[] = ['/' => "/{$locale}/start"];
+            }
+            $details[] = ['appIDs' => [$team.'.'.$bundle], 'components' => $components];
+        }
+
+        return response()->json(['applinks' => ['details' => $details]], 200, ['Cache-Control' => 'public, max-age=3600'], JSON_UNESCAPED_SLASHES);
+    }
+
     /** A sign-in that cannot be finished, asked by an app that is signed in: no error, just the studio. */
     private function signedInAlready(Request $request, string $locale): ?RedirectResponse
     {
