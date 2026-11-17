@@ -143,6 +143,19 @@ class CashierStripeTrialGateway implements StripeTrialGateway
         Cashier::stripe()->subscriptions->cancel($subscriptionId, []);
     }
 
+    public function voidOpenInvoices(string $subscriptionId): void
+    {
+        $subscriptionId = trim($subscriptionId);
+        if ($subscriptionId === '') {
+            return;
+        }
+
+        $open = Cashier::stripe()->invoices->all(['subscription' => $subscriptionId, 'status' => 'open', 'limit' => 20]);
+        foreach ($open->data ?? [] as $invoice) {
+            Cashier::stripe()->invoices->voidInvoice((string) $invoice->id, []);
+        }
+    }
+
     private function metadataValue(mixed $metadata, string $key): string
     {
         if (is_array($metadata)) {

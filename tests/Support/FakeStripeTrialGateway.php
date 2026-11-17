@@ -26,6 +26,11 @@ class FakeStripeTrialGateway implements StripeTrialGateway
 
     public bool $throwOnCreate = false;
 
+    public bool $throwOnCancel = false;
+
+    /** @var list<string> the subscriptions whose open invoices were voided */
+    public array $voided = [];
+
     public ?string $returnedPriceId = null;
 
     public ?string $returnedPaymentMethod = null;
@@ -142,6 +147,14 @@ class FakeStripeTrialGateway implements StripeTrialGateway
 
     public function cancelSubscription(string $subscriptionId): void
     {
+        if ($this->throwOnCancel) {
+            throw new RuntimeException('Stripe would not cancel the subscription.');
+        }
         $this->canceled[] = $subscriptionId;
+    }
+
+    public function voidOpenInvoices(string $subscriptionId): void
+    {
+        $this->voided[] = $subscriptionId;
     }
 }

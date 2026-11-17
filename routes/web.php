@@ -9,6 +9,7 @@ use App\Http\Controllers\AdminVideoDubFileController;
 use App\Http\Controllers\AgentCallController;
 use App\Http\Controllers\AgentController;
 use App\Http\Controllers\AgentFileController;
+use App\Http\Controllers\AccountDeletionController;
 use App\Http\Controllers\AppShellController;
 use App\Http\Controllers\AudioDownloadController;
 use App\Http\Controllers\AuthController;
@@ -408,6 +409,15 @@ Route::group([
         Route::post('/app/consent', [AppShellController::class, 'consentAgree'])->middleware('throttle:20,1')->name('app.consent.agree');
         Route::post('/app/consent/withdraw', [AppShellController::class, 'consentWithdraw'])->middleware('throttle:20,1')->name('app.consent.withdraw');
     });
+
+    // "Delete my account": a member deletes their own account, on the site and in the apps
+    // (App\Http\Controllers\AccountDeletionController). The last page is for someone who no
+    // longer has an account, so it asks for no sign-in.
+    Route::middleware('auth')->group(function (): void {
+        Route::get('/account/delete', [AccountDeletionController::class, 'show'])->name('account.delete');
+        Route::post('/account/delete', [AccountDeletionController::class, 'destroy'])->middleware('throttle:6,1')->name('account.delete.confirm');
+    });
+    Route::get('/account/deleted', [AccountDeletionController::class, 'done'])->name('account.deleted');
 
     // Referral capture runs BEFORE auth so guests landing on the demo page
     // with ?ref=CODE still record the visit and get the referral cookie set
