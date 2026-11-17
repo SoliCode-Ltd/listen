@@ -16,6 +16,15 @@
     .ai-ask-actions { display: grid; gap: .7rem; }
     .ai-ask-actions form { margin: 0; }
     .ai-ask-actions .btn { width: 100%; justify-content: center; min-height: 54px; font-size: 1.05rem; border-radius: 14px; }
+    /* The question stays in view while the page is read, above the app's tabs, with both answers
+       side by side (one above the other where the screen is too narrow for that). */
+    .ai-ask-actions.is-question { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap-reverse; gap: .6rem; margin: 0 calc(-1 * clamp(1.1rem, 4.5vw, 1.75rem)); padding: .8rem clamp(1.1rem, 4.5vw, 1.75rem); background: var(--bg); border-top: 1px solid var(--line); }
+    html:has(.app-tabs) .ai-ask-actions.is-question { bottom: calc(62px + env(safe-area-inset-bottom, 0px)); }
+    .ai-ask-actions.is-question form { flex: 1 1 9.5rem; }
+    .ai-ask-actions.is-question > .btn { order: -1; flex: 0 1 auto; width: auto; padding-inline: 1.3rem; }
+    @media (max-width: 359px) {
+      .ai-ask-actions.is-question .btn { font-size: .95rem; padding-inline: .7rem; min-height: 50px; }
+    }
   </style>
 </head>
 <body>
@@ -55,7 +64,7 @@
         </form>
       </div>
     @else
-      <div class="ai-ask-actions">
+      <div class="ai-ask-actions is-question">
         <form method="post" action="{{ route('app.consent.agree') }}">
           @csrf
           <button type="submit" class="btn btn-primary">{{ __('app.consent.agree') }}</button>
