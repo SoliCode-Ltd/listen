@@ -28,8 +28,8 @@
     font-size: 16px;
     line-height: 24px;
   }
-  .offer-bar-label { font-weight: 400; white-space: nowrap; }
-  .offer-bar-ends { color: #A9A6B8; font-weight: 400; white-space: nowrap; }
+  /* The label and the last day are equally quiet, either side of the discount. */
+  .offer-bar-label, .offer-bar-ends { color: #A9A6B8; font-weight: 400; white-space: nowrap; }
   .offer-bar-sep { flex: none; width: 1px; height: 18px; background: rgba(255, 255, 255, .2); }
   .offer-bar-offer { flex: none; display: inline-flex; align-items: center; gap: 7px; color: #CFC6FF; font-weight: 500; }
   /* The picker: the chosen number in the middle, ten either side small and faded. */
