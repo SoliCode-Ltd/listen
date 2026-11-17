@@ -5,7 +5,7 @@
      sentence. Off until the admin turns it on. --}}
 @if(! empty($offerBanner))
 <style>
-  /* A deep violet wash that the page sits on, the same in both themes so the offer stands out
+  /* A deep violet wash, the same in both themes so the offer stands out
      on the light site too. One text size, no bold, no glow; only the discount carries weight. */
   .offer-bar {
     position: relative;
@@ -15,9 +15,6 @@
       radial-gradient(60% 220% at 50% 0%, rgba(118, 89, 250, .42), rgba(118, 89, 250, .14) 55%, rgba(118, 89, 250, 0) 85%),
       #17141F;
   }
-  /* The page's rounded top edge, in the header's own colour. */
-  .offer-bar::after { content: ""; display: block; height: 20px; border-radius: 20px 20px 0 0; background: var(--bg); }
-  html[data-theme="light"] .offer-bar::after { background: #fff; }
   .offer-bar-in {
     min-height: 58px;
     display: flex;
@@ -66,7 +63,6 @@
   .offer-bar-btn:hover { background: #F1EEFF; color: #17132B; }
   .offer-bar-btn:focus-visible { outline: 2px solid #7659FA; outline-offset: 3px; }
   @media (max-width: 760px) {
-    .offer-bar::after { height: 16px; border-radius: 16px 16px 0 0; }
     .offer-bar-in { gap: 10px; padding: 7px 12px; min-height: 50px; font-size: 14px; line-height: 20px; }
     /* On a phone: the discount, the last day and the button, on one line. */
     .offer-bar-label, .offer-bar-sep.is-label { display: none; }
