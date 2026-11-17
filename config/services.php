@@ -57,6 +57,8 @@ return [
     'android_app' => [
         'package' => env('ANDROID_APP_PACKAGE', 'studio.listenai.app'),
         'cert_fingerprints' => env('ANDROID_APP_CERT_SHA256', ''),
+        // The app's page on Google Play, where the footer's badge leads.
+        'store_url' => env('ANDROID_APP_STORE_URL', 'https://play.google.com/store/apps/details?id=studio.listenai.app'),
         // "hidden" (the default): the app shows nothing about plans, as Google Play's payment
         // rules ask. "web": plans show in the app and are bought in the phone's browser
         // (App\Support\InApp\InApp::plansMode).

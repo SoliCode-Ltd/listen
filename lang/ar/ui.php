@@ -92,6 +92,7 @@ return [
     'footer' => [
         'tagline' => 'تحويل نص إلى كلام مدعوم بالذكاء الاصطناعي بمستوى متميز. أصوات طبيعية لكل مشروع.',
         'inception_badge' => 'NVIDIA Inception Program',
+        'play_badge' => 'احصل عليه من Google Play',
         'product' => 'المنتج',
         'solutions' => 'الحلول',
         'demo' => 'جرّب الآن',

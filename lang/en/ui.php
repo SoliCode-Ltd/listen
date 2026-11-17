@@ -92,6 +92,7 @@ return [
     'footer' => [
         'tagline' => 'Premium AI-powered text-to-speech. Natural voices for every project.',
         'inception_badge' => 'NVIDIA Inception Program',
+        'play_badge' => 'Get it on Google Play',
         'product' => 'Product',
         'solutions' => 'Solutions',
         'demo' => 'Try Demo',
