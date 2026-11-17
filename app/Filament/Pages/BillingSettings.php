@@ -9,6 +9,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Schemas\Components\Tabs;
@@ -20,6 +21,8 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\Billing\TrialEligibilityService;
 use App\Services\StripeProductSyncService;
+use App\Support\YearlyOfferBanner;
+use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -76,6 +79,12 @@ class BillingSettings extends Page implements HasForms
             'payment_logo_stripe' => (string) SiteSetting::get('payment_logo_stripe', ''),
             'manual_payment_instructions_en' => (string) SiteSetting::get('manual_payment_instructions_en', ''),
             'manual_payment_instructions_ar' => (string) SiteSetting::get('manual_payment_instructions_ar', ''),
+            'offer_banner_enabled' => YearlyOfferBanner::enabled(),
+            'offer_banner_ends_on' => (string) SiteSetting::get(YearlyOfferBanner::ENDS_ON, '') ?: null,
+            'offer_banner_label_en' => (string) SiteSetting::get(YearlyOfferBanner::LABEL_EN, ''),
+            'offer_banner_label_ar' => (string) SiteSetting::get(YearlyOfferBanner::LABEL_AR, ''),
+            'offer_banner_button_en' => (string) SiteSetting::get(YearlyOfferBanner::BUTTON_EN, ''),
+            'offer_banner_button_ar' => (string) SiteSetting::get(YearlyOfferBanner::BUTTON_AR, ''),
         ];
 
         $this->form->fill($state);
@@ -155,6 +164,52 @@ class BillingSettings extends Page implements HasForms
                         Toggle::make('webhook_emails_enabled')
                             ->label('Webhook Email Notifications')
                             ->helperText('Send email notifications on subscription lifecycle events.'),
+                    ]),
+
+                Section::make('Yearly offer banner')
+                    ->description('A slim bar above the header of the public pages (home, pricing, voices, demo, agents, extension, contact, developers and the search pages) announcing the yearly discount set above. It is never shown on the sign-in and sign-up pages, inside the app, or to members who already pay yearly. Its button opens the pricing page on yearly, and while it is on the pricing page opens on yearly.')
+                    ->columns(2)
+                    ->schema([
+                        Toggle::make('offer_banner_enabled')
+                            ->label('Show the yearly offer bar')
+                            ->helperText(fn (Get $get): string => 'Shows the yearly discount: now '.max(0, min(99, (int) ($get('yearly_discount_percentage') ?? 0))).'%, with ten either side faded. Hidden while the discount is 0.')
+                            ->columnSpanFull(),
+                        DatePicker::make('offer_banner_ends_on')
+                            ->label('Last day of the offer')
+                            ->native(false)
+                            ->displayFormat('j F Y')
+                            ->helperText('The bar says "Ends 31 December" and hides itself after this day. Leave empty for no end date (the bar then has no "Ends" part).'),
+                        Placeholder::make('offer_banner_preview')
+                            ->label('The bar reads')
+                            ->content(function (Get $get): string {
+                                $percent = max(0, min(99, (int) ($get('yearly_discount_percentage') ?? 0)));
+                                $ends = filled($get('offer_banner_ends_on')) ? ' | Ends '.Carbon::parse($get('offer_banner_ends_on'))->format('j F') : '';
+                                $label = trim((string) $get('offer_banner_label_en')) ?: (string) trans('ui.offer_banner.label', [], 'en');
+                                $button = trim((string) $get('offer_banner_button_en')) ?: (string) trans('ui.offer_banner.button', [], 'en');
+
+                                return "{$label} | {$percent}% off{$ends}   [{$button}]";
+                            }),
+                        TextInput::make('offer_banner_label_en')
+                            ->label('Label (English)')
+                            ->placeholder((string) trans('ui.offer_banner.label', [], 'en'))
+                            ->maxLength(40)
+                            ->live(onBlur: true)
+                            ->helperText('Leave empty for the default. Hidden on phones, where the bar shows the discount, the last day and the button.'),
+                        TextInput::make('offer_banner_label_ar')
+                            ->label('Label (Arabic)')
+                            ->placeholder((string) trans('ui.offer_banner.label', [], 'ar'))
+                            ->maxLength(40)
+                            ->extraInputAttributes(['dir' => 'rtl']),
+                        TextInput::make('offer_banner_button_en')
+                            ->label('Button (English)')
+                            ->placeholder((string) trans('ui.offer_banner.button', [], 'en'))
+                            ->maxLength(24)
+                            ->live(onBlur: true),
+                        TextInput::make('offer_banner_button_ar')
+                            ->label('Button (Arabic)')
+                            ->placeholder((string) trans('ui.offer_banner.button', [], 'ar'))
+                            ->maxLength(24)
+                            ->extraInputAttributes(['dir' => 'rtl']),
                     ]),
 
                 Section::make('Card trial')
@@ -352,6 +407,19 @@ class BillingSettings extends Page implements HasForms
         // Save yearly discount
         if (array_key_exists('yearly_discount_percentage', $data)) {
             SiteSetting::set('billing_yearly_discount_percentage', (string) max(0, min(99, (int) $data['yearly_discount_percentage'])), $group);
+        }
+        // The yearly offer bar
+        if (array_key_exists('offer_banner_enabled', $data)) {
+            SiteSetting::set(YearlyOfferBanner::ENABLED, $data['offer_banner_enabled'] ? '1' : '0', YearlyOfferBanner::GROUP);
+        }
+        if (array_key_exists('offer_banner_ends_on', $data)) {
+            $endsOn = filled($data['offer_banner_ends_on']) ? Carbon::parse($data['offer_banner_ends_on'])->toDateString() : '';
+            SiteSetting::set(YearlyOfferBanner::ENDS_ON, $endsOn, YearlyOfferBanner::GROUP);
+        }
+        foreach ([YearlyOfferBanner::LABEL_EN, YearlyOfferBanner::LABEL_AR, YearlyOfferBanner::BUTTON_EN, YearlyOfferBanner::BUTTON_AR] as $key) {
+            if (array_key_exists($key, $data)) {
+                SiteSetting::set($key, trim((string) $data[$key]), YearlyOfferBanner::GROUP);
+            }
         }
         // Save billing behavior settings
         if (array_key_exists('require_saved_payment_method', $data)) {

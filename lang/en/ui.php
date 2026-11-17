@@ -2465,4 +2465,13 @@ return [
         'cta' => 'Manage subscription',
         'footer' => 'You get this email because your Listen plan changes on :date.',
     ],
+    // The yearly offer bar above the header (App\Support\YearlyOfferBanner); the admin can change the label and button.
+    'offer_banner' => [
+        'label' => 'Yearly plans',
+        'before' => '',
+        'after' => 'off',
+        'ends' => 'Ends :date',
+        'button' => 'Get the offer',
+        'aria' => ':percent% off yearly plans',
+    ],
 ];

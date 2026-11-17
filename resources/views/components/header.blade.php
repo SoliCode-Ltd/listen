@@ -113,8 +113,11 @@
   }
   // The link that is lit: the page's own, and Dashboard anywhere in the app (Studio or Agents).
   $navActive = fn (string $route) => $currentRoute === $route || ($route === 'dashboard' && str_starts_with($currentRoute, 'voice-agents.'));
+  // The yearly offer bar above the header, on the public pages while the admin has it on.
+  $offerBanner = $appTabs ? null : \App\Support\YearlyOfferBanner::forPage($currentRoute, auth()->user(), $currentLocaleCode);
 @endphp
 
+@include('components.offer-banner', ['offerBanner' => $offerBanner])
 <header class="app-header {{ $appTabs ? 'is-app' : '' }}">
   <div class="header-inner">
     <a class="brand" href="{{ $brandHref }}" aria-label="{{ __('ui.header.brand_home', ['name' => $brandName]) }}">

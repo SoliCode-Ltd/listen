@@ -1311,7 +1311,9 @@
       <h1>{{ __('ui.pricing.hero_title') }} {{ __('ui.pricing.hero_title_accent') }}</h1>
       <p class="lead">{{ __('ui.pricing.hero_subtitle') }}</p>
       {{-- Monthly or yearly: every price on the page follows it. --}}
-      <div class="billing-toggle" id="billingToggle" role="group" aria-label="{{ __('ui.pricing.monthly') }} / {{ __('ui.pricing.yearly') }}">
+      {{-- It opens on yearly from the offer bar's link (?billing=yearly) and while the offer is on. --}}
+      @php $startYearly = $yearlySavePercent > 0 && (request()->query('billing') === 'yearly' || \App\Support\YearlyOfferBanner::live()); @endphp
+      <div class="billing-toggle" id="billingToggle" role="group" aria-label="{{ __('ui.pricing.monthly') }} / {{ __('ui.pricing.yearly') }}" data-start-yearly="{{ $startYearly ? '1' : '0' }}">
         <span class="billing-indicator" aria-hidden="true"></span>
         <button type="button" id="monthlyBtn" class="active" aria-pressed="true">{{ __('ui.pricing.monthly') }}</button>
         {{-- The yearly saving on the switch itself, so it is seen before the switch is pressed;
@@ -1767,6 +1769,13 @@
 
       updatePrices();
       updateUpgradeLinks();
+      // Opened on yearly (the offer bar's link, or while the offer is on): set it without the prices' lift.
+      if (billingToggle.getAttribute('data-start-yearly') === '1') {
+        var wasReduced = reduced;
+        reduced = true;
+        setBillingMode(true);
+        reduced = wasReduced;
+      }
     })();
   </script>
   <script>
