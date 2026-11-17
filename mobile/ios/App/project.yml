@@ -1,0 +1,96 @@
+# The iPhone app's Xcode project, written down. The project file itself
+# (App.xcodeproj) is made from this by XcodeGen when the app is built
+# (.github/workflows/ios-build.yml, or `xcodegen generate` on a Mac), so it is
+# never edited by hand and never committed.
+name: App
+
+options:
+  bundleIdPrefix: studio.listenai
+  createIntermediateGroups: true
+  developmentLanguage: en
+  deploymentTarget:
+    iOS: "15.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    # The version people see, and the build number that must go up with every upload.
+    # The workflow passes both; these are for a build made by hand.
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # The site the app opens. A staging app is built by passing another address.
+    LISTEN_APP_URL: "https://listenai.studio"
+    ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+
+packages:
+  # Capacitor and its two plugins; `npx cap sync ios` writes this package's list.
+  CapApp-SPM:
+    path: CapApp-SPM
+
+targets:
+  App:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes:
+          - public
+          - PrivacyInfo.xcprivacy
+          - "*.entitlements"
+      # The privacy manifest must be in the app as a resource.
+      - path: App/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      # The app's own bundled files (copied here by `npx cap sync ios`), kept as a folder.
+      - path: App/public
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: CapApp-SPM
+        product: CapApp-SPM
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: studio.listenai.app
+        PRODUCT_NAME: App
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/App.entitlements
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # iPhone only. On an iPad it runs in iPhone size.
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: "NO"
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: "NO"
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: "NO"
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
+      configs:
+        Debug:
+          CAPACITOR_DEBUG: "true"
+        Release:
+          CAPACITOR_DEBUG: "false"
+
+  AppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AppTests
+    dependencies:
+      - target: App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: studio.listenai.app.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TARGETED_DEVICE_FAMILY: "1"
+
+schemes:
+  App:
+    build:
+      targets:
+        App: all
+        AppTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - AppTests
+    archive:
+      config: Release

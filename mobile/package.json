@@ -2,7 +2,7 @@
   "name": "listen-mobile",
   "version": "1.0.0",
   "private": true,
-  "description": "Native Android shell for Listen (loads the live site in a WebView and adds native features).",
+  "description": "Native Android and iPhone shells for Listen (they load the live site in a web view and add native features).",
   "scripts": {
     "sync": "cap sync android",
     "build:debug": "cap sync android && cd android && ./gradlew assembleDebug",
@@ -12,6 +12,7 @@
     "@capacitor/android": "^8.6.0",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "^8.6.2",
     "@capacitor/push-notifications": "^8.1.3"
   },
   "devDependencies": {
