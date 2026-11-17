@@ -109,8 +109,6 @@
     <div class="footer-bottom {{ $hasSocialLinks ? '' : 'single' }}">
       <div class="footer-copyright">
         <p>{{ __('ui.footer.copyright', ['year' => $currentYear, 'name' => $brandName]) }}</p>
-        {{-- The line Google asks for beside its badge. --}}
-        <p class="footer-trademark">{{ __('ui.footer.play_trademark') }}</p>
       </div>
       @if($hasSocialLinks)
         <div class="footer-social">

@@ -986,10 +986,6 @@ html[data-theme="light"] .app-footer {
   height: 66px;
   width: auto;
 }
-.footer-trademark {
-  margin-top: .3rem !important;
-  font-size: .75rem;
-}
 
 .footer-links {
   display: grid;

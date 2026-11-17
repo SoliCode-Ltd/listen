@@ -93,7 +93,6 @@ return [
         'tagline' => 'Premium AI-powered text-to-speech. Natural voices for every project.',
         'inception_badge' => 'NVIDIA Inception Program',
         'play_badge' => 'Get it on Google Play',
-        'play_trademark' => 'Google Play and the Google Play logo are trademarks of Google LLC.',
         'product' => 'Product',
         'solutions' => 'Solutions',
         'demo' => 'Try Demo',

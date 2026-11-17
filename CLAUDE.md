@@ -21,10 +21,10 @@ These are the owner's standing instructions. Follow them in every session.
   footer); and for search engines and AI tools,
   the membership in the structured data (`memberOf`) and in llms.txt.
   A second exception the owner approved (17 November 2026): the Google Play
-  badge in the footer, leading to the app's page on the store, with the
-  trademark line Google asks for beside it. Google's own badge files,
-  unchanged, in the page's language (`public/images/partners/`). Nowhere
-  else on the site.
+  badge in the footer, leading to the app's page on the store. Google's own
+  badge files, unchanged, in the page's language (`public/images/partners/`).
+  The badge only: no trademark sentence beside it (the owner had it removed),
+  and nowhere else on the site.
 
 ## Email
 - Never send email. Draft it only, and let the owner send it.

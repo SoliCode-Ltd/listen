@@ -53,9 +53,9 @@ class HomeInceptionTest extends TestCase
                 ->assertSee('<a class="footer-store" href="'.$store.'" target="_blank" rel="noopener">', false)
                 ->assertSee('images/partners/google-play-badge-'.$locale.'.png', false)
                 ->assertSee('alt="'.$alt.'"', false)
-                // The line Google asks for beside its badge.
-                ->assertSee('class="footer-trademark"', false)
-                ->assertSee('Google LLC');
+                // The badge alone: no line about Google under the copyright (the owner's choice).
+                ->assertDontSee('footer-trademark', false)
+                ->assertDontSee('Google LLC');
         }
         // Google's files as it publishes them: 646 by 250, clear space included.
         foreach (['en', 'ar'] as $locale) {
