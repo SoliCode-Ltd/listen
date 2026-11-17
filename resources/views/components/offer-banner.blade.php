@@ -1,12 +1,12 @@
-{{-- The yearly offer bar above the header (App\Support\YearlyOfferBanner): a soft violet line
+{{-- The yearly offer bar above the header (App\Support\YearlyOfferBanner): a deep violet line
      that reads "Yearly plans | 50% off | Ends 31 December", with a small white button to the
      pricing page on yearly. The chosen discount sits bright in the middle of a picker, the
      numbers either side of it small and fading out above and below. Screen readers hear one
      sentence. Off until the admin turns it on. --}}
 @if(! empty($offerBanner))
 <style>
-  /* A soft wash of the brand colour that the page sits on: deep violet in dark, pale violet
-     in light. One text size, no bold, no glow; the header's top corners are rounded onto it. */
+  /* A deep violet wash that the page sits on, the same in both themes so the offer stands out
+     on the light site too. One text size, no bold, no glow; only the discount carries weight. */
   .offer-bar {
     position: relative;
     z-index: 70;
@@ -14,12 +14,6 @@
     background:
       radial-gradient(60% 220% at 50% 0%, rgba(118, 89, 250, .42), rgba(118, 89, 250, .14) 55%, rgba(118, 89, 250, 0) 85%),
       #17141F;
-  }
-  html[data-theme="light"] .offer-bar {
-    color: #17132B;
-    background:
-      radial-gradient(60% 220% at 50% 0%, rgba(118, 89, 250, .26), rgba(118, 89, 250, .10) 55%, rgba(118, 89, 250, 0) 85%),
-      #F4F1FF;
   }
   /* The page's rounded top edge, in the header's own colour. */
   .offer-bar::after { content: ""; display: block; height: 20px; border-radius: 20px 20px 0 0; background: var(--bg); }
@@ -34,13 +28,10 @@
     font-size: 16px;
     line-height: 24px;
   }
-  .offer-bar-label { font-weight: 500; white-space: nowrap; }
+  .offer-bar-label { font-weight: 400; white-space: nowrap; }
   .offer-bar-ends { color: #A9A6B8; font-weight: 400; white-space: nowrap; }
-  html[data-theme="light"] .offer-bar-ends { color: #6E6A85; }
   .offer-bar-sep { flex: none; width: 1px; height: 18px; background: rgba(255, 255, 255, .2); }
-  html[data-theme="light"] .offer-bar-sep { background: rgba(23, 19, 43, .18); }
   .offer-bar-offer { flex: none; display: inline-flex; align-items: center; gap: 7px; color: #CFC6FF; font-weight: 500; }
-  html[data-theme="light"] .offer-bar-offer { color: #5236E0; }
   /* The picker: the chosen number in the middle, ten either side small and faded. */
   .offer-bar-reel {
     display: inline-flex;
