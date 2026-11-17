@@ -1,22 +1,36 @@
 // Phone-size look at the site as the Listen app shows it: every member page, Arabic and
-// English, light and dark, at 360x800 and 412x915, with the app's user agent.
+// English, light and dark, at two phone sizes, with the app's user agent.
+// APP=android (the default): 360x800 and 412x915. APP=ios: the page area of the smallest and
+// the largest current iPhone (the app keeps pages out of the notch and the home indicator),
+// plus the iPhone app's own rules: no "Upgrade" button, nothing that opens the browser to
+// pay, no other phone platform or store named, and the question it asks before a first voice.
 // It fails on a purchase link, selling words, sideways scrolling, anything cut off, the wrong
 // direction or theme, or a script error, and keeps a screenshot of every page.
 // It checks the "hidden" setting, the default: the local .env must not say ANDROID_APP_PLANS=web.
 // Run against a LOCAL copy of the site with the test members of seed.php (see mobile/README.md,
 // section 8). It makes no voice and no payment: it only opens pages.
-//   BASE=http://127.0.0.1:8123 AGENT=agt_... node in-app-pages.js [guest,free,starter,max]
+//   BASE=http://127.0.0.1:8123 AGENT=agt_... [APP=ios] node in-app-pages.js [guest,free,starter,max]
 const { chromium } = require('playwright');
 const fs = require('fs');
 const BASE = process.env.BASE || 'http://127.0.0.1:8123';
-const OUT = __dirname + '/out';
+const IOS = process.env.APP === 'ios';
+const OUT = __dirname + (IOS ? '/out-ios' : '/out');
 fs.mkdirSync(OUT, { recursive: true });
-const UA = 'Mozilla/5.0 (Linux; Android 14; SM-A546E Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36 ListenApp/1.0.0 (Android)';
+const UA = IOS
+  ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 ListenApp/1.0.0 (iOS)'
+  : 'Mozilla/5.0 (Linux; Android 14; SM-A546E Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36 ListenApp/1.0.0 (Android)';
 const AGENT = process.env.AGENT;
-const SIZES = [[360, 800], [412, 915]];
+// iPhone: the screen less the status bar and the home indicator (iPhone 17e: 390x844, iPhone 17 Pro Max: 440x956).
+const SIZES = IOS ? [[390, 763], [440, 860]] : [[360, 800], [412, 915]];
 const only = process.argv[2] || '';
 
-const PAGES = {
+const PAGES = IOS ? {
+  guest: ['login', 'register', 'voice-samples', 'contact-us'],
+  // The free member has not answered the iPhone app's question yet: it comes first, then they agree.
+  free: ['app/consent', 'demo', 'dashboard', 'app/plan', 'agents', 'account/delete', 'contact-us?topic=delete'],
+  starter: ['dashboard', 'dashboard#planDefaultsSection', 'app/plan', 'app/consent', 'agents', 'pricing', 'billing', 'app/upgrade'],
+  max: ['dashboard', 'dashboard#voiceCloningSection', 'dashboard#generateVoiceSection', 'dub-my-video', 'agents', 'agents/' + AGENT, 'agents/' + AGENT + '/setup', 'app/plan', 'account/delete', 'privacy-policy'],
+} : {
   guest: ['login', 'register', 'voice-samples', 'contact-us'],
   free: ['demo', 'dashboard', 'app/plan', 'agents', 'contact-us?topic=delete'],
   starter: ['dashboard', 'dashboard#planDefaultsSection', 'app/plan', 'agents', 'pricing', 'billing'],
@@ -41,6 +55,13 @@ const PAGES = {
             await page.fill('input[name="email"]', `${who}@example.test`);
             await page.fill('input[name="password"]', 'password-123');
             await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.locator('form:has(input[name="password"]) button[type="submit"]').first().click()]);
+          }
+          // iPhone: the question before a first voice. The free member starts unanswered (so the
+          // question itself is looked at); everyone else has agreed.
+          if (IOS && who !== 'guest') {
+            await page.goto(`${BASE}/${locale}/app/consent`, { waitUntil: 'load' });
+            const button = page.locator(who === 'free' ? 'form[action$="/app/consent/withdraw"] button' : 'form[action$="/app/consent"] button');
+            if (await button.count()) await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), button.first().click()]);
           }
           for (const path of pages) {
             const name = `${who}_${path.replace(/[^a-z0-9]+/gi, '-').replace(/agt-[a-z0-9]+/, 'agent')}_${locale}_${theme}_${w}`;
@@ -72,6 +93,22 @@ const PAGES = {
               return { dir: document.documentElement.dir, theme: document.documentElement.getAttribute('data-theme'), scrollW: document.documentElement.scrollWidth, vw, cut: cut.slice(0, 6), sells: sells.slice(0, 6), links, url: location.pathname + location.hash, inApp: !!document.querySelector('meta[name="listen-in-app"]'), glue: !!window.__listenAppBooted };
             });
             await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: false });
+            if (IOS) {
+              const ios = await page.evaluate(() => {
+                const shown = (el) => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden';
+                const text = document.body.innerText || '';
+                return {
+                  upgrade: [...document.querySelectorAll('[data-app-upgrade], [data-app-open-web], a[href*="/app/upgrade"], a[href*="/app/continue"]')].filter(shown).length,
+                  platform: (text.match(/android|google\s?play|play\s?store|أندرويد|اندرويد|جوجل بلاي|غوغل بلاي/i) || [])[0] || '',
+                  asks: !!document.querySelector('form[action$="/app/consent"] button'),
+                };
+              });
+              facts.ios = ios;
+              // The question is answered once it has been looked at, so the tools after it open.
+              if (path === 'app/consent' && ios.asks) {
+                await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.locator('form[action$="/app/consent"] button').first().click()]);
+              }
+            }
             const problems = [];
             if (!response || response.status() >= 400) problems.push('status ' + (response && response.status()));
             if (facts.scrollW > facts.vw + 1) problems.push(`sideways scroll ${facts.scrollW}>${facts.vw}`);
@@ -82,6 +119,10 @@ const PAGES = {
             if (facts.theme !== theme) problems.push('theme ' + facts.theme);
             if (!facts.inApp || !facts.glue) problems.push('not in-app / glue not loaded');
             if (errors.length) problems.push('JS: ' + errors.join(' | '));
+            if (IOS && facts.ios.upgrade) problems.push('UPGRADE OR BROWSER HAND-OVER on iPhone');
+            if (IOS && facts.ios.platform) problems.push('NAMES ANOTHER PLATFORM: ' + facts.ios.platform);
+            if (IOS && who === 'free' && path === 'app/consent' && !facts.ios.asks) problems.push('the question before a first voice is missing');
+            if (IOS && path !== 'app/consent' && /\/app\/consent$/.test(facts.url)) problems.push('stopped at the question after agreeing');
             report.push(`${problems.length ? 'PROBLEM' : 'ok     '} ${name} -> ${facts.url}${problems.length ? '\n        ' + problems.join('\n        ') : ''}`);
           }
           await context.close();
