@@ -6,18 +6,23 @@ use App\Support\CreditPeriod;
 use Illuminate\Http\Request;
 
 /**
- * "In-app mode": the site as the Listen Android app shows it (mobile/).
+ * "In-app mode": the site as the Listen apps show it (mobile/): the Android
+ * app and the iPhone app.
  *
- * Google Play does not allow an app to sell digital plans with anything but
- * its own billing, or to send people to another way of paying. So inside the
- * app the site is sign-in-and-use only: no price, plan, pack, upgrade,
- * payment method or checkout, and no link to one. Plan limits stay as they are.
+ * Neither store allows an app to sell digital plans with anything but its own
+ * billing, or to send people to another way of paying. So inside the app the
+ * site is sign-in-and-use only: no price, plan, pack, upgrade, payment method
+ * or checkout, and no link to one. Plan limits stay as they are.
  *
- * The app's web view adds "ListenApp/<version>" to its user agent
- * (mobile/capacitor.config.ts); no browser sends that. The one other case is
- * the browser tab the app opens to sign a member in (AppSignIn): it is marked
- * in that browser's session for a few minutes, so the sign-in pages there show
- * no prices either.
+ * The app's web view adds "ListenApp/<version> (Android)" or
+ * "ListenApp/<version> (iOS)" to its user agent (mobile/capacitor.config.json);
+ * no browser sends that. The one other case is the browser tab the app opens
+ * to sign a member in (AppSignIn): it is marked in that browser's session for
+ * a few minutes, so the sign-in pages there show no prices either.
+ *
+ * The iPhone app is stricter than the Android one (mobile/ios/APPLE-RULES.md):
+ * plans are always hidden there, whatever ANDROID_APP_PLANS says, and nothing
+ * leads to the billing page, not even through the browser.
  */
 class InApp
 {
@@ -31,6 +36,18 @@ class InApp
      * fetched ahead of a tap, a download) is still known to be the app's.
      */
     public const COOKIE = 'listen_app';
+
+    /** What that cookie holds: "1" in the Android app (as it always did), "ios" in the iPhone app. */
+    public const COOKIE_ANDROID = '1';
+
+    public const COOKIE_IOS = 'ios';
+
+    public const PLATFORM_ANDROID = 'android';
+
+    public const PLATFORM_IOS = 'ios';
+
+    /** Session key: which app opened the sign-in tab ("ios" or "android"). */
+    public const SIGN_IN_PLATFORM = 'app_signin.platform';
 
     /** The language the member last used in the app, kept past the session. Until they choose, the app follows the phone. */
     public const LANGUAGE_COOKIE = 'listen_app_lang';
@@ -74,22 +91,84 @@ class InApp
      *   with what they chose. Nothing is ever paid inside the app.
      *
      * Changing it needs no new app version.
+     *
+     * The iPhone app is always "hidden": Apple does not let an app lead people
+     * to pay outside it, and an app that changes what it does after review is
+     * removed from the store. There is no setting for it on purpose.
      */
-    public static function plansMode(): string
+    public static function plansMode(?Request $request = null): string
     {
+        if (self::onIphone($request)) {
+            return self::PLANS_HIDDEN;
+        }
+
         return config('services.android_app.plans') === self::PLANS_ON_WEB ? self::PLANS_ON_WEB : self::PLANS_HIDDEN;
     }
 
     /** In the app, and the app shows nothing about plans. */
     public static function hidesPlans(?Request $request = null): bool
     {
-        return self::plansMode() === self::PLANS_HIDDEN && self::active($request);
+        return self::plansMode($request) === self::PLANS_HIDDEN && self::active($request);
     }
 
     /** In the app's own web view, where plans are shown and bought in the browser. */
     public static function buysOnWeb(?Request $request = null): bool
     {
-        return self::plansMode() === self::PLANS_ON_WEB && self::fromApp($request);
+        return self::plansMode($request) === self::PLANS_ON_WEB && self::fromApp($request);
+    }
+
+    /**
+     * Which app this is: "ios", "android", or null in a browser. The app says so
+     * in its name; a request without the name is known by the app's cookie, and
+     * the sign-in tab by what the app said when it opened it.
+     */
+    public static function platform(?Request $request = null): ?string
+    {
+        $request ??= request();
+
+        if (preg_match('/(?:^|[\s;(])'.self::UA_TOKEN.'\/\d[\w.\-]*(?: \((iOS|Android)\))?/', (string) $request->userAgent(), $m) === 1) {
+            return ($m[1] ?? '') === 'iOS' ? self::PLATFORM_IOS : self::PLATFORM_ANDROID;
+        }
+
+        $cookie = $request->cookies->get(self::COOKIE);
+        if ($cookie === self::COOKIE_IOS) {
+            return self::PLATFORM_IOS;
+        }
+        if ($cookie === self::COOKIE_ANDROID) {
+            return self::PLATFORM_ANDROID;
+        }
+
+        if (self::signInTab($request)) {
+            return $request->session()->get(self::SIGN_IN_PLATFORM) === self::PLATFORM_IOS ? self::PLATFORM_IOS : self::PLATFORM_ANDROID;
+        }
+
+        return null;
+    }
+
+    /** The iPhone app (its web view, or the sign-in sheet it opened). */
+    public static function onIphone(?Request $request = null): bool
+    {
+        return self::platform($request) === self::PLATFORM_IOS;
+    }
+
+    /**
+     * "Upgrade" on the app's account page, which opens the billing page in the
+     * phone's browser: on Android only. On iPhone it would be a call to pay
+     * outside the app, which Apple does not allow.
+     */
+    public static function offersUpgradeOnWeb(?Request $request = null): bool
+    {
+        return self::fromApp($request) && ! self::onIphone($request);
+    }
+
+    /**
+     * "Continue with Google" in the app. On iPhone, Apple asks for its own
+     * sign-in beside any other company's (guideline 4.8); until that exists
+     * (IOS_APP_SOCIAL_SIGN_IN), the iPhone app signs in with email only.
+     */
+    public static function offersSocialSignIn(?Request $request = null): bool
+    {
+        return self::fromApp($request) && (! self::onIphone($request) || (bool) config('services.ios_app.social_sign_in', false));
     }
 
     /** Pages and requests that take a payment or change a plan: never served inside the app. */
@@ -121,7 +200,7 @@ class InApp
     {
         $request ??= request();
 
-        return self::namedApp($request) || $request->cookies->get(self::COOKIE) === '1';
+        return self::namedApp($request) || in_array($request->cookies->get(self::COOKIE), [self::COOKIE_ANDROID, self::COOKIE_IOS], true);
     }
 
     /** The request says it is the app's, in its own name ("ListenApp/1.0.0"). */

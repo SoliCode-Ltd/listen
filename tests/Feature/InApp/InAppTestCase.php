@@ -22,6 +22,12 @@ abstract class InAppTestCase extends TestCase
     /** A phone's web view with the token the app adds (mobile/capacitor.config.ts). */
     public const APP_UA = 'Mozilla/5.0 (Linux; Android 14; SM-A546E Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36 ListenApp/1.0.0 (Android)';
 
+    /** An iPhone's web view with the token the iPhone app adds (mobile/capacitor.config.json). */
+    public const IPHONE_APP_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 ListenApp/1.0.0 (iOS)';
+
+    /** The same iPhone's browser. */
+    public const IPHONE_BROWSER_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.1 Mobile/15E148 Safari/604.1';
+
     /** The same phone's browser. */
     public const BROWSER_UA = 'Mozilla/5.0 (Linux; Android 14; SM-A546E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36';
 
@@ -80,7 +86,13 @@ abstract class InAppTestCase extends TestCase
     /** A request as the app's web view makes it, as this member (or signed out), in this language. */
     protected function inApp(?User $user = null, string $locale = 'en'): static
     {
-        return $this->as($user, $locale, self::APP_UA);
+        return $this->as($user, $locale, $this->appUserAgent());
+    }
+
+    /** Which app these tests are of: the Android one, unless a test class says the iPhone one. */
+    protected function appUserAgent(): string
+    {
+        return self::APP_UA;
     }
 
     /** The same from a browser. */
@@ -89,7 +101,7 @@ abstract class InAppTestCase extends TestCase
         return $this->as($user, $locale, self::BROWSER_UA);
     }
 
-    private function as(?User $user, string $locale, string $userAgent): static
+    protected function as(?User $user, string $locale, string $userAgent): static
     {
         app('auth')->forgetGuards();
         app()->setLocale($locale);

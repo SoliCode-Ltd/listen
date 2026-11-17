@@ -7,8 +7,9 @@
   $firebaseGoogleEnabled = (bool) ($authSettings['firebase_google_enabled'] ?? false);
   // Inside the Listen app's own web view Google refuses to sign anyone in, so one button
   // hands the sign-in to the phone's browser instead (AppShellController, public/js/listen-app.js).
-  $appSignIn = \App\Support\InApp\InApp::fromApp() && ($googleEnabled || $firebaseGoogleEnabled);
-  if ($appSignIn) {
+  $appSignIn = \App\Support\InApp\InApp::offersSocialSignIn() && ($googleEnabled || $firebaseGoogleEnabled);
+  // (The iPhone app has no such button until it can offer Apple's sign-in beside it: InApp::offersSocialSignIn.)
+  if ($appSignIn || \App\Support\InApp\InApp::fromApp()) {
     $googleEnabled = false;
     $firebaseGoogleEnabled = false;
   }

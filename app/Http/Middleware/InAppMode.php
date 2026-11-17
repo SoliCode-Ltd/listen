@@ -10,9 +10,9 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Inside the Listen app (App\Support\InApp\InApp) nothing is ever paid:
+ * Inside the Listen apps (App\Support\InApp\InApp) nothing is ever paid:
  *
- * - With plans on the web (the default), a member sees prices and plans as on
+ * - With plans on the web (Android only, when ANDROID_APP_PLANS says so), a member sees prices and plans as on
  *   the website; a page that takes a payment or changes a plan is not shown
  *   in the app but opened in the phone's browser, already signed in, with
  *   what the member chose (AppShellController::openOnWeb).
@@ -73,8 +73,9 @@ class InAppMode
             $response->headers->setCookie(cookie(InApp::LANGUAGE_COOKIE, $pageLanguage, 60 * 24 * 365, '/', null, $request->isSecure(), true, false, 'lax'));
         }
         // The app's mark, for the requests it makes without its name (InApp::COOKIE).
-        if (InApp::namedApp($request) && $request->cookies->get(InApp::COOKIE) !== '1') {
-            $response->headers->setCookie(cookie(InApp::COOKIE, '1', 60 * 24 * 365, '/', null, $request->isSecure(), true, false, 'lax'));
+        $mark = InApp::onIphone($request) ? InApp::COOKIE_IOS : InApp::COOKIE_ANDROID;
+        if (InApp::namedApp($request) && $request->cookies->get(InApp::COOKIE) !== $mark) {
+            $response->headers->setCookie(cookie(InApp::COOKIE, $mark, 60 * 24 * 365, '/', null, $request->isSecure(), true, false, 'lax'));
         }
 
         return $response;
