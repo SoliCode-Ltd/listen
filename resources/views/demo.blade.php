@@ -1011,7 +1011,10 @@
     function browserFamily() {
       const ua = navigator.userAgent || '';
       const browser = /Edg\//.test(ua) ? 'edge' : /OPR\/|Opera/.test(ua) ? 'opera' : /Firefox\//.test(ua) ? 'firefox'
-        : /Chrome\/|CriOS\//.test(ua) ? 'chrome' : /Safari\//.test(ua) ? 'safari' : 'other';
+        : /Chrome\/|CriOS\//.test(ua) ? 'chrome'
+        // The iPhone app's web view is Safari's engine, though it does not say "Safari": the same
+        // iPhone in Safari and in the app is one device.
+        : /Safari\//.test(ua) || /ListenApp\/[^ ]+ \(iOS\)/.test(ua) ? 'safari' : 'other';
       const system = /Windows/.test(ua) ? 'windows' : /Android/.test(ua) ? 'android' : /iPhone|iPad|iPod/.test(ua) ? 'ios'
         : /Mac OS X|Macintosh/.test(ua) ? 'mac' : /CrOS/.test(ua) ? 'chromeos' : /Linux/.test(ua) ? 'linux' : 'other';
       return browser + ':' + system;

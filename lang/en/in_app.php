@@ -98,4 +98,17 @@ return [
     'agents.balance.state_plan_none' => 'Your plan doesn\'t include live agents. You can build and test one now.',
     // The app's menu is the bar at the bottom, not the top of the page.
     'agents.start_continue_note' => 'You can switch between the Studio and Agents any time, from the bar at the bottom of every page.',
+    // Speech to text: the free try is offered, and its lines say what is true and stop.
+    'transcribe.refused.not_in_plan' => 'Your plan does not include speech to text.',
+    'transcribe.refused.too_long_plan' => 'This file is :length long and your plan takes files up to :max.',
+    'transcribe.refused.not_enough' => 'This file needs :need and you have :left left this month. Your minutes start again on :date.',
+    'transcribe.refused.free_used' => 'You have used your free try.',
+    'transcribe.refused.free_too_long' => 'The free try takes recordings up to :max, and this one is :length.',
+    'transcribe.refused.free_day_full' => 'Today\'s free tries are all taken. Try again tomorrow.',
+    'transcribe.page.upgrade_title' => 'Not part of your current plan',
+    'transcribe.page.free_text' => 'Try it free with one recording up to :length.',
+    'transcribe.page.used_text' => 'You have used your free try.',
+    'transcribe.page.plan_text' => 'Your plan does not include speech to text.',
+    'transcribe.page.see_plans' => 'Your plan',
+    'transcribe.page.get_plan' => 'Your plan',
 ];

@@ -2066,6 +2066,13 @@
           @inapp
             @if((int) ($usageSnapshot['remaining_chars'] ?? 0) <= 0)
               <div class="note" id="inAppNoCredits">{{ \App\Support\InApp\InApp::noCreditsLine(auth()->id()) }}</div>
+              {{-- On the free plan the demo is the free try: the way there, not a way to pay. --}}
+              @if(\App\Support\InApp\InApp::studioIsDemo(auth()->user()))
+                <a class="usage-hero-cta" id="inAppTryDemo" href="{{ route('demo.page') }}" style="margin-top:.85rem">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg>
+                  {{ __('app.try_demo') }}
+                </a>
+              @endif
             @endif
           @endinapp
           @if(!empty($packOffer) && ! \App\Support\InApp\InApp::hidesPlans())
@@ -2249,6 +2256,9 @@
           <div class="plan-showcase-note">
             @inapp
               <p>{{ \App\Support\InApp\InApp::noCreditsLine(auth()->id()) }}</p>
+              @if(\App\Support\InApp\InApp::studioIsDemo(auth()->user()))
+                <a class="btn btn-primary" href="{{ route('demo.page') }}">{{ __('app.try_demo') }}</a>
+              @endif
             @else
             <p>{{ __('ui.pack.showcase_note') }}</p>
             <a class="btn btn-primary" href="{{ route('pricing') }}">{{ __('ui.pack.offer_choose_title') }}</a>

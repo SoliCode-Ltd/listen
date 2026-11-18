@@ -65,11 +65,9 @@ final class TranscriptionAccess
         if ($user === null || ! TranscriptionSettings::visibleTo((string) $user->email)) {
             return false;
         }
-        // Inside the Listen app nothing is sold: the free try that leads to a plan is not offered there.
-        if (InApp::hidesPlans() && ! self::planIncludes(self::planOf($user))) {
-            return false;
-        }
-
+        // Inside the Listen apps it is offered as on the website, free try included, as the demo's
+        // other tries are. Nothing there is sold: upgrade() gives no link, and the lines that name a
+        // plan to buy say what is true instead (lang/*/in_app.php).
         return true;
     }
 
