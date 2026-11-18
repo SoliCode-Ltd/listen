@@ -75,6 +75,8 @@ class ManualPaymentService
         $approved = $this->approveWhileLocked($manualPaymentRequest, $reviewer, $reviewerNotes);
         // Only now is it a sale: kept for the Google Ads upload when it came from an ad.
         app(AdsPurchases::class)->recordManualPayment($approved);
+        // And sent to ChatGPT Ads, when the member was allowed to be followed at checkout.
+        rescue(fn () => app(\App\Services\Billing\ChatGptAdsConversions::class)->recordManualPayment($approved));
         // How it was paid, for Billing → Payments and the dashboard.
         app(PaymentLedger::class)->recordManualPayment($approved);
         // A lower plan that waits for the current one to end: nobody else tells the member

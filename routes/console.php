@@ -47,6 +47,8 @@ Schedule::command('plans:expire-discounts')->everyFiveMinutes()->withoutOverlapp
 // A declined first payment or a checkout left without paying: the follow-up emails that are due,
 // and who bought a plan since (App\Services\Billing\PurchaseFollowUps).
 Schedule::command('listen:purchase-follow-ups')->everyFiveMinutes()->withoutOverlapping(10);
+// Paid plans for ChatGPT Ads that could not be sent the moment they were paid (ChatGptAdsConversions).
+Schedule::command('listen:chatgpt-ads-send')->everyFiveMinutes()->withoutOverlapping(10);
 // Lower plans whose day has come take over (paid by hand, or by card after a plan paid by hand).
 Schedule::command('listen:plan-changes')->everyMinute()->withoutOverlapping(10);
 

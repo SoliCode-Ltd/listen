@@ -82,7 +82,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // The listen_demo_fp cookie is set by client-side JavaScript (unencrypted).
         // It must be excluded from Laravel's cookie encryption so the backend
         // can read the fingerprint components on GET requests (page loads).
-        $middleware->encryptCookies(except: ['listen_demo_fp', InApp::COOKIE, InApp::LANGUAGE_COOKIE]);
+        $middleware->encryptCookies(except: ['listen_demo_fp', InApp::COOKIE, InApp::LANGUAGE_COOKIE,
+            // The ChatGPT Ads pixel's own cookies, read for the purchase sent from the server.
+            CaptureAdClickId::PIXEL_OPPREF_COOKIE, CaptureAdClickId::PIXEL_BROWSER_COOKIE]);
 
         // www. pages move to the main address first, so a page and its requests are one site.
         $middleware->prepend(CanonicalHost::class);

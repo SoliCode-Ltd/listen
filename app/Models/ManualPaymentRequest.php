@@ -46,6 +46,7 @@ class ManualPaymentRequest extends Model
     protected $casts = [
         'price_snapshot' => 'array',
         'destination_snapshot' => 'array',
+        'chatgpt_ads_context' => 'array',
         'submitted_at' => 'datetime',
         'reviewed_at' => 'datetime',
         'approved_subscription_id' => 'integer',

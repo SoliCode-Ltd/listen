@@ -232,7 +232,7 @@ class ManualPaymentController extends Controller
         }
 
         try {
-            $this->manualPaymentService->createRequest(
+            $manualRequest = $this->manualPaymentService->createRequest(
                 $request->user(),
                 $plan,
                 $validated['billing_cycle'],
@@ -245,6 +245,13 @@ class ManualPaymentController extends Controller
                 $request->file('proof_image'),
                 CaptureAdClickId::fromRequest($request),
             );
+            // Where the member is buying from, for the ChatGPT Ads event sent once the team approves it.
+            rescue(function () use ($request, $manualRequest): void {
+                $adsContext = app(\App\Services\Billing\ChatGptAdsConversions::class)->context($request);
+                if ($adsContext !== null) {
+                    $manualRequest->forceFill(['chatgpt_ads_context' => $adsContext])->save();
+                }
+            });
         } catch (DomainException $exception) {
             if ($request->expectsJson()) {
                 return response()->json([
