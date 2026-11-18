@@ -253,7 +253,10 @@ extension AudioFiles {
         }
         picker.delegate = delegate
         pickers[ObjectIdentifier(picker)] = delegate
-        AudioFiles.top(of: presenter).present(picker, animated: true)
+        AudioFiles.top(of: presenter).present(picker, animated: true) { [weak picker] in
+            // Pulled down with a finger: the phone may tell nobody else that the sheet closed.
+            picker?.presentationController?.delegate = delegate
+        }
     }
 
     /// "Share": the share sheet with the file. The receiving app gets this one file only.
@@ -275,22 +278,33 @@ extension AudioFiles {
     }
 }
 
-private final class SavePicker: NSObject, UIDocumentPickerDelegate {
-    private let done: (Result<URL, AudioFiles.Failure>) -> Void
+private final class SavePicker: NSObject, UIDocumentPickerDelegate, UIAdaptivePresentationControllerDelegate {
+    private var done: ((Result<URL, AudioFiles.Failure>) -> Void)?
 
     init(done: @escaping (Result<URL, AudioFiles.Failure>) -> Void) {
         self.done = done
     }
 
+    /// The answer is given once, whichever way the sheet ends.
+    private func finish(_ result: Result<URL, AudioFiles.Failure>) {
+        let done = self.done
+        self.done = nil
+        done?(result)
+    }
+
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
         if let saved = urls.first {
-            done(.success(saved))
+            finish(.success(saved))
         } else {
-            done(.failure(AudioFiles.Failure(code: "cancelled", message: "cancelled")))
+            finish(.failure(AudioFiles.Failure(code: "cancelled", message: "cancelled")))
         }
     }
 
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-        done(.failure(AudioFiles.Failure(code: "cancelled", message: "cancelled")))
+        finish(.failure(AudioFiles.Failure(code: "cancelled", message: "cancelled")))
+    }
+
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        finish(.failure(AudioFiles.Failure(code: "cancelled", message: "cancelled")))
     }
 }

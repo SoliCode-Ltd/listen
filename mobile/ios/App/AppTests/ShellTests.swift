@@ -162,6 +162,32 @@ final class NativeRulesTests: XCTestCase {
         ], names)
     }
 
+    func testTheEndOfASignInIsLetThroughOnceAndOnlyForTheAppsOwnAddress() throws {
+        let end = try XCTUnwrap(URL(string: "https://listenai.studio/app/signin/complete?code=abc&verifier=def"))
+        let other = try XCTUnwrap(URL(string: "https://listenai.studio/app/signin/complete?code=evil&verifier=def"))
+        let now = Date()
+        // Nothing is let through unasked.
+        XCTAssertFalse(WebViewDelegates.takeAllowance(for: end, now: now))
+        WebViewDelegates.allowOnce(end, now: now)
+        // Not another code, and the right one only once.
+        XCTAssertFalse(WebViewDelegates.takeAllowance(for: other, now: now))
+        XCTAssertTrue(WebViewDelegates.takeAllowance(for: end, now: now))
+        XCTAssertFalse(WebViewDelegates.takeAllowance(for: end, now: now))
+        // And not after a minute.
+        WebViewDelegates.allowOnce(end, now: now)
+        XCTAssertFalse(WebViewDelegates.takeAllowance(for: end, now: now.addingTimeInterval(61)))
+        XCTAssertFalse(WebViewDelegates.takeAllowance(for: end, now: now))
+    }
+
+    func testAPagesQuestionIsAskedInThePagesLanguage() {
+        XCTAssertEqual("ar", WebViewDelegates.language(of: URL(string: "https://listenai.studio/ar/dashboard")))
+        XCTAssertEqual("en", WebViewDelegates.language(of: URL(string: "https://listenai.studio/en/agents/x")))
+        XCTAssertEqual(AppConfig.deviceLang, WebViewDelegates.language(of: URL(string: "https://listenai.studio/app/start")))
+        XCTAssertEqual(AppConfig.deviceLang, WebViewDelegates.language(of: nil))
+        XCTAssertEqual("إلغاء", AppConfig.text("action_cancel", lang: "ar"))
+        XCTAssertEqual("OK", AppConfig.text("action_ok", lang: "en"))
+    }
+
     func testLeavingAPageEarlyIsNotAFailure() {
         XCTAssertFalse(WebViewDelegates.isRealFailure(NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)))
         XCTAssertFalse(WebViewDelegates.isRealFailure(NSError(domain: "WebKitErrorDomain", code: 102)))

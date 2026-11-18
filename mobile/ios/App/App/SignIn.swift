@@ -24,8 +24,12 @@ final class SignIn: NSObject, ASWebAuthenticationPresentationContextProviding {
         session?.cancel()
         anchor = window
 
+        var opened: ASWebAuthenticationSession?
         let session = ASWebAuthenticationSession(url: start, callbackURLScheme: AppConfig.callbackScheme) { [weak self] callback, _ in
-            self?.session = nil
+            // Only this sheet's own end forgets it: an older sheet that was closed to make
+            // room for this one must not take this one away.
+            if let self = self, self.session === opened { self.session = nil }
+            opened = nil
             // Closed without signing in: nothing to do. The verifier is forgotten with this closure.
             guard let callback = callback, let code = SignIn.code(from: callback) else { return }
             AppRouter.shared.completeSignIn(code: code, verifier: verifier)
@@ -33,6 +37,7 @@ final class SignIn: NSObject, ASWebAuthenticationPresentationContextProviding {
         session.presentationContextProvider = self
         // The phone's browser may already be signed in to Google: let the sheet use that.
         session.prefersEphemeralWebBrowserSession = false
+        opened = session
         self.session = session
         return session.start()
     }

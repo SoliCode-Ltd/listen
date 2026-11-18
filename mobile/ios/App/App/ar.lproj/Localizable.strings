@@ -10,3 +10,5 @@
 "notif_settings_message" = "لنخبرك عندما يجهز صوتك، فعّل الإشعارات لتطبيق «إسمع» من إعدادات هاتفك.";
 "action_not_now" = "ليس الآن";
 "action_open_settings" = "فتح الإعدادات";
+"action_ok" = "موافق";
+"action_cancel" = "إلغاء";

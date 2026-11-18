@@ -10,3 +10,5 @@
 "notif_settings_message" = "To hear when your audio is ready, turn on notifications for Listen in your phone's settings.";
 "action_not_now" = "Not now";
 "action_open_settings" = "Open settings";
+"action_ok" = "OK";
+"action_cancel" = "Cancel";

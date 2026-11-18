@@ -35,6 +35,8 @@ final class AppRouter {
     /// The end of a sign-in: the one address of the sign-in leg that belongs in the app.
     func completeSignIn(code: String, verifier: String) {
         if let url = URL(string: AppConfig.urls.signInCompleteUrl(code: code, verifier: verifier)) {
+            // The web view refuses the sign-in leg's addresses; this one, once, is the app's own.
+            DispatchQueue.main.async { WebViewDelegates.allowOnce(url) }
             show(url)
         }
     }

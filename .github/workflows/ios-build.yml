@@ -13,7 +13,7 @@ name: iOS build
 # "upload" ticked) needs these repository secrets (mobile/ios/README.md says how to make each):
 #
 #   APPLE_TEAM_ID                 the ten-character team id of the Apple developer account
-#   APPSTORE_API_KEY_ID           the App Store Connect API key's id
+#   APPSTORE_API_KEY_ID           the App Store Connect API key's id (a team key with the Admin role)
 #   APPSTORE_API_ISSUER_ID        its issuer id
 #   APPSTORE_API_KEY_P8_BASE64    the key file (.p8), base64-encoded
 
@@ -115,30 +115,53 @@ jobs:
           plutil -p "$APP/Info.plist" | grep -E "CFBundleShortVersionString|CFBundleVersion|ListenAppURL|UIDeviceFamily|ITSAppUsesNonExemptEncryption|MinimumOSVersion|DTXcode\"|DTSDKName"
           ls "$APP" | head -50
 
-      # The form of the app that goes to Apple (Release, for a real iPhone), compiled here without
-      # signing: a mistake that only shows in that form is found now, not on the first upload.
-      - name: Build the App Store form (unsigned)
+      # The archive that goes to Apple, made exactly as the upload job makes it (see there), but
+      # with no Apple account: a mistake that only shows in that form is found now, not on the
+      # first upload.
+      - name: Archive as the upload does (no Apple account)
         working-directory: mobile/ios/App
         run: |
           set -o pipefail
-          xcodebuild build \
-            -project App.xcodeproj -scheme App -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath "$RUNNER_TEMP/dd-release" \
-            MARKETING_VERSION="$LISTEN_VERSION_NAME" CURRENT_PROJECT_VERSION="$LISTEN_BUILD_NUMBER" \
-            LISTEN_APP_URL="$LISTEN_APP_URL" \
-            CODE_SIGNING_ALLOWED=NO | xcbeautify --renderer github-actions
-          APP="$RUNNER_TEMP/dd-release/Build/Products/Release-iphoneos/App.app"
+          archive() {
+            xcodebuild archive \
+              -project App.xcodeproj -scheme App -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -archivePath "$RUNNER_TEMP/Check.xcarchive" \
+              -derivedDataPath "$RUNNER_TEMP/dd-release" \
+              CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Automatic "$@" \
+              MARKETING_VERSION="$LISTEN_VERSION_NAME" CURRENT_PROJECT_VERSION="$LISTEN_BUILD_NUMBER" \
+              LISTEN_APP_URL="$LISTEN_APP_URL" | xcbeautify --renderer github-actions
+          }
+          # The upload job names the team; here there is none to name. If Xcode insists on one,
+          # a stand-in shows that the rest of the archive is sound.
+          if archive; then
+            echo "Archived without a team."
+          else
+            echo "::warning::The archive needs a team to be named; trying with a stand-in."
+            rm -rf "$RUNNER_TEMP/Check.xcarchive"
+            archive DEVELOPMENT_TEAM=A1B2C3D4E5
+            echo "Archived with a stand-in team."
+          fi
+          APP="$RUNNER_TEMP/Check.xcarchive/Products/Applications/App.app"
           test -f "$APP/PrivacyInfo.xcprivacy"
           plutil -lint "$APP/PrivacyInfo.xcprivacy" "$APP/Info.plist"
-          # Apple refuses an upload without the icon, and one that is not for iPhone only would need iPad pictures.
+          # Apple refuses an upload without the icon.
           test "$(plutil -extract CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName raw "$APP/Info.plist")" = "AppIcon"
           test -f "$APP/Assets.car"
           plutil -p "$APP/Info.plist" | grep -E "MinimumOSVersion|UIDeviceFamily|ITSAppUsesNonExemptEncryption" -A2
+          # What the app is allowed (notifications, links to the site, Sign in with Apple) must
+          # be written into the archive: the upload's signing is made from it.
+          codesign -d --entitlements - --xml "$APP" > "$RUNNER_TEMP/entitlements.plist" 2>/dev/null
+          plutil -p "$RUNNER_TEMP/entitlements.plist"
+          for key in aps-environment com.apple.developer.associated-domains com.apple.developer.applesignin; do
+            grep -q "$key" "$RUNNER_TEMP/entitlements.plist" || { echo "::error::$key is not in the archive."; exit 1; }
+          done
           # What debug builds have for the simulator run (a record, a way to start on a named page) is not in the form people get.
           if strings "$APP/App" | grep -qE "listen-debug.log|ListenOpenPath"; then echo "::error::Debug-only code is in the release build."; exit 1; fi
 
       - name: Run the app in simulators
+        # Also when the archive above failed, so one run shows everything that is wrong.
+        if: ${{ !cancelled() }}
         run: mobile/ios/ci/simulator-shots.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" "$RUNNER_TEMP/shots"
 
       - name: Attach the simulator pictures
@@ -202,7 +225,10 @@ jobs:
           echo "$APPSTORE_API_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/keys/AuthKey_${APPSTORE_API_KEY_ID}.p8"
           chmod 600 "$RUNNER_TEMP/keys/AuthKey_${APPSTORE_API_KEY_ID}.p8"
 
-      # Apple makes and keeps the signing certificate itself ("cloud signing"): nothing to store.
+      # No signing certificate is stored anywhere. The archive is made with a local signature
+      # only (which needs no certificate, no profile and no registered iPhone); the next step
+      # signs it for the App Store with a certificate Apple makes and keeps itself ("cloud
+      # signing"), which the App Store Connect key may ask for when its role is Admin.
       - name: Archive
         working-directory: mobile/ios/App
         run: |
@@ -211,10 +237,7 @@ jobs:
             -project App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Listen.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_${APPSTORE_API_KEY_ID}.p8" \
-            -authenticationKeyID "$APPSTORE_API_KEY_ID" \
-            -authenticationKeyIssuerID "$APPSTORE_API_ISSUER_ID" \
+            CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             MARKETING_VERSION="$LISTEN_VERSION_NAME" CURRENT_PROJECT_VERSION="$LISTEN_BUILD_NUMBER" \
             LISTEN_APP_URL="$LISTEN_APP_URL" | xcbeautify --renderer github-actions

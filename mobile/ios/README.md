@@ -36,6 +36,9 @@ Nobody needs a Mac: GitHub builds it. **Actions → iOS build → Run workflow.*
   the run's page.
 - With **upload** ticked it also signs the build and sends it to TestFlight. That needs
   the four repository secrets named at the top of `.github/workflows/ios-build.yml`.
+  The App Store Connect key must be a team key with the **Admin** role: Apple then makes
+  and keeps the signing certificate itself, and nothing is stored in GitHub but the key.
+  No iPhone needs to be registered in the developer account.
 - A run takes about half an hour and costs roughly two US dollars (Mac machines are 0.062 dollars a minute at the time
   of writing), so it starts only when a pull request changes the iPhone app, or by hand.
 

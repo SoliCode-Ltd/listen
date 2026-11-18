@@ -47,8 +47,9 @@ final class WebViewDelegates: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
 
         if urls.isAppUrl(url) {
-            if urls.isSignInUrl(url.absoluteString) {
-                // The browser leg of sign-in stays in the sign-in sheet.
+            if urls.isSignInUrl(url.absoluteString) && !WebViewDelegates.takeAllowance(for: url) {
+                // The browser leg of sign-in stays in the sign-in sheet. The one exception is
+                // the page that ends a sign-in, when the app itself asks for it (allowOnce).
                 decisionHandler(.cancel)
                 return
             }
@@ -59,6 +60,28 @@ final class WebViewDelegates: NSObject, WKNavigationDelegate, WKUIDelegate {
         // Not the site: it opens outside the app, or not at all.
         decisionHandler(.cancel)
         WebViewDelegates.openOutside(url)
+    }
+
+    // MARK: - The end of a sign-in
+
+    /// The one address of the sign-in leg the app itself loads: the page that ends a sign-in,
+    /// with the code the sign-in sheet handed back. It is let through once, and only within a
+    /// minute, so no page can send the web view there with a code of its own.
+    private static var allowance: (address: String, until: Date)?
+
+    static func allowOnce(_ url: URL, now: Date = Date()) {
+        allowance = (url.absoluteString, now.addingTimeInterval(60))
+    }
+
+    static func takeAllowance(for url: URL, now: Date = Date()) -> Bool {
+        guard let allowed = allowance else { return false }
+        if now > allowed.until {
+            allowance = nil
+            return false
+        }
+        guard allowed.address == url.absoluteString else { return false }
+        allowance = nil
+        return true
     }
 
     /// Opens a link outside the app when it is one a phone knows what to do with.
@@ -123,6 +146,73 @@ final class WebViewDelegates: NSObject, WKNavigationDelegate, WKUIDelegate {
         // "Frame load interrupted" (102) and "plug-in handled load" (204).
         if error.domain == "WebKitErrorDomain" && (error.code == 102 || error.code == 204) { return false }
         return true
+    }
+
+    /// The page's process was ended by the phone (memory). Capacitor reloads the page; when no
+    /// page had come yet there is nothing to reload, so the first page is asked for again.
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        ShellViewController.note("page process ended \(webView.url?.absoluteString ?? "-")")
+        if webView.url == nil, let start = URL(string: urls.startUrl) {
+            webView.load(URLRequest(url: start))
+        } else {
+            inner.webViewWebContentProcessDidTerminate(webView)
+        }
+    }
+
+    // MARK: - A page's own questions (alert, confirm, prompt)
+
+    // The site's pages ask "Delete this voice?" with the browser's own question. It is shown
+    // in the page's language, over whatever is on the screen, and it always answers: a
+    // question that is never answered would end the page's process.
+
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        guard frame.isMainFrame, let presenter = presenter() else {
+            completionHandler()
+            return
+        }
+        let lang = WebViewDelegates.language(of: webView.url)
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: AppConfig.text("action_ok", lang: lang), style: .default) { _ in completionHandler() })
+        presenter.present(alert, animated: true)
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        guard frame.isMainFrame, let presenter = presenter() else {
+            completionHandler(false)
+            return
+        }
+        let lang = WebViewDelegates.language(of: webView.url)
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: AppConfig.text("action_cancel", lang: lang), style: .cancel) { _ in completionHandler(false) })
+        alert.addAction(UIAlertAction(title: AppConfig.text("action_ok", lang: lang), style: .default) { _ in completionHandler(true) })
+        presenter.present(alert, animated: true)
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) {
+        // Capacitor answers some of these itself (its cookie calls), so only the site's own
+        // page may ask: a frame inside a page gets no answer.
+        let origin = frame.securityOrigin
+        let isSite = origin.protocol.lowercased() == "https" && origin.host.lowercased() == urls.host
+        guard frame.isMainFrame, isSite, presenter() != nil else {
+            completionHandler(nil)
+            return
+        }
+        inner.webView(webView, runJavaScriptTextInputPanelWithPrompt: prompt, defaultText: defaultText, initiatedByFrame: frame, completionHandler: completionHandler)
+    }
+
+    /// What is on top of the screen and can show a question, or nil when nothing can.
+    private func presenter() -> UIViewController? {
+        guard var top: UIViewController = shell, top.viewIfLoaded?.window != nil else { return nil }
+        while let next = top.presentedViewController, !next.isBeingDismissed {
+            top = next
+        }
+        return top
+    }
+
+    /// The language of a page of the site, from its address (/ar/..., /en/...); the phone's otherwise.
+    static func language(of url: URL?) -> String {
+        let first = (url?.pathComponents ?? []).first(where: { $0 != "/" })?.lowercased() ?? ""
+        return ["ar", "en"].contains(first) ? first : AppConfig.deviceLang
     }
 
     // MARK: - New windows, microphone
