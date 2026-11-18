@@ -393,6 +393,12 @@ class InAppModeTest extends InAppTestCase
             $this->assertSame(1, preg_match_all('/class="app-tab is-on"/', $html), $route);
         }
 
+        // The studio's row of sections uses the site's own phone style (as the agents' tabs do): the
+        // app adds no pill or icon style of its own, and the agents' tabs sit right under the header.
+        $studio = (string) $this->inApp($member)->page('dashboard')->getContent();
+        $this->assertStringNotContainsString('html:has(.app-tabs) .dashboard-menu .dashboard-menu-link', $studio);
+        $this->assertStringContainsString('html:has(.app-tabs) .ag-tabs { margin-top: 0; }', $studio);
+
         // The Account page holds what the menu used to: help and signing out. The language is on the
         // bar at the top of every page, and on this page its links lead back here: they must not be
         // taken for purchase links and hidden (the rule in components/in-app-head).

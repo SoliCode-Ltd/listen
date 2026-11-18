@@ -49,7 +49,11 @@
     html:has(.app-tabs) .ag-toast { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); z-index: 120; }
     html.la-typing:has(.app-tabs) .ag-toast { bottom: 16px; }
     /* Agents start right under the header: the room kept for the Studio | Agents switch is not needed. */
-    html:has(.app-tabs) main.ag.ag-page { padding-top: .35rem; }
+    /* The agents' row of tabs sits right under the header, as the studio's does: no band of page between them. */
+    @media (max-width: 1100px) {
+      html:has(.app-tabs) main.ag.ag-page { padding-top: 0; }
+      html:has(.app-tabs) .ag-tabs { margin-top: 0; }
+    }
     /* While the keyboard is up the screen belongs to what is being typed: no bar above the keys. */
     html.la-typing .app-tabs { display: none; }
     /* The browser brings the cursor into view by itself; told how much the bars at the top cover
@@ -66,12 +70,8 @@
       html:has(.app-tabs) .dashboard-menu,
       html[dir="rtl"]:has(.app-tabs) .dashboard-menu { inset: var(--la-top, 65px) 0 auto 0; z-index: 96; border-top: 0;
         border-bottom: 1px solid var(--line); background: color-mix(in oklab, var(--bg) 92%, transparent); }
-      html:has(.app-tabs) .dashboard-menu .dashboard-menu-list { display: flex !important; flex-wrap: nowrap; gap: .25rem !important; padding: .35rem .6rem; overflow-x: auto; scrollbar-width: none; }
-      html:has(.app-tabs) .dashboard-menu .dashboard-menu-list::-webkit-scrollbar { display: none; }
-      html:has(.app-tabs) .dashboard-menu .dm-short { max-width: none; overflow: visible; }
-      html:has(.app-tabs) .dashboard-menu .dashboard-menu-link { flex: none; width: auto; min-width: max-content; flex-direction: row; gap: .4rem; min-height: 42px; padding: .3rem .8rem; font-size: .88rem; border-radius: 999px; }
-      html:has(.app-tabs) .dashboard-menu .dashboard-menu-link svg { width: 18px; height: 18px; flex: none; }
-      html:has(.app-tabs) .dashboard-menu .dashboard-menu-link.active { background: color-mix(in oklab, var(--brand-accent) 14%, transparent); }
+      /* Its tabs look like the agents' (the site's own phone style): names only, the current one
+         in full colour with a violet line under it. No pill, no icons. */
       /* The row of tabs is held under the header by the page itself, so nothing is left above it. */
       html:has(.app-tabs) .dashboard-shell { padding-top: 0 !important; padding-bottom: 1.5rem !important; }
       html:has(.app-tabs) #generatedAudioWrap.output-dock { bottom: calc(62px + .75rem + env(safe-area-inset-bottom, 0px)); }
@@ -83,7 +83,7 @@
        ground of its own, so it is not faded through to the page behind it, and nothing shows
        between it and the header. */
     .ag-tabs.la-strip { -webkit-mask-image: none !important; mask-image: none !important; }
-    html:has(.app-tabs) .ag-tabs { background: var(--bg); box-shadow: 0 -12px 0 var(--bg); }
+    html:has(.app-tabs) .ag-tabs { background: var(--bg); }
     .la-strip.la-more-left { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px); mask-image: linear-gradient(to right, transparent, #000 44px); }
     .la-strip.la-more-right { -webkit-mask-image: linear-gradient(to left, transparent, #000 44px); mask-image: linear-gradient(to left, transparent, #000 44px); }
     .la-strip.la-more-left.la-more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); }
