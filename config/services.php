@@ -65,6 +65,15 @@ return [
         'plans' => env('ANDROID_APP_PLANS', 'hidden'),
     ],
 
+    // The Listen iPhone app (mobile/ios). Plans are always hidden there (no setting, on
+    // purpose: App\Support\InApp\InApp::plansMode).
+    'ios_app' => [
+        // "Continue with Google" in the iPhone app. Apple asks for its own sign-in beside any
+        // other company's, so this stays off until the app offers both; off, the iPhone app
+        // signs in with email (mobile/ios/APPLE-RULES.md, 1.1).
+        'social_sign_in' => (bool) env('IOS_APP_SOCIAL_SIGN_IN', false),
+    ],
+
     'google_tts' => [
         'endpoint' => env('SPEECH_TTS_ENDPOINT', env('GOOGLE_TTS_ENDPOINT', 'https://texttospeech.googleapis.com/v1/text:synthesize')),
         'api_key' => env('SPEECH_TTS_API_KEY', env('GOOGLE_TTS_API_KEY', '')),

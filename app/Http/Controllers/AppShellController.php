@@ -21,7 +21,7 @@ use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * What the Listen Android app (mobile/) needs from the site:
+ * What the Listen apps (mobile/: Android and iPhone) need from the site:
  *
  * - where it starts (the studio for a member, sign-in for a guest);
  * - the neutral plan page that stands in for every purchase page;
@@ -34,6 +34,9 @@ class AppShellController extends Controller
 {
     /** The scheme the app answers to (mobile/android/app/src/main/AndroidManifest.xml). */
     public const APP_SCHEME = 'studio.listenai.app';
+
+    /** Places the app can start at by name (/app/start?to=voices), and the page each one is. */
+    private const START_PLACES = ['voices' => 'samples', 'agents' => 'voice-agents.index'];
 
     private const SIGN_IN_CHALLENGE = 'app_signin.challenge';
 
@@ -52,6 +55,13 @@ class AppShellController extends Controller
     {
         $locale = $this->locale($request);
         $user = $request->user();
+
+        // A shortcut on the app's icon names a place ("voices", "agents"): the site knows its
+        // address in the member's language. Anything else is the usual first page.
+        $place = self::START_PLACES[(string) $request->query('to', '')] ?? null;
+        if ($user && $place !== null) {
+            return redirect()->to($this->localized($place, $locale));
+        }
 
         return redirect()->to($user ? $this->memberHome($user, $locale) : $this->localized('login', $locale));
     }
@@ -90,6 +100,8 @@ class AppShellController extends Controller
         $locale = $this->locale($request);
         $request->session()->put(self::SIGN_IN_CHALLENGE, $challenge);
         $request->session()->put(InApp::SIGN_IN_SESSION, now()->getTimestamp());
+        // Which app opened this tab: the iPhone app says so, and its rules then hold here too.
+        $request->session()->put(InApp::SIGN_IN_PLATFORM, $request->query('platform') === InApp::PLATFORM_IOS ? InApp::PLATFORM_IOS : InApp::PLATFORM_ANDROID);
 
         $done = $this->localized('app.signin.done', $locale);
         if ($request->user()) {
@@ -215,6 +227,10 @@ class AppShellController extends Controller
         if (! InApp::fromApp($request)) {
             return redirect()->route('billing.page');
         }
+        // The iPhone app never leads to a place to pay (InApp::offersUpgradeOnWeb).
+        if (! InApp::offersUpgradeOnWeb($request)) {
+            return redirect()->to(InApp::planUrl());
+        }
 
         return $this->openOnWeb($request, '/'.app()->getLocale().'/billing');
     }
@@ -245,7 +261,7 @@ class AppShellController extends Controller
             $request->session()->regenerate();
         }
         // This browser is now on the website itself, not the app's sign-in tab.
-        $request->session()->forget(InApp::SIGN_IN_SESSION);
+        $request->session()->forget([InApp::SIGN_IN_SESSION, InApp::SIGN_IN_PLATFORM]);
 
         return redirect()->to(url($to));
     }
@@ -264,7 +280,7 @@ class AppShellController extends Controller
         $hash = AppDevice::hashOf($data['token']);
         $device = AppDevice::query()->updateOrCreate(['token_hash' => $hash], [
             'user_id' => $user->id,
-            'platform' => 'android',
+            'platform' => InApp::onIphone($request) ? InApp::PLATFORM_IOS : InApp::PLATFORM_ANDROID,
             'token' => $data['token'],
             'locale' => $data['locale'] ?? (app()->getLocale() === 'en' ? 'en' : 'ar'),
             'app_version' => InApp::version($request),

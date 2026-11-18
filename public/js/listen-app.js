@@ -1,5 +1,5 @@
 /*
- * The Listen Android app (mobile/): what the site's pages do only inside it.
+ * The Listen apps (mobile/: Android and iPhone): what the site's pages do only inside them.
  * Loaded by components/in-app-scripts.blade.php, and only when the page is
  * shown in the app's own web view. A browser never gets this file.
  *
@@ -10,8 +10,9 @@
  *  - "Continue with Google" through the phone's browser;
  *  - the phone's messaging token, for "your voice is ready".
  *
- * The native side is the ListenShell plugin (mobile/BRIDGE.md). Every call is
- * guarded: on an older app without a method, the page simply works as a page.
+ * The native side is the ListenShell plugin (mobile/BRIDGE.md), the same for both
+ * apps. Every call is guarded: on an older app without a method, the page simply works
+ * as a page. The two places where the iPhone differs are marked "iPhone".
  */
 (function () {
   'use strict';
@@ -76,6 +77,7 @@
   function quiet(promise) { return promise.catch(function () { return null; }); }
 
   var lang = cfg.locale === 'en' ? 'en' : 'ar';
+  var ios = cfg.platform === 'ios';
 
   // ------------------------------------------------------------- small UI
 
@@ -222,7 +224,10 @@
           return ready.then(function (file) {
             if (!file) throw new Error('file');
             return shell('saveAudio', file);
-          }).then(function () { toast(t.saved); }, function () { toast(t.save_failed); });
+          }).then(function () { toast(t.saved); }, function (e) {
+            // iPhone: the member closed the phone's "where to save" sheet. Nothing failed.
+            if (!e || !/cancel/i.test(String(e.code || '') + ' ' + String(e.message || e))) toast(t.save_failed);
+          });
         } },
         { label: t.share || 'Share', icon: ICON_SHARE, run: function () {
           return ready.then(function (file) {
@@ -277,12 +282,49 @@
 
   function long(el) { return isFinite(el.duration) && el.duration >= MIN_SECONDS; }
 
+  // iPhone: the lock-screen player is the phone's own for a page's sound. It is told the
+  // title and the place through the browser's Media Session, and its buttons come back the
+  // same way (on Android the app draws the player and sends 'mediaAction' instead).
+  var session = ios && navigator.mediaSession ? navigator.mediaSession : null, sessionWired = false, sessionTitle = '';
+  function sessionUpdate(el) {
+    if (!session) return;
+    try {
+      var title = titleFor(el);
+      if (window.MediaMetadata && title !== sessionTitle) {
+        var about = { title: title, artist: t.now_playing || 'Listen' };
+        try {
+          session.metadata = new MediaMetadata(Object.assign({ artwork: cfg.artwork ? [{ src: cfg.artwork, sizes: '512x512', type: 'image/png' }] : [] }, about));
+        } catch (e) {
+          // A picture the phone will not take: the title alone.
+          session.metadata = new MediaMetadata(about);
+        }
+        sessionTitle = title;
+      }
+      session.playbackState = !el.paused && !el.ended ? 'playing' : 'paused';
+      if (session.setPositionState && isFinite(el.duration) && el.duration > 0) {
+        session.setPositionState({ duration: el.duration, playbackRate: el.playbackRate || 1, position: Math.min(el.duration, Math.max(0, el.currentTime || 0)) });
+      }
+      if (sessionWired) return;
+      sessionWired = true;
+      var wire = function (name, action) {
+        try { session.setActionHandler(name, function (details) { mediaAction({ action: action, position: details && details.seekTime }); }); } catch (e) { /* a button this phone does not have */ }
+      };
+      wire('play', 'play'); wire('pause', 'pause'); wire('seekto', 'seek');
+      wire('seekforward', 'forward'); wire('seekbackward', 'rewind');
+    } catch (e) { /* the page plays on without the lock-screen title */ }
+  }
+  function sessionStop() {
+    if (!session) return;
+    try { sessionTitle = ''; session.metadata = null; session.playbackState = 'none'; } catch (e) {}
+  }
+
   function send(el, force) {
     if (!el || el !== current || !long(el)) return;
     var now = Date.now();
     if (!force && now - lastSent < 1000) return;
     lastSent = now;
     engaged = true;
+    sessionUpdate(el);
     quiet(shell('mediaUpdate', {
       playing: !el.paused && !el.ended,
       title: titleFor(el),
@@ -295,7 +337,7 @@
   function stop(el) {
     if (el && el !== current) return;
     current = null;
-    if (engaged) { engaged = false; quiet(shell('mediaStop')); }
+    if (engaged) { engaged = false; sessionStop(); quiet(shell('mediaStop')); }
   }
 
   function isAudio(target) { return target && target.tagName === 'AUDIO'; }
@@ -312,7 +354,7 @@
   document.addEventListener('emptied', function (e) { if (e.target === current) stop(current); }, true);
   window.addEventListener('pagehide', function () { stop(null); });
 
-  on('ListenShell', 'mediaAction', function (data) {
+  function mediaAction(data) {
     var el = current;
     if (!el || !data) return;
     var d = isFinite(el.duration) ? el.duration : 0;
@@ -324,7 +366,8 @@
       case 'forward': el.currentTime = Math.min(d || el.currentTime + 10, el.currentTime + 10); break;
       case 'rewind': el.currentTime = Math.max(0, el.currentTime - 10); break;
     }
-  });
+  }
+  on('ListenShell', 'mediaAction', mediaAction);
 
   // ----------------------------------------------------------- microphone
 

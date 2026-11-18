@@ -68,6 +68,7 @@ return [
         'share' => 'Share',
         'cancel' => 'Cancel',
         'saved' => 'Saved to Downloads, in the Listen folder.',
+        'saved_plain' => 'Saved.',
         'save_failed' => 'The file could not be saved. Please try again.',
         'preparing' => 'Getting the file ready…',
         'notify_title' => 'Tell you when it\'s ready?',

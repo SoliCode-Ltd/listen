@@ -103,9 +103,12 @@
           @endif
         </ul>
       @endif
+      {{-- Android only: on iPhone nothing may lead to a place to pay (InApp::offersUpgradeOnWeb). --}}
+      @if(\App\Support\InApp\InApp::offersUpgradeOnWeb())
       <div class="acct-cta">
         <a class="btn btn-primary" href="{{ route('app.upgrade') }}" data-app-upgrade data-no-prefetch>{{ __('app.plan.upgrade') }}</a>
       </div>
+      @endif
     </section>
 
     <section class="acct-card is-list" aria-labelledby="acctMore">
