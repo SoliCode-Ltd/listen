@@ -72,7 +72,8 @@
       html:has(.app-tabs) .dashboard-menu .dashboard-menu-link { flex: none; width: auto; min-width: max-content; flex-direction: row; gap: .4rem; min-height: 42px; padding: .3rem .8rem; font-size: .88rem; border-radius: 999px; }
       html:has(.app-tabs) .dashboard-menu .dashboard-menu-link svg { width: 18px; height: 18px; flex: none; }
       html:has(.app-tabs) .dashboard-menu .dashboard-menu-link.active { background: color-mix(in oklab, var(--brand-accent) 14%, transparent); }
-      html:has(.app-tabs) .dashboard-shell { padding-top: 3.4rem !important; padding-bottom: 1.5rem !important; }
+      /* The row of tabs is held under the header by the page itself, so nothing is left above it. */
+      html:has(.app-tabs) .dashboard-shell { padding-top: 0 !important; padding-bottom: 1.5rem !important; }
       html:has(.app-tabs) #generatedAudioWrap.output-dock { bottom: calc(62px + .75rem + env(safe-area-inset-bottom, 0px)); }
     }
     /* A row of tabs that slides sideways fades at the edge where more tabs wait (listen-app.js). */
