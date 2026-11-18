@@ -7,8 +7,11 @@ the app the same minute.
 
 - **Apple's rules and what each means for Listen:** `APPLE-RULES.md` (read first).
 - **How pages talk to the app:** `../BRIDGE.md`, section 5.
-- **The owner's step-by-step guide for App Store Connect** comes with the submission
-  package, once the app has been built and checked.
+- **The owner's step-by-step guide, from the Apple account to "Submit":** `START-HERE.md`.
+- **What to type in every box of the App Store listing, and the pictures:**
+  `APP-STORE-LISTING.md`, `store/`.
+- **What the person with a real iPhone checks:** `TESTFLIGHT-CHECKLIST.md`.
+- **Every known reason for a rejection and where it stands:** `PRE-SUBMISSION-AUDIT.md`.
 
 ## What is here
 
@@ -46,6 +49,9 @@ npx cap copy ios                       # the app's bundled files
 npx cap update ios                     # Capacitor's list of plugins
 open ios/App/App.xcodeproj
 ```
+
+The app asks for iOS 16.4 or later (an iPhone 8 or newer): the site's in-app pages use CSS
+that older iPhone systems cannot draw.
 
 Settings (build settings; the workflow passes them):
 

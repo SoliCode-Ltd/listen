@@ -1,4 +1,5 @@
 import UIKit
+import AVFoundation
 import UserNotifications
 import Capacitor
 
@@ -8,6 +9,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Notifications are shown and their taps handled here (see the extension below).
         UNUserNotificationCenter.current().delegate = self
+        // What the app plays is the member's voice-over, not a sound effect: it plays with the
+        // ring switch off and goes on with the screen locked. Nothing is interrupted by saying
+        // so here; other apps' sound stops only when a voice actually starts.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
         // Files made ready for sharing in an earlier run are no longer needed.
         AudioFiles.clearTemporaryFiles()
         return true

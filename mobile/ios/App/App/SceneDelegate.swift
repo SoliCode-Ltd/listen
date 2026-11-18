@@ -25,6 +25,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let shell = ShellViewController()
         AppRouter.shared.attach(shell)
         let window = UIWindow(windowScene: windowScene)
+        // White like the launch screen and the opening logo, so nothing dark shows between them.
+        window.backgroundColor = LaunchWaveView.background
         window.rootViewController = shell
         window.makeKeyAndVisible()
         self.window = window

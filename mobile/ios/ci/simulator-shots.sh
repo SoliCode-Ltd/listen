@@ -44,14 +44,13 @@ for index in "${!UDIDS[@]}"; do
   xcrun simctl bootstatus "$device" -b >/dev/null
   for look in light dark; do
     xcrun simctl ui "$device" appearance "$look"
-    # A fresh copy of the app for each look, so the page starts in the phone's own light or dark
-    # (the site remembers a member's choice of theme).
-    xcrun simctl uninstall "$device" "$BUNDLE_ID" 2>/dev/null || true
-    xcrun simctl install "$device" "$APP"
     for lang in ar en; do
       locale="en_US"; [ "$lang" = "ar" ] && locale="ar_EG"
+      # A fresh copy of the app every time, so each picture is a true first opening: the site
+      # remembers the language and the theme a phone was last shown.
       xcrun simctl terminate "$device" "$BUNDLE_ID" 2>/dev/null || true
-      rm -f "$(xcrun simctl get_app_container "$device" "$BUNDLE_ID" data 2>/dev/null)/Documents/listen-debug.log" 2>/dev/null || true
+      xcrun simctl uninstall "$device" "$BUNDLE_ID" 2>/dev/null || true
+      xcrun simctl install "$device" "$APP"
       xcrun simctl launch "$device" "$BUNDLE_ID" -AppleLanguages "($lang)" -AppleLocale "$locale" >/dev/null
       # The opening logo first.
       sleep 1

@@ -9,7 +9,8 @@ options:
   createIntermediateGroups: true
   developmentLanguage: en
   deploymentTarget:
-    iOS: "15.0"
+    # 16.4: the site's in-app pages use CSS (:has, color-mix) that older iPhone systems cannot draw.
+    iOS: "16.4"
 
 settings:
   base:

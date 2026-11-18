@@ -21,6 +21,9 @@ on:
   pull_request:
     paths:
       - 'mobile/ios/**'
+      # Not the papers for the App Store (texts, pictures, guides): they change nothing in the app.
+      - '!mobile/ios/**/*.md'
+      - '!mobile/ios/store/**'
       - 'mobile/www/**'
       - 'mobile/package.json'
       - 'mobile/package-lock.json'
