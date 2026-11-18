@@ -1,0 +1,47 @@
+name: Free overuse inspect
+
+# Read-only: the members on the free plan who used more than the free demo allows
+# (300 characters), on LIVE, and where each one's characters came from: what the demo
+# said the limit was when each voice was made, referral rewards, other accounts of the
+# same person, and for studio credits the paid plans, packs, gifts and trials they had.
+# Pipes scripts/support/free_overuse_inspect.php over SSH into the app's own PHP (READ
+# ONLY database session). Prints member ids, dates and numbers only: no email, no name,
+# no text. Nothing is written. A push of this file or the script runs it.
+
+on:
+  push:
+    branches: [solicode/gifted-fermi-jbcpfw]
+    paths:
+      - .github/workflows/free-overuse-inspect.yml
+      - scripts/support/free_overuse_inspect.php
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect live over SSH
+        env:
+          SSH_HOST: ${{ secrets.LIVE_SSH_HOST }}
+          SSH_USER: ${{ secrets.LIVE_SSH_USER }}
+          SSH_KEY: ${{ secrets.LIVE_SSH_KEY }}
+          APP_PATH: ${{ secrets.LIVE_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_inspect
+          chmod 600 ~/.ssh/id_inspect
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; \$(command -v php8.4 || command -v php)"
+          ssh -i ~/.ssh/id_inspect -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" < scripts/support/free_overuse_inspect.php
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_inspect
