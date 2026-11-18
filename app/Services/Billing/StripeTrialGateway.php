@@ -33,4 +33,10 @@ interface StripeTrialGateway
     public function createTrialSubscription(string $customerId, string $priceId, string $paymentMethodId, int $trialDays, array $metadata): array;
 
     public function cancelSubscription(string $subscriptionId): void;
+
+    /**
+     * Voids the open (unpaid) invoices of a subscription that has ended, so none of them
+     * can be collected or paid afterwards.
+     */
+    public function voidOpenInvoices(string $subscriptionId): void;
 }

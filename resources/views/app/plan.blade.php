@@ -127,7 +127,7 @@
             <button type="submit" class="acct-row is-out"><svg class="acct-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span>{{ __('app.plan.sign_out') }}</span></button>
           </form>
         </li>
-        <li><a class="acct-row is-quiet" href="{{ route('contact', ['topic' => 'delete']) }}"><svg class="acct-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg><span>{{ __('app.plan.delete_account') }}</span>{!! $go !!}</a></li>
+        <li><a class="acct-row is-quiet" href="{{ route('account.delete') }}"><svg class="acct-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg><span>{{ __('app.plan.delete_account') }}</span>{!! $go !!}</a></li>
       </ul>
     </section>
   </main>

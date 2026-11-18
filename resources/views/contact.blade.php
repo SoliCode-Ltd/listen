@@ -231,6 +231,11 @@
             @endif
           </div>
 
+          {{-- Asked to have an account deleted: a member can do that alone, at once (AccountDeletionController). --}}
+          @if(request()->query('topic') === 'delete')
+            <p class="in-app-note" style="margin: 0 0 1.25rem;">{{ __('account.delete.self_service') }} <a href="{{ route('account.delete') }}" style="font-weight: 700;">{{ __('account.delete.title') }}</a></p>
+          @endif
+
           {{-- A topic fills in the subject; it can still be changed by hand. --}}
           <fieldset class="contact-topics">
             <legend>{{ __('ui.contact.topic_label') }}</legend>

@@ -74,6 +74,8 @@ class AppLinksAndDeployTest extends InAppTestCase
             $as->get($this->localizedRoute('contact').'?topic=delete')->assertOk()
                 ->assertSee('value="'.__('ui.contact.topic_delete').'"', false);
         }
-        $this->inApp($member)->page('app.plan')->assertSee('topic=delete', false);
+        // The app's account page leads to the page where a member deletes the account alone
+        // (MemberAccountDeletionTest); the contact form's topic stays for someone who writes in.
+        $this->inApp($member)->page('app.plan')->assertSee($this->localizedRoute('account.delete'), false)->assertDontSee('topic=delete', false);
     }
 }
