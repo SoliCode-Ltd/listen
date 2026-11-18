@@ -76,6 +76,15 @@
       html:has(.app-tabs) .dashboard-shell { padding-top: 0 !important; padding-bottom: 1.5rem !important; }
       html:has(.app-tabs) #generatedAudioWrap.output-dock { bottom: calc(62px + .75rem + env(safe-area-inset-bottom, 0px)); }
     }
+    /* Speech to text in the app. Its sheets (downloads, the language the text is shown in) and their
+       shade cover the app's own bars too, so no option hides under the bottom bar and the strip of
+       tabs above is shaded with the rest. Its notices sit above the bottom bar. */
+    html:has(.app-tabs) .tr-ed-bar .tr-menu.is-open::before { z-index: 110; }
+    html:has(.app-tabs) .tr-ed-bar .tr-menu .tr-menu-list { z-index: 115; }
+    html:has(.app-tabs) .tr-toast { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); z-index: 120; }
+    @media (max-width: 899px) {
+      html:has(.app-tabs) body.tr-is-reading .tr-toast { bottom: calc(238px + env(safe-area-inset-bottom, 0px)); }
+    }
     /* A row of tabs that slides sideways fades at the edge where more tabs wait (listen-app.js). */
     .la-strip { scrollbar-width: none; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
     .la-strip::-webkit-scrollbar { display: none; }

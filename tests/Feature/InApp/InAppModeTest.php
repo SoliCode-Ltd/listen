@@ -398,6 +398,11 @@ class InAppModeTest extends InAppTestCase
         $studio = (string) $this->inApp($member)->page('dashboard')->getContent();
         $this->assertStringNotContainsString('html:has(.app-tabs) .dashboard-menu .dashboard-menu-link', $studio);
         $this->assertStringContainsString('html:has(.app-tabs) .ag-tabs { margin-top: 0; }', $studio);
+        // Speech to text's sheets (downloads, languages) and their shade sit above the app's bars, so
+        // no option hides under the bottom bar (the bars are at 96 and 100), and its notices above it.
+        $this->assertStringContainsString('html:has(.app-tabs) .tr-ed-bar .tr-menu.is-open::before { z-index: 110; }', $studio);
+        $this->assertStringContainsString('html:has(.app-tabs) .tr-ed-bar .tr-menu .tr-menu-list { z-index: 115; }', $studio);
+        $this->assertStringContainsString('html:has(.app-tabs) .tr-toast { bottom: calc(78px', $studio);
 
         // The Account page holds what the menu used to: help and signing out. The language is on the
         // bar at the top of every page, and on this page its links lead back here: they must not be
