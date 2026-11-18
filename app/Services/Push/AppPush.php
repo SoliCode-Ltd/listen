@@ -15,15 +15,16 @@ use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
  * "Your voice is ready", on the member's phone: for work that finishes after
  * the page's reply (a long text, a video dub, a cloned voice), sent to every
  * phone the member is signed in on with the Listen app, in that phone's
- * language. A member without the app costs one small query; nothing is sent
- * when messaging is not set up (FcmSender).
+ * language: an Android phone through Firebase (FcmSender), an iPhone through
+ * Apple's own service (ApnsSender). A member without the app costs one small
+ * query; nothing is sent to a kind of phone whose service is not set up.
  *
  * Nothing here may fail the work it announces: every entry point swallows
  * its own errors.
  */
 class AppPush
 {
-    public function __construct(private FcmSender $sender) {}
+    public function __construct(private FcmSender $sender, private ApnsSender $apple) {}
 
     /** A studio voice that took long enough for the member to have looked away. */
     public function voiceReady(AudioGeneration $generation): void
@@ -66,7 +67,7 @@ class AppPush
      */
     private function notify(int $userId, string $message, string $route, string $tag, string $fragment = ''): void
     {
-        if ($userId <= 0 || ! $this->sender->configured()) {
+        if ($userId <= 0 || (! $this->sender->configured() && ! $this->apple->configured())) {
             return;
         }
 
@@ -75,12 +76,13 @@ class AppPush
             $locale = $device->locale === 'en' ? 'en' : 'ar';
             $url = LaravelLocalization::getLocalizedURL($locale, route($route, [], true), [], true);
 
-            $result = $this->sender->send(
-                (string) $device->token,
-                (string) trans("app.push.{$message}_title", [], $locale),
-                (string) trans("app.push.{$message}_body", [], $locale),
-                ['url' => $url.$fragment, 'kind' => $message, 'tag' => $tag],
-            );
+            $title = (string) trans("app.push.{$message}_title", [], $locale);
+            $body = (string) trans("app.push.{$message}_body", [], $locale);
+            $data = ['url' => $url.$fragment, 'kind' => $message, 'tag' => $tag];
+
+            $result = $device->platform === 'ios'
+                ? $this->apple->send((string) $device->token, $title, $body, $data)
+                : $this->sender->send((string) $device->token, $title, $body, $data);
 
             if ($result === FcmSender::GONE) {
                 $device->delete();

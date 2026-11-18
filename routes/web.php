@@ -279,6 +279,21 @@ Route::get('/.well-known/assetlinks.json', [AppShellController::class, 'assetLin
         InAppMode::class,
     ])
     ->name('app.assetlinks');
+// The same for the iPhone app (Apple asks for this address, without an ending).
+Route::get('/.well-known/apple-app-site-association', [AppShellController::class, 'appleAppSiteAssociation'])
+    ->withoutMiddleware([
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        // Laravel 13's name, and 12's: the servers run either for a minute while a deploy's packages go in.
+        PreventRequestForgery::class,
+        ValidateCsrfToken::class,
+        EnsureUserIsNotBlocked::class,
+        CaptureAdClickId::class,
+        InAppMode::class,
+    ])
+    ->name('app.apple-links');
 Route::prefix('app')->group(function (): void {
     Route::get('/start', [AppShellController::class, 'start'])->name('app.start');
     Route::get('/signin/start', [AppShellController::class, 'signInStart'])->middleware('throttle:20,1,app-signin-start')->name('app.signin.start');
