@@ -1,0 +1,71 @@
+name: Suspicious accounts delete
+
+# Deletes the accounts the owner asked to remove on 18 November 2026: the eight
+# people found by "Free overuse inspect" who each made several accounts to get the
+# free demo more than once (46 accounts). Pipes scripts/support/suspicious_delete.php
+# over SSH, which keeps admins, members who pay or have paid, anyone the deletion
+# refuses and accounts with a cloned voice, and keeps each account's demo use first
+# so the same person never gets the demo back. It sends no email.
+#
+# A push of this file or the script runs a dry run on staging (nothing changed). A
+# run started by hand chooses the site and whether to apply.
+
+on:
+  push:
+    branches: [solicode/gifted-fermi-jbcpfw]
+    paths:
+      - .github/workflows/suspicious-delete.yml
+      - scripts/support/suspicious_delete.php
+  workflow_dispatch:
+    inputs:
+      target:
+        type: choice
+        options: [staging, live]
+        default: staging
+      apply:
+        description: "yes deletes; anything else is a dry run"
+        type: string
+        default: "no"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: suspicious-delete
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Over SSH
+        env:
+          TARGET: ${{ inputs.target || 'staging' }}
+          APPLY: ${{ inputs.apply == 'yes' && '1' || '0' }}
+          MEMBER_IDS: "7533,7603,7605,7018,5839,5840,5841,5842,5903,5907,6724,6674,6847,6882,7013,7182,7221,7216,6161,6163,6186,6188,6189,3390,3388,3389,3391,3392,3393,3394,3396,7012,7042,7196,7350,7474,6778,254,7336,7338,7187,5721,5746,5749,5745,5747"
+          EXPECTED_COUNT: "46"
+          LIVE_HOST: ${{ secrets.LIVE_SSH_HOST }}
+          LIVE_USER: ${{ secrets.LIVE_SSH_USER }}
+          LIVE_KEY: ${{ secrets.LIVE_SSH_KEY }}
+          LIVE_PATH: ${{ secrets.LIVE_APP_PATH }}
+          STAGING_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_USER: ${{ secrets.STAGING_SSH_USER }}
+          STAGING_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          STAGING_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          if [ "$TARGET" = live ]; then H="$LIVE_HOST"; U="$LIVE_USER"; K="$LIVE_KEY"; P="$LIVE_PATH"; else H="$STAGING_HOST"; U="$STAGING_USER"; K="$STAGING_KEY"; P="$STAGING_PATH"; fi
+          H="$(printf '%s' "$H" | tr -d '[:space:]')"; U="$(printf '%s' "$U" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$K" | tr -d '\r' > ~/.ssh/id_run
+          chmod 600 ~/.ssh/id_run
+          ssh-keyscan -T 15 -H "$H" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "Target: $TARGET, apply: $APPLY"
+          remote="for d in ${P:+'$P'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; MEMBER_IDS='$MEMBER_IDS' EXPECTED_COUNT='$EXPECTED_COUNT' APPLY='$APPLY' \$(command -v php8.4 || command -v php)"
+          ssh -i ~/.ssh/id_run -o BatchMode=yes -o ConnectTimeout=20 "$U@$H" "$remote" < scripts/support/suspicious_delete.php
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_run
