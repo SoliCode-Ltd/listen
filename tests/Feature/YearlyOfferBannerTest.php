@@ -128,13 +128,14 @@ class YearlyOfferBannerTest extends TestCase
         }
     }
 
-    public function test_the_bar_never_shows_inside_the_phone_apps_even_to_a_visitor(): void
+    private const ANDROID_APP = 'Mozilla/5.0 (Linux; Android 14; SM-A546E Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36 ListenApp/1.0.0 (Android)';
+
+    private const IPHONE_APP = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 ListenApp/1.0.0 (iOS)';
+
+    public function test_an_app_that_shows_nothing_about_plans_never_shows_the_bar_even_to_a_visitor(): void
     {
         $this->turnOn();
-        $apps = [
-            'Android app' => 'Mozilla/5.0 (Linux; Android 14; SM-A546E Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36 ListenApp/1.0.0 (Android)',
-            'iPhone app' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 ListenApp/1.0.0 (iOS)',
-        ];
+        config(['services.android_app.plans' => 'hidden']);
 
         foreach (['en', 'ar'] as $locale) {
             app()->setLocale($locale);
@@ -143,13 +144,34 @@ class YearlyOfferBannerTest extends TestCase
                 $browser = (string) $this->getLocalizedRoute($route)->assertOk()->getContent();
                 $this->assertStringContainsString('class="offer-bar"', $browser, "browser {$locale} {$route}");
                 // ...and nobody sees it in the apps, where nothing is sold.
-                foreach ($apps as $name => $userAgent) {
+                foreach (['Android app' => self::ANDROID_APP, 'iPhone app' => self::IPHONE_APP] as $name => $userAgent) {
                     $page = (string) $this->withHeader('User-Agent', $userAgent)->getLocalizedRoute($route)->assertOk()->getContent();
                     $this->assertStringNotContainsString('class="offer-bar"', $page, "{$name} {$locale} {$route}");
                     $this->assertStringNotContainsString('offer-bar-btn"', $page, "{$name} {$locale} {$route}");
                 }
                 $this->flushHeaders();
             }
+        }
+    }
+
+    public function test_where_the_android_app_shows_plans_the_bar_is_there_and_leads_to_them(): void
+    {
+        $this->turnOn();
+        config(['services.android_app.plans' => 'web']);
+        app()->setLocale('en');
+
+        // The Android app set to "web": plans are shown, and bought on the website in the browser.
+        $page = (string) $this->withHeader('User-Agent', self::ANDROID_APP)->getLocalizedRoute('samples')->assertOk()->getContent();
+        $this->assertStringContainsString('class="offer-bar"', $page);
+        $this->assertSame(1, preg_match('#<a class="offer-bar-btn" href="([^"]+)"#', $page, $button), 'The bar has no button.');
+        $this->assertStringContainsString('/pricing?billing=yearly', html_entity_decode($button[1]));
+        $this->flushHeaders();
+
+        // The iPhone app has no such setting: once the site knows it (InApp::onIphone), it
+        // shows nothing about plans whatever the Android setting says.
+        if (method_exists(\App\Support\InApp\InApp::class, 'onIphone')) {
+            $iphone = (string) $this->withHeader('User-Agent', self::IPHONE_APP)->getLocalizedRoute('samples')->assertOk()->getContent();
+            $this->assertStringNotContainsString('class="offer-bar"', $iphone);
         }
     }
 
