@@ -108,6 +108,8 @@ class StripeWebhookController extends Controller
 
             $trialOutcomeService->handleStripeEvent($event);
             app(\App\Services\Billing\AdsPurchases::class)->handleStripeEvent($event);
+            // A report: it never stops what follows.
+            rescue(fn () => app(\App\Services\Billing\ChatGptAdsConversions::class)->handleStripeEvent($event));
             // How the member paid, for Billing → Payments and the dashboard.
             app(\App\Services\Billing\PaymentLedger::class)->handleStripeEvent($event);
             $stripeWebhookEmailService->sendForEvent($event);

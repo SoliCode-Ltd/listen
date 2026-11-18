@@ -2477,7 +2477,16 @@
       }
     }
 
-    function trackPurchaseConversion(meta, selected) {
+    // One id per checkout, sent with the order and with the pixels' event: the server sends
+    // the same sale to ChatGPT Ads once Stripe says it is paid, and it is counted once.
+    function newAdsEventId() {
+      try {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+      } catch (error) {}
+      return 'lst' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+    }
+
+    function trackPurchaseConversion(meta, selected, eventId) {
       const chargeCurrency = String(meta?.charge_currency || meta?.currency || '').toUpperCase();
       const minor = chargeCurrency === 'USD' && meta?.base_usd_cents ? meta.base_usd_cents : meta?.amount_cents;
       const plan = String(selected?.plan?.slug || '');
@@ -2488,6 +2497,7 @@
         cycle: cycle,
         amount: Number(minor) > 0 ? Math.round(Number(minor)) : null,
         currency: Number(minor) > 0 && chargeCurrency ? chargeCurrency : null,
+        event_id: eventId ? String(eventId) : '',
       });
       // A moment for the pixels to send their event before the page moves on.
       const pixels = new Promise(function(resolve) { setTimeout(resolve, hasPurchaseEventCode ? 1000 : 0); });
@@ -2504,6 +2514,7 @@
         billing_cycle: String(selected.cycle || 'monthly'),
         payment_method: paymentMethod || null,
         save_card: saveCard,
+        ads_event_id: newAdsEventId(),
       };
       const prorationDate = planChangeProrationDate(selected);
       if (prorationDate) subscribeBody.proration_date = prorationDate;
@@ -2543,7 +2554,7 @@
           throw new Error(normalizeStripeMessage(confirmation.error.message, i18n.payment_auth_failed));
         }
 
-        await trackPurchaseConversion(selected.meta, selected);
+        await trackPurchaseConversion(selected.meta, selected, subscribeBody.ads_event_id);
         setMessage('ok', i18n.payment_confirmed_redirecting);
         window.location.href = '{{ route('manage-subscription.page') }}';
         return true;
@@ -2558,7 +2569,7 @@
 
       // Only a real charge is a purchase (not a resumed plan or a card change).
       if (response.data?.charged !== false) {
-        await trackPurchaseConversion(selected.meta, selected);
+        await trackPurchaseConversion(selected.meta, selected, subscribeBody.ads_event_id);
       }
       setMessage('ok', response.data?.message || i18n.subscription_updated_redirecting);
       window.location.href = '{{ route('manage-subscription.page') }}';

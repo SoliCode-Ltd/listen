@@ -183,6 +183,8 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
             'api_key_created_at' => 'datetime',
             'subscription_status_checked_at' => 'datetime',
             'ads_click_at' => 'datetime',
+            // Where the member came from at checkout, for the ChatGPT Ads server event (ChatGptAdsConversions).
+            'chatgpt_ads_context' => 'array',
             'is_admin' => 'boolean',
             'is_blocked' => 'boolean',
             'blocked_at' => 'datetime',

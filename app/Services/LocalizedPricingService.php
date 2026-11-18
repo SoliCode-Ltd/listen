@@ -926,6 +926,12 @@ class LocalizedPricingService
         return Storage::disk('public')->url($value);
     }
 
+    /** The visitor's own address, behind the site's proxies (CDN, load balancer). */
+    public function clientIp(Request $request): ?string
+    {
+        return $this->clientIpForLookup($request);
+    }
+
     private function clientIpForLookup(Request $request): ?string
     {
         $directHeaders = [

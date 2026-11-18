@@ -486,7 +486,10 @@ class BillingController extends Controller
             'save_card' => ['nullable', 'boolean'],
             'end_trial' => ['nullable', 'boolean'],
             'proration_date' => ['nullable', 'integer'],
+            'ads_event_id' => ['nullable', 'string', 'max:100'],
         ]);
+        // Where the member is buying from, for the ChatGPT Ads event sent once Stripe says it is paid.
+        rescue(fn () => app(\App\Services\Billing\ChatGptAdsConversions::class)->rememberCheckout($user, $request, (string) $validated['plan'], (string) $validated['billing_cycle']));
         // The moment the member's order details were worked out, so the charge matches them.
         $prorationDate = isset($validated['proration_date']) ? (int) $validated['proration_date'] : null;
 

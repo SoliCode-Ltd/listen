@@ -11,6 +11,10 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Placeholder;
 use Filament\Schemas\Components\Fieldset;
+use Filament\Schemas\Components\Actions;
+use Filament\Actions\Action;
+use App\Models\ChatGptAdsEvent;
+use App\Services\Billing\ChatGptAdsConversions;
 use App\Models\SiteSetting;
 use App\Support\SeoHelper;
 use App\Support\SeoSettingDefaults;
@@ -80,6 +84,10 @@ class SeoSettings extends Page implements HasForms
             'facebook_pixel_code' => SiteSetting::get('facebook_pixel_code', ''),
             'custom_head_code' => SiteSetting::get('custom_head_code', ''),
             'purchase_event_code' => SiteSetting::get('purchase_event_code', ''),
+            ChatGptAdsConversions::ENABLED => (string) SiteSetting::get(ChatGptAdsConversions::ENABLED, '0') === '1',
+            ChatGptAdsConversions::PIXEL_ID => SiteSetting::get(ChatGptAdsConversions::PIXEL_ID, ''),
+            // Never shown again once saved.
+            ChatGptAdsConversions::API_KEY => '',
             'enable_structured_data' => (string) SiteSetting::get('enable_structured_data', '1') === '1',
 
             'google_site_verification' => SiteSetting::get('google_site_verification', ''),
@@ -336,9 +344,51 @@ class SeoSettings extends Page implements HasForms
                             ->columnSpanFull(),
                         Textarea::make('purchase_event_code')
                             ->label('Code when a paid plan starts')
-                            ->helperText('JavaScript run once in the member\'s browser the moment a card payment for a plan succeeds (the same moment Google Ads is told). Script tags are optional. It can read purchase.plan_id (for example "pro_monthly"), purchase.plan, purchase.cycle, purchase.amount (whole minor units, for example 4900 for 49.00) and purchase.currency (for example "USD"). Example: the ChatGPT Ads "subscription_created" event call.')
+                            ->helperText('JavaScript run once in the member\'s browser the moment a card payment for a plan succeeds (the same moment Google Ads is told). Script tags are optional. It can read purchase.plan_id (for example "pro_monthly"), purchase.plan, purchase.cycle, purchase.amount (whole minor units, for example 4900 for 49.00), purchase.currency (for example "USD") and purchase.event_id (the id the server sends the same sale with, so a network that also takes server events counts it once). Example: the ChatGPT Ads "subscription_created" event call.')
                             ->rows(8)
                             ->columnSpanFull(),
+                        Fieldset::make('ChatGPT Ads: paid plans sent from the server')
+                            ->columns(2)
+                            ->schema([
+                                Placeholder::make('chatgpt_ads_capi_about')
+                                    ->hiddenLabel()
+                                    ->columnSpanFull()
+                                    ->content('Sends each paid plan to ChatGPT Ads from the server too (OpenAI\'s Conversions API): a card payment once Stripe says it is paid, also when the member\'s browser blocks the pixel, and an InstaPay / Vodafone Cash payment once you approve it. A card payment the pixel also reported has the same id, so ChatGPT Ads counts it once. Only members outside Europe, the UK and Switzerland whose country is known; it sends their e-mail address and account number as SHA-256 hashes, their browser and IP address, the ad click they came from, the plan and the amount.'),
+                                Toggle::make(ChatGptAdsConversions::ENABLED)
+                                    ->label('Send paid plans to ChatGPT Ads from the server')
+                                    ->helperText('Needs the pixel ID and the key below.')
+                                    ->columnSpanFull(),
+                                TextInput::make(ChatGptAdsConversions::PIXEL_ID)
+                                    ->label('Pixel ID')
+                                    ->helperText('Ads Manager → Conversions → Data Source: the pixel\'s ID.')
+                                    ->maxLength(64)
+                                    ->regex('/^[A-Za-z0-9_-]+$/'),
+                                TextInput::make(ChatGptAdsConversions::API_KEY)
+                                    ->label('Conversions API key')
+                                    ->password()
+                                    ->autocomplete('new-password')
+                                    ->helperText('Ads Manager → the key icon at the top → a Conversions API key. Kept encrypted and never shown again.')
+                                    ->placeholder(fn (): string => app(ChatGptAdsConversions::class)->apiKey() !== '' ? 'Saved (leave empty to keep it)' : 'Paste the key'),
+                                Placeholder::make('chatgpt_ads_capi_status')
+                                    ->label('Sent in the last 7 days')
+                                    ->columnSpanFull()
+                                    ->content(fn (): string => $this->chatGptAdsStatus()),
+                                Actions::make([
+                                    Action::make('check_chatgpt_ads_key')
+                                        ->label('Check the key with ChatGPT Ads')
+                                        ->icon('heroicon-o-check-circle')
+                                        ->color('gray')
+                                        ->action(function (): void {
+                                            $result = app(ChatGptAdsConversions::class)->check();
+                                            Notification::make()
+                                                ->title($result['ok'] ? 'ChatGPT Ads accepted the key and a sample event (nothing was saved there).' : 'ChatGPT Ads did not accept it'.($result['status'] ? ' ('.$result['status'].')' : '').'.')
+                                                ->body($result['ok'] ? null : $result['message'])
+                                                ->{$result['ok'] ? 'success' : 'danger'}()
+                                                ->persistent(! $result['ok'])
+                                                ->send();
+                                        }),
+                                ])->key('chatgpt_ads_actions')->columnSpanFull(),
+                            ]),
                     ]),
 
                 Section::make('Crawl Controls')
@@ -496,6 +546,7 @@ class SeoSettings extends Page implements HasForms
     public function save(): void
     {
         $data = $this->form->getState();
+        $this->saveChatGptAds($data);
         // A field left as the site's own text is not saved (and a saved copy of
         // it is let go), so the page keeps following that text when it improves.
         $defaults = SeoSettingDefaults::all();
@@ -516,5 +567,43 @@ class SeoSettings extends Page implements HasForms
             ->title('SEO settings saved')
             ->success()
             ->send();
+    }
+
+    /**
+     * The ChatGPT Ads server settings, kept apart from the SEO ones: the key encrypted, and
+     * only when a new one is typed.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function saveChatGptAds(array &$data): void
+    {
+        $key = trim((string) ($data[ChatGptAdsConversions::API_KEY] ?? ''));
+        if ($key !== '') {
+            app(ChatGptAdsConversions::class)->saveApiKey($key);
+        }
+        SiteSetting::set(ChatGptAdsConversions::ENABLED, ! empty($data[ChatGptAdsConversions::ENABLED]) ? '1' : '0', ChatGptAdsConversions::GROUP);
+        SiteSetting::set(ChatGptAdsConversions::PIXEL_ID, trim((string) ($data[ChatGptAdsConversions::PIXEL_ID] ?? '')), ChatGptAdsConversions::GROUP);
+        SiteSetting::flushGroupCache(ChatGptAdsConversions::GROUP);
+
+        unset($data[ChatGptAdsConversions::API_KEY], $data[ChatGptAdsConversions::ENABLED], $data[ChatGptAdsConversions::PIXEL_ID]);
+        $this->data[ChatGptAdsConversions::API_KEY] = '';
+    }
+
+    private function chatGptAdsStatus(): string
+    {
+        $conversions = app(ChatGptAdsConversions::class);
+        if (! $conversions->enabled()) {
+            return 'Off: nothing is kept or sent.';
+        }
+
+        $counts = $conversions->counts();
+        $line = sprintf('%d sent, %d waiting, %d refused or failed.', $counts[ChatGptAdsEvent::STATUS_SENT] ?? 0, $counts[ChatGptAdsEvent::STATUS_PENDING] ?? 0,
+            ($counts[ChatGptAdsEvent::STATUS_FAILED] ?? 0) + ($counts[ChatGptAdsEvent::STATUS_EXPIRED] ?? 0));
+        $last = $conversions->lastError();
+        if ($last && $last->status !== ChatGptAdsEvent::STATUS_SENT) {
+            $line .= ' Last problem ('.$last->updated_at?->diffForHumans().'): '.($last->response_status ? $last->response_status.' ' : '').mb_substr((string) $last->error, 0, 200);
+        }
+
+        return $line;
     }
 }

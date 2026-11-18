@@ -67,7 +67,7 @@ class AdPixelSettingsTest extends TestCase
         $this->assertMatchesRegularExpression('#function runPurchaseEventCode\(purchase\) \{\s*try \{\s*oaiq\("measure", "subscription_created", \{ type: "plan_enrollment", plan_id: purchase.plan_id \}\);\s*\} catch#', $page);
         $this->assertStringContainsString('const hasPurchaseEventCode = true;', $page);
         $this->assertStringContainsString("plan_id: plan ? plan + '_' + cycle : '',", $page);
-        $this->assertSame(2, substr_count($page, 'await trackPurchaseConversion(selected.meta, selected);'));
+        $this->assertSame(2, substr_count($page, 'await trackPurchaseConversion(selected.meta, selected, subscribeBody.ads_event_id);'));
     }
 
     public function test_without_plan_started_code_the_billing_page_runs_nothing_and_waits_for_nothing(): void
