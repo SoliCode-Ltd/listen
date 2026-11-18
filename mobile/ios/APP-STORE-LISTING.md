@@ -138,12 +138,13 @@ They are ready in `mobile/ios/store/`. Upload them as they are, in number order.
 
 | Where in App Store Connect | Files |
 |---|---|
-| English page → iPhone 6.9" Display | `iphone-en-1320x2868-1…8.jpg` |
-| English page → iPhone 6.3" Display (the one Apple requires; listed as 6.5"/6.3" in some menus) | `iphone-en-1206x2622-1…8.jpg` |
+| English page → iPhone, the **large** display with Dynamic Island (menus may call it 6.9") | `iphone-en-1320x2868-1…8.jpg` |
+| English page → iPhone, the **medium** display with Dynamic Island (menus may call it 6.3"). This is the one Apple requires. | `iphone-en-1206x2622-1…8.jpg` |
 | Arabic page → the same two sizes | `iphone-ar-1320x2868-1…8.jpg`, `iphone-ar-1206x2622-1…8.jpg` |
 
-- If the page shows only one iPhone size, give it the 1320×2868 set if it accepts it,
-  otherwise the 1206×2622 set. Apple makes the other sizes from it.
+- If the page offers only one iPhone size, drag one set in: it accepts a set only if its
+  size fits, so try the 1206×2622 set first, then the 1320×2868 one. Apple makes the
+  other sizes from it. Up to ten pictures are allowed for each size; there are eight.
 - No iPad pictures: the app is for iPhone.
 - Order: the studio, Arabic dialects, English accents, emotions, voice cloning, voice
   design, voice agents, voices in more languages. They are the same eight as on Google
@@ -220,14 +221,17 @@ support forms be left out.
 - Countries or regions: all of them **except China mainland**. Apps that generate content
   with AI need a licence from the Chinese authorities to be in that store; leaving it
   unticked avoids a removal notice later.
-- **Untick "Make this app available on Mac"** (Apple silicon Mac availability) and
-  **"Apple Vision Pro"**. The app is checked for iPhone only.
+- On the same page, find **iPhone and iPad Apps on Apple Silicon Mac** and untick
+  **Make this app available**; do the same in the **Apple Vision Pro** section beside it;
+  then **Save**. The app is checked for iPhone only.
 - Pre-order: no.
 
-**Digital Services Act (EU)**: App Store Connect → Business (or the banner on the app's
-page) → declare **trader** status with SoliCode Ltd's address, phone number and email.
-They are shown on the app's page in EU countries. Without this the app is not offered in
-the EU.
+**Digital Services Act (EU)**: App Store Connect → **Business** → **Agreements** tab →
+**Compliance** → next to "Digital Services Act", **Complete Compliance Requirements** →
+**This is a trader account.** For a company Apple fills in the address from the D-U-N-S
+record; you add a phone number and an email address (each is confirmed with a code) and
+upload a document that shows the company's name and address. These details are shown on
+the app's page in EU countries. Without this the app is not offered in the EU.
 
 **Agreements**: a free app needs only the free-apps agreement, which is accepted when you
 enrol. No bank or tax forms are needed, because nothing is sold in the app.

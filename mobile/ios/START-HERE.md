@@ -53,17 +53,21 @@ Then the key the **server** uses: same page → **Keys** → **+**
    downloaded again.
 
 Last, so that members who hide their email with "Sign in with Apple" still get Listen's
-emails (verification, password reset): same site → **Services** → **Sign in with Apple
-for Email Communication** → Configure → **+** → add the domain `listenai.studio` and the
-exact address Listen's emails come from (the "from" address on any email the site sent
-you). Without this, emails to those members are dropped by Apple.
+emails (verification, password reset): same site → **Services** in the side list →
+**Sign in with Apple for Email Communication** → **Configure** → under "Email Sources"
+press **+** → add the domain `listenai.studio` and the address Listen's emails come from
+(`help@listenai.studio`, unless the server's settings say another; it is the "from"
+address on any email the site sent you). Apple accepts the domain only
+if its emails are signed in the usual way (SPF or DKIM), which a working mail service
+already does; the row shows a green tick when it passes. Without this, emails to those
+members are dropped by Apple.
 
 ## 3. App Store Connect (15 minutes)
 
 https://appstoreconnect.apple.com
 
 **The key GitHub uses to build and upload.** Users and Access → **Integrations** →
-**App Store Connect API** → Team Keys → **+**
+**Team Keys** → **Generate API Key** (or **+** if a key exists already)
 
 1. Name: `GitHub build`. Access: **Admin** (Apple needs this role to make the signing
    certificate by itself, so no certificate is ever stored anywhere).
@@ -144,8 +148,9 @@ touch a real customer's subscription: staging refuses to delete an account that 
 After #358 is merged: GitHub → **Actions** → **iOS build** → **Run workflow** → branch
 `main` → tick **Sign the build and send it to TestFlight** → Run.
 
-- It takes about 45 minutes and costs about 3 US dollars of GitHub's Mac time (two Mac
-  jobs). An ordinary run without the tick is about 1 to 2 dollars.
+- It takes about 50 minutes and costs about 3 US dollars of GitHub's Mac time (two Mac
+  jobs: the checks, then the signing and upload). A run without the tick is about half an
+  hour and 2 dollars.
 - When it is green, the build shows in App Store Connect → the app → **TestFlight** after
   10 to 30 minutes ("Processing", then ready).
 
