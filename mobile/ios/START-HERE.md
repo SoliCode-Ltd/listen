@@ -104,7 +104,7 @@ the app. Say "yes merge it" for each when you are ready; I merge nothing without
 | Order | Pull request | After merging |
 |---|---|---|
 | any time | #356 Apple's rules and this package | nothing to deploy |
-| **first** | #364 The yearly offer bar never shows inside the apps | deploy. Do this one now, whatever happens with the iPhone app: the Android app shows the "50% off" bar to visitors today |
+| **first** | #364 The yearly offer bar is hidden where the app hides plans | deploy. Do this one now, whatever happens with the iPhone app: the Android app shows the "50% off" bar to visitors today |
 | any time | #363 No empty band above the studio's tabs | deploy |
 | 1 | #357 The site knows the iPhone app | deploy |
 | 2 | #359 Links and notifications for iPhones | deploy |
