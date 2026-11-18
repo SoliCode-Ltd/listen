@@ -18,11 +18,15 @@ on:
   pull_request:
     paths:
       - 'mobile/**'
+      # The iPhone app has its own workflow (ios-build.yml).
+      - '!mobile/ios/**'
       - '.github/workflows/android-build.yml'
   push:
     branches: [main]
     paths:
       - 'mobile/**'
+      # The iPhone app has its own workflow (ios-build.yml).
+      - '!mobile/ios/**'
       - '.github/workflows/android-build.yml'
   workflow_dispatch:
     inputs:

@@ -1,0 +1,20 @@
+# Made when the app is built: the Xcode project (from App/project.yml by XcodeGen)...
+App/App.xcodeproj
+App/*.xcworkspace
+# ...and what `npx cap sync ios` copies in.
+App/App/public
+App/App/capacitor.config.json
+App/App/config.xml
+capacitor-cordova-ios-plugins
+
+App/build
+App/output
+DerivedData
+xcuserdata
+*.xcresult
+
+# Signing material never belongs here.
+*.p8
+*.p12
+*.mobileprovision
+*.cer

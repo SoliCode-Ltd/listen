@@ -1,7 +1,8 @@
 # Listen app: the page ↔ native bridge
 
 How the site's pages (served from `https://listenai.studio`, plain JS, **no** `@capacitor/core`
-bundle) talk to the Android app. Written against Capacitor **8.6.0** by reading
+bundle) talk to the app. Sections 1 to 4 describe the Android app; **the iPhone app answers the
+same methods with the same payloads**, and section 5 lists what differs there. Written against Capacitor **8.6.0** by reading
 `@capacitor/android`'s `Bridge.java`, `JSInjector.java`, `JSExport.java`, `MessageHandler.java`,
 `Plugin.java` and `assets/native-bridge.js`; the JavaScript half was also executed (the real
 `native-bridge.js` in Chromium with a stand-in for the native side). The native half has not
@@ -305,3 +306,50 @@ key, and the upload key for builds installed directly). Paths that open in the a
   result to the page. `blob:` downloads cannot be saved natively; pass the data as `base64`.
 - File inputs (`<input type="file" accept="audio/*,video/*">`) open the phone's file picker.
 - Cookies persist between starts (first-party only; third-party cookies are refused).
+
+---
+
+## 5. The iPhone app (`mobile/ios`)
+
+The same plugin name (`ListenShell`), methods, payloads and error codes, so a page calls
+one bridge and does not ask which phone it is on. Keep this section in step with
+`ios/App/App/ListenShellPlugin.swift`. Written against Capacitor **8.6.2** by reading
+`@capacitor/ios` (`CAPBridgeViewController`, `WebViewDelegationHandler`, `JSExport`).
+
+**How the site knows it.** The web view's user agent ends with `ListenApp/<version> (iOS)`.
+The page script gets `LISTEN_APP.platform === 'ios'`.
+
+**What differs, by design**
+
+| Thing | On iPhone |
+|---|---|
+| `getInfo()` | `platform: 'ios'`. `micPermission: 'denied'` means the phone will not ask again (only its Settings can change it). |
+| `mediaUpdate` / `mediaStop` / `mediaAction` | The lock-screen and Control Centre player is the phone's own for a page's sound. `mediaUpdate` resolves `{ active: true }` and draws nothing; `mediaAction` is **never sent**. The page tells the phone the title, artist, position and buttons through the browser's Media Session API (`navigator.mediaSession`, in `listen-app.js`), and the buttons come back through it. |
+| `saveAudio` | Opens the phone's "save to" sheet; the person chooses the place. Resolves `{ uri, displayName }` of the copy, or rejects with code **`cancelled`** when the sheet is closed (not a failure: show nothing). |
+| `shareAudio` | The share sheet. Resolves once it is open. |
+| `ensureMic` / `ensureNotifications` | The phone's own question the first time; after a refusal, a dialog offering the phone's Settings (then `{ granted: false }`). There is no "explain first, then ask again" step: an iPhone asks once. |
+| `signIn` | The phone's sign-in sheet over the app (not the browser app), opened at `/app/signin/start?...&platform=ios`. The rest of the exchange (section 4) is the same. Rejects with `no_browser` if the sheet cannot open. |
+| `signInWithApple({ nonce })` | **iPhone only.** The phone's "Sign in with Apple" sheet. `nonce` is the site's one-time value (`LISTEN_APP.apple.nonce`); Apple signs it into the token. → `{ identityToken: string, authorizationCode?: string, givenName?: string, familyName?: string }` (the name only on a person's first sign-in). The page posts these to `LISTEN_APP.apple.url`, where the site checks the token. Rejects with code `cancelled` when the sheet is closed, `apple_failed` otherwise. |
+| `setBackHandler`, `minimize`, `backPressed` | No back button on an iPhone: the calls resolve and do nothing, and `backPressed` is never sent. A swipe from the screen's edge goes back a page. |
+| `setPullToRefresh`, `setTheme`, `openExternal` | As on Android. |
+| `PushNotifications` `registration` | `{ value }` is Apple's token (64 hexadecimal characters), not a Firebase one. The site sends to iPhones through Apple's service directly; there is no Firebase in the iPhone app. |
+
+**Who may call the bridge.** The bridge script is injected into the main frame only, but on
+iOS any frame could post to the message handler. The app therefore drops every message that
+does not come from the main frame of the site's own origin (`MainFrameMessages`).
+
+**What the web view may show.** Pages of the site (exact host, https). Any other address
+opens outside the app. `/app/signin/*` is never shown in the web view. A link that asks for
+a new window opens in the same one when it is the site's. Only the site's main frame gets
+the microphone; the camera is never given to a page.
+
+**No connection.** The app's own screen (`OfflineView`), not a page: nothing is added to
+the history, "Try again" loads the page that failed, and the app tries by itself when the
+connection returns. (`www/offline.html` is the Android app's.)
+
+**Links into the app.** `https://<site>/.well-known/apple-app-site-association` lists the
+same paths as Android's App Links (section 4). A tapped notification with `url` in its
+payload opens that page when it is on the site.
+
+**The start page.** Capacitor on iOS only starts when its start path exists as a file inside
+the app, so `www/app/start` is an empty placeholder. What is shown is the site's `/app/start`.

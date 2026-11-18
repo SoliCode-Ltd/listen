@@ -1,0 +1,8 @@
+/* What the phone shows in its own words: the app's name, the reasons it asks for a
+   permission, and the shortcuts on the app's icon. Arabic. */
+"CFBundleDisplayName" = "إسمع";
+"NSMicrophoneUsageDescription" = "يستخدم «إسمع» الميكروفون لتسجيل عيّنة صوتك لاستنساخ الصوت وللتحدث مع وكيل صوتي. لا يبدأ التسجيل إلا عندما تضغط زر التسجيل أو تبدأ مكالمة.";
+"NSCameraUsageDescription" = "يستخدم «إسمع» الكاميرا فقط إذا اخترت تسجيل فيديو لرفعه. لا يُسجَّل شيء ما لم تبدأ أنت.";
+"SHORTCUT_STUDIO" = "تعليق صوتي جديد";
+"SHORTCUT_VOICES" = "الأصوات";
+"SHORTCUT_AGENTS" = "الوكلاء الصوتيون";

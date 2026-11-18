@@ -1,0 +1,274 @@
+name: iOS build
+
+# Builds the iPhone app (mobile/ios) on one of GitHub's Mac machines: the unit tests, the app
+# run in iPhone simulators (smallest and largest iPhone, Arabic and English, light and dark,
+# with a picture of each kept on the run's page), and, when asked, the signed build sent to
+# TestFlight.
+#
+# Mac machines cost about ten times a Linux one (0.062 US dollars a minute at the time of
+# writing, so roughly two dollars a run). It therefore runs only when a pull request changes
+# the iPhone app itself, or when started by hand.
+#
+# The first job needs no secrets. Sending a build to TestFlight (manual runs only, with
+# "upload" ticked) needs these repository secrets (mobile/ios/README.md says how to make each):
+#
+#   APPLE_TEAM_ID                 the ten-character team id of the Apple developer account
+#   APPSTORE_API_KEY_ID           the App Store Connect API key's id (a team key with the Admin role)
+#   APPSTORE_API_ISSUER_ID        its issuer id
+#   APPSTORE_API_KEY_P8_BASE64    the key file (.p8), base64-encoded
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/ios/**'
+      # Not the papers for the App Store (texts, pictures, guides): they change nothing in the app.
+      - '!mobile/ios/**/*.md'
+      - '!mobile/ios/store/**'
+      - 'mobile/www/**'
+      - 'mobile/package.json'
+      - 'mobile/package-lock.json'
+      - 'mobile/capacitor.config.json'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version shown to people, e.g. 1.0.0 (blank = 1.0.0)'
+        required: false
+        type: string
+      build_number:
+        description: 'Build number; must go up with every upload to Apple (blank = the run number)'
+        required: false
+        type: string
+      app_url:
+        description: 'Site the app opens (blank = https://listenai.studio)'
+        required: false
+        type: string
+      upload:
+        description: 'Sign the build and send it to TestFlight'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  LISTEN_VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
+  LISTEN_BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
+  LISTEN_APP_URL: ${{ inputs.app_url || 'https://listenai.studio' }}
+
+jobs:
+  test:
+    name: Build, unit tests, simulator
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install Capacitor
+        working-directory: mobile
+        run: npm ci
+
+      # Three steps, in this order: the app's bundled files are copied in; the Xcode project is
+      # made from mobile/ios/App/project.yml (it lists those files); Capacitor writes its list
+      # of plugins (it reads the project to do so).
+      - name: Make the Xcode project
+        working-directory: mobile
+        run: |
+          brew install xcodegen
+          npx cap copy ios
+          (cd ios/App && xcodegen generate)
+          npx cap update ios
+          xcodebuild -version
+
+      - name: Unit tests
+        working-directory: mobile/ios/App
+        run: |
+          set -o pipefail
+          # An iPhone 17 simulator of the newest system on this machine.
+          DEVICE_ID="$(xcrun simctl list devices available | grep -F ' iPhone 17 (' | tail -1 | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' | head -1)"
+          xcodebuild test \
+            -project App.xcodeproj -scheme App \
+            -destination "platform=iOS Simulator,id=${DEVICE_ID}" \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            -resultBundlePath "$RUNNER_TEMP/unit-tests.xcresult" \
+            MARKETING_VERSION="$LISTEN_VERSION_NAME" CURRENT_PROJECT_VERSION="$LISTEN_BUILD_NUMBER" \
+            LISTEN_APP_URL="$LISTEN_APP_URL" \
+            CODE_SIGNING_ALLOWED=NO | xcbeautify --renderer github-actions
+
+      # The same checks Apple's upload runs on the manifest and the purpose strings, early.
+      - name: Check the built app
+        run: |
+          APP="$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app"
+          test -f "$APP/PrivacyInfo.xcprivacy"
+          plutil -lint "$APP/PrivacyInfo.xcprivacy" "$APP/Info.plist"
+          plutil -p "$APP/Info.plist" | grep -E "CFBundleShortVersionString|CFBundleVersion|ListenAppURL|UIDeviceFamily|ITSAppUsesNonExemptEncryption|MinimumOSVersion|DTXcode\"|DTSDKName"
+          ls "$APP" | head -50
+
+      # The archive that goes to Apple, made exactly as the upload job makes it (see there), but
+      # with no Apple account: a mistake that only shows in that form is found now, not on the
+      # first upload.
+      - name: Archive as the upload does (no Apple account)
+        working-directory: mobile/ios/App
+        run: |
+          set -o pipefail
+          archive() {
+            xcodebuild archive \
+              -project App.xcodeproj -scheme App -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -archivePath "$RUNNER_TEMP/Check.xcarchive" \
+              -derivedDataPath "$RUNNER_TEMP/dd-release" \
+              CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Automatic "$@" \
+              MARKETING_VERSION="$LISTEN_VERSION_NAME" CURRENT_PROJECT_VERSION="$LISTEN_BUILD_NUMBER" \
+              LISTEN_APP_URL="$LISTEN_APP_URL" | xcbeautify --renderer github-actions
+          }
+          # The upload job names the team; here there is none to name. If Xcode insists on one,
+          # a stand-in shows that the rest of the archive is sound.
+          if archive; then
+            echo "Archived without a team."
+          else
+            echo "::warning::The archive needs a team to be named; trying with a stand-in."
+            rm -rf "$RUNNER_TEMP/Check.xcarchive"
+            archive DEVELOPMENT_TEAM=A1B2C3D4E5
+            echo "Archived with a stand-in team."
+          fi
+          APP="$RUNNER_TEMP/Check.xcarchive/Products/Applications/App.app"
+          test -f "$APP/PrivacyInfo.xcprivacy"
+          plutil -lint "$APP/PrivacyInfo.xcprivacy" "$APP/Info.plist"
+          # Apple refuses an upload without the icon.
+          test "$(plutil -extract CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName raw "$APP/Info.plist")" = "AppIcon"
+          test -f "$APP/Assets.car"
+          plutil -p "$APP/Info.plist" | grep -E "MinimumOSVersion|UIDeviceFamily|ITSAppUsesNonExemptEncryption" -A2
+          # What the app is allowed (notifications, links to the site, Sign in with Apple) must
+          # be written into the archive: the upload's signing is made from it.
+          codesign -d --entitlements - --xml "$APP" > "$RUNNER_TEMP/entitlements.plist" 2>/dev/null
+          plutil -p "$RUNNER_TEMP/entitlements.plist"
+          for key in aps-environment com.apple.developer.associated-domains com.apple.developer.applesignin; do
+            grep -q "$key" "$RUNNER_TEMP/entitlements.plist" || { echo "::error::$key is not in the archive."; exit 1; }
+          done
+          # What debug builds have for the simulator run (a record, a way to start on a named page) is not in the form people get.
+          if strings "$APP/App" | grep -qE "listen-debug.log|ListenOpenPath"; then echo "::error::Debug-only code is in the release build."; exit 1; fi
+
+      - name: Run the app in simulators
+        # Also when the archive above failed, so one run shows everything that is wrong.
+        if: ${{ !cancelled() }}
+        run: mobile/ios/ci/simulator-shots.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" "$RUNNER_TEMP/shots"
+
+      - name: Attach the simulator pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: listen-ios-simulator-pictures
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: ignore
+
+      - name: Attach the test report (when something failed)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: listen-ios-test-report
+          path: ${{ runner.temp }}/unit-tests.xcresult
+          if-no-files-found: ignore
+
+  testflight:
+    name: Sign and send to TestFlight
+    if: github.event_name == 'workflow_dispatch' && inputs.upload
+    needs: test
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+      APPSTORE_API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+      APPSTORE_API_KEY_P8_BASE64: ${{ secrets.APPSTORE_API_KEY_P8_BASE64 }}
+    steps:
+      - name: Check that the signing secrets exist
+        run: |
+          for name in APPLE_TEAM_ID APPSTORE_API_KEY_ID APPSTORE_API_ISSUER_ID APPSTORE_API_KEY_P8_BASE64; do
+            if [ -z "${!name}" ]; then echo "::error::The repository secret $name is missing (see mobile/ios/README.md)."; exit 1; fi
+          done
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install Capacitor
+        working-directory: mobile
+        run: npm ci
+
+      - name: Make the Xcode project
+        working-directory: mobile
+        run: |
+          brew install xcodegen
+          npx cap copy ios
+          (cd ios/App && xcodegen generate)
+          npx cap update ios
+
+      # The key lives only in this machine's temporary folder, for this run.
+      - name: Put the App Store Connect key in place
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          echo "$APPSTORE_API_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/keys/AuthKey_${APPSTORE_API_KEY_ID}.p8"
+          chmod 600 "$RUNNER_TEMP/keys/AuthKey_${APPSTORE_API_KEY_ID}.p8"
+
+      # No signing certificate is stored anywhere. The archive is made with a local signature
+      # only (which needs no certificate, no profile and no registered iPhone); the next step
+      # signs it for the App Store with a certificate Apple makes and keeps itself ("cloud
+      # signing"), which the App Store Connect key may ask for when its role is Admin.
+      - name: Archive
+        working-directory: mobile/ios/App
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Listen.xcarchive" \
+            CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            MARKETING_VERSION="$LISTEN_VERSION_NAME" CURRENT_PROJECT_VERSION="$LISTEN_BUILD_NUMBER" \
+            LISTEN_APP_URL="$LISTEN_APP_URL" | xcbeautify --renderer github-actions
+
+      - name: Send to TestFlight
+        working-directory: mobile/ios/App
+        run: |
+          set -o pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Listen.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_${APPSTORE_API_KEY_ID}.p8" \
+            -authenticationKeyID "$APPSTORE_API_KEY_ID" \
+            -authenticationKeyIssuerID "$APPSTORE_API_ISSUER_ID" | xcbeautify --renderer github-actions
+
+      - name: Remove the key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"

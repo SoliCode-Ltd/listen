@@ -1,0 +1,14 @@
+/* The app's own words (everything else is the site's). Arabic. Keep the keys in step
+   with en.lproj/Localizable.strings; the unit tests check that. */
+"offline_title" = "تعذّر الاتصال";
+"offline_text" = "تحقّق من اتصالك بالإنترنت ثم حاول مرة أخرى.";
+"offline_retry" = "إعادة المحاولة";
+"offline_trying" = "جارٍ المحاولة…";
+"mic_settings_title" = "الميكروفون غير مفعّل";
+"mic_settings_message" = "لتسجيل صوتك، فعّل الميكروفون لتطبيق «إسمع» من إعدادات هاتفك.";
+"notif_settings_title" = "الإشعارات غير مفعّلة";
+"notif_settings_message" = "لنخبرك عندما يجهز صوتك، فعّل الإشعارات لتطبيق «إسمع» من إعدادات هاتفك.";
+"action_not_now" = "ليس الآن";
+"action_open_settings" = "فتح الإعدادات";
+"action_ok" = "موافق";
+"action_cancel" = "إلغاء";
