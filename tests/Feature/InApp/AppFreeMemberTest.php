@@ -68,6 +68,33 @@ class AppFreeMemberTest extends InAppTestCase
         $this->inBrowser($free)->page('demo.page')->assertOk()->assertSee('data-studio-tab="stt"', false);
     }
 
+    public function test_the_demo_out_of_allowance_offers_upgrade_in_the_browser_on_android_only(): void
+    {
+        $this->seedPlansWithEverythingOpen();
+        $free = $this->memberOn('free');
+
+        // Android: the demo's button, as on the website, leads to the app's hand-over, never to billing in the app.
+        $html = (string) $this->inApp($free)->page('demo.page')->assertOk()->getContent();
+        $this->assertSame(1, preg_match('#<a class="btn btn-primary error-upgrade" id="errorUpgrade" href="([^"]+)" data-app-upgrade data-no-prefetch hidden>#', $html, $m));
+        $this->assertStringContainsString('/app/upgrade?plan=', html_entity_decode($m[1]));
+        $this->assertDoesNotMatchRegularExpression('#href="[^"]*/(billing|pricing|checkout)#', $html);
+
+        // Tapped: the billing page with that plan, opened in the phone's browser, signed in.
+        $plan = (string) parse_url(html_entity_decode($m[1]), PHP_URL_QUERY);
+        $handOver = (string) $this->inApp($free)->get($this->localizedRoute('app.upgrade').'?'.$plan)->assertOk()->getContent();
+        $this->assertSame(1, preg_match('#/app/continue\?code=[A-Za-z0-9]{64}&(?:amp;)?to=([^"&<\s]+)#', $handOver, $to));
+        $this->assertStringEndsWith('/billing?'.$plan, urldecode($to[1]));
+        // A plan that is not a plan's name is left out.
+        $odd = (string) $this->inApp($free)->get($this->localizedRoute('app.upgrade').'?plan=../x')->getContent();
+        preg_match('#to=([^"&<\s]+)#', $odd, $oddTo);
+        $this->assertStringEndsWith('/billing', urldecode($oddTo[1]));
+
+        // iPhone: nothing may lead to a place to pay, so the message stands alone.
+        $iphone = (string) $this->as($free, 'en', self::IPHONE_APP_UA)->page('demo.page')->assertOk()->getContent();
+        $this->assertStringNotContainsString('data-app-upgrade', $iphone);
+        $this->assertStringNotContainsString('/app/upgrade', $iphone);
+    }
+
     /** The address the app's Studio tab leads to on this page. */
     private function studioTab(string $html): ?string
     {

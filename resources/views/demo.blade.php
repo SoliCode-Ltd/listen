@@ -198,9 +198,15 @@
           {{-- One red notice under the generate button: the error, with the upgrade button when more credit would help. --}}
           <div id="errorBox" class="s-card error-box" role="alert" style="display:none;">
             <span class="error-text" id="errorText"></span>
-            {{-- Inside the Listen app nothing is sold: the message stands alone (the script still finds its element). --}}
+            {{-- Inside the Listen app nothing is sold there. In the Android app the button is as on the website,
+                 but opens the billing page in the phone's browser, signed in (AppShellController::upgrade);
+                 on iPhone nothing may lead to a place to pay, so the message stands alone. --}}
             @inapp
-              <span id="errorUpgrade" hidden></span>
+              @if(\App\Support\InApp\InApp::offersUpgradeOnWeb())
+                <a class="btn btn-primary error-upgrade" id="errorUpgrade" href="{{ route('app.upgrade', ['plan' => $upgradePlanSlug]) }}" data-app-upgrade data-no-prefetch hidden>{{ __('app.plan.upgrade') }}</a>
+              @else
+                <span id="errorUpgrade" hidden></span>
+              @endif
             @else
             <a class="btn btn-primary error-upgrade" id="errorUpgrade" href="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}" hidden>{{ __('ui.demo.upgrade_plan') }}</a>
             @endinapp
