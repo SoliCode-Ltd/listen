@@ -44,6 +44,10 @@ return [
     ],
 
     'signin' => [
+        // "Sign in with Apple" in the iPhone app; the button itself is Apple's own picture.
+        'apple_failed' => 'تعذّر تسجيل دخولك باستخدام Apple. حاول مرة أخرى.',
+        'apple_continue' => 'الاستمرار باستخدام Apple',
+        'apple_sign_up' => 'التسجيل باستخدام Apple',
         'done_title' => 'تم تسجيل الدخول',
         'done_text' => 'سجّلت الدخول باسم :email. ارجع إلى التطبيق للمتابعة.',
         'done_button' => 'العودة إلى التطبيق',

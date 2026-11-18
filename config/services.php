@@ -83,10 +83,22 @@ return [
     // The Listen iPhone app (mobile/ios). Plans are always hidden there (no setting, on
     // purpose: App\Support\InApp\InApp::plansMode).
     'ios_app' => [
-        // "Continue with Google" in the iPhone app. Apple asks for its own sign-in beside any
-        // other company's, so this stays off until the app offers both; off, the iPhone app
-        // signs in with email (mobile/ios/APPLE-RULES.md, 1.1).
-        'social_sign_in' => (bool) env('IOS_APP_SOCIAL_SIGN_IN', false),
+        // "Continue with Google" and "Sign in with Apple" in the iPhone app. Apple asks for its
+        // own sign-in beside any other company's, so the two are offered together or not at
+        // all; off, the iPhone app signs in with email (mobile/ios/APPLE-RULES.md, 1.1).
+        'social_sign_in' => (bool) env('IOS_APP_SOCIAL_SIGN_IN', true),
+    ],
+
+    // "Sign in with Apple" in the iPhone app (App\Services\Auth\AppleSignIn). Checking a
+    // sign-in needs only the app's id. The key (from the Apple developer account, with "Sign
+    // in with Apple" ticked: the notifications key can be the same one) lets the site tell
+    // Apple to forget a member's link when they delete their account.
+    'apple_sign_in' => [
+        'client_id' => env('IOS_APP_BUNDLE_ID', 'studio.listenai.app'),
+        'team_id' => env('APPLE_SIGNIN_TEAM_ID', env('APNS_TEAM_ID', '')),
+        'key_id' => env('APPLE_SIGNIN_KEY_ID', env('APNS_KEY_ID', '')),
+        'private_key' => env('APPLE_SIGNIN_PRIVATE_KEY', env('APNS_PRIVATE_KEY', '')),
+        'private_key_path' => env('APPLE_SIGNIN_PRIVATE_KEY_PATH', env('APNS_PRIVATE_KEY_PATH', '')),
     ],
 
     'google_tts' => [

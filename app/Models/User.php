@@ -95,6 +95,7 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
         'password',
         'remember_token',
         'api_key_hash',
+        'apple_refresh_token',
     ];
 
     public function planSubscriptions(): HasMany
@@ -188,6 +189,8 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
             'paid_welcome_sent_at' => 'datetime',
             'free_monthly_chars' => 'boolean',
             'favorite_voices' => 'array',
+            // Lets the site tell Apple to forget the member's link (App\Services\Auth\AppleSignIn).
+            'apple_refresh_token' => 'encrypted',
         ];
     }
 

@@ -163,12 +163,19 @@ class InApp
 
     /**
      * "Continue with Google" in the app. On iPhone, Apple asks for its own
-     * sign-in beside any other company's (guideline 4.8); until that exists
-     * (IOS_APP_SOCIAL_SIGN_IN), the iPhone app signs in with email only.
+     * sign-in beside any other company's (guideline 4.8), so there the two are
+     * offered together (offersAppleSignIn) or, with IOS_APP_SOCIAL_SIGN_IN off,
+     * not at all: the iPhone app then signs in with email only.
      */
     public static function offersSocialSignIn(?Request $request = null): bool
     {
-        return self::fromApp($request) && (! self::onIphone($request) || (bool) config('services.ios_app.social_sign_in', false));
+        return self::fromApp($request) && (! self::onIphone($request) || (bool) config('services.ios_app.social_sign_in', true));
+    }
+
+    /** "Sign in with Apple": in the iPhone app's own web view only, where the phone can do it. */
+    public static function offersAppleSignIn(?Request $request = null): bool
+    {
+        return self::onIphone($request) && self::fromApp($request) && (bool) config('services.ios_app.social_sign_in', true);
     }
 
     /** Pages and requests that take a payment or change a plan: never served inside the app. */

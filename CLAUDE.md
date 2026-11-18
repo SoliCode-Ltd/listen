@@ -32,6 +32,12 @@ These are the owner's standing instructions. Follow them in every session.
   receives their data. That one page inside the iPhone app
   (`resources/views/app/consent.blade.php`, `lang/*/app.php` → `consent`), and
   nowhere else on the site or in the Android app.
+  A fourth exception the owner approved (17 November 2026), for the iPhone app
+  only: "Sign in with Apple" on the sign-in and sign-up pages, beside "Continue
+  with Google", because Apple requires its own sign-in wherever another
+  company's is offered. Apple's own button pictures, unchanged
+  (`public/images/partners/apple-*.png`), the same size as the Google button,
+  and nowhere else on the site or in the Android app.
 
 ## Email
 - Never send email. Draft it only, and let the owner send it.

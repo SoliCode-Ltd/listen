@@ -9,6 +9,8 @@
   // hands the sign-in to the phone's browser instead (AppShellController, public/js/listen-app.js).
   $appSignIn = \App\Support\InApp\InApp::offersSocialSignIn() && ($googleEnabled || $firebaseGoogleEnabled);
   // (The iPhone app has no such button until it can offer Apple's sign-in beside it: InApp::offersSocialSignIn.)
+  $appleSignIn = \App\Support\InApp\InApp::offersAppleSignIn();
+  $appleLang = app()->getLocale() === 'ar' ? 'ar' : 'en';
   if ($appSignIn || \App\Support\InApp\InApp::fromApp()) {
     $googleEnabled = false;
     $firebaseGoogleEnabled = false;
@@ -72,6 +74,28 @@
       font-size: .95rem;
       transition: all .2s ease;
     }
+    /* "Sign in with Apple" (iPhone app only): Apple's own button picture, in a frame the size
+       of the button above it. Black on a light page, white on a dark one, as Apple asks. */
+    .apple-btn {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 48px;
+      margin-top: .6rem;
+      padding: 0;
+      border-radius: var(--radius);
+      border: 1px solid #000;
+      background: #000;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .apple-btn img { display: block; height: 48px; width: auto; max-width: 100%; }
+    .apple-btn .apple-on-dark { display: none; }
+    html:not([data-theme="light"]) .apple-btn { background: #fff; border-color: #fff; }
+    html:not([data-theme="light"]) .apple-btn .apple-on-light { display: none; }
+    html:not([data-theme="light"]) .apple-btn .apple-on-dark { display: block; }
+    .apple-btn[disabled] { opacity: .6; }
     .google-btn:hover {
       transform: translateY(-1px);
       border-color: color-mix(in oklab, var(--b) 35%, var(--line));
@@ -535,6 +559,14 @@
         <button type="button" class="google-btn" data-app-signin>
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 31.367 32"><path d="M31.367,16.368a18.825,18.825,0,0,0-.276-3.251H16v6.161h8.642a7.4,7.4,0,0,1-3.2,4.862v4H26.6A15.626,15.626,0,0,0,31.367,16.368Z" fill="#4285f4"></path><path d="M16,32a15.317,15.317,0,0,0,10.606-3.862l-5.156-4A9.7,9.7,0,0,1,7.022,19.066H1.7v4.122A16,16,0,0,0,16,32Z" fill="#34a853"></path><path d="M7.016,19.066a9.583,9.583,0,0,1,0-6.125V8.819H1.7a16.017,16.017,0,0,0,0,14.369Z" fill="#fbbc04"></path><path d="M16,6.333a8.694,8.694,0,0,1,6.138,2.4h0l4.568-4.568A15.376,15.376,0,0,0,16,0,16,16,0,0,0,1.7,8.819l5.314,4.122A9.57,9.57,0,0,1,16,6.333Z" fill="#ea4335"></path></svg>
           {{ __('ui.auth.signup_google') }}
+        </button>
+      @endif
+
+      {{-- Apple asks for its own sign-in beside any other company's (iPhone app only: InApp::offersAppleSignIn). --}}
+      @if($appleSignIn)
+        <button type="button" class="apple-btn" data-app-signin-apple aria-label="{{ __('app.signin.apple_sign_up') }}">
+          <img class="apple-on-light" src="{{ \App\Support\VersionedAsset::url('images/partners/apple-sign-up-'.$appleLang.'-black.png') }}" alt="" width="280" height="48">
+          <img class="apple-on-dark" src="{{ \App\Support\VersionedAsset::url('images/partners/apple-sign-up-'.$appleLang.'-white.png') }}" alt="" width="280" height="48">
         </button>
       @endif
 

@@ -10,6 +10,7 @@ use App\Models\DemoVoiceGeneration;
 use App\Models\DesignedVoice;
 use App\Models\User;
 use App\Models\VideoDub;
+use App\Services\Auth\AppleSignIn;
 use App\Services\Billing\StripeTrialGateway;
 use App\Services\Billing\TrialSubscriptionService;
 use App\Services\Dubbing\VideoDubRunner;
@@ -31,6 +32,7 @@ use Illuminate\Support\Facades\Storage;
  * 2. What the member made is removed where rows alone would leave it behind:
  *    the audio files of their voices, their designed voices at the engine,
  *    their dubbed videos, their agents' files.
+ *    A member who signed in with Apple has that link ended at Apple.
  * 3. The account goes, as when an admin deletes it (UserDeletionService):
  *    cloned voices and their recordings, transcripts, sessions, and with the
  *    account every row that belongs to it.
@@ -97,6 +99,7 @@ class MemberAccountDeletion
 
         $userId = (int) $user->id;
         $this->removeWhatRowsWouldLeaveBehind($user);
+        $this->endAppleLink($user);
 
         // A copy of the row is what gets deleted, never the object the session holds: signing
         // out afterwards saves that object once more (a new "remember me" token), and saving a
@@ -214,6 +217,20 @@ class MemberAccountDeletion
                 });
             });
         }
+    }
+
+    /**
+     * A member who signed in with Apple: Apple is told to forget the link, as it asks of an
+     * app that deletes an account. It never stops the deletion.
+     */
+    private function endAppleLink(User $user): void
+    {
+        $this->quietly((int) $user->id, 'the link with Apple', function () use ($user): void {
+            $token = Schema::hasColumn('users', 'apple_refresh_token') ? (string) $user->getAttribute('apple_refresh_token') : '';
+            if ($token !== '') {
+                app(AppleSignIn::class)->revoke($token);
+            }
+        });
     }
 
     /** @return \Illuminate\Support\Collection<int, BillingSubscription> */

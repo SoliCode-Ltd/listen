@@ -784,6 +784,44 @@
       shell('signIn', { locale: lang }).catch(function () { toast(t.signin_failed); });
     });
 
+    // iPhone: "Sign in with Apple". The phone signs the member in and hands back Apple's signed
+    // answer; the site checks it and signs this web view in (AuthController::appleAuthenticate).
+    document.addEventListener('click', function (event) {
+      var button = event.target && event.target.closest ? event.target.closest('[data-app-signin-apple]') : null;
+      if (!button || !cfg.apple) return;
+      event.preventDefault();
+      if (button.disabled) return;
+      button.disabled = true;
+      shell('signInWithApple', { nonce: cfg.apple.nonce }).then(function (answer) {
+        loading(true);
+        return fetch(cfg.apple.url, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': cfg.csrf || '', 'X-Requested-With': 'XMLHttpRequest' },
+          body: JSON.stringify({
+            identity_token: answer && answer.identityToken,
+            authorization_code: answer && answer.authorizationCode,
+            given_name: answer && answer.givenName,
+            family_name: answer && answer.familyName
+          })
+        }).then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (data) {
+            if (response.ok && data && data.ok && data.redirect) { location.href = data.redirect; return; }
+            // The one-time value is used up: a fresh page has a fresh one.
+            loading(false);
+            toast((data && data.message) || t.apple_failed);
+            setTimeout(function () { location.reload(); }, 2600);
+          });
+        });
+      }).catch(function (error) {
+        loading(false);
+        button.disabled = false;
+        // The member closed Apple's sheet: nothing failed.
+        if (error && /cancel/i.test(String(error.code || '') + ' ' + String(error.message || error))) return;
+        toast(t.apple_failed);
+      });
+    });
+
     // A member who already said yes: keep this phone's token fresh, quietly.
     if (cfg.signedIn) {
       quiet(shell('getInfo')).then(function (info) { if (info && info.pushAvailable && info.notificationsAllowed) registerPush(); });

@@ -16,6 +16,15 @@
     ];
     // The iPhone app: the member chooses where the file goes, so the line does not name a folder.
     $appShell['platform'] = \App\Support\InApp\InApp::platform() ?? 'android';
+    // "Sign in with Apple" (iPhone app, signed out): where the page sends Apple's answer, and the
+    // one-time value that answer must carry back (App\Services\Auth\AppleSignIn).
+    if (! auth()->check() && \App\Support\InApp\InApp::offersAppleSignIn()) {
+      $appShell['apple'] = [
+        'url' => route('auth.apple.verify', [], false),
+        'nonce' => \App\Services\Auth\AppleSignIn::nonce(request()),
+      ];
+      $appShell['t']['apple_failed'] = __('app.signin.apple_failed');
+    }
     if ($appShell['platform'] === 'ios') {
       $appShell['t']['saved'] = __('app.shell.saved_plain');
       // The picture beside the title on the lock screen.
