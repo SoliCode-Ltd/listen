@@ -96,30 +96,32 @@ file name, press Enter. The line is then on your clipboard; paste it as the secr
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\Downloads\AuthKey_XXXXXXXXXX.p8")) | Set-Clipboard
 ```
 
-## 5. The site: merge, deploy, settings (the order matters)
+## 5. The site: done on 18 November 2026; the server settings wait for the key
 
-The iPhone app shows the live site, so the site's side must be live before anyone tries
-the app. Say "yes merge it" for each when you are ready; I merge nothing without it.
+**Already done, nothing for you to do here.** All nine pull requests were merged on 18
+November (#356 to #364), deployed with the **Server deploy** workflow (`inspect`, then
+`deploy`, staging first, then live), and the two migrations were run on both servers.
+They added three columns to the members table (`ai_consent_at`, `apple_id`,
+`apple_refresh_token`) and nothing else.
 
-| Order | Pull request | After merging |
-|---|---|---|
-| any time | #356 Apple's rules and this package | nothing to deploy |
-| **first** | #364 The yearly offer bar is hidden where the app hides plans | deploy. Do this one now, whatever happens with the iPhone app: the Android app shows the "50% off" bar to visitors today |
-| any time | #363 No empty band above the studio's tabs | deploy |
-| 1 | #357 The site knows the iPhone app | deploy |
-| 2 | #359 Links and notifications for iPhones | deploy |
-| 3 | #360 The question before a first voice | deploy, then migrate |
-| 4 | #361 Members can delete their own account | deploy |
-| 5 | #362 Sign in with Apple | deploy, then migrate |
-| 6 | #358 The iPhone app itself and its build | nothing to deploy (it never goes to the servers) |
+What that changed for people today:
 
-"Deploy" is the **Server deploy** workflow as always: `inspect`, then `deploy`, staging
-first, then live. "Migrate" is `php artisan migrate --force` by hand on the server; these
-two add three columns to the members table (`ai_consent_at`, `apple_id`,
-`apple_refresh_token`) and change nothing else.
+- **Website:** members can delete their own account (Account → Delete my account). The
+  yearly offer bar is unchanged on the website.
+- **Android app:** the offer bar no longer shows inside it, even to a visitor; the empty
+  band above the studio's tabs is gone; "Delete my account" works inside the app.
+- **iPhone app:** everything it needs from the site is live and waits for it: the Apple
+  sign-in button, the question before a first voice, links into the app, notifications.
 
-**Server settings** (the `.env` file on staging and on live), added once, after #359 is
-deployed:
+Checked after the deploy: live answers normally in both languages; the offer bar is on
+the website and in neither app; the Apple button shows in the iPhone app only; the link
+file answers (with empty `details` until the Team ID is set, below).
+
+What is left on the servers is only this, once you have the key from step 2.
+
+**Server settings** (the `.env` file on staging and on live). The key file must never
+be sent in chat or email: when you have it, tell me and I will walk you through putting
+it there yourself.
 
 ```
 APNS_TEAM_ID=          the Team ID (step 1)
@@ -132,14 +134,13 @@ Then `php artisan config:clear`. The same key serves notifications and Sign in w
 Do not add `APNS_SANDBOX`: builds from TestFlight and the App Store use Apple's real
 notification service, which is what the site uses when that line is absent.
 
-Three checks after that (I can run the first two for you once it is live):
+Then three checks (I run the first two for you):
 
 - `https://listenai.studio/.well-known/apple-app-site-association` shows the Team ID
   followed by `.studio.listenai.app`. (Empty `details` means the Team ID is not set.)
 - On the server: `curl --http2 -sI https://api.push.apple.com | head -1` prints a line
   starting with `HTTP/2`. Notifications to iPhones need it.
-- The Android app still looks and works as before (it should: the changes only add an
-  iPhone case).
+- The Android app still looks and works as before.
 
 Account deletion needs one more thing on **live only**, which is already there:
 `LISTEN_STRIPE_TRIAL_ACTIONS=true`. With it, deleting an account cancels a running card
