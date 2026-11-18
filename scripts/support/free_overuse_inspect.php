@@ -215,6 +215,38 @@ foreach (array_slice($groups, 0, 30) as $g) {
     echo $g.PHP_EOL;
 }
 
+// Every demo voice of those accounts, in the order made: what the demo said was left when
+// it made it, and the running total of the accounts known together now. A voice the demo
+// made with characters left (by its count then) while the group was already over shows the
+// accounts were not yet known to be one person.
+echo "\n  The voices of the members and groups above, in the order made\n";
+$detail = array_merge(
+    array_map(fn ($r) => [(int) $r->user_id], $overFree->all()),
+    array_map(fn ($g) => array_map('intval', explode(',', trim(preg_replace('/^\s*accounts\s+(\S+).*$/', '$1', $g)))), $groups),
+);
+foreach (array_slice($detail, 0, 20) as $ids) {
+    $made = User::query()->whereIn('id', $ids)->pluck('created_at', 'id');
+    $devices = $has('member_devices')
+        ? DB::table('member_devices')->whereIn('user_id', $ids)->select('user_id', 'kind', DB::raw('MIN(created_at) as first_at'), DB::raw('COUNT(*) as signals'))->groupBy('user_id', 'kind')->get()->groupBy('user_id')
+        : collect();
+    echo '  accounts '.implode(',', $ids).PHP_EOL;
+    foreach ($ids as $id) {
+        $sig = ($devices->get($id) ?? collect())->map(fn ($d) => $d->kind.' x'.$d->signals.' from '.$date($d->first_at))->implode(', ');
+        echo '    #'.$id.' made '.$date($made[$id] ?? null).($made->has($id) ? '' : ' (deleted)').'  signals: '.($sig !== '' ? $sig : 'none').PHP_EOL;
+    }
+    $running = 0;
+    DB::table('demo_voice_generations')->whereIn('user_id', $ids)->orderBy('created_at')->orderBy('id')
+        ->get(['id', 'user_id', 'created_at', 'billable_chars', 'quota_limit_chars', 'quota_remaining_chars'])
+        ->each(function ($v) use (&$running, $allowance, $n, $date) {
+            $before = $running;
+            $running += (int) $v->billable_chars;
+            printf("      %s  #%-6d %5s chars  demo said left after %-5s  together %5s%s\n",
+                $date($v->created_at), $v->user_id, $n($v->billable_chars),
+                $v->quota_remaining_chars === null ? '-' : $n($v->quota_remaining_chars), $n($running),
+                $before < $allowance && $running > $allowance ? '  <- over here' : ($before >= $allowance ? '  (already over)' : ''));
+        });
+}
+
 echo "\n== 4. Free members whose studio credits this period (Monthly usage) are over ".$n($allowance)."\n";
 $candidates = DB::table('usage_counters')->whereIn('user_id', $freeIds ?: [0])->where('total_chars', '>', $allowance)
     ->orderByDesc('period_ym')->get()->groupBy('user_id');
