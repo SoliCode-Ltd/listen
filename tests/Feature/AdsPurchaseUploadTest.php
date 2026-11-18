@@ -228,7 +228,7 @@ class AdsPurchaseUploadTest extends TestCase
 
         $this->assertStringNotContainsString('trackPurchaseConversion', $manualBranch);
         // Card payments still are.
-        $this->assertStringContainsString('await trackPurchaseConversion(selected.meta);', $billing);
+        $this->assertStringContainsString('await trackPurchaseConversion(selected.meta, selected);', $billing);
     }
 
     public function test_an_ad_click_from_where_the_consent_rules_apply_is_never_kept_or_uploaded(): void
