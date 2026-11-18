@@ -115,6 +115,29 @@ jobs:
           plutil -p "$APP/Info.plist" | grep -E "CFBundleShortVersionString|CFBundleVersion|ListenAppURL|UIDeviceFamily|ITSAppUsesNonExemptEncryption|MinimumOSVersion|DTXcode\"|DTSDKName"
           ls "$APP" | head -50
 
+      # The form of the app that goes to Apple (Release, for a real iPhone), compiled here without
+      # signing: a mistake that only shows in that form is found now, not on the first upload.
+      - name: Build the App Store form (unsigned)
+        working-directory: mobile/ios/App
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/dd-release" \
+            MARKETING_VERSION="$LISTEN_VERSION_NAME" CURRENT_PROJECT_VERSION="$LISTEN_BUILD_NUMBER" \
+            LISTEN_APP_URL="$LISTEN_APP_URL" \
+            CODE_SIGNING_ALLOWED=NO | xcbeautify --renderer github-actions
+          APP="$RUNNER_TEMP/dd-release/Build/Products/Release-iphoneos/App.app"
+          test -f "$APP/PrivacyInfo.xcprivacy"
+          plutil -lint "$APP/PrivacyInfo.xcprivacy" "$APP/Info.plist"
+          # Apple refuses an upload without the icon, and one that is not for iPhone only would need iPad pictures.
+          test "$(plutil -extract CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName raw "$APP/Info.plist")" = "AppIcon"
+          test -f "$APP/Assets.car"
+          plutil -p "$APP/Info.plist" | grep -E "MinimumOSVersion|UIDeviceFamily|ITSAppUsesNonExemptEncryption" -A2
+          # The record debug builds keep for the simulator run is not in the form people get.
+          if strings "$APP/App" | grep -q "listen-debug.log"; then echo "::error::The debug record is in the release build."; exit 1; fi
+
       - name: Run the app in simulators
         run: mobile/ios/ci/simulator-shots.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" "$RUNNER_TEMP/shots"
 
