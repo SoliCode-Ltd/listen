@@ -22,6 +22,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             openShortcut(shortcut)
         }
 
+        #if DEBUG
+        // Debug builds only, for the simulator run on the build machine: start on a named page
+        // of the site (-ListenOpenPath /en/voice-samples). A released app has no such door.
+        if let path = UserDefaults.standard.string(forKey: "ListenOpenPath") {
+            AppRouter.shared.open(AppConfig.urls.resolve(path))
+        }
+        #endif
+
         let shell = ShellViewController()
         AppRouter.shared.attach(shell)
         let window = UIWindow(windowScene: windowScene)

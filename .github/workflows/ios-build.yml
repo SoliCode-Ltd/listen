@@ -135,8 +135,8 @@ jobs:
           test "$(plutil -extract CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName raw "$APP/Info.plist")" = "AppIcon"
           test -f "$APP/Assets.car"
           plutil -p "$APP/Info.plist" | grep -E "MinimumOSVersion|UIDeviceFamily|ITSAppUsesNonExemptEncryption" -A2
-          # The record debug builds keep for the simulator run is not in the form people get.
-          if strings "$APP/App" | grep -q "listen-debug.log"; then echo "::error::The debug record is in the release build."; exit 1; fi
+          # What debug builds have for the simulator run (a record, a way to start on a named page) is not in the form people get.
+          if strings "$APP/App" | grep -qE "listen-debug.log|ListenOpenPath"; then echo "::error::Debug-only code is in the release build."; exit 1; fi
 
       - name: Run the app in simulators
         run: mobile/ios/ci/simulator-shots.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" "$RUNNER_TEMP/shots"

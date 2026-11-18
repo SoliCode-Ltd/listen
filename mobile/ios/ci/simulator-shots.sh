@@ -2,8 +2,8 @@
 # Runs the built app in iPhone simulators and keeps a picture of what it shows:
 # the smallest and the largest current iPhone, in Arabic and English, light and dark.
 #   simulator-shots.sh <path to App.app> <folder for the pictures>
-# It opens the app's first page only (the sign-in page of the site the app was built for);
-# it signs in to nothing, makes no voice and pays for nothing.
+# It opens the app's first page (the sign-in page of the site the app was built for) and the
+# voices page, as a visitor; it signs in to nothing, makes no voice and pays for nothing.
 set -euo pipefail
 
 APP="$1"
@@ -69,6 +69,24 @@ for index in "${!UDIDS[@]}"; do
         FAILED=1
         echo "::error::$name ($lang, $look): the first page did not come within a minute."
         xcrun simctl spawn "$device" log show --last 90s --style compact --predicate 'process == "App"' 2>/dev/null | tail -60 || true
+      fi
+      # A page with something on it, as a visitor sees it: the voices, opened directly (debug
+      # builds can be started on a named page). It shows the app's own bar of tabs and how a
+      # page sits between the notch and the home bar.
+      xcrun simctl terminate "$device" "$BUNDLE_ID" 2>/dev/null || true
+      xcrun simctl launch "$device" "$BUNDLE_ID" -AppleLanguages "($lang)" -AppleLocale "$locale" -ListenOpenPath "/$lang/voice-samples" >/dev/null
+      voices=""
+      for _ in $(seq 1 60); do
+        if app_log "$device" | grep -q "^[0-9.]* finished .*/voice-samples"; then voices="yes"; break; fi
+        sleep 1
+      done
+      sleep 3
+      xcrun simctl io "$device" screenshot "$OUT/$slug-$lang-$look-3-voices.png" >/dev/null
+      echo "-- $name, $lang, $look, the voices page: ${voices:-DID NOT COME}"
+      if [ -z "$voices" ]; then
+        FAILED=1
+        echo "::error::$name ($lang, $look): the voices page did not come within a minute."
+        app_log "$device" | tail -8 | sed 's/^/     /'
       fi
     done
   done
