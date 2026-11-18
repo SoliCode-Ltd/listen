@@ -263,7 +263,7 @@ ACCOUNT DELETION (5.1.1(v))
 Account tab > "Delete my account". It is done inside the app, immediately, after a confirmation. Accounts made with Sign in with Apple have their Apple tokens revoked. If you want to complete a deletion, please do it with a new account that you create, so the demo account stays available to you.
 
 PURCHASES
-Nothing is sold in the app. It shows no prices, no plans to buy, and no links or calls to buy anywhere. New accounts get free credits to use the studio. Listen is also used on the web and on Android, and members sign in here with the account they already have.
+Nothing is sold in the app. It shows no prices, no plans to buy, and no links or calls to buy anywhere. A new account can try the studio without paying. Listen is also used on the web and on Android, and members sign in here with the account they already have.
 
 WHAT THE APP ADDS TO THE WEB SITE (4.2)
 Audio that keeps playing in the background with Lock Screen and Control Centre controls; a push notification when a long voice is ready; saving to Files and the share sheet; microphone recording with the system permission; universal links that open in the app; Home Screen quick actions (press and hold the icon); Sign in with Apple; its own launch and "no connection" screens; app navigation with a tab bar instead of a web menu, laid out for the iPhone's safe areas.
