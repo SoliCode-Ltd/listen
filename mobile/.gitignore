@@ -36,3 +36,5 @@ android/capacitor-cordova-android-plugins/
 # Screenshots and reports of the checks
 checks/out/
 checks/out-ios/
+checks/out-webkit/
+checks/out-ios-webkit/

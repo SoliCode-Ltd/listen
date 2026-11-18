@@ -446,6 +446,8 @@ debug APK (or the internal test) and go through them once:
     the largest current iPhone) and adds that app's own rules: no "Upgrade" button, nothing
     that opens the browser to pay, no other phone platform or store named, and the question
     it asks before a first voice. Those screenshots go to `checks/out-ios/`.
+    With `ENGINE=webkit` it looks with the engine iPhones use instead of Chromium
+    (`npx playwright install webkit` once, and `npx playwright install-deps webkit` on Linux).
   - `page-script.js` runs the app's page script against a stand-in for the phone: the
     save/share sheet, the lock-screen player, the microphone and notification questions,
     the back button, the sign-in button.

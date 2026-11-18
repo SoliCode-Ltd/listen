@@ -9,12 +9,14 @@
 // It checks the "hidden" setting, the default: the local .env must not say ANDROID_APP_PLANS=web.
 // Run against a LOCAL copy of the site with the test members of seed.php (see mobile/README.md,
 // section 8). It makes no voice and no payment: it only opens pages.
-//   BASE=http://127.0.0.1:8123 AGENT=agt_... [APP=ios] node in-app-pages.js [guest,free,starter,max]
-const { chromium } = require('playwright');
+//   BASE=http://127.0.0.1:8123 AGENT=agt_... [APP=ios] [ENGINE=webkit] node in-app-pages.js [guest,free,starter,max]
+const playwright = require('playwright');
 const fs = require('fs');
 const BASE = process.env.BASE || 'http://127.0.0.1:8123';
 const IOS = process.env.APP === 'ios';
-const OUT = __dirname + (IOS ? '/out-ios' : '/out');
+// ENGINE=webkit looks with the engine iPhones use (needs `npx playwright install webkit` once).
+const WEBKIT = process.env.ENGINE === 'webkit';
+const OUT = __dirname + (IOS ? '/out-ios' : '/out') + (WEBKIT ? '-webkit' : '');
 fs.mkdirSync(OUT, { recursive: true });
 const UA = IOS
   ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 ListenApp/1.0.0 (iOS)'
@@ -38,7 +40,7 @@ const PAGES = IOS ? {
 };
 
 (async () => {
-  const browser = await chromium.launch();
+  const browser = await (WEBKIT ? playwright.webkit : playwright.chromium).launch();
   const report = [];
   for (const [who, pages] of Object.entries(PAGES)) {
     if (only && !only.split(',').includes(who)) continue;
@@ -49,7 +51,10 @@ const PAGES = IOS ? {
           await context.addInitScript((t) => { try { localStorage.setItem('listen_theme', t); } catch (e) {} }, theme);
           const page = await context.newPage();
           const errors = [];
-          page.on('pageerror', (e) => errors.push(String(e.message).slice(0, 160)));
+          // WebKit reports a request the page itself gave up and sent again (the demo page's first
+          // look at the allowance) as "... due to access control checks": the page handles it, and
+          // it is the same in an ordinary browser, so it is not counted.
+          page.on('pageerror', (e) => { if (!(WEBKIT && /due to access control checks/.test(String(e.message)))) errors.push(String(e.message).slice(0, 160)); });
           if (who !== 'guest') {
             await page.goto(`${BASE}/${locale}/login`, { waitUntil: 'domcontentloaded' });
             await page.fill('input[name="email"]', `${who}@example.test`);
