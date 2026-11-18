@@ -2054,6 +2054,25 @@ HTML;
         return trim((string) SiteSetting::get('facebook_pixel_code', ''));
     }
 
+    /** Any ad network's setup code for the page head (SEO Settings → Ad pixels and tracking code). */
+    public static function customHeadCode(): string
+    {
+        return trim((string) SiteSetting::get('custom_head_code', ''));
+    }
+
+    /**
+     * The JavaScript run in the browser when a paid plan starts (SEO Settings → Ad pixels and
+     * tracking code), without any script tags it was pasted with, so it can sit inside the
+     * billing page's own script.
+     */
+    public static function purchaseEventCode(): string
+    {
+        $code = (string) SiteSetting::get('purchase_event_code', '');
+        $code = preg_replace('#</?script\b[^>]*>#i', '', $code) ?? '';
+
+        return trim($code);
+    }
+
     public static function siteWebmanifest(): array
     {
         $name = self::siteName('en');

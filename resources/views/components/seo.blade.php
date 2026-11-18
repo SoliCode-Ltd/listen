@@ -38,6 +38,7 @@
 {!! SeoHelper::structuredData($faqItems, $resolvedPageTitle, $pageKey) !!}
 {!! SeoHelper::analyticsScript() !!}
 {!! SeoHelper::facebookPixelScript() !!}
+{!! SeoHelper::customHeadCode() !!}
 @endunless
 {!! SeoHelper::llmsDiscoveryTag() !!}
 

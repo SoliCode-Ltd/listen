@@ -78,6 +78,8 @@ class SeoSettings extends Page implements HasForms
             'google_ads_card_purchase_conversion_name' => SiteSetting::get('google_ads_card_purchase_conversion_name', 'Card purchase (server)'),
             'google_tag_head_code' => SiteSetting::get('google_tag_head_code', ''),
             'facebook_pixel_code' => SiteSetting::get('facebook_pixel_code', ''),
+            'custom_head_code' => SiteSetting::get('custom_head_code', ''),
+            'purchase_event_code' => SiteSetting::get('purchase_event_code', ''),
             'enable_structured_data' => (string) SiteSetting::get('enable_structured_data', '1') === '1',
 
             'google_site_verification' => SiteSetting::get('google_site_verification', ''),
@@ -322,6 +324,21 @@ class SeoSettings extends Page implements HasForms
                         Toggle::make('enable_structured_data')
                             ->label('Enable Structured Data')
                             ->helperText('Outputs Organization, WebSite, and FAQ schema where relevant.'),
+                    ]),
+
+                Section::make('Ad pixels and tracking code')
+                    ->description('For any ad network: paste its code here as it gives it to you. Nothing here runs inside the Android app, which declares no trackers to its store.')
+                    ->schema([
+                        Textarea::make('custom_head_code')
+                            ->label('Page head code')
+                            ->helperText('Printed in the <head> of every page of the site (public pages, studio, billing), once per page. Paste the full snippet including its <script> tags, one network after another. Example: the ChatGPT Ads pixel setup code.')
+                            ->rows(8)
+                            ->columnSpanFull(),
+                        Textarea::make('purchase_event_code')
+                            ->label('Code when a paid plan starts')
+                            ->helperText('JavaScript run once in the member\'s browser the moment a card payment for a plan succeeds (the same moment Google Ads is told). Script tags are optional. It can read purchase.plan_id (for example "pro_monthly"), purchase.plan, purchase.cycle, purchase.amount (whole minor units, for example 4900 for 49.00) and purchase.currency (for example "USD"). Example: the ChatGPT Ads "subscription_created" event call.')
+                            ->rows(8)
+                            ->columnSpanFull(),
                     ]),
 
                 Section::make('Crawl Controls')
