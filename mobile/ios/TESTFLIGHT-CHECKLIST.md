@@ -50,6 +50,9 @@ customer's account). Making a few short voices is expected and fine.
 - [ ] Swipe down from the top-right corner (Control Centre): the same player is there.
 - [ ] Leave the app (swipe up) while it plays: the sound continues.
 - [ ] A phone call or another app's sound interrupts it, and nothing crashes.
+- [ ] Flip the ring switch on the side to silent: a voice still plays.
+- [ ] Delete a voice from History: the question that asks "are you sure" is in the page's
+      language, with its two buttons in that language, and both buttons work.
 
 ## 5. Saving and sharing
 
@@ -66,6 +69,8 @@ customer's account). Making a few short voices is expected and fine.
 - [ ] Allow, record ten seconds, stop: the recording can be played back.
 - [ ] Agents tab → open the agent → **Talk to …**: you can speak with the agent and hear
       it answer. End the call.
+      (Locking the phone during a call ends the listening: that is the phone's rule for
+      the microphone, not a fault.)
 - [ ] (Optional) Settings → Listen → turn the microphone off, try to record again: the app
       explains how to turn it back on instead of doing nothing.
 

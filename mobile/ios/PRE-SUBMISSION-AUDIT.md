@@ -16,6 +16,10 @@ Checked means one of these, named in each line:
   the check on a price, a purchase link, an "Upgrade" button, another platform's name,
   anything cut off or scrolling sideways, or a script error.
 - **read**: the file was read against Apple's page.
+- **second reading**: the app's code was read a second time, independently, looking only
+  for faults that a simulator cannot show. It found six (among them that "Continue with
+  Google" would never have finished, and page questions with English-only buttons); all
+  are fixed, and each has a line in the tester's checklist.
 
 Nothing was checked on a real iPhone. Nothing was checked in Apple's own consoles.
 
@@ -64,6 +68,7 @@ Each is a section of `TESTFLIGHT-CHECKLIST.md`. A "no" on any of them is fixed b
 | 2.1, 2.5.14 | The microphone is refused, or asked at the wrong moment | section 6 |
 | 2.1 | A notification never arrives, or opens the wrong page | section 7 |
 | 2.1 | Signing in with Apple or Google does not come back to the app | section 2 |
+| 2.1 | A page's question ("Delete this voice?") has no answer, or the wrong language | section 4 |
 | 2.1 | A link to the site opens Safari instead of the app | section 8 |
 | 5.1.1(v) | After deletion Apple still lists Listen under "Sign in with Apple" | section 10 |
 | 2.1 | Keyboard covers the text box; text too large to use; Arabic cut off | section 11 |

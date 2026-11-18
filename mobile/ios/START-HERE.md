@@ -128,6 +128,8 @@ IOS_APP_BUNDLE_ID=studio.listenai.app
 ```
 
 Then `php artisan config:clear`. The same key serves notifications and Sign in with Apple.
+Do not add `APNS_SANDBOX`: builds from TestFlight and the App Store use Apple's real
+notification service, which is what the site uses when that line is absent.
 
 Three checks after that (I can run the first two for you once it is live):
 
@@ -151,6 +153,11 @@ After #358 is merged: GitHub → **Actions** → **iOS build** → **Run workflo
 - It takes about 50 minutes and costs about 3 US dollars of GitHub's Mac time (two Mac
   jobs: the checks, then the signing and upload). A run without the tick is about half an
   hour and 2 dollars.
+- **This is the one part that could not be tried before your Apple account existed.** The
+  checks half is proven; the signing and upload half runs for the first time here. If it
+  goes red, send me the run's link: it is a fix on my side, not something you did wrong.
+  No iPhone has to be registered in the Apple account for it, and no certificate is stored
+  anywhere: Apple makes and keeps the signing certificate itself.
 - When it is green, the build shows in App Store Connect → the app → **TestFlight** after
   10 to 30 minutes ("Processing", then ready).
 
