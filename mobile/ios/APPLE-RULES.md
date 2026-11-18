@@ -11,9 +11,10 @@ plainly. Section 3 lists what stays uncertain.
 
 ---
 
-## 1. What needs a decision from the owner
+## 1. What needed a decision from the owner
 
-These four change what gets built. Each has a recommendation.
+These four change what gets built. **The owner accepted all four recommendations on 17
+November 2026**; each section ends with what was decided and built.
 
 ### 1.1 Signing in (guideline 4.8)
 
@@ -30,8 +31,10 @@ company's own accounts (email and password).
 | **A. Add "Sign in with Apple" beside Google, in the iPhone app only** (recommended) | Google, Apple, email | Apple's name and button on the sign-in page inside the iPhone app. That needs the owner's approval, as the Google Play badge did. More to build and to set up in the Apple account. |
 | B. No Google button in the iPhone app | Email and password only. A member who joined with Google taps "Forgot your password?" once to choose a password. | Nothing to approve, nothing to set up. Less convenient for members who joined with Google. |
 
-Until the owner answers, the iPhone app is built as **B** (it follows the rule as it
-stands), and A is added on top if approved.
+**Decided: A.** The sign-in and sign-up pages inside the iPhone app show "Continue with
+Apple" beside "Continue with Google", with Apple's own button artwork. Recorded in
+`CLAUDE.md` as an approved exception to "no other company named", for those pages of the
+iPhone app only.
 
 ### 1.2 Paying (guidelines 3.1.1 and 3.1.3)
 
@@ -63,6 +66,9 @@ screens, Apple's prices, a second billing system beside Stripe, and Apple's 15%)
 the app is built so that it can be added. This is the most likely reason for a first
 rejection, together with 1.4 below.
 
+**Decided: as recommended.** No price, no plan to buy and no "Upgrade" button anywhere in
+the iPhone app, and no setting that could switch them on.
+
 ### 1.3 Telling people where their text and voice go (guideline 5.1.2(i))
 
 **The rule.** "You must clearly disclose where personal data will be shared with third
@@ -85,7 +91,10 @@ Two ways:
 - Keep general words ("our AI speech provider") and accept that a reviewer may ask for
   the name.
 
-Until the owner answers, the sheet uses general words.
+**Decided: name the provider**, on that one page of the iPhone app and nowhere else
+(`resources/views/app/consent.blade.php`; recorded in `CLAUDE.md`). The page comes before
+the member's first use of the studio, the voices they make and the agents, and the member
+can read it again and withdraw from the account page.
 
 ### 1.4 "More than a website" (guideline 4.2)
 
@@ -107,7 +116,7 @@ risk is named here because it cannot be brought to zero.
 
 | Rule | What Apple asks | How Listen handles it |
 |---|---|---|
-| Build tools (Upcoming Requirements) | Since 28 April 2026 uploads must be built with **Xcode 26 or later** and the **iOS 26 SDK**. Apps must target iOS 13 or later. | Built on GitHub's `macos-26` machine (Xcode 26.6). The app targets iOS 15 (what Capacitor 8 supports). |
+| Build tools (Upcoming Requirements) | Since 28 April 2026 uploads must be built with **Xcode 26 or later** and the **iOS 26 SDK**. Apps must target iOS 13 or later. | Built on GitHub's `macos-26` machine (Xcode 26.6). The app asks for iOS 16.4 or later: Capacitor 8 supports iOS 15, but the site's in-app pages use CSS that older iPhone systems cannot draw. |
 | 2.1 App completeness | Final build, no placeholders, working links, backend switched on, **a demo account** when there is a sign-in. | A reviewer account on the live site, on a paid plan so the studio opens (see the owner's list). |
 | 2.3 Accurate metadata | Screenshots show the app in use (not a sign-in or opening screen). No prices in name, subtitle or screenshots. Name at most 30 characters. | Screenshots are made from the app's real pages. No price anywhere. |
 | 2.3.10 Other platforms | No name, icon or picture of another mobile platform or app store in the app or its listing. | The Google Play badge is in the website footer, which the app never shows; the iPhone app's pages and listing are checked for "Android" and "Google Play". |
@@ -140,7 +149,8 @@ risk is named here because it cannot be brought to zero.
 
 1. **Payments (1.2).** A reviewer may ask for in-app purchase.
 2. **"More than a website" (1.4).** A reviewer may still find the app too close to the site.
-3. **Naming the AI provider (1.3)**, if general words are kept.
+3. **The consent page (1.3).** The provider is named and a yes is asked; a reviewer could
+   still want other wording or another place for it.
 4. **A real iPhone.** Neither the owner nor the builder has one. Lock-screen audio,
    notifications arriving, the microphone, saving and sharing, and sign-in returning to the
    app can only be confirmed by the TestFlight tester. Apple reviews on real devices.
@@ -158,12 +168,13 @@ Connect (and a new build if needed). A rejection does not harm the account.
    both apps. The existing admin deletion refuses accounts with a live card subscription
    (Stripe would keep charging). The member's page must therefore either cancel the
    subscription as part of deleting, or tell the member to cancel first and link to the
-   place. To be agreed with the owner before it is built.
+   place. **Decided:** deleting cancels a running card subscription on the spot, with no
+   refund, and the page says so before the member confirms.
 3. **Links that open in the app** (`/.well-known/apple-app-site-association`).
 4. **Notifications to iPhones**, sent straight to Apple's service with a key from the
    Apple developer account.
 5. **The consent sheet** of 1.3.
-6. **Sign in with Apple**, only if the owner chooses 1.1 A.
+6. **Sign in with Apple** (1.1 A, chosen).
 
 ---
 
