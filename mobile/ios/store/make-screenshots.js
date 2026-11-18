@@ -1,5 +1,6 @@
 // Makes the App Store screenshots: eight for each language, at the two sizes Apple takes for
-// iPhone (1206x2622, the required one, and 1320x2868), in the Play Store pictures' style.
+// iPhone (1206x2622, the required one, and 1320x2868), in the Play Store pictures' style, but a
+// mix of the app's two looks: dark and light pictures take turns, starting with dark.
 // Each one is a real page of the site as the iPhone app shows it (the app's user agent, the
 // page area the app gives a page), under a headline. No price, no plan to buy, no other
 // company and no other phone platform is in any of them.
@@ -24,42 +25,47 @@ const tab = (name) => async (page) => { await page.getByRole('tab', { name }).or
 // Words in the studio's text box, so the first picture shows the studio in use (nothing is generated).
 const write = (text) => async (page) => { await page.fill('#contentTextarea', text); await page.evaluate(() => { document.activeElement && document.activeElement.blur(); window.scrollTo(0, 0); }); };
 const SHOTS = [
-  { slug: '1-studio', path: { en: 'en/dashboard', ar: 'ar/dashboard' }, then: { en: write("Good evening, and welcome to tonight's episode. We start with the story everyone is talking about."), ar: write('مساء الخير، وأهلاً بكم في حلقة الليلة. نبدأ بالقصة التي يتحدث عنها الجميع.') },
+  { slug: '1-studio', look: 'dark', path: { en: 'en/dashboard', ar: 'ar/dashboard' }, then: { en: write("Good evening, and welcome to tonight's episode. We start with the story everyone is talking about."), ar: write('مساء الخير، وأهلاً بكم في حلقة الليلة. نبدأ بالقصة التي يتحدث عنها الجميع.') },
     en: ['Type it.<br>Hear it in seconds.', 'Natural AI voice-overs, ready to use'],
     ar: ['اكتب نصك<br>واسمعه في ثوانٍ', 'تعليق صوتي طبيعي بالذكاء الاصطناعي'] },
-  { slug: '2-arabic-dialects', path: { en: 'ar/voice-samples', ar: 'ar/voice-samples' },
+  { slug: '2-arabic-dialects', look: 'light', path: { en: 'ar/voice-samples', ar: 'ar/voice-samples' },
     en: ['140+ Arabic dialects', 'From Riyadh to Casablanca, each voice sounds local'],
     ar: ['+140 لهجة عربية', 'من الرياض إلى الدار البيضاء، كل صوت كأهل بلده'] },
-  { slug: '3-english-accents', path: { en: 'en/voice-samples', ar: 'en/voice-samples' },
+  { slug: '3-english-accents', look: 'dark', path: { en: 'en/voice-samples', ar: 'en/voice-samples' },
     en: ['60+ English accents', 'American, British, Australian and many more'],
     ar: ['+60 لكنة إنجليزية', 'أمريكية وبريطانية وأسترالية وغيرها'] },
-  { slug: '4-emotions', path: { en: 'en/voice-samples', ar: 'ar/voice-samples' }, then: { en: tab(/Moods and styles/), ar: tab(/المشاعر والأساليب/) },
+  { slug: '4-emotions', look: 'light', path: { en: 'en/voice-samples', ar: 'ar/voice-samples' }, then: { en: tab(/Moods and styles/), ar: tab(/المشاعر والأساليب/) },
     en: ['Emotion and performance', 'Laughter, whispers, excitement: voices that act'],
     ar: ['مشاعر وأداء حيّ', 'ضحك، همس، حماس... والصوت يمثّل النص'] },
-  { slug: '5-voice-cloning', path: { en: 'en/dashboard#voiceCloningSection', ar: 'ar/dashboard#voiceCloningSection' },
+  { slug: '5-voice-cloning', look: 'dark', path: { en: 'en/dashboard#voiceCloningSection', ar: 'ar/dashboard#voiceCloningSection' },
     en: ['Clone your own voice', 'Record 30 seconds, then use it for any text'],
     ar: ['استنسخ صوتك', 'سجّل 30 ثانية واستخدم صوتك في كل نص'] },
-  { slug: '6-voice-design', path: { en: 'en/dashboard', ar: 'ar/dashboard' }, then: { en: tab(/Voice Design/), ar: tab(/تصميم الصوت/) },
+  { slug: '6-voice-design', look: 'light', path: { en: 'en/dashboard', ar: 'ar/dashboard' }, then: { en: tab(/Voice Design/), ar: tab(/تصميم الصوت/) },
     en: ['Design any voice<br>from a description', 'Describe it in a sentence and hear it'],
     ar: ['صمّم أي صوت<br>بوصف بسيط', 'اكتب وصف الصوت في جملة واسمعه'] },
-  { slug: '7-agents', path: { en: 'en/agents/' + AGENT, ar: 'ar/agents/' + AGENT },
+  { slug: '7-agents', look: 'dark', path: { en: 'en/agents/' + AGENT, ar: 'ar/agents/' + AGENT },
     en: ['A voice agent for<br>your customers', 'Answers in their dialect, any time of day'],
     ar: ['وكيل صوتي لعملائك', 'يردّ على عملائك بلهجتهم، في أي وقت'] },
-  { slug: '8-more-languages', path: { en: 'en/voice-samples', ar: 'en/voice-samples' }, then: { en: tab(/Other languages/), ar: tab(/Other languages/) },
+  { slug: '8-more-languages', look: 'light', path: { en: 'en/voice-samples', ar: 'en/voice-samples' }, then: { en: tab(/Other languages/), ar: tab(/Other languages/) },
     en: ['Voices in more languages', 'French, Spanish, German, Turkish and more'],
     ar: ['وأصوات بلغات أخرى', 'الفرنسية والإسبانية والألمانية والتركية وغيرها'] },
 ];
 
 // The picture: the headline, then the phone with the page in it, running off the bottom edge.
-const sheet = (size, lang, head, sub, shot, pageColor) => `
+// The colours around the phone, for each look.
+const LOOKS = {
+  dark: { back: 'radial-gradient(120% 46% at 50% -6%, #3B2A9C 0%, #1B1450 34%, rgba(11,11,15,0) 70%), #07070B', flat: '#07070B', head: '#fff', sub: '#C9C0FF', frame: '#23232D', edge: '#3A3A48', glow: 'rgba(108, 77, 255, .38)' },
+  light: { back: 'radial-gradient(120% 46% at 50% -6%, #CFC3FF 0%, #E9E3FF 36%, rgba(250,249,255,0) 72%), #FAF9FF', flat: '#FAF9FF', head: '#14121F', sub: '#5A41D8', frame: '#FFFFFF', edge: '#D9D6E8', glow: 'rgba(108, 77, 255, .30)' },
+};
+const sheet = (size, lang, head, sub, shot, pageColor, look) => `
 <style>
-  html, body { margin: 0; padding: 0; width: ${size.w}px; height: ${size.h}px; overflow: hidden; background: #07070B; }
+  html, body { margin: 0; padding: 0; width: ${size.w}px; height: ${size.h}px; overflow: hidden; background: ${LOOKS[look].flat}; }
   .shot { position: relative; width: ${size.w}px; height: ${size.h}px; overflow: hidden; direction: ${lang === 'ar' ? 'rtl' : 'ltr'};
-    background: radial-gradient(120% 46% at 50% -6%, #3B2A9C 0%, #1B1450 34%, rgba(11,11,15,0) 70%), #07070B; }
+    background: ${LOOKS[look].back}; }
   .words { position: absolute; inset: 0 0 auto 0; height: ${Math.round(size.h * 0.255)}px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: ${Math.round(size.w * 0.028)}px; padding: ${Math.round(size.w * 0.06)}px ${Math.round(size.w * 0.06)}px 0; box-sizing: border-box; text-align: center; }
-  .words h1 { margin: 0; color: #fff; font-family: ${lang === 'ar' ? 'var(--font-display-ar, var(--font-body-ar))' : 'var(--font-display)'}; font-weight: 800; font-size: ${Math.round(size.w * (lang === 'ar' ? 0.094 : 0.086))}px; line-height: ${lang === 'ar' ? 1.32 : 1.14}; letter-spacing: ${lang === 'ar' ? '0' : '-0.01em'}; }
-  .words p { margin: 0; color: #C9C0FF; font-family: ${lang === 'ar' ? 'var(--font-body-ar)' : 'var(--font-body)'}; font-weight: 500; font-size: ${Math.round(size.w * 0.043)}px; line-height: 1.45; }
-  .phone { position: absolute; left: 50%; top: ${Math.round(size.h * 0.275)}px; width: ${Math.round(size.w * 0.84)}px; transform: translateX(-50%); border-radius: ${Math.round(size.w * 0.115)}px ${Math.round(size.w * 0.115)}px 0 0; padding: ${Math.round(size.w * 0.022)}px ${Math.round(size.w * 0.022)}px 0; box-sizing: border-box; background: #23232D; box-shadow: 0 0 0 1px #3A3A48, 0 0 ${Math.round(size.w * 0.3)}px rgba(108, 77, 255, .38); }
+  .words h1 { margin: 0; text-wrap: balance; color: ${LOOKS[look].head}; font-family: ${lang === 'ar' ? 'var(--font-display-ar, var(--font-body-ar))' : 'var(--font-display)'}; font-weight: 800; font-size: ${Math.round(size.w * (lang === 'ar' ? 0.094 : 0.086))}px; line-height: ${lang === 'ar' ? 1.32 : 1.14}; letter-spacing: ${lang === 'ar' ? '0' : '-0.01em'}; }
+  .words p { margin: 0; text-wrap: balance; color: ${LOOKS[look].sub}; font-family: ${lang === 'ar' ? 'var(--font-body-ar)' : 'var(--font-body)'}; font-weight: 500; font-size: ${Math.round(size.w * 0.043)}px; line-height: 1.45; }
+  .phone { position: absolute; left: 50%; top: ${Math.round(size.h * 0.275)}px; width: ${Math.round(size.w * 0.84)}px; transform: translateX(-50%); border-radius: ${Math.round(size.w * 0.115)}px ${Math.round(size.w * 0.115)}px 0 0; padding: ${Math.round(size.w * 0.022)}px ${Math.round(size.w * 0.022)}px 0; box-sizing: border-box; background: ${LOOKS[look].frame}; box-shadow: 0 0 0 1px ${LOOKS[look].edge}, 0 0 ${Math.round(size.w * 0.3)}px ${LOOKS[look].glow}; }
   .screen { border-radius: ${Math.round(size.w * 0.095)}px ${Math.round(size.w * 0.095)}px 0 0; overflow: hidden; background: ${pageColor}; }
   .bar { position: relative; height: ${Math.round(size.top * 0.84)}px; background: ${pageColor}; }
   .bar i { position: absolute; left: 50%; top: 50%; width: 31%; height: 56%; transform: translate(-50%, -50%); border-radius: 999px; background: #000; }
@@ -81,7 +87,6 @@ const sheet = (size, lang, head, sub, shot, pageColor) => `
     const pageH = Math.round(seen * size.w / phoneW);
     for (const lang of ['en', 'ar']) {
       const app = await browser.newContext({ viewport: { width: size.w, height: pageH }, deviceScaleFactor: 3, userAgent: UA, isMobile: true, hasTouch: true, colorScheme: 'dark' });
-      await app.addInitScript(() => { try { localStorage.setItem('listen_theme', 'dark'); } catch (e) {} });
       const page = await app.newPage();
       await page.goto(`${BASE}/${lang}/login`, { waitUntil: 'domcontentloaded' });
       await page.fill('input[name="email"]', 'max@example.test');
@@ -95,6 +100,9 @@ const sheet = (size, lang, head, sub, shot, pageColor) => `
       await canvas.goto(`${BASE}/${lang}/login`, { waitUntil: 'load' });
 
       for (const shot of SHOTS) {
+        // The page in this picture's look: the site keeps the member's choice of theme.
+        await page.emulateMedia({ colorScheme: shot.look });
+        await page.evaluate((look) => { try { localStorage.setItem('listen_theme', look); } catch (e) {} }, shot.look);
         await page.goto(`${BASE}/${shot.path[lang]}`, { waitUntil: 'load' });
         if (page.url().includes('/app/consent')) {
           await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.locator('.ai-ask-actions .btn-primary').click()]);
@@ -110,9 +118,12 @@ const sheet = (size, lang, head, sub, shot, pageColor) => `
         await page.waitForTimeout(900);
         const words = await page.evaluate(() => document.body.innerText);
         if (/[$€£]\s?\d|\d\s?(USD|EGP|SAR|AED)|upgrade|ترقية|Android|Google Play/i.test(words)) throw new Error(`${shot.slug} (${lang}): a price, an upgrade or another platform is on the page.`);
-        const pageColor = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+        const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+        if (theme !== shot.look) throw new Error(`${shot.slug} (${lang}): the page is ${theme}, not ${shot.look}.`);
+        // The colour behind the status bar is the page's own, as in the app (white, or the dark page colour).
+        const pageColor = shot.look === 'dark' ? '#0B0B0F' : '#FFFFFF';
         const png = await page.screenshot({ type: 'png' });
-        await canvas.evaluate((html) => { document.head.querySelectorAll('style[data-shot]').forEach((s) => s.remove()); document.body.className = ''; document.body.innerHTML = html; }, sheet(size, lang, shot[lang][0], shot[lang][1], 'data:image/png;base64,' + png.toString('base64'), pageColor));
+        await canvas.evaluate((html) => { document.head.querySelectorAll('style[data-shot]').forEach((s) => s.remove()); document.body.className = ''; document.body.innerHTML = html; }, sheet(size, lang, shot[lang][0], shot[lang][1], 'data:image/png;base64,' + png.toString('base64'), pageColor, shot.look));
         await canvas.evaluate(() => Promise.all([document.fonts.ready, ...[...document.images].map((i) => i.decode().catch(() => {}))]));
         await canvas.waitForTimeout(250);
         // JPEG: Apple takes it, it has no transparency, and it is a quarter of the PNG's size.

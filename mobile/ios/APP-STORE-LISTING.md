@@ -146,6 +146,8 @@ They are ready in `mobile/ios/store/`. Upload them as they are, in number order.
   size fits, so try the 1206×2622 set first, then the 1320×2868 one. Apple makes the
   other sizes from it. Up to ten pictures are allowed for each size; there are eight.
 - No iPad pictures: the app is for iPhone.
+- The app's two looks take turns: pictures 1, 3, 5 and 7 are dark, pictures 2, 4, 6 and 8
+  are light. Keep them in number order so the mix shows in the store.
 - Order: the studio, Arabic dialects, English accents, emotions, voice cloning, voice
   design, voice agents, voices in more languages. They are the same eight as on Google
   Play, taken again from the pages as the iPhone app shows them. No price is in any of them.
