@@ -6,7 +6,7 @@ name: iOS build
 # TestFlight.
 #
 # Mac machines cost about ten times a Linux one (0.062 US dollars a minute at the time of
-# writing, so roughly one dollar a run). It therefore runs only when a pull request changes
+# writing, so roughly two dollars a run). It therefore runs only when a pull request changes
 # the iPhone app itself, or when started by hand.
 #
 # The first job needs no secrets. Sending a build to TestFlight (manual runs only, with
@@ -65,7 +65,7 @@ jobs:
   test:
     name: Build, unit tests, simulator
     runs-on: macos-26
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 

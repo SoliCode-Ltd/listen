@@ -36,7 +36,7 @@ Nobody needs a Mac: GitHub builds it. **Actions → iOS build → Run workflow.*
   the run's page.
 - With **upload** ticked it also signs the build and sends it to TestFlight. That needs
   the four repository secrets named at the top of `.github/workflows/ios-build.yml`.
-- A run costs roughly one US dollar (Mac machines are 0.062 dollars a minute at the time
+- A run takes about half an hour and costs roughly two US dollars (Mac machines are 0.062 dollars a minute at the time
   of writing), so it starts only when a pull request changes the iPhone app, or by hand.
 
 On a Mac (Xcode 26 or later, Node 22, `brew install xcodegen`):
