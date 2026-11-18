@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Support\InApp\InApp;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\Billing\PlanChanges;
@@ -102,6 +103,11 @@ final class YearlyOfferBanner
      */
     public static function forPage(?string $route, ?User $user, string $locale): ?array
     {
+        // Never inside the phone apps, signed in or not: nothing is sold there, so nothing
+        // about a price or a discount is said there either (the stores' rules).
+        if (InApp::active()) {
+            return null;
+        }
         if (! self::live() || ! self::showsOnRoute($route) || self::paysYearly($user)) {
             return null;
         }
