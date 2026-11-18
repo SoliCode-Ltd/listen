@@ -2463,8 +2463,35 @@
       });
     }
 
-    function trackPurchaseConversion(meta) {
-      return sendAdsConversion(gadsConversionSendTo, meta, '');
+    // The ad networks' own code for a plan that starts (SEO Settings → Ad pixels and tracking
+    // code), given the plan and the amount it was paid in: purchase.plan_id ("pro_monthly"),
+    // purchase.amount in whole minor units and purchase.currency.
+    const hasPurchaseEventCode = @json(\App\Support\SeoHelper::purchaseEventCode() !== '');
+    function runPurchaseEventCode(purchase) {
+      try {
+@if(\App\Support\SeoHelper::purchaseEventCode() !== '')
+{!! \App\Support\SeoHelper::purchaseEventCode() !!}
+@endif
+      } catch (error) {
+        console.warn('Purchase event code:', error);
+      }
+    }
+
+    function trackPurchaseConversion(meta, selected) {
+      const chargeCurrency = String(meta?.charge_currency || meta?.currency || '').toUpperCase();
+      const minor = chargeCurrency === 'USD' && meta?.base_usd_cents ? meta.base_usd_cents : meta?.amount_cents;
+      const plan = String(selected?.plan?.slug || '');
+      const cycle = String(selected?.cycle || 'monthly');
+      runPurchaseEventCode({
+        plan_id: plan ? plan + '_' + cycle : '',
+        plan: plan,
+        cycle: cycle,
+        amount: Number(minor) > 0 ? Math.round(Number(minor)) : null,
+        currency: Number(minor) > 0 && chargeCurrency ? chargeCurrency : null,
+      });
+      // A moment for the pixels to send their event before the page moves on.
+      const pixels = new Promise(function(resolve) { setTimeout(resolve, hasPurchaseEventCode ? 1000 : 0); });
+      return Promise.all([sendAdsConversion(gadsConversionSendTo, meta, ''), pixels]);
     }
 
     // Pays for the chosen plan with a card from the card boxes, the saved card (no
@@ -2516,7 +2543,7 @@
           throw new Error(normalizeStripeMessage(confirmation.error.message, i18n.payment_auth_failed));
         }
 
-        await trackPurchaseConversion(selected.meta);
+        await trackPurchaseConversion(selected.meta, selected);
         setMessage('ok', i18n.payment_confirmed_redirecting);
         window.location.href = '{{ route('manage-subscription.page') }}';
         return true;
@@ -2531,7 +2558,7 @@
 
       // Only a real charge is a purchase (not a resumed plan or a card change).
       if (response.data?.charged !== false) {
-        await trackPurchaseConversion(selected.meta);
+        await trackPurchaseConversion(selected.meta, selected);
       }
       setMessage('ok', response.data?.message || i18n.subscription_updated_redirecting);
       window.location.href = '{{ route('manage-subscription.page') }}';
