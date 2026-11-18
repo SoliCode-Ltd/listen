@@ -39,6 +39,7 @@ Nothing was checked on a real iPhone. Nothing was checked in Apple's own console
 | 2.5.1, 2.5.2 | Private APIs; code downloaded to change the app | Closed. None used; the app shows the site's pages in the system web view, which Apple allows. |
 | 2.5.4 | Background mode declared but unused | Closed in the build (only "audio", which the player uses). Its working is for the tester. |
 | 2.5.14 | Recording without a clear sign and consent | Closed. The microphone is asked only when the member presses record or starts a call, with a reason in both languages; no page gets the camera except through the phone's own picker. |
+| 3.1.1 | A sale message inside the app | Closed by #364, once it is live. The site's yearly offer bar ("50% off") showed to a visitor on the voices and contact pages inside the apps; it was seen in the simulator pictures taken against the live site. Now no page shown in an app carries it (tests), and the page check runs with the bar switched on and fails on any offer. |
 | 3.1.1, 3.1.3 | A price, a plan to buy, an "Upgrade" button, or a link that leads to paying outside the app | Closed as far as it can be: tests and the page check prove none exists in the iPhone app, and every purchase page turns into the plain account page. What remains is in table 4. |
 | 4.0, 4.2 | Looks like a browser | Closed as far as it can be: no address bar, own opening and "no connection" screens, a bar of tabs, pages kept clear of the notch and the home bar. What remains is in table 4. |
 | 4.5.4 | Notifications used for advertising, or required to use the app | Closed. Asked in context, optional, only "your voice is ready". |
@@ -102,6 +103,8 @@ Each is a section of `TESTFLIGHT-CHECKLIST.md`. A "no" on any of them is fixed b
 ## The last look, on the day
 
 - [ ] Every site pull request is merged, deployed to live, and the two migrations are run.
+- [ ] On live, as the app and not signed in, the voices page shows no offer bar (I check
+      this, and every member page with the test member, once everything is deployed).
 - [ ] `https://listenai.studio/.well-known/apple-app-site-association` shows the Team ID.
 - [ ] The tester's checklist is back with every line ticked, on the same build that is
       being submitted.

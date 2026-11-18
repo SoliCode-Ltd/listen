@@ -17,6 +17,8 @@ customer's account). Making a few short voices is expected and fine.
       the phone is in Arabic).
 - [ ] Opening the app shows the logo moving on white for a moment, then the sign-in page.
       No blank screen, no browser bar, no address bar.
+- [ ] The sign-in page is in the phone's language the very first time the app is opened
+      (English phone: English; Arabic phone: Arabic).
 - [ ] Nothing is hidden under the notch or Dynamic Island at the top, or under the bar at
       the bottom of the screen.
 - [ ] Turning the phone sideways does nothing (the app stays upright).
@@ -92,10 +94,11 @@ customer's account). Making a few short voices is expected and fine.
 
 ## 9. No money anywhere
 
-Look at every tab and the Account page, signed out and signed in.
+Look at every tab and the Account page, signed out and signed in. Signed out, open the
+menu at the top of the sign-in page and look at the voices and contact pages too.
 
-- [ ] No price, no currency, no plan to buy, no "Upgrade", no "Subscribe", no link that
-      opens a payment page in Safari.
+- [ ] No price, no currency, no discount ("% off"), no plan to buy, no "Upgrade", no
+      "Subscribe", no link that opens a payment page in Safari.
 - [ ] No mention of Android or of another app store.
 
 ## 10. Deleting an account (use a throw-away account, not the test member)
