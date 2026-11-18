@@ -418,6 +418,10 @@ Route::group([
         Route::get('/app/plan', [AppShellController::class, 'plan'])->name('app.plan');
         Route::get('/app/upgrade', [AppShellController::class, 'upgrade'])->name('app.upgrade');
         Route::get('/app/signin/done', [AppShellController::class, 'signInDone'])->name('app.signin.done');
+        // The iPhone app's question before a member's text or voice is sent to the AI provider.
+        Route::get('/app/consent', [AppShellController::class, 'consent'])->name('app.consent');
+        Route::post('/app/consent', [AppShellController::class, 'consentAgree'])->middleware('throttle:20,1')->name('app.consent.agree');
+        Route::post('/app/consent/withdraw', [AppShellController::class, 'consentWithdraw'])->middleware('throttle:20,1')->name('app.consent.withdraw');
     });
 
     // Referral capture runs BEFORE auth so guests landing on the demo page

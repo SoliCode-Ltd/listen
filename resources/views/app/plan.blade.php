@@ -115,6 +115,10 @@
       <h2 id="acctMore">{{ __('app.plan.account') }}</h2>
       <ul class="acct-list">
         <li><a class="acct-row" href="{{ route('contact') }}"><svg class="acct-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg><span>{{ __('app.plan.help') }}</span>{!! $go !!}</a></li>
+        {{-- iPhone app only: what the member agreed to send to the AI provider, and taking it back (AiConsent). --}}
+        @if(\App\Support\InApp\InApp::onIphone())
+        <li><a class="acct-row" href="{{ route('app.consent') }}"><svg class="acct-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="4"/></svg><span>{{ __('app.consent.row') }}</span>{!! $go !!}</a></li>
+        @endif
         <li><a class="acct-row" href="{{ route('legal.privacy') }}"><svg class="acct-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-2.9 8.3-7 10-4.1-1.700-7-5.400-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span>{{ __('app.plan.privacy') }}</span>{!! $go !!}</a></li>
         <li><a class="acct-row" href="{{ route('legal.terms') }}"><svg class="acct-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg><span>{{ __('app.plan.terms') }}</span>{!! $go !!}</a></li>
         <li>

@@ -80,6 +80,12 @@ abstract class InAppTestCase extends TestCase
             'current_period_end' => now()->addMonth(),
         ]);
 
+        // A member who has already answered the iPhone app's question about AI processing
+        // (IphoneAiConsentTest is about the ones who have not): these tests are of the pages behind it.
+        if (\App\Support\InApp\AiConsent::available()) {
+            $user->forceFill([\App\Support\InApp\AiConsent::COLUMN => now()])->save();
+        }
+
         return $user;
     }
 

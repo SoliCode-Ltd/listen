@@ -99,7 +99,7 @@
   if ($appTabs) {
     $onAgents = str_starts_with($currentRoute, 'voice-agents.');
     $onVoices = $currentRoute === 'samples';
-    $onAccount = in_array($currentRoute, ['app.plan', 'app.upgrade', 'contact'], true) || str_starts_with($currentRoute, 'legal.');
+    $onAccount = in_array($currentRoute, ['app.plan', 'app.upgrade', 'app.consent', 'account.delete', 'contact'], true) || str_starts_with($currentRoute, 'legal.');
     $appTabLinks[] = ['key' => 'studio', 'href' => route('dashboard'), 'label' => __('agents.switch_studio'), 'on' => ! $onAgents && ! $onVoices && ! $onAccount,
       'icon' => '<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>'];
     if ($agentsOpen) {
