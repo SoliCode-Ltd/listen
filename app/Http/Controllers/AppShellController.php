@@ -276,7 +276,11 @@ class AppShellController extends Controller
             return redirect()->to(InApp::planUrl());
         }
 
-        return $this->openOnWeb($request, '/'.app()->getLocale().'/billing');
+        // The plan the button was for (the demo's, as on the website), when it names one.
+        $plan = (string) $request->query('plan', '');
+        $query = preg_match('/^[a-z0-9_-]{1,40}$/', $plan) === 1 ? '?'.http_build_query(['plan' => $plan]) : '';
+
+        return $this->openOnWeb($request, '/'.app()->getLocale().'/billing'.$query);
     }
 
     /**

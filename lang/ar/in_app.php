@@ -98,4 +98,17 @@ return [
     'agents.balance.state_plan_none' => 'باقتك لا تشمل تشغيل الوكلاء. يمكنك بناء وكيل وتجربته الآن.',
     // The app's menu is the bar at the bottom, not the top of the page.
     'agents.start_continue_note' => 'يمكنك التنقل بين الاستوديو والوكلاء في أي وقت، من الشريط أسفل كل صفحة.',
+    // Speech to text: the free try is offered, and its lines say what is true and stop.
+    'transcribe.refused.not_in_plan' => 'تحويل الصوت إلى نص ليس ضمن باقتك الحالية.',
+    'transcribe.refused.too_long_plan' => 'مدة هذا الملف :length، وباقتك تقبل ملفات حتى :max.',
+    'transcribe.refused.not_enough' => 'يحتاج هذا الملف :need، والمتبقي لك هذا الشهر :left. تتجدد دقائقك في :date.',
+    'transcribe.refused.free_used' => 'استخدمت تجربتك المجانية.',
+    'transcribe.refused.free_too_long' => 'التجربة المجانية تقبل تسجيلات حتى :max، ومدة هذا التسجيل :length.',
+    'transcribe.refused.free_day_full' => 'انتهت التجارب المجانية لليوم. جرّب غدًا.',
+    'transcribe.page.upgrade_title' => 'ليس ضمن باقتك الحالية',
+    'transcribe.page.free_text' => 'جرّبه مجانًا بتسجيل واحد حتى :length.',
+    'transcribe.page.used_text' => 'استخدمت تجربتك المجانية.',
+    'transcribe.page.plan_text' => 'تحويل الصوت إلى نص ليس ضمن باقتك الحالية.',
+    'transcribe.page.see_plans' => 'باقتك',
+    'transcribe.page.get_plan' => 'باقتك',
 ];

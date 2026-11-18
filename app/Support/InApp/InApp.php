@@ -2,7 +2,10 @@
 
 namespace App\Support\InApp;
 
+use App\Models\User;
+use App\Services\PlanAccessService;
 use App\Support\CreditPeriod;
+use App\Support\UsageSnapshot;
 use Illuminate\Http\Request;
 
 /**
@@ -263,9 +266,53 @@ class InApp
      */
     public static function noCreditsLine(?int $userId): string
     {
+        // A plan that gives no credits each month (the free plan, when the admin has it so): nothing
+        // was used up and nothing comes back, so it says so, and the demo is the way to try.
+        if ($userId && self::planGivesNoCredits($userId)) {
+            return __('app.no_credits_on_plan');
+        }
         $renews = $userId ? self::renewsOn($userId) : null;
 
         return $renews ? __('app.no_credits_until', ['date' => $renews]) : __('app.no_credits');
+    }
+
+    /**
+     * Where the app's Studio tab leads: the demo for a member on the free plan with nothing to
+     * spend in the studio (the demo is their free try, as after signing in), else the studio.
+     */
+    public static function studioUrl(?User $user): string
+    {
+        return $user && self::studioIsDemo($user) ? route('demo.page') : route('dashboard');
+    }
+
+    /** A member on the free plan (who may use the demo: EnsureFreeDemoAccess) with no credits to spend in the studio. */
+    public static function studioIsDemo(User $user): bool
+    {
+        if ($user->is_admin) {
+            return false;
+        }
+
+        return rescue(function () use ($user): bool {
+            $plans = app(PlanAccessService::class);
+            $active = $plans->resolveActivePlanForUserId((int) $user->id);
+            if (strtolower(trim((string) ($active?->slug ?? 'free'))) !== 'free') {
+                return false;
+            }
+            $snapshot = UsageSnapshot::for((int) $user->id, $plans->resolveQuotaPlanForUserId((int) $user->id), CreditPeriod::counter((int) $user->id));
+
+            return (int) ($snapshot['remaining_chars'] ?? 0) <= 0;
+        }, false, false);
+    }
+
+    /** The member's plan gives no credits each month and none are left from a gift or pack. */
+    public static function planGivesNoCredits(int $userId): bool
+    {
+        return rescue(function () use ($userId): bool {
+            $plans = app(PlanAccessService::class);
+            $snapshot = UsageSnapshot::for($userId, $plans->resolveQuotaPlanForUserId($userId), CreditPeriod::counter($userId));
+
+            return ! empty($snapshot['no_free_chars']) && (int) ($snapshot['plan_chars'] ?? 0) <= 0 && (int) ($snapshot['remaining_chars'] ?? 0) <= 0;
+        }, false, false);
     }
 
     /** The day the member's credits are given again ("1 December"), or null when that is not known. */

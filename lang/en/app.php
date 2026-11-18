@@ -7,6 +7,8 @@ return [
     'not_in_plan' => 'This feature isn\'t part of your current plan.',
     'no_credits' => 'You have used all your credits for now.',
     'no_credits_until' => 'You have used all your credits. They are back on :date.',
+    'no_credits_on_plan' => 'Your plan has no monthly credits. You can try Listen for free.',
+    'try_demo' => 'Try it free',
     'signin_failed' => 'We couldn\'t finish signing you in. Please try again.',
 
     'tabs' => [
