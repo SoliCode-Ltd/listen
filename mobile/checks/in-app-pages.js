@@ -50,7 +50,7 @@ const PAGES = {
             const facts = await page.evaluate(() => {
               const vw = document.documentElement.clientWidth;
               const cut = [];
-              const sellRe = /[$€£]\s?\d|\d\s?(EGP|USD|SAR|AED)\b|\bupgrad|\bsubscrib|\bcheckout\b|\bpricing\b|\/mo\b|choose a plan|see plans|compare plans|ترقية|رقِّ|اشترِ|اختر (خطة|باقة)|الأسعار والخطط/i;
+              const sellRe = /[$€£]\s?\d|\d\s?(EGP|USD|SAR|AED)\b|\d\s?% off\b|خصم|\bupgrad|\bsubscrib|\bcheckout\b|\bpricing\b|\/mo\b|choose a plan|see plans|compare plans|ترقية|رقِّ|اشترِ|اختر (خطة|باقة)|الأسعار والخطط/i;
               const sells = [];
               for (const el of document.body.querySelectorAll('*')) {
                 const cs = getComputedStyle(el);
@@ -69,7 +69,12 @@ const PAGES = {
                 }
               }
               const links = [...document.querySelectorAll('a[href]')].filter((a) => /\/(pricing|billing|manage-subscription|premium-pack|free-trial)\b/.test(a.getAttribute('href')) || (/\/app\/plan/.test(a.getAttribute('href')) && !a.hasAttribute('data-in-app-plan'))).filter((a) => a.getClientRects().length).map((a) => a.getAttribute('href') + ' "' + a.textContent.trim().slice(0, 30) + '"');
-              return { dir: document.documentElement.dir, theme: document.documentElement.getAttribute('data-theme'), scrollW: document.documentElement.scrollWidth, vw, cut: cut.slice(0, 6), sells: sells.slice(0, 6), links, url: location.pathname + location.hash, inApp: !!document.querySelector('meta[name="listen-in-app"]'), glue: !!window.__listenAppBooted };
+              // An offer on the screen (the yearly offer bar, the demo's offer): its words are split
+              // over several small elements, so it is found by what it is, not by what it says.
+              const offers = [...document.querySelectorAll('[class*="offer"], [id*="offer" i]')]
+                .filter((el) => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden')
+                .map((el) => (el.id ? '#' + el.id : '.' + String(el.className).split(' ')[0])).slice(0, 4);
+              return { offers, dir: document.documentElement.dir, theme: document.documentElement.getAttribute('data-theme'), scrollW: document.documentElement.scrollWidth, vw, cut: cut.slice(0, 6), sells: sells.slice(0, 6), links, url: location.pathname + location.hash, inApp: !!document.querySelector('meta[name="listen-in-app"]'), glue: !!window.__listenAppBooted };
             });
             await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: false });
             const problems = [];
@@ -78,6 +83,7 @@ const PAGES = {
             if (facts.cut.length) problems.push('cut off: ' + facts.cut.join(' | '));
             if (facts.sells.length) problems.push('SELLS: ' + facts.sells.join(' | '));
             if (facts.links.length) problems.push('PURCHASE LINK: ' + facts.links.join(' | '));
+            if (facts.offers.length) problems.push('AN OFFER IS SHOWN: ' + facts.offers.join(' | '));
             if (facts.dir !== (locale === 'ar' ? 'rtl' : 'ltr')) problems.push('direction ' + facts.dir);
             if (facts.theme !== theme) problems.push('theme ' + facts.theme);
             if (!facts.inApp || !facts.glue) problems.push('not in-app / glue not loaded');

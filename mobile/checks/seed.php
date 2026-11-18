@@ -9,6 +9,9 @@ if (! app()->environment('local')) {
 }
 use App\Models\{Plan, SiteSetting, Subscription, User, Agent};
 foreach (['voice_design_audience', 'video_dubbing_audience', 'voice_cloning_audience', 'agents_audience'] as $s) SiteSetting::set($s, 'everyone');
+// The yearly offer bar is switched on, as it can be on live: the checks then prove that no page the app shows carries it.
+SiteSetting::set('billing_yearly_discount_percentage', '50', 'billing');
+SiteSetting::set(\App\Support\YearlyOfferBanner::ENABLED, '1', \App\Support\YearlyOfferBanner::GROUP);
 Plan::query()->where('slug', 'studio_max')->firstOrFail()->forceFill(['voice_cloning_enabled' => true, 'voice_cloning_max_voices' => 5, 'video_dubbing_enabled' => true, 'voice_design_enabled' => true, 'voice_design_max_voices' => 10, 'agents_enabled' => true])->save();
 foreach (['free' => 'free', 'starter' => 'starter', 'max' => 'studio_max'] as $name => $slug) {
     $u = User::query()->updateOrCreate(['email' => "$name@example.test"], ['name' => $name === 'max' ? 'منى السيد' : ucfirst($name).' Member', 'password' => bcrypt('password-123'), 'email_verified_at' => now()]);
