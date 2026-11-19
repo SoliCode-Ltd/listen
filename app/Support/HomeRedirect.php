@@ -9,8 +9,8 @@ use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
  * For a visitor the site does not know yet, that answer is worked out here, before the app
  * starts (public/index.php), in a few milliseconds instead of a full page's time. The
  * language is the one the app would choose:
- * - the one the visitor last read the site in (the listen_locale cookie the pages set,
- *   standing in for the session they no longer get on the public pages);
+ * - the one the visitor last read the site in (the listen_locale cookie the pages set; the
+ *   app goes by it first too, App\Http\Middleware\RememberedLocale);
  * - else the site's main language (SEO Settings), as the app sets it.
  *
  * Anything else goes on to the app as before: a visitor with a session (their language is
