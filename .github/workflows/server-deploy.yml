@@ -35,6 +35,11 @@ name: Server deploy
 #            prints the plans' Stripe prices, the member's local billing rows
 #            and their log lines, plus every local subscription whose price
 #            no plan knows any more. Writes nothing; prints no names or emails.
+#   chatgpt-ads-check: read-only (READ ONLY database session). Whether the
+#            ChatGPT Ads purchase events are on (never the key), the events of
+#            the last 14 days and OpenAI's answers, what was kept from one
+#            Stripe customer's checkout (input "customer", optional) and the
+#            log's ChatGPT Ads lines. Prints member ids only.
 #   plan-audit: read-only. Every member on a paid plan with no card
 #            subscription: how the plan is saved, whether anything was paid
 #            for it, and whether it needs a look. Writes nothing; prints
@@ -216,10 +221,10 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
         default: inspect
       customer:
-        description: "billing-trace only: the Stripe customer id (cus_...)"
+        description: "billing-trace and chatgpt-ads-check: the Stripe customer id (cus_...)"
         type: string
         default: ""
       member:
@@ -520,6 +525,12 @@ jobs:
           fi
           if [ "$MODE" = wording-blocks ] || [ "$MODE" = wording-blocks-apply ]; then
             $S "$FIND; php artisan listen:recheck-wording-blocks $([ "$MODE" = wording-blocks-apply ] && echo --apply)"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = chatgpt-ads-check ]; then
+            if [ -n "$CUSTOMER" ]; then printf '%s' "$CUSTOMER" | grep -qE '^cus_[A-Za-z0-9]+$' || { echo "customer must look like cus_..."; exit 1; }; fi
+            tool chatgpt_ads_check.php | $S "$FIND; CUSTOMER='$CUSTOMER' php"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
