@@ -78,14 +78,20 @@ class WarmBusinessStatsTest extends TestCase
         $this->assertArrayNotHasKey('old', $fresh);
     }
 
-    public function test_it_runs_every_five_minutes_in_the_background(): void
+    public function test_it_runs_every_ten_minutes_in_the_background_on_the_live_site_only(): void
     {
         $event = collect(app(Schedule::class)->events())
             ->first(fn ($event) => str_contains((string) $event->command, 'listen:warm-business-stats'));
 
         $this->assertNotNull($event);
-        $this->assertSame('*/5 * * * *', $event->expression);
+        $this->assertSame('2-59/10 * * * *', $event->expression);
         $this->assertTrue($event->runInBackground);
         $this->assertTrue($event->withoutOverlapping);
+
+        config(['listen.live_actions' => true]);
+        $this->assertTrue($event->filtersPass($this->app));
+        // Staging does not even start it.
+        config(['listen.live_actions' => false]);
+        $this->assertFalse($event->filtersPass($this->app));
     }
 }

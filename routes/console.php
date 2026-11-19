@@ -5,9 +5,16 @@ use App\Models\ApiIdempotencyKey;
 use App\Models\ApiRequestLog;
 use App\Services\Api\ApiIdempotency;
 use App\Support\Agents\CallRecordings;
+use App\Support\LiveServer;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
+
+// Start times are spread over the minutes, so the jobs never all start at once (each one starts
+// the whole app: on a busy server a minute where a dozen start together is a spike). None starts
+// on a minute that is a multiple of five (:00, :05, …), when other sites' timed jobs on the same
+// server start, and the heavy ones each have a minute of their own. The every-minute jobs and the
+// speech-to-text workers keep their minutes.
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -40,21 +47,21 @@ foreach ([
 // Billing: a run that is still going is never started again on top of itself (two
 // syncs at once would call Stripe twice for every member). Each lock lapses after a
 // while, so a run that died never stops the next ones for long.
-Schedule::command('listen:billing-sync')->everyFifteenMinutes()->withoutOverlapping(60);
+Schedule::command('listen:billing-sync')->cron('13-59/15 * * * *')->withoutOverlapping(60);
 Schedule::command('listen:billing-reminders')->dailyAt('09:00')->withoutOverlapping(120);
-Schedule::command('listen:billing-enforce-grace')->hourly()->withoutOverlapping(50);
-Schedule::command('plans:expire-discounts')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('listen:billing-enforce-grace')->hourlyAt(18)->withoutOverlapping(50);
+Schedule::command('plans:expire-discounts')->cron('1-59/5 * * * *')->withoutOverlapping(10);
 // A declined first payment or a checkout left without paying: the follow-up emails that are due,
 // and who bought a plan since (App\Services\Billing\PurchaseFollowUps).
-Schedule::command('listen:purchase-follow-ups')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('listen:purchase-follow-ups')->cron('2-59/5 * * * *')->withoutOverlapping(10);
 // Paid plans for ChatGPT Ads that could not be sent the moment they were paid (ChatGptAdsConversions).
-Schedule::command('listen:chatgpt-ads-send')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('listen:chatgpt-ads-send')->cron('3-59/5 * * * *')->withoutOverlapping(10);
 // Lower plans whose day has come take over (paid by hand, or by card after a plan paid by hand).
 Schedule::command('listen:plan-changes')->everyMinute()->withoutOverlapping(10);
 
 // Developer API: give back the credits of generations that got stuck.
 // The overlap lock lapses after 10 minutes, so a run that died never stops the next ones for long.
-Schedule::command('api:expire-stuck-generations')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('api:expire-stuck-generations')->cron('3-59/5 * * * *')->withoutOverlapping(10);
 
 // Developer API request log (90 days) and Idempotency-Key records (past their
 // 24 hours), removed in small batches so the tables are never locked for long.
@@ -71,34 +78,38 @@ Schedule::command('passport:purge --hours=168')->dailyAt('03:30')->withoutOverla
 
 // Studio and extension: give back the credits of members' generations that got stuck.
 // The overlap lock lapses after 10 minutes, so a run that died never stops the next ones for long.
-Schedule::command('listen:expire-stuck-generations')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('listen:expire-stuck-generations')->cron('1-59/5 * * * *')->withoutOverlapping(10);
 
 // Dub my video: give back the credits of stuck dubs, move finished videos to Google Drive
 // and delete old server copies (App\Console\Commands\PruneVideoDubsCommand).
-Schedule::command('dubs:prune')->everyTenMinutes()->withoutOverlapping(30);
+Schedule::command('dubs:prune')->cron('9-59/10 * * * *')->withoutOverlapping(30);
 
 // Speech to text: give back the minutes of stuck transcripts and delete uploaded audio after the
 // days set in Speech to text → Settings (App\Console\Commands\PruneTranscriptionsCommand).
-Schedule::command('transcriptions:prune')->everyTenMinutes()->withoutOverlapping(30);
+Schedule::command('transcriptions:prune')->cron('7-59/10 * * * *')->withoutOverlapping(30);
 
 // Voice Design: delete the takes nobody kept, so the speech projects keep room for voices
 // (App\Console\Commands\PruneDesignedVoicesCommand).
-Schedule::command('voice-design:prune')->everyThirtyMinutes()->withoutOverlapping(20);
+Schedule::command('voice-design:prune')->cron('16,46 * * * *')->withoutOverlapping(20);
 
 // Listen Agents: calls whose browser went quiet are charged up to their last sign of life.
 Schedule::command('agents:settle-calls')->everyMinute()->withoutOverlapping(5);
 
-// Admin → Suspicious Users' list and its badge, worked out ahead of time (App\Services\DemoSuspects).
-Schedule::command('listen:warm-demo-suspects')->everyFiveMinutes()->withoutOverlapping(10);
+// Admin → Suspicious Users' list and its badge, worked out ahead of time (App\Services\DemoSuspects),
+// every ten minutes: well within the 15 minutes the list is kept, so an admin never waits for it.
+Schedule::command('listen:warm-demo-suspects')->cron('4-59/10 * * * *')->withoutOverlapping(10);
 
 // The admin dashboard's numbers, rebuilt ahead of time on the live site only (they read
-// Stripe; staging runs the live keys). In the background: at a large size a rebuild takes
-// a minute, and the jobs due every minute must not wait for it.
-Schedule::command('listen:warm-business-stats')->everyFiveMinutes()->withoutOverlapping(15)->runInBackground();
+// Stripe; staging runs the live keys), every ten minutes: within the 15 minutes they are kept
+// (BusinessStatsService), so an admin never waits for them. In the background: at a large size
+// a rebuild takes a minute, and the jobs due every minute must not wait for it. Staging does
+// not even start it.
+Schedule::command('listen:warm-business-stats')->cron('2-59/10 * * * *')->withoutOverlapping(15)->runInBackground()
+    ->when(fn (): bool => LiveServer::allowsCustomerActions());
 
 // Listen Agents: the newest posts on agents' links read again every few hours (AgentLinkReads).
-Schedule::command('agents:read-links')->hourly()->withoutOverlapping(30);
+Schedule::command('agents:read-links')->hourlyAt(33)->withoutOverlapping(30);
 // Every page of live agents' websites, for what callers ask (AgentSite): never read, or not for a week.
-Schedule::command('agents:read-websites')->hourly()->withoutOverlapping(30);
+Schedule::command('agents:read-websites')->hourlyAt(48)->withoutOverlapping(30);
 // Listen Agents: call recordings older than CallRecordings::KEEP_DAYS days go (the call's words stay).
 Schedule::call(fn () => CallRecordings::prune())->name('agents:prune-recordings')->dailyAt('04:10')->withoutOverlapping(60);

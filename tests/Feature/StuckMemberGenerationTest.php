@@ -166,7 +166,8 @@ class StuckMemberGenerationTest extends TestCase
             ->first(fn ($event) => str_contains((string) $event->command, 'listen:expire-stuck-generations'));
 
         $this->assertNotNull($event);
-        $this->assertSame('*/5 * * * *', $event->expression);
+        // Every five minutes, a minute after the multiples of five (routes/console.php).
+        $this->assertSame('1-59/5 * * * *', $event->expression);
         $this->assertTrue($event->withoutOverlapping);
     }
 

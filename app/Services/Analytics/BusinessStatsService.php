@@ -26,7 +26,8 @@ class BusinessStatsService
 
     public const DEFAULT_MONTHS = 12;
 
-    private const CACHE_TTL_SECONDS = 600;
+    /** Above the ten minutes between rebuilds (listen:warm-business-stats), so a snapshot is always there. */
+    private const CACHE_TTL_SECONDS = 900;
 
     private string $driver = '';
 
