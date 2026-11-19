@@ -313,7 +313,7 @@ Route::get('/talk/{slug}', [AgentCallController::class, 'talk'])
 
 Route::group([
     'prefix' => LaravelLocalization::setLocale(),
-    'middleware' => ['localize', 'localeSessionRedirect', 'localizationRedirect'],
+    'middleware' => ['localize', 'rememberedLocale', 'localeSessionRedirect', 'localizationRedirect'],
 ], function (): void {
     Route::get('/', [HomeController::class, 'index'])->name('home');
     Route::get('/pricing', [HomeController::class, 'pricingPage'])->name('pricing');

@@ -145,6 +145,13 @@ class AppServiceProvider extends ServiceProvider
             if (! request()->route()?->parameter('locale')) {
                 $this->app->setLocale($mainLanguage);
             }
+
+            // For the plain address's quick answer, before the app starts (public/index.php).
+            \App\Support\HomeRedirect::rememberSettings(base_path(), [
+                'url' => (string) config('app.url'),
+                'session_cookie' => (string) config('session.cookie'),
+                'language' => $mainLanguage,
+            ]);
         }
 
         // Register policies
