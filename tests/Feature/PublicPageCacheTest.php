@@ -183,4 +183,28 @@ class PublicPageCacheTest extends TestCase
         $this->withUnencryptedCookie(HomeRedirect::LOCALE_COOKIE, 'fr')->get('/')
             ->assertRedirect(url('/'.config('app.locale')));
     }
+
+    public function test_the_language_last_read_wins_over_one_a_background_fetch_left_in_the_session(): void
+    {
+        // Reading an English page fetched the Arabic one ahead, which left Arabic in the session.
+        $this->withSession(['locale' => 'ar'])->withUnencryptedCookie(HomeRedirect::LOCALE_COOKIE, 'en')->get('/')
+            ->assertRedirect(url('/en'));
+    }
+
+    public function test_without_the_cookie_the_session_decides_as_before(): void
+    {
+        // A browser that runs no script.
+        $this->withSession(['locale' => 'ar'])->get('/')->assertRedirect(url('/ar'));
+    }
+
+    public function test_the_app_keeps_its_own_language_rules(): void
+    {
+        // The phone's language says nothing here, so the app's own rule picks English; the page cookie is not asked.
+        $this->withUnencryptedCookie(HomeRedirect::LOCALE_COOKIE, 'ar')
+            ->withHeaders(['User-Agent' => 'Mozilla/5.0 (Linux; Android 14) ListenApp/1.4 (Android)'])
+            ->get('/');
+
+        $this->assertSame(InApp::language(request()), session('locale'));
+        $this->assertNotSame('ar', session('locale'));
+    }
 }
