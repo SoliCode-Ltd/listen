@@ -17,6 +17,9 @@ use App\Http\Middleware\AuthenticateApiKey;
 use App\Http\Middleware\AuthenticateMcp;
 use App\Http\Middleware\CanonicalHost;
 use App\Http\Middleware\CaptureAdClickId;
+use App\Http\Middleware\CachePublicPages;
+use App\Http\Middleware\RememberedLocale;
+use App\Support\HomeRedirect;
 use App\Http\Middleware\CaptureReferralVisit;
 use App\Http\Middleware\EnsureAuthMethodEnabled;
 use App\Http\Middleware\EnsureDemoEmailVerified;
@@ -84,10 +87,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // can read the fingerprint components on GET requests (page loads).
         $middleware->encryptCookies(except: ['listen_demo_fp', InApp::COOKIE, InApp::LANGUAGE_COOKIE,
             // The ChatGPT Ads pixel's own cookies, read for the purchase sent from the server.
-            CaptureAdClickId::PIXEL_OPPREF_COOKIE, CaptureAdClickId::PIXEL_BROWSER_COOKIE]);
+            CaptureAdClickId::PIXEL_OPPREF_COOKIE, CaptureAdClickId::PIXEL_BROWSER_COOKIE,
+            // The language a visitor last read the site in, set by the pages (App\Support\HomeRedirect).
+            HomeRedirect::LOCALE_COOKIE]);
 
         // www. pages move to the main address first, so a page and its requests are one site.
         $middleware->prepend(CanonicalHost::class);
+
+        // First of the web group: the public pages Cloudflare may keep (App\Support\PublicPageCache).
+        $middleware->web(prepend: [CachePublicPages::class]);
 
         $middleware->web(append: [
             EnsureUserIsNotBlocked::class,
@@ -109,6 +117,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'localize' => LaravelLocalizationRoutes::class,
             'localizationRedirect' => LaravelLocalizationRedirectFilter::class,
             'localeSessionRedirect' => LocaleSessionRedirect::class,
+            // Before it: the language a visitor without one in their session last read the site in.
+            'rememberedLocale' => RememberedLocale::class,
             'localeCookieRedirect' => LocaleCookieRedirect::class,
             'localeViewPath' => LaravelLocalizationViewPath::class,
             'api.key' => AuthenticateApiKey::class,
