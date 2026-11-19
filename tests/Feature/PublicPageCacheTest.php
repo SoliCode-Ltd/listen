@@ -52,16 +52,19 @@ class PublicPageCacheTest extends TestCase
     private function assertKept(TestResponse $response, string $what): void
     {
         $response->assertOk();
+        // Kept by Cloudflare alone, which reads its own header; private for every other cache
+        // (the server's Varnish cannot tell the app from a browser) and for the browser.
+        $this->assertSame('max-age='.PublicPageCache::SECONDS.', stale-while-revalidate=60', $response->headers->get(PublicPageCache::CLOUDFLARE_HEADER), $what);
         $cache = (string) $response->headers->get('Cache-Control');
-        $this->assertStringContainsString('public', $cache, $what);
-        $this->assertStringContainsString('s-maxage='.PublicPageCache::SECONDS, $cache, $what);
-        $this->assertStringNotContainsString('private', $cache, $what);
+        $this->assertStringContainsString('private', $cache, $what);
+        $this->assertStringNotContainsString('public', $cache, $what);
         $this->assertSame([], $response->headers->getCookies(), $what.' sets no cookie');
         $this->assertSame('public', $response->headers->get(PublicPageCache::HEADER), $what);
     }
 
     private function assertNotKept(TestResponse $response, string $what): void
     {
+        $this->assertNull($response->headers->get(PublicPageCache::CLOUDFLARE_HEADER), $what);
         $cache = (string) $response->headers->get('Cache-Control');
         $this->assertStringNotContainsString('public', $cache, $what);
         $this->assertStringNotContainsString('s-maxage', $cache, $what);

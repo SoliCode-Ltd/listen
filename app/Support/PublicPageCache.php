@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\Response;
  * The public marketing pages, for a visitor nobody knows yet, are the same for everyone: they
  * may be kept by Cloudflare for a few minutes and given to the next visitor at once.
  *
- * A page is kept ("public") only when all of these hold:
+ * A page is kept only when all of these hold:
  * - it is one of PAGES: the home page, the voice samples, the voice agents page, the SEO,
  *   dialect, accent and feature pages, the legal pages and the developer docs, in either
  *   language (the address names it, so a kept page is never in the wrong language). Not
@@ -29,7 +29,9 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Such a visitor is given no session or form-token cookie on these pages (nothing on them
  * uses one), with or without a query string, so the pages they open next can be kept too.
- * Everything else is answered as before: private, with its cookies. Cloudflare's own rules
+ * What is kept is told to Cloudflare alone (Cloudflare-CDN-Cache-Control); for every other
+ * cache the page stays private, as today. Everything else is answered as before: private, with
+ * its cookies. Cloudflare's own rules
  * (the pull request's notes) let it keep only pages under /ar and /en, and never for a
  * visitor with the session, "remember me" or app cookie, or the app's name.
  */
@@ -40,6 +42,9 @@ final class PublicPageCache
 
     /** How long Cloudflare keeps a page: an edit in the admin shows within this (or purge the cache). */
     public const SECONDS = 600;
+
+    /** Cloudflare's own cache header: only Cloudflare reads it, and it strips it before the browser. */
+    public const CLOUDFLARE_HEADER = 'Cloudflare-CDN-Cache-Control';
 
     /** Says what was decided, to check a page from outside: public, anonymous (no cookie, not kept) or private. */
     public const HEADER = 'X-Page-Cache';
@@ -53,7 +58,11 @@ final class PublicPageCache
         self::dropSessionCookies($response);
 
         if ($request->getQueryString() === null && $response->headers->getCookies() === []) {
-            $response->headers->set('Cache-Control', 'public, max-age=0, s-maxage='.self::SECONDS.', stale-while-revalidate=60');
+            // For Cloudflare only (it reads this header alone when it is there, and never passes it on).
+            // Every other cache, the server's own (Varnish) and the browser's included, keeps the usual
+            // "private": Varnish does not tell the Listen app from a browser, Cloudflare's rules do.
+            $response->headers->set(self::CLOUDFLARE_HEADER, 'max-age='.self::SECONDS.', stale-while-revalidate=60');
+            $response->headers->set('Cache-Control', 'no-cache, private');
             $response->headers->set(self::HEADER, 'public');
         } else {
             $response->headers->set(self::HEADER, 'anonymous');
