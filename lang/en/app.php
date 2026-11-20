@@ -45,6 +45,15 @@ return [
         'back' => 'Back to the app',
     ],
 
+    // Extra credits in the Android app (components/extra-credits-app): added on the website, in the browser.
+    'extra_credits' => [
+        'text' => 'Extra credits are added on our website, in your browser. You\'ll already be signed in, and they show here as soon as they\'re added.',
+        'away' => 'Once the credits are added, refresh here to see them.',
+        'refresh' => 'Refresh',
+        'close' => 'Close',
+        'failed' => 'The browser didn\'t open. Please try again.',
+    ],
+
     'signin' => [
         // "Sign in with Apple" in the iPhone app; the button itself is Apple's own picture.
         'apple_failed' => 'We couldn\'t sign you in with Apple. Please try again.',

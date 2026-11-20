@@ -224,8 +224,12 @@ class DashboardController extends Controller
             'developerApi' => $developerApi,
             'usage' => $usage,
             'usageSnapshot' => $usageSnapshot,
-            // A paid member who can add extra credits now (the studio's dialog and its buttons).
-            'canBuyExtraCredits' => $canBuyExtraCredits = app(ExtraCredits::class)->status($userId) === ExtraCredits::STATUS_OK,
+            // A paid member who can add extra credits now (the studio's dialog and its buttons). Inside the
+            // Android app they are added in the phone's browser (a popup leads there: extraCreditsInApp);
+            // the iPhone app never leads to a place to pay, so it offers nothing (InApp::offersUpgradeOnWeb).
+            'canBuyExtraCredits' => $canBuyExtraCredits = app(ExtraCredits::class)->status($userId) === ExtraCredits::STATUS_OK
+                && (! InApp::active($request) || InApp::offersUpgradeOnWeb($request)),
+            'extraCreditsInApp' => InApp::active($request),
             // Set when the studio may open that dialog by itself, once: the credits have run out (less than
             // a minute of voice is left) and no transfer is waiting. It names this running-out, so the
             // browser shows it one time and again only after more credits were added and used up.

@@ -2996,7 +2996,8 @@
     </div>
   </main>
 
-  @include('components.extra-credits-dialog')
+  {{-- Inside the Android app extra credits are added in the phone's browser: a small popup leads there. --}}
+  @include(($extraCreditsInApp ?? false) ? 'components.extra-credits-app' : 'components.extra-credits-dialog')
   @include('components.scripts')
   @php
     $dashboardI18n = [

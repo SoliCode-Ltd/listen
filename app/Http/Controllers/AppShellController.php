@@ -247,18 +247,56 @@ class AppShellController extends Controller
     {
         $to ??= '/'.ltrim($request->getRequestUri(), '/');
         $user = $request->user();
-        $webUrl = url($to);
-
-        if ($user) {
-            $code = Str::random(64);
-            Cache::put(self::webKey($code), (int) $user->id, now()->addMinutes(self::WEB_MINUTES));
-            $webUrl = url('/app/continue').'?'.http_build_query(['code' => $code, 'to' => $to]);
-        }
+        $webUrl = $this->webLink($request, $to);
 
         return response()->view('app.open-web', [
             'webUrl' => $webUrl,
             'backUrl' => $user ? $this->memberHome($user, app()->getLocale()) : $this->localized('login', $this->locale($request)),
         ])->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * The address the phone's browser opens for this page of the site: for a member, a one-time
+     * link that signs them in there first (continueOnWeb), so they never sign in twice.
+     */
+    private function webLink(Request $request, string $to): string
+    {
+        $user = $request->user();
+        if (! $user) {
+            return url($to);
+        }
+
+        $code = Str::random(64);
+        Cache::put(self::webKey($code), (int) $user->id, now()->addMinutes(self::WEB_MINUTES));
+
+        return url('/app/continue').'?'.http_build_query(['code' => $code, 'to' => $to]);
+    }
+
+    /**
+     * Extra credits from the Android app: the studio's extra-credits window, opened in the
+     * phone's browser with the member already signed in, where the card or a transfer pays
+     * for them. Nothing is bought inside the app. Asked with JSON (the studio's popup), it
+     * answers with that address, which the app hands to the browser; otherwise it shows
+     * the "Continue in your browser" page, which opens it.
+     *
+     * The iPhone app never leads to a place to pay (InApp::offersUpgradeOnWeb).
+     */
+    public function extraCredits(Request $request): Response|RedirectResponse|JsonResponse
+    {
+        $to = '/'.app()->getLocale().'/dashboard?extra_credits=1';
+        if (! InApp::fromApp($request)) {
+            return redirect()->to(url($to));
+        }
+        if (! InApp::offersUpgradeOnWeb($request)) {
+            return $request->expectsJson()
+                ? response()->json(['ok' => false, 'message' => __('app.not_sold_here')], 403)
+                : redirect()->to(InApp::planUrl());
+        }
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'url' => $this->webLink($request, $to)])->header('Cache-Control', 'no-store, private');
+        }
+
+        return $this->openOnWeb($request, $to);
     }
 
     /**
