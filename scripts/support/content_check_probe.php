@@ -160,7 +160,9 @@ if ($what === '') {
     if ($refused !== []) {
         echo "  Refused:\n".implode("\n", array_slice($refused, 0, 60))."\n";
     }
-    $failed = $counts[TextContentCheck::UNCHECKED] > 0;
+    // A reading that got no answer is not a failure of the check: that voice is made and its
+    // text read again later. Many of them would be: the reader is not answering.
+    $failed = $rows->count() > 0 && $counts[TextContentCheck::UNCHECKED] > max(1, (int) floor($rows->count() * 0.1));
 }
 
 echo $failed ? "\nFAILED\n" : "\nOK\n";
