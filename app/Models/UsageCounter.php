@@ -26,6 +26,7 @@ class UsageCounter extends Model
         'extra_ends_at',
         'extra_settled_at',
         'extra_outcome',
+        'credits_ended_email_at',
     ];
 
     protected $casts = [
@@ -38,6 +39,7 @@ class UsageCounter extends Model
         'extra_base_chars' => 'integer',
         'extra_ends_at' => 'datetime',
         'extra_settled_at' => 'datetime',
+        'credits_ended_email_at' => 'datetime',
     ];
 
     /**

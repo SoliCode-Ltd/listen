@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\BillingSettings;
+use App\Filament\Resources\CharPackPurchaseResource\Pages\ListCharPackPurchases;
 use App\Models\BillingSubscription;
 use App\Models\CharPackPurchase;
 use App\Models\ManualPaymentRequest;
@@ -19,11 +21,17 @@ use App\Support\CreditPeriod;
 use App\Support\PlanUsageGuard;
 use App\Support\UsageSnapshot;
 use DomainException;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
+use Livewire\Livewire;
+use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
+use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath;
+use Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect;
 use Tests\Support\FakeStripePackGateway;
 use Tests\TestCase;
 
@@ -109,6 +117,8 @@ class ExtraCreditsTest extends TestCase
         $egypt = $this->offer($member, 'EG')->assertOk()->assertJsonPath('status', 'ok')->assertJsonPath('default_minutes', 30);
         $this->assertSame([10, 20, 30, 50, 100], array_column($egypt->json('presets'), 'minutes'));
         $this->assertSame([9000, 18000, 27000, 45000, 90000], array_column($egypt->json('presets'), 'credits'));
+        // The dollars the card (or the phone wallet) is charged.
+        $this->assertSame([200, 400, 500, 800, 1200], array_column($egypt->json('presets'), 'amount_cents'));
         // $2, $4, $5, $8 and $12 at 52.35, each rounded up to a whole pound.
         $this->assertSame(['EGP 105', 'EGP 210', 'EGP 262', 'EGP 419', 'EGP 629'], $this->plain(array_column($egypt->json('presets'), 'price')));
         $this->assertSame('30 minutes of voice', $egypt->json('presets.2.minutes_label'));
@@ -243,6 +253,49 @@ class ExtraCreditsTest extends TestCase
         $this->postJson('/api/stripe/webhook', ['id' => 'evt_full'] + $this->succeeded('pi_test_1', 400, $purchase->id))->assertOk();
         $this->assertSame(18000, (int) CreditPeriod::counter($member->id)->extra_chars);
         $this->assertSame(CharPackPurchase::STATUS_PAID, $purchase->fresh()->status);
+    }
+
+    public function test_a_pay_request_sent_again_after_a_lost_reply_is_never_charged_twice(): void
+    {
+        $member = $this->member();
+        $pay = fn () => $this->actingAs($member)->postJsonLocalizedRoute('billing.extra-credits.card', ['minutes' => 30, 'attempt' => 'try-0001-abcdef']);
+
+        $first = $pay()->assertOk();
+        // The reply never reached the browser, so the dialog asks again with the same mark.
+        $pay()->assertOk()->assertJsonPath('purchase', $first->json('purchase'))->assertJsonPath('credits', 27000);
+
+        $this->assertCount(1, $this->stripe->charges);
+        $this->assertSame(1, CharPackPurchase::query()->count());
+        $this->assertSame(27000, (int) CreditPeriod::counter($member->id)->extra_chars);
+
+        // A new try (its own mark) is a new purchase.
+        $this->actingAs($member)->postJsonLocalizedRoute('billing.extra-credits.card', ['minutes' => 10, 'attempt' => 'try-0002-abcdef'])->assertOk();
+        $this->assertCount(2, $this->stripe->charges);
+        $this->assertSame(36000, (int) CreditPeriod::counter($member->id)->extra_chars);
+    }
+
+    public function test_a_payment_cut_off_while_the_card_was_charged_is_finished_not_made_again(): void
+    {
+        $member = $this->member();
+        // The first request made the purchase and kept its mark, then died while Stripe was answering.
+        $purchase = app(ExtraCredits::class)->startPurchase($member, 30, CharPackPurchase::METHOD_CARD, 500, 'USD');
+        Cache::put('extra-credits:attempt:'.$member->id.':try-0003-abcdef', $purchase->id, now()->addDay());
+        $pay = fn () => $this->actingAs($member)->postJsonLocalizedRoute('billing.extra-credits.card', ['minutes' => 30, 'attempt' => 'try-0003-abcdef']);
+
+        // Stripe cannot be reached on the second try either: nothing is written off, the member is told to wait.
+        $this->stripe->nextOutcome = 'throw';
+        $pay()->assertStatus(202)->assertJsonPath('processing', true);
+        $this->assertSame(CharPackPurchase::STATUS_PENDING, $purchase->fresh()->status);
+
+        // Asked again: the same purchase is charged under its own idempotency key, once.
+        $this->stripe->nextOutcome = 'succeeded';
+        $pay()->assertOk()->assertJsonPath('purchase', $purchase->id)->assertJsonPath('credits', 27000);
+        $pay()->assertOk()->assertJsonPath('purchase', $purchase->id);
+
+        $this->assertCount(1, $this->stripe->charges);
+        $this->assertSame('listen-extra-credits-'.$purchase->id, $this->stripe->charges[0]['idempotencyKey']);
+        $this->assertSame(1, CharPackPurchase::query()->count());
+        $this->assertSame(27000, (int) CreditPeriod::counter($member->id)->extra_chars);
     }
 
     public function test_a_declined_card_or_no_saved_card_charges_and_adds_nothing(): void
@@ -469,6 +522,23 @@ class ExtraCreditsTest extends TestCase
         $this->assertSame(ManualPaymentRequest::STATUS_PENDING, ManualPaymentRequest::query()->latest('id')->value('status'));
     }
 
+    public function test_a_transfer_method_is_offered_only_with_somewhere_to_pay(): void
+    {
+        Storage::fake('local');
+        $this->enableManualPayments();
+        $member = $this->member(byHand: true);
+
+        // The member is shown where to send the money: the team's payment link.
+        $this->offer($member, 'EG')->assertJsonPath('manual.0.method', 'instapay')
+            ->assertJsonPath('manual.0.payment_link', 'https://pay.example.test/listen');
+
+        // With no link and no code to scan, the method is not offered and a request for it is refused.
+        SiteSetting::set('manual_instapay_payment_link', '', 'billing');
+        $this->assertSame([], $this->offer($member, 'EG')->json('manual'));
+        $this->transfer($member, 30)->assertStatus(422)->assertJsonValidationErrors('payment_method');
+        $this->assertSame(0, ManualPaymentRequest::query()->count());
+    }
+
     public function test_a_card_member_cannot_send_a_transfer(): void
     {
         Storage::fake('local');
@@ -499,10 +569,10 @@ class ExtraCreditsTest extends TestCase
     {
         SiteSetting::set(ExtraCredits::ENABLED_SETTING, '0', 'billing');
         $this->actingAs($this->admin());
-        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
         config(['listen.live_actions' => false]);
 
-        \Livewire\Livewire::test(\App\Filament\Pages\BillingSettings::class)
+        Livewire::test(BillingSettings::class)
             ->assertFormSet(['extra_credits_enabled' => false])
             ->fillForm([
                 'extra_credits_enabled' => true,
@@ -514,7 +584,7 @@ class ExtraCreditsTest extends TestCase
             ->call('save')
             ->assertHasNoFormErrors();
 
-        \Illuminate\Support\Facades\Cache::flush();
+        Cache::flush();
         $this->assertTrue(ExtraCredits::enabled());
         $this->assertSame([15 => 300, 60 => 900], ExtraCredits::presets());
     }
@@ -527,8 +597,8 @@ class ExtraCreditsTest extends TestCase
         $purchase = CharPackPurchase::query()->sole();
 
         $this->actingAs($this->admin());
-        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
-        \Livewire\Livewire::test(\App\Filament\Resources\CharPackPurchaseResource\Pages\ListCharPackPurchases::class)
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(ListCharPackPurchases::class)
             ->assertCanSeeTableRecords([$purchase])
             ->callTableAction('takeBack', $purchase)
             ->assertNotified('25,000 credits taken back');
@@ -595,9 +665,9 @@ class ExtraCreditsTest extends TestCase
     private function offer(User $user, string $country = 'US'): TestResponse
     {
         return $this->actingAs($user)->withHeaders(['CF-IPCountry' => $country])->withoutMiddleware([
-            \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
-            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
-            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+            LocaleSessionRedirect::class,
+            LaravelLocalizationRedirectFilter::class,
+            LaravelLocalizationViewPath::class,
         ])->getJson($this->localizedRoute('billing.extra-credits'));
     }
 
@@ -638,7 +708,7 @@ class ExtraCreditsTest extends TestCase
     private function enableManualPayments(): void
     {
         SiteSetting::set('manual_instapay_enabled', '1', 'billing');
-        SiteSetting::set('manual_instapay_number', '0123456789', 'billing');
+        SiteSetting::set('manual_instapay_payment_link', 'https://pay.example.test/listen', 'billing');
     }
 
     private function admin(): User

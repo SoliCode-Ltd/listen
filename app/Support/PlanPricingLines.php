@@ -50,8 +50,6 @@ final class PlanPricingLines
         'download_formats' => ['download', true],
         // Shown on every plan that includes the developer API (Plans → Developer API).
         'developer_api' => ['globe', true],
-        // Off by default: members cannot buy top-ups yet.
-        'topup' => ['download', false],
     ];
 
     /** Icons an extra line can use (the pricing card draws each one). */
@@ -83,7 +81,6 @@ final class PlanPricingLines
         foreach (array_keys(self::LINES) as $key) {
             $options[$key] = self::t('label_'.$key, 'en');
         }
-        $options['topup'] .= ' (members cannot buy top-ups yet)';
         $options['processing_priority'] .= ' (the studio is as fast on every plan)';
 
         return $options;
@@ -387,9 +384,6 @@ final class PlanPricingLines
                     ['count' => number_format(TranscriptionAccess::monthlyMinutes($plan))], self::locale($locale))
                 : null,
             'voice_agents' => self::agentsValue($plan, $locale),
-            'topup' => ! $plan->isPack() && self::topupCents($plan) > 0
-                ? self::t('topup_price', $locale, ['price' => '$'.number_format(self::topupCents($plan) / 100, 0)])
-                : null,
             default => null,
         };
     }
@@ -420,7 +414,6 @@ final class PlanPricingLines
             'voice_design' => VoiceDesign::planIncludes($plan)
                 ? 'Hidden: Voice Design is still for the admin only (Voice Design → Settings).'
                 : 'Hidden: this plan does not include Voice Design.',
-            'topup' => 'Hidden: no top-up price is set.',
             'video_dubbing' => VideoDubbing::planIncludes($plan)
                 ? 'Hidden: Video Dubbing is still for the admin only (Video Dubbing → Settings).'
                 : 'Hidden: this plan does not include video dubbing.',
@@ -504,20 +497,6 @@ final class PlanPricingLines
     private static function cloningOpen(Plan $plan): bool
     {
         return VoiceCloningService::planAllows($plan) && ! VoiceCloningAccess::isPreviewOnly();
-    }
-
-    /**
-     * The top-up price per million characters, falling back to the overage price.
-     */
-    private static function topupCents(Plan $plan): int
-    {
-        if ($plan->topup_char_price_cents !== null) {
-            return (int) $plan->topup_char_price_cents;
-        }
-
-        return $plan->allow_overage && $plan->overage_price_per_million_cents !== null
-            ? (int) $plan->overage_price_per_million_cents
-            : 0;
     }
 
     /**

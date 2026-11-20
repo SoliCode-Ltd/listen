@@ -71,7 +71,6 @@
             <div class="row"><span>{{ __('ui.upgrade.requests') }}</span><span>{{ $plan['requests_unlimited'] ? __('ui.upgrade.unlimited') : number_format($plan['monthly_requests']).' '. __('ui.upgrade.per_month') }}</span></div>
             <div class="row"><span>{{ __('ui.upgrade.commercial_use') }}</span><span>{{ $plan['commercial_use_allowed'] ? __('ui.upgrade.allowed') : __('ui.upgrade.not_allowed') }}</span></div>
             <div class="row"><span>{{ __('ui.upgrade.processing_priority') }}</span><span>{{ $priorityLabel((string) $plan['processing_priority']) }}</span></div>
-            <div class="row"><span>{{ __('ui.pricing.topup_chars') }}</span><span>{{ $plan['char_topup_label'] }}</span></div>
             <div class="row"><span>{{ __('ui.upgrade.voice_quality') }}</span><span>{{ $formatTierLabel((string) $plan['voice_tier']) }}</span></div>
           </div>
 

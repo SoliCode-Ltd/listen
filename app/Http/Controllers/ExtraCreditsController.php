@@ -54,7 +54,7 @@ class ExtraCreditsController extends Controller
         $country = $this->pricing->resolveCountryContext($request);
         $byHand = $this->extraCredits->paysByHand($userId);
         // Members who pay their plan by hand can also send a transfer; everyone can pay by card.
-        $manualMethods = $byHand ? $this->pricing->enabledManualMethods('EG') : [];
+        $manualMethods = $byHand ? $this->transferMethods($locale) : [];
 
         $presets = [];
         foreach (ExtraCredits::presets() as $minutes => $cents) {
@@ -63,6 +63,8 @@ class ExtraCreditsController extends Controller
                 'minutes' => $minutes,
                 'minutes_label' => trans_choice('ui.extra_credits.minutes', $minutes),
                 'credits' => ExtraCredits::creditsFor($minutes),
+                // What the card (or the phone wallet) is charged, in US cents.
+                'amount_cents' => $cents,
                 'credits_label' => __('ui.extra_credits.credits', ['count' => number_format(ExtraCredits::creditsFor($minutes))]),
                 // Shown in the member's own currency, as the pricing page does; the card pays the dollars.
                 'price' => $this->pricing->formatWholeAmount((int) $local['amount_minor'], (string) $local['currency'], $locale),
@@ -113,7 +115,7 @@ class ExtraCreditsController extends Controller
                 'minutes_left' => Credits::minutesFor((int) $snapshot['remaining_chars']),
             ],
             // A plan cancelled to end with this period: the extra credits end with it.
-            'plan_ends' => $this->planEnds($userId),
+            'plan_ends' => $this->extraCredits->planEnds($userId),
             'renews_on' => $this->date($period['ends_at'], $locale),
             'pending' => $pending ? [
                 'minutes' => (int) (($pending->price_snapshot ?? [])['minutes'] ?? 0),
@@ -127,9 +129,12 @@ class ExtraCreditsController extends Controller
     {
         $validated = $request->validate([
             'minutes' => ['required', 'integer', Rule::in(array_keys(ExtraCredits::presets()))],
-            // Another card from the card form; without it, the card the member pays with.
+            // Another card from the card form or the phone wallet; without it, the card the member pays with.
             'payment_method' => ['nullable', 'string', 'starts_with:pm_', 'max:255'],
             'save_card' => ['nullable', 'boolean'],
+            // The dialog's own mark for this try: sent again after a reply that never
+            // arrived, it answers with what the first one did instead of charging twice.
+            'attempt' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_-]{8,64}$/'],
         ]);
 
         $user = $request->user();
@@ -147,17 +152,32 @@ class ExtraCreditsController extends Controller
         }
 
         try {
+            $attemptKey = filled($validated['attempt'] ?? null) ? 'extra-credits:attempt:'.$user->id.':'.$validated['attempt'] : null;
+            $paymentMethod = $validated['payment_method'] ?? null;
+            $saveCard = (bool) ($validated['save_card'] ?? false);
+            $earlier = $attemptKey !== null ? Cache::get($attemptKey) : null;
+            if ($earlier !== null) {
+                $purchase = CharPackPurchase::query()->whereKey((int) $earlier)->where('user_id', $user->id)->first();
+                if ($purchase) {
+                    return $this->respond($card->resumeExtraCredits($user, $purchase, $paymentMethod, $saveCard), $request);
+                }
+            }
+
             $minutes = (int) $validated['minutes'];
             $result = $card->startExtraCredits(
                 $user,
                 $minutes,
                 (int) ExtraCredits::priceCents($minutes),
-                $validated['payment_method'] ?? null,
-                (bool) ($validated['save_card'] ?? false),
+                $paymentMethod,
+                $saveCard,
+                // Kept before the card is charged: a request cut off while Stripe is
+                // answering is found again by its mark instead of being made twice.
+                $attemptKey !== null
+                    ? fn (CharPackPurchase $purchase) => Cache::put($attemptKey, (int) $purchase->id, now()->addDay())
+                    : null,
             );
-            if (($validated['payment_method'] ?? null) === null) {
-                Cache::forget($this->cardCacheKey((int) $user->id));
-            }
+            // The saved card shown next time is read again: a card just kept, or one that failed.
+            Cache::forget($this->cardCacheKey($user));
 
             return $this->respond($result, $request);
         } finally {
@@ -186,7 +206,7 @@ class ExtraCreditsController extends Controller
     {
         $user = $request->user();
         $userId = (int) $user->id;
-        $methods = $this->extraCredits->paysByHand($userId) ? $this->pricing->enabledManualMethods('EG') : [];
+        $methods = $this->extraCredits->paysByHand($userId) ? $this->transferMethods(app()->getLocale()) : [];
 
         $validated = $request->validate([
             'minutes' => ['required', 'integer', Rule::in(array_keys(ExtraCredits::presets()))],
@@ -229,6 +249,26 @@ class ExtraCreditsController extends Controller
             'credits' => ExtraCredits::creditsFor($minutes),
             'message' => __('ui.extra_credits.transfer_sent', ['credits' => number_format(ExtraCredits::creditsFor($minutes))]),
         ]);
+    }
+
+    /**
+     * The transfer methods that can be offered: switched on, and with somewhere to
+     * send the money (a payment link or a code to scan, from Billing Settings). One
+     * with neither would leave the member with an amount and nowhere to pay it.
+     *
+     * @return list<string>
+     */
+    private function transferMethods(string $locale): array
+    {
+        return array_values(array_filter(
+            $this->pricing->enabledManualMethods('EG'),
+            function (string $method) use ($locale): bool {
+                $destination = $this->pricing->manualPaymentDestination($method, $locale);
+
+                return trim((string) ($destination['payment_link'] ?? '')) !== ''
+                    || trim((string) ($destination['qr_image_url'] ?? '')) !== '';
+            },
+        ));
     }
 
     /** A member who cannot buy now gets why, in the same words as the dialog. */
@@ -284,7 +324,7 @@ class ExtraCreditsController extends Controller
             return null;
         }
 
-        $card = Cache::remember($this->cardCacheKey((int) $user->id), self::CARD_CACHE_SECONDS, function () use ($user) {
+        $card = Cache::remember($this->cardCacheKey($user), self::CARD_CACHE_SECONDS, function () use ($user) {
             try {
                 return app(StripePackGateway::class)->savedCard((string) $user->stripe_id) ?? false;
             } catch (\Throwable $exception) {
@@ -310,20 +350,13 @@ class ExtraCreditsController extends Controller
             : null;
     }
 
-    private function cardCacheKey(int $userId): string
+    /**
+     * Keyed with the card on the member's account, so a card changed in Billing is
+     * read again at once: the card shown is the card that will be charged.
+     */
+    private function cardCacheKey($user): string
     {
-        return 'extra-credits:card:'.$userId;
-    }
-
-    private function planEnds(int $userId): bool
-    {
-        return \App\Models\BillingSubscription::query()
-            ->where('user_id', $userId)
-            ->where('type', 'default')
-            ->whereIn('stripe_status', ['active', 'trialing'])
-            ->whereNotNull('ends_at')
-            ->where('ends_at', '>', now())
-            ->exists();
+        return 'extra-credits:card:'.(int) $user->id.':'.substr(md5($user->pm_type.'|'.$user->pm_last_four), 0, 10);
     }
 
     private function date(Carbon $date, string $locale): string

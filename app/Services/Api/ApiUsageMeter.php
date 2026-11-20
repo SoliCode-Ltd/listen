@@ -115,6 +115,7 @@ class ApiUsageMeter
                 $counter->increment('total_chars', (int) $estimate['credits']);
                 $counter->addSeconds((int) $estimate['seconds']);
                 $this->trialUsageRecorder->add($userId, $estimate);
+                PlanUsageGuard::afterSpend($quotaPlan, $counter);
             }
 
             ApiKeyUsage::apply((int) $apiKey->id, $period, 1, (int) $estimate['credits']);
@@ -231,6 +232,13 @@ class ApiUsageMeter
                 $extra['add_credits_url'] = url('/dashboard?extra_credits=1');
             }
             $extra['upgrade_url'] = url('/pricing');
+
+            // With nothing left, a member who can add extra credits is told so, not only to upgrade.
+            if ($e->remaining <= 0 && isset($extra['add_credits_url'])) {
+                return new ApiError(402, ApiError::TYPE_QUOTA, 'quota_exceeded',
+                    'Your plan\'s credits are used up. Add extra credits (add_credits_url) or upgrade your plan (upgrade_url) to continue.',
+                    null, [], $extra);
+            }
         }
 
         return new ApiError(402, ApiError::TYPE_QUOTA, 'quota_exceeded', self::firstMessage($e), null, [], $extra);

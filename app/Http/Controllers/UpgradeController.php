@@ -12,8 +12,7 @@ class UpgradeController extends Controller
 {
     public function __construct(
         private readonly PlanAccessService $planAccessService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -30,13 +29,6 @@ class UpgradeController extends Controller
                 $yearlyCents = max(0, (int) $plan->getEffectiveYearlyPriceCents(SiteSetting::yearlyDiscountPercent()));
                 $monthly = round($monthlyCents / 100, 2);
                 $yearlyMonthlyEquivalent = round(($yearlyCents / 12) / 100, 2);
-                $charTopupCents = $plan->topup_char_price_cents !== null
-                    ? (int) $plan->topup_char_price_cents
-                    : (
-                        $plan->allow_overage && $plan->overage_price_per_million_cents !== null
-                            ? (int) $plan->overage_price_per_million_cents
-                            : 0
-                    );
 
                 return [
                     'slug' => (string) $plan->slug,
@@ -49,9 +41,6 @@ class UpgradeController extends Controller
                     'requests_unlimited' => (int) $plan->monthly_requests <= 0,
                     'commercial_use_allowed' => (bool) $plan->commercial_use_allowed,
                     'processing_priority' => (string) ($plan->processing_priority ?: 'standard'),
-                    'char_topup_label' => $charTopupCents > 0
-                        ? '$'.number_format($charTopupCents / 100, 0).__('ui.pricing.topup_per_million')
-                        : __('ui.pricing.not_allowed'),
                     'voice_tier' => VoiceTier::label((string) ($plan->voice_tier ?: 'standard')),
                     'is_featured' => (bool) ($plan->is_featured ?? false),
                 ];

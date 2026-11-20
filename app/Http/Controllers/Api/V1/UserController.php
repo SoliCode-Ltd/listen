@@ -95,6 +95,8 @@ class UserController extends Controller
                 'limit' => (int) $usage['plan_chars'],
                 'remaining' => (int) $usage['remaining_chars'],
                 'gift' => (int) $usage['gift_chars'],
+                // Extra credits bought on top of the plan that are still left (already counted in limit and remaining).
+                'extra' => (int) $usage['extra_chars'],
                 'credits_per_second' => Credits::PER_SECOND,
                 // Usage stops at the limit: requests that would go over it are refused (402), never billed as overage.
                 'overage_allowed' => false,

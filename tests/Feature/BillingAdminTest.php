@@ -9,6 +9,7 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Stripe\ApiRequestor;
 use Tests\Support\FakeStripePlanSyncClient;
@@ -122,16 +123,12 @@ class BillingAdminTest extends TestCase
                 'price_dollars' => '-5',
                 'monthly_requests' => -1,
                 'recent_voices_days' => -3,
-                'topup_char_price_dollars' => '-1',
-                'topup_minute_price_dollars' => '-1',
             ])
             ->call('save')
             ->assertHasFormErrors([
                 'price_dollars' => 'min',
                 'monthly_requests' => 'min',
                 'recent_voices_days' => 'min',
-                'topup_char_price_dollars' => 'min',
-                'topup_minute_price_dollars' => 'min',
             ]);
 
         $this->editCreator()
@@ -231,12 +228,12 @@ class BillingAdminTest extends TestCase
         config(['services.stripe.secret' => 'sk_test_fake', 'cashier.secret' => 'sk_test_fake']);
     }
 
-    private function editCreator(): \Livewire\Features\SupportTesting\Testable
+    private function editCreator(): Testable
     {
         return Livewire::test(EditPlan::class, ['record' => $this->creator->getRouteKey()]);
     }
 
-    private function billingSettings(): \Livewire\Features\SupportTesting\Testable
+    private function billingSettings(): Testable
     {
         return Livewire::test(BillingSettings::class);
     }

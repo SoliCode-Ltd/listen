@@ -6,6 +6,8 @@ use App\Models\AudioGeneration;
 use App\Models\Plan;
 use App\Models\UsageCounter;
 use App\Services\Billing\ExtraCredits;
+use App\Services\Newsletter\CreditsEndedEmail;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class PlanUsageGuard
@@ -65,7 +67,7 @@ class PlanUsageGuard
     }
 
     /** Midnight of the members' current day, in the app's time zone (as stored). */
-    public static function startOfMemberDay(): \Illuminate\Support\Carbon
+    public static function startOfMemberDay(): Carbon
     {
         $zone = (string) config('listen.billing.daily_limit_timezone', 'Africa/Cairo');
         try {
@@ -94,6 +96,32 @@ class PlanUsageGuard
         return false;
     }
 
+    /**
+     * After credits were taken: when less than a minute of voice is left, the
+     * period's credits have run out.
+     */
+    public static function afterSpend(?Plan $plan, UsageCounter $counter): void
+    {
+        if (self::charsLimit($plan, $counter) - (int) $counter->total_chars < Credits::PER_MINUTE) {
+            self::creditsRanOut($plan, $counter);
+        }
+    }
+
+    /**
+     * A paid member whose credits ran out is told by email, once for the period
+     * (App\Services\Newsletter\CreditsEndedEmail), after this request is answered:
+     * whatever happens to the email, the request goes on as it would without it.
+     */
+    private static function creditsRanOut(?Plan $plan, UsageCounter $counter): void
+    {
+        $userId = (int) $counter->user_id;
+        if ($userId <= 0 || $counter->getAttribute('credits_ended_email_at') !== null || ! ExtraCredits::counts($plan)) {
+            return;
+        }
+
+        defer(fn () => app(CreditsEndedEmail::class)->memberRanOut($userId), 'credits-ended-'.$userId, true);
+    }
+
     public static function maxCharsPerRequest(?Plan $plan): int
     {
         return max(200, (int) ($plan?->max_chars_per_request ?? 600));
@@ -112,6 +140,9 @@ class PlanUsageGuard
             $incoming = (int) ($estimate['credits'] ?? $estimate['chars']);
             if (((int) $counter->total_chars + $incoming) > $charsLimit) {
                 $remaining = max(0, $charsLimit - (int) $counter->total_chars);
+                if ($remaining < Credits::PER_MINUTE) {
+                    self::creditsRanOut($plan, $counter);
+                }
                 throw OutOfCredits::make(match (true) {
                     $plan?->getAttribute('no_free_monthly_chars') && $remaining <= 0 => __('ui.backend.no_chars_yet'),
                     // Credits are left, only not enough for this text: say how many, as a pack does.

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\SiteSetting;
 use App\Models\User;
+use App\Models\Voice;
 use App\Services\Billing\ExtraCredits;
 use App\Support\CreditPeriod;
 use App\Support\VoiceCatalog;
@@ -58,6 +59,12 @@ class ExtraCreditsLimitsTest extends TestCase
         $extra = app(ExtraCredits::class);
         $extra->markPaid($extra->startPurchase($user, 10, 'card', 200, 'USD'));
 
+        // The account shows them: counted in the limit and what is left, and on their own.
+        $this->apiGet($plain, '/user/subscription')->assertOk()
+            ->assertJsonPath('credits.extra', 9000)
+            ->assertJsonPath('credits.limit', 99000)
+            ->assertJsonPath('credits.remaining', 9000);
+
         $this->speak($plain, $voice)->assertOk()->assertHeader('X-Credits-Remaining', (string) (9000 - 60));
         $this->assertSame(90060, $this->creditsSpent($user));
     }
@@ -77,6 +84,11 @@ class ExtraCreditsLimitsTest extends TestCase
             ->assertJsonPath('error.add_credits_url', url('/dashboard?extra_credits=1'))
             ->assertJsonPath('error.upgrade_url', url('/pricing'));
 
+        // With nothing left, the message says both ways on.
+        CreditPeriod::counter($user->id)->update(['total_chars' => 90000]);
+        $this->assertApiError($this->speak($plain, $voice), 402, 'quota_exceeded')
+            ->assertJsonPath('error.message', 'Your plan\'s credits are used up. Add extra credits (add_credits_url) or upgrade your plan (upgrade_url) to continue.');
+
         // Not offered while extra credits are switched off.
         SiteSetting::set(ExtraCredits::ENABLED_SETTING, '0', 'billing');
         $this->assertApiError($this->speak($plain, $voice), 402, 'quota_exceeded')
@@ -86,7 +98,7 @@ class ExtraCreditsLimitsTest extends TestCase
 
     private function studio(User $user, string $text = 'Hello there, this is a test.'): TestResponse
     {
-        $voice = \App\Models\Voice::query()->where('internal_voice_id', 'en-Gemini-HD-Kore')->first() ?? $this->premiumVoice();
+        $voice = Voice::query()->where('internal_voice_id', 'en-Gemini-HD-Kore')->first() ?? $this->premiumVoice();
 
         return $this->actingAs($user)->postJsonLocalizedRoute('dashboard.queue', [
             'content' => $text,

@@ -47,9 +47,41 @@ class CharPackCardPayment
      *
      * @return array{status:string, purchase:CharPackPurchase, client_secret?:?string, message?:string, reason?:string}
      */
-    public function startExtraCredits(User $user, int $minutes, int $amountCents, ?string $paymentMethodId, bool $saveCard): array
+    public function startExtraCredits(User $user, int $minutes, int $amountCents, ?string $paymentMethodId, bool $saveCard, ?callable $created = null): array
     {
         $purchase = $this->extraCredits->startPurchase($user, $minutes, CharPackPurchase::METHOD_CARD, $amountCents, 'USD');
+        // Told about the purchase before the card is charged, so a request that is
+        // cut off after this point can still be found and finished, never made twice.
+        if ($created !== null) {
+            $created($purchase);
+        }
+
+        return $this->chargeExtraCredits($user, $purchase, $paymentMethodId, $saveCard);
+    }
+
+    /**
+     * The same payment asked for again, after a reply that never arrived. A purchase
+     * that already has its payment is looked up. One whose charge was cut off is
+     * charged again under the same Stripe idempotency key, which answers with the
+     * first charge if there was one: the card is charged once either way.
+     *
+     * @return array{status:string, purchase:CharPackPurchase, client_secret?:?string, message?:string, reason?:string}
+     */
+    public function resumeExtraCredits(User $user, CharPackPurchase $purchase, ?string $paymentMethodId, bool $saveCard): array
+    {
+        if ($purchase->status !== CharPackPurchase::STATUS_PENDING || $purchase->stripe_payment_intent_id) {
+            return $this->confirm($purchase);
+        }
+
+        return $this->chargeExtraCredits($user, $purchase, $paymentMethodId, $saveCard, resumed: true);
+    }
+
+    /**
+     * @return array{status:string, purchase:CharPackPurchase, client_secret?:?string, message?:string, reason?:string}
+     */
+    private function chargeExtraCredits(User $user, CharPackPurchase $purchase, ?string $paymentMethodId, bool $saveCard, bool $resumed = false): array
+    {
+        $minutes = $purchase->minutes();
 
         $card = $paymentMethodId;
         if ($card === null) {
@@ -78,6 +110,7 @@ class CharPackCardPayment
             'listen-extra-credits-'.$purchase->id,
             $paymentMethodId !== null && $saveCard,
             __('ui.extra_credits.card_failed'),
+            $resumed,
         );
     }
 
@@ -150,7 +183,7 @@ class CharPackCardPayment
      * @param  array<string, string>  $metadata
      * @return array{status:string, purchase:CharPackPurchase, client_secret?:?string, message?:string, reason?:string}
      */
-    private function charge(User $user, CharPackPurchase $purchase, string $paymentMethodId, string $description, array $metadata, string $idempotencyKey, bool $saveCard, string $failedMessage): array
+    private function charge(User $user, CharPackPurchase $purchase, string $paymentMethodId, string $description, array $metadata, string $idempotencyKey, bool $saveCard, string $failedMessage, bool $resumed = false): array
     {
         try {
             $customerId = $this->gateway->ensureCustomer($user);
@@ -174,6 +207,11 @@ class CharPackCardPayment
                 'kind' => $purchase->kind,
                 'error' => $exception->getMessage(),
             ]);
+            if ($resumed) {
+                // The first try may still be on its way at Stripe: nothing is written off here.
+                // It settles through that request or the webhook, and the member is told to wait.
+                return ['status' => 'processing', 'purchase' => $purchase, 'message' => __('ui.extra_credits.card_processing')];
+            }
             $this->markFailed($purchase, $exception->getMessage());
 
             return ['status' => 'failed', 'purchase' => $purchase->fresh(), 'message' => $failedMessage];

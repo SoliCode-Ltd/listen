@@ -2,14 +2,13 @@
 
 namespace App\Filament\Resources\PlanResource\Pages;
 
-use Filament\Actions\ViewAction;
-use Filament\Actions\DeleteAction;
-use Exception;
 use App\Filament\Resources\PlanResource;
 use App\Models\Plan;
 use App\Services\Billing\KeptCredits;
 use App\Services\StripeProductSyncService;
-use Filament\Actions;
+use Exception;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Schema;
@@ -59,24 +58,6 @@ class EditPlan extends EditRecord
 
         $priceDollars = (float) ($rawState['price_dollars'] ?? 0);
         $data['price_cents'] = (int) round($priceDollars * 100);
-
-        if (! empty($rawState['overage_price_dollars'])) {
-            $data['overage_price_per_million_cents'] = (int) round(((float) $rawState['overage_price_dollars']) * 100);
-        } elseif (empty($data['allow_overage'])) {
-            $data['overage_price_per_million_cents'] = null;
-        }
-
-        if (! empty($rawState['topup_char_price_dollars'])) {
-            $data['topup_char_price_cents'] = (int) round(((float) $rawState['topup_char_price_dollars']) * 100);
-        } else {
-            $data['topup_char_price_cents'] = null;
-        }
-
-        if (! empty($rawState['topup_minute_price_dollars'])) {
-            $data['topup_minute_price_cents'] = (int) round(((float) $rawState['topup_minute_price_dollars']) * 100);
-        } else {
-            $data['topup_minute_price_cents'] = null;
-        }
 
         // Clear discount_percentage to null when empty
         if (empty($data['discount_percentage'])) {

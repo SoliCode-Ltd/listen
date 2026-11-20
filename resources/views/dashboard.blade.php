@@ -1572,6 +1572,10 @@
     .credit-live-tag.is-pending { background: color-mix(in oklab, #F0B04A 18%, var(--surface)); color: #F0B04A; }
     html[data-theme="light"] .credit-live-tag.is-pending { background: #FFF4E0; color: #9A5B00; }
     .credit-live-tag[hidden] { display: none; }
+    .credit-live-add { margin-inline-start: auto; align-self: center; min-height: 34px; padding: 0 .85rem; border: 1px solid var(--brand-accent, #7659FA); border-radius: 999px; background: var(--brand-accent, #7659FA); color: #fff; font: inherit; font-size: .82rem; font-weight: 700; white-space: nowrap; cursor: pointer; transition: background-color .15s ease; }
+    .credit-live-add:hover { background: var(--brand-hover, #5B3DF5); }
+    .credit-live-add:focus-visible { outline: 2px solid var(--brand-accent, #7659FA); outline-offset: 2px; }
+    .credit-live-add[hidden] { display: none; }
     /* ── App frame: the menu and its help links stay in view; no website footer. ── */
     .dashboard-shell { padding-bottom: 3rem !important; }
     .dashboard-menu-inner { position: sticky; top: 5.5rem; z-index: 1; }
@@ -2195,7 +2199,7 @@
                 @endif
                 @php $usageExtraLeft = (int) ($usageSnapshot['extra_chars'] ?? 0); @endphp
                 <span class="usage-chip" id="usageExtraChip" title="{{ __('ui.extra_credits.usage_note') }}" @if($usageExtraLeft <= 0) hidden @endif><span class="usage-chip-t"><b class="usage-chip-v" id="usageExtraLeft">{{ number_format($usageExtraLeft) }}</b> <span class="usage-chip-k">{{ __('ui.extra_credits.left') }}</span></span></span>
-                @if(! $packMode && app(\App\Services\Billing\ExtraCredits::class)->status((int) auth()->id()) === \App\Services\Billing\ExtraCredits::STATUS_OK)
+                @if(! $packMode && ($canBuyExtraCredits ?? false))
                   <button type="button" class="usage-chip usage-chip-link" data-extra-credits-open><svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>{{ __('ui.extra_credits.open') }}</button>
                 @endif
               </div>
@@ -2344,6 +2348,11 @@
                 @endphp
                 <span class="credit-live-tag" id="creditExtraTag" @if($extraLeft <= 0) hidden @endif>{{ __('ui.extra_credits.extra_tag', ['count' => number_format($extraLeft)]) }}</span>
                 <span class="credit-live-tag is-pending" id="creditPendingTag" @unless($extraPending) hidden @endunless>{{ __('ui.extra_credits.pending_tag') }}</span>
+                {{-- Out of credits, or not enough for this text: the way to add more is beside the balance.
+                     Never a popup by itself; the dialog opens when the member asks for it or for a voice. --}}
+                @if($canBuyExtraCredits ?? false)
+                  <button type="button" class="credit-live-add" id="creditAddBtn" data-extra-credits-open @if((int) ($usageSnapshot['remaining_chars'] ?? 0) > 0 || $extraPending) hidden @endif>{{ __('ui.extra_credits.open') }}</button>
+                @endif
               </div>
             </div>
                 <button class="dashboard-generate-btn" id="generateBtn" type="submit">
@@ -3794,6 +3803,12 @@
       }
       box.classList.toggle('is-spending', cost > 0 && after >= 0);
       box.classList.toggle('is-short', cost > 0 && after < 0);
+      // "Add credits" beside the balance while there are none, or not enough for this text.
+      const addCredits = document.getElementById('creditAddBtn');
+      if (addCredits) {
+        const waiting = document.getElementById('creditPendingTag');
+        addCredits.hidden = !(remaining <= 0 || (cost > 0 && after < 0)) || Boolean(waiting && !waiting.hidden);
+      }
       labelEl.textContent = cost <= 0
         ? @json(__('ui.dashboard.credits_left_label'))
         : (after < 0 ? @json(__('ui.dashboard.credits_not_enough')) : @json(__('ui.dashboard.credits_after_this_voice')));
@@ -4580,7 +4595,8 @@
           const opened = await window.ListenExtraCredits.open({
             remaining: data.credits?.remaining,
             needed: data.credits?.needed,
-            onClose: (purchased) => { if (!purchased) showFormMessage('error', refusal); },
+            // Closed without buying: the refusal is said under the text, as before.
+            onClose: (result) => { if (!result) showFormMessage('error', refusal); },
             onGenerate: () => { if (typeof voiceForm.requestSubmit === 'function') voiceForm.requestSubmit(generateBtn); },
           });
           if (opened) return;
@@ -4652,6 +4668,7 @@
       const pendingTag = document.getElementById('creditPendingTag');
       const extraTag = document.getElementById('creditExtraTag');
       if (pendingTag && (!extraTag || extraTag.hidden)) pendingTag.hidden = false;
+      refreshCreditLive();
     });
 
     if (oldVoice) {

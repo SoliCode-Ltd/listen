@@ -2,6 +2,7 @@
 
 namespace App\Services\Billing;
 
+use App\Models\BillingSubscription;
 use App\Models\CharPackPurchase;
 use App\Models\ManualPaymentRequest;
 use App\Models\Plan;
@@ -88,6 +89,21 @@ class ExtraCredits
     public function __construct(private readonly PlanAccessService $plans) {}
 
     /**
+     * The member's plan is cancelled and runs to the end of what was paid for:
+     * credits will not renew, and extra credits end with the plan.
+     */
+    public function planEnds(int $userId): bool
+    {
+        return BillingSubscription::query()
+            ->where('user_id', $userId)
+            ->where('type', 'default')
+            ->whereIn('stripe_status', ['active', 'trialing'])
+            ->whereNotNull('ends_at')
+            ->where('ends_at', '>', now())
+            ->exists();
+    }
+
+    /**
      * Whether the database has the columns (the migration runs after the code
      * is deployed). Only a yes is remembered.
      */
@@ -99,7 +115,7 @@ class ExtraCredits
 
         try {
             if (Cache::get(self::READY_CACHE) === true
-                || (Schema::hasColumn('usage_counters', 'extra_chars') && Schema::hasColumn('char_pack_purchases', 'kind'))) {
+                || (Schema::hasColumn('usage_counters', 'extra_chars') && Schema::hasColumn('usage_counters', 'credits_ended_email_at') && Schema::hasColumn('char_pack_purchases', 'kind'))) {
                 Cache::put(self::READY_CACHE, true, now()->addDay());
 
                 return self::$ready = true;
@@ -526,6 +542,8 @@ class ExtraCredits
             'extra_ends_at' => $period['ends_at'],
             'extra_settled_at' => null,
             'extra_outcome' => null,
+            // With credits again, running out again is told again (CreditsEndedEmail).
+            'credits_ended_email_at' => null,
         ])->save();
     }
 

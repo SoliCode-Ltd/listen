@@ -14,6 +14,7 @@ use App\Services\Api\ApiSpeechService;
 use App\Services\AudioGenerationRecorder;
 use App\Services\Auth\EmailVerificationMailer;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\ExtraCredits;
 use App\Services\Billing\MemberUsageMeter;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
@@ -220,6 +221,8 @@ class DashboardController extends Controller
             'developerApi' => $developerApi,
             'usage' => $usage,
             'usageSnapshot' => $usageSnapshot,
+            // A paid member who can add extra credits now (the studio's dialog and its buttons).
+            'canBuyExtraCredits' => app(ExtraCredits::class)->status($userId) === ExtraCredits::STATUS_OK,
             'packOffer' => $packOffer,
             'planShowcase' => $planShowcase,
             // The plan's own pricing-page lines; "credit card not needed" means nothing once signed in.

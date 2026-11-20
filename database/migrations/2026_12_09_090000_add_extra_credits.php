@@ -13,7 +13,9 @@ use Illuminate\Support\Facades\Schema;
  *   credits Listen gifts: extra_chars bought or carried into this period, the plan's
  *   own credits for the period (extra_base_chars: the plan's credits are used first),
  *   when the period ends (extra_ends_at), and once the period is over, when what was
- *   left moved on to the next period or ended (extra_settled_at, extra_outcome);
+ *   left moved on to the next period or ended (extra_settled_at, extra_outcome); and
+ *   when the member was emailed that the period's credits ran out
+ *   (credits_ended_email_at: once, App\Services\Newsletter\CreditsEndedEmail);
  * - char_pack_purchases (every one-time purchase, with its card payment or its payment by
  *   hand) records each purchase: kind tells a pack from extra credits, and period_ym is
  *   the credit period the credits were added to.
@@ -26,13 +28,28 @@ return new class extends Migration
     public function up(): void
     {
         OnlineSchema::change(function (): void {
-            if (Schema::hasTable('usage_counters') && ! Schema::hasColumn('usage_counters', 'extra_chars')) {
-                Schema::table('usage_counters', function (Blueprint $table): void {
-                    $table->unsignedBigInteger('extra_chars')->default(0);
-                    $table->unsignedBigInteger('extra_base_chars')->default(0);
-                    $table->timestamp('extra_ends_at')->nullable();
-                    $table->timestamp('extra_settled_at')->nullable();
-                    $table->string('extra_outcome', 10)->nullable();
+            if (Schema::hasTable('usage_counters')) {
+                // One column at a time, so a run that stopped half way finishes the rest.
+                $missing = fn (string $column): bool => ! Schema::hasColumn('usage_counters', $column);
+                Schema::table('usage_counters', function (Blueprint $table) use ($missing): void {
+                    if ($missing('extra_chars')) {
+                        $table->unsignedBigInteger('extra_chars')->default(0);
+                    }
+                    if ($missing('extra_base_chars')) {
+                        $table->unsignedBigInteger('extra_base_chars')->default(0);
+                    }
+                    if ($missing('extra_ends_at')) {
+                        $table->timestamp('extra_ends_at')->nullable();
+                    }
+                    if ($missing('extra_settled_at')) {
+                        $table->timestamp('extra_settled_at')->nullable();
+                    }
+                    if ($missing('extra_outcome')) {
+                        $table->string('extra_outcome', 10)->nullable();
+                    }
+                    if ($missing('credits_ended_email_at')) {
+                        $table->timestamp('credits_ended_email_at')->nullable();
+                    }
                 });
             }
 
@@ -56,7 +73,7 @@ return new class extends Migration
         }
         if (Schema::hasColumn('usage_counters', 'extra_chars')) {
             Schema::table('usage_counters', function (Blueprint $table): void {
-                $table->dropColumn(['extra_chars', 'extra_base_chars', 'extra_ends_at', 'extra_settled_at', 'extra_outcome']);
+                $table->dropColumn(['extra_chars', 'extra_base_chars', 'extra_ends_at', 'extra_settled_at', 'extra_outcome', 'credits_ended_email_at']);
             });
         }
     }

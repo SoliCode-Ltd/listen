@@ -602,6 +602,7 @@ final class OpenApiSpec
                                 'limit' => ['type' => 'integer'],
                                 'remaining' => ['type' => 'integer'],
                                 'gift' => ['type' => 'integer'],
+                                'extra' => ['type' => 'integer', 'description' => 'Extra credits added on top of the plan that are still left. They are used after the plan\'s credits, and are already counted in limit and remaining.'],
                                 'credits_per_second' => ['type' => 'integer'],
                                 'overage_allowed' => ['type' => 'boolean', 'const' => false],
                                 'period' => ['type' => ['string', 'null'], 'format' => 'date', 'description' => 'The day the current credit period started: the plan\'s own day each month (the 1st on the free plan).'],

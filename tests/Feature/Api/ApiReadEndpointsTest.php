@@ -312,6 +312,7 @@ class ApiReadEndpointsTest extends TestCase
             'limit' => 90000,
             'remaining' => 90000,
             'gift' => 0,
+            'extra' => 0,
             'credits_per_second' => Credits::PER_SECOND,
             'overage_allowed' => false,
             'period' => '2026-10-14',

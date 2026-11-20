@@ -1252,7 +1252,7 @@
       // The table in two groups: how much each plan gives, then what its voices can do
       // (the admin's own extra lines go with the voices).
       $usageLabels = [$minutesLabel, $creditsLabel];
-      foreach (['max_chars_per_request', 'monthly_requests', 'daily_requests', 'processing_priority', 'audio_kept', 'topup'] as $usageKey) {
+      foreach (['max_chars_per_request', 'monthly_requests', 'daily_requests', 'processing_priority', 'audio_kept'] as $usageKey) {
         $usageLabels[] = __('ui.pricing.lines.label_'.$usageKey);
       }
       // Voice agents in a group of their own, every row from each plan's agent settings and the

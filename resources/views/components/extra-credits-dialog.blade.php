@@ -5,11 +5,7 @@
      Opened by window.ListenExtraCredits.open() (the studio, when a voice is refused for
      credits; the "Add credits" chip; a link with ?extra_credits=1). Only members who can
      buy them get it: the server checks again on every step. --}}
-@php
-  $xcUserId = (int) auth()->id();
-  $xcStatus = $xcUserId > 0 ? app(\App\Services\Billing\ExtraCredits::class)->status($xcUserId) : null;
-@endphp
-@if($xcStatus === \App\Services\Billing\ExtraCredits::STATUS_OK)
+@if($canBuyExtraCredits ?? false)
 <dialog class="xc" id="xcDialog" aria-labelledby="xcTitle"
   data-offer-url="{{ route('billing.extra-credits') }}"
   data-card-url="{{ route('billing.extra-credits.card') }}"
@@ -29,6 +25,8 @@
         <span class="xc-summary-t"><b id="xcCredits"></b><small id="xcMinutes"></small></span>
         <b class="xc-summary-price" id="xcPrice"></b>
       </div>
+      {{-- Apple Pay / Google Pay where the device has one (hidden otherwise), as at checkout. --}}
+      <x-wallet-button id="xc-wallet" mode="payment" />
       <div class="xc-payline">
         <span class="xc-cardglyph" id="xcGlyph" aria-hidden="true"></span>
         <span id="xcPayWith"></span>
@@ -121,7 +119,7 @@
       </div>
       <h2 class="xc-title xc-after-mark" id="xcDoneTitle"></h2>
       <p class="xc-lead">{{ __('ui.extra_credits.done_lead') }}</p>
-      <div class="xc-btns"><button type="button" class="xc-btn is-primary xc-wide" id="xcGenerate">{{ __('ui.extra_credits.generate_now') }}</button></div>
+      <div class="xc-btns"><button type="button" class="xc-btn is-primary xc-wide" id="xcGenerate"></button></div>
     </section>
 
     {{-- A transfer sent for the team to check --}}
@@ -179,6 +177,8 @@
   .xc-summary-t { display: grid; line-height: 1.4; flex: 1; min-width: 0; }
   .xc-summary-t b, .xc-summary-price { font-size: 1.18rem; font-weight: 700; font-variant-numeric: tabular-nums; }
   .xc-summary-t small { font-size: .8rem; color: var(--muted); }
+  .xc .wallet-pay { margin: 14px 0 0; gap: 12px; }
+  .xc .wallet-pay + .xc-payline { margin-top: 12px; }
   .xc-payline { margin-top: 14px; display: flex; align-items: center; gap: 8px; font-size: .86rem; color: var(--muted); }
   .xc-payline b { color: var(--text); font-weight: 600; }
   .xc-sp { flex: 1; }
@@ -200,17 +200,18 @@
   @keyframes xc-spin { to { transform: rotate(360deg); } }
   .xc-btn:focus-visible, .xc-chip:focus-visible, .xc-link:focus-visible, .xc-icon:focus-visible, .xc-dest:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
   /* Keyboard focus only: a click on a row shows its radio, not a ring. */
-  .xc-opt:has(input[name="xcMethod"]:focus-visible), .xc-upload:has(input:focus-visible) { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+  .xc-m:has(input:focus-visible), .xc-upload:has(input:focus-visible) { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
   .xc-fine { margin: 14px 0 0; font-size: .8rem; line-height: 1.65; color: var(--muted); }
   .xc-note { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; font-size: .84rem; line-height: 1.6; background: color-mix(in oklab, var(--danger, #ee4a77) 10%, var(--surface)); color: var(--text); }
   .xc-note.is-info { background: var(--surface2); }
   /* Payment method */
-  .xc-methods { margin-top: 16px; display: grid; gap: 8px; }
-  /* Each way to pay is a box of its own, with room around it; the card form opens inside its box. */
-  .xc-opt { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); transition: border-color .15s ease; }
-  .xc-opt:hover, .xc-opt:has(input[name="xcMethod"]:checked) { border-color: var(--line-strong, var(--line)); }
+  /* Ways to pay: a plain list. No boxes, lines or fills; the radio alone shows the choice,
+     and the card form opens under its row at the dialog's full width. */
+  .xc-methods { margin-top: 10px; display: grid; gap: 2px; }
+  .xc-opt { border-radius: 10px; }
   .xc-opt[hidden], .xc-newcard[hidden] { display: none; }
-  .xc-m { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 14px 16px; cursor: pointer; }
+  .xc-m { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 10px 0; border-radius: 8px; cursor: pointer; }
+  @media (hover: hover) { .xc-m:hover input:not(:checked) + .xc-radio { border-color: var(--muted); } }
   .xc-m input { position: absolute; opacity: 0; pointer-events: none; }
   .xc-radio { width: 18px; height: 18px; flex: none; display: grid; place-items: center; border: 1.5px solid var(--line-strong, var(--line)); border-radius: 50%; background: var(--surface); }
   .xc-radio::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fff; transform: scale(0); transition: transform .15s ease; }
@@ -220,7 +221,7 @@
   .xc-m-lab small { font-size: .8rem; font-weight: 400; color: var(--muted); }
   .xc-m-stack { display: grid; gap: 2px; }
   .xc-inline { display: inline-flex; align-items: center; gap: 8px; }
-  .xc-newcard { padding: 0 16px 16px; overflow: hidden; }
+  .xc-newcard { padding: 2px 0 10px; overflow: hidden; }
   .xc-newcard .card-fields { gap: .7rem; }
   .xc-newcard .card-field-label { font-size: .8rem; margin-bottom: .35rem; }
   .xc-newcard .card-input { min-height: 44px; padding: .72rem .8rem; border-radius: 10px; }
@@ -233,18 +234,21 @@
   .xc-amount { margin-top: 16px; display: grid; gap: 4px; padding: 16px; border-radius: 12px; background: var(--surface2); }
   .xc-amount small { font-size: .8rem; color: var(--muted); }
   .xc-amount b { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .xc-dest { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 12px; color: var(--accent-text, var(--brand-accent)); font-weight: 600; font-size: .9rem; text-decoration: none; }
+  /* Where to pay: the team's payment link, as a button of its own. */
+  .xc-dest { margin-top: 12px; width: 100%; box-sizing: border-box; min-height: 46px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 1px solid var(--line-strong, var(--line)); border-radius: 12px; background: var(--surface); color: var(--text); font-weight: 600; font-size: .95rem; text-decoration: none; transition: background-color .15s ease; }
+  .xc-dest:hover { background: var(--surface2); }
   .xc-dest[hidden], .xc-qr[hidden], .xc-instructions[hidden] { display: none; }
   .xc-dest svg { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   html[dir="rtl"] .xc-dest svg { transform: scaleX(-1); }
-  .xc-qr { margin: 10px 0 0; display: flex; align-items: center; gap: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+  .xc-qr { margin: 14px 0 0; display: flex; align-items: center; gap: 14px; }
   .xc-qr img { width: 96px; height: 96px; border-radius: 8px; background: #fff; object-fit: contain; }
   .xc-qr figcaption { font-size: .84rem; color: var(--muted); line-height: 1.6; }
   .xc-instructions { margin: 10px 0 0; font-size: .84rem; line-height: 1.7; color: var(--muted); white-space: pre-line; }
   .xc-upload { margin-top: 10px; min-height: 54px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 1.5px dashed var(--line-strong, var(--line)); border-radius: 12px; color: var(--muted); font-size: .88rem; cursor: pointer; }
   .xc-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
   .xc-upload svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .xc-upload.is-ok { justify-content: flex-start; border-style: solid; border-color: var(--xc-good); background: var(--xc-good-tint); color: var(--xc-good); }
+  .xc-upload.is-ok { justify-content: flex-start; border-style: solid; border-color: var(--line-strong, var(--line)); color: var(--text); }
+  .xc-upload.is-ok svg { stroke: var(--xc-good); }
   .xc-upload span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Done / waiting */
   .xc-mark { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; animation: xc-pop .36s cubic-bezier(.2, .8, .2, 1.2); }
@@ -281,10 +285,18 @@
     let method = 'saved';      // saved | new | instapay | vodafone_cash
     let newCard = null;        // {id, last4}: the card typed in, once it is ready
     let context = { remaining: 0, needed: 0 };
-    let state = { purchased: false, onClose: null, onGenerate: null };
+    let state = { result: null, onClose: null, onGenerate: null };
     let current = 'buy';
     let stripe = null, stripePromise = null, cardForm = null, cardComplete = false;
+    let wallet = null;
+    let walletOpen = false;    // the phone wallet's sheet is showing an amount: the minutes stay as they are
     let proof = null;
+    let inFlight = false;      // a payment or a transfer is on its way: the dialog stays open
+    // The mark of one try at paying. Sent again after a reply that never arrived, the
+    // server answers with what the first request did, so nothing is charged twice.
+    const newAttempt = () => ((window.crypto && crypto.randomUUID ? crypto.randomUUID() : '') + Date.now().toString(36) + Math.random().toString(36).slice(2)).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 48);
+    let attempt = newAttempt();
+    let attemptOpen = false;   // the last reply was lost: the same mark is used again
 
     const fill = (text, values) => String(text || '').replace(/:(\w+)/g, (m, key) => (values && key in values ? values[key] : m));
     const fmt = (n) => Math.round(Number(n) || 0).toLocaleString('en-US');
@@ -324,13 +336,25 @@
         focusFirst(to);
         return;
       }
+      [from, to].forEach((view) => view.getAnimations().forEach((a) => a.cancel()));
+      Object.entries(views).forEach(([key, view]) => {
+        if (view !== from && view !== to) { view.hidden = true; view.classList.remove('is-on', 'is-leaving'); }
+      });
       from.classList.add('is-leaving');
       const endHeight = to.offsetHeight;
       const shift = 28 * (direction || 1) * (isRtl ? 1 : -1);
       const ease = 'cubic-bezier(.2, .8, .2, 1)';
+      stack.getAnimations().forEach((a) => a.cancel());
       stack.animate([{ height: startHeight + 'px' }, { height: endHeight + 'px' }], { duration: 320, easing: ease });
+      const leaving = name;
       from.animate([{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: `translateX(${-shift}px)` }], { duration: 200, easing: 'ease-in', fill: 'forwards' })
-        .onfinish = () => { from.hidden = true; from.classList.remove('is-leaving', 'is-on'); from.getAnimations().forEach((a) => a.cancel()); };
+        .onfinish = () => {
+          // Only while this is still the move in hand (a quick second tap starts another).
+          if (current !== leaving) return;
+          from.hidden = true;
+          from.classList.remove('is-leaving', 'is-on');
+          from.getAnimations().forEach((a) => a.cancel());
+        };
       to.animate([{ opacity: 0, transform: `translateX(${shift}px)` }, { opacity: 1, transform: 'translateX(0)' }], { duration: 320, delay: 60, easing: ease, fill: 'backwards' });
       current = name;
       focusFirst(to);
@@ -374,6 +398,7 @@
       }
       $('xcPayLabel').innerHTML = fill(esc(t.pay), { amount: `<bdi>${esc(price)}</bdi>` });
       $('xcFine').textContent = t.fine;
+      paintWallet();
       note('xcBuyNote', byHand() && offer.pending ? t.manual_pending_exists : '', true);
       $('xcPay').disabled = byHand() && Boolean(offer.pending);
     }
@@ -382,14 +407,14 @@
       const box = $('xcChips');
       box.style.setProperty('--xc-n', String(Math.min(5, offer.presets.length)));
       box.innerHTML = offer.presets.map((p) => `<button type="button" class="xc-chip" role="radio" data-minutes="${p.minutes}" aria-label="${esc(p.minutes_label)}">${p.minutes}</button>`).join('');
-      box.querySelectorAll('.xc-chip').forEach((chip) => chip.addEventListener('click', () => { minutes = Number(chip.dataset.minutes); paintBuy(); }));
+      box.querySelectorAll('.xc-chip').forEach((chip) => chip.addEventListener('click', () => { if (inFlight || walletOpen) return; minutes = Number(chip.dataset.minutes); paintBuy(); }));
     }
 
     // Arrow keys move between the minutes, as in any group of radio buttons.
     $('xcChips').addEventListener('keydown', (event) => {
       const keys = isRtl ? { ArrowLeft: 1, ArrowRight: -1, ArrowDown: 1, ArrowUp: -1 } : { ArrowLeft: -1, ArrowRight: 1, ArrowDown: 1, ArrowUp: -1 };
       const step = keys[event.key];
-      if (!step || !offer) return;
+      if (!step || !offer || inFlight || walletOpen) return;
       event.preventDefault();
       const list = offer.presets.map((p) => p.minutes);
       minutes = list[(list.indexOf(minutes) + step + list.length) % list.length];
@@ -458,6 +483,32 @@
         document.head.appendChild(script);
       }).then((s) => { stripe = s; if (!s) stripePromise = null; return s; });
       return stripePromise;
+    }
+
+    // Apple Pay / Google Pay: shown with the card choice, charged the same dollars.
+    async function mountWallet() {
+      if (wallet || !offer?.card_ready || typeof window.ListenWalletButton !== 'function') return;
+      const s = await loadStripe();
+      if (!s || wallet || !preset()) return;
+      wallet = window.ListenWalletButton(s, 'xc-wallet', {
+        mode: 'payment',
+        amount: preset().amount_cents,
+        onOpen: () => { walletOpen = true; },
+        onCancel: () => { walletOpen = false; },
+        onConfirm: async (paymentMethodId, walletError) => {
+          walletOpen = false;
+          if (walletError) { note('xcBuyNote', stripeText(walletError, t.card_failed)); return; }
+          if (inFlight || !paymentMethodId) return;
+          await payByCard(paymentMethodId);
+        },
+      });
+      paintWallet();
+    }
+
+    function paintWallet() {
+      if (!wallet || !preset()) return;
+      wallet.setAmount(preset().amount_cents);
+      wallet.show(!byHand());
     }
 
     const isLight = () => document.documentElement.getAttribute('data-theme') === 'light';
@@ -537,45 +588,87 @@
       return errors.length && errors[0][0] ? errors[0][0] : fallback;
     }
 
-    function added(data) {
-      state.purchased = true;
+    function added(data, usedNewCard, kept) {
+      state.result = 'purchased';
+      if (usedNewCard) {
+        // A card is used once unless it was kept: the next purchase starts from the saved card.
+        if (kept && newCard) offer.card = { brand: 'card', last4: newCard.last4, expires: null };
+        newCard = null;
+        cardComplete = false;
+        if (cardForm) cardForm.clear();
+        method = offer.card ? 'saved' : 'new';
+      }
       $('xcDoneTitle').textContent = fill(t.done_title, { credits: fmt(data.credits) });
+      $('xcGenerate').textContent = typeof state.onGenerate === 'function' ? t.generate_now : t.ok;
       if (data.usage) window.dispatchEvent(new CustomEvent('listen:usage', { detail: { usage: data.usage } }));
       show('done', 1);
     }
 
-    async function payByCard() {
+    // Pays with the saved card, the card typed in, or (walletCard) the phone wallet's card.
+    async function payByCard(walletCard) {
+      if (inFlight) return;
       const p = preset();
       const pay = $('xcPay');
       const label = $('xcPayLabel').innerHTML;
+      const usedNewCard = !walletCard && method === 'new' && Boolean(newCard);
+      const body = { minutes: p.minutes };
+      if (walletCard) body.payment_method = walletCard;
+      else if (usedNewCard) { body.payment_method = newCard.id; body.save_card = $('xcSaveCard').checked; }
+      if (!attemptOpen) attempt = newAttempt();
+      body.attempt = attempt;
+
+      inFlight = true;
       busy(pay, true, t.paying);
       note('xcBuyNote', '');
       const restore = () => { busy(pay, false); $('xcPayLabel').innerHTML = label; };
-      const body = { minutes: p.minutes };
-      if (method === 'new' && newCard) { body.payment_method = newCard.id; body.save_card = $('xcSaveCard').checked; }
-
-      let reply = await post(urls.card, body);
-      if (reply.status === 402 && reply.data.requires_action) {
-        const s = stripe || await loadStripe();
-        if (!s) { restore(); note('xcBuyNote', t.card_unavailable); return; }
-        const check = await s.confirmCardPayment(reply.data.client_secret);
-        if (check.error) { restore(); note('xcBuyNote', stripeText(check.error, t.card_failed)); return; }
-        reply = await post(urls.confirm, { purchase: reply.data.purchase });
+      try {
+        let reply = await post(urls.card, body);
+        if (reply.status === 402 && reply.data.requires_action) {
+          const purchase = reply.data.purchase;
+          const s = stripe || await loadStripe();
+          if (!s) { restore(); note('xcBuyNote', t.card_unavailable); return; }
+          // The bank's check opens in its own layer on the page. A modal dialog sits above the page
+          // and blocks it, so the dialog steps aside until the check is over.
+          let check;
+          dialog.close();
+          try { check = await s.confirmCardPayment(reply.data.client_secret); }
+          finally { if (!dialog.open) dialog.showModal(); }
+          if (check.error) {
+            // The bank's check was not passed: recorded, and nothing was charged.
+            post(urls.confirm, { purchase });
+            attemptOpen = false;
+            restore();
+            note('xcBuyNote', stripeText(check.error, t.card_declined));
+            return;
+          }
+          reply = await post(urls.confirm, { purchase });
+        }
+        // No reply, or the server stumbled: what happened is not known, so the next
+        // try asks about this same payment instead of making another.
+        // The same when the server says a payment is still in progress (409) or to slow down (429).
+        attemptOpen = reply.status === 0 || reply.status >= 500 || reply.status === 409 || reply.status === 429;
+        if (reply.data.ok) { restore(); added(reply.data, usedNewCard, Boolean(body.save_card)); return; }
+        if (reply.status === 202 && reply.data.processing) {
+          // Added once the bank finishes: Pay stays off so it is never paid twice.
+          busy(pay, false);
+          pay.disabled = true;
+          $('xcPayLabel').innerHTML = label;
+          note('xcBuyNote', reply.data.message || t.card_processing, true);
+          return;
+        }
+        restore();
+        if (reply.data.reason) console.info('Card payment:', reply.data.reason);
+        // A typed card is used once: after a refusal the member enters it again, or another.
+        if (usedNewCard && !attemptOpen) newCard = null;
+        paintBuy();
+        note('xcBuyNote', firstError(reply.data, t.card_failed));
+      } catch (_error) {
+        attemptOpen = true;
+        restore();
+        note('xcBuyNote', t.network_error);
+      } finally {
+        inFlight = false;
       }
-      if (reply.data.ok) { restore(); added(reply.data); return; }
-      if (reply.status === 202 && reply.data.processing) {
-        // Added once the bank finishes: Pay stays off so it is never paid twice.
-        busy(pay, false);
-        pay.disabled = true;
-        $('xcPayLabel').innerHTML = label;
-        note('xcBuyNote', reply.data.message || t.card_processing, true);
-        return;
-      }
-      restore();
-      if (reply.data.reason) console.info('Card payment:', reply.data.reason);
-      // A card that is no longer there: the member picks another.
-      newCard = method === 'new' ? null : newCard;
-      note('xcBuyNote', firstError(reply.data, t.card_failed));
     }
 
     function openTransfer() {
@@ -602,16 +695,20 @@
 
     $('xcSend').addEventListener('click', async () => {
       if (!proof) { note('xcTransferNote', t.choose_receipt); return; }
+      if (inFlight) return;
       const send = $('xcSend');
+      inFlight = true;
       busy(send, true, t.sending);
       const form = new FormData();
       form.append('minutes', String(preset().minutes));
       form.append('payment_method', method);
       form.append('proof_image', proof);
       const reply = await post(urls.transfer, form);
+      inFlight = false;
       busy(send, false, t.send);
       if (!reply.data.ok) { note('xcTransferNote', firstError(reply.data, t.card_failed)); return; }
       offer.pending = { minutes: preset().minutes, method };
+      state.result = 'pending';
       $('xcWaitLead').textContent = fill(t.transfer_sent, { credits: fmt(reply.data.credits) });
       window.dispatchEvent(new CustomEvent('listen:extra-credits-pending'));
       show('wait', 1);
@@ -637,19 +734,25 @@
     dialog.addEventListener('click', (event) => { if (event.target === dialog) close(); });
 
     function close() {
-      if (!dialog.open || dialog.classList.contains('is-closing')) return;
+      if (!dialog.open || inFlight || dialog.classList.contains('is-closing')) return;
       const finish = () => {
         dialog.classList.remove('is-closing');
         dialog.close();
         const done = state.onClose;
-        const purchased = state.purchased;
-        state = { purchased: false, onClose: null, onGenerate: null };
-        if (typeof done === 'function') done(purchased);
+        const result = state.result;
+        state = { result: null, onClose: null, onGenerate: null };
+        // 'purchased', 'pending' (a transfer sent for checking) or null (closed without buying).
+        if (typeof done === 'function') done(result);
       };
       if (reduced()) { finish(); return; }
       dialog.classList.add('is-closing');
       setTimeout(finish, 190);
     }
+
+    // The page behind stays still while the dialog is open (its own contents still scroll).
+    ['wheel', 'touchmove'].forEach((type) => dialog.addEventListener(type, (event) => {
+      if (event.target === dialog) event.preventDefault();
+    }, { passive: false }));
 
     function reset() {
       Object.entries(views).forEach(([name, el]) => {
@@ -659,8 +762,13 @@
         el.classList.remove('is-leaving');
       });
       current = 'buy';
+      stack.getAnimations().forEach((a) => a.cancel());
+      inFlight = false;
+      walletOpen = false;
       ['xcBuyNote', 'xcMethodNote', 'xcTransferNote'].forEach((id) => note(id, ''));
       busy($('xcPay'), false);
+      busy($('xcSend'), false, t.send);
+      busy($('xcUse'), false);
       proof = null;
       $('xcProof').value = '';
       $('xcUpload').classList.remove('is-ok');
@@ -670,9 +778,19 @@
     /**
      * Opens the dialog when the member can buy extra credits now; resolves to false
      * (and opens nothing) otherwise, so the caller shows its own message.
-     * options: { remaining, needed, onClose(purchased), onGenerate() }
+     * options: { remaining, needed, onClose(result), onGenerate() }; result is 'purchased',
+     * 'pending' (a transfer sent for checking) or null.
      */
-    async function open(options = {}) {
+    let opening = null;
+    function open(options = {}) {
+      if (dialog.open) return Promise.resolve(true);
+      // A second call while the first is still loading waits for the same dialog.
+      opening ??= load(options).finally(() => { opening = null; });
+
+      return opening;
+    }
+
+    async function load(options) {
       if (dialog.open) return true;
       let data = null;
       try {
@@ -682,23 +800,26 @@
         data = null;
       }
       if (!data || data.status !== 'ok' || !Array.isArray(data.presets) || data.presets.length === 0) return false;
+      // No way to pay is set up: nothing to offer.
+      if (!data.card_ready && !(data.manual || []).length) return false;
 
       const firstTime = !offer;
       offer = data;
       context = { remaining: Number(options.remaining ?? data.balance?.remaining ?? 0), needed: Number(options.needed || 0) };
-      state = { purchased: false, onClose: options.onClose || null, onGenerate: options.onGenerate || null };
+      state = { result: null, onClose: options.onClose || null, onGenerate: options.onGenerate || null };
       if (firstTime || !offer.presets.some((p) => p.minutes === minutes)) minutes = Number(data.default_minutes) || offer.presets[0].minutes;
       // Members who pay by hand start on their own way of paying; everyone else on their card.
       const manualFirst = (offer.manual || [])[0]?.method;
       if (firstTime || (byHand() && !manual(method))) method = manualFirst || (offer.card ? 'saved' : 'new');
       if (method === 'saved' && !offer.card) method = 'new';
+      if (method === 'new' && !newCard && offer.card) method = 'saved';
       if (!offer.card_ready && !byHand()) method = manualFirst || method;
 
       buildChips();
       reset();
       paintBuy();
       $('xcChange').hidden = !offer.card_ready && (offer.manual || []).length < 2;
-      if (offer.card_ready) loadStripe();
+      if (offer.card_ready) mountWallet();
       dialog.showModal();
       focusFirst(views.buy);
       return true;
