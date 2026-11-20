@@ -3,7 +3,8 @@
 /*
  * For the "Server deploy" workflow's upgrade-check mode: what one member was charged when they
  * changed plan, line by line as Stripe billed it, beside the credits they had used, and what a
- * move up to a higher plan would give them back now. Read-only:
+ * move up to a higher plan would give them back now, and every payment the site recorded for
+ * them (card, by hand, extra credits). Read-only:
  * Stripe is only read (no change, no payment) and the database session is READ ONLY where the
  * server allows it. Prints the member's id, never their name, email or card.
  *
@@ -86,6 +87,38 @@ foreach (Subscription::query()->where('user_id', $user->id)->latest('id')->limit
 echo "\n== Credits used, by period (newest first) ==\n";
 foreach (UsageCounter::query()->where('user_id', $user->id)->latest('id')->limit(6)->get() as $counter) {
     $line($counter->period_ym, number_format((int) $counter->total_chars).' used'.((int) ($counter->extra_chars ?? 0) > 0 ? ', '.number_format((int) $counter->extra_chars).' extra' : '').', row made '.$counter->created_at?->utc()->format('Y-m-d H:i'));
+}
+
+// Every payment the site recorded for the member, whatever the way (card, phone wallet, by hand).
+echo "\n== Payments the site recorded (newest first) ==\n";
+$payments = \App\Models\Payment::query()->where('user_id', $user->id)->latest('paid_at')->limit(20)->get();
+foreach ($payments as $payment) {
+    $line(($payment->paid_at?->utc()->format('Y-m-d H:i') ?? '-').' '.(string) $payment->method, $money((int) $payment->amount_minor, (string) $payment->currency)
+        .((int) $payment->refunded_minor > 0 ? ', refunded '.$money((int) $payment->refunded_minor, (string) $payment->currency) : '')
+        .'  '.trim((string) $payment->description));
+}
+if ($payments->isEmpty()) {
+    echo "  none\n";
+}
+
+echo "\n== Payments by hand: InstaPay, Vodafone Cash (newest first) ==\n";
+$byHand = \App\Models\ManualPaymentRequest::query()->where('user_id', $user->id)->latest('id')->limit(20)->get();
+foreach ($byHand as $request) {
+    $line(($request->created_at?->utc()->format('Y-m-d H:i') ?? '-').' '.(string) $request->payment_method, $request->status.', '.$money((int) $request->expected_amount_minor, (string) $request->currency)
+        .' for '.(Plan::query()->whereKey($request->plan_id)->value('slug') ?? '?').' '.(string) $request->billing_cycle
+        .($request->reviewed_at ? ', reviewed '.$request->reviewed_at->utc()->format('Y-m-d H:i') : ''));
+}
+if ($byHand->isEmpty()) {
+    echo "  none\n";
+}
+
+echo "\n== Extra credits bought (newest first) ==\n";
+$extra = \App\Models\CharPackPurchase::query()->where('user_id', $user->id)->latest('id')->limit(20)->get();
+foreach ($extra as $purchase) {
+    $line(($purchase->created_at?->utc()->format('Y-m-d H:i') ?? '-'), (string) $purchase->status.', '.$money((int) ($purchase->amount_minor ?? 0), (string) ($purchase->currency ?? 'usd')));
+}
+if ($extra->isEmpty()) {
+    echo "  none\n";
 }
 
 $customer = trim((string) $user->stripe_id);
