@@ -128,9 +128,10 @@ name: Server deploy
 #            fails on an error, a wrong status or text shown as its key
 #            (scripts/support/staging_page_check.php). Billing pages are left
 #            out: staging runs the live Stripe keys.
-#   extra-credits-test: staging only, and only when staging holds Stripe TEST
-#            keys (it checks first, prints which kind, never a key, and does
-#            nothing with live keys). Real sandbox payments for extra credits
+#   extra-credits-test: staging only, and only with Stripe TEST keys: the
+#            ones in use, or sandbox keys kept beside live ones in .env, used
+#            for the run only (it prints which kind, never a secret key, and
+#            does nothing without test keys). Real sandbox payments for extra credits
 #            through the app's own code, for one test member made for it: a
 #            card that works, a declined card, a card that needs the bank's
 #            check, the same payment asked for twice, a kept card and a refund

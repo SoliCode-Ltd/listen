@@ -6,10 +6,12 @@
  * code (App\Services\Billing\CharPackCardPayment), for one test member made
  * for it.
  *
- * It first looks at which Stripe keys this server holds and does nothing at all
- * unless both are test keys (sk_test_ / pk_test_): with live keys a "test"
- * payment would be a real one. It never prints a key. Refuses to run on the
- * live site.
+ * It first looks at which Stripe keys this server holds. It pays only with
+ * test keys (sk_test_ / pk_test_): the keys in use when they are test keys, or
+ * else sandbox keys kept beside them in .env, used for this run only (.env and
+ * the site are not changed). With no test keys it does nothing at all: with
+ * live keys a "test" payment would be a real one. It never prints a secret key.
+ * Refuses to run on the live site.
  *
  * What it does, each step printed as passed or FAILED:
  *   1. a card that works (Stripe's test card) pays, and the credits are added;
@@ -31,6 +33,7 @@
  */
 
 use App\Models\CharPackPurchase;
+use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
@@ -75,7 +78,28 @@ echo "== Stripe keys on this server ==\n";
 echo "  secret key: {$secret}   publishable key: {$public}   the key payments use: {$cashier}\n";
 echo '  webhook signing secret: '.(trim((string) config('services.stripe.webhook_secret')) !== '' ? 'set' : 'MISSING')."\n";
 if ($secret !== 'test' || $public !== 'test' || $cashier !== 'test') {
-    fwrite(STDERR, "Not all of them are test keys: no payment is made. Nothing was changed.\n");
+    // The keys in use are not test keys. Sandbox keys kept beside them in .env (under any
+    // name, or on a line that is commented out) are used for this run only: .env and the
+    // site itself are left exactly as they are.
+    $env = (string) @file_get_contents($root.'/.env');
+    $find = function (string $prefix) use ($env): ?array {
+        return preg_match('/^[ \t]*(#[ \t]*)?([A-Za-z0-9_]+)[ \t]*=[ \t]*["\']?('.$prefix.'[A-Za-z0-9]{16,})/m', $env, $m) === 1
+            ? ['name' => $m[2], 'off' => $m[1] !== '', 'value' => $m[3]]
+            : null;
+    };
+    $sk = $find('sk_test_');
+    $pk = $find('pk_test_');
+    echo '  sandbox secret key in .env: '.($sk ? $sk['name'].($sk['off'] ? ' (commented out)' : '') : 'none')."\n";
+    echo '  sandbox publishable key in .env: '.($pk ? $pk['name'].($pk['off'] ? ' (commented out)' : '') : 'none')."\n";
+    if (! $sk || ! $pk) {
+        fwrite(STDERR, "This server pays with keys that are not test keys, and holds no sandbox keys: no payment is made. Nothing was changed.\n");
+        exit(1);
+    }
+    config(['cashier.secret' => $sk['value'], 'cashier.key' => $pk['value'], 'services.stripe.secret' => $sk['value'], 'services.stripe.key' => $pk['value']]);
+    echo "  Using the sandbox keys for this run only.\n";
+}
+if (! str_starts_with((string) config('cashier.secret'), 'sk_test_')) {
+    fwrite(STDERR, "The key payments would use is not a test key: stopping.\n");
     exit(1);
 }
 
@@ -99,6 +123,7 @@ if (getenv('ACTION') === 'clean') {
         }
     }
     CharPackPurchase::query()->where('user_id', $user->id)->delete();
+    Payment::query()->where('user_id', $user->id)->delete();
     UsageCounter::query()->where('user_id', $user->id)->delete();
     Subscription::withoutEvents(fn () => Subscription::query()->where('user_id', $user->id)->delete());
     User::withoutEvents(fn () => $user->delete());
@@ -185,6 +210,7 @@ $bank = $card->startExtraCredits($user, 20, $price(20), 'pm_card_threeDSecure2Re
 $check('it is handed to the browser for the check', $bank['status'] === 'requires_action' && filled($bank['client_secret'] ?? null), 'status '.$bank['status']);
 $check('nothing is added before the check is passed', $left() === $before);
 $again = $card->confirm($bank['purchase']->fresh());
+$browser = ['key' => (string) config('services.stripe.key'), 'payment' => (string) ($bank['client_secret'] ?? '')];
 $check('asking again before the check still adds nothing', $again['status'] !== 'paid' && $left() === $before, 'status '.$again['status']);
 
 // ---------- 4. never twice
@@ -227,5 +253,8 @@ $check('the unused credits of that purchase are taken back', $taken === 9000 && 
 
 echo "\nExtra credits left on the test member: ".number_format($left()).". Its Stripe customer: sandbox.\n";
 echo 'The member is kept for a browser check: '.TEST_EMAIL." (run again with clean to remove it).\n";
+// For trying the bank's check in a real browser: the sandbox's public key (it is public by nature) and
+// the one sandbox payment still waiting for its check. Neither can touch real money.
+echo "For the browser check of the bank's test page: {$browser['key']} {$browser['payment']}\n";
 echo $failed === 0 ? "ALL PASSED\n" : "{$failed} FAILED\n";
 exit($failed === 0 ? 0 : 1);
