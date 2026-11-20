@@ -45,33 +45,17 @@
       display: block;
       font-size: 1rem;
     }
-    /* This month's minutes, kept quiet: the label and the way to add more on one line, the
-       number at the size of the values above, one thin bar of what is left, the renewal day.
-       Out of minutes, the action becomes a small filled button. */
-    .minutes-meter {
-      margin-bottom: 1.25rem;
-      padding: .9rem 1.1rem 1rem;
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-    }
-    .minutes-meter-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 1.9rem; }
-    .minutes-meter-label { color: var(--muted); font-size: .85rem; }
-    .minutes-meter-add {
+    /* Beside the plan's label: the extra-credits window, for a member who wants more minutes
+       without changing plan (or closed the window by mistake). Text, like a hint, not a button. */
+    .plan-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .4rem; }
+    .form-group .plan-label-row label { margin-bottom: 0; }
+    .plan-label-action {
       padding: 0; border: 0; background: none; color: var(--brand-accent);
-      font: inherit; font-size: .88rem; font-weight: 600; line-height: 1.9rem; cursor: pointer; white-space: nowrap;
+      font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer; white-space: nowrap;
       -webkit-tap-highlight-color: transparent;
     }
-    .minutes-meter-add:hover { text-decoration: underline; text-underline-offset: 3px; }
-    .minutes-meter-add:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; border-radius: 4px; }
-    .minutes-meter.is-out .minutes-meter-add { padding: 0 .9rem; border-radius: var(--btn-radius); background: var(--brand-accent); color: #fff; }
-    .minutes-meter.is-out .minutes-meter-add:hover { text-decoration: none; background: var(--brand-hover); }
-    .minutes-meter-value { display: flex; align-items: baseline; gap: .35rem; margin: .15rem 0 .75rem; }
-    .minutes-meter-value strong { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .minutes-meter-value span { color: var(--muted); font-size: .9rem; }
-    .minutes-meter-track { height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
-    .minutes-meter-track i { display: block; height: 100%; border-radius: inherit; background: var(--brand-accent); }
-    .minutes-meter-renews { margin: .6rem 0 0; color: var(--muted); font-size: .8rem; }
+    .plan-label-action:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .plan-label-action:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; border-radius: 4px; }
 
     /* ── Grid layout ── */
     .grid-layout {
@@ -1134,23 +1118,6 @@
       </div>
     </div>
 
-    @if(($canBuyExtraCredits ?? false) && ! empty($creditsMeter))
-      {{-- This month's minutes, as the studio shows them, and the way back to the extra-credits
-           window for a member who closed it (components/extra-credits-dialog). --}}
-      <section class="minutes-meter{{ $creditsMeter['out'] ? ' is-out' : '' }}" aria-labelledby="minutesMeterLabel">
-        <div class="minutes-meter-head">
-          <span class="minutes-meter-label" id="minutesMeterLabel">{{ __('ui.dashboard.minutes_left_label') }}</span>
-          <button type="button" class="minutes-meter-add" data-extra-credits-open>{{ __('ui.extra_credits.open') }}</button>
-        </div>
-        <p class="minutes-meter-value">
-          <strong>{{ number_format($creditsMeter['minutes_left']) }}</strong>
-          <span>{{ __('ui.dashboard.minutes_left_of', ['total' => number_format($creditsMeter['minutes_total'])]) }}</span>
-        </p>
-        <div class="minutes-meter-track" role="img" aria-label="{{ __('ui.dashboard.credits_used_percent', ['percent' => $creditsMeter['used_percent']]) }}"><i style="width: {{ $creditsMeter['left_percent'] }}%"></i></div>
-        <p class="minutes-meter-renews">{{ __('ui.billing.minutes_renew_on', ['date' => $creditsMeter['renews_on']]) }}</p>
-      </section>
-    @endif
-
     <div class="grid-layout">
       <div class="card">
         <div class="card-header">
@@ -1173,7 +1140,15 @@
           <input type="hidden" name="payment_method" id="manualMethodField" value="{{ $selectedPaymentMethod }}">
           <div class="form-row">
             <div class="form-group">
-              <label for="plan">{{ __('ui.billing.plan') }}</label>
+              @if($canBuyExtraCredits ?? false)
+                {{-- The extra-credits window again (components/extra-credits-dialog). --}}
+                <div class="plan-label-row">
+                  <label for="plan">{{ __('ui.billing.plan') }}</label>
+                  <button type="button" class="plan-label-action" data-extra-credits-open>{{ __('ui.billing.just_add_credits') }}</button>
+                </div>
+              @else
+                <label for="plan">{{ __('ui.billing.plan') }}</label>
+              @endif
               <select id="plan" {{ $hasUpgradePlans ? '' : 'disabled' }}>
                 @if($hasUpgradePlans)
                   @foreach($upgradePlansForUi as $plan)

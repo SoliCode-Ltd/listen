@@ -507,7 +507,7 @@ return [
         'voice_quality' => 'جودة الصوت',
         'saved_card' => 'البطاقة المحفوظة',
         'not_saved' => 'غير محفوظة',
-        'minutes_renew_on' => 'تتجدد دقائقك في :date.',
+        'just_add_credits' => 'أو أضف رصيداً فقط',
         'upgrade_plan' => 'ترقية الخطة',
         'change_plan' => 'تغيير الخطة',
         'upgrade_plan_hint' => 'اختر الخطة ودورة الفوترة ثم أكّد الدفع.',
