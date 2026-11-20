@@ -148,7 +148,8 @@ name: Server deploy
 #            only). Real moves up to a higher plan in the Stripe sandbox through
 #            the page's own code: the money back for unused credits, the amount
 #            charged against the amount shown, a declined card, an offer on the
-#            new plan, and the new plan starting with its full credits
+#            new plan, and the new plan starting with its full credits, once
+#            in each of Stripe's billing modes (live bills in classic)
 #            (scripts/support/upgrade_stripe_test.php). Staging keeps no trace:
 #            what it writes is rolled back, and the sandbox customers are
 #            deleted. Needs mode migrate first.
@@ -656,7 +657,7 @@ jobs:
           if [ "$MODE" = upgrade-test ]; then
             [ "$TARGET" = staging ] || { echo "upgrade-test runs on staging only"; exit 1; }
             failed=0
-            $S "$FIND; php" < scripts/support/upgrade_stripe_test.php || failed=1
+            for B in classic flexible; do $S "$FIND; BILLING_MODE=$B php" < scripts/support/upgrade_stripe_test.php || failed=1; done
             rm -f ~/.ssh/id_deploy
             exit "$failed"
           fi

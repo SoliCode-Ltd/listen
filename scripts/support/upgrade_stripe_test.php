@@ -29,6 +29,10 @@
  *   D. a declined card: nothing charged, nothing owed, the plan and credits as they were
  *   E. an offer on the new plan takes nothing off the money back
  *
+ * BILLING_MODE (classic or flexible) is how Stripe bills the test subscriptions.
+ * The live account bills in classic mode and the sandbox, left alone, in flexible:
+ * the workflow runs the check once in each.
+ *
  *   ssh user@host 'cd ~/public_html && php' < scripts/support/upgrade_stripe_test.php
  */
 
@@ -117,6 +121,8 @@ if (! $starter || ! $creator || (int) $starter->monthly_chars <= 0 || (int) $cre
     exit(1);
 }
 $allowance = (int) $starter->monthly_chars;
+$billingMode = in_array(getenv('BILLING_MODE'), ['classic', 'flexible'], true) ? (string) getenv('BILLING_MODE') : null;
+echo "\n== Subscriptions billed in ".($billingMode ?? "the sandbox account's own")." mode ==\n";
 
 $stripe = Cashier::stripe();
 $failed = 0;
@@ -158,7 +164,7 @@ try {
     $subscriptionOf = fn (string $id) => $stripe->subscriptions->retrieve($id, []);
 
     /** A member who paid for the $9 plan by card and has used $used of its credits. */
-    $member = function (string $label, int $used, bool $halfPrice = false) use ($stripe, $low, $coupon, $starter, &$customers): array {
+    $member = function (string $label, int $used, bool $halfPrice = false) use ($stripe, $low, $coupon, $starter, $billingMode, $check, &$customers): array {
         $customer = $stripe->customers->create(['name' => 'Staging upgrade test '.$label]);
         $customers[] = $customer->id;
         $card = $stripe->paymentMethods->attach('pm_card_visa', ['customer' => $customer->id]);
@@ -168,7 +174,11 @@ try {
             'items' => [['price' => $low->id]],
             'default_payment_method' => $card->id,
             'discounts' => $halfPrice ? [['coupon' => $coupon->id]] : null,
+            'billing_mode' => $billingMode ? ['type' => $billingMode] : null,
         ]));
+        if ($billingMode !== null && $label === 'a') {
+            $check("Stripe bills the test subscriptions in {$billingMode} mode", (string) ($sub->billing_mode->type ?? 'classic') === $billingMode, (string) ($sub->billing_mode->type ?? 'classic'));
+        }
         $item = $sub->items->data[0];
         $start = Carbon::createFromTimestamp((int) ($item->current_period_start ?? $sub->current_period_start));
         $end = Carbon::createFromTimestamp((int) ($item->current_period_end ?? $sub->current_period_end));
