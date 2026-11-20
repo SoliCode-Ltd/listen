@@ -7,6 +7,7 @@ use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\Billing\ExtraCredits;
 use App\Services\Newsletter\CreditsEndedEmail;
+use App\Services\Newsletter\NewsletterPace;
 use App\Services\PlanAccessService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
@@ -20,6 +21,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\HtmlString;
 use Throwable;
 
@@ -91,12 +93,19 @@ class CreditsEndedEmailPage extends Page implements HasForms
                         TextInput::make('cta_label_ar')->label('Button text')->maxLength(80)->extraInputAttributes(['dir' => 'rtl']),
                         TextInput::make('footer_ar')->label('Small print at the bottom')->maxLength(300)->extraInputAttributes(['dir' => 'rtl']),
                     ]),
+                Section::make('Members who already ran out')
+                    ->description('Members whose credits had already run out before this email existed never got it: it goes out when a request is refused, and they may not have tried since. The button at the top sends it to them, a few a minute, so the mailbox is never flooded. Each member is checked again just before their email goes: anyone who renewed, bought credits or got it meanwhile is left out, and nobody gets it twice.')
+                    ->schema([
+                        Placeholder::make('backfill')
+                            ->hiddenLabel()
+                            ->content(fn (): HtmlString => $this->backfillStatus()),
+                    ]),
                 Section::make('Sent lately')
                     ->description('Members this email went to in the last 30 days.')
                     ->collapsed()
                     ->schema([
                         Placeholder::make('sent')
-                            ->label('')
+                            ->hiddenLabel()
                             ->content(fn (): HtmlString|string => $this->sentTable()),
                     ]),
             ])
@@ -113,6 +122,43 @@ class CreditsEndedEmailPage extends Page implements HasForms
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('sendAlreadyOut')
+                ->label('Send to members who already ran out')
+                ->icon('heroicon-o-users')
+                ->visible(fn (): bool => ! $this->backfillRunning())
+                ->modalHeading('Send this email to members who already ran out')
+                ->modalDescription(fn (): string => $this->alreadyOutDescription())
+                ->modalSubmitActionLabel('Send it to them')
+                ->modalSubmitAction(fn (Action $action) => $this->alreadyOutCount() > 0 ? $action : false)
+                ->action(function (): void {
+                    $email = app(CreditsEndedEmail::class);
+                    $count = $email->startBackfill((int) auth()->id());
+                    $this->alreadyOutCount = null;
+                    if ($count === 0) {
+                        Notification::make()->title('Nothing was sent')->body($email->backfillBlocker() ?? 'No member is waiting for this email now.')->warning()->send();
+
+                        return;
+                    }
+
+                    Notification::make()
+                        ->title('Sending to '.number_format($count).' '.($count === 1 ? 'member' : 'members'))
+                        ->body('About '.$this->minutesFor($count).'. The progress shows below; you can stop it at any time.')
+                        ->success()
+                        ->send();
+                }),
+            Action::make('stopAlreadyOut')
+                ->label('Stop sending to members who already ran out')
+                ->icon('heroicon-o-stop')
+                ->color('danger')
+                ->visible(fn (): bool => $this->backfillRunning())
+                ->requiresConfirmation()
+                ->modalHeading('Stop sending?')
+                ->modalDescription('Members not reached yet get nothing. Those already sent it keep it. You can start again later: nobody gets it twice.')
+                ->modalSubmitActionLabel('Stop sending')
+                ->action(function (): void {
+                    app(CreditsEndedEmail::class)->stopBackfill();
+                    Notification::make()->title('Stopped')->success()->send();
+                }),
             Action::make('preview')
                 ->label('Preview')
                 ->icon('heroicon-o-eye')
@@ -181,6 +227,65 @@ class CreditsEndedEmailPage extends Page implements HasForms
         }
 
         return $settings;
+    }
+
+    /** Counted once each time the send window opens (it looks at every member on a paid plan). */
+    public ?int $alreadyOutCount = null;
+
+    private function alreadyOutCount(): int
+    {
+        return $this->alreadyOutCount ??= count(app(CreditsEndedEmail::class)->alreadyOut());
+    }
+
+    private function alreadyOutDescription(): string
+    {
+        $this->alreadyOutCount = null;
+        $email = app(CreditsEndedEmail::class);
+        if (($blocker = $email->backfillBlocker()) !== null) {
+            return 'It cannot be sent now. '.$blocker;
+        }
+
+        $count = $this->alreadyOutCount();
+        if ($count === 0) {
+            return 'Nobody is waiting for it: every member on a paid plan who has run out has already had it for their current credit period.';
+        }
+
+        return number_format($count).' '.($count === 1 ? 'member on a paid plan has' : 'members on a paid plan have').' run out of credits and not had this email for their current credit period. '
+            .'It goes to them a few a minute (about '.$this->minutesFor($count).'), with your saved words, and waits while a newsletter batch is going out. '
+            .'Each one is checked again just before it is sent. Save any changes to the words before you send.';
+    }
+
+    private function minutesFor(int $count): string
+    {
+        $minutes = (int) ceil($count / max(1, app(NewsletterPace::class)->perMinute()));
+
+        return $minutes <= 1 ? 'a minute' : ($minutes < 90 ? $minutes.' minutes' : round($minutes / 60, 1).' hours');
+    }
+
+    private function backfillRunning(): bool
+    {
+        $state = app(CreditsEndedEmail::class)->backfill();
+
+        return $state !== null && $state['ids'] !== [];
+    }
+
+    private function backfillStatus(): HtmlString
+    {
+        $state = app(CreditsEndedEmail::class)->backfill();
+        $when = fn (?string $iso): string => $iso ? Carbon::parse($iso)->utc()->format('j M Y, H:i').' UTC' : '';
+        if ($state === null) {
+            return new HtmlString('Not sent yet. Press <b>Send to members who already ran out</b> at the top to see how many members it would go to before anything is sent.');
+        }
+
+        $line = number_format($state['sent']).' of '.number_format($state['total']).' sent, '.number_format($state['skipped']).' left out';
+        if ($state['ids'] !== []) {
+            return new HtmlString('<span wire:poll.20s>Sending now: '.e($line).', '.number_format(count($state['ids'])).' waiting (about '.e($this->minutesFor(count($state['ids']))).'). Started '.e($when($state['started_at'])).'.</span>');
+        }
+
+        $line .= $state['not_reached'] > 0 ? ', '.number_format($state['not_reached']).' not reached' : '';
+
+        return new HtmlString(e(($state['stopped'] ? 'Stopped on ' : 'Finished on ').$when($state['finished_at']).': '.$line.'.')
+            .'<br><span style="opacity:.7">"Left out" are members who renewed, bought credits or got it on their own meanwhile, or whose address refused it three times.</span>');
     }
 
     private function sentTable(): HtmlString|string

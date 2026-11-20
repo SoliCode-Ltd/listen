@@ -8,6 +8,7 @@ use App\Models\BillingSubscription;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
+use App\Models\UsageCounter;
 use App\Models\User;
 use App\Models\Voice;
 use App\Services\Billing\ExtraCredits;
@@ -168,6 +169,135 @@ class CreditsEndedEmailTest extends TestCase
 
         $this->assertNull(CreditPeriod::counter($user->id)->credits_ended_email_at, 'left free to be sent later');
         $this->assertTrue(Cache::has('credits_ended_email:retry:'.$user->id));
+    }
+
+    public function test_members_who_already_ran_out_get_it_a_few_a_minute_and_once_each(): void
+    {
+        config(['newsletter.per_minute' => 3]);
+        $plan = $this->apiPlan();
+        $out = collect(range(1, 4))->map(function () use ($plan): User {
+            $member = $this->apiMember($plan);
+            CreditPeriod::counter($member->id)->update(['total_chars' => 90000]);
+
+            return $member;
+        });
+        $plenty = $this->apiMember($plan);
+        CreditPeriod::counter($plenty->id)->update(['total_chars' => 1000]);
+        $unused = $this->apiMember($plan);
+        $already = $this->apiMember($plan);
+        CreditPeriod::counter($already->id)->update(['total_chars' => 90000, 'credits_ended_email_at' => now()]);
+
+        $email = app(CreditsEndedEmail::class);
+        $this->assertSame($out->pluck('id')->all(), $email->alreadyOut());
+        $this->assertSame(0, UsageCounter::query()->where('user_id', $unused->id)->count(), 'counting makes no usage rows');
+
+        $this->assertSame(4, $email->startBackfill());
+        $this->assertSame(0, $email->startBackfill(), 'one send at a time');
+        Mail::assertNotSent(CreditsEndedMail::class);
+
+        // One of them buys extra credits before their turn: left out.
+        $extra = app(ExtraCredits::class);
+        $extra->markPaid($extra->startPurchase($out[3], 10, 'card', 200, 'USD'));
+
+        $this->artisan('listen:credits-ended-backfill')->assertSuccessful();
+        Mail::assertSent(CreditsEndedMail::class, 3);
+        $this->assertSame([$out[3]->id], $email->backfill()['ids']);
+
+        $this->artisan('listen:credits-ended-backfill')->assertSuccessful();
+        Mail::assertSent(CreditsEndedMail::class, 3);
+        foreach ($out->take(3) as $member) {
+            Mail::assertSent(CreditsEndedMail::class, fn (CreditsEndedMail $mail): bool => $mail->hasTo($member->email));
+        }
+        $state = $email->backfill();
+        $this->assertSame([[], 4, 3, 1], [$state['ids'], $state['total'], $state['sent'], $state['skipped']]);
+        $this->assertNotNull($state['finished_at']);
+
+        // Nobody gets it twice, from this send or by running out again in the period.
+        $this->assertFalse($email->memberRanOut($out[0]->id));
+        $this->assertSame([], $email->alreadyOut());
+        $this->artisan('listen:credits-ended-backfill')->assertSuccessful();
+        Mail::assertSent(CreditsEndedMail::class, 3);
+    }
+
+    public function test_it_is_not_sent_to_members_already_out_while_it_could_not_help_them_or_the_mailbox_is_held(): void
+    {
+        $member = $this->apiMember();
+        CreditPeriod::counter($member->id)->update(['total_chars' => 90000]);
+        $email = app(CreditsEndedEmail::class);
+
+        SiteSetting::set(ExtraCredits::ENABLED_SETTING, '0', 'billing');
+        $this->assertStringContainsString('Sell extra credits', (string) $email->backfillBlocker());
+        $this->assertSame([[], 0], [$email->alreadyOut(), $email->startBackfill()]);
+        SiteSetting::set(ExtraCredits::ENABLED_SETTING, '1', 'billing');
+
+        config(['listen.live_actions' => false]);
+        $this->assertStringContainsString('not the live site', (string) $email->backfillBlocker());
+        $this->assertSame(0, $email->startBackfill());
+        config(['listen.live_actions' => true]);
+
+        $this->assertNull($email->backfillBlocker());
+        $this->assertSame(1, $email->startBackfill());
+
+        // The mailbox is held (it refused mail): nothing goes until the hold ends.
+        SiteSetting::set('newsletter_send_hold_until', now()->addMinutes(30)->toIso8601String(), 'newsletter');
+        $this->artisan('listen:credits-ended-backfill')->assertSuccessful();
+        Mail::assertNotSent(CreditsEndedMail::class);
+        SiteSetting::set('newsletter_send_hold_until', '', 'newsletter');
+
+        $this->artisan('listen:credits-ended-backfill')->assertSuccessful();
+        Mail::assertSent(CreditsEndedMail::class, 1);
+    }
+
+    public function test_a_send_to_members_already_out_that_fails_is_tried_again_then_given_up(): void
+    {
+        $member = $this->apiMember();
+        CreditPeriod::counter($member->id)->update(['total_chars' => 90000]);
+        $email = app(CreditsEndedEmail::class);
+        $this->assertSame(1, $email->startBackfill());
+        Mail::shouldReceive('mailer')->andThrow(new \RuntimeException('The mail server did not answer.'));
+
+        foreach ([1, 2] as $tries) {
+            $this->artisan('listen:credits-ended-backfill')->assertSuccessful();
+            $state = $email->backfill();
+            $this->assertSame([[$member->id], $tries], [$state['ids'], $state['failures'][(string) $member->id]]);
+            // Within the hour it waits; then it is tried again.
+            $this->artisan('listen:credits-ended-backfill')->assertSuccessful();
+            $this->assertSame($tries, $email->backfill()['failures'][(string) $member->id]);
+            Cache::forget('credits_ended_email:retry:'.$member->id);
+        }
+
+        $this->artisan('listen:credits-ended-backfill')->assertSuccessful();
+        $state = $email->backfill();
+        $this->assertSame([[], 0, 1], [$state['ids'], $state['sent'], $state['skipped']]);
+        $this->assertNull(CreditPeriod::counter($member->id)->credits_ended_email_at, 'left free for the automatic email');
+    }
+
+    public function test_the_admin_sends_it_to_members_already_out_and_can_stop(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $plan = $this->apiPlan();
+        foreach (range(1, 2) as $i) {
+            CreditPeriod::counter($this->apiMember($plan)->id)->update(['total_chars' => 90000]);
+        }
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(CreditsEndedEmailPage::class)
+            ->assertSee('Not sent yet.')
+            ->mountAction('sendAlreadyOut')
+            ->assertMountedActionModalSee('2 members on a paid plan have run out of credits')
+            ->callMountedAction()
+            ->assertNotified('Sending to 2 members')
+            ->assertActionHidden('sendAlreadyOut')
+            ->assertActionVisible('stopAlreadyOut')
+            ->assertSee('Sending now: 0 of 2 sent, 0 left out, 2 waiting')
+            ->callAction('stopAlreadyOut')
+            ->assertNotified('Stopped')
+            ->assertActionVisible('sendAlreadyOut');
+
+        $state = app(CreditsEndedEmail::class)->backfill();
+        $this->assertSame([[], 0, 0, 2, true], [$state['ids'], $state['sent'], $state['skipped'], $state['not_reached'], $state['stopped']]);
+        Mail::assertNotSent(CreditsEndedMail::class);
     }
 
     public function test_the_admin_edits_its_words_and_sends_a_test(): void

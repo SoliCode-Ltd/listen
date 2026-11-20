@@ -163,14 +163,21 @@ class BillingPageClientTest extends TestCase
             ->assertSee("elements.create('expressCheckout', {", false)
             // Apple Pay in every desktop browser (paid from an iPhone), Google Pay in Safari and Firefox
             // too, but an iPhone or iPad gets Apple Pay only.
-            ->assertSee("paymentMethods: { applePay: 'always', googlePay: appleTouch ? 'never' : 'always', link: 'never', paypal: 'never', amazonPay: 'never', klarna: 'never' },", false)
+            // Apple Pay everywhere, Google Pay except on an iPhone or iPad, and no other wallet.
+            ->assertSee("var wallets = appleTouch ? ['applePay'] : ['applePay', 'googlePay'];", false)
+            ->assertSee("var methods = { link: 'never', paypal: 'never', amazonPay: 'never', klarna: 'never' };", false)
+            ->assertSee("methods.applePay = list.indexOf('applePay') >= 0 ? 'always' : 'never';", false)
+            ->assertSee("methods.googlePay = list.indexOf('googlePay') >= 0 ? 'always' : 'never';", false)
             ->assertSee("var appleTouch = /iPhone|iPad|iPod/.test(navigator.userAgent || '')", false)
             // Both wallets side by side on a wide screen, one under the other on a phone, never in a menu.
-            ->assertSee("layout: { maxColumns: narrow ? 1 : 2, overflow: 'never' },", false)
+            ->assertSee("layout: { maxColumns: split ? 1 : (narrow ? 1 : 2), overflow: 'never' },", false)
+            // The checkout keeps Stripe's own row: only the extra-credits dialog asks for a button per wallet.
+            ->assertDontSee('sideBySide: true', false)
             // Logos only: the wallets' own words would be in their fonts, not the site's.
             ->assertSee("buttonType: { applePay: 'plain', googlePay: 'plain' },", false)
             // The buttons speak the page's language.
-            ->assertSee("locale: String(document.documentElement.lang || '').toLowerCase().indexOf('ar') === 0 ? 'ar' : 'en',", false)
+            ->assertSee("var locale = String(document.documentElement.lang || '').toLowerCase().indexOf('ar') === 0 ? 'ar' : 'en';", false)
+            ->assertSee('locale: locale,', false)
             // It is shown the US dollar amount charged today; a free trial only takes its card.
             ->assertSee("if (!selected || selected.method !== 'stripe' || isCurrentChoice()) return null;", false)
             ->assertSee('if (isTrialCheckout()) return { selected: selected, setup: true };', false)

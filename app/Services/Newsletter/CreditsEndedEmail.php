@@ -6,6 +6,7 @@ use App\Mail\CreditsEndedMail;
 use App\Models\Newsletter;
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Models\Subscription;
 use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\Billing\ExtraCredits;
@@ -43,6 +44,22 @@ class CreditsEndedEmail
 
     /** After a send that failed, how long before it is tried again for that member. */
     private const RETRY_MINUTES = 60;
+
+    /** The send to members who already ran out (Newsletter → Credits ended): who is waiting, and how it went. */
+    public const BACKFILL_SETTING = 'credits_ended_backfill';
+
+    private const BACKFILL_LOCK = 'credits-ended-backfill';
+
+    /** Members looked at in one run, at most, so a run stays short even when many are left out. */
+    private const BACKFILL_LOOKS_PER_RUN = 60;
+
+    private const SENT = 'sent';
+
+    private const SKIPPED = 'skipped';
+
+    private const LATER = 'later';
+
+    private const FAILED = 'failed';
 
     public function __construct(
         private readonly ExtraCredits $extraCredits,
@@ -111,60 +128,291 @@ class CreditsEndedEmail
     public function memberRanOut(int $userId): bool
     {
         try {
-            if (! ExtraCredits::ready() || ! $this->enabled()
-                || $this->extraCredits->status($userId) !== ExtraCredits::STATUS_OK
-                // Staging runs on a copy of live members: they never get emails from it.
-                || ! LiveServer::allowsCustomerActions()
-                || Cache::has($this->retryKey($userId))) {
-                return false;
-            }
-
-            $user = User::query()->find($userId);
-            if (! $user || ! filter_var((string) $user->email, FILTER_VALIDATE_EMAIL) || PaidWelcomeEmail::isPhoneSignupAddress((string) $user->email)) {
-                return false;
-            }
-
-            // A plan cancelled to end with its period has no renewal to speak of: its member is not written to.
-            if ($this->extraCredits->planEnds($userId)) {
-                return false;
-            }
-
-            // Looked at again now: credits handed back since (a voice that failed) mean they did not run out.
-            $left = (int) UsageSnapshot::for($userId, $this->plans->resolveQuotaPlanForUserId($userId), CreditPeriod::counter($userId))['remaining_chars'];
-            if ($left >= Credits::PER_MINUTE) {
-                return false;
-            }
-
-            $period = CreditPeriod::current($userId);
-            // Claimed first, so two requests refused at the same moment send one email.
-            $claimed = UsageCounter::query()
-                ->where('user_id', $userId)
-                ->where('period_ym', $period['key'])
-                ->whereNull('credits_ended_email_at')
-                ->update(['credits_ended_email_at' => now()]);
-            if ($claimed !== 1) {
-                return false;
-            }
-
-            try {
-                $this->send($user, $this->plans->resolveActivePlanForUserId($userId), $period['ends_at']);
-            } catch (\Throwable $e) {
-                // Not sent: free to be tried again, a little later.
-                UsageCounter::query()->where('user_id', $userId)->where('period_ym', $period['key'])->update(['credits_ended_email_at' => null]);
-                Cache::put($this->retryKey($userId), true, now()->addMinutes(self::RETRY_MINUTES));
-                Log::warning('The credits-ended email could not be sent.', ['user_id' => $userId, 'error' => $e->getMessage()]);
-
-                return false;
-            }
-
-            Log::info('Credits-ended email sent.', ['user_id' => $userId, 'period' => $period['key']]);
-
-            return true;
+            return $this->deliver($userId) === self::SENT;
         } catch (\Throwable $e) {
             Log::warning('The credits-ended email check failed.', ['user_id' => $userId, 'error' => $e->getMessage()]);
 
             return false;
         }
+    }
+
+    /**
+     * Whether the email would go to this member now: nothing is claimed or sent.
+     * Only a member with a usage row for this period can have run out, so no row
+     * is made for anyone while counting.
+     */
+    public function isDue(int $userId): bool
+    {
+        if (! $this->canSendAtAll() || Cache::has($this->retryKey($userId))) {
+            return false;
+        }
+
+        $period = CreditPeriod::current($userId);
+        $unsent = UsageCounter::query()
+            ->where('user_id', $userId)
+            ->where('period_ym', $period['key'])
+            ->whereNull('credits_ended_email_at')
+            ->exists();
+
+        return $unsent && $this->dueMember($userId) !== null;
+    }
+
+    /**
+     * Sends it when it is due: 'sent', 'skipped' (not due, or already sent this
+     * period), 'later' (a send failed less than an hour ago) or 'failed'.
+     */
+    private function deliver(int $userId): string
+    {
+        if (! $this->canSendAtAll()) {
+            return self::SKIPPED;
+        }
+        if (Cache::has($this->retryKey($userId))) {
+            return self::LATER;
+        }
+
+        $user = $this->dueMember($userId);
+        if (! $user) {
+            return self::SKIPPED;
+        }
+
+        $period = CreditPeriod::current($userId);
+        // Claimed first, so two requests refused at the same moment send one email.
+        $claimed = UsageCounter::query()
+            ->where('user_id', $userId)
+            ->where('period_ym', $period['key'])
+            ->whereNull('credits_ended_email_at')
+            ->update(['credits_ended_email_at' => now()]);
+        if ($claimed !== 1) {
+            return self::SKIPPED;
+        }
+
+        try {
+            $this->send($user, $this->plans->resolveActivePlanForUserId($userId), $period['ends_at']);
+        } catch (\Throwable $e) {
+            // Not sent: free to be tried again, a little later.
+            UsageCounter::query()->where('user_id', $userId)->where('period_ym', $period['key'])->update(['credits_ended_email_at' => null]);
+            Cache::put($this->retryKey($userId), true, now()->addMinutes(self::RETRY_MINUTES));
+            Log::warning('The credits-ended email could not be sent.', ['user_id' => $userId, 'error' => $e->getMessage()]);
+
+            return self::FAILED;
+        }
+
+        Log::info('Credits-ended email sent.', ['user_id' => $userId, 'period' => $period['key']]);
+
+        return self::SENT;
+    }
+
+    /** The switches that hold for every member: the email on, extra credits on sale, the live site. */
+    private function canSendAtAll(): bool
+    {
+        // Staging runs on a copy of live members: they never get emails from it.
+        return ExtraCredits::ready() && $this->enabled() && ExtraCredits::enabled() && LiveServer::allowsCustomerActions();
+    }
+
+    /** The member, when they can buy extra credits and have less than a minute of voice left. */
+    private function dueMember(int $userId): ?User
+    {
+        if ($this->extraCredits->status($userId) !== ExtraCredits::STATUS_OK) {
+            return null;
+        }
+
+        $user = User::query()->find($userId);
+        if (! $user || ! filter_var((string) $user->email, FILTER_VALIDATE_EMAIL) || PaidWelcomeEmail::isPhoneSignupAddress((string) $user->email)) {
+            return null;
+        }
+
+        // A plan cancelled to end with its period has no renewal to speak of: its member is not written to.
+        if ($this->extraCredits->planEnds($userId)) {
+            return null;
+        }
+
+        // Looked at again now: credits handed back since (a voice that failed) mean they did not run out.
+        $left = (int) UsageSnapshot::for($userId, $this->plans->resolveQuotaPlanForUserId($userId), CreditPeriod::counter($userId))['remaining_chars'];
+
+        return $left < Credits::PER_MINUTE ? $user : null;
+    }
+
+    // ---------- members who ran out before this email existed
+
+    /**
+     * Members on a paid plan whose credits have run out and who have not had
+     * this email for the period: those who ran out before it existed, or whose
+     * last request was not refused. Lowest member id first.
+     *
+     * @return list<int>
+     */
+    public function alreadyOut(): array
+    {
+        if (! $this->canSendAtAll()) {
+            return [];
+        }
+
+        $ids = Subscription::query()
+            ->whereIn('status', ['active', 'trialing', 'past_due'])
+            ->whereHas('plan', fn ($plan) => $plan->where('price_cents', '>', 0))
+            ->distinct()
+            ->orderBy('user_id')
+            ->pluck('user_id');
+
+        return $ids->map(fn ($id): int => (int) $id)->filter(fn (int $id): bool => $this->isDue($id))->values()->all();
+    }
+
+    /**
+     * Why it cannot be sent to them now, in the admin's words, or null.
+     */
+    public function backfillBlocker(): ?string
+    {
+        return match (true) {
+            ! ExtraCredits::ready() => 'Run the migrations first.',
+            ! LiveServer::allowsCustomerActions() => 'This is not the live site: it never emails members.',
+            ! $this->enabled() => '"Send the email automatically" is off above. Switch it on and save first.',
+            ! ExtraCredits::enabled() => '"Sell extra credits" is off in Billing Settings, so the email\'s button would lead nowhere. Switch it on first.',
+            default => null,
+        };
+    }
+
+    /**
+     * Starts sending it to the members who already ran out, a few a minute
+     * (listen:credits-ended-backfill). Returns how many are waiting for it.
+     */
+    public function startBackfill(?int $startedBy = null): int
+    {
+        if ($this->backfillBlocker() !== null) {
+            return 0;
+        }
+
+        return (int) Cache::lock(self::BACKFILL_LOCK, 300)->block(30, function () use ($startedBy): int {
+            $state = $this->backfill();
+            if ($state !== null && $state['ids'] !== []) {
+                return 0;
+            }
+
+            $ids = $this->alreadyOut();
+            if ($ids === []) {
+                return 0;
+            }
+
+            $this->saveBackfill([
+                'ids' => $ids,
+                'total' => count($ids),
+                'sent' => 0,
+                'skipped' => 0,
+                'not_reached' => 0,
+                'failures' => [],
+                'started_at' => now()->toIso8601String(),
+                'started_by' => $startedBy,
+                'finished_at' => null,
+                'stopped' => false,
+            ]);
+            Log::info('Credits-ended email: sending to members who already ran out.', ['members' => count($ids), 'by' => $startedBy]);
+
+            return count($ids);
+        });
+    }
+
+    public function stopBackfill(): void
+    {
+        Cache::lock(self::BACKFILL_LOCK, 300)->block(30, function (): void {
+            $state = $this->backfill();
+            if ($state === null || $state['ids'] === []) {
+                return;
+            }
+
+            $state['not_reached'] = count($state['ids']);
+            $state['ids'] = [];
+            $state['stopped'] = true;
+            $state['finished_at'] = now()->toIso8601String();
+            $this->saveBackfill($state);
+        });
+    }
+
+    /**
+     * The send to members who already ran out: waiting ids, counts and times,
+     * or null when it was never started.
+     *
+     * @return array{ids:list<int>, total:int, sent:int, skipped:int, not_reached:int, failures:array<string,int>, started_at:?string, started_by:?int, finished_at:?string, stopped:bool}|null
+     */
+    public function backfill(): ?array
+    {
+        $raw = SiteSetting::get(self::BACKFILL_SETTING);
+        $state = is_string($raw) ? json_decode($raw, true) : (is_array($raw) ? $raw : null);
+        if (! is_array($state)) {
+            return null;
+        }
+
+        return [
+            'ids' => array_values(array_map('intval', (array) ($state['ids'] ?? []))),
+            'total' => (int) ($state['total'] ?? 0),
+            'sent' => (int) ($state['sent'] ?? 0),
+            'skipped' => (int) ($state['skipped'] ?? 0),
+            'not_reached' => (int) ($state['not_reached'] ?? 0),
+            'failures' => array_map('intval', (array) ($state['failures'] ?? [])),
+            'started_at' => $state['started_at'] ?? null,
+            'started_by' => isset($state['started_by']) ? (int) $state['started_by'] : null,
+            'finished_at' => $state['finished_at'] ?? null,
+            'stopped' => (bool) ($state['stopped'] ?? false),
+        ];
+    }
+
+    /**
+     * Sends the next few (at most $limit emails), each checked again just before
+     * it goes. A member who bought credits, renewed or already got it meanwhile is
+     * left out; a send that fails is tried again later (three times at most).
+     *
+     * @return array{sent:int, skipped:int, waiting:int}
+     */
+    public function sendBackfillBatch(int $limit): array
+    {
+        return Cache::lock(self::BACKFILL_LOCK, 300)->block(5, function () use ($limit): array {
+            $state = $this->backfill();
+            if ($state === null || $state['ids'] === []) {
+                return ['sent' => 0, 'skipped' => 0, 'waiting' => 0];
+            }
+
+            $queue = $state['ids'];
+            $later = [];
+            $sent = 0;
+            $skipped = 0;
+            $looked = 0;
+            while ($queue !== [] && $sent < $limit && $looked < self::BACKFILL_LOOKS_PER_RUN) {
+                $id = array_shift($queue);
+                $looked++;
+                $result = $this->deliver($id);
+                if ($result === self::SENT) {
+                    $sent++;
+                } elseif ($result === self::SKIPPED) {
+                    $skipped++;
+                } elseif ($result === self::LATER) {
+                    $later[] = $id;
+                } else {
+                    $tries = (int) ($state['failures'][(string) $id] ?? 0) + 1;
+                    $state['failures'][(string) $id] = $tries;
+                    if ($tries >= 3) {
+                        $skipped++;
+                    } else {
+                        $later[] = $id;
+                    }
+                    // The mailbox may be refusing for now: the rest wait for the next run.
+                    break;
+                }
+            }
+
+            $state['ids'] = array_values(array_merge($queue, $later));
+            $state['sent'] += $sent;
+            $state['skipped'] += $skipped;
+            if ($state['ids'] === []) {
+                $state['finished_at'] = now()->toIso8601String();
+            }
+            $this->saveBackfill($state);
+
+            return ['sent' => $sent, 'skipped' => $skipped, 'waiting' => count($state['ids'])];
+        });
+    }
+
+    /** @param  array<string, mixed>  $state */
+    private function saveBackfill(array $state): void
+    {
+        SiteSetting::set(self::BACKFILL_SETTING, json_encode($state), self::GROUP);
     }
 
     /**

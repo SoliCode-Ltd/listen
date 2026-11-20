@@ -53,6 +53,8 @@ Schedule::command('listen:billing-enforce-grace')->hourlyAt(18)->withoutOverlapp
 // Extra credits left when a period ends: on to the next period, or ended with the plan (ExtraCredits).
 // After the grace job, so a plan it ends is already over.
 Schedule::command('listen:extra-credits-settle')->hourlyAt(27)->withoutOverlapping(50);
+// The owner's send of the credits-ended email to members who already ran out: a few a minute while it is going.
+Schedule::command('listen:credits-ended-backfill')->everyMinute()->withoutOverlapping(10);
 Schedule::command('plans:expire-discounts')->cron('1-59/5 * * * *')->withoutOverlapping(10);
 // A declined first payment or a checkout left without paying: the follow-up emails that are due,
 // and who bought a plan since (App\Services\Billing\PurchaseFollowUps).
