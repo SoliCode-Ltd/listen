@@ -44,6 +44,13 @@ $request = Request::create('/en', 'GET', [], [], [], ['HTTPS' => 'on', 'REMOTE_A
 $app->instance('request', $request);
 $kernel = $app->make(HttpKernel::class);
 $kernel->bootstrap();
+
+// An error anywhere stops the check as FAILED (left to Laravel, it would be shown and the run would still pass).
+set_exception_handler(function (Throwable $e): void {
+    fwrite(STDERR, 'The check stopped on an error: '.$e::class.': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().")\nFAILED\n");
+    exit(1);
+});
+
 $host = (string) parse_url((string) config('app.url'), PHP_URL_HOST);
 $request->headers->set('host', $host);
 $request->server->set('HTTP_HOST', $host);

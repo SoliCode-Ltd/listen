@@ -9,11 +9,22 @@ use Tests\TestCase;
  * The "Server deploy" workflow (.github/workflows/server-deploy.yml) must
  * start: GitHub refuses to run a workflow whose step script that uses
  * ${{ … }} is longer than 21,000 characters once read as an expression, and
- * every support script a mode sends to the server must exist.
+ * every support script a mode sends to the server must exist. And a script
+ * that stops on an error must fail the run: once Laravel has started, its own
+ * handler shows an uncaught error and PHP still ends with 0, so the step
+ * would pass. Each script takes over right after starting Laravel.
  */
 class ServerDeployWorkflowTest extends TestCase
 {
     private const GITHUB_LIMIT = 21000;
+
+    /** What every script that starts Laravel carries on the lines after it (after a comment of its own, if any). */
+    private const STOPS_ON_AN_ERROR = <<<'PHP'
+        set_exception_handler(function (Throwable $e): void {
+            fwrite(STDERR, 'The check stopped on an error: '.$e::class.': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().")\nFAILED\n");
+            exit(1);
+        });
+        PHP;
 
     public function test_every_step_script_fits_githubs_limit(): void
     {
@@ -65,6 +76,64 @@ class ServerDeployWorkflowTest extends TestCase
         foreach (array_unique($matches[1]) as $script) {
             $this->assertFileExists(base_path('scripts/support/'.$script));
         }
+    }
+
+    public function test_every_support_script_that_starts_laravel_fails_the_run_when_it_stops_on_an_error(): void
+    {
+        $starting = array_filter(
+            glob(base_path('scripts/support/*.php')),
+            static fn (string $path): bool => str_contains((string) file_get_contents($path), '->bootstrap();'),
+        );
+
+        $this->assertNotEmpty($starting);
+        foreach ($starting as $path) {
+            $this->assertTrue(self::everyStartIsFollowedByTheHandler((string) file_get_contents($path)),
+                'scripts/support/'.basename($path).' starts Laravel: right after ->bootstrap(); it needs the set_exception_handler lines the other support scripts have, or an error in it would not fail the run.');
+        }
+    }
+
+    public function test_the_php_written_in_the_workflow_fails_the_run_when_it_stops_on_an_error(): void
+    {
+        $scripts = implode("\n", self::runScripts((string) file_get_contents(base_path('.github/workflows/server-deploy.yml'))));
+
+        // Sent on its own lines (a heredoc): the same handler as the support scripts.
+        $this->assertGreaterThan(0, preg_match_all('/->bootstrap\(\);$/m', $scripts));
+        $this->assertTrue(self::everyStartIsFollowedByTheHandler($scripts),
+            'PHP in server-deploy.yml starts Laravel without the set_exception_handler lines after ->bootstrap(); an error in it would not fail the run.');
+        // As the list of a "for", what PHP ends with is never looked at: read it into a variable first.
+        $this->assertDoesNotMatchRegularExpression('/^\s*for \w+ in [^\n]*\$\([^\n]*\bphp\b/m', $scripts);
+    }
+
+    public function test_the_handler_ends_php_with_an_error(): void
+    {
+        $script = implode("\n", [
+            '<?php',
+            "require 'vendor/autoload.php';",
+            "\$app = require 'bootstrap/app.php';",
+            '$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();',
+            self::STOPS_ON_AN_ERROR,
+            'echo "before\\n";',
+            "throw new RuntimeException('boom');",
+        ]);
+
+        // Sent the way the workflow sends it: on standard input, from the app's folder.
+        $run = Process::path(base_path())->input($script)->run([PHP_BINARY]);
+
+        $this->assertSame(1, $run->exitCode(), $run->output().$run->errorOutput());
+        $this->assertSame("before\n", $run->output());
+        $this->assertSame("The check stopped on an error: RuntimeException: boom (Standard input code:10)\nFAILED\n", $run->errorOutput());
+    }
+
+    /**
+     * Every "->bootstrap();" that ends a line is followed, after an empty line
+     * and a comment line at most, by the handler (at that line's own indent).
+     */
+    private static function everyStartIsFollowedByTheHandler(string $code): bool
+    {
+        $handler = implode('\n\1', array_map(static fn (string $line): string => preg_quote($line, '/'), explode("\n", self::STOPS_ON_AN_ERROR)));
+        $starts = preg_match_all('/->bootstrap\(\);$/m', $code);
+
+        return $starts > 0 && $starts === preg_match_all('/->bootstrap\(\);\n\n?( *)(?:\/\/[^\n]*\n\1)?'.$handler.'\n/', $code);
     }
 
     public function test_the_removed_files_list_names_only_files_the_code_no_longer_has(): void
