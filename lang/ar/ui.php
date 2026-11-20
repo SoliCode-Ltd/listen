@@ -507,6 +507,7 @@ return [
         'voice_quality' => 'جودة الصوت',
         'saved_card' => 'البطاقة المحفوظة',
         'not_saved' => 'غير محفوظة',
+        'credits_left' => 'الرصيد المتبقي',
         'upgrade_plan' => 'ترقية الخطة',
         'change_plan' => 'تغيير الخطة',
         'upgrade_plan_hint' => 'اختر الخطة ودورة الفوترة ثم أكّد الدفع.',

@@ -97,7 +97,10 @@ class BillingController extends Controller
             // The extra-credits window, opened by ?extra_credits=1: the address the credits-ended email
             // and the Android app send members to. Neither app opens /billing itself (unlike /dashboard),
             // so on a phone it stays in the browser, where it can be paid.
-            'canBuyExtraCredits' => app(ExtraCredits::class)->status((int) $user->id) === ExtraCredits::STATUS_OK,
+            'canBuyExtraCredits' => $canBuyExtraCredits = app(ExtraCredits::class)->status((int) $user->id) === ExtraCredits::STATUS_OK,
+            // Credits left, beside the button that opens the same window: a member who closed it
+            // by mistake finds it again here.
+            'creditsLeft' => $canBuyExtraCredits ? $this->creditsLeft((int) $user->id) : null,
             'activePlan' => $activePlan,
             'currentPlanSlug' => (string) ($activePlan?->slug ?? 'free'),
             'activeTierLabel' => VoiceTier::label((string) ($activePlan?->voice_tier ?: 'standard')),
@@ -2376,6 +2379,24 @@ class BillingController extends Controller
             }
 
             abort(422, __('ui.manage_subscription.invoice_download_failed'));
+        }
+    }
+
+    /** The credits the member has left now: the plan's, gifts and extra credits (UsageSnapshot). */
+    private function creditsLeft(int $userId): ?int
+    {
+        try {
+            $snapshot = \App\Support\UsageSnapshot::for(
+                $userId,
+                $this->planAccessService->resolveQuotaPlanForUserId($userId),
+                \App\Support\CreditPeriod::counter($userId),
+            );
+
+            return max(0, (int) ($snapshot['remaining_chars'] ?? 0));
+        } catch (\Throwable $e) {
+            Log::warning('Credits left could not be read for the billing page.', ['user_id' => $userId, 'error' => $e->getMessage()]);
+
+            return null;
         }
     }
 
