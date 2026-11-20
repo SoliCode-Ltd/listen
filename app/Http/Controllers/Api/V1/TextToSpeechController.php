@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Api\ApiConcurrency;
 use App\Services\Api\ApiIdempotency;
 use App\Services\Api\ApiSpeechService;
+use App\Services\ContentSafety\TextContentCheck;
 use App\Support\Api\ApiError;
 use App\Support\Api\ApiPlanAccess;
 use App\Support\Api\ApiPresenter;
@@ -64,6 +65,12 @@ class TextToSpeechController extends Controller
                 $generation = $this->speech->generate($user, $apiKey, $plan, $quotaPlan, $spec, false,
                     $idempotency !== null ? fn (AudioGeneration $made) => $this->idempotency->attach($idempotency, $userId, $made) : null);
 
+                // Refused by the reading of the text (TextContentCheck): the request's own fault, not a failed generation.
+                if ($generation->status === 'failed' && $generation->content_check === TextContentCheck::REFUSED) {
+                    throw new ApiError(422, ApiError::TYPE_INVALID_REQUEST, 'content_policy_violation',
+                        'The text has content Listen does not turn into audio. No credits were charged.',
+                        'text', ['X-History-Item-Id' => (string) $generation->id], ['history_item_id' => (int) $generation->id]);
+                }
                 if ($generation->status !== 'done' || blank($generation->audio_path)) {
                     $charged = $generation->status === 'done';
                     throw new ApiError(502, ApiError::TYPE_API, 'generation_failed',

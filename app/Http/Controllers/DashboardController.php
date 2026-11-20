@@ -31,6 +31,7 @@ use App\Support\EmailVerification;
 use App\Support\GeminiVocalTags;
 use App\Support\GenerationMessage;
 use App\Support\GenerationSource;
+use App\Support\HiddenAudio;
 use App\Support\InApp\InApp;
 use App\Support\PlanFeatures;
 use App\Support\PlanPricingLines;
@@ -360,7 +361,8 @@ class DashboardController extends Controller
             // Studio parameters
             'dialect' => ['nullable', 'string', 'max:10'],
             'performance_style' => ['nullable', 'string', 'in:'.implode(',', $performanceStyleValues)],
-            'style_prompt' => ['nullable', 'string', 'max:2000'],
+            // The voice engine reads the direction too, so a listed word is refused in it as well.
+            'style_prompt' => ['nullable', 'string', 'max:2000', new DoesNotContainProfanity(app(ProfanityFilter::class))],
             'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
@@ -663,7 +665,8 @@ class DashboardController extends Controller
     public function destroy(Request $request, AudioGeneration $job)
     {
         $userId = (int) auth()->id();
-        if ((int) $job->user_id !== $userId) {
+        // A voice an admin hid is kept for the admin: the member cannot delete it either.
+        if ((int) $job->user_id !== $userId || HiddenAudio::isHidden($job)) {
             abort(404);
         }
 
@@ -1096,7 +1099,9 @@ class DashboardController extends Controller
 
     private function userHistoryQuery(int $userId)
     {
-        return AudioGeneration::query()
+        // Never a voice an admin hid from the member: it cannot be listed, played, reused,
+        // downloaded or deleted from here (App\Support\HiddenAudio).
+        return HiddenAudio::visible(AudioGeneration::query())
             ->where('user_id', $userId)
             ->where(function ($query): void {
                 $query->whereDoesntHave('textItem')

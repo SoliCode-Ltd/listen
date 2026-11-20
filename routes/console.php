@@ -85,6 +85,10 @@ Schedule::command('passport:purge --hours=168')->dailyAt('03:30')->withoutOverla
 // The overlap lock lapses after 10 minutes, so a run that died never stops the next ones for long.
 Schedule::command('listen:expire-stuck-generations')->cron('1-59/5 * * * *')->withoutOverlapping(10);
 
+// Texts whose content check could not be done when their voice was made: read again, and a
+// voice that should not have been made is hidden (App\Console\Commands\RecheckUncheckedTextsCommand).
+Schedule::command('listen:recheck-unchecked-texts')->cron('4-59/5 * * * *')->withoutOverlapping(10);
+
 // Dub my video: give back the credits of stuck dubs, move finished videos to Google Drive
 // and delete old server copies (App\Console\Commands\PruneVideoDubsCommand).
 Schedule::command('dubs:prune')->cron('9-59/10 * * * *')->withoutOverlapping(30);

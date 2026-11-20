@@ -14,6 +14,9 @@ class ViewAudioGeneration extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            // Each refreshes the page, so the "Hidden from the member" section shows at once.
+            AudioGenerationResource::hideAction()->after(fn () => $this->refreshFormData(['hidden_at', 'hidden_by', 'hidden_note'])),
+            AudioGenerationResource::showAction()->after(fn () => $this->refreshFormData(['hidden_at', 'hidden_by', 'hidden_note'])),
             EditAction::make(),
         ];
     }

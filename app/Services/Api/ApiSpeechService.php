@@ -229,6 +229,15 @@ class ApiSpeechService
             throw new ApiError(422, ApiError::TYPE_INVALID_REQUEST, 'content_policy_violation',
                 'The text contains words that are not allowed. Change the text and try again.', 'text');
         }
+        // The direction for the delivery is read by the voice engine too.
+        $direction = trim((string) ($studio['style_prompt'] ?? ''));
+        $match = $direction !== '' ? $this->profanityFilter->firstMatch($direction) : null;
+        if ($match !== null) {
+            $this->blockedGenerationLogger->logFromValidation($direction, $match, 'style_prompt');
+
+            throw new ApiError(422, ApiError::TYPE_INVALID_REQUEST, 'content_policy_violation',
+                'The style prompt contains words that are not allowed. Change it and try again.', 'style_prompt');
+        }
 
         [, $recorded] = $this->meter->reserve($userId, $apiKey, $quotaPlan, $estimate, function (array $reservation) use ($userId, $apiKey, $plan, $async, $spec, $estimate, $status, $studio, $onRecorded): array {
             $this->assertQueueRoom($userId, $plan, $async);

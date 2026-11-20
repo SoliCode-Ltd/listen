@@ -20,6 +20,7 @@ final class GenerationMessage
         'ui.backend.cloned_voices_our_limit',
         'ui.backend.designed_voices_our_limit',
         'ui.backend.premium_text_refused',
+        'ui.backend.generation_content_refused',
         'ui.backend.generation_stuck_refunded',
         'ui.backend.cloned_voice_daily_limit',
         'ui.backend.translation_failed',

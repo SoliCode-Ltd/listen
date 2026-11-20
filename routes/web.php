@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminAgentRecordingController;
 use App\Http\Controllers\AdminClonedVoiceAudioController;
 use App\Http\Controllers\AdminDriveController;
+use App\Http\Controllers\AdminHiddenAudioController;
 use App\Http\Controllers\AdminManualPaymentProofController;
 use App\Http\Controllers\AdminTranscriptionAudioController;
 use App\Http\Controllers\AdminVideoDubFileController;
@@ -95,6 +96,11 @@ Route::middleware('auth')->get('/admin-audio/cloned-voices/{voice}/{kind}', Admi
 Route::middleware('auth')->get('/admin-audio/agent-calls/{call}', AdminAgentRecordingController::class)
     ->where('call', 'cnv_[a-z0-9]{24}')
     ->name('admin.agent-calls.recording');
+
+// A voice hidden from its member (Audio Generations → Hide from member), for admins only.
+Route::middleware('auth')->get('/admin-audio/hidden/{generation}', AdminHiddenAudioController::class)
+    ->whereNumber('generation')
+    ->name('admin.hidden-audio');
 
 // A transcript's recording, for the admin's transcript page (Speech to text → Transcripts).
 Route::middleware('auth')->get('/admin-audio/transcripts/{code}', AdminTranscriptionAudioController::class)

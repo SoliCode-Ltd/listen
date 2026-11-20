@@ -24,14 +24,19 @@ class AudioGenerationRecorder
      */
     public function createForUser(int $userId, array $textItemAttributes, array $generationAttributes): array
     {
-        $inputText = trim((string) ($generationAttributes['input_text'] ?? $textItemAttributes['content'] ?? ''));
-        if ($inputText !== '') {
-            $match = $this->profanityFilter->firstMatch($inputText);
+        // The text, and the member's own direction for the delivery: the voice engine reads
+        // both, so a listed word is refused in either.
+        $checked = [
+            'content' => trim((string) ($generationAttributes['input_text'] ?? $textItemAttributes['content'] ?? '')),
+            'style_prompt' => trim((string) ($generationAttributes['style_prompt'] ?? '')),
+        ];
+        foreach ($checked as $attribute => $value) {
+            $match = $value !== '' ? $this->profanityFilter->firstMatch($value) : null;
             if ($match !== null) {
-                $this->blockedGenerationLogger->logFromValidation($inputText, $match, 'content');
+                $this->blockedGenerationLogger->logFromValidation($value, $match, $attribute);
 
                 throw ValidationException::withMessages([
-                    'content' => __('ui.backend.generation_text_prohibited'),
+                    $attribute => __('ui.backend.generation_text_prohibited'),
                 ]);
             }
         }

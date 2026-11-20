@@ -6,6 +6,7 @@ use App\Models\AudioGeneration;
 use App\Models\DemoVoiceGeneration;
 use App\Services\PlanAccessService;
 use App\Support\AudioFormats;
+use App\Support\HiddenAudio;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -30,7 +31,7 @@ class AudioDownloadController extends Controller
             abort(403);
         }
 
-        $owned = AudioGeneration::query()->where('user_id', $userId)->where('audio_path', $path)->exists()
+        $owned = HiddenAudio::visible(AudioGeneration::query())->where('user_id', $userId)->where('audio_path', $path)->exists()
             || DemoVoiceGeneration::query()->where('user_id', $userId)->where('audio_path', $path)->exists();
         $disk = Storage::disk('public');
         if (! $owned || ! $disk->exists($path)) {

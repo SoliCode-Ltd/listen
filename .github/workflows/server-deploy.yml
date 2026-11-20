@@ -129,6 +129,15 @@ name: Server deploy
 #            today's rule would refuse, and the words it used most (words and
 #            counts only, never a text). For finding out how a member's voices
 #            got past the wording rule (scripts/support/member_audio_check.php).
+#   content-check: makes no audio and changes nothing. Asks the reading of a
+#            text's meaning (the content check that refuses sexual content before
+#            a voice is made) for real, on the server's own text model. Input
+#            "member" empty: written examples that must be allowed or refused, and
+#            the texts the word list refused lately. A member id: every text that
+#            member made a voice of, and how many would be refused now. "sample:300":
+#            the latest 300 voices on the site, to see how many ordinary texts would
+#            be wrongly refused. Voice ids and the reader's reason only, never a text
+#            (scripts/support/content_check_probe.php).
 #   page-check: staging only. Shows the pages members use inside the app,
 #            in English and Arabic, as a free and a paying test member, and
 #            fails on an error, a wrong status or text shown as its key
@@ -238,7 +247,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, content-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
         default: inspect
       customer:
         description: "billing-trace and chatgpt-ads-check: the Stripe customer id (cus_...)"
@@ -249,7 +258,7 @@ on:
         type: string
         default: ""
       member:
-        description: "email-check, member-audio-check, demo-links, join-check and speed-check: a member's email or member id"
+        description: "email-check, member-audio-check, demo-links, join-check and speed-check: a member's email or member id. content-check: empty, a member id, or sample:300"
         type: string
         default: ""
       dub:
@@ -614,6 +623,13 @@ jobs:
             tool email_check.php | $S "$FIND; MEMBER='$MEMBER' php"
             rm -f ~/.ssh/id_deploy
             exit 0
+          fi
+          if [ "$MODE" = content-check ]; then
+            printf '%s' "$MEMBER" | grep -qE '^([0-9]+|sample:[0-9]{1,4})?$' || { echo "member must be empty, a member id, or sample:N"; exit 1; }
+            failed=0
+            tool content_check_probe.php | $S "$FIND; MEMBER='$MEMBER' nice php" || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
           fi
           if [ "$MODE" = member-audio-check ]; then
             printf '%s' "$MEMBER" | grep -qE '^[0-9]+$' || { echo "member must be a member id"; exit 1; }

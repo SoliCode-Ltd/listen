@@ -9,6 +9,7 @@ use App\Services\Api\ApiSpeechService;
 use App\Support\Api\ApiError;
 use App\Support\Api\ApiPresenter;
 use App\Support\AudioFormats;
+use App\Support\HiddenAudio;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -114,7 +115,8 @@ class HistoryController extends Controller
      */
     private function historyQuery(Request $request): Builder
     {
-        return AudioGeneration::query()
+        // Never a voice an admin hid from the member (App\Support\HiddenAudio).
+        return HiddenAudio::visible(AudioGeneration::query())
             ->where('user_id', $request->user()->id)
             ->where(function (Builder $query): void {
                 $query->whereDoesntHave('textItem')

@@ -82,6 +82,8 @@ class AudioGeneration extends Model
         'duration_measured',
         // The developer API key that asked for it (null: dashboard or extension)
         'api_key_id',
+        // What the reading of its text found (App\Services\ContentSafety\TextContentCheck)
+        'content_check',
     ];
 
     protected $casts = [
@@ -103,12 +105,16 @@ class AudioGeneration extends Model
         'user_sequence_number' => 'integer',
         'settings_snapshot' => 'array',
         'api_key_id' => 'integer',
+        // Hidden from the member by an admin (App\Support\HiddenAudio)
+        'hidden_at' => 'datetime',
     ];
 
     protected static function booted(): void
     {
         // A developer API retry with the key that made it must not make (and charge) it again.
         static::deleting(fn (AudioGeneration $generation) => \App\Services\Api\ApiIdempotency::markResultDeleted($generation));
+        // A hidden voice's kept file goes with its row (an admin deleting it for good).
+        static::deleted(fn (AudioGeneration $generation) => \App\Support\HiddenAudio::forgetFile($generation));
     }
 
     public function textItem(): BelongsTo

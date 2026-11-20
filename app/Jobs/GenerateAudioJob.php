@@ -15,6 +15,9 @@ use App\Services\Api\ApiUsageMeter;
 use App\Services\GenerationErrorRecorder;
 use App\Services\Billing\CharPackService;
 use App\Services\Billing\MemberUsageMeter;
+use App\Services\BlockedGenerationLogger;
+use App\Services\ContentSafety\ContentRefusedException;
+use App\Services\ContentSafety\TextContentCheck;
 use App\Services\PlanAccessService;
 use App\Services\TranslationService;
 use App\Services\Tts\GeminiKeysOutException;
@@ -29,6 +32,7 @@ use App\Support\Credits;
 use App\Support\DialogueSpeakers;
 use App\Support\GeminiSpend;
 use App\Support\GenerationMessage;
+use App\Support\HiddenAudio;
 use App\Support\Pronunciations;
 use App\Support\SpeechText;
 use App\Support\UsageEstimator;
@@ -191,6 +195,11 @@ class GenerateAudioJob implements ShouldQueue
         $spendSaved = false;
         try {
             $reserved = $this->reservedUsage($generation);
+
+            // Read before anything is spoken, for every member and every way in (the studio,
+            // the app, the extension, the developer API, an AI app): a text Listen does not
+            // make a voice of stops here, with nothing charged.
+            $this->checkContent($generation);
 
             $textForSpeech = $translationService->maybeTranslate(
                 $generation->input_text,
@@ -447,8 +456,10 @@ class GenerateAudioJob implements ShouldQueue
                 $this->keepSpend($generation, $spend);
             }
             $sync = $this->connection === 'sync';
+            // A refused text is refused again as it is: its first try is its last.
+            $refused = $e instanceof ContentRefusedException;
             // Its last try: made inline (the dashboard), called directly, or out of tries on the queue.
-            $final = $sync || $this->job === null || $this->attempts() >= $this->tries;
+            $final = $sync || $this->job === null || $this->attempts() >= $this->tries || $refused;
             $message = $this->failureMessage($generation, $e);
 
             if ($sync && $generation->api_key_id) {
@@ -460,6 +471,10 @@ class GenerateAudioJob implements ShouldQueue
                 // in one locked step, exactly once (failed(), the request and the stuck
                 // sweep find it failed and give nothing back again).
                 app(MemberUsageMeter::class)->failAndRefund((int) $generation->id, $message, ['processing']);
+            } elseif ($refused) {
+                // A developer API request made in the background: failed now too, rather than
+                // after every try the queue would give it.
+                app(ApiUsageMeter::class)->failAndRefund((int) $generation->id, $message, ['processing']);
             } else {
                 // A queued job that will be tried again is not failed yet: it waits for the
                 // next try. A developer API one always waits for failed(), which ends it and
@@ -472,6 +487,12 @@ class GenerateAudioJob implements ShouldQueue
                 });
             }
             $generation->refresh();
+
+            // Not a failure of ours: it is in the admin's list of refused texts, not in the
+            // error log, and it is not thrown again, so the queue does not try it again.
+            if ($refused) {
+                return;
+            }
 
             // Log TTS failure telemetry
             $this->writeTtsLog($generation, [], 'failed', $e);
@@ -488,6 +509,29 @@ class GenerateAudioJob implements ShouldQueue
             throw $e;
         } finally {
             $spend->stop();
+        }
+    }
+
+    /**
+     * The reading of the text and the member's own direction (TextContentCheck). What it
+     * found is kept on the voice: "unchecked" (the reader did not answer) still makes the
+     * voice, and is read again within minutes (listen:recheck-unchecked-texts).
+     */
+    private function checkContent(AudioGeneration $generation): void
+    {
+        if (! TextContentCheck::enabled() || $generation->content_check === TextContentCheck::ALLOWED) {
+            return;
+        }
+
+        $ruling = app(TextContentCheck::class)->check($generation->input_text, $generation->style_prompt);
+        if (HiddenAudio::ready()) {
+            $generation->forceFill(['content_check' => $ruling['verdict']])->saveQuietly();
+        }
+
+        if ($ruling['verdict'] === TextContentCheck::REFUSED) {
+            app(BlockedGenerationLogger::class)->logFromContentCheck($generation, $ruling);
+
+            throw new ContentRefusedException($ruling['category'], $ruling['reason']);
         }
     }
 
@@ -524,6 +568,9 @@ class GenerateAudioJob implements ShouldQueue
      */
     private function failureMessage(AudioGeneration $generation, \Throwable $e): string
     {
+        if ($e instanceof ContentRefusedException) {
+            return GenerationMessage::stored('ui.backend.generation_content_refused');
+        }
         if ($e instanceof TranslationFailedException) {
             return $e->getMessage();
         }
