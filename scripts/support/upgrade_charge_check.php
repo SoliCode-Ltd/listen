@@ -125,11 +125,40 @@ if ($extra->isEmpty()) {
 }
 
 $customer = trim((string) $user->stripe_id);
+$stripe = new \Stripe\StripeClient((string) config('services.stripe.secret'));
+
+// Stripe customers with the member's email that the account does not point to (an
+// earlier account, or a payment made before signing up). Counted, never printed.
+$email = strtolower(trim((string) $user->email));
+$others = [];
+foreach (array_unique([$email, (string) $user->email]) as $address) {
+    foreach ($stripe->customers->all(['email' => $address, 'limit' => 10])->data as $found) {
+        if ((string) $found->id !== $customer) {
+            $others[(string) $found->id] = $found;
+        }
+    }
+}
+echo "\n== Other Stripe customers with this email ==\n";
+if ($others === []) {
+    echo "  none\n";
+}
+foreach ($others as $found) {
+    $paidCount = 0;
+    $paidTotal = 0;
+    foreach ($stripe->charges->all(['customer' => $found->id, 'limit' => 50])->data as $charge) {
+        if ((string) $charge->status === 'succeeded') {
+            $paidCount++;
+            $paidTotal += (int) $charge->amount - (int) $charge->amount_refunded;
+        }
+    }
+    $subs = $stripe->subscriptions->all(['customer' => $found->id, 'status' => 'all', 'limit' => 5])->data;
+    $line('made '.$when($found->created), $paidCount.' paid charges, '.$money($paidTotal, 'usd').' kept, '.count($subs).' subscriptions'.(count($subs) ? ' ('.implode(', ', array_map(fn ($sub) => (string) $sub->status, $subs)).')' : ''));
+}
+
 if ($customer === '') {
-    echo "\nNo Stripe customer.\nOK\n";
+    echo "\nNo Stripe customer on the account.\nOK\n";
     exit(0);
 }
-$stripe = new \Stripe\StripeClient((string) config('services.stripe.secret'));
 
 echo "\n== Stripe subscriptions ==\n";
 foreach ($stripe->subscriptions->all(['customer' => $customer, 'status' => 'all', 'limit' => 5])->data as $sub) {
