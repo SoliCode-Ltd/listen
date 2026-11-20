@@ -45,43 +45,33 @@
       display: block;
       font-size: 1rem;
     }
-    /* This month's minutes (as the studio's meter) and the way to add more. Phones stack it:
-       the figure, the bar across, then the renewal day facing the button. */
+    /* This month's minutes, kept quiet: the label and the way to add more on one line, the
+       number at the size of the values above, one thin bar of what is left, the renewal day.
+       Out of minutes, the action becomes a small filled button. */
     .minutes-meter {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      grid-template-areas: "figure figure" "track track" "renews add";
-      align-items: center;
-      gap: .7rem 1rem;
       margin-bottom: 1.25rem;
-      padding: 1rem 1.1rem;
+      padding: .9rem 1.1rem 1rem;
       background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
     }
-    .minutes-meter-figure { grid-area: figure; display: grid; gap: .2rem; }
+    .minutes-meter-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 1.9rem; }
     .minutes-meter-label { color: var(--muted); font-size: .85rem; }
-    .minutes-meter-value { display: flex; align-items: baseline; gap: .45rem; }
-    .minutes-meter-value strong { font-size: 1.6rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
-    .minutes-meter-value span { color: var(--muted); font-size: .92rem; }
-    .minutes-meter-track { grid-area: track; height: 8px; border-radius: 999px; background: color-mix(in oklab, var(--brand-accent) 13%, var(--line)); overflow: hidden; }
-    .minutes-meter-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #A28FFF, #5B3FE6); }
-    html[dir="rtl"] .minutes-meter-track i { background: linear-gradient(270deg, #A28FFF, #5B3FE6); }
-    html .minutes-meter-track.is-high i { background: #F59E0B; }
-    html .minutes-meter-track.is-low i { background: #EF4444; }
-    .minutes-meter-renews { grid-area: renews; color: var(--muted); font-size: .85rem; line-height: 1.5; }
-    .minutes-meter-add { grid-area: add; padding: .6rem 1.15rem; font-size: .9rem; white-space: nowrap; }
-    /* Wider screens: one line, the bar between the figure and the button, the day under the bar. */
-    @media (min-width: 761px) {
-      .minutes-meter {
-        grid-template-columns: auto 1fr auto;
-        grid-template-areas: "figure track add" "figure renews add";
-        gap: .35rem 2rem;
-        padding: 1rem 1.25rem;
-      }
-      .minutes-meter-track { align-self: end; }
-      .minutes-meter-renews { align-self: start; }
+    .minutes-meter-add {
+      padding: 0; border: 0; background: none; color: var(--brand-accent);
+      font: inherit; font-size: .88rem; font-weight: 600; line-height: 1.9rem; cursor: pointer; white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
     }
+    .minutes-meter-add:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .minutes-meter-add:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; border-radius: 4px; }
+    .minutes-meter.is-out .minutes-meter-add { padding: 0 .9rem; border-radius: var(--btn-radius); background: var(--brand-accent); color: #fff; }
+    .minutes-meter.is-out .minutes-meter-add:hover { text-decoration: none; background: var(--brand-hover); }
+    .minutes-meter-value { display: flex; align-items: baseline; gap: .35rem; margin: .15rem 0 .75rem; }
+    .minutes-meter-value strong { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .minutes-meter-value span { color: var(--muted); font-size: .9rem; }
+    .minutes-meter-track { height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
+    .minutes-meter-track i { display: block; height: 100%; border-radius: inherit; background: var(--brand-accent); }
+    .minutes-meter-renews { margin: .6rem 0 0; color: var(--muted); font-size: .8rem; }
 
     /* ── Grid layout ── */
     .grid-layout {
@@ -1148,16 +1138,16 @@
       {{-- This month's minutes, as the studio shows them, and the way back to the extra-credits
            window for a member who closed it (components/extra-credits-dialog). --}}
       <section class="minutes-meter{{ $creditsMeter['out'] ? ' is-out' : '' }}" aria-labelledby="minutesMeterLabel">
-        <div class="minutes-meter-figure">
+        <div class="minutes-meter-head">
           <span class="minutes-meter-label" id="minutesMeterLabel">{{ __('ui.dashboard.minutes_left_label') }}</span>
-          <span class="minutes-meter-value">
-            <strong>{{ number_format($creditsMeter['minutes_left']) }}</strong>
-            <span>{{ __('ui.dashboard.minutes_left_of', ['total' => number_format($creditsMeter['minutes_total'])]) }}</span>
-          </span>
+          <button type="button" class="minutes-meter-add" data-extra-credits-open>{{ __('ui.extra_credits.open') }}</button>
         </div>
-        <div class="minutes-meter-track {{ $creditsMeter['state'] }}" role="img" aria-label="{{ __('ui.dashboard.credits_used_percent', ['percent' => $creditsMeter['used_percent']]) }}"><i style="width: {{ $creditsMeter['left_percent'] }}%"></i></div>
-        <span class="minutes-meter-renews">{{ __('ui.billing.minutes_renew_on', ['date' => $creditsMeter['renews_on']]) }}</span>
-        <button type="button" class="btn{{ $creditsMeter['out'] ? ' btn-primary' : '' }} minutes-meter-add" data-extra-credits-open>{{ __('ui.extra_credits.open') }}</button>
+        <p class="minutes-meter-value">
+          <strong>{{ number_format($creditsMeter['minutes_left']) }}</strong>
+          <span>{{ __('ui.dashboard.minutes_left_of', ['total' => number_format($creditsMeter['minutes_total'])]) }}</span>
+        </p>
+        <div class="minutes-meter-track" role="img" aria-label="{{ __('ui.dashboard.credits_used_percent', ['percent' => $creditsMeter['used_percent']]) }}"><i style="width: {{ $creditsMeter['left_percent'] }}%"></i></div>
+        <p class="minutes-meter-renews">{{ __('ui.billing.minutes_renew_on', ['date' => $creditsMeter['renews_on']]) }}</p>
       </section>
     @endif
 
