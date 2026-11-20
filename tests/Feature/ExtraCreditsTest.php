@@ -522,6 +522,33 @@ class ExtraCreditsTest extends TestCase
         $this->assertSame(ManualPaymentRequest::STATUS_PENDING, ManualPaymentRequest::query()->latest('id')->value('status'));
     }
 
+    public function test_the_studio_opens_the_dialog_by_itself_only_once_credits_have_run_out(): void
+    {
+        $member = $this->member();
+        $studio = fn () => $this->actingAs($member)->withoutMiddleware([
+            \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+        ])->get($this->localizedRoute('dashboard'))->assertOk();
+        $period = CreditPeriod::current($member->id)['key'];
+
+        // Credits left: the dialog is on the page, and never opens by itself.
+        $studio()->assertSee('id="xcDialog"', false)->assertDontSee('data-auto-open', false);
+
+        // Run out: the page says it may open once, and names this running-out.
+        $this->spend($member, 90000);
+        $studio()->assertSee('data-auto-open="'.$member->id.':'.$period.':90000"', false);
+
+        // More credits bought and used up: a new running-out, so it may open once more.
+        $this->buy($member, 10);
+        $studio()->assertDontSee('data-auto-open', false);
+        $this->spend($member, 9000);
+        $studio()->assertSee('data-auto-open="'.$member->id.':'.$period.':99000"', false);
+
+        // Switched off in Billing Settings: only Generate and the button open it.
+        SiteSetting::set(ExtraCredits::AUTO_OPEN_SETTING, '0', 'billing');
+        $studio()->assertSee('id="xcDialog"', false)->assertDontSee('data-auto-open', false);
+    }
+
     public function test_a_transfer_method_is_offered_only_with_somewhere_to_pay(): void
     {
         Storage::fake('local');

@@ -6,7 +6,8 @@
      credits; the "Add credits" chip; a link with ?extra_credits=1). Only members who can
      buy them get it: the server checks again on every step. --}}
 @if($canBuyExtraCredits ?? false)
-<dialog class="xc" id="xcDialog" aria-labelledby="xcTitle"
+<dialog class="xc" id="xcDialog" aria-labelledby="xcTitle" tabindex="-1"
+  @if(! empty($extraCreditsAutoOpenKey)) data-auto-open="{{ $extraCreditsAutoOpenKey }}" @endif
   data-offer-url="{{ route('billing.extra-credits') }}"
   data-card-url="{{ route('billing.extra-credits.card') }}"
   data-confirm-url="{{ route('billing.extra-credits.card.confirm') }}"
@@ -147,6 +148,7 @@
     box-shadow: 0 24px 60px rgba(17, 15, 26, .22); overflow: hidden auto; overscroll-behavior: contain;
   }
   html[data-theme="dark"] .xc, html:not([data-theme]) .xc { --xc-good: #3FCB8B; --xc-wait: #F0B04A; box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .7); }
+  .xc:focus { outline: none; }
   .xc::backdrop { background: rgba(17, 15, 26, .46); }
   .xc[open] { animation: xc-in .26s cubic-bezier(.2, .8, .2, 1); }
   .xc[open]::backdrop { animation: xc-fade .22s ease; }
@@ -179,6 +181,7 @@
   .xc-summary-t small { font-size: .8rem; color: var(--muted); }
   .xc .wallet-pay { margin: 14px 0 0; gap: 12px; }
   .xc .wallet-pay + .xc-payline { margin-top: 12px; }
+  .xc .wallet-pay:not([hidden]) { animation: xc-fade .3s ease; }
   .xc-payline { margin-top: 14px; display: flex; align-items: center; gap: 8px; font-size: .86rem; color: var(--muted); }
   .xc-payline b { color: var(--text); font-weight: 600; }
   .xc-sp { flex: 1; }
@@ -262,7 +265,7 @@
     .xc-chip { font-size: .92rem; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .xc[open], .xc[open]::backdrop, .xc.is-closing, .xc.is-closing::backdrop, .xc-mark, .xc-spin { animation: none; }
+    .xc[open], .xc[open]::backdrop, .xc.is-closing, .xc.is-closing::backdrop, .xc-mark, .xc-spin, .xc .wallet-pay:not([hidden]) { animation: none; }
   }
 </style>
 
@@ -308,10 +311,65 @@
     function note(id, text, info) {
       const el = $(id);
       if (!el) return;
-      el.hidden = !text;
-      el.textContent = text || '';
-      el.classList.toggle('is-info', Boolean(info));
+      // Its words stay while it folds away.
+      if (text) { el.textContent = text; el.classList.toggle('is-info', Boolean(info)); }
+      reveal(el, Boolean(text));
     }
+
+    // ---------- nothing in the dialog jumps
+    // Sizes change on a curve that starts and ends gently, for a time that grows with the
+    // distance, so a tall change never lurches in its first frames.
+    const EASE = 'cubic-bezier(.4, 0, .2, 1)';
+    const SLIDE = 'cubic-bezier(.2, .8, .2, 1)';
+    const timeFor = (px) => Math.round(Math.min(420, Math.max(220, 190 + Math.abs(px) * 0.55)));
+    let lastHeight = 0;   // the open view's height, as last seen
+    let hold = 0;         // a move of our own is running: the watcher below only takes note
+
+    // Opens or folds one part of a view (a message, the card form): its height, spacing and
+    // opacity move together, and what is under it follows.
+    const moves = new Map();   // element -> its move in hand
+    function settleMoves() {
+      moves.forEach((record) => record.stop());
+      hold = 0;
+    }
+    function reveal(el, on) {
+      const before = moves.get(el);
+      if ((before ? before.on : !el.hidden) === on) return;
+      if (before) before.stop();
+      // Not on screen (another view, the dialog closed) or motion is off: just set it.
+      if (reduced() || !dialog.open || el.closest('.xc-view') !== views[current]) { el.hidden = !on; return; }
+      el.hidden = false;
+      const cs = getComputedStyle(el);
+      const full = { height: el.offsetHeight + 'px', marginTop: cs.marginTop, marginBottom: cs.marginBottom, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom, opacity: 1 };
+      const none = { height: '0px', marginTop: '0px', marginBottom: '0px', paddingTop: '0px', paddingBottom: '0px', opacity: 0 };
+      el.style.overflow = 'hidden';
+      hold += 1;
+      const move = el.animate(on ? [none, full] : [full, none], { duration: timeFor(el.offsetHeight), easing: EASE });
+      const finish = () => {
+        if (moves.get(el) !== record) return;
+        moves.delete(el);
+        hold = Math.max(0, hold - 1);
+        el.style.overflow = '';
+        el.hidden = !on;
+        if (dialog.open) lastHeight = views[current].offsetHeight;
+      };
+      // stop(): the move ends where it was heading, at once (a new move, or the dialog closing).
+      const record = { on, stop: () => { move.onfinish = null; move.cancel(); finish(); } };
+      moves.set(el, record);
+      move.onfinish = finish;
+    }
+
+    // Anything else that changes a view's height (the wallet button arriving, a picture
+    // loading, a line wrapping): the dialog grows or shrinks to it instead of snapping.
+    const watcher = new ResizeObserver(() => {
+      if (!dialog.open || !views[current]) return;
+      const next = views[current].offsetHeight;
+      if (!lastHeight || hold > 0 || reduced() || Math.abs(next - lastHeight) < 2) { lastHeight = next; return; }
+      const from = lastHeight;
+      lastHeight = next;
+      stack.getAnimations().forEach((a) => a.cancel());
+      stack.animate([{ height: from + 'px' }, { height: next + 'px' }], { duration: timeFor(next - from), easing: EASE });
+    });
 
     function busy(button, on, label) {
       button.disabled = on;
@@ -342,12 +400,20 @@
       });
       from.classList.add('is-leaving');
       const endHeight = to.offsetHeight;
-      const shift = 28 * (direction || 1) * (isRtl ? 1 : -1);
-      const ease = 'cubic-bezier(.2, .8, .2, 1)';
+      const shift = 20 * (direction || 1) * (isRtl ? 1 : -1);
+      const ease = SLIDE;
+      const time = timeFor(endHeight - startHeight);
       stack.getAnimations().forEach((a) => a.cancel());
-      stack.animate([{ height: startHeight + 'px' }, { height: endHeight + 'px' }], { duration: 320, easing: ease });
+      hold += 1;
+      const grown = stack.animate([{ height: startHeight + 'px' }, { height: endHeight + 'px' }], { duration: time, easing: EASE });
+      // The watcher stands by until the views have changed places (or the dialog closed meanwhile).
+      let settled = false;
+      const settle = () => { if (settled) return; settled = true; hold = Math.max(0, hold - 1); if (dialog.open) lastHeight = views[current].offsetHeight; };
+      grown.onfinish = settle;
+      setTimeout(settle, time + 80);
       const leaving = name;
-      from.animate([{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: `translateX(${-shift}px)` }], { duration: 200, easing: 'ease-in', fill: 'forwards' })
+      // The old view is gone before the new one can be read: no two titles on top of each other.
+      from.animate([{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: `translateX(${-shift / 2}px)` }], { duration: 120, easing: 'ease-in', fill: 'forwards' })
         .onfinish = () => {
           // Only while this is still the move in hand (a quick second tap starts another).
           if (current !== leaving) return;
@@ -355,13 +421,15 @@
           from.classList.remove('is-leaving', 'is-on');
           from.getAnimations().forEach((a) => a.cancel());
         };
-      to.animate([{ opacity: 0, transform: `translateX(${shift}px)` }, { opacity: 1, transform: 'translateX(0)' }], { duration: 320, delay: 60, easing: ease, fill: 'backwards' });
+      to.animate([{ opacity: 0, transform: `translateX(${shift}px)` }, { opacity: 1, transform: 'translateX(0)' }], { duration: 260, delay: 100, easing: ease, fill: 'backwards' });
       current = name;
       focusFirst(to);
     }
 
     function focusFirst(view) {
-      const target = view.querySelector('.xc-chip[aria-checked="true"], input:checked, .xc-btn.is-primary, button');
+      // In this order: what is chosen, then what to press (never the close button, which a list of selectors would find first).
+      const target = ['.xc-chip[aria-checked="true"]', 'input[name="xcMethod"]:checked', '.xc-btn.is-primary', 'button']
+        .map((selector) => view.querySelector(selector)).find((el) => el && !el.disabled && el.offsetParent !== null);
       if (target) setTimeout(() => target.focus({ preventScroll: true }), reduced() ? 0 : 120);
     }
 
@@ -455,19 +523,14 @@
 
     function openCardForm(open) {
       const box = $('xcNewCard');
-      const wasOpen = !box.hidden;
-      box.hidden = !open;
-      $('xcSecure').hidden = !open;
       if (open) {
-        // The card form opens inside its own box ("Another card", or "Card").
+        // The card form opens under its own row ("Another card", or "Card").
         const option = dialog.querySelector('[data-xc-method="card"]:not([hidden])') || dialog.querySelector('[data-xc-method="new"]');
         if (option && box.parentElement !== option) option.appendChild(box);
-        mountCard();
       }
-      if (open !== wasOpen && !reduced()) {
-        const h = box.scrollHeight;
-        if (open) box.animate([{ height: '0px', opacity: 0 }, { height: h + 'px', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(.2, .8, .2, 1)' });
-      }
+      reveal(box, open);
+      reveal($('xcSecure'), open);
+      if (open) mountCard();
     }
 
     function loadStripe() {
@@ -755,6 +818,7 @@
     }, { passive: false }));
 
     function reset() {
+      settleMoves();
       Object.entries(views).forEach(([name, el]) => {
         el.getAnimations().forEach((a) => a.cancel());
         el.hidden = name !== 'buy';
@@ -821,9 +885,13 @@
       $('xcChange').hidden = !offer.card_ready && (offer.manual || []).length < 2;
       if (offer.card_ready) mountWallet();
       dialog.showModal();
-      focusFirst(views.buy);
+      lastHeight = views.buy.offsetHeight;
+      // The dialog itself takes the focus (read out by its title); Tab then moves through its controls.
+      dialog.focus({ preventScroll: true });
       return true;
     }
+
+    Object.values(views).forEach((view) => watcher.observe(view));
 
     window.ListenExtraCredits = { open, close, isOpen: () => dialog.open };
 
@@ -834,6 +902,18 @@
       const rest = params.toString();
       history.replaceState(null, '', window.location.pathname + (rest ? '?' + rest : '') + window.location.hash);
       window.addEventListener('load', () => open());
+    } else if (dialog.dataset.autoOpen) {
+      // The credits have run out and the member may never press Generate: the dialog opens by
+      // itself one time for this running-out (remembered in this browser), a moment after the
+      // studio has settled, and never over something else the member has open or is typing.
+      const seenKey = 'listen_xc_seen';
+      const seen = () => { try { return window.localStorage.getItem(seenKey) === dialog.dataset.autoOpen; } catch (_e) { return true; } };
+      window.addEventListener('load', () => setTimeout(() => {
+        const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+        if (seen() || document.hidden || typing || document.querySelector('dialog[open], [aria-modal="true"]:not([hidden])')) return;
+        try { window.localStorage.setItem(seenKey, dialog.dataset.autoOpen); } catch (_e) { return; }
+        open();
+      }, 1400));
     }
     document.addEventListener('click', (event) => {
       const opener = event.target.closest('[data-extra-credits-open]');

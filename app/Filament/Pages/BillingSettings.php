@@ -2,22 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Placeholder;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Utilities\Set;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\CheckboxList;
-use Filament\Forms\Components\Select;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Repeater;
-use Throwable;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\Billing\ExtraCredits;
@@ -26,19 +10,34 @@ use App\Services\LocalizedPricingService;
 use App\Services\StripeProductSyncService;
 use App\Support\YearlyOfferBanner;
 use Carbon\Carbon;
-use Filament\Forms;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
+use Throwable;
 
 class BillingSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-credit-card';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Billing';
+    protected static string|\UnitEnum|null $navigationGroup = 'Billing';
 
     protected static ?int $navigationSort = 3;
 
@@ -83,6 +82,7 @@ class BillingSettings extends Page implements HasForms
             'manual_payment_instructions_en' => (string) SiteSetting::get('manual_payment_instructions_en', ''),
             'manual_payment_instructions_ar' => (string) SiteSetting::get('manual_payment_instructions_ar', ''),
             'extra_credits_enabled' => filter_var(SiteSetting::get(ExtraCredits::ENABLED_SETTING, false), FILTER_VALIDATE_BOOL),
+            'extra_credits_auto_open' => ExtraCredits::opensByItself(),
             'extra_credits_presets' => collect(ExtraCredits::presets())
                 ->map(fn (int $cents, int $minutes): array => ['minutes' => $minutes, 'price_usd' => intdiv($cents, 100)])
                 ->values()
@@ -135,6 +135,7 @@ class BillingSettings extends Page implements HasForms
                                 $plans = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->get();
                                 $synced = $plans->filter(fn ($p) => $p->hasStripeConfig())->count();
                                 $total = $plans->count();
+
                                 return "{$synced} / {$total} plans synced to Stripe";
                             }),
                     ]),
@@ -157,6 +158,7 @@ class BillingSettings extends Page implements HasForms
                             ->content(function (Get $get): string {
                                 $percent = max(0, min(99, (int) ($get('yearly_discount_percentage') ?? 20)));
                                 $multiplier = round(1 - ($percent / 100), 2);
+
                                 return "Monthly price x 12 x {$multiplier} = yearly price ({$percent}% off)";
                             }),
                         Toggle::make('require_saved_payment_method')
@@ -227,6 +229,9 @@ class BillingSettings extends Page implements HasForms
                             ->label('Sell extra credits')
                             ->helperText(ExtraCredits::ready() ? 'Off: nobody is offered them, and the studio says the credits are used up, as before.' : 'Run the migrations first: the database has no place for extra credits yet.')
                             ->disabled(! ExtraCredits::ready()),
+                        Toggle::make('extra_credits_auto_open')
+                            ->label('Open the window by itself, once, when credits have run out')
+                            ->helperText('On: the first time a member opens the studio after their credits ran out, the extra-credits window opens by itself, once. After "Not now" it does not come back by itself until they run out again; the "Add credits" button stays beside their balance. Off: it opens only when they press Generate or that button.'),
                         Repeater::make('extra_credits_presets')
                             ->label('Minutes on sale')
                             ->schema([
@@ -464,6 +469,9 @@ class BillingSettings extends Page implements HasForms
             }
         }
         // Extra credits
+        if (array_key_exists('extra_credits_auto_open', $data)) {
+            SiteSetting::set(ExtraCredits::AUTO_OPEN_SETTING, $data['extra_credits_auto_open'] ? '1' : '0', $group);
+        }
         if (array_key_exists('extra_credits_enabled', $data)) {
             SiteSetting::set(ExtraCredits::ENABLED_SETTING, $data['extra_credits_enabled'] ? '1' : '0', $group);
         }

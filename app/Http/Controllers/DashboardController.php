@@ -7,6 +7,7 @@ use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
 use App\Models\DemoVoiceGeneration;
 use App\Models\DesignedVoice;
+use App\Models\ManualPaymentRequest;
 use App\Models\Plan;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\Api\ApiAccountSummary;
@@ -24,6 +25,7 @@ use App\Support\AudioEffects;
 use App\Support\AudioFiles;
 use App\Support\AudioUrl;
 use App\Support\CreditPeriod;
+use App\Support\Credits;
 use App\Support\DialogueSpeakers;
 use App\Support\EmailVerification;
 use App\Support\GeminiVocalTags;
@@ -222,7 +224,15 @@ class DashboardController extends Controller
             'usage' => $usage,
             'usageSnapshot' => $usageSnapshot,
             // A paid member who can add extra credits now (the studio's dialog and its buttons).
-            'canBuyExtraCredits' => app(ExtraCredits::class)->status($userId) === ExtraCredits::STATUS_OK,
+            'canBuyExtraCredits' => $canBuyExtraCredits = app(ExtraCredits::class)->status($userId) === ExtraCredits::STATUS_OK,
+            // Set when the studio may open that dialog by itself, once: the credits have run out (less than
+            // a minute of voice is left) and no transfer is waiting. It names this running-out, so the
+            // browser shows it one time and again only after more credits were added and used up.
+            'extraCreditsAutoOpenKey' => $canBuyExtraCredits && ExtraCredits::opensByItself()
+                && (int) ($usageSnapshot['remaining_chars'] ?? 0) < Credits::PER_MINUTE
+                && ! ManualPaymentRequest::query()->extraCredits()->where('user_id', $userId)->where('status', ManualPaymentRequest::STATUS_PENDING)->exists()
+                    ? $userId.':'.CreditPeriod::current($userId)['key'].':'.(int) ($usageSnapshot['plan_chars'] ?? 0)
+                    : null,
             'packOffer' => $packOffer,
             'planShowcase' => $planShowcase,
             // The plan's own pricing-page lines; "credit card not needed" means nothing once signed in.

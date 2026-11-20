@@ -46,6 +46,9 @@ class ExtraCredits
     /** Admin switch (Billing Settings): off until the owner turns it on. */
     public const ENABLED_SETTING = 'extra_credits_enabled';
 
+    /** Whether the studio opens the dialog by itself, once, for a member whose credits have run out (on by default). */
+    public const AUTO_OPEN_SETTING = 'extra_credits_auto_open';
+
     /** Admin presets: {"10": 200, ...}, minutes to whole US dollar prices in cents. */
     public const PRESETS_SETTING = 'extra_credits_presets';
 
@@ -125,6 +128,11 @@ class ExtraCredits
         }
 
         return false;
+    }
+
+    public static function opensByItself(): bool
+    {
+        return filter_var(SiteSetting::get(self::AUTO_OPEN_SETTING, true), FILTER_VALIDATE_BOOL);
     }
 
     public static function enabled(): bool
