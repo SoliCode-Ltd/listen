@@ -66,7 +66,7 @@ class CreditsEndedEmailPage extends Page implements HasForms
         return $schema
             ->components([
                 Section::make('Sending')
-                    ->description('Goes out by itself the moment a member on a paid plan runs out of credits (less than a minute of voice left), wherever it happens: the studio, the browser extension or the developer API. Once for each credit period, and again only if they add extra credits and use those up too. Its button opens the studio with the extra-credits window. Only members who can buy extra credits get it: nothing is sent while extra credits are switched off (Billing Settings), to free members, or while a renewal payment is overdue.')
+                    ->description('Goes out by itself the moment a member on a paid plan runs out of credits (less than a minute of voice left), wherever it happens: the studio, the browser extension or the developer API. Once for each credit period, and again only if they add extra credits and use those up too. Its button opens the billing page with the extra-credits window, in the browser (also on a phone with the app, where nothing can be paid). Only members who can buy extra credits get it: nothing is sent while extra credits are switched off (Billing Settings), to free members, or while a renewal payment is overdue.')
                     ->columns(2)
                     ->schema([
                         Toggle::make('enabled')
@@ -84,7 +84,7 @@ class CreditsEndedEmailPage extends Page implements HasForms
                         TextInput::make('subject_en')->label('Subject')->required()->maxLength(200)->columnSpan(2),
                         TextInput::make('headline_en')->label('Headline')->maxLength(200)->helperText($placeholders)->columnSpan(2),
                         Textarea::make('body_en')->label('Message')->rows(6)->required()->helperText('A blank line starts a new paragraph. The placeholders work here and in the subject too.')->columnSpan(2),
-                        TextInput::make('cta_label_en')->label('Button text (opens the studio\'s extra-credits window)')->maxLength(80),
+                        TextInput::make('cta_label_en')->label('Button text (opens the extra-credits window on the billing page)')->maxLength(80),
                         TextInput::make('footer_en')->label('Small print at the bottom')->maxLength(300),
                     ]),
                 Section::make('العربية')

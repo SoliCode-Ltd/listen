@@ -283,7 +283,9 @@ class AppShellController extends Controller
      */
     public function extraCredits(Request $request): Response|RedirectResponse|JsonResponse
     {
-        $to = '/'.app()->getLocale().'/dashboard?extra_credits=1';
+        // The billing page, not the studio: the app opens /dashboard links itself (App Links), so the
+        // browser would hand the studio straight back to the app, and the app would ask again.
+        $to = '/'.app()->getLocale().'/billing?extra_credits=1';
         if (! InApp::fromApp($request)) {
             return redirect()->to(url($to));
         }

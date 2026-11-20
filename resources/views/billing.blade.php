@@ -1406,6 +1406,8 @@
 
   @include('components.footer')
   @include('components.scripts')
+  {{-- Extra credits, opened by ?extra_credits=1 (the credits-ended email, the Android app's popup). --}}
+  @include('components.extra-credits-dialog')
   @php
     $billingI18n = [
       'confirm_and_pay' => __('ui.billing.confirm_and_pay'),
