@@ -641,8 +641,11 @@
       } catch (_e) {
         return { status: 0, data: { ok: false, message: t.network_error } };
       }
+      // The server's own words for a fault or a rate limit are never shown: ours, in the member's language.
+      if (response.status >= 500) return { status: response.status, data: { ok: false, message: t.server_error } };
+      if (response.status === 429) return { status: 429, data: { ok: false, message: t.too_many } };
       const data = await response.json().catch(() => null);
-      return { status: response.status, data: data || { ok: false, message: t.card_failed } };
+      return { status: response.status, data: data || { ok: false, message: t.server_error } };
     }
 
     function firstError(data, fallback) {
@@ -724,7 +727,8 @@
         // A typed card is used once: after a refusal the member enters it again, or another.
         if (usedNewCard && !attemptOpen) newCard = null;
         paintBuy();
-        note('xcBuyNote', firstError(reply.data, t.card_failed));
+        // A fault on our side after the card may have been charged: paying again asks about the same payment.
+        note('xcBuyNote', reply.status >= 500 ? t.retry_safe : firstError(reply.data, t.card_failed));
       } catch (_error) {
         attemptOpen = true;
         restore();
@@ -769,7 +773,7 @@
       const reply = await post(urls.transfer, form);
       inFlight = false;
       busy(send, false, t.send);
-      if (!reply.data.ok) { note('xcTransferNote', firstError(reply.data, t.card_failed)); return; }
+      if (!reply.data.ok) { note('xcTransferNote', firstError(reply.data, t.server_error)); return; }
       offer.pending = { minutes: preset().minutes, method };
       state.result = 'pending';
       $('xcWaitLead').textContent = fill(t.transfer_sent, { credits: fmt(reply.data.credits) });

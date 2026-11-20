@@ -26,8 +26,9 @@
  * The test member (staging-extra-credits@example.com, on Starter, credits used
  * up) is kept afterwards so the dialog can be tried in a browser with Stripe's
  * test cards. MEMBER_PASSWORD_HASH (a bcrypt hash, never a password) sets its
- * password; ACTION=clean removes the member and everything made for it.
- * "Sell extra credits" is switched on for staging if it was off.
+ * password; ACTION=clean removes the member and everything made for it, and
+ * switches "Sell extra credits" off again (it is switched on for the check;
+ * staging holds live keys, so nothing is left on sale there).
  *
  *   ssh user@host 'cd ~/public_html && php' < scripts/support/extra_credits_stripe_test.php
  */
@@ -118,6 +119,10 @@ $gateway = app(StripePackGateway::class);
 if (getenv('ACTION') === 'clean') {
     $user = User::query()->where('email', TEST_EMAIL)->first();
     if (! $user) {
+        if (ExtraCredits::enabled()) {
+            SiteSetting::set(ExtraCredits::ENABLED_SETTING, '0', 'billing');
+            echo "\"Sell extra credits\" switched off on staging again.\n";
+        }
         echo "No test member to remove.\n";
         exit(0);
     }
@@ -135,6 +140,11 @@ if (getenv('ACTION') === 'clean') {
     Subscription::withoutEvents(fn () => Subscription::query()->where('user_id', $user->id)->delete());
     User::withoutEvents(fn () => $user->delete());
     echo "Test member removed.\n";
+    // Staging holds live keys and a copy of real members' cards: nothing is left on sale there by this check.
+    if (ExtraCredits::enabled()) {
+        SiteSetting::set(ExtraCredits::ENABLED_SETTING, '0', 'billing');
+        echo "\"Sell extra credits\" switched off on staging again.\n";
+    }
     exit(0);
 }
 

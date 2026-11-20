@@ -237,6 +237,28 @@ class ExtraCreditsTest extends TestCase
         $this->assertSame('4242', $member->fresh()->pm_last_four);
     }
 
+    public function test_stripe_not_answering_after_the_bank_check_writes_nothing_off(): void
+    {
+        $member = $this->member();
+        $this->stripe->nextOutcome = 'requires_action';
+        $started = $this->actingAs($member)->postJsonLocalizedRoute('billing.extra-credits.card', ['minutes' => 30])->assertStatus(402);
+        $purchase = (int) $started->json('purchase');
+
+        // The check is passed, but Stripe cannot be asked about the payment just now.
+        $kept = $this->stripe->intents;
+        $this->stripe->intents = [];
+        $this->actingAs($member)->postJsonLocalizedRoute('billing.extra-credits.card.confirm', ['purchase' => $purchase])
+            ->assertStatus(202)->assertJsonPath('processing', true)->assertJsonPath('message', __('ui.extra_credits.card_processing'));
+        $this->assertSame(CharPackPurchase::STATUS_PENDING, CharPackPurchase::query()->findOrFail($purchase)->status);
+        $this->assertSame(0, (int) CreditPeriod::counter($member->id)->extra_chars);
+
+        // Stripe's webhook then reports it, and the credits are added once.
+        $this->stripe->intents = $kept;
+        $this->stripe->completeBankCheck('pi_test_1');
+        $this->postJson('/api/stripe/webhook', $this->succeeded('pi_test_1', 500, $purchase))->assertOk();
+        $this->assertSame(27000, (int) CreditPeriod::counter($member->id)->extra_chars);
+    }
+
     public function test_a_payment_that_only_the_webhook_reports_is_added(): void
     {
         $member = $this->member();
@@ -526,8 +548,8 @@ class ExtraCreditsTest extends TestCase
     {
         $member = $this->member();
         $studio = fn () => $this->actingAs($member)->withoutMiddleware([
-            \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
-            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+            LocaleSessionRedirect::class,
+            LaravelLocalizationRedirectFilter::class,
         ])->get($this->localizedRoute('dashboard'))->assertOk();
         $period = CreditPeriod::current($member->id)['key'];
 

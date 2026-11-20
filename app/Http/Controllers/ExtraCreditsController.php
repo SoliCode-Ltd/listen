@@ -198,7 +198,16 @@ class ExtraCreditsController extends Controller
             ->where('method', CharPackPurchase::METHOD_CARD)
             ->firstOrFail();
 
-        return $this->respond($card->confirm($purchase), $request);
+        try {
+            $result = $card->confirm($purchase);
+        } catch (\Throwable $exception) {
+            // Stripe could not be asked just now. The bank's check is done, so the payment is not
+            // written off: the member is told to wait, and it is added by the webhook or the next look.
+            Log::warning('An extra-credits payment could not be looked up after the bank\'s check.', ['user_id' => $request->user()->id, 'purchase_id' => $purchase->id, 'error' => $exception->getMessage()]);
+            $result = ['status' => 'processing', 'purchase' => $purchase, 'message' => __('ui.extra_credits.card_processing')];
+        }
+
+        return $this->respond($result, $request);
     }
 
     /** A transfer by InstaPay / Vodafone Cash, with the picture of its receipt, for the team to check. */
