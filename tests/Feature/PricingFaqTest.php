@@ -33,12 +33,20 @@ class PricingFaqTest extends TestCase
         $en = fn (int $number): string => __('ui.pricing.faq'.$number.'_a', [], 'en');
         $ar = fn (int $number): string => __('ui.pricing.faq'.$number.'_a', [], 'ar');
 
-        // A downgrade applies at once too, with the unused time kept as account credit.
-        $this->assertStringNotContainsString('next billing cycle', $en(1));
-        $this->assertStringContainsString('takes effect right away', $en(1));
-        $this->assertStringContainsString('account credit', $en(1));
-        $this->assertStringNotContainsString('دورة الفوترة التالية', $ar(1));
-        $this->assertStringContainsString('يسري التغيير فوراً', $ar(1));
+        // A move up applies at once: the unused credits come off the price and the new plan
+        // starts full (App\Services\Billing\UnusedCredits). A move down starts at the renewal
+        // (App\Services\Billing\PlanChanges), with nothing turned into account credit.
+        $this->assertStringContainsString('Moving up takes effect right away', $en(1));
+        $this->assertStringContainsString('credits you have not used', $en(1));
+        $this->assertStringContainsString('starts with its full credits', $en(1));
+        $this->assertStringContainsString('Moving down starts at your next renewal', $en(1));
+        $this->assertStringNotContainsString('unused time', $en(1));
+        $this->assertStringNotContainsString('account credit', $en(1));
+        $this->assertStringNotContainsString('count on the new plan', $en(1));
+        $this->assertStringContainsString('الترقية تسري فوراً', $ar(1));
+        $this->assertStringContainsString('برصيدها كاملاً', $ar(1));
+        $this->assertStringContainsString('مع تجديدك القادم', $ar(1));
+        $this->assertStringNotContainsString('الوقت غير المستخدم', $ar(1));
 
         // No notification is sent: the studio says why, and nothing is billed over the limit.
         $this->assertStringNotContainsString('notification', $en(2));

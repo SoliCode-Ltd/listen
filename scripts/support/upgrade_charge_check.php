@@ -98,6 +98,7 @@ echo "\n== Stripe subscriptions ==\n";
 foreach ($stripe->subscriptions->all(['customer' => $customer, 'status' => 'all', 'limit' => 5])->data as $sub) {
     $item = $sub->items->data[0] ?? null;
     $price = (string) ($item->price->id ?? '');
+    $line('How Stripe bills it', 'billing mode '.((string) ($sub->billing_mode->type ?? 'classic')));
     $line($sub->status.', '.($priceToPlan[$price] ?? $price), 'period '.$when($item->current_period_start ?? $sub->current_period_start ?? null).' to '.$when($item->current_period_end ?? $sub->current_period_end ?? null).', anchor '.$when($sub->billing_cycle_anchor ?? null));
 }
 $balance = (int) ($stripe->customers->retrieve($customer)->balance ?? 0);
@@ -111,7 +112,7 @@ foreach ($stripe->invoices->all(['customer' => $customer, 'limit' => 6])->data a
     foreach ($stripe->invoices->allLines($invoice->id, ['limit' => 20])->data as $item) {
         $price = (string) ($item->price->id ?? $item->pricing->price_details->price ?? '');
         $proration = $item->proration ?? $item->parent->subscription_item_details->proration ?? false;
-        echo '      '.str_pad($money($item->amount, $item->currency), 14, ' ', STR_PAD_LEFT).'  '.($proration ? '[time credit/charge] ' : '').trim((string) $item->description)
+        echo '      '.str_pad($money($item->amount, $item->currency), 14, ' ', STR_PAD_LEFT).'  '.($proration ? '[time credit/charge] ' : ((int) $item->amount < 0 ? '[money back] ' : '')).trim((string) $item->description)
             .'  ('.$when($item->period->start ?? null).' to '.$when($item->period->end ?? null).')'.($price !== '' ? '  = '.($priceToPlan[$price] ?? $price) : '')."\n";
     }
 }
