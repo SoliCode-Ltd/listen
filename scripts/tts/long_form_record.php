@@ -48,6 +48,12 @@ $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
 $app->instance('request', Request::create('/en'));
 $kernel->bootstrap();
 
+// An error anywhere stops the check as FAILED (left to Laravel, it would be shown and the run would still pass).
+set_exception_handler(function (Throwable $e): void {
+    fwrite(STDERR, 'The check stopped on an error: '.$e::class.': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().")\nFAILED\n");
+    exit(1);
+});
+
 // Its own requests, one after another: past the form token and the studio's rate limit.
 $app->instance(ValidateCsrfToken::class, new class($app, $app['encrypter']) extends ValidateCsrfToken
 {

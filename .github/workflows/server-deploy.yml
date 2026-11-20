@@ -370,6 +370,11 @@ jobs:
           require 'vendor/autoload.php';
           $app = require 'bootstrap/app.php';
           $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          // An error anywhere stops the check as FAILED (left to Laravel, it would be shown and the run would still pass).
+          set_exception_handler(function (Throwable $e): void {
+              fwrite(STDERR, 'The check stopped on an error: '.$e::class.': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().")\nFAILED\n");
+              exit(1);
+          });
           $db = fn (string $t) => Illuminate\Support\Facades\DB::table($t);
           $show = function (string $title, $rows) { echo "== $title ==\n"; foreach ($rows as $r) echo '  ', json_encode($r, JSON_UNESCAPED_SLASHES), "\n"; if (count($rows) === 0) echo "  none\n"; };
           echo 'App timezone: ', config('app.timezone'), "\n";
@@ -384,7 +389,10 @@ jobs:
           }
           $show('Local Stripe subscriptions on a price no plan knows (all members)', $db('billing_subscriptions')->whereNotNull('stripe_price')->whereNotIn('stripe_price', $known)->select('id', 'user_id', 'stripe_id', 'stripe_status', 'stripe_price', 'created_at', 'updated_at', 'ends_at')->orderBy('id')->get());
           REMOTE
-            for u in $($S "$FIND; CUSTOMER='$CUSTOMER' php -r 'require \"vendor/autoload.php\"; \$a = require \"bootstrap/app.php\"; \$a->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo Illuminate\Support\Facades\DB::table(\"users\")->where(\"stripe_id\", getenv(\"CUSTOMER\"))->pluck(\"id\")->implode(\" \");'"); do
+            # Read before the loop: an error here stops the run (as the list of a "for" it would be passed over;
+            # php -r itself already ends in an error on anything uncaught, so it needs no handler of its own).
+            members="$($S "$FIND; CUSTOMER='$CUSTOMER' php -r 'require \"vendor/autoload.php\"; \$a = require \"bootstrap/app.php\"; \$a->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo Illuminate\Support\Facades\DB::table(\"users\")->where(\"stripe_id\", getenv(\"CUSTOMER\"))->pluck(\"id\")->implode(\" \");'")"
+            for u in $members; do
               echo "== Log lines for member $u (Oct 15-17) =="
               $S "$FIND; grep -hE '^\[2026-10-1[5-7]' storage/logs/*.log 2>/dev/null | grep -E \"\\\"user_id\\\":$u[,}]\" | cut -c1-400 | tail -60" || echo "  none"
             done
@@ -397,6 +405,11 @@ jobs:
           require 'vendor/autoload.php';
           $app = require 'bootstrap/app.php';
           $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          // An error anywhere stops the check as FAILED (left to Laravel, it would be shown and the run would still pass).
+          set_exception_handler(function (Throwable $e): void {
+              fwrite(STDERR, 'The check stopped on an error: '.$e::class.': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().")\nFAILED\n");
+              exit(1);
+          });
           $db = fn (string $t) => Illuminate\Support\Facades\DB::table($t);
           $now = now()->toDateTimeString();
           echo "Now (UTC): $now\n";
@@ -502,6 +515,11 @@ jobs:
           require 'vendor/autoload.php';
           $app = require 'bootstrap/app.php';
           $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          // An error anywhere stops the check as FAILED (left to Laravel, it would be shown and the run would still pass).
+          set_exception_handler(function (Throwable $e): void {
+              fwrite(STDERR, 'The check stopped on an error: '.$e::class.': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().")\nFAILED\n");
+              exit(1);
+          });
           $line = function (string $label, $value): void { echo '  '.str_pad($label, 46).(is_bool($value) ? ($value ? 'yes' : 'no') : (string) $value)."\n"; };
           echo "== In use now ==\n";
           $line('APP_ENV / debug', config('app.env').' / '.(config('app.debug') ? 'ON' : 'off'));

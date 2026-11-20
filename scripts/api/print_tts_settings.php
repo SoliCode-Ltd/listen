@@ -16,6 +16,12 @@ require getcwd().'/vendor/autoload.php';
 $app = require getcwd().'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
+// An error anywhere stops the check as FAILED (left to Laravel, it would be shown and the run would still pass).
+set_exception_handler(function (Throwable $e): void {
+    fwrite(STDERR, 'The check stopped on an error: '.$e::class.': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().")\nFAILED\n");
+    exit(1);
+});
+
 $settings = SiteSetting::query()
     ->get(['key', 'value', 'group'])
     ->filter(fn (SiteSetting $setting): bool => (bool) preg_match('/^(tts|gemini|daily)_/', (string) $setting->key))

@@ -42,6 +42,13 @@ use Symfony\Component\Process\Process;
 require 'vendor/autoload.php';
 $app = require 'bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
+
+// An error anywhere stops the check as FAILED (left to Laravel, it would be shown and the run would still pass).
+set_exception_handler(function (Throwable $e): void {
+    fwrite(STDERR, 'The check stopped on an error: '.$e::class.': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().")\nFAILED\n");
+    exit(1);
+});
+
 set_time_limit(0);
 echo 'Now (UTC): ', now()->utc()->toDateTimeString(), "\n";
 
