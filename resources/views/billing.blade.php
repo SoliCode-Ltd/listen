@@ -46,16 +46,17 @@
       font-size: 1rem;
     }
     /* Beside the plan's label: the extra-credits window, for a member who wants more minutes
-       without changing plan (or closed the window by mistake). Text, like a hint, not a button. */
-    .plan-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .4rem; }
+       without changing plan (or closed the window by mistake). The site's own button. */
+    .plan-label-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .6rem; }
     .form-group .plan-label-row label { margin-bottom: 0; }
-    .plan-label-action {
-      padding: 0; border: 0; background: none; color: var(--brand-accent);
-      font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer; white-space: nowrap;
-      -webkit-tap-highlight-color: transparent;
+    .btn.plan-label-action {
+      gap: .4rem; padding: .7rem 1.25rem; white-space: nowrap; -webkit-tap-highlight-color: transparent;
+      color: var(--brand-accent); border-color: color-mix(in oklab, var(--brand-accent) 45%, var(--line-strong));
     }
-    .plan-label-action:hover { text-decoration: underline; text-underline-offset: 3px; }
-    .plan-label-action:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; border-radius: 4px; }
+    .btn.plan-label-action:hover { border-color: var(--brand-accent); background: color-mix(in oklab, var(--brand-accent) 6%, var(--surface)); }
+    .plan-label-action svg { flex: none; }
+    /* Side by side (wider screens): the two pickers stay level although this label row is taller. */
+    .form-row:has(.plan-label-row) { align-items: end; }
 
     /* ── Grid layout ── */
     .grid-layout {
@@ -1144,7 +1145,10 @@
                 {{-- The extra-credits window again (components/extra-credits-dialog). --}}
                 <div class="plan-label-row">
                   <label for="plan">{{ __('ui.billing.plan') }}</label>
-                  <button type="button" class="plan-label-action" data-extra-credits-open>{{ __('ui.billing.just_add_credits') }}</button>
+                  <button type="button" class="btn plan-label-action" data-extra-credits-open>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                    <span>{{ __('ui.extra_credits.open') }}</span>
+                  </button>
                 </div>
               @else
                 <label for="plan">{{ __('ui.billing.plan') }}</label>
