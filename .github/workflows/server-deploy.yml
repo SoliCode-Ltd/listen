@@ -128,6 +128,16 @@ name: Server deploy
 #            fails on an error, a wrong status or text shown as its key
 #            (scripts/support/staging_page_check.php). Billing pages are left
 #            out: staging runs the live Stripe keys.
+#   extra-credits-test: staging only, and only when staging holds Stripe TEST
+#            keys (it checks first, prints which kind, never a key, and does
+#            nothing with live keys). Real sandbox payments for extra credits
+#            through the app's own code, for one test member made for it: a
+#            card that works, a declined card, a card that needs the bank's
+#            check, the same payment asked for twice, a kept card and a refund
+#            (scripts/support/extra_credits_stripe_test.php). The member is kept
+#            for a browser check; input "extra_credits" is empty, a bcrypt hash
+#            for that member's password, or clean to remove it. Needs mode
+#            migrate first.
 #   stt-test: staging only. Speech to text from start to end with the branch's
 #            code, for a throwaway member made for the run and removed after it:
 #            two short recordings of the studio's voice samples written out the
@@ -221,10 +231,14 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
         default: inspect
       customer:
         description: "billing-trace and chatgpt-ads-check: the Stripe customer id (cus_...)"
+        type: string
+        default: ""
+      extra_credits:
+        description: "extra-credits-test only: empty, a bcrypt hash for the test member's password, or clean"
         type: string
         default: ""
       member:
@@ -286,6 +300,7 @@ jobs:
           TARGET: ${{ inputs.target }}
           MODE: ${{ inputs.mode }}
           CUSTOMER: ${{ inputs.customer }}
+          XC: ${{ inputs.extra_credits }}
           MEMBER: ${{ inputs.member }}
           DUB: ${{ inputs.dub }}
           DESIGN: ${{ inputs.design }}
@@ -635,6 +650,15 @@ jobs:
             [ "$TARGET" = staging ] || { echo "stt-queue runs on staging only"; exit 1; }
             failed=0
             $S "$FIND; nice php" < scripts/support/stt_queue_check.php || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
+          if [ "$MODE" = extra-credits-test ]; then
+            [ "$TARGET" = staging ] || { echo "extra-credits-test runs on staging only"; exit 1; }
+            printf '%s' "$XC" | grep -qE '^(clean|\$2y\$[0-9]{2}\$[A-Za-z0-9./]{53})?$' || { echo "extra_credits: empty, a bcrypt hash, or clean"; exit 1; }
+            if [ "$XC" = clean ]; then A=clean; H=; else A=; H="$XC"; fi
+            failed=0
+            $S "$FIND; ACTION='$A' MEMBER_PASSWORD_HASH='$H' php" < scripts/support/extra_credits_stripe_test.php || failed=1
             rm -f ~/.ssh/id_deploy
             exit "$failed"
           fi
