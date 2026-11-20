@@ -27,6 +27,7 @@ class CashierStripePackGateway implements StripePackGateway
         string $description,
         array $metadata,
         string $idempotencyKey,
+        bool $saveCard = false,
     ): array {
         try {
             $intent = Cashier::stripe()->paymentIntents->create([
@@ -40,7 +41,7 @@ class CashierStripePackGateway implements StripePackGateway
                 // Shown on the card statement after the company name: "...* LISTEN".
                 'statement_descriptor_suffix' => 'LISTEN',
                 'metadata' => $metadata,
-            ], ['idempotency_key' => $idempotencyKey]);
+            ] + ($saveCard ? ['setup_future_usage' => 'off_session'] : []), ['idempotency_key' => $idempotencyKey]);
         } catch (CardException $exception) {
             // A declined card: Stripe answers with an error instead of the payment.
             $intent = $exception->getError()?->payment_intent ?? null;
@@ -52,6 +53,7 @@ class CashierStripePackGateway implements StripePackGateway
                 'amount' => $amountMinor,
                 'currency' => strtolower($currency),
                 'customer' => $customerId,
+                'payment_method' => $paymentMethodId,
                 'metadata' => $metadata,
                 'error' => $exception->getMessage(),
             ];
@@ -65,8 +67,40 @@ class CashierStripePackGateway implements StripePackGateway
         return $this->toArray(Cashier::stripe()->paymentIntents->retrieve($paymentIntentId, []));
     }
 
+    public function savedCard(string $customerId): ?array
+    {
+        $stripe = Cashier::stripe();
+        $customer = $stripe->customers->retrieve($customerId, ['expand' => ['invoice_settings.default_payment_method']]);
+        if ($customer->deleted ?? false) {
+            return null;
+        }
+
+        $card = $customer->invoice_settings->default_payment_method ?? null;
+        if (! is_object($card) || ($card->type ?? '') !== 'card') {
+            $card = $stripe->paymentMethods->all(['customer' => $customerId, 'type' => 'card', 'limit' => 1])->data[0] ?? null;
+        }
+        if (! is_object($card) || ! is_object($card->card ?? null)) {
+            return null;
+        }
+
+        return [
+            'id' => (string) $card->id,
+            'brand' => (string) ($card->card->brand ?? 'card'),
+            'last4' => (string) ($card->card->last4 ?? ''),
+            'exp_month' => (int) ($card->card->exp_month ?? 0),
+            'exp_year' => (int) ($card->card->exp_year ?? 0),
+        ];
+    }
+
+    public function makeDefaultCard(string $customerId, string $paymentMethodId): void
+    {
+        Cashier::stripe()->customers->update($customerId, [
+            'invoice_settings' => ['default_payment_method' => $paymentMethodId],
+        ]);
+    }
+
     /**
-     * @return array{id:string,status:string,client_secret:?string,amount:int,currency:string,customer:?string,metadata:array<string, string>,error:?string}
+     * @return array{id:string,status:string,client_secret:?string,amount:int,currency:string,customer:?string,payment_method:?string,metadata:array<string, string>,error:?string}
      */
     private function toArray(PaymentIntent $intent): array
     {
@@ -79,6 +113,7 @@ class CashierStripePackGateway implements StripePackGateway
             'amount' => (int) $intent->amount,
             'currency' => (string) $intent->currency,
             'customer' => is_string($intent->customer) ? $intent->customer : ($intent->customer->id ?? null),
+            'payment_method' => is_string($intent->payment_method) ? $intent->payment_method : ($intent->payment_method->id ?? null),
             'metadata' => array_map('strval', $metadata),
             'error' => $intent->last_payment_error->message ?? null,
         ];

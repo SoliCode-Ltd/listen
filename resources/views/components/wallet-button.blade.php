@@ -4,7 +4,7 @@
      site's domain is registered there; where neither can be used the box stays hidden and
      the card boxes work as before. The wallet hands over a card, so a page pays with it the same
      way as with the card boxes. A page makes it with
-     ListenWalletButton(stripe, id, { mode, amount, billingDetails, onConfirm }) and
+     ListenWalletButton(stripe, id, { mode, amount, billingDetails, onConfirm, onOpen, onCancel }) and
      shows it with .show(true) when paying by card is the choice. In 'setup' mode it only
      hands over a card for later (a free trial, the card that renews a plan), with no
      amount; .setMode(mode, amount) moves it between paying today and that. --}}
@@ -117,6 +117,9 @@
       });
       // No wallet could load (a blocked frame, a domain Stripe does not know yet): the card boxes stay.
       button.on('loaderror', function () { ready = false; waiting = false; remember(0); paint(); });
+      // Optional: the page is told when the wallet's sheet opens and when it is dismissed.
+      if (typeof options.onOpen === 'function') button.on('click', function (event) { options.onOpen(); event.resolve(); });
+      if (typeof options.onCancel === 'function') button.on('cancel', function () { options.onCancel(); });
       // The wallet's own sheet closes on a failure; the page then says what went wrong.
       button.on('confirm', function (event) {
         var fail = function (error) {

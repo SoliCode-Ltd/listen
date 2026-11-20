@@ -357,6 +357,30 @@ class LocalizedPricingService
         };
     }
 
+    /**
+     * A price in whole units of its currency, rounded up ("$5", "105 ج.م"):
+     * for prices that are shown without fractions (extra credits).
+     */
+    public function formatWholeAmount(int $amountMinor, string $currency, ?string $locale = null): string
+    {
+        $locale = strtolower(trim((string) ($locale ?: app()->getLocale())));
+        $whole = (int) ceil(max(0, $amountMinor) / 100);
+        $formatterLocale = $locale === 'ar'
+            ? (strtoupper($currency) === self::CURRENCY_EGP ? 'ar_EG@numbers=latn' : 'ar@numbers=latn')
+            : 'en_US';
+
+        if (class_exists(NumberFormatter::class)) {
+            $formatter = new NumberFormatter($formatterLocale, NumberFormatter::CURRENCY);
+            $formatter->setAttribute(NumberFormatter::FRACTION_DIGITS, 0);
+            $formatted = $formatter->formatCurrency($whole, strtoupper($currency));
+            if (is_string($formatted) && trim($formatted) !== '') {
+                return $this->normalizeToLatinDigits(trim($formatted));
+            }
+        }
+
+        return $this->normalizeToLatinDigits(strtoupper($currency).' '.number_format($whole));
+    }
+
     public function formatAmount(int $amountMinor, string $currency, ?string $locale = null): string
     {
         $locale = strtolower(trim((string) ($locale ?: app()->getLocale())));

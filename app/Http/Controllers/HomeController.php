@@ -49,11 +49,11 @@ use App\Support\SpeakerAvatar;
 use App\Support\SpeakerVoices;
 use App\Support\SpeechLanguages;
 use App\Support\SpeechText;
+use App\Support\Transcription\TranscriptionAccess;
+use App\Support\Transcription\TranscriptionPresenter;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VersionedAsset;
-use App\Support\Transcription\TranscriptionAccess;
-use App\Support\Transcription\TranscriptionPresenter;
 use App\Support\VideoDubbing;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceDesign;
@@ -1682,8 +1682,6 @@ class HomeController extends Controller
 
             $premiumMinutes = (int) ($plan->premium_voice_minutes ?? 0);
             $recentDays = (int) ($plan->recent_voices_days ?? 7);
-            $topupCharCents = $plan->topup_char_price_cents !== null ? (int) $plan->topup_char_price_cents : null;
-            $topupMinCents = $plan->topup_minute_price_cents !== null ? (int) $plan->topup_minute_price_cents : null;
 
             // Use localized name/description from admin panel, or fall back to translation file
             $localizedName = $plan->getLocalizedName($locale);
@@ -1755,10 +1753,6 @@ class HomeController extends Controller
                 'monthly_requests' => (int) $plan->monthly_requests,
                 'requests_unlimited' => (int) $plan->monthly_requests <= 0,
                 'max_chars_per_request' => (int) $plan->max_chars_per_request,
-                'allow_overage' => (bool) $plan->allow_overage,
-                'overage_price_per_million_cents' => $plan->overage_price_per_million_cents !== null
-                    ? (int) $plan->overage_price_per_million_cents
-                    : null,
                 'commercial_use_allowed' => (bool) $plan->commercial_use_allowed,
                 'processing_priority' => (string) ($plan->processing_priority ?: 'standard'),
                 'voice_tier' => $tier,
@@ -1766,8 +1760,6 @@ class HomeController extends Controller
                 'premium_voice_minutes' => $premiumMinutes,
                 'recent_voices_days' => $recentDays,
                 'dialogue_enabled' => (bool) ($plan->dialogue_enabled ?? false),
-                'topup_char_price_cents' => $topupCharCents,
-                'topup_minute_price_cents' => $topupMinCents,
                 'is_featured' => (bool) ($plan->is_featured ?? false),
                 'features' => $features,
                 // The comparison table's lines: from the plan's settings, never its card text.

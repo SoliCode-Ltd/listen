@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Plan;
 use App\Models\UsageCounter;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\ExtraCredits;
 
 /**
  * What a member has used and has left, for the dashboard and the extension.
@@ -14,7 +15,7 @@ final class UsageSnapshot
 {
     /**
      * @return array{
-     *   mode:string, total_chars:int, plan_chars:int, remaining_chars:int, chars_percent:int, gift_chars:int,
+     *   mode:string, total_chars:int, plan_chars:int, remaining_chars:int, chars_percent:int, gift_chars:int, extra_chars:int,
      *   total_requests:int, total_minutes:int, plan_requests:?int, requests_unlimited:bool, requests_percent:int,
      *   pack_expires_at:?string, no_free_chars:bool, minutes_limit:?int, seconds_used:int
      * }
@@ -42,6 +43,7 @@ final class UsageSnapshot
                 'remaining_chars' => $pack['remaining'],
                 'chars_percent' => $pack['total'] > 0 ? min(100, (int) round(($pack['used'] / $pack['total']) * 100)) : 100,
                 'gift_chars' => 0,
+                'extra_chars' => 0,
                 'total_requests' => (int) $counter->total_requests,
                 'total_minutes' => (int) $counter->total_minutes,
                 'plan_requests' => null,
@@ -66,6 +68,8 @@ final class UsageSnapshot
             'remaining_chars' => max(0, $planChars - $used),
             'chars_percent' => $planChars > 0 ? min(100, (int) round(($used / $planChars) * 100)) : 100,
             'gift_chars' => PlanUsageGuard::giftChars($counter),
+            // Extra credits still left (used after the plan's credits and the gifts).
+            'extra_chars' => ExtraCredits::left($quotaPlan, $counter),
             'total_requests' => (int) $counter->total_requests,
             'total_minutes' => (int) $counter->total_minutes,
             'plan_requests' => $requestsUnlimited ? null : $planRequests,

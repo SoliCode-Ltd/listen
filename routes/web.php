@@ -15,6 +15,7 @@ use App\Http\Controllers\AudioDownloadController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CharPackController;
+use App\Http\Controllers\ExtraCreditsController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DemoAgentController;
@@ -525,6 +526,11 @@ Route::group([
         Route::get('/billing/pack', [CharPackController::class, 'show'])->name('billing.pack');
         Route::post('/billing/pack/card', [CharPackController::class, 'payByCard'])->middleware('throttle:10,1')->name('billing.pack.card');
         Route::post('/billing/pack/card/confirm', [CharPackController::class, 'confirmCard'])->middleware('throttle:20,1')->name('billing.pack.card.confirm');
+        // Extra credits for paid plans, from the studio's dialog (App\Services\Billing\ExtraCredits).
+        Route::get('/billing/extra-credits', [ExtraCreditsController::class, 'offer'])->middleware('throttle:60,1')->name('billing.extra-credits');
+        Route::post('/billing/extra-credits/card', [ExtraCreditsController::class, 'payByCard'])->middleware('throttle:10,1')->name('billing.extra-credits.card');
+        Route::post('/billing/extra-credits/card/confirm', [ExtraCreditsController::class, 'confirmCard'])->middleware('throttle:20,1')->name('billing.extra-credits.card.confirm');
+        Route::post('/billing/extra-credits/transfer', [ExtraCreditsController::class, 'transfer'])->middleware('throttle:6,1')->name('billing.extra-credits.transfer');
         Route::get('/billing/manual', [ManualPaymentController::class, 'instructions'])->name('billing.manual.instructions');
         Route::post('/billing/manual/confirm', [ManualPaymentController::class, 'confirm'])->name('billing.manual.confirm');
         Route::get('/manage-subscription', [BillingController::class, 'manage'])->name('manage-subscription.page');

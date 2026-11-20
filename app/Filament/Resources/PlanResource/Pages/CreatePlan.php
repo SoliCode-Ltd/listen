@@ -2,10 +2,10 @@
 
 namespace App\Filament\Resources\PlanResource\Pages;
 
-use Exception;
 use App\Filament\Resources\PlanResource;
 use App\Models\Plan;
 use App\Services\StripeProductSyncService;
+use Exception;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -27,18 +27,6 @@ class CreatePlan extends CreateRecord
 
         $priceDollars = (float) ($rawState['price_dollars'] ?? 0);
         $data['price_cents'] = (int) round($priceDollars * 100);
-
-        if (! empty($rawState['overage_price_dollars'])) {
-            $data['overage_price_per_million_cents'] = (int) round(((float) $rawState['overage_price_dollars']) * 100);
-        }
-
-        if (! empty($rawState['topup_char_price_dollars'])) {
-            $data['topup_char_price_cents'] = (int) round(((float) $rawState['topup_char_price_dollars']) * 100);
-        }
-
-        if (! empty($rawState['topup_minute_price_dollars'])) {
-            $data['topup_minute_price_cents'] = (int) round(((float) $rawState['topup_minute_price_dollars']) * 100);
-        }
 
         if (empty($data['discount_percentage'])) {
             $data['discount_percentage'] = null;

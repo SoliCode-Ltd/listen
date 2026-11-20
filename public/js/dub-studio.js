@@ -435,6 +435,10 @@
       if (xhr.status === 419) return t.expired_page;
       if (xhr.status === 429) return t.too_many;
       if (xhr.status === 422 && body.errors) {
+        // Out of credits on a paid plan: the studio's extra-credits dialog is offered.
+        if (body.out_of_credits && window.ListenExtraCredits) {
+          window.ListenExtraCredits.open({ remaining: body.credits && body.credits.remaining, needed: body.credits && body.credits.needed });
+        }
         var first = Object.keys(body.errors).map(function (k) { return body.errors[k][0]; })[0];
         if (first) return first;
       }

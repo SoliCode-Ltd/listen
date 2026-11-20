@@ -38,6 +38,10 @@ These are the owner's standing instructions. Follow them in every session.
   company's is offered. Apple's own button pictures, unchanged
   (`public/images/partners/apple-*.png`), the same size as the Google button,
   and nowhere else on the site or in the Android app.
+  A fifth exception the owner asked for (20 November 2026): the Apple Pay and
+  Google Pay buttons in the extra-credits dialog in the studio, the same wallet
+  button as the checkout (`<x-wallet-button>`, drawn by Stripe). The buttons
+  only: no sentence naming them.
 
 ## Email
 - Never send email. Draft it only, and let the owner send it.

@@ -39,9 +39,6 @@ class PlanSeeder extends Seeder
                 'monthly_requests' => 60,
                 'max_chars_per_request' => 1200,
                 'allow_overage' => false,
-                'overage_price_per_million_cents' => null,
-                'topup_char_price_cents' => null,
-                'topup_minute_price_cents' => null,
                 'commercial_use_allowed' => false,
                 'processing_priority' => 'standard',
                 'voice_tier' => 'standard',
@@ -71,9 +68,6 @@ class PlanSeeder extends Seeder
                 'monthly_requests' => 0,   // 0 = unlimited
                 'max_chars_per_request' => 5000,
                 'allow_overage' => false,
-                'overage_price_per_million_cents' => 2800,   // $28/1M chars
-                'topup_char_price_cents' => 2800,
-                'topup_minute_price_cents' => 40,            // $0.40/min
                 'commercial_use_allowed' => true,
                 'processing_priority' => 'standard_plus',
                 'voice_tier' => 'hd',
@@ -107,9 +101,6 @@ class PlanSeeder extends Seeder
                 'monthly_requests' => 0,
                 'max_chars_per_request' => 20000,
                 'allow_overage' => false,
-                'overage_price_per_million_cents' => 2400,   // $24/1M chars
-                'topup_char_price_cents' => 2400,
-                'topup_minute_price_cents' => 35,            // $0.35/min
                 'commercial_use_allowed' => true,
                 'processing_priority' => 'high',
                 'voice_tier' => 'hd',
@@ -143,9 +134,6 @@ class PlanSeeder extends Seeder
                 'monthly_requests' => 0,
                 'max_chars_per_request' => 120000,
                 'allow_overage' => false,
-                'overage_price_per_million_cents' => 2000,   // $20/1M chars
-                'topup_char_price_cents' => 2000,
-                'topup_minute_price_cents' => 30,            // $0.30/min
                 'commercial_use_allowed' => true,
                 'processing_priority' => 'priority',
                 'voice_tier' => 'hd',
@@ -177,9 +165,6 @@ class PlanSeeder extends Seeder
                 'monthly_requests' => 0,
                 'max_chars_per_request' => 250000,
                 'allow_overage' => false,
-                'overage_price_per_million_cents' => 1600,   // $16/1M chars
-                'topup_char_price_cents' => 1600,
-                'topup_minute_price_cents' => 25,            // $0.25/min
                 'commercial_use_allowed' => true,
                 'processing_priority' => 'highest',
                 'voice_tier' => 'hd',

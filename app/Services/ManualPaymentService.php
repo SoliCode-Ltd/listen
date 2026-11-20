@@ -11,6 +11,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\AdsPurchases;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\ExtraCredits;
 use App\Services\Billing\PaymentLedger;
 use App\Services\Billing\PlanChanges;
 use App\Support\CreditPeriod;
@@ -73,10 +74,12 @@ class ManualPaymentService
     public function approve(ManualPaymentRequest $manualPaymentRequest, User $reviewer, ?string $reviewerNotes = null): ManualPaymentRequest
     {
         $approved = $this->approveWhileLocked($manualPaymentRequest, $reviewer, $reviewerNotes);
-        // Only now is it a sale: kept for the Google Ads upload when it came from an ad.
-        app(AdsPurchases::class)->recordManualPayment($approved);
-        // And sent to ChatGPT Ads, when the member was allowed to be followed at checkout.
-        rescue(fn () => app(\App\Services\Billing\ChatGptAdsConversions::class)->recordManualPayment($approved));
+        if (! $approved->isExtraCredits()) {
+            // Only now is it a sale: kept for the Google Ads upload when it came from an ad.
+            app(AdsPurchases::class)->recordManualPayment($approved);
+            // And sent to ChatGPT Ads, when the member was allowed to be followed at checkout.
+            rescue(fn () => app(\App\Services\Billing\ChatGptAdsConversions::class)->recordManualPayment($approved));
+        }
         // How it was paid, for Billing → Payments and the dashboard.
         app(PaymentLedger::class)->recordManualPayment($approved);
         // A lower plan that waits for the current one to end: nobody else tells the member
@@ -105,6 +108,10 @@ class ManualPaymentService
 
             if (! $request->user || ! $request->plan) {
                 throw new DomainException(__('ui.billing.admin_request_missing_relation'));
+            }
+
+            if ($request->isExtraCredits()) {
+                return $this->approveExtraCredits($request, $reviewer, $reviewerNotes);
             }
 
             if ($request->plan->isPack()) {
@@ -226,7 +233,16 @@ class ManualPaymentService
             $rolledBack = false;
             $usedFallbackPlan = false;
 
-            if ($request->status === ManualPaymentRequest::STATUS_APPROVED && $request->plan?->isPack()) {
+            if ($request->isExtraCredits()) {
+                // Approved: what is still unused is taken back. Waiting: the purchase is closed.
+                $purchase = CharPackPurchase::query()->where('manual_payment_request_id', $request->id)->first();
+                if ($purchase && $request->status === ManualPaymentRequest::STATUS_APPROVED) {
+                    $this->extraCredits()->refund($purchase);
+                    $rolledBack = true;
+                } elseif ($purchase) {
+                    $this->extraCredits()->markFailed($purchase, 'The payment request was deleted.');
+                }
+            } elseif ($request->status === ManualPaymentRequest::STATUS_APPROVED && $request->plan?->isPack()) {
                 // Deleting an approved pack payment takes back its unused characters.
                 $purchase = CharPackPurchase::query()->where('manual_payment_request_id', $request->id)->first();
                 if ($purchase) {
@@ -277,6 +293,13 @@ class ManualPaymentService
                 'reviewer_notes' => $reviewerNotes,
             ])->save();
 
+            if ($request->isExtraCredits()) {
+                $purchase = CharPackPurchase::query()->where('manual_payment_request_id', $request->id)->first();
+                if ($purchase) {
+                    $this->extraCredits()->markFailed($purchase, 'The transfer was not confirmed.');
+                }
+            }
+
             return $request->fresh(['user', 'plan', 'reviewer']);
         });
     }
@@ -308,6 +331,96 @@ class ManualPaymentService
         return $request->fresh(['user', 'plan', 'reviewer']);
     }
 
+    /**
+     * Extra credits paid by InstaPay / Vodafone Cash: added to the member's
+     * current period, beside their plan. The plan itself is not touched, and
+     * only a member whose paid plan is on can have them.
+     */
+    private function approveExtraCredits(ManualPaymentRequest $request, User $reviewer, ?string $reviewerNotes): ManualPaymentRequest
+    {
+        $purchase = CharPackPurchase::query()->where('manual_payment_request_id', $request->id)->lockForUpdate()->first();
+        if (! $purchase) {
+            throw new DomainException(__('ui.billing.admin_request_missing_relation'));
+        }
+
+        if (! ExtraCredits::counts($this->planAccessService->resolveQuotaPlanForUserId((int) $request->user_id))) {
+            throw new DomainException(__('ui.extra_credits.admin_plan_not_on'));
+        }
+
+        $this->extraCredits()->markPaid($purchase);
+
+        $request->forceFill([
+            'status' => ManualPaymentRequest::STATUS_APPROVED,
+            'reviewed_at' => now(),
+            'reviewed_by' => $reviewer->id,
+            'reviewer_notes' => $reviewerNotes,
+        ])->save();
+
+        return $request->fresh(['user', 'plan', 'reviewer']);
+    }
+
+    /**
+     * A member who pays their plan by hand sends a transfer for extra credits:
+     * the request for the team to check, and the purchase it pays for (waiting
+     * until the team approves the transfer).
+     *
+     * @param  array<string, mixed>  $quote
+     * @param  array<string, mixed>  $destinationSnapshot
+     */
+    public function createExtraCreditsRequest(
+        User $user,
+        Plan $plan,
+        int $minutes,
+        string $paymentMethod,
+        array $quote,
+        array $destinationSnapshot,
+        UploadedFile $proofImage,
+    ): ManualPaymentRequest {
+        return DB::transaction(function () use ($user, $plan, $minutes, $paymentMethod, $quote, $destinationSnapshot, $proofImage): ManualPaymentRequest {
+            // One at a time: the member waits for the team to check the first transfer.
+            $waiting = ManualPaymentRequest::query()
+                ->extraCredits()
+                ->where('user_id', $user->id)
+                ->where('status', ManualPaymentRequest::STATUS_PENDING)
+                ->lockForUpdate()
+                ->exists();
+            if ($waiting) {
+                throw new DomainException(__('ui.extra_credits.manual_pending_exists'));
+            }
+
+            $request = ManualPaymentRequest::query()->create([
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'billing_cycle' => ManualPaymentRequest::CYCLE_EXTRA_CREDITS,
+                'payment_method' => $paymentMethod,
+                'expected_amount_minor' => (int) ($quote['amount_minor'] ?? 0),
+                'currency' => strtoupper((string) ($quote['currency'] ?? 'EGP')),
+                'country_code' => strtoupper((string) ($quote['country_code'] ?? 'EG')),
+                'status' => ManualPaymentRequest::STATUS_PENDING,
+                'price_snapshot' => $quote + ['minutes' => $minutes, 'credits' => ExtraCredits::creditsFor($minutes)],
+                'destination_snapshot' => $destinationSnapshot,
+                'proof_path' => $proofImage->store('manual-payment-proofs', 'local'),
+                'submitted_at' => now(),
+            ]);
+
+            $this->extraCredits()->startPurchase(
+                $user,
+                $minutes,
+                $paymentMethod,
+                (int) $request->expected_amount_minor,
+                (string) $request->currency,
+                (int) $request->id,
+            );
+
+            return $request;
+        });
+    }
+
+    private function extraCredits(): ExtraCredits
+    {
+        return app(ExtraCredits::class);
+    }
+
     private function charPacks(): CharPackService
     {
         return app(CharPackService::class);
@@ -316,6 +429,7 @@ class ManualPaymentService
     public function hasPendingRequest(User $user, Plan $plan, string $billingCycle, string $paymentMethod): bool
     {
         return ManualPaymentRequest::query()
+            ->forPlans()
             ->where('user_id', $user->id)
             ->where('plan_id', $plan->id)
             ->where('billing_cycle', $billingCycle)
@@ -327,6 +441,7 @@ class ManualPaymentService
     public function latestPendingRequest(User $user, Plan $plan, string $billingCycle, string $paymentMethod): ?ManualPaymentRequest
     {
         return ManualPaymentRequest::query()
+            ->forPlans()
             ->where('user_id', $user->id)
             ->where('plan_id', $plan->id)
             ->where('billing_cycle', $billingCycle)

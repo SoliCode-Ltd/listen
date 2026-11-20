@@ -14,6 +14,9 @@ class ManualPaymentRequest extends Model
 
     public const STATUS_REJECTED = 'rejected';
 
+    /** billing_cycle of a payment for extra credits (App\Services\Billing\ExtraCredits), not for a plan. */
+    public const CYCLE_EXTRA_CREDITS = 'extra_credits';
+
     protected static function booted(): void
     {
         static::creating(static function (self $model): void {
@@ -52,6 +55,22 @@ class ManualPaymentRequest extends Model
         'approved_subscription_id' => 'integer',
         'expected_amount_minor' => 'integer',
     ];
+
+    public function isExtraCredits(): bool
+    {
+        return (string) $this->billing_cycle === self::CYCLE_EXTRA_CREDITS;
+    }
+
+    /** Payments for a plan or a pack: not for extra credits. */
+    public function scopeForPlans($query)
+    {
+        return $query->where($query->qualifyColumn('billing_cycle'), '!=', self::CYCLE_EXTRA_CREDITS);
+    }
+
+    public function scopeExtraCredits($query)
+    {
+        return $query->where($query->qualifyColumn('billing_cycle'), self::CYCLE_EXTRA_CREDITS);
+    }
 
     public function user(): BelongsTo
     {

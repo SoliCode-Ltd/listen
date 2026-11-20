@@ -19,6 +19,7 @@ use App\Models\CharGift;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
+use App\Services\Billing\ExtraCredits;
 use App\Models\User;
 use App\Services\Analytics\UsageInsights;
 use App\Services\Billing\RenewalGrace;
@@ -131,6 +132,14 @@ class UsageCounterResource extends Resource
                     ->numeric()
                     ->sortable()
                     ->formatStateUsing(fn ($state): string => (int) $state > 0 ? '🎁 '.number_format((int) $state) : '—'),
+                // Bought or carried into the period (App\Services\Billing\ExtraCredits), and what became of them.
+                TextColumn::make('extra_chars')
+                    ->label('Extra credits')
+                    ->numeric()
+                    ->sortable()
+                    ->formatStateUsing(fn ($state, UsageCounter $record): string => self::extraLabel($record))
+                    ->tooltip('Extra credits in this period: bought, or carried over from the last one. Used after the plan\'s credits and the gifts.')
+                    ->toggleable(),
                 TextColumn::make('updated_at')
                     ->label('Last generation')
                     ->since()
@@ -215,6 +224,10 @@ class UsageCounterResource extends Resource
                     TextEntry::make('bonus_chars')
                         ->label('Gifted credits')
                         ->state(fn (UsageCounter $record): string => number_format((int) $record->bonus_chars)),
+                    TextEntry::make('extra_chars')
+                        ->label('Extra credits')
+                        ->visible(fn (UsageCounter $record): bool => (int) $record->extra_chars > 0)
+                        ->state(fn (UsageCounter $record): string => self::extraLabel($record)),
                     TextEntry::make('updated_at')->label('Last generation')->dateTime()->since(),
                 ]),
             Section::make('What they made')
@@ -355,6 +368,23 @@ class UsageCounterResource extends Resource
         }
 
         return self::$planCache[$key] = ['plan' => $plan, 'allowance' => $allowance, 'current' => $record->isCurrentMonth()];
+    }
+
+    /** "27,000 · 20,000 left", "27,000 · moved on", "27,000 · ended unused 5,000". */
+    private static function extraLabel(UsageCounter $record): string
+    {
+        $extra = (int) $record->extra_chars;
+        if ($extra <= 0) {
+            return '—';
+        }
+        $left = $extra - ExtraCredits::usedOf($record, (int) $record->extra_base_chars);
+
+        return number_format($extra).' · '.match ((string) $record->extra_outcome) {
+            ExtraCredits::OUTCOME_CARRIED => 'moved on',
+            ExtraCredits::OUTCOME_ENDED => 'ended, '.number_format(max(0, $left)).' unused',
+            ExtraCredits::OUTCOME_USED => 'all used',
+            default => number_format(max(0, $left)).' left',
+        };
     }
 
     private static function giftsList(UsageCounter $record): HtmlString

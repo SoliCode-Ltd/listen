@@ -126,16 +126,6 @@ class PricingPageLinesTest extends TestCase
         $this->assertArrayHasKey('Voice quality', $lines, 'lines not mentioned keep their default');
     }
 
-    public function test_the_top_up_price_is_off_until_ticked(): void
-    {
-        $plan = $this->premiumPlan(['topup_char_price_cents' => 2400]);
-        $this->assertArrayNotHasKey('Credit top-up', $this->lines($plan, 'en'));
-
-        $plan->update(['pricing_lines' => ['topup' => true]]);
-        $this->assertSame('$24 per 1M credits', $this->lines($plan->fresh(), 'en')['Credit top-up']);
-        $this->assertSame('$24 لكل مليون رصيد', $this->lines($plan->fresh(), 'ar')['تعبئة رصيد']);
-    }
-
     public function test_nothing_on_the_page_promises_faster_processing(): void
     {
         // The studio makes every plan's audio as fast, so the priority is not on the
@@ -404,7 +394,7 @@ class PricingPageLinesTest extends TestCase
         $plan->refresh();
         $this->assertFalse($plan->pricing_lines['commercial_use']);
         $this->assertTrue($plan->pricing_lines['voice_quality']);
-        $this->assertFalse($plan->pricing_lines['topup']);
+        $this->assertArrayNotHasKey('topup', $plan->pricing_lines, 'plans have no top-up line any more');
         $this->assertSame('Arabic and English voices', $plan->pricing_extra_lines_en[0]['label']);
         $this->assertSame($own, $plan->features_en, 'hand-written lists stay saved while their switch is off');
         $this->assertSame($own, $plan->features_ar);

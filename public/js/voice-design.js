@@ -149,6 +149,10 @@
         }
         return response.json().catch(function () { return {}; }).then(function (json) {
           if (!response.ok || json.ok === false) {
+            // Out of credits on a paid plan: the studio's extra-credits dialog is offered.
+            if (json.out_of_credits && window.ListenExtraCredits) {
+              window.ListenExtraCredits.open({ remaining: json.credits && json.credits.remaining, needed: json.credits && json.credits.needed });
+            }
             var error = new Error(json.message || t.our_side);
             error.payload = json;
             throw error;

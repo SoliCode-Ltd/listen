@@ -97,7 +97,12 @@ class ManualPaymentRequestResource extends Resource
                 TextColumn::make('billing_cycle')
                     ->label('Cycle')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => $state === 'one_time' ? 'one-time pack' : $state),
+                    ->formatStateUsing(fn (string $state, ManualPaymentRequest $record): string => match ($state) {
+                        'one_time' => 'one-time pack',
+                        ManualPaymentRequest::CYCLE_EXTRA_CREDITS => 'extra credits · '.(int) (($record->price_snapshot ?? [])['minutes'] ?? 0).' min',
+                        default => $state,
+                    })
+                    ->color(fn (string $state): string => $state === ManualPaymentRequest::CYCLE_EXTRA_CREDITS ? 'info' : 'gray'),
                 TextColumn::make('expected_amount_minor')
                     ->label('Amount')
                     ->formatStateUsing(function (?string $state, ManualPaymentRequest $record): string {

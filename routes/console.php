@@ -50,6 +50,9 @@ foreach ([
 Schedule::command('listen:billing-sync')->cron('13-59/15 * * * *')->withoutOverlapping(60);
 Schedule::command('listen:billing-reminders')->dailyAt('09:00')->withoutOverlapping(120);
 Schedule::command('listen:billing-enforce-grace')->hourlyAt(18)->withoutOverlapping(50);
+// Extra credits left when a period ends: on to the next period, or ended with the plan (ExtraCredits).
+// After the grace job, so a plan it ends is already over.
+Schedule::command('listen:extra-credits-settle')->hourlyAt(27)->withoutOverlapping(50);
 Schedule::command('plans:expire-discounts')->cron('1-59/5 * * * *')->withoutOverlapping(10);
 // A declined first payment or a checkout left without paying: the follow-up emails that are due,
 // and who bought a plan since (App\Services\Billing\PurchaseFollowUps).

@@ -9,9 +9,11 @@ use App\Models\Plan;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\ExtraCredits;
 use App\Services\Billing\TrialUsageRecorder;
 use App\Support\Api\ApiError;
 use App\Support\CreditPeriod;
+use App\Support\OutOfCredits;
 use App\Support\PlanUsageGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -106,13 +108,14 @@ class ApiUsageMeter
                 try {
                     PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
                 } catch (ValidationException $e) {
-                    throw self::quotaExceeded($e, (int) $estimate['credits']);
+                    throw self::quotaExceeded($e, (int) $estimate['credits'], $userId);
                 }
 
                 $counter->increment('total_requests');
                 $counter->increment('total_chars', (int) $estimate['credits']);
                 $counter->addSeconds((int) $estimate['seconds']);
                 $this->trialUsageRecorder->add($userId, $estimate);
+                PlanUsageGuard::afterSpend($quotaPlan, $counter);
             }
 
             ApiKeyUsage::apply((int) $apiKey->id, $period, 1, (int) $estimate['credits']);
@@ -210,11 +213,35 @@ class ApiUsageMeter
         });
     }
 
-    private static function quotaExceeded(ValidationException $e, int $needed): ApiError
+    /**
+     * The plan's credits are not enough: what is left, when they start again,
+     * and where to get more (extra credits when the member can buy them, or a
+     * bigger plan), so a developer's code can tell the person what to do.
+     */
+    private static function quotaExceeded(ValidationException $e, int $needed, ?int $userId = null): ApiError
     {
-        return new ApiError(402, ApiError::TYPE_QUOTA, 'quota_exceeded', self::firstMessage($e), null, [], [
-            'credits_needed' => $needed,
-        ]);
+        $extra = ['credits_needed' => $needed];
+        if ($userId !== null && $e instanceof OutOfCredits) {
+            $period = CreditPeriod::current($userId);
+            $extra += [
+                'credits_remaining' => $e->remaining,
+                // While an unpaid renewal's grace runs, nothing starts again until it is paid.
+                'resets_at' => $period['grace_ends_at'] === null ? $period['ends_at']->toIso8601String() : null,
+            ];
+            if (app(ExtraCredits::class)->status($userId) === ExtraCredits::STATUS_OK) {
+                $extra['add_credits_url'] = url('/dashboard?extra_credits=1');
+            }
+            $extra['upgrade_url'] = url('/pricing');
+
+            // With nothing left, a member who can add extra credits is told so, not only to upgrade.
+            if ($e->remaining <= 0 && isset($extra['add_credits_url'])) {
+                return new ApiError(402, ApiError::TYPE_QUOTA, 'quota_exceeded',
+                    'Your plan\'s credits are used up. Add extra credits (add_credits_url) or upgrade your plan (upgrade_url) to continue.',
+                    null, [], $extra);
+            }
+        }
+
+        return new ApiError(402, ApiError::TYPE_QUOTA, 'quota_exceeded', self::firstMessage($e), null, [], $extra);
     }
 
     private static function firstMessage(ValidationException $e): string

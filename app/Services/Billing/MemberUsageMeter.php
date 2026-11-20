@@ -100,6 +100,7 @@ class MemberUsageMeter
                 $counter->increment('total_chars', $reservation['credits']);
                 $counter->addSeconds($reservation['seconds']);
                 $this->trialUsageRecorder->add($userId, $estimate);
+                PlanUsageGuard::afterSpend($quotaPlan, $counter);
             }
 
             return $record($reservation);

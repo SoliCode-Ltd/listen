@@ -220,7 +220,7 @@ class BillingController extends Controller
             'stripeReady' => $stripeReady,
             'stripeKey' => $stripeKey,
             'defaultPaymentMethod' => $this->loadDefaultPaymentMethod($user, $stripeReady, $stripeValid ? $subscription : null),
-            'invoices' => array_merge($stripeInvoices['rows'], $this->manualPaymentReceipts($user, $locale)),
+            'invoices' => array_merge($stripeInvoices['rows'], $this->cardPurchaseReceipts($user, $countryContext, $locale), $this->manualPaymentReceipts($user, $locale)),
             'billing' => $this->billingSummary($user, $subscription, $stripeValid, $manual, $stripeInvoices['last_paid'], $upcomingCharge, $locale),
             'hasCancelableSubscription' => ($stripeValid && ! $onGracePeriod) || $cancelEndsNow,
             'cancelEndsNow' => $cancelEndsNow,
@@ -328,6 +328,7 @@ class BillingController extends Controller
             }
         } elseif ($manual && ! empty($manual['plan_slug'])) {
             $payments = \App\Models\ManualPaymentRequest::query()
+                ->forPlans()
                 ->where('user_id', $user->id)
                 ->where('status', \App\Models\ManualPaymentRequest::STATUS_APPROVED)
                 ->orderBy('id')
@@ -396,6 +397,7 @@ class BillingController extends Controller
     {
         $local = Subscription::query()->where('user_id', $user->id)->latest('id')->with('plan')->first();
         $pending = \App\Models\ManualPaymentRequest::query()
+            ->forPlans()
             ->where('user_id', $user->id)
             ->where('status', \App\Models\ManualPaymentRequest::STATUS_PENDING)
             ->whereNotNull('submitted_at')
@@ -413,6 +415,7 @@ class BillingController extends Controller
         $expired = (string) $local->status !== 'active' || ($end !== null && $end->isPast());
         // Given by the Listen team: nothing was paid for this plan, by hand or by card.
         $granted = ! \App\Models\ManualPaymentRequest::query()
+                ->forPlans()
                 ->where('user_id', $user->id)
                 ->where('plan_id', $local->plan_id)
                 ->where('status', \App\Models\ManualPaymentRequest::STATUS_APPROVED)
@@ -437,6 +440,35 @@ class BillingController extends Controller
     }
 
     /**
+     * One-time card payments (extra credits, a pack): Stripe makes no invoice for
+     * them, so they are listed from their own records, with the card invoices.
+     *
+     * @return array<int, array<string, string>>
+     */
+    private function cardPurchaseReceipts(User $user, array $countryContext, string $locale): array
+    {
+        return \App\Models\CharPackPurchase::query()
+            ->where('user_id', $user->id)
+            ->where('method', \App\Models\CharPackPurchase::METHOD_CARD)
+            ->whereIn('status', [\App\Models\CharPackPurchase::STATUS_PAID, \App\Models\CharPackPurchase::STATUS_REFUNDED])
+            ->latest('paid_at')
+            ->limit(24)
+            ->with('plan')
+            ->get()
+            ->map(fn (\App\Models\CharPackPurchase $purchase): array => [
+                'id' => '',
+                'date' => $this->formatCarbonDate($purchase->paid_at ?? $purchase->created_at),
+                'status' => $purchase->status === \App\Models\CharPackPurchase::STATUS_REFUNDED ? 'REFUNDED' : 'PAID',
+                'total' => $this->formatChargedAmount((int) $purchase->amount_minor, (string) $purchase->currency, $countryContext, $locale),
+                'purpose' => $purchase->isExtraCredits()
+                    ? trans_choice('ui.extra_credits.receipt_label', $purchase->minutes())
+                    : (string) ($purchase->plan?->getLocalizedName($locale) ?: ($purchase->plan?->name ?? '')),
+                'pay_url' => '',
+            ])
+            ->all();
+    }
+
+    /**
      * Approved InstaPay / Vodafone Cash payments, listed with the card invoices.
      *
      * @return array<int, array<string, string>>
@@ -454,12 +486,17 @@ class BillingController extends Controller
                 $currency = strtoupper((string) ($payment->currency ?: 'EGP'));
                 $amount = (int) $payment->expected_amount_minor;
 
+                // Extra credits are named by what they bought, not by the plan they were bought on.
+                $what = $payment->isExtraCredits()
+                    ? trans_choice('ui.extra_credits.receipt_label', (int) (($payment->price_snapshot ?? [])['minutes'] ?? 0))
+                    : ($payment->plan ? ($payment->plan->getLocalizedName($locale) ?: $payment->plan->name) : '');
+
                 return [
                     'id' => '',
                     'date' => $this->formatCarbonDate($payment->reviewed_at ?? $payment->created_at),
                     'status' => 'PAID',
                     'total' => number_format($amount / 100, $amount % 100 === 0 ? 0 : 2).' '.$currency,
-                    'purpose' => trim(($payment->plan ? ($payment->plan->getLocalizedName($locale) ?: $payment->plan->name).' · ' : '').__('ui.manage_subscription.manual_payment_label')),
+                    'purpose' => trim(($what !== '' ? $what.' · ' : '').__('ui.manage_subscription.manual_payment_label')),
                     'pay_url' => '',
                 ];
             })

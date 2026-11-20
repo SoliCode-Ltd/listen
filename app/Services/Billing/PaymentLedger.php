@@ -96,7 +96,9 @@ class PaymentLedger
             'amount_minor' => (int) $request->expected_amount_minor,
             'refunded_minor' => 0,
             'currency' => strtoupper((string) $request->currency ?: 'EGP'),
-            'description' => $request->plan?->name,
+            'description' => $request->isExtraCredits()
+                ? ExtraCredits::description((int) (($request->price_snapshot ?? [])['minutes'] ?? 0))
+                : $request->plan?->name,
             'paid_at' => $request->reviewed_at ?? $request->submitted_at ?? now(),
         ]);
     }

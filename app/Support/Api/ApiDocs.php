@@ -5,6 +5,7 @@ namespace App\Support\Api;
 use App\Models\Plan;
 use App\Services\Api\ApiIdempotency;
 use App\Services\Api\ApiSpeechService;
+use App\Services\Billing\ExtraCredits;
 use App\Services\Transcription\TranscriptExport;
 use App\Support\AudioEffects;
 use App\Support\Credits;
@@ -223,6 +224,7 @@ final class ApiDocs
                 'limit' => $creditLimit,
                 'remaining' => $creditLimit - $creditsUsed,
                 'gift' => 0,
+                'extra' => 0,
                 'credits_per_second' => Credits::PER_SECOND,
                 'overage_allowed' => false,
                 'period' => $isPack ? null : '2026-10-14',
@@ -557,6 +559,10 @@ final class ApiDocs
                 'message' => 'Your monthly credits are used up. Please upgrade your plan to continue.',
                 'param' => null,
                 'credits_needed' => 450,
+                'credits_remaining' => 120,
+                'resets_at' => '2026-12-14T08:37:00+00:00',
+            ] + (ExtraCredits::enabled() ? ['add_credits_url' => url('/dashboard?extra_credits=1')] : []) + [
+                'upgrade_url' => url('/pricing'),
                 'request_id' => 'req_8f2kq0x7m3c9w1v5b6n4z2a1',
             ],
         ];
