@@ -49,18 +49,23 @@ final class UnusedCredits
 
     public function __construct(private readonly PlanAccessService $plans) {}
 
-    /** Whether the database can hold the mark (the migration ran). Until then upgrades work as before. */
+    /**
+     * Whether the database can hold the mark (the migration ran). Until then
+     * upgrades work as before. Only a yes is remembered: a queue worker that
+     * started before the migration must see it the moment it has run, or it
+     * would carry the usage on for an upgrade the site already settled.
+     */
     public static function ready(): bool
     {
-        if (self::$ready === null) {
-            try {
-                self::$ready = Schema::hasColumn('usage_counters', 'credited_chars');
-            } catch (\Throwable) {
-                return false;
-            }
+        if (self::$ready === true) {
+            return true;
         }
 
-        return self::$ready;
+        try {
+            return self::$ready = Schema::hasColumn('usage_counters', 'credited_chars');
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /** Forgets what ready() found (tests that change the table). */
