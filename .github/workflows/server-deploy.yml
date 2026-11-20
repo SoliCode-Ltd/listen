@@ -138,6 +138,21 @@ name: Server deploy
 #            the latest 300 voices on the site, to see how many ordinary texts would
 #            be wrongly refused. Voice ids and the reader's reason only, never a text
 #            (scripts/support/content_check_probe.php).
+#   upgrade-check: read-only. For one member (input "member": an email or a
+#            member id): what Stripe charged them line by line (the new plan,
+#            the money back for unused credits or time, account credit), their
+#            plan rows and the credits they used in each period. Stripe is only
+#            read. Prints the member id only (scripts/support/upgrade_charge_check.php).
+#   upgrade-test: staging only, and only with Stripe TEST keys (the ones in use,
+#            or sandbox keys kept beside live ones in .env, used for the run
+#            only). Real moves up to a higher plan in the Stripe sandbox through
+#            the page's own code: the money back for unused credits, the amount
+#            charged against the amount shown, a declined card, an offer on the
+#            new plan, and the new plan starting with its full credits, once
+#            in each of Stripe's billing modes (live bills in classic)
+#            (scripts/support/upgrade_stripe_test.php). Staging keeps no trace:
+#            what it writes is rolled back, and the sandbox customers are
+#            deleted. Needs mode migrate first.
 #   page-check: staging only. Shows the pages members use inside the app,
 #            in English and Arabic, as a free and a paying test member, and
 #            fails on an error, a wrong status or text shown as its key
@@ -247,7 +262,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, content-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, content-check, upgrade-check, upgrade-test, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
         default: inspect
       customer:
         description: "billing-trace and chatgpt-ads-check: the Stripe customer id (cus_...)"
@@ -629,6 +644,20 @@ jobs:
             [ -z "$MEMBER" ] || printf '%s' "$MEMBER" | grep -qE '^([0-9]+|sample:[0-9]{1,4})$' || { echo "member must be empty, a member id, or sample:N"; exit 1; }
             failed=0
             tool content_check_probe.php | $S "$FIND; MEMBER='$MEMBER' nice php" || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
+          if [ "$MODE" = upgrade-check ]; then
+            printf '%s' "$MEMBER" | grep -qE '^[A-Za-z0-9._%+@-]+$' || { echo "member must be an email or a member id"; exit 1; }
+            failed=0
+            tool upgrade_charge_check.php | $S "$FIND; MEMBER='$MEMBER' php" || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
+          if [ "$MODE" = upgrade-test ]; then
+            [ "$TARGET" = staging ] || { echo "upgrade-test runs on staging only"; exit 1; }
+            failed=0
+            for B in classic flexible; do $S "$FIND; BILLING_MODE=$B php" < scripts/support/upgrade_stripe_test.php || failed=1; done
             rm -f ~/.ssh/id_deploy
             exit "$failed"
           fi

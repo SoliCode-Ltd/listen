@@ -12,9 +12,14 @@ use Illuminate\Support\Carbon;
 /**
  * Moving up to a higher plan by hand (InstaPay, Vodafone Cash) works as a card
  * upgrade does: the higher plan starts the moment the payment is approved, with a
- * month (or year) of its own from then, and its price is less what is left of the
- * plan already paid by hand. The credits used so far carry on, as on a card
- * (App\Support\CreditPeriod::carryOverPlanChange()).
+ * month (or year) of its own from then, and its price is less what the unused
+ * credits of the plan already paid by hand are worth (UnusedCredits). The higher
+ * plan then starts with its full credits; credits used between the price being
+ * shown and the payment being approved count on it (ManualPaymentService marks
+ * the period at the standing the price was worked out at).
+ *
+ * A plan with no credits of its own is counted in days instead, and the credits
+ * used carry on (App\Support\CreditPeriod::carryOverPlanChange()), as before.
  *
  * Only a plan paid by hand earns the deduction: the free plan or a plan given by
  * the team has nothing paid to give back. Paying for the same plan again (monthly
@@ -23,16 +28,20 @@ use Illuminate\Support\Carbon;
  */
 final class ManualUpgrade
 {
-    public function __construct(private readonly PlanChanges $planChanges) {}
+    public function __construct(
+        private readonly PlanChanges $planChanges,
+        private readonly UnusedCredits $unusedCredits,
+    ) {}
 
     /**
      * The deduction for moving up to $to by hand now, or null when this payment is
      * not an upgrade from a plan paid by hand.
      *
-     * Counted in whole days and rounded down to a whole unit of the currency, so the
-     * amount the member is shown stays the same while they make the transfer.
+     * Rounded down to a whole unit of the currency. "by" says how it was counted:
+     * "credits" (with the standing it was worked out at: period, used, allowance)
+     * or "days".
      *
-     * @return array{credit_minor:int, value_minor:int, days_left:int, days_total:int, from_plan_id:int, from_subscription_id:int}|null
+     * @return array{credit_minor:int, value_minor:int, by:string, days_left:int, days_total:int, from_plan_id:int, from_subscription_id:int, period?:string, used?:int, allowance?:int}|null
      */
     public function credit(User $user, Plan $to, string $cycle, string $currency, ?Carbon $at = null): ?array
     {
@@ -81,19 +90,27 @@ final class ManualUpgrade
 
         $daysTotal = max(1, (int) round(abs($end->getTimestamp() - $start->getTimestamp()) / 86400));
         $daysLeft = min($daysTotal, max(0, (int) round(($end->getTimestamp() - $at->getTimestamp()) / 86400)));
-        $credit = intdiv($value * $daysLeft, $daysTotal);
+
+        $standing = $this->unusedCredits->standing((int) $user->id);
+        $credit = $standing !== null ? UnusedCredits::worth($value, $standing) : intdiv($value * $daysLeft, $daysTotal);
         $credit -= $credit % 100;
-        if ($credit <= 0) {
+        // Counted in credits, a member who used them all still moves up now, at the full price.
+        if ($credit <= 0 && $standing === null) {
             return null;
         }
 
         return [
-            'credit_minor' => $credit,
+            'credit_minor' => max(0, $credit),
             'value_minor' => $value,
+            'by' => $standing !== null ? 'credits' : 'days',
             'days_left' => $daysLeft,
             'days_total' => $daysTotal,
             'from_plan_id' => (int) $from->id,
             'from_subscription_id' => (int) $current->id,
-        ];
+        ] + ($standing !== null ? [
+            'period' => $standing['period'],
+            'used' => $standing['used'],
+            'allowance' => $standing['allowance'],
+        ] : []);
     }
 }

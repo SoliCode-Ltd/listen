@@ -241,15 +241,28 @@
             <small>{{ __('ui.billing.manual_exact_amount') }}</small>
             <strong>{{ $quote['amount_formatted'] }}</strong>
             @if(is_array($quote['upgrade'] ?? null))
-              {{-- A move up from a plan paid by hand: less the days left on it, as on a card. --}}
-              <p class="manual-upgrade-note">{{ __('ui.billing.manual_upgrade_credit', [
-                'plan' => $planName,
-                'price' => $quote['price_formatted'],
-                'credit' => $quote['upgrade']['credit_formatted'],
-                'days' => $quote['upgrade']['days_left'],
-                'current' => $quote['upgrade']['from_plan_name'],
-              ]) }}</p>
-              <p class="manual-upgrade-note">{{ __('ui.billing.manual_upgrade_starts_now') }}</p>
+              {{-- A move up from a plan paid by hand: less what its unused credits are worth, as on a
+                   card (App\Services\Billing\ManualUpgrade); a plan with no credits of its own, by the days left. --}}
+              @if(($quote['upgrade']['by'] ?? '') === 'credits')
+                @if((int) ($quote['upgrade']['credit_minor'] ?? 0) > 0)
+                  <p class="manual-upgrade-note">{{ __('ui.billing.manual_upgrade_unused_credits', [
+                    'plan' => $planName,
+                    'price' => $quote['price_formatted'],
+                    'credit' => $quote['upgrade']['credit_formatted'],
+                    'current' => $quote['upgrade']['from_plan_name'],
+                  ]) }}</p>
+                @endif
+                <p class="manual-upgrade-note">{{ __('ui.billing.manual_upgrade_starts_full') }}</p>
+              @else
+                <p class="manual-upgrade-note">{{ __('ui.billing.manual_upgrade_credit', [
+                  'plan' => $planName,
+                  'price' => $quote['price_formatted'],
+                  'credit' => $quote['upgrade']['credit_formatted'],
+                  'days' => $quote['upgrade']['days_left'],
+                  'current' => $quote['upgrade']['from_plan_name'],
+                ]) }}</p>
+                <p class="manual-upgrade-note">{{ __('ui.billing.manual_upgrade_starts_now') }}</p>
+              @endif
             @endif
           </div>
 

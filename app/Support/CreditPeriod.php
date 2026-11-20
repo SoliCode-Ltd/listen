@@ -13,6 +13,7 @@ use App\Models\Subscription;
 use App\Models\UsageCounter;
 use App\Services\Billing\ExtraCredits;
 use App\Services\Billing\RenewalGrace;
+use App\Services\Billing\UnusedCredits;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -24,7 +25,9 @@ use Illuminate\Support\Facades\Schema;
  * A paid plan's credits follow the plan's own dates: they start when the
  * plan's period starts (the day it was paid for, given or renewed) and start
  * again when a new period starts (a renewal, or subscribing again). A change
- * of plan carries the usage on instead (carryOverPlanChange()). A yearly
+ * of plan carries the usage on instead (carryOverPlanChange()), except a move
+ * up that paid the unused credits back: that one starts with the higher
+ * plan's full credits (App\Services\Billing\UnusedCredits). A yearly
  * or multi-month period starts again every month on the day it ends. The
  * free plan counts by calendar month, and so does everyone until the switch
  * is on (the site setting below, set by the migration that turned it on).
@@ -166,6 +169,10 @@ final class CreditPeriod
      * old one had used, and its gifts and API key spending go on with it.
      * The counter is made only once (its unique key), so nothing is carried
      * twice. Between calendar months and plan dates nothing is carried.
+     *
+     * A move up to a higher plan is the exception: the member was given money
+     * back for the plan credits they had not used, so the higher plan starts
+     * with its full credits (carry() reads the mark UnusedCredits left).
      */
     public static function carryOverPlanChange(Subscription $subscription): void
     {
@@ -314,6 +321,12 @@ final class CreditPeriod
      * own budget goes on). Made once: if the new period's counter is already
      * there, everything is left as it is (extra credits then move on when the
      * old period is settled, ExtraCredits::settle()).
+     *
+     * When the old period was settled by an upgrade (UnusedCredits::mark()),
+     * its plan credits are behind it: paid for, or paid back. The new period
+     * then starts with only what was used beyond them (gifts and extra credits
+     * already spent, and anything used after the price was worked out), with
+     * fresh counts of requests and seconds, and each API key's budget afresh.
      */
     private static function carry(int $userId, string $from, string $to, ?Plan $newPlan, Carbon $newEndsAt): void
     {
@@ -322,15 +335,17 @@ final class CreditPeriod
             return;
         }
 
-        $carried = DB::transaction(function () use ($userId, $previous, $from, $to, $newPlan, $newEndsAt): bool {
+        $settled = UnusedCredits::settled($previous);
+
+        $carried = DB::transaction(function () use ($userId, $previous, $from, $to, $newPlan, $newEndsAt, $settled): bool {
             $row = [
                 'user_id' => $userId,
                 'period_ym' => $to,
-                'total_minutes' => (int) $previous->total_minutes,
-                'total_seconds' => (int) $previous->total_seconds,
-                'total_chars' => (int) $previous->total_chars,
+                'total_minutes' => $settled === null ? (int) $previous->total_minutes : 0,
+                'total_seconds' => $settled === null ? (int) $previous->total_seconds : 0,
+                'total_chars' => $settled === null ? (int) $previous->total_chars : max(0, (int) $previous->total_chars - $settled),
                 'bonus_chars' => (int) $previous->bonus_chars,
-                'total_requests' => (int) $previous->total_requests,
+                'total_requests' => $settled === null ? (int) $previous->total_requests : 0,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
@@ -361,7 +376,7 @@ final class CreditPeriod
                 });
 
             // Before the developer API migration there are no keys.
-            if (Schema::hasTable('api_key_usages')) {
+            if ($settled === null && Schema::hasTable('api_key_usages')) {
                 ApiKeyUsage::query()
                     ->whereIn('api_key_id', ApiKey::query()->where('user_id', $userId)->select('id'))
                     ->where('period_ym', $from)
@@ -380,13 +395,16 @@ final class CreditPeriod
         });
 
         if ($carried) {
-            Log::info('Credits carried over to the period a plan change started.', [
-                'user_id' => $userId,
-                'from' => $from,
-                'to' => $to,
-                'chars' => (int) $previous->total_chars,
-                'extra_chars' => (int) ($previous->extra_chars ?? 0),
-            ]);
+            Log::info($settled === null
+                ? 'Credits carried over to the period a plan change started.'
+                : 'A move up started the new plan with its full credits.', [
+                    'user_id' => $userId,
+                    'from' => $from,
+                    'to' => $to,
+                    'chars' => (int) $previous->total_chars,
+                    'settled_chars' => $settled,
+                    'extra_chars' => (int) ($previous->extra_chars ?? 0),
+                ]);
         }
     }
 

@@ -23,8 +23,9 @@ use Tests\TestCase;
 /**
  * Moving up to a higher plan by InstaPay or Vodafone Cash works as a card upgrade
  * does (App\Services\Billing\ManualUpgrade): the member pays the new plan's price
- * less the days left on the plan they paid by hand, the new plan starts when the
- * payment is approved with a month of its own, and the credits used carry on.
+ * less what the unused credits of the plan they paid by hand are worth, and the new
+ * plan starts when the payment is approved, with a month of its own and its full
+ * credits.
  */
 class ManualUpgradeTest extends TestCase
 {
@@ -70,21 +71,32 @@ class ManualUpgradeTest extends TestCase
         $this->spend($user, 3000);
         $basicPaid = $this->latestRequest($user)->expected_amount_minor;
 
-        // 24 minutes later, Starter by Vodafone Cash: its price less the 30 days left on Basic,
-        // and the payment page says so.
+        // 24 minutes later, Starter by Vodafone Cash: its price less what the 15,000 credits
+        // not used on Basic (of 18,000) are worth, in whole pounds, and the payment page says so.
         $this->travelTo(Carbon::parse('2026-11-06 19:40:08'));
         $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
             ->actingAs($user)->withHeaders(['CF-IPCountry' => 'EG'])
             ->get($this->localizedRoute('billing.manual.instructions').'?plan=starter&billing_cycle=monthly&payment_method=vodafone_cash')
             ->assertOk()
             ->assertSee('manual-upgrade-note', false)
-            ->assertSee(__('ui.billing.manual_upgrade_starts_now'));
+            ->assertSee('for the unused credits on your Basic plan')
+            ->assertSee(__('ui.billing.manual_upgrade_starts_full'))
+            ->assertDontSee('days left');
         $this->confirm($user, $this->starter, 'vodafone_cash')->assertRedirect();
         $request = $this->latestRequest($user);
         $starterPrice = $this->egpPrice($this->starter);
-        $this->assertSame($starterPrice - $basicPaid, $request->expected_amount_minor);
-        $this->assertSame($basicPaid, $request->price_snapshot['upgrade']['credit_minor']);
+        $back = intdiv($basicPaid * 15000, 18000);
+        $back -= $back % 100;
+        $this->assertGreaterThan(0, $back);
+        $this->assertSame($starterPrice - $back, $request->expected_amount_minor);
+        $this->assertSame($back, $request->price_snapshot['upgrade']['credit_minor']);
+        $this->assertSame('credits', $request->price_snapshot['upgrade']['by']);
+        $this->assertSame(3000, $request->price_snapshot['upgrade']['used']);
         $this->assertSame($starterPrice, $request->price_snapshot['period_value_minor']);
+
+        // Used while the team looks at the transfer: these were given back in the price, so
+        // they count on the new plan.
+        $this->spend($user, 500);
 
         // Approved: Starter now, for one month from the approval, not after the Basic month.
         $this->travelTo(Carbon::parse('2026-11-06 19:43:33'));
@@ -94,26 +106,74 @@ class ManualUpgradeTest extends TestCase
         $this->assertSame('2026-11-06 19:43:33', $plan->current_period_start->toDateTimeString());
         $this->assertSame('2026-12-06 19:43:33', $plan->current_period_end->toDateTimeString());
 
-        // The credits used on Basic carry on into the Starter month, as on a card.
+        // Starter starts with its full credits: nothing of what was used on Basic before
+        // the price was worked out, only the 500 used since.
         $counter = CreditPeriod::counter($user->id);
         $this->assertSame('2026-11-06 19:43', $counter->period_ym);
-        $this->assertSame(3000, (int) $counter->total_chars);
+        $this->assertSame(500, (int) $counter->total_chars);
+        $this->assertSame(0, (int) $counter->total_requests);
     }
 
-    public function test_the_deduction_follows_the_days_left(): void
+    public function test_the_deduction_follows_the_credits_not_used_whatever_the_day(): void
     {
         $user = User::factory()->create();
         $this->travelTo(Carbon::parse('2026-11-01 10:00:00'));
         $this->confirm($user, $this->basic)->assertRedirect();
         app(ManualPaymentService::class)->approve($this->latestRequest($user), $this->reviewer);
         $paid = $this->latestRequest($user)->expected_amount_minor;
+        $wholePounds = fn (int $minor): int => $minor - $minor % 100;
+        $upgrade = app(ManualUpgrade::class);
 
-        // Halfway through November's 30 days: half of what was paid, in whole pounds.
-        $credit = app(ManualUpgrade::class)->credit($user, $this->starter, 'monthly', 'EGP', Carbon::parse('2026-11-16 10:00:00'));
-        $this->assertSame(15, $credit['days_left']);
-        $this->assertSame(30, $credit['days_total']);
-        $half = intdiv($paid, 2);
-        $this->assertSame($half - $half % 100, $credit['credit_minor']);
+        // Halfway through the month with nothing used: all of what was paid, not half of it.
+        $midMonth = Carbon::parse('2026-11-16 10:00:00');
+        $this->travelTo($midMonth);
+        $credit = $upgrade->credit($user, $this->starter, 'monthly', 'EGP', $midMonth);
+        $this->assertSame('credits', $credit['by']);
+        $this->assertSame($wholePounds($paid), $credit['credit_minor']);
+
+        // Half the credits used: half of what was paid.
+        $this->spend($user, 9000);
+        $this->assertSame($wholePounds(intdiv($paid, 2)), $upgrade->credit($user, $this->starter, 'monthly', 'EGP', $midMonth)['credit_minor']);
+
+        // All used, on any day: nothing back, and it is still a move up that starts now.
+        $this->spend($user, 9000);
+        $credit = $upgrade->credit($user, $this->starter, 'monthly', 'EGP', $midMonth);
+        $this->assertSame(0, $credit['credit_minor']);
+        $this->assertSame(18000, $credit['used']);
+    }
+
+    public function test_a_member_out_of_credits_pays_the_full_price_and_starts_full_at_once(): void
+    {
+        $user = User::factory()->create();
+        $this->travelTo(Carbon::parse('2026-11-03 16:54:00'));
+        $this->confirm($user, $this->basic)->assertRedirect();
+        app(ManualPaymentService::class)->approve($this->latestRequest($user), $this->reviewer);
+        $this->spend($user, 18000);
+
+        // 17 days in with every credit used: nothing comes back, so the full price.
+        $this->travelTo(Carbon::parse('2026-11-20 12:40:00'));
+        $this->confirm($user, $this->starter)->assertRedirect();
+        $request = $this->latestRequest($user);
+        $this->assertSame($this->egpPrice($this->starter), $request->expected_amount_minor);
+        $this->assertSame(0, $request->price_snapshot['upgrade']['credit_minor']);
+
+        // No line about a deduction of nothing; the page still says the plan starts full.
+        $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
+            ->actingAs($user)->withHeaders(['CF-IPCountry' => 'EG'])
+            ->get($this->localizedRoute('billing.manual.instructions').'?plan=starter&billing_cycle=monthly&payment_method=instapay')
+            ->assertOk()
+            ->assertDontSee('for the unused credits on your')
+            ->assertSee(__('ui.billing.manual_upgrade_starts_full'));
+
+        // Starter starts the day it is approved, not after the Basic month, with all 90,000.
+        $this->travelTo(Carbon::parse('2026-11-20 12:42:00'));
+        app(ManualPaymentService::class)->approve($request, $this->reviewer);
+        $plan = Subscription::query()->where('user_id', $user->id)->latest('id')->firstOrFail();
+        $this->assertSame('2026-11-20 12:42:00', $plan->current_period_start->toDateTimeString());
+        $counter = CreditPeriod::counter($user->id);
+        $this->assertSame(0, (int) $counter->total_chars);
+        $snapshot = \App\Support\UsageSnapshot::for($user->id, app(PlanAccessService::class)->resolveQuotaPlanForUserId($user->id), $counter);
+        $this->assertSame(90000, $snapshot['remaining_chars']);
     }
 
     public function test_a_plan_given_by_the_team_or_the_same_plan_earns_no_deduction(): void

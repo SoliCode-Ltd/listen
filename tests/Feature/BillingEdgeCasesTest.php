@@ -61,6 +61,9 @@ class BillingEdgeCasesTest extends TestCase
         $referrals->shouldReceive('isFirstPaidPlanTransition')->andReturnFalse();
         $this->app->instance(ReferralQualificationService::class, $referrals);
 
+        // Credits follow the plan's dates, as on the site: a move up is counted in credits.
+        \App\Models\SiteSetting::set(\App\Support\CreditPeriod::SWITCH_SETTING, '2026-01-01 00:00:00', 'billing');
+
         $this->stripe = new ScriptedStripeClient;
         ApiRequestor::setHttpClient($this->stripe);
         $this->mock(BillingSyncService::class, fn ($mock) => $mock->shouldReceive('syncIfStale')->andReturnNull());
@@ -302,25 +305,144 @@ class BillingEdgeCasesTest extends TestCase
         });
     }
 
-    public function test_a_paid_plan_change_charges_the_difference_today_and_applies_only_when_paid(): void
+    /**
+     * A member on Starter ($9 paid, 500,000 credits) who has used a quarter of them:
+     * the plan's own period, its paid invoice in Stripe, and the usage on the site.
+     */
+    private function starterMemberWhoUsed(int $chars, int $paid = 900): User
     {
         $user = $this->userWithSubscription('active', 'price_starter_m');
-        $this->planFollowsStripe($user);
-        $previewedAt = time() - 60;
+        app(PlanAccessService::class)->assignPlan($user, $this->starter, 'active', now()->addDays(20), now()->subDays(10));
+        $this->stripe->periodStart = now()->subDays(10)->getTimestamp();
+        $this->stripe->paidForPeriod = $paid;
+        \App\Support\CreditPeriod::counter((int) $user->id)->forceFill(['total_chars' => $chars, 'total_requests' => 12, 'total_seconds' => 600])->save();
 
-        $this->subscribe($user, ['plan' => 'creator', 'proration_date' => $previewedAt])
+        return $user;
+    }
+
+    private function usage(User $user): array
+    {
+        return \App\Support\UsageSnapshot::for((int) $user->id, app(PlanAccessService::class)->resolveQuotaPlanForUserId((int) $user->id), \App\Support\CreditPeriod::counter((int) $user->id));
+    }
+
+    public function test_a_move_up_gives_back_the_unused_credits_and_the_new_plan_starts_full(): void
+    {
+        // A quarter of Starter's credits used: three quarters of the $9 paid comes back.
+        $user = $this->starterMemberWhoUsed(125000);
+        $this->planFollowsStripe($user);
+
+        $this->subscribe($user, ['plan' => 'creator'])
             ->assertOk()
             ->assertJsonPath('charged', true)
             ->assertJsonPath('plan.slug', 'creator');
 
         $update = $this->stripe->last('post', '/v1/subscriptions/sub_edge');
         $this->assertSame([['id' => 'si_edge', 'price' => 'price_creator_m']], $update['items']);
-        // Charged now, not added to the next renewal, and applied only if the payment goes through.
-        $this->assertSame('always_invoice', $update['proration_behavior']);
+        // Charged now and applied only if the payment goes through; Stripe gives nothing back
+        // for the time left, the site's own line gives back the credits not used.
+        $this->assertSame('none', $update['proration_behavior']);
         $this->assertSame('pending_if_incomplete', $update['payment_behavior']);
         $this->assertSame('now', $update['billing_cycle_anchor']);
-        $this->assertSame($previewedAt, (int) $update['proration_date']);
+        $this->assertArrayNotHasKey('proration_date', $update);
         $this->assertArrayNotHasKey('trial_end', $update);
+        $this->assertCount(1, $update['add_invoice_items']);
+        $back = $update['add_invoice_items'][0];
+        $this->assertSame(-675, (int) $back['price_data']['unit_amount']);
+        $this->assertSame('usd', $back['price_data']['currency']);
+        $this->assertSame('listen_unused_credits', $back['price_data']['product']);
+        $this->assertFalse(filter_var($back['discountable'], FILTER_VALIDATE_BOOLEAN), 'An offer on the new plan would shrink the money back.');
+
+        // Creator starts with all 1,500,000 credits: nothing used on Starter counts on it.
+        $usage = $this->usage($user);
+        $this->assertSame(1500000, $usage['plan_chars']);
+        $this->assertSame(0, $usage['total_chars']);
+        $this->assertSame(1500000, $usage['remaining_chars']);
+        $this->assertSame(0, $usage['total_requests']);
+    }
+
+    public function test_a_member_who_used_every_credit_pays_the_full_price_for_a_full_new_plan(): void
+    {
+        // The case this rule was made for: out of credits early in the month. Nothing comes
+        // back (it was all used), and nothing used counts against the new plan.
+        $user = $this->starterMemberWhoUsed(500000);
+        $this->planFollowsStripe($user);
+
+        $this->subscribe($user, ['plan' => 'creator'])->assertOk()->assertJsonPath('charged', true);
+
+        $update = $this->stripe->last('post', '/v1/subscriptions/sub_edge');
+        $this->assertSame('none', $update['proration_behavior']);
+        $this->assertArrayNotHasKey('add_invoice_items', $update);
+        $this->assertSame(1500000, $this->usage($user)['remaining_chars']);
+    }
+
+    public function test_the_money_back_is_a_share_of_what_was_really_paid(): void
+    {
+        // The first month at half price ($4.50 paid for the $9 plan): half the credits unused
+        // is worth half of $4.50, not of $9.
+        $user = $this->starterMemberWhoUsed(250000);
+        $this->stripe->discountOnPeriod = 450;
+        $this->planFollowsStripe($user);
+
+        $this->subscribe($user, ['plan' => 'creator'])->assertOk();
+
+        $this->assertSame(-225, (int) $this->stripe->last('post', '/v1/subscriptions/sub_edge')['add_invoice_items'][0]['price_data']['unit_amount']);
+    }
+
+    public function test_gifts_and_extra_credits_are_not_paid_back_and_what_is_left_of_them_goes_on(): void
+    {
+        // 500,000 plan credits and a 40,000 gift; 510,000 used, so 10,000 of the gift is gone.
+        $user = $this->starterMemberWhoUsed(510000);
+        \App\Support\CreditPeriod::counter((int) $user->id)->forceFill(['bonus_chars' => 40000])->save();
+        $this->planFollowsStripe($user);
+
+        $this->subscribe($user, ['plan' => 'creator'])->assertOk();
+
+        // The plan's own credits were all used: nothing back.
+        $this->assertArrayNotHasKey('add_invoice_items', $this->stripe->last('post', '/v1/subscriptions/sub_edge'));
+        // Creator's full credits and the 30,000 still left of the gift.
+        $usage = $this->usage($user);
+        $this->assertSame(40000, $usage['gift_chars']);
+        $this->assertSame(10000, $usage['total_chars']);
+        $this->assertSame(1530000, $usage['remaining_chars']);
+    }
+
+    public function test_the_card_is_charged_what_the_order_details_showed_and_later_use_counts_on_the_new_plan(): void
+    {
+        $user = $this->starterMemberWhoUsed(125000);
+        $this->planFollowsStripe($user);
+        $this->stripe->preview = ['total' => 1525, 'amount_due' => 1525, 'lines' => ['object' => 'list', 'data' => [
+            ['object' => 'line_item', 'amount' => -675, 'period' => ['start' => time(), 'end' => time()]],
+            ['object' => 'line_item', 'amount' => 2200, 'period' => ['start' => time(), 'end' => time() + 86400 * 30]],
+        ]]];
+        $shown = $this->preview($user, 'creator')->assertOk()->json('proration_date');
+
+        // More is used after the price was shown (a voice that was being made).
+        \App\Support\CreditPeriod::counter((int) $user->id)->increment('total_chars', 20000);
+
+        $this->subscribe($user, ['plan' => 'creator', 'proration_date' => $shown])->assertOk();
+
+        // The amount shown, not a new one: the card and the wallet's sheet agree with the page.
+        $this->assertSame(-675, (int) $this->stripe->last('post', '/v1/subscriptions/sub_edge')['add_invoice_items'][0]['price_data']['unit_amount']);
+        // Those 20,000 were given back in the price, so they count on Creator.
+        $this->assertSame(20000, $this->usage($user)['total_chars']);
+    }
+
+    public function test_a_plan_counted_by_calendar_month_is_still_given_back_its_time_left(): void
+    {
+        // Before credits followed the plan's dates a change of plan starts no period of its
+        // own, so there is no full allowance to give: Stripe gives back the time left, as before.
+        \App\Models\SiteSetting::set(\App\Support\CreditPeriod::SWITCH_SETTING, '', 'billing');
+        $user = $this->userWithSubscription('active', 'price_starter_m');
+        $this->planFollowsStripe($user);
+        $previewedAt = time() - 60;
+
+        $this->subscribe($user, ['plan' => 'creator', 'proration_date' => $previewedAt])->assertOk();
+
+        $update = $this->stripe->last('post', '/v1/subscriptions/sub_edge');
+        $this->assertSame('always_invoice', $update['proration_behavior']);
+        $this->assertSame('now', $update['billing_cycle_anchor']);
+        $this->assertSame($previewedAt, (int) $update['proration_date']);
+        $this->assertArrayNotHasKey('add_invoice_items', $update);
     }
 
     public function test_a_declined_paid_plan_change_keeps_the_plan_and_voids_the_invoice(): void
@@ -341,6 +463,39 @@ class BillingEdgeCasesTest extends TestCase
         $this->assertSame('starter', app(PlanAccessService::class)->resolveActivePlanForUserId((int) $user->id)?->slug);
     }
 
+    public function test_a_declined_move_up_leaves_the_credits_as_they_were(): void
+    {
+        $user = $this->starterMemberWhoUsed(125000);
+        $this->stripe->pendingAfterUpdate = true;
+        $this->stripe->intentStatus = 'requires_payment_method';
+        $this->stripe->cardError = ['code' => 'card_declined', 'decline_code' => 'insufficient_funds'];
+
+        $this->subscribe($user, ['plan' => 'creator'])->assertStatus(422);
+
+        // Nothing marks the period as settled, so a later change by the team carries the
+        // usage on as it always did.
+        $counter = \App\Support\CreditPeriod::counter((int) $user->id);
+        $this->assertNull($counter->credited_at);
+        $this->assertNull($counter->credited_chars);
+        $this->assertSame(125000, (int) $counter->total_chars);
+        app(PlanAccessService::class)->assignPlan($user, $this->creator, 'active', now()->addMonth(), now());
+        $this->assertSame(125000, $this->usage($user)['total_chars']);
+    }
+
+    public function test_a_move_up_waiting_for_the_banks_check_still_starts_full_once_it_is_paid(): void
+    {
+        $user = $this->starterMemberWhoUsed(125000);
+        $this->stripe->pendingAfterUpdate = true;
+        $this->stripe->intentStatus = 'requires_action';
+
+        $this->subscribe($user, ['plan' => 'creator'])->assertStatus(402)->assertJsonPath('requires_action', true);
+
+        // The member passes the bank's check, Stripe applies the change, and the site hears of it.
+        $this->assertSame(125000, \App\Support\CreditPeriod::counter((int) $user->id)->credited_chars);
+        app(PlanAccessService::class)->assignPlan($user, $this->creator, 'active', now()->addMonth(), now());
+        $this->assertSame(1500000, $this->usage($user)['remaining_chars']);
+    }
+
     public function test_a_paid_plan_change_that_needs_3d_secure_hands_the_secret_to_the_browser(): void
     {
         $user = $this->userWithSubscription('active', 'price_starter_m');
@@ -359,7 +514,11 @@ class BillingEdgeCasesTest extends TestCase
 
     public function test_only_a_recent_proration_date_inside_the_period_is_used(): void
     {
+        // Counted in time (a plan still on calendar months): the moment the price was shown at.
+        \App\Models\SiteSetting::set(\App\Support\CreditPeriod::SWITCH_SETTING, '', 'billing');
         $user = $this->userWithSubscription('active', 'price_starter_m');
+        $this->subscribe($user, ['plan' => 'creator', 'proration_date' => time() - 60]);
+        $this->assertArrayHasKey('proration_date', $this->stripe->last('post', '/v1/subscriptions/sub_edge'));
 
         foreach ([time() + 600, time() - 7200] as $date) {
             $this->subscribe($user, ['plan' => 'creator', 'proration_date' => $date]);
@@ -379,15 +538,15 @@ class BillingEdgeCasesTest extends TestCase
             ->postJson($this->localizedRoute('billing.plan-change.preview'), ['plan' => $plan, 'billing_cycle' => $cycle]);
     }
 
-    public function test_order_details_show_the_new_plan_the_credit_and_the_total_due_today(): void
+    public function test_order_details_show_the_new_plan_the_unused_credits_and_the_total_due_today(): void
     {
         \App\Models\SiteSetting::set('pricing_forced_country_code', 'US', 'billing');
-        $user = $this->userWithSubscription('active', 'price_starter_m');
-        $renews = strtotime('2026-11-18 10:00:00 UTC');
+        $user = $this->starterMemberWhoUsed(250000);
+        $renews = strtotime('2026-12-20 10:00:00 UTC');
         $this->stripe->preview = [
             'total' => 1750, 'amount_due' => 1750,
             'lines' => ['object' => 'list', 'data' => [
-                ['object' => 'line_item', 'amount' => -450, 'period' => ['start' => time(), 'end' => strtotime('2026-11-02 UTC')]],
+                ['object' => 'line_item', 'amount' => -450, 'period' => ['start' => time(), 'end' => time()]],
                 ['object' => 'line_item', 'amount' => 2200, 'period' => ['start' => time(), 'end' => $renews]],
             ]],
         ];
@@ -397,25 +556,52 @@ class BillingEdgeCasesTest extends TestCase
             ->assertJsonPath('lines.0.kind', 'plan')
             ->assertJsonPath('lines.0.label', 'Creator, monthly')
             ->assertJsonPath('lines.1.kind', 'credit')
-            ->assertJsonPath('lines.1.label', 'Credit for the unused time on Starter')
+            ->assertJsonPath('lines.1.label', 'Unused credits on Starter')
+            ->assertJsonPath('note', 'Your new plan starts with its full credits.')
             ->assertJsonPath('total_cents', 1750)
             // What the phone wallet's sheet is shown: the total, in the currency it is charged in.
             ->assertJsonPath('currency', 'USD')
             ->assertJsonPath('credit_left', null)
-            ->assertJsonPath('renews_on', '18 Nov 2026')
+            ->assertJsonPath('renews_on', '20 Dec 2026')
             ->assertJsonPath('lines.0.amount', '$22.00')
             ->assertJsonPath('lines.1.amount', '$4.50')
             ->assertJsonPath('total', '$17.50')
             ->assertJsonPath('charged', null);
 
-        // The same change the payment makes, at the same moment.
+        // The same change the payment makes: half of Starter's credits unused, half of the $9 back.
         $request = $this->stripe->last('post', '/v1/invoices/create_preview');
         $this->assertSame('sub_edge', $request['subscription']);
         $this->assertSame([['id' => 'si_edge', 'price' => 'price_creator_m']], $request['subscription_details']['items']);
-        $this->assertSame('always_invoice', $request['subscription_details']['proration_behavior']);
+        $this->assertSame('none', $request['subscription_details']['proration_behavior']);
         $this->assertSame('now', $request['subscription_details']['billing_cycle_anchor']);
-        $this->assertSame($response->json('proration_date'), (int) $request['subscription_details']['proration_date']);
+        $this->assertArrayNotHasKey('proration_date', $request['subscription_details']);
+        $this->assertSame(-450, (int) $request['invoice_items'][0]['amount']);
+        $this->assertSame('usd', $request['invoice_items'][0]['currency']);
         $this->assertNull($this->stripe->last('post', '/v1/subscriptions/sub_edge'), 'A preview changed the subscription.');
+        $this->assertNull(\App\Support\CreditPeriod::counter((int) $user->id)->credited_at, 'A preview settled the credits.');
+        $this->assertGreaterThan(0, (int) $response->json('proration_date'));
+    }
+
+    public function test_order_details_counted_in_time_say_so(): void
+    {
+        // A plan still counted by calendar month: Stripe's own credit for the time left, and
+        // the note that the credits used carry on.
+        \App\Models\SiteSetting::set(\App\Support\CreditPeriod::SWITCH_SETTING, '', 'billing');
+        \App\Models\SiteSetting::set('pricing_forced_country_code', 'US', 'billing');
+        $user = $this->userWithSubscription('active', 'price_starter_m');
+        $this->stripe->preview = ['total' => 1750, 'amount_due' => 1750, 'lines' => ['object' => 'list', 'data' => [
+            ['object' => 'line_item', 'amount' => -450, 'period' => ['start' => time(), 'end' => time() + 86400]],
+            ['object' => 'line_item', 'amount' => 2200, 'period' => ['start' => time(), 'end' => time() + 86400 * 30]],
+        ]]];
+
+        $response = $this->preview($user, 'creator')->assertOk()
+            ->assertJsonPath('lines.1.label', 'Credit for the unused time on Starter')
+            ->assertJsonPath('note', "Credits you've already used this month count on the new plan.");
+
+        $request = $this->stripe->last('post', '/v1/invoices/create_preview');
+        $this->assertSame('always_invoice', $request['subscription_details']['proration_behavior']);
+        $this->assertSame($response->json('proration_date'), (int) $request['subscription_details']['proration_date']);
+        $this->assertArrayNotHasKey('invoice_items', $request);
     }
 
     public function test_a_past_payment_reads_in_local_money_with_the_dollars_in_brackets(): void
@@ -447,19 +633,22 @@ class BillingEdgeCasesTest extends TestCase
         $this->assertStringContainsString('EGP', $response->json('total'));
     }
 
-    public function test_order_details_say_credits_used_this_month_count_on_the_new_plan(): void
+    public function test_order_details_say_the_new_plan_starts_with_its_full_credits(): void
     {
         $user = $this->userWithSubscription('active', 'price_starter_m');
 
         $page = $this->actingAs($user)->getLocalizedRoute('billing.page')->assertOk();
         $this->assertMatchesRegularExpression(
-            '#<section class="order-details"[^>]*>.*'.preg_quote(e(__('ui.billing.order_usage_note')), '#').'.*</section>#s',
+            '#<section class="order-details"[^>]*>.*<p class="order-note" id="orderNote">'.preg_quote(e(__('ui.billing.order_full_credits_note')), '#').'</p>.*</section>#s',
             $page->getContent()
         );
+        // The order details' own note replaces it when they come (counted in time, it differs).
+        $page->assertSee('if (orderNote && data.note) orderNote.textContent = String(data.note);', false)
+            ->assertDontSee(__('ui.billing.order_usage_note'));
 
         app()->setLocale('ar');
         $this->actingAs($user)->getLocalizedRoute('billing.page')->assertOk()
-            ->assertSee(__('ui.billing.order_usage_note', [], 'ar'));
+            ->assertSee(__('ui.billing.order_full_credits_note', [], 'ar'));
     }
 
     public function test_a_running_plan_pays_what_is_due_today_with_the_phone_wallet_too(): void
@@ -502,7 +691,8 @@ class BillingEdgeCasesTest extends TestCase
         $this->assertSame('pm_edge', $updates[0]['params']['default_payment_method'] ?? null);
         $change = end($updates);
         $this->assertSame([['id' => 'si_edge', 'price' => 'price_creator_m']], $change['params']['items']);
-        $this->assertSame('always_invoice', $change['params']['proration_behavior']);
+        $this->assertSame('none', $change['params']['proration_behavior']);
+        $this->assertSame('pending_if_incomplete', $change['params']['payment_behavior']);
     }
 
     public function test_no_order_details_on_a_trial_or_the_same_plan(): void
@@ -548,6 +738,13 @@ class ScriptedStripeClient implements ClientInterface
     /** The customer's saved default card. */
     public ?string $customerDefault = 'pm_edge';
 
+    /** When the plan period running now began, and what its invoice charged for the plan (with any discount). */
+    public int $periodStart = 0;
+
+    public int $paidForPeriod = 0;
+
+    public int $discountOnPeriod = 0;
+
     public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
     {
         $method = strtolower($method);
@@ -565,6 +762,7 @@ class ScriptedStripeClient implements ClientInterface
                 'pending_update' => $method === 'post' && $this->pendingAfterUpdate ? ['expires_at' => time() + 3600] : null,
                 'items' => ['object' => 'list', 'data' => [[
                     'id' => 'si_edge', 'object' => 'subscription_item', 'quantity' => 1,
+                    'current_period_start' => $this->periodStart ?: null,
                     'price' => ['id' => $price, 'object' => 'price', 'product' => 'prod_x', 'recurring' => ['interval' => 'month', 'usage_type' => 'licensed']],
                 ]]],
                 'latest_invoice' => [
@@ -589,6 +787,20 @@ class ScriptedStripeClient implements ClientInterface
 
         if ($path === '/v1/subscriptions' && $method === 'get') {
             return $this->json(['object' => 'list', 'data' => $this->listedSubscriptions, 'has_more' => false, 'url' => '/v1/subscriptions']);
+        }
+
+        if ($path === '/v1/invoices' && $method === 'get' && ($params['status'] ?? '') === 'paid') {
+            // The invoice that began the period: a proration first (never the plan), then the plan's own line.
+            return $this->json(['object' => 'list', 'has_more' => false, 'data' => $this->paidForPeriod > 0 ? [[
+                'id' => 'in_period', 'object' => 'invoice', 'status' => 'paid', 'currency' => 'usd',
+                'lines' => ['object' => 'list', 'data' => [
+                    ['object' => 'line_item', 'amount' => 5000, 'currency' => 'usd', 'period' => ['start' => $this->periodStart, 'end' => $this->periodStart + 86400 * 30],
+                        'parent' => ['type' => 'subscription_item_details', 'subscription_item_details' => ['proration' => true]]],
+                    ['object' => 'line_item', 'amount' => $this->paidForPeriod, 'currency' => 'usd', 'period' => ['start' => $this->periodStart, 'end' => $this->periodStart + 86400 * 30],
+                        'discount_amounts' => $this->discountOnPeriod > 0 ? [['amount' => $this->discountOnPeriod, 'discount' => 'di_x']] : [],
+                        'parent' => ['type' => 'subscription_item_details', 'subscription_item_details' => ['proration' => false]]],
+                ]],
+            ]] : []]);
         }
 
         if ($path === '/v1/invoices' && $method === 'get') {

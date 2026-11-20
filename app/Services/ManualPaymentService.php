@@ -166,9 +166,20 @@ class ManualPaymentService
             $planChanges->supersede($request->user, 'replaced_by_payment');
 
             if (is_array($priceSnapshot['upgrade'] ?? null)) {
-                // A move up from a plan paid by hand, priced less the days left on it
-                // (App\Services\Billing\ManualUpgrade): as on a card, the higher plan
-                // starts now with a period of its own, and the credits used carry on.
+                // A move up from a plan paid by hand, priced less what its unused credits
+                // were worth (App\Services\Billing\ManualUpgrade): as on a card, the higher
+                // plan starts now with a period of its own and its full credits. The period
+                // it ends is marked at the standing the price was worked out at, so credits
+                // used since then count on the new plan. (Counted in days, for a plan with
+                // no credits of its own, the credits used carry on instead.)
+                $upgrade = $priceSnapshot['upgrade'];
+                if (($upgrade['by'] ?? '') === 'credits' && isset($upgrade['period'], $upgrade['used'], $upgrade['allowance'])) {
+                    app(\App\Services\Billing\UnusedCredits::class)->mark((int) $request->user_id, [
+                        'period' => (string) $upgrade['period'],
+                        'used' => (int) $upgrade['used'],
+                        'allowance' => (int) $upgrade['allowance'],
+                    ]);
+                }
                 $periodEnd = strtolower($request->billing_cycle) === 'yearly' ? now()->addYear() : now()->addMonth();
                 $subscription = $this->planAccessService->assignPlan($request->user, $request->plan, 'active', $periodEnd, now());
             } else {

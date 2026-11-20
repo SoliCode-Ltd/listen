@@ -1381,8 +1381,9 @@
             <dt>{{ __('ui.billing.order_total') }}</dt>
             <dd id="orderTotal" dir="ltr">-</dd>
           </div>
-          {{-- A change of plan starts no fresh allowance (App\Support\CreditPeriod). --}}
-          <p class="order-note">{{ __('ui.billing.order_usage_note') }}</p>
+          {{-- What happens to the credits, as the order details say it: a move up starts the new plan
+               with its full credits (App\Services\Billing\UnusedCredits). --}}
+          <p class="order-note" id="orderNote">{{ __(\App\Services\Billing\UnusedCredits::ready() ? 'ui.billing.order_full_credits_note' : 'ui.billing.order_usage_note') }}</p>
         </section>
 
         <div class="quote-details">
@@ -2268,6 +2269,8 @@
         return row;
       }));
       orderTotal.textContent = String(data.total || '-');
+      const orderNote = document.getElementById('orderNote');
+      if (orderNote && data.note) orderNote.textContent = String(data.note);
       orderDetails.hidden = false;
 
       quoteAmountLabel.textContent = i18n.due_today;

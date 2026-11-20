@@ -18,6 +18,7 @@ use App\Services\Billing\SavedPaymentMethodRecorder;
 use App\Services\Billing\StripePricePlans;
 use App\Services\Billing\TrialEligibilityService;
 use App\Services\Billing\TrialOutcomeService;
+use App\Services\Billing\UnusedCredits;
 use App\Services\BillingLifecycleService;
 use App\Services\BillingSyncService;
 use App\Services\DemoHistoryImporter;
@@ -49,6 +50,7 @@ class BillingController extends Controller
         private readonly TrialOutcomeService $trialOutcomes,
         private readonly StripePricePlans $stripePrices,
         private readonly PlanChanges $planChanges,
+        private readonly UnusedCredits $unusedCredits,
     ) {}
 
     public function index(Request $request)
@@ -1080,10 +1082,11 @@ class BillingController extends Controller
 
     /**
      * Moves the subscription to another plan and charges the difference today,
-     * like this: the new plan from today, less a credit for the time left on the
-     * current one. The billing date becomes today. Ending a trial charges the new
-     * plan in full. The change is applied only if the payment succeeds; a declined
-     * card leaves the subscription exactly as it was.
+     * like this: the new plan from today, less what the unused credits of the
+     * current one are worth (App\Services\Billing\UnusedCredits). The new plan
+     * starts with its full credits and the billing date becomes today. Ending a
+     * trial charges the new plan in full. The change is applied only if the
+     * payment succeeds; a declined card leaves the subscription exactly as it was.
      * Returns null when paid, or the response to send when it was not.
      */
     private function changePlanAndCharge(User $user, BillingSubscription $subscription, string $priceId, ?string $couponId, ?int $prorationDate, bool &$charged): ?\Illuminate\Http\JsonResponse
@@ -1101,18 +1104,42 @@ class BillingController extends Controller
         // Before the update: the invoice.paid webhook can land first and lock the trial record.
         $this->trialOutcomes->followPrice($stripeId, $priceId);
 
-        $payload = $this->planChangeDetails($current, $priceId, $endTrial, $prorationDate) + [
+        // What the unused credits of the plan being left are worth, as the order details showed it.
+        $credit = $endTrial ? null : $this->upgradeCredit($user, $current, $priceId, $prorationDate);
+        $payload = $this->planChangeDetails($current, $priceId, $endTrial, $prorationDate, $credit !== null) + [
             'payment_behavior' => 'pending_if_incomplete',
             'expand' => ['latest_invoice.payments'],
         ];
         if ($couponId) {
             $payload['discounts'] = [['coupon' => $couponId]];
         }
+        if ($credit !== null && $credit['minor'] > 0) {
+            // The same request as the change itself, so the money back is on this invoice or on none.
+            $payload['add_invoice_items'] = [[
+                'price_data' => [
+                    'currency' => $credit['currency'],
+                    'product' => $this->unusedCredits->stripeProduct((string) ($item->price->product ?? '')),
+                    'unit_amount' => -$credit['minor'],
+                ],
+                'quantity' => 1,
+                // An offer on the new plan takes nothing off the money back.
+                'discountable' => false,
+            ]];
+        }
+
+        // Before the update too: the plan's new dates can reach the site (the webhook)
+        // before this request goes on, and the new plan must then start with its full credits.
+        if ($credit !== null) {
+            $this->unusedCredits->mark((int) $user->id, $credit['standing']);
+        }
 
         try {
             $updated = $stripe->subscriptions->update($stripeId, $payload);
         } catch (\Throwable $exception) {
             $this->trialOutcomes->followPrice($stripeId, $oldPrice);
+            if ($credit !== null) {
+                $this->unusedCredits->unmark((int) $user->id, $credit['standing']['period']);
+            }
             throw $exception;
         }
 
@@ -1152,6 +1179,10 @@ class BillingController extends Controller
                     'error' => $exception->getMessage(),
                 ]);
             }
+        }
+        // Not paid: the credits of the plan the member keeps go on as they were.
+        if ($credit !== null) {
+            $this->unusedCredits->unmark((int) $user->id, $credit['standing']['period']);
         }
         $this->billingSyncService->syncIfStale($user, true);
         $kind = CardDecline::ofIntent($intent);
@@ -1375,9 +1406,14 @@ class BillingController extends Controller
      * The subscription change itself, shared by the order details and the payment
      * so both work out the same amount.
      *
+     * $byCredits: the money back is worked out by the site from the credits not
+     * used and sent as a line of its own, so Stripe gives nothing back for the
+     * time left. Without it (a plan with no credits of its own, or before the
+     * migration ran) Stripe gives back the time left, as it always did.
+     *
      * @return array<string, mixed>
      */
-    private function planChangeDetails(object $current, string $priceId, bool $endTrial, ?int $prorationDate): array
+    private function planChangeDetails(object $current, string $priceId, bool $endTrial, ?int $prorationDate, bool $byCredits = false): array
     {
         $item = $current->items->data[0] ?? null;
         $details = [
@@ -1393,6 +1429,12 @@ class BillingController extends Controller
         }
 
         $details['billing_cycle_anchor'] = 'now';
+        if ($byCredits) {
+            $details['proration_behavior'] = 'none';
+
+            return $details;
+        }
+
         // Only a recent moment inside this billing period; otherwise Stripe uses now.
         $periodStart = (int) ($item->current_period_start ?? $current->current_period_start ?? 0);
         if ($prorationDate !== null && $prorationDate <= time() && $prorationDate >= time() - 3600 && $prorationDate >= $periodStart) {
@@ -1403,8 +1445,81 @@ class BillingController extends Controller
     }
 
     /**
+     * What Stripe is asked to preview for a move to another plan: the change the
+     * payment makes (planChangeDetails()), with the money back for unused credits
+     * and the new plan's offer, as changePlanAndCharge() sends them.
+     *
+     * @param  array{minor:int, currency:string}|null  $credit
+     * @return array<string, mixed>
+     */
+    private function planChangePreviewParams(User $user, object $current, string $priceId, ?int $prorationDate, ?array $credit, ?string $couponId): array
+    {
+        $params = [
+            'customer' => (string) $user->stripe_id,
+            'subscription' => (string) ($current->id ?? ''),
+            'subscription_details' => $this->planChangeDetails($current, $priceId, false, $prorationDate, $credit !== null),
+        ];
+        if ($credit !== null && $credit['minor'] > 0) {
+            $params['invoice_items'] = [[
+                'amount' => -$credit['minor'],
+                'currency' => $credit['currency'],
+                'description' => UnusedCredits::STRIPE_PRODUCT_NAME,
+                // An offer on the new plan takes nothing off the money back.
+                'discountable' => false,
+            ]];
+        }
+        if ($couponId) {
+            $params['discounts'] = [['coupon' => $couponId]];
+        }
+
+        return $params;
+    }
+
+    /**
+     * What the member gets back for the credits they have not used on the plan
+     * they leave, or null when the move is not counted in credits (a plan with
+     * no credits of its own, or before the migration ran).
+     *
+     * The order details work it out and keep it for an hour under the moment
+     * they were shown ($quotedAt, sent back with the payment), so the card is
+     * charged what the member saw. Credits used after that count on the new
+     * plan (the period is marked at the standing the price was worked out at).
+     *
+     * @return array{minor:int, currency:string, standing:array{period:string, used:int, allowance:int, unused:int, months_left:int, months_total:int}}|null
+     */
+    private function upgradeCredit(User $user, object $current, string $priceId, ?int $quotedAt, bool $remember = false): ?array
+    {
+        $standing = $this->unusedCredits->standing((int) $user->id);
+        if ($standing === null) {
+            return null;
+        }
+
+        $key = 'upgrade_credit:'.$user->id.':'.sha1((string) ($current->id ?? '').'|'.$priceId.'|'.(int) $quotedAt);
+        if (! $remember && $quotedAt !== null && $quotedAt <= time() && $quotedAt >= time() - 3600) {
+            $quoted = Cache::get($key);
+            // Still the same period, and no credits given back since (a refund lowers what was used).
+            if (is_array($quoted) && ($quoted['standing']['period'] ?? null) === $standing['period']
+                && (int) ($quoted['standing']['used'] ?? PHP_INT_MAX) <= $standing['used']) {
+                return $quoted;
+            }
+        }
+
+        $paid = $this->unusedCredits->paidOnCard($current);
+        $credit = [
+            'minor' => $paid !== null ? UnusedCredits::worth($paid['minor'], $standing) : 0,
+            'currency' => (string) ($paid['currency'] ?? strtolower((string) ($current->currency ?? 'usd'))),
+            'standing' => $standing,
+        ];
+        if ($remember && $quotedAt !== null) {
+            Cache::put($key, $credit, now()->addHour());
+        }
+
+        return $credit;
+    }
+
+    /**
      * What moving to another plan costs today, shown before the member pays: the
-     * new plan, the credit for the time left on the current one, and the total.
+     * new plan, what the unused credits of the current one are worth, and the total.
      */
     public function planChangePreview(Request $request)
     {
@@ -1450,16 +1565,10 @@ class BillingController extends Controller
         try {
             $stripe = Cashier::stripe();
             $current = $stripe->subscriptions->retrieve((string) $subscription->stripe_id, []);
-            $params = [
-                'customer' => (string) $user->stripe_id,
-                'subscription' => (string) $subscription->stripe_id,
-                'subscription_details' => $this->planChangeDetails($current, $priceId, false, $prorationDate),
-            ];
-            $couponId = $this->resolveCheckoutCouponId($plan, $cycle);
-            if ($couponId) {
-                $params['discounts'] = [['coupon' => $couponId]];
-            }
-            $invoice = $stripe->invoices->createPreview($params);
+            $credit = $this->upgradeCredit($user, $current, $priceId, $prorationDate, true);
+            $invoice = $stripe->invoices->createPreview($this->planChangePreviewParams(
+                $user, $current, $priceId, $prorationDate, $credit, $this->resolveCheckoutCouponId($plan, $cycle)
+            ));
         } catch (\Throwable $exception) {
             Log::warning('Unable to preview a plan change.', [
                 'user_id' => $user->id,
@@ -1474,6 +1583,8 @@ class BillingController extends Controller
         $currency = strtoupper((string) ($invoice->currency ?? 'usd'));
         $money = fn (int $cents): string => $this->formatLocalizedInvoiceAmount(abs($cents), $currency, $countryContext, $locale);
 
+        // Counted in credits (UnusedCredits) or, without them, in the time left.
+        $byCredits = $credit !== null;
         $charge = 0;
         $credit = 0;
         $renews = 0;
@@ -1504,7 +1615,7 @@ class BillingController extends Controller
             'amount' => $money($charge),
         ]];
         if ($credit < 0) {
-            $lines[] = ['kind' => 'credit', 'label' => __('ui.billing.order_credit_line', ['plan' => $currentName]), 'amount' => $money($credit)];
+            $lines[] = ['kind' => 'credit', 'label' => __($byCredits ? 'ui.billing.order_unused_credits_line' : 'ui.billing.order_credit_line', ['plan' => $currentName]), 'amount' => $money($credit)];
         }
         if ($discount > 0) {
             $lines[] = ['kind' => 'credit', 'label' => __('ui.billing.order_discount_line'), 'amount' => $money($discount)];
@@ -1520,6 +1631,8 @@ class BillingController extends Controller
             'change' => true,
             'proration_date' => $prorationDate,
             'lines' => $lines,
+            // What happens to the credits: the new plan starts full, or (counted in time) carries them on.
+            'note' => __($byCredits ? 'ui.billing.order_full_credits_note' : 'ui.billing.order_usage_note'),
             'total' => $shown,
             'total_cents' => $due,
             // The currency the difference is charged in (what the phone wallet's sheet shows).

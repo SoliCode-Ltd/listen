@@ -764,9 +764,10 @@ class StripeWebhookEmailService
 
     /**
      * The invoice line for the plan the member pays for now. A plan change lists
-     * its prorations first ("Unused time on <old plan>", a credit), so it is the
-     * first line that is not a proration; when every line is one, the first that
-     * charges something.
+     * what it gives back first (a proration, "Unused time on <old plan>", or the
+     * line for unused credits, App\Services\Billing\UnusedCredits), so it is the
+     * first line that is neither a proration nor money back; when every line is
+     * one, the first that charges something.
      */
     private function planLine(object $invoice): ?object
     {
@@ -774,7 +775,7 @@ class StripeWebhookEmailService
         $lines = is_array($lines) ? array_values(array_filter($lines, 'is_object')) : [];
 
         foreach ($lines as $line) {
-            if (! $this->isProration($line)) {
+            if (! $this->isProration($line) && (int) ($line->amount ?? 0) >= 0) {
                 return $line;
             }
         }
