@@ -134,8 +134,9 @@
       }
     });
 
+    // Closed only on purpose ("Not now", "Close", the phone's back gesture): a tap outside the sheet does nothing.
     dialog.addEventListener('click', (event) => {
-      if (event.target === dialog || event.target.closest('[data-xca-close]')) close();
+      if (event.target.closest('[data-xca-close]')) close();
     });
     dialog.addEventListener('cancel', (event) => { event.preventDefault(); close(); });
 
