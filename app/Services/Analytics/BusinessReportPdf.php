@@ -2,6 +2,7 @@
 
 namespace App\Services\Analytics;
 
+use App\Services\Acquisition\SourceReport;
 use App\Support\Countries;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -152,6 +153,53 @@ class BusinessReportPdf
             'unit' => $unit,
             'api' => $apiTotals,
             'channels' => $s['growth_channels'] ?? [],
+            'sources' => $this->sources($s['sources'] ?? []),
+        ];
+    }
+
+    /**
+     * Where the period's new members came from (SourceReport), ready for the Acquisition page:
+     * each source with its top sites or networks, the period's payments by source, and the top
+     * campaigns and first pages. Counts and amounts only.
+     */
+    private function sources(array $sources): array
+    {
+        $totals = $sources['totals'] ?? ['members' => 0, 'paid' => 0, 'within_day' => 0, 'money' => []];
+        $members = max(1, (int) $totals['members']);
+        $recordedSince = ! empty($sources['recorded_since']) ? Carbon::parse($sources['recorded_since']) : null;
+        $row = fn (array $r): array => [
+            'label' => $r['label'],
+            'members' => (int) $r['members'],
+            'share' => $r['members'] / $members,
+            'paid' => (int) $r['paid'],
+            'paid_rate' => $r['members'] > 0 ? $r['paid'] / $r['members'] : 0,
+            'within_day' => (int) $r['within_day'],
+            'money' => SourceReport::money($r['money'] ?? []),
+        ];
+
+        return [
+            'available' => ! empty($sources['channels']),
+            'recorded_since' => $recordedSince?->format('j F Y'),
+            'totals' => $row($totals + ['label' => 'All new members']),
+            'channels' => array_map(fn (array $channel) => $row($channel) + [
+                // The few sites, networks or links behind the source, on one line.
+                'details' => collect($channel['details'] ?? [])
+                    ->reject(fn (array $d) => $d['label'] === $channel['label'])
+                    ->take(4)
+                    ->map(fn (array $d) => $d['label'].' '.$this->num($d['members']))
+                    ->implode(' · '),
+            ], $sources['channels'] ?? []),
+            'payments' => array_map(fn (array $p) => [
+                'label' => $p['label'],
+                'payments' => (int) $p['payments'],
+                'payers' => (int) $p['payers'],
+                // One currency to a line: the column is narrow.
+                'money' => SourceReport::moneyLines($p['money'] ?? []),
+            ], $sources['payments']['rows'] ?? []),
+            'payments_total' => (int) ($sources['payments']['payments'] ?? 0),
+            'payments_money' => SourceReport::moneyLines($sources['payments']['money'] ?? []),
+            'campaigns' => array_map($row, array_slice($sources['campaigns'] ?? [], 0, 6)),
+            'landings' => array_map($row, array_slice($sources['landings'] ?? [], 0, 6)),
         ];
     }
 

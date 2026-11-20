@@ -3,7 +3,7 @@
 namespace App\Support\Acquisition;
 
 /**
- * Where a visit came from, in the few groups the admin reads (Admin → Where members come from):
+ * Where a visit came from, in the few groups the business report reads (Dashboard → Where members come from, the investor PDF):
  * a group (the channel) and, inside it, the one site, network or campaign (the detail).
  *
  * A link's own markers decide first (an ad network's click marker, then its campaign fields),

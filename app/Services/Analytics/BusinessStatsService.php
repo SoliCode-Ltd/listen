@@ -2,6 +2,7 @@
 
 namespace App\Services\Analytics;
 
+use App\Services\Acquisition\SourceReport;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\Billing\StripePricePlans;
@@ -117,6 +118,7 @@ class BusinessStatsService
             'trials' => fn () => $this->trials(),
             'manual_payments' => fn () => $this->manualPayments(),
             'growth_channels' => fn () => $this->growthChannels(),
+            'sources' => fn () => $this->sources(),
             'monthly' => fn () => $this->monthly(),
             'cohorts' => fn () => $this->cohorts(),
             'providers' => fn () => $this->providers(),
@@ -593,6 +595,19 @@ class BusinessStatsService
         }
 
         return $data;
+    }
+
+    /**
+     * Where the period's new members came from, and the period's payments by how each payer found the
+     * site (App\Services\Acquisition\SourceReport). Counts and amounts only.
+     */
+    private function sources(): array
+    {
+        if (! $this->hasTable('member_sources')) {
+            return [];
+        }
+
+        return app(SourceReport::class)->build($this->since->copy(), $this->now->copy()->addSecond());
     }
 
     /**

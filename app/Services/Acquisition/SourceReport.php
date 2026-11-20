@@ -8,6 +8,7 @@ use App\Models\ChatGptAdsEvent;
 use App\Models\MemberSource;
 use App\Models\UserReferralProfile;
 use App\Support\Acquisition\Channels;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -15,25 +16,23 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Admin → Where members come from.
+ * Where the members of a period came from, for the business report (BusinessStatsService → the
+ * dashboard, the investor PDF and the Excel file):
  *
- * - The members who signed up in a period, grouped by how they found the site (MemberSource), with how
- *   many of them have paid, how many paid within a day of signing up, and everything they have paid
- *   so far (refunds taken off), by currency.
- * - The payments made in the period, renewals included, grouped by how each payer found the site.
+ * - the members who signed up in the period, grouped by the last place they came from before
+ *   signing up (MemberSource), with how many of them have paid, how many paid within a day of
+ *   signing up, and everything they have paid so far (refunds taken off), by currency;
+ * - the payments made in the period, renewals included, grouped by how each payer found the site;
+ * - the campaigns, first pages and websites that brought them.
  *
  * Members who joined before this was recorded have no MemberSource: they are grouped by what the site
  * kept then (a Google ad click seen at checkout, a ChatGPT ad click, an invite link), else "Not recorded".
- * Admins are left out.
+ * Admins are left out, as everywhere in the business report. Counts and amounts only: no member is named.
  */
 final class SourceReport
 {
-    public const COUNT_LAST = 'last';
-
-    public const COUNT_FIRST = 'first';
-
-    /** How many rows the campaign, page, site and country lists show. */
-    public const TOP = 15;
+    /** How many rows the campaign, page and website lists show. */
+    public const TOP = 10;
 
     private const CHUNK = 2000;
 
@@ -46,26 +45,22 @@ final class SourceReport
 
     /**
      * @return array{
-     *     from: Carbon, to: Carbon, count: string, signed_up_in: string, recorded_since: ?Carbon,
-     *     totals: array<string, mixed>, channels: list<array<string, mixed>>, campaigns: list<array<string, mixed>>,
-     *     landings: list<array<string, mixed>>, sites: list<array<string, mixed>>, countries: list<array<string, mixed>>,
-     *     signed_up: list<array<string, mixed>>, payments: array<string, mixed>, latest: list<array<string, mixed>>
+     *     recorded_since: ?string, totals: array<string, mixed>, channels: list<array<string, mixed>>,
+     *     campaigns: list<array<string, mixed>>, landings: list<array<string, mixed>>, sites: list<array<string, mixed>>,
+     *     payments: array{rows: list<array<string, mixed>>, payments: int, money: array<string, int>}
      * }
      */
-    public function build(Carbon $from, Carbon $to, string $count = self::COUNT_LAST, string $signedUpIn = 'all'): array
+    public function build(CarbonInterface $from, CarbonInterface $to): array
     {
-        $first = $count === self::COUNT_FIRST;
         $totals = self::bucket('All new members');
-        $channels = $campaigns = $landings = $sites = $countries = $signedUp = [];
+        $channels = $campaigns = $landings = $sites = [];
 
-        $this->members($from, $to, $signedUpIn)->chunkById(self::CHUNK, function (Collection $rows) use (
-            $first, &$totals, &$channels, &$campaigns, &$landings, &$sites, &$countries, &$signedUp
-        ): void {
+        $this->members($from, $to)->chunkById(self::CHUNK, function (Collection $rows) use (&$totals, &$channels, &$campaigns, &$landings, &$sites): void {
             $money = $this->moneyByMember($rows->pluck('id')->all());
             $older = $this->olderTraces($rows->whereNull('source_id'));
 
             foreach ($rows as $row) {
-                $place = $this->place($row, $first, $older);
+                $place = $this->place($row, $older);
                 $metrics = self::metrics($row->created_at, $money[(int) $row->id] ?? null);
 
                 self::add($totals, $metrics);
@@ -90,14 +85,6 @@ final class SourceReport
                     $sites[$place['site']] ??= self::bucket($place['site']) + ['channel' => Channels::label($channel)];
                     self::add($sites[$place['site']], $metrics);
                 }
-
-                $country = strtoupper((string) ($row->country_code ?: '')) ?: '?';
-                $countries[$country] ??= self::bucket($country);
-                self::add($countries[$country], $metrics);
-
-                $where = $row->source_id !== null ? (MemberSource::SIGNED_UP_LABELS[$row->signed_up_in] ?? 'Website') : self::BEFORE;
-                $signedUp[$where] ??= self::bucket($where);
-                self::add($signedUp[$where], $metrics);
             }
         }, 'u.id', 'id');
 
@@ -109,20 +96,13 @@ final class SourceReport
         usort($channels, fn (array $a, array $b) => [$b['members'], $b['paid']] <=> [$a['members'], $a['paid']]);
 
         return [
-            'from' => $from,
-            'to' => $to,
-            'count' => $first ? self::COUNT_FIRST : self::COUNT_LAST,
-            'signed_up_in' => $signedUpIn,
-            'recorded_since' => self::recordedSince(),
+            'recorded_since' => self::recordedSince()?->toDateString(),
             'totals' => $totals,
             'channels' => $channels,
             'campaigns' => array_slice(self::ranked($campaigns), 0, self::TOP),
             'landings' => array_slice(self::ranked($landings), 0, self::TOP),
             'sites' => array_slice(self::ranked($sites), 0, self::TOP),
-            'countries' => array_slice(self::ranked($countries), 0, self::TOP),
-            'signed_up' => self::ranked($signedUp),
-            'payments' => $this->payments($from, $to, $first, $signedUpIn),
-            'latest' => $this->latest($from, $to, $first, $signedUpIn),
+            'payments' => $this->payments($from, $to),
         ];
     }
 
@@ -172,19 +152,14 @@ final class SourceReport
         return number_format($share, $share > 0 && $share < 10 ? 1 : 0).'%';
     }
 
-    private function members(Carbon $from, Carbon $to, string $signedUpIn): Builder
+    private function members(CarbonInterface $from, CarbonInterface $to): Builder
     {
         return DB::table('users as u')
             ->leftJoin('member_sources as ms', 'ms.user_id', '=', 'u.id')
             ->where('u.created_at', '>=', $from)
             ->where('u.created_at', '<', $to)
             ->where(fn ($q) => $q->where('u.is_admin', false)->orWhereNull('u.is_admin'))
-            ->when($signedUpIn !== 'all', fn ($q) => $q->where('ms.signed_up_in', $signedUpIn))
-            ->select([
-                'u.id', 'u.created_at', 'u.country_code', 'u.ads_click_id',
-                'ms.id as source_id', 'ms.signed_up_in', 'ms.channel', 'ms.detail', 'ms.campaign', 'ms.landing_path', 'ms.referrer_host',
-                'ms.first_channel', 'ms.first_detail', 'ms.first_campaign', 'ms.first_landing_path', 'ms.first_referrer_host',
-            ]);
+            ->select(['u.id', 'u.created_at', 'u.ads_click_id', 'ms.id as source_id', 'ms.channel', 'ms.detail', 'ms.campaign', 'ms.landing_path', 'ms.referrer_host']);
     }
 
     /**
@@ -252,23 +227,22 @@ final class SourceReport
     }
 
     /**
-     * Where one member came from, as the chosen count reads it.
+     * Where one member came from.
      *
      * @param  array{google: array<int, true>, chatgpt: array<int, true>, invite: array<int, true>}  $older
      * @return array{channel: string, detail: ?string, campaign: ?string, landing: ?string, site: ?string}
      */
-    private function place(object $row, bool $first, array $older): array
+    private function place(object $row, array $older): array
     {
         if ($row->source_id !== null) {
-            $useFirst = $first && $row->first_channel !== null;
-            $channel = (string) ($useFirst ? $row->first_channel : $row->channel);
+            $channel = (string) $row->channel;
 
             return [
                 'channel' => $channel,
-                'detail' => ($useFirst ? $row->first_detail : $row->detail) ?? ($channel === Channels::UNKNOWN ? self::NOTHING_KEPT : null),
-                'campaign' => $useFirst ? $row->first_campaign : $row->campaign,
-                'landing' => $useFirst ? $row->first_landing_path : $row->landing_path,
-                'site' => $useFirst ? $row->first_referrer_host : $row->referrer_host,
+                'detail' => $row->detail ?? ($channel === Channels::UNKNOWN ? self::NOTHING_KEPT : null),
+                'campaign' => $row->campaign,
+                'landing' => $row->landing_path,
+                'site' => $row->referrer_host,
             ];
         }
 
@@ -288,7 +262,7 @@ final class SourceReport
      *
      * @return array{rows: list<array<string, mixed>>, payments: int, money: array<string, int>}
      */
-    private function payments(Carbon $from, Carbon $to, bool $first, string $signedUpIn): array
+    private function payments(CarbonInterface $from, CarbonInterface $to): array
     {
         $payments = DB::table('payments')
             ->where('paid_at', '>=', $from)
@@ -303,9 +277,7 @@ final class SourceReport
                 ->leftJoin('member_sources as ms', 'ms.user_id', '=', 'u.id')
                 ->whereIn('u.id', $ids)
                 ->where(fn ($q) => $q->where('u.is_admin', false)->orWhereNull('u.is_admin'))
-                ->when($signedUpIn !== 'all', fn ($q) => $q->where('ms.signed_up_in', $signedUpIn))
-                ->get(['u.id', 'u.created_at', 'u.ads_click_id', 'ms.id as source_id', 'ms.signed_up_in', 'ms.channel', 'ms.detail', 'ms.campaign',
-                    'ms.landing_path', 'ms.referrer_host', 'ms.first_channel', 'ms.first_detail', 'ms.first_campaign', 'ms.first_landing_path', 'ms.first_referrer_host']));
+                ->get(['u.id', 'u.created_at', 'u.ads_click_id', 'ms.id as source_id', 'ms.channel', 'ms.detail', 'ms.campaign', 'ms.landing_path', 'ms.referrer_host']));
         }
         $payers = $payers->keyBy(fn ($row) => (int) $row->id);
         $older = $this->olderTraces($payers->whereNull('source_id'));
@@ -318,7 +290,7 @@ final class SourceReport
             if ($payer === null) {
                 continue;
             }
-            $channel = $this->place($payer, $first, $older)['channel'];
+            $channel = $this->place($payer, $older)['channel'];
             $currency = strtoupper((string) ($payment->currency ?: 'USD'));
             $net = max(0, (int) $payment->amount_minor - (int) $payment->refunded_minor);
             $joinedNow = Carbon::parse($payer->created_at)->greaterThanOrEqualTo($from);
@@ -340,42 +312,6 @@ final class SourceReport
         usort($rows, fn (array $a, array $b) => [$b['payments'], $b['payers']] <=> [$a['payments'], $a['payers']]);
 
         return ['rows' => $rows, 'payments' => $count, 'money' => $money];
-    }
-
-    /**
-     * The newest members of the period, one by one, to read single cases.
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function latest(Carbon $from, Carbon $to, bool $first, string $signedUpIn, int $limit = 25): array
-    {
-        $rows = $this->members($from, $to, $signedUpIn)
-            ->addSelect(['u.name', 'u.email'])
-            ->orderByDesc('u.created_at')
-            ->orderByDesc('u.id')
-            ->limit($limit)
-            ->get();
-        $money = $this->moneyByMember($rows->pluck('id')->all());
-        $older = $this->olderTraces($rows->whereNull('source_id'));
-
-        return $rows->map(function (object $row) use ($first, $older, $money): array {
-            $place = $this->place($row, $first, $older);
-            $paid = $money[(int) $row->id] ?? null;
-
-            return [
-                'id' => (int) $row->id,
-                'name' => (string) $row->name,
-                'email' => (string) $row->email,
-                'joined' => Carbon::parse($row->created_at),
-                'channel' => Channels::label($place['channel']),
-                'detail' => $place['detail'],
-                'campaign' => $place['campaign'],
-                'landing' => $place['landing'],
-                'signed_up_in' => $row->source_id !== null ? (MemberSource::SIGNED_UP_LABELS[$row->signed_up_in] ?? 'Website') : null,
-                'country' => strtoupper((string) ($row->country_code ?: '')) ?: null,
-                'paid' => $paid['money'] ?? [],
-            ];
-        })->values()->all();
     }
 
     /** @return array{label: string, members: int, paid: int, within_day: int, money: array<string, int>} */

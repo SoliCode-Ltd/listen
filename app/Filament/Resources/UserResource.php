@@ -198,7 +198,7 @@ HTML;
                             }),
                     ]),
                 Section::make('How they found us')
-                    ->description('Kept when the account was made (Where members come from).')
+                    ->description('Kept when the account was made (Dashboard → Where members come from).')
                     ->columns(2)
                     ->collapsible()
                     ->visible(fn (string $operation): bool => $operation !== 'create')
@@ -266,7 +266,7 @@ HTML;
         return $table
             // Each row's plan and demo characters, for the whole page in two queries (not three a row).
             ->modifyQueryUsing(fn (Builder $query) => $query
-                ->with('latestActiveSubscription.plan')
+                ->with('latestActiveSubscription.plan', 'memberSource')
                 ->withSum('demoVoiceGenerations as demo_chars_list_sum', 'billable_chars')
                 ->withExists('demoVoiceGenerations as has_demo_history')
                 ->withExists('planSubscriptions as has_any_subscription'))
@@ -332,6 +332,13 @@ HTML;
                     ->placeholder('—')
                     ->searchable()
                     ->sortable()
+                    ->toggleable(),
+                // How they found the site, kept at sign-up (the dashboard's "Where members come from" counts these).
+                TextColumn::make('memberSource.channel')
+                    ->label('Came from')
+                    ->formatStateUsing(fn (?string $state) => Channels::label($state))
+                    ->description(fn (User $record): ?string => ($detail = $record->memberSource?->detail) !== null && $detail !== Channels::label($record->memberSource?->channel) ? $detail : null)
+                    ->placeholder('Not recorded')
                     ->toggleable(),
                 TextColumn::make('phone_number')
                     ->label(__('ui.admin.users.phone_number'))
@@ -420,6 +427,16 @@ HTML;
                         null, '' => $query,
                         '__unknown' => $query->whereNull('country_code'),
                         default => $query->where('country_code', $data['value']),
+                    }),
+                SelectFilter::make('came_from')
+                    ->label('Came from')
+                    ->options(Channels::LABELS)
+                    ->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {
+                        null, '' => $query,
+                        // Not recorded: nothing kept, or joined before sources were kept.
+                        Channels::UNKNOWN => $query->where(fn (Builder $q) => $q->doesntHave('memberSource')
+                            ->orWhereHas('memberSource', fn (Builder $m) => $m->where('channel', Channels::UNKNOWN))),
+                        default => $query->whereHas('memberSource', fn (Builder $m) => $m->where('channel', $data['value'])),
                     }),
                 TernaryFilter::make('is_admin')
                     ->label(__('ui.admin.users.admin_filter')),

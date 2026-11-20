@@ -2,8 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Pages\MemberSources;
 use App\Filament\Resources\UserResource;
+use App\Filament\Resources\UserResource\Pages\ListUsers;
+use App\Filament\Widgets\BusinessSources;
 use App\Models\AdsPurchase;
 use App\Models\MemberSource;
 use App\Models\Payment;
@@ -11,6 +12,9 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\Acquisition\SourceReport;
 use App\Services\Acquisition\VisitSources;
+use App\Services\Analytics\BusinessReportPdf;
+use App\Services\Analytics\BusinessStatsExporter;
+use App\Services\Analytics\BusinessStatsService;
 use App\Support\Acquisition\Channels;
 use App\Support\Acquisition\Touch;
 use Filament\Facades\Filament;
@@ -254,8 +258,6 @@ class MemberSourcesTest extends TestCase
         $this->assertSame('Launch', $report['campaigns'][0]['label']);
         $this->assertSame('/ar/arabic-dialects/gulf', $report['landings'][0]['label']);
         $this->assertSame('google.com', $report['sites'][0]['label']);
-        $this->assertSame(2, collect($report['countries'])->firstWhere('label', 'EG')['members']);
-        $this->assertSame(1, collect($report['countries'])->firstWhere('label', 'SA')['paid']);
 
         // The period's payments, renewals included, by the payer's source.
         $payments = collect($report['payments']['rows'])->keyBy('key');
@@ -264,43 +266,57 @@ class MemberSourcesTest extends TestCase
         $this->assertSame(0, $payments[Channels::SOCIAL]['from_new']);
         $this->assertSame(['USD' => 900], $payments[Channels::SOCIAL]['money']);
 
-        $this->assertSame($search->id, $report['latest'][0]['id'], 'The newest member comes first.');
-        $this->assertSame($searchUnpaid->id, $report['latest'][1]['id']);
-
-        // Counted by their first visit, the ad's member came from an AI assistant.
-        $byFirst = collect(app(SourceReport::class)->build($from, now()->addSecond(), SourceReport::COUNT_FIRST)['channels'])->keyBy('key');
-        $this->assertSame(1, $byFirst[Channels::AI]['members']);
-
-        // Only the website's sign-ups: the older members (no record) are left out.
-        $this->assertSame(3, app(SourceReport::class)->build($from, now()->addSecond(), SourceReport::COUNT_LAST, 'web')['totals']['members']);
+        // Counts and amounts only: nothing in it names a member.
+        $this->assertStringNotContainsString((string) $searchUnpaid->email, json_encode($report));
     }
 
-    public function test_the_admin_tab_and_the_member_page_show_the_sources(): void
+    public function test_the_dashboard_the_reports_and_the_members_list_show_the_sources(): void
     {
         $member = $this->member(Channels::AI, 'ChatGPT', ['landing_path' => '/ar/voices', 'campaign' => 'answers'], now()->subDay());
         $this->pay($member, 900, 'USD', now()->subHours(20));
-        AdsPurchase::query()->create(['user_id' => User::factory()->create(['created_at' => now()->subDays(2)])->id, 'source' => AdsPurchase::SOURCE_CARD, 'reference' => 'in_1', 'gclid' => 'g', 'value_minor' => 200, 'currency' => 'USD', 'purchased_at' => now()]);
+        $searcher = $this->member(Channels::SEARCH, 'Google', [], now()->subDays(2));
+        $older = User::factory()->create(['created_at' => now()->subDays(2)]);
+        AdsPurchase::query()->create(['user_id' => $older->id, 'source' => AdsPurchase::SOURCE_CARD, 'reference' => 'in_1', 'gclid' => 'g', 'value_minor' => 200, 'currency' => 'USD', 'purchased_at' => now()]);
+
+        // One snapshot for the dashboard, the investor PDF and the Excel file: the same numbers in all three.
+        $snapshot = app(BusinessStatsService::class)->build(3);
+        $this->assertSame(3, $snapshot['sources']['totals']['members']);
+        $this->assertSame(['AI assistants', 'Google Ads', 'Search results'], collect($snapshot['sources']['channels'])->pluck('label')->sort()->values()->all());
 
         $admin = User::factory()->create(['is_admin' => true]);
         $this->actingAs($admin);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        Livewire::test(MemberSources::class)
-            ->assertOk()
-            ->assertSee('Where they came from')
+        Livewire::test(BusinessSources::class, ['filters' => ['months' => 3]])
+            ->assertSee('Where members come from')
             ->assertSee('AI assistants')
-            ->assertSee('Google Ads')
+            ->assertSee('Google Ads (seen at checkout)')
             ->assertSee('/ar/voices')
-            ->assertSee('USD 9.00')
-            ->assertSee($member->name)
-            ->set('data.period', 'custom')
-            ->set('data.from', now()->subDays(40)->toDateString())
-            ->set('data.until', now()->toDateString())
-            ->assertOk()
-            ->set('data.count', SourceReport::COUNT_FIRST)
-            ->assertOk();
+            ->assertSee('answers')
+            ->assertSee('USD 9.00');
 
-        $this->get(MemberSources::getUrl())->assertOk()->assertSee('Where members come from');
+        $pdf = app(BusinessReportPdf::class);
+        $html = view('reports.business-analytics', $pdf->viewData($snapshot))->render();
+        $this->assertStringContainsString('Where new members come from', $html);
+        $this->assertStringContainsString('AI assistants', $html);
+        $this->assertStringContainsString('USD 9.00', $html);
+        $this->assertStringNotContainsString((string) $member->email, $html, 'no personal data in the report');
+        $this->assertStringStartsWith('%PDF-', $pdf->render($snapshot));
+
+        $sheets = app(BusinessStatsExporter::class)->sheets($snapshot);
+        $this->assertContains(['AI assistants', 'ChatGPT', 1, 1, 1, 'USD 9.00'], $sheets['Member sources']);
+        $this->assertSame('AI assistants', $sheets['Payments by source'][1][0]);
+
+        // The members list: who came from where, and a filter for it.
+        Livewire::test(ListUsers::class)
+            ->assertCanSeeTableRecords([$member, $searcher, $older])
+            ->filterTable('came_from', Channels::SEARCH)
+            ->assertCanSeeTableRecords([$searcher])
+            ->assertCanNotSeeTableRecords([$member, $older])
+            ->filterTable('came_from', Channels::UNKNOWN)
+            ->assertCanSeeTableRecords([$older])
+            ->assertCanNotSeeTableRecords([$member, $searcher]);
+
         $this->get(UserResource::getUrl('view', ['record' => $member]))->assertOk()->assertSee('How they found us')->assertSee('AI assistants · ChatGPT');
     }
 
