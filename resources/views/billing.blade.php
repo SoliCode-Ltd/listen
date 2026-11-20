@@ -48,15 +48,18 @@
     /* Credits left and the button that opens the extra-credits window. */
     .status-grid.has-credits { grid-template-columns: 1fr 1fr 1fr 340px; }
     .status-grid .status-item:nth-child(4) { animation-delay: .12s; }
-    /* The number reads like the other boxes; the action is a quiet line of its own under it. */
+    /* The number, and beside it a small dotted pill that opens the extra-credits window. */
+    .status-credits-row { display: inline-flex; align-items: center; gap: .55rem; flex-wrap: wrap; }
+    .status-item .status-credits-row b { display: inline; }
     .status-credits-add {
-      display: inline-flex; align-items: center; gap: .3rem; margin-top: .3rem; padding: 0;
-      border: 0; background: none; color: var(--brand-accent);
-      font: inherit; font-size: .85rem; font-weight: 700; cursor: pointer;
+      display: inline-flex; align-items: center; gap: .25rem; min-height: 26px; padding: 0 .6rem;
+      border: 1.5px dashed color-mix(in oklab, var(--brand-accent) 60%, var(--line)); border-radius: 999px;
+      background: transparent; color: var(--brand-accent);
+      font: inherit; font-size: .78rem; font-weight: 700; line-height: 1; cursor: pointer; white-space: nowrap;
       -webkit-tap-highlight-color: transparent;
     }
-    .status-credits-add:hover { text-decoration: underline; text-underline-offset: 3px; }
-    .status-credits-add:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; border-radius: 6px; }
+    .status-credits-add:hover { border-style: solid; background: color-mix(in oklab, var(--brand-accent) 7%, transparent); }
+    .status-credits-add:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
 
     /* ── Grid layout ── */
     .grid-layout {
@@ -967,15 +970,9 @@
         text-align: end;
       }
       .status-grid.has-credits { grid-template-columns: 1fr; }
-      /* On a phone: four rows alike (label, value), then the action across the foot of the box. */
-      .status-item.status-credits { order: 5; flex-wrap: wrap; row-gap: 0; padding-bottom: 0; }
-      .status-credits-add {
-        flex: 1 0 100%; justify-content: center; min-height: 46px; margin: .6rem -.9rem 0;
-        border-top: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
-        background: color-mix(in oklab, var(--brand-accent) 5%, transparent);
-        border-radius: 0 0 var(--radius) var(--radius); font-size: .92rem;
-      }
-      .status-credits-add:hover { text-decoration: none; background: color-mix(in oklab, var(--brand-accent) 10%, transparent); }
+      /* On a phone: the row as the others, the pill just before the number. */
+      .status-item.status-credits { align-items: center; }
+      .status-credits-row { flex-wrap: nowrap; }
       .stripe-container {
         padding: .75rem;
       }
@@ -1122,10 +1119,12 @@
         {{-- The extra-credits window again, for a member who closed it (components/extra-credits-dialog). --}}
         <div class="status-item status-credits">
           <small>{{ __('ui.billing.credits_left') }}</small>
-          <b><bdi dir="ltr">{{ $creditsLeft !== null ? number_format($creditsLeft) : '-' }}</bdi></b>
-          <button type="button" class="status-credits-add" data-extra-credits-open>
-            <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>{{ __('ui.extra_credits.open') }}
-          </button>
+          <span class="status-credits-row">
+            <b><bdi dir="ltr">{{ $creditsLeft !== null ? number_format($creditsLeft) : '-' }}</bdi></b>
+            <button type="button" class="status-credits-add" data-extra-credits-open>
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>{{ __('ui.extra_credits.open') }}
+            </button>
+          </span>
         </div>
       @endif
       <div class="status-item">
