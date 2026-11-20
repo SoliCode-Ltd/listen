@@ -506,7 +506,7 @@ return [
         'voice_quality' => 'Voice Quality',
         'saved_card' => 'Saved Card',
         'not_saved' => 'Not saved',
-        'credits_left' => 'Credits left',
+        'minutes_renew_on' => 'Your minutes renew on :date.',
         'upgrade_plan' => 'Upgrade Plan',
         'change_plan' => 'Change plan',
         'upgrade_plan_hint' => 'Choose a plan and billing cycle, then confirm payment.',

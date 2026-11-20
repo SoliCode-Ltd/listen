@@ -98,9 +98,9 @@ class BillingController extends Controller
             // and the Android app send members to. Neither app opens /billing itself (unlike /dashboard),
             // so on a phone it stays in the browser, where it can be paid.
             'canBuyExtraCredits' => $canBuyExtraCredits = app(ExtraCredits::class)->status((int) $user->id) === ExtraCredits::STATUS_OK,
-            // Credits left, beside the button that opens the same window: a member who closed it
-            // by mistake finds it again here.
-            'creditsLeft' => $canBuyExtraCredits ? $this->creditsLeft((int) $user->id) : null,
+            // This month's minutes, as the studio shows them, beside the button that opens the same
+            // window: a member who closed it by mistake finds it again here.
+            'creditsMeter' => $canBuyExtraCredits ? $this->creditsMeter((int) $user->id, app()->getLocale()) : null,
             'activePlan' => $activePlan,
             'currentPlanSlug' => (string) ($activePlan?->slug ?? 'free'),
             'activeTierLabel' => VoiceTier::label((string) ($activePlan?->voice_tier ?: 'standard')),
@@ -2382,8 +2382,14 @@ class BillingController extends Controller
         }
     }
 
-    /** The credits the member has left now: the plan's, gifts and extra credits (UsageSnapshot). */
-    private function creditsLeft(int $userId): ?int
+    /**
+     * This month's minutes as the studio's meter shows them (dashboard: minutes left, of how
+     * many, and its colour as the month runs low), and the day the plan's credits renew. The
+     * bar shows what is left, as the number beside it does: empty when nothing is left.
+     *
+     * @return array{minutes_left:int, minutes_total:int, used_percent:int, left_percent:int, state:string, out:bool, renews_on:string}|null
+     */
+    private function creditsMeter(int $userId, string $locale): ?array
     {
         try {
             $snapshot = \App\Support\UsageSnapshot::for(
@@ -2391,10 +2397,21 @@ class BillingController extends Controller
                 $this->planAccessService->resolveQuotaPlanForUserId($userId),
                 \App\Support\CreditPeriod::counter($userId),
             );
+            $remaining = max(0, (int) ($snapshot['remaining_chars'] ?? 0));
+            $used = max(0, min(100, (int) ($snapshot['chars_percent'] ?? 0)));
 
-            return max(0, (int) ($snapshot['remaining_chars'] ?? 0));
+            return [
+                'minutes_left' => \App\Support\Credits::minutesFor($remaining),
+                'minutes_total' => \App\Support\Credits::minutesFor((int) ($snapshot['plan_chars'] ?? 0)),
+                'used_percent' => $used,
+                'left_percent' => 100 - $used,
+                // As the studio: amber when most of the month is used, red when almost none is left.
+                'state' => $used >= 95 ? 'is-low' : ($used >= 80 ? 'is-high' : ''),
+                'out' => $remaining < \App\Support\Credits::PER_MINUTE,
+                'renews_on' => \App\Support\CreditPeriod::current($userId)['ends_at']->copy()->setTimezone('UTC')->locale($locale)->translatedFormat('j F'),
+            ];
         } catch (\Throwable $e) {
-            Log::warning('Credits left could not be read for the billing page.', ['user_id' => $userId, 'error' => $e->getMessage()]);
+            Log::warning('The minutes left could not be read for the billing page.', ['user_id' => $userId, 'error' => $e->getMessage()]);
 
             return null;
         }

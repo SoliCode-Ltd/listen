@@ -45,21 +45,43 @@
       display: block;
       font-size: 1rem;
     }
-    /* Credits left and the button that opens the extra-credits window. */
-    .status-grid.has-credits { grid-template-columns: 1fr 1fr 1fr 340px; }
-    .status-grid .status-item:nth-child(4) { animation-delay: .12s; }
-    /* The number, and beside it a small dotted pill that opens the extra-credits window. */
-    .status-credits-row { display: inline-flex; align-items: center; gap: .55rem; flex-wrap: wrap; }
-    .status-item .status-credits-row b { display: inline; }
-    .status-credits-add {
-      display: inline-flex; align-items: center; gap: .25rem; min-height: 26px; padding: 0 .6rem;
-      border: 1.5px dashed color-mix(in oklab, var(--brand-accent) 60%, var(--line)); border-radius: 999px;
-      background: transparent; color: var(--brand-accent);
-      font: inherit; font-size: .78rem; font-weight: 700; line-height: 1; cursor: pointer; white-space: nowrap;
-      -webkit-tap-highlight-color: transparent;
+    /* This month's minutes (as the studio's meter) and the way to add more. Phones stack it:
+       the figure, the bar across, then the renewal day facing the button. */
+    .minutes-meter {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-areas: "figure figure" "track track" "renews add";
+      align-items: center;
+      gap: .7rem 1rem;
+      margin-bottom: 1.25rem;
+      padding: 1rem 1.1rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
     }
-    .status-credits-add:hover { border-style: solid; background: color-mix(in oklab, var(--brand-accent) 7%, transparent); }
-    .status-credits-add:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+    .minutes-meter-figure { grid-area: figure; display: grid; gap: .2rem; }
+    .minutes-meter-label { color: var(--muted); font-size: .85rem; }
+    .minutes-meter-value { display: flex; align-items: baseline; gap: .45rem; }
+    .minutes-meter-value strong { font-size: 1.6rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .minutes-meter-value span { color: var(--muted); font-size: .92rem; }
+    .minutes-meter-track { grid-area: track; height: 8px; border-radius: 999px; background: color-mix(in oklab, var(--brand-accent) 13%, var(--line)); overflow: hidden; }
+    .minutes-meter-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #A28FFF, #5B3FE6); }
+    html[dir="rtl"] .minutes-meter-track i { background: linear-gradient(270deg, #A28FFF, #5B3FE6); }
+    html .minutes-meter-track.is-high i { background: #F59E0B; }
+    html .minutes-meter-track.is-low i { background: #EF4444; }
+    .minutes-meter-renews { grid-area: renews; color: var(--muted); font-size: .85rem; line-height: 1.5; }
+    .minutes-meter-add { grid-area: add; padding: .6rem 1.15rem; font-size: .9rem; white-space: nowrap; }
+    /* Wider screens: one line, the bar between the figure and the button, the day under the bar. */
+    @media (min-width: 761px) {
+      .minutes-meter {
+        grid-template-columns: auto 1fr auto;
+        grid-template-areas: "figure track add" "figure renews add";
+        gap: .35rem 2rem;
+        padding: 1rem 1.25rem;
+      }
+      .minutes-meter-track { align-self: end; }
+      .minutes-meter-renews { align-self: start; }
+    }
 
     /* ── Grid layout ── */
     .grid-layout {
@@ -910,7 +932,6 @@
         grid-template-columns: 1fr 1fr 1fr;
         gap: .65rem;
       }
-      .status-grid.has-credits { grid-template-columns: 1fr 1fr; }
       .manual-main-grid {
         grid-template-columns: 1fr;
       }
@@ -969,10 +990,6 @@
         font-size: .92rem;
         text-align: end;
       }
-      .status-grid.has-credits { grid-template-columns: 1fr; }
-      /* On a phone: the row as the others, the pill just before the number. */
-      .status-item.status-credits { align-items: center; }
-      .status-credits-row { flex-wrap: nowrap; }
       .stripe-container {
         padding: .75rem;
       }
@@ -1103,7 +1120,7 @@
       </div>
     @endif
 
-    <div class="status-grid{{ ($canBuyExtraCredits ?? false) ? ' has-credits' : '' }}" style="margin-bottom: 1.25rem;">
+    <div class="status-grid" style="margin-bottom: 1.25rem;">
       <div class="status-item">
         <small>{{ __('ui.billing.current_plan') }}</small>
         <b>{{ $activePlanName }}</b>
@@ -1115,18 +1132,6 @@
         <small>{{ __('ui.billing.voice_quality') }}</small>
         <b>{{ $normalizeTierLabel($activeTierLabel) }}</b>
       </div>
-      @if($canBuyExtraCredits ?? false)
-        {{-- The extra-credits window again, for a member who closed it (components/extra-credits-dialog). --}}
-        <div class="status-item status-credits">
-          <small>{{ __('ui.billing.credits_left') }}</small>
-          <span class="status-credits-row">
-            <b><bdi dir="ltr">{{ $creditsLeft !== null ? number_format($creditsLeft) : '-' }}</bdi></b>
-            <button type="button" class="status-credits-add" data-extra-credits-open>
-              <svg viewBox="0 0 24 24" aria-hidden="true" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>{{ __('ui.extra_credits.open') }}
-            </button>
-          </span>
-        </div>
-      @endif
       <div class="status-item">
         <small>{{ __('ui.billing.saved_card') }}</small>
         <b>
@@ -1138,6 +1143,23 @@
         </b>
       </div>
     </div>
+
+    @if(($canBuyExtraCredits ?? false) && ! empty($creditsMeter))
+      {{-- This month's minutes, as the studio shows them, and the way back to the extra-credits
+           window for a member who closed it (components/extra-credits-dialog). --}}
+      <section class="minutes-meter{{ $creditsMeter['out'] ? ' is-out' : '' }}" aria-labelledby="minutesMeterLabel">
+        <div class="minutes-meter-figure">
+          <span class="minutes-meter-label" id="minutesMeterLabel">{{ __('ui.dashboard.minutes_left_label') }}</span>
+          <span class="minutes-meter-value">
+            <strong>{{ number_format($creditsMeter['minutes_left']) }}</strong>
+            <span>{{ __('ui.dashboard.minutes_left_of', ['total' => number_format($creditsMeter['minutes_total'])]) }}</span>
+          </span>
+        </div>
+        <div class="minutes-meter-track {{ $creditsMeter['state'] }}" role="img" aria-label="{{ __('ui.dashboard.credits_used_percent', ['percent' => $creditsMeter['used_percent']]) }}"><i style="width: {{ $creditsMeter['left_percent'] }}%"></i></div>
+        <span class="minutes-meter-renews">{{ __('ui.billing.minutes_renew_on', ['date' => $creditsMeter['renews_on']]) }}</span>
+        <button type="button" class="btn{{ $creditsMeter['out'] ? ' btn-primary' : '' }} minutes-meter-add" data-extra-credits-open>{{ __('ui.extra_credits.open') }}</button>
+      </section>
+    @endif
 
     <div class="grid-layout">
       <div class="card">
