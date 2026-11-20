@@ -45,6 +45,15 @@ return [
         'back' => 'العودة إلى التطبيق',
     ],
 
+    // الرصيد الإضافي في تطبيق أندرويد (components/extra-credits-app): يُضاف من الموقع في المتصفح.
+    'extra_credits' => [
+        'text' => 'يُضاف الرصيد الإضافي من موقعنا في المتصفح. ستكون مسجّل الدخول هناك، ويظهر الرصيد هنا فور إضافته.',
+        'away' => 'بعد إضافة الرصيد، حدّث الصفحة هنا لتراه.',
+        'refresh' => 'تحديث',
+        'close' => 'إغلاق',
+        'failed' => 'لم يُفتح المتصفح. حاول مرة أخرى.',
+    ],
+
     'signin' => [
         // "Sign in with Apple" in the iPhone app; the button itself is Apple's own picture.
         'apple_failed' => 'تعذّر تسجيل دخولك باستخدام Apple. حاول مرة أخرى.',
