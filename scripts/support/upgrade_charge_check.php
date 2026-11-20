@@ -2,7 +2,8 @@
 
 /*
  * For the "Server deploy" workflow's upgrade-check mode: what one member was charged when they
- * changed plan, line by line as Stripe billed it, beside the credits they had used. Read-only:
+ * changed plan, line by line as Stripe billed it, beside the credits they had used, and what a
+ * move up to a higher plan would give them back now. Read-only:
  * Stripe is only read (no change, no payment) and the database session is READ ONLY where the
  * server allows it. Prints the member's id, never their name, email or card.
  *
@@ -103,6 +104,24 @@ foreach ($stripe->subscriptions->all(['customer' => $customer, 'status' => 'all'
 }
 $balance = (int) ($stripe->customers->retrieve($customer)->balance ?? 0);
 $line('Account credit with Stripe', $balance < 0 ? $money(-$balance, 'usd').' to use' : ($balance > 0 ? $money($balance, 'usd').' owed' : 'none'));
+
+// What a move up to a higher plan would give back right now, as the billing page works it out.
+echo "\n== If they moved up now (App\\Services\\Billing\\UnusedCredits) ==\n";
+$unused = app(\App\Services\Billing\UnusedCredits::class);
+$line('The database can mark a settled month', \App\Services\Billing\UnusedCredits::ready() ? 'yes' : 'NO: the migration has not run, moves up are counted in time');
+$standing = $unused->standing((int) $user->id);
+if ($standing === null) {
+    $line('Counted in', 'time left (no plan credits, or credits by calendar month)');
+} else {
+    $line('Counted in', 'credits: '.number_format($standing['unused']).' of '.number_format($standing['allowance']).' unused, '.$standing['months_left'].' of '.$standing['months_total'].' months not begun');
+    foreach ($stripe->subscriptions->all(['customer' => $customer, 'status' => 'active', 'limit' => 1])->data as $sub) {
+        $paid = $unused->paidOnCard($sub);
+        $line('Paid for the period running now', $paid ? $money($paid['minor'], $paid['currency']) : 'no paid invoice found for it: nothing would come back');
+        if ($paid) {
+            $line('Money back on a move up', $money(\App\Services\Billing\UnusedCredits::worth($paid['minor'], $standing), $paid['currency']).', and the new plan starts with its full credits');
+        }
+    }
+}
 
 echo "\n== Invoices (newest first), line by line ==\n";
 foreach ($stripe->invoices->all(['customer' => $customer, 'limit' => 6])->data as $invoice) {
