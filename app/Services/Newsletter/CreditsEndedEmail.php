@@ -26,8 +26,8 @@ use RuntimeException;
 /**
  * The email a member on a paid plan gets when the period's credits run out,
  * wherever they ran out: the studio, the browser extension or the developer
- * API. It says when the plan's credits renew, and its button opens the studio
- * with the extra-credits dialog (App\Services\Billing\ExtraCredits).
+ * API. It says when the plan's credits renew, and its button opens the billing
+ * page with the extra-credits dialog (App\Services\Billing\ExtraCredits).
  *
  * Once for each credit period (usage_counters.credits_ended_email_at), and again
  * only after extra credits were added and those ran out too. Only members who
@@ -583,10 +583,12 @@ class CreditsEndedEmail
         return app(NewsletterRenderer::class)->html($newsletter, Newsletter::LANGUAGE_BOTH, ['preview' => true, 'no_greeting' => true]);
     }
 
-    /** Where the email's button leads: the studio, with the extra-credits dialog open. */
+    /** Where the email's button leads: the billing page, with the extra-credits dialog open. */
     public static function addCreditsUrl(string $lang): string
     {
-        return rtrim((string) config('app.url', ''), '/').'/'.$lang.'/dashboard?extra_credits=1';
+        // The billing page with the extra-credits window: on a phone with the Android or iPhone app,
+        // a /dashboard link opens the app, where nothing can be paid; /billing stays in the browser.
+        return rtrim((string) config('app.url', ''), '/').'/'.$lang.'/billing?extra_credits=1';
     }
 
     /**

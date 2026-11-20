@@ -11,6 +11,7 @@ use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\CardDecline;
+use App\Services\Billing\ExtraCredits;
 use App\Services\Billing\PlanChanges;
 use App\Services\Billing\RenewalGrace;
 use App\Services\Billing\SavedPaymentMethodRecorder;
@@ -91,6 +92,10 @@ class BillingController extends Controller
         $overdueNotice = $this->overdueRenewalNotice($user);
 
         return view('billing', [
+            // The extra-credits window, opened by ?extra_credits=1: the address the credits-ended email
+            // and the Android app send members to. Neither app opens /billing itself (unlike /dashboard),
+            // so on a phone it stays in the browser, where it can be paid.
+            'canBuyExtraCredits' => app(ExtraCredits::class)->status((int) $user->id) === ExtraCredits::STATUS_OK,
             'activePlan' => $activePlan,
             'currentPlanSlug' => (string) ($activePlan?->slug ?? 'free'),
             'activeTierLabel' => VoiceTier::label((string) ($activePlan?->voice_tier ?: 'standard')),

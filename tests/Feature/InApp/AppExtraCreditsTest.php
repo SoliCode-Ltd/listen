@@ -5,6 +5,7 @@ namespace Tests\Feature\InApp;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\Billing\ExtraCredits;
+use App\Services\Newsletter\CreditsEndedEmail;
 use App\Support\CreditPeriod;
 
 /**
@@ -69,16 +70,18 @@ class AppExtraCreditsTest extends InAppTestCase
         $url = (string) $reply->json('url');
         $this->assertStringContainsString('/app/continue?', $url);
         parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
-        $this->assertSame('/en/dashboard?extra_credits=1', $query['to']);
+        $this->assertSame('/en/billing?extra_credits=1', $query['to']);
 
-        // The phone's browser, not signed in yet: the link signs the member in and opens the studio
-        // with the extra-credits window, where the card or a transfer pays.
+        // The phone's browser, not signed in yet: the link signs the member in and opens the billing
+        // page with the extra-credits window, where the card or a transfer pays. Not the studio: the
+        // app opens /dashboard links itself, so the browser would hand the studio straight back.
         $this->app['auth']->forgetGuards();
         $this->flushSession();
         $this->flushHeaders()->withHeader('User-Agent', self::BROWSER_UA);
-        $this->get($url)->assertRedirect(url('/en/dashboard?extra_credits=1'));
+        $this->get($url)->assertRedirect(url('/en/billing?extra_credits=1'));
         $this->assertAuthenticatedAs($member);
-        $this->inBrowser($member)->page('dashboard')->assertOk()->assertSee('id="xcDialog"', false)->assertDontSee('id="xcaDialog"', false);
+        $this->inBrowser($member)->page('billing.page')->assertOk()->assertSee('id="xcDialog"', false)->assertDontSee('id="xcaDialog"', false);
+        $this->assertNotAppLink('/en/billing');
 
         // The link works once.
         $this->app['auth']->forgetGuards();
@@ -113,7 +116,52 @@ class AppExtraCreditsTest extends InAppTestCase
 
         $this->inBrowser($member)->page('dashboard')->assertOk()
             ->assertSee('id="xcDialog"', false)->assertDontSee('id="xcaDialog"', false);
-        $this->inBrowser($member)->page('app.extra-credits')->assertRedirect(url('/en/dashboard?extra_credits=1'));
+        $this->inBrowser($member)->page('app.extra-credits')->assertRedirect(url('/en/billing?extra_credits=1'));
+    }
+
+    /**
+     * Where the browser is sent must be a page neither app opens itself (App Links on Android,
+     * Universal Links on iPhone): the studio is one, so the browser handed it back to the app and
+     * the app asked again, round and round.
+     */
+    public function test_the_browser_is_sent_to_a_page_no_app_opens_itself(): void
+    {
+        // The check itself sees the studio as the apps' own (that was the loop).
+        $this->assertSame('android', $this->appThatOpens('/ar/dashboard'));
+        $this->assertNotAppLink('/en/billing');
+        $this->assertNotAppLink('/ar/billing');
+        $this->assertStringContainsString('/billing?extra_credits=1', CreditsEndedEmail::addCreditsUrl('ar'));
+        $this->assertNotAppLink((string) parse_url(CreditsEndedEmail::addCreditsUrl('en'), PHP_URL_PATH));
+    }
+
+    /** A path that neither the Android app's manifest nor the iPhone app's association file claims. */
+    private function assertNotAppLink(string $path): void
+    {
+        $this->assertNull($this->appThatOpens($path), "An app opens $path itself.");
+    }
+
+    /** Which app opens this path itself ("android" or "iphone"), or null. */
+    private function appThatOpens(string $path): ?string
+    {
+        $manifest = (string) file_get_contents(base_path('mobile/android/app/src/main/AndroidManifest.xml'));
+        preg_match_all('#android:(path|pathPrefix)="([^"]+)"#', $manifest, $m, PREG_SET_ORDER);
+        $this->assertNotEmpty($m);
+        foreach ($m as [, $kind, $claimed]) {
+            if ($kind === 'path' ? $path === $claimed : str_starts_with($path, $claimed)) {
+                return 'android';
+            }
+        }
+
+        config(['services.apns.team_id' => 'ABCDE12345', 'services.apns.bundle_id' => 'studio.listenai.app']);
+        $components = (array) $this->get('/.well-known/apple-app-site-association')->json('applinks.details.0.components');
+        $this->assertNotEmpty($components);
+        foreach ($components as $component) {
+            if (preg_match('#^'.str_replace('\\*', '.*', preg_quote((string) $component['/'], '#')).'$#', $path) === 1) {
+                return 'iphone';
+            }
+        }
+
+        return null;
     }
 
     public function test_a_member_who_cannot_buy_extra_credits_gets_no_popup(): void

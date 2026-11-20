@@ -59,8 +59,8 @@ class CreditsEndedEmailTest extends TestCase
 
             return $mail->hasTo($user->email)
                 && str_contains($mail->subjectLine, 'Creator')
-                && str_contains($html, '/en/dashboard?extra_credits=1')
-                && str_contains($html, '/ar/dashboard?extra_credits=1')
+                && str_contains($html, '/en/billing?extra_credits=1')
+                && str_contains($html, '/ar/billing?extra_credits=1')
                 && str_contains($html, 'Add credits')
                 && str_contains($html, 'أضف رصيداً')
                 // The day the plan's credits renew.
