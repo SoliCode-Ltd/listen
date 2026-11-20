@@ -24,3 +24,9 @@ app/Filament/Resources/SourceAccountResource/Pages/ViewSourceAccount.php
 # every file in its folder.
 app/Filament/Resources/SavedPaymentMethodResource/Pages/ListSavedPaymentMethods.php
 app/Filament/Resources/SavedPaymentMethodResource/Pages/ViewSavedPaymentMethod.php
+
+# The separate "Where members come from" admin tab, replaced on 21 November 2026 by its section on
+# the dashboard (and in the business PDF and Excel file). Filament finds every page in its folder,
+# and this one no longer matches the report it reads.
+app/Filament/Pages/MemberSources.php
+resources/views/filament/pages/member-sources.blade.php
