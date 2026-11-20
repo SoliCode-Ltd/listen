@@ -123,6 +123,12 @@ name: Server deploy
 #            about links that failed to send (addresses masked), and for one
 #            member (input "member": an email or a member id) how they signed
 #            up and whether free use waits for them. Prints member ids only.
+#   member-audio-check: read-only. For one member (input "member", their id):
+#            the account's state, how many voices it made and by which way in,
+#            what the wording rule refused for it, how many of its texts
+#            today's rule would refuse, and the words it used most (words and
+#            counts only, never a text). For finding out how a member's voices
+#            got past the wording rule (scripts/support/member_audio_check.php).
 #   page-check: staging only. Shows the pages members use inside the app,
 #            in English and Arabic, as a free and a paying test member, and
 #            fails on an error, a wrong status or text shown as its key
@@ -232,7 +238,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
         default: inspect
       customer:
         description: "billing-trace and chatgpt-ads-check: the Stripe customer id (cus_...)"
@@ -243,7 +249,7 @@ on:
         type: string
         default: ""
       member:
-        description: "email-check, demo-links, join-check and speed-check: a member's email or member id"
+        description: "email-check, member-audio-check, demo-links, join-check and speed-check: a member's email or member id"
         type: string
         default: ""
       dub:
@@ -608,6 +614,13 @@ jobs:
             tool email_check.php | $S "$FIND; MEMBER='$MEMBER' php"
             rm -f ~/.ssh/id_deploy
             exit 0
+          fi
+          if [ "$MODE" = member-audio-check ]; then
+            printf '%s' "$MEMBER" | grep -qE '^[0-9]+$' || { echo "member must be a member id"; exit 1; }
+            failed=0
+            tool member_audio_check.php | $S "$FIND; MEMBER='$MEMBER' php" || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
           fi
           if [ "$MODE" = page-check ]; then
             [ "$TARGET" = staging ] || { echo "page-check runs on staging only"; exit 1; }
