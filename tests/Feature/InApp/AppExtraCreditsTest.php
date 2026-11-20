@@ -110,6 +110,13 @@ class AppExtraCreditsTest extends InAppTestCase
         $this->as($member, 'en', self::IPHONE_APP_UA)->page('app.extra-credits')->assertRedirect(route('app.plan'));
     }
 
+    public function test_a_tap_outside_the_popup_never_closes_it(): void
+    {
+        $this->inApp($this->memberOutOfCredits())->page('dashboard')->assertOk()
+            ->assertSee("if (event.target.closest('[data-xca-close]')) close();", false)
+            ->assertDontSee('event.target === dialog ||', false);
+    }
+
     public function test_a_browser_keeps_the_websites_own_window(): void
     {
         $member = $this->memberOutOfCredits();

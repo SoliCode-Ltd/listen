@@ -836,8 +836,9 @@
 
     dialog.querySelectorAll('[data-xc-back]').forEach((b) => b.addEventListener('click', () => show('buy', -1)));
     dialog.querySelectorAll('[data-xc-close]').forEach((b) => b.addEventListener('click', () => close()));
+    // Closed only on purpose: the close button, "Not now", Esc or the phone's back gesture.
+    // A tap outside the window does nothing, so a stray touch never loses the member's choice.
     dialog.addEventListener('cancel', (event) => { event.preventDefault(); close(); });
-    dialog.addEventListener('click', (event) => { if (event.target === dialog) close(); });
 
     function close() {
       if (!dialog.open || inFlight || dialog.classList.contains('is-closing')) return;

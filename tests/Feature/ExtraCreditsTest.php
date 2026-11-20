@@ -571,6 +571,20 @@ class ExtraCreditsTest extends TestCase
         $studio()->assertSee('id="xcDialog"', false)->assertDontSee('data-auto-open', false);
     }
 
+    public function test_a_tap_outside_the_window_never_closes_it(): void
+    {
+        // A stray touch beside the window lost the member's choice: only the close button,
+        // "Not now", Esc or the phone's back gesture close it.
+        $page = $this->actingAs($this->member())->withoutMiddleware([
+            LocaleSessionRedirect::class,
+            LaravelLocalizationRedirectFilter::class,
+        ])->get($this->localizedRoute('dashboard'))->assertOk();
+
+        $page->assertSee("dialog.querySelectorAll('[data-xc-close]').forEach((b) => b.addEventListener('click', () => close()));", false)
+            ->assertSee("dialog.addEventListener('cancel', (event) => { event.preventDefault(); close(); });", false)
+            ->assertDontSee('if (event.target === dialog) close();', false);
+    }
+
     public function test_a_transfer_method_is_offered_only_with_somewhere_to_pay(): void
     {
         Storage::fake('local');
