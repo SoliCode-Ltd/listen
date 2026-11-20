@@ -625,7 +625,8 @@ jobs:
             exit 0
           fi
           if [ "$MODE" = content-check ]; then
-            printf '%s' "$MEMBER" | grep -qE '^([0-9]+|sample:[0-9]{1,4})?$' || { echo "member must be empty, a member id, or sample:N"; exit 1; }
+            # Empty is the written examples; grep is not asked then (it matches lines, and nothing has none).
+            [ -z "$MEMBER" ] || printf '%s' "$MEMBER" | grep -qE '^([0-9]+|sample:[0-9]{1,4})$' || { echo "member must be empty, a member id, or sample:N"; exit 1; }
             failed=0
             tool content_check_probe.php | $S "$FIND; MEMBER='$MEMBER' nice php" || failed=1
             rm -f ~/.ssh/id_deploy
