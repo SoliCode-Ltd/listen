@@ -45,6 +45,7 @@ use App\Services\Billing\StripePackGateway;
 use App\Services\PlanAccessService;
 use App\Support\CreditPeriod;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Cashier;
 
@@ -59,6 +60,12 @@ if (! is_file($root.'/artisan')) {
 require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
+
+// An error anywhere stops the check as FAILED (left to Laravel, it would be shown and the run would still pass).
+set_exception_handler(function (Throwable $e): void {
+    fwrite(STDERR, 'The check stopped on an error: '.$e::class.': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().")\nFAILED\n");
+    exit(1);
+});
 
 if (str_contains(strtolower((string) config('app.url')), 'listenai.studio')) {
     fwrite(STDERR, "This is the live site: the payment test runs on staging only.\n");
@@ -152,11 +159,12 @@ $user = User::withoutEvents(fn () => User::query()->firstOrCreate(
     ['name' => 'Staging extra credits', 'password' => bcrypt(Str::random(40))],
 ));
 $hash = trim((string) getenv('MEMBER_PASSWORD_HASH'));
-$fields = ['email_verified_at' => now(), 'subscription_status_checked_at' => now()];
+User::withoutEvents(fn () => $user->forceFill(['email_verified_at' => now(), 'subscription_status_checked_at' => now()])->save());
 if (preg_match('/^\$2y\$\d{2}\$[A-Za-z0-9.\/]{53}$/', $hash) === 1) {
-    $fields['password'] = $hash;
+    // Written as it is: the model would hash it again, or refuse a hash made with other settings.
+    DB::table('users')->where('id', $user->id)->update(['password' => $hash]);
+    $user->refresh();
 }
-User::withoutEvents(fn () => $user->forceFill($fields)->save());
 CharPackPurchase::query()->where('user_id', $user->id)->delete();
 UsageCounter::query()->where('user_id', $user->id)->delete();
 $start = now()->subDays(6);
