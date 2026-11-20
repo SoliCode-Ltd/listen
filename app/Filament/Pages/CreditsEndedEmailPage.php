@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Resources\UserResource;
 use App\Models\Plan;
 use App\Models\UsageCounter;
 use App\Models\User;
@@ -22,12 +23,14 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\HtmlString;
 use Throwable;
 
 /**
  * Newsletter → Credits ended: the email a paid member gets when their credits
- * run out, its words, a preview, a test send and who got it lately.
+ * run out, its words, a preview, a test send, every member who is out of credits
+ * now with whether it went to them, and who got it lately.
  */
 class CreditsEndedEmailPage extends Page implements HasForms
 {
@@ -99,6 +102,9 @@ class CreditsEndedEmailPage extends Page implements HasForms
                         Placeholder::make('backfill')
                             ->hiddenLabel()
                             ->content(fn (): HtmlString => $this->backfillStatus()),
+                        Placeholder::make('ran_out')
+                            ->hiddenLabel()
+                            ->content(fn (): HtmlString => $this->ranOutTable()),
                     ]),
                 Section::make('Sent lately')
                     ->description('Members this email went to in the last 30 days.')
@@ -134,6 +140,7 @@ class CreditsEndedEmailPage extends Page implements HasForms
                     $email = app(CreditsEndedEmail::class);
                     $count = $email->startBackfill((int) auth()->id());
                     $this->alreadyOutCount = null;
+                    Cache::forget(self::RAN_OUT_CACHE);
                     if ($count === 0) {
                         Notification::make()->title('Nothing was sent')->body($email->backfillBlocker() ?? 'No member is waiting for this email now.')->warning()->send();
 
@@ -157,6 +164,7 @@ class CreditsEndedEmailPage extends Page implements HasForms
                 ->modalSubmitActionLabel('Stop sending')
                 ->action(function (): void {
                     app(CreditsEndedEmail::class)->stopBackfill();
+                    Cache::forget(self::RAN_OUT_CACHE);
                     Notification::make()->title('Stopped')->success()->send();
                 }),
             Action::make('preview')
@@ -286,6 +294,77 @@ class CreditsEndedEmailPage extends Page implements HasForms
 
         return new HtmlString(e(($state['stopped'] ? 'Stopped on ' : 'Finished on ').$when($state['finished_at']).': '.$line.'.')
             .'<br><span style="opacity:.7">"Left out" are members who renewed, bought credits or got it on their own meanwhile, or whose address refused it three times.</span>');
+    }
+
+    /** The list below is worked out from every member on a paid plan, so it is kept for a minute. */
+    private const RAN_OUT_CACHE = 'credits_ended:ran_out_list';
+
+    private const RAN_OUT_SHOWN = 200;
+
+    /**
+     * Every member on a paid plan who is out of credits now, and whether this email went
+     * to them for their current credit period (CreditsEndedEmail::ranOutMembers).
+     */
+    private function ranOutTable(): HtmlString
+    {
+        if (! ExtraCredits::ready()) {
+            return new HtmlString('Run the migrations first.');
+        }
+
+        $sending = $this->backfillRunning();
+        // Fresh while a send is going, so each row changes as its email leaves.
+        $rows = Cache::remember(self::RAN_OUT_CACHE, $sending ? 15 : 60, fn (): array => app(CreditsEndedEmail::class)->ranOutMembers());
+        if ($rows === []) {
+            return new HtmlString('<div style="margin-top:6px;opacity:.75">No member on a paid plan is out of credits right now.</div>');
+        }
+
+        $count = array_count_values(array_column($rows, 'state'));
+        $n = fn (string $state): int => (int) ($count[$state] ?? 0);
+        $parts = array_filter([
+            $n(CreditsEndedEmail::MAIL_SENT) > 0 ? number_format($n(CreditsEndedEmail::MAIL_SENT)).' sent' : null,
+            $n(CreditsEndedEmail::MAIL_WAITING) > 0 ? number_format($n(CreditsEndedEmail::MAIL_WAITING)).' waiting in line' : null,
+            $n(CreditsEndedEmail::MAIL_NOT_SENT) > 0 ? number_format($n(CreditsEndedEmail::MAIL_NOT_SENT)).' not sent yet' : null,
+            $n(CreditsEndedEmail::MAIL_HELD) > 0 ? number_format($n(CreditsEndedEmail::MAIL_HELD)).' held back' : null,
+        ]);
+        $total = count($rows);
+        $summary = number_format($total).' '.($total === 1 ? 'member on a paid plan is' : 'members on a paid plan are').' out of credits now: '.implode(', ', $parts).'.';
+
+        $badge = fn (string $text, string $colour): string => '<span style="display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;'.$colour.'">'.e($text).'</span>';
+        $cell = 'padding:9px 12px;border-bottom:1px solid rgba(128,128,128,0.18);vertical-align:top;';
+        $body = '';
+        foreach (array_slice($rows, 0, self::RAN_OUT_SHOWN) as $row) {
+            $status = match ($row['state']) {
+                CreditsEndedEmail::MAIL_SENT => $badge('Sent', 'background:rgba(18,128,79,.14);color:#12804F;')
+                    .'<div style="font-size:12px;opacity:.7;margin-top:3px">'.e($row['sent_at'] ? Carbon::parse($row['sent_at'])->utc()->format('j M Y, H:i').' UTC' : '').'</div>',
+                CreditsEndedEmail::MAIL_WAITING => $badge('Waiting in line', 'background:rgba(118,89,250,.14);color:#7659FA;'),
+                CreditsEndedEmail::MAIL_NOT_SENT => $badge('Not sent yet', 'background:rgba(232,154,26,.18);color:#B26A00;')
+                    .'<div style="font-size:12px;opacity:.7;margin-top:3px">'.($sending ? 'Ran out after this send began' : 'Use the button at the top').'</div>',
+                default => $badge('Held back', 'background:rgba(128,128,128,.18);color:inherit;')
+                    .'<div style="font-size:12px;opacity:.7;margin-top:3px">'.e(ucfirst($row['why'])).'</div>',
+            };
+            $member = '<a href="'.e(UserResource::getUrl('view', ['record' => $row['user_id']])).'" style="font-weight:600;text-decoration:underline;text-underline-offset:2px">'.e($row['email'] !== '' ? $row['email'] : 'Member '.$row['user_id']).'</a>'
+                .(filled($row['name']) ? '<div style="font-size:12px;opacity:.7;margin-top:3px">'.e($row['name']).'</div>' : '');
+            $body .= '<tr>'
+                .'<td style="'.$cell.'">'.$member.'</td>'
+                .'<td style="'.$cell.'">'.e($row['plan'] !== '' ? $row['plan'] : '—').'</td>'
+                .'<td style="'.$cell.'white-space:nowrap">'.e($row['renews_at'] ? Carbon::parse($row['renews_at'])->format('j M Y') : '—').'</td>'
+                .'<td style="'.$cell.'">'.$status.'</td>'
+                .'</tr>';
+        }
+        $head = 'padding:8px 12px;text-align:start;font-weight:600;';
+
+        return new HtmlString('<div'.($sending ? ' wire:poll.20s' : '').' style="margin-top:10px">'
+            .'<div style="font-weight:600;margin-bottom:8px">'.e($summary).'</div>'
+            .'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:14px;">'
+            .'<thead><tr style="background:rgba(128,128,128,0.10);">'
+            .'<th style="'.$head.'">Member</th>'
+            .'<th style="'.$head.'">Plan</th>'
+            .'<th style="'.$head.'">Credits renew</th>'
+            .'<th style="'.$head.'">This email</th>'
+            .'</tr></thead><tbody>'.$body.'</tbody></table></div>'
+            .($total > self::RAN_OUT_SHOWN ? '<div style="font-size:12px;opacity:.7;margin-top:8px">The first '.self::RAN_OUT_SHOWN.' of '.number_format($total).' are shown.</div>' : '')
+            .'<div style="font-size:12px;opacity:.7;margin-top:8px">Members who added extra credits or whose credits renewed since are no longer out, so they are not in this list: those who were sent the email are under "Sent lately" below. The list is worked out again every minute.</div>'
+            .'</div>');
     }
 
     private function sentTable(): HtmlString|string

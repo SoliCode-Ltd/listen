@@ -4,7 +4,7 @@
      site's domain is registered there; where neither can be used the box stays hidden and
      the card boxes work as before. The wallet hands over a card, so a page pays with it the same
      way as with the card boxes. A page makes it with
-     ListenWalletButton(stripe, id, { mode, amount, billingDetails, onConfirm, onOpen, onCancel, sideBySide }) and
+     ListenWalletButton(stripe, id, { mode, amount, billingDetails, onConfirm, onOpen, onCancel, sideBySide, amountDelay }) and
      shows it with .show(true) when paying by card is the choice. In 'setup' mode it only
      hands over a card for later (a free trial, the card that renews a plan), with no
      amount; .setMode(mode, amount) moves it between paying today and that. --}}
@@ -36,6 +36,9 @@
     .wallet-button.is-split { display: flex; gap: 12px; }
     .wallet-button.is-split .wallet-cell { flex: 1 1 0; min-width: 0; }
     .wallet-button.is-split .wallet-cell[hidden] { display: none; }
+    /* A new amount is on its way to the wallets (amountDelay): they wait for it, so one never
+       opens showing the amount before. */
+    .wallet-pay.is-updating .wallet-button { pointer-events: none; }
     @keyframes wallet-wait { 50% { opacity: .55; } }
     @keyframes wallet-in { from { opacity: 0; } }
     @media (prefers-reduced-motion: reduce) {
@@ -120,10 +123,15 @@
       var wanted = false;
       var waiting = remembered > 0;
       var timedOut = false;
+      // amountDelay (the extra-credits dialog, where the amount changes with every tile the
+      // member taps): Stripe redraws its buttons when it is told a new amount, so the row keeps
+      // the height it settled at, and nothing around it moves while they are redrawn.
+      var delay = Math.max(0, Number(options.amountDelay) || 0);
       var paint = function () {
         box.hidden = !(wanted && (ready || waiting));
         box.classList.toggle('is-loading', waiting && !ready);
         box.classList.toggle('is-ready', ready);
+        if (delay && ready && !box.hidden && holder.offsetHeight > 0) holder.style.minHeight = holder.offsetHeight + 'px';
       };
       var remember = function (count) {
         try {
@@ -188,9 +196,25 @@
         shown = { mode: next, amount: cents };
         if (orText) orText.textContent = next === 'setup' ? orText.dataset.setup : orText.dataset.pay;
       };
+      // With amountDelay the wallets are told the amount once the member has stopped choosing
+      // (a tap on each tile in turn tells them once, not five times), a moment after the tile's
+      // own move has finished. Until then the buttons do not take a tap.
+      var timer = null;
+      var setAmount = function (amount) {
+        var next = shown.mode === 'setup' ? 'subscription' : shown.mode;
+        var apply = function () {
+          timer = null;
+          box.classList.remove('is-updating');
+          setMode(next, amount);
+        };
+        if (timer) { window.clearTimeout(timer); timer = null; }
+        if (!delay || (next === shown.mode && Math.round(Number(amount)) === shown.amount)) return apply();
+        box.classList.add('is-updating');
+        timer = window.setTimeout(apply, delay);
+      };
       return {
         show: function (on) { wanted = Boolean(on); paint(); },
-        setAmount: function (amount) { setMode(shown.mode === 'setup' ? 'subscription' : shown.mode, amount); },
+        setAmount: setAmount,
         setMode: setMode,
       };
     };

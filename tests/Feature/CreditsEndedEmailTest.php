@@ -300,6 +300,68 @@ class CreditsEndedEmailTest extends TestCase
         Mail::assertNotSent(CreditsEndedMail::class);
     }
 
+    public function test_the_admin_sees_every_member_who_is_out_and_whether_the_email_went_to_each(): void
+    {
+        $plan = $this->apiPlan();
+        $member = function (string $email, int $used, array $counter = []) use ($plan): User {
+            $user = $this->apiMember($plan, ['email' => $email]);
+            CreditPeriod::counter($user->id)->update(['total_chars' => $used] + $counter);
+
+            return $user;
+        };
+        $sent = $member('sent@example.test', 90000, ['credits_ended_email_at' => now()->subHours(3)]);
+        $notSent = $member('not-sent@example.test', 90000);
+        $overdue = $member('overdue@example.test', 90000);
+        Subscription::query()->where('user_id', $overdue->id)->update(['billing_payment_state' => 'past_due', 'billing_grace_ends_at' => now()->addDays(5)]);
+        $member('plenty@example.test', 1000);
+        $this->apiMember($plan, ['email' => 'unused@example.test']);
+
+        $email = app(CreditsEndedEmail::class);
+        $states = collect($email->ranOutMembers())->pluck('state', 'email')->all();
+        $this->assertSame([
+            'not-sent@example.test' => CreditsEndedEmail::MAIL_NOT_SENT,
+            'overdue@example.test' => CreditsEndedEmail::MAIL_HELD,
+            'sent@example.test' => CreditsEndedEmail::MAIL_SENT,
+        ], $states, 'what needs the owner first; members with credits left are not listed');
+        $this->assertSame(0, UsageCounter::query()->whereIn('user_id', User::query()->where('email', 'unused@example.test')->pluck('id'))->count(), 'listing makes no usage rows');
+
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(CreditsEndedEmailPage::class)
+            ->assertSee('3 members on a paid plan are out of credits now: 1 sent, 1 not sent yet, 1 held back.')
+            ->assertSee('sent@example.test')
+            ->assertSee('not-sent@example.test')
+            ->assertSee('overdue@example.test')
+            ->assertSee('Their renewal payment is overdue')
+            ->assertDontSee('plenty@example.test')
+            ->assertDontSee('unused@example.test');
+
+        // Once the send starts, the one it can go to waits in line; the one held back stays held back.
+        $this->assertSame(1, $email->startBackfill());
+        $states = collect($email->ranOutMembers())->pluck('state', 'email')->all();
+        $this->assertSame(CreditsEndedEmail::MAIL_WAITING, $states['not-sent@example.test']);
+        $this->assertSame(CreditsEndedEmail::MAIL_HELD, $states['overdue@example.test']);
+
+        // And once it has gone, the list says so.
+        $this->artisan('listen:credits-ended-backfill')->assertSuccessful();
+        $rows = collect($email->ranOutMembers())->keyBy('email');
+        $this->assertSame(CreditsEndedEmail::MAIL_SENT, $rows['not-sent@example.test']['state']);
+        $this->assertNotNull($rows['not-sent@example.test']['sent_at']);
+        Mail::assertSent(CreditsEndedMail::class, fn (CreditsEndedMail $mail): bool => $mail->hasTo($notSent->email));
+        Mail::assertNotSent(CreditsEndedMail::class, fn (CreditsEndedMail $mail): bool => $mail->hasTo($sent->email));
+    }
+
+    public function test_the_list_says_why_when_nothing_can_be_sent_at_all(): void
+    {
+        $member = $this->apiMember($this->apiPlan(), ['email' => 'out@example.test']);
+        CreditPeriod::counter($member->id)->update(['total_chars' => 90000]);
+        app(CreditsEndedEmail::class)->save(['enabled' => false]);
+
+        $row = app(CreditsEndedEmail::class)->ranOutMembers()[0];
+
+        $this->assertSame([CreditsEndedEmail::MAIL_HELD, 'the email is switched off'], [$row['state'], $row['why']]);
+    }
+
     public function test_the_admin_edits_its_words_and_sends_a_test(): void
     {
         $admin = User::factory()->create(['is_admin' => true, 'email' => 'owner@example.test']);
