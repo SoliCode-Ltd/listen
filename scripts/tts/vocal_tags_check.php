@@ -31,6 +31,12 @@ require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
+// An error anywhere stops the check as FAILED (left to Laravel, it would be shown and the run would still pass).
+set_exception_handler(function (Throwable $e): void {
+    fwrite(STDERR, 'The check stopped on an error: '.$e::class.': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().")\nFAILED\n");
+    exit(1);
+});
+
 // The code under test, sent by the workflow as a file of its own (LISTEN_UNDER_TEST), loaded once the app is up.
 $underTest = (string) getenv('LISTEN_UNDER_TEST');
 if ($underTest === '' || ! is_file($underTest) || ! str_contains((string) file_get_contents($underTest), 'namespace ListenUnderTest;')) {

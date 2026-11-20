@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Tests\TestCase;
 
@@ -12,7 +13,9 @@ use Tests\TestCase;
  * every support script a mode sends to the server must exist. And a script
  * that stops on an error must fail the run: once Laravel has started, its own
  * handler shows an uncaught error and PHP still ends with 0, so the step
- * would pass. Each script takes over right after starting Laravel.
+ * would pass. Each script takes over right after starting Laravel: those in
+ * scripts/support/ and those the other workflows send from scripts/tts/,
+ * scripts/api/, scripts/stats/ and the rest.
  */
 class ServerDeployWorkflowTest extends TestCase
 {
@@ -78,30 +81,43 @@ class ServerDeployWorkflowTest extends TestCase
         }
     }
 
-    public function test_every_support_script_that_starts_laravel_fails_the_run_when_it_stops_on_an_error(): void
+    public function test_every_script_that_starts_laravel_fails_the_run_when_it_stops_on_an_error(): void
     {
-        $starting = array_filter(
-            glob(base_path('scripts/support/*.php')),
-            static fn (string $path): bool => str_contains((string) file_get_contents($path), '->bootstrap();'),
-        );
+        $starting = [];
+        foreach (File::allFiles(base_path('scripts')) as $file) {
+            if ($file->getExtension() === 'php' && str_contains($file->getContents(), '->bootstrap();')) {
+                $starting['scripts/'.str_replace('\\', '/', $file->getRelativePathname())] = $file->getContents();
+            }
+        }
 
-        $this->assertNotEmpty($starting);
-        foreach ($starting as $path) {
-            $this->assertTrue(self::everyStartIsFollowedByTheHandler((string) file_get_contents($path)),
-                'scripts/support/'.basename($path).' starts Laravel: right after ->bootstrap(); it needs the set_exception_handler lines the other support scripts have, or an error in it would not fail the run.');
+        // Every folder is looked at, not scripts/support/ alone.
+        $this->assertArrayHasKey('scripts/support/data_checks.php', $starting);
+        $this->assertArrayHasKey('scripts/stats/saas_stats.php', $starting);
+        $this->assertArrayHasKey('scripts/tts/long_form_record.php', $starting);
+        foreach ($starting as $path => $code) {
+            $this->assertTrue(self::everyStartIsFollowedByTheHandler($code),
+                $path.' starts Laravel: right after ->bootstrap(); it needs the set_exception_handler lines the other scripts have, or an error in it would not fail the run.');
         }
     }
 
-    public function test_the_php_written_in_the_workflow_fails_the_run_when_it_stops_on_an_error(): void
+    public function test_the_php_written_in_a_workflow_fails_the_run_when_it_stops_on_an_error(): void
     {
-        $scripts = implode("\n", self::runScripts((string) file_get_contents(base_path('.github/workflows/server-deploy.yml'))));
+        $withPhp = [];
+        foreach (glob(base_path('.github/workflows/*.yml')) as $path) {
+            $workflow = basename($path);
+            $scripts = implode("\n", self::runScripts((string) file_get_contents($path)));
 
-        // Sent on its own lines (a heredoc): the same handler as the support scripts.
-        $this->assertGreaterThan(0, preg_match_all('/->bootstrap\(\);$/m', $scripts));
-        $this->assertTrue(self::everyStartIsFollowedByTheHandler($scripts),
-            'PHP in server-deploy.yml starts Laravel without the set_exception_handler lines after ->bootstrap(); an error in it would not fail the run.');
-        // As the list of a "for", what PHP ends with is never looked at: read it into a variable first.
-        $this->assertDoesNotMatchRegularExpression('/^\s*for \w+ in [^\n]*\$\([^\n]*\bphp\b/m', $scripts);
+            // Sent on its own lines (a heredoc): the same handler as the scripts.
+            if (preg_match('/->bootstrap\(\);$/m', $scripts) === 1) {
+                $withPhp[] = $workflow;
+                $this->assertTrue(self::everyStartIsFollowedByTheHandler($scripts),
+                    'PHP in '.$workflow.' starts Laravel without the set_exception_handler lines after ->bootstrap(); an error in it would not fail the run.');
+            }
+            // As the list of a "for", what PHP ends with is never looked at: read it into a variable first.
+            $this->assertDoesNotMatchRegularExpression('/^\s*for \w+ in [^\n]*\$\([^\n]*\bphp\b/m', $scripts, $workflow);
+        }
+
+        $this->assertContains('server-deploy.yml', $withPhp);
     }
 
     public function test_the_handler_ends_php_with_an_error(): void

@@ -19,6 +19,12 @@ require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
+// An error anywhere stops the check as FAILED (left to Laravel, it would be shown and the run would still pass).
+set_exception_handler(function (Throwable $e): void {
+    fwrite(STDERR, 'The check stopped on an error: '.$e::class.': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().")\nFAILED\n");
+    exit(1);
+});
+
 $keys = app(GeminiKeyManager::class)->getAllKeys();
 $key = (string) (app(GeminiKeyManager::class)->getAvailableKey()['key'] ?? '');
 $base = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');

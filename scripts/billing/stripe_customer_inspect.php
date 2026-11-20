@@ -18,6 +18,12 @@ require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
+// An error anywhere stops the check as FAILED (left to Laravel, it would be shown and the run would still pass).
+set_exception_handler(function (Throwable $e): void {
+    fwrite(STDERR, 'The check stopped on an error: '.$e::class.': '.$e->getMessage().' ('.basename($e->getFile()).':'.$e->getLine().")\nFAILED\n");
+    exit(1);
+});
+
 $customer = '__CUSTOMER__';
 $secret = (string) config('services.stripe.secret');
 if (! preg_match('/^cus_[A-Za-z0-9]+$/', $customer) || $secret === '') {
