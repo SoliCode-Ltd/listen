@@ -95,44 +95,58 @@ class GeminiClient
     }
 
     /**
-     * A ruling on a text, answered as JSON: the text model at temperature 0, thinking as little
+     * The models that rule on a text, the quick one first. Measured on live (November 2026) on
+     * the same texts: gemini-3.6-flash, thinking as little as it can, rules in 1.3 to 1.9
+     * seconds; gemini-3.8-flash does not take that thinking level and needs 4 to 9 seconds.
+     */
+    public const JUDGE_MODELS = ['gemini-3.6-flash', 'gemini-3.8-flash'];
+
+    /**
+     * A ruling on a text, answered as JSON: a text model at temperature 0, thinking as little
      * as it can, with the provider's own filters off so it reads the text and rules on it rather
      * than turning the request away. Returns the reply text, and whether the provider would not
      * read the text at all (its own refusal, which is a ruling too); null when no model answered.
      *
+     * The first model is waited for half the time at most, so the second always has its turn:
+     * a slow first answer must never leave a text without a ruling.
+     *
      * @param  array<string, mixed>  $schema
      * @return array{text: ?string, blocked: bool, model: string}|null
      */
-    public function judge(string $system, string $content, array $schema, int $timeout = 14): ?array
+    public function judge(string $system, string $content, array $schema, int $timeout = 10): ?array
     {
-        $config = [
+        $base = [
             'temperature' => 0,
             'responseMimeType' => 'application/json',
             'responseSchema' => $schema,
-            'thinkingConfig' => ['thinkingLevel' => 'minimal'],
         ];
         $safety = array_map(
             static fn (string $category): array => ['category' => $category, 'threshold' => 'BLOCK_NONE'],
             ['HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_DANGEROUS_CONTENT'],
         );
         $deadline = microtime(true) + $timeout;
-        foreach (self::WRITER_MODELS as $model) {
-            $left = (int) floor($deadline - microtime(true));
-            if ($left < 3) {
+        $last = array_key_last(self::JUDGE_MODELS);
+        foreach (self::JUDGE_MODELS as $index => $model) {
+            if ($deadline - microtime(true) < 2) {
                 break;
             }
-            $ask = fn (array $config, int $seconds) => $this->post("/models/{$model}:generateContent", [
-                'systemInstruction' => ['parts' => [['text' => $system]]],
-                'contents' => [['role' => 'user', 'parts' => [['text' => $content]]]],
-                'generationConfig' => $config,
-                'safetySettings' => $safety,
-            ], $model, $seconds);
-            $response = $ask($config, $left);
-            // A model that does not take that thinking level is asked again with its own.
-            if ($response?->status() === 400 && str_contains(strtolower((string) $response->body()), 'thinking')) {
-                unset($config['thinkingConfig']);
-                $left = (int) floor($deadline - microtime(true));
-                $response = $left >= 3 ? $ask($config, $left) : null;
+            $until = $index === $last ? $deadline : min($deadline, microtime(true) + max(2, (int) ceil($timeout / 2)));
+            $response = null;
+            // The least thinking the model takes: one that refuses a level is asked with the next.
+            foreach (['minimal', 'low', null] as $thinking) {
+                $left = (int) floor($until - microtime(true));
+                if ($left < 2) {
+                    break;
+                }
+                $response = $this->post("/models/{$model}:generateContent", [
+                    'systemInstruction' => ['parts' => [['text' => $system]]],
+                    'contents' => [['role' => 'user', 'parts' => [['text' => $content]]]],
+                    'generationConfig' => $base + ($thinking !== null ? ['thinkingConfig' => ['thinkingLevel' => $thinking]] : []),
+                    'safetySettings' => $safety,
+                ], $model, $left);
+                if (! ($response?->status() === 400 && str_contains(strtolower((string) $response->body()), 'thinking'))) {
+                    break;
+                }
             }
             if (! $response?->successful()) {
                 continue;

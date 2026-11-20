@@ -142,10 +142,14 @@ if ($what === '') {
     $counts = [TextContentCheck::ALLOWED => 0, TextContentCheck::REFUSED => 0, TextContentCheck::UNCHECKED => 0];
     $refused = [];
     $ms = [];
+    $silent = [];
     foreach ($rows as $row) {
         $r = $ask($row->input_text, $row->style_prompt);
         $counts[$r['verdict']]++;
         $ms[] = $r['ms'];
+        if ($r['verdict'] === TextContentCheck::UNCHECKED && count($silent) < 8) {
+            $silent[] = $row;
+        }
         if ($r['verdict'] === TextContentCheck::REFUSED) {
             $refused[] = sprintf('    voice %d (%d characters): %s — %s', $row->id, mb_strlen((string) $row->input_text), $r['category'], $r['reason']);
         }
@@ -159,6 +163,87 @@ if ($what === '') {
     }
     if ($refused !== []) {
         echo "  Refused:\n".implode("\n", array_slice($refused, 0, 60))."\n";
+    }
+    // One member's texts, asked of the quick model directly (the request the check sends, built
+    // here, so it can be tried on a server before the code that asks it first is deployed).
+    if ($sample === null) {
+        echo "\n== The quick model on the same texts ==\n";
+        $instructions = (new ReflectionMethod(TextContentCheck::class, 'instructions'))->invoke(null);
+        $base = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
+        $model = 'gemini-3.6-flash';
+        $keys = array_values(array_filter(app(App\Services\Tts\GeminiKeyManager::class)->keysInOrder($model), fn ($k) => filled($k['key'] ?? null)));
+        $key = $keys[0]['key'] ?? trim((string) config('services.gemini_tts.api_key', ''));
+        $quick = ['refuse' => 0, 'allow' => 0, 'would not read it (a refusal)' => 0, 'no answer' => 0];
+        $times = [];
+        foreach ($rows as $row) {
+            $started = microtime(true);
+            try {
+                $response = Illuminate\Support\Facades\Http::timeout(5)->connectTimeout(5)
+                    ->withHeaders(['Content-Type' => 'application/json', 'x-goog-api-key' => $key])
+                    ->post($base."/models/{$model}:generateContent", [
+                        'systemInstruction' => ['parts' => [['text' => $instructions]]],
+                        'contents' => [['role' => 'user', 'parts' => [['text' => "The text between the two TEXT lines is what a customer asked a text-to-speech service to read aloud.\nTEXT\n".$row->input_text."\nTEXT\nRule on it."]]]],
+                        'generationConfig' => ['temperature' => 0, 'responseMimeType' => 'application/json', 'thinkingConfig' => ['thinkingLevel' => 'minimal']],
+                        'safetySettings' => array_map(fn ($c) => ['category' => $c, 'threshold' => 'BLOCK_NONE'], ['HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_DANGEROUS_CONTENT']),
+                    ]);
+                $json = (array) $response->json();
+                $text = '';
+                foreach ((array) data_get($json, 'candidates.0.content.parts', []) as $part) {
+                    $text .= is_array($part) && empty($part['thought']) ? (string) ($part['text'] ?? '') : '';
+                }
+                $verdict = (string) (json_decode($text, true)['verdict'] ?? '');
+                $blocked = filled(data_get($json, 'promptFeedback.blockReason')) || in_array((string) data_get($json, 'candidates.0.finishReason', ''), ['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST'], true);
+                $quick[$blocked ? 'would not read it (a refusal)' : (isset($quick[$verdict]) ? $verdict : 'no answer')]++;
+            } catch (Throwable) {
+                $quick['no answer']++;
+            }
+            $times[] = (int) round((microtime(true) - $started) * 1000);
+        }
+        foreach ($quick as $label => $n) {
+            $line($label, (string) $n);
+        }
+        sort($times);
+        if ($times !== []) {
+            $line('Time an answer took (middle / slowest)', $times[intdiv(count($times), 2)].' ms / '.end($times).' ms');
+        }
+    }
+    // What the text model itself answered for those that got no ruling: the same request,
+    // sent once to each model, with only its status and its own reasons printed (never the text).
+    if ($silent !== []) {
+        echo "\n== No ruling: what each model answered ==\n";
+        $instructions = (new ReflectionMethod(TextContentCheck::class, 'instructions'))->invoke(null);
+        $base = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
+        foreach ($silent as $row) {
+            foreach (App\Services\Agents\GeminiClient::WRITER_MODELS as $model) {
+                $keys = array_values(array_filter(app(App\Services\Tts\GeminiKeyManager::class)->keysInOrder($model), fn ($k) => filled($k['key'] ?? null)));
+                $key = $keys[0]['key'] ?? trim((string) config('services.gemini_tts.api_key', ''));
+                foreach (['minimal', null] as $thinking) {
+                    $started = microtime(true);
+                    try {
+                        $response = Illuminate\Support\Facades\Http::timeout(25)->connectTimeout(10)
+                            ->withHeaders(['Content-Type' => 'application/json', 'x-goog-api-key' => $key])
+                            ->post($base."/models/{$model}:generateContent", [
+                                'systemInstruction' => ['parts' => [['text' => $instructions]]],
+                                'contents' => [['role' => 'user', 'parts' => [['text' => "The text between the two TEXT lines is what a customer asked a text-to-speech service to read aloud.\nTEXT\n".$row->input_text."\nTEXT\nRule on it."]]]],
+                                'generationConfig' => ['temperature' => 0, 'responseMimeType' => 'application/json'] + ($thinking ? ['thinkingConfig' => ['thinkingLevel' => $thinking]] : []),
+                                'safetySettings' => array_map(fn ($c) => ['category' => $c, 'threshold' => 'BLOCK_NONE'], ['HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_DANGEROUS_CONTENT']),
+                            ]);
+                        $json = (array) $response->json();
+                        $text = '';
+                        foreach ((array) data_get($json, 'candidates.0.content.parts', []) as $part) {
+                            $text .= is_array($part) && empty($part['thought']) ? (string) ($part['text'] ?? '') : '';
+                        }
+                        printf("    voice %d  %-18s thinking %-8s HTTP %d  %5d ms  finish=%s  block=%s  candidates=%d  answer=%s  error=%s\n",
+                            $row->id, $model, $thinking ?? 'own', $response->status(), (int) round((microtime(true) - $started) * 1000),
+                            (string) data_get($json, 'candidates.0.finishReason', '-'), (string) data_get($json, 'promptFeedback.blockReason', '-'),
+                            count((array) ($json['candidates'] ?? [])), trim($text) === '' ? 'none' : mb_substr((string) (json_decode($text, true)['verdict'] ?? 'not a ruling'), 0, 20),
+                            mb_substr((string) data_get($json, 'error.message', '-'), 0, 110));
+                    } catch (Throwable $e) {
+                        printf("    voice %d  %-18s thinking %-8s no reply after %d ms: %s\n", $row->id, $model, $thinking ?? 'own', (int) round((microtime(true) - $started) * 1000), mb_substr($e->getMessage(), 0, 110));
+                    }
+                }
+            }
+        }
     }
     // A reading that got no answer is not a failure of the check: that voice is made and its
     // text read again later. Many of them would be: the reader is not answering.
