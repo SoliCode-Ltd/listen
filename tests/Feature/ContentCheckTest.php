@@ -36,6 +36,15 @@ class ContentCheckTest extends TestCase
 
     private string $readerSaw = '';
 
+    /** @var list<string> each request to the reader, as "model:thinking level" */
+    private array $readerAsked = [];
+
+    /** @var list<string> models that answer 503 */
+    private array $readerDown = [];
+
+    /** @var list<string> "model:level" pairs the model refuses, as the provider does for a level it does not take */
+    private array $readerNoThinking = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -172,6 +181,27 @@ class ContentCheckTest extends TestCase
         $this->assertSame(0, BlockedGeneration::query()->count());
     }
 
+    /**
+     * The quick model is asked first, and a model that does not answer (or does not take the
+     * thinking level) never leaves the text without a ruling: the next one is asked.
+     */
+    public function test_the_quick_model_rules_first_and_the_other_takes_over_when_it_does_not_answer(): void
+    {
+        $this->reader = 'refuse';
+        $check = app(TextContentCheck::class);
+
+        $this->assertSame(TextContentCheck::REFUSED, $check->check('One text.')['verdict']);
+        $this->assertSame(['gemini-3.6-flash:minimal'], $this->readerAsked);
+
+        // The quick model is down, and the other refuses the two lowest thinking levels.
+        $this->readerAsked = [];
+        $this->readerDown = ['gemini-3.6-flash'];
+        $this->readerNoThinking = ['gemini-3.8-flash:minimal', 'gemini-3.8-flash:low'];
+
+        $this->assertSame(TextContentCheck::REFUSED, $check->check('Another text.')['verdict']);
+        $this->assertSame(['gemini-3.6-flash:minimal', 'gemini-3.8-flash:minimal', 'gemini-3.8-flash:low', 'gemini-3.8-flash:own'], $this->readerAsked);
+    }
+
     public function test_an_answer_that_is_not_a_ruling_counts_as_not_read(): void
     {
         $this->reader = 'nonsense';
@@ -272,6 +302,15 @@ class ContentCheckTest extends TestCase
                 ]]]]]]]);
             }
             if (str_contains($url, 'generativelanguage.googleapis.com') && str_contains($url, ':generateContent')) {
+                preg_match('#/models/([^:]+):#', $url, $m);
+                $asked = ($m[1] ?? '?').':'.(data_get($request->data(), 'generationConfig.thinkingConfig.thinkingLevel') ?? 'own');
+                $this->readerAsked[] = $asked;
+                if (in_array($asked, $this->readerNoThinking, true)) {
+                    return Http::response(['error' => ['message' => 'Thinking level is not supported for this model.']], 400);
+                }
+                if (in_array($m[1] ?? '', $this->readerDown, true)) {
+                    return Http::response(['error' => ['message' => 'Unavailable.']], 503);
+                }
                 $this->readerCalls++;
                 $this->readerSaw = (string) data_get($request->data(), 'contents.0.parts.0.text');
                 // Its own filters are switched off, so it rules instead of turning the request away.
