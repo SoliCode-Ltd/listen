@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mcp\SpeechLinks;
 use App\Models\AudioGeneration;
+use App\Support\HiddenAudio;
 use App\Support\SignedLinks;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Exceptions\InvalidSignatureException;
@@ -22,7 +23,7 @@ class McpAudioController extends Controller
             throw new InvalidSignatureException;
         }
 
-        $made = AudioGeneration::query()->whereKey((int) $generation)->where('status', 'done')->first();
+        $made = HiddenAudio::visible(AudioGeneration::query())->whereKey((int) $generation)->where('status', 'done')->first();
         if (! $made instanceof AudioGeneration || blank($made->audio_path)) {
             abort(404);
         }

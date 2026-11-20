@@ -9,6 +9,7 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use App\Models\VoiceSample;
 use App\Rules\DoesNotContainProfanity;
+use App\Rules\PassesContentCheck;
 use App\Services\Auth\EmailVerificationMailer;
 use App\Services\Billing\CharPackService;
 use App\Services\Billing\PlanChanges;
@@ -779,7 +780,7 @@ class HomeController extends Controller
             $emotionValues = TtsStudioConfig::emotionValues();
 
             $validated = $request->validate([
-                'text' => ['required', 'string', 'max:50000', new DoesNotContainProfanity(app(ProfanityFilter::class))],
+                'text' => ['bail', 'required', 'string', 'max:50000', new DoesNotContainProfanity(app(ProfanityFilter::class)), new PassesContentCheck(is_string($request->input('style_prompt')) ? $request->input('style_prompt') : null)],
                 'target_language' => ['required', 'in:'.implode(',', SpeechLanguages::codes())],
                 'translate' => ['nullable', 'boolean'],
                 'voice_key' => ['nullable', 'string', 'max:60'],
@@ -787,7 +788,7 @@ class HomeController extends Controller
                 // Studio parameters
                 'dialect' => ['nullable', 'string', 'max:10'],
                 'performance_style' => ['nullable', 'string', 'in:'.implode(',', $performanceStyleValues)],
-                'style_prompt' => ['nullable', 'string', 'max:2000'],
+                'style_prompt' => ['nullable', 'string', 'max:2000', new DoesNotContainProfanity(app(ProfanityFilter::class))],
                 'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
                 'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
                 'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
@@ -900,7 +901,7 @@ class HomeController extends Controller
         $emotionValues = TtsStudioConfig::emotionValues();
 
         $validated = $request->validate([
-            'text' => ['required', 'string', 'max:50000', new DoesNotContainProfanity(app(ProfanityFilter::class))],
+            'text' => ['bail', 'required', 'string', 'max:50000', new DoesNotContainProfanity(app(ProfanityFilter::class)), new PassesContentCheck(is_string($request->input('style_prompt')) ? $request->input('style_prompt') : null)],
             'target_language' => ['required', 'in:'.implode(',', SpeechLanguages::codes())],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
@@ -908,7 +909,7 @@ class HomeController extends Controller
             // Studio parameters
             'dialect' => ['nullable', 'string', 'max:10'],
             'performance_style' => ['nullable', 'string', 'in:'.implode(',', $performanceStyleValues)],
-            'style_prompt' => ['nullable', 'string', 'max:2000'],
+            'style_prompt' => ['nullable', 'string', 'max:2000', new DoesNotContainProfanity(app(ProfanityFilter::class))],
             'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],

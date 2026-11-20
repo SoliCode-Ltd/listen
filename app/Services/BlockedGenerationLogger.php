@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\AudioGeneration;
 use App\Models\BlockedGeneration;
 use App\Models\User;
+use App\Support\GenerationSource;
 use App\Support\PaidMember;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -15,6 +17,9 @@ class BlockedGenerationLogger
 
     // The browser extension's reader, which reads pages from other sites.
     private const READER_ROUTE = 'api.reader.queue';
+
+    /** How a refusal by the reading of the text is named in the list (a refused word shows the word). */
+    public const CHECK_LABEL = 'Meaning';
 
     private ?bool $tableExists = null;
 
@@ -85,6 +90,62 @@ class BlockedGenerationLogger
             Log::warning('Failed to log blocked generation attempt.', [
                 'route_name' => $routeName,
                 'request_path' => $requestPath,
+                'exception_class' => get_class($exception),
+                'exception_message' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * A text the content check refused (App\Services\ContentSafety\TextContentCheck), found
+     * while the voice was being made, so there is no request to read: the route is named
+     * from where the voice was asked for, and counts toward the same rule as a refused word.
+     *
+     * @param  array{verdict?: string, category?: string, reason?: string}  $ruling
+     */
+    public function logFromContentCheck(AudioGeneration $generation, array $ruling, bool $voiceWasMade = false): void
+    {
+        $text = trim((string) $generation->input_text);
+        if (! $this->isReady()) {
+            return;
+        }
+
+        $source = (string) ($generation->textItem?->source_type ?? '');
+        $routeName = match (true) {
+            $generation->api_key_id !== null => 'v1.text-to-speech',
+            $source === GenerationSource::EXTENSION => self::READER_ROUTE,
+            default => 'dashboard.queue',
+        };
+        $userId = $generation->user_id ? (int) $generation->user_id : null;
+
+        try {
+            BlockedGeneration::query()->create([
+                'user_id' => $userId,
+                'route_name' => $routeName,
+                'request_path' => null,
+                'attribute' => 'content',
+                'input_text' => $text !== '' ? $text : (string) $generation->style_prompt,
+                'matched_term' => self::CHECK_LABEL.': '.(string) ($ruling['category'] ?? 'sexual'),
+                'matched_language' => $generation->target_language ?: null,
+                'ip_address' => null,
+                'user_agent' => null,
+                'metadata' => [
+                    'check' => 'meaning',
+                    'reason' => mb_substr((string) ($ruling['reason'] ?? ''), 0, 200),
+                    'audio_generation_id' => (int) $generation->id,
+                    'style_prompt' => filled($generation->style_prompt) ? mb_substr((string) $generation->style_prompt, 0, 2000) : null,
+                    // Found on a later reading (the first could not be done): the voice had been made, and is now hidden.
+                    'voice_was_made' => $voiceWasMade,
+                    'content_length' => mb_strlen($text),
+                ],
+            ]);
+
+            if (! self::isApiRoute($routeName)) {
+                $this->autoBlockUserAfterRepeatedAttempts($userId);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to log a text the content check refused.', [
+                'audio_generation_id' => $generation->id,
                 'exception_class' => get_class($exception),
                 'exception_message' => $exception->getMessage(),
             ]);

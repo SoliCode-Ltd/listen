@@ -171,13 +171,19 @@
   html[dir="rtl"] .xc-back svg { transform: scaleX(-1); }
   .xc-lead { margin: 8px 0 0; font-size: .92rem; line-height: 1.75; color: var(--muted); }
   .xc-lead b { color: var(--text); font-weight: 600; }
-  .xc-chips { margin-top: 18px; display: grid; grid-template-columns: repeat(var(--xc-n, 5), minmax(0, 1fr)); gap: 6px; }
-  /* Chosen in one move: the border and the inner ring change colour together, from the same
-     start (the ring is there all along, transparent), so the bold edge never builds in steps.
-     Hover only tints the background and leaves the edge alone. */
-  .xc-chip { height: 44px; border-radius: 11px; border: 1px solid var(--line-strong, var(--line)); box-shadow: inset 0 0 0 1px transparent; background: var(--surface); color: var(--text); font: inherit; font-size: .98rem; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color .18s ease-out, box-shadow .18s ease-out, background-color .18s ease-out, color .18s ease-out; }
+  .xc-chips { position: relative; margin-top: 18px; display: grid; grid-template-columns: repeat(var(--xc-n, 5), minmax(0, 1fr)); gap: 6px; }
+  /* The choice is one marker that slides from the tile it was on to the tile that was tapped
+     (the edge and the tint are the marker's own, so nothing is redrawn tile by tile). It moves
+     by transform alone, which the browser animates without laying the dialog out again. It
+     glides over the tiles, its edge unbroken, and its tint lets their numbers show through.
+     The tiles stay as they are: only the chosen one's own edge steps aside for the marker's. */
+  .xc-thumb { position: absolute; top: 0; left: 0; z-index: 2; box-sizing: border-box; width: 0; height: 44px; border-radius: 11px; border: 2px solid var(--brand-accent); background: color-mix(in oklab, var(--brand-accent, #7659FA) 9%, transparent); pointer-events: none; opacity: 0; will-change: transform; }
+  .xc-thumb.is-on { opacity: 1; }
+  .xc-thumb.is-moving { transition: transform .28s cubic-bezier(.3, .7, .2, 1), width .28s cubic-bezier(.3, .7, .2, 1); }
+  .xc-chip { position: relative; z-index: 1; height: 44px; border-radius: 11px; border: 1px solid var(--line-strong, var(--line)); background: transparent; color: var(--text); font: inherit; font-size: .98rem; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; -webkit-user-select: none; user-select: none; transition: border-color .2s ease-out, color .2s ease-out, background-color .15s ease-out; }
   @media (hover: hover) { .xc-chip:not([aria-checked="true"]):hover { background: var(--surface2); } }
-  .xc-chip[aria-checked="true"] { border-color: var(--brand-accent); box-shadow: inset 0 0 0 1px var(--brand-accent); background: var(--xc-tint); color: var(--accent-text, var(--brand-accent)); }
+  .xc-chip[aria-checked="true"] { border-color: transparent; color: var(--accent-text, var(--brand-accent)); }
+  @media (prefers-reduced-motion: reduce) { .xc-thumb.is-moving, .xc-chip { transition: none; } }
   .xc-summary { margin-top: 12px; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; background: var(--surface2); }
   .xc-summary-t { display: grid; line-height: 1.4; flex: 1; min-width: 0; }
   .xc-summary-t b, .xc-summary-price { font-size: 1.18rem; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -453,10 +459,18 @@
         chip.setAttribute('aria-checked', on ? 'true' : 'false');
         chip.tabIndex = on ? 0 : -1;
       });
+      placeThumb(true);
+      const price = byHand() ? (p.transfer_price || p.price) : p.price;
+      // What the choice comes to: the figures change with a short fade, never a hard swap.
+      const figures = [p.credits_label, p.minutes_label, price].join('|');
+      const changed = paintBuy.figures !== undefined && paintBuy.figures !== figures;
+      paintBuy.figures = figures;
       $('xcCredits').textContent = p.credits_label;
       $('xcMinutes').textContent = p.minutes_label;
-      const price = byHand() ? (p.transfer_price || p.price) : p.price;
       $('xcPrice').innerHTML = `<bdi>${esc(price)}</bdi>`;
+      if (changed && !reduced() && dialog.open) {
+        [$('xcCredits'), $('xcMinutes'), $('xcPrice')].forEach((el) => el.animate([{ opacity: .25 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' }));
+      }
       // How they pay
       $('xcGlyph').hidden = byHand();
       if (byHand()) {
@@ -474,10 +488,26 @@
       $('xcPay').disabled = byHand() && Boolean(offer.pending);
     }
 
+    // The marker under the chosen tile. It slides there when the member picks another tile;
+    // it is simply put there when the dialog opens, the tiles are built or the dialog's width
+    // changes (the tiles are measured, so a hidden dialog is left for when it shows).
+    function placeThumb(slide) {
+      const box = $('xcChips');
+      const thumb = box.querySelector('.xc-thumb');
+      const chip = box.querySelector('.xc-chip[aria-checked="true"]');
+      if (!thumb || !chip || !chip.offsetWidth) return;
+      thumb.classList.toggle('is-moving', Boolean(slide) && thumb.classList.contains('is-on') && !reduced());
+      thumb.style.width = chip.offsetWidth + 'px';
+      thumb.style.height = chip.offsetHeight + 'px';
+      thumb.style.transform = `translate3d(${chip.offsetLeft}px, ${chip.offsetTop}px, 0)`;
+      thumb.classList.add('is-on');
+    }
+    new ResizeObserver(() => placeThumb(false)).observe($('xcChips'));
+
     function buildChips() {
       const box = $('xcChips');
       box.style.setProperty('--xc-n', String(Math.min(5, offer.presets.length)));
-      box.innerHTML = offer.presets.map((p) => `<button type="button" class="xc-chip" role="radio" data-minutes="${p.minutes}" aria-label="${esc(p.minutes_label)}">${p.minutes}</button>`).join('');
+      box.innerHTML = '<span class="xc-thumb" aria-hidden="true"></span>' + offer.presets.map((p) => `<button type="button" class="xc-chip" role="radio" data-minutes="${p.minutes}" aria-label="${esc(p.minutes_label)}">${p.minutes}</button>`).join('');
       box.querySelectorAll('.xc-chip').forEach((chip) => chip.addEventListener('click', () => { if (inFlight || walletOpen) return; minutes = Number(chip.dataset.minutes); paintBuy(); }));
     }
 
@@ -560,6 +590,10 @@
         mode: 'payment',
         // Side by side, each wallet in its own half, at any width of the dialog.
         sideBySide: true,
+        // The wallets are told the amount once the member has settled on a tile, after the
+        // tile's own move: telling them makes Stripe redraw its buttons, and doing that on
+        // every tap, in the middle of the move, is what made choosing a tile look jumpy.
+        amountDelay: 320,
         amount: preset().amount_cents,
         onOpen: () => { walletOpen = true; },
         onCancel: () => { walletOpen = false; },

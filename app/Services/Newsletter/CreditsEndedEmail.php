@@ -257,6 +257,121 @@ class CreditsEndedEmail
         return $ids->map(fn ($id): int => (int) $id)->filter(fn (int $id): bool => $this->isDue($id))->values()->all();
     }
 
+    public const MAIL_SENT = 'sent';
+
+    public const MAIL_WAITING = 'waiting';
+
+    public const MAIL_NOT_SENT = 'not_sent';
+
+    public const MAIL_HELD = 'held';
+
+    /**
+     * Every member on a paid plan who is out of credits now (less than a minute of
+     * voice left in their current credit period), with whether this email went to
+     * them for the period: sent (and when), waiting in the send to members who
+     * already ran out, not sent yet, or held back and why. For the admin's list
+     * (Newsletter → Credits ended); nothing is claimed, sent or written.
+     *
+     * @return list<array{user_id:int, email:string, name:string, plan:string, renews_at:?string, state:string, sent_at:?string, why:string}>
+     */
+    public function ranOutMembers(): array
+    {
+        if (! ExtraCredits::ready()) {
+            return [];
+        }
+
+        $ids = Subscription::query()
+            ->whereIn('status', ['active', 'trialing', 'past_due'])
+            ->whereHas('plan', fn ($plan) => $plan->where('price_cents', '>', 0))
+            ->distinct()
+            ->orderBy('user_id')
+            ->pluck('user_id')
+            ->map(fn ($id): int => (int) $id);
+
+        $run = $this->backfill();
+        $waiting = array_flip($run['ids'] ?? []);
+        $failures = $run['failures'] ?? [];
+        // What holds the email back for everyone, before any member is looked at.
+        $switchedOff = match (true) {
+            ! $this->enabled() => 'the email is switched off',
+            ! ExtraCredits::enabled() => 'extra credits are switched off',
+            ! LiveServer::allowsCustomerActions() => 'this server does not email members',
+            default => null,
+        };
+
+        $rows = [];
+        foreach ($ids as $userId) {
+            $period = CreditPeriod::current($userId);
+            // Only a member with a usage row for the period can have run out (no row is made here).
+            $counter = UsageCounter::query()->where('user_id', $userId)->where('period_ym', $period['key'])->first();
+            if (! $counter) {
+                continue;
+            }
+            $left = (int) UsageSnapshot::for($userId, $this->plans->resolveQuotaPlanForUserId($userId), $counter)['remaining_chars'];
+            if ($left >= Credits::PER_MINUTE) {
+                continue;
+            }
+            $user = User::query()->find($userId, ['id', 'name', 'email']);
+            if (! $user) {
+                continue;
+            }
+
+            $sentAt = $counter->credits_ended_email_at;
+            [$state, $why] = match (true) {
+                $sentAt !== null => [self::MAIL_SENT, ''],
+                isset($waiting[$userId]) => [self::MAIL_WAITING, ''],
+                $switchedOff !== null => [self::MAIL_HELD, $switchedOff],
+                default => $this->heldBack($user, (int) ($failures[(string) $userId] ?? 0)),
+            };
+
+            $rows[] = [
+                'user_id' => $userId,
+                'email' => (string) $user->email,
+                'name' => (string) $user->name,
+                'plan' => (string) ($this->plans->resolveActivePlanForUserId($userId)?->name ?? ''),
+                'renews_at' => $period['ends_at'] instanceof \DateTimeInterface ? $period['ends_at']->format('Y-m-d') : null,
+                'state' => $state,
+                'sent_at' => $sentAt?->toIso8601String(),
+                'why' => $why,
+            ];
+        }
+
+        // What still needs the owner first, then those in line, then those who have it (latest first).
+        $order = [self::MAIL_NOT_SENT => 0, self::MAIL_HELD => 1, self::MAIL_WAITING => 2, self::MAIL_SENT => 3];
+        usort($rows, fn (array $a, array $b): int => [$order[$a['state']], (string) $b['sent_at'], $a['user_id']] <=> [$order[$b['state']], (string) $a['sent_at'], $b['user_id']]);
+
+        return $rows;
+    }
+
+    /**
+     * For a member who is out and has not had the email: not sent yet (it can go),
+     * or held back, with the reason in the admin's words.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function heldBack(User $user, int $failures): array
+    {
+        $userId = (int) $user->id;
+        if ($failures >= 3) {
+            return [self::MAIL_HELD, 'their address refused it three times'];
+        }
+        if (Cache::has($this->retryKey($userId))) {
+            return [self::MAIL_HELD, 'the last try failed; it is tried again within the hour'];
+        }
+        if (! filter_var((string) $user->email, FILTER_VALIDATE_EMAIL) || PaidWelcomeEmail::isPhoneSignupAddress((string) $user->email)) {
+            return [self::MAIL_HELD, 'they signed up without an email address'];
+        }
+
+        return match ($this->extraCredits->status($userId)) {
+            ExtraCredits::STATUS_RENEWAL_DUE => [self::MAIL_HELD, 'their renewal payment is overdue'],
+            ExtraCredits::STATUS_NO_PLAN => [self::MAIL_HELD, 'their plan is not one that can buy extra credits (a trial, a pack or a free plan)'],
+            ExtraCredits::STATUS_OFF => [self::MAIL_HELD, 'extra credits are switched off'],
+            default => $this->extraCredits->planEnds($userId)
+                ? [self::MAIL_HELD, 'their plan is cancelled and ends with this period']
+                : [self::MAIL_NOT_SENT, ''],
+        };
+    }
+
     /**
      * Why it cannot be sent to them now, in the admin's words, or null.
      */

@@ -45,6 +45,15 @@ return [
         'gemini_timeout_seconds' => (int) env('LISTEN_GEMINI_TIMEOUT_SECONDS', 60),
     ],
 
+    /*
+    | The reading of every text before a voice is made of it
+    | (App\Services\ContentSafety\TextContentCheck). The admin can also switch it
+    | off in Site settings; the tests switch it off here and on where they test it.
+    */
+    'content_check' => [
+        'enabled' => (bool) env('LISTEN_CONTENT_CHECK', true),
+    ],
+
     'billing' => [
         // A plan's daily generation limit resets at midnight in this time zone (most members are in Egypt).
         'daily_limit_timezone' => (string) env('LISTEN_DAILY_LIMIT_TIMEZONE', 'Africa/Cairo'),

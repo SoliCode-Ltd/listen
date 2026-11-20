@@ -20,6 +20,7 @@ use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\DialogueSpeakers;
 use App\Support\GenerationMessage;
+use App\Support\HiddenAudio;
 use App\Support\PlanUsageGuard;
 use App\Support\VoiceCloningAccess;
 use App\Support\TtsStudioConfig;
@@ -163,7 +164,7 @@ class MessageReaderController extends Controller
             'dialect' => ['nullable', 'string', 'max:10'],
             'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
             'performance_style' => ['nullable', 'string', 'in:'.implode(',', $performanceStyleValues)],
-            'style_prompt' => ['nullable', 'string', 'max:2000'],
+            'style_prompt' => ['nullable', 'string', 'max:2000', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
         ] + DialogueSpeakers::rules(), [
@@ -387,7 +388,7 @@ class MessageReaderController extends Controller
 
         $limit = min(100, max(1, (int) $request->integer('limit', 25)));
 
-        $jobs = AudioGeneration::query()
+        $jobs = HiddenAudio::visible(AudioGeneration::query())
             ->where('user_id', $user->id)
             ->latest()
             ->limit($limit)

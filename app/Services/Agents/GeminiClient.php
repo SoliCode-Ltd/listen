@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
  * and the next one is tried, as the studio does.
  *
  * - generate(): the text model, for writing agents and summing up calls.
+ * - judge(): the same model ruling on a text (App\Services\ContentSafety\TextContentCheck).
  * - converse(): the same model in a written chat with a customer (AgentChats): instructions,
  *   the conversation so far and tools in, its words or tool calls and its token counts out.
  * - readFile(): the same model reading a file the owner uploaded (a PDF, a photo of a menu).
@@ -87,6 +88,68 @@ class GeminiClient
 
                     return $text;
                 }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * A ruling on a text, answered as JSON: the text model at temperature 0, thinking as little
+     * as it can, with the provider's own filters off so it reads the text and rules on it rather
+     * than turning the request away. Returns the reply text, and whether the provider would not
+     * read the text at all (its own refusal, which is a ruling too); null when no model answered.
+     *
+     * @param  array<string, mixed>  $schema
+     * @return array{text: ?string, blocked: bool, model: string}|null
+     */
+    public function judge(string $system, string $content, array $schema, int $timeout = 14): ?array
+    {
+        $config = [
+            'temperature' => 0,
+            'responseMimeType' => 'application/json',
+            'responseSchema' => $schema,
+            'thinkingConfig' => ['thinkingLevel' => 'minimal'],
+        ];
+        $safety = array_map(
+            static fn (string $category): array => ['category' => $category, 'threshold' => 'BLOCK_NONE'],
+            ['HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_DANGEROUS_CONTENT'],
+        );
+        $deadline = microtime(true) + $timeout;
+        foreach (self::WRITER_MODELS as $model) {
+            $left = (int) floor($deadline - microtime(true));
+            if ($left < 3) {
+                break;
+            }
+            $ask = fn (array $config, int $seconds) => $this->post("/models/{$model}:generateContent", [
+                'systemInstruction' => ['parts' => [['text' => $system]]],
+                'contents' => [['role' => 'user', 'parts' => [['text' => $content]]]],
+                'generationConfig' => $config,
+                'safetySettings' => $safety,
+            ], $model, $seconds);
+            $response = $ask($config, $left);
+            // A model that does not take that thinking level is asked again with its own.
+            if ($response?->status() === 400 && str_contains(strtolower((string) $response->body()), 'thinking')) {
+                unset($config['thinkingConfig']);
+                $left = (int) floor($deadline - microtime(true));
+                $response = $left >= 3 ? $ask($config, $left) : null;
+            }
+            if (! $response?->successful()) {
+                continue;
+            }
+            $json = (array) $response->json();
+            $finish = (string) data_get($json, 'candidates.0.finishReason', '');
+            if (filled(data_get($json, 'promptFeedback.blockReason')) || in_array($finish, ['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST'], true)) {
+                return ['text' => null, 'blocked' => true, 'model' => $model];
+            }
+            $text = '';
+            foreach ((array) data_get($json, 'candidates.0.content.parts', []) as $part) {
+                if (is_array($part) && empty($part['thought']) && isset($part['text']) && is_string($part['text'])) {
+                    $text .= $part['text'];
+                }
+            }
+            if (trim($text) !== '') {
+                return ['text' => $text, 'blocked' => false, 'model' => $model];
             }
         }
 

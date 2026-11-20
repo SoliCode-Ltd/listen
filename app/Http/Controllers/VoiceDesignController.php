@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DesignedVoice;
 use App\Models\User;
 use App\Rules\DoesNotContainProfanity;
+use App\Rules\PassesContentCheck;
 use App\Services\Billing\MemberUsageMeter;
 use App\Services\PlanAccessService;
 use App\Services\ProfanityFilter;
@@ -201,11 +202,11 @@ class VoiceDesignController extends Controller
             }
         }
         $validated = $request->validate([
-            'description' => ['required', 'string', 'min:'.VoiceDesign::MIN_DESCRIPTION, 'max:'.VoiceDesign::MAX_DESCRIPTION, $profanity],
+            'description' => ['bail', 'required', 'string', 'min:'.VoiceDesign::MIN_DESCRIPTION, 'max:'.VoiceDesign::MAX_DESCRIPTION, $profanity, new PassesContentCheck],
             'language' => ['required', Rule::in(VoiceDesign::LANGUAGES)],
             'gender' => ['nullable', Rule::in(VoiceDesign::GENDERS)],
             'auto_line' => ['nullable', 'boolean'],
-            'line' => ['nullable', 'exclude_if:auto_line,1,true', 'required_unless:auto_line,1,true', 'string', 'min:'.VoiceDesign::MIN_PREVIEW, 'max:'.max(VoiceDesign::MIN_PREVIEW, $maxLine), $profanity],
+            'line' => ['bail', 'nullable', 'exclude_if:auto_line,1,true', 'required_unless:auto_line,1,true', 'string', 'min:'.VoiceDesign::MIN_PREVIEW, 'max:'.max(VoiceDesign::MIN_PREVIEW, $maxLine), $profanity, new PassesContentCheck],
             'projection' => ['nullable', 'integer', 'between:0,100'],
             'pace' => ['nullable', 'integer', 'between:0,100'],
             'variety' => ['nullable', 'integer', 'between:0,100'],

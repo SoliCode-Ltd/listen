@@ -1857,6 +1857,7 @@ return [
         'dialogue_needs_hd' => 'Dialogue mode uses premium voices, which your plan does not include.',
         'dashboard_upgrade_for_quality' => 'Upgrade your plan for higher voice quality.',
         'generation_text_prohibited' => 'Audio could not be generated because the entered text contains inappropriate or prohibited language. Listen does not allow abusive content.',
+        'generation_content_refused' => 'This text has content Listen does not turn into audio, so no voice was made and no credits were used.',
         'account_blocked' => 'Your account is currently blocked from accessing Listen. If you would like to request access again, please contact :email.',
         'account_blocked_with_reason' => 'Your account is currently blocked from accessing Listen. Reason: :reason. If you would like to request access again, please contact :email.',
         'translation_failed' => "The translation couldn't be made right now, so nothing was read and no characters were used. Please try again, or turn off translation and write the text in the voice's language.",

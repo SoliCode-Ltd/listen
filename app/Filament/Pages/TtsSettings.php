@@ -20,6 +20,7 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
 use App\Models\SiteSetting;
 use App\Models\Voice;
+use App\Services\ContentSafety\TextContentCheck;
 use App\Support\GeminiTtsModel;
 use App\Support\StandardVoiceEngine;
 use App\Support\TtsStudioConfig;
@@ -55,6 +56,7 @@ class TtsSettings extends Page implements HasForms
             StandardVoiceEngine::SETTING_KEY => StandardVoiceEngine::current(),
             SpeechText::SETTING => SpeechText::enabled(),
             Pronunciations::SETTING => Pronunciations::enabled(),
+            TextContentCheck::ENABLED_SETTING => TextContentCheck::enabled(),
 
             // Gemini config
             'gemini_api_key_set' => count(app(GeminiKeyManager::class)->getAllKeys()) > 0,
@@ -128,6 +130,11 @@ class TtsSettings extends Page implements HasForms
                             ->label('Members\' pronunciations (the «النطق» button)')
                             ->helperText('On: members save how a word should be said, from the «النطق» button in the studio and the demo, and their new voices say it that way. Off: the button is gone, nothing can be saved, and every voice is made from the text as written, exactly as before. Saved words are kept and work again when switched back on. Separate from smoothing above.')
                             ->default(false)
+                            ->columnSpanFull(),
+                        Toggle::make(TextContentCheck::ENABLED_SETTING)
+                            ->label('Read every text before a voice is made (content check)')
+                            ->helperText('On: before any voice is made, the text and the member\'s own direction are read for their meaning, and sexual content is refused however it is spelled, for every member, paying or not. Nothing is charged for a refused text, and each one is listed under Content → Blocked generations. If the reader does not answer, the voice is still made and its text is read again within minutes; a voice that should not have been made is then hidden from the member. Off: only the word list checks texts. Leave this on.')
+                            ->default(true)
                             ->columnSpanFull(),
                     ]),
 
@@ -288,6 +295,7 @@ class TtsSettings extends Page implements HasForms
             'tts_mode',
             SpeechText::SETTING,
             Pronunciations::SETTING,
+            TextContentCheck::ENABLED_SETTING,
             StandardVoiceEngine::SETTING_KEY,
             'gemini_default_voice',
             'gemini_timeout_seconds',
