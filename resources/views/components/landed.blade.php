@@ -1,0 +1,7 @@
+{{-- Where this visitor came from, told to the server when they arrive from outside the site
+     (App\Services\Acquisition\VisitSources): the other site's name only (never its page), this
+     page's path, the link's campaign fields and the names of the ad markers it carried (never their
+     values). The page does it itself because Cloudflare answers most public pages without the
+     server (App\Support\PublicPageCache). Nothing is sent while moving inside the site; the server
+     keeps nothing for visitors from where the consent rules apply. --}}
+<script>(function(){try{if(/bot|crawl|spider|slurp|lighthouse|headless/i.test(navigator.userAgent||''))return;var d=document,l=location,r=d.referrer,h='',u;if(r){try{u=new URL(r);h=u.protocol==='android-app:'?'android-app://'+u.hostname:u.hostname;}catch(e){}}var own=l.hostname.replace(/^www\./,''),b=h.replace(/^www\./,'');if(b&&(b===own||b.slice(-own.length-1)==='.'+own))return;var s=new URLSearchParams(l.search),q={},k=[];['utm_source','utm_medium','utm_campaign','utm_content','utm_term','gad_campaignid'].forEach(function(n){var v=s.get(n);if(v)q[n]=v.slice(0,100);});['gclid','gbraid','wbraid','gad_source','fbclid','ttclid','oppref','msclkid','twclid','li_fat_id','sccid','ScCid','ref'].forEach(function(n){if(s.has(n))k.push(n.toLowerCase());});if(!window.fetch)return;fetch('/landed',{method:'POST',credentials:'same-origin',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({r:h,p:l.pathname,q:q,k:k})}).catch(function(){});}catch(e){}})();</script>

@@ -25,6 +25,7 @@ use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ExtensionController;
 use App\Http\Controllers\FavoriteVoicesController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\LandedController;
 use App\Http\Controllers\ManualPaymentController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\NewsletterUnsubscribeController;
@@ -60,6 +61,23 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
+
+// A page opened from outside the site says where the visitor came from (App\Services\Acquisition\VisitSources).
+// No session, no form token: a visitor who only reads the public pages is given no session by it, so
+// Cloudflare can keep answering their pages. Only the visitor's own source cookie is read and set.
+Route::post('/landed', LandedController::class)
+    ->withoutMiddleware([
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        // Laravel 13's name, and 12's: the servers run either for a minute while a deploy's packages go in.
+        PreventRequestForgery::class,
+        ValidateCsrfToken::class,
+        EnsureUserIsNotBlocked::class,
+        CaptureAdClickId::class,
+        InAppMode::class,
+    ])
+    ->middleware('throttle:30,1')
+    ->name('landed');
 
 // Audio files need no session, cookies or form token: playing one starts
 // sooner, a player or the extension asking without cookies no longer makes

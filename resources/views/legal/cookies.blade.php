@@ -110,7 +110,7 @@
 
   <main class="container legal-page">
     @php
-      $effectiveDate = app()->getLocale() === 'ar' ? '28 أكتوبر 2026' : 'October 28, 2026';
+      $effectiveDate = app()->getLocale() === 'ar' ? '21 نوفمبر 2026' : 'November 21, 2026';
       $contactEmail = trim((string) \App\Models\SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio';
       $supportEmailLink = '<a href="mailto:'.e($contactEmail).'">'.e($contactEmail).'</a>';
     @endphp
@@ -147,6 +147,10 @@
           <article class="cookie-card">
             <h3>{{ __('ui.legal.cookies.c5_title') }}</h3>
             <p>{{ __('ui.legal.cookies.c5_body') }}</p>
+          </article>
+          <article class="cookie-card">
+            <h3>{{ __('ui.legal.cookies.c6_title') }}</h3>
+            <p>{{ __('ui.legal.cookies.c6_body') }}</p>
           </article>
         </div>
       </section>

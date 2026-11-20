@@ -25,7 +25,7 @@ class IphoneAiConsentTest extends InAppTestCase
     private const OPEN = [
         'account.*', 'admin.*', 'agent-talk', 'agents-landing', 'agents.*', 'api.reader.*', 'app.*', 'audio.download',
         'auth.*', 'billing.*', 'browsers-extension.*', 'contact', 'contact.submit', 'default-livewire.update',
-        'developers', 'developers.*', 'favicon', 'filament.*', 'home', 'indexnow.key', 'legal.*', 'livewire.*', 'llms',
+        'developers', 'developers.*', 'favicon', 'filament.*', 'home', 'indexnow.key', 'landed', 'legal.*', 'livewire.*', 'llms',
         'login', 'login.submit', 'logout', 'manage-subscription.page', 'mcp', 'mcp.*', 'media.file',
         'newsletter.unsubscribe', 'pack.start', 'passport.*', 'password.*', 'pricing', 'referral.*', 'register',
         'register.submit', 'robots', 'samples', 'seo.*', 'site.webmanifest', 'sitemap', 'storage.*', 'trial.start',
