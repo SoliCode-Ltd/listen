@@ -11,6 +11,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
+use App\Services\Billing\ExtraCredits;
 use App\Services\Billing\RenewalGrace;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -84,13 +85,40 @@ final class CreditPeriod
             + ['grace_ends_at' => $graceEndsAt];
     }
 
-    /** The member's usage row for their current credit period (made when missing). */
+    /**
+     * The member's usage row for their current credit period (made when missing).
+     * Extra credits left from a period that is over move on to it first (or end).
+     */
     public static function counter(int $userId): UsageCounter
     {
-        return UsageCounter::query()->firstOrCreate(
-            ['user_id' => $userId, 'period_ym' => self::current($userId)['key']],
+        $period = self::current($userId);
+        $counter = UsageCounter::query()->firstOrCreate(
+            ['user_id' => $userId, 'period_ym' => $period['key']],
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
+
+        try {
+            if (app(ExtraCredits::class)->settle($userId, $period)) {
+                $counter->refresh();
+            }
+        } catch (\Throwable $e) {
+            // The member's usage is still read; the hourly run settles it.
+            Log::warning('Settling extra credits failed.', ['user_id' => $userId, 'exception' => $e->getMessage()]);
+        }
+
+        return $counter;
+    }
+
+    /** When the period with this key starts ("2026-10" or "2026-10-14 08:37", UTC). */
+    public static function startOf(string $key): ?Carbon
+    {
+        try {
+            return self::followsPlan($key)
+                ? Carbon::createFromFormat('Y-m-d H:i', $key, 'UTC')->startOfMinute()
+                : Carbon::createFromFormat('Y-m-d H:i', $key.'-01 00:00', 'UTC');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -163,7 +191,7 @@ final class CreditPeriod
             return;
         }
 
-        self::carry($userId, $before['key'], $after['key']);
+        self::carry($userId, $before['key'], $after['key'], Plan::query()->find($subscription->plan_id), $after['ends_at']);
     }
 
     /**
@@ -281,19 +309,21 @@ final class CreditPeriod
 
     /**
      * The new period starts with the old one's usage, its gifts that still
-     * count (so they can be taken back there) and each API key's spending (so
-     * a key's own budget goes on). Made once: if the new period's counter is
-     * already there, everything is left as it is.
+     * count (so they can be taken back there), its extra credits (with the new
+     * plan's own credits beside them) and each API key's spending (so a key's
+     * own budget goes on). Made once: if the new period's counter is already
+     * there, everything is left as it is (extra credits then move on when the
+     * old period is settled, ExtraCredits::settle()).
      */
-    private static function carry(int $userId, string $from, string $to): void
+    private static function carry(int $userId, string $from, string $to, ?Plan $newPlan, Carbon $newEndsAt): void
     {
         $previous = UsageCounter::query()->where('user_id', $userId)->where('period_ym', $from)->first();
         if (! $previous) {
             return;
         }
 
-        $carried = DB::transaction(function () use ($userId, $previous, $from, $to): bool {
-            $made = UsageCounter::query()->insertOrIgnore([
+        $carried = DB::transaction(function () use ($userId, $previous, $from, $to, $newPlan, $newEndsAt): bool {
+            $row = [
                 'user_id' => $userId,
                 'period_ym' => $to,
                 'total_minutes' => (int) $previous->total_minutes,
@@ -303,9 +333,18 @@ final class CreditPeriod
                 'total_requests' => (int) $previous->total_requests,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
+            $extra = ExtraCredits::ready() ? ExtraCredits::carriedOver($previous, $newPlan, $newEndsAt) : null;
+            if ($extra !== null && $extra['extra_chars'] > 0) {
+                $row += $extra;
+            }
+
+            $made = UsageCounter::query()->insertOrIgnore($row);
             if ($made === 0) {
                 return false;
+            }
+            if ($extra !== null && $extra['extra_chars'] > 0) {
+                ExtraCredits::markCarried($previous);
             }
 
             CharGift::query()
@@ -346,6 +385,7 @@ final class CreditPeriod
                 'from' => $from,
                 'to' => $to,
                 'chars' => (int) $previous->total_chars,
+                'extra_chars' => (int) ($previous->extra_chars ?? 0),
             ]);
         }
     }

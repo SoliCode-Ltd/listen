@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\AudioGeneration;
 use App\Models\Plan;
 use App\Models\UsageCounter;
+use App\Services\Billing\ExtraCredits;
 use Illuminate\Validation\ValidationException;
 
 class PlanUsageGuard
@@ -19,12 +20,13 @@ class PlanUsageGuard
     }
 
     /**
-     * This month's character allowance: the plan's plus any characters
-     * Listen gifted for this month (usage_counters.bonus_chars).
+     * This period's credit allowance: the plan's, plus any credits Listen
+     * gifted for it (usage_counters.bonus_chars) and the extra credits the
+     * member bought (App\Services\Billing\ExtraCredits), used in that order.
      */
     public static function charsLimit(?Plan $plan, ?UsageCounter $counter): int
     {
-        return self::planChars($plan) + self::giftChars($counter);
+        return self::planChars($plan) + self::giftChars($counter) + ExtraCredits::available($plan, $counter);
     }
 
     public static function giftChars(?UsageCounter $counter): int
@@ -110,14 +112,12 @@ class PlanUsageGuard
             $incoming = (int) ($estimate['credits'] ?? $estimate['chars']);
             if (((int) $counter->total_chars + $incoming) > $charsLimit) {
                 $remaining = max(0, $charsLimit - (int) $counter->total_chars);
-                throw ValidationException::withMessages([
-                    'content' => match (true) {
-                        $plan?->getAttribute('no_free_monthly_chars') && $remaining <= 0 => __('ui.backend.no_chars_yet'),
-                        // Credits are left, only not enough for this text: say how many, as a pack does.
-                        $remaining > 0 => __('ui.backend.monthly_chars_not_enough', ['remaining' => number_format($remaining), 'needed' => number_format($incoming)]),
-                        default => __('ui.backend.monthly_chars_exceeded'),
-                    },
-                ]);
+                throw OutOfCredits::make(match (true) {
+                    $plan?->getAttribute('no_free_monthly_chars') && $remaining <= 0 => __('ui.backend.no_chars_yet'),
+                    // Credits are left, only not enough for this text: say how many, as a pack does.
+                    $remaining > 0 => __('ui.backend.monthly_chars_not_enough', ['remaining' => number_format($remaining), 'needed' => number_format($incoming)]),
+                    default => __('ui.backend.monthly_chars_exceeded'),
+                }, $remaining, $incoming);
             }
         }
 

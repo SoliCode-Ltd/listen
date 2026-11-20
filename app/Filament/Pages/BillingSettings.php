@@ -16,10 +16,13 @@ use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Repeater;
 use Throwable;
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Services\Billing\ExtraCredits;
 use App\Services\Billing\TrialEligibilityService;
+use App\Services\LocalizedPricingService;
 use App\Services\StripeProductSyncService;
 use App\Support\YearlyOfferBanner;
 use Carbon\Carbon;
@@ -79,6 +82,11 @@ class BillingSettings extends Page implements HasForms
             'payment_logo_stripe' => (string) SiteSetting::get('payment_logo_stripe', ''),
             'manual_payment_instructions_en' => (string) SiteSetting::get('manual_payment_instructions_en', ''),
             'manual_payment_instructions_ar' => (string) SiteSetting::get('manual_payment_instructions_ar', ''),
+            'extra_credits_enabled' => filter_var(SiteSetting::get(ExtraCredits::ENABLED_SETTING, false), FILTER_VALIDATE_BOOL),
+            'extra_credits_presets' => collect(ExtraCredits::presets())
+                ->map(fn (int $cents, int $minutes): array => ['minutes' => $minutes, 'price_usd' => intdiv($cents, 100)])
+                ->values()
+                ->all(),
             'offer_banner_enabled' => YearlyOfferBanner::enabled(),
             'offer_banner_ends_on' => (string) SiteSetting::get(YearlyOfferBanner::ENDS_ON, '') ?: null,
             'offer_banner_label_en' => (string) SiteSetting::get(YearlyOfferBanner::LABEL_EN, ''),
@@ -210,6 +218,40 @@ class BillingSettings extends Page implements HasForms
                             ->placeholder((string) trans('ui.offer_banner.button', [], 'ar'))
                             ->maxLength(24)
                             ->extraInputAttributes(['dir' => 'rtl']),
+                    ]),
+
+                Section::make('Extra credits')
+                    ->description('Members on a paid plan whose credits run out buy more minutes once, from the studio. Card members pay by card; members who pay their plan by hand can also pay by InstaPay or Vodafone Cash (you approve those under Manual Payments). The plan\'s credits are used first. What is left moves on each time the plan renews and ends if the plan is cancelled or its renewal stays unpaid. Prices are whole US dollars: members see them in their own currency, rounded up, and cards are charged the dollars.')
+                    ->schema([
+                        Toggle::make('extra_credits_enabled')
+                            ->label('Sell extra credits')
+                            ->helperText(ExtraCredits::ready() ? 'Off: nobody is offered them, and the studio says the credits are used up, as before.' : 'Run the migrations first: the database has no place for extra credits yet.')
+                            ->disabled(! ExtraCredits::ready()),
+                        Repeater::make('extra_credits_presets')
+                            ->label('Minutes on sale')
+                            ->schema([
+                                TextInput::make('minutes')
+                                    ->label('Minutes')
+                                    ->numeric()->integer()->minValue(1)->maxValue(10000)->required()
+                                    ->live(onBlur: true)
+                                    ->helperText(fn (Get $get): string => number_format(ExtraCredits::creditsFor((int) $get('minutes'))).' credits'),
+                                TextInput::make('price_usd')
+                                    ->label('Price (US dollars)')
+                                    ->numeric()->integer()->minValue(1)->maxValue(1000)->required()->prefix('$')
+                                    ->live(onBlur: true)
+                                    ->helperText(function (Get $get): string {
+                                        $cents = max(0, (int) $get('price_usd')) * 100;
+                                        $pricing = app(LocalizedPricingService::class);
+
+                                        return 'Egypt sees '.$pricing->formatAmount($pricing->convertUsdMinorToCurrency($cents, LocalizedPricingService::CURRENCY_EGP), LocalizedPricingService::CURRENCY_EGP, 'en');
+                                    }),
+                            ])
+                            ->columns(2)
+                            ->minItems(1)
+                            ->maxItems(8)
+                            ->reorderable(false)
+                            ->addActionLabel('Add minutes')
+                            ->helperText('Shown fewest minutes first. 30 minutes is chosen when the dialog opens, or the smallest when 30 is not on sale.'),
                     ]),
 
                 Section::make('Card trial')
@@ -419,6 +461,24 @@ class BillingSettings extends Page implements HasForms
         foreach ([YearlyOfferBanner::LABEL_EN, YearlyOfferBanner::LABEL_AR, YearlyOfferBanner::BUTTON_EN, YearlyOfferBanner::BUTTON_AR] as $key) {
             if (array_key_exists($key, $data)) {
                 SiteSetting::set($key, trim((string) $data[$key]), YearlyOfferBanner::GROUP);
+            }
+        }
+        // Extra credits
+        if (array_key_exists('extra_credits_enabled', $data)) {
+            SiteSetting::set(ExtraCredits::ENABLED_SETTING, $data['extra_credits_enabled'] ? '1' : '0', $group);
+        }
+        if (array_key_exists('extra_credits_presets', $data)) {
+            $presets = [];
+            foreach ((array) $data['extra_credits_presets'] as $row) {
+                $minutes = (int) ($row['minutes'] ?? 0);
+                $dollars = (int) ($row['price_usd'] ?? 0);
+                if ($minutes >= 1 && $dollars >= 1) {
+                    $presets[$minutes] = $dollars * 100;
+                }
+            }
+            ksort($presets);
+            if ($presets !== []) {
+                SiteSetting::set(ExtraCredits::PRESETS_SETTING, json_encode($presets), $group);
             }
         }
         // Save billing behavior settings

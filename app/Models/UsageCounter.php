@@ -21,6 +21,11 @@ class UsageCounter extends Model
         'total_chars',
         'bonus_chars',
         'total_requests',
+        'extra_chars',
+        'extra_base_chars',
+        'extra_ends_at',
+        'extra_settled_at',
+        'extra_outcome',
     ];
 
     protected $casts = [
@@ -29,6 +34,10 @@ class UsageCounter extends Model
         'total_requests' => 'integer',
         'total_minutes' => 'integer',
         'total_seconds' => 'integer',
+        'extra_chars' => 'integer',
+        'extra_base_chars' => 'integer',
+        'extra_ends_at' => 'datetime',
+        'extra_settled_at' => 'datetime',
     ];
 
     /**

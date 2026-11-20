@@ -7,7 +7,7 @@ use App\Services\Billing\StripePackGateway;
 use RuntimeException;
 
 /**
- * Stands in for Stripe in pack tests: no real card is ever charged.
+ * Stands in for Stripe in pack and extra-credit tests: no real card is ever charged.
  */
 class FakeStripePackGateway implements StripePackGateway
 {
@@ -37,13 +37,14 @@ class FakeStripePackGateway implements StripePackGateway
         string $description,
         array $metadata,
         string $idempotencyKey,
+        bool $saveCard = false,
     ): array {
         if ($this->nextOutcome === 'throw') {
             throw new RuntimeException('Stripe is unreachable.');
         }
 
         $id = 'pi_test_'.(count($this->intents) + 1);
-        $this->charges[] = compact('customerId', 'paymentMethodId', 'amountMinor', 'currency', 'description', 'metadata', 'idempotencyKey');
+        $this->charges[] = compact('customerId', 'paymentMethodId', 'amountMinor', 'currency', 'description', 'metadata', 'idempotencyKey', 'saveCard');
 
         $status = match ($this->nextOutcome) {
             'declined' => 'requires_payment_method',
@@ -57,6 +58,7 @@ class FakeStripePackGateway implements StripePackGateway
             'amount' => $amountMinor,
             'currency' => $currency,
             'customer' => $customerId,
+            'payment_method' => $paymentMethodId,
             'metadata' => $metadata,
             'error' => $this->nextOutcome === 'declined' ? 'Your card was declined.' : null,
         ];
@@ -67,6 +69,22 @@ class FakeStripePackGateway implements StripePackGateway
     public function retrievePaymentIntent(string $paymentIntentId): array
     {
         return $this->intents[$paymentIntentId] ?? throw new RuntimeException('No such payment.');
+    }
+
+    /** The customer's saved card, or null: what savedCard() answers. */
+    public ?array $card = null;
+
+    /** @var list<array{customer:string, payment_method:string}> */
+    public array $defaultCards = [];
+
+    public function savedCard(string $customerId): ?array
+    {
+        return $this->card;
+    }
+
+    public function makeDefaultCard(string $customerId, string $paymentMethodId): void
+    {
+        $this->defaultCards[] = ['customer' => $customerId, 'payment_method' => $paymentMethodId];
     }
 
     /** The member passed the bank's check in the browser. */

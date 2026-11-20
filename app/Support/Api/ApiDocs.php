@@ -557,6 +557,10 @@ final class ApiDocs
                 'message' => 'Your monthly credits are used up. Please upgrade your plan to continue.',
                 'param' => null,
                 'credits_needed' => 450,
+                'credits_remaining' => 120,
+                'resets_at' => '2026-12-14T08:37:00+00:00',
+            ] + (\App\Services\Billing\ExtraCredits::enabled() ? ['add_credits_url' => url('/dashboard?extra_credits=1')] : []) + [
+                'upgrade_url' => url('/pricing'),
                 'request_id' => 'req_8f2kq0x7m3c9w1v5b6n4z2a1',
             ],
         ];

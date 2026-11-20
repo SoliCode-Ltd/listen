@@ -72,6 +72,24 @@ class Subscription extends Model
         // edit, or programmatic assignment), evaluate the referral program.
         // evaluate() is idempotent: it only promotes a pending conversion
         // once, and is a no-op if no pending conversion exists.
+        // Extra credits are counted beside the plan's own credits for the period
+        // (App\Services\Billing\ExtraCredits): a change of plan that keeps the period
+        // changes those.
+        static::saved(function (Subscription $subscription): void {
+            if (! $subscription->wasChanged(['plan_id', 'status', 'current_period_start', 'current_period_end']) && ! $subscription->wasRecentlyCreated) {
+                return;
+            }
+            try {
+                app(\App\Services\Billing\ExtraCredits::class)->refreshBase((int) $subscription->user_id);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Updating extra credits after a plan change failed.', [
+                    'subscription_id' => $subscription->id,
+                    'user_id' => $subscription->user_id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        });
+
         static::saved(function (Subscription $subscription): void {
             try {
                 if (! in_array((string) $subscription->status, ['active', 'trialing'], true)) {

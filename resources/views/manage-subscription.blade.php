@@ -711,6 +711,7 @@
                     'open' => __('ui.manage_subscription.invoice_status_open'),
                     'void' => __('ui.manage_subscription.invoice_status_void'),
                     'uncollectible' => __('ui.manage_subscription.invoice_status_uncollectible'),
+                    'refunded' => __('ui.extra_credits.refunded'),
                     default => __('ui.manage_subscription.status_unknown'),
                   };
                 @endphp

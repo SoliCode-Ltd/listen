@@ -1478,6 +1478,8 @@
       font-size: .88rem; color: var(--text);
     }
     .usage-chip svg { width: 14px; height: 14px; fill: none; stroke: var(--a, #6A45F2); stroke-width: 2; stroke-linecap: round; }
+    button.usage-chip { font: inherit; font-size: .88rem; cursor: pointer; }
+    .usage-chip[hidden] { display: none; }
     /* Where the credits went: the Usage page. */
     .usage-chip-link { color: var(--accent-text, var(--a)); font-weight: 700; text-decoration: none; transition: border-color .18s ease, background .18s ease; }
     .usage-chip-link:hover { border-color: color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 7%, var(--surface)); }
@@ -1564,6 +1566,12 @@
     .credit-live.is-spending { border-color: color-mix(in oklab, var(--a, #6A45F2) 40%, var(--line)); }
     .credit-live.is-short { border-color: color-mix(in oklab, var(--danger, #ef4444) 55%, var(--line)); background: color-mix(in oklab, var(--danger, #ef4444) 8%, var(--surface)); }
     .credit-live.is-short .credit-live-value { color: var(--danger, #ef4444); }
+    /* Extra credits left (App\Services\Billing\ExtraCredits), or a transfer for them under review. */
+    .credit-live-tag { align-self: center; padding: 3px 9px; border-radius: 999px; font-size: .74rem; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; background: color-mix(in oklab, #3FCB8B 16%, var(--surface)); color: #3FCB8B; }
+    html[data-theme="light"] .credit-live-tag { background: #E9F6EF; color: #12804F; }
+    .credit-live-tag.is-pending { background: color-mix(in oklab, #F0B04A 18%, var(--surface)); color: #F0B04A; }
+    html[data-theme="light"] .credit-live-tag.is-pending { background: #FFF4E0; color: #9A5B00; }
+    .credit-live-tag[hidden] { display: none; }
     /* ── App frame: the menu and its help links stay in view; no website footer. ── */
     .dashboard-shell { padding-bottom: 3rem !important; }
     .dashboard-menu-inner { position: sticky; top: 5.5rem; z-index: 1; }
@@ -2185,6 +2193,11 @@
                 @if (($giftChars ?? 0) > 0)
                   <span class="usage-chip gift-chars-note" data-gift-chars="{{ (int) $giftChars }}">🎁 {{ __('ui.dashboard.gift_chars_note', ['count' => number_format((int) $giftChars)]) }}</span>
                 @endif
+                @php $usageExtraLeft = (int) ($usageSnapshot['extra_chars'] ?? 0); @endphp
+                <span class="usage-chip" id="usageExtraChip" title="{{ __('ui.extra_credits.usage_note') }}" @if($usageExtraLeft <= 0) hidden @endif><span class="usage-chip-t"><b class="usage-chip-v" id="usageExtraLeft">{{ number_format($usageExtraLeft) }}</b> <span class="usage-chip-k">{{ __('ui.extra_credits.left') }}</span></span></span>
+                @if(! $packMode && app(\App\Services\Billing\ExtraCredits::class)->status((int) auth()->id()) === \App\Services\Billing\ExtraCredits::STATUS_OK)
+                  <button type="button" class="usage-chip usage-chip-link" data-extra-credits-open><svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>{{ __('ui.extra_credits.open') }}</button>
+                @endif
               </div>
             </div>
             <a class="usage-hero-cta" href="#generateVoiceSection" data-dashboard-go="generateVoiceSection">
@@ -2324,6 +2337,13 @@
                   <span class="credit-live-label" id="creditLiveLabel">{{ __('ui.dashboard.credits_left_label') }}</span>
                   <strong class="credit-live-value" id="creditLiveValue">{{ number_format((int) ($usageSnapshot['remaining_chars'] ?? 0)) }}</strong>
                 </div>
+                @php
+                  $extraLeft = (int) ($usageSnapshot['extra_chars'] ?? 0);
+                  $extraPending = $extraLeft <= 0 && \App\Services\Billing\ExtraCredits::ready()
+                    && \App\Models\ManualPaymentRequest::query()->extraCredits()->where('user_id', auth()->id())->where('status', \App\Models\ManualPaymentRequest::STATUS_PENDING)->exists();
+                @endphp
+                <span class="credit-live-tag" id="creditExtraTag" @if($extraLeft <= 0) hidden @endif>{{ __('ui.extra_credits.extra_tag', ['count' => number_format($extraLeft)]) }}</span>
+                <span class="credit-live-tag is-pending" id="creditPendingTag" @unless($extraPending) hidden @endunless>{{ __('ui.extra_credits.pending_tag') }}</span>
               </div>
             </div>
                 <button class="dashboard-generate-btn" id="generateBtn" type="submit">
@@ -2967,6 +2987,7 @@
     </div>
   </main>
 
+  @include('components.extra-credits-dialog')
   @include('components.scripts')
   @php
     $dashboardI18n = [
@@ -3822,6 +3843,21 @@
       }
       const creditsLeftEl = document.getElementById('usageCreditsLeft');
       if (creditsLeftEl && usage.remaining_chars !== undefined) creditsLeftEl.textContent = formatNumber(usage.remaining_chars);
+      // Extra credits still left, beside the credits and on the month's chips.
+      if (usage.extra_chars !== undefined) {
+        const extra = Math.max(0, Number(usage.extra_chars) || 0);
+        const tag = document.getElementById('creditExtraTag');
+        if (tag) {
+          tag.hidden = extra <= 0;
+          tag.textContent = formatQuotaText(@json(__('ui.extra_credits.extra_tag')), { count: formatNumber(extra) });
+        }
+        const pendingTag = document.getElementById('creditPendingTag');
+        if (pendingTag && extra > 0) pendingTag.hidden = true;
+        const chip = document.getElementById('usageExtraChip');
+        if (chip) chip.hidden = extra <= 0;
+        const chipValue = document.getElementById('usageExtraLeft');
+        if (chipValue) chipValue.textContent = formatNumber(extra);
+      }
       const minutesLeftEl = document.getElementById('usageMinutesLeft');
       if (minutesLeftEl && usage.remaining_chars !== undefined) {
         minutesLeftEl.textContent = formatNumber(Math.floor(Math.max(0, Number(usage.remaining_chars) || 0) / {{ \App\Support\Credits::PER_MINUTE }}));
@@ -4535,6 +4571,20 @@
         if (data?.job) upsertJobRow(data.job);
         if (data?.usage) updateUsagePanel(data.usage);
         if (data?.stats) updateStats(data.stats);
+        // The credits ran out: a paid plan is offered extra credits, with the same words
+        // under the text once the dialog is closed without buying them.
+        if (!response.ok && data?.out_of_credits && window.ListenExtraCredits) {
+          const refusal = extractErrorMessage(data, i18n.voice_generation_failed, replyStatus);
+          generateBtn.disabled = false;
+          renderGenerateButtonContent(defaultText);
+          const opened = await window.ListenExtraCredits.open({
+            remaining: data.credits?.remaining,
+            needed: data.credits?.needed,
+            onClose: (purchased) => { if (!purchased) showFormMessage('error', refusal); },
+            onGenerate: () => { if (typeof voiceForm.requestSubmit === 'function') voiceForm.requestSubmit(generateBtn); },
+          });
+          if (opened) return;
+        }
         if (!response.ok || !data || data.ok === false) throw new Error(extractErrorMessage(data, i18n.voice_generation_failed, replyStatus));
         wasSuccessful = true;
         if (data?.job?.audio_url) {
@@ -4596,6 +4646,13 @@
       updateTranslateHint();
     });
     voiceForm?.addEventListener('submit', submitVoiceForm);
+    // Extra credits bought in their dialog: the balance shows them at once.
+    window.addEventListener('listen:usage', (event) => updateUsagePanel(event.detail?.usage));
+    window.addEventListener('listen:extra-credits-pending', () => {
+      const pendingTag = document.getElementById('creditPendingTag');
+      const extraTag = document.getElementById('creditExtraTag');
+      if (pendingTag && (!extraTag || extraTag.hidden)) pendingTag.hidden = false;
+    });
 
     if (oldVoice) {
       preferredVoiceKeyByLanguage[normalizeLanguage(targetLanguage?.value)] = String(oldVoice || '').trim();

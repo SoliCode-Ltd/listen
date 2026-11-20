@@ -17,6 +17,12 @@ class CharPackPurchase extends Model
 
     public const METHOD_CARD = 'card';
 
+    /** The one-time character pack (members without a paid plan). */
+    public const KIND_PACK = 'pack';
+
+    /** Extra credits a paid member adds to their plan (App\Services\Billing\ExtraCredits). */
+    public const KIND_EXTRA_CREDITS = 'extra_credits';
+
     protected $fillable = [
         'user_id',
         'plan_id',
@@ -31,6 +37,8 @@ class CharPackPurchase extends Model
         'failure_message',
         'paid_at',
         'refunded_at',
+        'kind',
+        'period_ym',
     ];
 
     protected $casts = [
@@ -40,6 +48,18 @@ class CharPackPurchase extends Model
         'paid_at' => 'datetime',
         'refunded_at' => 'datetime',
     ];
+
+    /** Extra credits for a paid plan, not a pack. */
+    public function isExtraCredits(): bool
+    {
+        return (string) $this->kind === self::KIND_EXTRA_CREDITS;
+    }
+
+    /** Whole minutes of voice the purchase's credits make. */
+    public function minutes(): int
+    {
+        return intdiv(max(0, (int) $this->chars), \App\Support\Credits::PER_MINUTE);
+    }
 
     public function user(): BelongsTo
     {

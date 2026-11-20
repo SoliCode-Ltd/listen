@@ -445,7 +445,8 @@ class BusinessStatsService
                 : [])
             ->flip();
         $manual = $this->hasTable('manual_payment_requests')
-            ? DB::table('manual_payment_requests')->where('status', 'approved')->get(['user_id', 'plan_id'])
+            // Plans paid by hand (a payment for extra credits pays for no plan).
+            ? DB::table('manual_payment_requests')->where('status', 'approved')->where('billing_cycle', '!=', 'extra_credits')->get(['user_id', 'plan_id'])
                 ->map(fn ($r) => $r->user_id.':'.$r->plan_id)->flip()
             : collect();
 
