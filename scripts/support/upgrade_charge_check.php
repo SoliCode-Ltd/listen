@@ -75,7 +75,10 @@ echo "== Member {$user->id} ==\n";
 $line('Joined', (string) $user->created_at);
 $line('Plan now', $active ? $active->slug.' ($'.number_format(((int) $active->price_cents) / 100, 2).', '.number_format((int) $active->monthly_chars).' credits a month)' : 'none');
 $period = CreditPeriod::current((int) $user->id);
-$snapshot = UsageSnapshot::for((int) $user->id, $plans->resolveQuotaPlanForUserId((int) $user->id), CreditPeriod::counter((int) $user->id));
+// Read only: the period's row as it is, or an empty one (counter() would make it).
+$counterNow = UsageCounter::query()->where('user_id', $user->id)->where('period_ym', $period['key'])->first()
+    ?? new UsageCounter(['user_id' => $user->id, 'period_ym' => $period['key'], 'total_chars' => 0, 'total_requests' => 0, 'total_minutes' => 0]);
+$snapshot = UsageSnapshot::for((int) $user->id, $plans->resolveQuotaPlanForUserId((int) $user->id), $counterNow);
 $line('Credit period now', $period['key'].' to '.$period['ends_at']->utc()->format('Y-m-d H:i').' UTC');
 $line('Credits in it: allowance / used / left', number_format((int) ($snapshot['plan_chars'] ?? 0)).' / '.number_format((int) ($snapshot['total_chars'] ?? 0)).' / '.number_format((int) ($snapshot['remaining_chars'] ?? 0)));
 
@@ -142,7 +145,8 @@ $line('Account credit with Stripe', $balance < 0 ? $money(-$balance, 'usd').' to
 echo "\n== If they moved up now (App\\Services\\Billing\\UnusedCredits) ==\n";
 $unused = app(\App\Services\Billing\UnusedCredits::class);
 $line('The database can mark a settled month', \App\Services\Billing\UnusedCredits::ready() ? 'yes' : 'NO: the migration has not run, moves up are counted in time');
-$standing = $unused->standing((int) $user->id);
+// Only a paid plan has unused credits to give back; standing() would also make the period's row.
+$standing = $active && (int) $active->price_cents > 0 && $counterNow->exists ? $unused->standing((int) $user->id) : null;
 if ($standing === null) {
     $line('Counted in', 'time left (no plan credits, or credits by calendar month)');
 } else {
