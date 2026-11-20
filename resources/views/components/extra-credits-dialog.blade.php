@@ -172,8 +172,11 @@
   .xc-lead { margin: 8px 0 0; font-size: .92rem; line-height: 1.75; color: var(--muted); }
   .xc-lead b { color: var(--text); font-weight: 600; }
   .xc-chips { margin-top: 18px; display: grid; grid-template-columns: repeat(var(--xc-n, 5), minmax(0, 1fr)); gap: 6px; }
-  .xc-chip { height: 44px; border-radius: 11px; border: 1px solid var(--line-strong, var(--line)); background: var(--surface); color: var(--text); font: inherit; font-size: .98rem; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease; }
-  .xc-chip:hover { border-color: color-mix(in oklab, var(--brand-accent) 45%, var(--line)); }
+  /* Chosen in one move: the border and the inner ring change colour together, from the same
+     start (the ring is there all along, transparent), so the bold edge never builds in steps.
+     Hover only tints the background and leaves the edge alone. */
+  .xc-chip { height: 44px; border-radius: 11px; border: 1px solid var(--line-strong, var(--line)); box-shadow: inset 0 0 0 1px transparent; background: var(--surface); color: var(--text); font: inherit; font-size: .98rem; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color .18s ease-out, box-shadow .18s ease-out, background-color .18s ease-out, color .18s ease-out; }
+  @media (hover: hover) { .xc-chip:not([aria-checked="true"]):hover { background: var(--surface2); } }
   .xc-chip[aria-checked="true"] { border-color: var(--brand-accent); box-shadow: inset 0 0 0 1px var(--brand-accent); background: var(--xc-tint); color: var(--accent-text, var(--brand-accent)); }
   .xc-summary { margin-top: 12px; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; background: var(--surface2); }
   .xc-summary-t { display: grid; line-height: 1.4; flex: 1; min-width: 0; }
@@ -555,6 +558,8 @@
       if (!s || wallet || !preset()) return;
       wallet = window.ListenWalletButton(s, 'xc-wallet', {
         mode: 'payment',
+        // Side by side, each wallet in its own half, at any width of the dialog.
+        sideBySide: true,
         amount: preset().amount_cents,
         onOpen: () => { walletOpen = true; },
         onCancel: () => { walletOpen = false; },
