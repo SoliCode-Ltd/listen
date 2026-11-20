@@ -40,6 +40,11 @@ name: Server deploy
 #            the last 14 days and OpenAI's answers, what was kept from one
 #            Stripe customer's checkout (input "customer", optional) and the
 #            log's ChatGPT Ads lines. Prints member ids only.
+#   ads-sources: read-only (READ ONLY database session). Where paying members came
+#            from, as the site recorded it: payments, new plans and plan changes
+#            and how many came from a ChatGPT ad click, purchases and trials from a
+#            Google Ads click, and new accounts, since 18 November and over the last
+#            7 and 30 days (scripts/support/ads_sources_check.php). Counts only.
 #   plan-audit: read-only. Every member on a paid plan with no card
 #            subscription: how the plan is saved, whether anything was paid
 #            for it, and whether it needs a look. Writes nothing; prints
@@ -262,7 +267,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, content-check, upgrade-check, upgrade-test, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, content-check, upgrade-check, upgrade-test, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, ads-sources, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
         default: inspect
       customer:
         description: "billing-trace and chatgpt-ads-check: the Stripe customer id (cus_...)"
@@ -579,6 +584,12 @@ jobs:
             tool chatgpt_ads_check.php | $S "$FIND; CUSTOMER='$CUSTOMER' php"
             rm -f ~/.ssh/id_deploy
             exit 0
+          fi
+          if [ "$MODE" = ads-sources ]; then
+            failed=0
+            tool ads_sources_check.php | $S "$FIND; php" || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
           fi
           if [ "$MODE" = data-checks ]; then
             tool data_checks.php | $S "$FIND; php"
