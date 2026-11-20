@@ -184,7 +184,10 @@ try {
             'stripe_status' => (string) $sub->status, 'stripe_price' => $low->id, 'quantity' => 1,
         ]);
         $local->items()->create(['stripe_id' => $item->id, 'stripe_product' => (string) $item->price->product, 'stripe_price' => $low->id, 'quantity' => 1]);
-        Subscription::withoutEvents(fn () => app(PlanAccessService::class)->assignPlan($user, $starter, 'active', $end, $start));
+        // On the site the month began ten days ago, as for a member part-way through it. (Stripe's
+        // sandbox starts it now; begun in the same minute as the move up, the site would see one
+        // period, not two, and there would be no new month to start full.)
+        Subscription::withoutEvents(fn () => app(PlanAccessService::class)->assignPlan($user, $starter, 'active', $end->copy()->subDays(10), $start->copy()->subDays(10)));
         CreditPeriod::counter((int) $user->id)->forceFill(['total_chars' => $used, 'total_requests' => 3])->save();
 
         return ['user' => $user, 'local' => $local, 'sub' => (string) $sub->id, 'customer' => (string) $customer->id];
