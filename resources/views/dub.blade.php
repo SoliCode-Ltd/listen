@@ -49,5 +49,6 @@
   <script src="{{ asset('js/voice-studio-icons.js') }}?v={{ filemtime(public_path('js/voice-studio-icons.js')) }}" defer></script>
   <script src="{{ asset('js/dub-studio.js') }}?v={{ filemtime(public_path('js/dub-studio.js')) }}" defer></script>
   <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
+  <script src="{{ asset('js/glide.js') }}?v={{ filemtime(public_path('js/glide.js')) }}" defer></script>
 </body>
 </html>

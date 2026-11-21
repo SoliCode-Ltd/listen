@@ -6483,5 +6483,6 @@
     <script src="{{ asset('js/voice-design.js') }}?v={{ filemtime(public_path('js/voice-design.js')) }}" defer></script>
   @endif
   <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
+  <script src="{{ asset('js/glide.js') }}?v={{ filemtime(public_path('js/glide.js')) }}" defer></script>
 </body>
 </html>

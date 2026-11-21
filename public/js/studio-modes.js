@@ -17,8 +17,21 @@
     if (!host) return;
     var tabs = sw.querySelectorAll('[data-studio-tab]');
     var modes = Array.prototype.map.call(tabs, function (tab) { return tab.dataset.studioTab; });
+    var panes = host.querySelectorAll('[data-studio-pane]');
+    function shows(pane, mode) { return (' ' + pane.getAttribute('data-studio-pane') + ' ').indexOf(' ' + mode + ' ') >= 0; }
     function set(mode, remember) {
+      var was = host.getAttribute('data-studio');
       host.setAttribute('data-studio', mode);
+      // What this mode shows and the last one did not comes in gently (css/studio-modes.css); what both
+      // show stays still. Not when the page first opens.
+      if (sw.classList.contains('is-ready') && was && was !== mode) {
+        panes.forEach(function (pane) {
+          if (!shows(pane, mode) || shows(pane, was)) return;
+          pane.classList.remove('studio-pane-in');
+          void pane.offsetWidth;
+          pane.classList.add('studio-pane-in');
+        });
+      }
       tabs.forEach(function (tab) { tab.setAttribute('aria-selected', tab.dataset.studioTab === mode ? 'true' : 'false'); });
       if (remember) {
         try { window.localStorage.setItem(MODE_KEY, mode); } catch (e) { /* no storage */ }
@@ -48,6 +61,10 @@
     });
     requestAnimationFrame(function () { sw.classList.add('is-ready'); });
   }
+
+  document.addEventListener('animationend', function (e) {
+    if (e.animationName === 'studio-pane-in' && e.target.classList) e.target.classList.remove('studio-pane-in');
+  });
 
   function boot() { document.querySelectorAll('[data-studio-switch]').forEach(initSwitch); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

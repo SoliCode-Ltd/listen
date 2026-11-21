@@ -6,7 +6,7 @@
   #voice-agent in the address opens that side.
 --}}
 @props(['design' => false, 'dub' => false, 'stt' => false, 'agent' => false])
-<div class="studio-modes" role="tablist" aria-label="{{ __('ui.dub.modes_label') }}" data-studio-switch>
+<div class="studio-modes" role="tablist" aria-label="{{ __('ui.dub.modes_label') }}" data-studio-switch data-glide="aria-selected">
   <button type="button" role="tab" class="studio-mode" data-studio-tab="tts" aria-selected="true">
     <span class="studio-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><path d="M17 14v6M20 15.5v3M14 16v2"/></svg></span>
     <span class="studio-mode-text">

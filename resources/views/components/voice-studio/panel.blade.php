@@ -72,7 +72,7 @@
 
   <div class="vs-lib" data-vs-library>
     <select name="voice_key" id="{{ $prefix }}voice_key" class="vs-hidden-field" tabindex="-1" aria-hidden="true" data-speaker-avatar></select>
-    <div class="vs-lib-tabs" role="tablist" aria-label="{{ __('ui.dashboard.library.title') }}">
+    <div class="vs-lib-tabs" data-glide="aria-selected" role="tablist" aria-label="{{ __('ui.dashboard.library.title') }}">
       <button type="button" class="vs-lib-tab" role="tab" data-vs-lib-tab="all" aria-selected="true">{{ __('ui.dashboard.library.all') }} <small data-vs-lib-count="all"></small></button>
       <button type="button" class="vs-lib-tab" role="tab" data-vs-lib-tab="favorites" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.4-7.5-10A4.3 4.3 0 0 1 12 7.8a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10-7.5 10z"/></svg>{{ __('ui.dashboard.library.favorites') }} <small data-vs-lib-count="favorites"></small></button>
       <button type="button" class="vs-lib-tab" role="tab" data-vs-lib-tab="mine" aria-selected="false" hidden>{{ __('ui.dashboard.library.mine') }} <small data-vs-lib-count="mine"></small></button>
@@ -82,14 +82,14 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input type="search" autocomplete="off" placeholder="{{ __('ui.dashboard.library.search') }}" aria-label="{{ __('ui.dashboard.library.search') }}" data-vs-lib-search>
       </label>
-      <div class="vs-lib-gender" role="group" aria-label="{{ __('ui.dashboard.library.gender') }}">
+      <div class="vs-lib-gender" data-glide="aria-pressed" role="group" aria-label="{{ __('ui.dashboard.library.gender') }}">
         <button type="button" data-vs-lib-gender="" aria-pressed="true">{{ __('ui.dashboard.library.any') }}</button>
         <button type="button" data-vs-lib-gender="female" aria-pressed="false">{{ __('ui.dashboard.library.female') }}</button>
         <button type="button" data-vs-lib-gender="male" aria-pressed="false">{{ __('ui.dashboard.library.male') }}</button>
       </div>
     </div>
     {{-- Age, with the gender: an age shows only when the language has speakers of that age. --}}
-    <div class="vs-lib-age" role="group" aria-label="{{ __('ui.dashboard.library.age') }}">
+    <div class="vs-lib-age" data-glide="aria-pressed" role="group" aria-label="{{ __('ui.dashboard.library.age') }}">
       @foreach (['any', ...\App\Support\SpeakerVoices::AGES] as $vsAge)
         <button type="button" data-vs-lib-age="{{ $vsAge === 'any' ? '' : $vsAge }}" aria-pressed="{{ $vsAge === 'any' ? 'true' : 'false' }}" aria-label="{{ __('ui.dashboard.library.age_'.$vsAge) }}" @if($vsAge !== 'any') hidden @endif><span class="vs-age-long">{{ __('ui.dashboard.library.age_'.$vsAge) }}</span><span class="vs-age-short" aria-hidden="true">{{ __('ui.dashboard.library.age_short.'.$vsAge) }}</span></button>
       @endforeach
