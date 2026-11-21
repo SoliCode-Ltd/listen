@@ -2032,3 +2032,40 @@ html[dir="rtl"] .vs-pron-arrow { transform: scaleX(-1); }
   .vs-pron-save { flex: 1; }
   .vs-tb-pron .vs-tb-label { max-width: 11rem; }
 }
+
+/*
+ * The library's tabs, gender and age: the chosen button's highlight is one layer (js/glide.js) that
+ * glides to the new choice instead of jumping, each in its own look. Until the script has placed it
+ * (or without it), the chosen button keeps its own highlight above.
+ */
+.vs-lib-tabs[data-glide], .vs-lib-gender[data-glide], .vs-lib-age[data-glide] { position: relative; isolation: isolate; }
+.vs-lib-tabs[data-glide] > button, .vs-lib-gender[data-glide] > button, .vs-lib-age[data-glide] > button { position: relative; z-index: 1; transition: color .2s ease; }
+.vs-lib-tabs .glide-thumb, .vs-lib-gender .glide-thumb, .vs-lib-age .glide-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform .25s cubic-bezier(.4, 0, .2, 1), width .25s cubic-bezier(.4, 0, .2, 1), height .25s cubic-bezier(.4, 0, .2, 1), opacity .2s ease;
+  will-change: transform, width;
+}
+.vs-lib-tabs .glide-thumb {
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 2px 8px -3px rgba(20, 10, 60, .18), 0 0 0 1px color-mix(in oklab, var(--line) 80%, transparent);
+}
+.vs-lib-tabs.has-glide .vs-lib-tab[aria-selected="true"] { background: transparent; box-shadow: none; }
+.vs-lib-tab svg { transition: color .2s ease, fill .2s ease; }
+.vs-lib-gender .glide-thumb { border-radius: 8px; background: var(--a, #7659FA); }
+.vs-lib-gender.has-glide button[aria-pressed="true"] { background: transparent; }
+.vs-lib-age .glide-thumb {
+  border: 1px solid color-mix(in oklab, var(--a, #7659FA) 35%, transparent);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--a, #7659FA) 12%, transparent);
+}
+.vs-lib-age.has-glide button[aria-pressed="true"] { background: transparent; border-color: transparent; }
+@media (prefers-reduced-motion: reduce) {
+  .vs-lib-tabs .glide-thumb, .vs-lib-gender .glide-thumb, .vs-lib-age .glide-thumb { transition: none; }
+}

@@ -29,7 +29,7 @@
   cursor: pointer;
 }
 /* Animated once the page has opened on its side. */
-.studio-modes.is-ready .studio-mode { transition: background .18s ease, color .18s ease, box-shadow .18s ease; }
+.studio-modes.is-ready .studio-mode { transition: background .2s ease, color .2s ease, box-shadow .2s ease, border-color .2s ease; }
 .studio-mode:hover { color: var(--text); }
 .studio-mode[aria-selected="true"] {
   background: var(--surface);
@@ -47,7 +47,20 @@
   background: color-mix(in oklab, var(--a) 12%, transparent);
   color: var(--a);
 }
-.studio-mode[aria-selected="true"] .studio-mode-icon { background: linear-gradient(135deg, var(--a), color-mix(in oklab, var(--b) 70%, #c084fc)); color: #fff; }
+/* The chosen icon's colour fades in (a gradient itself cannot be animated, so it sits on a layer). */
+.studio-mode-icon { position: relative; overflow: hidden; transition: color .25s ease; }
+.studio-mode-icon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--a), color-mix(in oklab, var(--b) 70%, #c084fc));
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.studio-mode-icon svg { position: relative; }
+.studio-mode[aria-selected="true"] .studio-mode-icon { color: #fff; }
+.studio-mode[aria-selected="true"] .studio-mode-icon::before { opacity: 1; }
 .studio-mode-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 /* Wraps rather than cuts: Arabic letters that reach below the line (ى، ي، ج) need the room. */
 .studio-mode-text { display: grid; gap: .2rem; min-width: 0; line-height: 1.5; }
@@ -84,4 +97,48 @@
   .studio-mode-text small { display: block; font-size: .78rem; line-height: 1.45; overflow-wrap: normal; text-wrap: pretty; }
   /* The full-width last tile reads as a row: icon beside its words. */
   .studio-mode:last-child:nth-child(odd) { flex-direction: row; align-items: center; gap: .7rem; }
+}
+
+/*
+ * The chosen tab's raised card is one layer (js/glide.js) that glides from tab to tab, instead of
+ * one card disappearing and another appearing. Until the script has placed it (or without it), the
+ * chosen tab keeps its own card above.
+ */
+.studio-modes[data-glide] { position: relative; isolation: isolate; }
+.studio-modes > .studio-mode { position: relative; z-index: 1; }
+.studio-modes .glide-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(15, 12, 40, .06), 0 6px 18px -8px color-mix(in oklab, var(--a) 45%, transparent);
+  box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform .25s cubic-bezier(.4, 0, .2, 1), width .25s cubic-bezier(.4, 0, .2, 1), height .25s cubic-bezier(.4, 0, .2, 1), opacity .2s ease;
+  will-change: transform, width, height;
+}
+.studio-modes.has-glide .studio-mode[aria-selected="true"] { background: transparent; box-shadow: none; border-color: transparent; }
+@media (max-width: 899px) {
+  .studio-modes .glide-thumb { border-color: color-mix(in oklab, var(--a) 42%, transparent); }
+}
+@media (max-width: 640px) {
+  .studio-modes .glide-thumb { border-radius: 12px; }
+}
+
+/* What the new mode shows comes in gently, instead of the page changing in one frame (js/studio-modes.js). */
+@keyframes studio-pane-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+[data-studio-pane].studio-pane-in { animation: studio-pane-in .25s cubic-bezier(.4, 0, .2, 1) backwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-modes .glide-thumb,
+  .studio-mode-icon,
+  .studio-mode-icon::before { transition: none; }
+  [data-studio-pane].studio-pane-in { animation: none; }
 }
