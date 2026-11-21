@@ -6,6 +6,7 @@ use App\Http\Middleware\CaptureAdClickId;
 use App\Models\SiteSetting;
 use App\Support\InApp\InApp;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Visit recordings and heatmaps (Microsoft Clarity, SEO Settings → Visit recordings), on the
@@ -44,10 +45,13 @@ final class Clarity
     /** Pages for signed-in members: the free demo. */
     public const MEMBER_PAGES = ['demo.page'];
 
+    /** Both settings, kept together so a page reads them with one cache look-up (SiteSetting::set forgets it). */
+    public const CACHE = 'clarity.settings';
+
     /** The Clarity project's ID (the short code at the end of its install code), when it looks like one. */
     public static function projectId(): ?string
     {
-        $id = trim((string) SiteSetting::get(self::PROJECT, ''));
+        $id = trim((string) (self::settings()[self::PROJECT] ?? ''));
 
         return preg_match('/^[a-z0-9]{6,20}$/i', $id) === 1 ? $id : null;
     }
@@ -55,24 +59,47 @@ final class Clarity
     /** Switched on, with a project, on the live site. */
     public static function enabled(): bool
     {
-        return (string) SiteSetting::get(self::ENABLED, '0') === '1'
-            && self::projectId() !== null
-            && LiveServer::allowsCustomerActions();
+        return LiveServer::allowsCustomerActions()
+            && (string) (self::settings()[self::ENABLED] ?? '0') === '1'
+            && self::projectId() !== null;
+    }
+
+    /**
+     * The project to load on this page, or null. The page's own checks come first and cost nothing, so a
+     * page that never records (the studio, account and billing pages) reads no setting at all.
+     */
+    public static function forPage(Request $request): ?string
+    {
+        if ($request->route() === null) {
+            return null;
+        }
+
+        $user = $request->user();
+        $allowed = $user === null
+            ? $request->routeIs(...self::PUBLIC_PAGES)
+            : ! $user->is_admin && $request->routeIs(...self::MEMBER_PAGES);
+
+        if (! $allowed || InApp::active($request) || ! self::enabled()) {
+            return null;
+        }
+
+        return self::projectId();
     }
 
     /** Whether this page may load the recorder (the visitor's country is asked for by the page). */
     public static function offeredOn(Request $request): bool
     {
-        if (! self::enabled() || $request->route() === null || InApp::active($request)) {
-            return false;
-        }
+        return self::forPage($request) !== null;
+    }
 
-        $user = $request->user();
-        if ($user === null) {
-            return $request->routeIs(...self::PUBLIC_PAGES);
-        }
-
-        return ! $user->is_admin && $request->routeIs(...self::MEMBER_PAGES);
+    /** @return array<string, string> */
+    private static function settings(): array
+    {
+        return Cache::remember(self::CACHE, 3600, fn (): array => SiteSetting::query()
+            ->whereIn('key', [self::ENABLED, self::PROJECT])
+            ->pluck('value', 'key')
+            ->map(fn ($value): string => (string) $value)
+            ->all());
     }
 
     /** Whether this visitor may be recorded: their country is known and not where the consent rules apply. */

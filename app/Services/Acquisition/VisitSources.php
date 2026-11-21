@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Cookie as SymfonyCookie;
 
+use function Illuminate\Support\defer;
+
 /**
  * How visitors find the site, until they sign up.
  *
@@ -80,30 +82,45 @@ class VisitSources
     /**
      * A new account: keep how its member found the site. Called when any account is made (User::created),
      * so it keeps nothing unless a visitor made it for themselves: a visitor's request, nobody signed in.
+     * Only the request's own cookie and country are read now; the record is written once the answer has
+     * gone back to the new member (defer), so signing up waits for none of it.
      */
     public function recordSignUp(User $user, ?Request $request = null): void
     {
         try {
             $request ??= request();
-            if (! MemberSource::ready() || $request->route() === null || Auth::guard('web')->check()) {
-                return;
-            }
-            if (MemberSource::query()->where('user_id', $user->id)->exists()) {
+            if ($request->route() === null || Auth::guard('web')->check()) {
                 return;
             }
 
             $visits = CaptureAdClickId::mayTrack($request) ? $this->read($request) : null;
-            MemberSource::fromVisits((int) $user->id, $visits, $this->platform($request))->save();
-
+            $platform = $this->platform($request);
             if ($visits !== null) {
                 Cookie::queue(Cookie::forget(self::COOKIE));
             }
+
+            $userId = (int) $user->id;
+            defer(function () use ($userId, $visits, $platform): void {
+                try {
+                    if (! MemberSource::ready() || MemberSource::query()->where('user_id', $userId)->exists()) {
+                        return;
+                    }
+                    MemberSource::fromVisits($userId, $visits, $platform)->save();
+                } catch (\Throwable $e) {
+                    self::couldNotKeep($userId, $e);
+                }
+            }, always: true);
         } catch (\Throwable $e) {
-            Log::warning('Could not keep how a new member found the site.', [
-                'user_id' => $user->id,
-                'exception' => $e->getMessage(),
-            ]);
+            self::couldNotKeep((int) $user->id, $e);
         }
+    }
+
+    private static function couldNotKeep(int $userId, \Throwable $e): void
+    {
+        Log::warning('Could not keep how a new member found the site.', [
+            'user_id' => $userId,
+            'exception' => $e->getMessage(),
+        ]);
     }
 
     /** android or ios when the account is made in the phone app (or the sign-in tab it opened), else null. */

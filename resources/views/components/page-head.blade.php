@@ -19,8 +19,9 @@
   @include('components.landed')
   @endunless
   {{-- Visit recordings: the public pages and the free demo only (App\Support\Clarity). --}}
-  @if(\App\Support\Clarity::offeredOn(request()))
-  @include('components.clarity', ['projectId' => \App\Support\Clarity::projectId()])
+  @php($clarityProject = \App\Support\Clarity::forPage(request()))
+  @if($clarityProject !== null)
+  @include('components.clarity', ['projectId' => $clarityProject])
   @endif
   @include('components.seo', ['pageTitle' => $pageTitle, 'page' => $page, 'faqItems' => $faqItems])
   @include('components.site-fonts')
