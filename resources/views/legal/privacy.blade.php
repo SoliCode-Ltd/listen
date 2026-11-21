@@ -52,6 +52,9 @@
       color: var(--muted);
       line-height: 1.65;
     }
+    .legal-section p + p {
+      margin-top: .75rem;
+    }
     .legal-section ul {
       margin: .55rem 0 0 0;
       padding-left: 1.15rem;
@@ -111,6 +114,7 @@
           <li>{{ __('ui.legal.privacy.s1_14') }}</li>
           <li>{{ __('ui.legal.privacy.s1_15') }}</li>
           <li>{{ __('ui.legal.privacy.s1_16') }}</li>
+          <li>{{ __('ui.legal.privacy.s1_17') }}</li>
         </ul>
       </section>
 
@@ -138,6 +142,12 @@
       <section class="legal-section">
         <h2>{{ __('ui.legal.privacy.s5_title') }}</h2>
         <p>{{ __('ui.legal.privacy.s5_body') }}</p>
+        {{-- Visit recordings (App\Support\Clarity): its terms ask the privacy notice to say this and to link Microsoft's statement. --}}
+        <p>{{ __('ui.legal.privacy.s5_clarity') }}</p>
+        <ul>
+          <li><a href="https://privacy.microsoft.com/en-us/privacystatement" target="_blank" rel="noopener">{{ __('ui.legal.privacy.s5_clarity_microsoft') }}</a></li>
+          <li><a href="{{ route('legal.cookies') }}#recordings">{{ __('ui.legal.privacy.s5_clarity_off') }}</a></li>
+        </ul>
       </section>
 
       <section class="legal-section">

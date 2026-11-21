@@ -29,7 +29,7 @@ class IphoneAiConsentTest extends InAppTestCase
         'login', 'login.submit', 'logout', 'manage-subscription.page', 'mcp', 'mcp.*', 'media.file',
         'newsletter.unsubscribe', 'pack.start', 'passport.*', 'password.*', 'pricing', 'referral.*', 'register',
         'register.submit', 'robots', 'samples', 'seo.*', 'site.webmanifest', 'sitemap', 'storage.*', 'trial.start',
-        'v1.*', 'verification.*',
+        'v1.*', 'verification.*', 'visit-check',
     ];
 
     protected function appUserAgent(): string

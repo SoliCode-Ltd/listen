@@ -167,7 +167,7 @@
             </x-voice-studio.setbar>
             <div class="tag-editor" data-vs-editor>
               <div class="tag-editor-backdrop" data-vs-backdrop aria-hidden="true" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}"></div>
-              <textarea id="text" name="text" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" placeholder="{{ __('ui.dashboard.paste_text') }}" aria-label="{{ __('ui.dashboard.text_box_label') }}" required></textarea>
+              <textarea id="text" name="text" data-clarity-mask="True" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" placeholder="{{ __('ui.dashboard.paste_text') }}" aria-label="{{ __('ui.dashboard.text_box_label') }}" required></textarea>
             </div>
             <div class="demo-samples">
               <div class="sample-chips">
