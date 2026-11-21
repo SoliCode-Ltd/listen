@@ -165,7 +165,7 @@ class BusinessStatsDashboardTest extends TestCase
         $reader->close();
         unlink($path);
 
-        $this->assertSame(['Summary', 'Monthly', 'Cohorts', 'Plans', 'API usage', 'API by model (30d)', 'API by model (period)', 'API monthly', 'Plan quota usage', 'Countries', 'Regions', 'Breakdowns'], $names);
+        $this->assertSame(['Summary', 'Monthly', 'Cohorts', 'Plans', 'API usage', 'API by model (30d)', 'API by model (period)', 'API monthly', 'Plan quota usage', 'Countries', 'Regions', 'Member sources', 'Payments by source', 'Breakdowns'], $names);
         $this->assertEquals(3, $summary['Total members (excl. admins)']);
         // No Stripe key in tests: the list-price estimate, and the sheet says which.
         $this->assertSame('List-price estimate (Stripe not read)', $summary['MRR source']);
@@ -179,7 +179,7 @@ class BusinessStatsDashboardTest extends TestCase
 
         $this->actingAs($admin)->get('/admin')->assertOk()->assertSee('Investor report (PDF)')->assertSee('Raw data (Excel)');
         $this->assertSame(
-            ['ApiCostChart', 'ApiUsageBreakdown', 'ApiUsageKpis', 'BusinessBreakdowns', 'BusinessGrowthChart', 'BusinessGrowthKpis', 'BusinessPaymentMethods', 'BusinessProductKpis', 'BusinessRevenueChart', 'BusinessRevenueKpis', 'BusinessUsageChart', 'ExpectedIncome'],
+            ['ApiCostChart', 'ApiUsageBreakdown', 'ApiUsageKpis', 'BusinessBreakdowns', 'BusinessGrowthChart', 'BusinessGrowthKpis', 'BusinessPaymentMethods', 'BusinessProductKpis', 'BusinessRevenueChart', 'BusinessRevenueKpis', 'BusinessSources', 'BusinessUsageChart', 'ExpectedIncome'],
             collect(\Filament\Facades\Filament::getPanel('admin')->getWidgets())->map(fn ($w) => class_basename($w))->sort()->values()->all(),
             'Only the business widgets should be on the dashboard.'
         );
@@ -232,6 +232,7 @@ class BusinessStatsDashboardTest extends TestCase
             \App\Filament\Widgets\ExpectedIncome::class => 'Expected monthly income',
             \App\Filament\Widgets\BusinessProductKpis::class => 'Failure rate',
             \App\Filament\Widgets\BusinessBreakdowns::class => 'Signup cohorts',
+            \App\Filament\Widgets\BusinessSources::class => 'Where members come from',
             \App\Filament\Widgets\BusinessGrowthChart::class => 'Growth',
             \App\Filament\Widgets\BusinessUsageChart::class => 'Usage',
             \App\Filament\Widgets\BusinessRevenueChart::class => 'Monetisation',

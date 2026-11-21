@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Services\Acquisition\VisitSources;
 use App\Services\PlanAccessService;
 use App\Support\MailboxKey;
 use Database\Factories\UserFactory;
@@ -52,6 +53,10 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
                     'exception_message' => $e->getMessage(),
                 ]);
             }
+
+            // How the member found the site, when they made the account themselves (every way of
+            // signing up passes here: email, Google, Apple, phone, the app). Never fails the sign-up.
+            app(VisitSources::class)->recordSignUp($user);
         });
     }
 
@@ -125,6 +130,12 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
     public function referralProfile(): HasOne
     {
         return $this->hasOne(UserReferralProfile::class);
+    }
+
+    /** How the member found the site, kept when they signed up (App\Services\Acquisition\VisitSources). */
+    public function memberSource(): HasOne
+    {
+        return $this->hasOne(MemberSource::class);
     }
 
     public function referralsMade(): HasMany

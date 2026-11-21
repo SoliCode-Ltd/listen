@@ -19,7 +19,7 @@ class LegalPagesTest extends TestCase
     public function test_the_privacy_policy_says_what_is_kept_and_where_it_goes(): void
     {
         $this->page('en', 'legal.privacy')
-            ->assertSee('Effective date: November 10, 2026')
+            ->assertSee('Effective date: November 21, 2026')
             // The phone app: its notification address and its use of the microphone.
             ->assertSee('In the Listen phone app: if you allow notifications')
             ->assertSee('It is removed when you sign out of the app or turn its notifications off.')
@@ -38,7 +38,7 @@ class LegalPagesTest extends TestCase
             ->assertDontSee('through your dashboard');
 
         $this->page('ar', 'legal.privacy')
-            ->assertSee('تاريخ السريان: 10 نوفمبر 2026')
+            ->assertSee('تاريخ السريان: 21 نوفمبر 2026')
             ->assertSee('في تطبيق إسمع على الهاتف: إذا سمحت بالإشعارات')
             ->assertSee('إن اتصلت بمساعدنا على موقعنا وأنت مسجّل الدخول، ليعرف فريقنا من اتصل')
             ->assertSee('يُحفظ النص الذي تحوّله مع صوته في سجلك إلى أن تحذفه.')
@@ -57,10 +57,10 @@ class LegalPagesTest extends TestCase
     public function test_the_cookie_policy_names_the_free_demos_device_cookie_and_fingerprint(): void
     {
         $this->page('en', 'legal.cookies')
-            ->assertSee('Effective date: October 28, 2026')
+            ->assertSee('Effective date: November 21, 2026')
             ->assertSee('including a device cookie and a fingerprint of your device (kept in a cookie and in your browser&#039;s storage), so the free demo is used only once per device', false);
         $this->page('ar', 'legal.cookies')
-            ->assertSee('تاريخ السريان: 28 أكتوبر 2026')
+            ->assertSee('تاريخ السريان: 21 نوفمبر 2026')
             ->assertSee('ومنها ملف تعريف ارتباط للجهاز وبصمة لجهازك (تُحفظ في ملف تعريف ارتباط وفي مساحة التخزين بمتصفحك)');
     }
 

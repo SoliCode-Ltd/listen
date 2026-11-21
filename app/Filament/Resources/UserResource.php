@@ -20,6 +20,8 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use App\Filament\Resources\UserResource\RelationManagers\FeatureGrantsRelationManager;
+use App\Models\MemberSource;
+use App\Support\Acquisition\Channels;
 use App\Filament\Resources\UserResource\Pages\ListUsers;
 use App\Filament\Resources\UserResource\Pages\CreateUser;
 use App\Filament\Resources\UserResource\Pages\ViewUser;
@@ -195,6 +197,31 @@ HTML;
                                 return new HtmlString('<ul style="margin: 0; padding-left: 18px;">'.$items.'</ul>');
                             }),
                     ]),
+                Section::make('How they found us')
+                    ->description('Kept when the account was made (Dashboard → Where members come from).')
+                    ->columns(2)
+                    ->collapsible()
+                    ->visible(fn (string $operation): bool => $operation !== 'create')
+                    ->schema([
+                        Placeholder::make('source_came_from')
+                            ->label('Came from (the last place before signing up)')
+                            ->content(fn (?User $record): string => self::sourceLine($record?->memberSource, false)),
+                        Placeholder::make('source_first_visit')
+                            ->label('First visit')
+                            ->content(fn (?User $record): string => self::sourceLine($record?->memberSource, true)),
+                        Placeholder::make('source_campaign')
+                            ->label('Campaign')
+                            ->content(fn (?User $record): string => $record?->memberSource?->campaign ?: '–'),
+                        Placeholder::make('source_page')
+                            ->label('First page they opened')
+                            ->content(fn (?User $record): string => $record?->memberSource?->landing_path ?: '–'),
+                        Placeholder::make('source_site')
+                            ->label('Website they came from')
+                            ->content(fn (?User $record): string => $record?->memberSource?->referrer_host ?: '–'),
+                        Placeholder::make('source_signed_up_in')
+                            ->label('Signed up in')
+                            ->content(fn (?User $record): string => $record?->memberSource?->signedUpInLabel() ?? '–'),
+                    ]),
                 Section::make(__('ui.admin.users.oauth_section'))
                     ->columns(2)
                     ->schema([
@@ -239,7 +266,7 @@ HTML;
         return $table
             // Each row's plan and demo characters, for the whole page in two queries (not three a row).
             ->modifyQueryUsing(fn (Builder $query) => $query
-                ->with('latestActiveSubscription.plan')
+                ->with('latestActiveSubscription.plan', 'memberSource')
                 ->withSum('demoVoiceGenerations as demo_chars_list_sum', 'billable_chars')
                 ->withExists('demoVoiceGenerations as has_demo_history')
                 ->withExists('planSubscriptions as has_any_subscription'))
@@ -305,6 +332,13 @@ HTML;
                     ->placeholder('—')
                     ->searchable()
                     ->sortable()
+                    ->toggleable(),
+                // How they found the site, kept at sign-up (the dashboard's "Where members come from" counts these).
+                TextColumn::make('memberSource.channel')
+                    ->label('Came from')
+                    ->formatStateUsing(fn (?string $state) => Channels::label($state))
+                    ->description(fn (User $record): ?string => ($detail = $record->memberSource?->detail) !== null && $detail !== Channels::label($record->memberSource?->channel) ? $detail : null)
+                    ->placeholder('Not recorded')
                     ->toggleable(),
                 TextColumn::make('phone_number')
                     ->label(__('ui.admin.users.phone_number'))
@@ -393,6 +427,16 @@ HTML;
                         null, '' => $query,
                         '__unknown' => $query->whereNull('country_code'),
                         default => $query->where('country_code', $data['value']),
+                    }),
+                SelectFilter::make('came_from')
+                    ->label('Came from')
+                    ->options(Channels::LABELS)
+                    ->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {
+                        null, '' => $query,
+                        // Not recorded: nothing kept, or joined before sources were kept.
+                        Channels::UNKNOWN => $query->where(fn (Builder $q) => $q->doesntHave('memberSource')
+                            ->orWhereHas('memberSource', fn (Builder $m) => $m->where('channel', Channels::UNKNOWN))),
+                        default => $query->whereHas('memberSource', fn (Builder $m) => $m->where('channel', $data['value'])),
                     }),
                 TernaryFilter::make('is_admin')
                     ->label(__('ui.admin.users.admin_filter')),
@@ -569,6 +613,28 @@ HTML;
             'view' => ViewUser::route('/{record}'),
             'edit' => EditUser::route('/{record}/edit'),
         ];
+    }
+
+    /** "Search results · Google, 12 Dec 2026 14:05" for the member's source (or their first visit). */
+    private static function sourceLine(?MemberSource $source, bool $first): string
+    {
+        if ($source === null) {
+            return 'Not recorded (joined before this was kept)';
+        }
+
+        $channel = $first ? ($source->first_channel ?? $source->channel) : $source->channel;
+        $detail = $first ? ($source->first_detail ?? $source->detail) : $source->detail;
+        $at = $first ? ($source->first_came_at ?? $source->came_at) : $source->came_at;
+        if ($channel === Channels::UNKNOWN) {
+            return 'Nothing could be kept (cookies blocked, or a visitor from the UK, the EEA or Switzerland)';
+        }
+
+        $line = Channels::label($channel);
+        if ($detail !== null && $detail !== '' && $detail !== $line) {
+            $line .= ' · '.$detail;
+        }
+
+        return $at !== null ? $line.', '.$at->format('j M Y H:i') : $line;
     }
 
     /** Counted once for each row on the page (its badge asks again for its colour); none to count without signals. */

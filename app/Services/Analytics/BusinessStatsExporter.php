@@ -2,6 +2,7 @@
 
 namespace App\Services\Analytics;
 
+use App\Services\Acquisition\SourceReport;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Style;
 use OpenSpout\Writer\XLSX\Writer;
@@ -191,6 +192,27 @@ class BusinessStatsExporter
             'paying' => $r['paying'],
         ], $audience['countries'] ?? []));
         $sheets['Regions'] = $this->table($audience['regions'] ?? []);
+
+        // Where the period's new members came from (SourceReport): each source, then its sites, networks or links.
+        $sources = $s['sources'] ?? [];
+        $sourceRows = [['Source', 'Site, network or link', 'New members', 'Have paid', 'Paid within a day', 'Paid by them so far']];
+        foreach ($sources['channels'] ?? [] as $channel) {
+            $sourceRows[] = [$channel['label'], '', $channel['members'], $channel['paid'], $channel['within_day'], SourceReport::money($channel['money'] ?? [])];
+            foreach ($channel['details'] ?? [] as $detail) {
+                $sourceRows[] = [$channel['label'], $detail['label'], $detail['members'], $detail['paid'], $detail['within_day'], SourceReport::money($detail['money'] ?? [])];
+            }
+        }
+        foreach (['campaigns' => 'Campaign', 'landings' => 'First page', 'sites' => 'Website'] as $list => $kind) {
+            foreach ($sources[$list] ?? [] as $row) {
+                $sourceRows[] = [$kind, $row['label'], $row['members'], $row['paid'], $row['within_day'], SourceReport::money($row['money'] ?? [])];
+            }
+        }
+        $sheets['Member sources'] = count($sourceRows) > 1 ? $sourceRows : [['No data']];
+        $paymentRows = [['Source', 'Payments', 'Members who paid', 'From the period\'s new members', 'Amount']];
+        foreach ($sources['payments']['rows'] ?? [] as $row) {
+            $paymentRows[] = [$row['label'], $row['payments'], $row['payers'], $row['from_new'], SourceReport::money($row['money'] ?? [])];
+        }
+        $sheets['Payments by source'] = count($paymentRows) > 1 ? $paymentRows : [['No data']];
 
         $breakdowns = [
             ['Members', 'Signup method', $members['signup_method'] ?? []],

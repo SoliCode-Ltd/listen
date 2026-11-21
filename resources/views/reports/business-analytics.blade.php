@@ -322,9 +322,133 @@
   @endif
 </div>
 
+{{-- ============================ Acquisition =========================== --}}
+<div class="page">
+  <div class="eyebrow">04 · Acquisition</div>
+  <div class="h1">Where new members come from</div>
+  <div class="lead">How the members who joined in this period found {{ $product }}, counted by the last place they came from before signing up, and how many of them went on to pay.</div>
+
+  @if ($sources['available'])
+    <div class="section callout">
+      @if ($sources['recorded_since'])
+        Recorded for every member who joined from {{ $sources['recorded_since'] }}. Members who joined earlier show only what was kept then: an ad click seen at checkout or an invite link; the rest are listed as not recorded.
+      @else
+        Recording starts with the next member who signs up. Members who joined earlier show only what was kept then: an ad click seen at checkout or an invite link; the rest are listed as not recorded.
+      @endif
+    </div>
+
+    <div class="section">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th class="num">New members</th>
+            <th class="num">Share</th>
+            <th class="num">Paid</th>
+            <th class="num">Paid, of them</th>
+            <th class="num">Revenue from them</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach ($sources['channels'] as $row)
+            <tr>
+              <td>{{ $row['label'] }}@if ($row['details'] !== '')<div class="small muted">{{ $row['details'] }}</div>@endif</td>
+              <td class="num">{{ $r->num($row['members']) }}</td>
+              <td class="num">{{ $r->pct($row['share'], 0) }}</td>
+              <td class="num">{{ $r->num($row['paid']) }}</td>
+              <td class="num">{{ $r->pct($row['paid_rate'], 0) }}</td>
+              <td class="num">{{ $row['money'] }}</td>
+            </tr>
+          @endforeach
+          <tr class="total">
+            <td>All new members</td>
+            <td class="num">{{ $r->num($sources['totals']['members']) }}</td>
+            <td></td>
+            <td class="num">{{ $r->num($sources['totals']['paid']) }}</td>
+            <td class="num">{{ $r->pct($sources['totals']['paid_rate'], 0) }}</td>
+            <td class="num">{{ $sources['totals']['money'] }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="small muted" style="margin-top: 2mm">
+        Revenue from them: everything these members have paid up to the report date, renewals included, refunds taken off, in the currency paid.
+      </div>
+    </div>
+
+    <table class="two section">
+      <tr>
+        <td class="l">
+          <div class="h2">Payments in the period, by source</div>
+          @if ($sources['payments'])
+            <table class="data">
+              <thead><tr><th>Source</th><th class="num">Payments</th><th class="num">Amount</th></tr></thead>
+              <tbody>
+                @foreach ($sources['payments'] as $row)
+                  <tr><td style="white-space: nowrap">{{ $row['label'] }}</td><td class="num">{{ $r->num($row['payments']) }}</td><td class="num">{!! implode('<br>', array_map('e', $row['money'])) !!}</td></tr>
+                @endforeach
+                <tr class="total"><td style="white-space: nowrap">All payments</td><td class="num">{{ $r->num($sources['payments_total']) }}</td><td class="num">{!! implode('<br>', array_map('e', $sources['payments_money'])) !!}</td></tr>
+              </tbody>
+            </table>
+            <div class="small muted" style="margin-top: 2mm">Every payment in the period, renewals included, by how the payer found {{ $product }}, whenever they joined.</div>
+          @else
+            <div class="small muted">No payment in the period.</div>
+          @endif
+        </td>
+        <td class="r">
+          @if ($sources['campaigns'])
+            <div class="h2">Top campaigns</div>
+            <table class="data">
+              <thead><tr><th>Campaign</th><th class="num">New</th><th class="num">Paid</th></tr></thead>
+              <tbody>
+                @foreach ($sources['campaigns'] as $row)
+                  <tr><td>{{ $row['label'] }}</td><td class="num">{{ $r->num($row['members']) }}</td><td class="num">{{ $r->num($row['paid']) }}</td></tr>
+                @endforeach
+              </tbody>
+            </table>
+          @endif
+          @if ($sources['landings'])
+            <div class="h2" style="margin-top: {{ $sources['campaigns'] ? '5mm' : '0' }}">Top first pages</div>
+            <table class="data">
+              <thead><tr><th>Page</th><th class="num">New</th><th class="num">Paid</th></tr></thead>
+              <tbody>
+                @foreach ($sources['landings'] as $row)
+                  <tr><td>{{ $row['label'] }}</td><td class="num">{{ $r->num($row['members']) }}</td><td class="num">{{ $r->num($row['paid']) }}</td></tr>
+                @endforeach
+              </tbody>
+            </table>
+          @endif
+        </td>
+      </tr>
+    </table>
+  @else
+    <div class="section callout">
+      Recording where new members come from starts with the next member who signs up. The breakdown by source will appear here as soon as members join.
+    </div>
+  @endif
+
+  @if (! empty($channels['demo_generations_total']) || isset($channels['referral_visits']))
+    <div class="section">
+      <div class="h2">Free demo and referrals</div>
+      <table class="stat-row">
+        @if (! empty($channels['demo_generations_total']))
+          <tr><td>Free demo generations, lifetime</td><td class="num">{{ $r->num($channels['demo_generations_total']) }}</td></tr>
+          <tr><td>Free demo generations, 30 days</td><td class="num">{{ $r->num($channels['demo_generations_30d'] ?? 0) }}</td></tr>
+          <tr><td>Unique demo visitors</td><td class="num">{{ $r->num($channels['demo_visitors'] ?? 0) }}</td></tr>
+          @isset($channels['demo_paid_rate'])
+            <tr><td>Demo users who went on to pay</td><td class="num">{{ $r->pct($channels['demo_paid_rate']) }}</td></tr>
+          @endisset
+        @endif
+        @isset($channels['referral_visits'])
+          <tr><td>Referral link visits</td><td class="num">{{ $r->num($channels['referral_visits']) }}</td></tr>
+        @endisset
+      </table>
+    </div>
+  @endif
+</div>
+
 {{-- ======================= Engagement & retention ===================== --}}
 <div class="page">
-  <div class="eyebrow">04 · Engagement</div>
+  <div class="eyebrow">05 · Engagement</div>
   <div class="h1">Usage, engagement and retention</div>
   <div class="lead">How much audio members create, how usage is spread across the base, and how sign-up cohorts keep using the product.</div>
 
@@ -395,7 +519,7 @@
 
 {{-- ============================ Product usage ========================= --}}
 <div class="page">
-  <div class="eyebrow">05 · Product</div>
+  <div class="eyebrow">06 · Product</div>
   <div class="h1">What customers create</div>
   <div class="lead">The mix of voice quality, Arabic dialects and delivery styles in the last 30 days, and how the voice infrastructure performed.</div>
 
@@ -460,7 +584,7 @@
 
 {{-- ========================= Revenue & economics ====================== --}}
 <div class="page">
-  <div class="eyebrow">06 · Revenue</div>
+  <div class="eyebrow">07 · Revenue</div>
   <div class="h1">Revenue and unit economics</div>
   <div class="lead">Recurring revenue from card subscriptions {{ ($revenue['mrr_source'] ?? '') === 'stripe' ? 'at what they actually charge, after discounts' : 'estimated at list price' }}, plan mix, and what the voice infrastructure costs to serve.</div>
 
@@ -545,20 +669,6 @@
             @endforeach
           </table>
         @endif
-        @if (! empty($channels['demo_generations_total']))
-          <div class="h2" style="margin-top: 5mm">Acquisition</div>
-          <table class="stat-row">
-            <tr><td>Free demo generations, lifetime</td><td class="num">{{ $r->num($channels['demo_generations_total']) }}</td></tr>
-            <tr><td>Free demo generations, 30 days</td><td class="num">{{ $r->num($channels['demo_generations_30d'] ?? 0) }}</td></tr>
-            <tr><td>Unique demo visitors</td><td class="num">{{ $r->num($channels['demo_visitors'] ?? 0) }}</td></tr>
-            @isset($channels['demo_paid_rate'])
-              <tr><td>Demo users who went on to pay</td><td class="num">{{ $r->pct($channels['demo_paid_rate']) }}</td></tr>
-            @endisset
-            @isset($channels['referral_visits'])
-              <tr><td>Referral link visits</td><td class="num">{{ $r->num($channels['referral_visits']) }}</td></tr>
-            @endisset
-          </table>
-        @endif
       </td>
     </tr>
   </table>
@@ -566,7 +676,7 @@
 
 {{-- ============================ Methodology =========================== --}}
 <div class="page">
-  <div class="eyebrow">07 · Notes</div>
+  <div class="eyebrow">08 · Notes</div>
   <div class="h1">Definitions and methodology</div>
 
   <div class="section callout">
@@ -586,6 +696,8 @@
     <dt>Voice API cost</dt><dd>What the speech providers charge for the audio produced, using the cost recorded per request or, where none was recorded, provider list prices.</dd>
     <dt>Gross margin after API cost</dt><dd>MRR minus voice API cost for the last 30 days, divided by MRR. Hosting and other costs are not included.</dd>
     <dt>Cohort retention</dt><dd>Of the members who joined in a month, the share who created audio in the following month (+1) and the month after (+2).</dd>
+    <dt>Source</dt><dd>The last place a new member came from before signing up, as the page they arrived on reported it: an ad (known by the ad network's own marker in the link), search results, an AI assistant, a social network, an email, an invite link, the phone app or another website. Direct means the address was typed, a bookmark, or an app that hides where the link was. Only the other site's name is kept, never its page, and nothing is kept for visitors from the United Kingdom, the European Economic Area or Switzerland.</dd>
+    <dt>Revenue from new members</dt><dd>Everything the members who joined in the period have paid up to the report date, renewals included, refunds taken off, in the currency paid.</dd>
     <dt>Country and region</dt><dd>The country of the network a member signed in from, saved once per member; no address, city or IP address is kept. Regions group countries: Gulf (GCC), Egypt, Levant &amp; Iraq, North Africa, other Arab states, Europe, North America and the rest of the world.</dd>
     <dt>Work email</dt><dd>A sign-up email on a company, school or other organisation domain rather than a personal webmail service.</dd>
     <dt>Current month</dt><dd>Shown "to date" and in a lighter colour, as it is not yet complete.</dd>
