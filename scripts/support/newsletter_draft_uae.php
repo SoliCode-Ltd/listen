@@ -59,6 +59,13 @@ $open = [
 $dialects = StudioFacts::roundedDown(StudioFacts::arabicDialects());
 $countries = StudioFacts::arabicCountries();
 $accents = StudioFacts::roundedDown(StudioFacts::englishAccents());
+// Every voice speaks every dialect of its language, so the email names no speaker: all the Arabic
+// voices speak Emirati. Their count, rounded down; without one, the words alone.
+$arVoices = StudioFacts::roundedDown(StudioFacts::arabicVoices());
+$allVoices = [
+    'en' => $arVoices > 0 ? 'all '.$arVoices.'+ of our Arabic voices' : 'all of our Arabic voices',
+    'ar' => $arVoices > 0 ? 'أكثر من '.StudioFacts::arabicCount($arVoices, 'صوت عربي', 'أصوات عربية', 'صوتاً عربياً') : 'كل أصواتنا العربية',
+];
 
 $tools = [
     'en' => array_filter([
@@ -110,8 +117,8 @@ $drafts[] = array_merge($common, [
     'name' => 'UAE companies 1: Emirati voices',
     'subject_en' => 'Hear your brand in Emirati Arabic',
     'subject_ar' => 'صوت علامتكم التجارية باللهجة الإماراتية',
-    'preheader_en' => 'Emirati, Gulf, MSA, Egyptian and Levantine voices, plus the English accents your customers speak.',
-    'preheader_ar' => 'حامد وعائشة وسلطان بثلاث لهجات إماراتية، ومعهم أصوات خليجية وفصحى ومصرية وشامية وإنجليزية.',
+    'preheader_en' => 'Every one of our Arabic voices speaks Emirati, along with Gulf, MSA, Egyptian, Levantine and the English accents your customers speak.',
+    'preheader_ar' => 'كل أصواتنا العربية تتحدث الإماراتية، ومعها الخليجية والفصحى والمصرية والشامية واللكنات الإنجليزية.',
     'eyebrow_en' => 'Voice samples for UAE teams',
     'eyebrow_ar' => 'عينات صوتية لفرق العمل في الإمارات',
     'headline_en' => 'Your brand\'s voice, in the dialect your audience knows',
@@ -119,14 +126,13 @@ $drafts[] = array_merge($common, [
     'intro_en' => 'We\'re Listen, an Arabic-first AI voice platform. If your company makes ads, project videos, welcome messages or training in Arabic and English, we\'ve gathered voices in your audience\'s dialects for you to hear for yourself.',
     'intro_ar' => 'نحن فريق إسمع، منصة أصوات بالذكاء الاصطناعي تبدأ بالعربية. إذا كانت شركتكم تُعدّ إعلانات أو فيديوهات مشاريع أو رسائل ترحيب أو دورات تدريبية بالعربية والإنجليزية، فقد جمعنا لكم أصواتاً بلهجات جمهوركم لتسمعوها بأنفسكم.',
     'body_en' => implode("\n\n", [
-        "## From the Emirates\n".implode("\n", [
-            '- **Hamed**: a lively, upbeat Emirati show host, for promos and shows',
-            '- **Aisha**: a clear, polite voice from Ras Al Khaimah, for customer service and welcome messages',
-            '- **Sultan**: a gravelly, unhurried Bedouin voice from Al Ain, for narration and stories',
-            '- **Hessa**: an Emirati girl\'s voice, for children\'s and family content',
+        "## Emirati, in any voice\n".implode("\n", [
+            '- **Every voice speaks Emirati**: choose from '.$allVoices['en'].', men and women of every age, and each one speaks Emirati',
+            '- **Three Emirati variants**: Dubai and Abu Dhabi, Northern (Ras Al Khaimah and Fujairah), and Bedouin (Al Ain)',
+            '- **For every job**: promos and shows, customer service and welcome messages, narration and stories, children\'s and family content',
         ]),
         "## From the Gulf and the wider Arab world\n".implode("\n", [
-            '- **Gulf**: Saudi, Qatari, Omani, Kuwaiti and Bahraini voices, including Abdulaziz, Abeer, Noura, Maha, Mishary and Reem',
+            '- **Gulf**: Saudi, Qatari, Omani, Kuwaiti and Bahraini dialects',
             '- **Modern Standard Arabic**: for official, training and pan-Arab content, with a news style when you need one',
             '- **Egyptian and Levantine**: Egyptian, and Levantine in Lebanese, Syrian, Jordanian and Palestinian',
             '- **English**: British, American, Indian, Pakistani and Filipino accents, and Arabic-accented English',
@@ -136,14 +142,13 @@ $drafts[] = array_merge($common, [
         'The button opens our Emirati page. From there you can move to the other Arabic dialects and to our English accents.',
     ]),
     'body_ar' => implode("\n\n", [
-        "## من الإمارات\n".implode("\n", [
-            '- **حامد**: مقدّم برامج حيوي بلهجة إماراتية، للعروض الترويجية والبرامج',
-            '- **عائشة**: صوت واضح ومهذّب من رأس الخيمة، لخدمة العملاء ورسائل الترحيب',
-            '- **سلطان**: صوت أجشّ متأنٍّ بلهجة العين البدوية، للسرد والقصص',
-            '- **حصة**: صوت طفلة إماراتية، لمحتوى الأطفال والعائلة',
+        "## الإماراتية بأي صوت\n".implode("\n", [
+            '- **كل الأصوات تتحدث الإماراتية**: اختاروا من '.$allVoices['ar'].'، رجالاً ونساءً ومن كل الأعمار، وكلها تتحدث باللهجة الإماراتية',
+            '- **ثلاث لهجات إماراتية**: لهجة دبي وأبوظبي، والشمالية (رأس الخيمة والفجيرة)، والبدوية (العين)',
+            '- **لكل عمل**: العروض الترويجية والبرامج، وخدمة العملاء ورسائل الترحيب، والسرد والقصص، ومحتوى الأطفال والعائلة',
         ]),
         "## من الخليج والعالم العربي\n".implode("\n", [
-            '- **الخليجية**: أصوات سعودية وقطرية وعُمانية وكويتية وبحرينية، منها عبدالعزيز وعبير ونورة ومها ومشاري وريم',
+            '- **الخليجية**: اللهجات السعودية والقطرية والعُمانية والكويتية والبحرينية',
             '- **الفصحى**: للمراسلات الرسمية والتدريب والمحتوى العربي العام، وبأسلوب إخباري عند الحاجة',
             '- **المصرية والشامية**: المصرية، والشامية بلهجاتها اللبنانية والسورية والأردنية والفلسطينية',
             '- **الإنجليزية**: بلكنات بريطانية وأمريكية وهندية وباكستانية وفلبينية، وبلكنة عربية',
@@ -154,12 +159,12 @@ $drafts[] = array_merge($common, [
     ]),
     'highlights_en' => $lines(array_filter([
         $dialects.'+ Arabic dialects from '.$countries.' countries, and '.$accents.'+ English accents',
-        'Three Emirati variants: Dubai and Abu Dhabi, Northern (Ras Al Khaimah and Fujairah), and Bedouin (Al Ain)',
+        'Every Arabic voice speaks every dialect, Emirati included',
         $open['cloning'] ? 'No voice is cloned without a consent recording' : null,
     ])),
     'highlights_ar' => $lines(array_filter([
         'أكثر من '.$dialects.' لهجة عربية من '.$countries.' دولة، وأكثر من '.$accents.' لكنة إنجليزية',
-        'ثلاث لهجات إماراتية: لهجة دبي وأبوظبي، والشمالية (رأس الخيمة والفجيرة)، والبدوية (العين)',
+        'كل صوت عربي يتحدث كل اللهجات، ومنها الإماراتية',
         $open['cloning'] ? 'لا يُستنسخ أي صوت إلا بتسجيل موافقة صاحبه' : null,
     ])),
     'cta_label_en' => 'Hear the Emirati voices',
@@ -185,7 +190,7 @@ $drafts[] = array_merge($common, [
     'intro_ar' => 'راسلناكم مؤخراً بعينات صوتية بالعربية والإنجليزية، وأسهل طريقة للحكم عليها أن تسمعوا نصكم أنتم.',
     'body_en' => implode("\n\n", [
         "Reply with one or two lines from an ad, a welcome message or a project video, and tell us the voice you want:\n".implode("\n", [
-            '- **Emirati**: voiced by Hamed or Aisha',
+            '- **Emirati**: in any of our Arabic voices, man or woman',
             '- **Gulf, Modern Standard Arabic, Egyptian or Levantine**',
             '- **English**: in a British, Indian or Arabic accent',
         ]),
@@ -194,7 +199,7 @@ $drafts[] = array_merge($common, [
     ]),
     'body_ar' => implode("\n\n", [
         "ردّوا على هذه الرسالة بسطر أو سطرين من إعلان أو رسالة ترحيب أو فيديو مشروع، واذكروا الصوت الذي تريدونه:\n".implode("\n", [
-            '- **الإماراتية**: بصوت حامد أو عائشة',
+            '- **الإماراتية**: بأي صوت من أصواتنا العربية، رجلاً أو امرأة',
             '- **الخليجية أو الفصحى أو المصرية أو الشامية**',
             '- **الإنجليزية**: بلكنة بريطانية أو هندية أو بلكنة عربية',
         ]),
