@@ -78,8 +78,8 @@ class YearlyOfferBannerTest extends TestCase
         $this->assertStringContainsString('ينتهي في 31 ديسمبر', $ar);
         $this->assertStringContainsString('>احصل على العرض</a>', $ar);
 
-        // While it is on, the pricing page opens on yearly.
-        $this->assertStringContainsString('data-start-yearly="1"', $this->page('pricing', 'en'));
+        // While it is on, the pricing page still opens on monthly: only the bar's link opens it on yearly.
+        $this->assertStringContainsString('data-start-yearly="0"', $this->page('pricing', 'en'));
     }
 
     public function test_the_bar_follows_the_yearly_discount_and_hides_without_one(): void
