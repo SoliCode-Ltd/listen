@@ -247,7 +247,8 @@ name: Server deploy
 #            who it would reach as counts, and the whole email as text
 #            (scripts/support/newsletter_draft.php). newsletter-draft-save
 #            saves it in Admin -> Newsletter as a draft. Neither sends anything:
-#            the owner sends it from the admin.
+#            the owner sends it from the admin. With newsletter=uae: the two
+#            emails to UAE companies instead (scripts/support/newsletter_draft_uae.php).
 # New migrations and composer.lock changes are reported, not run (see migrate and composer).
 # The "Run over SSH" script must stay under GitHub's 21,000-character limit for one
 # step (tests/Feature/ServerDeployWorkflowTest.php): longer remote work goes in
@@ -292,6 +293,11 @@ on:
         description: "plan-price and plan-price-apply only: the plan and its monthly price in dollars (studio_max=120)"
         type: string
         default: ""
+      newsletter:
+        description: "newsletter-draft and newsletter-draft-save only: which drafts"
+        type: choice
+        options: [speech-to-text, uae]
+        default: speech-to-text
 
 permissions:
   contents: read
@@ -337,6 +343,7 @@ jobs:
           DESIGN: ${{ inputs.design }}
           RT_ONLY: ${{ inputs.calls }}
           PLAN_PRICE: ${{ inputs.price }}
+          NL_SET: ${{ inputs.newsletter }}
           # What is deployed, as a variable: the script below must hold no ${{ }}
           # of its own, or GitHub reads all of it as one expression (21,000 at most).
           DEPLOY_REF: ${{ inputs.target == 'live' && 'main' || github.ref_name }}
@@ -798,7 +805,7 @@ jobs:
           fi
           if [ "$MODE" = newsletter-draft ] || [ "$MODE" = newsletter-draft-save ]; then
             failed=0
-            tool newsletter_draft.php | $S "$FIND; NL_APPLY=$([ "$MODE" = newsletter-draft-save ] && echo 1 || echo 0) php" || failed=1
+            if [ "$NL_SET" = uae ]; then tool newsletter_draft_uae.php; else tool newsletter_draft.php; fi | $S "$FIND; NL_APPLY=$([ "$MODE" = newsletter-draft-save ] && echo 1 || echo 0) php" || failed=1
             rm -f ~/.ssh/id_deploy
             exit "$failed"
           fi
