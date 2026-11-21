@@ -16,6 +16,7 @@ use Filament\Actions\Action;
 use App\Models\ChatGptAdsEvent;
 use App\Services\Billing\ChatGptAdsConversions;
 use App\Models\SiteSetting;
+use App\Support\Clarity;
 use App\Support\SeoHelper;
 use App\Support\SeoSettingDefaults;
 use Filament\Forms;
@@ -83,6 +84,8 @@ class SeoSettings extends Page implements HasForms
             'google_tag_head_code' => SiteSetting::get('google_tag_head_code', ''),
             'facebook_pixel_code' => SiteSetting::get('facebook_pixel_code', ''),
             'custom_head_code' => SiteSetting::get('custom_head_code', ''),
+            Clarity::ENABLED => (string) SiteSetting::get(Clarity::ENABLED, '0') === '1',
+            Clarity::PROJECT => SiteSetting::get(Clarity::PROJECT, ''),
             'purchase_event_code' => SiteSetting::get('purchase_event_code', ''),
             ChatGptAdsConversions::ENABLED => (string) SiteSetting::get(ChatGptAdsConversions::ENABLED, '0') === '1',
             ChatGptAdsConversions::PIXEL_ID => SiteSetting::get(ChatGptAdsConversions::PIXEL_ID, ''),
@@ -389,6 +392,21 @@ class SeoSettings extends Page implements HasForms
                                         }),
                                 ])->key('chatgpt_ads_actions')->columnSpanFull(),
                             ]),
+                    ]),
+
+                Section::make('Visit recordings (Clarity)')
+                    ->description('Heatmaps and recordings of visits in Microsoft Clarity: where visitors click and tap, how far they scroll and where they leave. On the live site only: the public pages for visitors not signed in (home, pricing, samples, feature and dialect pages, developers, legal, contact, sign-in and sign-up) and the free demo for members trying it. Never in the studio, the account or billing pages, for paying members or the team, inside the apps, for visitors from the UK, the EEA or Switzerland, or for a visitor who turned it off on the cookie policy page. What visitors type, e-mail addresses and the member\'s name are hidden. The privacy and cookie policies name it, as its terms ask.')
+                    ->columns(2)
+                    ->schema([
+                        Toggle::make(Clarity::ENABLED)
+                            ->label('Record visits')
+                            ->helperText('Needs the project ID. Turned off, no page loads it.')
+                            ->columnSpanFull(),
+                        TextInput::make(Clarity::PROJECT)
+                            ->label('Clarity project ID')
+                            ->helperText('The short code at the end of the install code Clarity gives you (Settings → Setup), for example zguy8b887j.')
+                            ->maxLength(20)
+                            ->regex('/^[A-Za-z0-9]{6,20}$/'),
                     ]),
 
                 Section::make('Crawl Controls')

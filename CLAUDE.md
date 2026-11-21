@@ -42,6 +42,15 @@ These are the owner's standing instructions. Follow them in every session.
   Google Pay buttons in the extra-credits dialog in the studio, the same wallet
   button as the checkout (`<x-wallet-button>`, drawn by Stripe). The buttons
   only: no sentence naming them.
+  A sixth exception the owner approved (21 November 2026): Microsoft Clarity
+  (visit recordings and heatmaps) named in the privacy policy and the cookie
+  policy, in English and Arabic (`lang/*/ui.php` → `legal.privacy.s5_clarity*`,
+  `legal.cookies.c7_*`), together with Microsoft, Microsoft Advertising and the
+  link to Microsoft's privacy statement, because Clarity's terms require them
+  there. Nowhere else in the site's text. Its script runs only on the live
+  site's public pages for visitors not signed in and on the free demo
+  (`App\Support\Clarity`), never in the studio, for paying members, in the apps,
+  or for visitors from the UK, the EEA or Switzerland.
 
 ## Email
 - Never send email. Draft it only, and let the owner send it.

@@ -18,6 +18,11 @@
   @unless(\App\Support\InApp\InApp::active() || auth()->check())
   @include('components.landed')
   @endunless
+  {{-- Visit recordings: the public pages and the free demo only (App\Support\Clarity). --}}
+  @php($clarityProject = \App\Support\Clarity::forPage(request()))
+  @if($clarityProject !== null)
+  @include('components.clarity', ['projectId' => $clarityProject])
+  @endif
   @include('components.seo', ['pageTitle' => $pageTitle, 'page' => $page, 'faqItems' => $faqItems])
   @include('components.site-fonts')
   @include('components.styles')

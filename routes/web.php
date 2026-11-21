@@ -37,6 +37,7 @@ use App\Http\Controllers\StartController;
 use App\Http\Controllers\TranscribeController;
 use App\Http\Controllers\TrialBillingController;
 use App\Http\Controllers\VideoDubController;
+use App\Http\Controllers\VisitCheckController;
 use App\Http\Controllers\VoiceCloningController;
 use App\Http\Controllers\VoiceDesignController;
 use App\Http\Middleware\CaptureAdClickId;
@@ -78,6 +79,21 @@ Route::post('/landed', LandedController::class)
     ])
     ->middleware('throttle:30,1')
     ->name('landed');
+
+// Whether this visitor may be recorded (App\Support\Clarity), asked by the page before it loads the
+// recorder: only the server knows their country. No session, no form token, no cookies, as above.
+Route::get('/visit-check', VisitCheckController::class)
+    ->withoutMiddleware([
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        PreventRequestForgery::class,
+        ValidateCsrfToken::class,
+        EnsureUserIsNotBlocked::class,
+        CaptureAdClickId::class,
+        InAppMode::class,
+    ])
+    ->middleware('throttle:60,1')
+    ->name('visit-check');
 
 // Audio files need no session, cookies or form token: playing one starts
 // sooner, a player or the extension asking without cookies no longer makes

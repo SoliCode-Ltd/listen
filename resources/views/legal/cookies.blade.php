@@ -85,6 +85,16 @@
       margin: 0;
       font-size: .95rem;
     }
+    .cookie-card .recordings-switch {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .5rem .85rem;
+      margin-top: .75rem;
+    }
+    .cookie-card .recordings-switch[hidden] {
+      display: none;
+    }
     .legal-section a {
       color: var(--text);
       text-underline-offset: 3px;
@@ -152,7 +162,21 @@
             <h3>{{ __('ui.legal.cookies.c6_title') }}</h3>
             <p>{{ __('ui.legal.cookies.c6_body') }}</p>
           </article>
+          {{-- Visit recordings (App\Support\Clarity), with the visitor's own switch for this browser. --}}
+          <article class="cookie-card" id="recordings">
+            <h3>{{ __('ui.legal.cookies.c7_title') }}</h3>
+            <p>{{ __('ui.legal.cookies.c7_body') }}</p>
+            <p class="recordings-switch" hidden data-recordings
+               data-turn-off="{{ __('ui.legal.cookies.c7_turn_off') }}"
+               data-turn-on="{{ __('ui.legal.cookies.c7_turn_on') }}"
+               data-is-off="{{ __('ui.legal.cookies.c7_is_off') }}"
+               data-gpc="{{ __('ui.legal.cookies.c7_gpc') }}">
+              <button type="button" class="btn btn-ghost"></button>
+              <span role="status"></span>
+            </p>
+          </article>
         </div>
+        <script>(function(){var box=document.querySelector('[data-recordings]');if(!box)return;var btn=box.querySelector('button'),state=box.querySelector('[role=status]'),key=@json(\App\Support\Clarity::OFF_KEY),n=navigator;var isOff=function(){try{return localStorage.getItem(key)==='1';}catch(e){return false;}};var draw=function(){if(n.globalPrivacyControl===true||n.doNotTrack==='1'){btn.hidden=true;state.textContent=box.dataset.gpc;return;}var off=isOff();btn.textContent=off?box.dataset.turnOn:box.dataset.turnOff;state.textContent=off?box.dataset.isOff:'';};btn.addEventListener('click',function(){var off=!isOff();try{if(off){localStorage.setItem(key,'1');sessionStorage.removeItem('listen_recording');}else{localStorage.removeItem(key);}}catch(e){}if(off&&typeof window.clarity==='function'){try{window.clarity('consent',false);}catch(e){}}draw();});box.hidden=false;draw();})();</script>
       </section>
 
       <section class="legal-section">

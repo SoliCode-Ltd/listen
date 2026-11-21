@@ -175,7 +175,8 @@
 
       @if($appTabs)
       @elseauth
-        <div class="user-menu" id="userMenu">
+        {{-- data-clarity-mask: the member's name, picture and e-mail never show in visit recordings (App\Support\Clarity). --}}
+        <div class="user-menu" id="userMenu" data-clarity-mask="True">
           <button type="button" class="user-trigger" id="userMenuTrigger" aria-expanded="false" aria-haspopup="true">
             <div class="user-avatar">
               @if(auth()->user()->google_avatar)
