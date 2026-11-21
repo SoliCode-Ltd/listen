@@ -1311,8 +1311,8 @@
       <h1>{{ __('ui.pricing.hero_title') }} {{ __('ui.pricing.hero_title_accent') }}</h1>
       <p class="lead">{{ __('ui.pricing.hero_subtitle') }}</p>
       {{-- Monthly or yearly: every price on the page follows it. --}}
-      {{-- It opens on yearly from the offer bar's link (?billing=yearly) and while the offer is on. --}}
-      @php $startYearly = $yearlySavePercent > 0 && (request()->query('billing') === 'yearly' || \App\Support\YearlyOfferBanner::live()); @endphp
+      {{-- It opens on monthly; on yearly only from the offer bar's "Get the offer" link (?billing=yearly). --}}
+      @php $startYearly = $yearlySavePercent > 0 && request()->query('billing') === 'yearly'; @endphp
       <div class="billing-toggle" id="billingToggle" role="group" aria-label="{{ __('ui.pricing.monthly') }} / {{ __('ui.pricing.yearly') }}" data-start-yearly="{{ $startYearly ? '1' : '0' }}">
         <span class="billing-indicator" aria-hidden="true"></span>
         <button type="button" id="monthlyBtn" class="active" aria-pressed="true">{{ __('ui.pricing.monthly') }}</button>
