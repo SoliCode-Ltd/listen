@@ -1,7 +1,7 @@
 {{-- One member's credit period on the Monthly usage details page. --}}
 @php($insights = $getState())
 @php($summary = $insights['summary'])
-<div style="display: grid; gap: 1.25rem;">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem;">
     <dl class="text-sm" style="display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));">
         @foreach ([
             'Generations made' => number_format($summary['made']),

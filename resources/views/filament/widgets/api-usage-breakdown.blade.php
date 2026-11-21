@@ -1,5 +1,5 @@
 <x-filament-widgets::widget>
-    <div style="display: grid; gap: 1.5rem;">
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem;">
         @foreach ([['Last 30 days', $byModel30], ["Last {$months} months", $byModelPeriod]] as [$title, $rows])
             <x-filament::section>
                 <x-slot name="heading">API usage by provider and model · {{ $title }}</x-slot>
@@ -104,12 +104,12 @@
                 </div>
             </x-filament::section>
 
-            <div style="display: grid; gap: 1.5rem; align-content: start;">
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; align-content: start;">
                 <x-filament::section>
                     <x-slot name="heading">Characters by plan (last 30 days)</x-slot>
                     <x-slot name="description">What members on each plan generated (admins excluded).</x-slot>
                     @php($planSum = max(1, array_sum($charsByPlan)))
-                    <ul class="text-sm" style="display: grid; gap: 0.5rem;">
+                    <ul class="text-sm" style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.5rem;">
                         @forelse ($charsByPlan as $plan => $chars)
                             <li>
                                 <div style="display: flex; justify-content: space-between; gap: 0.75rem;">

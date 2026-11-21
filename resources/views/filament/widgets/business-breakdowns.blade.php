@@ -1,5 +1,5 @@
 <x-filament-widgets::widget>
-    <div style="display: grid; gap: 1.5rem;">
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem;">
         @if (! empty($statErrors))
             <x-filament::section>
                 <x-slot name="heading">Some statistics could not be calculated</x-slot>
@@ -32,7 +32,7 @@
                     <tbody>
                         @forelse ($cohorts as $row)
                             <tr class="border-b border-gray-100 dark:border-white/5">
-                                <td class="px-3 py-2">{{ $monthLabel($row['month']) }}</td>
+                                <td class="px-3 py-2 whitespace-nowrap">{{ $monthLabel($row['month']) }}</td>
                                 <td class="px-3 py-2 text-end tabular-nums">{{ number_format($row['signups']) }}</td>
                                 <td class="px-3 py-2 text-end tabular-nums">{{ number_format($row['ever_generated']) }}</td>
                                 <td class="px-3 py-2 text-end tabular-nums">{{ $percent($row['activation_rate']) }}</td>
@@ -51,7 +51,7 @@
             </div>
         </x-filament::section>
 
-        <div style="display: grid; gap: 1.5rem;">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem;">
             <x-filament::section>
                 <x-slot name="heading">Plans</x-slot>
                 <x-slot name="description">Members on each plan now and how many of them pay (card or InstaPay / Vodafone Cash; trials and plans given free are not paying), the plan's card subscriptions, and their MRR {{ $mrrSource === 'stripe' ? 'from Stripe, after discounts' : 'estimated at list price (Stripe could not be read)' }}.</x-slot>
@@ -98,7 +98,7 @@
                 @php($sum = max(1, array_sum($items)))
                 <x-filament::section compact>
                     <x-slot name="heading">{{ $title }}</x-slot>
-                    <ul class="text-sm" style="display: grid; gap: 0.5rem;">
+                    <ul class="text-sm" style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.5rem;">
                         @foreach ($items as $label => $count)
                             <li>
                                 <div style="display: flex; justify-content: space-between; gap: 0.75rem;">
