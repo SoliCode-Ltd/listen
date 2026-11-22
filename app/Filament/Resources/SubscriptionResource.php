@@ -33,6 +33,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
 use App\Services\Billing\CharGiftService;
+use App\Support\Acquisition\Channels;
 use App\Support\Countries;
 use App\Support\CreditPeriod;
 use Filament\Forms;
@@ -281,6 +282,14 @@ class SubscriptionResource extends Resource
                     ->formatStateUsing(fn (?string $state) => Countries::label($state))
                     ->placeholder('—')
                     ->toggleable(),
+                // How the member found the site, kept at sign-up (the same as in Users).
+                TextColumn::make('user.memberSource.channel')
+                    ->label('Came from')
+                    ->formatStateUsing(fn (?string $state) => Channels::label($state))
+                    ->description(fn (Subscription $record): ?string => ($source = $record->user?->memberSource) !== null
+                        && ($detail = $source->detail) !== null && $detail !== Channels::label($source->channel) ? $detail : null)
+                    ->placeholder('Not recorded')
+                    ->toggleable(),
                 TextColumn::make('plan.name')
                     ->label('Plan')
                     ->searchable()
@@ -334,6 +343,16 @@ class SubscriptionResource extends Resource
                         null, '' => $query,
                         '__unknown' => $query->whereHas('user', fn (Builder $q) => $q->whereNull('country_code')),
                         default => $query->whereHas('user', fn (Builder $q) => $q->where('country_code', $data['value'])),
+                    }),
+                SelectFilter::make('came_from')
+                    ->label('Came from')
+                    ->options(Channels::LABELS)
+                    ->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {
+                        null, '' => $query,
+                        // Not recorded: nothing kept, or joined before sources were kept.
+                        Channels::UNKNOWN => $query->whereHas('user', fn (Builder $u) => $u->where(fn (Builder $q) => $q->doesntHave('memberSource')
+                            ->orWhereHas('memberSource', fn (Builder $m) => $m->where('channel', Channels::UNKNOWN)))),
+                        default => $query->whereHas('user.memberSource', fn (Builder $m) => $m->where('channel', $data['value'])),
                     }),
                 SelectFilter::make('status')
                     ->options([
