@@ -72,4 +72,10 @@ for ($d = now($zone)->subDays(29)->startOfDay(); $d->lte(now($zone)); $d->addDay
     echo '  '.$d->toDateString().' '.$d->format('D').': '.($rows ? $describe($rows) : 'none')."\n";
 }
 
+// Every day with a sale, for a chart: day, sales, then the amount in each currency (minor units).
+$currencies = $sales->pluck('currency')->unique()->sort()->values();
+echo "\n== Every day with a sale (csv) ==\n  day,sales,members,".$currencies->map(fn ($c) => strtolower($c).'_minor')->implode(',')."\n";
+$byDay->sortKeys()->each(fn ($rows, $day) => print('  '.$day.','.$rows->count().','.$rows->pluck('user')->unique()->count().','
+    .$currencies->map(fn ($c) => $rows->where('currency', $c)->sum('net'))->implode(',')."\n"));
+
 echo "\nNothing was changed.\n";
