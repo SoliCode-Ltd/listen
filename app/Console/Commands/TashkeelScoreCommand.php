@@ -19,7 +19,7 @@ use Illuminate\Console\Command;
  * The headline is the weighted rate: a word said wrong counts in full, an
  * ending alone counts a fifth (ENDING_WEIGHT), because a voice says most
  * endings the same either way. Homographs (words only the sentence tells
- * apart) are listed first.
+ * apart) are listed first, then names.
  *
  * --against fails (exit 1) when any kind of sentence has more words said
  * wrong than in the saved run, so a fix for one kind cannot quietly break
@@ -129,8 +129,9 @@ class TashkeelScoreCommand extends Command
             }
         }
 
-        // All, then homographs (weighted highest: they are the words said wrong), then the rest.
-        $summary = array_replace(array_intersect_key(['all' => null, 'homograph' => null], $summary), $summary);
+        // All, then homographs (weighted highest: they are the words said wrong), then names
+        // (where members struggle most), then the rest.
+        $summary = array_replace(array_intersect_key(['all' => null, 'homograph' => null, 'name' => null], $summary), $summary);
         $worse = [];
         $this->table(['Kind', 'Sentences', 'Words', 'Weighted %', 'Said wrong %', 'Ending only %', 'Marks wrong %', 'Extra marks'] + ($old ? [8 => 'Said wrong, before'] : []),
             collect($summary)->map(function (array $s, string $kind) use ($old, &$worse): array {
