@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter;
+use Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath;
+use Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect;
 use Tests\TestCase;
 
 /** Addresses people guess lead somewhere, and the Terms say what the voice cloning flow asks for. */
@@ -17,9 +20,9 @@ class SiteHygieneTest extends TestCase
         $prefix = substr($docs, 0, -strlen('/developers'));
         foreach (['api', 'api-docs', 'docs'] as $guess) {
             $response = $this->withoutMiddleware([
-                \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
-                \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
-                \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+                LocaleSessionRedirect::class,
+                LaravelLocalizationRedirectFilter::class,
+                LaravelLocalizationViewPath::class,
             ])->get("{$prefix}/{$guess}");
             $response->assertStatus(301);
             $this->assertSame($docs, parse_url((string) $response->headers->get('Location'), PHP_URL_PATH), "{$prefix}/{$guess}");
