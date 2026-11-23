@@ -403,7 +403,6 @@
     $demoI18n = [
       'upgrade_text' => __('ui.demo.trial_exhausted_text'),
       'chars_left' => __('ui.demo.chars_left'),
-      'quota_total_start' => __('ui.demo.quota_total_start'),
       'translate_enabled_hint' => __('ui.demo.translate_enabled_hint'),
       'translate_disabled_hint' => __('ui.demo.translate_disabled_hint'),
       'any' => __('ui.demo.any'),
