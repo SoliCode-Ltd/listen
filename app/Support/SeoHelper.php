@@ -2628,7 +2628,7 @@ HTML;
         if (is_file($publicFile)) {
             $separator = str_contains($url, '?') ? '&' : '?';
 
-            return $url.$separator.'v='.filemtime($publicFile);
+            return $url.$separator.'v='.self::contentVersion($publicFile);
         }
 
         $storageCandidate = ltrim($path, '/');
@@ -2639,10 +2639,26 @@ HTML;
         if ($storageCandidate !== '' && Storage::disk('public')->exists($storageCandidate)) {
             $separator = str_contains($url, '?') ? '&' : '?';
 
-            return $url.$separator.'v='.filemtime(Storage::disk('public')->path($storageCandidate));
+            return $url.$separator.'v='.self::contentVersion(Storage::disk('public')->path($storageCandidate));
         }
 
         return $url;
+    }
+
+    /** @var array<string, string> */
+    private static array $contentVersions = [];
+
+    /**
+     * The version in an icon's or share picture's address: a number from the file's content, not its
+     * date. Every deploy uploads every file again, so a date changed the address each time although the
+     * picture had not, and Google, which wants a site icon's address to stay the same, kept its old copy.
+     * Now the address changes only when the picture does. Worked out once a file (by path, date and size).
+     */
+    private static function contentVersion(string $file): string
+    {
+        $key = $file.'|'.@filemtime($file).'|'.@filesize($file);
+
+        return self::$contentVersions[$key] ??= (string) hexdec((string) (hash_file('crc32b', $file) ?: '0'));
     }
 
     private static function manifestIconType(string $icon): string
