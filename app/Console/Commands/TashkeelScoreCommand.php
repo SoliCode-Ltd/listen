@@ -16,6 +16,11 @@ use Illuminate\Console\Command;
  *   php artisan tashkeel:score --system=input                 the sentences as members wrote them
  *   php artisan tashkeel:score --candidates=out.json --save=v2 --against=v1
  *
+ * The headline is the weighted rate: a word said wrong counts in full, an
+ * ending alone counts a fifth (ENDING_WEIGHT), because a voice says most
+ * endings the same either way. Homographs (words only the sentence tells
+ * apart) are listed first.
+ *
  * --against fails (exit 1) when any kind of sentence has more words said
  * wrong than in the saved run, so a fix for one kind cannot quietly break
  * another.
@@ -32,6 +37,15 @@ class TashkeelScoreCommand extends Command
         {--show=15 : How many wrong words to list}';
 
     protected $description = 'Score vowel marks against the locked test set, by kind of sentence.';
+
+    /** What an ending-only error counts beside a word said wrong. */
+    public const ENDING_WEIGHT = 0.2;
+
+    /** The weighted rate: words said wrong in full, endings alone at ENDING_WEIGHT. */
+    public static function weighted(float $inside, float $ending): float
+    {
+        return round($inside + self::ENDING_WEIGHT * $ending, 2);
+    }
 
     public function handle(): int
     {
@@ -97,6 +111,7 @@ class TashkeelScoreCommand extends Command
                 'inside' => round(100 * $r['inside_words'] / max(1, $r['words']), 2),
                 // Words whose ending alone differs.
                 'ending' => round(100 * $r['ending_words'] / max(1, $r['words']), 2),
+                'weighted' => self::weighted(100 * $r['inside_words'] / max(1, $r['words']), 100 * $r['ending_words'] / max(1, $r['words'])),
                 // Marks wrong, of all the marks the reference writes; and leaving the endings out.
                 'marks' => round(100 * $r['wrong_marks'] / max(1, $r['letters']), 2),
                 'marks_inside' => round(100 * $r['wrong_marks_inside'] / max(1, $r['letters']), 2),
@@ -113,10 +128,12 @@ class TashkeelScoreCommand extends Command
             }
         }
 
+        // All, then homographs (weighted highest: they are the words said wrong), then the rest.
+        $summary = array_replace(array_intersect_key(['all' => null, 'homograph' => null], $summary), $summary);
         $worse = [];
-        $this->table(['Kind', 'Sentences', 'Words', 'Said wrong %', 'Ending only %', 'Marks wrong %', 'Extra marks'] + ($old ? [7 => 'Said wrong, before'] : []),
+        $this->table(['Kind', 'Sentences', 'Words', 'Weighted %', 'Said wrong %', 'Ending only %', 'Marks wrong %', 'Extra marks'] + ($old ? [8 => 'Said wrong, before'] : []),
             collect($summary)->map(function (array $s, string $kind) use ($old, &$worse): array {
-                $row = [$kind, $s['sentences'], $s['words'], $s['inside'], $s['ending'], $s['marks'], $s['extra']];
+                $row = [$kind, $s['sentences'], $s['words'], $s['weighted'], $s['inside'], $s['ending'], $s['marks'], $s['extra']];
                 if ($old) {
                     $before = $old[$kind]['inside'] ?? null;
                     $row[] = $before === null ? '-' : $before.($s['inside'] > $before + 0.005 ? '  << worse' : '');
