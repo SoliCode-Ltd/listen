@@ -1,0 +1,3500 @@
+{
+ "version": 1,
+ "locked": false,
+ "about": "The tashkeel test set. 270 single sentences members made voices of (anonymized sample of live, 2026-11-23; sentences naming a person, explicit ones, scripture and poetry, and dialects outside the four in scope were left out) and 30 written sentences whose marked word is a homograph. variety: what the sentence is written in. A sentence counts only once the owner has approved its ref (approved: true); the set is locked (locked: true) when all are, and is not changed after that.",
+ "policy": "Not decided yet: which marks a reference writes (every letter, or only the letters a voice needs) waits for the round 2 listening results.",
+ "items": [
+  {
+   "id": "h01",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "رفع الجنود علم بلادهم فوق القلعة.",
+   "ref": "رَفَعَ الْجُنُودُ عَلَمَ بِلَادِهِمْ فَوْقَ الْقَلْعَة.",
+   "word": "علم",
+   "reading": "عَلَم"
+  },
+  {
+   "id": "h02",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "طلب العلم واجب على كل إنسان.",
+   "ref": "طَلَبُ الْعِلْمِ وَاجِبٌ عَلَى كُلِّ إِنْسَان.",
+   "word": "العلم",
+   "reading": "العِلْم"
+  },
+  {
+   "id": "h03",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "علم المدير بالخبر بعد يومين.",
+   "ref": "عَلِمَ الْمُدِيرُ بِالْخَبَرِ بَعْدَ يَوْمَيْن.",
+   "word": "علم",
+   "reading": "عَلِمَ"
+  },
+  {
+   "id": "h04",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "في المكتبة كتب كثيرة عن التاريخ.",
+   "ref": "فِي الْمَكْتَبَةِ كُتُبٌ كَثِيرَةٌ عَنِ التَّارِيخ.",
+   "word": "كتب",
+   "reading": "كُتُب"
+  },
+  {
+   "id": "h05",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "كتب الصحفي مقالاً طويلاً عن المدينة.",
+   "ref": "كَتَبَ الصُّحُفِيُّ مَقَالًا طَوِيلًا عَنِ الْمَدِينَة.",
+   "word": "كتب",
+   "reading": "كَتَبَ"
+  },
+  {
+   "id": "h06",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "زار ملك البلاد المدينة أمس.",
+   "ref": "زَارَ مَلِكُ الْبِلَادِ الْمَدِينَةَ أَمْس.",
+   "word": "ملك",
+   "reading": "مَلِك"
+  },
+  {
+   "id": "h07",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "انتهى ملك هذه الأسرة بعد قرنين.",
+   "ref": "انْتَهَى مُلْكُ هَذِهِ الْأُسْرَةِ بَعْدَ قَرْنَيْن.",
+   "word": "ملك",
+   "reading": "مُلْك"
+  },
+  {
+   "id": "h08",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "درس أحمد الطب في القاهرة.",
+   "ref": "دَرَسَ أَحْمَدُ الطِّبَّ فِي الْقَاهِرَة.",
+   "word": "درس",
+   "reading": "دَرَسَ"
+  },
+  {
+   "id": "h09",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "كان درس اليوم عن الكواكب.",
+   "ref": "كَانَ دَرْسُ الْيَوْمِ عَنِ الْكَوَاكِب.",
+   "word": "درس",
+   "reading": "دَرْس"
+  },
+  {
+   "id": "h10",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "قص الحلاق شعر الطفل.",
+   "ref": "قَصَّ الْحَلَّاقُ شَعْرَ الطِّفْل.",
+   "word": "شعر",
+   "reading": "شَعْر"
+  },
+  {
+   "id": "h11",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "يحب جدي شعر المتنبي.",
+   "ref": "يُحِبُّ جَدِّي شِعْرَ الْمُتَنَبِّي.",
+   "word": "شعر",
+   "reading": "شِعْر"
+  },
+  {
+   "id": "h12",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "وقع الطرفان عقد البيع أمس.",
+   "ref": "وَقَّعَ الطَّرَفَانِ عَقْدَ الْبَيْعِ أَمْس.",
+   "word": "عقد",
+   "reading": "عَقْد"
+  },
+  {
+   "id": "h13",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "أهداها زوجها عقداً من اللؤلؤ.",
+   "ref": "أَهْدَاهَا زَوْجُهَا عِقْدًا مِنَ اللُّؤْلُؤ.",
+   "word": "عقداً",
+   "reading": "عِقْدًا"
+  },
+  {
+   "id": "h14",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "كسر اللاعب قدمه في المباراة.",
+   "ref": "كَسَرَ اللَّاعِبُ قَدَمَهُ فِي الْمُبَارَاة.",
+   "word": "قدمه",
+   "reading": "قَدَمَه"
+  },
+  {
+   "id": "h15",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "قدم المدير تقريره إلى المجلس.",
+   "ref": "قَدَّمَ الْمُدِيرُ تَقْرِيرَهُ إِلَى الْمَجْلِس.",
+   "word": "قدم",
+   "reading": "قَدَّمَ"
+  },
+  {
+   "id": "h16",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "دخل رجل طويل إلى المحل.",
+   "ref": "دَخَلَ رَجُلٌ طَوِيلٌ إِلَى الْمَحَلّ.",
+   "word": "رجل",
+   "reading": "رَجُل"
+  },
+  {
+   "id": "h17",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "يشكو المريض من ألم في رجله اليسرى.",
+   "ref": "يَشْكُو الْمَرِيضُ مِنْ أَلَمٍ فِي رِجْلِهِ الْيُسْرَى.",
+   "word": "رجله",
+   "reading": "رِجْلِه"
+  },
+  {
+   "id": "h18",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "تعمل أختي مدرسة للغة العربية.",
+   "ref": "تَعْمَلُ أُخْتِي مُدَرِّسَةً لِلُّغَةِ الْعَرَبِيَّة.",
+   "word": "مدرسة",
+   "reading": "مُدَرِّسَة"
+  },
+  {
+   "id": "h19",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "بنيت مدرسة جديدة في الحي.",
+   "ref": "بُنِيَتْ مَدْرَسَةٌ جَدِيدَةٌ فِي الْحَيّ.",
+   "word": "مدرسة",
+   "reading": "مَدْرَسَة"
+  },
+  {
+   "id": "h20",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "نلتقي بعد صلاة الظهر.",
+   "ref": "نَلْتَقِي بَعْدَ صَلَاةِ الظُّهْر.",
+   "word": "الظهر",
+   "reading": "الظُّهْر"
+  },
+  {
+   "id": "h21",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "تحب الأرانب أكل الجزر.",
+   "ref": "تُحِبُّ الْأَرَانِبُ أَكْلَ الْجَزَر.",
+   "word": "الجزر",
+   "reading": "الجَزَر"
+  },
+  {
+   "id": "h22",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "تتكون الدولة من مئات الجزر الصغيرة.",
+   "ref": "تَتَكَوَّنُ الدَّوْلَةُ مِنْ مِئَاتِ الْجُزُرِ الصَّغِيرَة.",
+   "word": "الجزر",
+   "reading": "الجُزُر"
+  },
+  {
+   "id": "h23",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "قبل الطالب العرض فوراً.",
+   "ref": "قَبِلَ الطَّالِبُ الْعَرْضَ فَوْرًا.",
+   "word": "قبل",
+   "reading": "قَبِلَ"
+  },
+  {
+   "id": "h24",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "صعد العامل على السلم.",
+   "ref": "صَعِدَ الْعَامِلُ عَلَى السُّلَّم.",
+   "word": "السلم",
+   "reading": "السُّلَّم"
+  },
+  {
+   "id": "h25",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "سلم الموظف الملف إلى مديره.",
+   "ref": "سَلَّمَ الْمُوَظَّفُ الْمِلَفَّ إِلَى مُدِيرِه.",
+   "word": "سلم",
+   "reading": "سَلَّمَ"
+  },
+  {
+   "id": "h26",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "عليه دين كبير للبنك.",
+   "ref": "عَلَيْهِ دَيْنٌ كَبِيرٌ لِلْبَنْك.",
+   "word": "دين",
+   "reading": "دَيْن"
+  },
+  {
+   "id": "h27",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "الإسلام دين التسامح.",
+   "ref": "الْإِسْلَامُ دِينُ التَّسَامُح.",
+   "word": "دين",
+   "reading": "دِين"
+  },
+  {
+   "id": "h28",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "يعد الطباخ العشاء الآن.",
+   "ref": "يُعِدُّ الطَّبَّاخُ الْعَشَاءَ الْآن.",
+   "word": "يعد",
+   "reading": "يُعِدُّ"
+  },
+  {
+   "id": "h29",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "نشر الخبر في جميع الصحف.",
+   "ref": "نُشِرَ الْخَبَرُ فِي جَمِيعِ الصُّحُف.",
+   "word": "نشر",
+   "reading": "نُشِرَ"
+  },
+  {
+   "id": "h30",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "ولد الشاعر في دمشق.",
+   "ref": "وُلِدَ الشَّاعِرُ فِي دِمَشْق.",
+   "word": "ولد",
+   "reading": "وُلِدَ"
+  },
+  {
+   "id": "m001",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "اكتشف تشكيلة مميزة من السيارات الجديدة، جميعها موديل 2027 وصفر كيلومتر، بتصاميم عصرية ومواصفات متنوعة تناسب احتياجاتك وميزانيتك.",
+   "ref": ""
+  },
+  {
+   "id": "m002",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "لقياس الأثر دور مهم في معرفة مدى نجاح",
+   "ref": ""
+  },
+  {
+   "id": "m003",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "أكثرُ من ثلاثِمئةِ وظيفةٍ للشبابِ العُماني…",
+   "ref": ""
+  },
+  {
+   "id": "m004",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "ولا تنسوا الصلاة على النبي ﷺ.",
+   "ref": ""
+  },
+  {
+   "id": "m005",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "عِنْدَمَا كُنْتُ صَغِيرَةً كُنْتُ أُحِبُّ الحِكَايَاتِ كَثِيرًا، وَكُنْتُ أَجْمَعُ أَطْفَالَ الجِيرَانِ لِأَحْكِيَ لَهُمُ القِصَصَ المُمْتِعَةَ.",
+   "ref": ""
+  },
+  {
+   "id": "m006",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "سيتم اختيار عائلة مستوره لتركيب نظام طاقة مجاني.",
+   "ref": ""
+  },
+  {
+   "id": "m007",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "أم أن هناك شيئًا آخر في أعماق الكون؟\"",
+   "ref": ""
+  },
+  {
+   "id": "m008",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "وَهَذَا يُمْكِنْ يَكُونُ أَغْرَبَ شَيْءٍ فِي المَوْضُوعِ كُلِّهِ:",
+   "ref": ""
+  },
+  {
+   "id": "m009",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "حمد: مهمة الموظف متابعة أمر العمل وتوثيق الإغلاق، ودليل الإنجاز أمر عمل مرتبط بالأصل مع التحقق من جودة الإصلاح.",
+   "ref": ""
+  },
+  {
+   "id": "m010",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "هل مررت يومًا بابتلاء شعرت معه أن كل الأبواب أُغلقت؟",
+   "ref": ""
+  },
+  {
+   "id": "m011",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "للمبيعات والاستفسار عن أنواع واسعار الرخام والجرانيت اضغط ٢",
+   "ref": ""
+  },
+  {
+   "id": "m012",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "البلاستيك الصلب، علب الألمنيوم والصلب،",
+   "ref": ""
+  },
+  {
+   "id": "m013",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "اجعل جهدك إيقاعًا يمكنك مواصلته.",
+   "ref": ""
+  },
+  {
+   "id": "m014",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "سيارتك القادمة موديل 2027 بانتظارك في أوتو سنتر!",
+   "ref": ""
+  },
+  {
+   "id": "m015",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "لكن هناك أمر مهم جدًا...",
+   "ref": ""
+  },
+  {
+   "id": "m016",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "والإضاءة تدخل من كل مكان.",
+   "ref": ""
+  },
+  {
+   "id": "m017",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "يوم الجمعه الموافق 27/11/2026 على تمام الساعه5:00م بـ نُزل سما الليدو في حي المناره",
+   "ref": ""
+  },
+  {
+   "id": "m018",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "ثاني أكبر نهر جليدي في أوروبا ، ويغطي حوالي 8100 كيلو متر مربع، أي 8% من مساحة آيسلندا.",
+   "ref": ""
+  },
+  {
+   "id": "m019",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "المدينة بأكملها تكتسي بالألوان، والناس يبتسمون ويرقصون تحت مطر من الضوء الملون.",
+   "ref": ""
+  },
+  {
+   "id": "m020",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number",
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "بَاقِي10دَقَائِقَ عَلَى صَلَاةِ الْفَجْرِ",
+   "ref": ""
+  },
+  {
+   "id": "m021",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "\"بيتي كان يحتاج تنظيف شامل، سجاد، مجالس، أرضيات، حتى الخزانات والمكيفات...",
+   "ref": ""
+  },
+  {
+   "id": "m022",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "تعد الكثبان الحمراء الشاهقة في سوسوسفلي من أطول الكثبان في العالم، حيث يصل ارتفاعها إلى ما يقرب 400 متر.",
+   "ref": ""
+  },
+  {
+   "id": "m023",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "لِذَلِكَ كانَ مِنَ الطَّبِيعِيِّ أَنْ يَقْضِيا الكَثيرَ مِنَ الوَقْتِ في الحَديثِ عَنْ هَذِهِ الأَشْياءِ.",
+   "ref": ""
+  },
+  {
+   "id": "m024",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "نحن هنا لنضيف لمسة من الإبداع والجمال إلى احتفالاتكم باليوم الوطني السعودي الـ96.",
+   "ref": ""
+  },
+  {
+   "id": "m025",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "نقوم بإدخال بيانات الدخول المطلوبة في الحقول المخصصة لذلك، ثم نضغط على زر تسجيل الدخول.",
+   "ref": ""
+  },
+  {
+   "id": "m026",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وبقيت أخاف من يومٍ يمرّ من عمري",
+   "ref": ""
+  },
+  {
+   "id": "m027",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "دخلت، فاستقبلتني رائحة عفن باردة، وصمت ثقيل.",
+   "ref": ""
+  },
+  {
+   "id": "m028",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "يَوْمٌ نَفْخَرُ فِيهِ بِوَطَنِنَا، وَنَحْتَفِي بِتَارِيخِهِ وَحَاضِرِهِ، وَنَتَطَلَّعُ إِلَى مُسْتَقْبَلِهِ بِكُلِّ ثِقَة",
+   "ref": ""
+  },
+  {
+   "id": "m029",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "نقدم لكم خدمات تصنيع وتصليح قطع السيارات، من البونيت والبنفار والرفارف، إلى الطبلون الداخلي وقطع تعديل السيارات والدراجات النارية.",
+   "ref": ""
+  },
+  {
+   "id": "m030",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "أمثلتها: البندول البسيط، وجسم معلق في نابض، وجزيئات المادة الصلبة تهتز حول أوضاع اتزانها، والأوتار المهتزة، وضربات القلب.",
+   "ref": ""
+  },
+  {
+   "id": "m031",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "فَالأَمْرُ لِلْمُذَكَّرِ يَنْتَهي بِسُكونٍ مِثلُ: كُلْ، اشْرَبْ، اِلْعَبْ.",
+   "ref": ""
+  },
+  {
+   "id": "m032",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "levantine",
+   "tags": [],
+   "approved": false,
+   "text": "سمعنا عن رجال صنعتهم الأيام...",
+   "ref": ""
+  },
+  {
+   "id": "m033",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "ضحك الأطفال الحلوين عند جدتهم و ذاقوا الأكل الطيب قبل الظهر",
+   "ref": ""
+  },
+  {
+   "id": "m034",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "عقلي النشط يستغل كثرة التفاصيل ليتجسد فَورا وبِبراعة داخل عالمي المفضل.",
+   "ref": ""
+  },
+  {
+   "id": "m035",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "فرصه حقيقيه للاستثمار والتطوير العقاري",
+   "ref": ""
+  },
+  {
+   "id": "m036",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "استقبلتِ العالمَ بملاعبِها الحديثة، وتنظيمِها المميّز، وثقافتِها الأصيلة، وقدّمتْ للعالمِ نسخةً استثنائيّةً من البطولة.",
+   "ref": ""
+  },
+  {
+   "id": "m037",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "لِأَن الإِنْجِلِيزِيَّة لَيْسَت مُجَرَّد لُغَة نَتَعَلَّمُهَا، بَل ثِقَة نَكْتَسِبُهَا...",
+   "ref": ""
+  },
+  {
+   "id": "m038",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "خامساً: تجنب الحرارة العالية لأنها ممكن تشوه الطقم.",
+   "ref": ""
+  },
+  {
+   "id": "m039",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وفي أبريل، ألفينِ وستّةٍ وعشرين، أُطلِقَ مشروعٌ جديدٌ بالشراكةِ مع أوقافِ العَقْر…",
+   "ref": ""
+  },
+  {
+   "id": "m040",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "جميع ممثلي خدمة العملاء مشغولون حاليًا.",
+   "ref": ""
+  },
+  {
+   "id": "m041",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "بارك اللهُ فيك يا سعيد!",
+   "ref": ""
+  },
+  {
+   "id": "m042",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "ويتم وضع العقدة الشهيرة ذات اللفات المحددة، أسفل الفك أو خلف الأذن مباشرة، لضمان توزيع القوة بالشكل المطلوب.",
+   "ref": ""
+  },
+  {
+   "id": "m043",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "الإطار التنظيمي لمنافسات اللغة العربية والمهارات الأدبية - نجران - 2026م -",
+   "ref": ""
+  },
+  {
+   "id": "m044",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "هَلْ كَانَتِ السَّمَاوَاتُ وَالنُّجُومُ وَالأَرْضُ مَوْجُودَةً مُنْذُ البِدَايَة؟",
+   "ref": ""
+  },
+  {
+   "id": "m045",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "اخلط الدجاج مع الحليب والبقسماط والدقيق والبيض والتوابل والزبدة جيدًا.",
+   "ref": ""
+  },
+  {
+   "id": "m046",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "قَفَزَتْ مَرْيَمُ مِنَ الفَرَحِ، وَقَالَتْ: «لَقَدْ نَجَحْتُ فِي زِرَاعَةِ الوَرْدَةِ».",
+   "ref": ""
+  },
+  {
+   "id": "m047",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "أكثر من 17 سنة من الخبرة في البحرين.",
+   "ref": ""
+  },
+  {
+   "id": "m048",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "في عامِ ألفٍ وتسعمئةٍ واثنينِ وتسعين، تُوِّجَ المنتخبُ القطريُّ بلقبِهِ الأولِ في كأسِ الخليج، على أرضِ الدوحة.",
+   "ref": ""
+  },
+  {
+   "id": "m049",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "أَمَّا مَنْ فَقَدَ بَصَرَهُ بَعْدَ مَا كَانَ يَرَى، فَقَدْ تَسْتَمِرُّ الصُّوَرُ البَصَرِيَّةُ فِي أَحْلَامِهِ.",
+   "ref": ""
+  },
+  {
+   "id": "m050",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number",
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وفقاً للمستندات النازية، فإن خطة 'المساحة الحيوية' (Lebensraum) كانت تقتضي إزالة وتهجير واستعباد أكثر من 30 إلى 45 مليون شخص من الشعوب السلافية في شرق أوروبا وروسيا.",
+   "ref": ""
+  },
+  {
+   "id": "m051",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "حمد: ومكتب إدارة الأداء والمشاريع يتابع الخطة والمؤشرات والمشاريع ويحلل النتائج، ووحدات الجودة تدعم تطبيق المعايير والتحسين وفق الاختصاص.",
+   "ref": ""
+  },
+  {
+   "id": "m052",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "سرعة أفكاري وتشعُّبها تقربني أكثر وأكثر من واقعيْ المفضل.",
+   "ref": ""
+  },
+  {
+   "id": "m053",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "رسمتُ ٩٦ داخل قلب أخضر…",
+   "ref": ""
+  },
+  {
+   "id": "m054",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وبسبب دوره في إعادة الأذان بالعربية، لُقب عدنان مندريس بشهيد الأذان",
+   "ref": ""
+  },
+  {
+   "id": "m055",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "levantine",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "توقعات الأبراج من Solunari ليوم الجمعة.",
+   "ref": ""
+  },
+  {
+   "id": "m056",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "كما أحرص على سؤال معلمتي أو أسرتي عندما أسمع فكرة لا أفهمها، أو أشعر بأنها قد تسبب الأذى.",
+   "ref": ""
+  },
+  {
+   "id": "m057",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "من الفكرة إلى الواقع، ومن الإبداع إلى التميز…",
+   "ref": ""
+  },
+  {
+   "id": "m058",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "السلام عليكم ورحمة الله وبركاته،",
+   "ref": ""
+  },
+  {
+   "id": "m059",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "​فجأة، توصل رسالة سرية لـ خالد بن الوليد -سيف الله المسلول وقائد الجيش-.",
+   "ref": ""
+  },
+  {
+   "id": "m060",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "تُعد وحدة التحكم في ناقل الحركة (كنترول الفتيس - GS/EPS) في شاحنات مرسيدس أكتروس من الأجزاء الحيوية، وأبرز الأعطال الشائعة التي تتعرض لها تشمل:",
+   "ref": ""
+  },
+  {
+   "id": "m061",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "levantine",
+   "tags": [],
+   "approved": false,
+   "text": "أحمد: لم أعد أشعر بأنني كما كنت.",
+   "ref": ""
+  },
+  {
+   "id": "m062",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "مع موقع سقيا العطاء جمعنا لك ابواب الخير في مكان واحد",
+   "ref": ""
+  },
+  {
+   "id": "m063",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "خبرة ميدانية عميقة لا تُقدّر بثمن:أكثر من 25 سنة من العطاء المستمر والتميز في الميدان كأستاذة لمادة العلوم الطبيعية",
+   "ref": ""
+  },
+  {
+   "id": "m064",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "أَيْ أَنَّ مَا نَرَاهُ مِنَ النُّجُومِ...",
+   "ref": ""
+  },
+  {
+   "id": "m065",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "حمل ConvertVid Pro واستخرج الصوتيات بسهولة وسرعة.\"",
+   "ref": ""
+  },
+  {
+   "id": "m066",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "​\"أولاً، نبدأ بالرقم الموجود قبل النقطة.",
+   "ref": ""
+  },
+  {
+   "id": "m067",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "ولهذا فإن مسائل الطلاق الإلكتروني لا ينبغي أن تُحسم بمجرد النظر إلى الكلمات المكتوبة، وإنما يجب النظر إلى نية الزوج وقصده وظروف الواقعة كاملة.",
+   "ref": ""
+  },
+  {
+   "id": "m068",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "بأحدث الطرق التعليمية مع خاصية mind games",
+   "ref": ""
+  },
+  {
+   "id": "m069",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "رأيتُ الرقم ٩٦ يلبس وشاحاً أخضر…",
+   "ref": ""
+  },
+  {
+   "id": "m070",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "ومجموع المرحلتين 50 درجة، بوزن 5% من أعمال السنة في المواد الـ7 المحددة.",
+   "ref": ""
+  },
+  {
+   "id": "m071",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "كما تقدم لوغان خصماً على السماد العضوي يصل إلى 50 دولاراً.",
+   "ref": ""
+  },
+  {
+   "id": "m072",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "السُّؤَالُ الَّذِي يَحْتَارُ فِيهِ الكَثِيرُونَ عِنْدَ شِرَاءِ هَاتِفٍ جَدِيد.",
+   "ref": ""
+  },
+  {
+   "id": "m073",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "ومن مكة إلى إفريقيا امتدت الحكاية…",
+   "ref": ""
+  },
+  {
+   "id": "m074",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "لا وجود للاتحاد السوفيتي، أوروبا بأكملها تتحدث لغة واحدة، وفي واشنطن..",
+   "ref": ""
+  },
+  {
+   "id": "m075",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "أسعارنا تبدأ من 500 فلس فقط!**",
+   "ref": ""
+  },
+  {
+   "id": "m076",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "في بعض الأيام، قد أواجه موقفًا صعبًا، أو لا تسير الأمور كما أردت.",
+   "ref": ""
+  },
+  {
+   "id": "m077",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "وَكَيْفَ بَعَثَ اللهُ أَوَّلَ رَسُول؟",
+   "ref": ""
+  },
+  {
+   "id": "m078",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "levantine",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "Vest باللون الأسود والأبيض، لإطلالة أنيقة وعصرية.",
+   "ref": ""
+  },
+  {
+   "id": "m079",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "levantine",
+   "tags": [],
+   "approved": false,
+   "text": "**الطبيب:* هل تتذكر أحداث الحرب بشكل مفاجئ؟",
+   "ref": ""
+  },
+  {
+   "id": "m080",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "اختار موقع عيادتك داخل وجهة تجمع بين التميز والقيمة الاستثمارية.",
+   "ref": ""
+  },
+  {
+   "id": "m081",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "لا تجعل الذكاء الاصطناعي يفكر عنك…",
+   "ref": ""
+  },
+  {
+   "id": "m082",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "إنّه فأرٌ يضرُّ صحّةَ الإنسان ويُصيبُه بالأمراض!",
+   "ref": ""
+  },
+  {
+   "id": "m083",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "مرحباً، أنا ياسمين، مساعدتك الشخصية.",
+   "ref": ""
+  },
+  {
+   "id": "m084",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "وفي 16 يونيو 1950، ومع قرب شهر رمضان، أعلن إلغاء منع الأذان بالعربية، فعاد الأذان يصدح من المآذن بالعربية في جميع أنحاء تركيا.",
+   "ref": ""
+  },
+  {
+   "id": "m085",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "يرتدي قميصاً بمقاس كبير جداً لضمان التهوية والسرعة الخارقة!",
+   "ref": ""
+  },
+  {
+   "id": "m086",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "أُحَبَّ الأَطْفَالَ حِكَايَاتِي؛ لِأَنَّهَا كَانَتْ مَلِيئَةً بِالدُّرُوسِ المُفِيدَةِ، وَحَتَّى اليَوْمَ مَا زَالَتْ حِكَايَاتِي تُسْمَعُ عَبْرَ الإِنْتَرْنِتِ، وَتَدْخُلُ قُلُوبَ الأَطْفَالِ فِي كُلِّ مَكَانٍ.",
+   "ref": ""
+  },
+  {
+   "id": "m087",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "أداء قوي، حماية عالية، وثقة تدوم.",
+   "ref": ""
+  },
+  {
+   "id": "m088",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "لا تؤجلوا قراركم، احجزوا الآن واستفيدوا من العرض قبل اكتمال الأماكن!",
+   "ref": ""
+  },
+  {
+   "id": "m089",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "تأخر أو نتعة عند التنقل بين السرعات: عدم استجابة الكنترول للأوامر بسرعة، أو حدوث اهتزاز وقسوة أثناء نقل السرعات أو التبديل بين المجموعات (Range Group).",
+   "ref": ""
+  },
+  {
+   "id": "m090",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "خامات مناسبة، طباعة واضحة وألوان ثابتة، وتشطيبات احترافية تناسب منتجك.",
+   "ref": ""
+  },
+  {
+   "id": "m091",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "لشراء صناديق السماد أو مزارع الديدان.",
+   "ref": ""
+  },
+  {
+   "id": "m092",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "مرحبًا بكم في مقاطعة روكس وود، نرجو منكم الانتظار.",
+   "ref": ""
+  },
+  {
+   "id": "m093",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "ربنا يثبتنا جميعًا ويغفر لنا.",
+   "ref": ""
+  },
+  {
+   "id": "m094",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "في هذا الفيديو، نستعرض معًا تجربة استخدام النظام، وكيف يساعد المدرسة على تنظيم أعمال التقويم والاعتماد، وإدارة المؤشرات والشواهد والأدلة في مكان واحد.",
+   "ref": ""
+  },
+  {
+   "id": "m095",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "هل تساءلتم يومًا ماذا يوجد خارج كوكب الأرض؟",
+   "ref": ""
+  },
+  {
+   "id": "m096",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "لَا يَنْبَغِي أَنْ نَفْهَمَ القِصَّةَ بِهَذِهِ الطَّرِيقَةِ فَقَط...",
+   "ref": ""
+  },
+  {
+   "id": "m097",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "حكايةٌ نسجها الإيمان، وحملها الإنسان، وحفظتها القرون.",
+   "ref": ""
+  },
+  {
+   "id": "m098",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "وعناية دقيقة في كل مرحلة.",
+   "ref": ""
+  },
+  {
+   "id": "m099",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "نبدأ من اهتمامه ونبني عليه.",
+   "ref": ""
+  },
+  {
+   "id": "m100",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "انقع الأسياخ الخشبية في الماء لمدة 30 دقيقة على الأقل لمنع احتراقها.",
+   "ref": ""
+  },
+  {
+   "id": "m101",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "gulf",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "قطع الفلفل الحلو والكوسا والبصل الأحمر إلى قطع مماثلة في الحجم (مربعات حوالي 2.5 سم).",
+   "ref": ""
+  },
+  {
+   "id": "m102",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "فَاشْتَرِكْ فِيهَا، وَفَعِّلْ زِرَّ الجَرَس...",
+   "ref": ""
+  },
+  {
+   "id": "m103",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "خبرة عريقة: تاريخ ممتدٌّ لأكثر من 30سنة في خدمة التعليم وبناء الأجيال.",
+   "ref": ""
+  },
+  {
+   "id": "m104",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "​أستمع بوضوح تام لإيقاع قطرات المطر وهي تتساقط بنعومة على زجاج نافذتي.",
+   "ref": ""
+  },
+  {
+   "id": "m105",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "والأسوأ من ذلك، ضباب سام مرعب يتمدد عبر ساحة المعركة.",
+   "ref": ""
+  },
+  {
+   "id": "m106",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "حمد: القيادات تحدد الأولويات والنتائج، والقطاعات تضع الخطط التشغيلية وتتابعها.",
+   "ref": ""
+  },
+  {
+   "id": "m107",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "levantine",
+   "tags": [],
+   "approved": false,
+   "text": "الأحد، منتجع شمس الأصيل – كفروة.",
+   "ref": ""
+  },
+  {
+   "id": "m108",
+   "source": "member",
+   "variety": "fusha",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "شكرًا لاتصالكم بمكتبة كريم وأحمد!",
+   "ref": ""
+  },
+  {
+   "id": "m109",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وصلت تشكيلة جديدة من Qumra، موديلات بتجنّن، خامات تركية وجودة بتلبّي ذوقكن، وأسعار بتناسب الجميع!",
+   "ref": ""
+  },
+  {
+   "id": "m110",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "ليش الزوار دايما بيختاروا حملة أنوار الكوثر",
+   "ref": ""
+  },
+  {
+   "id": "m111",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [],
+   "approved": false,
+   "text": "جبنالك طقم مجوهرات بيجمعلك الأناقة والتناسق بكل تفاصيله.",
+   "ref": ""
+  },
+  {
+   "id": "m112",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "شغّلتلك الـ playlist المفضلة على الـ speaker بالصالون.",
+   "ref": ""
+  },
+  {
+   "id": "m113",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [],
+   "approved": false,
+   "text": "تصميم راقي، ولمعة بتخطف الأنظار، وتفاصيل بتزيد إطلالتك جمال وجاذبية.",
+   "ref": ""
+  },
+  {
+   "id": "m114",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "إن شاء الله قريباً تيتا",
+   "ref": ""
+  },
+  {
+   "id": "m115",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "هاي حياتك، وإنتِ صاحبة القرار.",
+   "ref": ""
+  },
+  {
+   "id": "m116",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "ومش كل طريق مسكّر يعني ما في غيره، ومش كل حدا سابقك يعني إنتِ متأخرة.",
+   "ref": ""
+  },
+  {
+   "id": "m117",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "توقعات بُرْج الجَدي الأسبوعية من Solunari، من تلاتة وعشرين نوفمبر إلى تسعة وعشرين نوفمبر.",
+   "ref": ""
+  },
+  {
+   "id": "m118",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وفّري وقتك وجهدك، وخلّي تنظيف الأحذية أسهل !",
+   "ref": ""
+  },
+  {
+   "id": "m119",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "لو كان عندي إيدين، كنت عبطتك هلّق عبطة كبيرة، وقلتلك: ولا يهمك، أنا معك.",
+   "ref": ""
+  },
+  {
+   "id": "m120",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "رح تكون معنا 64عائلة مشاركة عدد اللاعبين مفتوح من كل عائلة ولكن في حال خسارة شخص من العائلة يقصى اللاعب من البطولة كامله",
+   "ref": ""
+  },
+  {
+   "id": "m121",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "من فترة، وصلنا واحد من أغرب الطلبات عَ ترو!",
+   "ref": ""
+  },
+  {
+   "id": "m122",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "الطَلب كتير قَوي و كبير عَليهُن و مش عم نلحق ابداً",
+   "ref": ""
+  },
+  {
+   "id": "m123",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "من هون، من حَاصْبَيَّا، منقلّكن أهلا وسهلا فيكن بـ CNS Computer.",
+   "ref": ""
+  },
+  {
+   "id": "m124",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "هال الليلة، منا ليلةً متل كلّ الليالي...",
+   "ref": ""
+  },
+  {
+   "id": "m125",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [],
+   "approved": false,
+   "text": "بتعرفونا كمان بخبرتنا اللي صارلها أكتر من عشرين سنة بتصليح وصيانة الكمبيوترات واللابتوبات.",
+   "ref": ""
+  },
+  {
+   "id": "m126",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "باي باي، يلّا باي، باي!",
+   "ref": ""
+  },
+  {
+   "id": "m127",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "الفَصل كامِل بالصّوت، والرّابط بالبايو.",
+   "ref": ""
+  },
+  {
+   "id": "m128",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "number",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "يوم السبت، تمانية وعشرين نوفمبر، الساعة 11:20 بالتوقيت العالمي: ينتقل القمر إلى برج الأَسَد.",
+   "ref": ""
+  },
+  {
+   "id": "m129",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وبدّك تقوّي تغطية Wifi بالبيت أو بالمكتب؟",
+   "ref": ""
+  },
+  {
+   "id": "m130",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "شركة يارا توفرلكم كل هالخدمات بكل اهتمام واحترافية.",
+   "ref": ""
+  },
+  {
+   "id": "m131",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "«ومنختم بالمطبخ، فيه شبّاك كبير للتهوية، وهون بيبيّن معنا باب السقيفة.»",
+   "ref": ""
+  },
+  {
+   "id": "m132",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "دايمًا في محلّ لواحد كمان",
+   "ref": ""
+  },
+  {
+   "id": "m133",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "بالميلاد، خلّي النجمة تدلّك عَ عمشيت!",
+   "ref": ""
+  },
+  {
+   "id": "m134",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "عملتلك backup لكل الصور على الـ server.",
+   "ref": ""
+  },
+  {
+   "id": "m135",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "number",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "بيجامات بناتي مصوف قلبن بيقتلُو البرد بلبسه من ٦ شهور ل سنتين",
+   "ref": ""
+  },
+  {
+   "id": "m136",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "بعده عم يجرّب، بس عنده خبرة كبيرة بالفشل.",
+   "ref": ""
+  },
+  {
+   "id": "m137",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number",
+    "english"
+   ],
+   "approved": false,
+   "text": "نحنا بشركة LEO 2B، منستلم عقارك عالعظم، وبنسلمك ياه تحفة فنية!",
+   "ref": ""
+  },
+  {
+   "id": "m138",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "الـ temperature بالزولدر صارت عشرين درجة.",
+   "ref": ""
+  },
+  {
+   "id": "m139",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وهو شو حقّق من هالنجاح؟",
+   "ref": ""
+  },
+  {
+   "id": "m140",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "number",
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "عدسات بتساعد على تخفيف التعرّض للضوء الأزرق، مع حماية UV400، لتستمتعي بالستايل والراحة خلال نهارك.",
+   "ref": ""
+  },
+  {
+   "id": "m141",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "نحنا فاتحين من الاتنين للسبت، من الـ9 الصبح لـ6 المسا.",
+   "ref": ""
+  },
+  {
+   "id": "m142",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "مش بس سُفرة حلوة، كمان أجواء فنية بتستاهل تعيشوها.",
+   "ref": ""
+  },
+  {
+   "id": "m143",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "مِستر كَفائين، الفَصل التّاني: بيئة العَمل.",
+   "ref": ""
+  },
+  {
+   "id": "m144",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "روف توب بمار مخايل عالـ٩.",
+   "ref": ""
+  },
+  {
+   "id": "m145",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [],
+   "approved": false,
+   "text": "نحنا متخصصين بالإكساء الداخلي والديكورات للشقق، الفلل والمحلات، ومنشتغل معك من أول فكرة، لحد آخر تفصيلة بالمكان.",
+   "ref": ""
+  },
+  {
+   "id": "m146",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [],
+   "approved": false,
+   "text": "ما فهمت عليك منيح، فيك تعيدلي؟",
+   "ref": ""
+  },
+  {
+   "id": "m147",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "number",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "خلوني فرجيكن هالفيلا المميّزة ب 35 دونم مؤولفه من فيلا وبناء متعدد الطوابق توزيع منسق، ودرج داخلي أنيق ب اطلالة مباشرة على الْمَسْبَحِ.",
+   "ref": ""
+  },
+  {
+   "id": "m148",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "number",
+    "english"
+   ],
+   "approved": false,
+   "text": "تواصل معنا وشوف تصميمك المجاني مع LEO 2B.",
+   "ref": ""
+  },
+  {
+   "id": "m149",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "صبيّة طلبت منّا نركّبلها شريحة إلكترونية جوّا ظفرها، لتقدر تفتح البروفايل تبعها بلمسة وحدة!",
+   "ref": ""
+  },
+  {
+   "id": "m150",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "بس الميزان عنده حِسّ عالي بالعدالة، وبيحاول يعطي كِل واحد حقه.",
+   "ref": ""
+  },
+  {
+   "id": "m151",
+   "source": "member",
+   "variety": "levantine",
+   "voice_dialect": "levantine",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "بس ب ١٠$ من عمر ٦ ل ١٦ سنة",
+   "ref": ""
+  },
+  {
+   "id": "m152",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "مش كل لفة غلط معناها إنك ضِعتي، ومش كل طريق زحمة يبقى ملوش آخر.",
+   "ref": ""
+  },
+  {
+   "id": "m153",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "والمميز هنا إن المهارات دي مش بنتعلمها بالكلام بس.",
+   "ref": ""
+  },
+  {
+   "id": "m154",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "تلات خطوات: بيك، وبعدين باك في الـباكينج زون، وبعدين التسليم.",
+   "ref": ""
+  },
+  {
+   "id": "m155",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "شنطة إتش سي من باجيستا وصلت بألوان تجنن!",
+   "ref": ""
+  },
+  {
+   "id": "m156",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "لأن الشحن مش مجرد طاقة…",
+   "ref": ""
+  },
+  {
+   "id": "m157",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "بمقدم 50% فقط، وتقسيط على سنتين.",
+   "ref": ""
+  },
+  {
+   "id": "m158",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "عظيم عظيم خلينا نشوف العمليه دى هتخلص على ايه و على فكره انا مش بنسى",
+   "ref": ""
+  },
+  {
+   "id": "m159",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "بنستخدم أحدث أجهزة تصحيح النظر، وبنوفر لك متابعة مستمرة بعد العملية لحد ما نظرك يتحسن 100%.",
+   "ref": ""
+  },
+  {
+   "id": "m160",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "بس لما تكون قلقان، الـ RAS بيفتكر الأفكار دي خطر حقيقي، فبيفرز كورتيزول وأدرينالين وكأنك في معركة.",
+   "ref": ""
+  },
+  {
+   "id": "m161",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "أهلاً بيكم في مكتبة كريم وأحمد!",
+   "ref": ""
+  },
+  {
+   "id": "m162",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "يا جدعان، هو إحنا ليه محدش مقدّر قيمتنا؟",
+   "ref": ""
+  },
+  {
+   "id": "m163",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "هو ماشي على السرعة المسموحة بالظبط…",
+   "ref": ""
+  },
+  {
+   "id": "m164",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "بص في المراية كل شوية.",
+   "ref": ""
+  },
+  {
+   "id": "m165",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "كريم: ماشي يا آنسة، تسلمي، كده إحنا فهمنا الحكاية.",
+   "ref": ""
+  },
+  {
+   "id": "m166",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "بابا كان فنان يا حبيبتي أكيد",
+   "ref": ""
+  },
+  {
+   "id": "m167",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "بصي يا ستي، نصيحة من القلب…",
+   "ref": ""
+  },
+  {
+   "id": "m168",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "ازيك عاملين ايه مطابع عمر جيلكم بعرض الختم الدائري مقاس 4.5 سم با 300 ج فقط",
+   "ref": ""
+  },
+  {
+   "id": "m169",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "عموما حصل خير ي استاذ مصطفى انا بس هركن العربيه واطلع و نتكلم",
+   "ref": ""
+  },
+  {
+   "id": "m170",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "تصوّر كود QR متقطع أو عليه بقعة…",
+   "ref": ""
+  },
+  {
+   "id": "m171",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "\"لما بتكون ميت من التعب وفاضل باصص في السقف، فيه جزء في مخك اسمه RAS - بواب الأمن، بيفلتر المؤثرات طول اليوم عشان يخليك فايق.",
+   "ref": ""
+  },
+  {
+   "id": "m172",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "​التسوية: على أعلى درجة حرارة في الفرن لمدة ١٠ لـ ١٢ دقيقة لحد ما الجبنة تسيح والحرواف تاخد لون ذهبي.",
+   "ref": ""
+  },
+  {
+   "id": "m173",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "في الـلاب استلمنا عشر قطع على مخزن إسكندرية وعملنا Validate للاستلام بس.",
+   "ref": ""
+  },
+  {
+   "id": "m174",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "ابعتلي كلمة STEP وهبعتلك البلان والاسعار\"",
+   "ref": ""
+  },
+  {
+   "id": "m175",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "وده بالظبط اللي أنظمة الـ ERP زي Odoo بتسهله، لو اتعملت صح.",
+   "ref": ""
+  },
+  {
+   "id": "m176",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وطبعاً \"اكتشاف الذات\" (Self-discovery) هو الرحلة اللي بتعرفك أنت مين بجد.",
+   "ref": ""
+  },
+  {
+   "id": "m177",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "كل مرة بتخرجي بتحتاري تختاري شنطة إيه على لبسك؟",
+   "ref": ""
+  },
+  {
+   "id": "m178",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "وإحنا طلبنا من أولياء الأمور يساعدوا ولادهم في تكوين المجموعات.",
+   "ref": ""
+  },
+  {
+   "id": "m179",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "عايز اتعلم الاغانى اللى بحبها بطريقة بسيطه وسريعة",
+   "ref": ""
+  },
+  {
+   "id": "m180",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "بيدعم توصيل ألواح شمسية بقدرة تصل إلى 200% من قدرته الاسمية، علشان تستفيد من إمكانيات أكبر لنظامك الشمسي.",
+   "ref": ""
+  },
+  {
+   "id": "m181",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "عارف إن إنت مادية بس مش للدرجة ديه",
+   "ref": ""
+  },
+  {
+   "id": "m182",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "وتكلفة السيرفرات والدعم الفني حوالي عشرين في المية، يعني Gross Margin تمانين في المية.",
+   "ref": ""
+  },
+  {
+   "id": "m183",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "و QR فقط بينزّل لك الرمز لوحده، ونسخ الكود ونسخ الرابط لو هتبعتهم لحد.",
+   "ref": ""
+  },
+  {
+   "id": "m184",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "تميزه بيبدأ من موقع استراتيجي على طريق الواحات، في قلب منطقة جنوب الأحياء بمدينة 6 أكتوبر،",
+   "ref": ""
+  },
+  {
+   "id": "m185",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "ده المكان اللي جيتله أتعالج نفسيًا من حروق الليزر اللي اتعرضتلها في أماكن تانية.",
+   "ref": ""
+  },
+  {
+   "id": "m186",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "الحكاية اللي محدش قالهالك عن قرية القَلَج..",
+   "ref": ""
+  },
+  {
+   "id": "m187",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number",
+    "english"
+   ],
+   "approved": false,
+   "text": "٦ و أخر و أحلى حاجة حمام سباحة مرتين في الشهر for fun.",
+   "ref": ""
+  },
+  {
+   "id": "m188",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "ولو إنت اللي ورا: متلزقش، ومتنوّرش العالي!",
+   "ref": ""
+  },
+  {
+   "id": "m189",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "مع إنفرتر VASTSR بنظام الأوف جريد…",
+   "ref": ""
+  },
+  {
+   "id": "m190",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "لل ميني مارت اضغط تلاته",
+   "ref": ""
+  },
+  {
+   "id": "m191",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "الموبايل ممكن يستخدم الـGPS عشان يحدد موقعك، وده بيساعد تطبيقات الملاحة والخدمات المختلفة.",
+   "ref": ""
+  },
+  {
+   "id": "m192",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وده تِجارة عادِيّة، مِش اسْتِغلال.",
+   "ref": ""
+  },
+  {
+   "id": "m193",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "السلام عليكم ياصدقائي فى قناه اكلات وحلويات هنيه انا جايب لكم النهارده طريقة عمل القرنبيط الكرسبي مظبوطة، ومقرمش من بره وطري من جوه",
+   "ref": ""
+  },
+  {
+   "id": "m194",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "يبقى لازم تزور جناح إيجيكو في معرض فارما كونكس، من 1 إلى 3 سبتمبر.",
+   "ref": ""
+  },
+  {
+   "id": "m195",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number",
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "**بدّل لوح التقطيع القديم، واختار النظافة والعملية مع InoxChef 316!**",
+   "ref": ""
+  },
+  {
+   "id": "m196",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "ده شغل كارت الشاشة: معالج مخصوص للرسم، اسمه الـ GPU.",
+   "ref": ""
+  },
+  {
+   "id": "m197",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "أَحْمَد، رَاجِل فِي أَوَاخِر التَّلَاتِينات، كَان رَاجِع بَيْتُه بَعْد يَوْم شُغْل مُتْعِب.",
+   "ref": ""
+  },
+  {
+   "id": "m198",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "في مول West Gravity Plaza، فرصتك دلوقتي تمتلك وحدتك الطبية داخل مول بموقع مميز، يجمع بين سهولة الوصول وقيمة الاستثمار.",
+   "ref": ""
+  },
+  {
+   "id": "m199",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "وبنحط برنامج علاج مناسب يساعد يقلل الضغط على الأعصاب، ويحسن الحركة، ويخفف الأعراض، ويرجعك تمارس حياتك بشكل طبيعي.",
+   "ref": ""
+  },
+  {
+   "id": "m200",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "قالتلي: عند غلط في السنة؟",
+   "ref": ""
+  },
+  {
+   "id": "m201",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "دي أجهزة مخصصة بتتصنع لكل واحد حسب حالته،",
+   "ref": ""
+  },
+  {
+   "id": "m202",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "\"بس المرة دي قلت أجرب الليزر بطريقة مختلفة، وبدأت جلسة إزالة الشعر بجهاز AMI REX-DUAL الكوري، واللي أكتر حاجة فرقت معايا فيه هي نظام التبريد.",
+   "ref": ""
+  },
+  {
+   "id": "m203",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "يا جماعة، أنا هموت من الجوع.",
+   "ref": ""
+  },
+  {
+   "id": "m204",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "لو حابب تطلب من الويب سايت وتستفاد باحدث العروض دوس 1 1",
+   "ref": ""
+  },
+  {
+   "id": "m205",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "لوحدك، أو مع أصحابك، هتلاقي مكان تقعد فيه وتروق مزاجك.",
+   "ref": ""
+  },
+  {
+   "id": "m206",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "دي قوة تقدر تعتمد عليها!",
+   "ref": ""
+  },
+  {
+   "id": "m207",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "ساعات بيقولو ان صوتي حلو",
+   "ref": ""
+  },
+  {
+   "id": "m208",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "3 علامات بتقولك أن موتور طرومبة البنزين بتاع عربييتك فيه مشكله..",
+   "ref": ""
+  },
+  {
+   "id": "m209",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "ورا كل تجربة شحن موثوقة، في فريق بيشتغل بكل اهتمام، وبيحط مجهود كبير في كل تفصيلة.",
+   "ref": ""
+  },
+  {
+   "id": "m210",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "english"
+   ],
+   "approved": false,
+   "text": "\"عشان كده بقولك على STEP Mall في مدينة بدر.",
+   "ref": ""
+  },
+  {
+   "id": "m211",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "تحس بشكشكة في إيدك أو رجلك…",
+   "ref": ""
+  },
+  {
+   "id": "m212",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "لو عربية أسرع بتقرّب من وراك…",
+   "ref": ""
+  },
+  {
+   "id": "m213",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "\"أهلاً بيكم في حلقة جديدة من برنامج (حارس العقيدة).",
+   "ref": ""
+  },
+  {
+   "id": "m214",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "**أول حاجة: إنت تساعد الشخص اللي بعدك.**",
+   "ref": ""
+  },
+  {
+   "id": "m215",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "العالم كله كان مشغول بالحرب…",
+   "ref": ""
+  },
+  {
+   "id": "m216",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "شكل شيك وعملي، وخامتها جلد ووتر بروف، ومقاسها 30 في 32.",
+   "ref": ""
+  },
+  {
+   "id": "m217",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "**أكبر بكتير من مجرد 5% من درجات أعمال السنة.**",
+   "ref": ""
+  },
+  {
+   "id": "m218",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "والحسابات دي تقيلة جدًا، عشان كده كروت إنفيديا آر تي إكس فيها أنوية مخصوصة للـ Ray Tracing بس.",
+   "ref": ""
+  },
+  {
+   "id": "m219",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "لاي استفسار تاني اضغط ٦",
+   "ref": ""
+  },
+  {
+   "id": "m220",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number",
+    "english"
+   ],
+   "approved": false,
+   "text": "عندنا هتلاقي زيوت أصلية 100%، وتقدر تتأكد بنفسك من الأصالة عن طريق الـ QR Code.",
+   "ref": ""
+  },
+  {
+   "id": "m221",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "سعرها 310 جنيه بس، والشحن 60 جنيه!",
+   "ref": ""
+  },
+  {
+   "id": "m222",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "تجربتك تعطي الشخص اللي بعدك حاجة يبني عليها قراره،",
+   "ref": ""
+  },
+  {
+   "id": "m223",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [],
+   "approved": false,
+   "text": "تواصل معانا دلوقتى وستفيد بخصومات الشهر ده",
+   "ref": ""
+  },
+  {
+   "id": "m224",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "أو بسبب إهدار الميه والعلف في المزرعة؟",
+   "ref": ""
+  },
+  {
+   "id": "m225",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "number",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "كل يوم من ٥ ل ٩ مساءاً",
+   "ref": ""
+  },
+  {
+   "id": "m226",
+   "source": "member",
+   "variety": "egyptian",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "السر وراء نجاحه إنه دمج بين خبرته الحقيقية في السوق من سنة 2014، واستخدامه الذكي للتكنولوجيا.",
+   "ref": ""
+  },
+  {
+   "id": "m227",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "fusha",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "هذي النبتة فيها شي يذكّرني فيها!",
+   "ref": ""
+  },
+  {
+   "id": "m228",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "قبل ما نبدأ بأي عملية تلوين للشعر، لازم أول شيء نفهم مستويات اللون، واللي بنسميها الكولور ليفل.",
+   "ref": ""
+  },
+  {
+   "id": "m229",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "ما حد يحقق الاستراتيجية بروحه؛ النتيجة هي حاصل تكامل الأدوار.",
+   "ref": ""
+  },
+  {
+   "id": "m230",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "english",
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وأخيرًا، كمل عملية الدفع بالطريقة اللي تناسبك، سواء عن طريق Apple Pay أو غيرها من وسائل الدفع المتوفرة في الموقع.",
+   "ref": ""
+  },
+  {
+   "id": "m231",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "تخيّل لو انقطعت الكهرباء عن بيتي وبيتك نص ساعة بس!",
+   "ref": ""
+  },
+  {
+   "id": "m232",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "بالفترة من ١٤ لي ٣٠ نوفمبر",
+   "ref": ""
+  },
+  {
+   "id": "m233",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "ومين انحسب، ومين انستبعد وليش.",
+   "ref": ""
+  },
+  {
+   "id": "m234",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "استقدم عاملتك من إثيوبيا بثلاثة آلاف وخمس مية ريال بس!",
+   "ref": ""
+  },
+  {
+   "id": "m235",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "هذا معزبنا يا خِبل أركد",
+   "ref": ""
+  },
+  {
+   "id": "m236",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "اسمع أنت وياه ترى إن جيتوا هنا ثاني مره لجنتكم.",
+   "ref": ""
+  },
+  {
+   "id": "m237",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "يرجع يطلع السلّم، ويركّبها من جديد.",
+   "ref": ""
+  },
+  {
+   "id": "m238",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "وصلتنا رسالة غريبة من أحد المستمعين، يقول إنه شاف امرأة قرب الشط…",
+   "ref": ""
+  },
+  {
+   "id": "m239",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "ما أحد يعبر الشط في دا الليل.",
+   "ref": ""
+  },
+  {
+   "id": "m240",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "جدّك يغوص فيه من الفجر، ويرجع بلولو يلمع أكثر من الشمس.",
+   "ref": ""
+  },
+  {
+   "id": "m241",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "ظافر طلع من تحت الظل قبل ما يأدن الظهر",
+   "ref": ""
+  },
+  {
+   "id": "m242",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "تواصلوا معانا الحين، وخلّوا مشروعكم علينا!",
+   "ref": ""
+  },
+  {
+   "id": "m243",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "تراه ما هو كل طريق مختصر يوصّلك للمكان الزين، وما هو كل إشارة حمراء تعني إنك أبطيتِ.",
+   "ref": ""
+  },
+  {
+   "id": "m244",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "غسّل سيارته الجديدة بالمويا والصابون قبل ما يطلع للبر مع الشباب",
+   "ref": ""
+  },
+  {
+   "id": "m245",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "وبجانبه شخص مجهول ما يبين وجهه.",
+   "ref": ""
+  },
+  {
+   "id": "m246",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "زين يا حمد، كيف المسؤول الجديد بيقيّم أداء الموظف عن الفترة اللي كان فيها مع مسؤوله السابق؟",
+   "ref": ""
+  },
+  {
+   "id": "m247",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "مسوّية جدول: ست مطاعم، وكل رسوم التوصيل.",
+   "ref": ""
+  },
+  {
+   "id": "m248",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "قبل لا يكون عندنا شي…",
+   "ref": ""
+  },
+  {
+   "id": "m249",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "كل طلبية نغلفها لج بحب…",
+   "ref": ""
+  },
+  {
+   "id": "m250",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "زين يا جده، أبي أزرع نخلة مثل اللي كانت عندكم زمان.",
+   "ref": ""
+  },
+  {
+   "id": "m251",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "السلام عليكم جده انا مسك كنت ابغى اسلم عليكي",
+   "ref": ""
+  },
+  {
+   "id": "m252",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "أتخيله هادي، يعرف وش يقول، ومتى يسكت، وكيف يخلي كلمة وحدة توجع أكثر من صراخ طويل.",
+   "ref": ""
+  },
+  {
+   "id": "m253",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وقبل لا نردّها لك، نسوي لها فحص وتشغيل، ونتأكد إن كل شي شغّال مثل المطلوب.",
+   "ref": ""
+  },
+  {
+   "id": "m254",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "حَيَّاكُمُ اللهْ، وَمَرْحَبَا بِكُمْ فِي مَنَاحِلِ الظَّاهِرَةْ!",
+   "ref": ""
+  },
+  {
+   "id": "m255",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "وإذا خلصت مهلة إشعار العقد بلا قرار…",
+   "ref": ""
+  },
+  {
+   "id": "m256",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "تبغى تعتمر من الرياض براحة وتنظيم؟",
+   "ref": ""
+  },
+  {
+   "id": "m257",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "طيب تخيّل العمال اللي يشتغلون تحت أشعة الشمس لساعات طويلة!",
+   "ref": ""
+  },
+  {
+   "id": "m258",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "الطالب الذكي قرأ ثلاث كتب كبيرة في إجازة الصيف اللي راحت",
+   "ref": ""
+  },
+  {
+   "id": "m259",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "وعقبها نجهّز القطع ونصبغها، ونركّب المروحة من يديد.",
+   "ref": ""
+  },
+  {
+   "id": "m260",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "ضغطة زر من جوالك أو من الكمبيوتر…",
+   "ref": ""
+  },
+  {
+   "id": "m261",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "بأربعة عشر ألف وخمسمية ريال!",
+   "ref": ""
+  },
+  {
+   "id": "m262",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "fusha",
+   "tags": [],
+   "approved": false,
+   "text": "صانع القصص الثمينة اللي الكل يحتاجه",
+   "ref": ""
+  },
+  {
+   "id": "m263",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "سمعي زين، هالشهر ما فيه شوبنق!",
+   "ref": ""
+  },
+  {
+   "id": "m264",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "خصم ٣٠٪؜ على كل المنتجات اللي بالموقع",
+   "ref": ""
+  },
+  {
+   "id": "m265",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "egyptian",
+   "tags": [
+    "member-marked-fully"
+   ],
+   "approved": false,
+   "text": "تَوَّنَا بَادِينْ نِفْرِزْ مَحْصُولِ السِّدْرِ الْجَدِيدْ، وَالْيَوْمْ بْنْوَرِّيكُمْ هَالْعَسَلْ مِنْ مَنَاحِلِ الظَّاهِرَةْ!",
+   "ref": ""
+  },
+  {
+   "id": "m266",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "خمس غرف نوم، وتبدأ من سبعمية وخمسين ألف ريال.",
+   "ref": ""
+  },
+  {
+   "id": "m267",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [
+    "member-marked-partly"
+   ],
+   "approved": false,
+   "text": "تتذكّرون نورة يوم كانت صغيرة في المهاد؟",
+   "ref": ""
+  },
+  {
+   "id": "m268",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "السؤال: وش يضمن لك إني مجرد شخص ورا شاشة؟",
+   "ref": ""
+  },
+  {
+   "id": "m269",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "fusha",
+   "tags": [
+    "number"
+   ],
+   "approved": false,
+   "text": "وعندهم كشاف قوي مع شنطته بـ49 ريال، وخيط مائي مع برشاي بـ49 ريال.",
+   "ref": ""
+  },
+  {
+   "id": "m270",
+   "source": "member",
+   "variety": "gulf",
+   "voice_dialect": "gulf",
+   "tags": [],
+   "approved": false,
+   "text": "قالوا لها: يا زين الحياة",
+   "ref": ""
+  }
+ ]
+}

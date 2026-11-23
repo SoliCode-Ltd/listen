@@ -74,7 +74,8 @@ class TashkeelScoreCommand extends Command
         $changed = [];
         $missing = 0;
         foreach ($golden['items'] as $item) {
-            if (empty($item['approved']) && ! $this->option('all')) {
+            // Not approved yet, or its reference not written yet: it does not count.
+            if ((empty($item['approved']) && ! $this->option('all')) || trim((string) ($item['ref'] ?? '')) === '') {
                 continue;
             }
             $candidate = $candidates === null ? (string) $item['text'] : ($candidates[$item['id']] ?? null);
