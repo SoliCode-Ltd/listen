@@ -82,7 +82,7 @@
 
   <main class="container legal-page">
     @php
-      $effectiveDate = app()->getLocale() === 'ar' ? '22 فبراير 2026' : 'February 22, 2026';
+      $effectiveDate = app()->getLocale() === 'ar' ? '23 نوفمبر 2026' : 'November 23, 2026';
       $contactEmail = trim((string) \App\Models\SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio';
       $supportEmailLink = '<a href="mailto:'.e($contactEmail).'">'.e($contactEmail).'</a>';
     @endphp
@@ -119,6 +119,18 @@
       <section class="legal-section">
         <h2>{{ __('ui.legal.terms.s5_title') }}</h2>
         <p>{{ __('ui.legal.terms.s5_body') }}</p>
+      </section>
+
+      <section class="legal-section" id="voice-cloning">
+        <h2>{{ __('ui.legal.terms.clone_title') }}</h2>
+        <p>{{ __('ui.legal.terms.clone_intro') }}</p>
+        <ul>
+          <li>{{ __('ui.legal.terms.clone_1') }}</li>
+          <li>{{ __('ui.legal.terms.clone_2') }}</li>
+          <li>{{ __('ui.legal.terms.clone_3') }}</li>
+          <li>{{ __('ui.legal.terms.clone_4') }}</li>
+          <li>{{ __('ui.legal.terms.clone_5') }}</li>
+        </ul>
       </section>
 
       <section class="legal-section">

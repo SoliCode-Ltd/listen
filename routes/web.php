@@ -386,6 +386,10 @@ Route::group([
     Route::view('/cookie-policy', 'legal.cookies')->name('legal.cookies');
     Route::get('/browsers-extension', [ExtensionController::class, 'show'])->name('browsers-extension.page');
     Route::get('/developers', [DeveloperController::class, 'docs'])->name('developers');
+    // The addresses people guess for the API docs lead to them, as /contact does to /contact-us.
+    foreach (['/api', '/api-docs', '/docs'] as $guess) {
+        Route::get($guess, fn () => redirect()->route('developers', status: 301));
+    }
 
     Route::get('/contact-us', [ContactController::class, 'show'])->name('contact');
     Route::post('/contact-us', [ContactController::class, 'submit'])->middleware('throttle:contact')->name('contact.submit');
