@@ -820,7 +820,7 @@ jobs:
             exit "$failed"
           fi
           if [ "$MODE" = tashkeel-sample ]; then
-            tool tashkeel_sample.php | $S "$FIND; COUNT=300 nice php"
+            tool tashkeel_sample.php | $S "$FIND; COUNT=340 nice php"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi

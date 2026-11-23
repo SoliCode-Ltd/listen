@@ -11,7 +11,8 @@
  *  - totals with no text: how many voices each dialect group has, how many
  *    texts already carry vowel marks, digits or English words;
  *  - single sentences, never a whole text, with no member, voice or date:
- *    5 to 24 words, at most two from one member, each one once, shuffled.
+ *    5 to 24 words, at most two from one member (four where a group is
+ *    short), each one once, shuffled.
  *    A sentence with an email, a link, a handle, a long number (a phone, a
  *    card, an account) or a word about passwords and accounts is left out.
  * Admin accounts and test addresses are left out. Writes nothing. The run's
@@ -32,6 +33,7 @@ if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
 }
 mt_srand(20261123);
 $count = max(20, min(400, (int) (getenv('COUNT') ?: 300)));
+// A few more than asked for: sentences that name a person are taken out by hand.
 $marks = '\x{064B}-\x{065F}\x{0670}';
 
 // The owner's order: Fusha first, then Egyptian, Gulf, Levantine.
@@ -113,20 +115,23 @@ foreach ($share as $g => $part) {
     usort($list, fn (array $a, array $b): int => (int) ($b['f'] !== '' && $b['f'] !== 'm') <=> (int) ($a['f'] !== '' && $a['f'] !== 'm'));
     $hard = 0;
     $perMember = [];
-    $rest = [];
-    foreach ($list as $s) {
-        $isHard = $s['f'] !== '' && $s['f'] !== 'm';
-        if ($isHard && $hard >= (int) ceil($want / 3)) {
-            $rest[] = $s;
-
-            continue;
+    $got = 0;
+    // Two passes: at most two sentences from one member, then up to four when a group is still short.
+    foreach ([2, 4] as $each) {
+        foreach ($list as $i => $s) {
+            if ($got >= $want) {
+                break 2;
+            }
+            $isHard = $s['f'] !== '' && $s['f'] !== 'm';
+            if (($isHard && $hard >= (int) ceil($want / 3)) || ($perMember[$s['u']] ?? 0) >= $each) {
+                continue;
+            }
+            $perMember[$s['u']] = ($perMember[$s['u']] ?? 0) + 1;
+            $hard += $isHard ? 1 : 0;
+            $got++;
+            $picked[] = $s;
+            unset($list[$i]);
         }
-        if (($perMember[$s['u']] ?? 0) >= 2 || count(array_filter($picked, fn ($p) => $p['g'] === $g)) >= $want) {
-            continue;
-        }
-        $perMember[$s['u']] = ($perMember[$s['u']] ?? 0) + 1;
-        $hard += $isHard ? 1 : 0;
-        $picked[] = $s;
     }
 }
 shuffle($picked);
