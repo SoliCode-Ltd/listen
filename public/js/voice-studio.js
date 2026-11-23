@@ -909,7 +909,7 @@
       return '<div class="vs-pron-mark-group"><span class="vs-pron-mark-group-name">' + escAttr(tr('marks_' + group[0])) + '</span><div class="vs-pron-mark-row">'
         + group[1].map(function (m) {
           return '<button type="button" class="vs-pron-mark" data-mark="' + m[0] + '" data-host="' + m[2] + '" aria-pressed="false" aria-label="' + escAttr(tr('mark_' + m[1])) + '">'
-            + '<span class="vs-pron-mark-glyph" aria-hidden="true" dir="rtl">' + m[2] + m[0] + '</span><span class="vs-pron-mark-name" dir="rtl">' + escAttr(tr('mark_' + m[1])) + '</span></button>';
+            + '<span class="vs-pron-mark-glyph" aria-hidden="true" dir="rtl">' + m[2] + m[0] + '</span><span class="vs-pron-mark-name" dir="auto">' + escAttr(tr('mark_' + m[1])) + '</span></button>';
         }).join('') + '</div></div>';
     }).join('');
     // Hear the difference: the same letters read differently, from recordings made once.
@@ -1114,7 +1114,7 @@
       if (usable.indexOf(letterAt) < 0) letterAt = usable.length ? usable[0] : -1;
       lettersBox.innerHTML = '';
       if (!usable.length) {
-        lettersBox.innerHTML = '<p class="vs-pron-letters-empty">' + escAttr(tr('letters_empty')) + '</p>';
+        lettersBox.innerHTML = '<p class="vs-pron-letters-empty" dir="auto">' + escAttr(tr('letters_empty')) + '</p>';
       }
       letters.forEach(function (l, i) {
         if (!usable.length) return;
