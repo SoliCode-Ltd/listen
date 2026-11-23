@@ -919,7 +919,10 @@
       + '<header class="vs-modal-head"><span class="vs-modal-ico" aria-hidden="true">' + icon('g-pron') + '</span><div class="vs-modal-titles"><h2 id="vsPronTitle">' + escAttr(tr('title')) + '</h2><p id="vsPronHint">' + escAttr(tr('hint')) + '</p></div>'
       + '<button type="button" class="vs-modal-close" data-vs-close aria-label="' + escAttr(tr('close')) + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>'
       + '<div class="vs-pron-scroll">'
-      + '<section class="vs-pron-example" aria-labelledby="vsPronExTitle" hidden><h3 id="vsPronExTitle">' + escAttr(tr('example_title')) + '</h3><p class="vs-pron-example-text"></p><div class="vs-pron-example-row"></div></section>'
+      // The title folds the example away: open on a first visit, folded once the member has words of their own.
+      + '<section class="vs-pron-example" aria-labelledby="vsPronExTitle" hidden><h3><button type="button" class="vs-pron-example-toggle" aria-expanded="true" aria-controls="vsPronExBody">'
+      + '<span id="vsPronExTitle">' + escAttr(tr('example_title')) + '</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h3>'
+      + '<div class="vs-pron-example-body" id="vsPronExBody"><p class="vs-pron-example-text"></p><div class="vs-pron-example-row"></div></div></section>'
       + '<form class="vs-pron-add" id="vsPronForm" novalidate>'
       + '<div class="vs-pron-fields">'
       + '<label class="vs-pron-field"><span>' + escAttr(tr('word_label')) + '</span><input name="word" maxlength="60" autocomplete="off" spellcheck="false" dir="auto" placeholder=""></label>'
@@ -980,12 +983,31 @@
       wordIn.placeholder = tr('word_placeholder_' + lang);
       spokenIn.placeholder = tr('spoken_placeholder_' + lang);
     }
+    // Folded or open: the member's own choice once they have made one (kept in this browser);
+    // until then open for a first visit and folded for a member who already has saved words.
+    var exToggle = exBox.querySelector('.vs-pron-example-toggle');
+    var exBody = exBox.querySelector('.vs-pron-example-body');
+    var EX_KEY = 'listen:pron-example';
+    function exChoice() { try { return window.localStorage.getItem(EX_KEY); } catch (e) { return null; } }
+    function foldExample(folded) {
+      if (folded) stopExample();
+      exBox.classList.toggle('is-folded', folded);
+      exBody.hidden = folded;
+      exToggle.setAttribute('aria-expanded', folded ? 'false' : 'true');
+    }
+    exToggle.addEventListener('click', function () {
+      var folded = !exBox.classList.contains('is-folded');
+      foldExample(folded);
+      try { window.localStorage.setItem(EX_KEY, folded ? 'closed' : 'open'); } catch (e) {}
+    });
     function drawExample() {
       stopExample();
       var lang = voiceLang();
       var ex = examples[lang];
       exBox.hidden = !ex || !ex.items || !ex.items.length;
       if (exBox.hidden) return;
+      var choice = exChoice();
+      foldExample(choice === 'closed' || (choice !== 'open' && items.length > 0));
       exText.textContent = ex.text || '';
       exRow.innerHTML = '';
       ex.items.forEach(function (it) {

@@ -1972,6 +1972,29 @@ html[dir="rtl"] .vs-pron-arrow { transform: scaleX(-1); }
 .vs-pron-example[hidden] { display: none; }
 .vs-pron-example { text-align: center; }
 .vs-pron-example h3 { margin: 0; font-size: .95rem; font-weight: 700; color: var(--text); }
+/* The title is the fold: one line once the member has words of their own. */
+.vs-pron-example-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  min-height: 44px;
+  margin: -.6rem 0;
+  padding: 0 .75rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.vs-pron-example-toggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .7; transform: rotate(180deg); transition: transform .15s ease; }
+.vs-pron-example.is-folded .vs-pron-example-toggle svg { transform: none; }
+.vs-pron-example-toggle:hover { background: color-mix(in oklab, var(--a, #7659FA) 10%, transparent); }
+.vs-pron-example-toggle:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 2px; }
+.vs-pron-example.is-folded { padding-block: .6rem; }
+.vs-pron-example-body[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .vs-pron-example-toggle svg { transition: none; } }
 .vs-pron-example-text { max-width: 30rem; margin: .3rem auto .8rem; font-size: .88rem; line-height: 1.7; color: var(--muted); }
 .vs-pron-example-row { display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem; }
 /* Each reading is a card: the word, its meaning, and a small listen button under them. */
