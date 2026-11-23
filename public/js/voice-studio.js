@@ -940,7 +940,9 @@
       + '<p class="vs-pron-note">' + escAttr(tr('foot')) + '</p></section>'
       + '</div>'
       // The add button stays in view however far the panel is scrolled.
-      + '<footer class="vs-pron-foot"><p class="vs-pron-error" role="alert" hidden></p>'
+      + '<footer class="vs-pron-foot"><p class="vs-pron-done" role="status" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
+      + '<span class="vs-pron-done-text" dir="auto"></span><button type="button" class="vs-pron-done-show"></button></p>'
+      + '<p class="vs-pron-error" role="alert" hidden></p>'
       + '<div class="vs-pron-actions"><button type="submit" form="vsPronForm" class="vs-pron-save">' + escAttr(tr('add')) + '</button><button type="button" class="vs-pron-cancel" hidden>' + escAttr(tr('cancel')) + '</button></div></footer>'
       + '</div>';
     document.body.appendChild(modal);
@@ -955,6 +957,23 @@
     var total = modal.querySelector('.vs-pron-total');
     var editing = null;
     var opener = null;
+    // What was just saved, said in the footer (the list itself is further down the panel).
+    var doneEl = modal.querySelector('.vs-pron-done');
+    var doneText = doneEl.querySelector('.vs-pron-done-text');
+    var doneShow = doneEl.querySelector('.vs-pron-done-show');
+    var justSaved = null;
+    function hideDone() { doneEl.hidden = true; }
+    function showDone(entry) {
+      doneText.textContent = tr('saved', { word: entry.word, spoken: entry.spoken });
+      // The count sits in its own badge, as beside the list's title, so its digits stay the site's own.
+      doneShow.innerHTML = escAttr(tr('saved_show')) + ' <small class="vs-pron-total">' + items.length + '</small>';
+      doneEl.hidden = false;
+    }
+    doneShow.addEventListener('click', function () {
+      var row = list.querySelector('.vs-pron-row.is-new') || list.querySelector('.vs-pron-row');
+      var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (row) row.scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
+    });
 
     // The example follows the voice's language: Arabic letters with vowel marks, or an English spelling.
     var exBox = modal.querySelector('.vs-pron-example');
@@ -1019,7 +1038,7 @@
       var sorted = items.slice().sort(function (a, b) { return (inText(b) ? 1 : 0) - (inText(a) ? 1 : 0); });
       sorted.forEach(function (entry) {
         var li = document.createElement('li');
-        li.className = 'vs-pron-row' + (editing && editing.id === entry.id ? ' is-editing' : '');
+        li.className = 'vs-pron-row' + (editing && editing.id === entry.id ? ' is-editing' : '') + (justSaved === entry.id ? ' is-new' : '');
         li.innerHTML = '<span class="vs-pron-pair"><span class="vs-pron-word" dir="auto">' + escAttr(entry.word) + '</span>'
           + '<svg class="vs-pron-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
           + '<span class="vs-pron-spoken" dir="auto">' + escAttr(entry.spoken) + '</span></span>'
@@ -1036,6 +1055,7 @@
     function showError(key) {
       errorEl.textContent = key ? tr(key) : '';
       errorEl.hidden = !key;
+      if (key) hideDone();
     }
     function resetForm() {
       editing = null;
@@ -1085,11 +1105,19 @@
       if (!editing && items.length >= (cfg.limit || 200)) { showError('error_full'); return; }
       saveBtn.disabled = true;
       send('POST', cfg.url, { id: editing ? editing.id : null, word: word, spoken: spoken })
-        .then(function (data) { resetForm(); applyItems(data); wordIn.focus(); })
+        .then(function (data) {
+          resetForm();
+          var saved = (data && Array.isArray(data.items) ? data.items : []).filter(function (it) { return it.word === word && it.spoken === spoken; })[0];
+          justSaved = saved ? saved.id : null;
+          applyItems(data);
+          if (saved) showDone(saved);
+          wordIn.focus();
+        })
         .catch(function (err) {
           var msg = err.data && err.data.message;
           errorEl.textContent = msg || tr('error_save');
           errorEl.hidden = false;
+          hideDone();
         })
         .then(function () { saveBtn.disabled = false; });
     });
@@ -1204,6 +1232,7 @@
     // so its letters are there to be marked straight away.
     var mirrored = '';
     wordIn.addEventListener('input', function () {
+      hideDone();
       if (spokenIn.value === '' || spokenIn.value === mirrored) {
         spokenIn.value = mirrored = wordIn.value;
         letterAt = 0;
@@ -1213,6 +1242,8 @@
 
     function open() {
       opener = document.activeElement;
+      justSaved = null;
+      hideDone();
       resetForm();
       if (picked) {
         // The selected word, ready to be given its marks.
