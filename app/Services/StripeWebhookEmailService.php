@@ -38,7 +38,9 @@ class StripeWebhookEmailService
             match ($type) {
                 'checkout.session.completed' => $this->handleCheckoutSessionCompleted($object),
                 'customer.subscription.created' => $this->handleSubscriptionCreated($object),
-                'invoice.paid', 'invoice.payment_succeeded' => $this->handleInvoicePaid($object),
+                // No email of the site's own for a paid invoice (a new plan, a renewal or a plan
+                // change): Stripe sends its receipt, and the welcome email greets a new plan.
+                'invoice.paid', 'invoice.payment_succeeded' => null,
                 'customer.subscription.updated' => $this->handleSubscriptionUpdated($object, $event->data->previous_attributes ?? null),
                 'customer.subscription.deleted' => $this->handleSubscriptionDeleted($object),
                 'customer.subscription.trial_will_end' => $this->handleTrialWillEnd($object),
@@ -174,66 +176,6 @@ class StripeWebhookEmailService
             $details,
             $this->manageBillingUrl(),
             'Manage Billing'
-        );
-
-        $this->sendMail($user, $subject, $html);
-    }
-
-    private function handleInvoicePaid(object $invoice): void
-    {
-        $invoiceId = trim((string) ($invoice->id ?? ''));
-        if ((int) ($invoice->amount_paid ?? 0) <= 0) {
-            return;
-        }
-        if ($this->shouldSkipEmail("invoice-paid:{$invoiceId}", 24 * 30)) {
-            return;
-        }
-
-        $billingReason = strtolower((string) ($invoice->billing_reason ?? ''));
-        $customerId = trim((string) ($invoice->customer ?? ''));
-        $customerEmail = trim((string) ($invoice->customer_email ?? ''));
-        $user = $this->findUser($customerId, $customerEmail);
-
-        if (! $user) {
-            return;
-        }
-
-        $amount = $this->formatAmount(
-            isset($invoice->amount_paid) ? (int) $invoice->amount_paid : (isset($invoice->total) ? (int) $invoice->total : null),
-            (string) ($invoice->currency ?? 'usd')
-        );
-
-        $priceId = $this->extractPriceIdFromInvoice($invoice);
-        $planLabel = $this->planLabelFromPriceId($priceId);
-        if ($planLabel === 'subscription') {
-            $planLabel = $this->extractInvoiceLineDescription($invoice)
-                ?? $this->localPlanLabelFromUser($user)
-                ?? $planLabel;
-        }
-
-        $isInitialPurchase = $billingReason === 'subscription_create';
-        $periodEnd = $this->extractInvoicePeriodEnd($invoice);
-        $invoiceNumber = trim((string) ($invoice->number ?? ''));
-        $invoiceUrl = trim((string) ($invoice->hosted_invoice_url ?? ''));
-
-        $details = [
-            'Plan' => $planLabel,
-            'Amount' => $amount,
-            'Status' => 'Paid',
-            'Billing Reason' => $this->normalizeBillingReason($billingReason),
-            'Renewal Date' => $periodEnd,
-            'Invoice Number' => $invoiceNumber,
-            'Paid At' => $this->formatUnixTimestamp(isset($invoice->status_transitions->paid_at) ? (int) $invoice->status_transitions->paid_at : null, true),
-        ];
-
-        $subject = $isInitialPurchase ? 'Subscription activated' : 'Subscription payment received';
-        $html = $this->renderEmail(
-            $user,
-            $subject,
-            [$isInitialPurchase ? 'Your subscription is now active.' : 'Your subscription payment was successful.'],
-            $details,
-            $invoiceUrl !== '' ? $invoiceUrl : $this->manageBillingUrl(),
-            $invoiceUrl !== '' ? 'View Invoice' : 'Manage Billing'
         );
 
         $this->sendMail($user, $subject, $html);
@@ -755,47 +697,6 @@ class StripeWebhookEmailService
         return trim((string) ($session->metadata->stripe_price ?? '')) ?: null;
     }
 
-    private function extractPriceIdFromInvoice(object $invoice): ?string
-    {
-        $priceId = trim((string) ($this->planLine($invoice)?->price->id ?? ''));
-
-        return $priceId !== '' ? $priceId : null;
-    }
-
-    /**
-     * The invoice line for the plan the member pays for now. A plan change lists
-     * what it gives back first (a proration, "Unused time on <old plan>", or the
-     * line for unused credits, App\Services\Billing\UnusedCredits), so it is the
-     * first line that is neither a proration nor money back; when every line is
-     * one, the first that charges something.
-     */
-    private function planLine(object $invoice): ?object
-    {
-        $lines = $invoice->lines->data ?? [];
-        $lines = is_array($lines) ? array_values(array_filter($lines, 'is_object')) : [];
-
-        foreach ($lines as $line) {
-            if (! $this->isProration($line) && (int) ($line->amount ?? 0) >= 0) {
-                return $line;
-            }
-        }
-        foreach ($lines as $line) {
-            if ((int) ($line->amount ?? 0) > 0) {
-                return $line;
-            }
-        }
-
-        return $lines[0] ?? null;
-    }
-
-    /** Whether an invoice line is a proration, in the API versions from before and after it moved under parent. */
-    private function isProration(object $line): bool
-    {
-        return (bool) ($line->proration ?? false)
-            || (bool) ($line->parent->subscription_item_details->proration ?? false)
-            || (bool) ($line->parent->invoice_item_details->proration ?? false);
-    }
-
     private function extractPriceIdFromSubscription(object $subscription): ?string
     {
         $items = $subscription->items->data ?? [];
@@ -807,20 +708,6 @@ class StripeWebhookEmailService
         }
 
         return null;
-    }
-
-    private function extractInvoiceLineDescription(object $invoice): ?string
-    {
-        $description = trim((string) ($this->planLine($invoice)?->description ?? ''));
-
-        return $description !== '' ? $description : null;
-    }
-
-    private function extractInvoicePeriodEnd(object $invoice): string
-    {
-        $end = (int) ($this->planLine($invoice)?->period->end ?? 0);
-
-        return $end > 0 ? $this->formatUnixTimestamp($end) : 'N/A';
     }
 
     private function localPlanLabelFromUser(User $user): ?string
@@ -938,16 +825,6 @@ class StripeWebhookEmailService
         return now()
             ->setTimestamp($timestamp)
             ->format($withTime ? 'M j, Y g:i A' : 'M j, Y');
-    }
-
-    private function normalizeBillingReason(string $billingReason): string
-    {
-        return match ($billingReason) {
-            'subscription_create' => 'Initial purchase',
-            'subscription_cycle' => 'Recurring renewal',
-            'subscription_update' => 'Plan update',
-            default => $billingReason !== '' ? ucfirst(str_replace('_', ' ', $billingReason)) : 'N/A',
-        };
     }
 
     private function formatStatus(string $status): string
