@@ -93,7 +93,8 @@ class BillingEmailsTest extends TestCase
         $emails->sendCancellationScheduledForUser($this->member);
 
         $sent = $this->sentEmails()->map(fn ($message): string => (string) $message->getOriginalMessage()->getHtmlBody());
-        $this->assertCount(6, $sent);
+        // The paid invoice sends none of its own (Stripe's receipt does): five emails for six events.
+        $this->assertCount(5, $sent);
         foreach ($sent as $html) {
             $this->assertStringNotContainsString('Stripe', $html);
             foreach (['cus_mail', 'sub_gone', 'sub_grace', 'in_paid', 'cs_pack', 'ch_refund'] as $id) {
@@ -101,55 +102,27 @@ class BillingEmailsTest extends TestCase
             }
             $this->assertStringContainsString('<html lang="en" dir="ltr">', $html);
         }
-        // The invoice number is the member's own reference, on their invoice too.
-        $this->assertTrue($sent->contains(fn (string $html): bool => str_contains($html, 'LISTEN-0042')));
         $this->assertTrue($sent->contains(fn (string $html): bool => str_contains($html, 'Your billing profile was removed.')));
     }
 
-    public function test_the_receipt_for_a_plan_change_names_the_new_plan_and_its_renewal_date(): void
+    public function test_a_paid_invoice_sends_no_email_of_the_sites_own(): void
     {
-        config(['services.stripe.prices' => [
-            'starter' => ['monthly' => 'price_starter_m'],
-            'creator' => ['monthly' => 'price_creator_m'],
-        ]]);
-        $oldRenewal = now()->addDays(9)->startOfDay();
-        $newRenewal = now()->addMonth()->startOfDay();
         $emails = app(StripeWebhookEmailService::class);
 
-        // Stripe lists the credit for the old plan first. As the current API sends it...
-        $emails->sendForEvent($this->event('invoice.paid', $this->planChangeInvoice('in_change', [
-            [
-                'description' => 'Unused time on Starter after 5 Oct 2026', 'amount' => -450,
-                'parent' => ['type' => 'subscription_item_details', 'subscription_item_details' => ['proration' => true]],
-                'period' => ['start' => now()->timestamp, 'end' => $oldRenewal->timestamp],
-            ],
-            [
-                'description' => '1 × Creator (at $19.00 / month)', 'amount' => 1900,
-                'parent' => ['type' => 'subscription_item_details', 'subscription_item_details' => ['proration' => false]],
-                'period' => ['start' => now()->timestamp, 'end' => $newRenewal->timestamp],
-            ],
-        ])));
-        // ...and as older API versions did, with the line's own price.
-        $emails->sendForEvent($this->event('invoice.paid', $this->planChangeInvoice('in_change_old_api', [
-            [
-                'description' => 'Unused time on Starter after 5 Oct 2026', 'amount' => -450, 'proration' => true,
-                'price' => ['id' => 'price_starter_m'], 'period' => ['start' => now()->timestamp, 'end' => $oldRenewal->timestamp],
-            ],
-            [
-                'description' => '1 × Creator (at $19.00 / month)', 'amount' => 1900, 'proration' => false,
-                'price' => ['id' => 'price_creator_m'], 'period' => ['start' => now()->timestamp, 'end' => $newRenewal->timestamp],
-            ],
-        ])));
-
-        $sent = $this->sentEmails()->map(fn ($message): string => (string) $message->getOriginalMessage()->getHtmlBody())->values();
-        $this->assertCount(2, $sent);
-        $this->assertStringContainsString('1 × Creator (at $19.00 / month)', $sent[0]);
-        $this->assertStringContainsString('Creator (Monthly)', $sent[1]);
-        foreach ($sent as $html) {
-            $this->assertStringNotContainsString('Starter', $html);
-            $this->assertStringContainsString($newRenewal->format('M j, Y'), $html);
-            $this->assertStringNotContainsString($oldRenewal->format('M j, Y'), $html);
+        // A new plan, a renewal and a plan change: Stripe's receipt covers each, and a new plan gets the welcome email.
+        foreach (['subscription_create', 'subscription_cycle', 'subscription_update'] as $i => $reason) {
+            foreach (['invoice.paid', 'invoice.payment_succeeded'] as $type) {
+                $emails->sendForEvent($this->event($type, [
+                    'id' => 'in_'.$reason, 'customer' => 'cus_mail', 'subscription' => 'sub_paid', 'amount_paid' => 1900,
+                    'currency' => 'usd', 'billing_reason' => $reason, 'number' => 'LISTEN-004'.$i,
+                    'status_transitions' => ['paid_at' => now()->timestamp],
+                    'lines' => ['data' => [['description' => 'Listen Creator', 'amount' => 1900, 'period' => ['end' => now()->addMonth()->timestamp]]]],
+                ]));
+            }
         }
+        $emails->sendForEvent($this->event('invoice.paid', $this->planChangeInvoice('in_change', [])));
+
+        $this->assertCount(0, $this->sentEmails());
     }
 
     /**
