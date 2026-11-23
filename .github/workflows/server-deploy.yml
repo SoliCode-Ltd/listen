@@ -248,6 +248,18 @@ name: Server deploy
 #            (scripts/support/newsletter_draft.php). newsletter-draft-save
 #            saves it in Admin -> Newsletter as a draft. Neither sends anything:
 #            the owner sends it from the admin.
+#   tashkeel-sample: read-only (READ ONLY database session), on either site.
+#            A sample of the Arabic sentences members make voices of, for the
+#            vowel-marks (tashkeel) test set the owner reviews: 300 single
+#            sentences, anonymized, with no member, voice or date, and totals
+#            (scripts/support/tashkeel_sample.php). Owner-approved; the run's
+#            log is deleted once the sentences are read.
+#   tashkeel-listen: staging only. Does a premium voice say what the vowel
+#            marks say? Short clips of words with several readings, with and
+#            without marks, each heard by a listening model
+#            (scripts/support/tashkeel_listen.php; input "tashkeel": the kinds
+#            of clip, all when empty). About 14 minutes of speech on the quota
+#            staging shares with live: only when the owner has said yes.
 # New migrations and composer.lock changes are reported, not run (see migrate and composer).
 # The "Run over SSH" script must stay under GitHub's 21,000-character limit for one
 # step (tests/Feature/ServerDeployWorkflowTest.php): longer remote work goes in
@@ -262,7 +274,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, content-check, upgrade-check, upgrade-test, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, content-check, upgrade-check, upgrade-test, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save, tashkeel-sample, tashkeel-listen]
         default: inspect
       customer:
         description: "billing-trace and chatgpt-ads-check: the Stripe customer id (cus_...)"
@@ -288,6 +300,10 @@ on:
         description: "agent-redteam only: the calls to make, by id (house-en-secrets,clinic-ar,real-house-en ...); all when empty"
         type: string
         default: ""
+      tashkeel:
+        description: "tashkeel-listen only: the kinds of clip to make (iso,plain,word,full,wrong,wrong+dir); all when empty"
+        type: string
+        default: ""
       price:
         description: "plan-price and plan-price-apply only: the plan and its monthly price in dollars (studio_max=120)"
         type: string
@@ -305,7 +321,7 @@ jobs:
   run:
     runs-on: ubuntu-latest
     # A test dub takes the server several minutes (separation, hearing, a voice for each line).
-    timeout-minutes: ${{ (inputs.mode == 'dub-test' || inputs.mode == 'agent-redteam') && 45 || (inputs.mode == 'stt-test' || inputs.mode == 'stt-check') && 30 || 15 }}
+    timeout-minutes: ${{ (inputs.mode == 'dub-test' || inputs.mode == 'agent-redteam' || inputs.mode == 'tashkeel-listen') && 45 || (inputs.mode == 'stt-test' || inputs.mode == 'stt-check') && 30 || 15 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -337,6 +353,7 @@ jobs:
           DESIGN: ${{ inputs.design }}
           RT_ONLY: ${{ inputs.calls }}
           PLAN_PRICE: ${{ inputs.price }}
+          TASHKEEL: ${{ inputs.tashkeel }}
           # What is deployed, as a variable: the script below must hold no ${{ }}
           # of its own, or GitHub reads all of it as one expression (21,000 at most).
           DEPLOY_REF: ${{ inputs.target == 'live' && 'main' || github.ref_name }}
@@ -799,6 +816,19 @@ jobs:
           if [ "$MODE" = newsletter-draft ] || [ "$MODE" = newsletter-draft-save ]; then
             failed=0
             tool newsletter_draft.php | $S "$FIND; NL_APPLY=$([ "$MODE" = newsletter-draft-save ] && echo 1 || echo 0) php" || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
+          if [ "$MODE" = tashkeel-sample ]; then
+            tool tashkeel_sample.php | $S "$FIND; COUNT=300 nice php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = tashkeel-listen ]; then
+            [ "$TARGET" = staging ] || { echo "tashkeel-listen runs on staging only"; exit 1; }
+            printf '%s' "$TASHKEEL" | grep -qE '^[a-z,+]*$' || { echo "tashkeel must be kinds of clip: iso,plain,word,full,wrong,wrong+dir"; exit 1; }
+            failed=0
+            tool tashkeel_listen.php | $S "$FIND; ONLY='$TASHKEEL' nice php" || failed=1
             rm -f ~/.ssh/id_deploy
             exit "$failed"
           fi
