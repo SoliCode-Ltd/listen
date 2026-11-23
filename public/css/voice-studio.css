@@ -1939,8 +1939,10 @@ html[dir="rtl"] .vs-pron-arrow { transform: scaleX(-1); }
 }
 .vs-pron-row-actions { display: flex; gap: .25rem; flex: none; margin-inline-start: auto; }
 .vs-pron-row button {
-  min-height: 34px;
-  padding: 0 .6rem;
+  /* A thumb's size: 44px at least, each way. */
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 .7rem;
   border: 0;
   border-radius: 9px;
   background: transparent;
