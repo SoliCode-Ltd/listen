@@ -19,8 +19,13 @@
  *             does NOT mean: a voice that obeys marks says the marked one
  *   wrong+dir the same, and the voice is told to follow the marks (the
  *             direction a member's saved pronunciation already sends)
- * The listener is asked for the sounds, not the meaning; "iso" and "wrong"
- * show how far it can be trusted, since there the meaning cannot help it.
+ *   either    a sentence in which both readings make sense («هذا علم مهم»),
+ *             once with each reading marked: only the marks can decide, so
+ *             neither the voice nor the listener can lean on the meaning
+ *   either+dir the same, with the "follow the marks" direction
+ * The listener is asked for the sounds, not the meaning; "iso", "wrong" and
+ * "either" show how far it can be trusted, since there the meaning cannot
+ * help it.
  *
  * Prints one line a clip and the scores for each kind. The clips stay on the
  * public disk (tashkeel-listen/<run>/) to hear; nothing else is written.
@@ -65,6 +70,24 @@ $groups = [
     'يعد' => ['yuaddu' => ['يُعَدُّ', 'yuʿadd(u)', 'is considered'], 'yuiddu' => ['يُعِدُّ', 'yuʿidd(u)', 'prepares'], 'yaidu' => ['يَعِدُ', 'yaʿid(u)', 'promises']],
     'نشر' => ['nashara' => ['نَشَرَ', 'nashara', 'he published'], 'nushira' => ['نُشِرَ', 'nushira', 'it was published']],
     'ولد' => ['wulida' => ['وُلِدَ', 'wulida', 'he was born'], 'walad' => ['وَلَد', 'walad', 'boy']],
+    'ذكر' => ['dhukira' => ['ذُكِرَ', 'dhukira', 'it was mentioned'], 'dhakara' => ['ذَكَرَ', 'dhakara', 'he mentioned']],
+];
+
+// Sentences that mean something with either reading: [spelling, sentence, the word, [reading => the word marked]]
+$either = [
+    ['علم', 'هذا علم مهم.', 'علم', ['ilm' => 'عِلْم', 'alam' => 'عَلَم']],
+    ['ملك', 'قرأت عن ملك عظيم.', 'ملك', ['malik' => 'مَلِك', 'mulk' => 'مُلْك']],
+    ['شعر', 'أعجبني شعرها كثيراً.', 'شعرها', ['shaar' => 'شَعْرها', 'shiir' => 'شِعْرها']],
+    ['درس', 'سمعت أنه درس هناك.', 'درس', ['darasa' => 'دَرَسَ', 'darrasa' => 'دَرَّسَ']],
+    ['عقد', 'رأيت العقد على الطاولة.', 'العقد', ['aqd' => 'العَقْد', 'iqd' => 'العِقْد']],
+    ['جزر', 'الجزر كثيرة هنا.', 'الجزر', ['jazar' => 'الجَزَر', 'juzur' => 'الجُزُر']],
+    ['دين', 'هذا دين قديم.', 'دين', ['dayn' => 'دَيْن', 'din' => 'دِين']],
+    ['سلم', 'تكلموا عن السلم طويلاً.', 'السلم', ['silm' => 'السِّلْم', 'sullam' => 'السُّلَّم']],
+    ['مدرسة', 'هي مدرسة معروفة.', 'مدرسة', ['madrasa' => 'مَدْرَسَة', 'mudarrisa' => 'مُدَرِّسَة']],
+    ['كتب', 'كتب هذا في القاهرة.', 'كتب', ['kataba' => 'كَتَبَ', 'kutiba' => 'كُتِبَ']],
+    ['نشر', 'نشر هذا في الصحف.', 'نشر', ['nashara' => 'نَشَرَ', 'nushira' => 'نُشِرَ']],
+    ['يعد', 'يعد الرجل ابنه.', 'يعد', ['yaidu' => 'يَعِدُ', 'yuiddu' => 'يُعِدُّ']],
+    ['ذكر', 'ذكر ذلك في الكتاب.', 'ذكر', ['dhakara' => 'ذَكَرَ', 'dhukira' => 'ذُكِرَ']],
 ];
 
 // [spelling, sentence as written, the word in it, its reading, the word marked, the sentence fully marked, (the wrong reading, the word marked wrongly)]
@@ -134,6 +157,13 @@ foreach ($sentences as $n => $s) {
     if (isset($s[6])) {
         $clips[] = ["s{$n}-wrong", 'wrong', $one($s[7]), $plain, $word, $spelling, $s[6], $reading, false];
         $clips[] = ["s{$n}-wrongdir", 'wrong+dir', $one($s[7]), $plain, $word, $spelling, $s[6], $reading, true];
+    }
+}
+foreach ($either as $n => [$spelling, $plain, $word, $ways]) {
+    foreach ($ways as $reading => $marked) {
+        $text = (string) preg_replace('/(?<!\p{L})'.preg_quote($word, '/').'(?!\p{L})/u', $marked, $plain, 1);
+        $clips[] = ["e{$n}-{$reading}", 'either', $text, $plain, $word, $spelling, $reading, null, false];
+        $clips[] = ["e{$n}-{$reading}-dir", 'either+dir', $text, $plain, $word, $spelling, $reading, null, true];
     }
 }
 $clips = array_values(array_filter($clips, fn (array $c): bool => $wants($c[1])));

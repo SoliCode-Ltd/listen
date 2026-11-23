@@ -301,7 +301,7 @@ on:
         type: string
         default: ""
       tashkeel:
-        description: "tashkeel-listen only: the kinds of clip to make (iso,plain,word,full,wrong,wrong+dir); all when empty"
+        description: "tashkeel-listen only: the kinds of clip to make (iso,plain,word,full,wrong,wrong+dir,either,either+dir); all when empty"
         type: string
         default: ""
       price:
@@ -826,7 +826,7 @@ jobs:
           fi
           if [ "$MODE" = tashkeel-listen ]; then
             [ "$TARGET" = staging ] || { echo "tashkeel-listen runs on staging only"; exit 1; }
-            printf '%s' "$TASHKEEL" | grep -qE '^[a-z,+]*$' || { echo "tashkeel must be kinds of clip: iso,plain,word,full,wrong,wrong+dir"; exit 1; }
+            printf '%s' "$TASHKEEL" | grep -qE '^[a-z,+]*$' || { echo "tashkeel must be kinds of clip: iso,plain,word,full,wrong,wrong+dir,either,either+dir"; exit 1; }
             failed=0
             tool tashkeel_listen.php | $S "$FIND; ONLY='$TASHKEEL' nice php" || failed=1
             rm -f ~/.ssh/id_deploy
