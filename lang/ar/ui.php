@@ -1450,6 +1450,8 @@ return [
             'spoken_placeholder_ar' => 'مثال: هَيِتْكَرَّر',
             'word_placeholder_en' => 'مثال: Nguyen',
             'spoken_placeholder_en' => 'مثال: Win',
+            'saved' => 'حُفظت: «:word» تُقال الآن «:spoken».',
+            'saved_show' => 'كلماتك',
             'add' => 'أضف الكلمة',
             'save' => 'احفظ التعديل',
             'cancel' => 'إلغاء',

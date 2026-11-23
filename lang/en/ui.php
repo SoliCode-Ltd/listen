@@ -1447,6 +1447,8 @@ return [
             'spoken_placeholder_ar' => 'e.g. هَيِتْكَرَّر',
             'word_placeholder_en' => 'e.g. Nguyen',
             'spoken_placeholder_en' => 'e.g. Win',
+            'saved' => 'Saved: “:word” is now said “:spoken”.',
+            'saved_show' => 'Your words',
             'add' => 'Add word',
             'save' => 'Save changes',
             'cancel' => 'Cancel',
