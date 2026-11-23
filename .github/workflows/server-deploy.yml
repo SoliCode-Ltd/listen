@@ -248,6 +248,8 @@ name: Server deploy
 #            (scripts/support/newsletter_draft.php). newsletter-draft-save
 #            saves it in Admin -> Newsletter as a draft. Neither sends anything:
 #            the owner sends it from the admin.
+#   member-countries: read-only. How many members, and paying members, come from
+#            each country (scripts/support/member_countries.php). Counts only.
 # New migrations and composer.lock changes are reported, not run (see migrate and composer).
 # The "Run over SSH" script must stay under GitHub's 21,000-character limit for one
 # step (tests/Feature/ServerDeployWorkflowTest.php): longer remote work goes in
@@ -262,7 +264,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, content-check, upgrade-check, upgrade-test, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, content-check, upgrade-check, upgrade-test, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save, member-countries]
         default: inspect
       customer:
         description: "billing-trace and chatgpt-ads-check: the Stripe customer id (cus_...)"
@@ -793,6 +795,12 @@ jobs:
             if [ "$MODE" = plan-price-apply ] && [ "$TARGET" != live ]; then echo "plan-price-apply runs on live only (the site that makes Stripe prices)"; exit 1; fi
             failed=0
             tool plan_price.php | $S "$FIND; PLAN_PRICE='$PLAN_PRICE' APPLY=$([ "$MODE" = plan-price-apply ] && echo 1 || echo 0) php" || failed=1
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
+          if [ "$MODE" = member-countries ]; then
+            failed=0
+            tool member_countries.php | $S "$FIND; php" || failed=1
             rm -f ~/.ssh/id_deploy
             exit "$failed"
           fi
