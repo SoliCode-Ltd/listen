@@ -85,8 +85,35 @@ class WordReadingsTest extends TestCase
         $this->assertSame(['جدة'], array_column(WordReadings::find($text, 'Levantine Arabic', fn (): string => $answer), 'word'));
         // The same answer for a Fusha text keeps all three.
         $this->assertCount(3, WordReadings::find($text, null, fn (): string => $answer));
-        $this->assertStringContainsString('List ONLY names', WordReadings::prompt($text, 'Levantine Arabic'));
-        $this->assertStringNotContainsString('List ONLY names', WordReadings::prompt($text));
+        // A caller that knows the dialect is not asked to decide it; one that does not, is.
+        $this->assertStringNotContainsString('First decide', WordReadings::prompt($text, 'Levantine Arabic'));
+        $this->assertStringContainsString('First decide what the text is written in', WordReadings::prompt($text));
+        $this->assertStringContainsString('list ONLY names', WordReadings::prompt($text));
+    }
+
+    public function test_the_answers_say_what_the_text_is_written_in_and_a_dialect_keeps_names_only(): void
+    {
+        $text = 'جبنالك طقم من جدة بكل تفاصيله';
+        $answer = fn (string $in): string => json_encode(['written_in' => $in, 'words' => [
+            ['word' => 'جبنالك', 'marked' => 'جِبْنَالَك', 'said' => 'jibnālak', 'means' => 'we brought you', 'kind' => 'word'],
+            ['word' => 'جدة', 'marked' => 'جِدَّة', 'said' => 'Jidda', 'means' => 'the city of Jeddah', 'kind' => 'name'],
+        ]], JSON_UNESCAPED_UNICODE);
+
+        // Most answers call it a dialect: the name only, though nobody told the step the variety.
+        $answers = [$answer('levantine'), $answer('Fusha'), $answer('gulf')];
+        $this->assertSame('dialect', WordReadings::writtenIn($answers));
+        $refused = [];
+        $this->assertSame(['جدة'], array_column(WordReadings::agreed($text, $answers, [], $refused), 'word'));
+        $this->assertSame(3, $refused['a word in a dialect text']);
+        // Most call it Fusha: both words. One each way is a dialect, the careful side.
+        $this->assertSame('fusha', WordReadings::writtenIn([$answer('fusha'), $answer('Modern Standard Arabic (Fusha)'), $answer('egyptian')]));
+        $this->assertCount(2, WordReadings::agreed($text, [$answer('fusha'), $answer('fusha'), $answer('egyptian')]));
+        $this->assertSame('dialect', WordReadings::writtenIn([$answer('fusha'), $answer('egyptian')]));
+        // Answers that do not say (a bare list) leave it to the caller.
+        $this->assertNull(WordReadings::writtenIn(['[]', 'no idea']));
+        // The words are read from the object, wrapped or not.
+        $this->assertCount(2, WordReadings::parse("```json\n".$answer('fusha')."\n```"));
+        $this->assertSame([], WordReadings::parse('{"written_in": "fusha", "words": []}'));
     }
 
     public function test_no_more_than_the_limit_and_each_word_once(): void
@@ -194,6 +221,7 @@ class WordReadingsTest extends TestCase
         $this->assertStringContainsString('«'.self::TEXT.'»', WordReadings::prompt(self::TEXT));
         $this->assertStringContainsString('Modern Standard Arabic', WordReadings::prompt(self::TEXT));
         $this->assertStringContainsString('written in Egyptian Arabic', WordReadings::prompt(self::TEXT, 'Egyptian Arabic'));
+        $this->assertStringContainsString('"written_in"', WordReadings::prompt(self::TEXT));
     }
 
     public function test_two_markings_of_a_word_are_the_same_reading_or_not(): void

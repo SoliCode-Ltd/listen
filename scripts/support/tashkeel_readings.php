@@ -17,6 +17,8 @@
  *   - the written name sentences, the same way;
  *   - every word the model marks in any sentence, against the reference marks
  *     of that word (drafts until the owner approves them);
+ *   - what the step takes each text to be written in (it is not told: it treats a
+ *     text as Fusha only when most answers call it that), beside the test set's label;
  *   - safety: no letter changed, and why entries of the model were refused.
  *
  * The model does not answer the same way every time (حمد came back as Ḥamad
@@ -37,6 +39,7 @@
  *
  *   ssh user@host 'cd ~/public_html && DIR=/tmp/x ONLY=readings php' < scripts/support/tashkeel_readings.php
  *   ONLY=readings,runs3   three runs of the written sentences and the passages
+ *   ONLY=readings,labels  the step is told each text's variety from the test set, as before it judged for itself
  *   ONLY=readings,ptexts  the passages only (a quick look at the words marked in each)
  *   ONLY=readings,35      the model the site's dialect rewrite uses, instead of the default
  */
@@ -93,7 +96,13 @@ foreach ($only as $token) {
 $key = (string) (app(GeminiKeyManager::class)->getAvailableKey()['key'] ?? '');
 $url = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/').'/models/'.$model.':generateContent';
 $variety = ['egyptian' => 'Egyptian Arabic', 'levantine' => 'Levantine Arabic', 'gulf' => 'Gulf Arabic'];
-$dialectOf = fn (array $item): ?string => $variety[$item['variety'] ?? ''] ?? null;
+// The step is not told what a text is written in (the site does not know: members write Egyptian for a Fusha voice):
+// it decides from the answers. ONLY=readings,labels tells it the test set's label instead, as the first tests did.
+$labels = in_array('labels', $only, true);
+$dialectOf = fn (array $item): ?string => $labels ? ($variety[$item['variety'] ?? ''] ?? null) : null;
+$judged = [];        // what the text is written in by its label => what the step judged (first run) => count
+$judgedWords = [];   // the same => words marked there
+$judgedOther = [];   // texts asked every run (all Fusha) that some run judged a dialect
 $asks = WordReadings::ASKS;
 // Each of the step's asks carries its own fixed seed, so the same ask of the same text has the best chance of the same answer.
 $body = fn (string $prompt, ?int $k): array => [
@@ -181,6 +190,16 @@ for ($run = 1; $run <= $runs; $run++) {
             $marks[$how][$i][$run] = array_column($list, 'marked', 'word');
         }
         $made = WordReadings::apply($item['text'], $readings);
+        // What the step took the text to be written in, beside the test set's label.
+        $in = WordReadings::writtenIn($given) ?? 'not said';
+        $label = ($item['source'] ?? '') === 'written' || $isPassage($item) ? 'fusha (written for the test)' : (string) ($item['variety'] ?? 'fusha');
+        if ($run === 1) {
+            $judged[$label][$in] = ($judged[$label][$in] ?? 0) + 1;
+            $judgedWords[$label][$in] = ($judgedWords[$label][$in] ?? 0) + count($readings);
+        }
+        if ($in !== 'fusha' && (($item['source'] ?? '') === 'written' || $isPassage($item))) {
+            $judgedOther[$item['id']][] = $run;
+        }
         $lettersChanged += (int) (TashkeelScore::strip($made['text']) !== TashkeelScore::strip($item['text']));
         $kind = $kindOf($item);
 
@@ -291,6 +310,16 @@ foreach ($verdicts as $i => $byRun) {
     }
 }
 echo $any ? '' : "  none\n";
+
+if (! $labels) {
+    echo "\nWhat the step took each text to be written in (first run), beside the test set's label:\n";
+    foreach ($judged as $label => $by) {
+        echo sprintf("  %-30s %3d texts: Fusha %3d (%3d words marked), a dialect %3d (%2d words marked, names only), not said %d\n", $label, array_sum($by),
+            $by['fusha'] ?? 0, $judgedWords[$label]['fusha'] ?? 0, $by['dialect'] ?? 0, $judgedWords[$label]['dialect'] ?? 0, $by['not said'] ?? 0);
+    }
+    echo '  Fusha texts written for the test that a run took for a dialect: ',
+        $judgedOther === [] ? 'none' : implode('; ', array_map(fn (string $id, array $r): string => $id.' (run '.implode(', ', $r).')', array_keys($judgedOther), $judgedOther)), "\n";
+}
 
 // How steady the choice of words is: the same text, run after run.
 $same = fn (string $a, string $b): bool => TashkeelScore::reading($a, $b) === 'same' && TashkeelScore::reading($b, $a) === 'same';

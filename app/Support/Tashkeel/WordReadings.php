@@ -15,8 +15,11 @@ namespace App\Support\Tashkeel;
  * listening rounds found marks alone a hint, and marks with the meaning told
  * the surest: the word is marked in the text, and the voice is told what it
  * means and how it is said. The rest of the text stays as written. In a
- * dialect text only names are touched: a voice set to a dialect already says
- * that dialect's words right, so marking them could only do harm.
+ * dialect text only names are touched: a voice already says a dialect's own
+ * words right, so marking them could only do harm. What a text is written in
+ * is not what its voice is set to (members write Egyptian for a Fusha voice):
+ * the model says which it is with its answer, and the text is treated as
+ * Fusha only when most answers call it that.
  *
  * The model does not answer the same way twice: asked once, it listed رفع in
  * two runs of a passage and skipped it in the third, and the voice then read
@@ -57,7 +60,7 @@ final class WordReadings
         }
         $refused = [];
 
-        // In a dialect only names are touched: the voice already says the dialect's own words right.
+        // A variety the caller knows (a voice set to a dialect) settles it; otherwise the answers say what the text is written in.
         return self::agreed($text, $answers, $keep, $refused, trim((string) $variety) !== '');
     }
 
@@ -69,10 +72,13 @@ final class WordReadings
      * @param  list<string>  $answers  the model's answers as they came (the ones that failed left out)
      * @param  list<string>  $keep
      * @param  array<string, int>  $refused
+     * @param  bool  $namesOnly  the caller knows the text is in a dialect
      * @return list<array{word: string, marked: string, said: string, means: string, kind: string}>
      */
     public static function agreed(string $text, array $answers, array $keep = [], array &$refused = [], bool $namesOnly = false): array
     {
+        // In a dialect only names are touched: the voice already says the dialect's own words right.
+        $namesOnly = $namesOnly || self::writtenIn($answers) === 'dialect';
         $votes = [];
         foreach ($answers as $raw) {
             foreach (self::accept($text, self::parse($raw), $keep, $refused, $namesOnly, PHP_INT_MAX) as $reading) {
@@ -118,26 +124,46 @@ final class WordReadings
         return array_column(array_slice($kept, 0, self::MAX), 1);
     }
 
-    /** $variety: what the text is written in, in English ("Egyptian Arabic"); null or empty for Fusha. */
+    /**
+     * What the answers say the text is written in: "fusha" when more than half of
+     * those that say call it that, "dialect" otherwise (a tie is a dialect: the
+     * careful side), null when none says.
+     *
+     * @param  list<string>  $answers
+     */
+    public static function writtenIn(array $answers): ?string
+    {
+        $said = array_values(array_filter(array_map(fn (string $raw): ?string => self::decode($raw)['written_in'], $answers), 'is_string'));
+        if ($said === []) {
+            return null;
+        }
+        $fusha = count(array_filter($said, fn (string $v): bool => $v === 'fusha'));
+
+        return $fusha >= intdiv(count($said), 2) + 1 ? 'fusha' : 'dialect';
+    }
+
+    /** $variety: what the caller knows the text is written in, in English ("Egyptian Arabic"); null or empty when it does not know. */
     public static function prompt(string $text, ?string $variety = null): string
     {
         $variety = trim((string) $variety);
+        $names = 'list ONLY names of people, places and brands; leave every other word alone, however it could be read. Give a name the vowels it has in that dialect.';
 
         return "You prepare Arabic text for a text-to-speech voice. Arabic is written without its short vowels, so a few words can be said as two different words.\n\n"
-            ."List ONLY the words in the text below that the voice could say as the wrong word:\n"
-            ."- a word whose letters spell two or more different, common words, where the sentence decides which (علم: ʿilm, ʿalam or ʿalima; عقد: ʿaqd or ʿiqd; كتب: kataba, kutiba or kutub);\n"
-            ."- a name of a person, a place or a brand whose vowels its letters do not give (جدة، الخبر، عمر، حمد).\n"
-            ."Leave out everything else: a word with one natural reading (في، كان، المدينة، كبير), a word only because it is long, foreign or colloquial, and a word that already carries vowel marks inside it. Most sentences have none, one or two such words.\n\n"
             .($variety !== ''
-                ? "The text is written in {$variety}, and the voice already knows this variety. List ONLY names of people, places and brands; leave every other word alone, however it could be read. Give a name the vowels it has in that variety.\n\n"
-                : "The text is Modern Standard Arabic (Fusha).\n\n")
+                ? "The text is written in {$variety}, a spoken dialect, and the voice already knows it: {$names}\n\n"
+                : "First decide what the text is written in, from its own words and grammar and not from its subject: Modern Standard Arabic (Fusha), or a spoken dialect (Egyptian, Levantine, Gulf or another). A text that mixes Fusha with a dialect counts as that dialect.\n\n"
+                    ."If the text is in a dialect, the voice already knows that dialect: {$names}\n\n"
+                    ."If the text is Fusha, list ONLY the words in it that the voice could say as the wrong word:\n"
+                    ."- a word whose letters spell two or more different, common words, where the sentence decides which (علم: ʿilm, ʿalam or ʿalima; عقد: ʿaqd or ʿiqd; كتب: kataba, kutiba or kutub);\n"
+                    ."- a name of a person, a place or a brand whose vowels its letters do not give (جدة، الخبر، عمر، حمد).\n"
+                    ."Leave out everything else: a word with one natural reading (في، كان، المدينة، كبير), a word only because it is long, foreign or colloquial, and a word that already carries vowel marks inside it. Most sentences have none, one or two such words.\n\n")
             ."For each word give:\n"
             ."- \"word\": the word copied exactly as it is written in the text, with any prefix attached to it and any mark it already has, without punctuation;\n"
             ."- \"marked\": the same letters with every vowel mark inside the word (fatha, damma, kasra, sukun, shadda), for the reading this sentence means. Never add, drop or change a letter, and do not stretch the word with a tatweel. Leave the last letter's case ending off;\n"
             ."- \"said\": how it is said, in Latin letters;\n"
             ."- \"means\": what it means here, in two to five English words;\n"
             ."- \"kind\": \"name\" for the name of a person, a place or a brand, \"word\" for anything else.\n\n"
-            .'Answer with a JSON array only, at most '.self::MAX." items, in the order the words appear. When no word qualifies, answer [].\n\n"
+            .'Answer with a JSON object only: {"written_in": "fusha", "egyptian", "levantine", "gulf" or "other dialect", "words": [the words, at most '.self::MAX.", in the order they appear]}. When no word qualifies, \"words\" is [].\n\n"
             ."Text:\n«{$text}»";
     }
 
@@ -148,17 +174,29 @@ final class WordReadings
      */
     public static function parse(string $raw): array
     {
-        $raw = trim($raw);
-        // An answer wrapped in a code fence or in a sentence: the array inside it.
-        if (preg_match('/\[.*\]/su', $raw, $m)) {
-            $raw = $m[0];
-        }
-        $list = json_decode($raw, true);
-        if (! is_array($list)) {
-            return [];
-        }
+        return self::decode($raw)['words'];
+    }
 
-        return array_values(array_filter($list, 'is_array'));
+    /**
+     * The answer read: what it says the text is written in ("fusha", or the dialect it names;
+     * null when it does not say), and its entries. An answer wrapped in a code fence or in a
+     * sentence is read too, and so is a bare list of entries.
+     *
+     * @return array{written_in: ?string, words: list<array<string, mixed>>}
+     */
+    private static function decode(string $raw): array
+    {
+        $raw = trim($raw);
+        $object = preg_match('/\{.*\}/su', $raw, $m) ? json_decode($m[0], true) : null;
+        if (is_array($object) && array_key_exists('words', $object)) {
+            $in = strtolower(trim((string) (is_string($object['written_in'] ?? null) ? $object['written_in'] : '')));
+            $in = $in === '' ? null : (preg_match('/fusha|standard|msa|classical/', $in) ? 'fusha' : $in);
+
+            return ['written_in' => $in, 'words' => array_values(array_filter((array) $object['words'], 'is_array'))];
+        }
+        $list = preg_match('/\[.*\]/su', $raw, $m) ? json_decode($m[0], true) : null;
+
+        return ['written_in' => null, 'words' => is_array($list) ? array_values(array_filter($list, 'is_array')) : []];
     }
 
     /**
