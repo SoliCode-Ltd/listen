@@ -183,9 +183,9 @@ echo 'Now (UTC): ', now()->utc()->toDateTimeString(), '; voices: ', implode(' an
 $ways = ['today' => 'as written (the step off)', 'now' => 'marked, told as today', 'calm' => 'marked, told to read evenly', 'marks' => 'marked, told nothing'];
 $rows = [];
 $stopped = false;
-foreach ($chosen as $n => $voice) {
-    echo "\n== voice ", $n + 1, ': ', $voice->display_name, ' (', $voice->gender, ") ==\n";
-    foreach ($items as $item) {
+// A sentence at a time, both voices: a run that stops early has heard the same sentences from each.
+foreach ($items as $item) {
+    foreach ($chosen as $n => $voice) {
         if ($seconds > $cap * 60 - 14) {
             $stopped = true;
             break 2;
@@ -209,7 +209,7 @@ foreach ($chosen as $n => $voice) {
             continue;
         }
         $rows[] = ['voice' => $n, 'item' => $item, 'clips' => $clips];
-        echo sprintf("%-4s want %-9s %s\n", $item['id'], $item['listen']['want'], implode('   ', array_map(
+        echo sprintf("%-4s %-6s want %-9s %s\n", $item['id'], $voice->display_name, $item['listen']['want'], implode('   ', array_map(
             fn (string $way): string => sprintf('%s %-5s (%s | %s)', $way, $clips[$way]['result'], $clips[$way]['a'], $clips[$way]['b']),
             array_keys($ways),
         )));
