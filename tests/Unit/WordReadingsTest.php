@@ -53,6 +53,8 @@ class WordReadingsTest extends TestCase
         $kept = WordReadings::accept($text, [['word' => 'عقداً', 'marked' => 'عِقْدا', 'said' => 'ʿiqdan', 'means' => 'a necklace']]);
 
         $this->assertSame('عِقْداً', $kept[0]['marked']);
+        // The model's own tanween, on the letter before the alef, is not doubled.
+        $this->assertSame('عِقْداً', WordReadings::accept($text, [['word' => 'عقداً', 'marked' => 'عِقْدًا', 'said' => 'ʿiqdan', 'means' => 'a necklace']])[0]['marked']);
         $this->assertSame('أهداها زوجها عِقْداً من اللؤلؤ.', WordReadings::apply($text, $kept)['text']);
     }
 

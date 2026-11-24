@@ -195,16 +195,26 @@ final class WordReadings
         return true;
     }
 
-    /** The reading's marks, except where the writer already put one: theirs stays. */
+    /**
+     * The reading's marks, except where the writer already put one: theirs stays.
+     * A tanween the writer put on the final alef (عقداً) is the word's one tanween:
+     * the reading's own, on the letter before, is dropped rather than doubled.
+     */
     private static function keepingOwnMarks(string $word, string $marked): string
     {
         $own = self::units($word);
-        $out = '';
-        foreach (self::units($marked) as $k => [$letter, $marks]) {
-            $out .= $letter.(($own[$k][1] ?? '') !== '' ? $own[$k][1] : $marks);
+        $units = self::units($marked);
+        foreach ($units as $k => [$letter, $marks]) {
+            if (($own[$k][1] ?? '') === '') {
+                continue;
+            }
+            $units[$k][1] = $own[$k][1];
+            if ($k > 0 && str_contains($own[$k][1], "\u{064B}")) {
+                $units[$k - 1][1] = str_replace("\u{064B}", '', $units[$k - 1][1]);
+            }
         }
 
-        return $out;
+        return implode('', array_map(fn (array $u): string => $u[0].$u[1], $units));
     }
 
     /** The word standing alone: no letter or mark on either side of it. */
