@@ -262,7 +262,9 @@ name: Server deploy
 #            (scripts/support/tashkeel_levers.php): what makes the voice say the
 #            reading asked for (more takes, the word's meaning in the direction,
 #            the standard engine, dialect respelling), heard by two listeners,
-#            with a page of the clips to check by ear. About 14 minutes of speech
+#            with a page of the clips to check by ear. Input "formants" makes no
+#            speech: the runner reads clips already made and measures which vowel
+#            was said (scripts/support/tashkeel_formants.py). About 14 minutes of speech
 #            a round on the quota staging shares with live: only when the owner
 #            has said yes.
 # New migrations and composer.lock changes are reported, not run (see migrate and composer).
@@ -832,6 +834,8 @@ jobs:
           if [ "$MODE" = tashkeel-listen ]; then
             [ "$TARGET" = staging ] || { echo "tashkeel-listen runs on staging only"; exit 1; }
             printf '%s' "$TASHKEEL" | grep -qE '^[a-z0-9,+]*$' || { echo "tashkeel must be kinds of clip: iso,plain,word,full,wrong,wrong+dir,either,either+dir"; exit 1; }
+            # "formants" makes no speech and needs no server: the runner measures clips already made (the step below).
+            [ "${TASHKEEL#formants}" = "$TASHKEEL" ] || { rm -f ~/.ssh/id_deploy; exit 0; }
             failed=0
             # "levers,..." is round 2 (what makes the voice obey); anything else is round 1.
             T=tashkeel_listen.php; [ "${TASHKEEL#levers}" = "$TASHKEEL" ] || T=tashkeel_levers.php
@@ -910,6 +914,13 @@ jobs:
           path: voice-cloning-examples/
           if-no-files-found: ignore
           retention-days: 3
+      - name: Measure the vowels in the tashkeel clips
+        if: inputs.mode == 'tashkeel-listen' && startsWith(inputs.tashkeel, 'formants')
+        env:
+          BASE: https://phplaravel-1516130-6707450.cloudwaysapps.com/storage/tashkeel-listen
+        run: |
+          pip install --quiet numpy soundfile praat-parselmouth
+          python3 scripts/support/tashkeel_formants.py
       - name: Check the public footer
         env:
           BASE: ${{ inputs.target == 'live' && 'https://listenai.studio' || 'https://phplaravel-1516130-6707450.cloudwaysapps.com' }}
