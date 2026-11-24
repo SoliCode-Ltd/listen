@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Support\SpeechText;
+use App\Support\Tashkeel\AutoReadings;
 use App\Support\Pronunciations;
 use App\Services\Tts\GeminiKeyManager;
 use Filament\Schemas\Schema;
@@ -57,6 +58,8 @@ class TtsSettings extends Page implements HasForms
             SpeechText::SETTING => SpeechText::enabled(),
             Pronunciations::SETTING => Pronunciations::enabled(),
             TextContentCheck::ENABLED_SETTING => TextContentCheck::enabled(),
+            AutoReadings::SETTING => AutoReadings::mode(),
+            AutoReadings::MEMBERS_SETTING => implode(', ', AutoReadings::testMembers()),
 
             // Gemini config
             'gemini_api_key_set' => count(app(GeminiKeyManager::class)->getAllKeys()) > 0,
@@ -131,6 +134,20 @@ class TtsSettings extends Page implements HasForms
                             ->helperText('On: members save how a word should be said, from the «النطق» button in the studio and the demo, and their new voices say it that way. Off: the button is gone, nothing can be saved, and every voice is made from the text as written, exactly as before. Saved words are kept and work again when switched back on. Separate from smoothing above.')
                             ->default(false)
                             ->columnSpanFull(),
+                        Select::make(AutoReadings::SETTING)
+                            ->label('Automatic pronunciation of words with two readings')
+                            ->options([
+                                AutoReadings::OFF => 'Off',
+                                AutoReadings::TEST => 'Test accounts only',
+                                AutoReadings::ON => 'On for everyone',
+                            ])
+                            ->default(AutoReadings::OFF)
+                            ->required()
+                            ->helperText('Before a premium voice reads an Arabic text, the few words it could say as the wrong word (علم، عقد، a name like جدة) are marked and the voice is told what each means. The member\'s text, history and charge stay as written. Only for one premium voice set to Fusha or to no dialect, a text read in one piece and without tags; everything else is read as today. Off: exactly as today.'),
+                        TextInput::make(AutoReadings::MEMBERS_SETTING)
+                            ->label('Test accounts (member ids)')
+                            ->helperText('Used by "Test accounts only": the member ids whose voices go through the step, separated by commas.')
+                            ->maxLength(500),
                         Toggle::make(TextContentCheck::ENABLED_SETTING)
                             ->label('Read every text before a voice is made (content check)')
                             ->helperText('On: before any voice is made, the text and the member\'s own direction are read for their meaning, and sexual content is refused however it is spelled, for every member, paying or not. Nothing is charged for a refused text, and each one is listed under Content → Blocked generations. If the reader does not answer, the voice is still made and its text is read again within minutes; a voice that should not have been made is then hidden from the member. Off: only the word list checks texts. Leave this on.')
@@ -296,6 +313,8 @@ class TtsSettings extends Page implements HasForms
             SpeechText::SETTING,
             Pronunciations::SETTING,
             TextContentCheck::ENABLED_SETTING,
+            AutoReadings::SETTING,
+            AutoReadings::MEMBERS_SETTING,
             StandardVoiceEngine::SETTING_KEY,
             'gemini_default_voice',
             'gemini_timeout_seconds',
