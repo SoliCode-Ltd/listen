@@ -56,6 +56,20 @@ class WordReadingsTest extends TestCase
         $this->assertSame('أهداها زوجها عِقْداً من اللؤلؤ.', WordReadings::apply($text, $kept)['text']);
     }
 
+    public function test_a_stretched_reading_loses_its_tatweel_and_refusals_are_counted(): void
+    {
+        $refused = [];
+
+        $kept = WordReadings::accept('حجزت جلسة في جدة', [
+            ['word' => 'جلسة', 'marked' => 'جَـلْـسَـة', 'said' => 'jalsa', 'means' => 'a session'],
+            ['word' => 'جدة', 'marked' => 'جِدَّه', 'said' => 'Jidda', 'means' => 'the city of Jeddah'],
+            ['word' => 'الرياض', 'marked' => 'الرِّيَاض', 'said' => 'ar-Riyāḍ', 'means' => 'the city of Riyadh'],
+        ], [], $refused);
+
+        $this->assertSame(['جَلْسَة'], array_column($kept, 'marked'));
+        $this->assertSame(['letters changed' => 1, 'not in the text as written' => 1], $refused);
+    }
+
     public function test_no_more_than_the_limit_and_each_word_once(): void
     {
         $text = '';
@@ -121,5 +135,10 @@ class WordReadingsTest extends TestCase
         $this->assertSame('different', TashkeelScore::reading('جدة', 'جده'));
         // A vowel the reference gives and the candidate leaves open.
         $this->assertSame('unclear', TashkeelScore::reading('كُتُب', 'كُتب'));
+        // A sukun where the reference has a vowel is another word (Ḥamad, ḥamd); a sukun or nothing where it has none is not.
+        $this->assertSame('different', TashkeelScore::reading('حَمَد', 'حَمْد'));
+        $this->assertSame('same', TashkeelScore::reading('دَرْس', 'دَرس'));
+        // Letters the reference leaves without a mark are not judged: مَجَّانِي and مَجَّانِيّ are one word.
+        $this->assertSame('same', TashkeelScore::reading('مَجَّانِي', 'مَجَّانِيّ'));
     }
 }

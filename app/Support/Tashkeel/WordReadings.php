@@ -44,17 +44,17 @@ final class WordReadings
     {
         $variety = trim((string) $variety);
 
-        return "You prepare Arabic text for a text-to-speech voice. Arabic is written without its short vowels, so some words can be said in more than one way.\n\n"
-            ."List ONLY the words in the text below that a careful reader could say wrongly:\n"
-            ."- a word with more than one common reading, where the sentence decides which (علم: ʿilm, ʿalam or ʿalima; عقد: ʿaqd or ʿiqd; كتب: kataba, kutiba or kutub);\n"
+        return "You prepare Arabic text for a text-to-speech voice. Arabic is written without its short vowels, so a few words can be said as two different words.\n\n"
+            ."List ONLY the words in the text below that the voice could say as the wrong word:\n"
+            ."- a word whose letters spell two or more different, common words, where the sentence decides which (علم: ʿilm, ʿalam or ʿalima; عقد: ʿaqd or ʿiqd; كتب: kataba, kutiba or kutub);\n"
             ."- a name of a person, a place or a brand whose vowels its letters do not give (جدة، الخبر، عمر، حمد).\n"
-            ."Leave out every word that has one natural reading, and every word that already carries vowel marks.\n\n"
+            ."Leave out everything else: a word with one natural reading (في، كان، المدينة، كبير), a word only because it is long, foreign or colloquial, and a word that already carries vowel marks inside it. Most sentences have none, one or two such words.\n\n"
             .($variety !== ''
-                ? "The text is written in {$variety}: give that variety's own vowels, not those of Fusha.\n\n"
+                ? "The text is written in {$variety}. The voice already knows this variety: leave its everyday words alone, and where you do list a word, give that variety's own vowels, not those of Fusha.\n\n"
                 : "The text is Modern Standard Arabic (Fusha).\n\n")
             ."For each word give:\n"
-            ."- \"word\": the word exactly as it is written in the text, with any prefix attached to it, without punctuation;\n"
-            ."- \"marked\": the same letters with every vowel mark inside the word (fatha, damma, kasra, sukun, shadda), for the reading this sentence means. Never add, drop or change a letter. Leave the last letter's case ending off;\n"
+            ."- \"word\": the word copied exactly as it is written in the text, with any prefix attached to it and any mark it already has, without punctuation;\n"
+            ."- \"marked\": the same letters with every vowel mark inside the word (fatha, damma, kasra, sukun, shadda), for the reading this sentence means. Never add, drop or change a letter, and do not stretch the word with a tatweel. Leave the last letter's case ending off;\n"
             ."- \"said\": how it is said, in Latin letters;\n"
             ."- \"means\": what it means here, in two to five English words.\n\n"
             .'Answer with a JSON array only, at most '.self::MAX." items, in the order the words appear. When no word qualifies, answer [].\n\n"
@@ -86,33 +86,40 @@ final class WordReadings
      *
      * @param  list<array<string, mixed>>  $entries
      * @param  list<string>  $keep
+     * @param  array<string, int>  $refused  why entries were left out, counted (for measuring)
      * @return list<array{word: string, marked: string, said: string, means: string}>
      */
-    public static function accept(string $text, array $entries, array $keep = []): array
+    public static function accept(string $text, array $entries, array $keep = [], array &$refused = []): array
     {
         $kept = array_map(fn (string $w): string => TashkeelScore::strip($w), array_values(array_filter($keep, 'is_string')));
         $marks = '/['.TashkeelScore::MARKS.']/u';
         $out = [];
         foreach ($entries as $entry) {
             $word = trim((string) ($entry['word'] ?? ''));
-            $marked = trim((string) ($entry['marked'] ?? ''));
+            // A tatweel is not a letter: the reading never stretches the word.
+            $marked = str_replace("\u{0640}", '', trim((string) ($entry['marked'] ?? '')));
             $said = self::plain((string) ($entry['said'] ?? ''));
             $means = self::plain((string) ($entry['means'] ?? ''));
             $bare = TashkeelScore::strip($word);
-            if (count($out) >= self::MAX) {
-                break;
-            }
-            if ($bare === '' || $marked === '' || $said === '' || $means === ''
+            $why = match (true) {
+                count($out) >= self::MAX => 'over the limit',
+                $bare === '' || $marked === '' || $said === '' || $means === '' => 'incomplete',
                 // One word of Arabic letters. A mark of its own is allowed only at its end (كتاباً).
-                || ! preg_match('/^\p{Arabic}+$/u', $bare) || ! self::markedOnlyAtEnd($word)
+                ! preg_match('/^\p{Arabic}+$/u', $bare) => 'not one Arabic word',
+                ! self::markedOnlyAtEnd($word) => 'marked by the writer',
                 // The reading is these letters and nothing else, and it does mark them.
-                || ! preg_match('/^[\p{Arabic}'.TashkeelScore::MARKS.']+$/u', $marked)
-                || TashkeelScore::strip($marked) !== $bare || ! preg_match($marks, $marked)
+                ! preg_match('/^[\p{Arabic}'.TashkeelScore::MARKS.']+$/u', $marked) || TashkeelScore::strip($marked) !== $bare => 'letters changed',
+                ! preg_match($marks, $marked) => 'no marks given',
                 // The member's own spelling of a word is not ours to change.
-                || in_array($bare, $kept, true)
-                || isset($out[$bare])
+                in_array($bare, $kept, true) => 'saved by the member',
+                isset($out[$bare]) => 'given twice',
                 // In the text as a whole word, as written.
-                || ! preg_match(self::whole($word), $text)) {
+                ! preg_match(self::whole($word), $text) => 'not in the text as written',
+                default => null,
+            };
+            if ($why !== null) {
+                $refused[$why] = ($refused[$why] ?? 0) + 1;
+
                 continue;
             }
             $out[$bare] = ['word' => $word, 'marked' => self::keepingOwnMarks($word, $marked), 'said' => $said, 'means' => $means];

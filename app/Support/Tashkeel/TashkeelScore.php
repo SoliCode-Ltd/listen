@@ -81,11 +81,12 @@ final class TashkeelScore
     }
 
     /**
-     * Is a word marked for the same reading as the reference word? The ending
-     * is left out (عَلَم and عَلَمَ are one word), and a sukun is the same as
-     * no mark. "same"; "different" when a mark says another sound or a letter
-     * differs; "unclear" when the candidate leaves unmarked a letter the
-     * reference gives a vowel or a doubling.
+     * Is a word marked for the same reading as the reference word? Only the
+     * letters the reference marks are looked at, and its ending is left out
+     * (عَلَم and عَلَمَ are one word). "same"; "different" when a mark says
+     * another sound (a vowel where the reference has none, or a sukun where it
+     * has a vowel) or a letter differs; "unclear" when the candidate leaves
+     * unmarked a letter the reference gives a vowel or a doubling.
      */
     public static function reading(string $reference, string $candidate): string
     {
@@ -97,18 +98,23 @@ final class TashkeelScore
         $last = self::endingIndex($ref['units']);
         $unclear = false;
         foreach ($ref['units'] as $k => [$letter, $marks]) {
-            if ($k === $last) {
+            if ($k === $last || $marks === '') {
                 continue;
             }
+            $have = $got['units'][$k][1] ?? '';
             $want = str_replace("\u{0652}", '', $marks);
-            $have = str_replace("\u{0652}", '', $got['units'][$k][1] ?? '');
-            if ($want === $have) {
+            $sound = str_replace("\u{0652}", '', $have);
+            if ($want === $sound) {
+                // The same vowel, or no vowel on either side (a sukun or nothing).
                 continue;
             }
-            if ($have !== '') {
-                return 'different';
+            if ($have === '') {
+                $unclear = true;
+
+                continue;
             }
-            $unclear = true;
+
+            return 'different';
         }
 
         return $unclear ? 'unclear' : 'same';

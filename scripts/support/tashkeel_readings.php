@@ -120,12 +120,11 @@ $flagged = [];     // variety => verdict => count, for every word the model mark
 $lines = [];
 $memberWords = [];
 $lettersChanged = 0;
-$refused = 0;
+$refused = [];
 $perSentence = [];
 foreach ($items as $i => $item) {
     $entries = $raw[$i] === null ? [] : WordReadings::parse($raw[$i]);
-    $readings = WordReadings::accept($item['text'], $entries);
-    $refused += count($entries) - count($readings);
+    $readings = WordReadings::accept($item['text'], $entries, [], $refused);
     $made = WordReadings::apply($item['text'], $readings);
     $lettersChanged += (int) (TashkeelScore::strip($made['text']) !== TashkeelScore::strip($item['text']));
     $written = ($item['source'] ?? '') === 'written';
@@ -145,7 +144,8 @@ foreach ($items as $i => $item) {
             }
         }
         $groups[$kind][$verdict] = ($groups[$kind][$verdict] ?? 0) + 1;
-        $lines[] = sprintf('  %-4s %-10s want %-12s %s %s', $item['id'], $verdict, $item['reading'], $shown === '' ? '' : 'got '.$shown,
+        $lines[] = sprintf('  %-4s %-10s want %-12s %s %s', $item['id'], $verdict, $item['reading'],
+            $shown === '' ? 'the model listed: '.(implode('، ', array_map(fn (array $e): string => (string) ($e['word'] ?? '?'), $entries)) ?: 'nothing') : 'got '.$shown,
             in_array('known-hard', $item['tags'] ?? [], true) ? ' [known hard]' : '');
     }
 
@@ -204,7 +204,9 @@ foreach ($flagged as $kind => $f) {
         $kind, count($counts), $n, $n / max(1, count($counts)), max($counts), count(array_filter($counts, fn (int $c): bool => $c === 0)),
         $f['same'] ?? 0, $f['different'] ?? 0, $f['unclear'] ?? 0, $f['no reference'] ?? 0);
 }
-echo "\nSafety: sentences whose letters changed: ", $lettersChanged, '; entries of the model refused (letters changed, not in the text, already marked, incomplete): ', $refused, ".\n";
+arsort($refused);
+echo "\nSafety: sentences whose letters changed: ", $lettersChanged, '; entries of the model refused: ', array_sum($refused),
+    $refused === [] ? '' : ' ('.implode(', ', array_map(fn (string $k, int $v): string => $k.' '.$v, array_keys($refused), $refused)).')', ".\n";
 
 echo "\nThe written sentences, one by one:\n", implode("\n", $lines), "\n";
 echo "\nMember sentences: words marked differently from the draft reference (the word only):\n", $memberWords === [] ? "  none\n" : implode("\n", $memberWords)."\n";
