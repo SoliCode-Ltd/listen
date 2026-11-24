@@ -78,11 +78,12 @@ JAZAR_PAIRS = [
 ]
 
 
-def compact(tr):
-    """The whole clip on a few lines: F1/F2 in tens of Hz every 20 ms, a dot where there is no voice."""
-    for start in range(0, len(tr['t']), 50):
+def compact(tr, first=0, last=None):
+    """The clip (or frames first..last of it) on a few lines: F1/F2 in tens of Hz every 20 ms, a dot where there is no voice."""
+    last = len(tr['t']) if last is None else min(last, len(tr['t']))
+    for start in range(max(0, first) // 50 * 50, last, 50):
         cells = []
-        for k in range(start, min(start + 50, len(tr['t'])), 2):
+        for k in range(max(start, first), min(start + 50, last), 2):
             voiced = tr['f0'][k] > 0 and np.isfinite(tr['f1'][k]) and np.isfinite(tr['f2'][k])
             cells.append(f"{tr['f1'][k] / 10:.0f}/{tr['f2'][k] / 10:.0f}" if voiced else '.')
         print(f"     {tr['t'][start]:4.2f}s  " + ' '.join(cells))
@@ -207,9 +208,15 @@ def splits():
         except Exception as err:
             print(f'   could not be read: {err}')
             continue
+        # In a long text only the part around the word is looked at: where it starts in the text, a seventh of the clip either side.
+        first, last = 0, len(a['t'])
+        if e.get('pos') is not None:
+            first = max(0, int((e['pos'] - 0.14) * len(a['t'])))
+            last = min(len(a['t']), int((e['pos'] + 0.16) * len(a['t'])))
+            print(f"   the word starts {e['pos']:.0%} into the text: looking at {a['t'][first]:.2f}s to {a['t'][last - 1]:.2f}s of {a['t'][-1]:.2f}s")
         if not e.get('partner'):
             print('   no other clip of this sentence the listeners agree on: the clip alone, F1/F2 in tens of Hz every 20 ms')
-            compact(a)
+            compact(a, first, last)
             continue
         try:
             b = tracks(sound(fetch(e['partner'])))
@@ -222,6 +229,8 @@ def splits():
         big = 0
         lines = []
         for n, k in enumerate(nuclei(a), 1):
+            if k < first or k >= last:
+                continue
             j = int(to[k])
             f1a, f2a, f1b, f2b = mean_at(a, k, 'f1'), mean_at(a, k, 'f2'), mean_at(b, j, 'f1'), mean_at(b, j, 'f2')
             far = np.isfinite(f1a + f2a + f1b + f2b) and (abs(f1a - f1b) >= 200 or abs(f2a - f2b) >= 450)
@@ -232,9 +241,10 @@ def splits():
             continue
         print(f'   {big} vowel(s) differ: vowel, at(s), this clip F1 F2 | the other clip at(s) F1 F2 | differences')
         print('\n'.join(lines))
-        for name, tr in ((e['clip'], a), (e['partner'], b)):
-            print(f'   {name}: F1/F2 in tens of Hz every 20 ms')
-            compact(tr)
+        print(f"   {e['clip']}: F1/F2 in tens of Hz every 20 ms")
+        compact(a, first, last)
+        print(f"   {e['partner']}: F1/F2 in tens of Hz every 20 ms")
+        compact(b, int(to[first]), int(to[last - 1]) + 1)
 
 
 def main():

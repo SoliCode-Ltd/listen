@@ -1,0 +1,1873 @@
+{
+ "about": "Longer texts for the listening tests of the automatic pronunciation step (written for the test, not members' text): several words in each can be read in more than one way, some spelled alike and meant differently in the same text. ref: the text fully marked, by the test set's marking rule. words: the words scored by ear, each with the time it appears in the text, the readings a listener chooses between, and the one meant.",
+ "passages": [
+  {
+   "id": "p01",
+   "text": "افتتح أمير المنطقة معرض الكتاب في جدة مساء أمس، وذكر أن المعرض يعد من أكبر المعارض في المملكة.",
+   "ref": "اِفْتَتَحَ أَمِيرُ الْمِنْطَقَةِ مَعْرِضَ الْكِتَابِ فِي جِدَّة مَسَاءَ أَمْس، وَذَكَرَ أَنَّ الْمَعْرِضَ يُعَدُّ مِنْ أَكْبَرِ الْمَعَارِضِ فِي الْمَمْلَكَة.",
+   "words": [
+    {
+     "word": "افتتح",
+     "n": 1,
+     "kind": "word",
+     "want": "iftataha",
+     "options": {
+      "iftataha": [
+       "اِفْتَتَحَ",
+       "iftataḥa",
+       "he opened"
+      ],
+      "uftutiha": [
+       "اُفْتُتِحَ",
+       "uftutiḥa",
+       "it was opened"
+      ]
+     }
+    },
+    {
+     "word": "جدة",
+     "n": 1,
+     "kind": "name",
+     "want": "jidda",
+     "options": {
+      "jidda": [
+       "جِدَّة",
+       "Jidda",
+       "the city of Jeddah"
+      ],
+      "jadda": [
+       "جَدَّة",
+       "jadda",
+       "a grandmother"
+      ]
+     }
+    },
+    {
+     "word": "وذكر",
+     "n": 1,
+     "kind": "word",
+     "want": "dhakara",
+     "options": {
+      "dhakara": [
+       "ذَكَرَ",
+       "dhakara",
+       "he mentioned"
+      ],
+      "dhukira": [
+       "ذُكِرَ",
+       "dhukira",
+       "it was mentioned"
+      ]
+     }
+    },
+    {
+     "word": "يعد",
+     "n": 1,
+     "kind": "word",
+     "want": "yuaddu",
+     "options": {
+      "yuaddu": [
+       "يُعَدُّ",
+       "yuʿaddu",
+       "is considered"
+      ],
+      "yuiddu": [
+       "يُعِدُّ",
+       "yuʿiddu",
+       "prepares"
+      ],
+      "yaidu": [
+       "يَعِدُ",
+       "yaʿidu",
+       "promises"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p02",
+   "text": "افتتح المعرض في مدينة الخبر، ونشر الخبر في جميع الصحف، ثم عقد مؤتمر صحفي حضره وزير الثقافة.",
+   "ref": "اُفْتُتِحَ الْمَعْرِضُ فِي مَدِينَةِ الْخُبَر، وَنُشِرَ الْخَبَرُ فِي جَمِيعِ الصُّحُف، ثُمَّ عُقِدَ مُؤْتَمَرٌ صُحُفِيٌّ حَضَرَهُ وَزِيرُ الثَّقَافَة.",
+   "words": [
+    {
+     "word": "افتتح",
+     "n": 1,
+     "kind": "word",
+     "want": "uftutiha",
+     "options": {
+      "iftataha": [
+       "اِفْتَتَحَ",
+       "iftataḥa",
+       "he opened"
+      ],
+      "uftutiha": [
+       "اُفْتُتِحَ",
+       "uftutiḥa",
+       "it was opened"
+      ]
+     }
+    },
+    {
+     "word": "الخبر",
+     "n": 1,
+     "kind": "name",
+     "want": "khubar",
+     "options": {
+      "khubar": [
+       "الخُبَر",
+       "al-Khubar",
+       "the city of Khobar"
+      ],
+      "khabar": [
+       "الخَبَر",
+       "al-khabar",
+       "the news"
+      ]
+     }
+    },
+    {
+     "word": "ونشر",
+     "n": 1,
+     "kind": "word",
+     "want": "nushira",
+     "options": {
+      "nashara": [
+       "نَشَرَ",
+       "nashara",
+       "he published"
+      ],
+      "nushira": [
+       "نُشِرَ",
+       "nushira",
+       "it was published"
+      ]
+     }
+    },
+    {
+     "word": "الخبر",
+     "n": 2,
+     "kind": "word",
+     "want": "khabar",
+     "options": {
+      "khubar": [
+       "الخُبَر",
+       "al-Khubar",
+       "the city of Khobar"
+      ],
+      "khabar": [
+       "الخَبَر",
+       "al-khabar",
+       "the news"
+      ]
+     }
+    },
+    {
+     "word": "عقد",
+     "n": 1,
+     "kind": "word",
+     "want": "uqida",
+     "options": {
+      "aqd": [
+       "عَقْد",
+       "ʿaqd",
+       "a contract"
+      ],
+      "iqd": [
+       "عِقْد",
+       "ʿiqd",
+       "a necklace"
+      ],
+      "aqada": [
+       "عَقَدَ",
+       "ʿaqada",
+       "he held"
+      ],
+      "uqida": [
+       "عُقِدَ",
+       "ʿuqida",
+       "it was held"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p03",
+   "text": "سافر عمر من عمان إلى مسقط ليقضي بقية عمره في سلطنة عمان، قرب البحر الذي أحبه منذ الصغر.",
+   "ref": "سَافَرَ عُمَر مِنْ عَمَّان إِلَى مَسْقَط لِيَقْضِيَ بَقِيَّةَ عُمْرِهِ فِي سَلْطَنَةِ عُمَان، قُرْبَ الْبَحْرِ الَّذِي أَحَبَّهُ مُنْذُ الصِّغَر.",
+   "words": [
+    {
+     "word": "عمر",
+     "n": 1,
+     "kind": "name",
+     "want": "umar",
+     "options": {
+      "umar": [
+       "عُمَر",
+       "ʿUmar",
+       "the man's name Omar"
+      ],
+      "umr": [
+       "عُمْر",
+       "ʿumr",
+       "age, lifetime"
+      ]
+     }
+    },
+    {
+     "word": "عمان",
+     "n": 1,
+     "kind": "name",
+     "want": "amman",
+     "options": {
+      "amman": [
+       "عَمَّان",
+       "ʿAmmān",
+       "the city of Amman"
+      ],
+      "uman": [
+       "عُمَان",
+       "ʿUmān",
+       "the country Oman"
+      ]
+     }
+    },
+    {
+     "word": "مسقط",
+     "n": 1,
+     "kind": "name",
+     "want": "masqat",
+     "options": {
+      "masqat": [
+       "مَسْقَط",
+       "Masqaṭ",
+       "the city of Muscat"
+      ],
+      "masqit": [
+       "مَسْقِط",
+       "masqiṭ",
+       "a birthplace"
+      ]
+     }
+    },
+    {
+     "word": "عمره",
+     "n": 1,
+     "kind": "word",
+     "want": "umr",
+     "options": {
+      "umar": [
+       "عُمَر",
+       "ʿUmar",
+       "the man's name Omar"
+      ],
+      "umr": [
+       "عُمْر",
+       "ʿumr",
+       "age, lifetime"
+      ]
+     }
+    },
+    {
+     "word": "عمان",
+     "n": 2,
+     "kind": "name",
+     "want": "uman",
+     "options": {
+      "amman": [
+       "عَمَّان",
+       "ʿAmmān",
+       "the city of Amman"
+      ],
+      "uman": [
+       "عُمَان",
+       "ʿUmān",
+       "the country Oman"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p04",
+   "text": "علم الطلاب أن مدرسة العلوم درست الكيمياء في مدرسة الحي عشر سنوات، وأنها تعد كتابا جديدا.",
+   "ref": "عَلِمَ الطُّلَّابُ أَنَّ مُدَرِّسَةَ الْعُلُومِ دَرَّسَتِ الْكِيمْيَاءَ فِي مَدْرَسَةِ الْحَيِّ عَشْرَ سَنَوَات، وَأَنَّهَا تُعِدُّ كِتَابًا جَدِيدًا.",
+   "words": [
+    {
+     "word": "علم",
+     "n": 1,
+     "kind": "word",
+     "want": "alima",
+     "options": {
+      "ilm": [
+       "عِلْم",
+       "ʿilm",
+       "knowledge, science"
+      ],
+      "alam": [
+       "عَلَم",
+       "ʿalam",
+       "a flag"
+      ],
+      "alima": [
+       "عَلِمَ",
+       "ʿalima",
+       "he knew, learned"
+      ],
+      "allama": [
+       "عَلَّمَ",
+       "ʿallama",
+       "he taught, told"
+      ]
+     }
+    },
+    {
+     "word": "مدرسة",
+     "n": 1,
+     "kind": "word",
+     "want": "mudarrisa",
+     "options": {
+      "mudarrisa": [
+       "مُدَرِّسَة",
+       "mudarrisa",
+       "a woman teacher"
+      ],
+      "madrasa": [
+       "مَدْرَسَة",
+       "madrasa",
+       "a school"
+      ]
+     }
+    },
+    {
+     "word": "درست",
+     "n": 1,
+     "kind": "word",
+     "want": "darrasat",
+     "options": {
+      "darrasat": [
+       "دَرَّسَتْ",
+       "darrasat",
+       "she taught"
+      ],
+      "darasat": [
+       "دَرَسَتْ",
+       "darasat",
+       "she studied"
+      ]
+     }
+    },
+    {
+     "word": "مدرسة",
+     "n": 2,
+     "kind": "word",
+     "want": "madrasa",
+     "options": {
+      "mudarrisa": [
+       "مُدَرِّسَة",
+       "mudarrisa",
+       "a woman teacher"
+      ],
+      "madrasa": [
+       "مَدْرَسَة",
+       "madrasa",
+       "a school"
+      ]
+     }
+    },
+    {
+     "word": "تعد",
+     "n": 1,
+     "kind": "word",
+     "want": "tuiddu",
+     "options": {
+      "tuiddu": [
+       "تُعِدُّ",
+       "tuʿiddu",
+       "she prepares"
+      ],
+      "tuaddu": [
+       "تُعَدُّ",
+       "tuʿaddu",
+       "is considered"
+      ],
+      "taidu": [
+       "تَعِدُ",
+       "taʿidu",
+       "she promises"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p05",
+   "text": "رفع علم البلاد فوق مبنى الوزارة، وعلم الوزير الحاضرين أن العلم طريق التقدم.",
+   "ref": "رُفِعَ عَلَمُ الْبِلَادِ فَوْقَ مَبْنَى الْوِزَارَة، وَعَلَّمَ الْوَزِيرُ الْحَاضِرِينَ أَنَّ الْعِلْمَ طَرِيقُ التَّقَدُّم.",
+   "words": [
+    {
+     "word": "رفع",
+     "n": 1,
+     "kind": "word",
+     "want": "rufia",
+     "options": {
+      "rufia": [
+       "رُفِعَ",
+       "rufiʿa",
+       "it was raised"
+      ],
+      "rafaa": [
+       "رَفَعَ",
+       "rafaʿa",
+       "he raised"
+      ]
+     }
+    },
+    {
+     "word": "علم",
+     "n": 1,
+     "kind": "word",
+     "want": "alam",
+     "options": {
+      "ilm": [
+       "عِلْم",
+       "ʿilm",
+       "knowledge, science"
+      ],
+      "alam": [
+       "عَلَم",
+       "ʿalam",
+       "a flag"
+      ],
+      "alima": [
+       "عَلِمَ",
+       "ʿalima",
+       "he knew, learned"
+      ],
+      "allama": [
+       "عَلَّمَ",
+       "ʿallama",
+       "he taught, told"
+      ]
+     }
+    },
+    {
+     "word": "وعلم",
+     "n": 1,
+     "kind": "word",
+     "want": "allama",
+     "options": {
+      "ilm": [
+       "عِلْم",
+       "ʿilm",
+       "knowledge, science"
+      ],
+      "alam": [
+       "عَلَم",
+       "ʿalam",
+       "a flag"
+      ],
+      "alima": [
+       "عَلِمَ",
+       "ʿalima",
+       "he knew, learned"
+      ],
+      "allama": [
+       "عَلَّمَ",
+       "ʿallama",
+       "he taught, told"
+      ]
+     }
+    },
+    {
+     "word": "العلم",
+     "n": 1,
+     "kind": "word",
+     "want": "ilm",
+     "options": {
+      "ilm": [
+       "عِلْم",
+       "ʿilm",
+       "knowledge, science"
+      ],
+      "alam": [
+       "عَلَم",
+       "ʿalam",
+       "a flag"
+      ],
+      "alima": [
+       "عَلِمَ",
+       "ʿalima",
+       "he knew, learned"
+      ],
+      "allama": [
+       "عَلَّمَ",
+       "ʿallama",
+       "he taught, told"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p06",
+   "text": "اتصلت منى بصديقتها علا لتخبرها أن حمد وصل من منى بعد الحج، وأن حسن ينتظرهما في ينبع.",
+   "ref": "اِتَّصَلَتْ مُنَى بِصَدِيقَتِهَا عُلَا لِتُخْبِرَهَا أَنَّ حَمَد وَصَلَ مِنْ مِنَى بَعْدَ الْحَجّ، وَأَنَّ حَسَن يَنْتَظِرُهُمَا فِي يَنْبُع.",
+   "words": [
+    {
+     "word": "منى",
+     "n": 1,
+     "kind": "name",
+     "want": "muna",
+     "options": {
+      "muna": [
+       "مُنى",
+       "Muna",
+       "the woman's name Mona"
+      ],
+      "mina": [
+       "مِنى",
+       "Mina",
+       "Mina, the place near Mecca"
+      ]
+     }
+    },
+    {
+     "word": "علا",
+     "n": 1,
+     "kind": "name",
+     "want": "ula",
+     "options": {
+      "ula": [
+       "عُلا",
+       "ʿUlā",
+       "the woman's name Ola"
+      ],
+      "ala": [
+       "عَلا",
+       "ʿalā",
+       "the man's name Alaa"
+      ]
+     }
+    },
+    {
+     "word": "حمد",
+     "n": 1,
+     "kind": "name",
+     "want": "hamad",
+     "options": {
+      "hamad": [
+       "حَمَد",
+       "Ḥamad",
+       "the man's name Hamad"
+      ],
+      "hamd": [
+       "حَمْد",
+       "ḥamd",
+       "praise"
+      ]
+     }
+    },
+    {
+     "word": "منى",
+     "n": 2,
+     "kind": "name",
+     "want": "mina",
+     "options": {
+      "muna": [
+       "مُنى",
+       "Muna",
+       "the woman's name Mona"
+      ],
+      "mina": [
+       "مِنى",
+       "Mina",
+       "Mina, the place near Mecca"
+      ]
+     }
+    },
+    {
+     "word": "حسن",
+     "n": 1,
+     "kind": "name",
+     "want": "hasan",
+     "options": {
+      "hasan": [
+       "حَسَن",
+       "Ḥasan",
+       "the man's name Hasan"
+      ],
+      "husn": [
+       "حُسْن",
+       "ḥusn",
+       "beauty"
+      ]
+     }
+    },
+    {
+     "word": "ينبع",
+     "n": 1,
+     "kind": "name",
+     "want": "yanbu",
+     "options": {
+      "yanbu": [
+       "يَنْبُع",
+       "Yanbuʿ",
+       "the city of Yanbu"
+      ],
+      "yanba": [
+       "يَنْبَع",
+       "yanbaʿ",
+       "it springs"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p07",
+   "text": "وقع المدير عقد العمل مع شركة في دبي، ثم قدم لزوجته عقدا من الذهب، وقدم ابنه من السفر في اليوم نفسه.",
+   "ref": "وَقَّعَ الْمُدِيرُ عَقْدَ الْعَمَلِ مَعَ شَرِكَةٍ فِي دُبَيّ، ثُمَّ قَدَّمَ لِزَوْجَتِهِ عِقْدًا مِنَ الذَّهَب، وَقَدِمَ ابْنُهُ مِنَ السَّفَرِ فِي الْيَوْمِ نَفْسِه.",
+   "words": [
+    {
+     "word": "وقع",
+     "n": 1,
+     "kind": "word",
+     "want": "waqqaa",
+     "options": {
+      "waqqaa": [
+       "وَقَّعَ",
+       "waqqaʿa",
+       "he signed"
+      ],
+      "waqaa": [
+       "وَقَعَ",
+       "waqaʿa",
+       "it fell, it happened"
+      ],
+      "wuqqia": [
+       "وُقِّعَ",
+       "wuqqiʿa",
+       "it was signed"
+      ]
+     }
+    },
+    {
+     "word": "عقد",
+     "n": 1,
+     "kind": "word",
+     "want": "aqd",
+     "options": {
+      "aqd": [
+       "عَقْد",
+       "ʿaqd",
+       "a contract"
+      ],
+      "iqd": [
+       "عِقْد",
+       "ʿiqd",
+       "a necklace"
+      ],
+      "aqada": [
+       "عَقَدَ",
+       "ʿaqada",
+       "he held"
+      ],
+      "uqida": [
+       "عُقِدَ",
+       "ʿuqida",
+       "it was held"
+      ]
+     }
+    },
+    {
+     "word": "دبي",
+     "n": 1,
+     "kind": "name",
+     "want": "dubayy",
+     "options": {
+      "dubayy": [
+       "دُبَيّ",
+       "Dubayy",
+       "the city of Dubai"
+      ],
+      "dubbi": [
+       "دُبِّي",
+       "dubbī",
+       "my bear"
+      ]
+     }
+    },
+    {
+     "word": "قدم",
+     "n": 1,
+     "kind": "word",
+     "want": "qaddama",
+     "options": {
+      "qaddama": [
+       "قَدَّمَ",
+       "qaddama",
+       "he presented, gave"
+      ],
+      "qadima": [
+       "قَدِمَ",
+       "qadima",
+       "he arrived"
+      ],
+      "qadam": [
+       "قَدَم",
+       "qadam",
+       "a foot"
+      ]
+     }
+    },
+    {
+     "word": "عقدا",
+     "n": 1,
+     "kind": "word",
+     "want": "iqd",
+     "options": {
+      "aqd": [
+       "عَقْد",
+       "ʿaqd",
+       "a contract"
+      ],
+      "iqd": [
+       "عِقْد",
+       "ʿiqd",
+       "a necklace"
+      ],
+      "aqada": [
+       "عَقَدَ",
+       "ʿaqada",
+       "he held"
+      ],
+      "uqida": [
+       "عُقِدَ",
+       "ʿuqida",
+       "it was held"
+      ]
+     }
+    },
+    {
+     "word": "وقدم",
+     "n": 1,
+     "kind": "word",
+     "want": "qadima",
+     "options": {
+      "qaddama": [
+       "قَدَّمَ",
+       "qaddama",
+       "he presented, gave"
+      ],
+      "qadima": [
+       "قَدِمَ",
+       "qadima",
+       "he arrived"
+      ],
+      "qadam": [
+       "قَدَم",
+       "qadam",
+       "a foot"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p08",
+   "text": "كتب الروائي أن كتب الأطفال قليلة، وكتب على غلاف روايته أن القراءة غذاء العقل.",
+   "ref": "كَتَبَ الرِّوَائِيُّ أَنَّ كُتُبَ الْأَطْفَالِ قَلِيلَة، وَكُتِبَ عَلَى غِلَافِ رِوَايَتِهِ أَنَّ الْقِرَاءَةَ غِذَاءُ الْعَقْل.",
+   "words": [
+    {
+     "word": "كتب",
+     "n": 1,
+     "kind": "word",
+     "want": "kataba",
+     "options": {
+      "kataba": [
+       "كَتَبَ",
+       "kataba",
+       "he wrote"
+      ],
+      "kutub": [
+       "كُتُب",
+       "kutub",
+       "books"
+      ],
+      "kutiba": [
+       "كُتِبَ",
+       "kutiba",
+       "it was written"
+      ]
+     }
+    },
+    {
+     "word": "كتب",
+     "n": 2,
+     "kind": "word",
+     "want": "kutub",
+     "options": {
+      "kataba": [
+       "كَتَبَ",
+       "kataba",
+       "he wrote"
+      ],
+      "kutub": [
+       "كُتُب",
+       "kutub",
+       "books"
+      ],
+      "kutiba": [
+       "كُتِبَ",
+       "kutiba",
+       "it was written"
+      ]
+     }
+    },
+    {
+     "word": "وكتب",
+     "n": 1,
+     "kind": "word",
+     "want": "kutiba",
+     "options": {
+      "kataba": [
+       "كَتَبَ",
+       "kataba",
+       "he wrote"
+      ],
+      "kutub": [
+       "كُتُب",
+       "kutub",
+       "books"
+      ],
+      "kutiba": [
+       "كُتِبَ",
+       "kutiba",
+       "it was written"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p09",
+   "text": "تحب الأرانب الجزر، وتكثر الجزر الصغيرة في هذا البحر، وأهل الجزر يزرعون الجزر في حدائقهم.",
+   "ref": "تُحِبُّ الْأَرَانِبُ الْجَزَر، وَتَكْثُرُ الْجُزُرُ الصَّغِيرَةُ فِي هَذَا الْبَحْر، وَأَهْلُ الْجُزُرِ يَزْرَعُونَ الْجَزَرَ فِي حَدَائِقِهِم.",
+   "words": [
+    {
+     "word": "الجزر",
+     "n": 1,
+     "kind": "word",
+     "want": "jazar",
+     "options": {
+      "jazar": [
+       "الجَزَر",
+       "al-jazar",
+       "carrots"
+      ],
+      "juzur": [
+       "الجُزُر",
+       "al-juzur",
+       "islands"
+      ]
+     }
+    },
+    {
+     "word": "الجزر",
+     "n": 2,
+     "kind": "word",
+     "want": "juzur",
+     "options": {
+      "jazar": [
+       "الجَزَر",
+       "al-jazar",
+       "carrots"
+      ],
+      "juzur": [
+       "الجُزُر",
+       "al-juzur",
+       "islands"
+      ]
+     }
+    },
+    {
+     "word": "الجزر",
+     "n": 3,
+     "kind": "word",
+     "want": "juzur",
+     "options": {
+      "jazar": [
+       "الجَزَر",
+       "al-jazar",
+       "carrots"
+      ],
+      "juzur": [
+       "الجُزُر",
+       "al-juzur",
+       "islands"
+      ]
+     }
+    },
+    {
+     "word": "الجزر",
+     "n": 4,
+     "kind": "word",
+     "want": "jazar",
+     "options": {
+      "jazar": [
+       "الجَزَر",
+       "al-jazar",
+       "carrots"
+      ],
+      "juzur": [
+       "الجُزُر",
+       "al-juzur",
+       "islands"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p10",
+   "text": "قبل الطالب النصيحة قبل الامتحان، فدرس الدرس جيدا، وشعر بالراحة حين ظهر اسمه بين الناجحين قبل الظهر.",
+   "ref": "قَبِلَ الطَّالِبُ النَّصِيحَةَ قَبْلَ الِامْتِحَان، فَدَرَسَ الدَّرْسَ جَيِّدًا، وَشَعَرَ بِالرَّاحَةِ حِينَ ظَهَرَ اسْمُهُ بَيْنَ النَّاجِحِينَ قَبْلَ الظُّهْر.",
+   "words": [
+    {
+     "word": "قبل",
+     "n": 1,
+     "kind": "word",
+     "want": "qabila",
+     "options": {
+      "qabila": [
+       "قَبِلَ",
+       "qabila",
+       "he accepted"
+      ],
+      "qabla": [
+       "قَبْلَ",
+       "qabla",
+       "before"
+      ]
+     }
+    },
+    {
+     "word": "قبل",
+     "n": 2,
+     "kind": "word",
+     "want": "qabla",
+     "options": {
+      "qabila": [
+       "قَبِلَ",
+       "qabila",
+       "he accepted"
+      ],
+      "qabla": [
+       "قَبْلَ",
+       "qabla",
+       "before"
+      ]
+     }
+    },
+    {
+     "word": "فدرس",
+     "n": 1,
+     "kind": "word",
+     "want": "darasa",
+     "options": {
+      "darasa": [
+       "دَرَسَ",
+       "darasa",
+       "he studied"
+      ],
+      "darrasa": [
+       "دَرَّسَ",
+       "darrasa",
+       "he taught"
+      ],
+      "dars": [
+       "دَرْس",
+       "dars",
+       "a lesson"
+      ]
+     }
+    },
+    {
+     "word": "الدرس",
+     "n": 1,
+     "kind": "word",
+     "want": "dars",
+     "options": {
+      "darasa": [
+       "دَرَسَ",
+       "darasa",
+       "he studied"
+      ],
+      "darrasa": [
+       "دَرَّسَ",
+       "darrasa",
+       "he taught"
+      ],
+      "dars": [
+       "دَرْس",
+       "dars",
+       "a lesson"
+      ]
+     }
+    },
+    {
+     "word": "وشعر",
+     "n": 1,
+     "kind": "word",
+     "want": "shaara",
+     "options": {
+      "shaara": [
+       "شَعَرَ",
+       "shaʿara",
+       "he felt"
+      ],
+      "shaar": [
+       "شَعْر",
+       "shaʿr",
+       "hair"
+      ],
+      "shiir": [
+       "شِعْر",
+       "shiʿr",
+       "poetry"
+      ]
+     }
+    },
+    {
+     "word": "ظهر",
+     "n": 1,
+     "kind": "word",
+     "want": "zahara",
+     "options": {
+      "zahara": [
+       "ظَهَرَ",
+       "ẓahara",
+       "it appeared"
+      ],
+      "zahr": [
+       "ظَهْر",
+       "ẓahr",
+       "a back"
+      ],
+      "zuhr": [
+       "ظُهْر",
+       "ẓuhr",
+       "noon"
+      ]
+     }
+    },
+    {
+     "word": "الظهر",
+     "n": 1,
+     "kind": "word",
+     "want": "zuhr",
+     "options": {
+      "zahara": [
+       "ظَهَرَ",
+       "ẓahara",
+       "it appeared"
+      ],
+      "zahr": [
+       "ظَهْر",
+       "ẓahr",
+       "a back"
+      ],
+      "zuhr": [
+       "ظُهْر",
+       "ẓuhr",
+       "noon"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p11",
+   "text": "يعد مطعم علي في الأقصر من أشهر المطاعم، ويعد صاحبه زبائنه بأطباق جديدة كل شهر، ويعد الطهاة الطعام أمام الضيوف.",
+   "ref": "يُعَدُّ مَطْعَمُ عَلِيّ فِي الْأُقْصُر مِنْ أَشْهَرِ الْمَطَاعِم، وَيَعِدُ صَاحِبُهُ زَبَائِنَهُ بِأَطْبَاقٍ جَدِيدَةٍ كُلَّ شَهْر، وَيُعِدُّ الطُّهَاةُ الطَّعَامَ أَمَامَ الضُّيُوف.",
+   "words": [
+    {
+     "word": "يعد",
+     "n": 1,
+     "kind": "word",
+     "want": "yuaddu",
+     "options": {
+      "yuaddu": [
+       "يُعَدُّ",
+       "yuʿaddu",
+       "is considered"
+      ],
+      "yuiddu": [
+       "يُعِدُّ",
+       "yuʿiddu",
+       "prepares"
+      ],
+      "yaidu": [
+       "يَعِدُ",
+       "yaʿidu",
+       "promises"
+      ]
+     }
+    },
+    {
+     "word": "علي",
+     "n": 1,
+     "kind": "name",
+     "want": "ali",
+     "options": {
+      "ali": [
+       "عَلِيّ",
+       "ʿAlī",
+       "the man's name Ali"
+      ],
+      "alayya": [
+       "عَلَيَّ",
+       "ʿalayya",
+       "on me"
+      ]
+     }
+    },
+    {
+     "word": "الأقصر",
+     "n": 1,
+     "kind": "name",
+     "want": "uqsur",
+     "options": {
+      "uqsur": [
+       "الأُقْصُر",
+       "al-Uqṣur",
+       "the city of Luxor"
+      ],
+      "aqsar": [
+       "الأَقْصَر",
+       "al-aqṣar",
+       "the shorter one"
+      ]
+     }
+    },
+    {
+     "word": "ويعد",
+     "n": 1,
+     "kind": "word",
+     "want": "yaidu",
+     "options": {
+      "yuaddu": [
+       "يُعَدُّ",
+       "yuʿaddu",
+       "is considered"
+      ],
+      "yuiddu": [
+       "يُعِدُّ",
+       "yuʿiddu",
+       "prepares"
+      ],
+      "yaidu": [
+       "يَعِدُ",
+       "yaʿidu",
+       "promises"
+      ]
+     }
+    },
+    {
+     "word": "ويعد",
+     "n": 2,
+     "kind": "word",
+     "want": "yuiddu",
+     "options": {
+      "yuaddu": [
+       "يُعَدُّ",
+       "yuʿaddu",
+       "is considered"
+      ],
+      "yuiddu": [
+       "يُعِدُّ",
+       "yuʿiddu",
+       "prepares"
+      ],
+      "yaidu": [
+       "يَعِدُ",
+       "yaʿidu",
+       "promises"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p12",
+   "text": "ولد الشاعر في صور، ونشر أول شعره وهو ولد صغير، ثم سلم على أستاذه وسلم له ديوانه الأول.",
+   "ref": "وُلِدَ الشَّاعِرُ فِي صُور، وَنَشَرَ أَوَّلَ شِعْرِهِ وَهُوَ وَلَدٌ صَغِير، ثُمَّ سَلَّمَ عَلَى أُسْتَاذِهِ وَسَلَّمَ لَهُ دِيوَانَهُ الْأَوَّل.",
+   "words": [
+    {
+     "word": "ولد",
+     "n": 1,
+     "kind": "word",
+     "want": "wulida",
+     "options": {
+      "wulida": [
+       "وُلِدَ",
+       "wulida",
+       "he was born"
+      ],
+      "walad": [
+       "وَلَد",
+       "walad",
+       "a boy"
+      ]
+     }
+    },
+    {
+     "word": "صور",
+     "n": 1,
+     "kind": "name",
+     "want": "sur",
+     "options": {
+      "sur": [
+       "صُور",
+       "Ṣūr",
+       "the city of Tyre"
+      ],
+      "suwar": [
+       "صُوَر",
+       "ṣuwar",
+       "pictures"
+      ]
+     }
+    },
+    {
+     "word": "ونشر",
+     "n": 1,
+     "kind": "word",
+     "want": "nashara",
+     "options": {
+      "nashara": [
+       "نَشَرَ",
+       "nashara",
+       "he published"
+      ],
+      "nushira": [
+       "نُشِرَ",
+       "nushira",
+       "it was published"
+      ]
+     }
+    },
+    {
+     "word": "شعره",
+     "n": 1,
+     "kind": "word",
+     "want": "shiir",
+     "options": {
+      "shaara": [
+       "شَعَرَ",
+       "shaʿara",
+       "he felt"
+      ],
+      "shaar": [
+       "شَعْر",
+       "shaʿr",
+       "hair"
+      ],
+      "shiir": [
+       "شِعْر",
+       "shiʿr",
+       "poetry"
+      ]
+     }
+    },
+    {
+     "word": "ولد",
+     "n": 2,
+     "kind": "word",
+     "want": "walad",
+     "options": {
+      "wulida": [
+       "وُلِدَ",
+       "wulida",
+       "he was born"
+      ],
+      "walad": [
+       "وَلَد",
+       "walad",
+       "a boy"
+      ]
+     }
+    },
+    {
+     "word": "سلم",
+     "n": 1,
+     "kind": "word",
+     "want": "sallama",
+     "options": {
+      "sallama": [
+       "سَلَّمَ",
+       "sallama",
+       "he greeted, he handed over"
+      ],
+      "silm": [
+       "سِلْم",
+       "silm",
+       "peace"
+      ],
+      "sullam": [
+       "سُلَّم",
+       "sullam",
+       "a ladder"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p13",
+   "text": "ذكر مدير الشركة أن عقد الصيانة وقع في مسقط، وأن ملك البلاد افتتح المشروع، وأن الدين الذي على الشركة سدد كله، وأن رجل الأعمال حمد قدم دعما كبيرا، وأن خبر الافتتاح نشر في الصحف.",
+   "ref": "ذَكَرَ مُدِيرُ الشَّرِكَةِ أَنَّ عَقْدَ الصِّيَانَةِ وُقِّعَ فِي مَسْقَط، وَأَنَّ مَلِكَ الْبِلَادِ افْتَتَحَ الْمَشْرُوع، وَأَنَّ الدَّيْنَ الَّذِي عَلَى الشَّرِكَةِ سُدِّدَ كُلُّه، وَأَنَّ رَجُلَ الْأَعْمَالِ حَمَد قَدَّمَ دَعْمًا كَبِيرًا، وَأَنَّ خَبَرَ الِافْتِتَاحِ نُشِرَ فِي الصُّحُف.",
+   "words": [
+    {
+     "word": "ذكر",
+     "n": 1,
+     "kind": "word",
+     "want": "dhakara",
+     "options": {
+      "dhakara": [
+       "ذَكَرَ",
+       "dhakara",
+       "he mentioned"
+      ],
+      "dhukira": [
+       "ذُكِرَ",
+       "dhukira",
+       "it was mentioned"
+      ]
+     }
+    },
+    {
+     "word": "عقد",
+     "n": 1,
+     "kind": "word",
+     "want": "aqd",
+     "options": {
+      "aqd": [
+       "عَقْد",
+       "ʿaqd",
+       "a contract"
+      ],
+      "iqd": [
+       "عِقْد",
+       "ʿiqd",
+       "a necklace"
+      ],
+      "aqada": [
+       "عَقَدَ",
+       "ʿaqada",
+       "he held"
+      ],
+      "uqida": [
+       "عُقِدَ",
+       "ʿuqida",
+       "it was held"
+      ]
+     }
+    },
+    {
+     "word": "وقع",
+     "n": 1,
+     "kind": "word",
+     "want": "wuqqia",
+     "options": {
+      "waqqaa": [
+       "وَقَّعَ",
+       "waqqaʿa",
+       "he signed"
+      ],
+      "waqaa": [
+       "وَقَعَ",
+       "waqaʿa",
+       "it fell, it happened"
+      ],
+      "wuqqia": [
+       "وُقِّعَ",
+       "wuqqiʿa",
+       "it was signed"
+      ]
+     }
+    },
+    {
+     "word": "مسقط",
+     "n": 1,
+     "kind": "name",
+     "want": "masqat",
+     "options": {
+      "masqat": [
+       "مَسْقَط",
+       "Masqaṭ",
+       "the city of Muscat"
+      ],
+      "masqit": [
+       "مَسْقِط",
+       "masqiṭ",
+       "a birthplace"
+      ]
+     }
+    },
+    {
+     "word": "ملك",
+     "n": 1,
+     "kind": "word",
+     "want": "malik",
+     "options": {
+      "malik": [
+       "مَلِك",
+       "malik",
+       "a king"
+      ],
+      "mulk": [
+       "مُلْك",
+       "mulk",
+       "a reign"
+      ],
+      "malak": [
+       "مَلَك",
+       "malak",
+       "an angel"
+      ]
+     }
+    },
+    {
+     "word": "افتتح",
+     "n": 1,
+     "kind": "word",
+     "want": "iftataha",
+     "options": {
+      "iftataha": [
+       "اِفْتَتَحَ",
+       "iftataḥa",
+       "he opened"
+      ],
+      "uftutiha": [
+       "اُفْتُتِحَ",
+       "uftutiḥa",
+       "it was opened"
+      ]
+     }
+    },
+    {
+     "word": "الدين",
+     "n": 1,
+     "kind": "word",
+     "want": "dayn",
+     "options": {
+      "dayn": [
+       "دَيْن",
+       "dayn",
+       "a debt"
+      ],
+      "din": [
+       "دِين",
+       "dīn",
+       "a religion"
+      ]
+     }
+    },
+    {
+     "word": "سدد",
+     "n": 1,
+     "kind": "word",
+     "want": "suddida",
+     "options": {
+      "suddida": [
+       "سُدِّدَ",
+       "suddida",
+       "it was paid off"
+      ],
+      "saddada": [
+       "سَدَّدَ",
+       "saddada",
+       "he paid off"
+      ]
+     }
+    },
+    {
+     "word": "رجل",
+     "n": 1,
+     "kind": "word",
+     "want": "rajul",
+     "options": {
+      "rajul": [
+       "رَجُل",
+       "rajul",
+       "a man"
+      ],
+      "rijl": [
+       "رِجْل",
+       "rijl",
+       "a leg"
+      ]
+     }
+    },
+    {
+     "word": "حمد",
+     "n": 1,
+     "kind": "name",
+     "want": "hamad",
+     "options": {
+      "hamad": [
+       "حَمَد",
+       "Ḥamad",
+       "the man's name Hamad"
+      ],
+      "hamd": [
+       "حَمْد",
+       "ḥamd",
+       "praise"
+      ]
+     }
+    },
+    {
+     "word": "قدم",
+     "n": 1,
+     "kind": "word",
+     "want": "qaddama",
+     "options": {
+      "qaddama": [
+       "قَدَّمَ",
+       "qaddama",
+       "he presented, gave"
+      ],
+      "qadima": [
+       "قَدِمَ",
+       "qadima",
+       "he arrived"
+      ],
+      "qadam": [
+       "قَدَم",
+       "qadam",
+       "a foot"
+      ]
+     }
+    },
+    {
+     "word": "نشر",
+     "n": 1,
+     "kind": "word",
+     "want": "nushira",
+     "options": {
+      "nashara": [
+       "نَشَرَ",
+       "nashara",
+       "he published"
+      ],
+      "nushira": [
+       "نُشِرَ",
+       "nushira",
+       "it was published"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "p14",
+   "text": "في مدينة العلا عقد مؤتمر عن علم الفلك، وظهر فيه أن طلاب المدرسة يحبون شعر المتنبي، وأن مدرسة اللغة العربية سحر تعد كتابا عن ملك الشعر، وأن الدين والعلم لا يتعارضان.",
+   "ref": "فِي مَدِينَةِ الْعُلَا عُقِدَ مُؤْتَمَرٌ عَنْ عِلْمِ الْفَلَك، وَظَهَرَ فِيهِ أَنَّ طُلَّابَ الْمَدْرَسَةِ يُحِبُّونَ شِعْرَ الْمُتَنَبِّي، وَأَنَّ مُدَرِّسَةَ اللُّغَةِ الْعَرَبِيَّةِ سَحَر تُعِدُّ كِتَابًا عَنْ مَلِكِ الشِّعْر، وَأَنَّ الدِّينَ وَالْعِلْمَ لَا يَتَعَارَضَان.",
+   "words": [
+    {
+     "word": "العلا",
+     "n": 1,
+     "kind": "name",
+     "want": "alula",
+     "options": {
+      "alula": [
+       "العُلا",
+       "al-ʿUlā",
+       "the city of AlUla"
+      ],
+      "alala": [
+       "العَلا",
+       "al-ʿalā",
+       "loftiness"
+      ]
+     }
+    },
+    {
+     "word": "عقد",
+     "n": 1,
+     "kind": "word",
+     "want": "uqida",
+     "options": {
+      "aqd": [
+       "عَقْد",
+       "ʿaqd",
+       "a contract"
+      ],
+      "iqd": [
+       "عِقْد",
+       "ʿiqd",
+       "a necklace"
+      ],
+      "aqada": [
+       "عَقَدَ",
+       "ʿaqada",
+       "he held"
+      ],
+      "uqida": [
+       "عُقِدَ",
+       "ʿuqida",
+       "it was held"
+      ]
+     }
+    },
+    {
+     "word": "علم",
+     "n": 1,
+     "kind": "word",
+     "want": "ilm",
+     "options": {
+      "ilm": [
+       "عِلْم",
+       "ʿilm",
+       "knowledge, science"
+      ],
+      "alam": [
+       "عَلَم",
+       "ʿalam",
+       "a flag"
+      ],
+      "alima": [
+       "عَلِمَ",
+       "ʿalima",
+       "he knew, learned"
+      ],
+      "allama": [
+       "عَلَّمَ",
+       "ʿallama",
+       "he taught, told"
+      ]
+     }
+    },
+    {
+     "word": "وظهر",
+     "n": 1,
+     "kind": "word",
+     "want": "zahara",
+     "options": {
+      "zahara": [
+       "ظَهَرَ",
+       "ẓahara",
+       "it appeared"
+      ],
+      "zahr": [
+       "ظَهْر",
+       "ẓahr",
+       "a back"
+      ],
+      "zuhr": [
+       "ظُهْر",
+       "ẓuhr",
+       "noon"
+      ]
+     }
+    },
+    {
+     "word": "المدرسة",
+     "n": 1,
+     "kind": "word",
+     "want": "madrasa",
+     "options": {
+      "mudarrisa": [
+       "مُدَرِّسَة",
+       "mudarrisa",
+       "a woman teacher"
+      ],
+      "madrasa": [
+       "مَدْرَسَة",
+       "madrasa",
+       "a school"
+      ]
+     }
+    },
+    {
+     "word": "شعر",
+     "n": 1,
+     "kind": "word",
+     "want": "shiir",
+     "options": {
+      "shaara": [
+       "شَعَرَ",
+       "shaʿara",
+       "he felt"
+      ],
+      "shaar": [
+       "شَعْر",
+       "shaʿr",
+       "hair"
+      ],
+      "shiir": [
+       "شِعْر",
+       "shiʿr",
+       "poetry"
+      ]
+     }
+    },
+    {
+     "word": "مدرسة",
+     "n": 1,
+     "kind": "word",
+     "want": "mudarrisa",
+     "options": {
+      "mudarrisa": [
+       "مُدَرِّسَة",
+       "mudarrisa",
+       "a woman teacher"
+      ],
+      "madrasa": [
+       "مَدْرَسَة",
+       "madrasa",
+       "a school"
+      ]
+     }
+    },
+    {
+     "word": "سحر",
+     "n": 1,
+     "kind": "name",
+     "want": "sahar",
+     "options": {
+      "sahar": [
+       "سَحَر",
+       "Saḥar",
+       "the woman's name Sahar"
+      ],
+      "sihr": [
+       "سِحْر",
+       "siḥr",
+       "magic"
+      ]
+     }
+    },
+    {
+     "word": "تعد",
+     "n": 1,
+     "kind": "word",
+     "want": "tuiddu",
+     "options": {
+      "tuiddu": [
+       "تُعِدُّ",
+       "tuʿiddu",
+       "she prepares"
+      ],
+      "tuaddu": [
+       "تُعَدُّ",
+       "tuʿaddu",
+       "is considered"
+      ],
+      "taidu": [
+       "تَعِدُ",
+       "taʿidu",
+       "she promises"
+      ]
+     }
+    },
+    {
+     "word": "ملك",
+     "n": 1,
+     "kind": "word",
+     "want": "malik",
+     "options": {
+      "malik": [
+       "مَلِك",
+       "malik",
+       "a king"
+      ],
+      "mulk": [
+       "مُلْك",
+       "mulk",
+       "a reign"
+      ],
+      "malak": [
+       "مَلَك",
+       "malak",
+       "an angel"
+      ]
+     }
+    },
+    {
+     "word": "الشعر",
+     "n": 1,
+     "kind": "word",
+     "want": "shiir",
+     "options": {
+      "shaara": [
+       "شَعَرَ",
+       "shaʿara",
+       "he felt"
+      ],
+      "shaar": [
+       "شَعْر",
+       "shaʿr",
+       "hair"
+      ],
+      "shiir": [
+       "شِعْر",
+       "shiʿr",
+       "poetry"
+      ]
+     }
+    },
+    {
+     "word": "الدين",
+     "n": 1,
+     "kind": "word",
+     "want": "din",
+     "options": {
+      "dayn": [
+       "دَيْن",
+       "dayn",
+       "a debt"
+      ],
+      "din": [
+       "دِين",
+       "dīn",
+       "a religion"
+      ]
+     }
+    },
+    {
+     "word": "والعلم",
+     "n": 1,
+     "kind": "word",
+     "want": "ilm",
+     "options": {
+      "ilm": [
+       "عِلْم",
+       "ʿilm",
+       "knowledge, science"
+      ],
+      "alam": [
+       "عَلَم",
+       "ʿalam",
+       "a flag"
+      ],
+      "alima": [
+       "عَلِمَ",
+       "ʿalima",
+       "he knew, learned"
+      ],
+      "allama": [
+       "عَلَّمَ",
+       "ʿallama",
+       "he taught, told"
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}
