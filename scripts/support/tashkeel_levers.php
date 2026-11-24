@@ -21,6 +21,8 @@
  *   dialect    as members write them, through the site's own dialect rewrite
  *   raw        as written, the rewrite off
  *   respelled  written the way the dialect says it (ألبي، أوي، گال), rewrite off
+ *   hard       only the known-hard words (الجزر، دين، جدة، علا، عنيزة), set beside round 2;
+ *              the run fails when one that was right is now heard wrong by both listeners
  *
  * Two listening models hear every clip and are asked for the sounds, not the
  * meaning. The first round's single listener disagreed with the owner's ear
@@ -101,6 +103,26 @@ $dialects = [
 ];
 
 $only = array_values(array_diff(array_filter(array_map('trim', explode(',', (string) getenv('ONLY')))), ['levers']));
+
+// The known-hard cases (owner, 2026-11-24): words the premium voice got wrong on every marked take
+// in round 2, kept so that no later change makes them worse. "levers,hard" makes only these clips
+// (marks alone, marks with the meaning told, and the other engine; about half a minute of speech)
+// and sets them beside what round 2 found. true = the reading asked for was said. Where the two
+// listeners disagreed the clip was measured (tashkeel_formants.py), except الجزر with the meaning
+// told and on the other engine, which rest on the first listener alone.
+// عنيزة: ʿAnīza is not a real name (the city is ʿUnayza, which the voice says by itself); it is
+// here only to see whether a voice follows marks that go against its habit.
+$hard = [
+    'n5-jazar' => ['take1' => false, 'take2' => false, 'take3' => false, 'gloss' => true, 'glossonly' => true, 'engine' => true],
+    'n6-din' => ['take1' => false, 'take2' => false, 'take3' => false, 'gloss' => true, 'glossonly' => true, 'engine' => true],
+    'n13-jidda' => ['take1' => false, 'take2' => true, 'take3' => false, 'gloss' => false, 'glossonly' => false, 'engine' => true],
+    'n19-ala' => ['take1' => false, 'take2' => false, 'take3' => false, 'gloss' => false, 'glossonly' => false, 'engine' => true],
+    'n21-aniza' => ['take1' => false, 'take2' => false, 'take3' => false, 'gloss' => false, 'glossonly' => false, 'engine' => true],
+];
+$hardOnly = in_array('hard', $only, true);
+if ($hardOnly) {
+    $only = array_values(array_diff($only, ['hard'])) ?: ['take1', 'gloss', 'engine'];
+}
 $wants = fn (string $kind): bool => $only === [] || in_array($kind, $only, true);
 $voice = (string) (getenv('VOICE') ?: 'Kore');
 $replace = fn (string $sentence, string $word, string $with): string => (string) preg_replace('/(?<!\p{L})'.preg_quote($word, '/').'(?!\p{L})/u', $with, $sentence, 1);
@@ -127,6 +149,9 @@ foreach ($dialects as $n => [$dialect, $sentence, $word, $respelled, [$theirs, $
     $clips[] = $base + ['id' => "d{$n}-respelled", 'kind' => 'respelled', 'text' => $replace($sentence, $word, $respelled), 'rewrite' => false];
 }
 $clips = array_values(array_filter($clips, fn (array $c): bool => $wants($c['kind'])));
+if ($hardOnly) {
+    $clips = array_values(array_filter($clips, fn (array $c): bool => isset($hard[preg_replace('/-[a-z0-9]+$/', '', $c['id'])])));
+}
 if ((int) getenv('LIMIT') > 0) {
     $clips = array_slice($clips, 0, (int) getenv('LIMIT'));
 }
@@ -252,6 +277,22 @@ if ($takes !== []) {
     echo 'Words whose three takes did not all come out the same: ', count(array_filter($takes, fn (array $t): bool => count($t) === 3 && count(array_unique($t)) > 1)), ' of ', count($takes), "\n";
 }
 
+// The known-hard cases beside round 2: a clip that was right and is now heard wrong by both fails the run.
+$worse = 0;
+if ($hardOnly) {
+    echo "\nKnown-hard cases (was, in round 2 -> now):\n";
+    foreach ($rows as $r) {
+        $was = $hard[preg_replace('/-[a-z0-9]+$/', '', $r['id'])][$r['kind']] ?? null;
+        if ($was === null) {
+            continue;
+        }
+        $now = ['ok' => 'right', 'not' => 'wrong', 'split' => 'the listeners disagree: measure it (formants)'][$r['result']];
+        $worse += (int) ($was && $r['result'] === 'not');
+        echo sprintf("  %-22s %-5s -> %s%s\n", $r['id'], $was ? 'right' : 'wrong', $now, $was && $r['result'] === 'not' ? '   << WORSE' : (! $was && $r['result'] === 'ok' ? '   << better' : ''));
+    }
+    echo 'Worse than round 2: ', $worse, "\n";
+}
+
 // The page to check by ear: splits first, then the ones both heard wrong, then the rest.
 usort($rows, fn (array $x, array $y): int => array_search($x['result'], ['split', 'not', 'ok'], true) <=> array_search($y['result'], ['split', 'not', 'ok'], true));
 $e = fn (string $s): string => htmlspecialchars($s, ENT_QUOTES);
@@ -267,3 +308,5 @@ foreach ($rows as $i => $r) {
         .'<audio controls preload="none" src="'.$e($r['file']).'"></audio></article>';
 }
 $disk->put('tashkeel-listen/'.$run.'/index.html', $html.'</html>');
+// A known-hard word that got worse fails the run, so it cannot pass unnoticed.
+exit($worse > 0 ? 1 : 0);

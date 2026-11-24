@@ -1,7 +1,7 @@
 {
- "version": 2,
+ "version": 3,
  "locked": false,
- "about": "The tashkeel test set. 270 single sentences members made voices of (anonymized sample of live, 2026-11-23; sentences with a person's private details, explicit ones, scripture and poetry, and dialects outside the four in scope were left out), 30 written sentences whose marked word is a homograph, and 25 written sentences whose marked word is a name that is also an ordinary word (tag: name; member sentences with a name in them carry the tag too). variety: what the sentence is written in. A sentence counts only once the owner has approved its ref (approved: true); the set is locked (locked: true) when all are, and is not changed after that. note: something in the draft the owner should look at.",
+ "about": "The tashkeel test set. 270 single sentences members made voices of (anonymized sample of live, 2026-11-23; sentences with a person's private details, explicit ones, scripture and poetry, and dialects outside the four in scope were left out), 30 written sentences whose marked word is a homograph, and 25 written sentences whose marked word is a name that is also an ordinary word (tag: name; member sentences with a name in them carry the tag too). variety: what the sentence is written in. A sentence counts only once the owner has approved its ref (approved: true); the set is locked (locked: true) when all are, and is not changed after that. known-hard: a word the premium voice got wrong on every marked take in the listening rounds (الجزر as carrots, دِين, جدة, علا as Alaa); their sentences here are ones whose context decides the reading, and the spoken side of the same words is kept by scripts/support/tashkeel_levers.php (\"levers,hard\"). note: something in the draft the owner should look at.",
  "policy": "Approved by the owner 2026-11-23. Every word is fully marked inside (vowels, shadda, sukun): that decides how it is said. Endings are marked as a careful news reader says them: spoken inside a phrase, silent at a pause, and a silent ending is left without a mark, so it is not scored (the tanween of an adverb, شكرًا / مباشرةً, is said and is marked). An ending a reader may say either way (after a name, before a number or a foreign word) is left without a mark too. Endings count a fifth. Dialect sentences are marked with the dialect's own vowels and carry no case endings. Letters, digits, Latin words and punctuation stay exactly as the member wrote them.",
  "items": [
   {
@@ -290,7 +290,8 @@
    "variety": "fusha",
    "voice_dialect": "fusha",
    "tags": [
-    "homograph"
+    "homograph",
+    "known-hard"
    ],
    "approved": false,
    "text": "تحب الأرانب أكل الجزر.",
@@ -374,7 +375,8 @@
    "variety": "fusha",
    "voice_dialect": "fusha",
    "tags": [
-    "homograph"
+    "homograph",
+    "known-hard"
    ],
    "approved": false,
    "text": "الإسلام دين التسامح.",
@@ -430,7 +432,8 @@
    "variety": "fusha",
    "voice_dialect": "fusha",
    "tags": [
-    "name"
+    "name",
+    "known-hard"
    ],
    "approved": false,
    "text": "سافرت العائلة إلى جدة في عطلة الصيف.",
@@ -773,6 +776,22 @@
    "ref": "اِنْتَقَلَتِ الشَّرِكَةُ إِلَى دُبَيّ الْعَامَ الْمَاضِي.",
    "word": "دبي",
    "reading": "دُبَيّ"
+  },
+  {
+   "id": "n26",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "name",
+    "known-hard"
+   ],
+   "approved": false,
+   "text": "اتصل علا بأخيه ليطمئن عليه.",
+   "ref": "اِتَّصَلَ عَلَا بِأَخِيهِ لِيَطْمَئِنَّ عَلَيْه.",
+   "word": "علا",
+   "reading": "عَلَا",
+   "note": "علا here is the man's name Alaa written without its hamza (the verb is masculine), not the woman's name Ola (n03)."
   },
   {
    "id": "m001",
