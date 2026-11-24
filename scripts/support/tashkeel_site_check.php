@@ -13,6 +13,7 @@
  *   ONLY=sitecheck,look   no speech: is the step on this server, the switch, the
  *                         test member and their plan, the premium Arabic voices
  *   ONLY=sitecheck        the check
+ *   ONLY=sitecheck,first1 a trial: the first sentence of each set (then ONLY=sitecheck,skip1 for the rest)
  *
  * The check: written test sentences (homographs and names, not the known-hard
  * ones) are made for the test member, each twice: with the switch off ("today")
@@ -30,12 +31,19 @@
  *
  * The switch is left on "test accounts only" with this member listed.
  *
- *   ONLY=sitecheck,m8215  another test member than 8215
+ * The voices are made for the staging checks' own paying test member
+ * (staging-pages-paid@example.com, as the page check makes it): no Stripe
+ * customer, the dearest plan for the run with model events off, back to the
+ * free plan at the end. No email is sent.
+ *
+ *   ONLY=sitecheck,m123   another member of staging, as they are
  */
 
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
+use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Models\Voice;
 use App\Services\PlanAccessService;
@@ -49,6 +57,7 @@ use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 ini_set('display_errors', 'stderr');
 set_time_limit(2600);
@@ -67,7 +76,7 @@ if (! class_exists(AutoReadings::class)) {
 $only = array_map('trim', explode(',', (string) getenv('ONLY')));
 $look = in_array('look', $only, true);
 $cap = 4.5;
-$memberId = 8215;
+$memberId = 0;
 foreach ($only as $token) {
     if (preg_match('/^cap(\d)$/', $token, $m)) {
         $cap = (float) $m[1];
@@ -77,8 +86,33 @@ foreach ($only as $token) {
     }
 }
 
-$member = User::query()->find($memberId);
-$plan = $member ? app(PlanAccessService::class)->resolveAccessPlanForUserId($memberId) : null;
+// No email leaves a check: anything the site would send stays in memory.
+config(['mail.default' => 'array']);
+$access = app(PlanAccessService::class);
+// The member the voices are made for: the staging checks' own paying test member (as the page check
+// makes it: no Stripe customer, its plan set with model events off, so no welcome email and nothing
+// at Stripe), unless ONLY names another (m123). The live site's test member is not on staging.
+if ($memberId === 0) {
+    $member = User::query()->firstOrCreate(['email' => 'staging-pages-paid@example.com'], ['name' => 'Staging pages (paid)', 'password' => bcrypt(Str::random(40))]);
+    $memberId = (int) $member->id;
+    $ownMember = true;
+} else {
+    $member = User::query()->find($memberId);
+    $ownMember = false;
+}
+$freePlan = $access->freePlan();
+$paidPlan = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->orderByDesc('price_cents')->first();
+if ($ownMember && ! $look && $paidPlan) {
+    // The dearest plan on sale for the run (premium voices, a member's own direction); back to free at the end.
+    Subscription::withoutEvents(fn () => $access->assignPlan($member, $paidPlan));
+}
+// Whatever stops the run, the checks' test member does not stay on a paid plan.
+register_shutdown_function(function () use (&$ownMember, $member, $freePlan, $access): void {
+    if ($ownMember && $member && $freePlan) {
+        Subscription::withoutEvents(fn () => $access->assignPlan($member, $freePlan));
+    }
+});
+$plan = $member ? $access->resolveAccessPlanForUserId($memberId) : null;
 // Premium Arabic voices, as the studio lists them; the one heard in every test so far is left out.
 $voices = Voice::query()->where('is_active', true)->where('tier', 'hd')->where('language', 'like', 'ar%')->orderBy('sort_order')->orderBy('id')->get()
     ->filter(fn (Voice $v): bool => stripos((string) $v->provider_voice_id.' '.$v->internal_voice_id, 'kore') === false)->values();
@@ -87,7 +121,7 @@ $male = $voices->first(fn (Voice $v): bool => strtolower((string) $v->gender) ==
 $chosen = array_values(array_filter([$male, $female]));
 
 echo 'Now (UTC): ', now()->utc()->toDateTimeString(), '; the switch: ', AutoReadings::mode(), '; test accounts: ', implode(', ', AutoReadings::testMembers()) ?: 'none', "\n";
-echo 'Test member ', $memberId, ': ', $member ? 'found' : 'NOT FOUND', '; plan: ', $plan ? $plan->slug.' (voices: '.$plan->voice_tier.', own direction: '.($plan->custom_prompt_enabled ? 'yes' : 'no').')' : 'none (free)', "\n";
+echo 'Test member ', $memberId, $ownMember ? ' (the staging checks\' own)' : '', ': ', $member ? 'found' : 'NOT FOUND', '; plan: ', $plan ? $plan->slug.' (voices: '.$plan->voice_tier.', own direction: '.($plan->custom_prompt_enabled ? 'yes' : 'no').')' : 'none (free)', "\n";
 echo 'Premium Arabic voices: ', $voices->count(), '; for the check: ', implode(' and ', array_map(fn (Voice $v): string => $v->display_name.' ('.$v->gender.', '.$v->internal_voice_id.')', $chosen)) ?: 'none found', "\n";
 if ($look) {
     foreach ($voices->take(12) as $v) {
@@ -119,6 +153,18 @@ foreach ($golden['items'] as $item) {
 // Ten sentences for each voice (six homographs, four names), and six others for the member's own direction.
 $forVoices = array_merge(array_slice($homographs, 0, 6), array_slice($names, 0, 4));
 $forStyle = array_merge(array_slice($homographs, 6, 4), array_slice($names, 4, 2));
+// "first1": only the first sentence of each set, to see the whole run work before the speech is spent.
+foreach ($only as $token) {
+    if (preg_match('/^first(\d+)$/', $token, $m)) {
+        $forVoices = array_slice($forVoices, 0, (int) $m[1]);
+        $forStyle = array_slice($forStyle, 0, (int) $m[1]);
+    }
+    // "skip1": leave out the first of each set, when a trial has already made it.
+    if (preg_match('/^skip(\d+)$/', $token, $m)) {
+        $forVoices = array_slice($forVoices, (int) $m[1]);
+        $forStyle = array_slice($forStyle, (int) $m[1]);
+    }
+}
 $direction = 'اقرأ بصوت مذيع أخبار هادئ وواثق';
 $sets = [
     ['label' => 'voice 1', 'voice' => $chosen[0], 'items' => $forVoices, 'style' => null],
