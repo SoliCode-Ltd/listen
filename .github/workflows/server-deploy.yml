@@ -264,7 +264,9 @@ name: Server deploy
 #            the standard engine, dialect respelling), heard by two listeners,
 #            with a page of the clips to check by ear. Input "formants" makes no
 #            speech: the runner reads clips already made and measures which vowel
-#            was said (scripts/support/tashkeel_formants.py). About 14 minutes of speech
+#            was said (scripts/support/tashkeel_formants.py). Input "readings" makes
+#            no speech either: a text model is asked which words of the test set could
+#            be read wrongly and how they are said (scripts/support/tashkeel_readings.php). About 14 minutes of speech
 #            a round on the quota staging shares with live: only when the owner
 #            has said yes.
 # New migrations and composer.lock changes are reported, not run (see migrate and composer).
@@ -308,7 +310,7 @@ on:
         type: string
         default: ""
       tashkeel:
-        description: "tashkeel-listen only: the kinds of clip (iso,plain,word,full,wrong,wrong+dir,either,either+dir), or round 2: levers,take1,take2,take3,gloss,glossonly,engine,dialect,raw,respelled; levers,hard = only the known-hard words; formants = measure clips already made (no speech)"
+        description: "tashkeel-listen only: the kinds of clip (iso,plain,word,full,wrong,wrong+dir,either,either+dir), or round 2: levers,take1,take2,take3,gloss,glossonly,engine,dialect,raw,respelled; levers,hard = only the known-hard words; formants = measure clips already made (no speech); readings = the automatic step on text alone (no speech)"
         type: string
         default: ""
       price:
@@ -837,6 +839,14 @@ jobs:
             # "formants" makes no speech and needs no server: the runner measures clips already made (the step below).
             [ "${TASHKEEL#formants}" = "$TASHKEEL" ] || { rm -f ~/.ssh/id_deploy; exit 0; }
             failed=0
+            # "readings" makes no speech: a text model is asked how the test set's words are read. The test
+            # set and the two classes are not on the server, so they go to a private temporary folder.
+            if [ "${TASHKEEL#readings}" != "$TASHKEEL" ]; then
+              D="$($S 'mktemp -d')"
+              for f in tests/tashkeel/golden.json app/Support/Tashkeel/WordReadings.php app/Support/Tashkeel/TashkeelScore.php; do git show "$GITHUB_SHA:$f" | $S "cat > $D/$(basename "$f")"; done
+              tool tashkeel_readings.php | $S "$FIND; DIR=$D ONLY='$TASHKEEL' nice php" || failed=1
+              $S "rm -rf $D"; rm -f ~/.ssh/id_deploy; exit "$failed"
+            fi
             # "levers,..." is round 2 (what makes the voice obey); anything else is round 1.
             T=tashkeel_listen.php; [ "${TASHKEEL#levers}" = "$TASHKEEL" ] || T=tashkeel_levers.php
             tool "$T" | $S "$FIND; ONLY='$TASHKEEL' nice php" || failed=1

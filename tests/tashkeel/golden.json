@@ -1,7 +1,7 @@
 {
- "version": 3,
+ "version": 4,
  "locked": false,
- "about": "The tashkeel test set. 270 single sentences members made voices of (anonymized sample of live, 2026-11-23; sentences with a person's private details, explicit ones, scripture and poetry, and dialects outside the four in scope were left out), 30 written sentences whose marked word is a homograph, and 25 written sentences whose marked word is a name that is also an ordinary word (tag: name; member sentences with a name in them carry the tag too). variety: what the sentence is written in. A sentence counts only once the owner has approved its ref (approved: true); the set is locked (locked: true) when all are, and is not changed after that. known-hard: a word the premium voice got wrong on every marked take in the listening rounds (الجزر as carrots, دِين, جدة, علا as Alaa); their sentences here are ones whose context decides the reading, and the spoken side of the same words is kept by scripts/support/tashkeel_levers.php (\"levers,hard\"). note: something in the draft the owner should look at.",
+ "about": "The tashkeel test set. 270 single sentences members made voices of (anonymized sample of live, 2026-11-23; sentences with a person's private details, explicit ones, scripture and poetry, and dialects outside the four in scope were left out), 42 written sentences whose marked word is a homograph and whose context decides its reading, and 25 written sentences whose marked word is a name that is also an ordinary word (tag: name; member sentences with a name in them carry the tag too). variety: what the sentence is written in. A sentence counts only once the owner has approved its ref (approved: true); the set is locked (locked: true) when all are, and is not changed after that. known-hard: a word the premium voice got wrong on every marked take in the listening rounds (الجزر as carrots, دِين, جدة, علا as Alaa); their sentences here are ones whose context decides the reading, and the spoken side of the same words is kept by scripts/support/tashkeel_levers.php (\"levers,hard\"). note: something in the draft the owner should look at.",
  "policy": "Approved by the owner 2026-11-23. Every word is fully marked inside (vowels, shadda, sukun): that decides how it is said. Endings are marked as a careful news reader says them: spoken inside a phrase, silent at a pause, and a silent ending is left without a mark, so it is not scored (the tanween of an adverb, شكرًا / مباشرةً, is said and is marked). An ending a reader may say either way (after a name, before a number or a foreign word) is left without a mark too. Endings count a fifth. Dialect sentences are marked with the dialect's own vowels and carry no case endings. Letters, digits, Latin words and punctuation stay exactly as the member wrote them.",
  "items": [
   {
@@ -425,6 +425,174 @@
    "ref": "وُلِدَ الشَّاعِرُ فِي دِمَشْق.",
    "word": "ولد",
    "reading": "وُلِدَ"
+  },
+  {
+   "id": "h31",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "علم الأب ابنه السباحة في الصيف.",
+   "ref": "عَلَّمَ الْأَبُ ابْنَهُ السِّبَاحَةَ فِي الصَّيْف.",
+   "word": "علم",
+   "reading": "عَلَّمَ"
+  },
+  {
+   "id": "h32",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "كتب على الباب اسم صاحب البيت.",
+   "ref": "كُتِبَ عَلَى الْبَابِ اسْمُ صَاحِبِ الْبَيْت.",
+   "word": "كتب",
+   "reading": "كُتِبَ"
+  },
+  {
+   "id": "h33",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "درس الأستاذ طلابه قواعد النحو.",
+   "ref": "دَرَّسَ الْأُسْتَاذُ طُلَّابَهُ قَوَاعِدَ النَّحْو.",
+   "word": "درس",
+   "reading": "دَرَّسَ"
+  },
+  {
+   "id": "h34",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "شعر المسافر بالتعب بعد الرحلة.",
+   "ref": "شَعَرَ الْمُسَافِرُ بِالتَّعَبِ بَعْدَ الرِّحْلَة.",
+   "word": "شعر",
+   "reading": "شَعَرَ"
+  },
+  {
+   "id": "h35",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "عقد الوزير مؤتمراً صحفياً.",
+   "ref": "عَقَدَ الْوَزِيرُ مُؤْتَمَرًا صُحُفِيًّا.",
+   "word": "عقد",
+   "reading": "عَقَدَ"
+  },
+  {
+   "id": "h36",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "قدم الوفد من الرياض صباح اليوم.",
+   "ref": "قَدِمَ الْوَفْدُ مِنَ الرِّيَاضِ صَبَاحَ الْيَوْم.",
+   "word": "قدم",
+   "reading": "قَدِمَ"
+  },
+  {
+   "id": "h37",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "ظهر القمر بعد غياب الشمس.",
+   "ref": "ظَهَرَ الْقَمَرُ بَعْدَ غِيَابِ الشَّمْس.",
+   "word": "ظهر",
+   "reading": "ظَهَرَ"
+  },
+  {
+   "id": "h38",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "يشكو من ألم في أسفل ظهره.",
+   "ref": "يَشْكُو مِنْ أَلَمٍ فِي أَسْفَلِ ظَهْرِه.",
+   "word": "ظهره",
+   "reading": "ظَهْرِه"
+  },
+  {
+   "id": "h39",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "وصلنا قبل غروب الشمس.",
+   "ref": "وَصَلْنَا قَبْلَ غُرُوبِ الشَّمْس.",
+   "word": "قبل",
+   "reading": "قَبْلَ"
+  },
+  {
+   "id": "h40",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "يعد هذا الكتاب من أهم المراجع.",
+   "ref": "يُعَدُّ هَذَا الْكِتَابُ مِنْ أَهَمِّ الْمَرَاجِع.",
+   "word": "يعد",
+   "reading": "يُعَدُّ"
+  },
+  {
+   "id": "h41",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "يعد الأب أولاده بهدية.",
+   "ref": "يَعِدُ الْأَبُ أَوْلَادَهُ بِهَدِيَّة.",
+   "word": "يعد",
+   "reading": "يَعِدُ"
+  },
+  {
+   "id": "h42",
+   "source": "written",
+   "variety": "fusha",
+   "voice_dialect": "fusha",
+   "tags": [
+    "homograph"
+   ],
+   "approved": false,
+   "text": "نشر الكاتب روايته الأولى.",
+   "ref": "نَشَرَ الْكَاتِبُ رِوَايَتَهُ الْأُولَى.",
+   "word": "نشر",
+   "reading": "نَشَرَ"
   },
   {
    "id": "n01",

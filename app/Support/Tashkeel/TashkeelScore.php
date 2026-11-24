@@ -81,6 +81,40 @@ final class TashkeelScore
     }
 
     /**
+     * Is a word marked for the same reading as the reference word? The ending
+     * is left out (عَلَم and عَلَمَ are one word), and a sukun is the same as
+     * no mark. "same"; "different" when a mark says another sound or a letter
+     * differs; "unclear" when the candidate leaves unmarked a letter the
+     * reference gives a vowel or a doubling.
+     */
+    public static function reading(string $reference, string $candidate): string
+    {
+        $ref = self::words($reference)[0] ?? null;
+        $got = self::words($candidate)[0] ?? null;
+        if ($ref === null || $got === null || $ref['bare'] !== $got['bare']) {
+            return 'different';
+        }
+        $last = self::endingIndex($ref['units']);
+        $unclear = false;
+        foreach ($ref['units'] as $k => [$letter, $marks]) {
+            if ($k === $last) {
+                continue;
+            }
+            $want = str_replace("\u{0652}", '', $marks);
+            $have = str_replace("\u{0652}", '', $got['units'][$k][1] ?? '');
+            if ($want === $have) {
+                continue;
+            }
+            if ($have !== '') {
+                return 'different';
+            }
+            $unclear = true;
+        }
+
+        return $unclear ? 'unclear' : 'same';
+    }
+
+    /**
      * One spelling for the same sounds: marks in one order (shadda first), no
      * mark where the letters already say it (a long vowel's own letter, the
      * fatha before an alef, the alef-lam, the shadda a sun letter takes after

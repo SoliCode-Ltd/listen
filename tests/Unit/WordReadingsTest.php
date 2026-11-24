@@ -1,0 +1,125 @@
+<?php
+
+namespace Tests\Unit;
+
+use App\Support\Tashkeel\TashkeelScore;
+use App\Support\Tashkeel\WordReadings;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * The automatic step before a voice reads: the words a text model says could
+ * be read wrongly are used only when they are safe (same letters, in the text,
+ * not already marked, not the member's own), the text is marked on those words
+ * alone, and the voice is told what each means.
+ */
+class WordReadingsTest extends TestCase
+{
+    private const TEXT = 'رفع الجنود علم بلادهم في جدة، وكتب الخبر.';
+
+    public function test_a_reading_is_used_only_with_the_same_letters_in_the_text(): void
+    {
+        $kept = WordReadings::accept(self::TEXT, [
+            ['word' => 'علم', 'marked' => 'عَلَم', 'said' => 'ʿalam', 'means' => 'a flag'],
+            // A letter changed, a word that is not in the text, no marks at all, no meaning: all left out.
+            ['word' => 'جدة', 'marked' => 'جِدَّه', 'said' => 'Jidda', 'means' => 'the city of Jeddah'],
+            ['word' => 'القلعة', 'marked' => 'القَلْعَة', 'said' => 'al-qalʿa', 'means' => 'the castle'],
+            ['word' => 'بلادهم', 'marked' => 'بلادهم', 'said' => 'bilādihim', 'means' => 'their country'],
+            ['word' => 'الخبر', 'marked' => 'الخَبَر', 'said' => 'al-khabar', 'means' => ''],
+            // Part of a longer word («وكتب») is not the word.
+            ['word' => 'كتب', 'marked' => 'كَتَبَ', 'said' => 'kataba', 'means' => 'he wrote'],
+            'not an entry',
+        ]);
+
+        $this->assertSame([['word' => 'علم', 'marked' => 'عَلَم', 'said' => 'ʿalam', 'means' => 'a flag']], $kept);
+    }
+
+    public function test_a_word_the_member_marked_or_saved_is_left_alone(): void
+    {
+        $entries = [
+            ['word' => 'علم', 'marked' => 'عِلْم', 'said' => 'ʿilm', 'means' => 'knowledge'],
+            ['word' => 'جدة', 'marked' => 'جِدَّة', 'said' => 'Jidda', 'means' => 'the city of Jeddah'],
+        ];
+
+        // The member wrote «عَلَم» with its marks: the model's «علم» is no longer in the text.
+        $this->assertSame(['جدة'], array_column(WordReadings::accept('رفع الجنود عَلَم بلادهم في جدة', $entries), 'word'));
+        // The member saved their own way to say جدة.
+        $this->assertSame(['علم'], array_column(WordReadings::accept(self::TEXT, $entries, ['جَدّة']), 'word'));
+    }
+
+    public function test_an_ending_the_writer_put_stays_and_the_word_can_still_be_read(): void
+    {
+        $text = 'أهداها زوجها عقداً من اللؤلؤ.';
+
+        $kept = WordReadings::accept($text, [['word' => 'عقداً', 'marked' => 'عِقْدا', 'said' => 'ʿiqdan', 'means' => 'a necklace']]);
+
+        $this->assertSame('عِقْداً', $kept[0]['marked']);
+        $this->assertSame('أهداها زوجها عِقْداً من اللؤلؤ.', WordReadings::apply($text, $kept)['text']);
+    }
+
+    public function test_no_more_than_the_limit_and_each_word_once(): void
+    {
+        $text = '';
+        $entries = [];
+        foreach (['علم', 'عقد', 'كتب', 'ملك', 'درس', 'شعر', 'قدم', 'رجل', 'ظهر', 'جزر'] as $word) {
+            $text .= $word.' ';
+            $entries[] = ['word' => $word, 'marked' => mb_substr($word, 0, 1)."\u{064E}".mb_substr($word, 1), 'said' => 'x', 'means' => 'y'];
+            $entries[] = ['word' => $word, 'marked' => mb_substr($word, 0, 1)."\u{064F}".mb_substr($word, 1), 'said' => 'x2', 'means' => 'y2'];
+        }
+
+        $kept = WordReadings::accept($text, $entries);
+
+        $this->assertCount(WordReadings::MAX, $kept);
+        $this->assertSame('x', $kept[0]['said']);
+        $this->assertSame('عقد', $kept[1]['word']);
+    }
+
+    public function test_only_those_words_are_marked_and_the_voice_is_told_what_they_mean(): void
+    {
+        $readings = [
+            ['word' => 'علم', 'marked' => 'عَلَم', 'said' => 'ʿalam', 'means' => 'a flag'],
+            ['word' => 'جدة', 'marked' => 'جِدَّة', 'said' => 'Jidda', 'means' => 'the city of Jeddah'],
+        ];
+
+        $made = WordReadings::apply(self::TEXT, $readings);
+
+        $this->assertSame('رفع الجنود عَلَم بلادهم في جِدَّة، وكتب الخبر.', $made['text']);
+        // Not a letter changed.
+        $this->assertSame(self::TEXT, TashkeelScore::strip($made['text']));
+        $this->assertSame('In this text the word written «علم» means "a flag" and is said "ʿalam"; the word written «جدة» means "the city of Jeddah" and is said "Jidda". Say those words exactly that way.', $made['direction']);
+        $this->assertSame('In this text the word written «علم» means "a flag" and is said "ʿalam". Say that word exactly that way.', WordReadings::direction([$readings[0]]));
+        $this->assertSame('', WordReadings::direction([]));
+    }
+
+    public function test_the_models_answer_is_read_even_when_wrapped_and_nothing_is_used_when_it_fails(): void
+    {
+        $answer = "```json\n[{\"word\": \"علم\", \"marked\": \"عَلَم\", \"said\": \"ʿalam\", \"means\": \"a flag\"}]\n```";
+
+        $this->assertSame('عَلَم', WordReadings::find(self::TEXT, null, fn (string $prompt): string => $answer)[0]['marked']);
+        $this->assertSame([], WordReadings::find(self::TEXT, null, fn (): ?string => null));
+        $this->assertSame([], WordReadings::find(self::TEXT, null, fn (): string => 'I could not find any.'));
+        $this->assertSame([], WordReadings::parse('{"word": "علم"}'));
+        // No Arabic: the model is not asked at all.
+        $this->assertSame([], WordReadings::find('Hello there', null, fn () => $this->fail('asked')));
+    }
+
+    public function test_the_prompt_carries_the_text_and_the_variety(): void
+    {
+        $this->assertStringContainsString('«'.self::TEXT.'»', WordReadings::prompt(self::TEXT));
+        $this->assertStringContainsString('Modern Standard Arabic', WordReadings::prompt(self::TEXT));
+        $this->assertStringContainsString('written in Egyptian Arabic', WordReadings::prompt(self::TEXT, 'Egyptian Arabic'));
+    }
+
+    public function test_two_markings_of_a_word_are_the_same_reading_or_not(): void
+    {
+        // The ending and a sukun make no difference; the article's own marks neither.
+        $this->assertSame('same', TashkeelScore::reading('عَلَم', 'عَلَمَ'));
+        $this->assertSame('same', TashkeelScore::reading('العِلْم', 'الْعِلمِ'));
+        $this->assertSame('same', TashkeelScore::reading('جِدَّة', 'جِدَّةَ'));
+        $this->assertSame('different', TashkeelScore::reading('عَلَم', 'عِلْم'));
+        $this->assertSame('different', TashkeelScore::reading('جِدَّة', 'جَدَّة'));
+        $this->assertSame('different', TashkeelScore::reading('دَرَسَ', 'دَرَّسَ'));
+        $this->assertSame('different', TashkeelScore::reading('جدة', 'جده'));
+        // A vowel the reference gives and the candidate leaves open.
+        $this->assertSame('unclear', TashkeelScore::reading('كُتُب', 'كُتب'));
+    }
+}

@@ -107,9 +107,9 @@ $only = array_values(array_diff(array_filter(array_map('trim', explode(',', (str
 // The known-hard cases (owner, 2026-11-24): words the premium voice got wrong on every marked take
 // in round 2, kept so that no later change makes them worse. "levers,hard" makes only these clips
 // (marks alone, marks with the meaning told, and the other engine; about half a minute of speech)
-// and sets them beside what round 2 found. true = the reading asked for was said. Where the two
-// listeners disagreed the clip was measured (tashkeel_formants.py), except الجزر with the meaning
-// told and on the other engine, which rest on the first listener alone.
+// and sets them beside what round 2 found. true = the reading asked for was said: both listeners
+// heard it, or, where they disagreed, the clip was measured (tashkeel_formants.py). That is the
+// rule from now on: a clip counts when the two agree, and is measured when they do not.
 // عنيزة: ʿAnīza is not a real name (the city is ʿUnayza, which the voice says by itself); it is
 // here only to see whether a voice follows marks that go against its habit.
 $hard = [
