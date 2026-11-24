@@ -1,7 +1,7 @@
 {
- "version": 4,
+ "version": 5,
  "locked": false,
- "about": "The tashkeel test set. 270 single sentences members made voices of (anonymized sample of live, 2026-11-23; sentences with a person's private details, explicit ones, scripture and poetry, and dialects outside the four in scope were left out), 42 written sentences whose marked word is a homograph and whose context decides its reading, and 25 written sentences whose marked word is a name that is also an ordinary word (tag: name; member sentences with a name in them carry the tag too). variety: what the sentence is written in. A sentence counts only once the owner has approved its ref (approved: true); the set is locked (locked: true) when all are, and is not changed after that. known-hard: a word the premium voice got wrong on every marked take in the listening rounds (الجزر as carrots, دِين, جدة, علا as Alaa); their sentences here are ones whose context decides the reading, and the spoken side of the same words is kept by scripts/support/tashkeel_levers.php (\"levers,hard\"). note: something in the draft the owner should look at.",
+ "about": "The tashkeel test set. 270 single sentences members made voices of (anonymized sample of live, 2026-11-23; sentences with a person's private details, explicit ones, scripture and poetry, and dialects outside the four in scope were left out), 42 written sentences whose marked word is a homograph and whose context decides its reading, and 25 written sentences whose marked word is a name that is also an ordinary word (tag: name; member sentences with a name in them carry the tag too). variety: what the sentence is written in. A sentence counts only once the owner has approved its ref (approved: true); the set is locked (locked: true) when all are, and is not changed after that. known-hard: a word the premium voice got wrong on every marked take in the listening rounds (الجزر as carrots, دِين, جدة, علا as Alaa); their sentences here are ones whose context decides the reading, and the spoken side of the same words is kept by scripts/support/tashkeel_levers.php (\"levers,hard\"). listen: for a written sentence, the readings a listener chooses between and the one meant (id: the word marked, in Latin letters, its meaning). note: something in the draft the owner should look at.",
  "policy": "Approved by the owner 2026-11-23. Every word is fully marked inside (vowels, shadda, sukun): that decides how it is said. Endings are marked as a careful news reader says them: spoken inside a phrase, silent at a pause, and a silent ending is left without a mark, so it is not scored (the tanween of an adverb, شكرًا / مباشرةً, is said and is marked). An ending a reader may say either way (after a name, before a number or a foreign word) is left without a mark too. Endings count a fifth. Dialect sentences are marked with the dialect's own vowels and carry no case endings. Letters, digits, Latin words and punctuation stay exactly as the member wrote them.",
  "items": [
   {
@@ -16,7 +16,32 @@
    "text": "رفع الجنود علم بلادهم فوق القلعة.",
    "ref": "رَفَعَ الْجُنُودُ عَلَمَ بِلَادِهِمْ فَوْقَ الْقَلْعَة.",
    "word": "علم",
-   "reading": "عَلَم"
+   "reading": "عَلَم",
+   "listen": {
+    "want": "alam",
+    "options": {
+     "ilm": [
+      "عِلْم",
+      "ʿilm",
+      "knowledge"
+     ],
+     "alam": [
+      "عَلَم",
+      "ʿalam",
+      "flag"
+     ],
+     "alima": [
+      "عَلِمَ",
+      "ʿalima",
+      "he knew"
+     ],
+     "allama": [
+      "عَلَّمَ",
+      "ʿallama",
+      "he taught"
+     ]
+    }
+   }
   },
   {
    "id": "h02",
@@ -30,7 +55,32 @@
    "text": "طلب العلم واجب على كل إنسان.",
    "ref": "طَلَبُ الْعِلْمِ وَاجِبٌ عَلَى كُلِّ إِنْسَان.",
    "word": "العلم",
-   "reading": "العِلْم"
+   "reading": "العِلْم",
+   "listen": {
+    "want": "ilm",
+    "options": {
+     "ilm": [
+      "عِلْم",
+      "ʿilm",
+      "knowledge"
+     ],
+     "alam": [
+      "عَلَم",
+      "ʿalam",
+      "flag"
+     ],
+     "alima": [
+      "عَلِمَ",
+      "ʿalima",
+      "he knew"
+     ],
+     "allama": [
+      "عَلَّمَ",
+      "ʿallama",
+      "he taught"
+     ]
+    }
+   }
   },
   {
    "id": "h03",
@@ -44,7 +94,32 @@
    "text": "علم المدير بالخبر بعد يومين.",
    "ref": "عَلِمَ الْمُدِيرُ بِالْخَبَرِ بَعْدَ يَوْمَيْن.",
    "word": "علم",
-   "reading": "عَلِمَ"
+   "reading": "عَلِمَ",
+   "listen": {
+    "want": "alima",
+    "options": {
+     "ilm": [
+      "عِلْم",
+      "ʿilm",
+      "knowledge"
+     ],
+     "alam": [
+      "عَلَم",
+      "ʿalam",
+      "flag"
+     ],
+     "alima": [
+      "عَلِمَ",
+      "ʿalima",
+      "he knew"
+     ],
+     "allama": [
+      "عَلَّمَ",
+      "ʿallama",
+      "he taught"
+     ]
+    }
+   }
   },
   {
    "id": "h04",
@@ -58,7 +133,27 @@
    "text": "في المكتبة كتب كثيرة عن التاريخ.",
    "ref": "فِي الْمَكْتَبَةِ كُتُبٌ كَثِيرَةٌ عَنِ التَّارِيخ.",
    "word": "كتب",
-   "reading": "كُتُب"
+   "reading": "كُتُب",
+   "listen": {
+    "want": "kutub",
+    "options": {
+     "kutub": [
+      "كُتُب",
+      "kutub",
+      "books"
+     ],
+     "kataba": [
+      "كَتَبَ",
+      "kataba",
+      "he wrote"
+     ],
+     "kutiba": [
+      "كُتِبَ",
+      "kutiba",
+      "it was written"
+     ]
+    }
+   }
   },
   {
    "id": "h05",
@@ -72,7 +167,27 @@
    "text": "كتب الصحفي مقالاً طويلاً عن المدينة.",
    "ref": "كَتَبَ الصُّحُفِيُّ مَقَالًا طَوِيلًا عَنِ الْمَدِينَة.",
    "word": "كتب",
-   "reading": "كَتَبَ"
+   "reading": "كَتَبَ",
+   "listen": {
+    "want": "kataba",
+    "options": {
+     "kutub": [
+      "كُتُب",
+      "kutub",
+      "books"
+     ],
+     "kataba": [
+      "كَتَبَ",
+      "kataba",
+      "he wrote"
+     ],
+     "kutiba": [
+      "كُتِبَ",
+      "kutiba",
+      "it was written"
+     ]
+    }
+   }
   },
   {
    "id": "h06",
@@ -86,7 +201,27 @@
    "text": "زار ملك البلاد المدينة أمس.",
    "ref": "زَارَ مَلِكُ الْبِلَادِ الْمَدِينَةَ أَمْس.",
    "word": "ملك",
-   "reading": "مَلِك"
+   "reading": "مَلِك",
+   "listen": {
+    "want": "malik",
+    "options": {
+     "malik": [
+      "مَلِك",
+      "malik",
+      "king"
+     ],
+     "mulk": [
+      "مُلْك",
+      "mulk",
+      "reign"
+     ],
+     "malak": [
+      "مَلَك",
+      "malak",
+      "angel"
+     ]
+    }
+   }
   },
   {
    "id": "h07",
@@ -100,7 +235,27 @@
    "text": "انتهى ملك هذه الأسرة بعد قرنين.",
    "ref": "انْتَهَى مُلْكُ هَذِهِ الْأُسْرَةِ بَعْدَ قَرْنَيْن.",
    "word": "ملك",
-   "reading": "مُلْك"
+   "reading": "مُلْك",
+   "listen": {
+    "want": "mulk",
+    "options": {
+     "malik": [
+      "مَلِك",
+      "malik",
+      "king"
+     ],
+     "mulk": [
+      "مُلْك",
+      "mulk",
+      "reign"
+     ],
+     "malak": [
+      "مَلَك",
+      "malak",
+      "angel"
+     ]
+    }
+   }
   },
   {
    "id": "h08",
@@ -114,7 +269,27 @@
    "text": "درس أحمد الطب في القاهرة.",
    "ref": "دَرَسَ أَحْمَدُ الطِّبَّ فِي الْقَاهِرَة.",
    "word": "درس",
-   "reading": "دَرَسَ"
+   "reading": "دَرَسَ",
+   "listen": {
+    "want": "darasa",
+    "options": {
+     "darasa": [
+      "دَرَسَ",
+      "darasa",
+      "he studied"
+     ],
+     "dars": [
+      "دَرْس",
+      "dars",
+      "lesson"
+     ],
+     "darrasa": [
+      "دَرَّسَ",
+      "darrasa",
+      "he taught"
+     ]
+    }
+   }
   },
   {
    "id": "h09",
@@ -128,7 +303,27 @@
    "text": "كان درس اليوم عن الكواكب.",
    "ref": "كَانَ دَرْسُ الْيَوْمِ عَنِ الْكَوَاكِب.",
    "word": "درس",
-   "reading": "دَرْس"
+   "reading": "دَرْس",
+   "listen": {
+    "want": "dars",
+    "options": {
+     "darasa": [
+      "دَرَسَ",
+      "darasa",
+      "he studied"
+     ],
+     "dars": [
+      "دَرْس",
+      "dars",
+      "lesson"
+     ],
+     "darrasa": [
+      "دَرَّسَ",
+      "darrasa",
+      "he taught"
+     ]
+    }
+   }
   },
   {
    "id": "h10",
@@ -142,7 +337,27 @@
    "text": "قص الحلاق شعر الطفل.",
    "ref": "قَصَّ الْحَلَّاقُ شَعْرَ الطِّفْل.",
    "word": "شعر",
-   "reading": "شَعْر"
+   "reading": "شَعْر",
+   "listen": {
+    "want": "shaar",
+    "options": {
+     "shaar": [
+      "شَعْر",
+      "shaʿr",
+      "hair"
+     ],
+     "shiir": [
+      "شِعْر",
+      "shiʿr",
+      "poetry"
+     ],
+     "shaara": [
+      "شَعَرَ",
+      "shaʿara",
+      "he felt"
+     ]
+    }
+   }
   },
   {
    "id": "h11",
@@ -156,7 +371,27 @@
    "text": "يحب جدي شعر المتنبي.",
    "ref": "يُحِبُّ جَدِّي شِعْرَ الْمُتَنَبِّي.",
    "word": "شعر",
-   "reading": "شِعْر"
+   "reading": "شِعْر",
+   "listen": {
+    "want": "shiir",
+    "options": {
+     "shaar": [
+      "شَعْر",
+      "shaʿr",
+      "hair"
+     ],
+     "shiir": [
+      "شِعْر",
+      "shiʿr",
+      "poetry"
+     ],
+     "shaara": [
+      "شَعَرَ",
+      "shaʿara",
+      "he felt"
+     ]
+    }
+   }
   },
   {
    "id": "h12",
@@ -170,7 +405,27 @@
    "text": "وقع الطرفان عقد البيع أمس.",
    "ref": "وَقَّعَ الطَّرَفَانِ عَقْدَ الْبَيْعِ أَمْس.",
    "word": "عقد",
-   "reading": "عَقْد"
+   "reading": "عَقْد",
+   "listen": {
+    "want": "aqd",
+    "options": {
+     "aqd": [
+      "عَقْد",
+      "ʿaqd",
+      "contract"
+     ],
+     "iqd": [
+      "عِقْد",
+      "ʿiqd",
+      "necklace"
+     ],
+     "aqada": [
+      "عَقَدَ",
+      "ʿaqada",
+      "he held"
+     ]
+    }
+   }
   },
   {
    "id": "h13",
@@ -184,7 +439,27 @@
    "text": "أهداها زوجها عقداً من اللؤلؤ.",
    "ref": "أَهْدَاهَا زَوْجُهَا عِقْدًا مِنَ اللُّؤْلُؤ.",
    "word": "عقداً",
-   "reading": "عِقْدًا"
+   "reading": "عِقْدًا",
+   "listen": {
+    "want": "iqd",
+    "options": {
+     "aqd": [
+      "عَقْد",
+      "ʿaqd",
+      "contract"
+     ],
+     "iqd": [
+      "عِقْد",
+      "ʿiqd",
+      "necklace"
+     ],
+     "aqada": [
+      "عَقَدَ",
+      "ʿaqada",
+      "he held"
+     ]
+    }
+   }
   },
   {
    "id": "h14",
@@ -198,7 +473,27 @@
    "text": "كسر اللاعب قدمه في المباراة.",
    "ref": "كَسَرَ اللَّاعِبُ قَدَمَهُ فِي الْمُبَارَاة.",
    "word": "قدمه",
-   "reading": "قَدَمَه"
+   "reading": "قَدَمَه",
+   "listen": {
+    "want": "qadam",
+    "options": {
+     "qadam": [
+      "قَدَم",
+      "qadam",
+      "foot"
+     ],
+     "qaddama": [
+      "قَدَّمَ",
+      "qaddama",
+      "he presented"
+     ],
+     "qadima": [
+      "قَدِمَ",
+      "qadima",
+      "he arrived"
+     ]
+    }
+   }
   },
   {
    "id": "h15",
@@ -212,7 +507,27 @@
    "text": "قدم المدير تقريره إلى المجلس.",
    "ref": "قَدَّمَ الْمُدِيرُ تَقْرِيرَهُ إِلَى الْمَجْلِس.",
    "word": "قدم",
-   "reading": "قَدَّمَ"
+   "reading": "قَدَّمَ",
+   "listen": {
+    "want": "qaddama",
+    "options": {
+     "qadam": [
+      "قَدَم",
+      "qadam",
+      "foot"
+     ],
+     "qaddama": [
+      "قَدَّمَ",
+      "qaddama",
+      "he presented"
+     ],
+     "qadima": [
+      "قَدِمَ",
+      "qadima",
+      "he arrived"
+     ]
+    }
+   }
   },
   {
    "id": "h16",
@@ -226,7 +541,22 @@
    "text": "دخل رجل طويل إلى المحل.",
    "ref": "دَخَلَ رَجُلٌ طَوِيلٌ إِلَى الْمَحَلّ.",
    "word": "رجل",
-   "reading": "رَجُل"
+   "reading": "رَجُل",
+   "listen": {
+    "want": "rajul",
+    "options": {
+     "rajul": [
+      "رَجُل",
+      "rajul",
+      "man"
+     ],
+     "rijl": [
+      "رِجْل",
+      "rijl",
+      "leg"
+     ]
+    }
+   }
   },
   {
    "id": "h17",
@@ -240,7 +570,22 @@
    "text": "يشكو المريض من ألم في رجله اليسرى.",
    "ref": "يَشْكُو الْمَرِيضُ مِنْ أَلَمٍ فِي رِجْلِهِ الْيُسْرَى.",
    "word": "رجله",
-   "reading": "رِجْلِه"
+   "reading": "رِجْلِه",
+   "listen": {
+    "want": "rijl",
+    "options": {
+     "rajul": [
+      "رَجُل",
+      "rajul",
+      "man"
+     ],
+     "rijl": [
+      "رِجْل",
+      "rijl",
+      "leg"
+     ]
+    }
+   }
   },
   {
    "id": "h18",
@@ -254,7 +599,22 @@
    "text": "تعمل أختي مدرسة للغة العربية.",
    "ref": "تَعْمَلُ أُخْتِي مُدَرِّسَةً لِلُّغَةِ الْعَرَبِيَّة.",
    "word": "مدرسة",
-   "reading": "مُدَرِّسَة"
+   "reading": "مُدَرِّسَة",
+   "listen": {
+    "want": "mudarrisa",
+    "options": {
+     "madrasa": [
+      "مَدْرَسَة",
+      "madrasa",
+      "school"
+     ],
+     "mudarrisa": [
+      "مُدَرِّسَة",
+      "mudarrisa",
+      "woman teacher"
+     ]
+    }
+   }
   },
   {
    "id": "h19",
@@ -268,7 +628,22 @@
    "text": "بنيت مدرسة جديدة في الحي.",
    "ref": "بُنِيَتْ مَدْرَسَةٌ جَدِيدَةٌ فِي الْحَيّ.",
    "word": "مدرسة",
-   "reading": "مَدْرَسَة"
+   "reading": "مَدْرَسَة",
+   "listen": {
+    "want": "madrasa",
+    "options": {
+     "madrasa": [
+      "مَدْرَسَة",
+      "madrasa",
+      "school"
+     ],
+     "mudarrisa": [
+      "مُدَرِّسَة",
+      "mudarrisa",
+      "woman teacher"
+     ]
+    }
+   }
   },
   {
    "id": "h20",
@@ -282,7 +657,27 @@
    "text": "نلتقي بعد صلاة الظهر.",
    "ref": "نَلْتَقِي بَعْدَ صَلَاةِ الظُّهْر.",
    "word": "الظهر",
-   "reading": "الظُّهْر"
+   "reading": "الظُّهْر",
+   "listen": {
+    "want": "zuhr",
+    "options": {
+     "zahara": [
+      "ظَهَرَ",
+      "ẓahara",
+      "it appeared"
+     ],
+     "zahr": [
+      "ظَهْر",
+      "ẓahr",
+      "back"
+     ],
+     "zuhr": [
+      "ظُهْر",
+      "ẓuhr",
+      "noon"
+     ]
+    }
+   }
   },
   {
    "id": "h21",
@@ -297,7 +692,22 @@
    "text": "تحب الأرانب أكل الجزر.",
    "ref": "تُحِبُّ الْأَرَانِبُ أَكْلَ الْجَزَر.",
    "word": "الجزر",
-   "reading": "الجَزَر"
+   "reading": "الجَزَر",
+   "listen": {
+    "want": "jazar",
+    "options": {
+     "jazar": [
+      "جَزَر",
+      "jazar",
+      "carrots"
+     ],
+     "juzur": [
+      "جُزُر",
+      "juzur",
+      "islands"
+     ]
+    }
+   }
   },
   {
    "id": "h22",
@@ -311,7 +721,22 @@
    "text": "تتكون الدولة من مئات الجزر الصغيرة.",
    "ref": "تَتَكَوَّنُ الدَّوْلَةُ مِنْ مِئَاتِ الْجُزُرِ الصَّغِيرَة.",
    "word": "الجزر",
-   "reading": "الجُزُر"
+   "reading": "الجُزُر",
+   "listen": {
+    "want": "juzur",
+    "options": {
+     "jazar": [
+      "جَزَر",
+      "jazar",
+      "carrots"
+     ],
+     "juzur": [
+      "جُزُر",
+      "juzur",
+      "islands"
+     ]
+    }
+   }
   },
   {
    "id": "h23",
@@ -325,7 +750,22 @@
    "text": "قبل الطالب العرض فوراً.",
    "ref": "قَبِلَ الطَّالِبُ الْعَرْضَ فَوْرًا.",
    "word": "قبل",
-   "reading": "قَبِلَ"
+   "reading": "قَبِلَ",
+   "listen": {
+    "want": "qabila",
+    "options": {
+     "qabla": [
+      "قَبْلَ",
+      "qabla",
+      "before"
+     ],
+     "qabila": [
+      "قَبِلَ",
+      "qabila",
+      "he accepted"
+     ]
+    }
+   }
   },
   {
    "id": "h24",
@@ -339,7 +779,27 @@
    "text": "صعد العامل على السلم.",
    "ref": "صَعِدَ الْعَامِلُ عَلَى السُّلَّم.",
    "word": "السلم",
-   "reading": "السُّلَّم"
+   "reading": "السُّلَّم",
+   "listen": {
+    "want": "sullam",
+    "options": {
+     "sullam": [
+      "سُلَّم",
+      "sullam",
+      "ladder"
+     ],
+     "sallama": [
+      "سَلَّمَ",
+      "sallama",
+      "he handed over"
+     ],
+     "silm": [
+      "سِلْم",
+      "silm",
+      "peace"
+     ]
+    }
+   }
   },
   {
    "id": "h25",
@@ -353,7 +813,27 @@
    "text": "سلم الموظف الملف إلى مديره.",
    "ref": "سَلَّمَ الْمُوَظَّفُ الْمِلَفَّ إِلَى مُدِيرِه.",
    "word": "سلم",
-   "reading": "سَلَّمَ"
+   "reading": "سَلَّمَ",
+   "listen": {
+    "want": "sallama",
+    "options": {
+     "sullam": [
+      "سُلَّم",
+      "sullam",
+      "ladder"
+     ],
+     "sallama": [
+      "سَلَّمَ",
+      "sallama",
+      "he handed over"
+     ],
+     "silm": [
+      "سِلْم",
+      "silm",
+      "peace"
+     ]
+    }
+   }
   },
   {
    "id": "h26",
@@ -367,7 +847,22 @@
    "text": "عليه دين كبير للبنك.",
    "ref": "عَلَيْهِ دَيْنٌ كَبِيرٌ لِلْبَنْك.",
    "word": "دين",
-   "reading": "دَيْن"
+   "reading": "دَيْن",
+   "listen": {
+    "want": "dayn",
+    "options": {
+     "dayn": [
+      "دَيْن",
+      "dayn",
+      "debt"
+     ],
+     "din": [
+      "دِين",
+      "dīn",
+      "religion"
+     ]
+    }
+   }
   },
   {
    "id": "h27",
@@ -382,7 +877,22 @@
    "text": "الإسلام دين التسامح.",
    "ref": "الْإِسْلَامُ دِينُ التَّسَامُح.",
    "word": "دين",
-   "reading": "دِين"
+   "reading": "دِين",
+   "listen": {
+    "want": "din",
+    "options": {
+     "dayn": [
+      "دَيْن",
+      "dayn",
+      "debt"
+     ],
+     "din": [
+      "دِين",
+      "dīn",
+      "religion"
+     ]
+    }
+   }
   },
   {
    "id": "h28",
@@ -396,7 +906,27 @@
    "text": "يعد الطباخ العشاء الآن.",
    "ref": "يُعِدُّ الطَّبَّاخُ الْعَشَاءَ الْآن.",
    "word": "يعد",
-   "reading": "يُعِدُّ"
+   "reading": "يُعِدُّ",
+   "listen": {
+    "want": "yuiddu",
+    "options": {
+     "yuaddu": [
+      "يُعَدُّ",
+      "yuʿadd(u)",
+      "is considered"
+     ],
+     "yuiddu": [
+      "يُعِدُّ",
+      "yuʿidd(u)",
+      "prepares"
+     ],
+     "yaidu": [
+      "يَعِدُ",
+      "yaʿid(u)",
+      "promises"
+     ]
+    }
+   }
   },
   {
    "id": "h29",
@@ -410,7 +940,22 @@
    "text": "نشر الخبر في جميع الصحف.",
    "ref": "نُشِرَ الْخَبَرُ فِي جَمِيعِ الصُّحُف.",
    "word": "نشر",
-   "reading": "نُشِرَ"
+   "reading": "نُشِرَ",
+   "listen": {
+    "want": "nushira",
+    "options": {
+     "nashara": [
+      "نَشَرَ",
+      "nashara",
+      "he published"
+     ],
+     "nushira": [
+      "نُشِرَ",
+      "nushira",
+      "it was published"
+     ]
+    }
+   }
   },
   {
    "id": "h30",
@@ -424,7 +969,22 @@
    "text": "ولد الشاعر في دمشق.",
    "ref": "وُلِدَ الشَّاعِرُ فِي دِمَشْق.",
    "word": "ولد",
-   "reading": "وُلِدَ"
+   "reading": "وُلِدَ",
+   "listen": {
+    "want": "wulida",
+    "options": {
+     "wulida": [
+      "وُلِدَ",
+      "wulida",
+      "he was born"
+     ],
+     "walad": [
+      "وَلَد",
+      "walad",
+      "boy"
+     ]
+    }
+   }
   },
   {
    "id": "h31",
@@ -438,7 +998,32 @@
    "text": "علم الأب ابنه السباحة في الصيف.",
    "ref": "عَلَّمَ الْأَبُ ابْنَهُ السِّبَاحَةَ فِي الصَّيْف.",
    "word": "علم",
-   "reading": "عَلَّمَ"
+   "reading": "عَلَّمَ",
+   "listen": {
+    "want": "allama",
+    "options": {
+     "ilm": [
+      "عِلْم",
+      "ʿilm",
+      "knowledge"
+     ],
+     "alam": [
+      "عَلَم",
+      "ʿalam",
+      "flag"
+     ],
+     "alima": [
+      "عَلِمَ",
+      "ʿalima",
+      "he knew"
+     ],
+     "allama": [
+      "عَلَّمَ",
+      "ʿallama",
+      "he taught"
+     ]
+    }
+   }
   },
   {
    "id": "h32",
@@ -452,7 +1037,27 @@
    "text": "كتب على الباب اسم صاحب البيت.",
    "ref": "كُتِبَ عَلَى الْبَابِ اسْمُ صَاحِبِ الْبَيْت.",
    "word": "كتب",
-   "reading": "كُتِبَ"
+   "reading": "كُتِبَ",
+   "listen": {
+    "want": "kutiba",
+    "options": {
+     "kutub": [
+      "كُتُب",
+      "kutub",
+      "books"
+     ],
+     "kataba": [
+      "كَتَبَ",
+      "kataba",
+      "he wrote"
+     ],
+     "kutiba": [
+      "كُتِبَ",
+      "kutiba",
+      "it was written"
+     ]
+    }
+   }
   },
   {
    "id": "h33",
@@ -466,7 +1071,27 @@
    "text": "درس الأستاذ طلابه قواعد النحو.",
    "ref": "دَرَّسَ الْأُسْتَاذُ طُلَّابَهُ قَوَاعِدَ النَّحْو.",
    "word": "درس",
-   "reading": "دَرَّسَ"
+   "reading": "دَرَّسَ",
+   "listen": {
+    "want": "darrasa",
+    "options": {
+     "darasa": [
+      "دَرَسَ",
+      "darasa",
+      "he studied"
+     ],
+     "dars": [
+      "دَرْس",
+      "dars",
+      "lesson"
+     ],
+     "darrasa": [
+      "دَرَّسَ",
+      "darrasa",
+      "he taught"
+     ]
+    }
+   }
   },
   {
    "id": "h34",
@@ -480,7 +1105,27 @@
    "text": "شعر المسافر بالتعب بعد الرحلة.",
    "ref": "شَعَرَ الْمُسَافِرُ بِالتَّعَبِ بَعْدَ الرِّحْلَة.",
    "word": "شعر",
-   "reading": "شَعَرَ"
+   "reading": "شَعَرَ",
+   "listen": {
+    "want": "shaara",
+    "options": {
+     "shaar": [
+      "شَعْر",
+      "shaʿr",
+      "hair"
+     ],
+     "shiir": [
+      "شِعْر",
+      "shiʿr",
+      "poetry"
+     ],
+     "shaara": [
+      "شَعَرَ",
+      "shaʿara",
+      "he felt"
+     ]
+    }
+   }
   },
   {
    "id": "h35",
@@ -494,7 +1139,27 @@
    "text": "عقد الوزير مؤتمراً صحفياً.",
    "ref": "عَقَدَ الْوَزِيرُ مُؤْتَمَرًا صُحُفِيًّا.",
    "word": "عقد",
-   "reading": "عَقَدَ"
+   "reading": "عَقَدَ",
+   "listen": {
+    "want": "aqada",
+    "options": {
+     "aqd": [
+      "عَقْد",
+      "ʿaqd",
+      "contract"
+     ],
+     "iqd": [
+      "عِقْد",
+      "ʿiqd",
+      "necklace"
+     ],
+     "aqada": [
+      "عَقَدَ",
+      "ʿaqada",
+      "he held"
+     ]
+    }
+   }
   },
   {
    "id": "h36",
@@ -508,7 +1173,27 @@
    "text": "قدم الوفد من الرياض صباح اليوم.",
    "ref": "قَدِمَ الْوَفْدُ مِنَ الرِّيَاضِ صَبَاحَ الْيَوْم.",
    "word": "قدم",
-   "reading": "قَدِمَ"
+   "reading": "قَدِمَ",
+   "listen": {
+    "want": "qadima",
+    "options": {
+     "qadam": [
+      "قَدَم",
+      "qadam",
+      "foot"
+     ],
+     "qaddama": [
+      "قَدَّمَ",
+      "qaddama",
+      "he presented"
+     ],
+     "qadima": [
+      "قَدِمَ",
+      "qadima",
+      "he arrived"
+     ]
+    }
+   }
   },
   {
    "id": "h37",
@@ -522,7 +1207,27 @@
    "text": "ظهر القمر بعد غياب الشمس.",
    "ref": "ظَهَرَ الْقَمَرُ بَعْدَ غِيَابِ الشَّمْس.",
    "word": "ظهر",
-   "reading": "ظَهَرَ"
+   "reading": "ظَهَرَ",
+   "listen": {
+    "want": "zahara",
+    "options": {
+     "zahara": [
+      "ظَهَرَ",
+      "ẓahara",
+      "it appeared"
+     ],
+     "zahr": [
+      "ظَهْر",
+      "ẓahr",
+      "back"
+     ],
+     "zuhr": [
+      "ظُهْر",
+      "ẓuhr",
+      "noon"
+     ]
+    }
+   }
   },
   {
    "id": "h38",
@@ -536,7 +1241,27 @@
    "text": "يشكو من ألم في أسفل ظهره.",
    "ref": "يَشْكُو مِنْ أَلَمٍ فِي أَسْفَلِ ظَهْرِه.",
    "word": "ظهره",
-   "reading": "ظَهْرِه"
+   "reading": "ظَهْرِه",
+   "listen": {
+    "want": "zahr",
+    "options": {
+     "zahara": [
+      "ظَهَرَ",
+      "ẓahara",
+      "it appeared"
+     ],
+     "zahr": [
+      "ظَهْر",
+      "ẓahr",
+      "back"
+     ],
+     "zuhr": [
+      "ظُهْر",
+      "ẓuhr",
+      "noon"
+     ]
+    }
+   }
   },
   {
    "id": "h39",
@@ -550,7 +1275,22 @@
    "text": "وصلنا قبل غروب الشمس.",
    "ref": "وَصَلْنَا قَبْلَ غُرُوبِ الشَّمْس.",
    "word": "قبل",
-   "reading": "قَبْلَ"
+   "reading": "قَبْلَ",
+   "listen": {
+    "want": "qabla",
+    "options": {
+     "qabla": [
+      "قَبْلَ",
+      "qabla",
+      "before"
+     ],
+     "qabila": [
+      "قَبِلَ",
+      "qabila",
+      "he accepted"
+     ]
+    }
+   }
   },
   {
    "id": "h40",
@@ -564,7 +1304,27 @@
    "text": "يعد هذا الكتاب من أهم المراجع.",
    "ref": "يُعَدُّ هَذَا الْكِتَابُ مِنْ أَهَمِّ الْمَرَاجِع.",
    "word": "يعد",
-   "reading": "يُعَدُّ"
+   "reading": "يُعَدُّ",
+   "listen": {
+    "want": "yuaddu",
+    "options": {
+     "yuaddu": [
+      "يُعَدُّ",
+      "yuʿadd(u)",
+      "is considered"
+     ],
+     "yuiddu": [
+      "يُعِدُّ",
+      "yuʿidd(u)",
+      "prepares"
+     ],
+     "yaidu": [
+      "يَعِدُ",
+      "yaʿid(u)",
+      "promises"
+     ]
+    }
+   }
   },
   {
    "id": "h41",
@@ -578,7 +1338,27 @@
    "text": "يعد الأب أولاده بهدية.",
    "ref": "يَعِدُ الْأَبُ أَوْلَادَهُ بِهَدِيَّة.",
    "word": "يعد",
-   "reading": "يَعِدُ"
+   "reading": "يَعِدُ",
+   "listen": {
+    "want": "yaidu",
+    "options": {
+     "yuaddu": [
+      "يُعَدُّ",
+      "yuʿadd(u)",
+      "is considered"
+     ],
+     "yuiddu": [
+      "يُعِدُّ",
+      "yuʿidd(u)",
+      "prepares"
+     ],
+     "yaidu": [
+      "يَعِدُ",
+      "yaʿid(u)",
+      "promises"
+     ]
+    }
+   }
   },
   {
    "id": "h42",
@@ -592,7 +1372,22 @@
    "text": "نشر الكاتب روايته الأولى.",
    "ref": "نَشَرَ الْكَاتِبُ رِوَايَتَهُ الْأُولَى.",
    "word": "نشر",
-   "reading": "نَشَرَ"
+   "reading": "نَشَرَ",
+   "listen": {
+    "want": "nashara",
+    "options": {
+     "nashara": [
+      "نَشَرَ",
+      "nashara",
+      "he published"
+     ],
+     "nushira": [
+      "نُشِرَ",
+      "nushira",
+      "it was published"
+     ]
+    }
+   }
   },
   {
    "id": "n01",
@@ -607,7 +1402,22 @@
    "text": "سافرت العائلة إلى جدة في عطلة الصيف.",
    "ref": "سَافَرَتِ الْعَائِلَةُ إِلَى جِدَّة فِي عُطْلَةِ الصَّيْف.",
    "word": "جدة",
-   "reading": "جِدَّة"
+   "reading": "جِدَّة",
+   "listen": {
+    "want": "jidda",
+    "options": {
+     "jidda": [
+      "جِدَّة",
+      "Jidda",
+      "the city of Jeddah"
+     ],
+     "jadda": [
+      "جَدَّة",
+      "jadda",
+      "a grandmother"
+     ]
+    }
+   }
   },
   {
    "id": "n02",
@@ -621,7 +1431,22 @@
    "text": "افتتح المعرض في مدينة الخبر مساء أمس.",
    "ref": "اُفْتُتِحَ الْمَعْرِضُ فِي مَدِينَةِ الْخُبَرِ مَسَاءَ أَمْس.",
    "word": "الخبر",
-   "reading": "الخُبَر"
+   "reading": "الخُبَر",
+   "listen": {
+    "want": "khubar",
+    "options": {
+     "khubar": [
+      "الخُبَر",
+      "al-Khubar",
+      "the city of Khobar"
+     ],
+     "khabar": [
+      "الخَبَر",
+      "al-khabar",
+      "the news"
+     ]
+    }
+   }
   },
   {
    "id": "n03",
@@ -635,7 +1460,22 @@
    "text": "فازت علا بالجائزة الأولى في المسابقة.",
    "ref": "فَازَتْ عُلَا بِالْجَائِزَةِ الْأُولَى فِي الْمُسَابَقَة.",
    "word": "علا",
-   "reading": "عُلَا"
+   "reading": "عُلَا",
+   "listen": {
+    "want": "ula",
+    "options": {
+     "ula": [
+      "عُلا",
+      "ʿUlā",
+      "the woman's name Ola"
+     ],
+     "ala": [
+      "عَلا",
+      "ʿalā",
+      "the man's name Alaa"
+     ]
+    }
+   }
   },
   {
    "id": "n04",
@@ -649,7 +1489,22 @@
    "text": "زار السياح آثار العلا في الشتاء.",
    "ref": "زَارَ السُّيَّاحُ آثَارَ الْعُلَا فِي الشِّتَاء.",
    "word": "العلا",
-   "reading": "العُلَا"
+   "reading": "العُلَا",
+   "listen": {
+    "want": "alula",
+    "options": {
+     "alula": [
+      "العُلا",
+      "al-ʿUlā",
+      "the city of AlUla"
+     ],
+     "alala": [
+      "العَلا",
+      "al-ʿalā",
+      "loftiness"
+     ]
+    }
+   }
   },
   {
    "id": "n05",
@@ -663,7 +1518,22 @@
    "text": "قرأ عمر كتابا جديدا كل أسبوع.",
    "ref": "قَرَأَ عُمَر كِتَابًا جَدِيدًا كُلَّ أُسْبُوع.",
    "word": "عمر",
-   "reading": "عُمَر"
+   "reading": "عُمَر",
+   "listen": {
+    "want": "umar",
+    "options": {
+     "umar": [
+      "عُمَر",
+      "ʿUmar",
+      "the man's name Omar"
+     ],
+     "umr": [
+      "عُمْر",
+      "ʿumr",
+      "age"
+     ]
+    }
+   }
   },
   {
    "id": "n06",
@@ -677,7 +1547,22 @@
    "text": "وصل حسن إلى المطار قبل موعد الرحلة.",
    "ref": "وَصَلَ حَسَن إِلَى الْمَطَارِ قَبْلَ مَوْعِدِ الرِّحْلَة.",
    "word": "حسن",
-   "reading": "حَسَن"
+   "reading": "حَسَن",
+   "listen": {
+    "want": "hasan",
+    "options": {
+     "hasan": [
+      "حَسَن",
+      "Ḥasan",
+      "the man's name Hasan"
+     ],
+     "husn": [
+      "حُسْن",
+      "ḥusn",
+      "beauty"
+     ]
+    }
+   }
   },
   {
    "id": "n07",
@@ -691,7 +1576,22 @@
    "text": "قال حمد إن المشروع سينتهي غدا.",
    "ref": "قَالَ حَمَد إِنَّ الْمَشْرُوعَ سَيَنْتَهِي غَدًا.",
    "word": "حمد",
-   "reading": "حَمَد"
+   "reading": "حَمَد",
+   "listen": {
+    "want": "hamad",
+    "options": {
+     "hamad": [
+      "حَمَد",
+      "Ḥamad",
+      "the man's name Hamad"
+     ],
+     "hamd": [
+      "حَمْد",
+      "ḥamd",
+      "praise"
+     ]
+    }
+   }
   },
   {
    "id": "n08",
@@ -705,7 +1605,22 @@
    "text": "اتصلت منى بأمها بعد العمل.",
    "ref": "اِتَّصَلَتْ مُنَى بِأُمِّهَا بَعْدَ الْعَمَل.",
    "word": "منى",
-   "reading": "مُنَى"
+   "reading": "مُنَى",
+   "listen": {
+    "want": "muna",
+    "options": {
+     "muna": [
+      "مُنى",
+      "Muna",
+      "the woman's name Mona"
+     ],
+     "mina": [
+      "مِنى",
+      "Mina",
+      "Mina, the place near Mecca"
+     ]
+    }
+   }
   },
   {
    "id": "n09",
@@ -719,7 +1634,22 @@
    "text": "بات الحجاج ليلتهم في منى.",
    "ref": "بَاتَ الْحُجَّاجُ لَيْلَتَهُمْ فِي مِنَى.",
    "word": "منى",
-   "reading": "مِنَى"
+   "reading": "مِنَى",
+   "listen": {
+    "want": "mina",
+    "options": {
+     "muna": [
+      "مُنى",
+      "Muna",
+      "the woman's name Mona"
+     ],
+     "mina": [
+      "مِنى",
+      "Mina",
+      "Mina, the place near Mecca"
+     ]
+    }
+   }
   },
   {
    "id": "n10",
@@ -733,7 +1663,22 @@
    "text": "تبدأ الرحلة النيلية من الأقصر.",
    "ref": "تَبْدَأُ الرِّحْلَةُ النِّيلِيَّةُ مِنَ الْأُقْصُر.",
    "word": "الأقصر",
-   "reading": "الأُقْصُر"
+   "reading": "الأُقْصُر",
+   "listen": {
+    "want": "uqsur",
+    "options": {
+     "uqsur": [
+      "الأُقْصُر",
+      "al-Uqṣur",
+      "the city of Luxor"
+     ],
+     "aqsar": [
+      "الأَقْصَر",
+      "al-aqṣar",
+      "the shorter one"
+     ]
+    }
+   }
   },
   {
    "id": "n11",
@@ -747,7 +1692,22 @@
    "text": "تشتهر عنيزة بتمورها.",
    "ref": "تَشْتَهِرُ عُنَيْزَة بِتُمُورِهَا.",
    "word": "عنيزة",
-   "reading": "عُنَيْزَة"
+   "reading": "عُنَيْزَة",
+   "listen": {
+    "want": "unayza",
+    "options": {
+     "unayza": [
+      "عُنَيْزة",
+      "ʿUnayza",
+      "the city of Unaizah"
+     ],
+     "aniza": [
+      "عَنِيزة",
+      "ʿAnīza",
+      "another reading of the same letters"
+     ]
+    }
+   }
   },
   {
    "id": "n12",
@@ -761,7 +1721,27 @@
    "text": "فرحت ملك بنجاح أختها.",
    "ref": "فَرِحَتْ مَلَك بِنَجَاحِ أُخْتِهَا.",
    "word": "ملك",
-   "reading": "مَلَك"
+   "reading": "مَلَك",
+   "listen": {
+    "want": "malak",
+    "options": {
+     "malak": [
+      "مَلَك",
+      "Malak",
+      "the woman's name Malak"
+     ],
+     "malik": [
+      "مَلِك",
+      "malik",
+      "a king"
+     ],
+     "mulk": [
+      "مُلْك",
+      "mulk",
+      "a reign"
+     ]
+    }
+   }
   },
   {
    "id": "n13",
@@ -775,7 +1755,22 @@
    "text": "سلم عبيد التقرير إلى مديره.",
    "ref": "سَلَّمَ عُبَيْد التَّقْرِيرَ إِلَى مُدِيرِه.",
    "word": "عبيد",
-   "reading": "عُبَيْد"
+   "reading": "عُبَيْد",
+   "listen": {
+    "want": "ubayd",
+    "options": {
+     "ubayd": [
+      "عُبَيْد",
+      "ʿUbayd",
+      "the man's name Obaid"
+     ],
+     "abid": [
+      "عَبِيد",
+      "ʿabīd",
+      "slaves"
+     ]
+    }
+   }
   },
   {
    "id": "n14",
@@ -789,7 +1784,22 @@
    "text": "سعد يعمل مهندسا في الشركة.",
    "ref": "سَعْد يَعْمَلُ مُهَنْدِسًا فِي الشَّرِكَة.",
    "word": "سعد",
-   "reading": "سَعْد"
+   "reading": "سَعْد",
+   "listen": {
+    "want": "saad",
+    "options": {
+     "saad": [
+      "سَعْد",
+      "Saʿd",
+      "the man's name Saad"
+     ],
+     "saida": [
+      "سَعِدَ",
+      "saʿida",
+      "he was happy"
+     ]
+    }
+   }
   },
   {
    "id": "n15",
@@ -803,7 +1813,22 @@
    "text": "حصلت هبة على منحة دراسية.",
    "ref": "حَصَلَتْ هِبَة عَلَى مِنْحَةٍ دِرَاسِيَّة.",
    "word": "هبة",
-   "reading": "هِبَة"
+   "reading": "هِبَة",
+   "listen": {
+    "want": "hiba",
+    "options": {
+     "hiba": [
+      "هِبَة",
+      "Hiba",
+      "the woman's name Hiba"
+     ],
+     "habba": [
+      "هَبَّة",
+      "habba",
+      "a gust of wind"
+     ]
+    }
+   }
   },
   {
    "id": "n16",
@@ -817,7 +1842,22 @@
    "text": "طلب علي من أخيه أن ينتظره.",
    "ref": "طَلَبَ عَلِيّ مِنْ أَخِيهِ أَنْ يَنْتَظِرَه.",
    "word": "علي",
-   "reading": "عَلِيّ"
+   "reading": "عَلِيّ",
+   "listen": {
+    "want": "ali",
+    "options": {
+     "ali": [
+      "عَلِيّ",
+      "ʿAlī",
+      "the man's name Ali"
+     ],
+     "alayya": [
+      "عَلَيَّ",
+      "ʿalayya",
+      "on me"
+     ]
+    }
+   }
   },
   {
    "id": "n17",
@@ -831,7 +1871,22 @@
    "text": "هبطت الطائرة في مسقط صباحا.",
    "ref": "هَبَطَتِ الطَّائِرَةُ فِي مَسْقَط صَبَاحًا.",
    "word": "مسقط",
-   "reading": "مَسْقَط"
+   "reading": "مَسْقَط",
+   "listen": {
+    "want": "masqat",
+    "options": {
+     "masqat": [
+      "مَسْقَط",
+      "Masqaṭ",
+      "the city of Muscat"
+     ],
+     "masqit": [
+      "مَسْقِط",
+      "masqiṭ",
+      "a birthplace"
+     ]
+    }
+   }
   },
   {
    "id": "n18",
@@ -845,7 +1900,22 @@
    "text": "عمان عاصمة الأردن.",
    "ref": "عَمَّان عَاصِمَةُ الْأُرْدُنّ.",
    "word": "عمان",
-   "reading": "عَمَّان"
+   "reading": "عَمَّان",
+   "listen": {
+    "want": "amman",
+    "options": {
+     "amman": [
+      "عَمَّان",
+      "ʿAmmān",
+      "the city of Amman"
+     ],
+     "uman": [
+      "عُمَان",
+      "ʿUmān",
+      "the country Oman"
+     ]
+    }
+   }
   },
   {
    "id": "n19",
@@ -859,7 +1929,22 @@
    "text": "سلطنة عمان تطل على بحر العرب.",
    "ref": "سَلْطَنَةُ عُمَان تُطِلُّ عَلَى بَحْرِ الْعَرَب.",
    "word": "عمان",
-   "reading": "عُمَان"
+   "reading": "عُمَان",
+   "listen": {
+    "want": "uman",
+    "options": {
+     "amman": [
+      "عَمَّان",
+      "ʿAmmān",
+      "the city of Amman"
+     ],
+     "uman": [
+      "عُمَان",
+      "ʿUmān",
+      "the country Oman"
+     ]
+    }
+   }
   },
   {
    "id": "n20",
@@ -873,7 +1958,22 @@
    "text": "يقع ميناء ينبع على البحر الأحمر.",
    "ref": "يَقَعُ مِينَاءُ يَنْبُع عَلَى الْبَحْرِ الْأَحْمَر.",
    "word": "ينبع",
-   "reading": "يَنْبُع"
+   "reading": "يَنْبُع",
+   "listen": {
+    "want": "yanbu",
+    "options": {
+     "yanbu": [
+      "يَنْبُع",
+      "Yanbuʿ",
+      "the city of Yanbu"
+     ],
+     "yanba": [
+      "يَنْبَع",
+      "yanbaʿ",
+      "it springs"
+     ]
+    }
+   }
   },
   {
    "id": "n21",
@@ -887,7 +1987,22 @@
    "text": "زرنا مدينة صور على الساحل.",
    "ref": "زُرْنَا مَدِينَةَ صُور عَلَى السَّاحِل.",
    "word": "صور",
-   "reading": "صُور"
+   "reading": "صُور",
+   "listen": {
+    "want": "sur",
+    "options": {
+     "sur": [
+      "صُور",
+      "Ṣūr",
+      "the city of Tyre"
+     ],
+     "suwar": [
+      "صُوَر",
+      "ṣuwar",
+      "pictures"
+     ]
+    }
+   }
   },
   {
    "id": "n22",
@@ -901,7 +2016,22 @@
    "text": "قدمت سحر عرضا مميزا أمام اللجنة.",
    "ref": "قَدَّمَتْ سَحَر عَرْضًا مُمَيَّزًا أَمَامَ اللَّجْنَة.",
    "word": "سحر",
-   "reading": "سَحَر"
+   "reading": "سَحَر",
+   "listen": {
+    "want": "sahar",
+    "options": {
+     "sahar": [
+      "سَحَر",
+      "Saḥar",
+      "the woman's name Sahar"
+     ],
+     "sihr": [
+      "سِحْر",
+      "siḥr",
+      "magic"
+     ]
+    }
+   }
   },
   {
    "id": "n23",
@@ -915,7 +2045,22 @@
    "text": "يزن طالب مجتهد في صفه.",
    "ref": "يَزَن طَالِبٌ مُجْتَهِدٌ فِي صَفِّه.",
    "word": "يزن",
-   "reading": "يَزَن"
+   "reading": "يَزَن",
+   "listen": {
+    "want": "yazan",
+    "options": {
+     "yazan": [
+      "يَزَن",
+      "Yazan",
+      "the man's name Yazan"
+     ],
+     "yazin": [
+      "يَزِن",
+      "yazin",
+      "he weighs"
+     ]
+    }
+   }
   },
   {
    "id": "n24",
@@ -929,7 +2074,22 @@
    "text": "سافر قصي إلى الخارج لإكمال دراسته.",
    "ref": "سَافَرَ قُصَيّ إِلَى الْخَارِجِ لِإِكْمَالِ دِرَاسَتِه.",
    "word": "قصي",
-   "reading": "قُصَيّ"
+   "reading": "قُصَيّ",
+   "listen": {
+    "want": "qusayy",
+    "options": {
+     "qusayy": [
+      "قُصَيّ",
+      "Quṣayy",
+      "the man's name Qusai"
+     ],
+     "qasiyy": [
+      "قَصِيّ",
+      "qaṣiyy",
+      "far away"
+     ]
+    }
+   }
   },
   {
    "id": "n25",
@@ -943,7 +2103,22 @@
    "text": "انتقلت الشركة إلى دبي العام الماضي.",
    "ref": "اِنْتَقَلَتِ الشَّرِكَةُ إِلَى دُبَيّ الْعَامَ الْمَاضِي.",
    "word": "دبي",
-   "reading": "دُبَيّ"
+   "reading": "دُبَيّ",
+   "listen": {
+    "want": "dubayy",
+    "options": {
+     "dubayy": [
+      "دُبَيّ",
+      "Dubayy",
+      "the city of Dubai"
+     ],
+     "dubbi": [
+      "دُبِّي",
+      "dubbī",
+      "my bear"
+     ]
+    }
+   }
   },
   {
    "id": "n26",
@@ -959,7 +2134,22 @@
    "ref": "اِتَّصَلَ عَلَا بِأَخِيهِ لِيَطْمَئِنَّ عَلَيْه.",
    "word": "علا",
    "reading": "عَلَا",
-   "note": "علا here is the man's name Alaa written without its hamza (the verb is masculine), not the woman's name Ola (n03)."
+   "note": "علا here is the man's name Alaa written without its hamza (the verb is masculine), not the woman's name Ola (n03).",
+   "listen": {
+    "want": "ala",
+    "options": {
+     "ula": [
+      "عُلا",
+      "ʿUlā",
+      "the woman's name Ola"
+     ],
+     "ala": [
+      "عَلا",
+      "ʿalā",
+      "the man's name Alaa"
+     ]
+    }
+   }
   },
   {
    "id": "m001",

@@ -310,7 +310,7 @@ on:
         type: string
         default: ""
       tashkeel:
-        description: "tashkeel-listen only: the kinds of clip (iso,plain,word,full,wrong,wrong+dir,either,either+dir), or round 2: levers,take1,take2,take3,gloss,glossonly,engine,dialect,raw,respelled; levers,hard = only the known-hard words; formants = measure clips already made (no speech); readings = the automatic step on text alone (no speech)"
+        description: "tashkeel-listen only: the kinds of clip (iso,plain,word,full,wrong,wrong+dir,either,either+dir), or round 2: levers,take1,take2,take3,gloss,glossonly,engine,dialect,raw,respelled; levers,hard = only the known-hard words; formants = measure clips already made (no speech); readings = the automatic step on text alone (no speech); autolisten = the automatic step heard (makes speech)"
         type: string
         default: ""
       price:
@@ -841,10 +841,12 @@ jobs:
             failed=0
             # "readings" makes no speech: a text model is asked how the test set's words are read. The test
             # set and the two classes are not on the server, so they go to a private temporary folder.
-            if [ "${TASHKEEL#readings}" != "$TASHKEEL" ]; then
+            # "autolisten" is the same step heard: it does make speech (the owner's yes, and it stops at 9 minutes).
+            if [ "${TASHKEEL#readings}" != "$TASHKEEL" ] || [ "${TASHKEEL#autolisten}" != "$TASHKEEL" ]; then
+              T=tashkeel_readings.php; [ "${TASHKEEL#autolisten}" = "$TASHKEEL" ] || T=tashkeel_auto_listen.php
               D="$($S 'mktemp -d')"
               for f in tests/tashkeel/golden.json app/Support/Tashkeel/WordReadings.php app/Support/Tashkeel/TashkeelScore.php; do git show "$GITHUB_SHA:$f" | $S "cat > $D/$(basename "$f")"; done
-              tool tashkeel_readings.php | $S "$FIND; DIR=$D ONLY='$TASHKEEL' nice php" || failed=1
+              tool "$T" | $S "$FIND; DIR=$D ONLY='$TASHKEEL' nice php" || failed=1
               $S "rm -rf $D"; rm -f ~/.ssh/id_deploy; exit "$failed"
             fi
             # "levers,..." is round 2 (what makes the voice obey); anything else is round 1.

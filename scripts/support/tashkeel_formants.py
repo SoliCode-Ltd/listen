@@ -18,6 +18,7 @@ and writes nothing.
   TASHKEEL=formants,n14   only the pairs of sentence n14, printed in full
   TASHKEEL=formants,engine   the standard engine's name clips the listeners disagreed on
   TASHKEEL=formants,jidda    the premium voice's جدة clips
+  TASHKEEL=formants,splits,20261124,031500   every clip of that listening run the listeners disagreed on
 """
 import io
 import os
@@ -88,6 +89,9 @@ def compact(tr):
 
 
 def fetch(clip):
+    if '.' in clip:  # a file name, as splits.json gives it
+        with urllib.request.urlopen(f'{BASE}/{RUN}/{clip}', timeout=30) as r:
+            return r.read()
     for ext in ('wav', 'mp3', 'ogg', 'flac'):
         try:
             with urllib.request.urlopen(f'{BASE}/{RUN}/{clip}.{ext}', timeout=30) as r:
@@ -177,6 +181,53 @@ def vowel(f1, f2):
     return 'mid'
 
 
+def splits():
+    """
+    Every clip of a listening run the two listeners disagreed on (splits.json, written beside the
+    clips), against the same sentence's other clip when the listeners agreed on that one. Where no
+    vowel differs much the two clips say the same sounds; where one does, both are printed to be read.
+    """
+    import json
+    with urllib.request.urlopen(f'{BASE}/{RUN}/splits.json', timeout=30) as r:
+        entries = json.loads(r.read().decode('utf-8'))
+    print(f'{len(entries)} clip(s) the listeners disagreed on, run {RUN}')
+    for e in entries:
+        print(f"\n== {e['id']}: meant {e['want']}; the listeners heard {e['heard'][0]} and {e['heard'][1]}")
+        try:
+            a = tracks(sound(fetch(e['clip'])))
+        except Exception as err:
+            print(f'   could not be read: {err}')
+            continue
+        if not e.get('partner'):
+            print('   no other clip of this sentence the listeners agree on: the clip alone, F1/F2 in tens of Hz every 20 ms')
+            compact(a)
+            continue
+        try:
+            b = tracks(sound(fetch(e['partner'])))
+        except Exception as err:
+            print(f'   the other clip could not be read: {err}')
+            continue
+        heard = 'both heard the reading meant' if e['partner_result'] == 'ok' else 'both heard ANOTHER reading'
+        print(f"   against {e['partner']} ({heard}); lengths {a['t'][-1]:.2f}s and {b['t'][-1]:.2f}s")
+        to = align(a['feat'], b['feat'])
+        big = 0
+        lines = []
+        for n, k in enumerate(nuclei(a), 1):
+            j = int(to[k])
+            f1a, f2a, f1b, f2b = mean_at(a, k, 'f1'), mean_at(a, k, 'f2'), mean_at(b, j, 'f1'), mean_at(b, j, 'f2')
+            far = np.isfinite(f1a + f2a + f1b + f2b) and (abs(f1a - f1b) >= 200 or abs(f2a - f2b) >= 450)
+            big += int(far)
+            lines.append(f'   {n:>4}  {a["t"][k]:5.2f}   {f1a:5.0f} {f2a:5.0f}  |  {b["t"][j]:5.2f}  {f1b:5.0f} {f2b:5.0f}  |  {f1a - f1b:+6.0f}  {f2a - f2b:+6.0f}{"   <<" if far else ""}')
+        if big == 0:
+            print('   no vowel differs much between the two clips: they say the same sounds')
+            continue
+        print(f'   {big} vowel(s) differ: vowel, at(s), this clip F1 F2 | the other clip at(s) F1 F2 | differences')
+        print('\n'.join(lines))
+        for name, tr in ((e['clip'], a), (e['partner'], b)):
+            print(f'   {name}: F1/F2 in tens of Hz every 20 ms')
+            compact(tr)
+
+
 def main():
     if not BASE:
         sys.exit('BASE is not set')
@@ -184,6 +235,11 @@ def main():
     global RUN
     only = [x for x in os.environ.get('TASHKEEL', '').split(',')[1:] if x]
     pairs = PAIRS
+    if 'splits' in only:
+        # "formants,splits,20261124,031500": the run 20261124-031500.
+        numbers = [x for x in only if x.isdigit()]
+        RUN = '-'.join(numbers[:2])
+        return splits()
     if 'engine' in only:
         pairs, RUN, only = ENGINE_PAIRS, ENGINE_RUN, [x for x in only if x != 'engine']
         brief = True
