@@ -16,6 +16,7 @@ and writes nothing.
 
   BASE=https://<staging>/storage/tashkeel-listen RUN=20261123-220024 python3 tashkeel_formants.py
   TASHKEEL=formants,n14   only the pairs of sentence n14, printed in full
+  TASHKEEL=formants,engine   the standard engine's name clips the listeners disagreed on
 """
 import io
 import os
@@ -39,6 +40,30 @@ PAIRS = [
     ('n12-dhakara-take1', 'n12-dhukira-take1', 'ذكر: asked for dhakara; the other clip is dhukira'),
     ('n14-khubar-take1', 'n14-khabar-take2', 'الخبر: asked for al-Khubar; the other clip is al-khabar'),
 ]
+
+
+# The other (standard) engine's name clips the two listeners disagreed on, each against the same
+# engine's clip of the other reading. Run 20261123-214519; asked for with "formants,engine".
+ENGINE_RUN = '20261123-214519'
+ENGINE_PAIRS = [
+    ('n13-jidda-engine', 'n13-jadda-engine', 'زرت جدة أمس: asked for Jidda; the other clip is jadda'),
+    ('n14-khubar-engine', 'n14-khabar-engine', 'سمعت عن الخبر أمس: asked for al-Khubar; the other clip is al-khabar'),
+    ('n15-umar-engine', 'n15-umr-engine', 'سألته عن عمر: asked for ʿUmar; the other clip is ʿumr'),
+    ('n16-hasan-engine', 'n16-husn-engine', 'أعجبني حسن كثيراً: asked for Ḥasan; the other clip is ḥusn'),
+    ('n19-ala-engine', 'n19-ula-engine', 'تكلمت مع علا: asked for ʿalā; the other clip is ʿUlā'),
+    ('n20-hamad-engine', 'n20-hamd-engine', 'شكرت حمد كثيراً: asked for Ḥamad; the other clip is ḥamd'),
+    ('n21-aniza-engine', 'n21-unayza-engine', 'وصلنا عنيزة مساء: asked for ʿAnīza; the other clip is ʿUnayza'),
+]
+
+
+def compact(tr):
+    """The whole clip on a few lines: F1/F2 in tens of Hz every 20 ms, a dot where there is no voice."""
+    for start in range(0, len(tr['t']), 50):
+        cells = []
+        for k in range(start, min(start + 50, len(tr['t'])), 2):
+            voiced = tr['f0'][k] > 0 and np.isfinite(tr['f1'][k]) and np.isfinite(tr['f2'][k])
+            cells.append(f"{tr['f1'][k] / 10:.0f}/{tr['f2'][k] / 10:.0f}" if voiced else '.')
+        print(f"     {tr['t'][start]:4.2f}s  " + ' '.join(cells))
 
 
 def fetch(clip):
@@ -135,8 +160,15 @@ def main():
     if not BASE:
         sys.exit('BASE is not set')
     # "formants,n14" measures only the pairs whose clip names start with n14, and prints them in full.
+    global RUN
     only = [x for x in os.environ.get('TASHKEEL', '').split(',')[1:] if x]
-    for asked, other, what in PAIRS:
+    pairs = PAIRS
+    if 'engine' in only:
+        pairs, RUN, only = ENGINE_PAIRS, ENGINE_RUN, [x for x in only if x != 'engine']
+        brief = True
+    else:
+        brief = False
+    for asked, other, what in pairs:
         if only and not any(asked.startswith(x + '-') for x in only):
             continue
         print(f'\n== {what}\n   {asked}  against  {other}')
@@ -157,7 +189,11 @@ def main():
         rows = [r for r in rows if np.isfinite(r[0])]
         if rows:
             print(f'   the vowel that differs most between the two clips: number {max(rows)[1]}')
-        if only or asked == PAIRS[0][0]:
+        if brief:
+            for name, tr in ((asked, a), (other, b)):
+                print(f'   {name}: F1/F2 in tens of Hz every 20 ms')
+                compact(tr)
+        elif only or asked == PAIRS[0][0]:
             for name, tr in ((asked, a), (other, b)):
                 print(f'   {name}, every 20 ms: time loudness pitch F1 F2')
                 for k in range(0, min(len(tr['t']), 141 if not only else 400), 2):
