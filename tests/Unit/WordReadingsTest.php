@@ -86,8 +86,8 @@ class WordReadingsTest extends TestCase
         // The same answer for a Fusha text keeps all three.
         $this->assertCount(3, WordReadings::find($text, null, fn (): string => $answer));
         // A caller that knows the dialect is not asked to decide it; one that does not, is.
-        $this->assertStringNotContainsString('First decide', WordReadings::prompt($text, 'Levantine Arabic'));
-        $this->assertStringContainsString('First decide what the text is written in', WordReadings::prompt($text));
+        $this->assertStringNotContainsString('Say what this one is written in', WordReadings::prompt($text, 'Levantine Arabic'));
+        $this->assertStringContainsString('Say what this one is written in', WordReadings::prompt($text));
         $this->assertStringContainsString('list ONLY names', WordReadings::prompt($text));
     }
 
