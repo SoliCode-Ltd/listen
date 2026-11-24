@@ -669,7 +669,7 @@ jobs:
             exit "$failed"
           fi
           if [ "$MODE" = readings-check ]; then
-            printf '%s' "$MEMBER" | grep -qE '^[0-9]*$' || { echo "member must be empty or a number of days"; exit 1; }
+            case "$MEMBER" in *[!0-9]*) echo "member must be empty or a number of days"; exit 1;; esac
             failed=0
             tool auto_readings_check.php | $S "$FIND; DAYS='$MEMBER' php" || failed=1
             rm -f ~/.ssh/id_deploy
