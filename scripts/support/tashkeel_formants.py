@@ -86,7 +86,7 @@ def compact(tr, first=0, last=None):
         for k in range(max(start, first), min(start + 50, last), 2):
             voiced = tr['f0'][k] > 0 and np.isfinite(tr['f1'][k]) and np.isfinite(tr['f2'][k])
             cells.append(f"{tr['f1'][k] / 10:.0f}/{tr['f2'][k] / 10:.0f}" if voiced else '.')
-        print(f"     {tr['t'][start]:4.2f}s  " + ' '.join(cells))
+        print(f"     {tr['t'][max(start, first)]:4.2f}s  " + ' '.join(cells))
 
 
 def fetch(clip):
