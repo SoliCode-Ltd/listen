@@ -30,6 +30,7 @@ use App\Models\User;
 use App\Services\ContentSafety\TextContentCheck;
 use App\Support\AudioDuration;
 use App\Support\AudioUrl;
+use App\Support\Tashkeel\AutoReadings;
 use App\Support\GenerationChoiceLabels;
 use App\Support\GenerationSource;
 use App\Support\HiddenAudio;
@@ -134,6 +135,16 @@ class AudioGenerationResource extends Resource
                         Placeholder::make('environment_label')
                             ->label('Sound environment')
                             ->content(fn (?AudioGeneration $record): string => GenerationChoiceLabels::environment((string) (($record?->settings_snapshot ?? [])['audio_effect'] ?? '')))
+                            ->columnSpanFull(),
+                        Placeholder::make('auto_readings_label')
+                            ->label('Automatic pronunciation')
+                            ->content(fn (?AudioGeneration $record): string => AutoReadings::describe(is_array(($record?->settings_snapshot ?? [])['auto_readings'] ?? null) ? $record->settings_snapshot['auto_readings'] : null))
+                            ->columnSpanFull(),
+                        Placeholder::make('spoken_text_label')
+                            ->label('Text as the voice read it')
+                            ->content(fn (?AudioGeneration $record): string => filled(($record?->settings_snapshot ?? [])['spoken_text'] ?? null)
+                                ? (string) $record->settings_snapshot['spoken_text']
+                                : 'As the member wrote it.')
                             ->columnSpanFull(),
                         Placeholder::make('dialogue_label')
                             ->label('Dialogue speakers')
