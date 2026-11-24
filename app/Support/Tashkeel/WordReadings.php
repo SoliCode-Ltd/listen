@@ -146,17 +146,17 @@ final class WordReadings
     public static function prompt(string $text, ?string $variety = null): string
     {
         $variety = trim((string) $variety);
-        $names = 'list ONLY names of people, places and brands; leave every other word alone, however it could be read. Give a name the vowels it has in that dialect.';
+        $names = 'list ONLY names of people, places and brands; leave every other word alone, however it could be read.';
 
         return "You prepare Arabic text for a text-to-speech voice. Arabic is written without its short vowels, so a few words can be said as two different words.\n\n"
             .($variety !== ''
-                ? "The text is written in {$variety}, a spoken dialect, and the voice already knows it: {$names}\n\n"
+                ? "The text is written in {$variety}, a spoken dialect, and the voice already knows it: {$names} Give a name the vowels it has in that dialect.\n\n"
                 : "First decide what the text is written in, from its own words and grammar and not from its subject: Modern Standard Arabic (Fusha), or a spoken dialect (Egyptian, Levantine, Gulf or another). A text that mixes Fusha with a dialect counts as that dialect.\n\n"
-                    ."If the text is in a dialect, the voice already knows that dialect: {$names}\n\n"
                     ."If the text is Fusha, list ONLY the words in it that the voice could say as the wrong word:\n"
                     ."- a word whose letters spell two or more different, common words, where the sentence decides which (علم: ʿilm, ʿalam or ʿalima; عقد: ʿaqd or ʿiqd; كتب: kataba, kutiba or kutub);\n"
-                    ."- a name of a person, a place or a brand whose vowels its letters do not give (جدة، الخبر، عمر، حمد).\n"
-                    ."Leave out everything else: a word with one natural reading (في، كان، المدينة، كبير), a word only because it is long, foreign or colloquial, and a word that already carries vowel marks inside it. Most sentences have none, one or two such words.\n\n")
+                    ."- a name of a person, a place or a brand whose vowels its letters do not give (جدة، الخبر، عمر، حمد), with the pronunciation a news reader uses in formal Arabic.\n"
+                    ."Leave out everything else: a word with one natural reading (في، كان، المدينة، كبير), a word only because it is long, foreign or colloquial, and a word that already carries vowel marks inside it. Most sentences have none, one or two such words.\n\n"
+                    ."If the text is in a dialect, the voice already knows that dialect: {$names}\n\n")
             ."For each word give:\n"
             ."- \"word\": the word copied exactly as it is written in the text, with any prefix attached to it and any mark it already has, without punctuation;\n"
             ."- \"marked\": the same letters with every vowel mark inside the word (fatha, damma, kasra, sukun, shadda), for the reading this sentence means. Never add, drop or change a letter, and do not stretch the word with a tatweel. Leave the last letter's case ending off;\n"

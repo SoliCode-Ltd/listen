@@ -41,6 +41,7 @@
  *   ONLY=readings,runs3   three runs of the written sentences and the passages
  *   ONLY=readings,labels  the step is told each text's variety from the test set, as before it judged for itself
  *   ONLY=readings,ptexts  the passages only (a quick look at the words marked in each)
+ *   ONLY=readings,wtexts  the written sentences and the passages only (a quick look after a change of the prompt)
  *   ONLY=readings,35      the model the site's dialect rewrite uses, instead of the default
  */
 
@@ -85,6 +86,10 @@ foreach (json_decode((string) @file_get_contents($dir.'/passages.json'), true)['
 $only = array_map('trim', explode(',', (string) getenv('ONLY')));
 if (in_array('ptexts', $only, true)) {
     $items = array_values(array_filter($items, fn (array $item): bool => ($item['source'] ?? '') === 'passage'));
+}
+// "wtexts": only the texts written for the test (the sentences and the passages), for a quick look after a change of the prompt.
+if (in_array('wtexts', $only, true)) {
+    $items = array_values(array_filter($items, fn (array $item): bool => in_array($item['source'] ?? '', ['written', 'passage'], true)));
 }
 $model = in_array('35', $only, true) ? 'gemini-3.5-flash' : (in_array('36', $only, true) ? 'gemini-3.6-flash' : 'gemini-3.8-flash');
 $runs = 5;
