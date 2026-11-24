@@ -30,7 +30,7 @@ class WordReadingsTest extends TestCase
             'not an entry',
         ]);
 
-        $this->assertSame([['word' => 'علم', 'marked' => 'عَلَم', 'said' => 'ʿalam', 'means' => 'a flag']], $kept);
+        $this->assertSame([['word' => 'علم', 'marked' => 'عَلَم', 'said' => 'ʿalam', 'means' => 'a flag', 'kind' => 'word']], $kept);
     }
 
     public function test_a_word_the_member_marked_or_saved_is_left_alone(): void
@@ -68,6 +68,23 @@ class WordReadingsTest extends TestCase
 
         $this->assertSame(['جَلْسَة'], array_column($kept, 'marked'));
         $this->assertSame(['letters changed' => 1, 'not in the text as written' => 1], $refused);
+    }
+
+    public function test_in_a_dialect_text_only_names_are_touched(): void
+    {
+        $text = 'جبنالك طقم من جدة بكل تفاصيله';
+        $answer = json_encode([
+            ['word' => 'جبنالك', 'marked' => 'جِبْنَالَك', 'said' => 'jibnālak', 'means' => 'we brought you', 'kind' => 'word'],
+            ['word' => 'جدة', 'marked' => 'جِدَّة', 'said' => 'Jidda', 'means' => 'the city of Jeddah', 'kind' => 'Name'],
+            // No kind given: taken for a word.
+            ['word' => 'بكل', 'marked' => 'بِكِلّ', 'said' => 'b-kill', 'means' => 'with all'],
+        ], JSON_UNESCAPED_UNICODE);
+
+        $this->assertSame(['جدة'], array_column(WordReadings::find($text, 'Levantine Arabic', fn (): string => $answer), 'word'));
+        // The same answer for a Fusha text keeps all three.
+        $this->assertCount(3, WordReadings::find($text, null, fn (): string => $answer));
+        $this->assertStringContainsString('List ONLY names', WordReadings::prompt($text, 'Levantine Arabic'));
+        $this->assertStringNotContainsString('List ONLY names', WordReadings::prompt($text));
     }
 
     public function test_no_more_than_the_limit_and_each_word_once(): void

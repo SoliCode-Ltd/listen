@@ -14,7 +14,9 @@ namespace App\Support\Tashkeel;
  * is put to the voice in two ways at once (apply, direction), because the
  * listening rounds found marks alone a hint, and marks with the meaning told
  * the surest: the word is marked in the text, and the voice is told what it
- * means and how it is said. The rest of the text stays as written.
+ * means and how it is said. The rest of the text stays as written. In a
+ * dialect text only names are touched: a voice set to a dialect already says
+ * that dialect's words right, so marking them could only do harm.
  *
  * Makes no request by itself: the caller gives the function that asks the
  * model, so this can be measured and tested without one.
@@ -27,7 +29,7 @@ final class WordReadings
     /**
      * @param  callable(string): ?string  $ask  sends the prompt, returns the model's answer (null when it failed)
      * @param  list<string>  $keep  spellings the member saved, to be left alone
-     * @return list<array{word: string, marked: string, said: string, means: string}>
+     * @return list<array{word: string, marked: string, said: string, means: string, kind: string}>
      */
     public static function find(string $text, ?string $variety, callable $ask, array $keep = []): array
     {
@@ -35,8 +37,10 @@ final class WordReadings
             return [];
         }
         $raw = $ask(self::prompt($text, $variety));
+        $refused = [];
 
-        return is_string($raw) ? self::accept($text, self::parse($raw), $keep) : [];
+        // In a dialect only names are touched: the voice already says the dialect's own words right.
+        return is_string($raw) ? self::accept($text, self::parse($raw), $keep, $refused, trim((string) $variety) !== '') : [];
     }
 
     /** $variety: what the text is written in, in English ("Egyptian Arabic"); null or empty for Fusha. */
@@ -50,13 +54,14 @@ final class WordReadings
             ."- a name of a person, a place or a brand whose vowels its letters do not give (جدة، الخبر، عمر، حمد).\n"
             ."Leave out everything else: a word with one natural reading (في، كان، المدينة، كبير), a word only because it is long, foreign or colloquial, and a word that already carries vowel marks inside it. Most sentences have none, one or two such words.\n\n"
             .($variety !== ''
-                ? "The text is written in {$variety}. The voice already knows this variety: leave its everyday words alone, and where you do list a word, give that variety's own vowels, not those of Fusha.\n\n"
+                ? "The text is written in {$variety}, and the voice already knows this variety. List ONLY names of people, places and brands; leave every other word alone, however it could be read. Give a name the vowels it has in that variety.\n\n"
                 : "The text is Modern Standard Arabic (Fusha).\n\n")
             ."For each word give:\n"
             ."- \"word\": the word copied exactly as it is written in the text, with any prefix attached to it and any mark it already has, without punctuation;\n"
             ."- \"marked\": the same letters with every vowel mark inside the word (fatha, damma, kasra, sukun, shadda), for the reading this sentence means. Never add, drop or change a letter, and do not stretch the word with a tatweel. Leave the last letter's case ending off;\n"
             ."- \"said\": how it is said, in Latin letters;\n"
-            ."- \"means\": what it means here, in two to five English words.\n\n"
+            ."- \"means\": what it means here, in two to five English words;\n"
+            ."- \"kind\": \"name\" for the name of a person, a place or a brand, \"word\" for anything else.\n\n"
             .'Answer with a JSON array only, at most '.self::MAX." items, in the order the words appear. When no word qualifies, answer [].\n\n"
             ."Text:\n«{$text}»";
     }
@@ -87,9 +92,10 @@ final class WordReadings
      * @param  list<array<string, mixed>>  $entries
      * @param  list<string>  $keep
      * @param  array<string, int>  $refused  why entries were left out, counted (for measuring)
-     * @return list<array{word: string, marked: string, said: string, means: string}>
+     * @param  bool  $namesOnly  a dialect text: only names are used
+     * @return list<array{word: string, marked: string, said: string, means: string, kind: string}>
      */
-    public static function accept(string $text, array $entries, array $keep = [], array &$refused = []): array
+    public static function accept(string $text, array $entries, array $keep = [], array &$refused = [], bool $namesOnly = false): array
     {
         $kept = array_map(fn (string $w): string => TashkeelScore::strip($w), array_values(array_filter($keep, 'is_string')));
         $marks = '/['.TashkeelScore::MARKS.']/u';
@@ -101,8 +107,11 @@ final class WordReadings
             $said = self::plain((string) ($entry['said'] ?? ''));
             $means = self::plain((string) ($entry['means'] ?? ''));
             $bare = TashkeelScore::strip($word);
+            // Anything the model does not call a name is a word.
+            $kind = strtolower(trim((string) ($entry['kind'] ?? ''))) === 'name' ? 'name' : 'word';
             $why = match (true) {
                 count($out) >= self::MAX => 'over the limit',
+                $namesOnly && $kind !== 'name' => 'a word in a dialect text',
                 $bare === '' || $marked === '' || $said === '' || $means === '' => 'incomplete',
                 // One word of Arabic letters. A mark of its own is allowed only at its end (كتاباً).
                 ! preg_match('/^\p{Arabic}+$/u', $bare) => 'not one Arabic word',
@@ -122,7 +131,7 @@ final class WordReadings
 
                 continue;
             }
-            $out[$bare] = ['word' => $word, 'marked' => self::keepingOwnMarks($word, $marked), 'said' => $said, 'means' => $means];
+            $out[$bare] = ['word' => $word, 'marked' => self::keepingOwnMarks($word, $marked), 'said' => $said, 'means' => $means, 'kind' => $kind];
         }
 
         return array_values($out);
