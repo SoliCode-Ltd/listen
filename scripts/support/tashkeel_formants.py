@@ -15,6 +15,7 @@ Runs on the GitHub runner (the "tashkeel-listen" mode with the input
 and writes nothing.
 
   BASE=https://<staging>/storage/tashkeel-listen RUN=20261123-220024 python3 tashkeel_formants.py
+  TASHKEEL=formants,n14   only the pairs of sentence n14, printed in full
 """
 import io
 import os
@@ -133,7 +134,11 @@ def vowel(f1, f2):
 def main():
     if not BASE:
         sys.exit('BASE is not set')
+    # "formants,n14" measures only the pairs whose clip names start with n14, and prints them in full.
+    only = [x for x in os.environ.get('TASHKEEL', '').split(',')[1:] if x]
     for asked, other, what in PAIRS:
+        if only and not any(asked.startswith(x + '-') for x in only):
+            continue
         print(f'\n== {what}\n   {asked}  against  {other}')
         try:
             a, b = tracks(sound(fetch(asked))), tracks(sound(fetch(other)))
@@ -152,10 +157,10 @@ def main():
         rows = [r for r in rows if np.isfinite(r[0])]
         if rows:
             print(f'   the vowel that differs most between the two clips: number {max(rows)[1]}')
-        if asked == PAIRS[0][0]:
+        if only or asked == PAIRS[0][0]:
             for name, tr in ((asked, a), (other, b)):
-                print(f'   {name}, every 20 ms up to 1.4 s: time loudness pitch F1 F2')
-                for k in range(0, min(len(tr['t']), 141), 2):
+                print(f'   {name}, every 20 ms: time loudness pitch F1 F2')
+                for k in range(0, min(len(tr['t']), 141 if not only else 400), 2):
                     print(f'     {tr["t"][k]:4.2f} {tr["loud"][k]:5.1f} {tr["f0"][k]:4.0f} {tr["f1"][k]:5.0f} {tr["f2"][k]:5.0f}')
 
 

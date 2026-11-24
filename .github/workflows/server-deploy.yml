@@ -918,6 +918,7 @@ jobs:
         if: inputs.mode == 'tashkeel-listen' && startsWith(inputs.tashkeel, 'formants')
         env:
           BASE: https://phplaravel-1516130-6707450.cloudwaysapps.com/storage/tashkeel-listen
+          TASHKEEL: ${{ inputs.tashkeel }}
         run: |
           pip install --quiet numpy soundfile praat-parselmouth
           python3 scripts/support/tashkeel_formants.py
