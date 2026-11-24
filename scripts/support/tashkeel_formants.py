@@ -69,6 +69,14 @@ JIDDA_PAIRS = [
 ]
 
 
+# الجزر as carrots with the meaning told and on the other engine: the listeners disagreed on both.
+# Asked for with "formants,jazar".
+JAZAR_PAIRS = [
+    ('n5-jazar-gloss', 'n5-juzur-gloss', 'الجزر كثيرة هنا, marks and the meaning told: asked for al-jazar (carrots); the other clip is al-juzur', '20261123-214519'),
+    ('n5-jazar-engine', 'n5-juzur-engine', 'the same on the other engine', '20261123-214519'),
+]
+
+
 def compact(tr):
     """The whole clip on a few lines: F1/F2 in tens of Hz every 20 ms, a dot where there is no voice."""
     for start in range(0, len(tr['t']), 50):
@@ -179,6 +187,8 @@ def main():
     if 'engine' in only:
         pairs, RUN, only = ENGINE_PAIRS, ENGINE_RUN, [x for x in only if x != 'engine']
         brief = True
+    elif 'jazar' in only:
+        pairs, only, brief = JAZAR_PAIRS, [x for x in only if x != 'jazar'], True
     elif 'jidda' in only:
         pairs, only, brief = JIDDA_PAIRS, [x for x in only if x != 'jidda'], True
     else:
