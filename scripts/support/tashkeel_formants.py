@@ -17,6 +17,7 @@ and writes nothing.
   BASE=https://<staging>/storage/tashkeel-listen RUN=20261123-220024 python3 tashkeel_formants.py
   TASHKEEL=formants,n14   only the pairs of sentence n14, printed in full
   TASHKEEL=formants,engine   the standard engine's name clips the listeners disagreed on
+  TASHKEEL=formants,jidda    the premium voice's جدة clips
 """
 import io
 import os
@@ -53,6 +54,18 @@ ENGINE_PAIRS = [
     ('n19-ala-engine', 'n19-ula-engine', 'تكلمت مع علا: asked for ʿalā; the other clip is ʿUlā'),
     ('n20-hamad-engine', 'n20-hamd-engine', 'شكرت حمد كثيراً: asked for Ḥamad; the other clip is ḥamd'),
     ('n21-aniza-engine', 'n21-unayza-engine', 'وصلنا عنيزة مساء: asked for ʿAnīza; the other clip is ʿUnayza'),
+]
+
+
+# The premium voice's جدة clips (Listener 1 heard "jadda" in all of them) and one عنيزة clip, each
+# against a clip both listeners agreed on. Asked for with "formants,jidda". [clip, other, what, run]
+JIDDA_PAIRS = [
+    ('n13-jidda-take1', 'n13-jadda-take1', 'زرت جدة أمس, marks only, take 1: asked for Jidda', '20261123-220024'),
+    ('n13-jidda-take2', 'n13-jadda-take1', 'the same, take 2', '20261123-220024'),
+    ('n13-jidda-take3', 'n13-jadda-take1', 'the same, take 3', '20261123-220024'),
+    ('n13-jidda-gloss', 'n13-jadda-gloss', 'the same, marks and the meaning told', '20261123-214519'),
+    ('n13-jidda-glossonly', 'n13-jadda-glossonly', 'the same, the meaning told and no marks', '20261123-214519'),
+    ('n21-aniza-take1', 'n21-unayza-take1', 'وصلنا عنيزة مساء, marks only, take 1: asked for ʿAnīza', '20261123-220024'),
 ]
 
 
@@ -166,9 +179,15 @@ def main():
     if 'engine' in only:
         pairs, RUN, only = ENGINE_PAIRS, ENGINE_RUN, [x for x in only if x != 'engine']
         brief = True
+    elif 'jidda' in only:
+        pairs, only, brief = JIDDA_PAIRS, [x for x in only if x != 'jidda'], True
     else:
         brief = False
-    for asked, other, what in pairs:
+    shown = set()
+    for pair in pairs:
+        asked, other, what = pair[:3]
+        if len(pair) > 3:
+            RUN = pair[3]
         if only and not any(asked.startswith(x + '-') for x in only):
             continue
         print(f'\n== {what}\n   {asked}  against  {other}')
@@ -191,6 +210,9 @@ def main():
             print(f'   the vowel that differs most between the two clips: number {max(rows)[1]}')
         if brief:
             for name, tr in ((asked, a), (other, b)):
+                if name in shown:
+                    continue
+                shown.add(name)
                 print(f'   {name}: F1/F2 in tens of Hz every 20 ms')
                 compact(tr)
         elif only or asked == PAIRS[0][0]:
