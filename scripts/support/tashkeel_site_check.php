@@ -101,7 +101,9 @@ if ($memberId === 0) {
     $ownMember = false;
 }
 $freePlan = $access->freePlan();
-$paidPlan = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->orderByDesc('price_cents')->first();
+// The dearest plan on sale that lets a member write their own direction, when one does; otherwise the dearest.
+$onSale = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->where('voice_tier', 'hd')->orderByDesc('price_cents');
+$paidPlan = (clone $onSale)->where('custom_prompt_enabled', true)->first() ?? $onSale->first();
 if ($ownMember && ! $look && $paidPlan) {
     // The dearest plan on sale for the run (premium voices, a member's own direction); back to free at the end.
     Subscription::withoutEvents(fn () => $access->assignPlan($member, $paidPlan));
@@ -166,10 +168,15 @@ foreach ($only as $token) {
     }
 }
 $direction = 'اقرأ بصوت مذيع أخبار هادئ وواثق';
+// The third set is a delivery a member chooses: their own direction where the plan lets them write one,
+// otherwise a style and a mood from the studio's lists.
+$own = (bool) ($plan?->custom_prompt_enabled ?? false);
 $sets = [
-    ['label' => 'voice 1', 'voice' => $chosen[0], 'items' => $forVoices, 'style' => null],
-    ['label' => 'voice 2', 'voice' => $chosen[1], 'items' => $forVoices, 'style' => null],
-    ['label' => 'voice 1, own direction', 'voice' => $chosen[0], 'items' => $forStyle, 'style' => $direction],
+    ['label' => 'voice 1', 'voice' => $chosen[0], 'items' => $forVoices, 'style' => null, 'performance' => 'neutral', 'emotion' => 'neutral'],
+    ['label' => 'voice 2', 'voice' => $chosen[1], 'items' => $forVoices, 'style' => null, 'performance' => 'neutral', 'emotion' => 'neutral'],
+    $own
+        ? ['label' => 'voice 1, own direction', 'voice' => $chosen[0], 'items' => $forStyle, 'style' => $direction, 'performance' => 'neutral', 'emotion' => 'neutral']
+        : ['label' => 'voice 1, commercial style, excited', 'voice' => $chosen[0], 'items' => $forStyle, 'style' => null, 'performance' => 'commercial', 'emotion' => 'excited'],
 ];
 
 $run = now()->utc()->format('Ymd-His');
@@ -234,7 +241,7 @@ $make = function (array $item, array $set, int $n, string $which) use ($memberId
         'user_id' => $memberId, 'input_text' => $item['text'], 'source_language' => 'ar', 'target_language' => 'ar',
         'voice_tier' => 'hd', 'voice_name' => $voice->internal_voice_id, 'tts_provider' => $voice->provider,
         'translate' => false, 'status' => 'queued', 'dialect' => 'ar-XA',
-        'performance_style' => 'neutral', 'emotion' => 'neutral', 'style_prompt' => $set['style'],
+        'performance_style' => $set['performance'], 'emotion' => $set['emotion'], 'style_prompt' => $set['style'],
     ]);
     GenerateAudioJob::dispatchSync($generation->id);
     $generation->refresh();
@@ -342,8 +349,6 @@ if ($rows !== []) {
         array_sum(array_map(fn (array $r): float => $r['today']['cost'], $rows)) / count($rows),
         $autos === [] ? 0 : array_sum(array_map(fn (array $r): float => $r['auto']['cost'], $autos)) / count($autos));
 }
-$styled = array_values(array_filter($rows, fn (array $r): bool => $sets[$r['set']]['style'] !== null));
-echo '  the member\'s own direction was kept on the request for ', count(array_filter($styled, fn (array $r): bool => (string) $r['today']['style_used'] !== '')), ' of ', count($styled), " voices of the third set\n";
 
 // What the step costs and how long it takes, the first time a text is made.
 if ($costs !== []) {
