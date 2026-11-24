@@ -28,6 +28,7 @@
  *   ssh user@host 'cd ~/public_html && DIR=/tmp/x ONLY=autolisten php' < scripts/support/tashkeel_auto_listen.php
  *   ONLY=autolisten,cap5   stop at 5 minutes of speech
  *   ONLY=autolisten,first3 only the first three sentences (a trial of the whole run)
+ *   ONLY=autolisten,skip3  all but the first three (after such a trial)
  */
 
 use App\Services\Tts\GeminiKeyManager;
@@ -91,6 +92,10 @@ while ($homographs !== [] || $names !== []) {
 foreach ($only as $token) {
     if (preg_match('/^first(\d+)$/', $token, $m)) {
         $items = array_slice($items, 0, (int) $m[1]);
+    }
+    // "skip3": leave out the first three, when a trial has already made them.
+    if (preg_match('/^skip(\d+)$/', $token, $m)) {
+        $items = array_slice($items, (int) $m[1]);
     }
 }
 
