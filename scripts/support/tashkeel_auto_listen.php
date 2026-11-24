@@ -108,12 +108,13 @@ $reader = 'gemini-3.8-flash';
 mt_srand(11);
 
 // The text model of the automatic step: the prompt in, its answer out (null when it failed).
-$ask = function (string $prompt) use ($base, $key, $reader): ?string {
+// The step asks several times; each ask carries its own fixed seed (the second try of a failed one carries none).
+$ask = function (string $prompt, int $k = 0) use ($base, $key, $reader): ?string {
     foreach ([true, false] as $thinking) {
         try {
             $r = Http::timeout(60)->withHeaders(['x-goog-api-key' => $key])->post($base.'/models/'.$reader.':generateContent', [
                 'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                'generationConfig' => ['responseMimeType' => 'application/json', 'temperature' => 0] + ($thinking ? ['thinkingConfig' => ['thinkingLevel' => 'low']] : []),
+                'generationConfig' => ['responseMimeType' => 'application/json', 'temperature' => 0] + ($thinking ? ['seed' => 101 + $k, 'thinkingConfig' => ['thinkingLevel' => 'low']] : []),
             ]);
             $text = $r->successful() ? data_get($r->json(), 'candidates.0.content.parts.0.text') : null;
             if (is_string($text) && $text !== '') {

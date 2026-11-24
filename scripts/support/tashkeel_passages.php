@@ -100,12 +100,13 @@ $reader = 'gemini-3.8-flash';
 mt_srand(11);
 
 // The text model of the automatic step: the prompt in, its answer out (null when it failed).
-$ask = function (string $prompt) use ($base, $key, $reader): ?string {
+// The step asks several times; each ask carries its own fixed seed (the second try of a failed one carries none).
+$ask = function (string $prompt, int $k = 0) use ($base, $key, $reader): ?string {
     foreach ([true, false] as $thinking) {
         try {
             $r = Http::timeout(60)->withHeaders(['x-goog-api-key' => $key])->post($base.'/models/'.$reader.':generateContent', [
                 'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                'generationConfig' => ['responseMimeType' => 'application/json', 'temperature' => 0] + ($thinking ? ['thinkingConfig' => ['thinkingLevel' => 'low']] : []),
+                'generationConfig' => ['responseMimeType' => 'application/json', 'temperature' => 0] + ($thinking ? ['seed' => 101 + $k, 'thinkingConfig' => ['thinkingLevel' => 'low']] : []),
             ]);
             $text = $r->successful() ? data_get($r->json(), 'candidates.0.content.parts.0.text') : null;
             if (is_string($text) && $text !== '') {
@@ -269,7 +270,8 @@ foreach ($passages as $p) {
         $rows[] = ['id' => $p['id'], 'w' => $w, 'today' => $today[$i], 'auto' => $auto[$i]];
         echo sprintf("  %-10s %-5s want %-9s today %-5s (%s | %s)   auto %-5s (%s | %s)   step: %s\n", $w['word'].($w['n'] > 1 ? '#'.$w['n'] : ''), $w['kind'], $w['want'],
             $today[$i]['result'], $today[$i]['a'], $today[$i]['b'], $auto[$i]['result'], $auto[$i]['a'], $auto[$i]['b'],
-            ['left' => 'left alone', 'earlier' => 'the same letters were marked earlier in the text', 'marked' => 'marked, the right reading'][$w['step']] ?? 'MARKED WITH ANOTHER READING');
+            (['left' => 'left alone', 'earlier' => 'the same letters were marked earlier in the text', 'marked' => 'marked, the right reading'][$w['step']] ?? 'MARKED WITH ANOTHER READING')
+                .(($w['hard'] ?? false) ? '   [known hard]' : ''));
         foreach (['today' => [$today[$i], $todayFile, $auto[$i], $autoFile], 'auto' => [$auto[$i], $autoFile, $today[$i], $todayFile]] as $which => [$mine, $file, $other, $otherFile]) {
             if ($mine['result'] === 'split' && $file !== $otherFile) {
                 $splits[] = ['clip' => $file, 'id' => $p['id'].'-'.$which.' '.$w['word'].($w['n'] > 1 ? '#'.$w['n'] : ''), 'want' => $w['want'], 'heard' => [$mine['a'], $mine['b']],
@@ -312,13 +314,17 @@ $table = function (string $title, array $mine): void {
     }
     echo '  Changed between the two: ', $moves === [] ? 'none' : implode('; ', $moves), "\n";
 };
-$table('Heard: every word scored', $rows);
+// The known-hard words (شعر as poetry) are heard and shown, and counted apart: the voice says them one way or another from take to take.
+$hardRows = array_values(array_filter($rows, fn (array $r): bool => (bool) ($r['w']['hard'] ?? false)));
+$rows = array_values(array_filter($rows, fn (array $r): bool => ! ($r['w']['hard'] ?? false)));
+$table('Heard: every word scored (the known-hard ones apart)', $rows);
 $table('Heard: ordinary words', array_values(array_filter($rows, fn (array $r): bool => $r['w']['kind'] === 'word')));
 $table('Heard: names', array_values(array_filter($rows, fn (array $r): bool => $r['w']['kind'] === 'name')));
 $table('Heard: words the step marked with the right reading', array_values(array_filter($rows, fn (array $r): bool => $r['w']['step'] === 'marked')));
 $table('Heard: words the step left alone', array_values(array_filter($rows, fn (array $r): bool => $r['w']['step'] === 'left')));
 $table('Heard: words whose letters the step marked earlier in the text for another word', array_values(array_filter($rows, fn (array $r): bool => $r['w']['step'] === 'earlier')));
 $table('Heard: words the step marked with another reading than the reference', array_values(array_filter($rows, fn (array $r): bool => str_starts_with($r['w']['step'], 'marked-'))));
+$table('Heard: known-hard words, counted for or against nothing', $hardRows);
 
 $disk->put('tashkeel-listen/'.$run.'/splits.json', json_encode($splits, JSON_UNESCAPED_UNICODE));
 echo "\nWords the listeners disagree on: ", count($splits), ' (', count(array_filter($splits, fn (array $s): bool => $s['partner'] !== null)),

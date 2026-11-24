@@ -18,6 +18,13 @@ namespace App\Support\Tashkeel;
  * dialect text only names are touched: a voice set to a dialect already says
  * that dialect's words right, so marking them could only do harm.
  *
+ * The model does not answer the same way twice: asked once, it listed رفع in
+ * two runs of a passage and skipped it in the third, and the voice then read
+ * that word wrongly. So it is asked several times (ASKS) and a word is used
+ * only when most of the answers give it, with the same reading (agreed); the
+ * words kept are put in the order of the text, so the limit always falls on
+ * the same ones.
+ *
  * Makes no request by itself: the caller gives the function that asks the
  * model, so this can be measured and tested without one.
  */
@@ -26,21 +33,89 @@ final class WordReadings
     /** The most words one piece of text may carry: a longer direction is read less closely. */
     public const MAX = 8;
 
+    /** How many times the model is asked about one text: a word is used when most of the answers agree on it. */
+    public const ASKS = 3;
+
     /**
-     * @param  callable(string): ?string  $ask  sends the prompt, returns the model's answer (null when it failed)
+     * @param  callable(string, int): ?string  $ask  sends the prompt, returns the model's answer (null when it failed);
+     *                                               its second argument counts the asks from 0 (a caller may seed the model with it)
      * @param  list<string>  $keep  spellings the member saved, to be left alone
      * @return list<array{word: string, marked: string, said: string, means: string, kind: string}>
      */
-    public static function find(string $text, ?string $variety, callable $ask, array $keep = []): array
+    public static function find(string $text, ?string $variety, callable $ask, array $keep = [], int $asks = self::ASKS): array
     {
         if (! preg_match('/\p{Arabic}/u', $text)) {
             return [];
         }
-        $raw = $ask(self::prompt($text, $variety));
+        $prompt = self::prompt($text, $variety);
+        $answers = [];
+        for ($k = 0; $k < max(1, $asks); $k++) {
+            $raw = $ask($prompt, $k);
+            if (is_string($raw)) {
+                $answers[] = $raw;
+            }
+        }
         $refused = [];
 
         // In a dialect only names are touched: the voice already says the dialect's own words right.
-        return is_string($raw) ? self::accept($text, self::parse($raw), $keep, $refused, trim((string) $variety) !== '') : [];
+        return self::agreed($text, $answers, $keep, $refused, trim((string) $variety) !== '');
+    }
+
+    /**
+     * What several answers to the same prompt agree on: a word is kept when more
+     * than half of the answers give it the same reading (one answer alone decides
+     * when it is the only one). Kept in the order of the text, up to the limit.
+     *
+     * @param  list<string>  $answers  the model's answers as they came (the ones that failed left out)
+     * @param  list<string>  $keep
+     * @param  array<string, int>  $refused
+     * @return list<array{word: string, marked: string, said: string, means: string, kind: string}>
+     */
+    public static function agreed(string $text, array $answers, array $keep = [], array &$refused = [], bool $namesOnly = false): array
+    {
+        $votes = [];
+        foreach ($answers as $raw) {
+            foreach (self::accept($text, self::parse($raw), $keep, $refused, $namesOnly, PHP_INT_MAX) as $reading) {
+                $bare = TashkeelScore::strip($reading['word']);
+                // With the answers that gave this word the same reading (the ending and a sukun make no difference).
+                $with = null;
+                foreach ($votes[$bare] ?? [] as $g => $given) {
+                    if (self::sameReading($given[0]['marked'], $reading['marked'])) {
+                        $with = $g;
+                        break;
+                    }
+                }
+                if ($with === null) {
+                    $votes[$bare][] = [$reading];
+                } else {
+                    $votes[$bare][$with][] = $reading;
+                }
+            }
+        }
+        $need = intdiv(count($answers), 2) + 1;
+        $kept = [];
+        foreach ($votes as $bare => $byReading) {
+            // The reading most answers gave; between two as often given, the one given first.
+            $most = [];
+            foreach ($byReading as $given) {
+                if (count($given) > count($most)) {
+                    $most = $given;
+                }
+            }
+            if (count($most) < $need) {
+                $refused['not agreed between the answers'] = ($refused['not agreed between the answers'] ?? 0) + 1;
+
+                continue;
+            }
+            preg_match(self::whole($most[0]['word']), $text, $found, PREG_OFFSET_CAPTURE);
+            $kept[] = [$found[0][1] ?? PHP_INT_MAX, $most[0]];
+        }
+        usort($kept, fn (array $a, array $b): int => $a[0] <=> $b[0]);
+        if (count($kept) > self::MAX) {
+            $refused['over the limit'] = ($refused['over the limit'] ?? 0) + count($kept) - self::MAX;
+        }
+
+        return array_column(array_slice($kept, 0, self::MAX), 1);
     }
 
     /** $variety: what the text is written in, in English ("Egyptian Arabic"); null or empty for Fusha. */
@@ -93,9 +168,10 @@ final class WordReadings
      * @param  list<string>  $keep
      * @param  array<string, int>  $refused  why entries were left out, counted (for measuring)
      * @param  bool  $namesOnly  a dialect text: only names are used
+     * @param  int  $limit  the most entries kept, in the order given
      * @return list<array{word: string, marked: string, said: string, means: string, kind: string}>
      */
-    public static function accept(string $text, array $entries, array $keep = [], array &$refused = [], bool $namesOnly = false): array
+    public static function accept(string $text, array $entries, array $keep = [], array &$refused = [], bool $namesOnly = false, int $limit = self::MAX): array
     {
         $kept = array_map(fn (string $w): string => TashkeelScore::strip($w), array_values(array_filter($keep, 'is_string')));
         $marks = '/['.TashkeelScore::MARKS.']/u';
@@ -110,7 +186,7 @@ final class WordReadings
             // Anything the model does not call a name is a word.
             $kind = strtolower(trim((string) ($entry['kind'] ?? ''))) === 'name' ? 'name' : 'word';
             $why = match (true) {
-                count($out) >= self::MAX => 'over the limit',
+                count($out) >= $limit => 'over the limit',
                 $namesOnly && $kind !== 'name' => 'a word in a dialect text',
                 $bare === '' || $marked === '' || $said === '' || $means === '' => 'incomplete',
                 // One word of Arabic letters. A mark of its own is allowed only at its end (كتاباً).
@@ -180,6 +256,12 @@ final class WordReadings
         preg_match_all('/([^'.TashkeelScore::MARKS.'])(['.TashkeelScore::MARKS.']*)/u', $word, $found, PREG_SET_ORDER);
 
         return array_map(fn (array $u): array => [$u[1], $u[2]], $found);
+    }
+
+    /** Two markings of a word that are one reading: neither has a vowel inside the word that the other contradicts or leaves open. */
+    private static function sameReading(string $a, string $b): bool
+    {
+        return TashkeelScore::reading($a, $b) === 'same' && TashkeelScore::reading($b, $a) === 'same';
     }
 
     /** No mark before the word's last two letters: an ending the writer put (كتاباً) is not a reading. */

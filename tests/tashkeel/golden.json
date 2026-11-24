@@ -1,7 +1,7 @@
 {
- "version": 5,
+ "version": 6,
  "locked": false,
- "about": "The tashkeel test set. 270 single sentences members made voices of (anonymized sample of live, 2026-11-23; sentences with a person's private details, explicit ones, scripture and poetry, and dialects outside the four in scope were left out), 42 written sentences whose marked word is a homograph and whose context decides its reading, and 25 written sentences whose marked word is a name that is also an ordinary word (tag: name; member sentences with a name in them carry the tag too). variety: what the sentence is written in. A sentence counts only once the owner has approved its ref (approved: true); the set is locked (locked: true) when all are, and is not changed after that. known-hard: a word the premium voice got wrong on every marked take in the listening rounds (الجزر as carrots, دِين, جدة, علا as Alaa); their sentences here are ones whose context decides the reading, and the spoken side of the same words is kept by scripts/support/tashkeel_levers.php (\"levers,hard\"). listen: for a written sentence, the readings a listener chooses between and the one meant (id: the word marked, in Latin letters, its meaning). note: something in the draft the owner should look at.",
+ "about": "The tashkeel test set. 270 single sentences members made voices of (anonymized sample of live, 2026-11-23; sentences with a person's private details, explicit ones, scripture and poetry, and dialects outside the four in scope were left out), 42 written sentences whose marked word is a homograph and whose context decides its reading, and 25 written sentences whose marked word is a name that is also an ordinary word (tag: name; member sentences with a name in them carry the tag too). variety: what the sentence is written in. A sentence counts only once the owner has approved its ref (approved: true); the set is locked (locked: true) when all are, and is not changed after that. known-hard: a word the premium voice got wrong on every marked take in the listening rounds (الجزر as carrots, دِين, جدة, علا as Alaa), or says one way or the other from take to take whatever it is given (شعر as poetry, added 2026-11-24); their sentences here are ones whose context decides the reading, and the spoken side of the same words is kept by scripts/support/tashkeel_levers.php (\"levers,hard\"). listen: for a written sentence, the readings a listener chooses between and the one meant (id: the word marked, in Latin letters, its meaning). note: something in the draft the owner should look at.",
  "policy": "Approved by the owner 2026-11-23. Every word is fully marked inside (vowels, shadda, sukun): that decides how it is said. Endings are marked as a careful news reader says them: spoken inside a phrase, silent at a pause, and a silent ending is left without a mark, so it is not scored (the tanween of an adverb, شكرًا / مباشرةً, is said and is marked). An ending a reader may say either way (after a name, before a number or a foreign word) is left without a mark too. Endings count a fifth. Dialect sentences are marked with the dialect's own vowels and carry no case endings. Letters, digits, Latin words and punctuation stay exactly as the member wrote them.",
  "items": [
   {
@@ -365,7 +365,8 @@
    "variety": "fusha",
    "voice_dialect": "fusha",
    "tags": [
-    "homograph"
+    "homograph",
+    "known-hard"
    ],
    "approved": false,
    "text": "يحب جدي شعر المتنبي.",
@@ -391,7 +392,8 @@
       "he felt"
      ]
     }
-   }
+   },
+   "note": "Known hard since 2026-11-24 (owner): the voice says this word as \"poetry\" or as \"hair\" from one take to the next, with or without marks, so it is tracked and not counted for or against a change."
   },
   {
    "id": "h12",

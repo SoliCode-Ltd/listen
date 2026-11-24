@@ -106,6 +106,60 @@ class WordReadingsTest extends TestCase
         $this->assertSame('عقد', $kept[1]['word']);
     }
 
+    public function test_a_word_is_used_only_when_most_answers_agree_on_its_reading(): void
+    {
+        $entry = fn (string $word, string $marked, string $said): array => ['word' => $word, 'marked' => $marked, 'said' => $said, 'means' => 'm'];
+        $answers = [
+            // رفع in two answers of three (once with its ending, once without): kept. جدة in one: not.
+            json_encode([$entry('علم', 'عَلَم', 'ʿalam'), $entry('رفع', 'رَفَعَ', 'rafaʿa'), $entry('جدة', 'جِدَّة', 'Jidda')], JSON_UNESCAPED_UNICODE),
+            json_encode([$entry('رفع', 'رَفَع', 'rafaʿa 2'), $entry('علم', 'عِلْم', 'ʿilm')], JSON_UNESCAPED_UNICODE),
+            // علم: "ʿalam" twice against "ʿilm" once. الخبر: three answers, three readings.
+            json_encode([$entry('علم', 'عَلَمَ', 'ʿalam 3'), $entry('الخبر', 'الخَبَر', 'khabar')], JSON_UNESCAPED_UNICODE),
+        ];
+        $refused = [];
+
+        $kept = WordReadings::agreed(self::TEXT, $answers, [], $refused);
+
+        // In the order of the text, each as the first answer that gave it wrote it.
+        $this->assertSame([['رفع', 'رَفَعَ', 'rafaʿa'], ['علم', 'عَلَم', 'ʿalam']], array_map(fn (array $r): array => [$r['word'], $r['marked'], $r['said']], $kept));
+        $this->assertSame(2, $refused['not agreed between the answers']);
+        // One answer alone decides; none gives nothing; two that differ on a word leave it.
+        $this->assertSame(['رفع', 'علم', 'جدة'], array_column(WordReadings::agreed(self::TEXT, [$answers[0]]), 'word'));
+        $this->assertSame([], WordReadings::agreed(self::TEXT, []));
+        $this->assertSame(['رفع'], array_column(WordReadings::agreed(self::TEXT, [$answers[0], $answers[1]]), 'word'));
+    }
+
+    public function test_the_model_is_asked_several_times_and_an_answer_that_failed_is_left_out(): void
+    {
+        $asked = [];
+        $ask = function (string $prompt, int $k) use (&$asked): ?string {
+            $asked[] = $k;
+
+            return [
+                '[{"word": "علم", "marked": "عَلَم", "said": "ʿalam", "means": "a flag"}, {"word": "جدة", "marked": "جِدَّة", "said": "Jidda", "means": "Jeddah"}]',
+                null,
+                '[{"word": "علم", "marked": "عَلَم", "said": "ʿalam", "means": "a flag"}]',
+            ][$k];
+        };
+
+        // Two answers came back: both give علم, one gives جدة.
+        $this->assertSame(['علم'], array_column(WordReadings::find(self::TEXT, null, $ask), 'word'));
+        $this->assertSame([0, 1, 2], $asked);
+        $this->assertSame(['علم', 'جدة'], array_column(WordReadings::find(self::TEXT, null, $ask, [], 1), 'word'));
+    }
+
+    public function test_the_limit_falls_on_the_last_words_of_the_text_whatever_order_the_answer_has(): void
+    {
+        $words = ['علم', 'عقد', 'كتب', 'ملك', 'درس', 'شعر', 'قدم', 'رجل', 'ظهر', 'جزر'];
+        $entries = array_map(fn (string $w): array => ['word' => $w, 'marked' => mb_substr($w, 0, 1)."\u{064E}".mb_substr($w, 1), 'said' => 'x', 'means' => 'y'], array_reverse($words));
+        $refused = [];
+
+        $kept = WordReadings::agreed(implode(' ', $words), [json_encode($entries, JSON_UNESCAPED_UNICODE)], [], $refused);
+
+        $this->assertSame(array_slice($words, 0, WordReadings::MAX), array_column($kept, 'word'));
+        $this->assertSame(2, $refused['over the limit']);
+    }
+
     public function test_only_those_words_are_marked_and_the_voice_is_told_what_they_mean(): void
     {
         $readings = [

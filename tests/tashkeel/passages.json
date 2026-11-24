@@ -1,5 +1,5 @@
 {
- "about": "Longer texts for the listening tests of the automatic pronunciation step (written for the test, not members' text): several words in each can be read in more than one way, some spelled alike and meant differently in the same text. ref: the text fully marked, by the test set's marking rule. words: the words scored by ear, each with the time it appears in the text, the readings a listener chooses between, and the one meant.",
+ "about": "Longer texts for the listening tests of the automatic pronunciation step (written for the test, not members' text): several words in each can be read in more than one way, some spelled alike and meant differently in the same text. ref: the text fully marked, by the test set's marking rule. words: the words scored by ear, each with the time it appears in the text, the readings a listener chooses between, and the one meant. hard: true marks a known-hard word (شعر as poetry): it is heard and shown, and counted apart from the others.",
  "passages": [
   {
    "id": "p01",
@@ -778,7 +778,7 @@
   {
    "id": "p08",
    "text": "كتب الروائي أن كتب الأطفال قليلة، وكتب على غلاف روايته أن القراءة غذاء العقل.",
-   "ref": "كَتَبَ الرِّوَائِيُّ أَنَّ كُتُبَ الْأَطْفَالِ قَلِيلَة، وَكُتِبَ عَلَى غِلَافِ رِوَايَتِهِ أَنَّ الْقِرَاءَةَ غِذَاءُ الْعَقْل.",
+   "ref": "كَتَبَ الرِّوَائِيُّ أَنَّ كُتُبَ الْأَطْفَالِ قَلِيلَة، وَكَتَبَ عَلَى غِلَافِ رِوَايَتِهِ أَنَّ الْقِرَاءَةَ غِذَاءُ الْعَقْل.",
    "words": [
     {
      "word": "كتب",
@@ -830,7 +830,7 @@
      "word": "وكتب",
      "n": 1,
      "kind": "word",
-     "want": "kutiba",
+     "want": "kataba",
      "options": {
       "kataba": [
        "كَتَبَ",
@@ -1280,7 +1280,8 @@
        "shiʿr",
        "poetry"
       ]
-     }
+     },
+     "hard": true
     },
     {
      "word": "ولد",
@@ -1714,7 +1715,8 @@
        "shiʿr",
        "poetry"
       ]
-     }
+     },
+     "hard": true
     },
     {
      "word": "مدرسة",
@@ -1819,7 +1821,8 @@
        "shiʿr",
        "poetry"
       ]
-     }
+     },
+     "hard": true
     },
     {
      "word": "الدين",
