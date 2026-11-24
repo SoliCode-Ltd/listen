@@ -92,6 +92,15 @@ def fetch(clip):
     if '.' in clip:  # a file name, as splits.json gives it
         with urllib.request.urlopen(f'{BASE}/{RUN}/{clip}', timeout=30) as r:
             return r.read()
+    if '/' in clip:  # "run/clip": a clip of another run
+        run, name = clip.split('/', 1)
+        for ext in ('wav', 'mp3', 'ogg', 'flac'):
+            try:
+                with urllib.request.urlopen(f'{BASE}/{run}/{name}.{ext}', timeout=30) as r:
+                    return r.read()
+            except Exception:
+                continue
+        raise RuntimeError(f'{clip}: not found')
     for ext in ('wav', 'mp3', 'ogg', 'flac'):
         try:
             with urllib.request.urlopen(f'{BASE}/{RUN}/{clip}.{ext}', timeout=30) as r:
@@ -235,12 +244,22 @@ def main():
     global RUN
     only = [x for x in os.environ.get('TASHKEEL', '').split(',')[1:] if x]
     pairs = PAIRS
-    if 'splits' in only:
+    if 'hard' in only:
+        # "formants,hard,20261124,023420": the known-hard clips of that run the listeners disagreed on,
+        # each against round 2's clip of the same sentence in the other reading (both listeners agreed on it).
+        run = '-'.join([x for x in only if x.isdigit()][:2])
+        pairs, only, brief = [
+            (f'{run}/n5-jazar-gloss', '20261123-214519/n5-juzur-gloss', 'الجزر كثيرة هنا, marks and the meaning told: asked for al-jazar; the other clip is al-juzur'),
+            (f'{run}/n13-jidda-take1', '20261123-220024/n13-jadda-take1', 'زرت جدة أمس, marks only: asked for Jidda; the other clip is jadda'),
+            (f'{run}/n13-jidda-gloss', '20261123-214519/n13-jadda-gloss', 'the same, marks and the meaning told'),
+            (f'{run}/n19-ala-gloss', '20261123-214519/n19-ula-gloss', 'تكلمت مع علا, marks and the meaning told: asked for ʿalā; the other clip is ʿUlā'),
+        ], [], True
+    elif 'splits' in only:
         # "formants,splits,20261124,031500": the run 20261124-031500.
         numbers = [x for x in only if x.isdigit()]
         RUN = '-'.join(numbers[:2])
         return splits()
-    if 'engine' in only:
+    elif 'engine' in only:
         pairs, RUN, only = ENGINE_PAIRS, ENGINE_RUN, [x for x in only if x != 'engine']
         brief = True
     elif 'jazar' in only:
