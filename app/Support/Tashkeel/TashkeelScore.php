@@ -165,6 +165,8 @@ final class TashkeelScore
         $words = [];
         preg_match_all('/[\p{Arabic}'.self::MARKS.']+/u', self::canonical($text), $found);
         foreach ($found[0] as $word) {
+            // Letters and their marks only: an Arabic comma or digit standing against the word is not part of it.
+            $word = (string) preg_replace('/[^\p{L}\p{M}]/u', '', $word);
             preg_match_all('/([^'.self::MARKS.'])(['.self::MARKS.']*)/u', $word, $units, PREG_SET_ORDER);
             $list = array_map(fn (array $u): array => [$u[1], $u[2]], $units);
             if ($list === [] || ! preg_match('/\p{L}/u', $word)) {

@@ -37,6 +37,7 @@
  *
  *   ssh user@host 'cd ~/public_html && DIR=/tmp/x ONLY=readings php' < scripts/support/tashkeel_readings.php
  *   ONLY=readings,runs3   three runs of the written sentences and the passages
+ *   ONLY=readings,ptexts  the passages only (a quick look at the words marked in each)
  *   ONLY=readings,35      the model the site's dialect rewrite uses, instead of the default
  */
 
@@ -79,6 +80,9 @@ foreach (json_decode((string) @file_get_contents($dir.'/passages.json'), true)['
 }
 
 $only = array_map('trim', explode(',', (string) getenv('ONLY')));
+if (in_array('ptexts', $only, true)) {
+    $items = array_values(array_filter($items, fn (array $item): bool => ($item['source'] ?? '') === 'passage'));
+}
 $model = in_array('35', $only, true) ? 'gemini-3.5-flash' : (in_array('36', $only, true) ? 'gemini-3.6-flash' : 'gemini-3.8-flash');
 $runs = 5;
 foreach ($only as $token) {
@@ -325,6 +329,12 @@ foreach (['one' => 'one answer alone (the step before)', 'agreed' => 'what '.$as
 echo "  Words the step now did not mark the same in every run (run by run; - is left alone):\n", $unsteady === [] ? "  none\n" : implode("\n", $unsteady)."\n";
 
 if ($passageMarks !== []) {
+    echo "\nPassages: the words the step marked in each (first run):\n";
+    foreach ($repeated as $i) {
+        if ($isPassage($items[$i])) {
+            echo sprintf("  %-4s %d: %s\n", $items[$i]['id'], count($marks['agreed'][$i][1] ?? []), implode('، ', $marks['agreed'][$i][1] ?? []));
+        }
+    }
     echo "\nPassages: every word the step marked, against the reference marking:\n";
     foreach ($passageMarks as $run => $v) {
         echo sprintf("  run %d: marked %2d: the same reading %2d, A DIFFERENT READING %d, unclear %d, no reference %d\n", $run, array_sum($v), $v['same'] ?? 0, $v['different'] ?? 0, $v['unclear'] ?? 0, $v['no reference'] ?? 0);

@@ -103,4 +103,12 @@ class TashkeelScoreTest extends TestCase
         $this->assertSame(0, $s['wrong_marks']);
         $this->assertFalse($s['letters_changed']);
     }
+
+    public function test_a_comma_against_a_word_is_not_one_of_its_letters(): void
+    {
+        $words = TashkeelScore::words('في مدينة الخُبَر، ونُشِرَ الخَبَرُ عام ٢٠٢٤.');
+
+        $this->assertSame(['في', 'مدينة', 'الخبر', 'ونشر', 'الخبر', 'عام'], array_column($words, 'bare'));
+        $this->assertSame('الخُبَر', $words[2]['text']);
+    }
 }
