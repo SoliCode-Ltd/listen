@@ -844,9 +844,11 @@ jobs:
             # "autolisten" is the same step heard: it does make speech (the owner's yes, and it stops at 9 minutes).
             # "passages" is the step heard on longer texts with several open words (speech too, the same stop).
             # "sitecheck" is step 4 on staging: voices made the site's own way with the admin switch (speech too; "sitecheck,look" makes none).
-            if [ "${TASHKEEL#readings}" != "$TASHKEEL" ] || [ "${TASHKEEL#autolisten}" != "$TASHKEEL" ] || [ "${TASHKEEL#passages}" != "$TASHKEEL" ] || [ "${TASHKEEL#sitecheck}" != "$TASHKEEL" ]; then
+            if [ "${TASHKEEL#readings}" != "$TASHKEEL" ] || [ "${TASHKEEL#autolisten}" != "$TASHKEEL" ] || [ "${TASHKEEL#passages}" != "$TASHKEEL" ] || [ "${TASHKEEL#sitecheck}" != "$TASHKEEL" ] || [ "${TASHKEEL#calmtest}" != "$TASHKEEL" ]; then
               T=tashkeel_readings.php; [ "${TASHKEEL#autolisten}" = "$TASHKEEL" ] || T=tashkeel_auto_listen.php; [ "${TASHKEEL#passages}" = "$TASHKEEL" ] || T=tashkeel_passages.php
               [ "${TASHKEEL#sitecheck}" = "$TASHKEEL" ] || T=tashkeel_site_check.php
+              # "calmtest": does the step make the voice lean on the marked word, and which way of telling it avoids that (speech too).
+              [ "${TASHKEEL#calmtest}" = "$TASHKEEL" ] || T=tashkeel_calm_test.php
               D="$($S 'mktemp -d')"
               for f in tests/tashkeel/golden.json tests/tashkeel/passages.json app/Support/Tashkeel/WordReadings.php app/Support/Tashkeel/TashkeelScore.php; do git show "$GITHUB_SHA:$f" | $S "cat > $D/$(basename "$f")"; done
               tool "$T" | $S "$FIND; DIR=$D ONLY='$TASHKEEL' nice php" || failed=1
