@@ -160,6 +160,10 @@ class TtsService
         if (! empty($options['pronounce'])) {
             $voiceConfig['pronounce'] = array_values((array) $options['pronounce']);
         }
+        // The automatic pronunciation step, switched on for this member (App\Support\Tashkeel\AutoReadings).
+        if (($options['auto_readings'] ?? false) === true) {
+            $voiceConfig['auto_readings'] = true;
+        }
 
         $studio = $this->normalizeStudioStyleOptions($voiceConfig);
         $voiceConfig['performance_style'] = $studio['performance_style'];
@@ -262,6 +266,10 @@ class TtsService
             $pronounce = array_values((array) $config['pronounce']);
             sort($pronounce);
             $parts[] = 'pronounce:'.sha1(json_encode($pronounce, JSON_UNESCAPED_UNICODE));
+        }
+        // A take the automatic pronunciation step may have marked is never the copy of one it did not see.
+        if (($config['auto_readings'] ?? false) === true) {
+            $parts[] = 'auto-readings';
         }
 
         if ($provider === 'gemini') {

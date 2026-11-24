@@ -35,6 +35,7 @@ use App\Support\GenerationMessage;
 use App\Support\HiddenAudio;
 use App\Support\Pronunciations;
 use App\Support\SpeechText;
+use App\Support\Tashkeel\AutoReadings;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCloningAccess;
 use App\Support\VoiceDesign;
@@ -315,6 +316,9 @@ class GenerateAudioJob implements ShouldQueue
                     // A developer API request may still get the saved copy.
                     'fresh_take' => $generation->api_key_id === null,
                     'pronounce' => $keepAsWritten,
+                    // The automatic pronunciation step, where it is switched on for this member
+                    // (App\Support\Tashkeel\AutoReadings): the premium voice applies it within its scope.
+                    'auto_readings' => AutoReadings::allowsMember($generation->user_id ? (int) $generation->user_id : null),
                 ];
 
                 // Add dialogue speakers if applicable
@@ -339,6 +343,12 @@ class GenerateAudioJob implements ShouldQueue
                     $plan,
                     (int) $generation->user_id,
                 );
+            }
+
+            // What the automatic step did, and the text as the voice read it with its marks.
+            $autoReadings = is_array($audio['auto_readings'] ?? null) ? $audio['auto_readings'] : null;
+            if (is_string($autoReadings['text'] ?? null)) {
+                $spokenText = $autoReadings['text'];
             }
 
             $actualEstimate = UsageEstimator::estimate($textForSpeech, $requestedTier, (float) ($studioOptions['speed'] ?? 1.0), $studioOptions);
@@ -377,7 +387,7 @@ class GenerateAudioJob implements ShouldQueue
             // never charges twice. A generation failed meanwhile (swept as stuck, its
             // credits already given back) is not delivered or charged.
             $spend->stop();
-            $settled = DB::transaction(function () use ($generation, $audio, $actualSeconds, $measuredSeconds, $actualChars, $actualCredits, $reserved, $effect, $effectNotAdded, $spokenText, $textForSpeech, $spend): bool {
+            $settled = DB::transaction(function () use ($generation, $audio, $actualSeconds, $measuredSeconds, $actualChars, $actualCredits, $reserved, $effect, $effectNotAdded, $spokenText, $textForSpeech, $spend, $autoReadings): bool {
                 $locked = AudioGeneration::query()->whereKey($generation->id)->lockForUpdate()->first();
                 if (! $locked || $locked->status !== 'processing') {
                     return false;
@@ -395,6 +405,10 @@ class GenerateAudioJob implements ShouldQueue
                 if ($spokenText !== $textForSpeech) {
                     // What the voice read when it differs from the text (pronunciations, abbreviations), for support.
                     $snapshot['spoken_text'] = mb_substr($spokenText, 0, 20000);
+                }
+                if ($autoReadings !== null) {
+                    // The automatic step on this voice: words marked, what it took the text for, kept result or asked, time.
+                    $snapshot['auto_readings'] = array_diff_key($autoReadings, ['text' => true]);
                 }
                 if ($effectNotAdded) {
                     // The history and the developer API read audio_effect as the voice's own,

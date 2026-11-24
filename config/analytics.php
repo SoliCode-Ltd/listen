@@ -73,6 +73,12 @@ return [
             ['from' => null, 'input' => 0.75, 'cached' => 0.075, 'output' => 3.75],
             ['from' => '2027-01-01', 'input' => 1.50, 'cached' => 0.15, 'output' => 7.50],
         ],
+        // The automatic pronunciation step (App\Support\Tashkeel\AutoReadings): three short requests for a text.
+        // Output includes thinking tokens. From the pricing page, read 2026-11-24.
+        'gemini-3.8-flash' => [
+            ['from' => null, 'input' => 0.75, 'cached' => 0.075, 'output' => 3.75],
+            ['from' => '2027-01-01', 'input' => 1.50, 'cached' => 0.15, 'output' => 7.50],
+        ],
         // No longer on Google's pricing page: the app's own figure for it (as for dubbing,
         // listen.dubbing.prices). Check it against the Cloud Billing report and set it here.
         'gemini-3.5-flash' => [

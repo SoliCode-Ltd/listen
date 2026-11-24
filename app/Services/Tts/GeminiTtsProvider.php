@@ -17,6 +17,7 @@ use App\Support\PieceCheck;
 use App\Support\Pronunciations;
 use App\Support\ShareableAudio;
 use App\Support\SpeechJoin;
+use App\Support\Tashkeel\AutoReadings;
 use App\Support\TextChunker;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
@@ -492,6 +493,16 @@ class GeminiTtsProvider implements TtsProviderInterface
             if ($dialect !== '' && $this->isArabicLanguage($targetLanguage) && config('services.gemini_tts.dialect_rewrite', true)) {
                 $text = app(VoiceCloningService::class)->speakableText($text, $dialect, $keep);
             }
+            // The automatic pronunciation step (App\Support\Tashkeel\AutoReadings), where the caller
+            // switched it on for this member and the text is in its first scope: the words the voice
+            // could say as the wrong word are marked, and the voice is told what each means.
+            if (($voiceConfig['auto_readings'] ?? false) === true && $this->isArabicLanguage($targetLanguage)
+                && AutoReadings::fits($text, $dialect, $this->maxCharsFor($voiceConfig))) {
+                $auto = AutoReadings::for($text, $keep);
+                $voiceConfig['readings_direction'] = $auto['direction'];
+                $autoReadings = $auto['info'] + ($auto['text'] !== $text ? ['text' => $auto['text']] : []);
+                $text = $auto['text'];
+            }
             $voiceConfig['vocal_parts'] = GeminiVocalTags::parts($text);
             $text = implode(' ', array_column($voiceConfig['vocal_parts'], 'text'));
         }
@@ -499,9 +510,23 @@ class GeminiTtsProvider implements TtsProviderInterface
             throw new \RuntimeException('TTS text is empty.');
         }
 
-        return $isDialogue
+        $result = $isDialogue
             ? $this->synthesizeDialogue($text, $targetLanguage, $speakers, $voiceConfig, $model)
             : $this->synthesizeSingle($text, $targetLanguage, $voiceConfig, $model);
+
+        // What the step did, for the voice's record: the words marked, and the text as it was read.
+        return $result + (isset($autoReadings) ? ['auto_readings' => $autoReadings] : []);
+    }
+
+    /** The most characters one request reads: a child's voice is read in shorter pieces. */
+    private function maxCharsFor(array $voiceConfig): int
+    {
+        $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
+        if (self::isChild((string) ($voiceConfig['voice_name'] ?? ''))) {
+            $maxChars = min($maxChars, max(200, (int) config('services.gemini_tts.child_max_chars_per_request', 300)));
+        }
+
+        return $maxChars;
     }
 
     /**
@@ -541,11 +566,8 @@ class GeminiTtsProvider implements TtsProviderInterface
         // shorter pieces, each with the child's direction, so the voice never
         // has long enough to drift back to a grown-up's, and a piece pitched
         // lower than a child's voice is taken again (PieceCheck).
-        $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
+        $maxChars = $this->maxCharsFor($voiceConfig);
         $child = self::isChild((string) ($voiceConfig['voice_name'] ?? ''));
-        if ($child) {
-            $maxChars = min($maxChars, max(200, (int) config('services.gemini_tts.child_max_chars_per_request', 300)));
-        }
         $floor = $child ? ['floor' => (float) config('services.gemini_tts.child_min_pitch', 220)] : [];
         $pieces = [];
         foreach ($voiceConfig['vocal_parts'] ?? [['text' => $text, 'cues' => []]] as $partIndex => $part) {
@@ -568,6 +590,8 @@ class GeminiTtsProvider implements TtsProviderInterface
         // The member's pronunciations in the whole text, told to every piece alike: a piece
         // with a different direction from its neighbours can change the voice's tone there.
         $pronounce = Pronunciations::direction($text, (array) ($voiceConfig['pronounce'] ?? []));
+        // What the automatic step tells the voice about the words it marked (a one-piece text only).
+        $pronounce = trim($pronounce.' '.trim((string) ($voiceConfig['readings_direction'] ?? '')));
         foreach ($pieces as [$partIndex, $chunk, $partStyle]) {
             // The pieces one stretch of the script (one direction) is cut into are told they
             // are one reading; a mood tag's own part changes the delivery on purpose.

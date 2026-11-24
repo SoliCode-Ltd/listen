@@ -135,6 +135,10 @@ return [
         'api_key' => env('GEMINI_TTS_API_KEY', ''),
         // Rewrite an Arabic script into the chosen dialect before a stock voice reads it.
         'dialect_rewrite' => (bool) env('GEMINI_TTS_DIALECT_REWRITE', true),
+        // The automatic pronunciation step (App\Support\Tashkeel\AutoReadings): the text model it asks,
+        // and the seconds it may take before the text is read as written.
+        'readings_model' => env('GEMINI_TTS_READINGS_MODEL', 'gemini-3.8-flash'),
+        'readings_timeout' => (int) env('GEMINI_TTS_READINGS_TIMEOUT', 6),
         'timeout_seconds' => (int) env('GEMINI_TTS_TIMEOUT', 60),
         'verify_ssl' => env('GEMINI_TTS_VERIFY_SSL', true),
         'default_voice' => env('GEMINI_TTS_DEFAULT_VOICE', 'Kore'),
