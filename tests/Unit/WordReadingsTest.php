@@ -156,6 +156,21 @@ class WordReadingsTest extends TestCase
         $this->assertSame(['رفع'], array_column(WordReadings::agreed(self::TEXT, [$answers[0], $answers[1]]), 'word'));
     }
 
+    public function test_a_spelling_used_as_two_words_in_one_text_is_left_alone(): void
+    {
+        $text = 'سافرت منى إلى مكة ووقفت في منى مع عمر.';
+        $entry = fn (string $word, string $marked): array => ['word' => $word, 'marked' => $marked, 'said' => 's', 'means' => 'm', 'kind' => 'name'];
+        $both = json_encode([$entry('منى', 'مُنَى'), $entry('منى', 'مِنَى'), $entry('عمر', 'عُمَر')], JSON_UNESCAPED_UNICODE);
+        $one = json_encode([$entry('منى', 'مِنَى'), $entry('عمر', 'عُمَر')], JSON_UNESCAPED_UNICODE);
+        $refused = [];
+
+        // One answer saw both readings: the first منى is not marked with either, whatever the others say.
+        $this->assertSame(['عمر'], array_column(WordReadings::agreed($text, [$one, $both, $one], [], $refused), 'word'));
+        $this->assertSame(1, $refused['two readings in one text']);
+        // The same word listed twice with one reading is one word.
+        $this->assertSame(['منى', 'عمر'], array_column(WordReadings::agreed($text, [json_encode([$entry('منى', 'مُنَى'), $entry('منى', 'مُنَى'), $entry('عمر', 'عُمَر')], JSON_UNESCAPED_UNICODE)]), 'word'));
+    }
+
     public function test_the_model_is_asked_several_times_and_an_answer_that_failed_is_left_out(): void
     {
         $asked = [];

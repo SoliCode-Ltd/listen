@@ -26,7 +26,9 @@ namespace App\Support\Tashkeel;
  * that word wrongly. So it is asked several times (ASKS) and a word is used
  * only when most of the answers give it, with the same reading (agreed); the
  * words kept are put in the order of the text, so the limit always falls on
- * the same ones.
+ * the same ones. A spelling an answer gives two readings (the text uses it as
+ * two words) is left alone: only its first time could be marked, and nothing
+ * says which of the two that is.
  *
  * Makes no request by itself: the caller gives the function that asks the
  * model, so this can be measured and tested without one.
@@ -80,7 +82,22 @@ final class WordReadings
         // In a dialect only names are touched: the voice already says the dialect's own words right.
         $namesOnly = $namesOnly || self::writtenIn($answers) === 'dialect';
         $votes = [];
+        $twoReadings = [];
         foreach ($answers as $raw) {
+            // A spelling one answer gives two readings is used as two words in the text (منى the woman, منى the place):
+            // only its first time could be marked, and nothing says which reading that is, so it is left alone.
+            $seen = [];
+            foreach (self::parse($raw) as $entry) {
+                $bare = TashkeelScore::strip(trim((string) ($entry['word'] ?? '')));
+                $marked = str_replace("\u{0640}", '', trim((string) ($entry['marked'] ?? '')));
+                if ($bare === '' || TashkeelScore::strip($marked) !== $bare || $marked === $bare) {
+                    continue;
+                }
+                if (isset($seen[$bare]) && ! self::sameReading($seen[$bare], $marked)) {
+                    $twoReadings[$bare] = true;
+                }
+                $seen[$bare] ??= $marked;
+            }
             foreach (self::accept($text, self::parse($raw), $keep, $refused, $namesOnly, PHP_INT_MAX) as $reading) {
                 $bare = TashkeelScore::strip($reading['word']);
                 // With the answers that gave this word the same reading (the ending and a sukun make no difference).
@@ -101,6 +118,11 @@ final class WordReadings
         $need = intdiv(count($answers), 2) + 1;
         $kept = [];
         foreach ($votes as $bare => $byReading) {
+            if (isset($twoReadings[$bare])) {
+                $refused['two readings in one text'] = ($refused['two readings in one text'] ?? 0) + 1;
+
+                continue;
+            }
             // The reading most answers gave; between two as often given, the one given first.
             $most = [];
             foreach ($byReading as $given) {
