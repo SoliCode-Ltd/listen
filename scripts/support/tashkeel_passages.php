@@ -35,6 +35,7 @@
  *   ssh user@host 'cd ~/public_html && DIR=/tmp/x ONLY=passages php' < scripts/support/tashkeel_passages.php
  *   ONLY=passages,first1   only the first passage (a trial of the whole run)
  *   ONLY=passages,skip1    all but the first (after such a trial)
+ *   ONLY=passages,p05,p14  only those passages (another take of them)
  */
 
 use App\Services\Tts\GeminiKeyManager;
@@ -71,7 +72,11 @@ if (! is_array($passages)) {
 }
 
 $cap = 9.0;
+$chosen = [];
 foreach (array_map('trim', explode(',', (string) getenv('ONLY'))) as $token) {
+    if (preg_match('/^p\d\d$/', $token)) {
+        $chosen[] = $token;
+    }
     if (preg_match('/^cap(\d)$/', $token, $m)) {
         $cap = (float) $m[1];
     }
@@ -81,6 +86,9 @@ foreach (array_map('trim', explode(',', (string) getenv('ONLY'))) as $token) {
     if (preg_match('/^skip(\d+)$/', $token, $m)) {
         $passages = array_slice($passages, (int) $m[1]);
     }
+}
+if ($chosen !== []) {
+    $passages = array_values(array_filter($passages, fn (array $p): bool => in_array($p['id'], $chosen, true)));
 }
 $voice = (string) (getenv('VOICE') ?: 'Kore');
 $run = now()->utc()->format('Ymd-His');
