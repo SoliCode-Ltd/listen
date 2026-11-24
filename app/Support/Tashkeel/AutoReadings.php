@@ -134,6 +134,33 @@ final class AutoReadings
     }
 
     /**
+     * What the step did on one voice, in a line for the admin: from the record the audio job keeps
+     * (settings_snapshot → auto_readings), or null when the step did not run on it.
+     *
+     * @param  array<string, mixed>|null  $info
+     */
+    public static function describe(?array $info): string
+    {
+        if ($info === null) {
+            return 'Did not run on this voice (switched off for this member when it was made, or outside the step\'s scope).';
+        }
+        $reused = (bool) ($info['reused'] ?? false);
+        $words = (int) ($info['words'] ?? 0);
+        $how = $reused ? 'the result kept for this text was reused' : 'asked now, '.round(((int) ($info['ms'] ?? 0)) / 1000, 1).' s';
+        // Fewer than two answers in time: nothing is marked and nothing is kept.
+        if (! $reused && (int) ($info['answers'] ?? 0) < 2) {
+            return 'Ran, but too few answers came back in time ('.(int) ($info['answers'] ?? 0).' of '.WordReadings::ASKS.'): the text was read as written ('.$how.').';
+        }
+        $taken = match ($info['written_in'] ?? null) {
+            'fusha' => 'text taken as Fusha',
+            'dialect' => 'text taken as a dialect, so names only',
+            default => 'what the text is written in was not said',
+        };
+
+        return ($words === 0 ? 'Ran: no word needed marking' : 'Ran: '.$words.' '.($words === 1 ? 'word' : 'words').' marked').' ('.$taken.'; '.$how.').';
+    }
+
+    /**
      * The model's answers to the same prompt, asked together, each with its own fixed seed
      * so the same text has the best chance of the same answers. Only the ones that came back.
      *

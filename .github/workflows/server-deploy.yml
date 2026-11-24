@@ -129,6 +129,13 @@ name: Server deploy
 #            today's rule would refuse, and the words it used most (words and
 #            counts only, never a text). For finding out how a member's voices
 #            got past the wording rule (scripts/support/member_audio_check.php).
+#   readings-check: read-only. What the automatic pronunciation step did on
+#            the voices of the last days (input "member": empty for 7, or a
+#            number of days): the switch and its test accounts, on how many
+#            premium Arabic voices it ran, the words it marked, the time it
+#            added, what it took the texts to be written in, and how many texts
+#            taken for Fusha use a common colloquial word. Counts and member
+#            ids only, never a text (scripts/support/auto_readings_check.php).
 #   content-check: makes no audio and changes nothing. Asks the reading of a
 #            text's meaning (the content check that refuses sexual content before
 #            a voice is made) for real, on the server's own text model. Input
@@ -262,7 +269,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, content-check, upgrade-check, upgrade-test, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, readings-check, content-check, upgrade-check, upgrade-test, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
         default: inspect
       customer:
         description: "billing-trace and chatgpt-ads-check: the Stripe customer id (cus_...)"
@@ -273,7 +280,7 @@ on:
         type: string
         default: ""
       member:
-        description: "email-check, member-audio-check, demo-links, join-check and speed-check: a member's email or member id. content-check: empty, a member id, or sample:300"
+        description: "email-check, member-audio-check, demo-links, join-check and speed-check: a member's email or member id. readings-check: empty, or a number of days. content-check: empty, a member id, or sample:300"
         type: string
         default: ""
       dub:
@@ -658,6 +665,13 @@ jobs:
             [ "$TARGET" = staging ] || { echo "upgrade-test runs on staging only"; exit 1; }
             failed=0
             for B in classic flexible; do $S "$FIND; BILLING_MODE=$B php" < scripts/support/upgrade_stripe_test.php || failed=1; done
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
+          if [ "$MODE" = readings-check ]; then
+            case "$MEMBER" in *[!0-9]*) echo "member must be empty or a number of days"; exit 1;; esac
+            failed=0
+            tool auto_readings_check.php | $S "$FIND; DAYS='$MEMBER' php" || failed=1
             rm -f ~/.ssh/id_deploy
             exit "$failed"
           fi

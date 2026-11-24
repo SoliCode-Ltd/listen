@@ -214,8 +214,8 @@ class WordReadingsTest extends TestCase
         $this->assertSame('رفع الجنود عَلَم بلادهم في جِدَّة، وكتب الخبر.', $made['text']);
         // Not a letter changed.
         $this->assertSame(self::TEXT, TashkeelScore::strip($made['text']));
-        $this->assertSame('In this text the word written «علم» means "a flag" and is said "ʿalam"; the word written «جدة» means "the city of Jeddah" and is said "Jidda". Say those words exactly that way.', $made['direction']);
-        $this->assertSame('In this text the word written «علم» means "a flag" and is said "ʿalam". Say that word exactly that way.', WordReadings::direction([$readings[0]]));
+        $this->assertSame('In this text the word written «علم» means "a flag" and is said "ʿalam"; the word written «جدة» means "the city of Jeddah" and is said "Jidda". This only tells you which word is meant. Read the whole text as you would without this note: the same pace, pitch and loudness on every word, with no stress, pause or slowing on those words.', $made['direction']);
+        $this->assertSame('In this text the word written «علم» means "a flag" and is said "ʿalam". This only tells you which word is meant. Read the whole text as you would without this note: the same pace, pitch and loudness on every word, with no stress, pause or slowing on that word.', WordReadings::direction([$readings[0]]));
         $this->assertSame('', WordReadings::direction([]));
     }
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\TtsSettings;
+use App\Filament\Resources\AudioGenerationResource;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
 use App\Models\Plan;
@@ -213,6 +214,33 @@ class AutoReadingsTest extends TestCase
         $this->assertSame(UsageEstimator::estimate(self::TEXT, 'standard')['chars'], (int) $made[0]->billable_chars);
         $this->assertSame((int) $made[0]->billable_chars, (int) $made[1]->billable_chars);
         $this->assertArrayNotHasKey('auto_readings', (array) $made[1]->settings_snapshot);
+    }
+
+    public function test_the_admin_sees_on_a_voices_page_what_the_step_did_and_the_text_as_read(): void
+    {
+        $this->assertSame('Did not run on this voice (switched off for this member when it was made, or outside the step\'s scope).', AutoReadings::describe(null));
+        $this->assertSame('Ran: 2 words marked (text taken as Fusha; asked now, 2.9 s).', AutoReadings::describe(['words' => 2, 'written_in' => 'fusha', 'reused' => false, 'ms' => 2900, 'answers' => 3]));
+        $this->assertSame('Ran: 1 word marked (text taken as a dialect, so names only; the result kept for this text was reused).', AutoReadings::describe(['words' => 1, 'written_in' => 'dialect', 'reused' => true, 'ms' => 3, 'answers' => 0]));
+        $this->assertSame('Ran: no word needed marking (text taken as Fusha; asked now, 3.1 s).', AutoReadings::describe(['words' => 0, 'written_in' => 'fusha', 'reused' => false, 'ms' => 3100, 'answers' => 2]));
+        $this->assertSame('Ran, but too few answers came back in time (1 of 3): the text was read as written (asked now, 6 s).', AutoReadings::describe(['words' => 0, 'written_in' => null, 'reused' => false, 'ms' => 6000, 'answers' => 1]));
+
+        $voice = fn (array $snapshot): AudioGeneration => AudioGeneration::create([
+            'user_id' => User::factory()->create()->id, 'input_text' => self::TEXT, 'source_language' => 'ar', 'target_language' => 'ar',
+            'voice_tier' => 'hd', 'voice_name' => 'ar-test-voice', 'translate' => false, 'status' => 'done', 'settings_snapshot' => $snapshot,
+        ]);
+        $marked = $voice(['spoken_text' => self::MARKED, 'auto_readings' => ['words' => 2, 'written_in' => 'fusha', 'reused' => false, 'ms' => 2900, 'answers' => 3]]);
+        $plain = $voice([]);
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->get(AudioGenerationResource::getUrl('view', ['record' => $marked]))
+            ->assertOk()
+            ->assertSee('Ran: 2 words marked (text taken as Fusha; asked now, 2.9 s).', false)
+            ->assertSee(self::MARKED, false);
+        $this->get(AudioGenerationResource::getUrl('view', ['record' => $plain]))
+            ->assertOk()
+            ->assertSee('Did not run on this voice', false)
+            ->assertSee('As the member wrote it.', false);
     }
 
     public function test_the_admin_sets_the_switch_and_the_test_accounts_in_tts_settings(): void

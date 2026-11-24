@@ -288,7 +288,10 @@ final class WordReadings
     }
 
     /**
-     * What the voice is told, in the wording the listening rounds measured.
+     * What the voice is told: which word is meant, and to read on as it would have without the
+     * note. The first wording ended "Say that word exactly that way", and the owner heard the
+     * marked word stressed on live (2026-11-24): the voice is asked for the same pace, pitch and
+     * loudness on every word instead.
      *
      * @param  list<array{word: string, marked: string, said: string, means: string}>  $readings
      */
@@ -302,7 +305,8 @@ final class WordReadings
             $readings,
         );
 
-        return 'In this text '.implode('; ', $parts).'. Say '.(count($parts) === 1 ? 'that word' : 'those words').' exactly that way.';
+        return 'In this text '.implode('; ', $parts).'. This only tells you which word is meant. Read the whole text as you would without this note: '
+            .'the same pace, pitch and loudness on every word, with no stress, pause or slowing on '.(count($parts) === 1 ? 'that word' : 'those words').'.';
     }
 
     /**
