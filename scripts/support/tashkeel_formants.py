@@ -19,6 +19,7 @@ and writes nothing.
   TASHKEEL=formants,engine   the standard engine's name clips the listeners disagreed on
   TASHKEEL=formants,jidda    the premium voice's جدة clips
   TASHKEEL=formants,splits,20261124,031500   every clip of that listening run the listeners disagreed on
+  TASHKEEL=formants,emphasis,20261124,054747 whether the voice leans on the word the automatic step marked
 """
 import io
 import os
@@ -247,6 +248,83 @@ def splits():
         compact(b, int(to[first]), int(to[last - 1]) + 1)
 
 
+def emphasis():
+    """
+    "formants,emphasis,20261124,054747": does the voice lean on the word the automatic step marked?
+    For every sentence of that listening run made twice (as today, and with the step), the stretch of
+    the clip where the word is said is set beside the rest of the clip, in both: how loud it is, how
+    long it lasts and how high the voice goes there. A word the voice leans on is louder, longer or
+    higher than the same word in today's clip. The same is measured on a stretch away from the word,
+    to tell a change on the word from a change of the whole reading.
+    """
+    import html
+    import re
+    with urllib.request.urlopen(f'{BASE}/{RUN}/index.html', timeout=30) as r:
+        page = r.read().decode('utf-8')
+    marks = re.compile('[\u064B-\u0652\u0670\u0640]')
+    clips = {}
+    for art in re.findall(r'<article.*?</article>', page, flags=re.S):
+        text = re.search(r'<h2>(.*?)</h2>', art, flags=re.S)
+        name = re.search(r'<b>([^<]+)</b>', art)
+        word = re.search(r'The word «([^»]+)»', art)
+        src = re.search(r'<audio[^>]*src="([^"]+)"', art)
+        if text and name and word and src:
+            clips[name.group(1)] = (marks.sub('', html.unescape(text.group(1))), marks.sub('', html.unescape(word.group(1))), src.group(1))
+    rows = []
+    for name in sorted(clips):
+        if not name.endswith('-today') or name[:-6] + '-auto' not in clips:
+            continue
+        text, word, file_a = clips[name]
+        file_b = clips[name[:-6] + '-auto'][2]
+        at = text.find(word)
+        if at < 0:
+            continue
+        try:
+            a, b = tracks(sound(fetch(file_a))), tracks(sound(fetch(file_b)))
+        except Exception as e:  # noqa: BLE001
+            print(f'{name[:-6]}: {e}')
+            continue
+        to = align(a['feat'], b['feat'])
+        n = len(a['t'])
+
+        def measure(lo, hi):
+            i0, i1 = max(0, int(lo * n)), min(n - 1, int(hi * n))
+            j0, j1 = int(to[i0]), max(int(to[i0]) + 1, int(to[i1]))
+            out = []
+            for tr, x0, x1 in ((a, i0, i1), (b, j0, j1)):
+                speech = tr['loud'] > tr['loud'].max() - 25
+                voiced = tr['f0'] > 0
+                seg = slice(x0, x1 + 1)
+                loud = tr['loud'][seg][speech[seg]].mean() - tr['loud'][speech].mean() if speech[seg].any() else 0.0
+                f0 = tr['f0'][seg][voiced[seg]]
+                high = 12 * np.log2(np.percentile(f0, 90) / np.median(tr['f0'][voiced])) if len(f0) > 3 else 0.0
+                out.append((loud, (x1 - x0 + 1) / len(tr['t']), high))
+            (la, da, ha), (lb, db, hb) = out
+            return lb - la, db / da, hb - ha
+
+        frac = len(word) / max(1, len(text))
+        pos = at / max(1, len(text))
+        on = measure(pos - 0.06, pos + frac + 0.08)
+        # A stretch as long, as far from the word as the clip allows.
+        other = pos + 0.5 if pos < 0.45 else pos - 0.5
+        off = measure(max(0.0, other - 0.06), min(1.0, max(0.0, other) + frac + 0.08))
+        rows.append((name[:-6], word, on, off, len(a['t']) * STEP, len(b['t']) * STEP))
+        print(f'{name[:-6]:<10} {word:<10} on the word: louder {on[0]:+5.1f} dB, longer x{on[1]:.2f}, higher {on[2]:+5.1f} st   |   away from it: {off[0]:+5.1f} dB, x{off[1]:.2f}, {off[2]:+5.1f} st   |   clip {rows[-1][4]:.1f}s -> {rows[-1][5]:.1f}s')
+    if not rows:
+        print('No sentence of that run was made twice.')
+        return
+    print(f'\n{len(rows)} sentences, the clip with the step set beside the clip without it:')
+    for label, k in (('on the marked word', 2), ('away from it      ', 3)):
+        loud = np.array([r[k][0] for r in rows])
+        long = np.array([r[k][1] for r in rows])
+        high = np.array([r[k][2] for r in rows])
+        print(f'  {label}: louder by {np.median(loud):+.1f} dB at the middle ({(loud > 1).sum()} of {len(rows)} by more than 1 dB, {(loud < -1).sum()} quieter by more than 1 dB); '
+              f'longer x{np.median(long):.2f} ({(long > 1.1).sum()} by more than a tenth, {(long < 0.9).sum()} shorter); '
+              f'higher by {np.median(high):+.1f} semitones ({(high > 1).sum()} by more than one, {(high < -1).sum()} lower)')
+    whole = np.array([r[5] / r[4] for r in rows])
+    print(f'  the whole clip: x{np.median(whole):.2f} as long with the step at the middle ({(whole > 1.1).sum()} longer by more than a tenth, {(whole < 0.9).sum()} shorter)')
+
+
 def main():
     if not BASE:
         sys.exit('BASE is not set')
@@ -264,6 +342,9 @@ def main():
             (f'{run}/n13-jidda-gloss', '20261123-214519/n13-jadda-gloss', 'the same, marks and the meaning told'),
             (f'{run}/n19-ala-gloss', '20261123-214519/n19-ula-gloss', 'تكلمت مع علا, marks and the meaning told: asked for ʿalā; the other clip is ʿUlā'),
         ], [], True
+    elif 'emphasis' in only:
+        RUN = '-'.join([x for x in only if x.isdigit()][:2])
+        return emphasis()
     elif 'splits' in only:
         # "formants,splits,20261124,031500": the run 20261124-031500.
         numbers = [x for x in only if x.isdigit()]
