@@ -468,13 +468,13 @@
       position: relative;
       display: grid;
       align-items: center;
-      min-height: clamp(500px, 42vw, 620px);
+      min-height: clamp(460px, 36vw, 560px);
     }
     html[data-theme="light"] .reach-panel { --reach-glow-a: #8a6dff; --reach-glow-b: #5a3bf0; --reach-violet: #6247ee; }
-    .reach-copy { position: relative; z-index: 1; max-width: 47%; }
+    .reach-copy { position: relative; z-index: 1; max-width: 56%; }
     .reach h2 {
       margin: 0 0 1.25rem;
-      font-size: clamp(2.4rem, 4.1vw, 3.9rem);
+      font-size: clamp(2.7rem, 4.9vw, 4.8rem);
       font-weight: 800;
       line-height: 1.04;
       letter-spacing: -.035em;
@@ -494,9 +494,9 @@
     html[dir="rtl"] .reach .reach-title-glow { background: linear-gradient(270deg, var(--reach-glow-a), var(--reach-glow-b)); -webkit-background-clip: text; background-clip: text; }
     .reach-lead {
       margin: 0;
-      max-width: 30ch;
+      max-width: 34ch;
       color: var(--muted);
-      font-size: clamp(1.1rem, 1.6vw, 1.35rem);
+      font-size: clamp(1.15rem, 1.7vw, 1.5rem);
       line-height: 1.55;
       text-wrap: pretty;
     }
@@ -524,18 +524,18 @@
     .reach-stats li { display: flex; flex-direction: column; gap: .3rem; }
     .reach-stats li + li { padding-inline-start: clamp(1.5rem, 3.5vw, 2.75rem); border-inline-start: 1px solid var(--line); }
     .reach-stats strong {
-      font-size: clamp(2.8rem, 5.6vw, 4.4rem);
+      font-size: clamp(3rem, 6vw, 5.2rem);
       font-weight: 800;
       line-height: 1;
       letter-spacing: -.035em;
       font-variant-numeric: tabular-nums;
     }
-    .reach-stats span { font-size: clamp(1.05rem, 1.6vw, 1.35rem); font-weight: 600; }
+    .reach-stats span { font-size: clamp(1.1rem, 1.7vw, 1.45rem); font-weight: 600; }
     .reach-note {
       margin: 1.4rem 0 0;
       max-width: 44ch;
       color: var(--muted);
-      font-size: 1rem;
+      font-size: 1.06rem;
       font-style: italic;
       line-height: 1.6;
     }
@@ -544,10 +544,11 @@
     /* The globe takes the far half at almost the section's full height, its rings running towards the edge. */
     .reach-globe {
       position: absolute;
-      top: -4%;
-      bottom: -4%;
-      inset-inline-end: -3%;
-      width: 60%;
+      top: 50%;
+      inset-inline-end: 0;
+      width: 40%;
+      aspect-ratio: 1;
+      transform: translateY(-50%);
     }
     .reach-globe canvas {
       position: relative;
@@ -558,29 +559,6 @@
     }
     .reach-globe.is-dragging canvas { cursor: grabbing; }
 
-    /* The entrance, one moment: while .reach-ready is on (until the section comes into view) the parts wait below and
-       soft; then they rise in one after another on the same long, gentle curve, and the globe grows in with them. */
-    .reach h2 > span, .reach-lead, .reach-stats li, .reach-note, .reach-globe canvas {
-      transition: opacity .9s cubic-bezier(.16, 1, .3, 1), transform 1.15s cubic-bezier(.16, 1, .3, 1), filter .9s cubic-bezier(.16, 1, .3, 1);
-      transition-delay: var(--reach-in, 0ms);
-    }
-    .reach h2 > span:first-child { --reach-in: 0ms; }
-    .reach h2 > span + span { --reach-in: 110ms; }
-    .reach-lead { --reach-in: 240ms; }
-    .reach-stats li:first-child { --reach-in: 380ms; }
-    .reach-stats li + li { --reach-in: 470ms; }
-    .reach-note { --reach-in: 760ms; }
-    .reach-globe canvas { --reach-in: 120ms; transition-duration: 1.4s, 1.9s, 1.4s; }
-    .reach.reach-ready h2 > span, .reach.reach-ready .reach-lead, .reach.reach-ready .reach-stats li, .reach.reach-ready .reach-note {
-      opacity: 0;
-      transform: translateY(24px);
-      filter: blur(6px);
-    }
-    .reach.reach-ready .reach-globe canvas { opacity: 0; transform: scale(.9); filter: blur(4px); }
-    /* The line of light draws itself from its start, after the numbers. */
-    .reach-stats::after { transform-origin: left center; transition: transform 1.3s cubic-bezier(.16, 1, .3, 1) .58s, opacity .8s ease .58s; }
-    html[dir="rtl"] .reach-stats::after { transform-origin: right center; }
-    .reach.reach-ready .reach-stats::after { transform: scaleX(0); opacity: 0; }
     .reach.reach-flat .reach-globe { display: none; }
     .reach.reach-flat .reach-copy { max-width: none; }
     /* On phones and small tablets the section is one centred column: heading, text, numbers, line, note, globe. */
@@ -598,10 +576,7 @@
         background: linear-gradient(90deg, rgba(118, 89, 250, 0), var(--reach-glow-a) 30%, var(--reach-glow-b) 50%, var(--reach-glow-a) 70%, rgba(118, 89, 250, 0));
         transform-origin: center;
       }
-      .reach-globe { position: relative; inset: auto; justify-self: center; width: 100%; max-width: 620px; aspect-ratio: 1.1; margin-top: .5rem; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .reach h2 > span, .reach-lead, .reach-stats li, .reach-note, .reach-globe canvas, .reach-stats::after { transition: none; }
+      .reach-globe { position: relative; inset: auto; transform: none; justify-self: center; width: 100%; max-width: 460px; aspect-ratio: 1; margin-top: 1rem; }
     }
 
     /* What Listen has, in real numbers, each drawn above its figure. With the voice-cloning line under

@@ -1,8 +1,7 @@
 {{-- Where Listen's members are, straight on the page: the two numbers beside a turning globe of fine dotted land where
      every country with members glows like a city at night, brighter where there are more (public/js/home-globe.js,
-     no dependencies). Counted live from sign-ups (App\Support\MemberReach), cached. One
-     orchestrated moment as it comes into view: the heading, the text, the numbers, the line and the note rise in one
-     after another while the globe fades up, its lights spread from the Arab world outward and the numbers climb. The land loads only near the screen; the globe draws only while seen; reduced motion
+     no dependencies). Counted live from sign-ups (App\Support\MemberReach), cached. Nothing
+     waits to appear: the globe turns from the start and the numbers count up as they come into view. The land loads only near the screen; the globe draws only while seen; reduced motion
      keeps it still. --}}
 @php
   $reach = \App\Support\MemberReach::class;
@@ -36,19 +35,31 @@
   </div>
 </section>
 <script>
-  // The section's entrance, read as the page arrives: hold the section's parts back until it comes into view, then let
-  // them rise in one after another (CSS) and tell the globe to start its part. Without this script, or with reduced
-  // motion, everything simply shows.
+  // The numbers count up once, as they come into view; everything else is there from the start. Without this script,
+  // or with reduced motion, they simply show their value.
   (function () {
     var section = document.currentScript.previousElementSibling;
-    if (!section) return;
-    var on = function () { section.classList.remove('reach-ready'); section.classList.add('reach-on'); section.dispatchEvent(new Event('reach:on')); };
-    if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { on(); return; }
-    section.classList.add('reach-ready');
+    var stats = section && section.querySelector('.reach-stats');
+    if (!stats || !('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var els = stats.querySelectorAll('[data-count]');
+    var fmt = function (n, el) {
+      var s = Math.round(n).toLocaleString('en-US');
+      return el.dataset.plus === 'before' ? '+' + s : el.dataset.plus === 'after' ? s + '+' : s;
+    };
+    var show = function (k) { for (var i = 0; i < els.length; i++) els[i].textContent = fmt(Number(els[i].dataset.count) * k, els[i]); };
+    show(0);
     var seen = new IntersectionObserver(function (entries) {
-      if (entries[0].isIntersecting) { seen.disconnect(); requestAnimationFrame(on); }
-    }, { threshold: 0.12, rootMargin: '0px 0px -12% 0px' });
-    seen.observe(section);
+      if (!entries[0].isIntersecting) return;
+      seen.disconnect();
+      var t0 = performance.now();
+      var step = function (now) {
+        var t = Math.min(1, (now - t0) / 1800);
+        show(1 - Math.pow(1 - t, 4));
+        if (t < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }, { threshold: 0.6 });
+    seen.observe(stats);
   })();
 </script>
 <script type="module" src="{{ \App\Support\VersionedAsset::url('js/home-globe.js') }}"></script>

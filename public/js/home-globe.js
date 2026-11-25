@@ -3,16 +3,14 @@
 // wider where there are more members), under a glassy rim and a soft atmosphere. The sphere is deep violet on a dark
 // page and a lighter brand violet on a light one. Canvas 2D, no dependencies.
 //
-// The section's entrance is started by the small script beside it (it adds .reach-on as the section comes into
-// view, and the text rises in with CSS); this script plays the globe's part of the same moment: the lights spread
-// from the Arab world outward and the numbers climb with them. Then the globe turns slowly and can be dragged. It draws only while it can be seen; with reduced motion it stays still and lit.
+// Nothing waits to appear: the globe is there and lit from the start, turning slowly, and can be dragged; the
+// numbers beside it count up (the small script beside the section does that). The land fades in as it arrives. It
+// draws only while it can be seen; with reduced motion it stays still.
 
 const RAD = Math.PI / 180;
 const TAU = Math.PI * 2;
 const clamp = (v) => Math.max(0, Math.min(1, v));
 const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
-const easeOutQuart = (t) => 1 - Math.pow(1 - clamp(t), 4);
-const easeOutCubic = (t) => 1 - Math.pow(1 - clamp(t), 3);
 const unit = (lat, lon) => { const a = lat * RAD, b = lon * RAD; return [Math.cos(a) * Math.sin(b), Math.sin(a), Math.cos(a) * Math.cos(b)]; };
 function seeded(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
@@ -43,9 +41,6 @@ export function mountReach(section) {
   const ctx = canvas.getContext('2d');
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const markers = JSON.parse(wrap.dataset.markers || '[]').map((m) => ({ ...m, v: unit(m.at[0], m.at[1]) }));
-  const counters = [...section.querySelectorAll('[data-count]')];
-  const fmt = (n, el) => { const s = Math.round(n).toLocaleString('en-US'); return el.dataset.plus === 'before' ? '+' + s : el.dataset.plus === 'after' ? s + '+' : s; };
-  const lastDelay = Math.max(0, ...markers.map((m) => m.delay));
   const sprite = glowSprite(LIGHT.glow);
   const themeName = () => (document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
   let SP = SPHERE[themeName()], O = OUTER[themeName()];
@@ -53,13 +48,10 @@ export function mountReach(section) {
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
   // The view: which longitude faces us (it turns), and a fixed tilt that shows a little more of the north.
-  let lon0 = 30, lat0 = 18, spin = 0, turn = 0, drag = null, last = 0, frameId = 0, shownAt = null, dpr = 1, W = 0, H = 0;
-  let land = null, landLit = null, landOwner = null, landGrain = null;
-  // Degrees a second, westward, about once round a minute. The turn eases in from standstill.
-  const TURN = reduce ? 0 : -5.5;
-  if (!reduce && !section.classList.contains('reach-on')) counters.forEach((el) => { el.textContent = fmt(0, el); });
-
-  const beat = markers.map((m, i) => (m.tier >= 2 ? { phase: (i * 0.37) % 1, period: 2400 + (i % 5) * 320 } : null));
+  let lon0 = 30, lat0 = 18, spin = 0, drag = null, last = 0, frameId = 0, dpr = 1, W = 0, H = 0;
+  let land = null, landLit = null, landOwner = null, landGrain = null, landIn = 0;
+  // Degrees a second, westward: about once round a minute.
+  const TURN = reduce ? 0 : -6;
   // Each land dot near a member country takes that country's light: strongest at its spot, fading with distance,
   // wider for countries with more members, with a little grain so it reads as many small lights. Worked out once.
   const lightLand = () => {
@@ -96,18 +88,10 @@ export function mountReach(section) {
   };
 
   const draw = (now) => {
-    const cx = W / 2, cy = H / 2, R = Math.min(H * 0.41, W * 0.39);
+    const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.4;
     const P = (p) => { const q = view(p); return [cx + q[0] * R, cy - q[1] * R, q[2]]; };
-    const t = shownAt === null ? -1 : now - shownAt;
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, W, H);
-
-    const grown = markers.map((m) => (reduce ? 1 : t < 0 ? 0 : easeOutCubic((t - m.delay) / 900)));
-    const breath = markers.map((m, i) => {
-      if (!beat[i] || reduce || t < m.delay + 900) return 0;
-      const k = ((t - m.delay) / beat[i].period + beat[i].phase) % 1;
-      return k < 0.4 ? Math.pow(Math.sin(Math.PI * (k / 0.4)), 2) : 0;
-    });
 
     // Atmosphere, then the sphere: lit from the upper left, darker at the edge.
     let g = ctx.createRadialGradient(cx, cy, R * 0.9, cx, cy, R * 1.3);
@@ -128,7 +112,7 @@ export function mountReach(section) {
         if (z <= 0.04) continue;
         let lv = 0;
         if (landLit && landOwner[n] >= 0) {
-          const o = landOwner[n], v = landLit[n] * landGrain[n] * grown[o] * (1 + 0.3 * breath[o]);
+          const v = landLit[n] * landGrain[n];
           if (v > 0.06) lv = Math.min(LV - 1, 1 + Math.floor(v * (LV - 1)));
         }
         buckets[Math.min(5, Math.floor(z * 6)) * LV + lv].push(cx + x1 * R, cy - y * R);
@@ -137,7 +121,7 @@ export function mountReach(section) {
       buckets.forEach((pts, b) => {
         if (!pts.length) return;
         const k = Math.floor(b / LV), lv = b % LV, f = lv / (LV - 1), depth = Math.pow((k + 0.5) / 6, 0.85);
-        const base = lo + (hi - lo) * depth, alpha = base + ((0.3 + 0.7 * depth) - base) * f;
+        const base = lo + (hi - lo) * depth, alpha = (base + ((0.3 + 0.7 * depth) - base) * f) * landIn;
         const c = mix(SP.dot, SP.city, Math.pow(f, 0.8)), d = d0 * (1 + 0.45 * f), h = d / 2;
         ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${alpha.toFixed(3)})`;
         ctx.beginPath();
@@ -157,14 +141,12 @@ export function mountReach(section) {
 
     // Spots: a soft bloom of light over each member country.
     ctx.globalCompositeOperation = 'lighter';
-    markers.forEach((m, i) => {
-      if (grown[i] <= 0) return;
+    markers.forEach((m) => {
       const [x, y, z] = P(m.v);
       if (z < 0.02) return;
       const edge = clamp((z - 0.02) / 0.3);
-      const twinkle = m.tier === 1 && !reduce ? 0.85 + 0.15 * Math.sin(now * 0.0021 + i * 1.7) : 1;
-      const s = R * (0.035 + 0.03 * m.tier) * (0.6 + 0.4 * grown[i]) * (1 + 0.28 * breath[i]);
-      ctx.globalAlpha = clamp(LIGHT.spot[m.tier] * edge * grown[i] * twinkle * (0.82 + 0.18 * breath[i]));
+      const s = R * (0.035 + 0.03 * m.tier);
+      ctx.globalAlpha = clamp(LIGHT.spot[m.tier] * edge * landIn);
       ctx.drawImage(sprite, x - s, y - s, s * 2, s * 2);
     });
 
@@ -174,9 +156,8 @@ export function mountReach(section) {
   const frame = (now) => {
     const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
     last = now;
-    // The turn eases up to speed over about two seconds once the section is in view.
-    if (shownAt !== null) turn += (TURN - turn) * (1 - Math.exp(-dt / 0.7));
-    if (!drag) { lon0 += turn * dt + spin; spin *= Math.pow(0.04, dt); }
+    if (land && landIn < 1) landIn = reduce ? 1 : Math.min(1, landIn + dt / 0.5); // the land fades in as it arrives
+    if (!drag) { lon0 += TURN * dt + spin; spin *= Math.pow(0.04, dt); }
     draw(now);
     frameId = requestAnimationFrame(frame);
   };
@@ -193,33 +174,6 @@ export function mountReach(section) {
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
 
-  // The numbers climb with the lights and land as the last one lights.
-  const countUp = () => {
-    const total = lastDelay + 700;
-    const step = (now) => {
-      const t = now - shownAt;
-      counters.forEach((el) => {
-        const target = Number(el.dataset.count);
-        const v = el.dataset.kind === 'countries' && markers.length
-          ? markers.reduce((a, m) => a + clamp((t - m.delay) / 260), 0) * (target / markers.length)
-          : target * easeOutQuart(t / total);
-        el.textContent = fmt(Math.min(target, v), el);
-      });
-      if (t < total + 300) requestAnimationFrame(step);
-      else counters.forEach((el) => { el.textContent = fmt(Number(el.dataset.count), el); });
-    };
-    requestAnimationFrame(step);
-  };
-
-  // The globe's part of the entrance starts when the section's does (the script beside it adds .reach-on).
-  const start = () => {
-    if (shownAt !== null) return;
-    shownAt = performance.now();
-    if (!reduce) countUp();
-  };
-  if (section.classList.contains('reach-on')) start();
-  else section.addEventListener('reach:on', start, { once: true });
-
   // Load the land when the section is near; draw only while it can be seen.
   const near = new IntersectionObserver(async (entries) => {
     if (!entries[0].isIntersecting) return;
@@ -231,7 +185,7 @@ export function mountReach(section) {
       land = xyz;
       lightLand();
     } catch (e) { land = new Float32Array(0); }
-  }, { rootMargin: '600px' });
+  }, { rootMargin: '800px' });
   near.observe(section);
   new IntersectionObserver((entries) => {
     if (entries[0].isIntersecting) { if (!frameId) { last = 0; frameId = requestAnimationFrame(frame); } }
