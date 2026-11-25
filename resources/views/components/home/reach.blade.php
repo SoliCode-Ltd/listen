@@ -1,6 +1,6 @@
 {{-- Where Listen's members are, straight on the page: the two numbers beside a turning globe of fine dotted land where
-     every country with members glows like a city at night, brighter where there are more, with network arcs and light
-     trails (public/js/home-globe.js, no dependencies). Counted live from sign-ups (App\Support\MemberReach), cached. One
+     every country with members glows like a city at night, brighter where there are more (public/js/home-globe.js,
+     no dependencies). Counted live from sign-ups (App\Support\MemberReach), cached. One
      orchestrated moment as it comes into view: the heading, the text, the numbers, the line and the note rise in one
      after another while the globe fades up, its lights spread from the Arab world outward and the numbers climb. The land loads only near the screen; the globe draws only while seen; reduced motion
      keeps it still. --}}
