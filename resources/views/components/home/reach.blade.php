@@ -1,6 +1,6 @@
 {{-- Where Listen's members are, straight on the page: the two numbers beside a turning globe of fine dotted land where
-     every country with members glows like a city at night, brighter where there are more (public/js/home-globe.js,
-     no dependencies). Counted live from sign-ups (App\Support\MemberReach), cached. Nothing
+     every country with members glows like a city at night, brighter where there are more; a click or tap on a light
+     names its country (public/js/home-globe.js, no dependencies). Counted live from sign-ups (App\Support\MemberReach), cached. Nothing
      waits to appear: the globe turns from the start and the numbers count up as they come into view. The land loads only near the screen; the globe draws only while seen; reduced motion
      keeps it still. --}}
 @php
@@ -8,7 +8,12 @@
   $isAr = app()->getLocale() === 'ar';
   $members = $reach::membersRoundedDown();
   $countries = $reach::countryCount();
-  $markers = array_map(fn (array $m) => ['code' => $m['code'], 'at' => $m['at'], 'tier' => $m['tier'], 'delay' => $m['delay']], $reach::markers());
+  // Each light, with its country's name in the page's language and whether a flag is on the site (public/images/flags).
+  $locale = app()->getLocale();
+  $markers = array_map(fn (array $m) => [
+      'at' => $m['at'], 'tier' => $m['tier'], 'name' => $reach::countryName($m['code'], $locale),
+      'flag' => is_file(public_path('images/flags/'.strtolower($m['code']).'.svg')) ? strtolower($m['code']) : null,
+  ], $reach::markers());
 @endphp
 <section class="reach" aria-labelledby="reachTitle" data-reach>
   <div class="reach-panel">
@@ -29,7 +34,7 @@
       </ul>
       <p class="reach-note">{{ __('ui.landing.reach_caption_a') }} <span>{{ __('ui.landing.reach_caption_b') }}</span></p>
     </div>
-    <div class="reach-globe" data-markers='@json($markers)' data-land="{{ \App\Support\VersionedAsset::url('data/globe-land.json') }}">
+    <div class="reach-globe" data-markers='@json($markers)' data-land="{{ \App\Support\VersionedAsset::url('data/globe-land.json') }}" data-flags="{{ asset('images/flags') }}">
       <canvas role="img" aria-label="{{ __('ui.landing.reach_map_label', ['countries' => $countries]) }}"></canvas>
     </div>
   </div>

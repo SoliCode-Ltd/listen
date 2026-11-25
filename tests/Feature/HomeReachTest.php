@@ -84,6 +84,21 @@ class HomeReachTest extends TestCase
         $this->assertEqualsWithDelta(2.4, $lon, 1.0);
     }
 
+    public function test_each_light_carries_its_country_name_in_the_page_language(): void
+    {
+        $this->members(['EG' => 60, 'SA' => 30, 'US' => 10, 'DE' => 8, 'FR' => 7]);
+
+        app()->setLocale('en');
+        $en = view('components.home.reach')->render();
+        $this->assertStringContainsString('"name":"Egypt"', $en);
+        $this->assertStringContainsString('"flag":"eg"', $en);
+
+        app()->setLocale('ar');
+        $ar = view('components.home.reach')->render();
+        // @json writes Arabic as \u escapes inside the attribute; the browser reads them back as مصر.
+        $this->assertStringContainsString(substr(json_encode(['name' => 'مصر']), 1, -1), $ar);
+    }
+
     public function test_the_section_stays_off_until_there_is_something_to_show(): void
     {
         $this->members(['EG' => 20, 'SA' => 10]);

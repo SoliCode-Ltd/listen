@@ -109,6 +109,16 @@ final class MemberReach
         return acos(max(-1.0, min(1.0, $c)));
     }
 
+    /** A country's name in the page's language (resources/data/country-names.json), or its code if none is known. */
+    public static function countryName(string $code, string $locale): string
+    {
+        static $names = null;
+        $names ??= json_decode((string) file_get_contents(resource_path('data/country-names.json')), true);
+        $code = strtoupper($code);
+
+        return (string) ($names[$locale === 'ar' ? 'ar' : 'en'][$code] ?? $code);
+    }
+
     /** @return array<string, array{0: float, 1: float}> latitude and longitude per country */
     private static function points(): array
     {

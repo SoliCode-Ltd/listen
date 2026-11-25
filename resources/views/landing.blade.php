@@ -48,13 +48,14 @@
       text-transform: uppercase;
       margin-bottom: 1rem;
     }
+    /* The hero's title and lead share the globe section's type: extra-bold title, regular lead at one size. */
     .hero h1 {
-      margin: 0 0 1rem;
-      font-size: clamp(2.4rem, 6vw, 4.5rem);
-      /* Medium, like every big title on the site: confident without shouting. */
-      font-weight: 600;
-      line-height: 1.05;
-      letter-spacing: -.03em;
+      margin: 0 0 1.1rem;
+      /* Sized so "Hear it in any accent." always fits its column on one line at this weight. */
+      font-size: clamp(2.4rem, 5vw, 4.4rem);
+      font-weight: 800;
+      line-height: 1.04;
+      letter-spacing: -.035em;
       text-wrap: balance;
     }
     /* Two sentences, two lines: "Type anything." / "Hear it in any accent." */
@@ -74,6 +75,13 @@
       line-height: 1.6;
       max-width: 52ch;
       text-wrap: pretty;
+    }
+    .hero .lead {
+      margin-bottom: 1.75rem;
+      max-width: 40ch;
+      font-size: clamp(1.15rem, 1.7vw, 1.5rem);
+      font-weight: 400;
+      line-height: 1.55;
     }
     .hero-cta {
       display: flex;
@@ -474,7 +482,7 @@
     .reach-copy { position: relative; z-index: 1; max-width: 56%; }
     .reach h2 {
       margin: 0 0 1.25rem;
-      font-size: clamp(2.7rem, 4.9vw, 4.8rem);
+      font-size: clamp(2.6rem, 4.6vw, 4.3rem);
       font-weight: 800;
       line-height: 1.04;
       letter-spacing: -.035em;
@@ -489,7 +497,7 @@
       color: transparent;
       padding-bottom: .08em;
     }
-    @media (min-width: 901px) { .reach-title-glow { white-space: nowrap; } }
+    @media (min-width: 961px) { .reach-title-glow { white-space: nowrap; } }
     html[dir="rtl"] .reach h2 { letter-spacing: 0; line-height: 1.2; }
     html[dir="rtl"] .reach .reach-title-glow { background: linear-gradient(270deg, var(--reach-glow-a), var(--reach-glow-b)); -webkit-background-clip: text; background-clip: text; }
     .reach-lead {
@@ -538,6 +546,7 @@
       font-size: 1.06rem;
       font-style: italic;
       line-height: 1.6;
+      text-wrap: balance;
     }
     .reach-note span { color: var(--reach-violet); }
     html[dir="rtl"] .reach-note { font-style: normal; }
@@ -558,12 +567,71 @@
       touch-action: pan-y;
     }
     .reach-globe.is-dragging canvas { cursor: grabbing; }
+    /* A light's country, in a small card pinned above it: its flag and its name. The nub keeps pointing at the light
+       when the card is held inside the globe's box near an edge. */
+    .reach-tip {
+      position: absolute;
+      z-index: 2;
+      /* Parked in the middle of the globe until a light is picked, so it never sticks out of the page. */
+      left: 50%;
+      top: 50%;
+      display: inline-flex;
+      align-items: center;
+      gap: .55rem;
+      padding: .5rem .9rem;
+      border-radius: 999px;
+      background: rgba(18, 14, 40, .94);
+      border: 1px solid rgba(201, 184, 255, .28);
+      box-shadow: 0 14px 34px -14px rgba(0, 0, 0, .7);
+      color: #fff;
+      font-size: .98rem;
+      font-weight: 600;
+      line-height: 1.1;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(-50%, calc(-100% - 8px)) scale(.92);
+      transform-origin: 50% 100%;
+      transition: opacity .18s ease, transform .26s cubic-bezier(.16, 1, .3, 1);
+    }
+    .reach-tip:has(img) { padding-inline-start: .45rem; }
+    .reach-tip.is-on { opacity: 1; transform: translate(-50%, calc(-100% - 16px)) scale(1); }
+    .reach-tip img { flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255, 255, 255, .3); }
+    .reach-tip::after {
+      content: "";
+      position: absolute;
+      left: calc(50% + var(--reach-tip-nudge, 0px));
+      bottom: -6px;
+      width: 10px;
+      height: 10px;
+      background: inherit;
+      border-right: 1px solid rgba(201, 184, 255, .28);
+      border-bottom: 1px solid rgba(201, 184, 255, .28);
+      transform: translateX(-50%) rotate(45deg);
+    }
+    html[data-theme="light"] .reach-tip {
+      background: rgba(255, 255, 255, .97);
+      border-color: rgba(118, 89, 250, .22);
+      box-shadow: 0 14px 34px -14px rgba(40, 20, 120, .45);
+      color: var(--text);
+    }
+    html[data-theme="light"] .reach-tip::after { border-color: rgba(118, 89, 250, .22); }
+    html[data-theme="light"] .reach-tip img { box-shadow: 0 0 0 1px rgba(20, 18, 43, .12); }
+    @media (prefers-reduced-motion: reduce) { .reach-tip { transition: none; } }
 
     .reach.reach-flat .reach-globe { display: none; }
     .reach.reach-flat .reach-copy { max-width: none; }
     /* On phones and small tablets the section is one centred column: heading, text, numbers, line, note, globe. */
-    @media (max-width: 900px) {
+    /* Phones and small tablets, at the hero's own breakpoint: one centred column, the title a step below the hero's. */
+    @media (max-width: 960px) {
       .reach { padding-bottom: 0; } /* the NVIDIA strip follows close under the globe */
+      .reach h2 { font-size: clamp(1.95rem, 8.6vw, 2.75rem); margin-bottom: .9rem; }
+      .reach-lead { font-size: 1.06rem; }
+      .reach-stats { margin-top: 1.6rem; gap: 0 1.75rem; }
+      .reach-stats li + li { padding-inline-start: 1.75rem; }
+      .reach-stats strong { font-size: clamp(2.5rem, 11vw, 3.2rem); }
+      .reach-stats span { font-size: 1.05rem; }
+      .reach-note { font-size: .98rem; }
       .reach-panel { min-height: 0; justify-items: center; }
       .reach-copy { max-width: 34rem; margin-inline: auto; text-align: center; }
       .reach-lead, .reach-note { margin-inline: auto; }
@@ -815,12 +883,12 @@
         gap: 1.1rem;
       }
       .hero h1 {
-        font-size: clamp(2rem, 10vw, 2.85rem);
-        margin-bottom: .85rem;
+        font-size: clamp(2.05rem, 9.6vw, 3rem);
+        margin-bottom: .9rem;
       }
-      .lead {
-        margin-bottom: 1.2rem;
-        font-size: 1rem;
+      .lead, .hero .lead {
+        margin-bottom: 1.3rem;
+        font-size: 1.06rem;
         margin-left: auto;
         margin-right: auto;
       }
