@@ -15,6 +15,7 @@
  *
  *   ssh user@host 'cd ~/public_html && LIMIT=60 php' < scripts/support/join_check.php
  *   ssh user@host 'cd ~/public_html && MEMBER=someone@example.com php' < scripts/support/join_check.php
+ *   ssh user@host 'cd ~/public_html && MEMBER=spread php' < scripts/support/join_check.php
  */
 
 use App\Models\AudioGeneration;
