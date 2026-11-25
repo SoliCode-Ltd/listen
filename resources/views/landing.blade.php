@@ -1173,6 +1173,10 @@
         grid-template-columns: 1fr;
         text-align: center;
       }
+      /* One column from here (a phone's "desktop site" view is 980px wide): the subheading's box centres with its text. */
+      .hero .lead {
+        margin-inline: auto;
+      }
       .hero-cta {
         justify-content: center;
       }
