@@ -458,6 +458,152 @@
       .hero-listen-bars i { animation: none; }
     }
 
+    /* Where the members are (components/home/reach): the numbers beside a turning globe, straight on the page. */
+    /* No clipping: the globe's rings may run a little into the page margin (it stays inside the screen). */
+    .reach { padding: var(--landing-section-space) 0 clamp(.5rem, 2vw, 1.5rem); }
+    .reach-panel {
+      --reach-glow-a: #a993ff;
+      --reach-glow-b: #7659fa;
+      --reach-violet: #b9a6ff;
+      position: relative;
+      display: grid;
+      align-items: center;
+      min-height: clamp(500px, 42vw, 620px);
+    }
+    html[data-theme="light"] .reach-panel { --reach-glow-a: #8a6dff; --reach-glow-b: #5a3bf0; --reach-violet: #6247ee; }
+    .reach-copy { position: relative; z-index: 1; max-width: 47%; }
+    .reach h2 {
+      margin: 0 0 1.25rem;
+      font-size: clamp(2.4rem, 4.1vw, 3.9rem);
+      font-weight: 800;
+      line-height: 1.04;
+      letter-spacing: -.035em;
+    }
+    .reach h2 span { display: block; }
+    /* The gradient is painted in the text's own box, so the box hugs the text. */
+    .reach .reach-title-glow {
+      display: inline-block;
+      background: linear-gradient(90deg, var(--reach-glow-a), var(--reach-glow-b));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      padding-bottom: .08em;
+    }
+    @media (min-width: 901px) { .reach-title-glow { white-space: nowrap; } }
+    html[dir="rtl"] .reach h2 { letter-spacing: 0; line-height: 1.2; }
+    html[dir="rtl"] .reach .reach-title-glow { background: linear-gradient(270deg, var(--reach-glow-a), var(--reach-glow-b)); -webkit-background-clip: text; background-clip: text; }
+    .reach-lead {
+      margin: 0;
+      max-width: 30ch;
+      color: var(--muted);
+      font-size: clamp(1.1rem, 1.6vw, 1.35rem);
+      line-height: 1.55;
+      text-wrap: pretty;
+    }
+    .reach-stats {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(2, max-content);
+      gap: 0 clamp(1.5rem, 3.5vw, 2.75rem);
+      margin: clamp(1.75rem, 3.5vw, 2.5rem) 0 0;
+      padding: 0 0 clamp(1.5rem, 3vw, 2rem);
+      list-style: none;
+    }
+    /* A line of light under the numbers, glowing from the start of the line. */
+    .reach-stats::after {
+      content: "";
+      position: absolute;
+      inset-inline-start: 0;
+      bottom: 0;
+      width: min(480px, 100%);
+      height: 1.5px;
+      background: linear-gradient(90deg, var(--reach-glow-b), var(--reach-glow-a) 35%, rgba(118, 89, 250, 0));
+      box-shadow: 0 0 12px 0 rgba(118, 89, 250, .45);
+    }
+    html[dir="rtl"] .reach-stats::after { background: linear-gradient(270deg, var(--reach-glow-b), var(--reach-glow-a) 35%, rgba(118, 89, 250, 0)); }
+    .reach-stats li { display: flex; flex-direction: column; gap: .3rem; }
+    .reach-stats li + li { padding-inline-start: clamp(1.5rem, 3.5vw, 2.75rem); border-inline-start: 1px solid var(--line); }
+    .reach-stats strong {
+      font-size: clamp(2.8rem, 5.6vw, 4.4rem);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -.035em;
+      font-variant-numeric: tabular-nums;
+    }
+    .reach-stats span { font-size: clamp(1.05rem, 1.6vw, 1.35rem); font-weight: 600; }
+    .reach-note {
+      margin: 1.4rem 0 0;
+      max-width: 44ch;
+      color: var(--muted);
+      font-size: 1rem;
+      font-style: italic;
+      line-height: 1.6;
+    }
+    .reach-note span { color: var(--reach-violet); }
+    html[dir="rtl"] .reach-note { font-style: normal; }
+    /* The globe takes the far half at almost the section's full height, its rings running towards the edge. */
+    .reach-globe {
+      position: absolute;
+      top: -4%;
+      bottom: -4%;
+      inset-inline-end: -3%;
+      width: 60%;
+    }
+    .reach-globe canvas {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: pan-y;
+    }
+    .reach-globe.is-dragging canvas { cursor: grabbing; }
+
+    /* The entrance, one moment: while .reach-ready is on (until the section comes into view) the parts wait below and
+       soft; then they rise in one after another on the same long, gentle curve, and the globe grows in with them. */
+    .reach h2 > span, .reach-lead, .reach-stats li, .reach-note, .reach-globe canvas {
+      transition: opacity .9s cubic-bezier(.16, 1, .3, 1), transform 1.15s cubic-bezier(.16, 1, .3, 1), filter .9s cubic-bezier(.16, 1, .3, 1);
+      transition-delay: var(--reach-in, 0ms);
+    }
+    .reach h2 > span:first-child { --reach-in: 0ms; }
+    .reach h2 > span + span { --reach-in: 110ms; }
+    .reach-lead { --reach-in: 240ms; }
+    .reach-stats li:first-child { --reach-in: 380ms; }
+    .reach-stats li + li { --reach-in: 470ms; }
+    .reach-note { --reach-in: 760ms; }
+    .reach-globe canvas { --reach-in: 120ms; transition-duration: 1.4s, 1.9s, 1.4s; }
+    .reach.reach-ready h2 > span, .reach.reach-ready .reach-lead, .reach.reach-ready .reach-stats li, .reach.reach-ready .reach-note {
+      opacity: 0;
+      transform: translateY(24px);
+      filter: blur(6px);
+    }
+    .reach.reach-ready .reach-globe canvas { opacity: 0; transform: scale(.9); filter: blur(4px); }
+    /* The line of light draws itself from its start, after the numbers. */
+    .reach-stats::after { transform-origin: left center; transition: transform 1.3s cubic-bezier(.16, 1, .3, 1) .58s, opacity .8s ease .58s; }
+    html[dir="rtl"] .reach-stats::after { transform-origin: right center; }
+    .reach.reach-ready .reach-stats::after { transform: scaleX(0); opacity: 0; }
+    .reach.reach-flat .reach-globe { display: none; }
+    .reach.reach-flat .reach-copy { max-width: none; }
+    /* On phones and small tablets the section is one centred column: heading, text, numbers, line, note, globe. */
+    @media (max-width: 900px) {
+      .reach { padding-bottom: 0; } /* the NVIDIA strip follows close under the globe */
+      .reach-panel { min-height: 0; justify-items: center; }
+      .reach-copy { max-width: 34rem; margin-inline: auto; text-align: center; }
+      .reach-lead, .reach-note { margin-inline: auto; }
+      .reach-lead { max-width: 32ch; }
+      .reach-stats { justify-content: center; }
+      .reach-stats::after, html[dir="rtl"] .reach-stats::after {
+        inset-inline: 0;
+        width: min(320px, 90%);
+        margin-inline: auto;
+        background: linear-gradient(90deg, rgba(118, 89, 250, 0), var(--reach-glow-a) 30%, var(--reach-glow-b) 50%, var(--reach-glow-a) 70%, rgba(118, 89, 250, 0));
+        transform-origin: center;
+      }
+      .reach-globe { position: relative; inset: auto; justify-self: center; width: 100%; max-width: 620px; aspect-ratio: 1.1; margin-top: .5rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .reach h2 > span, .reach-lead, .reach-stats li, .reach-note, .reach-globe canvas, .reach-stats::after { transition: none; }
+    }
+
     /* What Listen has, in real numbers, each drawn above its figure. With the voice-cloning line under
        it, it is one pair: the section rhythm above the strip and below the line, a small step between. */
     .facts {
@@ -757,17 +903,6 @@
       justify-content: center;
       gap: 44px;
     }
-    .inception-strip::before,
-    .inception-strip::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent 0, var(--line) 24%, var(--line) 76%, transparent 100%);
-    }
-    .inception-strip::before { top: 0; }
-    .inception-strip::after { bottom: 0; }
     .inception-strip img {
       display: block;
       flex: none;
@@ -784,6 +919,8 @@
     /* The program's name never breaks across two lines. */
     .inception-strip p b { font-weight: 600; color: var(--text); white-space: nowrap; }
     html[dir="rtl"] .inception-strip p { font-size: 1.17rem; line-height: 1.75; }
+    /* Right after the reach section the strip follows close under the globe. */
+    .reach ~ .inception-strip { padding-top: 0; }
     /* Where the sentence no longer fits on one line beside the badge, it sits on two short lines that hug the
        badge, so the strip stays centred. */
     @media (max-width: 1180px) {
@@ -801,9 +938,11 @@
       .inception-strip img { height: 54px; }
       .inception-strip p { font-size: 1rem; max-width: 32ch; }
       html[dir="rtl"] .inception-strip p { font-size: 1.04rem; }
+      .reach ~ .inception-strip { margin-top: .5rem; padding-top: 0; }
     }
     @media (max-width: 640px) {
       .inception-strip { margin-top: 2.1rem; }
+      .reach ~ .inception-strip { margin-top: .5rem; }
       /* Arabic fits on two even lines on a phone at this size. */
       html[dir="rtl"] .inception-strip p { font-size: .96rem; max-width: none; }
     }
@@ -1067,8 +1206,13 @@
       </div>
     </section>
 
-    {{-- NVIDIA Inception, right under the hero: NVIDIA's own badge (public/images/partners, unchanged but for its
-         empty margin) beside one line, between two rules that span only the strip and fade at their ends. --}}
+    {{-- Where the members are, right under the hero: the reach of the studio, then the NVIDIA strip under it. --}}
+    @if(\App\Support\MemberReach::show())
+      @include('components.home.reach')
+    @endif
+
+    {{-- NVIDIA Inception, under the hero (and close under the reach section when it shows): NVIDIA's own badge
+         (public/images/partners, unchanged but for its empty margin) beside one line. --}}
     <section class="inception-strip" aria-label="{{ __('ui.landing.inception_program') }}">
       <img src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.landing.inception_badge') }}" width="174" height="64" loading="lazy" decoding="async">
       <p>{!! __('ui.landing.inception_line', ['program' => '<b>'.e(__('ui.landing.inception_program')).'</b>']) !!}</p>
