@@ -25,12 +25,29 @@ class HomeInceptionTest extends TestCase
         $strip = strpos($html, '<section class="inception-strip"');
         $this->assertNotFalse($strip);
         $this->assertGreaterThan($hero, $strip);
-        // Nothing between the hero's end and the strip.
+        // Nothing between the hero's end and the strip (the reach section is off on a site this small).
         $this->assertSame(0, substr_count(substr($html, $hero + 1, $strip - $hero), '<section'));
 
         app()->setLocale('ar');
         $this->getLocalizedRoute('home')->assertOk()
             ->assertSee('إسمع عضو في برنامج <b>إنسبشن من إنفيديا</b> للشركات الناشئة في مجال الذكاء الاصطناعي.', false);
+    }
+
+    public function test_with_the_reach_section_the_strip_sits_right_under_it(): void
+    {
+        // Enough members in enough countries for the reach section to show, without making them all.
+        cache()->put('member_reach:v1', ['members' => 9483, 'countries' => ['EG' => 4623, 'SA' => 1019, 'US' => 120, 'DE' => 99, 'FR' => 74, 'GB' => 45]], 60);
+
+        app()->setLocale('en');
+        $html = $this->getLocalizedRoute('home')->assertOk()->getContent();
+        $hero = strpos($html, '<section class="hero">');
+        $reach = strpos($html, '<section class="reach"');
+        $strip = strpos($html, '<section class="inception-strip"');
+        $this->assertNotFalse($reach);
+        $this->assertNotFalse($strip);
+        // Hero, then the reach section, then the strip, with nothing else between them.
+        $this->assertTrue($hero < $reach && $reach < $strip);
+        $this->assertSame(1, substr_count(substr($html, $hero + 1, $strip - $hero), '<section'));
     }
 
     public function test_the_footer_shows_the_badge_on_every_page(): void

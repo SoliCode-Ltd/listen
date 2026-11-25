@@ -48,13 +48,14 @@
       text-transform: uppercase;
       margin-bottom: 1rem;
     }
+    /* The hero's title and lead share the globe section's type: extra-bold title, regular lead at one size. */
     .hero h1 {
-      margin: 0 0 1rem;
-      font-size: clamp(2.4rem, 6vw, 4.5rem);
-      /* Medium, like every big title on the site: confident without shouting. */
-      font-weight: 600;
-      line-height: 1.05;
-      letter-spacing: -.03em;
+      margin: 0 0 1.1rem;
+      /* Sized so "Hear it in any accent." always fits its column on one line at this weight. */
+      font-size: clamp(2.4rem, 5vw, 4.4rem);
+      font-weight: 800;
+      line-height: 1.04;
+      letter-spacing: -.035em;
       text-wrap: balance;
     }
     /* Two sentences, two lines: "Type anything." / "Hear it in any accent." */
@@ -74,6 +75,13 @@
       line-height: 1.6;
       max-width: 52ch;
       text-wrap: pretty;
+    }
+    .hero .lead {
+      margin-bottom: 1.75rem;
+      max-width: 40ch;
+      font-size: clamp(1.15rem, 1.7vw, 1.5rem);
+      font-weight: 400;
+      line-height: 1.55;
     }
     .hero-cta {
       display: flex;
@@ -458,6 +466,206 @@
       .hero-listen-bars i { animation: none; }
     }
 
+    /* Where the members are (components/home/reach): the numbers beside a turning globe, straight on the page. */
+    /* No clipping: the globe's rings may run a little into the page margin (it stays inside the screen). */
+    /* Spaced by what shows, not by boxes: about 56px from the hero's last line (the hero keeps its own 40px below it)
+       to the heading, and 48px from the note to the NVIDIA strip, which follows close under it. */
+    .reach { padding: 1rem 0 3rem; }
+    .reach-panel {
+      --reach-glow-a: #a993ff;
+      --reach-glow-b: #7659fa;
+      --reach-violet: #b9a6ff;
+      position: relative;
+      display: grid;
+      /* The hero's own columns, so the globe sits under the hero's circle of speakers at its exact size: the circle
+         is 76% of that column, and so is the globe's sphere. */
+      grid-template-columns: 1.1fr .9fr;
+      gap: 1.75rem;
+      align-items: center;
+    }
+    html[data-theme="light"] .reach-panel { --reach-glow-a: #8a6dff; --reach-glow-b: #5a3bf0; --reach-violet: #6247ee; }
+    .reach-copy { position: relative; z-index: 1; grid-column: 1; grid-row: 1; }
+    .reach h2 {
+      margin: 0 0 1.25rem;
+      font-size: clamp(2.6rem, 4.6vw, 4.3rem);
+      font-weight: 800;
+      line-height: 1.04;
+      letter-spacing: -.035em;
+    }
+    .reach h2 span { display: block; }
+    /* The gradient is painted in the text's own box, so the box hugs the text. */
+    .reach .reach-title-glow {
+      display: inline-block;
+      background: linear-gradient(90deg, var(--reach-glow-a), var(--reach-glow-b));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      padding-bottom: .08em;
+    }
+    @media (min-width: 981px) { .reach-title-glow { white-space: nowrap; } }
+    html[dir="rtl"] .reach h2 { letter-spacing: 0; line-height: 1.2; }
+    html[dir="rtl"] .reach .reach-title-glow { background: linear-gradient(270deg, var(--reach-glow-a), var(--reach-glow-b)); -webkit-background-clip: text; background-clip: text; }
+    .reach-lead {
+      margin: 0;
+      max-width: 34ch;
+      color: var(--muted);
+      font-size: clamp(1.15rem, 1.7vw, 1.5rem);
+      line-height: 1.55;
+      text-wrap: pretty;
+    }
+    .reach-stats {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(2, max-content);
+      gap: 0 clamp(1.5rem, 3.5vw, 2.75rem);
+      margin: clamp(1.75rem, 3.5vw, 2.5rem) 0 0;
+      padding: 0 0 clamp(1.5rem, 3vw, 2rem);
+      list-style: none;
+    }
+    /* A line of light under the numbers, glowing from the start of the line. */
+    .reach-stats::after {
+      content: "";
+      position: absolute;
+      inset-inline-start: 0;
+      bottom: 0;
+      width: min(480px, 100%);
+      height: 1.5px;
+      background: linear-gradient(90deg, var(--reach-glow-b), var(--reach-glow-a) 35%, rgba(118, 89, 250, 0));
+      box-shadow: 0 0 12px 0 rgba(118, 89, 250, .45);
+    }
+    html[dir="rtl"] .reach-stats::after { background: linear-gradient(270deg, var(--reach-glow-b), var(--reach-glow-a) 35%, rgba(118, 89, 250, 0)); }
+    .reach-stats li { display: flex; flex-direction: column; gap: .3rem; }
+    .reach-stats li + li { padding-inline-start: clamp(1.5rem, 3.5vw, 2.75rem); border-inline-start: 1px solid var(--line); }
+    .reach-stats strong {
+      font-size: clamp(3rem, 6vw, 5.2rem);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -.035em;
+      font-variant-numeric: tabular-nums;
+    }
+    .reach-stats span { font-size: clamp(1.1rem, 1.7vw, 1.45rem); font-weight: 600; }
+    .reach-note {
+      margin: 1.4rem 0 0;
+      color: var(--muted);
+      font-size: 1.06rem;
+      font-style: italic;
+      line-height: 1.6;
+      text-wrap: balance;
+    }
+    .reach-note span { color: var(--reach-violet); }
+    /* The note breaks after its comma, with its second clause on its own line, except on an Arabic desktop page,
+       where the whole note fits on one line. */
+    .reach-note span { display: block; }
+    @media (min-width: 981px) { html[dir="rtl"] .reach-note span { display: inline; } }
+    html[dir="rtl"] .reach-note { font-style: normal; }
+    /* The globe takes the far half at almost the section's full height, its rings running towards the edge. */
+    .reach-globe {
+      position: relative;
+      grid-column: 2;
+      grid-row: 1;
+      width: 100%;
+      aspect-ratio: 1;
+      /* The sphere fills the middle 76% of its square: the empty 12% above and below leave the layout, so the
+         section's spacing is measured from the sphere itself. */
+      margin-block: -12%;
+    }
+    .reach-globe canvas {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: pan-y;
+    }
+    .reach-globe.is-dragging canvas { cursor: grabbing; }
+    /* A light's country, in a small card pinned above it: its flag and its name. The nub keeps pointing at the light
+       when the card is held inside the globe's box near an edge. */
+    .reach-tip {
+      position: absolute;
+      z-index: 2;
+      /* Parked in the middle of the globe until a light is picked, so it never sticks out of the page. */
+      left: 50%;
+      top: 50%;
+      display: inline-flex;
+      align-items: center;
+      gap: .55rem;
+      padding: .5rem .9rem;
+      border-radius: 999px;
+      background: rgba(18, 14, 40, .94);
+      border: 1px solid rgba(201, 184, 255, .28);
+      box-shadow: 0 14px 34px -14px rgba(0, 0, 0, .7);
+      color: #fff;
+      font-size: .98rem;
+      font-weight: 600;
+      line-height: 1.1;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(-50%, calc(-100% - 8px)) scale(.92);
+      transform-origin: 50% 100%;
+      transition: opacity .18s ease, transform .26s cubic-bezier(.16, 1, .3, 1);
+    }
+    .reach-tip:has(img) { padding-inline-start: .45rem; }
+    .reach-tip.is-on { opacity: 1; transform: translate(-50%, calc(-100% - 16px)) scale(1); }
+    .reach-tip img { flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255, 255, 255, .3); }
+    .reach-tip::after {
+      content: "";
+      position: absolute;
+      left: calc(50% + var(--reach-tip-nudge, 0px));
+      bottom: -6px;
+      width: 10px;
+      height: 10px;
+      background: inherit;
+      border-right: 1px solid rgba(201, 184, 255, .28);
+      border-bottom: 1px solid rgba(201, 184, 255, .28);
+      transform: translateX(-50%) rotate(45deg);
+    }
+    html[data-theme="light"] .reach-tip {
+      background: rgba(255, 255, 255, .97);
+      border-color: rgba(118, 89, 250, .22);
+      box-shadow: 0 14px 34px -14px rgba(40, 20, 120, .45);
+      color: var(--text);
+    }
+    html[data-theme="light"] .reach-tip::after { border-color: rgba(118, 89, 250, .22); }
+    html[data-theme="light"] .reach-tip img { box-shadow: 0 0 0 1px rgba(20, 18, 43, .12); }
+    @media (prefers-reduced-motion: reduce) { .reach-tip { transition: none; } }
+
+    .reach.reach-flat .reach-globe { display: none; }
+    .reach.reach-flat .reach-copy { max-width: none; }
+    /* On phones and small tablets the section is one centred column: heading, text, numbers, line, note, globe. */
+    /* Phones and tablets, where the hero goes to one column too: one centred column, the title a step below the hero's. */
+    @media (max-width: 980px) {
+      .reach-panel { grid-template-columns: 1fr; gap: 0; }
+      .reach-copy, .reach-globe { grid-column: 1; grid-row: auto; }
+      .reach ~ .inception-strip { margin-top: 48px; padding-top: 0; }
+      /* Phones and tablets: the same 56px under the hero; the strip follows the globe's own empty edge. */
+      .reach { padding: calc(56px - var(--landing-section-space-mobile)) 0 0; }
+      .reach h2 { font-size: clamp(1.95rem, 8.6vw, 2.75rem); margin-bottom: .9rem; }
+      .reach-lead { font-size: 1.06rem; }
+      .reach-stats { margin-top: 1.6rem; gap: 0 1.75rem; }
+      .reach-stats li + li { padding-inline-start: 1.75rem; }
+      .reach-stats strong { font-size: clamp(2.5rem, 11vw, 3.2rem); }
+      .reach-stats span { font-size: 1.05rem; }
+      .reach-note { font-size: .98rem; }
+      .reach-panel { min-height: 0; justify-items: center; }
+      .reach-copy { max-width: 34rem; margin-inline: auto; text-align: center; }
+      .reach-lead, .reach-note { margin-inline: auto; }
+      .reach-lead { max-width: 32ch; }
+      .reach-stats { justify-content: center; }
+      .reach-stats::after, html[dir="rtl"] .reach-stats::after {
+        inset-inline: 0;
+        width: min(320px, 90%);
+        margin-inline: auto;
+        background: linear-gradient(90deg, rgba(118, 89, 250, 0), var(--reach-glow-a) 30%, var(--reach-glow-b) 50%, var(--reach-glow-a) 70%, rgba(118, 89, 250, 0));
+        transform-origin: center;
+      }
+      /* The sphere fills 76% of its square, so the bottom 12% is empty: pull the strip up over it, so the space
+         under the globe is the strip's own 48px whatever the screen's width. */
+      .reach-globe { position: relative; inset: auto; transform: none; justify-self: center; width: 100%; max-width: 460px; aspect-ratio: 1; margin-block: 1rem calc(-.12 * min(100%, 460px)); }
+    }
+
+    /* Between 961 and 980px the hero is one column but keeps its desktop space below (40px): 56px in all. */
+    @media (min-width: 961px) and (max-width: 980px) { .reach { padding-top: 1rem; } }
+
     /* What Listen has, in real numbers, each drawn above its figure. With the voice-cloning line under
        it, it is one pair: the section rhythm above the strip and below the line, a small step between. */
     .facts {
@@ -694,12 +902,12 @@
         gap: 1.1rem;
       }
       .hero h1 {
-        font-size: clamp(2rem, 10vw, 2.85rem);
-        margin-bottom: .85rem;
+        font-size: clamp(2.05rem, 9.6vw, 3rem);
+        margin-bottom: .9rem;
       }
-      .lead {
-        margin-bottom: 1.2rem;
-        font-size: 1rem;
+      .lead, .hero .lead {
+        margin-bottom: 1.3rem;
+        font-size: 1.06rem;
         margin-left: auto;
         margin-right: auto;
       }
@@ -757,17 +965,6 @@
       justify-content: center;
       gap: 44px;
     }
-    .inception-strip::before,
-    .inception-strip::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent 0, var(--line) 24%, var(--line) 76%, transparent 100%);
-    }
-    .inception-strip::before { top: 0; }
-    .inception-strip::after { bottom: 0; }
     .inception-strip img {
       display: block;
       flex: none;
@@ -784,6 +981,8 @@
     /* The program's name never breaks across two lines. */
     .inception-strip p b { font-weight: 600; color: var(--text); white-space: nowrap; }
     html[dir="rtl"] .inception-strip p { font-size: 1.17rem; line-height: 1.75; }
+    /* Right after the reach section the strip follows close under the globe. */
+    .reach ~ .inception-strip { padding-top: 0; }
     /* Where the sentence no longer fits on one line beside the badge, it sits on two short lines that hug the
        badge, so the strip stays centred. */
     @media (max-width: 1180px) {
@@ -801,9 +1000,12 @@
       .inception-strip img { height: 54px; }
       .inception-strip p { font-size: 1rem; max-width: 32ch; }
       html[dir="rtl"] .inception-strip p { font-size: 1.04rem; }
+      .reach ~ .inception-strip { margin-top: 48px; padding-top: 0; }
     }
     @media (max-width: 640px) {
       .inception-strip { margin-top: 2.1rem; }
+      .reach ~ .inception-strip { margin-top: 48px; }
+      .reach { padding-top: 1.5rem; } /* phones: 48px under the hero, whose own space below is smaller here */
       /* Arabic fits on two even lines on a phone at this size. */
       html[dir="rtl"] .inception-strip p { font-size: .96rem; max-width: none; }
     }
@@ -1067,8 +1269,13 @@
       </div>
     </section>
 
-    {{-- NVIDIA Inception, right under the hero: NVIDIA's own badge (public/images/partners, unchanged but for its
-         empty margin) beside one line, between two rules that span only the strip and fade at their ends. --}}
+    {{-- Where the members are, right under the hero: the reach of the studio, then the NVIDIA strip under it. --}}
+    @if(\App\Support\MemberReach::show())
+      @include('components.home.reach')
+    @endif
+
+    {{-- NVIDIA Inception, under the hero (and close under the reach section when it shows): NVIDIA's own badge
+         (public/images/partners, unchanged but for its empty margin) beside one line. --}}
     <section class="inception-strip" aria-label="{{ __('ui.landing.inception_program') }}">
       <img src="{{ \App\Support\VersionedAsset::url('images/partners/nvidia-inception.svg') }}" alt="{{ __('ui.landing.inception_badge') }}" width="174" height="64" loading="lazy" decoding="async">
       <p>{!! __('ui.landing.inception_line', ['program' => '<b>'.e(__('ui.landing.inception_program')).'</b>']) !!}</p>
