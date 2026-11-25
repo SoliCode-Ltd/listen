@@ -477,10 +477,14 @@
       --reach-violet: #b9a6ff;
       position: relative;
       display: grid;
+      /* The hero's own columns, so the globe sits under the hero's circle of speakers at its exact size: the circle
+         is 76% of that column, and so is the globe's sphere. */
+      grid-template-columns: 1.1fr .9fr;
+      gap: 1.75rem;
       align-items: center;
     }
     html[data-theme="light"] .reach-panel { --reach-glow-a: #8a6dff; --reach-glow-b: #5a3bf0; --reach-violet: #6247ee; }
-    .reach-copy { position: relative; z-index: 1; max-width: 56%; }
+    .reach-copy { position: relative; z-index: 1; grid-column: 1; grid-row: 1; }
     .reach h2 {
       margin: 0 0 1.25rem;
       font-size: clamp(2.6rem, 4.6vw, 4.3rem);
@@ -498,7 +502,7 @@
       color: transparent;
       padding-bottom: .08em;
     }
-    @media (min-width: 961px) { .reach-title-glow { white-space: nowrap; } }
+    @media (min-width: 981px) { .reach-title-glow { white-space: nowrap; } }
     html[dir="rtl"] .reach h2 { letter-spacing: 0; line-height: 1.2; }
     html[dir="rtl"] .reach .reach-title-glow { background: linear-gradient(270deg, var(--reach-glow-a), var(--reach-glow-b)); -webkit-background-clip: text; background-clip: text; }
     .reach-lead {
@@ -542,7 +546,6 @@
     .reach-stats span { font-size: clamp(1.1rem, 1.7vw, 1.45rem); font-weight: 600; }
     .reach-note {
       margin: 1.4rem 0 0;
-      max-width: 44ch;
       color: var(--muted);
       font-size: 1.06rem;
       font-style: italic;
@@ -550,15 +553,21 @@
       text-wrap: balance;
     }
     .reach-note span { color: var(--reach-violet); }
+    /* The note breaks after its comma, with its second clause on its own line, except on an Arabic desktop page,
+       where the whole note fits on one line. */
+    .reach-note span { display: block; }
+    @media (min-width: 981px) { html[dir="rtl"] .reach-note span { display: inline; } }
     html[dir="rtl"] .reach-note { font-style: normal; }
     /* The globe takes the far half at almost the section's full height, its rings running towards the edge. */
     .reach-globe {
-      position: absolute;
-      top: 50%;
-      inset-inline-end: 0;
-      width: 40%;
+      position: relative;
+      grid-column: 2;
+      grid-row: 1;
+      width: 100%;
       aspect-ratio: 1;
-      transform: translateY(-50%);
+      /* The sphere fills the middle 76% of its square: the empty 12% above and below leave the layout, so the
+         section's spacing is measured from the sphere itself. */
+      margin-block: -12%;
     }
     .reach-globe canvas {
       position: relative;
@@ -623,8 +632,11 @@
     .reach.reach-flat .reach-globe { display: none; }
     .reach.reach-flat .reach-copy { max-width: none; }
     /* On phones and small tablets the section is one centred column: heading, text, numbers, line, note, globe. */
-    /* Phones and small tablets, at the hero's own breakpoint: one centred column, the title a step below the hero's. */
-    @media (max-width: 960px) {
+    /* Phones and tablets, where the hero goes to one column too: one centred column, the title a step below the hero's. */
+    @media (max-width: 980px) {
+      .reach-panel { grid-template-columns: 1fr; gap: 0; }
+      .reach-copy, .reach-globe { grid-column: 1; grid-row: auto; }
+      .reach ~ .inception-strip { margin-top: 48px; padding-top: 0; }
       /* Phones and tablets: the same 56px under the hero; the strip follows the globe's own empty edge. */
       .reach { padding: calc(56px - var(--landing-section-space-mobile)) 0 0; }
       .reach h2 { font-size: clamp(1.95rem, 8.6vw, 2.75rem); margin-bottom: .9rem; }
@@ -648,8 +660,11 @@
       }
       /* The sphere fills 76% of its square, so the bottom 12% is empty: pull the strip up over it, so the space
          under the globe is the strip's own 48px whatever the screen's width. */
-      .reach-globe { position: relative; inset: auto; transform: none; justify-self: center; width: 100%; max-width: 460px; aspect-ratio: 1; margin-top: 1rem; margin-bottom: calc(-.12 * min(100%, 460px)); }
+      .reach-globe { position: relative; inset: auto; transform: none; justify-self: center; width: 100%; max-width: 460px; aspect-ratio: 1; margin-block: 1rem calc(-.12 * min(100%, 460px)); }
     }
+
+    /* Between 961 and 980px the hero is one column but keeps its desktop space below (40px): 56px in all. */
+    @media (min-width: 961px) and (max-width: 980px) { .reach { padding-top: 1rem; } }
 
     /* What Listen has, in real numbers, each drawn above its figure. With the voice-cloning line under
        it, it is one pair: the section rhythm above the strip and below the line, a small step between. */
