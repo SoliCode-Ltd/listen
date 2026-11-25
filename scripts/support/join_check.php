@@ -15,11 +15,13 @@
  *
  *   ssh user@host 'cd ~/public_html && LIMIT=60 php' < scripts/support/join_check.php
  *   ssh user@host 'cd ~/public_html && MEMBER=someone@example.com php' < scripts/support/join_check.php
+ *   ssh user@host 'cd ~/public_html && MEMBER=spread php' < scripts/support/join_check.php
  */
 
 use App\Models\AudioGeneration;
 use App\Support\AudioFormats;
 use App\Support\GeminiVocalTags;
+use App\Support\SpeakerVoices;
 use App\Support\TextChunker;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
@@ -221,6 +223,10 @@ $quantile = function (array $values, float $q): float {
 
 // MEMBER (an email or a member id): only that member's voices, e.g. the listening test's on staging.
 $member = trim((string) getenv('MEMBER'));
+// MEMBER=spread: every member's voices of two minutes or more, at most four of one voice,
+// so the newest are not all one member's batch with one voice.
+$spreadOut = $member === 'spread';
+$member = $spreadOut ? '' : $member;
 $memberId = $member === '' ? null : (ctype_digit($member) ? (int) $member : (int) DB::table('users')->where('email', $member)->value('id'));
 if ($member !== '') {
     echo $memberId ? "Only member {$memberId}'s voices.\n" : "No such member.\n";
@@ -230,14 +236,15 @@ $voices = AudioGeneration::query()
     ->where('voice_tier', 'hd')
     ->where('tts_provider', 'gemini')
     ->where('is_dialogue', false)
-    ->where('duration_seconds', '>=', $member === '' ? 75 : 30)
+    ->where('duration_seconds', '>=', $spreadOut ? 120 : ($member === '' ? 75 : 30))
     ->whereNotNull('audio_path')
     ->when($member !== '', fn ($q) => $q->where('user_id', $memberId ?: 0))
     ->orderByDesc('id')
-    ->limit($limit * 4)
-    ->get(['id', 'input_text', 'audio_path', 'duration_seconds', 'settings_snapshot', 'speed', 'dialect', 'tts_model', 'created_at']);
+    ->limit($limit * ($spreadOut ? 30 : 4))
+    ->get(['id', 'input_text', 'audio_path', 'duration_seconds', 'settings_snapshot', 'speed', 'dialect', 'tts_model', 'voice_name', 'created_at']);
 
 $across = $within = $retakes = [];
+$perVoice = [];
 $joinsMatched = $joinsChecked = 0;
 $rows = [];
 foreach ($voices as $g) {
@@ -253,12 +260,19 @@ foreach ($voices as $g) {
     if (! is_file($path)) {
         continue;
     }
+    // A child's voice is read in shorter pieces (GeminiTtsProvider::maxCharsFor).
+    $child = (SpeakerVoices::speaker((string) $g->voice_name)['age'] ?? null) === 'child';
+    $voiceChars = $child ? min($maxChars, max(200, (int) config('services.gemini_tts.child_max_chars_per_request', 300))) : $maxChars;
     $expected = 0;
     $parts = GeminiVocalTags::parts((string) $g->input_text);
     foreach ($parts as $part) {
-        $expected += mb_strlen($part['text']) > $maxChars ? count(TextChunker::pieces($part['text'], $maxChars, 'mb_strlen', $parallel)) : 1;
+        $expected += mb_strlen($part['text']) > $voiceChars ? count(TextChunker::pieces($part['text'], $voiceChars, 'mb_strlen', $parallel)) : 1;
     }
     if ($expected < 2) {
+        continue;
+    }
+
+    if ($spreadOut && ($perVoice[(string) $g->voice_name] = ($perVoice[(string) $g->voice_name] ?? 0) + 1) > 4) {
         continue;
     }
 
@@ -277,7 +291,8 @@ foreach ($voices as $g) {
     for ($i = 0; $i + 1 < count($bounds); $i++) {
         $m = $measure($decode($path, $bounds[$i], $bounds[$i + 1]));
         if ($m !== null) {
-            $pieces[] = $m;
+            // Where the piece starts in the voice, to listen at that spot.
+            $pieces[] = $m + ['at' => $bounds[$i]];
             // The two halves of one long piece: how much a single take varies.
             if ($m['seconds'] >= 40) {
                 $mid = ($bounds[$i] + $bounds[$i + 1]) / 2;
@@ -327,7 +342,7 @@ foreach ($voices as $g) {
             $flags[] = sprintf('level %+.1f dB', $p['level'] - $medianLevel);
         }
         if ($flags !== []) {
-            $odd[] = 'piece '.($k + 1).': '.implode(', ', $flags);
+            $odd[] = 'piece '.($k + 1).' (at '.sprintf('%d:%02d', intdiv((int) $p['at'], 60), ((int) $p['at']) % 60).'): '.implode(', ', $flags);
         }
     }
     $rows[] = $odd;
@@ -336,8 +351,8 @@ foreach ($voices as $g) {
     $checkedText = $checked === null ? '' : sprintf('; checked when made: %d taken again of %d, %d retakes kept%s',
         $checked['retaken'] ?? 0, $checked['pieces'] ?? 0, $checked['kept_retake'] ?? 0,
         ($checked['reasons'] ?? []) === [] ? '' : ' ('.implode(', ', array_map(fn ($r, $n) => "{$r} {$n}", array_keys($checked['reasons']), $checked['reasons'])).')');
-    printf("  #%d %s, %.1f min, %d pieces expected, %d found%s; pace spread %d%%, pitch spread %.1f st, level spread %.1f dB%s%s\n",
-        $g->id, (string) ($g->tts_model ?: '-'), $length / 60, $expected, count($joins) + 1, $s['moods'] ? ', with moods' : '', round(100 * $s['pace']), $s['pitch'], $s['level'],
+    printf("  #%d %s, voice %s%s, %.1f min, %d pieces expected, %d found%s; pace spread %d%%, pitch spread %.1f st, level spread %.1f dB%s%s\n",
+        $g->id, (string) ($g->tts_model ?: '-'), preg_replace('/[^\\p{L}\\p{N}_ -]/u', '', (string) $g->voice_name) ?: '-', $child ? ' (a child)' : '', $length / 60, $expected, count($joins) + 1, $s['moods'] ? ', with moods' : '', round(100 * $s['pace']), $s['pitch'], $s['level'],
         $checkedText, $odd === [] ? '' : ' | '.implode('; ', $odd));
 }
 

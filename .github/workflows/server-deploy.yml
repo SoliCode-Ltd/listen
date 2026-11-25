@@ -280,7 +280,7 @@ on:
         type: string
         default: ""
       member:
-        description: "email-check, member-audio-check, demo-links, join-check and speed-check: a member's email or member id. readings-check: empty, or a number of days. content-check: empty, a member id, or sample:300"
+        description: "email-check, member-audio-check, demo-links, join-check and speed-check: a member's email or member id. join-check also: empty (every member's newest long voices) or spread (two minutes or more, at most four of one voice). readings-check: empty, or a number of days. content-check: empty, a member id, or sample:300"
         type: string
         default: ""
       dub:
@@ -598,7 +598,8 @@ jobs:
             exit 0
           fi
           if [ "$MODE" = join-check ]; then
-            printf '%s' "$MEMBER" | grep -qE '^[A-Za-z0-9._%+@-]*$' || { echo "member must be an email or a member id"; exit 1; }
+            # Empty is every member's voices: grep finds no line in an empty value, so it is let through first.
+            [ -z "$MEMBER" ] || printf '%s' "$MEMBER" | grep -qE '^[A-Za-z0-9._%+@-]+$' || { echo "member must be an email or a member id"; exit 1; }
             tool join_check.php | $S "$FIND; LIMIT=40 MEMBER='$MEMBER' nice php"
             rm -f ~/.ssh/id_deploy
             exit 0
