@@ -598,7 +598,8 @@ jobs:
             exit 0
           fi
           if [ "$MODE" = join-check ]; then
-            printf '%s' "$MEMBER" | grep -qE '^[A-Za-z0-9._%+@-]*$' || { echo "member must be an email or a member id"; exit 1; }
+            # Empty is every member's voices: grep finds no line in an empty value, so it is let through first.
+            [ -z "$MEMBER" ] || printf '%s' "$MEMBER" | grep -qE '^[A-Za-z0-9._%+@-]+$' || { echo "member must be an email or a member id"; exit 1; }
             tool join_check.php | $S "$FIND; LIMIT=40 MEMBER='$MEMBER' nice php"
             rm -f ~/.ssh/id_deploy
             exit 0
