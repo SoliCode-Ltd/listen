@@ -468,7 +468,9 @@
 
     /* Where the members are (components/home/reach): the numbers beside a turning globe, straight on the page. */
     /* No clipping: the globe's rings may run a little into the page margin (it stays inside the screen). */
-    .reach { padding: var(--landing-section-space) 0 clamp(.5rem, 2vw, 1.5rem); }
+    /* Spaced by what shows, not by boxes: about 56px from the hero's last line (the hero keeps its own 40px below it)
+       to the heading, and 48px from the note to the NVIDIA strip, which follows close under it. */
+    .reach { padding: 1rem 0 3rem; }
     .reach-panel {
       --reach-glow-a: #a993ff;
       --reach-glow-b: #7659fa;
@@ -476,7 +478,6 @@
       position: relative;
       display: grid;
       align-items: center;
-      min-height: clamp(460px, 36vw, 560px);
     }
     html[data-theme="light"] .reach-panel { --reach-glow-a: #8a6dff; --reach-glow-b: #5a3bf0; --reach-violet: #6247ee; }
     .reach-copy { position: relative; z-index: 1; max-width: 56%; }
@@ -624,7 +625,8 @@
     /* On phones and small tablets the section is one centred column: heading, text, numbers, line, note, globe. */
     /* Phones and small tablets, at the hero's own breakpoint: one centred column, the title a step below the hero's. */
     @media (max-width: 960px) {
-      .reach { padding-bottom: 0; } /* the NVIDIA strip follows close under the globe */
+      /* Phones and tablets: the same 56px under the hero; the strip follows the globe's own empty edge. */
+      .reach { padding: calc(56px - var(--landing-section-space-mobile)) 0 0; }
       .reach h2 { font-size: clamp(1.95rem, 8.6vw, 2.75rem); margin-bottom: .9rem; }
       .reach-lead { font-size: 1.06rem; }
       .reach-stats { margin-top: 1.6rem; gap: 0 1.75rem; }
@@ -644,7 +646,9 @@
         background: linear-gradient(90deg, rgba(118, 89, 250, 0), var(--reach-glow-a) 30%, var(--reach-glow-b) 50%, var(--reach-glow-a) 70%, rgba(118, 89, 250, 0));
         transform-origin: center;
       }
-      .reach-globe { position: relative; inset: auto; transform: none; justify-self: center; width: 100%; max-width: 460px; aspect-ratio: 1; margin-top: 1rem; }
+      /* The sphere fills 76% of its square, so the bottom 12% is empty: pull the strip up over it, so the space
+         under the globe is the strip's own 48px whatever the screen's width. */
+      .reach-globe { position: relative; inset: auto; transform: none; justify-self: center; width: 100%; max-width: 460px; aspect-ratio: 1; margin-top: 1rem; margin-bottom: calc(-.12 * min(100%, 460px)); }
     }
 
     /* What Listen has, in real numbers, each drawn above its figure. With the voice-cloning line under
@@ -981,11 +985,12 @@
       .inception-strip img { height: 54px; }
       .inception-strip p { font-size: 1rem; max-width: 32ch; }
       html[dir="rtl"] .inception-strip p { font-size: 1.04rem; }
-      .reach ~ .inception-strip { margin-top: .5rem; padding-top: 0; }
+      .reach ~ .inception-strip { margin-top: 48px; padding-top: 0; }
     }
     @media (max-width: 640px) {
       .inception-strip { margin-top: 2.1rem; }
-      .reach ~ .inception-strip { margin-top: .5rem; }
+      .reach ~ .inception-strip { margin-top: 48px; }
+      .reach { padding-top: 1.5rem; } /* phones: 48px under the hero, whose own space below is smaller here */
       /* Arabic fits on two even lines on a phone at this size. */
       html[dir="rtl"] .inception-strip p { font-size: .96rem; max-width: none; }
     }
