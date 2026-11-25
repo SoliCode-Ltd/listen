@@ -222,6 +222,10 @@ $quantile = function (array $values, float $q): float {
 
 // MEMBER (an email or a member id): only that member's voices, e.g. the listening test's on staging.
 $member = trim((string) getenv('MEMBER'));
+// MEMBER=spread: every member's voices of two minutes or more, at most four of one voice,
+// so the newest are not all one member's batch with one voice.
+$spreadOut = $member === 'spread';
+$member = $spreadOut ? '' : $member;
 $memberId = $member === '' ? null : (ctype_digit($member) ? (int) $member : (int) DB::table('users')->where('email', $member)->value('id'));
 if ($member !== '') {
     echo $memberId ? "Only member {$memberId}'s voices.\n" : "No such member.\n";
@@ -231,14 +235,15 @@ $voices = AudioGeneration::query()
     ->where('voice_tier', 'hd')
     ->where('tts_provider', 'gemini')
     ->where('is_dialogue', false)
-    ->where('duration_seconds', '>=', $member === '' ? 75 : 30)
+    ->where('duration_seconds', '>=', $spreadOut ? 120 : ($member === '' ? 75 : 30))
     ->whereNotNull('audio_path')
     ->when($member !== '', fn ($q) => $q->where('user_id', $memberId ?: 0))
     ->orderByDesc('id')
-    ->limit($limit * 4)
+    ->limit($limit * ($spreadOut ? 30 : 4))
     ->get(['id', 'input_text', 'audio_path', 'duration_seconds', 'settings_snapshot', 'speed', 'dialect', 'tts_model', 'voice_name', 'created_at']);
 
 $across = $within = $retakes = [];
+$perVoice = [];
 $joinsMatched = $joinsChecked = 0;
 $rows = [];
 foreach ($voices as $g) {
@@ -263,6 +268,10 @@ foreach ($voices as $g) {
         $expected += mb_strlen($part['text']) > $voiceChars ? count(TextChunker::pieces($part['text'], $voiceChars, 'mb_strlen', $parallel)) : 1;
     }
     if ($expected < 2) {
+        continue;
+    }
+
+    if ($spreadOut && ($perVoice[(string) $g->voice_name] = ($perVoice[(string) $g->voice_name] ?? 0) + 1) > 4) {
         continue;
     }
 
