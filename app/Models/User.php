@@ -9,13 +9,16 @@ use App\Support\MailboxKey;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
 use Laravel\Passport\Contracts\OAuthenticatable;
@@ -102,6 +105,45 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
         'api_key_hash',
         'apple_refresh_token',
     ];
+
+    /** The longest picture address kept, once the column takes long ones (its migration); 255 until then. */
+    public const AVATAR_MAX = 2048;
+
+    public const AVATAR_LIMIT_CACHE = 'users.google_avatar.limit';
+
+    /**
+     * The member's Google picture: an address Google gives, which can be far
+     * longer than most. One the column cannot hold is left out (the member
+     * gets their initial) instead of failing the sign-up.
+     */
+    protected function googleAvatar(): Attribute
+    {
+        return Attribute::make(set: static fn (mixed $value): ?string => self::avatarThatFits($value));
+    }
+
+    /** The address as it can be stored, or null when it is empty or too long for the column. */
+    public static function avatarThatFits(mixed $value): ?string
+    {
+        if (! is_string($value) || ($value = trim($value)) === '') {
+            return null;
+        }
+
+        return mb_strlen($value) <= self::avatarLimit() ? $value : null;
+    }
+
+    /** What the column holds on this server: read once a day, and again when its migration runs. */
+    private static function avatarLimit(): int
+    {
+        try {
+            return (int) Cache::remember(self::AVATAR_LIMIT_CACHE, now()->addDay(), static function (): int {
+                $type = strtolower((string) Schema::getColumnType('users', 'google_avatar'));
+
+                return str_contains($type, 'text') ? self::AVATAR_MAX : 255;
+            });
+        } catch (\Throwable) {
+            return 255;
+        }
+    }
 
     public function planSubscriptions(): HasMany
     {

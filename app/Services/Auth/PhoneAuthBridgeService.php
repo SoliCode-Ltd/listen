@@ -214,7 +214,9 @@ class PhoneAuthBridgeService
             throw new RuntimeException('firebase_uid_mismatch');
         }
 
-        if ($photoUrl && $photoUrl !== '' && $user->google_avatar !== $photoUrl) {
+        // A picture address the column cannot hold keeps the one the member has.
+        $photoUrl = User::avatarThatFits($photoUrl);
+        if ($photoUrl !== null && $user->google_avatar !== $photoUrl) {
             $attributes['google_avatar'] = $photoUrl;
         }
 
