@@ -88,20 +88,14 @@ foreach (range('A', 'Z') as $a) {
 }
 echo 'Countries checked: ', count($countries), "\n\n";
 
-// A written price read back as a number, with the formatter that wrote it.
-$readBack = function (string $written, string $currency, string $locale): ?float {
-    $fmt = new NumberFormatter($locale === 'ar' ? ($currency === 'USD' ? 'en_US' : ($currency === 'EGP' ? 'ar_EG@numbers=latn' : 'ar@numbers=latn')) : 'en_US', NumberFormatter::CURRENCY);
-    $clean = str_replace("\u{200F}", '', $written);
-    $cur = '';
-    $value = $fmt->parseCurrency($clean, $cur);
-    if ($value === false) {
-        // The number alone, when the currency's sign is not one the parser reads back.
-        $digits = preg_replace('/[^0-9.]/', '', str_replace(',', '', $clean));
-
-        return $digits === '' ? null : (float) $digits;
+// A written price read back as a number: the first number in it, whatever symbol is around
+// it ("₺1,433.00", "kr. 15.00", "S/ 15.00", "15.00 ر.س."). Grouping commas are dropped.
+$readBack = function (string $written): ?float {
+    if (preg_match('/\d[\d,]*(?:\.\d+)?/', $written, $m) !== 1) {
+        return null;
     }
 
-    return (float) $value;
+    return (float) str_replace(',', '', $m[0]);
 };
 
 $problems = [];
@@ -119,6 +113,7 @@ foreach ($countries as $code => $name) {
         $problems[] = "{$code}: taken for {$context['country_code']}";
     }
     $first = $pricing->convertedQuoteFromUsd($plans[0]['monthly'], 'monthly', $context, 'stripe', 'en');
+    $firstAr = $pricing->convertedQuoteFromUsd($plans[0]['monthly'], 'monthly', $context, 'stripe', 'ar');
     $currency = (string) $first['currency'];
     $wanted = (string) ($context['currency'] ?? '');
     if ($currency !== $wanted) {
@@ -127,6 +122,7 @@ foreach ($countries as $code => $name) {
     $rate = $rateOf($currency);
     $byCurrency[$currency]['countries'][] = $code;
     $byCurrency[$currency]['rate'] = $rate;
+    $byCurrency[$currency]['written'] = '"'.str_replace(["\u{200F}", "\u{00A0}"], ['', ' '], (string) $first['amount_formatted']).'" / "'.str_replace(["\u{200F}", "\u{00A0}"], ['', ' '], (string) $firstAr['amount_formatted']).'"';
     if ($currency !== 'USD' && isset($second[$currency]) && $second[$currency] > 0 && $rate > 0) {
         $gap = $rate / $second[$currency] - 1;
         if (abs($gap) > 0.03) {
@@ -149,7 +145,7 @@ foreach ($countries as $code => $name) {
                 if ($shown < $expected - 0.011 || $shown > $expected + $slack) {
                     $problems[] = sprintf('%s %s %s %s: shows %.2f %s, the dollar price times the rate is %.2f (%.2fx)', $code, $plan['slug'], $cycle, $locale, $shown, $currency, $expected, $expected > 0 ? $shown / $expected : 0);
                 }
-                $back = $readBack((string) $quote['amount_formatted'], $currency, $locale);
+                $back = $readBack((string) $quote['amount_formatted']);
                 // The written price may round to the currency's own digits (no cents for yen).
                 $fmt = new NumberFormatter('en_US@currency='.$currency, NumberFormatter::CURRENCY);
                 $unit = 10 ** -max(0, (int) $fmt->getAttribute(NumberFormatter::FRACTION_DIGITS));
@@ -162,7 +158,7 @@ foreach ($countries as $code => $name) {
                         $problems[] = "{$code} {$plan['slug']} yearly {$locale}: {$perMonth} a month for {$quote['amount_minor']} a year";
                     }
                 }
-                if ($code === 'SA' || $code === 'YE' || $code === 'JP' || $code === 'KW' || $code === 'DE' || $code === 'MR') {
+                if (in_array($code, ['SA', 'YE', 'JP', 'KW', 'DE', 'MR', 'TR', 'PK', 'NG', 'BG', 'AR'], true)) {
                     $byCurrency[$currency]['examples'][$plan['slug'].' '.$cycle.' '.$locale] = (string) $quote['amount_formatted'];
                 }
             }
@@ -173,9 +169,9 @@ foreach ($countries as $code => $name) {
 echo "== Currencies shown ==\n";
 ksort($byCurrency);
 foreach ($byCurrency as $currency => $row) {
-    printf("  %s  rate %s  %d countries: %s\n", $currency, rtrim(rtrim(number_format($row['rate'], 4, '.', ''), '0'), '.'), count($row['countries']), implode(' ', $row['countries']));
+    printf("  %s  rate %s  written %s  %d countries: %s\n", $currency, rtrim(rtrim(number_format($row['rate'], 4, '.', ''), '0'), '.'), $row['written'] ?? '-', count($row['countries']), implode(' ', $row['countries']));
 }
-echo "\n== Examples (Saudi Arabia, Yemen, Japan, Kuwait, Germany, Mauritania) ==\n";
+echo "\n== Examples (Saudi Arabia, Yemen, Japan, Kuwait, Germany, Mauritania, Turkey, Pakistan, Nigeria, Bulgaria, Argentina) ==\n";
 foreach ($byCurrency as $currency => $row) {
     foreach ($row['examples'] ?? [] as $what => $written) {
         echo "  {$currency}  {$what}: {$written}\n";
